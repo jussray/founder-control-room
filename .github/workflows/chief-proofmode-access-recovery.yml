@@ -140,6 +140,7 @@ jobs:
           node --test scripts/fcr-cloudflare-bridge-contract.node-test.mjs
 
       - name: Require configured Chief service-token identity before repair
+        id: selector
         if: inputs.mode == 'repair'
         env:
           CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID: ${{ secrets.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID || secrets.CLOUDFLARE_ACCESS_CLIENT_ID || vars.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID || vars.CLOUDFLARE_ACCESS_CLIENT_ID }}
@@ -161,6 +162,7 @@ jobs:
         run: node scripts/reconcile-chief-proofmode-access.mjs >/dev/null 2>&1
 
       - name: Apply exact-host Chief Service Auth with dedicated admin authority
+        id: apply
         if: inputs.mode == 'repair'
         env:
           CLOUDFLARE_ACCESS_ADMIN_API_TOKEN: ${{ secrets.CLOUDFLARE_ACCESS_ADMIN_API_TOKEN }}
@@ -168,12 +170,17 @@ jobs:
           CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID: ${{ vars.CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID || vars.CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID }}
         shell: bash
         run: |
-          set -euo pipefail
+          set +e
           node scripts/reconcile-chief-proofmode-access.mjs >/dev/null 2>&1
-          cp test-results/chief-proofmode-access-recovery.json test-results/chief-proofmode-access-mutation.json
+          status=$?
+          set -e
+          if [[ -f test-results/chief-proofmode-access-recovery.json ]]; then
+            cp test-results/chief-proofmode-access-recovery.json test-results/chief-proofmode-access-mutation.json
+          fi
+          exit "$status"
 
       - name: Re-read repaired policy with provider authority
-        if: inputs.mode == 'repair'
+        if: ${{ always() && inputs.mode == 'repair' && steps.selector.outcome == 'success' }}
         env:
           CHIEF_ACCESS_MODE: check
           CLOUDFLARE_ACCESS_API_TOKEN: ${{ secrets.CLOUDFLARE_ACCESS_ADMIN_API_TOKEN }}
@@ -221,26 +228,35 @@ jobs:
                 or . == "access-scope-not-repair-eligible"
                 or . == "provider-read-credential-missing"
                 or . == "provider-read-failed"
+                or . == "provider-write-outcome-unknown"
+                or . == "provider-write-verification-failed"
                 or . == "bounded-check-failed";
+              def allowed_mutation_outcome: . == "none" or . == "performed" or . == "unknown";
               length == 1 and (.[0]
                 | type == "object"
-                and .schemaVersion == 1
+                and .schemaVersion == 2
                 and .scope == "chief-proofmode-access-recovery"
                 and (.observedAt | iso8601)
                 and (.mode == "check" or .mode == "repair")
                 and (.state == "configured" or .state == "blocked")
-                and (.mutationPerformed | type == "boolean")
+                and (.mutationOutcome | allowed_mutation_outcome)
+                and (
+                  if .mutationOutcome == "none" then .mutationPerformed == false
+                  elif .mutationOutcome == "performed" then .mutationPerformed == true
+                  else .mutationPerformed == null
+                  end
+                )
                 and .targetOrigin == $target
                 and (
                   if .state == "configured" then
-                    (.accessScope | allowed_scope)
+                    .mutationOutcome != "unknown"
+                    and (.accessScope | allowed_scope)
                     and (.applicationId | type == "string" and length > 0 and length <= 200)
                     and (.policyId == null or (.policyId | type == "string" and length <= 200))
                     and (.serviceTokenId | type == "string" and length > 0 and length <= 200)
                     and (.reasonCode == null)
                   else
-                    .mutationPerformed == false
-                    and (.reasonCode | allowed_reason)
+                    (.reasonCode | allowed_reason)
                     and (.accessScope == null)
                     and (.applicationId == null)
                     and (.policyId == null)
@@ -274,7 +290,7 @@ jobs:
               fi
               echo
               echo '```json'
-              jq -s '.[0] | if .state == "blocked" then {schemaVersion, scope, observedAt, mode, state, mutationPerformed, targetOrigin, reasonCode} else {schemaVersion, scope, observedAt, mode, state, mutationPerformed, targetOrigin, accessScope, applicationId, policyId, serviceTokenId} end' "$current_receipt"
+              jq -s '.[0] | if .state == "blocked" then {schemaVersion, scope, observedAt, mode, state, mutationOutcome, mutationPerformed, targetOrigin, reasonCode} else {schemaVersion, scope, observedAt, mode, state, mutationOutcome, mutationPerformed, targetOrigin, accessScope, applicationId, policyId, serviceTokenId} end' "$current_receipt"
               echo '```'
             fi
 
@@ -285,7 +301,7 @@ jobs:
                 echo '- Mutation receipt: `present`'
                 echo
                 echo '```json'
-                jq -s '.[0] | if .state == "blocked" then {schemaVersion, scope, observedAt, mode, state, mutationPerformed, targetOrigin, reasonCode} else {schemaVersion, scope, observedAt, mode, state, mutationPerformed, targetOrigin, accessScope, applicationId, policyId, serviceTokenId} end' "$mutation_receipt"
+                jq -s '.[0] | if .state == "blocked" then {schemaVersion, scope, observedAt, mode, state, mutationOutcome, mutationPerformed, targetOrigin, reasonCode} else {schemaVersion, scope, observedAt, mode, state, mutationOutcome, mutationPerformed, targetOrigin, accessScope, applicationId, policyId, serviceTokenId} end' "$mutation_receipt"
                 echo '```'
               fi
             fi

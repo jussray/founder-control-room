@@ -364,6 +364,62 @@ test('repair creates exactly one specific non-identity service-token policy', as
   assert.equal('any_valid_service_token' in body.include[0], false);
 });
 
+test('repair marks transport failure after policy POST as mutation outcome unknown', async () => {
+  const routed = routeFetch({
+    serviceTokens: [activeToken],
+    apps: [exactPublicApp],
+    policiesByApp: { [exactPublicApp.id]: [] },
+  });
+  const fetchImpl = async (url, init = {}) => {
+    if (init.method === 'POST') {
+      routed.calls.push({ url: String(url), init });
+      throw new Error('socket reset after request write');
+    }
+    return routed.fetchImpl(url, init);
+  };
+
+  await assert.rejects(
+    ensureChiefProofModeAccessPolicy({
+      ...baseArgs,
+      mode: 'repair',
+      apiToken: ADMIN_TOKEN,
+      fetchImpl,
+    }),
+    (error) => {
+      assert.equal(error.chiefAccessMutationOutcome, 'unknown');
+      assert.equal(classifyChiefAccessError(error), 'provider-write-outcome-unknown');
+      return true;
+    },
+  );
+  assert.equal(routed.calls.filter(({ init }) => init.method === 'POST').length, 1);
+});
+
+test('repair marks successful POST with invalid returned policy shape as mutation performed', async () => {
+  const routed = routeFetch({
+    serviceTokens: [activeToken],
+    apps: [exactPublicApp],
+    policiesByApp: { [exactPublicApp.id]: [] },
+    createByApp: {
+      [exactPublicApp.id]: { id: 'policy-new', decision: 'allow', include: [] },
+    },
+  });
+
+  await assert.rejects(
+    ensureChiefProofModeAccessPolicy({
+      ...baseArgs,
+      mode: 'repair',
+      apiToken: ADMIN_TOKEN,
+      fetchImpl: routed.fetchImpl,
+    }),
+    (error) => {
+      assert.equal(error.chiefAccessMutationOutcome, 'performed');
+      assert.equal(classifyChiefAccessError(error), 'provider-write-verification-failed');
+      return true;
+    },
+  );
+  assert.equal(routed.calls.filter(({ init }) => init.method === 'POST').length, 1);
+});
+
 test('provider credential appears only in Authorization header', async () => {
   const { fetchImpl, calls } = routeFetch({
     serviceTokens: [activeToken],

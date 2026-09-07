@@ -42,13 +42,14 @@ test('recovery keeps repair selector mandatory while check may discover one exis
   const selectorStep = recoveryWorkflow.match(
     /- name: Require configured Chief service-token identity before repair([\s\S]*?)- name: Inspect current Chief Service Auth with dedicated read authority/,
   )?.[1] ?? '';
+  assert.match(selectorStep, /id: selector/);
   assert.match(selectorStep, /if: inputs\.mode == 'repair'/);
   assert.match(selectorStep, /-z "\$CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID" && -z "\$CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID"/);
   assert.match(selectorStep, /repair requires CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID/);
   assert.match(selectorStep, /protected selector in the FCR production environment/);
 
   assert.match(recoveryWorkflow, /- name: Inspect current Chief Service Auth with dedicated read authority\n\s+if: inputs\.mode == 'check'/);
-  assert.match(recoveryWorkflow, /- name: Apply exact-host Chief Service Auth with dedicated admin authority\n\s+if: inputs\.mode == 'repair'/);
+  assert.match(recoveryWorkflow, /- name: Apply exact-host Chief Service Auth with dedicated admin authority\n\s+id: apply\n\s+if: inputs\.mode == 'repair'/);
   assert.match(recoveryWorkflow, /current_main.*EXPECTED_HEAD_SHA/s);
 
   assert.match(reconciler, /discoverBoundServiceTokenId/);
@@ -112,6 +113,26 @@ test('raw provider receipts stay ephemeral and provider commands are suppressed 
   assert.doesNotMatch(artifactStep, /chief-proofmode-access-mutation\.json/);
 });
 
+test('repair preserves uncertain mutation receipt and rereads provider state before any retry', () => {
+  const applyStep = recoveryWorkflow.match(
+    /- name: Apply exact-host Chief Service Auth with dedicated admin authority([\s\S]*?)- name: Re-read repaired policy with provider authority/,
+  )?.[1] ?? '';
+  const rereadStep = recoveryWorkflow.match(
+    /- name: Re-read repaired policy with provider authority([\s\S]*?)- name: Return sanitized Chief Access receipt to founder control issue/,
+  )?.[1] ?? '';
+
+  assert.match(applyStep, /set \+e/);
+  assert.match(applyStep, /status=\$\?/);
+  assert.match(applyStep, /chief-proofmode-access-mutation\.json/);
+  assert.match(applyStep, /exit "\$status"/);
+  assert.match(rereadStep, /always\(\)/);
+  assert.match(rereadStep, /steps\.selector\.outcome == 'success'/);
+  assert.match(rereadStep, /CHIEF_ACCESS_MODE: check/);
+  assert.match(reconciler, /provider-write-outcome-unknown/);
+  assert.match(reconciler, /provider-write-verification-failed/);
+  assert.match(reconciler, /mutationOutcome/);
+});
+
 test('public receipt explicitly keeps browser/runtime proof separate', () => {
   const returnStep = recoveryWorkflow.match(
     /- name: Return sanitized Chief Access receipt to founder control issue([\s\S]*?)- name: Upload sanitized Chief Access evidence/,
@@ -121,6 +142,9 @@ test('public receipt explicitly keeps browser/runtime proof separate', () => {
   assert.match(returnStep, /Current provider truth: `UNKNOWN`/);
   assert.match(returnStep, /Current provider truth: `BLOCKED`/);
   assert.match(returnStep, /\.state == "configured" or \.state == "blocked"/);
+  assert.match(returnStep, /schemaVersion == 2/);
+  assert.match(returnStep, /mutationOutcome/);
+  assert.match(returnStep, /provider-write-outcome-unknown/);
   assert.match(returnStep, /reasonCode/);
   assert.match(returnStep, /single-document|length == 1/);
   assert.doesNotMatch(returnStep, /cat "\$current_receipt"/);
@@ -128,13 +152,15 @@ test('public receipt explicitly keeps browser/runtime proof separate', () => {
   assert.doesNotMatch(returnStep, /error\.message|rawError|errorMessage/);
 });
 
-test('blocked diagnostics are allowlisted and cannot become provider mutation authority', () => {
+test('blocked diagnostics preserve none, performed, or unknown mutation truth without granting authority', () => {
   assert.match(reconciler, /BLOCKED_REASON_CODES/);
   assert.match(reconciler, /state: 'blocked'/);
-  assert.match(reconciler, /mutationPerformed: false/);
+  assert.match(reconciler, /mutationOutcomeForError/);
+  assert.match(reconciler, /mutationPerformed/);
   assert.match(reconciler, /reasonCode/);
   assert.match(recoveryWorkflow, /allowed_reason/);
-  assert.match(recoveryWorkflow, /\.mutationPerformed == false/);
+  assert.match(recoveryWorkflow, /allowed_mutation_outcome/);
+  assert.match(recoveryWorkflow, /\.mutationPerformed == null/);
 });
 
 test('dedicated recovery documentation keeps source, provider, and browser truth separate', () => {
