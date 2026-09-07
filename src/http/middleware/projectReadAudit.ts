@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { NextFunction, Response } from 'express';
 import { supabase } from '../../lib/supabaseClient.js';
-import { requireFounder, type FounderRequest } from './requireFounder.js';
+import type { FounderRequest } from './requireFounder.js';
 import { resolveActiveWorkspace, WorkspaceAccessError } from '../workspaceContext.js';
 
 type JsonRecord = Record<string, unknown>;
@@ -100,6 +100,7 @@ function projectIdFromBody(body: unknown): string | null {
 
 async function authenticateFounder(req: FounderRequest, res: Response): Promise<boolean> {
   if (req.founder) return true;
+  const { requireFounder } = await import('./requireFounder.js');
   let authenticated = false;
   await requireFounder(req, res, () => {
     authenticated = true;
