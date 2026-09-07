@@ -272,7 +272,8 @@ test('foreign-named bare apex bypass is accepted as Cloudflare whole-site semant
   assert.equal(receipt.managedApplicationId, null);
 });
 
-test('foreign subpath remains narrower than the whole-site contract and stays blocked', async () => {
+test('foreign subpath reads bypass semantics before the whole-site scope block', async () => {
+  const requests = [];
   await assert.rejects(
     reconcileFcrPublicAccessZone({
       env: readEnv,
@@ -282,9 +283,64 @@ test('foreign subpath remains narrower than the whole-site contract and stays bl
           name: 'narrow app',
           destinations: [{ type: 'public', uri: `${FCR_PUBLIC_ZONE}/admin` }],
         }],
+        policiesByApp: { 'foreign-subpath': [bypassPolicy()] },
+        onRequest(request) {
+          requests.push(request);
+        },
       }),
     }),
-    (error) => error?.classification === 'existing-public-access-app-requires-review',
+    (error) => error?.classification === 'existing-public-access-app-requires-review'
+      && error?.alreadyExempt === true,
+  );
+  assert.ok(requests.some((request) => request.url.includes('/access/apps/foreign-subpath/policies?')));
+});
+
+test('foreign multi-destination app reads Everyone bypass before destination-scope block', async () => {
+  const requests = [];
+  await assert.rejects(
+    reconcileFcrPublicAccessZone({
+      env: readEnv,
+      fetchImpl: fakeFetch({
+        applications: [{
+          id: 'foreign-multi',
+          name: 'existing multi app',
+          destinations: [
+            { type: 'public', uri: `${FCR_PUBLIC_ZONE}/*` },
+            { type: 'worker', uri: 'existing-worker' },
+          ],
+        }],
+        policiesByApp: { 'foreign-multi': [bypassPolicy()] },
+        onRequest(request) {
+          requests.push(request);
+        },
+      }),
+    }),
+    (error) => error?.classification === 'existing-public-access-app-requires-review'
+      && error?.alreadyExempt === true,
+  );
+  assert.ok(requests.some((request) => request.url.includes('/access/apps/foreign-multi/policies?')));
+});
+
+test('foreign multi-destination app reports missing Everyone bypass before destination-scope block', async () => {
+  await assert.rejects(
+    reconcileFcrPublicAccessZone({
+      env: readEnv,
+      fetchImpl: fakeFetch({
+        applications: [{
+          id: 'foreign-multi',
+          name: 'existing multi app',
+          destinations: [
+            { type: 'public', uri: `${FCR_PUBLIC_ZONE}/*` },
+            { type: 'worker', uri: 'existing-worker' },
+          ],
+        }],
+        policiesByApp: {
+          'foreign-multi': [{ decision: 'allow', include: [{ everyone: {} }], require: [], exclude: [] }],
+        },
+      }),
+    }),
+    (error) => error?.classification === 'existing-public-access-app-requires-review'
+      && error?.alreadyExempt === false,
   );
 });
 
@@ -304,7 +360,8 @@ test('foreign exact public destination without Everyone bypass blocks automatic 
         },
       }),
     }),
-    (error) => error?.classification === 'existing-public-access-app-requires-review',
+    (error) => error?.classification === 'existing-public-access-app-requires-review'
+      && error?.alreadyExempt === false,
   );
 });
 
