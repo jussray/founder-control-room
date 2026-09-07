@@ -1,0 +1,33 @@
+name: FCR Cloudflare Build Cost Policy Test
+
+on:
+  push:
+    branches:
+      - fix/cloudflare-build-cost-guard
+    paths:
+      - config/cloudflare-worker-git-authority-policy.json
+      - scripts/verify-cloudflare-build-cost-policy.mjs
+      - .github/workflows/cloudflare-build-cost-guard-apply.yml
+      - .github/workflows/cloudflare-build-cost-policy-test.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source-contract:
+    name: Prove FCR native-build cost policy
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out exact source head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Set up Node 24
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+      - name: Verify policy and mutation-lane contract
+        run: node scripts/verify-cloudflare-build-cost-policy.mjs
