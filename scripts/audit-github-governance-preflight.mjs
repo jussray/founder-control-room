@@ -78,6 +78,9 @@ export function rulesetSnapshot(ruleset, targetRef = 'main', defaultBranch = tar
   const targets = branchTargets(ruleset);
   const targetTokens = new Set([`refs/heads/${targetRef}`]);
   if (text(defaultBranch) === text(targetRef)) targetTokens.add('~DEFAULT_BRANCH');
+  const targetsRequestedRef = targets.some((target) => targetTokens.has(target));
+  const targetsOnlyRequestedRef = targetsRequestedRef
+    && targets.every((target) => targetTokens.has(target));
 
   return {
     id: ruleset?.id == null ? '' : String(ruleset.id),
@@ -85,7 +88,8 @@ export function rulesetSnapshot(ruleset, targetRef = 'main', defaultBranch = tar
     enforcement: text(ruleset?.enforcement),
     target: text(ruleset?.target),
     targetRefs: targets,
-    targetsRequestedRef: targets.some((target) => targetTokens.has(target)),
+    targetsRequestedRef,
+    targetsOnlyRequestedRef,
     ruleTypes,
     requirePullRequest: Boolean(pull),
     requiredApprovingReviewCount: Number(pull?.parameters?.required_approving_review_count ?? 0),
@@ -150,6 +154,7 @@ export function canonicalFloorSatisfied(
     && snapshot.enforcement === 'active'
     && snapshot.target === 'branch'
     && snapshot.targetsRequestedRef === true
+    && snapshot.targetsOnlyRequestedRef === true
     && exactRuleTypesMatch(snapshot, ['pull_request', 'code_scanning', 'non_fast_forward', 'deletion'])
     && snapshot.requirePullRequest === true
     && snapshot.requiredApprovingReviewCount === requiredNativeApprovals
@@ -171,6 +176,7 @@ export function freshnessFloorSatisfied(snapshot, expectedName = canonicalFreshn
     && snapshot.enforcement === 'active'
     && snapshot.target === 'branch'
     && snapshot.targetsRequestedRef === true
+    && snapshot.targetsOnlyRequestedRef === true
     && exactRuleTypesMatch(snapshot, ['required_status_checks'])
     && snapshot.requirePullRequest === false
     && snapshot.strictRequiredStatusChecks === true
