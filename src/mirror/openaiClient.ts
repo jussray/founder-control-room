@@ -1,6 +1,7 @@
 import {
   runStructuredJson,
   StructuredProviderError,
+  type StructuredJsonResult,
   type StructuredProviderConfig,
   type StructuredProviderName,
 } from '../aiRuntime/structuredProvider.js';
@@ -205,7 +206,7 @@ export function createOpenAiMirrorRunner(dependencies: OpenAiMirrorDependencies 
   const fetchFn = dependencies.fetchFn ?? fetch;
 
   return async function runMirror(input: MirrorRunInput): Promise<MirrorModelResult> {
-    let result;
+    let result: StructuredJsonResult;
     try {
       result = await runStructuredJson(
         providerChain(env),
@@ -237,7 +238,7 @@ export function createOpenAiMirrorRunner(dependencies: OpenAiMirrorDependencies 
         model: result.model,
         responseId: result.responseId,
         promptVersion: MIRROR_PROMPT_VERSION,
-        storedByProvider: false,
+        storedByProvider: result.provider === 'openai' ? false : null,
       },
     };
   };
