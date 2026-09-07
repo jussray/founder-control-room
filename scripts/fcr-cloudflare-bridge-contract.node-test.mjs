@@ -169,6 +169,9 @@ test('recovery returns only bounded sanitized fields to fixed issue and summary'
   assert.match(returnStep, /gh issue comment "\$RETURN_ISSUE" --repo "\$GITHUB_REPOSITORY" --body-file "\$public_receipt"/);
   assert.match(returnStep, /cat "\$public_receipt" >> "\$GITHUB_STEP_SUMMARY"/);
   assert.match(returnStep, /matchingApplicationCount/);
+  assert.match(returnStep, /destinationShape/);
+  assert.match(returnStep, /"single-subpath"/);
+  assert.match(returnStep, /"multi-destination"/);
   assert.match(returnStep, /credentialFailures/);
   assert.match(returnStep, /rollbackPerformed/);
   assert.match(returnStep, /apiVersionMatchesExpectedSha/);
@@ -176,7 +179,8 @@ test('recovery returns only bounded sanitized fields to fixed issue and summary'
   assert.match(returnStep, /Browser proof receipt: `malformed`/);
   assert.match(returnStep, /Provider truth: `UNKNOWN`/);
   assert.match(returnStep, /Browser proof: `UNKNOWN`/);
-  assert.doesNotMatch(returnStep, /matchingApplications/);
+  assert.match(returnStep, /\.matchingApplications/);
+  assert.doesNotMatch(returnStep, /\n\s*matchingApplications\s*[,}]/);
   assert.doesNotMatch(returnStep, /\n\s*managedApplicationId,?\s*\n/);
   assert.doesNotMatch(returnStep, /\n\s*finalOrigin,\s*\n/);
   assert.doesNotMatch(returnStep, /\n\s*error\s*\n/);
