@@ -3,15 +3,11 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 const workflow = readFileSync('.github/workflows/chief-proofmode-runtime-witness.yml', 'utf8');
+const selectorResolver = readFileSync('scripts/resolve-chief-proofmode-access-selector.mjs', 'utf8');
 const publisher = readFileSync('scripts/publish-chief-runtime-witness.mjs', 'utf8');
 const runtimeTest = readFileSync('e2e/chief-proofmode-runtime.pw.mjs', 'utf8');
 
 const FULL_SHA = /\^\[0-9a-f\]\{40\}\$/;
-
-function workflowEnvValue(name) {
-  const match = workflow.match(new RegExp(`^\\s{6}${name}:\\s*(.+)$`, 'm'));
-  return match?.[1]?.trim() ?? '';
-}
 
 test('trusted runtime witness executes only from exact FCR main under founder identity', () => {
   assert.match(workflow, /github\.ref == 'refs\/heads\/main'/);
@@ -33,20 +29,29 @@ test('witness lane is read-only for Cloudflare Access and cannot perform repair'
   assert.match(workflow, /node scripts\/reconcile-chief-proofmode-access\.mjs >\/dev\/null 2>&1/);
 });
 
-test('Access check and protected Playwright use the exact same Chief client identity source', () => {
-  const checkedClientId = workflowEnvValue('CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID');
-  const runtimeClientId = workflowEnvValue('CHIEF_RUNTIME_ACCESS_CLIENT_ID');
-  assert.ok(checkedClientId);
-  assert.equal(checkedClientId, runtimeClientId);
-  assert.match(checkedClientId, /secrets\.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID/);
-  assert.match(checkedClientId, /secrets\.CLOUDFLARE_ACCESS_CLIENT_ID/);
-  assert.match(checkedClientId, /vars\.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID/);
-  assert.match(checkedClientId, /vars\.CLOUDFLARE_ACCESS_CLIENT_ID/);
+test('Access check and protected Playwright use the exact same canonical Chief client identity resolver', () => {
+  const resolve = workflow.indexOf('Resolve canonical Chief Access selector without exposing identity');
+  const providerRead = workflow.indexOf('Re-read exact Chief Service Auth without mutation');
+  const credentialGate = workflow.indexOf('Require protected Chief runtime credential pair');
+  const playwright = workflow.indexOf('Run trusted protected Chief ProofMode Playwright');
+
+  assert.ok(resolve >= 0 && providerRead > resolve && credentialGate > providerRead && playwright > credentialGate);
+  assert.match(workflow, /run: node scripts\/resolve-chief-proofmode-access-selector\.mjs/);
+  assert.match(workflow, /CHIEF_ACCESS_CLIENT_ID_SECRET:\s*\$\{\{ secrets\.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID \}\}/);
+  assert.match(workflow, /CHIEF_ACCESS_CLIENT_ID_VARIABLE:\s*\$\{\{ vars\.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID \}\}/);
+  assert.match(workflow, /GENERIC_ACCESS_CLIENT_ID_SECRET:\s*\$\{\{ secrets\.CLOUDFLARE_ACCESS_CLIENT_ID \}\}/);
+  assert.match(workflow, /GENERIC_ACCESS_CLIENT_ID_VARIABLE:\s*\$\{\{ vars\.CLOUDFLARE_ACCESS_CLIENT_ID \}\}/);
+  assert.match(selectorResolver, /appendEnv\('CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID', resolved\.clientId\)/);
+  assert.match(selectorResolver, /appendEnv\('CHIEF_RUNTIME_ACCESS_CLIENT_ID', resolved\.clientId\)/);
+  assert.match(selectorResolver, /Chief-specific \$\{label\} conflicts with the generic fallback alias/);
 });
 
 test('protected runtime credentials stay in the FCR production secret lane', () => {
+  assert.match(workflow, /environment:\s*production/);
   assert.match(workflow, /CHIEF_RUNTIME_ACCESS_CLIENT_SECRET:\s*\$\{\{ secrets\.CHIEF_CLOUDFLARE_ACCESS_CLIENT_SECRET \|\| secrets\.CLOUDFLARE_ACCESS_CLIENT_SECRET \}\}/);
-  assert.match(workflow, /CHIEF_RUNTIME_ACCESS_CLIENT_ID:/);
+  assert.match(workflow, /CHIEF_ACCESS_CLIENT_ID_SECRET:\s*\$\{\{ secrets\.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID \}\}/);
+  assert.match(workflow, /GENERIC_ACCESS_CLIENT_ID_SECRET:\s*\$\{\{ secrets\.CLOUDFLARE_ACCESS_CLIENT_ID \}\}/);
+  assert.match(selectorResolver, /CHIEF_RUNTIME_ACCESS_CLIENT_ID/);
   assert.match(workflow, /Missing protected runtime credential/);
   assert.doesNotMatch(runtimeTest, /console\.log\([^)]*ACCESS_CLIENT_SECRET/i);
   assert.doesNotMatch(publisher, /CHIEF_RUNTIME_ACCESS_CLIENT_SECRET/);
