@@ -33,7 +33,7 @@ function commandBridgeRequestId(pathname: string): string | null {
 
 function commandBridgeProjectSlug(req: FounderRequest): string | null {
   const segments = req.path.split('/').filter(Boolean);
-  if (segments.length === 1 && segments[0] !== 'requests') {
+  if (segments[0] && segments[0] !== 'requests') {
     return stringValue(segments[0]) || null;
   }
   if (segments[0] === 'requests' && segments.length === 1 && req.method === 'POST') {
