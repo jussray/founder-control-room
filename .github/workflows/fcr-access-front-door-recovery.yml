@@ -296,7 +296,7 @@ jobs:
                   and .scope == "fcr-access-front-door-browser-proof"
                   and (.observedAt | iso8601)
                   and .expectedHeadSha == $expectedHeadSha
-                  and .requestedOrigin == "https://www.foundercontrolroom.org"
+                  and .requestedOrigin == "https://foundercontrolroom.org"
                   and (.finalOrigin | origin_or_null)
                   and (.navigationStatus | status_or_null)
                   and (.apiVersionStatus | status_or_null)
