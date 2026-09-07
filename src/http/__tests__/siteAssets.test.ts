@@ -52,6 +52,29 @@ describe('Founder Control Room Cloudflare topology', () => {
     expect(existsSync(resolve(repoRoot, 'public/portable-founder-console/index.html'))).toBe(true);
   });
 
+  it('binds the founder color language to meaning without replacing status colors', () => {
+    const styles = read('public/control-room/styles.css');
+    const stackRouter = read('public/control-room/stack-router.js');
+
+    expect(styles).toContain('--founder-core: #a78bfa');
+    expect(styles).toContain('--founder-truth: #60a5fa');
+    expect(styles).toContain('--founder-motion: #fb923c');
+    expect(styles).toContain('--founder-lift: #fde047');
+    expect(styles).toContain('button.primary { background: var(--founder-motion)');
+    expect(styles).toContain('.topbar .brand { color: var(--founder-core)');
+    expect(styles).toContain('.notice { color: var(--founder-truth)');
+
+    expect(stackRouter).toContain("strip.dataset.founderLanguage = 'v1'");
+    expect(stackRouter).toContain('data-signal="core"><strong>Core</strong><small>Decide</small>');
+    expect(stackRouter).toContain('data-signal="truth"><strong>Truth</strong><small>Evidence</small>');
+    expect(stackRouter).toContain('data-signal="motion"><strong>Motion</strong><small>Act</small>');
+    expect(stackRouter).toContain('data-signal="lift"><strong>Lift</strong><small>Outcome</small>');
+
+    expect(styles).toContain('.badge.ok { color: var(--ok); border-color: var(--ok); }');
+    expect(styles).toContain('.badge.warn { color: var(--warn); border-color: var(--warn); }');
+    expect(styles).toContain('.badge.danger { color: var(--danger); border-color: var(--danger); }');
+  });
+
   it('turns the founder stack into a five-lane execution loop', () => {
     const app = read('public/control-room/index.html');
     const stackRouter = read('public/control-room/stack-router.js');
