@@ -7,10 +7,11 @@ This probe exists to close the provider-observability gap for the governed Jira 
 A successful manual run proves only that, for the exact protected `main` SHA supplied to the workflow:
 
 1. the trusted workflow checked out that exact current `main` commit;
-2. the configured production FCR Jira ingress accepted a fresh authenticated observation for the secret-pinned probe issue;
-3. the deployed FCR runtime reported the same exact SHA;
-4. the Jira dispatcher reached the configured n8n provider path;
-5. n8n returned the canonical plan-bound Jira receipt that FCR independently recomputed and accepted.
+2. immediately before mutation, the workflow re-read remote `main` and confirmed it still equals the approved target SHA;
+3. before any Jira dispatch, the configured production FCR `/version` endpoint reported `service: founder-control-room` and the same exact `gitSha`;
+4. the configured production FCR Jira ingress accepted a fresh authenticated observation for the secret-pinned probe issue;
+5. the Jira dispatcher reached the configured n8n provider path and n8n returned the canonical plan-bound Jira receipt that FCR independently recomputed and accepted;
+6. the dispatch response still reported the same exact FCR runtime SHA after provider dispatch.
 
 The retained artifact is therefore **provider-dispatch proof**, not full end-to-end Jira outcome proof.
 
@@ -32,7 +33,7 @@ The workflow is `workflow_dispatch` only, runs only from `refs/heads/main`, and 
 
 The target issue is not caller-selectable. `JIRA_AUTOMATION_PROBE_ISSUE_KEY` is a production secret and the observation must name that exact issue. The probe accepts only a fresh `transitioned` observation for an **unassigned In Progress** probe issue, which maps to the already-approved assignment-only Jira action. It cannot request transitions, closure, deletion, project-setting mutation, arbitrary comments, arbitrary issue keys, or arbitrary provider URLs.
 
-The ingress URL must be HTTPS and target exactly `/ingest/jira-work-automation` with no query string, fragment, or embedded credentials.
+The ingress URL must be HTTPS and target exactly `/ingest/jira-work-automation` with no query string, fragment, or embedded credentials. The probe derives `/version` from that same HTTPS origin and must prove exact runtime identity there before it can send the mutation request.
 
 ## Required protected configuration
 
@@ -63,8 +64,9 @@ No secret value belongs in source, workflow inputs, retained artifacts, PR text,
 2. Re-read the secret-pinned Jira probe issue and construct a fresh observation reflecting its exact current status, assignee, and updated timestamp.
 3. Provide a concrete approval/test reference in `approval_reference`.
 4. Dispatch **Jira Work Automation Live Probe** from `main`.
-5. Retain the generated `jira-work-automation-live-probe-<sha>` artifact.
-6. Independently re-read the probe issue in Jira.
-7. Classify end-to-end success only if the Jira state matches the expected bounded assignment and the exact dispatch receipt/runtime proof remains valid.
+5. The workflow must re-read remote `main`, then the probe must prove `/version` serves the same exact SHA **before** the Jira mutation request is sent.
+6. Retain the generated `jira-work-automation-live-probe-<sha>` artifact.
+7. Independently re-read the probe issue in Jira.
+8. Classify end-to-end success only if the Jira state matches the expected bounded assignment and the exact dispatch receipt/runtime proof remains valid.
 
 If any SHA, issue state, provider configuration, or observation freshness changes, reacquire evidence instead of reusing predecessor proof.
