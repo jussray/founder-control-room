@@ -31,11 +31,8 @@ import { founderContentLifecycleRouter } from './founderContentLifecycle.js';
 
 export const n8nConveyorRouter = Router();
 n8nConveyorRouter.use(requireFounder);
-n8nConveyorRouter.use(
-  '/founder-content/lifecycle',
-  rateLimitFounderPermissions,
-  founderContentLifecycleRouter,
-);
+n8nConveyorRouter.use('/founder-content/lifecycle', rateLimitFounderPermissions);
+n8nConveyorRouter.use('/founder-content/lifecycle', founderContentLifecycleRouter);
 
 type JsonRecord = Record<string, unknown>;
 
