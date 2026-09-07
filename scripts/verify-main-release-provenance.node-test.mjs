@@ -31,18 +31,34 @@ function response(body, status = 200) {
   };
 }
 
-test('accepts exactly one merged PR bound to current main SHA', () => {
+test('accepts exactly one merged PR as provenance without claiming review or merge authorization', () => {
   assert.deepEqual(classifyMainReleaseProvenance({
     targetSha: SHA,
     currentMainSha: SHA,
     associatedPulls: [pr()],
   }), {
     ok: true,
-    reason: 'reviewed_pr_merge_provenance',
+    reason: 'pr_merge_provenance',
+    evidenceScope: 'pr_merge_only',
+    reviewAuthority: 'not_evaluated',
+    mergeAuthorization: 'not_evaluated',
     targetSha: SHA,
     pullRequestNumber: 42,
     mergedAt: '2026-08-25T12:00:00Z',
   });
+});
+
+test('PR association cannot impersonate reviewed provenance', () => {
+  const result = classifyMainReleaseProvenance({
+    targetSha: SHA,
+    currentMainSha: SHA,
+    associatedPulls: [pr()],
+  });
+
+  assert.equal(result.ok, true);
+  assert.notEqual(result.reason, 'reviewed_pr_merge_provenance');
+  assert.equal(result.reviewAuthority, 'not_evaluated');
+  assert.equal(result.mergeAuthorization, 'not_evaluated');
 });
 
 test('rejects a direct or otherwise unproven main commit', () => {
@@ -127,6 +143,25 @@ test('observes provider state and rejects missing release provenance', async () 
   });
   assert.equal(result.ok, false);
   assert.equal(result.reason, 'direct_or_unproven_main_commit');
+});
+
+test('provider observation preserves provenance-only scope for merged PRs', async () => {
+  const fetchImpl = async (url) => {
+    if (String(url).endsWith('/branches/main')) return response({ commit: { sha: SHA } });
+    if (String(url).endsWith(`/commits/${SHA}/pulls`)) return response([pr()]);
+    return response({}, 404);
+  };
+
+  const result = await observeMainReleaseProvenance({
+    repository: 'jussray/founder-control-room',
+    targetSha: SHA,
+    fetchImpl,
+    token: '',
+  });
+  assert.equal(result.ok, true);
+  assert.equal(result.reason, 'pr_merge_provenance');
+  assert.equal(result.reviewAuthority, 'not_evaluated');
+  assert.equal(result.mergeAuthorization, 'not_evaluated');
 });
 
 test('provider observation failure blocks instead of manufacturing green', async () => {
