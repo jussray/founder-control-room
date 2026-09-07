@@ -11,9 +11,7 @@ function read(path: string) {
 
 describe('Founder Control Room Cloudflare topology', () => {
   it('builds the browser frontend as a Cloudflare Pages artifact', () => {
-    const packageJson = JSON.parse(read('package.json')) as {
-      scripts?: Record<string, string>;
-    };
+    const packageJson = JSON.parse(read('package.json')) as { scripts?: Record<string, string> };
     const buildScript = read('scripts/build-pages.mjs');
 
     expect(packageJson.scripts?.['build:pages']).toBe('node scripts/build-pages.mjs');
@@ -24,25 +22,34 @@ describe('Founder Control Room Cloudflare topology', () => {
     expect(buildScript).toContain("'portable-founder-console/index.html'");
   });
 
-  it('provides a five-screen public front door into the founder-authenticated app', () => {
+  it('provides one public threshold into the founder-authenticated app', () => {
     const landing = read('public/index.html');
     const app = read('public/control-room/index.html');
     const bootstrap = read('public/control-room/opaque-session-bootstrap.js');
+    const entryFlow = read('public/control-room/entry-flow.js');
 
     expect(landing).toContain('<link rel="canonical" href="https://www.foundercontrolroom.org/" />');
-    expect(landing).toContain('href="https://www.foundercontrolroom.org/control-room/"');
-    expect(landing).toContain('href="https://www.foundercontrolroom.org/guardrails"');
-    expect(landing).not.toContain('href="/control-room/"');
-    expect(landing).toContain('data-bottom-nav="five-screen"');
-    for (const screen of ['home', 'control-room', 'chief', 'promptos', 'proof']) {
-      expect(landing).toContain(`data-public-screen="${screen}"`);
-      expect(landing).toContain(`data-nav-screen="${screen}"`);
-    }
-    expect(landing).toContain('Chief turns founder intent into governed execution.');
-    expect(landing).toContain('PromptOS is an intention compiler.');
-    expect(landing).toContain('Private projects, approvals, credentials, and operating evidence stay behind founder authentication.');
+    expect(landing).toContain('Move one thing forward.');
+    expect(landing).toContain('Turn an intention into an action you can prove.');
+    expect(landing).toContain('href="/control-room/"');
+    expect(landing.match(/Enter Control Room/g)?.length).toBe(1);
+    expect(landing).not.toContain('data-bottom-nav="five-screen"');
+    expect(landing).not.toContain('data-public-screen=');
+    expect(landing).not.toContain('Meet Chief');
+    expect(landing).not.toContain('PromptOS is an intention compiler.');
+
     expect(app).toContain('src="/control-room/opaque-session-bootstrap.js"');
+    expect(app).toContain('src="/control-room/stack-router.js"');
+    expect(app).toContain('src="/control-room/entry-flow.js"');
     expect(app).not.toContain('src="/control-room/app.js"');
+    expect(app).not.toContain('launch-dock');
+
+    expect(entryFlow).toContain("heading.textContent = 'Who are you?'");
+    expect(entryFlow).toContain("appendText(copy, 'h1', '', 'What do you want to move?')");
+    expect(entryFlow).toContain("fetch('/founder-os/preview'");
+    expect(entryFlow).toContain("action: 'plan'");
+    expect(entryFlow).toContain('Capability selection is the next handoff');
+
     expect(bootstrap).toContain("await import('/control-room/app.js')");
     expect(bootstrap).toContain("fetch('/auth/me'");
     expect(bootstrap).toContain("credentials: 'same-origin'");
@@ -52,38 +59,32 @@ describe('Founder Control Room Cloudflare topology', () => {
     expect(existsSync(resolve(repoRoot, 'public/portable-founder-console/index.html'))).toBe(true);
   });
 
-  it('turns the founder stack into a five-lane execution loop', () => {
+  it('keeps founder stack routing behind the authenticated shell', () => {
     const app = read('public/control-room/index.html');
     const stackRouter = read('public/control-room/stack-router.js');
+    const entryFlow = read('public/control-room/entry-flow.js');
 
-    expect(app).toContain('Every output fuels the next prompt');
-    expect(app).toContain('data-lane="chat"');
-    expect(app).toContain('data-lane="workflows"');
-    expect(app).toContain('data-lane="code"');
-    expect(app).toContain('data-lane="projects"');
-    expect(app).toContain('data-lane="skills"');
-    expect(app).toContain('Workflows output becomes the Code prompt');
-    expect(app).not.toContain('Cowork');
-    expect(app).not.toContain('data-lane="cowork"');
-    expect(app).toContain('Terminal build/test');
-    expect(app).toContain('href="/control-room/?tab=terminal"');
-    expect(app).toContain('Create / Add to Project');
-    expect(app).toContain('Consistent output becomes the next Chat prompt');
+    expect(app).not.toContain('Every output fuels the next prompt');
+    expect(app).not.toContain('data-lane="chat"');
+    expect(app).not.toContain('data-lane="workflows"');
+    expect(app).not.toContain('data-lane="code"');
+    expect(app).not.toContain('data-lane="projects"');
+    expect(app).not.toContain('data-lane="skills"');
     expect(app).toContain('src="/control-room/stack-router.js"');
+    expect(app).toContain('src="/control-room/entry-flow.js"');
 
     expect(stackRouter).toContain("const PENDING_TAB_KEY = 'fcr_pending_tab'");
     expect(stackRouter).toContain("'terminal'");
     expect(stackRouter).toContain('.tabs button[data-tab=');
     expect(stackRouter).toContain('new MutationObserver');
+    expect(entryFlow).toContain("const shell = document.querySelector('.shell')");
+    expect(entryFlow).toContain("const tabs = shell?.querySelector('.tabs')");
   });
 
-  it('routes Workflows through the current proof-bound founder content lifecycle', () => {
-    const app = read('public/control-room/index.html');
+  it('keeps the proof-bound founder content lifecycle available as an authenticated product surface', () => {
     const contentManager = read('public/control-room/content-manager.html');
     const playwrightProof = read('e2e/content-manager-proof.mjs');
 
-    expect(app).toContain('href="/control-room/content-manager.html"');
-    expect(app).toContain('Content manager');
     expect(contentManager).toContain('Workflow content lifecycle');
     expect(contentManager).not.toContain('Cowork');
     expect(contentManager).toContain('Proof → draft → review → approval → schedule → publish → metrics');
@@ -113,7 +114,6 @@ describe('Founder Control Room Cloudflare topology', () => {
 
   it('keeps browser API calls same-origin and binds them directly to the API Worker', () => {
     const proxy = read('public/_worker.js');
-
     expect(proxy).toContain("const API_ORIGIN = 'https://api.foundercontrolroom.org'");
     expect(proxy).toContain("const EXPECTED_API_SERVICE = 'founder-control-room'");
     expect(proxy).toContain('STATIC_FILE_PATTERN');
@@ -133,7 +133,6 @@ describe('Founder Control Room Cloudflare topology', () => {
 
   it('deploys one API Worker and keeps Pages out of Worker configuration', () => {
     const worker = read('wrangler.worker.toml');
-
     expect(worker).toContain('name = "founder-control-room"');
     expect(worker).toContain('pattern = "api.foundercontrolroom.org"');
     expect(worker).toContain('FOUNDER_API_URL = "https://foundercontrolroom.org"');
@@ -145,7 +144,6 @@ describe('Founder Control Room Cloudflare topology', () => {
 
   it('applies browser security headers to Pages assets', () => {
     const headers = read('public/_headers');
-
     expect(headers).toContain("Content-Security-Policy: default-src 'self'");
     expect(headers).toContain('X-Frame-Options: DENY');
     expect(headers).toContain('/control-room/*');
