@@ -26,9 +26,11 @@ import {
 } from '../../lib/n8nConveyorReadiness.js';
 import { FOUNDER_CONVEYOR_CONTRACT } from '../../lib/founderConveyorReceipt.js';
 import { requireFounder, type FounderRequest } from '../middleware/requireFounder.js';
+import { founderContentLifecycleRouter } from './founderContentLifecycle.js';
 
 export const n8nConveyorRouter = Router();
 n8nConveyorRouter.use(requireFounder);
+n8nConveyorRouter.use('/founder-content/lifecycle', founderContentLifecycleRouter);
 
 type JsonRecord = Record<string, unknown>;
 
