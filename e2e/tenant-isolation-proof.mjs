@@ -10,6 +10,9 @@ const BASE_URL = `http://127.0.0.1:${PORT}`;
 const FOUNDER_EMAIL = 'tenant-founder@example.com';
 const WORKSPACE_ID = 'tenant-workspace-a';
 const FOREIGN_WORKSPACE_ID = 'tenant-workspace-b';
+const FOREIGN_PROJECT_SLUG = 'foreign-project';
+const FOREIGN_MISSION_ID = 'tenant-foreign-mission';
+const FOREIGN_TERMINAL_RUN_ID = 'tenant-foreign-terminal-run';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = dirname(HERE);
 const BRIDGE_FILE = join(HERE, '.tenant-auth-bridge.json');
@@ -59,10 +62,16 @@ const server = spawn(
       FOUNDER_EMAIL,
       E2E_SEED_FOUNDER_EMAIL: FOUNDER_EMAIL,
       E2E_WORKSPACE_ID: WORKSPACE_ID,
+      E2E_SEED_FOREIGN_TENANT: 'true',
+      E2E_FOREIGN_WORKSPACE_ID: FOREIGN_WORKSPACE_ID,
+      E2E_FOREIGN_PROJECT_SLUG: FOREIGN_PROJECT_SLUG,
+      E2E_FOREIGN_MISSION_ID: FOREIGN_MISSION_ID,
+      E2E_FOREIGN_TERMINAL_RUN_ID: FOREIGN_TERMINAL_RUN_ID,
       E2E_AUTH_BRIDGE_FILE: BRIDGE_FILE,
       FOUNDER_SESSION_ENCRYPTION_KEY: Buffer.alloc(32, 17).toString('base64url'),
       FOUNDER_API_URL: BASE_URL,
       FOUNDER_ALLOWED_ORIGINS: BASE_URL,
+      CONTROL_ROOM_TERMINAL_ENABLED: 'true',
       PORT: String(PORT),
       NODE_ENV: 'development',
     },
@@ -121,12 +130,47 @@ try {
         'content-type': 'application/json',
         'x-fcr-workspace-id': foreignWorkspaceId,
       },
-      body: JSON.stringify({ slug: 'foreign-project', name: 'Foreign Project' }),
+      body: JSON.stringify({ slug: 'attacker-project', name: 'Attacker Project' }),
     });
     return { status: response.status, body: await response.json() };
   }, { foreignWorkspaceId: FOREIGN_WORKSPACE_ID });
 
   assert(foreignCreate.status === 403, 'foreign workspace project creation is rejected');
+
+  const foreignResourceChecks = await page.evaluate(async ({ projectSlug, missionId, runId }) => {
+    async function read(path) {
+      const response = await fetch(path, { credentials: 'same-origin' });
+      return { path, status: response.status, body: await response.json() };
+    }
+    async function mutate(path) {
+      const response = await fetch(path, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ actionType: 'merge', idempotencyKey: 'foreign-tenant-proof' }),
+      });
+      return { path, status: response.status, body: await response.json() };
+    }
+    return [
+      await read(`/projects/${projectSlug}/verification`),
+      await read(`/missions/${missionId}/council`),
+      await mutate(`/approvals/${missionId}/execute`),
+      await read(`/terminal/${projectSlug}/commands`),
+      await read(`/terminal/runs/${runId}`),
+    ];
+  }, {
+    projectSlug: FOREIGN_PROJECT_SLUG,
+    missionId: FOREIGN_MISSION_ID,
+    runId: FOREIGN_TERMINAL_RUN_ID,
+  });
+
+  for (const check of foreignResourceChecks) {
+    assert(check.status === 404, `${check.path} hides the foreign resource behind active-workspace ownership`);
+    assert(
+      /resource not found in the active workspace/i.test(String(check.body?.error ?? '')),
+      `${check.path} returns the tenant-safe not-found boundary`,
+    );
+  }
 
   await page.goto(`${BASE_URL}/control-room/`, { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('#new-project-form');
@@ -137,6 +181,10 @@ try {
   assert(
     (await page.locator('#project-list').innerText()).includes('Tenant Proof Project'),
     'active workspace can create and read its own project through the real UI',
+  );
+  assert(
+    !(await page.locator('#project-list').innerText()).includes('Foreign Project'),
+    'foreign seeded project never appears in the active founder project list',
   );
 
   const activeState = await page.evaluate(async () => {
