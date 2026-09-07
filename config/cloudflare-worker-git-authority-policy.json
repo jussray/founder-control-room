@@ -11,6 +11,27 @@
   ],
   "currentDesiredState": "non-promoting",
   "currentDesiredDeployCommand": "npx wrangler versions upload --config wrangler.worker.toml",
+  "buildWatchPaths": {
+    "mode": "enforced-cost-guard",
+    "pathIncludes": [
+      "*"
+    ],
+    "pathExcludes": [
+      ".agents/**",
+      ".ai/**",
+      ".github/**",
+      "artifacts/**",
+      "docs/**",
+      "e2e/**",
+      "skills/**",
+      "test/**",
+      "*.md"
+    ],
+    "purpose": "Only commits capable of changing the deployed Worker artifact should consume native Workers Build minutes.",
+    "mutationAuthority": "explicit-cloudflare-build-cost-guard-workflow-only",
+    "providerReadbackRequired": true,
+    "rollbackRequiredOnMismatch": true
+  },
   "policyRole": "desired-state-only",
   "canAuthorizeProviderMutation": false,
   "currentFounderIntent": {
