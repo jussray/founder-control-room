@@ -1,0 +1,56 @@
+name: FCR Cloudflare User Token Preflight
+
+on:
+  push:
+    branches:
+      - fix/cloudflare-build-cost-guard
+    paths:
+      - .github/workflows/cloudflare-user-token-preflight.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-token:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      CF_ACCOUNT_ID: 9b59861bd1747cf7525571b4c51d2aa0
+      CF_TOKEN: ${{ secrets.FCR_CLOUDFLARE_BUILDS_USER_TOKEN }}
+    steps:
+      - name: Verify Cloudflare user token and account read scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          const API = 'https://api.cloudflare.com/client/v4';
+          const token = String(process.env.CF_TOKEN || '').trim();
+          const accountId = String(process.env.CF_ACCOUNT_ID || '').trim();
+          if (!token) throw new Error('TOKEN_MISSING');
+          if (!/^[0-9a-f]{32}$/.test(accountId)) throw new Error('ACCOUNT_ID_INVALID_FORMAT');
+
+          const request = async (path) => {
+            const response = await fetch(`${API}${path}`, {
+              headers: { Authorization: `Bearer ${token}` },
+            });
+            const body = await response.json().catch(() => null);
+            return { response, body };
+          };
+          const summary = (body, status) => {
+            const errors = Array.isArray(body?.errors) ? body.errors : [];
+            return errors.map((e) => `${e?.code ?? 'unknown'}:${e?.message ?? 'provider error'}`).join('; ') || `HTTP ${status}`;
+          };
+
+          const verify = await request('/user/tokens/verify');
+          if (!verify.response.ok || verify.body?.success === false) {
+            throw new Error(`TOKEN_VERIFY_FAILED ${summary(verify.body, verify.response.status)}`);
+          }
+          console.log(`TOKEN_VERIFY_OK status=${verify.body?.result?.status ?? 'unknown'}`);
+
+          const scripts = await request(`/accounts/${accountId}/workers/scripts?per_page=1`);
+          if (!scripts.response.ok || scripts.body?.success === false) {
+            throw new Error(`WORKERS_READ_FAILED ${summary(scripts.body, scripts.response.status)}`);
+          }
+          console.log('WORKERS_READ_OK');
+          NODE
