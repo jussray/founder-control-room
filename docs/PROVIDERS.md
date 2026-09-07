@@ -72,6 +72,14 @@ CRM proof, deal-associated review tasks, notes, tickets, contacts, companies, an
 
 Founder Signal Engine tasks and notes must be associated with the `Founder Signal Engine` deal rather than created as floating records. HubSpot OAuth remains provider-held; never copy access tokens, customer data, vendor intelligence, mailbox contents, payment details, or order data into Control Room storage.
 
+## Shopify
+
+Shopify commerce is a provider boundary, not inherited founder authority. `src/providers/ShopifyReadOnlyProvider.ts` is a source-only read-only preflight bound to the exact Founder Control Room store identity: permanent Shopify domain `vercel-store-93a908b0-wcrkkq76.myshopify.com` plus branded primary domain `foundercontrolroom.org`. Another portfolio store, matching display name, app title, or developer identity cannot satisfy that boundary.
+
+Child apps are reconciled by provider-account identity, installation identity, app identity, complete scope inventory, observation freshness, and founder-approved declaration evidence. Installation alone is never approval. A reinstall under a different installation ID surfaces as `IDENTITY_DRIFT`; added or removed scopes surface as `SCOPE_DRIFT`; missing declaration surfaces as `UNDECLARED`; incomplete provider evidence is `UNKNOWN`; expired provider evidence is `STALE`. Even `CURRENT` is evidence-only and retains `authorityGranted: false`.
+
+The current source module accepts an already authenticated, sanitized provider snapshot. It performs no Shopify network request, persists no provider inventory as current truth, creates no `project_connections` row, exposes no credential, and provides no order, checkout, product, price, refund, app-installation, scope-change, or customer mutation path. A future runtime observer must re-read Shopify at the use boundary, exhaust pagination, keep credentials server-side/provider-held, and fail closed when provider state is unavailable, partial, stale, or identity-mismatched.
+
 ## Required handoff between providers
 
 Every handoff should state:
