@@ -202,13 +202,21 @@ function wholeSitePublicApplications(applications, zone) {
       .some((destination) => isWholeSitePublicDestination(destination, zone)));
 }
 
+function isExactManagedPublicApplication(application, zone) {
+  const destinations = Array.isArray(application?.destinations) ? application.destinations : [];
+  return clean(application?.name) === FCR_PUBLIC_ACCESS_APP_NAME
+    && destinations.length === 1
+    && isWholeSitePublicDestination(destinations[0], zone);
+}
+
 function exactManagedPublicApplications(applications, zone) {
-  return applications.filter((application) => {
-    const destinations = Array.isArray(application?.destinations) ? application.destinations : [];
-    return clean(application?.name) === FCR_PUBLIC_ACCESS_APP_NAME
-      && destinations.length === 1
-      && isWholeSitePublicDestination(destinations[0], zone);
-  });
+  return applications.filter((application) => isExactManagedPublicApplication(application, zone));
+}
+
+function namedManagedPublicApplications(applications) {
+  return applications.filter(
+    (application) => clean(application?.name) === FCR_PUBLIC_ACCESS_APP_NAME,
+  );
 }
 
 function errorWith(classification, message, fields = {}) {
@@ -222,7 +230,8 @@ async function readSourceState({ token, fetchImpl, sourceId, zone }) {
   const applications = await listApplications({ token, fetchImpl });
   const source = applications.find((application) => clean(application?.id) === sourceId) ?? null;
   const managed = exactManagedPublicApplications(applications, zone);
-  return { applications, source, managed };
+  const namedManaged = namedManagedPublicApplications(applications);
+  return { applications, source, managed, namedManaged };
 }
 
 function isWorkerOnly(application) {
@@ -419,9 +428,9 @@ export async function executeFcrPublicWorkerSplit({
         { mutationOutcome: 'unknown', sourceApplicationId: sourceId },
       );
     }
-    if (readback.managed.length === 1) {
+    if (readback.managed.length === 1 && readback.namedManaged.length === 1) {
       [managedApp] = readback.managed;
-    } else if (readback.managed.length === 0) {
+    } else if (readback.namedManaged.length === 0) {
       await restoreOriginalDestinations({
         token,
         fetchImpl,
@@ -439,7 +448,7 @@ export async function executeFcrPublicWorkerSplit({
     } else {
       throw errorWith(
         'split-public-create-reconcile-required',
-        'Provider readback found ambiguous managed public-app ownership after the create attempt.',
+        'Provider readback found a named public application whose exact split ownership or shape is ambiguous.',
         { mutationOutcome: 'unknown', sourceApplicationId: sourceId },
       );
     }
@@ -473,6 +482,7 @@ export async function executeFcrPublicWorkerSplit({
       expectedPolicyFingerprint: policyFingerprintBefore,
     }))
     || finalState.managed.length !== 1
+    || finalState.namedManaged.length !== 1
     || clean(finalState.managed[0]?.id) !== managedId) {
     throw errorWith(
       'split-final-readback-mismatch',
@@ -529,15 +539,23 @@ export async function rollbackFcrPublicWorkerSplit({
   }
 
   let state = await readSourceState({ token, fetchImpl, sourceId, zone: receipt.zone });
-  const managed = state.managed.filter((application) => clean(application?.id) === managedId);
-  if (managed.length > 1) {
+  const managedById = state.applications.filter(
+    (application) => clean(application?.id) === managedId,
+  );
+  if (managedById.length > 1) {
     throw errorWith(
       'split-rollback-managed-app-ambiguous',
       'Rollback cannot uniquely identify the run-created public application.',
     );
   }
 
-  if (managed.length === 1) {
+  if (managedById.length === 1) {
+    if (!isExactManagedPublicApplication(managedById[0], receipt.zone)) {
+      throw errorWith(
+        'split-rollback-managed-app-drift',
+        'The run-created public application still exists but its shape drifted; rollback refuses to infer safe deletion.',
+      );
+    }
     try {
       await deleteApplication({ token, fetchImpl, appId: managedId });
     } catch {
@@ -550,7 +568,7 @@ export async function rollbackFcrPublicWorkerSplit({
           { mutationOutcome: 'unknown' },
         );
       }
-      if (state.managed.some((application) => clean(application?.id) === managedId)) {
+      if (state.applications.some((application) => clean(application?.id) === managedId)) {
         throw errorWith(
           'split-rollback-public-delete-not-performed',
           'Provider readback proves the public application still exists; source restoration is blocked to avoid overlapping public ownership.',
@@ -561,7 +579,7 @@ export async function rollbackFcrPublicWorkerSplit({
   }
 
   state = await readSourceState({ token, fetchImpl, sourceId, zone: receipt.zone });
-  if (state.managed.some((application) => clean(application?.id) === managedId)) {
+  if (state.applications.some((application) => clean(application?.id) === managedId)) {
     throw errorWith(
       'split-rollback-public-delete-unverified',
       'Public application removal is not proven; source restoration is blocked.',
