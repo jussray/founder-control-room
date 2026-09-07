@@ -1,0 +1,276 @@
+name: FCR Cloudflare Build Cost Guard Apply
+
+on:
+  push:
+    branches:
+      - fix/cloudflare-build-cost-guard
+    paths:
+      - .github/workflows/cloudflare-build-cost-guard-apply.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fcr-cloudflare-build-cost-guard-apply
+  cancel-in-progress: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  apply-cost-guard:
+    name: Apply and verify FCR Worker build watch-path cost guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: production
+    outputs:
+      live_sha: ${{ steps.live_identity.outputs.live_sha }}
+    env:
+      CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CF_READ_TOKEN: ${{ secrets.FCR_CLOUDFLARE_BUILDS_USER_TOKEN }}
+      CF_WRITE_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CF_WORKER_NAME: founder-control-room
+    steps:
+      - name: Require bounded provider authority
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${CF_ACCOUNT_ID:-}" || {
+            echo 'CLOUDFLARE_ACCOUNT_ID is not configured.' >&2
+            exit 1
+          }
+          test -n "${CF_READ_TOKEN:-}" || {
+            echo 'FCR_CLOUDFLARE_BUILDS_USER_TOKEN is not configured.' >&2
+            exit 1
+          }
+          test -n "${CF_WRITE_TOKEN:-}" || {
+            echo 'CLOUDFLARE_API_TOKEN is not configured.' >&2
+            exit 1
+          }
+
+      - name: Capture live Worker identity before provider-setting mutation
+        id: live_identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          body="$(curl --silent --show-error --fail --connect-timeout 10 --max-time 20 https://api.foundercontrolroom.org/version)"
+          live_sha="$(jq -r '.gitSha // empty' <<<"$body")"
+          service="$(jq -r '.service // empty' <<<"$body")"
+          test "$service" = 'founder-control-room'
+          [[ "$live_sha" =~ ^[0-9a-f]{40}$ ]]
+          echo "live_sha=$live_sha" >> "$GITHUB_OUTPUT"
+          echo "Captured pre-mutation live SHA: $live_sha"
+
+      - name: Patch only production build watch paths and verify readback
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+
+          const API = 'https://api.cloudflare.com/client/v4';
+          const accountId = String(process.env.CF_ACCOUNT_ID || '').trim();
+          const workerName = String(process.env.CF_WORKER_NAME || '').trim();
+          const desiredPathIncludes = ['*'];
+          const desiredPathExcludes = [
+            '.agents/**',
+            '.ai/**',
+            '.github/**',
+            'artifacts/**',
+            'docs/**',
+            'e2e/**',
+            'skills/**',
+            'test/**',
+            '*.md',
+          ];
+
+          function unwrap(value) {
+            let token = String(value || '').trim().normalize('NFKC');
+            let previous;
+            do {
+              previous = token;
+              token = token.trim();
+              token = token.replace(/^[A-Z_][A-Z0-9_]*[\p{White_Space}\p{Cf}]*=[\p{White_Space}\p{Cf}]*/u, '');
+              const quoted = token.match(/^(["'])([\s\S]*)\1$/u);
+              if (quoted) token = quoted[2].trim();
+              token = token.replace(/^Bearer[\p{White_Space}\p{Cf}]+/iu, '');
+            } while (token !== previous);
+            token = token.replace(/[\p{White_Space}\p{Cf}]+/gu, '');
+            if (!/^[\x21-\x7e]+$/.test(token)) return '';
+            return token;
+          }
+
+          function cleanList(value) {
+            return [...new Set((Array.isArray(value) ? value : [])
+              .map((item) => String(item || '').trim())
+              .filter(Boolean))];
+          }
+
+          function sameSet(left, right) {
+            const a = [...cleanList(left)].sort();
+            const b = [...cleanList(right)].sort();
+            return a.length === b.length && a.every((value, index) => value === b[index]);
+          }
+
+          function providerError(payload, status) {
+            const errors = Array.isArray(payload?.errors) ? payload.errors : [];
+            return errors.map((entry) => `${entry?.code ?? 'unknown'}:${entry?.message ?? 'provider error'}`).join('; ')
+              || `HTTP ${status}`;
+          }
+
+          async function cf(token, path, options = {}) {
+            const response = await fetch(`${API}${path}`, {
+              method: options.method || 'GET',
+              headers: {
+                Authorization: `Bearer ${token}`,
+                'Content-Type': 'application/json',
+              },
+              body: options.body === undefined ? undefined : JSON.stringify(options.body),
+            });
+            const payload = await response.json().catch(() => null);
+            if (!response.ok || payload?.success === false) {
+              throw new Error(providerError(payload, response.status));
+            }
+            return payload?.result;
+          }
+
+          const readToken = unwrap(process.env.CF_READ_TOKEN);
+          const writeToken = unwrap(process.env.CF_WRITE_TOKEN);
+          if (!readToken) throw new Error('FCR read credential has invalid transport.');
+          if (!writeToken) throw new Error('FCR write credential has invalid transport.');
+
+          async function inspect() {
+            const scripts = await cf(readToken, `/accounts/${accountId}/workers/scripts?per_page=100`);
+            const matches = (Array.isArray(scripts) ? scripts : []).filter((row) => row?.id === workerName);
+            if (matches.length !== 1 || !matches[0]?.tag) {
+              throw new Error(`Expected one ${workerName} Worker with a script tag.`);
+            }
+            const triggers = await cf(readToken, `/accounts/${accountId}/builds/workers/${matches[0].tag}/triggers`);
+            const active = (Array.isArray(triggers) ? triggers : []).filter((row) => !row?.deleted_on);
+            const production = active.filter((row) => {
+              const includes = cleanList(row?.branch_includes);
+              const excludes = cleanList(row?.branch_excludes);
+              return includes.includes('main') && !excludes.includes('main') && !excludes.includes('*');
+            });
+            if (production.length !== 1) {
+              throw new Error(`Expected one active main production trigger, found ${production.length}.`);
+            }
+            return {
+              trigger: production[0],
+              nonProductionTriggerCount: active.filter((row) => row?.trigger_uuid !== production[0]?.trigger_uuid).length,
+            };
+          }
+
+          const beforeState = await inspect();
+          const triggerUuid = String(beforeState.trigger?.trigger_uuid || '').trim();
+          if (!triggerUuid) throw new Error('Production trigger UUID is missing.');
+          const before = {
+            pathIncludes: cleanList(beforeState.trigger?.path_includes),
+            pathExcludes: cleanList(beforeState.trigger?.path_excludes),
+          };
+          const changeRequired = !sameSet(before.pathIncludes, desiredPathIncludes)
+            || !sameSet(before.pathExcludes, desiredPathExcludes);
+          let mutationStarted = false;
+
+          try {
+            if (changeRequired) {
+              mutationStarted = true;
+              await cf(writeToken, `/accounts/${accountId}/builds/triggers/${triggerUuid}`, {
+                method: 'PATCH',
+                body: { path_includes: desiredPathIncludes, path_excludes: desiredPathExcludes },
+              });
+            }
+
+            const afterState = await inspect();
+            const after = {
+              pathIncludes: cleanList(afterState.trigger?.path_includes),
+              pathExcludes: cleanList(afterState.trigger?.path_excludes),
+            };
+            if (!sameSet(after.pathIncludes, desiredPathIncludes)
+              || !sameSet(after.pathExcludes, desiredPathExcludes)) {
+              throw new Error('FCR Cloudflare watch-path readback mismatch.');
+            }
+
+            const receipt = {
+              schema: 'fcr/cloudflare-build-cost-guard@v1',
+              generatedAt: new Date().toISOString(),
+              worker: workerName,
+              branchPolicy: 'main production trigger only',
+              before,
+              desired: { pathIncludes: desiredPathIncludes, pathExcludes: desiredPathExcludes },
+              after,
+              applied: changeRequired,
+              verified: true,
+              nonProductionTriggerCount: afterState.nonProductionTriggerCount,
+              buildRequested: false,
+              deploymentRequested: false,
+            };
+            fs.writeFileSync('artifacts/cloudflare-build-cost-guard.json', `${JSON.stringify(receipt, null, 2)}\n`);
+            console.log(`FCR_COST_GUARD_VERIFIED applied=${changeRequired} non_production_triggers=${receipt.nonProductionTriggerCount}`);
+          } catch (error) {
+            if (mutationStarted) {
+              try {
+                await cf(writeToken, `/accounts/${accountId}/builds/triggers/${triggerUuid}`, {
+                  method: 'PATCH',
+                  body: { path_includes: before.pathIncludes, path_excludes: before.pathExcludes },
+                });
+                console.error('FCR_COST_GUARD_ROLLBACK_SUCCEEDED');
+              } catch {
+                console.error('FCR_COST_GUARD_ROLLBACK_FAILED');
+              }
+            }
+            throw error;
+          }
+          NODE
+
+      - name: Upload sanitized cost-guard receipt
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: fcr-cloudflare-build-cost-guard-${{ github.run_id }}
+          path: artifacts/cloudflare-build-cost-guard.json
+          if-no-files-found: warn
+          retention-days: 30
+
+  browser-proof:
+    name: Prove live Pages and Worker identity stayed unchanged
+    needs: apply-cost-guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      LIVE_ORIGIN: https://foundercontrolroom.org
+      EXPECTED_HEAD_SHA: ${{ needs.apply-cost-guard.outputs.live_sha }}
+    steps:
+      - name: Check out exact repair commit
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run exact live Pages/Worker Playwright proof
+        run: npx playwright test -c playwright.live-release.config.ts e2e/live-pages-worker-release.spec.ts
+
+      - name: Upload browser proof artifacts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: fcr-cloudflare-build-cost-guard-browser-${{ github.run_id }}
+          path: |
+            playwright-report/live-release
+            test-results
+          if-no-files-found: warn
+          retention-days: 30
