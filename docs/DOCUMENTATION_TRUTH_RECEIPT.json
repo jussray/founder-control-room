@@ -1,6 +1,6 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Preserve the existing #746 evidence-authority, Cloudflare Access recovery, Founder Capital Decision, ATTACK-20, and governed Founder Content n8n invariants while binding the FCR GitHub constitutional governance target to main-only source enforcement. This receipt keeps source intent, live provider topology, provider configuration, runtime identity, database application, publication outcome, merge authority, and deploy authority as separate proof planes; main-only source guards do not claim that the currently observed GitHub ruleset has already been reconciled or that production provider state is READY.",
+  "purpose": "Bind FCR's canonical GitHub governance source contract to exactly main while preserving the existing provider, evidence, merge, Cloudflare, and publishing invariants. This receipt documents source enforcement only: it does not claim the live GitHub ruleset is reconciled, provider state is READY, or any merge or deploy authority exists.",
   "domains": [
     "repository-provider",
     "evidence-authority",
