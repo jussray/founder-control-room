@@ -238,6 +238,9 @@ This table covers GitHub Actions secret names that are referenced outside the ca
 | `PERPLEXITY_API_KEY` | `playwright.yml` | Injected only into the E2E harness when configured; do not expose it to browser/static assets. |
 | `N8N_CONVEYOR_WEBHOOK_URL` | `n8n-conveyor-live-probe.yml` | Required private webhook URL for the founder-approved live conveyor probe. |
 | `N8N_CONVEYOR_BEARER_TOKEN` | `n8n-conveyor-live-probe.yml` | Required bearer credential paired with the live conveyor webhook probe. |
+| `FCR_JIRA_AUTOMATION_INGRESS_TOKEN` | `jira-work-automation-live-probe.yml` | Required bearer credential for the bounded FCR Jira automation ingress. Never log or expose the value. |
+| `FCR_JIRA_AUTOMATION_INGRESS_URL` | `jira-work-automation-live-probe.yml` | Required HTTPS URL for the exact `/ingest/jira-work-automation` production route; name presence does not prove reachability. |
+| `JIRA_AUTOMATION_PROBE_ISSUE_KEY` | `jira-work-automation-live-probe.yml` | Protected identifier for the dedicated Jira control issue. It constrains the probe target and is not authority to select arbitrary issues. |
 | `CLOUDFLARE_DEPLOY_HOOK_URL` | `pages-production-release.yml` | Required reusable-workflow secret used to trigger the exact-SHA Pages release. |
 | `FCR_CLOUDFLARE_REQUEST_TRACER_TOKEN` | `cloudflare-build-diagnostic.yml` | Optional read credential for request-trace enrichment; does not authorize Worker mutation. |
 | `FCR_CLOUDFLARE_DNS_INVENTORY_TOKEN` | `cloudflare-build-diagnostic.yml` | Optional read credential for DNS inventory enrichment; does not authorize DNS mutation. |
