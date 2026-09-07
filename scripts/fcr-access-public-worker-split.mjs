@@ -414,6 +414,10 @@ export async function executeFcrPublicWorkerSplit({
     );
   }
 
+  const applicationIdsBeforeCreate = new Set(
+    afterNarrow.applications.map((application) => clean(application?.id)).filter(Boolean),
+  );
+
   let managedApp = null;
   try {
     managedApp = await createManagedPublicApplication({ token, fetchImpl, zone });
@@ -428,9 +432,18 @@ export async function executeFcrPublicWorkerSplit({
         { mutationOutcome: 'unknown', sourceApplicationId: sourceId },
       );
     }
-    if (readback.managed.length === 1 && readback.namedManaged.length === 1) {
-      [managedApp] = readback.managed;
-    } else if (readback.namedManaged.length === 0) {
+
+    const newlyObserved = readback.applications.filter((application) => {
+      const id = clean(application?.id);
+      return !id || !applicationIdsBeforeCreate.has(id);
+    });
+    if (newlyObserved.length === 1
+      && clean(newlyObserved[0]?.id)
+      && isExactManagedPublicApplication(newlyObserved[0], zone)
+      && readback.managed.length === 1
+      && readback.namedManaged.length === 1) {
+      [managedApp] = newlyObserved;
+    } else if (newlyObserved.length === 0) {
       await restoreOriginalDestinations({
         token,
         fetchImpl,
@@ -442,13 +455,13 @@ export async function executeFcrPublicWorkerSplit({
       });
       throw errorWith(
         'split-public-create-not-performed',
-        'Provider readback proves the public app was not created; independent readback proves the original mixed destinations were restored.',
+        'Provider inventory readback proves the public app was not created; independent readback proves the original mixed destinations were restored.',
         { mutationOutcome: 'none', rollbackPerformed: true, sourceApplicationId: sourceId },
       );
     } else {
       throw errorWith(
         'split-public-create-reconcile-required',
-        'Provider readback found a named public application whose exact split ownership or shape is ambiguous.',
+        'Provider inventory changed after the public-app create attempt but exact run ownership cannot be proven.',
         { mutationOutcome: 'unknown', sourceApplicationId: sourceId },
       );
     }
