@@ -104,7 +104,7 @@
     {
       "path": "src/http/routes/n8nConveyor.ts",
       "claims": [
-        "src/http/routes/n8nConveyor.ts may expose Founder Content lifecycle mutation and n8n execution only behind authenticated founder identity and explicit route-local abuse control; the lifecycle path must register rateLimitFounderPermissions before mounting its child router, provider-neutral scheduling must be rate-limited before its mutating handler, caller-supplied approval objects remain forbidden, and a returned n8n scheduling receipt must keep published false with final publication truth delegated to provider readback."
+        "src/http/routes/n8nConveyor.ts may expose Founder Content lifecycle mutation and n8n execution only behind authenticated founder identity and explicit route-local abuse control; the lifecycle path must apply rateLimitFounderPermissions before invoking its explicit child-router forwarding handler, provider-neutral scheduling must be rate-limited before its mutating handler, caller-supplied approval objects remain forbidden, and a returned n8n scheduling receipt must keep published false with final publication truth delegated to provider readback."
       ]
     },
     {
