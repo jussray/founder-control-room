@@ -167,4 +167,45 @@ describe('runStructuredJson', () => {
       maxResponseBytes: 1024,
     })).rejects.toMatchObject({ code: 'OPENAI_RESPONSE_TOO_LARGE' });
   });
+
+  it('cancels streamed bodies as soon as their byte budget is exceeded', async () => {
+    const encoder = new TextEncoder();
+    const chunks = [
+      encoder.encode('x'.repeat(700)),
+      encoder.encode('y'.repeat(700)),
+      encoder.encode('z'.repeat(700)),
+    ];
+    let readIndex = 0;
+    let cancelled = false;
+
+    const reader = {
+      read: async () => {
+        const value = chunks[readIndex];
+        readIndex += 1;
+        return value ? { done: false, value } : { done: true, value: undefined };
+      },
+      cancel: async () => {
+        cancelled = true;
+      },
+      releaseLock: () => undefined,
+    };
+
+    const fetchFn = vi.fn<typeof fetch>(async () => ({
+      ok: true,
+      status: 200,
+      headers: { get: () => null },
+      body: { getReader: () => reader },
+      text: async () => {
+        throw new Error('streamed responses must not fall back to response.text()');
+      },
+    } as unknown as Response));
+
+    await expect(runStructuredJson([openAiConfig()], REQUEST, {
+      fetchFn,
+      maxResponseBytes: 1024,
+    })).rejects.toMatchObject({ code: 'OPENAI_RESPONSE_TOO_LARGE' });
+
+    expect(cancelled).toBe(true);
+    expect(readIndex).toBe(2);
+  });
 });
