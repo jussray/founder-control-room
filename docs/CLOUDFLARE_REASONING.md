@@ -249,6 +249,12 @@ A successful create is not production proof. It enters `mutated-needs-browser-pr
 
 Only the bounded sanitized public receipt is returned to the fixed founder control issue and retained artifact. Raw Access/browser receipts, raw approval references, managed application IDs, final origins, raw errors, and blockers are not promoted into public proof. Source code for this workflow proves the recovery contract only; current Access state, credential validity, provider mutation success, and public runtime identity still require fresh provider/browser evidence.
 
+## Canonical public browser-proof origin
+
+The Access recovery destination and the public browser proof intentionally answer different questions. `foundercontrolroom.org/*` remains the bounded Access destination for provider inspection and separately authorized repair, while `https://www.foundercontrolroom.org` is the canonical anonymous browser origin that recovery proof must request and retain.
+
+The sanitized browser receipt must therefore require `requestedOrigin` to equal `https://www.foundercontrolroom.org` exactly. An apex redirect or any other final-origin mismatch cannot be normalized into a proven result. This source invariant does not mutate DNS, routes, Access, Workers, or credentials, and it does not prove current public reachability; live provider and browser evidence remain separate gates.
+
 ## Verification
 
 ```bash
