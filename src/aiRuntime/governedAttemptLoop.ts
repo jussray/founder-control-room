@@ -94,7 +94,9 @@ function receiptMatchesLease(
  * The runtime may propose a read-only tool attempt, but FCR remains the broker:
  * it supplies the authoritative world state and adapter capability graph, evaluates
  * the lease immediately before execution, admits at most one exact adapter call,
- * rejects unbound receipts, and leaves verification to an independent witness.
+ * rejects unbound receipts, and may collect witness evidence. This first seam does
+ * not promote an execution to VERIFIED until witness independence is structurally
+ * bound to an FCR-owned authority source rather than accepted from a caller label.
  *
  * Write-capable adapters are intentionally excluded from this first spike.
  */
@@ -159,6 +161,15 @@ export async function runGovernedReadOnlyAttempt(
     witness,
     input.minimumWitnessStrength ?? 'W1',
   );
+
+  if (outcome === 'VERIFIED') {
+    return {
+      state: 'EXECUTED_UNVERIFIED',
+      decision,
+      receipt,
+      reason: 'Witness independence is not yet structurally bound to an FCR-owned authority source in this donor-runtime seam; caller-supplied witness evidence cannot promote execution truth to VERIFIED.',
+    };
+  }
 
   return {
     state: outcome,
