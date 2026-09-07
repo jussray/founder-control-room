@@ -13,13 +13,14 @@ Mirror Engine turns one founder transcript into:
 - a factual-claim ledger that blocks unsupported external use;
 - model and prompt provenance.
 
-V1 deliberately runs the four model stages in one structured OpenAI Responses API call. This keeps latency, cost, prompt drift, and partial-failure surfaces lower while preserving logical stage boundaries.
+V1 deliberately runs the four model stages in one structured provider call. OpenAI remains the default provider for backward compatibility; Anthropic can be selected explicitly, and an optional second provider can be configured as a retryable-failure fallback. This keeps latency, cost, prompt drift, and partial-failure surfaces lower while preserving logical stage boundaries without coupling the product contract to one model vendor.
 
 ```text
 Friend Intake
 → supplied transcript and related-memory context
 → Mirror + Intent + Tiny Move + Tone Guard
-→ factual-claim detection
+→ provider-neutral structured-output runtime
+→ factual-claim detection + local semantic validation
 → draft-only response
 → Fact Check Every Claim when required
 → founder review or portable founder approval
@@ -97,6 +98,59 @@ The API never writes raw transcript or memory text into `project_events`. Audit 
 }
 ```
 
+`provenance.provider` may be `openai` or `anthropic`. `storedByProvider` is `false` only when the runtime has direct per-request evidence for that claim (`store: false` on OpenAI). It is `null` for Anthropic because this receipt does not independently prove the selected model/account retention state; do not convert provider documentation or feature eligibility into runtime evidence.
+
+## Provider configuration
+
+OpenAI remains the no-migration default:
+
+```env
+OPENAI_API_KEY=
+OPENAI_API_BASE_URL=https://api.openai.com/v1
+MIRROR_ENGINE_MODEL=
+MIRROR_ENGINE_PROVIDER=openai
+MIRROR_ENGINE_TIMEOUT_MS=25000
+```
+
+Anthropic is opt-in and requires an explicit model instead of a hard-coded moving model ID:
+
+```env
+ANTHROPIC_API_KEY=
+ANTHROPIC_API_BASE_URL=https://api.anthropic.com/v1
+MIRROR_ENGINE_PROVIDER=anthropic
+MIRROR_ENGINE_ANTHROPIC_MODEL=
+```
+
+Optional bounded failover:
+
+```env
+MIRROR_ENGINE_FALLBACK_PROVIDER=anthropic
+```
+
+The fallback is attempted only for retryable provider-availability failures such as timeout/network, HTTP 408/409/429, or 5xx. Authentication failure, invalid schema/configuration, refusal, incomplete output, and local semantic validation failures do not trigger provider failover.
+
+QuickScan Chief uses the same shared runtime with its own selectors:
+
+```env
+QUICKSCAN_CHIEF_PROVIDER=openai
+QUICKSCAN_CHIEF_FALLBACK_PROVIDER=
+QUICKSCAN_CHIEF_MODEL=
+QUICKSCAN_CHIEF_ANTHROPIC_MODEL=
+QUICKSCAN_CHIEF_TIMEOUT_MS=25000
+```
+
+## Structured-output boundary
+
+The shared runtime keeps the product schema richer than either provider grammar:
+
+- OpenAI receives the existing strict JSON Schema through the Responses structured-output field.
+- Anthropic receives a grammar-safe projection through `output_config.format`; generation-time keywords that Anthropic documents as unsupported are removed before dispatch.
+- The original FCR validators remain authoritative after parsing, so removing a provider-unsupported grammar keyword does not remove the product rule.
+- Anthropic recursive root references and external schema references fail closed before provider dispatch rather than being silently weakened.
+- Response bodies are bounded before and after read, and the abort timer remains armed through response-body consumption.
+
+Provider-specific wire formats live in `src/aiRuntime/structuredProvider.ts`; schema projection lives in `src/aiRuntime/schemaCompiler.ts`. Existing Mirror and QuickScan files keep their historical OpenAI-named compatibility exports so current imports do not churn.
+
 ## Error contract
 
 ```json
@@ -106,31 +160,33 @@ The API never writes raw transcript or memory text into `project_events`. Audit 
 }
 ```
 
-Important codes:
+Important codes include:
 
 - `MIRROR_PROJECT_UNAVAILABLE`: Founder Control Room project registry lookup failed.
-- `OPENAI_NOT_CONFIGURED`: backend provider key absent.
-- `OPENAI_TIMEOUT`: provider timeout.
-- `OPENAI_HTTP_ERROR`: provider returned a non-success status.
-- `INVALID_MODEL_OUTPUT`: structured output failed local contract validation.
+- `OPENAI_NOT_CONFIGURED` / `ANTHROPIC_NOT_CONFIGURED`: selected primary provider configuration is incomplete.
+- `MODEL_PROVIDER_INVALID`: unsupported provider selector.
+- `OPENAI_TIMEOUT` / `ANTHROPIC_TIMEOUT`: provider timeout.
+- `OPENAI_HTTP_ERROR` / `ANTHROPIC_HTTP_ERROR`: provider returned a non-success status.
+- `OPENAI_SCHEMA_UNSUPPORTED` / `ANTHROPIC_SCHEMA_UNSUPPORTED`: schema cannot be safely dispatched to the selected provider.
+- `OPENAI_REFUSAL` / `ANTHROPIC_REFUSAL`: provider refused the structured request.
+- `OPENAI_INCOMPLETE_OUTPUT` / `ANTHROPIC_INCOMPLETE_OUTPUT`: generation ended before a complete structured result.
+- `INVALID_MODEL_OUTPUT`: structured output failed FCR's local semantic contract.
 - `AUDIT_PERSISTENCE_FAILED`: required audit could not be written, so output is withheld.
 
 Provider error details are not echoed to clients or written into public audit metadata.
 
-## OpenAI request boundary
+## Tool-call and failover boundary
 
-The adapter uses:
+The structured Mirror/QuickScan paths do not execute external tools. Shared tool-runtime primitives exist for future agentic consumers, with these invariants:
 
-- `POST /v1/responses`;
-- server-side `OPENAI_API_KEY` only;
-- `store: false`;
-- strict JSON Schema Structured Outputs;
-- bounded response size;
-- a configurable timeout;
-- configurable `MIRROR_ENGINE_MODEL`;
-- no raw provider key, transcript, or related memories in audit logs.
+1. streamed tool arguments are accumulated by `(provider, callId)`, byte-bounded, and parsed only after completion;
+2. a completed final argument payload replaces, rather than duplicates, accumulated deltas;
+3. a provider failure before tool execution may fail over safely;
+4. a successful write may be reused for fallback answer synthesis but is never replayed merely because the model connection failed;
+5. an unknown write outcome blocks model failover and tool replay until the authoritative FCR execution ledger and external provider outcome are reconciled;
+6. idempotent write replay is permitted only after non-application is confirmed and the external provider guarantees deduplication for the same idempotency key.
 
-The direct Mirror Engine key is separate from the existing Zapier-held `zapier-founder-signal-engine` key reference.
+`src/aiRuntime/toolFailover.ts` is policy only. It does not invent a second journal. Existing FCR mission/project/action idempotency and provider receipts remain the write authority.
 
 ## Fact-check gate
 
@@ -158,13 +214,15 @@ The required repository proof floor for this slice is:
 ```bash
 npm run typecheck
 npm run lint
-npm test -- src/http/routes/__tests__/mirror.integration.test.ts
+npm test -- src/aiRuntime/__tests__ src/http/routes/__tests__/mirror.integration.test.ts src/quickscan/__tests__/chiefOpenaiClient.test.ts
 npm run verify:ai-skills
 npm run build
 ```
 
-Playwright is not required for the API-only V1 route because no user-facing browser path changes in this slice. It becomes required when the Mirror Engine UI, audio intake, action card, approval card, or browser workflow is implemented.
+The repository's current Quality Gate is pull-request triggered and binds jobs to the exact PR head. Do not report those checks as executed for a branch-only change unless a real PR-head run exists.
+
+This remains an API/runtime-only slice; no browser UI behavior changes in these files. A real Playwright receipt is still required before any later UI/browser-flow claim or merge gate that requires browser proof.
 
 ## Rollback
 
-Before merge, revert the feature-branch commit(s) or abandon the branch. After merge, revert the focused Mirror Engine commit. Do not delete audit history or approval receipts.
+Before merge, revert the focused feature-branch commits or abandon the branch. After merge, revert the focused provider-runtime commits in reverse order. Do not delete audit history, approval receipts, provider receipts, or existing idempotency state.
