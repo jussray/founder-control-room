@@ -336,6 +336,32 @@ jobs:
                       end
                   end
                 ),
+                destinationProfile: (
+                  if .classification != "existing-public-access-app-requires-review" then null
+                  elif .blocker != "An existing non-managed Access application targets the FCR apex with broader or different destination scope; manual review is required before mutation." then null
+                  else
+                    (.matchingApplications | if type == "array" then . else [] end) as $apps
+                    | if ($apps | length) != 1 then null
+                      else (($apps[0].destinations // []) | if type == "array" then . else [] end) as $destinations
+                      | def destination_type: ((.type // "") | if type == "string" then ascii_downcase else "" end);
+                        def public_uri:
+                          ((.uri // .hostname // "") | if type == "string" then ascii_downcase else "" end)
+                          | sub("^https?://"; "")
+                          | sub("/$"; "");
+                        {
+                          total: ($destinations | length),
+                          public: ([$destinations[] | select(destination_type == "public")] | length),
+                          allWorkers: ([$destinations[] | select(destination_type == "all_workers")] | length),
+                          worker: ([$destinations[] | select(destination_type == "worker")] | length),
+                          previewWorker: ([$destinations[] | select(destination_type == "preview_worker")] | length),
+                          other: ([$destinations[] | select((destination_type != "public") and (destination_type != "all_workers") and (destination_type != "worker") and (destination_type != "preview_worker"))] | length),
+                          hasWholeSitePublic: any($destinations[]; (destination_type == "public") and ((public_uri == "foundercontrolroom.org") or (public_uri == "foundercontrolroom.org/*"))),
+                          hasNarrowPublic: any($destinations[]; (destination_type == "public") and (public_uri | startswith("foundercontrolroom.org/")) and (public_uri != "foundercontrolroom.org/*")),
+                          hasAllWorkers: any($destinations[]; destination_type == "all_workers")
+                        }
+                      end
+                  end
+                ),
                 reviewReason: (
                   if .classification != "existing-public-access-app-requires-review" then null
                   elif .blocker == "More than one Access application targets the FCR public apex; refusing to infer ownership or mutate automatically." then "multiple-matching-apps"
