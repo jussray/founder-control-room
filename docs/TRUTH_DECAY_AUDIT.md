@@ -48,6 +48,14 @@ The corrected rule keeps those roles separate: `.github/workflows/playwright.yml
 
 This remains a proof contract, not production proof by itself. The witness must actually run for the relevant release and return terminal exact-SHA evidence before a production-runtime claim becomes current.
 
+## 2026-09 control correction: Capital Decision documentation drift
+
+The Founder Capital Decision feature introduced a founder-facing evidence-evaluation surface with freshness-sensitive recommendations, dilution and option-set reasoning, and an explicit authority ceiling. Its source and browser proof correctly keep financing authority false and allow `HOLD` when broader or fresher evidence is missing, but the feature landed without the required durable README, truth-decay audit, and documentation receipt refresh for its evidence-authority semantics.
+
+The correction is documentation-only with respect to the Capital Decision behavior: `README.md`, this audit, and `docs/DOCUMENTATION_TRUTH_RECEIPT.json` now state that a decision card, score, option set, or browser rendering is evidence interpretation rather than authority. Stale or missing evidence must remove derived certainty instead of silently carrying an earlier recommendation forward. Financing, spend, investor-contact, fundraise, merge, deploy, publication, and execution authority remain separate and require their own explicit gates.
+
+This documentation repair does not retroactively prove the earlier feature branch, external financing activity, investor contact, or any provider/runtime outcome. It closes the durable truth-surface gap so future operators do not mistake a source-level capital recommendation for executable authority.
+
 ## Root causes
 
 ### 1. Evidence lifetime was implicit
@@ -358,6 +366,7 @@ The strongest optimization is not faster claiming. It is shortening the distance
 29. A public deployment origin must not be mislabeled as a secret merely because a workflow consumes it; authority classification must follow the sensitivity and mutation boundary of the value.
 30. A predecessor Playwright success cannot prove a cross-repository federation successor after either repository head, peer proof contract, peer runtime identity, or serialized wire shape moves.
 31. A privileged `workflow_run` witness may consume an upstream release SHA as evidence, but it cannot execute that upstream checkout or treat upstream success as executable trust.
+32. A capital decision card, recommendation, score, or HOLD state is evidence interpretation, not financing or execution authority; stale or missing capital evidence must remove derived certainty instead of preserving an earlier recommendation.
 
 ## Rollback
 
