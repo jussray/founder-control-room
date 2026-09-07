@@ -108,6 +108,7 @@ describe('Founder Control Room Cloudflare topology', () => {
     expect(playwrightProof).toContain("'content-manager-mobile.png'");
     expect(playwrightProof).toContain('page must not overflow the mobile viewport');
     expect(playwrightProof).toContain('capability must not be presented as an already-authorized publish control');
+    expect(playwrightProof).toContain('approved post may expose publish gate without being authorized to execute it');
   });
 
   it('keeps browser API calls same-origin and binds them directly to the API Worker', () => {

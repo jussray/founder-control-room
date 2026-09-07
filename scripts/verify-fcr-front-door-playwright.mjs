@@ -1,7 +1,11 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { chromium } from 'playwright';
 
-const WEB_ORIGIN = 'https://www.foundercontrolroom.org';
+const APEX_ORIGIN = 'https://foundercontrolroom.org';
+const PUBLIC_ORIGIN = 'https://www.foundercontrolroom.org';
+const WEB_ORIGIN = PUBLIC_ORIGIN;
+const CONTROL_ROOM_URL = `${PUBLIC_ORIGIN}/control-room/`;
+const AUTH_ME_URL = `${PUBLIC_ORIGIN}/auth/me`;
 const API_VERSION_URL = 'https://api.foundercontrolroom.org/version';
 const RECEIPT_PATH = 'test-results/fcr-access-front-door-browser-proof.json';
 const expectedHeadSha = process.env.EXPECTED_HEAD_SHA?.trim() ?? '';
@@ -20,95 +24,102 @@ const receipt = {
   scope: 'fcr-access-front-door-browser-proof',
   observedAt: new Date().toISOString(),
   expectedHeadSha,
-  requestedOrigin: WEB_ORIGIN,
+  audience: 'random-stranger',
+  requestedOrigin: APEX_ORIGIN,
+  publicOrigin: PUBLIC_ORIGIN,
   finalOrigin: null,
   navigationStatus: null,
-  canonicalHref: null,
-  publicDestinations: [],
-  relativePublicLinks: [],
-  publicScreens: [],
-  bottomNavItems: [],
+  publicCanonicalHref: null,
+  controlRoomStatus: null,
+  founderSignInVisible: false,
+  founderShellVisible: false,
+  authMeStatus: null,
+  founderAuthorityContained: false,
   apiVersionStatus: null,
   apiVersionMatchesExpectedSha: false,
   state: 'unknown',
 };
 
+function assertNoCloudflareIntercept(url, body) {
+  if (/cloudflareaccess\.com/i.test(url) || /Error\s+5(?:00|02|03|04|20|21|22|23|24|25|26)/i.test(body)) {
+    throw new Error('Random stranger was intercepted by Cloudflare Access or a Cloudflare server error before reaching FCR.');
+  }
+}
+
 try {
-  const response = await page.goto(WEB_ORIGIN, {
+  const response = await page.goto(APEX_ORIGIN, {
     waitUntil: 'domcontentloaded',
     timeout: 30_000,
   });
-  if (!response) throw new Error('Founder Control Room returned no navigation response.');
+  if (!response) throw new Error('Founder Control Room returned no public-front-door navigation response.');
 
   receipt.navigationStatus = response.status();
   if (response.status() >= 500) {
-    throw new Error(`Founder Control Room returned HTTP ${response.status()}.`);
+    throw new Error(`Founder Control Room public front door returned HTTP ${response.status()}.`);
   }
 
   receipt.finalOrigin = new URL(page.url()).origin;
-  if (receipt.finalOrigin !== WEB_ORIGIN) {
-    throw new Error(`Front door redirected away from ${WEB_ORIGIN} to ${receipt.finalOrigin}.`);
+  if (receipt.finalOrigin !== APEX_ORIGIN && receipt.finalOrigin !== WEB_ORIGIN) {
+    throw new Error(`Public front door redirected outside FCR to ${receipt.finalOrigin}.`);
   }
 
-  const body = (await page.locator('body').innerText().catch(() => '')).slice(0, 8_000);
-  if (/cloudflareaccess\.com/i.test(page.url()) || /Error\s+5(?:00|02|03|04|20|21|22|23|24|25|26)/i.test(body)) {
-    throw new Error('Front door still resolves to Cloudflare Access or a Cloudflare server error.');
+  const publicBody = (await page.locator('body').innerText().catch(() => '')).slice(0, 8_000);
+  assertNoCloudflareIntercept(page.url(), publicBody);
+
+  receipt.publicCanonicalHref = await page.locator('link[rel="canonical"]').getAttribute('href');
+  if (receipt.publicCanonicalHref !== `${PUBLIC_ORIGIN}/`) {
+    throw new Error(`Public front door canonical URL must be ${PUBLIC_ORIGIN}/.`);
   }
 
-  receipt.canonicalHref = await page.locator('link[rel="canonical"]').getAttribute('href');
-  if (receipt.canonicalHref !== `${WEB_ORIGIN}/`) {
-    throw new Error(`Front door canonical URL must be ${WEB_ORIGIN}/.`);
+  const enterLink = page.getByRole('link', { name: /Enter authenticated Control Room/i });
+  if (await enterLink.count() !== 1) {
+    throw new Error('Public front door must expose exactly one authenticated Control Room entry link.');
   }
 
-  const publicLinks = await page.locator('a[href]').evaluateAll((links) => links.map((link) => ({
-    href: link.getAttribute('href') ?? '',
-    text: link.textContent?.trim() ?? '',
-  })));
-  receipt.publicDestinations = publicLinks.map(({ href }) => href);
-  receipt.relativePublicLinks = publicLinks
-    .filter(({ href }) => href.startsWith('/'))
-    .map(({ href, text }) => ({ href, text }));
+  const controlRoomResponse = await page.goto(CONTROL_ROOM_URL, {
+    waitUntil: 'domcontentloaded',
+    timeout: 30_000,
+  });
+  if (!controlRoomResponse) throw new Error('Founder Control Room returned no Control Room navigation response.');
 
-  if (receipt.relativePublicLinks.length > 0) {
-    throw new Error(`Front door still contains origin-relative public links: ${JSON.stringify(receipt.relativePublicLinks)}.`);
+  receipt.controlRoomStatus = controlRoomResponse.status();
+  if (controlRoomResponse.status() >= 500) {
+    throw new Error(`Control Room entry surface returned HTTP ${controlRoomResponse.status()}.`);
   }
 
-  receipt.publicScreens = await page.locator('[data-public-screen]').evaluateAll((screens) =>
-    screens.map((screen) => screen.getAttribute('data-public-screen')).filter(Boolean),
+  const controlRoomBody = (await page.locator('body').innerText().catch(() => '')).slice(0, 8_000);
+  assertNoCloudflareIntercept(page.url(), controlRoomBody);
+
+  const signIn = page.locator('.sign-in-wrap');
+  await signIn.waitFor({ state: 'visible', timeout: 20_000 });
+  receipt.founderSignInVisible = await signIn.isVisible().catch(() => false);
+  receipt.founderShellVisible = await page.locator('.shell').isVisible().catch(() => false);
+
+  const signInCopy = (await signIn.innerText().catch(() => '')).slice(0, 4_000);
+  if (!receipt.founderSignInVisible
+      || !/Sign in with your founder email/i.test(signInCopy)
+      || !/allowlist/i.test(signInCopy)
+      || !await page.locator('#magic-link-form').isVisible().catch(() => false)) {
+    throw new Error('Random stranger did not reach the founder-gated sign-in surface.');
+  }
+
+  if (receipt.founderShellVisible) {
+    throw new Error('Random stranger reached the authenticated Founder Control Room shell without founder authority.');
+  }
+
+  const authMeResponse = await context.request.get(AUTH_ME_URL, { timeout: 20_000 });
+  receipt.authMeStatus = authMeResponse.status();
+  if (receipt.authMeStatus !== 401) {
+    throw new Error(`Founder identity endpoint must reject a random stranger with HTTP 401, received ${receipt.authMeStatus}.`);
+  }
+
+  receipt.founderAuthorityContained = (
+    receipt.founderSignInVisible
+    && !receipt.founderShellVisible
+    && receipt.authMeStatus === 401
   );
-  const expectedScreens = ['home', 'control-room', 'chief', 'promptos', 'proof'];
-  if (JSON.stringify(receipt.publicScreens) !== JSON.stringify(expectedScreens)) {
-    throw new Error(`Front door public screens must be exactly ${JSON.stringify(expectedScreens)}.`);
-  }
-
-  receipt.bottomNavItems = await page.locator('[data-bottom-nav="five-screen"] [data-nav-screen]').evaluateAll((items) =>
-    items.map((item) => item.getAttribute('data-nav-screen')).filter(Boolean),
-  );
-  if (JSON.stringify(receipt.bottomNavItems) !== JSON.stringify(expectedScreens)) {
-    throw new Error(`Bottom navigation must expose exactly ${JSON.stringify(expectedScreens)}.`);
-  }
-
-  for (const requiredHref of [
-    `${WEB_ORIGIN}/#home`,
-    `${WEB_ORIGIN}/#control-room`,
-    `${WEB_ORIGIN}/#chief`,
-    `${WEB_ORIGIN}/#promptos`,
-    `${WEB_ORIGIN}/#proof`,
-    `${WEB_ORIGIN}/control-room/`,
-    `${WEB_ORIGIN}/guardrails`,
-  ]) {
-    if (!receipt.publicDestinations.includes(requiredHref)) {
-      throw new Error(`Front door is missing required canonical HTTPS destination ${requiredHref}.`);
-    }
-  }
-
-  for (const screen of expectedScreens) {
-    await page.locator(`[data-nav-screen="${screen}"]`).first().click();
-    await page.waitForTimeout(100);
-    if (new URL(page.url()).hash !== `#${screen}`) {
-      throw new Error(`Bottom navigation did not reach #${screen}.`);
-    }
-    await page.locator(`[data-public-screen="${screen}"]`).scrollIntoViewIfNeeded();
+  if (!receipt.founderAuthorityContained) {
+    throw new Error('Founder authority containment was not proven for a random stranger.');
   }
 
   const versionResponse = await context.request.get(API_VERSION_URL, { timeout: 20_000 });

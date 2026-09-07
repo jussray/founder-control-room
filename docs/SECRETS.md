@@ -99,7 +99,13 @@ The former `founder-control-room2` Worker was deleted and must not be recreated 
 | `ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL` | secret | Private approved Zapier Catch Hook URL. |
 | `FOUNDER_SIGNAL_ENGINE_HOOK_TIMEOUT_MS` | protected variable | Optional bounded provider timeout. |
 | `FOUNDER_REVIEW_EMAIL_INGRESS_SECRET` | secret | Shared only with the review-email Worker when that route is activated. |
+| `N8N_FOUNDER_CONTENT_WEBHOOK_URL` | secret | Required private production webhook URL for the governed Founder Content n8n workflow. Source presence does not prove a live n8n deployment. |
+| `N8N_FOUNDER_CONTENT_BEARER_TOKEN` | secret | Bearer credential paired only with the governed Founder Content production webhook. |
+| `N8N_FOUNDER_CONTENT_EXPECTED_WORKFLOW_FINGERPRINT` | secret | Exact SHA-256 workflow fingerprint that binds FCR to the published n8n workflow identity. |
+| `N8N_FOUNDER_CONTENT_IDENTITY_HMAC_SECRET` | secret | HMAC secret used to verify challenge-bound n8n runtime identity receipts. |
 | `REPOSITORY_INGEST_SECRET` | secret | Optional repository-verification ingest credential. |
+
+The Founder Content n8n source lane is Buffer-only and schedule-only. `N8N_FOUNDER_CONTENT_ENABLED=true` is source intent, not runtime proof. A production claim requires exact-main deployment, provider-held secret-name readback, exact `fcrFounderContentV1` workflow fingerprint and n8n `2.32.6` identity, plus provider-native Buffer readback. n8n acceptance never establishes final publication truth.
 
 The Worker intentionally fails closed when required bindings are absent, empty, malformed, or when the GitHub App pair is incomplete. Do not weaken `validateWorkerEnv` to bypass provider configuration.
 
@@ -219,6 +225,10 @@ The four Chief runtime-witness credential names above document **workflow wiring
 [ ] FOUNDER_SIGNAL_ENGINE_MCP_TOKEN
 [ ] ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL
 [ ] FOUNDER_REVIEW_EMAIL_INGRESS_SECRET when email intake is active
+[ ] N8N_FOUNDER_CONTENT_WEBHOOK_URL
+[ ] N8N_FOUNDER_CONTENT_BEARER_TOKEN
+[ ] N8N_FOUNDER_CONTENT_EXPECTED_WORKFLOW_FINGERPRINT
+[ ] N8N_FOUNDER_CONTENT_IDENTITY_HMAC_SECRET
 [ ] REPOSITORY_INGEST_SECRET when repository ingest is active
 ```
 
