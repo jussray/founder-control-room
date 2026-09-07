@@ -319,7 +319,7 @@ function supabaseRepository(client: SupabaseClient): FounderContentLifecycleRepo
         p_observed_at: input.observedAt,
       });
       if (error) throw new Error(error.message);
-      return (data ?? []).map((row) => normalizePost(row as Record<string, unknown>));
+      return ((data ?? []) as Record<string, unknown>[]).map((row) => normalizePost(row));
     },
   };
 }

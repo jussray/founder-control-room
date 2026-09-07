@@ -188,10 +188,7 @@ export function createFounderContentLifecycleRouter(
     contract: FOUNDER_CONTENT_LIFECYCLE_CONTRACT,
     storeContract: FOUNDER_CONTENT_LIFECYCLE_STORE_CONTRACT,
     publicationSyncContract: FOUNDER_CONTENT_PUBLICATION_SYNC_CONTRACT,
-    operations: FOUNDER_CONTENT_LIFECYCLE_OPERATIONS.map((operation) => ({
-      operation,
-      ...FOUNDER_CONTENT_LIFECYCLE_POLICY[operation],
-    })),
+    operations: FOUNDER_CONTENT_LIFECYCLE_OPERATIONS.map((operation) => FOUNDER_CONTENT_LIFECYCLE_POLICY[operation]),
     platforms: FIRST_PARTY_SOCIAL_PLATFORMS,
     providerAdapters: Object.values(deps.providerAdapters).map((item) => ({
       provider: item.provider,
