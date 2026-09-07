@@ -100,6 +100,7 @@ test('exact main scope accepts either the default-branch sentinel or literal mai
   assert.equal(sentinel.targetsRequestedRef, true);
   assert.equal(sentinel.targetsOnlyRequestedRef, true);
   assert.equal(sentinel.requestedRefExcluded, false);
+  assert.deepEqual(sentinel.requestedRefExcludedBy, []);
   assert.deepEqual(sentinel.excludedTargetRefs, []);
   assert.equal(canonicalFloorSatisfied(sentinel, expectedBypass), true);
 
@@ -107,6 +108,7 @@ test('exact main scope accepts either the default-branch sentinel or literal mai
   assert.equal(literal.targetsRequestedRef, true);
   assert.equal(literal.targetsOnlyRequestedRef, true);
   assert.equal(literal.requestedRefExcluded, false);
+  assert.deepEqual(literal.requestedRefExcludedBy, []);
   assert.equal(canonicalFloorSatisfied(literal, expectedBypass), true);
 });
 
@@ -146,11 +148,44 @@ test('canonical review membrane rejects include-main plus exclude-main', () => {
 
   assert.equal(excluded.requestedRefExplicitlyIncluded, true);
   assert.equal(excluded.requestedRefExcluded, true);
+  assert.deepEqual(excluded.requestedRefExcludedBy, ['refs/heads/main']);
   assert.equal(excluded.targetsRequestedRef, false);
   assert.equal(excluded.targetsOnlyRequestedRef, false);
   assert.deepEqual(excluded.excludedTargetRefs, ['refs/heads/main']);
   assert.equal(canonicalFloorSatisfied(excluded, expectedBypass), false);
   assert.equal(report(['refs/heads/main'], ['~DEFAULT_BRANCH'], ['refs/heads/main']).status, 'NOT_READY');
+});
+
+test('unrelated branch exclusion preserves exact-main targeting', () => {
+  const expectedBypass = trustedBypassPolicy(TRUSTED_APP_ID);
+  const snapshot = rulesetSnapshot(
+    canonicalRuleset(['refs/heads/main'], ['refs/heads/release']),
+    'main',
+    'main',
+  );
+
+  assert.equal(snapshot.requestedRefExcluded, false);
+  assert.deepEqual(snapshot.requestedRefExcludedBy, []);
+  assert.equal(snapshot.targetsRequestedRef, true);
+  assert.equal(snapshot.targetsOnlyRequestedRef, true);
+  assert.equal(canonicalFloorSatisfied(snapshot, expectedBypass), true);
+  assert.equal(report(['refs/heads/main'], ['~DEFAULT_BRANCH'], ['refs/heads/release']).status, 'READY');
+});
+
+test('wildcard exclusion covering main fails closed with the matched pattern in the receipt', () => {
+  const expectedBypass = trustedBypassPolicy(TRUSTED_APP_ID);
+  const excluded = rulesetSnapshot(
+    canonicalRuleset(['refs/heads/main'], ['refs/heads/*']),
+    'main',
+    'main',
+  );
+
+  assert.equal(excluded.requestedRefExcluded, true);
+  assert.deepEqual(excluded.requestedRefExcludedBy, ['refs/heads/*']);
+  assert.equal(excluded.targetsRequestedRef, false);
+  assert.equal(excluded.targetsOnlyRequestedRef, false);
+  assert.equal(canonicalFloorSatisfied(excluded, expectedBypass), false);
+  assert.equal(report(['refs/heads/main'], ['~DEFAULT_BRANCH'], ['refs/heads/*']).status, 'NOT_READY');
 });
 
 test('strict-freshness membrane rejects broadened target scope', () => {
@@ -175,9 +210,24 @@ test('strict-freshness membrane rejects default-branch include plus exclude-all'
 
   assert.equal(excluded.requestedRefExplicitlyIncluded, true);
   assert.equal(excluded.requestedRefExcluded, true);
+  assert.deepEqual(excluded.requestedRefExcludedBy, ['~ALL']);
   assert.equal(excluded.targetsRequestedRef, false);
   assert.equal(excluded.targetsOnlyRequestedRef, false);
   assert.deepEqual(excluded.excludedTargetRefs, ['~ALL']);
   assert.equal(freshnessFloorSatisfied(excluded), false);
   assert.equal(report(['~DEFAULT_BRANCH'], ['~DEFAULT_BRANCH'], [], ['~ALL']).status, 'NOT_READY');
+});
+
+test('strict-freshness wildcard exclusion covering main also fails closed', () => {
+  const excluded = rulesetSnapshot(
+    freshnessRuleset(['~DEFAULT_BRANCH'], ['refs/heads/ma?n']),
+    'main',
+    'main',
+  );
+
+  assert.equal(excluded.requestedRefExcluded, true);
+  assert.deepEqual(excluded.requestedRefExcludedBy, ['refs/heads/ma?n']);
+  assert.equal(excluded.targetsRequestedRef, false);
+  assert.equal(freshnessFloorSatisfied(excluded), false);
+  assert.equal(report(['~DEFAULT_BRANCH'], ['~DEFAULT_BRANCH'], [], ['refs/heads/ma?n']).status, 'NOT_READY');
 });
