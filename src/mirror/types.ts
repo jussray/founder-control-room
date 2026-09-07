@@ -38,7 +38,7 @@ export interface MirrorModelProvenance {
   model: string;
   responseId: string | null;
   promptVersion: string;
-  storedByProvider: false;
+  storedByProvider: false | null;
 }
 
 export interface MirrorModelResult {
