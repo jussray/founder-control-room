@@ -1,6 +1,7 @@
 import {
   runStructuredJson,
   StructuredProviderError,
+  type StructuredJsonResult,
   type StructuredProviderConfig,
   type StructuredProviderName,
 } from '../aiRuntime/structuredProvider.js';
@@ -181,7 +182,7 @@ export function createOpenAiQuickScanChiefRunner(dependencies: OpenAiQuickScanCh
   const fetchFn = dependencies.fetchFn ?? fetch;
 
   return async function runQuickScanChief(input: QuickScanChiefPromptInput): Promise<QuickScanChiefResult> {
-    let result;
+    let result: StructuredJsonResult;
     try {
       result = await runStructuredJson(
         providerChain(env),
