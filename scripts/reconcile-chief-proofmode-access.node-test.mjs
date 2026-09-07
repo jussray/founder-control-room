@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { classifyChiefAccessError, ensureChiefProofModeAccessPolicy } from './reconcile-chief-proofmode-access.mjs';
+import { classifyChiefAccessError, createChiefAccessSubjectFingerprint, ensureChiefProofModeAccessPolicy } from './reconcile-chief-proofmode-access.mjs';
 
 const ACCOUNT = 'account-1';
 const READ_TOKEN = 'read-token';
@@ -104,6 +104,11 @@ test('accepts only the configured service token on an existing exact-host Servic
     scope: 'public_exact_host',
     serviceTokenId: SERVICE_ID,
     targetOrigin: TARGET,
+    subjectFingerprint: createChiefAccessSubjectFingerprint({
+      targetOrigin: TARGET,
+      applicationId: exactPublicApp.id,
+      serviceTokenId: SERVICE_ID,
+    }),
   });
   assert.equal(calls.length, 3);
 });
