@@ -34,14 +34,17 @@ describe('review-email Worker reconciliation authority contract', () => {
     expect(workflow).toContain('needs: authority-gate');
   });
 
-  it('targets only the dedicated review-email Worker config and canonical Service Binding', () => {
-    expect(workflow).toContain('wrangler deploy --config wrangler.email.toml');
+  it('targets only the dedicated review-email Worker config, route, and canonical Service Binding', () => {
+    expect(workflow).toContain('npx --yes wrangler@4.129.0 deploy --config wrangler.email.toml');
     expect(workflow).toContain("'FOUNDER_CONTROL_ROOM_API (founder-control-room)'");
     expect(workflow).not.toContain('wrangler deploy --config wrangler.worker.toml');
     expect(workflow).not.toContain('wrangler deploy --config wrangler.deletion-queue.toml');
 
     expect(emailConfig).toMatch(/^name = "founder-control-room-review-email"$/m);
     expect(emailConfig).toMatch(/^account_id = "[0-9a-f]{32}"$/m);
+    expect(emailConfig).toMatch(/^addresses = \["review@foundercontrolroom.org"\]$/m);
+    expect(emailConfig).not.toMatch(/addresses\s*=\s*\[[^\]]*\*@/m);
+    expect(emailConfig).not.toContain('[[routes]]');
     expect(emailConfig).toMatch(/^binding = "FOUNDER_CONTROL_ROOM_API"$/m);
     expect(emailConfig).toMatch(/^service = "founder-control-room"$/m);
   });
@@ -90,13 +93,15 @@ describe('review-email Worker reconciliation authority contract', () => {
 
   it('initializes a redacted receipt before provider credential and secret-name checks', () => {
     expect(workflow).toContain('Initialize redacted reconciliation receipt');
+    expect(workflow).toContain('email_routing_address: $address');
     expect(workflow).toContain('credential_header_safe: false');
     expect(workflow).toContain('required_secret_names_verified: false');
     expect(workflow).toContain('provider_deploy_succeeded: false');
+    expect(workflow).toContain('email_trigger_reconciled: false');
     expect(workflow).toContain('blocked_stage: "credential_header_safety"');
     expect(workflow).toContain('.credential_header_safe = true | .blocked_stage = "secret_names"');
     expect(workflow).toContain('.required_secret_names_verified = true | .blocked_stage = "provider_deploy"');
-    expect(workflow).toContain('.provider_deploy_succeeded = true | .blocked_stage = null');
+    expect(workflow).toContain('.provider_deploy_succeeded = true | .email_trigger_reconciled = true | .blocked_stage = null');
     expect(workflow).toContain('if-no-files-found: error');
   });
 
@@ -114,6 +119,8 @@ describe('review-email Worker reconciliation authority contract', () => {
   it('keeps provider deployment proof separate from unproven runtime email invocation', () => {
     expect(workflow).toContain('provider_deploy_succeeded: false');
     expect(workflow).toContain('.provider_deploy_succeeded = true');
+    expect(workflow).toContain('email_trigger_reconciled: false');
+    expect(workflow).toContain('.email_trigger_reconciled = true');
     expect(workflow).toContain('required_secret_names_verified: false');
     expect(workflow).toContain('.required_secret_names_verified = true');
     expect(workflow).toContain('runtime_email_invocation_proven: false');
