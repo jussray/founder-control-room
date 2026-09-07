@@ -12,7 +12,7 @@ import {
 
 const TRUSTED_APP_ID = '123456';
 
-function canonicalRuleset(include) {
+function canonicalRuleset(include, exclude = []) {
   return {
     id: 20819094,
     name: CANONICAL_RULESET_NAME,
@@ -23,7 +23,7 @@ function canonicalRuleset(include) {
       actor_id: Number(TRUSTED_APP_ID),
       bypass_mode: 'pull_request',
     }],
-    conditions: { ref_name: { include, exclude: [] } },
+    conditions: { ref_name: { include, exclude } },
     rules: [
       {
         type: 'pull_request',
@@ -51,14 +51,14 @@ function canonicalRuleset(include) {
   };
 }
 
-function freshnessRuleset(include) {
+function freshnessRuleset(include, exclude = []) {
   return {
     id: 20819095,
     name: canonicalFreshnessRulesetName(),
     target: 'branch',
     enforcement: 'active',
     bypass_actors: [],
-    conditions: { ref_name: { include, exclude: [] } },
+    conditions: { ref_name: { include, exclude } },
     rules: [
       {
         type: 'required_status_checks',
@@ -74,14 +74,19 @@ function freshnessRuleset(include) {
   };
 }
 
-function report(reviewInclude, freshnessInclude = ['~DEFAULT_BRANCH']) {
+function report(
+  reviewInclude,
+  freshnessInclude = ['~DEFAULT_BRANCH'],
+  reviewExclude = [],
+  freshnessExclude = [],
+) {
   return buildReport({
     repository: 'jussray/founder-control-room',
     targetRef: 'main',
     defaultBranch: 'main',
     fullRulesets: [
-      canonicalRuleset(reviewInclude),
-      freshnessRuleset(freshnessInclude),
+      canonicalRuleset(reviewInclude, reviewExclude),
+      freshnessRuleset(freshnessInclude, freshnessExclude),
     ],
     collaborators: [],
     trustedGitHubAppId: TRUSTED_APP_ID,
@@ -94,11 +99,14 @@ test('exact main scope accepts either the default-branch sentinel or literal mai
   const sentinel = rulesetSnapshot(canonicalRuleset(['~DEFAULT_BRANCH']), 'main', 'main');
   assert.equal(sentinel.targetsRequestedRef, true);
   assert.equal(sentinel.targetsOnlyRequestedRef, true);
+  assert.equal(sentinel.requestedRefExcluded, false);
+  assert.deepEqual(sentinel.excludedTargetRefs, []);
   assert.equal(canonicalFloorSatisfied(sentinel, expectedBypass), true);
 
   const literal = rulesetSnapshot(canonicalRuleset(['refs/heads/main']), 'main', 'main');
   assert.equal(literal.targetsRequestedRef, true);
   assert.equal(literal.targetsOnlyRequestedRef, true);
+  assert.equal(literal.requestedRefExcluded, false);
   assert.equal(canonicalFloorSatisfied(literal, expectedBypass), true);
 });
 
@@ -128,7 +136,24 @@ test('canonical review membrane rejects any additional protected branch', () => 
   assert.equal(report(['refs/heads/main', 'refs/heads/release']).status, 'NOT_READY');
 });
 
-test('strict-freshness membrane also rejects broadened target scope', () => {
+test('canonical review membrane rejects include-main plus exclude-main', () => {
+  const expectedBypass = trustedBypassPolicy(TRUSTED_APP_ID);
+  const excluded = rulesetSnapshot(
+    canonicalRuleset(['refs/heads/main'], ['refs/heads/main']),
+    'main',
+    'main',
+  );
+
+  assert.equal(excluded.requestedRefExplicitlyIncluded, true);
+  assert.equal(excluded.requestedRefExcluded, true);
+  assert.equal(excluded.targetsRequestedRef, false);
+  assert.equal(excluded.targetsOnlyRequestedRef, false);
+  assert.deepEqual(excluded.excludedTargetRefs, ['refs/heads/main']);
+  assert.equal(canonicalFloorSatisfied(excluded, expectedBypass), false);
+  assert.equal(report(['refs/heads/main'], ['~DEFAULT_BRANCH'], ['refs/heads/main']).status, 'NOT_READY');
+});
+
+test('strict-freshness membrane rejects broadened target scope', () => {
   const widened = rulesetSnapshot(
     freshnessRuleset(['refs/heads/main', '~ALL']),
     'main',
@@ -139,4 +164,20 @@ test('strict-freshness membrane also rejects broadened target scope', () => {
   assert.equal(widened.targetsOnlyRequestedRef, false);
   assert.equal(freshnessFloorSatisfied(widened), false);
   assert.equal(report(['~DEFAULT_BRANCH'], ['refs/heads/main', '~ALL']).status, 'NOT_READY');
+});
+
+test('strict-freshness membrane rejects default-branch include plus exclude-all', () => {
+  const excluded = rulesetSnapshot(
+    freshnessRuleset(['~DEFAULT_BRANCH'], ['~ALL']),
+    'main',
+    'main',
+  );
+
+  assert.equal(excluded.requestedRefExplicitlyIncluded, true);
+  assert.equal(excluded.requestedRefExcluded, true);
+  assert.equal(excluded.targetsRequestedRef, false);
+  assert.equal(excluded.targetsOnlyRequestedRef, false);
+  assert.deepEqual(excluded.excludedTargetRefs, ['~ALL']);
+  assert.equal(freshnessFloorSatisfied(excluded), false);
+  assert.equal(report(['~DEFAULT_BRANCH'], ['~DEFAULT_BRANCH'], [], ['~ALL']).status, 'NOT_READY');
 });
