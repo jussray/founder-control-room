@@ -601,6 +601,15 @@ export function createFounderContentLifecycleRouter(
       if (!['approved', 'scheduled'].includes(post.status)) {
         return res.status(409).json({ ok: false, code: 'POST_NOT_PUBLISHABLE', status: post.status, published: false });
       }
+      const configuredLinkedInAccountId = text(process.env.LINKEDIN_AUTHOR_URN);
+      if (!configuredLinkedInAccountId || post.accountId !== configuredLinkedInAccountId) {
+        return res.status(409).json({
+          ok: false,
+          code: 'POST_DESTINATION_ACCOUNT_MISMATCH',
+          published: false,
+          reason: 'Stored lifecycle destination must match the server-owned LinkedIn author before provider mutation.',
+        });
+      }
       if (!post.approvalId || post.approvalId !== text(body.approval_id).toLowerCase()) {
         return res.status(409).json({ ok: false, code: 'POST_APPROVAL_MISMATCH', published: false });
       }
