@@ -126,6 +126,34 @@ function activateTab(tab) {
   return true;
 }
 
+function installFounderColorLanguage() {
+  const root = document.getElementById('root');
+  if (!root) return;
+
+  const ensureInstalled = () => {
+    const topbar = root.querySelector('.topbar');
+    if (!(topbar instanceof HTMLElement)) return;
+    if (root.querySelector('[data-founder-language="v1"]')) return;
+
+    const strip = document.createElement('div');
+    strip.className = 'founder-language';
+    strip.dataset.founderLanguage = 'v1';
+    strip.setAttribute('aria-label', 'Founder color language');
+    strip.innerHTML = `
+      <span class="founder-language-title">Founder language</span>
+      <span class="founder-signal" data-signal="core"><strong>Core</strong><small>Decide</small></span>
+      <span class="founder-signal" data-signal="truth"><strong>Truth</strong><small>Evidence</small></span>
+      <span class="founder-signal" data-signal="motion"><strong>Motion</strong><small>Act</small></span>
+      <span class="founder-signal" data-signal="lift"><strong>Lift</strong><small>Outcome</small></span>
+    `;
+    topbar.insertAdjacentElement('afterend', strip);
+  };
+
+  ensureInstalled();
+  const observer = new MutationObserver(ensureInstalled);
+  observer.observe(root, { childList: true, subtree: true });
+}
+
 const requestedTab = requestedTabFromUrl();
 if (requestedTab) safeSessionSet(PENDING_TAB_KEY, requestedTab);
 
@@ -149,5 +177,6 @@ if (launchDock instanceof HTMLDetailsElement) {
   });
 }
 
+installFounderColorLanguage();
 installMissionBoard();
 void refreshConveyorReadiness();
