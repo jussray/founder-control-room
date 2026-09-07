@@ -88,7 +88,6 @@ class QueryBuilder {
       return { data: null, error: null };
     }
 
-    // select
     let result = sortRows(matched, this.orderCol, this.orderAsc);
     if (this.limitN != null) result = result.slice(0, this.limitN);
     return this._shapeResult(result, wantSingle, allowZero);
@@ -214,18 +213,33 @@ export function makeSupabaseClient() {
   return supabase;
 }
 
-// Seed the founder allowlist synchronously at process start, mirroring what
-// migration 0002 does for real (`insert into founder_users ...`) — this
-// module is the first thing the loader redirects to, so this runs before
-// the HTTP server accepts any request.
+// Seed the founder allowlist and one explicit workspace membership. This is the
+// E2E mirror of the tenant migration: auth remains private, while every browser
+// project request must also resolve an active owning workspace.
 if (process.env.E2E_SEED_FOUNDER_EMAIL) {
-  table('founder_users').push({ email: process.env.E2E_SEED_FOUNDER_EMAIL, created_at: new Date().toISOString() });
+  const now = new Date().toISOString();
+  const email = process.env.E2E_SEED_FOUNDER_EMAIL.trim().toLowerCase();
+  const workspaceId = process.env.E2E_WORKSPACE_ID?.trim() || 'e2e-workspace';
+  table('founder_users').push({ email, created_at: now });
+  table('workspaces').push({
+    id: workspaceId,
+    slug: 'e2e-founder-control-room',
+    name: 'E2E Founder Control Room',
+    status: 'active',
+    created_at: now,
+    updated_at: now,
+  });
+  table('workspace_members').push({
+    workspace_id: workspaceId,
+    email,
+    auth_user_id: null,
+    role: 'owner',
+    status: 'active',
+    created_at: now,
+    updated_at: now,
+  });
 }
 
-// E2E-only mirror of the V10 founder approval boundary. The harness must
-// explicitly provide one exact registry hash and its canonical entries;
-// unlike an "always true" fake, every other registry remains unapproved and
-// the real middleware still verifies the entry hash and capability identity.
 const approvedV10RegistryHash = String(process.env.E2E_APPROVED_V10_REGISTRY_HASH ?? '').trim().toLowerCase();
 if (/^[0-9a-f]{64}$/.test(approvedV10RegistryHash)) {
   let entries = [];
