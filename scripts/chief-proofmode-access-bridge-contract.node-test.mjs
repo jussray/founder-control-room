@@ -120,9 +120,22 @@ test('public receipt explicitly keeps browser/runtime proof separate', () => {
   assert.match(returnStep, /Browser\/runtime proof: `NOT CLAIMED HERE`/);
   assert.match(returnStep, /rerun Chief exact-head Playwright after provider repair/);
   assert.match(returnStep, /Current provider truth: `UNKNOWN`/);
+  assert.match(returnStep, /Current provider truth: `BLOCKED`/);
+  assert.match(returnStep, /\.state == "configured" or \.state == "blocked"/);
+  assert.match(returnStep, /reasonCode/);
   assert.match(returnStep, /single-document|length == 1/);
   assert.doesNotMatch(returnStep, /cat "\$current_receipt"/);
   assert.doesNotMatch(returnStep, /cat "\$mutation_receipt"/);
+  assert.doesNotMatch(returnStep, /error\.message|rawError|errorMessage/);
+});
+
+test('blocked diagnostics are allowlisted and cannot become provider mutation authority', () => {
+  assert.match(reconciler, /BLOCKED_REASON_CODES/);
+  assert.match(reconciler, /state: 'blocked'/);
+  assert.match(reconciler, /mutationPerformed: false/);
+  assert.match(reconciler, /reasonCode/);
+  assert.match(recoveryWorkflow, /allowed_reason/);
+  assert.match(recoveryWorkflow, /\.mutationPerformed == false/);
 });
 
 test('dedicated recovery documentation keeps source, provider, and browser truth separate', () => {
