@@ -94,7 +94,7 @@ describe('Jira work automation service ingress', () => {
     const response = await authorizedPost(JSON.stringify(observation()));
 
     expect(response.status).toBe(202);
-    expect(response.body).toMatchObject({ ok: true, code: 'DISPATCHED' });
+    expect(response.body).toMatchObject({ ok: true, code: 'DISPATCHED', runtimeHeadSha: SHA });
     expect(response.body.receiptId).toMatch(/^fcr-jira-receipt-v1:[0-9a-f]{64}$/);
     expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
