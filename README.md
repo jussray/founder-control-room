@@ -144,6 +144,8 @@ verified evidence
 
 A draft, provider acceptance, or n8n execution is not publication truth. **Provider readback** is the terminal external-state evidence for the route that actually ran.
 
+The governed Founder Content n8n production-source lane is source-enabled only when its reviewed configuration sets `N8N_FOUNDER_CONTENT_ENABLED=true`, restricts the enabled provider to Buffer, pins workflow identity `fcrFounderContentV1`, and pins n8n runtime `2.32.6`. That source state does not prove the canonical Worker was deployed with the four required provider-held n8n secret bindings, the production workflow was published at the exact expected fingerprint, the database migrations were applied, or Buffer accepted a schedule. CI may prove the checked workflow on an isolated real n8n runtime without proving production use. Present-tense `live`, `used`, `scheduled`, or `published` claims require exact deployed runtime identity plus provider-native readback.
+
 Investor email is a separate authority class and must not auto-send without the applicable policy, recipient-specific qualification, and send authority.
 
 ### Cloudflare and production release
@@ -185,6 +187,12 @@ The Evidence Trust Plane keeps observation, provider readback, evidence validity
 Current source includes receipt/evaluator foundations that can classify whether exact GitHub evidence is suitable to prepare merge review. This does **not** claim durable evidence persistence is universally wired. `ledgerState` remains supplied state where a separately reviewed persistent writer/store has not been proven.
 
 Even a valid current receipt cannot by itself authorize merge, deploy, production promotion, issue closure, secret mutation, policy mutation, billing, publication, or deletion.
+
+### Founder Capital Decision
+
+The Founder Capital Decision surface is an evidence-evaluation capability, not a financing actuator. It can turn founder-supplied and verified fundraising context into a decision card, surface dilution and option tradeoffs, and return `HOLD` when required evidence is stale, missing, or insufficient.
+
+Its authority ceiling is explicit: a capital decision card, score, option set, or browser rendering **does not grant financing, spend, investor-contact, fundraise, merge, deploy, publication, or execution authority**. Missing or stale evidence removes derived certainty rather than preserving an earlier recommendation. Browser and route tests prove only the source behavior they exercise; they do not prove that financing occurred, that an investor was contacted, or that a current external outcome exists.
 
 ### Guarded terminal
 

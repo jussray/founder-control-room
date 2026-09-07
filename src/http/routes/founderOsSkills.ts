@@ -22,6 +22,7 @@ import {
   FOUNDER_OS_LAB_PROVIDERS,
 } from '../../founder-os-lab/registry.js';
 import { runFounderOsSandbox } from '../../founder-os-lab/sandbox.js';
+import { installFounderCapitalDecisionRoute } from './founderCapitalDecision.js';
 import {
   UNTRUSTED_ARTIFACT_SOURCES,
   untrustedArtifactContentHash,
@@ -405,3 +406,5 @@ founderOsSkillsRouter.post('/preview', (req, res) => {
   res.set('Cache-Control', 'no-store');
   return res.status(result.status === 'simulated' ? 200 : 422).json(result);
 });
+
+installFounderCapitalDecisionRoute(founderOsSkillsRouter);

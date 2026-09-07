@@ -54,6 +54,10 @@ Founder-content orchestration readiness is a separate preflight truth layer. An 
 
 Founder-content orchestration must not reuse the generic conveyor activation receipt as Buffer proof. A founder-content `enabled-live-verified` state requires enabled/configured transport, a valid provider allowlist, Buffer enabled, and proof explicitly bound to `buffer` with a non-empty receipt ID, a valid observation timestamp, and `expectedHeadSha` exactly equal to deployed `GIT_SHA`. Missing, stale, unbound, incomplete, or provider-unverified proof remains non-live. This source contract does not claim the live route currently has a Buffer proof reader.
 
+### Current Founder Content n8n source activation boundary
+
+The governed Founder Content rescue may set `N8N_FOUNDER_CONTENT_ENABLED=true` in candidate source, restrict the enabled provider to Buffer, and pin the expected workflow/runtime identity. That is **source intent only**. It does not prove the canonical Worker carrying those bindings was deployed, that the production n8n workflow was published, that the Supabase migrations were applied, that Buffer accepted a schedule, or that a public artifact exists. A successful isolated n8n runtime proof or webhook `202` remains execution-plane evidence; present-tense `live`, `used`, `scheduled`, or `published` language requires the corresponding exact deployed runtime and provider-native readback.
+
 ## /confess
 
 Before release, state internally and, when material to the audience, publicly:

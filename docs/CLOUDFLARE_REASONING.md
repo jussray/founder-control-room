@@ -209,6 +209,12 @@ The only runtime secret canonical Deploy actively writes is the checked-in fail-
 
 This source membrane does not prove the current Cloudflare required-secret set, values, Workers Builds dashboard configuration, custom-domain routing, active deployment, or runtime SHA. Those remain separate provider/runtime readback gates.
 
+### Founder Content n8n Worker activation boundary
+
+`wrangler.worker.toml` may express the reviewed Founder Content source intent with `N8N_FOUNDER_CONTENT_ENABLED=true`, Buffer as the only enabled provider for this slice, expected workflow ID `fcrFounderContentV1`, and n8n runtime `2.32.6`. The canonical Worker also declares four provider-held required binding names: `N8N_FOUNDER_CONTENT_WEBHOOK_URL`, `N8N_FOUNDER_CONTENT_BEARER_TOKEN`, `N8N_FOUNDER_CONTENT_EXPECTED_WORKFLOW_FINGERPRINT`, and `N8N_FOUNDER_CONTENT_IDENTITY_HMAC_SECRET`.
+
+Those source declarations and required names are not provider/runtime observations. A Wrangler dry-run, ordinary CI, or an isolated real-n8n proof cannot establish that the production Worker has those bindings, that the exact production workflow is published, that its HMAC identity matches, that the database migrations are applied, or that Buffer accepted a schedule. Canonical exact-main Deploy must fail closed on missing required binding names before Worker mutation, and any later `live`, `used`, `scheduled`, or `published` claim requires exact deployed Worker identity plus production n8n workflow/runtime identity and provider-native Buffer readback.
+
 ## Durable release-proof Workflow boundary
 
 `wrangler.worker.toml` declares one Cloudflare Workflows binding for the exported `ReleaseProofWorkflowV0` class:

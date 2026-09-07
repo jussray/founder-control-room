@@ -89,10 +89,11 @@ jobs:
           fi
 
           grep -Eq '^name = "founder-control-room-review-email"$' wrangler.email.toml
+          grep -Eq '^addresses = \["review@foundercontrolroom.org"\]$' wrangler.email.toml
           grep -Eq '^binding = "FOUNDER_CONTROL_ROOM_API"$' wrangler.email.toml
           grep -Eq '^service = "founder-control-room"$' wrangler.email.toml
 
-          echo 'Review-email Worker identity, account authority, private API binding, and dedicated deploy credential are declared.'
+          echo 'Review-email Worker identity, review@ routing trigger, account authority, private API binding, and dedicated deploy credential are declared.'
 
       - name: Record bounded authority receipt
         shell: bash
@@ -104,6 +105,7 @@ jobs:
             echo "- Approval reference: \`$DEPLOYMENT_APPROVAL_ID\`"
             echo "- Reason: ${DEPLOYMENT_REASON:-not supplied}"
             echo "- Mutation scope: Cloudflare Worker \`founder-control-room-review-email\` via \`wrangler.email.toml\`"
+            echo "- Email trigger: \`review@foundercontrolroom.org -> founder-control-room-review-email\`"
             echo "- Credential authority: dedicated \`CLOUDFLARE_REVIEW_EMAIL_DEPLOY_TOKEN\`"
             echo "- Intended private binding: \`FOUNDER_CONTROL_ROOM_API -> founder-control-room\`"
             echo "- Existing Worker secrets: preserved and validated by name before deploy"
@@ -133,7 +135,9 @@ jobs:
         run: npm ci
 
       - name: Re-prove review-email Worker repository contract
-        run: npm run verify:founder-review-email
+        run: |
+          node scripts/verify-founder-review-email-routing.mjs
+          npm run verify:founder-review-email
 
       - name: Initialize redacted reconciliation receipt
         env:
@@ -146,16 +150,19 @@ jobs:
             --arg scope 'review_email_worker_reconcile' \
             --arg expected_sha "$EXPECTED_HEAD_SHA" \
             --arg worker 'founder-control-room-review-email' \
+            --arg address 'review@foundercontrolroom.org' \
             --arg binding 'FOUNDER_CONTROL_ROOM_API' \
             --arg service 'founder-control-room' \
             '{
               scope: $scope,
               expected_sha: $expected_sha,
               worker: $worker,
+              email_routing_address: $address,
               service_binding: {binding: $binding, service: $service},
               credential_header_safe: false,
               required_secret_names_verified: false,
               provider_deploy_succeeded: false,
+              email_trigger_reconciled: false,
               blocked_stage: "credential_header_safety",
               supabase_db_mutation: false,
               access_policy_mutation: false,
@@ -219,7 +226,7 @@ jobs:
           mv "$tmp" "$receipt"
           echo 'Required review-email Worker secret names are present. Values were not read.'
 
-      - name: Deploy only the review-email Worker
+      - name: Deploy review-email Worker and reconcile email trigger
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_REVIEW_EMAIL_DEPLOY_TOKEN }}
           EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha }}
@@ -229,7 +236,7 @@ jobs:
           deploy_log="$RUNNER_TEMP/review-email-worker-deploy.log"
 
           set +e
-          ./node_modules/.bin/wrangler deploy --config wrangler.email.toml 2>&1 | tee "$deploy_log"
+          npx --yes wrangler@4.129.0 deploy --config wrangler.email.toml 2>&1 | tee "$deploy_log"
           deploy_status=${PIPESTATUS[0]}
           set -e
           if (( deploy_status != 0 )); then
@@ -244,7 +251,7 @@ jobs:
 
           receipt='test-results/fcr-review-email-worker-reconcile.json'
           tmp="${receipt}.tmp"
-          jq '.provider_deploy_succeeded = true | .blocked_stage = null' "$receipt" > "$tmp"
+          jq '.provider_deploy_succeeded = true | .email_trigger_reconciled = true | .blocked_stage = null' "$receipt" > "$tmp"
           mv "$tmp" "$receipt"
           cat "$receipt" >> "$GITHUB_STEP_SUMMARY"
 

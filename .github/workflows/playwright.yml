@@ -201,6 +201,12 @@ jobs:
           set -euo pipefail
           node e2e/evidence-trust-plane-proof.mjs 2>&1 | tee logs/evidence-trust-plane-proof.log
 
+      - name: Prove Founder capital decision card
+        shell: bash
+        run: |
+          set -euo pipefail
+          node e2e/founder-capital-decision-proof.mjs 2>&1 | tee logs/founder-capital-decision-proof.log
+
       - name: Prove evidence-aware mission board
         shell: bash
         run: |
