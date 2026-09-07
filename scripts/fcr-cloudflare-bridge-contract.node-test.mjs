@@ -133,7 +133,7 @@ test('browser receipt must pass a bounded field schema before derived public boo
   assert.match(returnStep, /\.schemaVersion == 1/);
   assert.match(returnStep, /\.scope == "fcr-access-front-door-browser-proof"/);
   assert.match(returnStep, /\.expectedHeadSha == \$expectedHeadSha/);
-  assert.match(returnStep, /\.requestedOrigin == "https:\/\/foundercontrolroom\.org"/);
+  assert.match(returnStep, /\.requestedOrigin == "https:\/\/www\.foundercontrolroom\.org"/);
   assert.match(returnStep, /def origin_or_null:/);
   assert.match(returnStep, /\.finalOrigin \| origin_or_null/);
   assert.match(returnStep, /def status_or_null:/);
