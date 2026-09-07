@@ -20,6 +20,12 @@ The workflow must emit `endToEndComplete: false` and `independentJiraReadbackReq
 
 A green PR, a green workflow, a canonical receipt, or a matching runtime SHA must not substitute for that independent Jira readback.
 
+## Controlled mutation boundary
+
+A successful live probe is not read-only. It deliberately exercises the already-approved **assignment-only** Jira action on one dedicated probe issue so the n8n/Jira mutation path can be witnessed instead of inferred.
+
+Do not dispatch this workflow against ordinary product work. The probe issue must be a designated control item whose expected result is assignment to the configured `sekretbip` Jira account. If the designated probe issue is no longer unassigned and In Progress, reacquire or reset the control fixture through an independently authorized Jira operation before another probe. Do not broaden the probe to transitions, deletion, arbitrary comments, or arbitrary issue selection.
+
 ## Authority ceiling
 
 The workflow is `workflow_dispatch` only, runs only from `refs/heads/main`, and uses the protected `production` environment.
