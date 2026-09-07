@@ -1,6 +1,6 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Preserve the existing #746 evidence-authority, Cloudflare Access recovery, Founder Capital Decision, and ATTACK-20 invariants while binding the governed Founder Content n8n production-source rescue to current documentation. This receipt keeps source intent, provider configuration, runtime identity, database application, publication outcome, merge authority, and deploy authority as separate proof planes and does not claim that production n8n, Buffer scheduling, Cloudflare bindings, or Supabase migrations are live merely because the source lane is enabled.",
+  "purpose": "Preserve the existing #746 evidence-authority, Cloudflare Access recovery, Founder Capital Decision, ATTACK-20, and governed Founder Content n8n invariants while recording the post-merge GHAS containment repair. This receipt keeps source intent, abuse control, provider configuration, runtime identity, database application, publication outcome, merge authority, and deploy authority as separate proof planes and does not claim that production n8n, Buffer scheduling, Cloudflare bindings, or Supabase migrations are live merely because the source lane is enabled or rate-limited.",
   "domains": [
     "repository-provider",
     "evidence-authority",
@@ -104,7 +104,7 @@
     {
       "path": "src/http/routes/n8nConveyor.ts",
       "claims": [
-        "src/http/routes/n8nConveyor.ts may expose the Founder Content n8n execution route only behind authenticated founder identity and FCR-issued one-shot approval identity; caller-supplied approval objects remain forbidden, and a returned n8n scheduling receipt must keep published false with final publication truth delegated to provider readback."
+        "src/http/routes/n8nConveyor.ts may expose Founder Content lifecycle mutation and n8n execution only behind authenticated founder identity and explicit route-local abuse control; the lifecycle path must apply rateLimitFounderPermissions before invoking its explicit child-router forwarding handler, provider-neutral scheduling must be rate-limited before its mutating handler, caller-supplied approval objects remain forbidden, and a returned n8n scheduling receipt must keep published false with final publication truth delegated to provider readback."
       ]
     },
     {

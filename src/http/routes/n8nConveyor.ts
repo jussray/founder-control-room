@@ -26,11 +26,16 @@ import {
 } from '../../lib/n8nConveyorReadiness.js';
 import { FOUNDER_CONVEYOR_CONTRACT } from '../../lib/founderConveyorReceipt.js';
 import { requireFounder, type FounderRequest } from '../middleware/requireFounder.js';
+import { rateLimitFounderPermissions } from '../middleware/security.js';
 import { founderContentLifecycleRouter } from './founderContentLifecycle.js';
 
 export const n8nConveyorRouter = Router();
 n8nConveyorRouter.use(requireFounder);
-n8nConveyorRouter.use('/founder-content/lifecycle', founderContentLifecycleRouter);
+n8nConveyorRouter.use(
+  '/founder-content/lifecycle',
+  rateLimitFounderPermissions,
+  (req, res, next) => founderContentLifecycleRouter(req, res, next),
+);
 
 type JsonRecord = Record<string, unknown>;
 
@@ -266,33 +271,37 @@ n8nConveyorRouter.post('/founder-content/publish-now', async (req: FounderReques
   return res.status(result.status).json(result);
 });
 
-n8nConveyorRouter.post('/founder-content', async (req: FounderRequest, res) => {
-  const body = (req.body ?? {}) as JsonRecord;
-  const founder = req.founder;
-  if (!founder) return res.status(401).json({ ok: false, code: 'FOUNDER_SESSION_REQUIRED' });
-  if (Object.hasOwn(body, 'approval')) {
-    return res.status(400).json({
-      ok: false,
-      code: 'CALLER_APPROVAL_OBJECT_FORBIDDEN',
-      contract: N8N_FOUNDER_CONTENT_CONTRACT,
-      published: false,
-      reasons: ['provider orchestration accepts only an FCR-issued approval_id, never caller-supplied approval authority'],
+n8nConveyorRouter.post(
+  '/founder-content',
+  rateLimitFounderPermissions,
+  async (req: FounderRequest, res) => {
+    const body = (req.body ?? {}) as JsonRecord;
+    const founder = req.founder;
+    if (!founder) return res.status(401).json({ ok: false, code: 'FOUNDER_SESSION_REQUIRED' });
+    if (Object.hasOwn(body, 'approval')) {
+      return res.status(400).json({
+        ok: false,
+        code: 'CALLER_APPROVAL_OBJECT_FORBIDDEN',
+        contract: N8N_FOUNDER_CONTENT_CONTRACT,
+        published: false,
+        reasons: ['provider orchestration accepts only an FCR-issued approval_id, never caller-supplied approval authority'],
+      });
+    }
+
+    const result = await dispatchAuthoritativeN8nFounderContent({
+      proposal: record(body.proposal),
+      approval_id: text(body.approval_id),
+      n8n_provider: text(body.n8n_provider),
+      confirmation: publicationConfirmation(body.confirmation),
+    }, {
+      founderUserId: founder.userId,
+      founderIdentity: founder.email,
     });
-  }
 
-  const result = await dispatchAuthoritativeN8nFounderContent({
-    proposal: record(body.proposal),
-    approval_id: text(body.approval_id),
-    n8n_provider: text(body.n8n_provider),
-    confirmation: publicationConfirmation(body.confirmation),
-  }, {
-    founderUserId: founder.userId,
-    founderIdentity: founder.email,
-  });
-
-  return res.status(result.status).json({
-    ...result,
-    published: false,
-    finalPublishedTruth: 'fcr-provider-readback-only',
-  });
-});
+    return res.status(result.status).json({
+      ...result,
+      published: false,
+      finalPublishedTruth: 'fcr-provider-readback-only',
+    });
+  },
+);

@@ -22,6 +22,7 @@ on:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+  CODEQL_OVERLAY_DATABASE_MODE: none
 
 jobs:
   analyze:
@@ -55,8 +56,8 @@ jobs:
           build-mode: none
         # CodeQL supports the following values keywords for 'language': 'actions', 'c-cpp', 'csharp', 'go', 'java-kotlin', 'javascript-typescript', 'python', 'ruby', 'rust', 'swift'
         # Use `c-cpp` to analyze code written in C, C++ or both
-        # Use 'java-kotlin' to analyze code written in Java, Kotlin or both
-        # Use 'javascript-typescript' to analyze code written in JavaScript, TypeScript or both
+        # Use 'java-kotlin' to analyze code written in Java or Kotlin, or both
+        # Use 'javascript-typescript' to analyze code written in JavaScript, TypeScript, or both
         # To learn more about changing the languages that are analyzed or customizing the build mode for this analysis,
         # see https://docs.github.com/en/code-security/code-scanning/creating-an-advanced-setup-for-code-scanning/customizing-your-advanced-setup-for-code-scanning.
         # If you are analyzing a compiled language, you can modify the 'build-mode' for that language to customize how
@@ -75,30 +76,14 @@ jobs:
         test "$actual" = "$EXPECTED_HEAD_SHA"
 
     # Add any setup steps before running the `github/codeql-action/init` action.
-    # This includes steps like installing compilers or runtimes (`actions/setup-node`
-    # or others). This is typically only required for manual builds.
-    # - name: Setup runtime (example)
-    #   uses: actions/setup-example@v1
+    # This includes installing compilers or runtimes when manual build mode is used.
 
-    # Initializes the CodeQL tools for scanning.
     - name: Initialize CodeQL
       uses: github/codeql-action/init@cdf488f595d80d6e07e03d4674febd5ab45fa938
       with:
         languages: ${{ matrix.language }}
         build-mode: ${{ matrix.build-mode }}
-        # If you wish to specify custom queries, you can do so here or in a config file.
-        # By default, queries listed here will override any specified in a config file.
-        # Prefix the list here with "+" to use these queries and those in the config file.
 
-        # For more details on CodeQL's query packs, refer to: https://docs.github.com/en/code-security/code-scanning/automatically-scanning-your-code-for-vulnerabilities-and-errors/configuring-code-scanning#using-queries-in-ql-packs
-        # queries: security-extended,security-and-quality
-
-    # If the analyze step fails for one of the languages you are analyzing with
-    # "We were unable to automatically build your code", modify the matrix above
-    # to set the build mode to "manual" for that language. Then modify this step
-    # to build your code.
-    # ℹ️ Command-line programs to run using the OS shell.
-    # 📚 See https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#jobsjob_idstepsrun
     - name: Run manual build steps
       if: matrix.build-mode == 'manual'
       shell: bash
@@ -112,4 +97,69 @@ jobs:
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@cdf488f595d80d6e07e03d4674febd5ab45fa938
       with:
-        category: "/language:${{matrix.language}}"
+        category: "/language:${{ matrix.language }}"
+        output: ../results
+
+    - name: Build sanitized CodeQL findings receipt
+      if: always()
+      shell: bash
+      env:
+        CODEQL_LANGUAGE: ${{ matrix.language }}
+      run: |
+        python - <<'PY'
+        import glob
+        import json
+        import os
+
+        findings = []
+        sarif_files = sorted(glob.glob('../results/*.sarif'))
+        for path in sarif_files:
+            with open(path, encoding='utf-8') as handle:
+                sarif = json.load(handle)
+            for run in sarif.get('runs', []):
+                rules = {
+                    rule.get('id'): rule
+                    for rule in run.get('tool', {}).get('driver', {}).get('rules', [])
+                    if rule.get('id')
+                }
+                for result in run.get('results', []):
+                    rule_id = result.get('ruleId')
+                    rule = rules.get(rule_id, {})
+                    rule_props = rule.get('properties', {}) or {}
+                    result_props = result.get('properties', {}) or {}
+                    locations = result.get('locations') or []
+                    physical = locations[0].get('physicalLocation', {}) if locations else {}
+                    artifact = physical.get('artifactLocation', {}) or {}
+                    region = physical.get('region', {}) or {}
+                    findings.append({
+                        'ruleId': rule_id,
+                        'level': result.get('level'),
+                        'securitySeverity': (
+                            result_props.get('security-severity')
+                            or rule_props.get('security-severity')
+                        ),
+                        'path': artifact.get('uri'),
+                        'line': region.get('startLine'),
+                    })
+
+        receipt = {
+            'schema': 'fcr/codeql-sanitized-findings@v1',
+            'exactHeadSha': os.environ.get('EXPECTED_HEAD_SHA'),
+            'language': os.environ.get('CODEQL_LANGUAGE'),
+            'sarifFileCount': len(sarif_files),
+            'findingCount': len(findings),
+            'findings': findings,
+        }
+        with open('codeql-findings.json', 'w', encoding='utf-8') as handle:
+            json.dump(receipt, handle, indent=2, sort_keys=True)
+            handle.write('\n')
+        PY
+
+    - name: Retain sanitized CodeQL findings
+      if: always()
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      with:
+        name: codeql-findings-${{ matrix.language }}-${{ env.EXPECTED_HEAD_SHA }}
+        path: codeql-findings.json
+        if-no-files-found: error
+        retention-days: 1

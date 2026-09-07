@@ -144,6 +144,8 @@ verified evidence
 
 A draft, provider acceptance, or n8n execution is not publication truth. **Provider readback** is the terminal external-state evidence for the route that actually ran.
 
+Authenticated Founder Content mutation surfaces are source-guarded by the repository's founder-content rate limiter before lifecycle mutation or provider-neutral n8n scheduling handlers execute. That limiter is an abuse-control boundary only: it grants no approval, publication, provider, deployment, or outcome authority, and its presence does not prove the live Worker carries the reviewed source.
+
 The governed Founder Content n8n production-source lane is source-enabled only when its reviewed configuration sets `N8N_FOUNDER_CONTENT_ENABLED=true`, restricts the enabled provider to Buffer, pins workflow identity `fcrFounderContentV1`, and pins n8n runtime `2.32.6`. That source state does not prove the canonical Worker was deployed with the four required provider-held n8n secret bindings, the production workflow was published at the exact expected fingerprint, the database migrations were applied, or Buffer accepted a schedule. CI may prove the checked workflow on an isolated real n8n runtime without proving production use. Present-tense `live`, `used`, `scheduled`, or `published` claims require exact deployed runtime identity plus provider-native readback.
 
 Investor email is a separate authority class and must not auto-send without the applicable policy, recipient-specific qualification, and send authority.
