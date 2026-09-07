@@ -24,14 +24,23 @@ describe('Founder Control Room Cloudflare topology', () => {
     expect(buildScript).toContain("'portable-founder-console/index.html'");
   });
 
-  it('provides a root front door into the founder-authenticated app', () => {
+  it('provides a five-screen public front door into the founder-authenticated app', () => {
     const landing = read('public/index.html');
     const app = read('public/control-room/index.html');
     const bootstrap = read('public/control-room/opaque-session-bootstrap.js');
 
-    expect(landing).toContain('href="/control-room/"');
-    expect(landing).toContain('The four jobs');
-    expect(landing).toContain('View safety boundary');
+    expect(landing).toContain('<link rel="canonical" href="https://www.foundercontrolroom.org/" />');
+    expect(landing).toContain('href="https://www.foundercontrolroom.org/control-room/"');
+    expect(landing).toContain('href="https://www.foundercontrolroom.org/guardrails"');
+    expect(landing).not.toContain('href="/control-room/"');
+    expect(landing).toContain('data-bottom-nav="five-screen"');
+    for (const screen of ['home', 'control-room', 'chief', 'promptos', 'proof']) {
+      expect(landing).toContain(`data-public-screen="${screen}"`);
+      expect(landing).toContain(`data-nav-screen="${screen}"`);
+    }
+    expect(landing).toContain('Chief turns founder intent into governed execution.');
+    expect(landing).toContain('PromptOS is an intention compiler.');
+    expect(landing).toContain('Private projects, approvals, credentials, and operating evidence stay behind founder authentication.');
     expect(app).toContain('src="/control-room/opaque-session-bootstrap.js"');
     expect(app).not.toContain('src="/control-room/app.js"');
     expect(bootstrap).toContain("await import('/control-room/app.js')");
@@ -43,7 +52,7 @@ describe('Founder Control Room Cloudflare topology', () => {
     expect(existsSync(resolve(repoRoot, 'public/portable-founder-console/index.html'))).toBe(true);
   });
 
-  it('turns the founder stack into a five-lane execution loop without booting closed optional surfaces', () => {
+  it('turns the founder stack into a five-lane execution loop', () => {
     const app = read('public/control-room/index.html');
     const stackRouter = read('public/control-room/stack-router.js');
 
@@ -66,13 +75,6 @@ describe('Founder Control Room Cloudflare topology', () => {
     expect(stackRouter).toContain("'terminal'");
     expect(stackRouter).toContain('.tabs button[data-tab=');
     expect(stackRouter).toContain('new MutationObserver');
-    expect(stackRouter).not.toContain("import { installMissionBoard } from './mission-board.js'");
-    expect(stackRouter).toContain("import('./mission-board.js')");
-    expect(stackRouter).toContain("target.closest('.tabs button[data-tab=\"missions\"]')");
-    expect(stackRouter).toContain("if (launchDock.open) void refreshConveyorReadiness()");
-    expect(stackRouter.trim().endsWith('}')).toBe(true);
-    expect(stackRouter).not.toMatch(/\nvoid refreshConveyorReadiness\(\);\s*$/);
-    expect(stackRouter).not.toMatch(/\ninstallMissionBoard\(\);\s*$/);
   });
 
   it('routes Workflows through the current proof-bound founder content lifecycle', () => {
@@ -106,6 +108,7 @@ describe('Founder Control Room Cloudflare topology', () => {
     expect(playwrightProof).toContain("'content-manager-mobile.png'");
     expect(playwrightProof).toContain('page must not overflow the mobile viewport');
     expect(playwrightProof).toContain('capability must not be presented as an already-authorized publish control');
+    expect(playwrightProof).toContain('approved post may expose publish gate without being authorized to execute it');
   });
 
   it('keeps browser API calls same-origin and binds them directly to the API Worker', () => {

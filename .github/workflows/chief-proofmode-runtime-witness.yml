@@ -1,0 +1,221 @@
+name: Chief ProofMode Runtime Witness
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_main_sha:
+        description: 'Founder-bound exact current FCR main SHA'
+        required: true
+        type: string
+      chief_candidate_sha:
+        description: 'Exact current Chief PR #143 candidate SHA'
+        required: true
+        type: string
+      target_url:
+        description: 'Exact immutable Chief workers.dev preview origin'
+        required: true
+        type: string
+      approval_reference:
+        description: 'Auditable founder approval reference for evidence publication'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: chief-proofmode-runtime-witness
+  cancel-in-progress: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  EXPECTED_FOUNDER_MAIN_SHA: ${{ inputs.expected_main_sha }}
+  EXPECTED_TRUSTED_MAIN_SHA: ${{ github.sha }}
+  CHIEF_CANDIDATE_SHA: ${{ inputs.chief_candidate_sha }}
+  CHIEF_RUNTIME_TARGET_URL: ${{ inputs.target_url }}
+  CHIEF_ACCESS_MODE: check
+  CHIEF_ACCESS_TARGET_URL: ${{ inputs.target_url }}
+  CLOUDFLARE_ACCOUNT_ID: '9b59861bd1747cf7525571b4c51d2aa0'
+  CHIEF_ACCESS_APP_NAME: 'chief-ai - Cloudflare Workers'
+  RUNTIME_WITNESS_APPROVAL_REFERENCE: ${{ inputs.approval_reference }}
+  RUNTIME_RECEIPT_PATH: test-results/chief-proofmode-runtime-receipt.json
+
+jobs:
+  witness:
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      github.actor == 'jussray' &&
+      github.actor_id == '286642846'
+    name: Verify and publish exact Chief ProofMode runtime witness
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    environment: production
+    env:
+      GITHUB_APP_ID: ${{ secrets.APP_ID }}
+      GITHUB_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}
+      CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID: ${{ secrets.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID || secrets.CLOUDFLARE_ACCESS_CLIENT_ID || vars.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID || vars.CLOUDFLARE_ACCESS_CLIENT_ID }}
+      CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID: ${{ vars.CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID || vars.CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID }}
+      CHIEF_RUNTIME_ACCESS_CLIENT_ID: ${{ secrets.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID || secrets.CLOUDFLARE_ACCESS_CLIENT_ID || vars.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID || vars.CLOUDFLARE_ACCESS_CLIENT_ID }}
+      CHIEF_RUNTIME_ACCESS_CLIENT_SECRET: ${{ secrets.CHIEF_CLOUDFLARE_ACCESS_CLIENT_SECRET || secrets.CLOUDFLARE_ACCESS_CLIENT_SECRET }}
+
+    steps:
+      - name: Check out founder-bound exact current FCR main
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.EXPECTED_TRUSTED_MAIN_SHA }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Fail closed unless workflow source is exact current FCR main
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = 'refs/heads/main'
+          test "$GITHUB_ACTOR" = 'jussray'
+          [[ "$EXPECTED_FOUNDER_MAIN_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$EXPECTED_TRUSTED_MAIN_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$CHIEF_CANDIDATE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$RUNTIME_WITNESS_APPROVAL_REFERENCE" =~ ^[A-Za-z0-9._:-]{8,200}$ ]]
+          test "$EXPECTED_FOUNDER_MAIN_SHA" = "$EXPECTED_TRUSTED_MAIN_SHA"
+          test "$EXPECTED_TRUSTED_MAIN_SHA" = "$(git rev-parse HEAD)"
+
+          git fetch --no-tags --depth=1 origin refs/heads/main:refs/remotes/origin/main
+          current_main="$(git rev-parse refs/remotes/origin/main)"
+          test "$EXPECTED_TRUSTED_MAIN_SHA" = "$current_main"
+
+          target_origin="$(node -e '
+            const raw = process.argv[1];
+            try {
+              const url = new URL(raw);
+              if (
+                url.protocol !== "https:"
+                || url.username
+                || url.password
+                || url.search
+                || url.hash
+                || (url.pathname !== "/" && url.pathname !== "")
+                || !/^[0-9a-f]{8}-chief-ai\.mcgill-raylene\.workers\.dev$/i.test(url.hostname)
+              ) process.exit(1);
+              process.stdout.write(url.origin);
+            } catch { process.exit(1); }
+          ' "$CHIEF_RUNTIME_TARGET_URL")" || {
+            echo '::error title=Invalid Chief target::target_url must be one immutable Chief workers.dev preview origin.'
+            exit 1
+          }
+          printf 'CHIEF_RUNTIME_TARGET_URL=%s\n' "$target_origin" >> "$GITHUB_ENV"
+          printf 'CHIEF_ACCESS_TARGET_URL=%s\n' "$target_origin" >> "$GITHUB_ENV"
+
+          {
+            echo '## Chief runtime witness authority gate'
+            echo
+            echo "- Trusted FCR main: \`$EXPECTED_TRUSTED_MAIN_SHA\`"
+            echo "- Chief candidate: \`$CHIEF_CANDIDATE_SHA\`"
+            echo "- Immutable preview: \`$target_origin\`"
+            echo '- Cloudflare Access mode: `check` only'
+            echo '- GitHub evidence mutation: fixed external App check + fixed proofmode-access-admin evidence deployment only after runtime proof'
+            echo '- Merge, bypass, ruleset mutation, Cloudflare repair, Worker deploy, DNS, database, and secret mutation: none'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Set up Node 24
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Prove witness and Access contracts before provider access
+        run: |
+          node --check scripts/reconcile-chief-proofmode-access.mjs
+          node --check scripts/publish-chief-runtime-witness.mjs
+          node --test scripts/reconcile-chief-proofmode-access.node-test.mjs
+          node --test scripts/chief-proofmode-access-bridge-contract.node-test.mjs
+          node --test scripts/publish-chief-runtime-witness.node-test.mjs
+
+      - name: Re-read exact Chief Service Auth without mutation
+        env:
+          CLOUDFLARE_ACCESS_API_TOKEN: ${{ secrets.CLOUDFLARE_ACCESS_API_TOKEN }}
+        run: node scripts/reconcile-chief-proofmode-access.mjs >/dev/null 2>&1
+
+      - name: Require protected Chief runtime credential pair
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "$CHIEF_RUNTIME_ACCESS_CLIENT_ID" || -z "$CHIEF_RUNTIME_ACCESS_CLIENT_SECRET" ]]; then
+            echo '::error title=Missing protected runtime credential::Trusted FCR runtime witness requires both Chief Access client ID and client secret in the protected FCR production environment.'
+            exit 1
+          fi
+
+      - name: Run trusted protected Chief ProofMode Playwright
+        env:
+          PROOFMODE_BASE_URL: ${{ env.CHIEF_RUNTIME_TARGET_URL }}
+          EXPECTED_HEAD_SHA: ${{ env.CHIEF_CANDIDATE_SHA }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > playwright.chief-runtime.config.mjs <<'EOF'
+          import { defineConfig } from '@playwright/test';
+
+          export default defineConfig({
+            testDir: './e2e',
+            testMatch: /chief-proofmode-runtime\.pw\.mjs$/,
+            fullyParallel: false,
+            retries: 0,
+            workers: 1,
+            outputDir: './test-results/chief-proofmode-runtime',
+            reporter: [['line']],
+          });
+          EOF
+          npx playwright test --config=playwright.chief-runtime.config.mjs
+
+      - name: Materialize exact protected runtime receipt
+        env:
+          WORKFLOW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p test-results
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const receipt = {
+            schema: 'fcr/chief-runtime-playwright@v1',
+            trustedFcrMainSha: process.env.EXPECTED_TRUSTED_MAIN_SHA,
+            chiefCandidateSha: process.env.CHIEF_CANDIDATE_SHA,
+            targetOrigin: process.env.CHIEF_RUNTIME_TARGET_URL,
+            versionVerified: true,
+            playwrightPassed: true,
+            proofModeVerified: true,
+            workflowRunUrl: process.env.WORKFLOW_RUN_URL,
+            generatedAt: new Date().toISOString(),
+          };
+          fs.writeFileSync(process.env.RUNTIME_RECEIPT_PATH, `${JSON.stringify(receipt, null, 2)}\n`, 'utf8');
+          NODE
+
+      - name: Build trusted GitHub App authentication implementation
+        run: npm run build
+
+      - name: Publish and independently read back exact-head runtime evidence
+        run: node scripts/publish-chief-runtime-witness.mjs
+
+      - name: Re-read trusted FCR main after evidence publication
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin refs/heads/main:refs/remotes/origin/main
+          current_main="$(git rev-parse refs/remotes/origin/main)"
+          printf 'founder_bound_main=%s\ntrusted_workflow_sha=%s\ncurrent_main_after=%s\n' \
+            "$EXPECTED_FOUNDER_MAIN_SHA" "$EXPECTED_TRUSTED_MAIN_SHA" "$current_main"
+          test "$EXPECTED_FOUNDER_MAIN_SHA" = "$current_main"
+          test "$EXPECTED_TRUSTED_MAIN_SHA" = "$current_main"
+
+      - name: Retain sanitized runtime witness receipts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: chief-proofmode-runtime-witness-${{ inputs.chief_candidate_sha }}-${{ github.run_id }}
+          path: |
+            test-results/chief-proofmode-runtime-receipt.json
+            artifacts/chief-runtime-witness.json
+          if-no-files-found: warn
+          retention-days: 30

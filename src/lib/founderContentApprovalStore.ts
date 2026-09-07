@@ -1,9 +1,5 @@
-import { createHash, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import {
-  evaluateFounderEditorialNovelty,
-  type FounderEditorialHistoryRepository,
-} from './founderEditorialNovelty.js';
 // @ts-expect-error -- canonical founder-content authority is the provider-neutral CommonJS firewall contract.
 import founderContentAuthorizationContract from '../../tools/founder-content-contracts/founder-content-authorization-contract.cjs';
 
@@ -53,11 +49,7 @@ export interface FounderContentApprovalClaimFailure {
 }
 
 export interface FounderContentApprovalRepository {
-  issue(input: FounderContentIssuedApproval & {
-    founderUserId: string;
-    publicCopyFingerprint: string;
-    editorialPatternFingerprint: string;
-  }): Promise<boolean>;
+  issue(input: FounderContentIssuedApproval & { founderUserId: string }): Promise<boolean>;
   readCurrent?(input: {
     founderUserId: string;
     approvalId: string;
@@ -92,49 +84,14 @@ function parseTime(value: unknown, label: string): number {
   return ms;
 }
 
-function deterministicApprovalId({
-  founderUserId,
-  platform,
-  publicCopyFingerprint,
-  approvedAt,
-}: {
-  founderUserId: string;
-  platform: string;
-  publicCopyFingerprint: string;
-  approvedAt: string;
-}): string {
-  // The canonical public-copy fingerprint remains the content identity, but
-  // approval rows are immutable historical one-shot records. A later fresh
-  // approval for unchanged copy must therefore receive a new row identity once
-  // both the previous exact-copy and editorial-pattern leases are inactive,
-  // instead of colliding with the old primary key forever. The server-observed
-  // issuance timestamp versions that immutable row identity. Concurrent or
-  // near-concurrent duplicate authority is serialized separately by the
-  // database-owned exact-copy and editorial-pattern reservations in one
-  // transaction. Current You intent id/version remain recorded on the
-  // authorization itself and are intentionally excluded from this identity.
-  const digest = createHash('sha256')
-    .update(JSON.stringify({
-      contract: 'fcr/founder-content-approval-reservation@v5',
-      founderUserId: text(founderUserId),
-      platform: text(platform).toLowerCase(),
-      publicCopyFingerprint: text(publicCopyFingerprint).toLowerCase(),
-      approvedAt: new Date(parseTime(approvedAt, 'approval issuance time')).toISOString(),
-    }))
-    .digest('hex');
-  return `fca:${digest}`;
-}
-
 function canonicalIssue({
   proposal,
   founderUserId,
   now,
-  approvalId: requestedApprovalId,
 }: {
   proposal: JsonRecord;
   founderUserId: string;
   now: string;
-  approvalId?: string;
 }): FounderContentIssuedApproval {
   if (!text(founderUserId)) throw new Error('authenticated founder user id is required');
   const nowMs = parseTime(now, 'now');
@@ -147,7 +104,7 @@ function canonicalIssue({
   const expiresMs = Math.min(nowMs + MAX_APPROVAL_TTL_MS, proposalExpiresMs);
   if (expiresMs <= nowMs) throw new Error('proposal is already expired');
 
-  const approvalId = text(requestedApprovalId) || `fca:${randomUUID()}`;
+  const approvalId = `fca:${randomUUID()}`;
   const proposalHash = text(proposal.proposal_hash).toLowerCase();
   const publicPayloadHash = canonicalFounderContent.hashPublicPayload(payload).toLowerCase();
   const platform = text(payload.platform).toLowerCase();
@@ -215,25 +172,25 @@ function normalizeStoredApproval(data: Record<string, unknown>): FounderContentA
 function supabaseRepository(client: SupabaseClient): FounderContentApprovalRepository {
   return {
     async issue(input) {
-      const { data, error } = await client.rpc(
-        'issue_founder_content_approval_with_active_reservations',
-        {
-          p_approval_id: input.approvalId,
-          p_founder_user_id: input.founderUserId,
-          p_proposal_hash: input.proposalHash,
-          p_public_payload_hash: input.publicPayloadHash,
-          p_authorization_hash: input.authorizationHash,
-          p_platform: input.platform,
-          p_source_repo: input.sourceRepo,
-          p_source_commit_sha: input.sourceCommitSha,
-          p_approval: input.approval,
-          p_approved_at: input.approvedAt,
-          p_expires_at: input.expiresAt,
-          p_public_copy_fingerprint: input.publicCopyFingerprint,
-          p_pattern_fingerprint: input.editorialPatternFingerprint,
-        },
-      );
-      return !error && data === true;
+      const { error } = await client
+        .from('founder_content_approvals')
+        .insert({
+          approval_id: input.approvalId,
+          founder_user_id: input.founderUserId,
+          proposal_hash: input.proposalHash,
+          public_payload_hash: input.publicPayloadHash,
+          authorization_hash: input.authorizationHash,
+          platform: input.platform,
+          source_repo: input.sourceRepo,
+          source_commit_sha: input.sourceCommitSha,
+          approval: input.approval,
+          approved_at: input.approvedAt,
+          expires_at: input.expiresAt,
+          revoked_at: null,
+          consumed_at: null,
+          consumed_by: null,
+        });
+      return !error;
     },
 
     async readCurrent(input) {
@@ -363,49 +320,16 @@ export async function issueFounderContentApproval({
   founderUserId,
   now = new Date().toISOString(),
   repository,
-  historyRepository,
 }: {
   proposal: JsonRecord;
   founderUserId: string;
   now?: string;
   repository?: FounderContentApprovalRepository;
-  historyRepository?: FounderEditorialHistoryRepository;
 }): Promise<FounderContentIssuedApproval> {
-  const canonicalIdentity = canonicalFounderContent.canonicalChiefIdentity(proposal);
-  const platform = text(record(canonicalIdentity.public_payload).platform).toLowerCase();
-  // Validate the proposal's canonical authorization contract (proposal_hash,
-  // evidence binding, Sauce Guard state, Current You freshness, ...) before
-  // any history lookup. canonicalIssue() also performs this validation, but
-  // running it here first — with a throwaway approval id, discarded below —
-  // rejects a malformed proposal before evaluateFounderEditorialNovelty()
-  // reads history for it. Without this, an invalid proposal could be
-  // misreported as a repetition hold or history-read failure instead of
-  // being rejected for its invalid authority contract.
-  canonicalIssue({ proposal, founderUserId, now });
-  const novelty = await evaluateFounderEditorialNovelty({ proposal, historyRepository });
-  if (!novelty.allowed) {
-    throw new Error(
-      `FOUNDER_EDITORIAL_REPETITION_BLOCKED: story=${novelty.storyFingerprint} closest=${novelty.closestMatchId ?? 'unknown'} similarity=${novelty.closestSimilarity}`,
-    );
-  }
-  const approvedAt = new Date(parseTime(now, 'now')).toISOString();
-  const approvalId = deterministicApprovalId({
-    founderUserId,
-    platform,
-    publicCopyFingerprint: novelty.publicCopyFingerprint,
-    approvedAt,
-  });
-  const issued = canonicalIssue({ proposal, founderUserId, now: approvedAt, approvalId });
+  const issued = buildFounderContentIssuedApproval({ proposal, founderUserId, now });
   const store = repository ?? await defaultRepository();
-  const persisted = await store.issue({
-    ...issued,
-    founderUserId,
-    publicCopyFingerprint: novelty.publicCopyFingerprint,
-    editorialPatternFingerprint: novelty.promptOsPatternFingerprint,
-  });
-  if (!persisted) {
-    throw new Error('authoritative founder-content approval could not be persisted; active public copy or editorial pattern is already reserved, the exact issuance row already exists, or the store rejected issuance');
-  }
+  const persisted = await store.issue({ ...issued, founderUserId });
+  if (!persisted) throw new Error('authoritative founder-content approval could not be persisted');
   return issued;
 }
 
@@ -477,8 +401,5 @@ export async function claimFounderContentApproval({
   if (!lookup.ok) return lookup.failure;
 
   const store = repository ?? await defaultRepository();
-  return store.claim({
-    ...lookup.input,
-    consumedBy: text(consumedBy),
-  });
+  return store.claim({ ...lookup.input, consumedBy: text(consumedBy) });
 }

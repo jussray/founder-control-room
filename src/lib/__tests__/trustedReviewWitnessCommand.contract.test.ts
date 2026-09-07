@@ -42,16 +42,17 @@ describe('trusted review witness command contract', () => {
     expect(commandJob).not.toContain('pull-requests: write');
   });
 
-  it('hard-codes the trusted witness workflow and binds dispatch to founder-supplied main', () => {
+  it('hard-codes the trusted witness workflow and binds dispatch to founder-supplied main plus exact observed PR head', () => {
     expect(reviewWorkflow).toContain(
       '/actions/workflows/deterministic-review-core-advisory.yml/dispatches',
     );
     expect(reviewWorkflow).toContain('--arg ref main');
     expect(reviewWorkflow).toContain('--arg pr "$PR_NUMBER"');
     expect(reviewWorkflow).not.toContain('--argjson pr "$PR_NUMBER"');
+    expect(reviewWorkflow).toContain('--arg expected_pr_head_sha "$TARGET_HEAD_SHA"');
     expect(reviewWorkflow).toContain('--arg expected_main_sha "$EXPECTED_MAIN_SHA"');
     expect(reviewWorkflow).toContain(
-      "'{ref:$ref, inputs:{pull_request_number:$pr, expected_main_sha:$expected_main_sha}}'",
+      "'{ref:$ref, inputs:{pull_request_number:$pr, expected_pr_head_sha:$expected_pr_head_sha, expected_main_sha:$expected_main_sha}}'",
     );
 
     expect(reviewWorkflow).not.toContain('/actions/workflows/deploy.yml/dispatches');
@@ -65,8 +66,11 @@ describe('trusted review witness command contract', () => {
   it('requires workflow dispatch to carry the founder-bound main SHA into trusted publication', () => {
     expect(reviewWorkflow).toContain('workflow_dispatch:');
     expect(reviewWorkflow).toContain('pull_request_number:');
+    expect(reviewWorkflow).toContain('expected_pr_head_sha:');
+    expect(reviewWorkflow).toContain('Exact PR head observed before trusted witness dispatch');
     expect(reviewWorkflow).toContain('expected_main_sha:');
     expect(reviewWorkflow).toContain('Founder-bound exact current main SHA for this witness request');
+    expect(reviewWorkflow).toContain('EXPECTED_REVIEW_HEAD_SHA: ${{ inputs.expected_pr_head_sha }}');
     expect(reviewWorkflow).toContain('EXPECTED_FOUNDER_MAIN_SHA: ${{ inputs.expected_main_sha }}');
     expect(reviewWorkflow).toContain('[[ "$EXPECTED_FOUNDER_MAIN_SHA" =~ ^[0-9a-f]{40}$ ]]');
     expect(reviewWorkflow).toContain(

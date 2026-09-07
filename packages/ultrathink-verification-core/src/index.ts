@@ -10,4 +10,3 @@ export * from './evaluator.js';
 export * from './provider-authority-receipt.v0.js';
 export * from './provider-authority-evaluator.v0.js';
 export * from './github-authority-observation.v0.js';
-export * from './v4-advisory-handoff.v0.js';

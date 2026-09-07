@@ -64,18 +64,18 @@ FCR_V10_CONVEYOR_CONTRACT = "founder-control-room/n8n-conveyor@v3"
 FCR_V10_MAX_RUNTIME_AUTHORITY = "draft"
 FCR_V10_REGISTRY_RESOLUTION_REQUIRED = "true"
 FCR_V10_RECEIPT_PERSISTENCE_REQUIRED = "true"
+MCP_EXA_URL = "https://mcp.exa.ai/mcp"
+MCP_RESEND_URL = "https://mcp.resend.com/mcp"
 
-# Founder-approved production activation. Buffer is the only runtime-eligible
-# provider for this v1 lane; share-now remains forbidden. Canonical production
-# deployment must verify the four provider-held n8n bindings by name before any
-# Worker mutation, because they are part of [secrets].required while enabled.
+# Founder-approved source activation for the governed founder-content n8n lane.
+# Buffer is the only enabled provider, share-now remains forbidden, and runtime
+# identity must match the exact workflow fingerprint and pinned n8n version.
+# These vars express source intent only. Production use still requires the four
+# provider-held secret bindings below, exact-main deployment, and live readback.
 N8N_FOUNDER_CONTENT_ENABLED = "true"
 N8N_FOUNDER_CONTENT_ENABLED_PROVIDERS = "buffer"
 N8N_FOUNDER_CONTENT_EXPECTED_WORKFLOW_ID = "fcrFounderContentV1"
 N8N_FOUNDER_CONTENT_EXPECTED_RUNTIME_VERSION = "2.32.6"
-
-MCP_EXA_URL = "https://mcp.exa.ai/mcp"
-MCP_RESEND_URL = "https://mcp.resend.com/mcp"
 
 # Runtime secrets are provider-held in Cloudflare. Canonical GitHub production
 # deployment preserves them rather than copying their values through Actions.

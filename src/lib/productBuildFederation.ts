@@ -42,7 +42,7 @@ export interface StoryEngineRuntimeIdentity {
 }
 
 export interface ProductBuildFederationReconciliation {
-  state: 'verified';
+  state: 'execution_reconciled';
   directive: ProductBuildDirective;
   receipt: ProductBuildReceipt;
   runtimeIdentityBefore: StoryEngineRuntimeIdentity;
@@ -50,6 +50,7 @@ export interface ProductBuildFederationReconciliation {
   exactHeadVerified: true;
   serviceIdentityVerified: true;
   receiptVerified: true;
+  outcomeVerified: false;
   mergePerformed: false;
   deployPerformed: false;
   providerMutationPerformed: false;
@@ -265,7 +266,7 @@ export function reconcileStoryEngineProductBuild(input: {
   }
 
   return {
-    state: 'verified',
+    state: 'execution_reconciled',
     directive: input.directive,
     receipt: input.receipt,
     runtimeIdentityBefore: input.runtimeIdentityBefore,
@@ -273,6 +274,7 @@ export function reconcileStoryEngineProductBuild(input: {
     exactHeadVerified: true,
     serviceIdentityVerified: true,
     receiptVerified: true,
+    outcomeVerified: false,
     mergePerformed: false,
     deployPerformed: false,
     providerMutationPerformed: false,

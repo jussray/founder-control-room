@@ -130,6 +130,25 @@ This checked-in binding and sender allowlist prove repository intent only. They 
 
 Repository source contains a founder-gated Cloudflare Access inspection/recovery lane. Its existence does **not** prove current Access application state, exemption state, token permissions, or production front-door availability.
 
+The current recovery contract is intentionally narrower than general Access administration. The `FCR Access Front Door Recovery` workflow requires an exact requested SHA that still equals current `main`. Read-only inspection uses only `CLOUDFLARE_ACCESS_API_TOKEN`. Any apply or rollback uses only `CLOUDFLARE_ACCESS_ADMIN_API_TOKEN`, and `apply=true` additionally requires a fresh auditable founder approval reference whose raw value is not published.
+
+The only permitted create target is:
+
+```text
+account: canonical FCR Cloudflare account
+zone: foundercontrolroom.org
+destination: foundercontrolroom.org/*
+managed app: foundercontrolroom.org - public apex bypass
+type: self_hosted
+policy: Bypass / Everyone
+```
+
+The recovery does not mutate DNS, Worker routes, the database, account-level `deny_unmatched_requests_exempted_zone_names`, unrelated Access applications, or existing all-workers protection. If a non-managed application already owns the exact public destination, or the managed application is duplicated or has destination/policy drift, automatic repair fails closed for manual review.
+
+A newly created public destination is only `mutated-needs-browser-proof`. Anonymous Playwright must then verify the recovered front door and exact runtime SHA. If that proof fails, rollback may delete only the run-created managed application after the receipt-bound account, zone, application ID, managed name, and exact destination are uniquely reacquired and still match. Ambiguity or drift blocks deletion rather than widening rollback authority.
+
+Only a bounded sanitized recovery receipt may be returned to the fixed founder-control issue or retained as an artifact. Raw provider/browser receipts, raw approval references, managed application IDs, final origins, raw errors, and blockers remain outside public proof.
+
 Keep these truths separate:
 
 ```text
@@ -163,6 +182,8 @@ A failing or unavailable enrichment read is `UNKNOWN`/blocked evidence in that e
 
 The canonical Worker runtime secret values belong in the Cloudflare Worker secret store. Canonical `.github/workflows/deploy.yml` preserves those provider-held values instead of copying them through GitHub Actions. The required runtime secret names are declared by `wrangler.worker.toml [secrets].required`, including `FOUNDER_SESSION_ENCRYPTION_KEY`; Wrangler must fail closed when a required binding name is absent before the Worker promotion can be treated as successful.
 
+For the governed Founder Content n8n production-source lane, the same canonical Worker additionally requires the provider-held binding names `N8N_FOUNDER_CONTENT_WEBHOOK_URL`, `N8N_FOUNDER_CONTENT_BEARER_TOKEN`, `N8N_FOUNDER_CONTENT_EXPECTED_WORKFLOW_FINGERPRINT`, and `N8N_FOUNDER_CONTENT_IDENTITY_HMAC_SECRET`. Public-safe source may declare `N8N_FOUNDER_CONTENT_ENABLED=true`, Buffer-only provider selection, workflow ID `fcrFounderContentV1`, and runtime `2.32.6`, but those declarations do not prove any of the four secret values exist or that production n8n is active. Canonical exact-main Deploy must verify required binding-name presence before Worker mutation, and production truth still requires exact deployed Worker identity, production n8n workflow/fingerprint/runtime readback, and provider-native Buffer outcome evidence.
+
 The canonical Deploy authority gate has a smaller GitHub production credential surface. It requires only the credentials needed to perform the release itself:
 
 ```text
@@ -178,12 +199,6 @@ The only runtime secret canonical Deploy deliberately writes is `FOUNDER_SIGNAL_
 `https://api.foundercontrolroom.org` is the canonical public API origin and therefore is source configuration, not a GitHub secret. Smoke proof, proof-of-ship runtime readback, and the post-Deploy production Playwright witness use that explicit origin. The witness still requires a successful canonical Deploy and binds direct Worker plus public Pages/proxy `/version` reads to the exact Deploy run SHA before and after the browser journey.
 
 Trusted deterministic-review or other bounded workflows that actually need GitHub App execution credentials may continue to use their separately scoped Actions-facing `APP_ID` / `APP_PRIVATE_KEY` inputs. That does not make canonical Deploy responsible for re-uploading the Worker's provider-held `GITHUB_APP_ID` / `GITHUB_PRIVATE_KEY` pair.
-
-### Founder-content n8n activation boundary
-
-`wrangler.worker.toml` declares founder-content n8n as source-disabled by default with `N8N_FOUNDER_CONTENT_ENABLED="false"`, constrains the checked-in v1 provider allowlist to `buffer`, and pins the expected workflow ID and runtime version. The conditional webhook, bearer, workflow-fingerprint, and identity-HMAC bindings are intentionally not unconditional Worker requirements while the lane is disabled.
-
-This checked-in state proves only desired source configuration. Before enabling the lane, a separately authorized provider change must install the required private bindings, preserve the bounded provider allowlist, and obtain fresh Cloudflare/runtime readback. Neither a repository commit nor a successful Worker build proves that founder-content n8n is active, that its private bindings are present, or that any provider publication occurred.
 
 Never copy secret values into repository files, logs, screenshots, issue comments, PR bodies, documentation, or public content. A source declaration or required-name check proves only the intended boundary. Live provider secret presence, validity, permissions, deployment success, and runtime identity still require provider/runtime evidence.
 
@@ -219,6 +234,6 @@ Current executable source and authoritative provider readback outrank an older v
 - API Worker: redeploy the prior exact Worker SHA through the authorized Worker release path.
 - Proxy: revert the focused `public/_worker.js` change and matching deployment contract together; do not silently point the browser at an unverified origin.
 - Service binding: revert only the affected Pages binding through separately authorized provider mutation; preserve unrelated bindings/configuration.
-- Access: remove only the bounded exemption/change that was separately authorized, preserving unrelated Access policy.
+- Access: remove only the run-created managed `foundercontrolroom.org/*` public-bypass application when its receipt-bound identity and scope still match; otherwise stop for manual review.
 - Credentials: remove/revoke only the affected credential; do not rotate unrelated keys to repair binding drift.
 - Preserve build logs, deployment IDs, provider readback, browser traces, and runtime receipts.

@@ -8,7 +8,9 @@ on:
       - '.github/workflows/fcr-cloudflare-command-bridge.yml'
       - '.github/workflows/chief-proofmode-access-command-bridge.yml'
       - '.github/workflows/chief-proofmode-access-recovery.yml'
+      - '.github/workflows/chief-proofmode-runtime-witness.yml'
       - '.github/workflows/fcr-cloudflare-bridge-contract.yml'
+      - 'e2e/chief-proofmode-runtime.pw.mjs'
       - 'scripts/provider-credential-contract.mjs'
       - 'scripts/provider-credential-contract.node-test.mjs'
       - 'scripts/reconcile-cloudflare-access-public-zone.mjs'
@@ -16,6 +18,9 @@ on:
       - 'scripts/reconcile-chief-proofmode-access.mjs'
       - 'scripts/reconcile-chief-proofmode-access.node-test.mjs'
       - 'scripts/chief-proofmode-access-bridge-contract.node-test.mjs'
+      - 'scripts/publish-chief-runtime-witness.mjs'
+      - 'scripts/publish-chief-runtime-witness.node-test.mjs'
+      - 'scripts/chief-proofmode-runtime-witness-contract.node-test.mjs'
       - 'scripts/fcr-cloudflare-bridge-contract.node-test.mjs'
       - 'scripts/verify-fcr-front-door-playwright.mjs'
       - 'docs/CHIEF_PROOFMODE_ACCESS_RECOVERY.md'
@@ -26,7 +31,9 @@ on:
       - '.github/workflows/fcr-cloudflare-command-bridge.yml'
       - '.github/workflows/chief-proofmode-access-command-bridge.yml'
       - '.github/workflows/chief-proofmode-access-recovery.yml'
+      - '.github/workflows/chief-proofmode-runtime-witness.yml'
       - '.github/workflows/fcr-cloudflare-bridge-contract.yml'
+      - 'e2e/chief-proofmode-runtime.pw.mjs'
       - 'scripts/provider-credential-contract.mjs'
       - 'scripts/provider-credential-contract.node-test.mjs'
       - 'scripts/reconcile-cloudflare-access-public-zone.mjs'
@@ -34,6 +41,9 @@ on:
       - 'scripts/reconcile-chief-proofmode-access.mjs'
       - 'scripts/reconcile-chief-proofmode-access.node-test.mjs'
       - 'scripts/chief-proofmode-access-bridge-contract.node-test.mjs'
+      - 'scripts/publish-chief-runtime-witness.mjs'
+      - 'scripts/publish-chief-runtime-witness.node-test.mjs'
+      - 'scripts/chief-proofmode-runtime-witness-contract.node-test.mjs'
       - 'scripts/fcr-cloudflare-bridge-contract.node-test.mjs'
       - 'scripts/verify-fcr-front-door-playwright.mjs'
       - 'docs/CHIEF_PROOFMODE_ACCESS_RECOVERY.md'
@@ -76,9 +86,12 @@ jobs:
           node --check scripts/provider-credential-contract.mjs
           node --check scripts/reconcile-cloudflare-access-public-zone.mjs
           node --check scripts/reconcile-chief-proofmode-access.mjs
+          node --check scripts/publish-chief-runtime-witness.mjs
           node --check scripts/verify-fcr-front-door-playwright.mjs
           node --test scripts/provider-credential-contract.node-test.mjs
           node --test scripts/reconcile-cloudflare-access-public-zone.node-test.mjs
           node --test scripts/reconcile-chief-proofmode-access.node-test.mjs
           node --test scripts/chief-proofmode-access-bridge-contract.node-test.mjs
+          node --test scripts/publish-chief-runtime-witness.node-test.mjs
+          node --test scripts/chief-proofmode-runtime-witness-contract.node-test.mjs
           node --test scripts/fcr-cloudflare-bridge-contract.node-test.mjs

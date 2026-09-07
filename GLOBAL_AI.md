@@ -198,6 +198,12 @@ This source/runtime membrane does **not** prove the live GitHub repository rules
 
 Never use a GitHub merge that occurred outside the in-app FCR path as proof that the in-app founder-final contract executed.
 
+### Chief candidate-proof producer boundary
+
+For Chief pre-merge ProofMode authority, a required status-check context plus GitHub Actions integration `15368` authenticates the GitHub Actions App, not the exact workflow file or event that produced the check. Because Chief pull requests can modify `.github/workflows/**`, FCR must not treat that pair as sufficient producer provenance.
+
+FCR governance reconciliation must fail closed until the candidate ProofMode context is bound to a provider-observed external GitHub App/check producer unavailable to PR-authored Chief Actions. It must also keep post-merge-only `Cloudflare Production` out of the pre-merge required-deployment set. Observation, planning, or a same-named check never grants ruleset mutation, merge, deploy, provider-policy, or self-certification authority.
+
 ## Provider roles
 
 - **Claude / Claude Code** — long-context repository analysis, structured implementation, careful refactors, and documentation.

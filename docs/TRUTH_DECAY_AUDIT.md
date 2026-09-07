@@ -38,6 +38,8 @@ A unit test, source declaration, reachable endpoint, or earlier successful Playw
 
 This is why the exact-head Playwright workflow is registered as `evidence-authority`: changing what the browser witness sends or accepts can change what future operators believe has been proven even when the underlying actuator remains intentionally bounded.
 
+A September peer-rollover incident made the freshness rule concrete. FCR `af87c67e05584203b04610eb25e6f89ad8c1e7a0` completed a real federation lap against its pinned StoryEngine peer `abd4aab9f33e6c67d7863bd1a03c917901a00668`, but StoryEngine PR #89 had already advanced to separately exact-head-proven `f78492230e88c66b04d4d8c9d6210c6380ba0db1`. The earlier FCR green therefore remains historical for the old peer rather than current integration authority. Refreshing the peer pin is only the start of recovery: the successor FCR head must rerun the entire browser/runtime/receipt witness against the newly bound StoryEngine SHA, and movement on either side expires that successor proof again.
+
 ## 2026-09 control correction: privileged production witness isolation
 
 A post-Deploy `workflow_run` witness is privileged even when its purpose is read-only verification. Treating the triggering workflow's `head_sha` as both the release identity to observe and the code to execute collapses evidence identity into executable authority. A successful upstream workflow must not make its checkout trusted merely by becoming a completed run.
@@ -46,21 +48,13 @@ The corrected rule keeps those roles separate: `.github/workflows/playwright.yml
 
 This remains a proof contract, not production proof by itself. The witness must actually run for the relevant release and return terminal exact-SHA evidence before a production-runtime claim becomes current.
 
-## 2026-09 control correction: merged PR identity versus proposal-head identity
+## 2026-09 control correction: Capital Decision documentation drift
 
-The GitHub BuildEvent projection exposed a truth-governance boundary that cannot be inferred from a green proposal head. A pull request can be reviewed and tested at one head SHA, while the authoritative repository identity after merge is the landed `merge_commit_sha` on the base branch. Projecting the proposal head as merged-main identity would make a historically valid review fact masquerade as the repository state that actually landed.
+The Founder Capital Decision feature introduced a founder-facing evidence-evaluation surface with freshness-sensitive recommendations, dilution and option-set reasoning, and an explicit authority ceiling. Its source and browser proof correctly keep financing authority false and allow `HOLD` when broader or fresher evidence is missing, but the feature landed without the required durable README, truth-decay audit, and documentation receipt refresh for its evidence-authority semantics.
 
-The corrected GitHub webhook projection keeps those identities separate. For a merged pull request, `src/buildEvents/githubBuildEvent.ts` must validate and project the GitHub `merge_commit_sha` as the authoritative landed commit on the base branch while retaining the former PR head separately as `auditedCommitSha`. Non-merged pull requests remain proposal-head observations. Invalid, empty, or all-zero SHAs fail closed instead of being promoted into repository truth.
+The correction is documentation-only with respect to the Capital Decision behavior: `README.md`, this audit, and `docs/DOCUMENTATION_TRUTH_RECEIPT.json` now state that a decision card, score, option set, or browser rendering is evidence interpretation rather than authority. Stale or missing evidence must remove derived certainty instead of silently carrying an earlier recommendation forward. Financing, spend, investor-contact, fundraise, merge, deploy, publication, and execution authority remain separate and require their own explicit gates.
 
-This separation is still observation, not authority escalation. A webhook-derived BuildEvent may support portfolio-ledger and reconciliation evidence, but it does not by itself authorize merge, prove current `main` after time has passed, prove deployment/runtime identity, or prove publication. Current-state use still requires the appropriate repository/provider revalidation at the use boundary.
-
-## 2026-09 control correction: frozen PR base snapshot versus live base ref
-
-The PR continuity rollover exposed another repository TOCTOU failure. GitHub's pull-request object can retain the base SHA associated with the PR snapshot while the named base branch has already advanced. Comparing the head only against that frozen `pr.base.sha` can therefore report `ahead` and label the carrier `CURRENT` even though the live `base.ref` contains a newer commit that the carrier has never absorbed.
-
-The corrected continuity rule resolves the named base branch through the provider immediately before every ancestry decision. For a root PR, `main` is re-read at use time. For a stacked PR, the live parent branch is re-read at use time. The frozen `pr.base.sha` remains useful historical provenance, but it cannot decide current ancestry, populate the machine `live_base` receipt, or suppress a required rollover.
-
-Update-branch remains fenced by `expected_head_sha`, and the live base is re-observed again after provider races or asynchronous updates. A rollover still creates a new proof subject and grants no merge, deploy, publication, provider-mutation, or production authority. The repair closes a false-current classification; it does not convert continuity into an authority source.
+This documentation repair does not retroactively prove the earlier feature branch, external financing activity, investor contact, or any provider/runtime outcome. It closes the durable truth-surface gap so future operators do not mistake a source-level capital recommendation for executable authority.
 
 ## Root causes
 
@@ -372,9 +366,8 @@ The strongest optimization is not faster claiming. It is shortening the distance
 29. A public deployment origin must not be mislabeled as a secret merely because a workflow consumes it; authority classification must follow the sensitivity and mutation boundary of the value.
 30. A predecessor Playwright success cannot prove a cross-repository federation successor after either repository head, peer proof contract, peer runtime identity, or serialized wire shape moves.
 31. A privileged `workflow_run` witness may consume an upstream release SHA as evidence, but it cannot execute that upstream checkout or treat upstream success as executable trust.
-32. A merged PR's proposal head is not the landed base-branch identity; merged-state projection must bind the validated merge commit while preserving the reviewed head separately.
-33. A frozen `pr.base.sha` cannot prove current ancestry after the named base branch moves; continuity must resolve the live `base.ref` at the use boundary.
+32. A capital decision card, recommendation, score, or HOLD state is evidence interpretation, not financing or execution authority; stale or missing capital evidence must remove derived certainty instead of preserving an earlier recommendation.
 
 ## Rollback
 
-The Truth Lease, production-specific lease composer, temporal founder-content guards, analytics-authority guard, PR continuity live-base observation rule, and Documentation Truth control are additive/fail-closed. Revert the focused contract/test/workflow/documentation change if it causes incompatibility. No database, provider credential, DNS, publication, provider ruleset, or production mutation is performed by the documentation-truth slice.
+The Truth Lease, production-specific lease composer, temporal founder-content guards, analytics-authority guard, and Documentation Truth control are additive/fail-closed. Revert the focused contract/test/workflow/documentation change if it causes incompatibility. No database, provider credential, DNS, publication, provider ruleset, or production mutation is performed by the documentation-truth slice.

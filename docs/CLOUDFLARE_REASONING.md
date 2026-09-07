@@ -209,15 +209,11 @@ The only runtime secret canonical Deploy actively writes is the checked-in fail-
 
 This source membrane does not prove the current Cloudflare required-secret set, values, Workers Builds dashboard configuration, custom-domain routing, active deployment, or runtime SHA. Those remain separate provider/runtime readback gates.
 
-## Founder-content n8n activation boundary
+### Founder Content n8n Worker activation boundary
 
-`wrangler.worker.toml` keeps founder-content n8n orchestration **disabled by default** with `N8N_FOUNDER_CONTENT_ENABLED="false"`, limits the checked-in v1 provider set to `buffer`, and pins the expected workflow/runtime identity. Those source declarations describe the desired fail-closed Worker configuration only. They do not prove that private webhook, bearer, workflow-fingerprint, or HMAC bindings exist in Cloudflare, and they do not authorize changing the switch to `true`.
+`wrangler.worker.toml` may express the reviewed Founder Content source intent with `N8N_FOUNDER_CONTENT_ENABLED=true`, Buffer as the only enabled provider for this slice, expected workflow ID `fcrFounderContentV1`, and n8n runtime `2.32.6`. The canonical Worker also declares four provider-held required binding names: `N8N_FOUNDER_CONTENT_WEBHOOK_URL`, `N8N_FOUNDER_CONTENT_BEARER_TOKEN`, `N8N_FOUNDER_CONTENT_EXPECTED_WORKFLOW_FINGERPRINT`, and `N8N_FOUNDER_CONTENT_IDENTITY_HMAC_SECRET`.
 
-Enabling this lane requires a separate founder-approved provider configuration step, provider-held binding readback, and exact deployed-runtime proof. A source commit, successful Worker build, or n8n import is never enough to claim orchestration is active or publication occurred.
-
-The isolated n8n runtime proof must distinguish process health from route readiness. `GET /healthz` proves only that n8n is responding; it does not prove the published founder-content workflow has registered its production webhook. The proof therefore waits on `POST /webhook/founder-control-room/founder-content` itself and accepts only the expected unauthenticated `401`/`403` boundary as route-ready. A `404` remains a hard missing-route failure and must not be reclassified as authentication success. If registration never appears, the proof records sanitized workflow publication/database state and n8n logs before failing.
-
-This CI registration probe uses only ephemeral local credentials and the isolated Buffer fake. It neither enables the Cloudflare `N8N_FOUNDER_CONTENT_ENABLED` production switch nor proves production n8n, Buffer, or social-account activation. Production remains separately gated by founder approval, provider-held bindings, exact deployed identity, and provider readback.
+Those source declarations and required names are not provider/runtime observations. A Wrangler dry-run, ordinary CI, or an isolated real-n8n proof cannot establish that the production Worker has those bindings, that the exact production workflow is published, that its HMAC identity matches, that the database migrations are applied, or that Buffer accepted a schedule. Canonical exact-main Deploy must fail closed on missing required binding names before Worker mutation, and any later `live`, `used`, `scheduled`, or `published` claim requires exact deployed Worker identity plus production n8n workflow/runtime identity and provider-native Buffer readback.
 
 ## Durable release-proof Workflow boundary
 
@@ -232,6 +228,32 @@ class: ReleaseProofWorkflowV0
 This is durable orchestration, not release authority. No HTTP route, cron schedule, or other application trigger creates Workflow instances in this slice. The Workflow binds repository, target branch, exact base/head SHAs, optional PR identity, and a deterministic candidate fingerprint; waits for separately supplied exact evidence and founder-approval observations; rejects mismatched or blocked observations; and stops at `READY_FOR_FINAL_REREAD`.
 
 Its final receipt deliberately keeps `mergeAuthorized`, `deploymentAuthorized`, and `providerMutationAuthorized` false. A Workflow event or completed instance cannot replace authenticated Founder Final, the final mutable provider/PR reread, expected-head protection, or the existing guarded deployment path. Repository source proves only the intended class/binding contract. Cloudflare provider configuration, instance state, and runtime behavior require their own readback evidence.
+
+## Bounded FCR Access front-door recovery
+
+The manual `FCR Access Front Door Recovery` workflow is a narrowly scoped provider-recovery lane, not general Cloudflare administration authority. Its requested `expected_head_sha` must be a lowercase 40-character SHA, the workflow checks out that exact SHA, and provider inspection or mutation proceeds only when the same SHA still equals current `main`.
+
+Read and mutation authority are intentionally split. `apply=false` uses only `CLOUDFLARE_ACCESS_API_TOKEN` for Access application inspection and rejects an unnecessary approval reference. `apply=true` requires a fresh auditable `approval_reference`, records only its SHA-256 receipt, and uses only `CLOUDFLARE_ACCESS_ADMIN_API_TOKEN` for the provider write path. Neither credential is a fallback for the other.
+
+The mutation surface is exact:
+
+```text
+Cloudflare account: canonical FCR account only
+Access destination: foundercontrolroom.org/*
+managed application: foundercontrolroom.org - public apex bypass
+application type: self_hosted
+policy: Bypass / Everyone
+DNS mutation: none
+Worker route mutation: none
+database mutation: none
+unrelated Access application mutation: none
+```
+
+If the exact managed public-destination application already exists, its destination and Everyone-bypass policy must match before it can be treated as clear. Multiple managed matches, destination/policy drift, or any non-managed Access application already owning the exact public destination fails closed for manual review. The recovery code does not rewrite the account-level `deny_unmatched_requests_exempted_zone_names` setting and does not alter existing all-workers protection.
+
+A successful create is not production proof. It enters `mutated-needs-browser-proof`, then the workflow runs anonymous Playwright against the public front door and exact runtime SHA. If that post-apply proof fails, rollback may delete only the run-created managed application after reacquiring exactly one application with the same receipt-bound account, zone, application ID, managed name, and destination. Missing identity, ambiguity, or drift blocks rollback instead of widening deletion authority.
+
+Only the bounded sanitized public receipt is returned to the fixed founder control issue and retained artifact. Raw Access/browser receipts, raw approval references, managed application IDs, final origins, raw errors, and blockers are not promoted into public proof. Source code for this workflow proves the recovery contract only; current Access state, credential validity, provider mutation success, and public runtime identity still require fresh provider/browser evidence.
 
 ## Verification
 

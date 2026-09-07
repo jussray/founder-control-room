@@ -48,23 +48,19 @@ function route(goal: string, ids: string[]) {
 }
 
 describe('FCR truth-decay skill routing', () => {
-  it('keeps /truth-decay inert when Chief does not select the capability', () => {
+  it('fails closed when /truth-decay is requested but Chief omits the capability', () => {
     const decision = route('/truth-decay audit why this once-true claim is unsafe now.', ['repo-truth']);
 
-    expect(decision.untrustedWorkflowTokensInert).toBe(true);
-    expect(decision.policyRequiredCapabilityIds).not.toContain('truth-decay-audit');
-    expect(decision.missingPolicyCapabilityIds).toEqual([]);
-    expect(decision.plannedCapabilityIds).toEqual(['repo-truth']);
-    expect(decision.status).toBe('ready_for_runtime_discovery');
+    expect(decision.policyRequiredCapabilityIds).toContain('truth-decay-audit');
+    expect(decision.missingPolicyCapabilityIds).toContain('truth-decay-audit');
+    expect(decision.status).toBe('blocked');
     expect(decision.executionAllowed).toBe(false);
   });
 
-  it('accepts Chief-selected truth-decay capability only for runtime discovery and never grants execution', () => {
+  it('accepts the explicit capability only for runtime discovery and never grants execution', () => {
     const decision = route('/truth-decay audit why this once-true claim is unsafe now.', ['truth-decay-audit']);
 
-    expect(decision.untrustedWorkflowTokensInert).toBe(true);
-    expect(decision.policyRequiredCapabilityIds).not.toContain('truth-decay-audit');
-    expect(decision.plannedCapabilityIds).toContain('truth-decay-audit');
+    expect(decision.policyRequiredCapabilityIds).toContain('truth-decay-audit');
     expect(decision.missingPolicyCapabilityIds).toEqual([]);
     expect(decision.missingParallelLenses).toEqual([]);
     expect(decision.status).toBe('ready_for_runtime_discovery');

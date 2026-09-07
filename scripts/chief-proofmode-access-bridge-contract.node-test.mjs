@@ -23,35 +23,39 @@ test('Chief Access command bridge is founder-only, issue-scoped, and exact-FCR-m
   assert.doesNotMatch(commandBridge, /CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID/);
 });
 
-test('recovery is protected by production environment and separates secrets from Chief service-token identity selectors', () => {
+test('recovery keeps repair selector mandatory while check may discover one existing bound identity', () => {
   assert.match(recoveryWorkflow, /environment:\s*production/);
   assert.match(recoveryWorkflow, new RegExp(ACCOUNT_ID));
   assert.match(recoveryWorkflow, /CLOUDFLARE_ACCESS_API_TOKEN:\s*\$\{\{ secrets\.CLOUDFLARE_ACCESS_API_TOKEN \}\}/);
   assert.match(recoveryWorkflow, /CLOUDFLARE_ACCESS_ADMIN_API_TOKEN:\s*\$\{\{ secrets\.CLOUDFLARE_ACCESS_ADMIN_API_TOKEN \}\}/);
-  assert.match(recoveryWorkflow, /CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID:\s*\$\{\{ vars\.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID \}\}/);
-  assert.match(recoveryWorkflow, /CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID:\s*\$\{\{ vars\.CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID \}\}/);
+  assert.match(
+    recoveryWorkflow,
+    /CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID:\s*\$\{\{ vars\.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID \|\| vars\.CLOUDFLARE_ACCESS_CLIENT_ID \}\}/,
+  );
+  assert.match(
+    recoveryWorkflow,
+    /CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID:\s*\$\{\{ vars\.CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID \|\| vars\.CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID \}\}/,
+  );
   assert.doesNotMatch(recoveryWorkflow, /secrets\.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID/);
   assert.doesNotMatch(recoveryWorkflow, /secrets\.CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID/);
-  assert.match(recoveryWorkflow, /-z "\$CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID" && -z "\$CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID"/);
-  assert.match(recoveryWorkflow, /if: inputs\.mode == 'check'/);
-  assert.match(recoveryWorkflow, /if: inputs\.mode == 'repair'/);
-  assert.match(recoveryWorkflow, /current_main.*EXPECTED_HEAD_SHA/s);
-});
+  assert.doesNotMatch(recoveryWorkflow, /secrets\.CLOUDFLARE_ACCESS_CLIENT_ID/);
+  assert.doesNotMatch(recoveryWorkflow, /secrets\.CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID/);
 
-test('recovery permits only a bounded non-secret selector fallback and refuses protected-selector override', () => {
-  assert.match(recoveryWorkflow, /service_client_id:/);
-  assert.match(recoveryWorkflow, /service_token_id:/);
-  assert.match(recoveryWorkflow, /INPUT_CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID:\s*\$\{\{ inputs\.service_client_id \}\}/);
-  assert.match(recoveryWorkflow, /INPUT_CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID:\s*\$\{\{ inputs\.service_token_id \}\}/);
-  assert.match(recoveryWorkflow, /service_client_id cannot override the protected production client ID/);
-  assert.match(recoveryWorkflow, /service_token_id cannot override the protected production service-token ID/);
-  assert.match(recoveryWorkflow, /resolved_client_id="\$\{CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID:-\$INPUT_CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID\}"/);
-  assert.match(recoveryWorkflow, /resolved_service_token_id="\$\{CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID:-\$INPUT_CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID\}"/);
-  assert.match(recoveryWorkflow, /\^\[A-Za-z0-9\._:-\]\{1,200\}\$/);
-  assert.match(recoveryWorkflow, /CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID=%s\\n.*GITHUB_ENV/s);
-  assert.match(recoveryWorkflow, /CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID=%s\\n.*GITHUB_ENV/s);
-  assert.doesNotMatch(recoveryWorkflow, /INPUT_CHIEF_CLOUDFLARE_ACCESS_CLIENT_SECRET/);
-  assert.doesNotMatch(recoveryWorkflow, /service_client_secret:/);
+  const selectorStep = recoveryWorkflow.match(
+    /- name: Require configured Chief service-token identity before repair([\s\S]*?)- name: Inspect current Chief Service Auth with dedicated read authority/,
+  )?.[1] ?? '';
+  assert.match(selectorStep, /if: inputs\.mode == 'repair'/);
+  assert.match(selectorStep, /-z "\$CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID" && -z "\$CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID"/);
+  assert.match(selectorStep, /repair requires CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID/);
+
+  assert.match(recoveryWorkflow, /- name: Inspect current Chief Service Auth with dedicated read authority\n\s+if: inputs\.mode == 'check'/);
+  assert.match(recoveryWorkflow, /- name: Apply exact-host Chief Service Auth with dedicated admin authority\n\s+if: inputs\.mode == 'repair'/);
+  assert.match(recoveryWorkflow, /current_main.*EXPECTED_HEAD_SHA/s);
+
+  assert.match(reconciler, /discoverBoundServiceTokenId/);
+  assert.match(reconciler, /normalizedMode === 'check' && !configuredClientId && !configuredServiceTokenId/);
+  assert.match(reconciler, /normalizedMode === 'repair' && !configuredClientId && !configuredServiceTokenId/);
+  assert.match(reconciler, /service-token identity is required before repair/);
 });
 
 test('repair requires founder approval but never publishes the raw approval reference', () => {
@@ -92,6 +96,13 @@ test('automatic repair refuses broader Access scopes and conflicting named polic
   assert.match(reconciler, /not the approved exact immutable-preview host; refusing repair/);
 });
 
+test('selector-free discovery is policy-bound and rejects zero or multiple identities', () => {
+  assert.match(reconciler, /No existing non-identity service-token binding identifies the Chief CI token/);
+  assert.match(reconciler, /Multiple service-token identities are bound to the effective Chief Access application/);
+  assert.match(reconciler, /policy\?\.decision === 'non_identity'/);
+  assert.match(reconciler, /rule\?\.service_token\?\.token_id/);
+});
+
 test('raw provider receipts stay ephemeral and provider commands are suppressed from logs', () => {
   assert.match(recoveryWorkflow, /node scripts\/reconcile-chief-proofmode-access\.mjs >\/dev\/null 2>&1/);
   const artifactStep = recoveryWorkflow.match(
@@ -109,13 +120,28 @@ test('public receipt explicitly keeps browser/runtime proof separate', () => {
   assert.match(returnStep, /Browser\/runtime proof: `NOT CLAIMED HERE`/);
   assert.match(returnStep, /rerun Chief exact-head Playwright after provider repair/);
   assert.match(returnStep, /Current provider truth: `UNKNOWN`/);
+  assert.match(returnStep, /Current provider truth: `BLOCKED`/);
+  assert.match(returnStep, /\.state == "configured" or \.state == "blocked"/);
+  assert.match(returnStep, /reasonCode/);
   assert.match(returnStep, /single-document|length == 1/);
   assert.doesNotMatch(returnStep, /cat "\$current_receipt"/);
   assert.doesNotMatch(returnStep, /cat "\$mutation_receipt"/);
+  assert.doesNotMatch(returnStep, /error\.message|rawError|errorMessage/);
+});
+
+test('blocked diagnostics are allowlisted and cannot become provider mutation authority', () => {
+  assert.match(reconciler, /BLOCKED_REASON_CODES/);
+  assert.match(reconciler, /state: 'blocked'/);
+  assert.match(reconciler, /mutationPerformed: false/);
+  assert.match(reconciler, /reasonCode/);
+  assert.match(recoveryWorkflow, /allowed_reason/);
+  assert.match(recoveryWorkflow, /\.mutationPerformed == false/);
 });
 
 test('dedicated recovery documentation keeps source, provider, and browser truth separate', () => {
   assert.match(recoveryDoc, /SOURCE CONTRACT \/ PROVIDER REPAIR NOT YET EXECUTED/);
+  assert.match(recoveryDoc, /read-only `check` may discover/);
+  assert.match(recoveryDoc, /repair still requires/);
   assert.match(recoveryDoc, /CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID/);
   assert.match(recoveryDoc, /CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID/);
   assert.match(recoveryDoc, /CLOUDFLARE_ACCESS_API_TOKEN/);

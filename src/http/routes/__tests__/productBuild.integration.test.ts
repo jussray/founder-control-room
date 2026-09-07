@@ -255,7 +255,7 @@ describe('POST /product-build/storyengine/directive', () => {
 });
 
 describe('POST /product-build/storyengine/execute', () => {
-  it('drives one exact-head federation lap and returns the reconciled receipt', async () => {
+  it('drives one exact-head federation lap and returns execution-reconciled evidence without outcome promotion', async () => {
     founderSession();
     const fetchMock = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
       const url = String(input);
@@ -301,9 +301,10 @@ describe('POST /product-build/storyengine/execute', () => {
         providerMutationPerformed: false,
       },
       reconciliation: {
-        state: 'verified',
+        state: 'execution_reconciled',
         exactHeadVerified: true,
         receiptVerified: true,
+        outcomeVerified: false,
       },
       authority: {
         crossProductDispatchPerformed: true,

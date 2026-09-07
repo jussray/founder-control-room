@@ -7,6 +7,19 @@ const IMMUTABLE_CHIEF_HOST = /^[0-9a-f]{8}-chief-ai\.mcgill-raylene\.workers\.de
 const REQUIRED_PATHS = ['/version', '/mcp'];
 const RECEIPT_PATH = 'test-results/chief-proofmode-access-recovery.json';
 
+const BLOCKED_REASON_CODES = Object.freeze([
+  'service-token-binding-missing',
+  'service-token-binding-ambiguous',
+  'service-auth-policy-missing',
+  'service-auth-policy-conflict',
+  'access-application-ambiguous-or-unresolved',
+  'service-token-invalid-or-ambiguous',
+  'access-scope-not-repair-eligible',
+  'provider-read-credential-missing',
+  'provider-read-failed',
+  'bounded-check-failed',
+]);
+
 function required(value, name) {
   const normalized = typeof value === 'string' ? value.trim() : '';
   if (!normalized) throw new Error(`${name} is required.`);
@@ -54,6 +67,23 @@ function hasSpecificServiceToken(policy, serviceTokenId) {
   return policy?.decision === 'non_identity'
     && Array.isArray(policy.include)
     && policy.include.some((rule) => rule?.service_token?.token_id === serviceTokenId);
+}
+
+function discoverBoundServiceTokenId(policies) {
+  const ids = [...new Set(
+    policies
+      .filter((policy) => policy?.decision === 'non_identity' && Array.isArray(policy.include))
+      .flatMap((policy) => policy.include)
+      .map((rule) => (typeof rule?.service_token?.token_id === 'string' ? rule.service_token.token_id.trim() : ''))
+      .filter(Boolean),
+  )];
+  if (ids.length === 0) {
+    throw new Error('No existing non-identity service-token binding identifies the Chief CI token; configure an exact protected selector before repair.');
+  }
+  if (ids.length !== 1) {
+    throw new Error(`Multiple service-token identities are bound to the effective Chief Access application; found ${ids.length}; refusing ambiguous discovery.`);
+  }
+  return ids[0];
 }
 
 async function cloudflareJson(fetchImpl, apiToken, path, init = {}) {
@@ -225,14 +255,31 @@ export async function ensureChiefProofModeAccessPolicy({
   const token = required(apiToken, normalizedMode === 'repair' ? 'CLOUDFLARE_ACCESS_ADMIN_API_TOKEN' : 'CLOUDFLARE_ACCESS_API_TOKEN');
   const appName = required(applicationName, 'CHIEF_ACCESS_APP_NAME');
   const target = validateTargetUrl(targetUrl);
+  const configuredClientId = typeof serviceClientId === 'string' ? serviceClientId.trim() : '';
+  const configuredServiceTokenId = typeof serviceTokenId === 'string' ? serviceTokenId.trim() : '';
 
-  const serviceTokens = await listAll(fetchImpl, token, `/accounts/${encodeURIComponent(account)}/access/service_tokens`, 'List Access service tokens');
-  const serviceId = resolveServiceToken(serviceTokens, { serviceClientId, serviceTokenId, nowMs });
+  if (normalizedMode === 'repair' && !configuredClientId && !configuredServiceTokenId) {
+    throw new Error('Chief Access service-token identity is required before repair.');
+  }
+
   const apps = await listAll(fetchImpl, token, `/accounts/${encodeURIComponent(account)}/access/apps`, 'List Access applications');
   const effective = resolveEffectiveApplication(apps, target.hostname, appName);
   const appId = required(effective.app?.id, 'Resolved Cloudflare Access application ID');
   const policyPath = `/accounts/${encodeURIComponent(account)}/access/apps/${encodeURIComponent(appId)}/policies`;
   const policies = await listAll(fetchImpl, token, policyPath, 'List Access application policies');
+
+  let identityTokenId = configuredServiceTokenId;
+  if (normalizedMode === 'check' && !configuredClientId && !configuredServiceTokenId) {
+    identityTokenId = discoverBoundServiceTokenId(policies);
+  }
+
+  const serviceTokens = await listAll(fetchImpl, token, `/accounts/${encodeURIComponent(account)}/access/service_tokens`, 'List Access service tokens');
+  const serviceId = resolveServiceToken(serviceTokens, {
+    serviceClientId: configuredClientId,
+    serviceTokenId: identityTokenId,
+    nowMs,
+  });
+
   const exact = policies.find((policy) => hasSpecificServiceToken(policy, serviceId));
   if (exact) {
     return { state: 'configured', changed: false, appId, policyId: exact.id || null, scope: effective.scope, serviceTokenId: serviceId, targetOrigin: target.origin };
@@ -266,6 +313,26 @@ export async function ensureChiefProofModeAccessPolicy({
   return { state: 'configured', changed: true, appId, policyId: created.id || null, scope: effective.scope, serviceTokenId: serviceId, targetOrigin: target.origin };
 }
 
+export function classifyChiefAccessError(error) {
+  const message = error instanceof Error ? error.message : '';
+  if (/No existing non-identity service-token binding/.test(message)) return 'service-token-binding-missing';
+  if (/Multiple service-token identities/.test(message)) return 'service-token-binding-ambiguous';
+  if (/No matching Chief Service Auth policy/.test(message)) return 'service-auth-policy-missing';
+  if (/ProofMode CI service-auth policy exists for another rule/.test(message)) return 'service-auth-policy-conflict';
+  if (/Multiple public Access applications|Multiple preview_worker Access applications|Multiple worker Access applications|Expected exactly one Chief Worker identity|Could not resolve an effective Access application/.test(message)) {
+    return 'access-application-ambiguous-or-unresolved';
+  }
+  if (/configured Chief Access service token is disabled|configured Chief Access service token is expired|configured Chief Access service token has invalid expiry metadata|does not match the configured client ID|Expected exactly one configured Cloudflare Access service token|Expected exactly one Cloudflare Access service token/.test(message)) {
+    return 'service-token-invalid-or-ambiguous';
+  }
+  if (/not the approved exact immutable-preview host; refusing repair/.test(message)) return 'access-scope-not-repair-eligible';
+  if (/CLOUDFLARE_ACCESS_API_TOKEN is required/.test(message)) return 'provider-read-credential-missing';
+  if (/Cloudflare API request failed|Cloudflare API returned non-JSON|returned an unexpected result shape|exceeded the bounded pagination limit|List .* failed/.test(message)) {
+    return 'provider-read-failed';
+  }
+  return 'bounded-check-failed';
+}
+
 function writeReceipt(result, mode) {
   mkdirSync('test-results', { recursive: true });
   writeFileSync(RECEIPT_PATH, `${JSON.stringify({
@@ -280,6 +347,28 @@ function writeReceipt(result, mode) {
     applicationId: result.appId,
     policyId: result.policyId,
     serviceTokenId: result.serviceTokenId,
+  })}\n`, 'utf8');
+}
+
+function writeBlockedReceipt(error, mode, targetUrl) {
+  let targetOrigin = null;
+  try {
+    targetOrigin = validateTargetUrl(targetUrl).origin;
+  } catch {
+    return;
+  }
+  const reasonCode = classifyChiefAccessError(error);
+  if (!BLOCKED_REASON_CODES.includes(reasonCode)) return;
+  mkdirSync('test-results', { recursive: true });
+  writeFileSync(RECEIPT_PATH, `${JSON.stringify({
+    schemaVersion: 1,
+    scope: 'chief-proofmode-access-recovery',
+    observedAt: new Date().toISOString(),
+    mode,
+    state: 'blocked',
+    mutationPerformed: false,
+    targetOrigin,
+    reasonCode,
   })}\n`, 'utf8');
 }
 
@@ -301,7 +390,9 @@ async function main() {
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  main().catch(() => {
+  main().catch((error) => {
+    const mode = process.env.CHIEF_ACCESS_MODE === 'repair' ? 'repair' : 'check';
+    writeBlockedReceipt(error, mode, process.env.CHIEF_ACCESS_TARGET_URL);
     process.exitCode = 1;
   });
 }

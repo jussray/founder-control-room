@@ -73,7 +73,7 @@ function directive() {
   });
 }
 
-test('FCR drives exact StoryEngine runtime and reconciles its receipt through the service ingress', async ({ page, request }) => {
+test('FCR drives workflow-pinned exact StoryEngine peer, proves replay safety, and reconciles execution evidence without outcome promotion', async ({ page, request }) => {
   const identityResponse = await page.goto(`${peerUrl}/runtime-identity`);
   expect(identityResponse?.status()).toBe(200);
   const browserIdentity = await identityResponse?.json() as { service?: string; release_sha?: string };
@@ -85,8 +85,12 @@ test('FCR drives exact StoryEngine runtime and reconciles its receipt through th
     baseUrl: peerUrl,
     apiKey: peerApiKey,
   });
+  const replay = await dispatchStoryEngineProductBuildDirective(buildDirective, {
+    baseUrl: peerUrl,
+    apiKey: peerApiKey,
+  });
 
-  expect(reconciliation.state).toBe('verified');
+  expect(reconciliation.state).toBe('execution_reconciled');
   expect(reconciliation.runtimeIdentityBefore.release_sha).toBe(peerSha);
   expect(reconciliation.runtimeIdentityAfter.release_sha).toBe(peerSha);
   expect(reconciliation.receipt.status).toBe('completed');
@@ -94,6 +98,13 @@ test('FCR drives exact StoryEngine runtime and reconciles its receipt through th
   expect(reconciliation.receipt.mergePerformed).toBe(false);
   expect(reconciliation.receipt.deployPerformed).toBe(false);
   expect(reconciliation.receipt.providerMutationPerformed).toBe(false);
+  expect(reconciliation.outcomeVerified).toBe(false);
+
+  expect(replay.state).toBe('execution_reconciled');
+  expect(replay.receipt).toEqual(reconciliation.receipt);
+  expect(replay.receipt.executionReceiptId).toBe(reconciliation.receipt.executionReceiptId);
+  expect(replay.receipt.receiptHash).toBe(reconciliation.receipt.receiptHash);
+  expect(replay.outcomeVerified).toBe(false);
 
   const ingress = await request.post(`${receiptOrigin}/ingest/product-build-receipts/storyengine`, {
     headers: {
@@ -113,17 +124,19 @@ test('FCR drives exact StoryEngine runtime and reconciles its receipt through th
     ok: true,
     accepted: true,
     reconciled: true,
-    evidenceState: 'verified-in-request',
+    evidenceState: 'execution-reconciled-in-request',
+    outcomeVerified: false,
     durablePersistencePerformed: false,
     replayProtectionPerformed: false,
     mergeAuthorized: false,
     deployAuthorized: false,
     providerMutationAuthorized: false,
     reconciliation: {
-      state: 'verified',
+      state: 'execution_reconciled',
       exactHeadVerified: true,
       serviceIdentityVerified: true,
       receiptVerified: true,
+      outcomeVerified: false,
     },
   });
 });

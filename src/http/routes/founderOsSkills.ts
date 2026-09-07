@@ -1,4 +1,4 @@
-import { Router, raw } from 'express';
+import { Router } from 'express';
 import type { FirstPartySocialPostInput } from '../../lib/firstPartySocialPublisher.js';
 import {
   type FounderOsLabAction,
@@ -22,15 +22,14 @@ import {
   FOUNDER_OS_LAB_PROVIDERS,
 } from '../../founder-os-lab/registry.js';
 import { runFounderOsSandbox } from '../../founder-os-lab/sandbox.js';
+import { installFounderCapitalDecisionRoute } from './founderCapitalDecision.js';
 import {
   UNTRUSTED_ARTIFACT_SOURCES,
   untrustedArtifactContentHash,
   type UntrustedArtifact,
   type UntrustedArtifactSource,
 } from '../../security/untrustedArtifactBoundary.js';
-import { runFounderProofAuditInternalDryRun } from '../../services/founderProofAuditDryRun.js';
 import { requireFounder } from '../middleware/requireFounder.js';
-import { requirePortfolioSwitchOn } from '../middleware/requirePortfolioSwitchOn.js';
 
 export const founderOsSkillsRouter = Router();
 founderOsSkillsRouter.use(requireFounder);
@@ -344,49 +343,6 @@ function parseUntrustedArtifacts(value: unknown): UntrustedArtifact[] | undefine
   return artifacts;
 }
 
-function isTransportBodyEmpty(value: unknown): boolean {
-  return value === undefined || (Buffer.isBuffer(value) && value.length === 0);
-}
-
-founderOsSkillsRouter.post(
-  '/proof-audit/internal-dry-run',
-  requirePortfolioSwitchOn('fcr-privileged-execution-master'),
-  raw({ type: () => true, limit: '1kb' }),
-  async (req, res, next) => {
-    res.set('Cache-Control', 'no-store');
-
-    if (!isTransportBodyEmpty(req.body)) {
-      return res.status(400).json({
-        error: 'Founder Proof Audit internal dry run accepts no request body.',
-      });
-    }
-
-    const runtimeSha = process.env.GIT_SHA?.trim() ?? '';
-    if (!EXACT_COMMIT_SHA.test(runtimeSha)) {
-      return res.status(503).json({
-        error: 'Founder Proof Audit internal dry run requires an exact deployed GIT_SHA.',
-      });
-    }
-
-    try {
-      const result = await runFounderProofAuditInternalDryRun(runtimeSha);
-      const payload = {
-        contract: result.dryRun.contract,
-        runtimeSha: result.dryRun.runtimeSha,
-        testCase: result.dryRun.testCase,
-        sourceEventId: result.dryRun.sourceEventId,
-        inputFingerprint: result.dryRun.inputFingerprint,
-        receipt: result.dryRun.receipt,
-        guarantees: result.dryRun.guarantees,
-        persistence: result.persistence,
-      };
-      return res.status(result.persistence === 'conflict' ? 409 : 200).json(payload);
-    } catch (error) {
-      return next(error);
-    }
-  },
-);
-
 founderOsSkillsRouter.post('/preview', (req, res) => {
   const body = req.body as unknown;
   if (!isRecord(body) || !hasOnlyFields(body, TOP_LEVEL_FIELDS)) {
@@ -450,3 +406,5 @@ founderOsSkillsRouter.post('/preview', (req, res) => {
   res.set('Cache-Control', 'no-store');
   return res.status(result.status === 'simulated' ? 200 : 422).json(result);
 });
+
+installFounderCapitalDecisionRoute(founderOsSkillsRouter);

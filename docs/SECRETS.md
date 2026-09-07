@@ -99,11 +99,13 @@ The former `founder-control-room2` Worker was deleted and must not be recreated 
 | `ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL` | secret | Private approved Zapier Catch Hook URL. |
 | `FOUNDER_SIGNAL_ENGINE_HOOK_TIMEOUT_MS` | protected variable | Optional bounded provider timeout. |
 | `FOUNDER_REVIEW_EMAIL_INGRESS_SECRET` | secret | Shared only with the review-email Worker when that route is activated. |
-| `N8N_FOUNDER_CONTENT_WEBHOOK_URL` | secret | Required private production webhook URL for the governed founder-content n8n workflow. |
-| `N8N_FOUNDER_CONTENT_BEARER_TOKEN` | secret | Required bearer credential paired only with the founder-content n8n production webhook. |
-| `N8N_FOUNDER_CONTENT_EXPECTED_WORKFLOW_FINGERPRINT` | secret | Required expected workflow fingerprint used to bind the Worker to the exact published n8n workflow identity. |
-| `N8N_FOUNDER_CONTENT_IDENTITY_HMAC_SECRET` | secret | Required HMAC secret for verifying signed n8n runtime identity receipts. |
+| `N8N_FOUNDER_CONTENT_WEBHOOK_URL` | secret | Required private production webhook URL for the governed Founder Content n8n workflow. Source presence does not prove a live n8n deployment. |
+| `N8N_FOUNDER_CONTENT_BEARER_TOKEN` | secret | Bearer credential paired only with the governed Founder Content production webhook. |
+| `N8N_FOUNDER_CONTENT_EXPECTED_WORKFLOW_FINGERPRINT` | secret | Exact SHA-256 workflow fingerprint that binds FCR to the published n8n workflow identity. |
+| `N8N_FOUNDER_CONTENT_IDENTITY_HMAC_SECRET` | secret | HMAC secret used to verify challenge-bound n8n runtime identity receipts. |
 | `REPOSITORY_INGEST_SECRET` | secret | Optional repository-verification ingest credential. |
+
+The Founder Content n8n source lane is Buffer-only and schedule-only. `N8N_FOUNDER_CONTENT_ENABLED=true` is source intent, not runtime proof. A production claim requires exact-main deployment, provider-held secret-name readback, exact `fcrFounderContentV1` workflow fingerprint and n8n `2.32.6` identity, plus provider-native Buffer readback. n8n acceptance never establishes final publication truth.
 
 The Worker intentionally fails closed when required bindings are absent, empty, malformed, or when the GitHub App pair is incomplete. Do not weaken `validateWorkerEnv` to bypass provider configuration.
 
@@ -194,6 +196,10 @@ Never commit, log, or expose this value through a `NEXT_PUBLIC_*` variable.
 [ ] FCR_CLOUDFLARE_BUILDS_USER_TOKEN for read-only FCR Workers Builds inspection
 [ ] FCR_CLOUDFLARE_MCP_READ_TOKEN for official Cloudflare API MCP GET-only provider proof
 [ ] CLOUDFLARE_ACCOUNT_ID
+[ ] CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID when the trusted Chief runtime witness is activated; name presence here does not prove configuration
+[ ] CHIEF_CLOUDFLARE_ACCESS_CLIENT_SECRET when the trusted Chief runtime witness is activated; never expose the value
+[ ] CLOUDFLARE_ACCESS_CLIENT_ID only as the documented backward-compatible runtime-witness alias when the Chief-specific name is absent
+[ ] CLOUDFLARE_ACCESS_CLIENT_SECRET only as the documented backward-compatible runtime-witness alias when the Chief-specific name is absent
 [ ] DEPLOY_URL=https://api.foundercontrolroom.org
 [ ] FOUNDER_SIGNAL_ENGINE_MCP_TOKEN
 [ ] ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL
@@ -201,6 +207,8 @@ Never commit, log, or expose this value through a `NEXT_PUBLIC_*` variable.
 [ ] PROOF_OF_SHIP_STEERING_GRANT_ID for scheduled proof-of-ship publication
 [ ] RECONCILE_SHARED_SECRET where enabled
 ```
+
+The four Chief runtime-witness credential names above document **workflow wiring only**. This source registry does not assert that any corresponding secret exists in the protected `production` environment. A trusted FCR-main witness run must fail closed when the required client credential pair cannot be resolved.
 
 ### `founder-control-room` Worker
 
@@ -243,11 +251,9 @@ This table covers GitHub Actions secret names that are referenced outside the ca
 | `CLOUDFLARE_DEPLOY_HOOK_URL` | `pages-production-release.yml` | Required reusable-workflow secret used to trigger the exact-SHA Pages release. |
 | `FCR_CLOUDFLARE_REQUEST_TRACER_TOKEN` | `cloudflare-build-diagnostic.yml` | Optional read credential for request-trace enrichment; does not authorize Worker mutation. |
 | `FCR_CLOUDFLARE_DNS_INVENTORY_TOKEN` | `cloudflare-build-diagnostic.yml` | Optional read credential for DNS inventory enrichment; does not authorize DNS mutation. |
-| `CLOUDFLARE_ACCESS_API_TOKEN` | `fcr-access-front-door-recovery.yml` | Dedicated read credential for Access inspection. It must not inherit admin mutation authority. |
-| `CLOUDFLARE_ACCESS_ADMIN_API_TOKEN` | `fcr-access-front-door-recovery.yml` | Dedicated Access mutation credential used only when the founder-approved `apply=true` recovery path is invoked. |
-| `LINKEDIN_FOLLOWER_SNAPSHOT_URL` | `linkedin-follower-cohort.yml` | Private source locator for an authorized follower snapshot. Source configuration is required only for snapshot-reconciliation events; absence must fail closed as `BLOCKED_SOURCE`. |
-| `LINKEDIN_FOLLOWER_SNAPSHOT_TOKEN` | `linkedin-follower-cohort.yml` | Optional bearer credential for the private follower snapshot source. Never store follower identity data in the public repository. |
-| `LINKEDIN_FOLLOWER_ID_HMAC_KEY` | `linkedin-follower-cohort.yml` | Dedicated private HMAC key for public-safe stable follower member identifiers. Keep separate from snapshot-source credentials; rotating it requires a matching non-secret `LINKEDIN_FOLLOWER_ID_HMAC_EPOCH` change and intentionally starts a new privacy identity baseline. |
-| `LINKEDIN_ANALYTICS_SNAPSHOT_URL` | `linkedin-post-analytics.yml` | Private source locator for an authorized LinkedIn analytics XLSX snapshot. Source configuration is required only for analytics-reconciliation events; absence must fail closed as `BLOCKED_SOURCE`. |
-| `LINKEDIN_ANALYTICS_SNAPSHOT_TOKEN` | `linkedin-post-analytics.yml` | Optional bearer credential for the private analytics snapshot source. Never persist the raw XLSX into public repository evidence. |
-| `LINKEDIN_POST_ID_HMAC_KEY` | `linkedin-post-analytics.yml` | Dedicated private HMAC key for public-safe stable LinkedIn post identifiers. Keep separate from analytics snapshot credentials; rotating it requires a matching non-secret `LINKEDIN_POST_ID_HMAC_EPOCH` change and intentionally starts a new privacy identity baseline. |
+| `CLOUDFLARE_ACCESS_API_TOKEN` | `fcr-access-front-door-recovery.yml`, `chief-proofmode-access-recovery.yml`, `chief-proofmode-runtime-witness.yml` | Dedicated read credential for Access inspection. It must not inherit admin mutation authority. |
+| `CLOUDFLARE_ACCESS_ADMIN_API_TOKEN` | `fcr-access-front-door-recovery.yml`, `chief-proofmode-access-recovery.yml` | Dedicated Access mutation credential used only when the founder-approved repair/apply path is invoked. The runtime-witness workflow must not reference it. |
+| `CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID` | `chief-proofmode-runtime-witness.yml` | Preferred protected Chief Access client identifier for the trusted runtime witness. Its documented name is not proof that a value exists. |
+| `CHIEF_CLOUDFLARE_ACCESS_CLIENT_SECRET` | `chief-proofmode-runtime-witness.yml` | Preferred protected Chief Access client secret for the trusted runtime witness. Never log, echo, or copy the value into source or receipts. |
+| `CLOUDFLARE_ACCESS_CLIENT_ID` | `chief-proofmode-runtime-witness.yml` | Backward-compatible protected alias used only if the Chief-specific client-ID name is absent. It is not Access provider-administration authority. |
+| `CLOUDFLARE_ACCESS_CLIENT_SECRET` | `chief-proofmode-runtime-witness.yml` | Backward-compatible protected alias used only if the Chief-specific client-secret name is absent. Never expose the value; alias presence alone is not runtime proof. |

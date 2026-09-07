@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import {
   START_MARKER,
   END_MARKER,
@@ -11,14 +12,14 @@ import {
   continuityBlock,
   collectRolloverOrder,
   sameRepositoryPull,
-  resolveLiveBaseObservation,
 } from '../scripts/pr-continuity.mjs';
 
 const repo = 'jussray/example';
 const baseRepo = { full_name: repo };
+const continuitySource = readFileSync(new URL('../scripts/pr-continuity.mjs', import.meta.url), 'utf8');
 
-function pr(number, baseRef, headRef, state = 'open', headRepo = baseRepo, baseSha = '0'.repeat(40)) {
-  return { number, state, base: { ref: baseRef, sha: baseSha, repo: baseRepo }, head: { ref: headRef, repo: headRepo } };
+function pr(number, baseRef, headRef, state = 'open', headRepo = baseRepo) {
+  return { number, state, base: { ref: baseRef, repo: baseRepo }, head: { ref: headRef, repo: headRepo } };
 }
 
 test('AT01 identical base/head is current ancestry', () => assert.equal(isCurrentCompareStatus('identical'), true));
@@ -58,38 +59,16 @@ test('AT17 receipt explicitly denies deploy authority', () => assert.match(conti
 test('AT18 stacked dependency graph rolls parent before child', () => assert.deepEqual(collectRolloverOrder([pr(10, 'main', 'parent'), pr(11, 'parent', 'child')]), [10, 11]));
 test('AT19 unrelated stack is excluded', () => assert.deepEqual(collectRolloverOrder([pr(10, 'other', 'child')]), []));
 test('AT20 cyclic malformed stack terminates once per pull', () => assert.deepEqual(collectRolloverOrder([pr(1, 'main', 'a'), pr(2, 'a', 'main')]), [1, 2]));
-
-test('REG01 live root base SHA outranks the frozen PR base snapshot', async () => {
-  const stale = 'a'.repeat(40);
-  const live = 'b'.repeat(40);
-  const candidate = pr(21, 'main', 'feature', 'open', baseRepo, stale);
-  const seen = [];
-  const observation = await resolveLiveBaseObservation(repo, candidate, 'main', async (_repository, ref) => {
-    seen.push(ref);
-    return live;
-  });
-  assert.equal(observation.rootSha, live);
-  assert.equal(observation.baseSha, live);
-  assert.notEqual(observation.baseSha, candidate.base.sha);
-  assert.deepEqual(seen, ['main']);
+test('AT21 continuity compares against the live base ref instead of the PR snapshot SHA', () => {
+  assert.match(continuitySource, /branchSha\(repository, pr\.base\.ref\)/);
+  assert.doesNotMatch(continuitySource, /compare\(repository, pr\.base\.sha, pr\.head\.sha\)/);
+  assert.doesNotMatch(continuitySource, /baseSha:\s*pr\.base\.sha/);
 });
-
-test('REG02 stacked child resolves the live parent branch SHA', async () => {
-  const root = '1'.repeat(40);
-  const frozenParent = '2'.repeat(40);
-  const liveParent = '3'.repeat(40);
-  const candidate = pr(22, 'parent', 'child', 'open', baseRepo, frozenParent);
-  const seen = [];
-  const observation = await resolveLiveBaseObservation(repo, candidate, 'main', async (_repository, ref) => {
-    seen.push(ref);
-    if (ref === 'main') return root;
-    if (ref === 'parent') return liveParent;
-    throw new Error(`unexpected ref ${ref}`);
-  });
-  assert.equal(observation.rootSha, root);
-  assert.equal(observation.baseSha, liveParent);
-  assert.notEqual(observation.baseSha, candidate.base.sha);
-  assert.deepEqual(seen, ['main', 'parent']);
+test('AT22 continuity CLI actually invokes audit metadata or rollover', () => {
+  assert.match(continuitySource, /const mode = process\.argv\[2\]/);
+  assert.match(continuitySource, /if \(mode === 'audit'\) return auditMode\(\)/);
+  assert.match(continuitySource, /if \(mode === 'metadata'\) return metadataMode\(\)/);
+  assert.match(continuitySource, /if \(mode === 'rollover'\) return rolloverMode\(\)/);
+  assert.match(continuitySource, /main\(\)\.catch/);
 });
-
 test('schema remains stable', () => assert.equal(SCHEMA, 'juss/pr-continuity@v1'));

@@ -23,7 +23,6 @@ export const FOUNDER_CONVEYOR_COMMANDS = {
 } as const;
 
 export type FounderConveyorCommand = keyof typeof FOUNDER_CONVEYOR_COMMANDS;
-export type FounderConveyorCommandSource = 'founder-control' | 'untrusted';
 
 const NORMALIZED = new Map<string, FounderConveyorCommand>(
   Object.keys(FOUNDER_CONVEYOR_COMMANDS).map((command) => [command.toLowerCase(), command as FounderConveyorCommand]),
@@ -34,15 +33,7 @@ export function normalizeFounderConveyorCommand(value: string): FounderConveyorC
   return NORMALIZED.get(normalized) ?? null;
 }
 
-export function parseFounderConveyorCommands(
-  input: string,
-  options: { source?: FounderConveyorCommandSource } = {},
-): FounderConveyorCommand[] {
-  // Command words inside emails, webpages, issues, MCP/tool results, imported docs,
-  // or any other untrusted text are data, never workflow authority. A caller must
-  // already be on the authenticated founder-control surface before parsing can occur.
-  if (options.source !== 'founder-control') return [];
-
+export function parseFounderConveyorCommands(input: string): FounderConveyorCommand[] {
   const matches = input.match(/(?:^|\s)(\/[A-Za-z0-9-]+|80\/20|FutureYOU|Antiadvice|First principles|YCOMBINATOR|SOCRATES)(?=\s|$)/gi) ?? [];
   const resolved: FounderConveyorCommand[] = [];
 
