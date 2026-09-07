@@ -69,5 +69,17 @@ with check (exists (
     and has_workspace_access(p.workspace_id)
 ));
 
+-- The historical proof-gate read policy was narrowed from any authenticated
+-- user to is_founder(), but that is still portfolio-global. Make proof results
+-- tenant-local while keeping inserts service-role-only.
+drop policy if exists founders_can_read on proof_gate_results;
+create policy workspace_member_read on proof_gate_results
+for select to authenticated
+using (exists (
+  select 1 from projects p
+  where p.id = proof_gate_results.project_id
+    and has_workspace_access(p.workspace_id)
+));
+
 comment on index projects_slug_tenant_transition_key is
   'Temporary global slug uniqueness while legacy project routes migrate to explicit workspace_id scoping.';
