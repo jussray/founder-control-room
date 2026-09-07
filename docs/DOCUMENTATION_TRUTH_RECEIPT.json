@@ -1,6 +1,6 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Preserve the existing #746 evidence-authority, Cloudflare Access recovery, Founder Capital Decision, and ATTACK-20 invariants while binding the governed Founder Content n8n production-source rescue to current documentation. This receipt keeps source intent, provider configuration, runtime identity, database application, publication outcome, merge authority, and deploy authority as separate proof planes and does not claim that production n8n, Buffer scheduling, Cloudflare bindings, or Supabase migrations are live merely because the source lane is enabled.",
+  "purpose": "Preserve the existing #746 evidence-authority, Cloudflare Access recovery, Founder Capital Decision, ATTACK-20, and governed Founder Content n8n invariants while binding the FCR GitHub constitutional governance target to main-only source enforcement. This receipt keeps source intent, live provider topology, provider configuration, runtime identity, database application, publication outcome, merge authority, and deploy authority as separate proof planes; main-only source guards do not claim that the currently observed GitHub ruleset has already been reconciled or that production provider state is READY.",
   "domains": [
     "repository-provider",
     "evidence-authority",
@@ -18,7 +18,8 @@
     {
       "path": "src/providers/providerFactory.ts",
       "claims": [
-        "src/providers/providerFactory.ts must keep the current FCR founder-only native approving-review floor at zero while retaining the constitutional required checks and trusted GitHub App boundary, and a later deliberate positive native-review count must remain representable without weakening the existing machine or founder-final authority membrane."
+        "src/providers/providerFactory.ts must keep the current FCR founder-only native approving-review floor at zero while retaining the constitutional required checks and trusted GitHub App boundary, and a later deliberate positive native-review count must remain representable without weakening the existing machine or founder-final authority membrane.",
+        "src/providers/providerFactory.ts must reject the canonical Founder Control Room governance ruleset before provider delegation unless targetRefs is exactly main; ~ALL or any additional branch scope cannot be accepted by the constitutional mutation path."
       ]
     },
     {
