@@ -9,6 +9,11 @@ preview_urls = false
 [observability]
 enabled = true
 
+# Canonical inbound Email Routing trigger. With Cloudflare subaddressing enabled,
+# review+<context-uuid>@foundercontrolroom.org matches this base address while
+# preserving the +<context-uuid> value in message.to for the parser.
+addresses = ["review@foundercontrolroom.org"]
+
 # Keep founder review-email ingestion on Cloudflare's private Worker fabric.
 # The request URL remains the canonical API route for downstream routing, but
 # the transport uses this Service Binding instead of the public Internet.
@@ -16,9 +21,8 @@ enabled = true
 binding = "FOUNDER_CONTROL_ROOM_API"
 service = "founder-control-room"
 
-# Non-secret values only. This Worker receives mail only after a separately
-# approved Cloudflare Email Routing rule is created. This file creates no DNS,
-# route, destination address, or live email binding.
+# Non-secret values only. Email Routing must already be enabled for the domain,
+# and subaddressing must be enabled provider-side before review+UUID replies are live.
 [vars]
 FOUNDER_REVIEW_EMAIL_DOMAIN = "foundercontrolroom.org"
 FOUNDER_REVIEW_INGEST_URL = "https://api.foundercontrolroom.org/ingest/founder-review-email"
