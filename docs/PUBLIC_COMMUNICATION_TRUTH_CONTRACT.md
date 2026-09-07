@@ -58,6 +58,8 @@ Founder-content orchestration must not reuse the generic conveyor activation rec
 
 The governed Founder Content rescue may set `N8N_FOUNDER_CONTENT_ENABLED=true` in candidate source, restrict the enabled provider to Buffer, and pin the expected workflow/runtime identity. That is **source intent only**. It does not prove the canonical Worker carrying those bindings was deployed, that the production n8n workflow was published, that the Supabase migrations were applied, that Buffer accepted a schedule, or that a public artifact exists. A successful isolated n8n runtime proof or webhook `202` remains execution-plane evidence; present-tense `live`, `used`, `scheduled`, or `published` language requires the corresponding exact deployed runtime and provider-native readback.
 
+Authenticated Founder Content mutation lanes must also remain behind the repository's explicit rate-limit boundary before lifecycle mutation or provider-neutral n8n scheduling handlers execute. Rate limiting is abuse control, not publication authority: it cannot create or consume founder approval, prove provider configuration, prove deployment, convert scheduler acceptance into outcome truth, or substitute for provider-native readback.
+
 ## /confess
 
 Before release, state internally and, when material to the audience, publicly:
