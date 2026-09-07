@@ -8,6 +8,7 @@ import {
   FCR_CLOUDFLARE_ACCOUNT_ID,
   FCR_PUBLIC_ACCESS_APP_NAME,
   FCR_PUBLIC_ZONE,
+  appHasOnlyEquivalentPublicDestination,
   appHasOnlyManagedPublicDestination,
   isEveryoneBypassPolicy,
   matchingAccessReasons,
@@ -115,8 +116,18 @@ test('all-workers coverage can coexist with a narrower public destination', () =
   );
 });
 
-test('managed destination and bypass policy validators are exact', () => {
+test('managed destination remains exact while bare apex is equivalent only for inspection', () => {
   assert.equal(appHasOnlyManagedPublicDestination(managedApp(), FCR_PUBLIC_ZONE), true);
+  assert.equal(appHasOnlyEquivalentPublicDestination(managedApp(), FCR_PUBLIC_ZONE), true);
+  assert.equal(appHasOnlyEquivalentPublicDestination({
+    destinations: [{ type: 'public', uri: FCR_PUBLIC_ZONE }],
+  }, FCR_PUBLIC_ZONE), true);
+  assert.equal(appHasOnlyManagedPublicDestination({
+    destinations: [{ type: 'public', uri: FCR_PUBLIC_ZONE }],
+  }, FCR_PUBLIC_ZONE), false);
+  assert.equal(appHasOnlyEquivalentPublicDestination({
+    destinations: [{ type: 'public', uri: `${FCR_PUBLIC_ZONE}/admin` }],
+  }, FCR_PUBLIC_ZONE), false);
   assert.equal(isEveryoneBypassPolicy(bypassPolicy()), true);
   assert.equal(isEveryoneBypassPolicy({ decision: 'allow', include: [{ everyone: {} }] }), false);
 });
@@ -239,6 +250,42 @@ test('foreign-named exact public bypass is accepted by semantics without being a
   assert.equal(receipt.mutationPerformed, false);
   assert.equal(receipt.managedApplicationId, null);
   assert.ok(requests.every((request) => request.authorization === `Bearer ${READ_TOKEN}`));
+});
+
+test('foreign-named bare apex bypass is accepted as Cloudflare whole-site semantics without rollback authority', async () => {
+  const receipt = await reconcileFcrPublicAccessZone({
+    env: readEnv,
+    fetchImpl: fakeFetch({
+      applications: [{
+        id: 'foreign-apex',
+        name: 'existing apex app',
+        destinations: [{ type: 'public', uri: FCR_PUBLIC_ZONE }],
+      }],
+      policiesByApp: { 'foreign-apex': [bypassPolicy()] },
+    }),
+  });
+
+  assert.equal(receipt.state, 'clear');
+  assert.equal(receipt.action, 'already-public-bypass');
+  assert.equal(receipt.alreadyExempt, true);
+  assert.equal(receipt.mutationPerformed, false);
+  assert.equal(receipt.managedApplicationId, null);
+});
+
+test('foreign subpath remains narrower than the whole-site contract and stays blocked', async () => {
+  await assert.rejects(
+    reconcileFcrPublicAccessZone({
+      env: readEnv,
+      fetchImpl: fakeFetch({
+        applications: [{
+          id: 'foreign-subpath',
+          name: 'narrow app',
+          destinations: [{ type: 'public', uri: `${FCR_PUBLIC_ZONE}/admin` }],
+        }],
+      }),
+    }),
+    (error) => error?.classification === 'existing-public-access-app-requires-review',
+  );
 });
 
 test('foreign exact public destination without Everyone bypass blocks automatic mutation', async () => {

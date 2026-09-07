@@ -70,6 +70,18 @@ export function appHasOnlyManagedPublicDestination(app, hostname = FCR_PUBLIC_ZO
       === `${clean(hostname).toLowerCase()}/*`;
 }
 
+export function appHasOnlyEquivalentPublicDestination(app, hostname = FCR_PUBLIC_ZONE) {
+  const destinations = Array.isArray(app?.destinations) ? app.destinations : [];
+  if (destinations.length !== 1 || clean(destinations[0]?.type).toLowerCase() !== 'public') return false;
+  const uri = normalizePublicUri(destinations[0]?.uri || destinations[0]?.hostname);
+  const target = clean(hostname).toLowerCase();
+  // Cloudflare documents an apex-domain Access application as protecting the
+  // entire website. Treat that provider shape as equivalent to an explicit /*
+  // only for read-only semantic recognition. Creation and rollback remain
+  // pinned to the explicit managed /* representation.
+  return uri === target || uri === `${target}/*`;
+}
+
 export function isEveryoneBypassPolicy(policy) {
   if (clean(policy?.decision).toLowerCase() !== 'bypass') return false;
   const include = Array.isArray(policy?.include) ? policy.include : [];
@@ -315,8 +327,9 @@ export async function reconcileFcrPublicAccessZone({
   const existingPublic = exactPublicApps[0] || null;
   if (existingPublic) {
     const isNamedManaged = clean(existingPublic?.name) === FCR_PUBLIC_ACCESS_APP_NAME;
+    const isExactManagedDestination = appHasOnlyManagedPublicDestination(existingPublic, zone);
 
-    if (!appHasOnlyManagedPublicDestination(existingPublic, zone)) {
+    if (!appHasOnlyEquivalentPublicDestination(existingPublic, zone)) {
       const error = new Error(
         isNamedManaged
           ? 'The managed FCR public-bypass application destination drifted from the exact public apex scope.'
@@ -359,9 +372,11 @@ export async function reconcileFcrPublicAccessZone({
       state: 'clear',
       alreadyExempt: true,
       action: 'already-public-bypass',
-      // A semantically equivalent foreign-named app is accepted as provider truth,
-      // but is never adopted as a managed rollback target.
-      managedApplicationId: isNamedManaged ? (clean(existingPublic.id) || null) : null,
+      // A behaviorally equivalent app may be recognized as provider truth,
+      // but only the exact workflow-managed shape can become a rollback target.
+      managedApplicationId: isNamedManaged && isExactManagedDestination
+        ? (clean(existingPublic.id) || null)
+        : null,
       nextAction: 'run exact-head anonymous Playwright and verify the public front door',
     };
   }
