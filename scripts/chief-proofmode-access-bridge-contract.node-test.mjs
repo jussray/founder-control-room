@@ -13,7 +13,7 @@ const recoveryDoc = readFileSync('docs/CHIEF_PROOFMODE_ACCESS_RECOVERY.md', 'utf
 const ACCOUNT_ID = '9b59861bd1747cf7525571b4c51d2aa0';
 const STORAGE_FIRST_SELECTOR = /secrets\.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID\s*\|\|\s*secrets\.CLOUDFLARE_ACCESS_CLIENT_ID\s*\|\|\s*vars\.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID/;
 
-test('Chief Access command bridge is founder-only, issue-scoped, exact-main bound, and cannot dispatch Actions directly', () => {
+test('Chief Access command bridge is founder-only, issue-scoped, exact-main bound, checkout-free, and cannot dispatch Actions directly', () => {
   assert.match(commandBridge, /github\.event\.issue\.number == 485/);
   assert.match(commandBridge, /github\.event\.comment\.user\.login == 'jussray'/);
   assert.match(commandBridge, /github\.event\.comment\.user\.id == 286642846/);
@@ -22,7 +22,8 @@ test('Chief Access command bridge is founder-only, issue-scoped, exact-main boun
   assert.doesNotMatch(commandBridge, /actions:\s*write/);
   assert.match(commandBridge, /commits\/main/);
   assert.match(commandBridge, /test "\$current_main" = "\$EXPECTED_HEAD_SHA"/);
-  assert.match(commandBridge, /Check out exact trusted FCR main reconciliation evaluator/);
+  assert.doesNotMatch(commandBridge, /actions\/checkout/);
+  assert.doesNotMatch(commandBridge, /node scripts\//);
   assert.match(commandBridge, /uses:\s*\.\/\.github\/workflows\/chief-proofmode-access-recovery\.yml/);
   assert.match(commandBridge, /authority_comment_id:\s*\$\{\{ needs\.authorize\.outputs\.authority_comment_id \}\}/);
   assert.match(commandBridge, /secrets:\s*inherit/);
@@ -64,9 +65,7 @@ test('recovery is workflow-call only and rebinds the original founder issue-comm
 });
 
 test('recovery latch is subject-bound and blocks blind duplicate repair', () => {
-  const dispatchGate = commandBridge.match(
-    /- name: Refuse repair while subject-bound reconciliation is unresolved([\s\S]*?)\n\s{2}recover:/,
-  )?.[1] ?? '';
+  assert.doesNotMatch(commandBridge, /chief-proofmode-access-reconciliation-state\.mjs/);
   const recoveryGate = recoveryWorkflow.match(
     /- name: Refuse unresolved prior Chief Access repair([\s\S]*?)- name: Set up Node 24/,
   )?.[1] ?? '';
@@ -77,12 +76,10 @@ test('recovery latch is subject-bound and blocks blind duplicate repair', () => 
     /- name: Return sanitized Chief Access receipt to founder control issue([\s\S]*?)- name: Upload sanitized Chief Access evidence/,
   )?.[1] ?? '';
 
-  for (const gate of [dispatchGate, recoveryGate]) {
-    assert.match(gate, /gh api --paginate --slurp/);
-    assert.match(gate, /chief-proofmode-access-reconciliation-state\.mjs/);
-    assert.match(gate, /matching provider subject|subject-bound reconciliation/);
-    assert.doesNotMatch(gate, /chief-proofmode-access-reconciliation:v1/);
-  }
+  assert.match(recoveryGate, /gh api --paginate --slurp/);
+  assert.match(recoveryGate, /chief-proofmode-access-reconciliation-state\.mjs/);
+  assert.match(recoveryGate, /matching provider subject|subject-bound reconciliation/);
+  assert.doesNotMatch(recoveryGate, /chief-proofmode-access-reconciliation:v1/);
 
   assert.match(latchStep, /steps\.selector\.outcome == 'success'/);
   assert.match(latchStep, /chief-proofmode-access-reconciliation:v2/);
