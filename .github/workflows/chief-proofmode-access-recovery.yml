@@ -123,6 +123,42 @@ jobs:
             echo '- DNS, Worker route, deployment, database, secret, and application mutation: none'
           } >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Refuse unresolved prior Chief Access repair
+        id: reconcile_gate
+        if: inputs.mode == 'repair'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          disposition="$(
+            gh api --paginate --slurp "repos/${GITHUB_REPOSITORY}/issues/485/comments?per_page=100" \
+              | jq -r --arg target "$CHIEF_ACCESS_TARGET_URL" '
+                  [ .[][] as $comment
+                    | select($comment.user.login == "github-actions[bot]")
+                    | ($comment.body | try capture("<!-- chief-proofmode-access-reconciliation:v1 target=(?<target>https://[^ ]+) disposition=(?<disposition>CLEAR|REPAIR_IN_PROGRESS|RECONCILE_REQUIRED) head=(?<head>[0-9a-f]{40}) run=(?<run>[0-9]+) -->") catch empty) as $marker
+                    | select($marker.target == $target)
+                    | $marker + { commentId: $comment.id }
+                  ]
+                  | sort_by(.commentId)
+                  | (last // {disposition:"CLEAR"})
+                  | .disposition
+                '
+          )"
+
+          case "$disposition" in
+            CLEAR)
+              ;;
+            REPAIR_IN_PROGRESS|RECONCILE_REQUIRED)
+              echo "::error title=Chief Access reconciliation required::latest trusted state for this exact target is $disposition; read-only CONFIGURED provider evidence is required before another repair can execute."
+              exit 1
+              ;;
+            *)
+              echo '::error title=Unknown reconciliation state::refusing repair before provider access.'
+              exit 1
+              ;;
+          esac
+
       - name: Set up Node 24
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
@@ -153,6 +189,29 @@ jobs:
             exit 1
           fi
 
+      - name: Persist repair-in-progress reconciliation latch
+        if: inputs.mode == 'repair' && steps.selector.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RETURN_ISSUE: '485'
+        shell: bash
+        run: |
+          set -euo pipefail
+          latch='test-results/chief-proofmode-access-reconciliation-latch.md'
+          mkdir -p test-results
+          {
+            echo "<!-- chief-proofmode-access-reconciliation:v1 target=$CHIEF_ACCESS_TARGET_URL disposition=REPAIR_IN_PROGRESS head=$EXPECTED_HEAD_SHA run=$GITHUB_RUN_ID -->"
+            echo
+            echo '## Chief ProofMode Access reconciliation latch'
+            echo
+            echo '- Disposition: `REPAIR_IN_PROGRESS`'
+            echo "- Exact FCR authority head: \`$EXPECTED_HEAD_SHA\`"
+            echo "- Chief target: \`$CHIEF_ACCESS_TARGET_URL\`"
+            echo "- Workflow run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            echo '- A later repair is blocked until this run publishes `CLEAR` or read-only provider evidence publishes `CLEAR`.'
+          } > "$latch"
+          gh issue comment "$RETURN_ISSUE" --repo "$GITHUB_REPOSITORY" --body-file "$latch"
+
       - name: Inspect current Chief Service Auth with dedicated read authority
         if: inputs.mode == 'check'
         env:
@@ -180,6 +239,7 @@ jobs:
           exit "$status"
 
       - name: Re-read repaired policy with provider authority
+        id: reread
         if: ${{ always() && inputs.mode == 'repair' && steps.selector.outcome == 'success' }}
         env:
           CHIEF_ACCESS_MODE: check
@@ -195,6 +255,10 @@ jobs:
           RETURN_ISSUE: '485'
           JOB_STATUS: ${{ job.status }}
           WORKFLOW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          RECONCILIATION_GATE_OUTCOME: ${{ steps.reconcile_gate.outcome }}
+          SELECTOR_OUTCOME: ${{ steps.selector.outcome }}
+          APPLY_OUTCOME: ${{ steps.apply.outcome }}
+          REREAD_OUTCOME: ${{ steps.reread.outcome }}
         shell: bash
         run: |
           set -euo pipefail
@@ -267,7 +331,44 @@ jobs:
             ' "$path" >/dev/null 2>&1
           }
 
+          current_receipt_valid=false
+          current_state=''
+          if [[ "$safe_target" != 'UNKNOWN' && -f "$current_receipt" ]] && validate_receipt "$current_receipt"; then
+            current_receipt_valid=true
+            current_state="$(jq -r '.state' "$current_receipt")"
+          fi
+
+          mutation_receipt_valid=false
+          mutation_outcome=''
+          if [[ "$safe_target" != 'UNKNOWN' && -f "$mutation_receipt" ]] && validate_receipt "$mutation_receipt"; then
+            mutation_receipt_valid=true
+            mutation_outcome="$(jq -r '.mutationOutcome' "$mutation_receipt")"
+          fi
+
+          reconciliation_disposition=''
+          if [[ "$safe_target" != 'UNKNOWN' && "$safe_head" != 'UNKNOWN' ]]; then
+            if [[ "$CHIEF_ACCESS_MODE" == 'repair' ]]; then
+              if [[ "$RECONCILIATION_GATE_OUTCOME" == 'success' ]]; then
+                if [[ "$REREAD_OUTCOME" == 'success' && "$current_receipt_valid" == 'true' && "$current_state" == 'configured' ]]; then
+                  reconciliation_disposition='CLEAR'
+                elif [[ "$APPLY_OUTCOME" == 'skipped' ]]; then
+                  reconciliation_disposition='CLEAR'
+                elif [[ "$mutation_receipt_valid" == 'true' && "$mutation_outcome" == 'none' ]]; then
+                  reconciliation_disposition='CLEAR'
+                else
+                  reconciliation_disposition='RECONCILE_REQUIRED'
+                fi
+              fi
+            elif [[ "$current_receipt_valid" == 'true' && "$current_state" == 'configured' ]]; then
+              reconciliation_disposition='CLEAR'
+            fi
+          fi
+
           {
+            if [[ -n "$reconciliation_disposition" ]]; then
+              echo "<!-- chief-proofmode-access-reconciliation:v1 target=$safe_target disposition=$reconciliation_disposition head=$safe_head run=$GITHUB_RUN_ID -->"
+              echo
+            fi
             echo '## Chief ProofMode Cloudflare Access receipt'
             echo
             echo "- Exact FCR authority head: \`$safe_head\`"
@@ -276,14 +377,16 @@ jobs:
             echo "- Founder approval receipt: \`$safe_approval\`"
             echo "- Workflow run: $WORKFLOW_RUN_URL"
             echo "- Job status: \`$JOB_STATUS\`"
+            if [[ -n "$reconciliation_disposition" ]]; then
+              echo "- Reconciliation disposition: \`$reconciliation_disposition\`"
+            fi
 
-            if [[ "$safe_target" == 'UNKNOWN' || ! -f "$current_receipt" ]] || ! validate_receipt "$current_receipt"; then
+            if [[ "$current_receipt_valid" != 'true' ]]; then
               echo '- Current provider receipt: `missing-or-malformed`'
               echo '- Current provider truth: `UNKNOWN`'
             else
               echo '- Current provider receipt: `present`'
-              receipt_state="$(jq -r '.state' "$current_receipt")"
-              if [[ "$receipt_state" == 'blocked' ]]; then
+              if [[ "$current_state" == 'blocked' ]]; then
                 echo '- Current provider truth: `BLOCKED`'
               else
                 echo '- Current provider truth: `CONFIGURED`'
@@ -295,7 +398,7 @@ jobs:
             fi
 
             if [[ "$CHIEF_ACCESS_MODE" == 'repair' ]]; then
-              if [[ "$safe_target" == 'UNKNOWN' || ! -f "$mutation_receipt" ]] || ! validate_receipt "$mutation_receipt"; then
+              if [[ "$mutation_receipt_valid" != 'true' ]]; then
                 echo '- Mutation receipt: `missing-or-malformed`'
               else
                 echo '- Mutation receipt: `present`'
@@ -306,6 +409,9 @@ jobs:
               fi
             fi
 
+            if [[ "$reconciliation_disposition" == 'RECONCILE_REQUIRED' ]]; then
+              echo '- Retry authority: `BLOCKED`; run read-only `check` until provider state is `CONFIGURED`. Do not issue another repair while this latch remains current.'
+            fi
             echo '- Browser/runtime proof: `NOT CLAIMED HERE`; rerun Chief exact-head Playwright after provider repair.'
           } > "$public_receipt"
 

@@ -6,6 +6,7 @@ on:
 
 permissions:
   contents: read
+  issues: read
   actions: write
 
 jobs:
@@ -89,6 +90,42 @@ jobs:
           current_main="$(gh api "repos/${GITHUB_REPOSITORY}/commits/main" --jq .sha)"
           printf 'expected=%s\ncurrent_main=%s\n' "$EXPECTED_HEAD_SHA" "$current_main"
           test "$current_main" = "$EXPECTED_HEAD_SHA"
+
+      - name: Refuse repair dispatch while reconciliation is unresolved
+        if: steps.parse.outputs.mode == 'repair'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET: ${{ steps.parse.outputs.target }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          disposition="$(
+            gh api --paginate --slurp "repos/${GITHUB_REPOSITORY}/issues/485/comments?per_page=100" \
+              | jq -r --arg target "$TARGET" '
+                  [ .[][] as $comment
+                    | select($comment.user.login == "github-actions[bot]")
+                    | ($comment.body | try capture("<!-- chief-proofmode-access-reconciliation:v1 target=(?<target>https://[^ ]+) disposition=(?<disposition>CLEAR|REPAIR_IN_PROGRESS|RECONCILE_REQUIRED) head=(?<head>[0-9a-f]{40}) run=(?<run>[0-9]+) -->") catch empty) as $marker
+                    | select($marker.target == $target)
+                    | $marker + { commentId: $comment.id }
+                  ]
+                  | sort_by(.commentId)
+                  | (last // {disposition:"CLEAR"})
+                  | .disposition
+                '
+          )"
+
+          case "$disposition" in
+            CLEAR)
+              ;;
+            REPAIR_IN_PROGRESS|RECONCILE_REQUIRED)
+              echo "::error title=Chief Access reconciliation required::latest trusted state for this exact target is $disposition; run read-only check and obtain CONFIGURED provider evidence before another repair dispatch."
+              exit 1
+              ;;
+            *)
+              echo '::error title=Unknown reconciliation state::refusing repair dispatch.'
+              exit 1
+              ;;
+          esac
 
       - name: Dispatch bounded Chief Access recovery
         if: steps.parse.outputs.sha != ''

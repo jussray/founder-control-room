@@ -16,6 +16,7 @@ test('Chief Access command bridge is founder-only, issue-scoped, and exact-FCR-m
   assert.match(commandBridge, /github\.event\.comment\.user\.login == 'jussray'/);
   assert.match(commandBridge, /\/cloudflare-chief-access/);
   assert.match(commandBridge, /actions:\s*write/);
+  assert.match(commandBridge, /issues:\s*read/);
   assert.match(commandBridge, /commits\/main/);
   assert.match(commandBridge, /test "\$current_main" = "\$EXPECTED_HEAD_SHA"/);
   assert.match(commandBridge, /chief-proofmode-access-recovery\.yml\/dispatches/);
@@ -23,6 +24,42 @@ test('Chief Access command bridge is founder-only, issue-scoped, and exact-FCR-m
   assert.doesNotMatch(commandBridge, /CLOUDFLARE_ACCESS_ADMIN_API_TOKEN/);
   assert.doesNotMatch(commandBridge, /CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID/);
   assert.doesNotMatch(commandBridge, /CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID/);
+});
+
+test('recovery latch blocks blind duplicate repair until configured readback clears it', () => {
+  const dispatchGate = commandBridge.match(
+    /- name: Refuse repair dispatch while reconciliation is unresolved([\s\S]*?)- name: Dispatch bounded Chief Access recovery/,
+  )?.[1] ?? '';
+  const recoveryGate = recoveryWorkflow.match(
+    /- name: Refuse unresolved prior Chief Access repair([\s\S]*?)- name: Set up Node 24/,
+  )?.[1] ?? '';
+  const latchStep = recoveryWorkflow.match(
+    /- name: Persist repair-in-progress reconciliation latch([\s\S]*?)- name: Inspect current Chief Service Auth with dedicated read authority/,
+  )?.[1] ?? '';
+  const returnStep = recoveryWorkflow.match(
+    /- name: Return sanitized Chief Access receipt to founder control issue([\s\S]*?)- name: Upload sanitized Chief Access evidence/,
+  )?.[1] ?? '';
+
+  for (const gate of [dispatchGate, recoveryGate]) {
+    assert.match(gate, /gh api --paginate --slurp/);
+    assert.match(gate, /github-actions\[bot\]/);
+    assert.match(gate, /chief-proofmode-access-reconciliation:v1/);
+    assert.match(gate, /REPAIR_IN_PROGRESS\|RECONCILE_REQUIRED/);
+    assert.match(gate, /latest trusted state/);
+  }
+
+  assert.match(latchStep, /steps\.selector\.outcome == 'success'/);
+  assert.match(latchStep, /disposition=REPAIR_IN_PROGRESS/);
+  assert.match(latchStep, /issue comment/);
+  assert.match(recoveryWorkflow, /concurrency:\s*[\s\S]*cancel-in-progress:\s*false/);
+  assert.match(returnStep, /RECONCILIATION_GATE_OUTCOME/);
+  assert.match(returnStep, /REREAD_OUTCOME/);
+  assert.match(returnStep, /reconciliation_disposition='RECONCILE_REQUIRED'/);
+  assert.match(returnStep, /reconciliation_disposition='CLEAR'/);
+  assert.match(returnStep, /mutation_outcome.*none/s);
+  assert.match(returnStep, /REREAD_OUTCOME.*success.*current_state.*configured/s);
+  assert.match(returnStep, /read-only `check` until provider state is `CONFIGURED`/);
+  assert.match(returnStep, /Retry authority: `BLOCKED`/);
 });
 
 test('recovery keeps repair selector mandatory while check may discover one existing bound identity', () => {
@@ -40,7 +77,7 @@ test('recovery keeps repair selector mandatory while check may discover one exis
   assert.doesNotMatch(recoveryWorkflow, /secrets\.CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID/);
 
   const selectorStep = recoveryWorkflow.match(
-    /- name: Require configured Chief service-token identity before repair([\s\S]*?)- name: Inspect current Chief Service Auth with dedicated read authority/,
+    /- name: Require configured Chief service-token identity before repair([\s\S]*?)- name: Persist repair-in-progress reconciliation latch/,
   )?.[1] ?? '';
   assert.match(selectorStep, /id: selector/);
   assert.match(selectorStep, /if: inputs\.mode == 'repair'/);
@@ -60,7 +97,7 @@ test('recovery keeps repair selector mandatory while check may discover one exis
 
 test('repair requires founder approval but never publishes the raw approval reference', () => {
   const authorityStep = recoveryWorkflow.match(
-    /- name: Verify exact FCR main, target, and founder mutation approval([\s\S]*?)- name: Set up Node 24/,
+    /- name: Verify exact FCR main, target, and founder mutation approval([\s\S]*?)- name: Refuse unresolved prior Chief Access repair/,
   )?.[1] ?? '';
   assert.match(authorityStep, /repair requires an auditable 8-200 character approval_reference/);
   assert.match(authorityStep, /sha256sum/);
@@ -125,6 +162,7 @@ test('repair preserves uncertain mutation receipt and rereads provider state bef
   assert.match(applyStep, /status=\$\?/);
   assert.match(applyStep, /chief-proofmode-access-mutation\.json/);
   assert.match(applyStep, /exit "\$status"/);
+  assert.match(rereadStep, /id: reread/);
   assert.match(rereadStep, /always\(\)/);
   assert.match(rereadStep, /steps\.selector\.outcome == 'success'/);
   assert.match(rereadStep, /CHIEF_ACCESS_MODE: check/);
