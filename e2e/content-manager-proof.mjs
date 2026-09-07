@@ -152,7 +152,7 @@ try {
   assert.match(founderLaneText, /provider readback/i);
   assert.match(founderLaneText, /provider and publication state remain UNKNOWN/i);
   assert.equal(await founderLane.locator('[data-founder-lane-card]').count(), 3);
-  assert.equal(await founderLane.locator('button, .action').count(), 0, 'capability lane must not masquerade as authorization');
+  assert.equal(await founderLane.locator('button, .action').count(), 0, 'capability must not be presented as an already-authorized publish control');
 
   const learningLoop = page.locator('[data-content-learning-loop]');
   await learningLoop.waitFor({ state: 'visible' });
