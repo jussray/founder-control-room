@@ -58,6 +58,50 @@ describe('compileAnthropicStructuredSchema', () => {
     })).toThrow(StructuredSchemaError);
   });
 
+  it('rejects Pydantic-style indirect circular references in $defs', () => {
+    expect(() => compileAnthropicStructuredSchema({
+      $defs: {
+        TreeNode: {
+          type: 'object',
+          properties: {
+            name: { type: 'string' },
+            children: {
+              type: 'array',
+              items: { $ref: '#/$defs/TreeNode' },
+            },
+          },
+          required: ['name', 'children'],
+          additionalProperties: false,
+        },
+      },
+      $ref: '#/$defs/TreeNode',
+    })).toThrow(/recursive schema reference/);
+  });
+
+  it('preserves acyclic local references', () => {
+    expect(compileAnthropicStructuredSchema({
+      $defs: {
+        Label: { type: 'string', maxLength: 120 },
+      },
+      type: 'object',
+      properties: {
+        label: { $ref: '#/$defs/Label' },
+      },
+      required: ['label'],
+      additionalProperties: false,
+    })).toEqual({
+      $defs: {
+        Label: { type: 'string' },
+      },
+      type: 'object',
+      properties: {
+        label: { $ref: '#/$defs/Label' },
+      },
+      required: ['label'],
+      additionalProperties: false,
+    });
+  });
+
   it('rejects external references before provider dispatch', () => {
     expect(() => compileAnthropicStructuredSchema({
       $ref: 'https://example.com/schema.json',
