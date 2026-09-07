@@ -36,6 +36,24 @@ function branchTargetConditions(ruleset) {
   return { include, exclude };
 }
 
+function escapeRegExp(value) {
+  return value.replace(/[.+^${}()|[\]\\]/g, '\\$&');
+}
+
+function refExclusionCoversTarget(pattern, targetRef, defaultBranch) {
+  const normalized = text(pattern);
+  if (!normalized) return false;
+  if (normalized === '~ALL') return true;
+  if (normalized === '~DEFAULT_BRANCH') return text(defaultBranch) === text(targetRef);
+
+  const literalTarget = `refs/heads/${targetRef}`;
+  if (normalized === literalTarget) return true;
+  if (!/[*?]/.test(normalized)) return false;
+
+  const matcher = new RegExp(`^${escapeRegExp(normalized).replace(/\*/g, '.*').replace(/\?/g, '.')}$`);
+  return matcher.test(literalTarget);
+}
+
 function ruleOfType(ruleset, type) {
   const rules = Array.isArray(ruleset?.rules) ? ruleset.rules : [];
   return rules.find((rule) => rule?.type === type) ?? null;
@@ -85,7 +103,9 @@ export function rulesetSnapshot(ruleset, targetRef = 'main', defaultBranch = tar
   const targetTokens = new Set([`refs/heads/${targetRef}`]);
   if (text(defaultBranch) === text(targetRef)) targetTokens.add('~DEFAULT_BRANCH');
   const requestedRefExplicitlyIncluded = targets.some((target) => targetTokens.has(target));
-  const requestedRefExcluded = excludedTargets.some((target) => target === '~ALL' || targetTokens.has(target));
+  const requestedRefExcludedBy = excludedTargets.filter((target) =>
+    refExclusionCoversTarget(target, targetRef, defaultBranch));
+  const requestedRefExcluded = requestedRefExcludedBy.length > 0;
   const targetsRequestedRef = requestedRefExplicitlyIncluded && !requestedRefExcluded;
   const targetsOnlyRequestedRef = targetsRequestedRef
     && targets.every((target) => targetTokens.has(target));
@@ -98,6 +118,7 @@ export function rulesetSnapshot(ruleset, targetRef = 'main', defaultBranch = tar
     targetRefs: targets,
     excludedTargetRefs: excludedTargets,
     requestedRefExplicitlyIncluded,
+    requestedRefExcludedBy,
     requestedRefExcluded,
     targetsRequestedRef,
     targetsOnlyRequestedRef,
