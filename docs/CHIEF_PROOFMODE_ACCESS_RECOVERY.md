@@ -15,6 +15,8 @@ The trusted Access command is founder-only and issue-scoped:
 /cloudflare-chief-access repair <exact-fcr-main-sha> <immutable-chief-preview-origin> <approval-reference>
 ```
 
+The issue-comment bridge is the only invocation surface for the recovery workflow. `.github/workflows/chief-proofmode-access-recovery.yml` is reusable through `workflow_call` and has no direct `workflow_dispatch` trigger. The bridge carries the exact founder issue-comment ID into recovery, and recovery rebinds the original `issue_comment` event, issue `#485`, founder login and numeric account ID, comment ID, command body, exact FCR main SHA, mode, immutable target, and repair approval reference before any provider credential can be used. A caller-supplied input or inherited secret cannot substitute for that original founder event.
+
 The target must be exactly one origin matching:
 
 ```text
@@ -118,7 +120,7 @@ The caller cannot choose a different repository, check name, environment, conclu
 
 The `proofmode-access-admin` GitHub Deployment object is an evidence object required by the existing #208 topology. It uses `auto_merge: false`, `transient_environment: true`, and `production_environment: false`. It does not deploy Chief software and does not grant deploy or merge authority. Chief currently has no deployment-event workflow that this evidence object is intended to trigger.
 
-Repair and witness publication are deliberately separate operations. A repair dispatch may never publish runtime success. After any repair, a new read-only check/runtime-witness run must independently re-observe provider state and pass the real runtime proof before evidence is published.
+Repair and witness publication are deliberately separate operations. A repair call may never publish runtime success. After any repair, a new read-only check/runtime-witness run must independently re-observe provider state and pass the real runtime proof before evidence is published.
 
 Do not interpret this trusted path as permission to merely `rerun failed Chief ProofMode MCP Playwright job` or `rerun failed Chief capability-plan Playwright job`. Those historical candidate-source lanes remain authority-blocked for protected candidate proof and cannot substitute for the FCR-main witness.
 
