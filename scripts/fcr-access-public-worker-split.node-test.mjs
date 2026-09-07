@@ -57,7 +57,7 @@ function mixedApp() {
     session_duration: '24h',
     destinations: [
       { type: 'public', uri: `${FCR_PUBLIC_ZONE}/*` },
-      { type: 'worker', uri: 'founder-control-room' },
+      { type: 'worker', worker_id: 'founder-control-room' },
     ],
   };
 }
@@ -68,6 +68,7 @@ function fakeProvider({
   failUpdateAfterWrite = false,
   failCreateAfterWrite = false,
   failDeleteAfterWrite = false,
+  driftCreatedAfterWrite = false,
 } = {}) {
   const state = {
     applications: structuredClone(applications),
@@ -116,6 +117,12 @@ function fakeProvider({
     if (url.endsWith('/access/apps') && method === 'POST') {
       const body = parsedBody;
       const created = { id: 'public-1', ...body };
+      if (driftCreatedAfterWrite) {
+        created.destinations = [
+          ...structuredClone(body.destinations ?? []),
+          { type: 'worker', worker_id: 'unexpected-worker' },
+        ];
+      }
       state.applications.push(structuredClone(created));
       state.policiesByApp['public-1'] = structuredClone(body.policies ?? []);
       return failCreateAfterWrite ? failure() : success(structuredClone(created), 201);
@@ -139,14 +146,14 @@ test('split eligibility requires exactly one whole-site public destination and o
   assert.equal(classifyFcrPublicWorkerSplit({
     destinations: [
       { type: 'public', uri: `${FCR_PUBLIC_ZONE}/*` },
-      { type: 'worker', uri: 'founder-control-room' },
-      { type: 'preview_worker', uri: 'founder-control-room' },
+      { type: 'worker', worker_id: 'founder-control-room' },
+      { type: 'preview_worker', worker_id: 'founder-control-room' },
     ],
   }).eligible, false);
   assert.equal(classifyFcrPublicWorkerSplit({
     destinations: [
       { type: 'public', uri: `${FCR_PUBLIC_ZONE}/admin` },
-      { type: 'worker', uri: 'founder-control-room' },
+      { type: 'worker', worker_id: 'founder-control-room' },
     ],
   }).eligible, false);
 });
@@ -163,7 +170,7 @@ test('split preserves the existing Worker app and policies while creating one de
 
   const source = provider.state.applications.find((application) => application.id === 'mixed-1');
   const managed = provider.state.applications.find((application) => application.id === 'public-1');
-  assert.deepEqual(source.destinations, [{ type: 'worker', uri: 'founder-control-room' }]);
+  assert.deepEqual(source.destinations, [{ type: 'worker', worker_id: 'founder-control-room' }]);
   assert.deepEqual(provider.state.policiesByApp['mixed-1'], [allowPolicy()]);
   assert.equal(managed.name, FCR_PUBLIC_ACCESS_APP_NAME);
   assert.deepEqual(managed.destinations, [{ type: 'public', uri: `${FCR_PUBLIC_ZONE}/*` }]);
@@ -185,7 +192,7 @@ test('ambiguous Worker-only PUT is reconciled by readback and never blindly retr
   assert.equal(updateRequests.length, 1);
 });
 
-test('ambiguous public-app POST is reconciled by provider readback and never duplicated', async () => {
+test('ambiguous public-app POST is reconciled by provider inventory and never duplicated', async () => {
   const provider = fakeProvider({ failCreateAfterWrite: true });
   const receipt = await executeFcrPublicWorkerSplit({ env, fetchImpl: provider.fetchImpl });
 
@@ -199,13 +206,31 @@ test('ambiguous public-app POST is reconciled by provider readback and never dup
   );
 });
 
+test('ambiguous POST with a drifted new application becomes RECONCILE and does not restore mixed scope', async () => {
+  const provider = fakeProvider({
+    failCreateAfterWrite: true,
+    driftCreatedAfterWrite: true,
+  });
+
+  await assert.rejects(
+    executeFcrPublicWorkerSplit({ env, fetchImpl: provider.fetchImpl }),
+    (error) => error?.classification === 'split-public-create-reconcile-required'
+      && error?.mutationOutcome === 'unknown',
+  );
+
+  const source = provider.state.applications.find((application) => application.id === 'mixed-1');
+  const created = provider.state.applications.find((application) => application.id === 'public-1');
+  assert.deepEqual(source.destinations, [{ type: 'worker', worker_id: 'founder-control-room' }]);
+  assert.equal(created.destinations.length, 2);
+});
+
 test('non-eligible topology fails before any provider write', async () => {
   const provider = fakeProvider({
     applications: [{
       ...mixedApp(),
       destinations: [
         { type: 'public', uri: `${FCR_PUBLIC_ZONE}/*` },
-        { type: 'worker', uri: 'founder-control-room' },
+        { type: 'worker', worker_id: 'founder-control-room' },
         { type: 'all_workers' },
       ],
     }],
@@ -259,5 +284,23 @@ test('ambiguous public-app DELETE is reconciled before source restoration', asyn
   assert.deepEqual(
     provider.state.applications.find((application) => application.id === 'mixed-1').destinations,
     mixedApp().destinations,
+  );
+});
+
+test('rollback refuses to restore mixed scope if the run-created public app drifted', async () => {
+  const provider = fakeProvider();
+  const receipt = await executeFcrPublicWorkerSplit({ env, fetchImpl: provider.fetchImpl });
+  const publicApp = provider.state.applications.find((application) => application.id === 'public-1');
+  publicApp.destinations.push({ type: 'worker', worker_id: 'unexpected-worker' });
+
+  await assert.rejects(
+    rollbackFcrPublicWorkerSplit({ receipt, env, fetchImpl: provider.fetchImpl }),
+    (error) => error?.classification === 'split-rollback-managed-app-drift',
+  );
+
+  assert.equal(provider.state.applications.some((application) => application.id === 'public-1'), true);
+  assert.deepEqual(
+    provider.state.applications.find((application) => application.id === 'mixed-1').destinations,
+    [{ type: 'worker', worker_id: 'founder-control-room' }],
   );
 });
