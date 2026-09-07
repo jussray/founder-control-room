@@ -1,0 +1,20 @@
+{
+  "kind": "fcr/cloudflare-provider-only-worker-policy@v1",
+  "policyVersion": 1,
+  "workerName": "fcr_mail",
+  "sourceStatus": "provider-only",
+  "canonicalRuntimeRole": "unknown-until-migrated-or-retired",
+  "repositoryOwnsRuntimeCode": false,
+  "nativeGitBuildMode": "verification-only",
+  "currentDesiredDeployCommand": "node scripts/verify-fcr-mail-provider-only.mjs",
+  "forbiddenNativeGitCommands": [
+    "npx wrangler deploy",
+    "npx wrangler versions upload"
+  ],
+  "forbiddenAutoConfiguration": [
+    "generated-wrangler-jsonc",
+    "public-as-worker-static-assets"
+  ],
+  "providerReadbackRequiredBeforeMigrationOrRetirement": true,
+  "canAuthorizeProviderMutation": false
+}
