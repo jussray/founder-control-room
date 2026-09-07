@@ -348,7 +348,7 @@ describe('runGovernedReadOnlyAttempt', () => {
     expect(witnessFn).not.toHaveBeenCalled();
   });
 
-  it('promotes only a lease-bound read-only receipt with a sufficient independent witness', async () => {
+  it('does not promote a caller-supplied receipt-bound witness until witness authority is structurally bound', async () => {
     const activeLease = lease();
     const activeAdapter = adapter(activeLease);
     const witnessFn = vi.fn(async (value: GovernedExecutionReceipt) => witness(value));
@@ -365,9 +365,36 @@ describe('runGovernedReadOnlyAttempt', () => {
       minimumWitnessStrength: 'W1',
     });
 
-    expect(result.state).toBe('VERIFIED');
+    expect(result.state).toBe('EXECUTED_UNVERIFIED');
+    expect(result.reason).toContain('not yet structurally bound');
     expect(result.decision).toEqual({ disposition: 'EXECUTE', reasons: [] });
     expect(activeAdapter.invoke).toHaveBeenCalledTimes(1);
+    expect(witnessFn).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not let a self-described W4 witness upgrade execution truth', async () => {
+    const activeLease = lease();
+    const activeAdapter = adapter(activeLease);
+    const witnessFn = vi.fn(async (value: GovernedExecutionReceipt): Promise<GovernedExecutionWitness> => ({
+      ...witness(value),
+      strength: 'W4',
+      evidenceFingerprint: 'f'.repeat(64),
+    }));
+
+    const result = await runGovernedReadOnlyAttempt({
+      lease: activeLease,
+      world: world(),
+      proposal: {
+        toolName: activeAdapter.name,
+        requestedCapabilities: ['provider.observation.read'],
+      },
+      adapter: activeAdapter,
+      witness: witnessFn,
+      minimumWitnessStrength: 'W1',
+    });
+
+    expect(result.state).toBe('EXECUTED_UNVERIFIED');
+    expect(result.reason).toContain('caller-supplied witness evidence cannot promote');
     expect(witnessFn).toHaveBeenCalledTimes(1);
   });
 });
