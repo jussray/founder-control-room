@@ -7,7 +7,7 @@ import { temporalClaimTextDomainErrors } from '../governance/temporalClaimTruth.
 import {
   N8N_FOUNDER_CONTENT_CONTRACT,
   N8N_FOUNDER_CONTENT_EVENT,
-  buildCanonicalFirstPartyFounderScheduleEnvelope,
+  acquireN8nFounderContentProviderWrite,
   buildN8nFounderContentRequest,
   finalizeN8nFounderContentExecution,
   readN8nFounderContentConfig,
@@ -78,6 +78,10 @@ const NATIVE_REVIEW_WINDOW_MINUTES = 20;
 const NATIVE_REVIEW_WINDOW_MS = NATIVE_REVIEW_WINDOW_MINUTES * 60 * 1000;
 const PROVIDER_NEUTRAL_EXECUTION_IDENTITY = 'fcr/n8n-founder-content-execution-identity@v2' as const;
 const PROVIDER_NEUTRAL_CADENCE_PROVIDER = 'n8n' as const;
+const BUFFER_FOUNDER_CHANNELS: Readonly<Record<string, string>> = Object.freeze({
+  linkedin: 'juss_rayy_linkedin',
+  facebook: 'juss_and_co_facebook',
+});
 
 function text(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
@@ -198,6 +202,28 @@ function nativeScheduleAt(input: FirstPartyFounderDistributionInput, authorizati
   return new Date(scheduledMs).toISOString();
 }
 
+function assertScheduleBeforeApprovalExpiry(scheduleAt: string, expiresAt: string): void {
+  const scheduleMs = Date.parse(scheduleAt);
+  const expiresMs = Date.parse(expiresAt);
+  if (!Number.isFinite(scheduleMs) || !Number.isFinite(expiresMs)) {
+    throw new Error('N8N_FOUNDER_CONTENT_CADENCE_AUTHORITY_REJECTED: cadence schedule or approval expiry is invalid');
+  }
+  if (scheduleMs >= expiresMs) {
+    throw new Error('N8N_FOUNDER_CONTENT_CADENCE_AUTHORITY_REJECTED: cadence-adjusted schedule must remain before exact founder approval expiry');
+  }
+}
+
+function providerChannel(provider: N8nFounderContentProvider, platform: string): string {
+  if (provider === DEFAULT_PROVIDER) {
+    const channel = BUFFER_FOUNDER_CHANNELS[platform];
+    if (!channel) {
+      throw new Error(`N8N_FOUNDER_CONTENT_NATIVE_SCHEDULE_REJECTED: no server-owned Buffer founder channel is configured for ${platform}`);
+    }
+    return channel;
+  }
+  return `fcr_${platform}`;
+}
+
 function providerNeutralExecutionId(request: N8nFounderContentRequest): string {
   return `fcr-n8n-social-v2:${stableHash({
     contract: PROVIDER_NEUTRAL_EXECUTION_IDENTITY,
@@ -285,19 +311,6 @@ export function buildProviderNeutralN8nFounderContentEnvelope(
     platform,
   });
 
-  if (provider === DEFAULT_PROVIDER) {
-    const canonical = buildCanonicalFirstPartyFounderScheduleEnvelope(input);
-    const envelope = {
-      ...canonical,
-      content_id: contentId,
-    };
-    const reasons = validateProviderNeutralN8nFounderContentEnvelope(envelope);
-    if (reasons.length > 0) {
-      throw new Error(`N8N_FOUNDER_CONTENT_PROVIDER_ENVELOPE_REJECTED: ${reasons.join('; ')}`);
-    }
-    return envelope;
-  }
-
   if (authorization.state !== 'authorized-for-scheduled-review') {
     throw new Error('N8N_FOUNDER_CONTENT_NATIVE_SCHEDULE_REJECTED: exact founder authorization is not valid for scheduled review');
   }
@@ -319,7 +332,7 @@ export function buildProviderNeutralN8nFounderContentEnvelope(
     state: 'scheduled_review_window',
     content_id: contentId,
     platform,
-    channel: `fcr_${platform}`,
+    channel: providerChannel(provider, platform),
     text: authorization.content.text,
     source: {
       repo: authorization.source.repo,
@@ -501,6 +514,7 @@ export async function dispatchProviderNeutralN8nFounderContent(
       channel: request.platform,
       contentId: envelope.content_id,
       requestedScheduleAt: envelope.provider_request.schedule_at,
+      approvalExpiresAt: exactAuthorization(input).expires_at,
     });
     const cadenceProjection = applyFounderContentCadenceSchedule({
       provider: PROVIDER_NEUTRAL_CADENCE_PROVIDER,
@@ -508,6 +522,11 @@ export async function dispatchProviderNeutralN8nFounderContent(
       content_id: envelope.content_id,
       provider_request: { schedule_at: envelope.provider_request.schedule_at },
     }, cadence);
+    const authorization = exactAuthorization(input);
+    assertScheduleBeforeApprovalExpiry(
+      cadenceProjection.provider_request.schedule_at,
+      authorization.expires_at,
+    );
     envelope = {
       ...envelope,
       provider_request: {
@@ -539,6 +558,24 @@ export async function dispatchProviderNeutralN8nFounderContent(
       request,
       receipt: null,
       reasons: [reservation.reason],
+    };
+  }
+
+  const providerWriteAcquired = await acquireN8nFounderContentProviderWrite(
+    reservation.executionId,
+    reservation.reservationStartedAt,
+  );
+  if (!providerWriteAcquired) {
+    return {
+      ok: false,
+      code: 'ACTION_AUDIT_INCOMPLETE',
+      status: 409,
+      request,
+      receipt: null,
+      reasons: [
+        'FCR could not acquire the active reservation generation at the provider-write boundary',
+        'no provider request was attempted',
+      ],
     };
   }
 
@@ -579,7 +616,11 @@ export async function dispatchProviderNeutralN8nFounderContent(
 
     try {
       const receipt = verifyProviderNeutralN8nFounderContentReceipt(request, body);
-      const finalized = await finalizeN8nFounderContentExecution(reservation.executionId, receipt);
+      const finalized = await finalizeN8nFounderContentExecution(
+        reservation.executionId,
+        receipt,
+        reservation.reservationStartedAt,
+      );
       if (!finalized) {
         return {
           ok: false,
