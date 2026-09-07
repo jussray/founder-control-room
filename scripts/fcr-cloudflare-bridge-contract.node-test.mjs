@@ -133,20 +133,27 @@ test('browser receipt must pass a bounded field schema before derived public boo
   assert.match(returnStep, /\.schemaVersion == 1/);
   assert.match(returnStep, /\.scope == "fcr-access-front-door-browser-proof"/);
   assert.match(returnStep, /\.expectedHeadSha == \$expectedHeadSha/);
+  assert.match(returnStep, /\.audience == "random-stranger"/);
   assert.match(returnStep, /\.requestedOrigin == "https:\/\/foundercontrolroom\.org"/);
+  assert.match(returnStep, /\.publicOrigin == "https:\/\/www\.foundercontrolroom\.org"/);
   assert.match(returnStep, /def origin_or_null:/);
   assert.match(returnStep, /\.finalOrigin \| origin_or_null/);
   assert.match(returnStep, /def status_or_null:/);
   assert.match(returnStep, /\.navigationStatus \| status_or_null/);
+  assert.match(returnStep, /\.controlRoomStatus \| status_or_null/);
+  assert.match(returnStep, /\.founderSignInVisible \| type == "boolean"/);
+  assert.match(returnStep, /\.founderShellVisible \| type == "boolean"/);
+  assert.match(returnStep, /\.authMeStatus \| status_or_null/);
+  assert.match(returnStep, /\.founderAuthorityContained \| type == "boolean"/);
   assert.match(returnStep, /\.apiVersionStatus \| status_or_null/);
   assert.match(returnStep, /\.apiVersionMatchesExpectedSha \| type == "boolean"/);
   assert.match(returnStep, /\.state == "unknown" or \.state == "proven" or \.state == "failed"/);
   assert.match(returnStep, /has\("error"\)/);
   assert.match(returnStep, /\.error \| type == "string" and length <= 2000/);
   assert.doesNotMatch(returnStep, /\| tostring/);
-  assert.match(returnStep, /finalOriginMatchesExpected/);
-  assert.match(returnStep, /unexpectedOriginDetected/);
+  assert.match(returnStep, /finalOriginIsFcr/);
   assert.match(returnStep, /accessInterceptDetected/);
+  assert.match(returnStep, /founderAuthorityContained/);
   assert.match(returnStep, /errorPresent/);
 });
 
@@ -206,7 +213,8 @@ test('provider mutation is limited to exact public Access application create/del
 test('browser proof binds public origin and API runtime to the exact approved SHA', () => {
   assert.match(browserProof, /https:\/\/www\.foundercontrolroom\.org/);
   assert.match(browserProof, /https:\/\/api\.foundercontrolroom\.org\/version/);
-  assert.match(browserProof, /receipt\.finalOrigin !== WEB_ORIGIN/);
+  assert.match(browserProof, /receipt\.finalOrigin !== PUBLIC_ORIGIN/);
+  assert.match(browserProof, /Always probe the canonical public origin independently/);
   assert.match(browserProof, /versionPayload\.includes\(expectedHeadSha\)/);
   assert.match(browserProof, /chromium\.launch/);
 });
