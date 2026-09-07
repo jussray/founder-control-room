@@ -23,12 +23,16 @@ on:
       - 'scripts/chief-proofmode-access-reconciliation-state.mjs'
       - 'scripts/chief-proofmode-access-reconciliation-state.node-test.mjs'
       - 'scripts/chief-proofmode-access-bridge-contract.node-test.mjs'
+      - 'scripts/documentation-truth-chief-access-contract.node-test.mjs'
       - 'scripts/publish-chief-runtime-witness.mjs'
       - 'scripts/publish-chief-runtime-witness.node-test.mjs'
       - 'scripts/chief-proofmode-runtime-witness-contract.node-test.mjs'
       - 'scripts/fcr-cloudflare-bridge-contract.node-test.mjs'
+      - 'scripts/verify-documentation-truth.mjs'
       - 'scripts/verify-fcr-front-door-playwright.mjs'
       - 'docs/CHIEF_PROOFMODE_ACCESS_RECOVERY.md'
+      - 'docs/DOCUMENTATION_TRUTH_RECEIPT.json'
+      - 'docs/TRUTH_DECAY_AUDIT.md'
   push:
     branches: [main]
     paths:
@@ -51,12 +55,16 @@ on:
       - 'scripts/chief-proofmode-access-reconciliation-state.mjs'
       - 'scripts/chief-proofmode-access-reconciliation-state.node-test.mjs'
       - 'scripts/chief-proofmode-access-bridge-contract.node-test.mjs'
+      - 'scripts/documentation-truth-chief-access-contract.node-test.mjs'
       - 'scripts/publish-chief-runtime-witness.mjs'
       - 'scripts/publish-chief-runtime-witness.node-test.mjs'
       - 'scripts/chief-proofmode-runtime-witness-contract.node-test.mjs'
       - 'scripts/fcr-cloudflare-bridge-contract.node-test.mjs'
+      - 'scripts/verify-documentation-truth.mjs'
       - 'scripts/verify-fcr-front-door-playwright.mjs'
       - 'docs/CHIEF_PROOFMODE_ACCESS_RECOVERY.md'
+      - 'docs/DOCUMENTATION_TRUTH_RECEIPT.json'
+      - 'docs/TRUTH_DECAY_AUDIT.md'
 
 permissions:
   contents: read
@@ -99,6 +107,7 @@ jobs:
           node --check scripts/resolve-chief-proofmode-access-selector.mjs
           node --check scripts/chief-proofmode-access-reconciliation-state.mjs
           node --check scripts/publish-chief-runtime-witness.mjs
+          node --check scripts/verify-documentation-truth.mjs
           node --check scripts/verify-fcr-front-door-playwright.mjs
           node --test scripts/provider-credential-contract.node-test.mjs
           node --test scripts/reconcile-cloudflare-access-public-zone.node-test.mjs
@@ -107,6 +116,7 @@ jobs:
           node --test scripts/resolve-chief-proofmode-access-selector.node-test.mjs
           node --test scripts/chief-proofmode-access-reconciliation-state.node-test.mjs
           node --test scripts/chief-proofmode-access-bridge-contract.node-test.mjs
+          node --test scripts/documentation-truth-chief-access-contract.node-test.mjs
           node --test scripts/publish-chief-runtime-witness.node-test.mjs
           node --test scripts/chief-proofmode-runtime-witness-contract.node-test.mjs
           node --test scripts/fcr-cloudflare-bridge-contract.node-test.mjs
