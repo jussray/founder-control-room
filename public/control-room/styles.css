@@ -9,6 +9,12 @@
   --danger: #f56565;
   --warn: #ecc94b;
   --ok: #68d391;
+
+  /* Founder Color Language v1: semantic meaning, not generic decoration. */
+  --founder-core: #a78bfa;
+  --founder-truth: #60a5fa;
+  --founder-motion: #fb923c;
+  --founder-lift: #fde047;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 
@@ -36,7 +42,8 @@ button {
 }
 button:hover { border-color: var(--accent); }
 button:disabled { opacity: 0.5; cursor: not-allowed; }
-button.primary { background: var(--accent); color: #0a0e10; border-color: var(--accent); font-weight: 600; }
+button.primary { background: var(--founder-motion); color: #1a0d00; border-color: var(--founder-motion); font-weight: 700; }
+button.primary:hover { filter: brightness(1.06); }
 button.danger { border-color: var(--danger); color: var(--danger); }
 
 input, textarea, select {
@@ -62,8 +69,53 @@ label { display: block; font-size: 0.8rem; color: var(--muted); margin: 0.6rem 0
   gap: 1rem;
 }
 
-.topbar .brand { font-weight: 700; letter-spacing: 0.02em; }
+.topbar .brand { color: var(--founder-core); font-weight: 700; letter-spacing: 0.02em; }
 .topbar .founder-email { color: var(--muted); font-size: 0.85rem; }
+
+.founder-language {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+  padding: 0.55rem 1.25rem;
+  border-bottom: 1px solid var(--panel-border);
+  background: #11141a;
+}
+.founder-language-title {
+  margin-right: 0.2rem;
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.founder-signal {
+  --signal: var(--founder-core);
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  border: 1px solid color-mix(in srgb, var(--signal) 42%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--signal) 10%, transparent);
+  color: var(--text);
+  padding: 0.2rem 0.55rem;
+  font-size: 0.7rem;
+  white-space: nowrap;
+}
+.founder-signal::before {
+  content: '';
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 999px;
+  background: var(--signal);
+  flex: 0 0 auto;
+}
+.founder-signal strong { color: var(--signal); font-size: 0.7rem; }
+.founder-signal small { color: var(--muted); font-size: 0.64rem; }
+.founder-signal[data-signal='core'] { --signal: var(--founder-core); }
+.founder-signal[data-signal='truth'] { --signal: var(--founder-truth); }
+.founder-signal[data-signal='motion'] { --signal: var(--founder-motion); }
+.founder-signal[data-signal='lift'] { --signal: var(--founder-lift); }
 
 .tabs { display: flex; gap: 0.25rem; padding: 0 1.25rem; border-bottom: 1px solid var(--panel-border); overflow-x: auto; }
 .tabs button { border: none; border-radius: 0; background: transparent; border-bottom: 2px solid transparent; padding: 0.7rem 0.9rem; color: var(--muted); white-space: nowrap; }
@@ -96,7 +148,7 @@ pre { background: #0b0d11; border: 1px solid var(--panel-border); border-radius:
 textarea.code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; min-height: 260px; }
 
 .error { color: var(--danger); font-size: 0.85rem; margin-top: 0.4rem; }
-.notice { color: var(--muted); font-size: 0.85rem; margin-top: 0.4rem; }
+.notice { color: var(--founder-truth); font-size: 0.85rem; margin-top: 0.4rem; }
 
 .sign-in-wrap { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
 .sign-in-card { width: 100%; max-width: 360px; }
@@ -112,5 +164,11 @@ textarea.code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; min
 .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 
 .capabilities-link { color: var(--text); text-decoration: none; border: 1px solid var(--panel-border); border-radius: 8px; padding: 0.45rem 0.75rem; font-size: 0.85rem; }
-.capabilities-link:hover { border-color: #8558ff; color: #cbbcff; }
+.capabilities-link:hover { border-color: var(--founder-core); color: #d8ccff; }
 .capabilities-link:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+
+@media (max-width: 640px) {
+  .founder-language { align-items: flex-start; padding-inline: 0.85rem; }
+  .founder-language-title { flex-basis: 100%; }
+  .founder-signal small { display: none; }
+}
