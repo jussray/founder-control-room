@@ -30,15 +30,14 @@ jobs:
       CF_WRITE_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CF_WORKER_NAME: founder-control-room
     steps:
-      - name: Require bounded provider authority
+      - name: Require read authority and account identity
         shell: bash
         run: |
           set -euo pipefail
           test -n "${CF_ACCOUNT_ID:-}"
           test -n "${CF_READ_TOKEN:-}"
-          test -n "${CF_WRITE_TOKEN:-}"
 
-      - name: Patch only production build watch paths and verify provider readback
+      - name: Read, repair if required, and verify build watch paths
         shell: bash
         run: |
           set -euo pipefail
@@ -111,7 +110,6 @@ jobs:
           const readToken = unwrap(process.env.CF_READ_TOKEN);
           const writeToken = unwrap(process.env.CF_WRITE_TOKEN);
           if (!readToken) throw new Error('FCR read credential has invalid transport.');
-          if (!writeToken) throw new Error('FCR write credential has invalid transport.');
 
           async function inspect() {
             const scripts = await cf(readToken, `/accounts/${accountId}/workers/scripts?per_page=100`);
@@ -144,16 +142,49 @@ jobs:
           };
           const changeRequired = !sameSet(before.pathIncludes, desiredPathIncludes)
             || !sameSet(before.pathExcludes, desiredPathExcludes);
-          let mutationStarted = false;
 
+          const receipt = {
+            schema: 'fcr/cloudflare-build-cost-guard@v1',
+            generatedAt: new Date().toISOString(),
+            worker: workerName,
+            branchPolicy: 'main production trigger only',
+            before,
+            desired: { pathIncludes: desiredPathIncludes, pathExcludes: desiredPathExcludes },
+            after: null,
+            applied: false,
+            verified: false,
+            changeRequired,
+            writeCredentialTransportValid: Boolean(writeToken),
+            nonProductionTriggerCount: beforeState.nonProductionTriggerCount,
+            buildRequested: false,
+            deploymentRequested: false,
+          };
+          const persist = () => fs.writeFileSync(
+            'artifacts/cloudflare-build-cost-guard.json',
+            `${JSON.stringify(receipt, null, 2)}\n`,
+          );
+          persist();
+
+          if (!changeRequired) {
+            receipt.after = before;
+            receipt.verified = true;
+            persist();
+            console.log(`FCR_COST_GUARD_ALREADY_CORRECT non_production_triggers=${receipt.nonProductionTriggerCount}`);
+            process.exit(0);
+          }
+
+          if (!writeToken) {
+            console.error('FCR_COST_GUARD_WRITE_CREDENTIAL_REPAIR_REQUIRED');
+            throw new Error('FCR write credential has invalid transport; provider state was read but not mutated.');
+          }
+
+          let mutationStarted = false;
           try {
-            if (changeRequired) {
-              mutationStarted = true;
-              await cf(writeToken, `/accounts/${accountId}/builds/triggers/${triggerUuid}`, {
-                method: 'PATCH',
-                body: { path_includes: desiredPathIncludes, path_excludes: desiredPathExcludes },
-              });
-            }
+            mutationStarted = true;
+            await cf(writeToken, `/accounts/${accountId}/builds/triggers/${triggerUuid}`, {
+              method: 'PATCH',
+              body: { path_includes: desiredPathIncludes, path_excludes: desiredPathExcludes },
+            });
 
             const afterState = await inspect();
             const after = {
@@ -165,22 +196,12 @@ jobs:
               throw new Error('FCR Cloudflare watch-path readback mismatch.');
             }
 
-            const receipt = {
-              schema: 'fcr/cloudflare-build-cost-guard@v1',
-              generatedAt: new Date().toISOString(),
-              worker: workerName,
-              branchPolicy: 'main production trigger only',
-              before,
-              desired: { pathIncludes: desiredPathIncludes, pathExcludes: desiredPathExcludes },
-              after,
-              applied: changeRequired,
-              verified: true,
-              nonProductionTriggerCount: afterState.nonProductionTriggerCount,
-              buildRequested: false,
-              deploymentRequested: false,
-            };
-            fs.writeFileSync('artifacts/cloudflare-build-cost-guard.json', `${JSON.stringify(receipt, null, 2)}\n`);
-            console.log(`FCR_COST_GUARD_VERIFIED applied=${changeRequired} non_production_triggers=${receipt.nonProductionTriggerCount}`);
+            receipt.after = after;
+            receipt.applied = true;
+            receipt.verified = true;
+            receipt.nonProductionTriggerCount = afterState.nonProductionTriggerCount;
+            persist();
+            console.log(`FCR_COST_GUARD_VERIFIED applied=true non_production_triggers=${receipt.nonProductionTriggerCount}`);
           } catch (error) {
             if (mutationStarted) {
               try {
@@ -193,6 +214,7 @@ jobs:
                 console.error('FCR_COST_GUARD_ROLLBACK_FAILED');
               }
             }
+            persist();
             throw error;
           }
           NODE
