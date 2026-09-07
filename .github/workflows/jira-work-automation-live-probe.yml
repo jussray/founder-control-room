@@ -1,0 +1,83 @@
+name: Jira Work Automation Live Probe
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_sha:
+        description: Exact current Founder Control Room main SHA to probe
+        required: true
+        type: string
+      observation_json:
+        description: Fresh Jira observation JSON for the secret-pinned probe issue
+        required: true
+        type: string
+      approval_reference:
+        description: Founder approval or controlled-test reference for this one probe dispatch
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: jira-work-automation-live-probe-${{ inputs.target_sha }}
+  cancel-in-progress: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  probe:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: production
+    env:
+      JIRA_AUTOMATION_PROBE_HEAD_SHA: ${{ inputs.target_sha }}
+      JIRA_AUTOMATION_PROBE_OBSERVATION_JSON: ${{ inputs.observation_json }}
+      JIRA_AUTOMATION_PROBE_APPROVAL_REFERENCE: ${{ inputs.approval_reference }}
+      JIRA_AUTOMATION_PROBE_ISSUE_KEY: ${{ secrets.JIRA_AUTOMATION_PROBE_ISSUE_KEY }}
+      FCR_JIRA_AUTOMATION_INGRESS_URL: ${{ secrets.FCR_JIRA_AUTOMATION_INGRESS_URL }}
+      FCR_JIRA_AUTOMATION_INGRESS_TOKEN: ${{ secrets.FCR_JIRA_AUTOMATION_INGRESS_TOKEN }}
+    steps:
+      - name: Check out protected default branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+
+      - name: Verify immutable current-main target and bounded probe inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${{ github.event.repository.default_branch }}" = "main"
+          test "${GITHUB_REF}" = "refs/heads/main"
+          [[ "${JIRA_AUTOMATION_PROBE_HEAD_SHA}" =~ ^[0-9a-fA-F]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "${JIRA_AUTOMATION_PROBE_HEAD_SHA}"
+          test -n "${JIRA_AUTOMATION_PROBE_OBSERVATION_JSON}"
+          test -n "${JIRA_AUTOMATION_PROBE_APPROVAL_REFERENCE}"
+          test -n "${JIRA_AUTOMATION_PROBE_ISSUE_KEY}"
+          test -n "${FCR_JIRA_AUTOMATION_INGRESS_URL}"
+          test -n "${FCR_JIRA_AUTOMATION_INGRESS_TOKEN}"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install locked trusted dependencies
+        run: npm ci
+
+      - name: Run bounded Jira provider dispatch probe
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx tsx scripts/verify-jira-work-automation-live.ts | tee jira-work-automation-live-probe-receipt.json
+
+      - name: Upload retained dispatch receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: jira-work-automation-live-probe-${{ inputs.target_sha }}
+          path: jira-work-automation-live-probe-receipt.json
+          if-no-files-found: error
