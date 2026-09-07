@@ -1,4 +1,3 @@
-const STORAGE_KEY = 'fcr_session';
 const root = document.getElementById('capital-root');
 
 function escapeHtml(value) {
@@ -7,13 +6,23 @@ function escapeHtml(value) {
   ));
 }
 
-function loadSession() {
-  try {
-    const raw = sessionStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
+function unwrapApiData(value) {
+  return value && value.success === true && value.data ? value.data : value;
+}
+
+async function loadFounderIdentity() {
+  const response = await fetch('/auth/me', {
+    credentials: 'same-origin',
+    cache: 'no-store',
+    headers: { Accept: 'application/json' },
+  });
+
+  if (!response.ok) return null;
+  const payload = unwrapApiData(await response.json().catch(() => null));
+  const email = typeof payload?.founder?.email === 'string'
+    ? payload.founder.email.trim().toLowerCase()
+    : '';
+  return email ? { email } : null;
 }
 
 function lines(value) {
@@ -78,7 +87,7 @@ function renderSignedOut() {
   `;
 }
 
-function renderForm(session) {
+function renderForm(founder) {
   const now = new Date();
   const observed = new Date(now.getTime() - 60 * 60 * 1000);
 
@@ -185,7 +194,7 @@ function renderForm(session) {
         </fieldset>
 
         <div class="actions">
-          <p>Signed in as ${escapeHtml(session.email || 'founder')}. This is a non-persistent preview and is returned with <code>Cache-Control: no-store</code>.</p>
+          <p>Signed in as ${escapeHtml(founder.email || 'founder')}. This is a non-persistent preview and is returned with <code>Cache-Control: no-store</code>.</p>
           <button class="primary" type="submit">Evaluate optionality</button>
         </div>
         <p id="capital-error" class="error" hidden></p>
@@ -197,11 +206,11 @@ function renderForm(session) {
 
   root.querySelector('#capital-form').addEventListener('submit', (event) => {
     event.preventDefault();
-    void submitCapitalPreview(event.currentTarget, session);
+    void submitCapitalPreview(event.currentTarget);
   });
 }
 
-async function submitCapitalPreview(form, session) {
+async function submitCapitalPreview(form) {
   const error = root.querySelector('#capital-error');
   const button = form.querySelector('button[type="submit"]');
   error.hidden = true;
@@ -246,16 +255,13 @@ async function submitCapitalPreview(form, session) {
     const response = await fetch('/founder-os/capital-preview', {
       method: 'POST',
       credentials: 'same-origin',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${session.access_token}`,
-      },
+      cache: 'no-store',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
     const body = await response.json().catch(() => null);
 
     if (response.status === 401) {
-      sessionStorage.removeItem(STORAGE_KEY);
       renderSignedOut();
       return;
     }
@@ -361,6 +367,6 @@ function renderCard(card) {
   `;
 }
 
-const session = loadSession();
-if (!session?.access_token) renderSignedOut();
-else renderForm(session);
+const founder = await loadFounderIdentity().catch(() => null);
+if (!founder) renderSignedOut();
+else renderForm(founder);
