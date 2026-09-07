@@ -13,25 +13,59 @@ const recoveryDoc = readFileSync('docs/CHIEF_PROOFMODE_ACCESS_RECOVERY.md', 'utf
 const ACCOUNT_ID = '9b59861bd1747cf7525571b4c51d2aa0';
 const STORAGE_FIRST_SELECTOR = /secrets\.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID\s*\|\|\s*secrets\.CLOUDFLARE_ACCESS_CLIENT_ID\s*\|\|\s*vars\.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID/;
 
-test('Chief Access command bridge is founder-only, issue-scoped, and exact-FCR-main bound', () => {
+test('Chief Access command bridge is founder-only, issue-scoped, exact-main bound, and cannot dispatch Actions directly', () => {
   assert.match(commandBridge, /github\.event\.issue\.number == 485/);
   assert.match(commandBridge, /github\.event\.comment\.user\.login == 'jussray'/);
+  assert.match(commandBridge, /github\.event\.comment\.user\.id == 286642846/);
   assert.match(commandBridge, /\/cloudflare-chief-access/);
-  assert.match(commandBridge, /actions:\s*write/);
-  assert.match(commandBridge, /issues:\s*read/);
+  assert.match(commandBridge, /issues:\s*write/);
+  assert.doesNotMatch(commandBridge, /actions:\s*write/);
   assert.match(commandBridge, /commits\/main/);
   assert.match(commandBridge, /test "\$current_main" = "\$EXPECTED_HEAD_SHA"/);
   assert.match(commandBridge, /Check out exact trusted FCR main reconciliation evaluator/);
-  assert.match(commandBridge, /chief-proofmode-access-recovery\.yml\/dispatches/);
+  assert.match(commandBridge, /uses:\s*\.\/\.github\/workflows\/chief-proofmode-access-recovery\.yml/);
+  assert.match(commandBridge, /authority_comment_id:\s*\$\{\{ needs\.authorize\.outputs\.authority_comment_id \}\}/);
+  assert.match(commandBridge, /secrets:\s*inherit/);
+  assert.doesNotMatch(commandBridge, /workflow_dispatch/);
+  assert.doesNotMatch(commandBridge, /\/dispatches/);
   assert.doesNotMatch(commandBridge, /CLOUDFLARE_ACCESS_API_TOKEN/);
   assert.doesNotMatch(commandBridge, /CLOUDFLARE_ACCESS_ADMIN_API_TOKEN/);
   assert.doesNotMatch(commandBridge, /CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID/);
   assert.doesNotMatch(commandBridge, /CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID/);
 });
 
+test('recovery is workflow-call only and rebinds the original founder issue-comment before provider capability', () => {
+  assert.match(recoveryWorkflow, /workflow_call:/);
+  assert.doesNotMatch(recoveryWorkflow, /workflow_dispatch:/);
+  assert.match(recoveryWorkflow, /authority_comment_id:/);
+
+  const authorityStep = recoveryWorkflow.match(
+    /- name: Verify founder-bound bridge invocation before provider capability([\s\S]*?)- name: Check out exact approved FCR current main/,
+  )?.[1] ?? '';
+  assert.ok(authorityStep);
+  assert.match(authorityStep, /test "\$GITHUB_EVENT_NAME" = 'issue_comment'/);
+  assert.match(authorityStep, /test "\$GITHUB_ACTOR" = 'jussray'/);
+  assert.match(authorityStep, /test "\$EVENT_ISSUE_NUMBER" = '485'/);
+  assert.match(authorityStep, /test "\$EVENT_COMMENT_LOGIN" = 'jussray'/);
+  assert.match(authorityStep, /test "\$EVENT_COMMENT_USER_ID" = '286642846'/);
+  assert.match(authorityStep, /test "\$EVENT_COMMENT_ID" = "\$AUTHORITY_COMMENT_ID"/);
+  assert.match(authorityStep, /read -r command mode sha target approval extra <<< "\$COMMENT_BODY"/);
+  assert.match(authorityStep, /test "\$command" = '\/cloudflare-chief-access'/);
+  assert.match(authorityStep, /test "\$mode" = "\$CHIEF_ACCESS_MODE"/);
+  assert.match(authorityStep, /test "\$sha" = "\$EXPECTED_HEAD_SHA"/);
+  assert.match(authorityStep, /test "\$target_origin" = "\$CHIEF_ACCESS_TARGET_URL"/);
+  assert.match(authorityStep, /test "\$approval" = "\$APPROVAL_REFERENCE"/);
+  assert.match(authorityStep, /Recovery is not directly dispatchable/);
+
+  const authorityIndex = recoveryWorkflow.indexOf('Verify founder-bound bridge invocation before provider capability');
+  const readCredentialIndex = recoveryWorkflow.indexOf('CLOUDFLARE_ACCESS_API_TOKEN:');
+  const adminCredentialIndex = recoveryWorkflow.indexOf('CLOUDFLARE_ACCESS_ADMIN_API_TOKEN:');
+  assert.ok(authorityIndex >= 0 && readCredentialIndex > authorityIndex && adminCredentialIndex > authorityIndex);
+});
+
 test('recovery latch is subject-bound and blocks blind duplicate repair', () => {
   const dispatchGate = commandBridge.match(
-    /- name: Refuse repair dispatch while subject-bound reconciliation is unresolved([\s\S]*?)- name: Dispatch bounded Chief Access recovery/,
+    /- name: Refuse repair while subject-bound reconciliation is unresolved([\s\S]*?)\n\s{2}recover:/,
   )?.[1] ?? '';
   const recoveryGate = recoveryWorkflow.match(
     /- name: Refuse unresolved prior Chief Access repair([\s\S]*?)- name: Set up Node 24/,
