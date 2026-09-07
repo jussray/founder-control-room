@@ -10,6 +10,7 @@ import {
   readFounderSession,
   rotateFounderSession,
 } from '../../auth/founderSession.js';
+import { resolveActiveWorkspace, WorkspaceAccessError } from '../workspaceContext.js';
 
 export interface FounderRequest extends Request {
   founder?: { email: string; userId: string };
@@ -41,18 +42,70 @@ async function founderAllowlisted(identity: AuthenticatedIdentity): Promise<'all
   return allowRow ? 'allowed' : 'denied';
 }
 
+function projectSlugFromMountedRoute(req: FounderRequest): string | null {
+  if (req.baseUrl !== '/projects') return null;
+  const [slug] = req.path.split('/').filter(Boolean);
+  return typeof slug === 'string' && slug.length > 0 ? slug : null;
+}
+
+async function projectWorkspaceAccess(
+  req: FounderRequest,
+): Promise<'allowed' | 'denied' | 'error'> {
+  const slug = projectSlugFromMountedRoute(req);
+  if (!slug) return 'allowed';
+
+  try {
+    const workspace = await resolveActiveWorkspace(req);
+    const { data, error } = await supabase
+      .from('projects')
+      .select('id')
+      .eq('workspace_id', workspace.id)
+      .eq('slug', slug)
+      .maybeSingle();
+    if (error) return 'error';
+    return data ? 'allowed' : 'denied';
+  } catch (error) {
+    if (error instanceof WorkspaceAccessError) return 'denied';
+    return 'error';
+  }
+}
+
+async function authorizeFounderProjectScope(
+  req: FounderRequest,
+  res: Response,
+  identity: AuthenticatedIdentity,
+): Promise<boolean> {
+  // Make the verified identity available to the workspace resolver before the
+  // downstream route is allowed to inspect a project. This does not broaden
+  // authority: the founder allowlist has already passed immediately above.
+  req.founder = identity;
+  const projectState = await projectWorkspaceAccess(req);
+  if (projectState === 'error') {
+    res.status(500).json({ error: 'Workspace project authorization failed' });
+    return false;
+  }
+  if (projectState === 'denied') {
+    res.status(404).json({ error: 'Project not found in the active workspace' });
+    return false;
+  }
+  return true;
+}
+
 /**
- * Founder authorization has two independent gates:
+ * Founder authorization has three independent gates on project-scoped routes:
  *
  * 1. A valid Supabase Auth session, supplied either as a Bearer token for API
  *    clients or resolved server-side from the opaque HttpOnly Control Room
  *    browser session capability.
  * 2. The authenticated email must still exist in the service-role-only
  *    `founder_users` allowlist.
+ * 3. Requests mounted under /projects/:slug must resolve that slug inside an
+ *    active workspace membership for the same founder. This closes service-role
+ *    route paths that would otherwise bypass database RLS.
  *
- * Cookie sessions may refresh once with their server-held refresh token. A
- * successful refresh rotates the opaque browser capability; Bearer sessions
- * never receive implicit refresh behavior so automated clients remain explicit.
+ * Root /projects registry filtering and project creation remain owned by the
+ * project tenant middleware because they do not name a project slug yet.
+ * Public self-service signup remains disabled.
  */
 export async function requireFounder(
   req: FounderRequest,
@@ -98,6 +151,8 @@ export async function requireFounder(
   if (allowState === 'denied') {
     return res.status(403).json({ error: 'Not on the founder allowlist' });
   }
+
+  if (!(await authorizeFounderProjectScope(req, res, identity))) return;
 
   if (refreshedSession) {
     try {
