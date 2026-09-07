@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 
 import type { RepositoryProvider } from '../providers/RepositoryProvider.js';
 import {
-  providerForProject as createProviderForProject,
+  providerForProject,
   type ProviderProjectConfig,
 } from '../providers/providerFactory.js';
 import {
@@ -22,7 +22,7 @@ import {
 
 export const REPOSITORY_READ_TOOL = 'repository.readFile' as const;
 export const REPOSITORY_READ_CAPABILITY = 'repository.content.read' as const;
-const DEFAULT_MAX_CONTENT_BYTES = 256 * 1024;
+const MAX_CONTENT_BYTES = 256 * 1024;
 const FULL_SHA = /^[0-9a-f]{40}$/i;
 const REPOSITORY = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
 
@@ -36,7 +36,6 @@ export interface GovernedRepositoryReadInput {
   proposal: GovernedAttemptProposal;
   repository: string;
   projectId: string;
-  repoProvider?: string;
   ref: string;
   path: string;
 }
@@ -58,12 +57,6 @@ export interface GovernedRepositoryReadResult {
   witness?: GovernedExecutionWitness;
   output?: VerifiedRepositoryReadOutput;
   reason?: string;
-}
-
-export interface GovernedRepositoryReadDependencies {
-  providerForProject?: (config: ProviderProjectConfig) => RepositoryProvider;
-  now?: () => Date;
-  maxContentBytes?: number;
 }
 
 function sha256(value: string): string {
@@ -157,33 +150,30 @@ function denied(reason: string, code: string): GovernedRepositoryReadResult {
 }
 
 /**
- * Executes one repository file read through the existing governed-runtime
- * membrane, then independently re-reads provider state before exposing content.
+ * Executes one GitHub-backed repository file read through the existing
+ * governed-runtime membrane, then independently re-reads provider state before
+ * exposing content.
  *
- * The donor/runtime may propose the tool, but it cannot select the provider
- * object, forge the immutable ref, supply the verification witness, or receive
- * unverified content. A fresh provider instance performs the post-execution
- * readback; only a stable ref plus identical content can promote this bounded
- * read to VERIFIED and release the output.
+ * The donor/runtime may propose the tool, but it cannot select or inject the
+ * RepositoryProvider, forge the immutable ref, supply the verification witness,
+ * or receive unverified content. Both provider instances are constructed by
+ * FCR's server-owned provider factory. Only a stable ref plus identical content
+ * can promote this bounded read to VERIFIED and release the output.
+ *
+ * This first vertical slice intentionally fixes the repository provider to the
+ * current GitHub authority. Provider selection can move behind the project
+ * registry later without making it runtime-authored.
  */
 export async function runGovernedRepositoryRead(
   input: GovernedRepositoryReadInput,
-  dependencies: GovernedRepositoryReadDependencies = {},
 ): Promise<GovernedRepositoryReadResult> {
   const repository = normalize(input.repository);
   const projectId = normalize(input.projectId);
-  const repoProvider = normalize(input.repoProvider ?? 'github');
   const ref = normalize(input.ref);
   const path = safePath(input.path);
-  const now = dependencies.now ?? (() => new Date());
-  const maxContentBytes = dependencies.maxContentBytes ?? DEFAULT_MAX_CONTENT_BYTES;
-  const makeProvider = dependencies.providerForProject ?? createProviderForProject;
 
-  if (!REPOSITORY.test(repository) || !projectId || !repoProvider || !ref || !path) {
+  if (!REPOSITORY.test(repository) || !projectId || !ref || !path) {
     return denied('Repository read target is malformed.', 'invalid_repository_read_target');
-  }
-  if (!Number.isInteger(maxContentBytes) || maxContentBytes < 1 || maxContentBytes > 1024 * 1024) {
-    return denied('Repository read size bound is invalid.', 'invalid_repository_read_size_bound');
   }
   if (!input.lease) {
     return denied('A governed repository read requires an FCR lease.', 'missing_lease');
@@ -203,7 +193,7 @@ export async function runGovernedRepositoryRead(
   }
 
   const project: ProviderProjectConfig = {
-    repo_provider: repoProvider,
+    repo_provider: 'github',
     slug: projectId,
     repo_identifier: repository,
   };
@@ -211,7 +201,7 @@ export async function runGovernedRepositoryRead(
   let executionProvider: RepositoryProvider;
   let resolvedSha: string;
   try {
-    executionProvider = makeProvider(project);
+    executionProvider = providerForProject(project);
     resolvedSha = normalize(await executionProvider.resolveRef(projectId, ref));
   } catch {
     return {
@@ -252,7 +242,7 @@ export async function runGovernedRepositoryRead(
       capabilities: [REPOSITORY_READ_CAPABILITY],
       invoke: async () => {
         const content = await executionProvider.readFile(projectId, resolvedSha, path);
-        if (Buffer.byteLength(content, 'utf8') > maxContentBytes) {
+        if (Buffer.byteLength(content, 'utf8') > MAX_CONTENT_BYTES) {
           throw new Error('repository_read_too_large');
         }
         const contentHash = sha256(content);
@@ -264,7 +254,7 @@ export async function runGovernedRepositoryRead(
           status: 'succeeded',
           runtimeIdentity: runtimeIdentityForLease(input.lease!),
           externalRefs: externalRefs(repository, ref, resolvedSha, path, contentHash),
-          observedAt: now().toISOString(),
+          observedAt: new Date().toISOString(),
         };
       },
     },
@@ -282,7 +272,7 @@ export async function runGovernedRepositoryRead(
   let readbackSha: string;
   let readbackContent: string;
   try {
-    const readbackProvider = makeProvider(project);
+    const readbackProvider = providerForProject(project);
     readbackSha = normalize(await readbackProvider.resolveRef(projectId, ref));
     if (!FULL_SHA.test(readbackSha)) throw new Error('invalid_readback_sha');
     if (readbackSha !== resolvedSha) {
@@ -297,7 +287,7 @@ export async function runGovernedRepositoryRead(
           capturedHash,
           attempt.receipt,
         ),
-        observedAt: now().toISOString(),
+        observedAt: new Date().toISOString(),
         receiptBinding: receiptBinding(attempt.receipt),
       };
       return {
@@ -309,7 +299,7 @@ export async function runGovernedRepositoryRead(
       };
     }
     readbackContent = await readbackProvider.readFile(projectId, readbackSha, path);
-    if (Buffer.byteLength(readbackContent, 'utf8') > maxContentBytes) {
+    if (Buffer.byteLength(readbackContent, 'utf8') > MAX_CONTENT_BYTES) {
       throw new Error('repository_readback_too_large');
     }
   } catch {
@@ -322,9 +312,8 @@ export async function runGovernedRepositoryRead(
   }
 
   const readbackHash = sha256(readbackContent);
-  const matches = readbackSha === resolvedSha && readbackHash === capturedHash;
   const witness: GovernedExecutionWitness = {
-    status: matches ? 'verified' : 'contradicted',
+    status: readbackHash === capturedHash ? 'verified' : 'contradicted',
     strength: 'W1',
     evidenceFingerprint: witnessFingerprint(
       repository,
@@ -334,7 +323,7 @@ export async function runGovernedRepositoryRead(
       readbackHash,
       attempt.receipt,
     ),
-    observedAt: now().toISOString(),
+    observedAt: new Date().toISOString(),
     receiptBinding: receiptBinding(attempt.receipt),
   };
   const outcome = evaluateGovernedExecutionOutcome(attempt.receipt, witness, 'W1');
