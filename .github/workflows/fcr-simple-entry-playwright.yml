@@ -8,6 +8,7 @@ on:
       - public/control-room/index.html
       - public/control-room/styles.css
       - public/control-room/entry-flow.js
+      - src/http/__tests__/siteAssets.test.ts
       - e2e/fcr-welcome-login-proof.mjs
       - .github/workflows/fcr-simple-entry-playwright.yml
 
@@ -42,9 +43,10 @@ jobs:
           node-version: '24'
       - name: Install dependencies
         run: npm install --no-audit --no-fund
-      - name: Verify Cloudflare and Supabase auth bridge contracts
+      - name: Verify entry topology and Cloudflare Supabase auth bridge contracts
         run: >-
           npx vitest run
+          src/http/__tests__/siteAssets.test.ts
           src/http/routes/__tests__/auth.integration.test.ts
           src/http/routes/__tests__/auth.onboarding.test.ts
           src/http/__tests__/pagesEdgeProxy.test.ts
