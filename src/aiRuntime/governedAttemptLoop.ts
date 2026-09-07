@@ -80,14 +80,22 @@ function receiptMatchesLease(
  *
  * The runtime may propose a read-only tool attempt, but FCR remains the broker:
  * it supplies the authoritative world state and adapter capability graph, evaluates
- * the lease immediately before execution, admits at most one adapter call, rejects
- * unbound receipts, and leaves verification to an independent witness.
+ * the lease immediately before execution, admits at most one exact adapter call,
+ * rejects unbound receipts, and leaves verification to an independent witness.
  *
  * Write-capable adapters are intentionally excluded from this first spike.
  */
 export async function runGovernedReadOnlyAttempt(
   input: GovernedAttemptInput,
 ): Promise<GovernedAttemptResult> {
+  if (input.proposal.toolName !== input.adapter.name) {
+    return {
+      state: 'DENIED',
+      decision: { disposition: 'DENY', reasons: ['adapter_name_mismatch'] },
+      reason: 'The runtime proposal must bind to the exact broker-selected adapter.',
+    };
+  }
+
   if (input.adapter.effect !== 'read_only') {
     return {
       state: 'DENIED',
