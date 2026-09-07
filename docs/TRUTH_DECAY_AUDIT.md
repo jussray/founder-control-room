@@ -20,6 +20,8 @@ The Documentation Truth gate had a parallel weakness: it treated a touched docum
 
 Goalfix governance exposed another false-green class: canonical execution/adaptive documents and their portable Claude/Perplexity entry points could change while the verifier reported zero truth-sensitive files. Those paths are now registered as `truth-governance`. The gate must therefore require a current README/truth-decay refresh and path-bound receipt whenever the canonical Goalfix workflow, adaptive kernel, portable Goalfix skills, or Claude/Perplexity master execution overlays move. Registration is documentation consistency evidence only; it does not prove `/goalfix/inspect` runtime adoption, independent review, Founder Final, merge authority, provider configuration, deployment, or publication.
 
+Chief ProofMode Access exposed the same false-green pattern on a mutation-capable provider boundary. Its founder-only issue bridge, reusable recovery workflow, runtime witness, selector resolver, provider reconciler, and cross-run reconciliation evaluator can change what identity may reach Cloudflare and what evidence may clear a prior ambiguous write. Those paths are now registered as `chief-access-authority`; a changed Chief Access authority source must refresh `docs/CHIEF_PROOFMODE_ACCESS_RECOVERY.md` and carry a path-bound Documentation Truth receipt. This registration does not authorize a Cloudflare repair, prove that a service-token selector exists, or convert source contracts into provider/runtime truth.
+
 ## 2026-09 control correction: deployment-plane secrets versus runtime-secret authority
 
 Canonical Deploy #218 exposed a second truth-decay pattern: documentation still described Worker runtime secret values as GitHub production configuration even though those values belong to the Cloudflare Worker secret plane. The exact-head authority check was correct, but an old secret-copy model made the deployment gate fail before any migration or provider mutation. Treating that failure as evidence that the runtime secret was absent in Cloudflare would have crossed an authority boundary without provider readback.
@@ -188,6 +190,8 @@ truth-sensitive implementation / authority / provider change
 The verifier classifies truth-sensitive changed files by domain and requires the relevant current-state docs rather than forcing documentation edits for every test-only change.
 
 Goalfix governance is explicitly part of that classification. Changes to `.ai/skills/goalfix/SKILL.md`, `.claude/skills/goalfix/SKILL.md`, `docs/FOUNDER_ADAPTIVE_KERNEL_V0.md`, `docs/GOALFIX_EXECUTION_WORKFLOW_V2.md`, `docs/CLAUDE_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC.md`, or `docs/PERPLEXITY_MCP_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC.md` must be treated as truth-sensitive because those files can change how future operators select targets, interpret proof, consume founder authority, or report post-merge state.
+
+Chief Access authority is also explicitly part of that classification. Changes to the founder command bridge, reusable recovery workflow, runtime witness, provider reconciler, selector resolver, or subject-aware reconciliation evaluator require the dedicated Chief Access runbook and a path-bound receipt. A test-only edit may remain outside that domain, but any operational authority-path change cannot pass Documentation Truth merely because the generic Cloudflare docs were untouched.
 
 It also checks cross-document invariants that are easy to regress during fast-moving work, including:
 
@@ -367,6 +371,7 @@ The strongest optimization is not faster claiming. It is shortening the distance
 30. A predecessor Playwright success cannot prove a cross-repository federation successor after either repository head, peer proof contract, peer runtime identity, or serialized wire shape moves.
 31. A privileged `workflow_run` witness may consume an upstream release SHA as evidence, but it cannot execute that upstream checkout or treat upstream success as executable trust.
 32. A capital decision card, recommendation, score, or HOLD state is evidence interpretation, not financing or execution authority; stale or missing capital evidence must remove derived certainty instead of preserving an earlier recommendation.
+33. A mutation-capable Chief Access workflow cannot be treated as documentation-current if its authority path changes without refreshing the dedicated recovery runbook and a path-bound receipt; source registration is not provider authorization.
 
 ## Rollback
 
