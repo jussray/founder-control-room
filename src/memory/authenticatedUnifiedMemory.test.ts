@@ -11,6 +11,7 @@ import type { NativeMemoryObservation, UnifiedMemoryRecord } from './unifiedMemo
 const NOW = new Date('2026-09-07T19:00:00.000Z');
 const SHA = 'a'.repeat(40);
 const HASH = `sha256:${'b'.repeat(64)}`;
+const PLACEHOLDER_FINGERPRINT = `memfp:sha256:${'0'.repeat(64)}`;
 
 function chief(overrides: Partial<NativeMemoryObservation> = {}): NativeMemoryObservation {
   return {
@@ -40,6 +41,7 @@ function sourceWitness(
     projectSlug: 'chief-ai-machine',
     repository: 'jussray/chief-ai-machine',
     sourceSha: SHA,
+    continuityFingerprint: PLACEHOLDER_FINGERPRINT,
     observedAt: '2026-09-07T18:59:00.000Z',
     expiresAt: '2026-09-07T19:04:00.000Z',
     evidenceRef: 'auth:chief:session-1',
@@ -67,7 +69,9 @@ function trustRoot(overrides: {
   resolveCurrentProjectAuthority?: (projectSlug: string) => CurrentMemoryProjectAuthorityWitness | null;
 } = {}): AuthenticatedUnifiedMemoryTrustRoot {
   return {
-    authenticateSource: overrides.authenticateSource ?? (() => sourceWitness()),
+    authenticateSource: overrides.authenticateSource ?? ((record) => sourceWitness({
+      continuityFingerprint: record.continuityFingerprint,
+    })),
     resolveCurrentProjectAuthority: overrides.resolveCurrentProjectAuthority ?? (() => projectWitness()),
   };
 }
@@ -91,6 +95,7 @@ describe('authenticated unified memory ingress', () => {
       decisionSupportUsable: false,
       executionAuthority: false,
     });
+    expect(result.envelope.sourceWitness.continuityFingerprint).toBe(result.envelope.record.continuityFingerprint);
   });
 
   it('fails closed when the source cannot be authenticated outside the payload', async () => {
@@ -106,12 +111,52 @@ describe('authenticated unified memory ingress', () => {
   it('rejects a source witness bound to the wrong exact source SHA', async () => {
     const result = await authenticateUnifiedMemoryObservation(
       chief(),
-      trustRoot({ authenticateSource: () => sourceWitness({ sourceSha: 'c'.repeat(40) }) }),
+      trustRoot({
+        authenticateSource: (record) => sourceWitness({
+          continuityFingerprint: record.continuityFingerprint,
+          sourceSha: 'c'.repeat(40),
+        }),
+      }),
       NOW,
     );
 
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.errors).toContain('MEMORY_SOURCE_SHA_MISMATCH');
+  });
+
+  it('rejects a witness for another normalized record even when source repository and SHA match', async () => {
+    const result = await authenticateUnifiedMemoryObservation(
+      chief(),
+      trustRoot({
+        authenticateSource: () => sourceWitness({
+          continuityFingerprint: `memfp:sha256:${'c'.repeat(64)}`,
+        }),
+      }),
+      NOW,
+    );
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.errors).toContain('MEMORY_SOURCE_RECORD_MISMATCH');
+  });
+
+  it('returns immutable snapshots so callers cannot rewrite an authenticated record after validation', async () => {
+    const result = await authenticateUnifiedMemoryObservation(chief(), trustRoot(), NOW);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(Object.isFrozen(result.envelope)).toBe(true);
+    expect(Object.isFrozen(result.envelope.record)).toBe(true);
+    expect(Object.isFrozen(result.envelope.record.categoryKeys)).toBe(true);
+    expect(Object.isFrozen(result.envelope.record.provenanceRefs)).toBe(true);
+    expect(Object.isFrozen(result.envelope.sourceWitness)).toBe(true);
+    expect(Object.isFrozen(result.envelope.projectAuthority)).toBe(true);
+
+    expect(() => {
+      (result.envelope.record as { summary: string | null }).summary = 'tampered after authentication';
+    }).toThrow(TypeError);
+    expect(() => {
+      result.envelope.record.categoryKeys.push('tampered');
+    }).toThrow(TypeError);
   });
 
   it('rejects stale project authority rather than inheriting bootstrap registration forever', async () => {
@@ -156,8 +201,8 @@ describe('authenticated unified memory ingress', () => {
     };
 
     const result = await authenticateUnifiedMemoryObservation(input, {
-      authenticateSource: () => ({
-        ...sourceWitness(),
+      authenticateSource: (record) => ({
+        ...sourceWitness({ continuityFingerprint: record.continuityFingerprint }),
         sourceSystem: 'sleepwealth-agent',
         projectSlug: 'sleepwealth-agent',
         repository: 'jussray/SleepWealth-Agent',
@@ -194,7 +239,8 @@ describe('authenticated unified memory ingress', () => {
     if (!authenticated.ok) return;
 
     const laterTrustRoot = trustRoot({
-      authenticateSource: () => sourceWitness({
+      authenticateSource: (record) => sourceWitness({
+        continuityFingerprint: record.continuityFingerprint,
         observedAt: '2026-09-10T18:45:00.000Z',
         expiresAt: '2026-09-10T18:50:00.000Z',
       }),
