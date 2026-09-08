@@ -48,6 +48,18 @@ describe('GitHub App secret-shape diagnostic contract', () => {
     expect(workflow).not.toContain('secrets.GITHUB_PRIVATE_KEY');
   });
 
+  it('classifies literal escaped-newline PEM transport before raw PEM', () => {
+    const escapedBranch = "} else if (trimmed.includes('\\\\n') || trimmed.includes('\\\\r\\\\n')) {";
+    const rawBranch = "} else if (trimmed.startsWith('-----BEGIN')) {";
+    const escapedIndex = workflow.indexOf(escapedBranch);
+    const rawIndex = workflow.indexOf(rawBranch);
+
+    expect(escapedIndex).toBeGreaterThan(-1);
+    expect(rawIndex).toBeGreaterThan(-1);
+    expect(escapedIndex).toBeLessThan(rawIndex);
+    expect(workflow.slice(escapedIndex, rawIndex)).toContain("transportClass = 'escaped-newline-pem';");
+  });
+
   it('emits only non-reconstructable shape classifications', () => {
     expect(workflow).toContain("schema: 'fcr/github-app-secret-shape@v1'");
     expect(workflow).toContain('appIdNumeric,');
