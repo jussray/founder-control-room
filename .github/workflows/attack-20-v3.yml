@@ -94,7 +94,7 @@ jobs:
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
 
-      - name: Resolve exact live base
+      - name: Resolve exact stack base and security main baseline
         shell: bash
         env:
           EVENT_NAME: ${{ github.event_name }}
@@ -106,25 +106,41 @@ jobs:
           if [ "$EVENT_NAME" = "pull_request" ]; then
             test -n "$BASE_REF"
             live_base_sha="$(git ls-remote --heads origin "refs/heads/${BASE_REF}" | awk 'NR == 1 {print $1}')"
+            main_baseline_sha="$(git ls-remote --heads origin refs/heads/main | awk 'NR == 1 {print $1}')"
           else
             live_base_sha="$PUSH_BEFORE_SHA"
+            main_baseline_sha="$PUSH_BEFORE_SHA"
           fi
 
           if ! [[ "$live_base_sha" =~ ^[0-9a-f]{40}$ ]]; then
-            echo "Attack-20 base resolution failed: expected an exact live base SHA." >&2
+            echo "Attack-20 base resolution failed: expected an exact live PR base SHA." >&2
+            exit 1
+          fi
+          if ! [[ "$main_baseline_sha" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "Attack-20 main provenance resolution failed: expected an exact main baseline SHA." >&2
             exit 1
           fi
 
-          git fetch --no-tags origin "$live_base_sha"
+          git fetch --no-tags origin "$live_base_sha" "$main_baseline_sha"
           if ! git merge-base --is-ancestor "$live_base_sha" "$EXPECTED_SHA"; then
-            echo "Attack-20 base resolution failed: live base is not an ancestor of the exact candidate." >&2
+            echo "Attack-20 base resolution failed: live PR base is not an ancestor of the exact candidate." >&2
             echo "live_base_sha=$live_base_sha" >&2
             echo "candidate_sha=$EXPECTED_SHA" >&2
             exit 1
           fi
+          if ! git merge-base --is-ancestor "$main_baseline_sha" "$EXPECTED_SHA"; then
+            echo "Attack-20 main provenance resolution failed: current main is not an ancestor of the exact candidate." >&2
+            echo "main_baseline_sha=$main_baseline_sha" >&2
+            echo "candidate_sha=$EXPECTED_SHA" >&2
+            exit 1
+          fi
 
-          printf 'EXPECTED_BASE_SHA=%s\n' "$live_base_sha" >> "$GITHUB_ENV"
-          printf 'resolved_base_sha=%s\n' "$live_base_sha"
+          # EXPECTED_BASE_SHA is retained for verifier compatibility. Its
+          # semantic contract is the exact main provenance baseline named by
+          # registry.declaredFromMainSha, not a stacked PR's immediate base.
+          printf 'EXPECTED_BASE_SHA=%s\n' "$main_baseline_sha" >> "$GITHUB_ENV"
+          printf 'resolved_pr_base_sha=%s\n' "$live_base_sha"
+          printf 'resolved_main_baseline_sha=%s\n' "$main_baseline_sha"
 
       - name: Set up Node
         uses: actions/setup-node@v4
