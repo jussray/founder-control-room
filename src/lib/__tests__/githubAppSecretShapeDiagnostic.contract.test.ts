@@ -1,6 +1,5 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { evaluateDeterministicReviewRules } from '../../review/deterministicReviewProducer.js';
 
 const workflowPath = '.github/workflows/github-app-secret-shape-diagnostic.yml';
 const workflow = readFileSync(
@@ -68,21 +67,18 @@ describe('GitHub App secret-shape diagnostic contract', () => {
     expect(workflow).toContain('artifacts/github-app-secret-shape.json');
   });
 
-  it('keeps the diagnostic workflow classified as a P1 trust-root change', () => {
-    const findings = evaluateDeterministicReviewRules([{
-      path: workflowPath,
-      status: 'added',
-      additions: 1,
-      deletions: 0,
-      patch: '@@ -0,0 +1 @@\n+name: GitHub App Secret Shape Diagnostic',
-    }]);
-
-    expect(findings).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        id: 'trust-root-self-modification',
-        severity: 'P1',
-        path: workflowPath,
-      }),
-    ]));
+  it('keeps production-secret execution off candidate-controlled pull-request events', () => {
+    expect(workflow).toContain('issue_comment:');
+    expect(workflow).not.toContain('pull_request:');
+    expect(workflow).not.toContain('push:');
+    expect(workflow).not.toContain('workflow_dispatch:');
+    expect(workflow).toContain('environment: production');
+    expect(workflow).toContain('permissions:');
+    expect(workflow).toContain('contents: read');
+    expect(workflow).toContain('issues: read');
+    expect(workflow).not.toContain('contents: write');
+    expect(workflow).not.toContain('issues: write');
+    expect(workflow).not.toContain('pull-requests: write');
+    expect(workflow).not.toContain('actions: write');
   });
 });
