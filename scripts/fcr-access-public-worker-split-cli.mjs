@@ -7,6 +7,7 @@ import {
 
 export const SPLIT_RECEIPT_PATH = 'test-results/fcr-access-public-worker-split.json';
 export const SPLIT_ROLLBACK_ERROR_PATH = 'test-results/fcr-access-public-worker-split-rollback-error.json';
+const FCR_ZONE = 'foundercontrolroom.org';
 
 function clean(value) {
   return typeof value === 'string' ? value.trim() : '';
@@ -41,6 +42,7 @@ function boundedError(error, metadata) {
     schemaVersion: 1,
     scope: 'fcr-access-public-worker-split',
     ...metadata,
+    zone: FCR_ZONE,
     state: mutationOutcome === 'unknown' ? 'reconcile-required' : 'failed',
     mutationOutcome,
     mutationPerformed: mutationOutcome === 'performed',
