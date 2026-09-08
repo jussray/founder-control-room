@@ -1,14 +1,14 @@
 # Main Release Provenance Recovery — 2026-09-07
 
-## Current truth
+## Historical observation boundary
 
-Authoritative `main` is:
+At the recorded recovery boundary, the observed authoritative `main` was:
 
 `9afd4f5da0f8307266d846ec34bf5d678634a78d`
 
-That SHA is the GitHub-signed squash merge commit for PR #735. Its tree contains the exact intended three-file Founder Content / Visual Wonder slice that was reconciled onto the then-current main before merge.
+That SHA was the GitHub-signed squash merge commit for PR #735. Its tree contained the exact intended three-file Founder Content / Visual Wonder slice that had been reconciled onto the then-current main before merge.
 
-That source fact does **not** establish reviewed merge authorization.
+That historical source fact does **not** establish reviewed merge authorization, and it is not durable current-main authority. Current `main`, PR base/head identity, and proof freshness must be re-observed at use time. For PR #764, the machine PR Continuity Receipt is the present-tense authority for current base/head identity.
 
 Historical truth is immutable. Current truth must be re-observed.
 
@@ -48,10 +48,10 @@ Post-merge evidence then split across gates:
 - `Main Release Provenance` succeeded;
 - the post-merge PR Continuity workflow failed;
 - Cloudflare Workers / Pages integration checks executed automatically for the merged source;
-- no canonical manual `Deploy` workflow receipt has been established here for `9afd4f5...`;
-- no independent production `/version` exact-SHA witness has been established here.
+- no canonical manual `Deploy` workflow receipt was established there for `9afd4f5...`;
+- no independent production `/version` exact-SHA witness was established there.
 
-Therefore source and provider execution evidence exist, while exact public runtime identity and outcome remain unverified.
+Therefore source and provider execution evidence existed at that observation boundary, while exact public runtime identity and outcome remained unverified.
 
 ## Provenance semantic defect
 
@@ -79,9 +79,9 @@ This is a provenance-classifier repair, not a provider merge-membrane repair.
 
 ## Separate provider governance
 
-Issue #418 remains the authority lane for the actual GitHub provider merge membrane, including independent approval, final-head binding, stale-approval dismissal, review-thread resolution, strict required checks, and bypass/admin behavior.
+Issue #418 remains the authority lane for the actual GitHub provider merge membrane, including exact-head/freshness enforcement, review-thread resolution, trusted evidence, bypass/admin behavior, and any deliberately selected human-review phase.
 
-This PR does not mutate GitHub rulesets, branch protection, Cloudflare, Supabase, n8n, Jira, Shopify, StoryEngine, Chief, credentials, secrets, billing, publication state, or production runtime.
+This PR does not itself mutate GitHub rulesets, branch protection, Cloudflare, Supabase, n8n, Jira, Shopify, StoryEngine, Chief, credentials, secrets, billing, publication state, or production runtime.
 
 Ordinary conversation commands such as `approved`, `merge`, `continue`, `cont`, or `audit` are not a founder manual-merge override receipt.
 
@@ -89,11 +89,11 @@ Ordinary conversation commands such as `approved`, `merge`, `continue`, `cont`, 
 
 This source recovery is acceptable only when all of the following remain true:
 
-1. PR #764 is reacquired against exact authoritative `main@9afd4f5da0f8307266d846ec34bf5d678634a78d`, or reacquired again if main moves;
+1. PR #764 is reacquired against the exact authoritative current `main` at merge-gate evaluation; the machine PR Continuity Receipt must match the live provider base/head readback, and any base movement expires predecessor proof;
 2. fresh required exact-head CI for the final PR head is terminal and green;
 3. the provenance verifier returns `pr_merge_provenance` only for exactly one merged PR bound to exact current main;
 4. the verifier does not claim review or merge authorization from PR association alone;
-5. current review/governance requirements are independently satisfied without bypass before any merge of this carrier;
+5. current review/governance requirements are independently satisfied without unauthorized bypass before any merge of this carrier;
 6. auto-merge remains unarmed unless separately and explicitly authorized;
 7. provider merge-membrane truth remains separately owned by issue #418;
 8. deployment, runtime, browser, and external-outcome claims remain separate and require their own current evidence.
@@ -111,7 +111,9 @@ Any base/head movement expires present-tense proof and merge authority.
 
 ## Rollback
 
-Close PR #764 unmerged or revert its source-only provenance correction if later integrated. No provider or production mutation is required to roll back this carrier.
+Before integration, close PR #764 unmerged if this carrier should be abandoned. If the provenance implementation is later integrated and needs correction, use a forward fix that preserves provenance-only semantics. Do **not** restore `reviewed_pr_merge_provenance` or otherwise reintroduce review or merge-authorization claims that the classifier does not evaluate.
+
+No provider or production mutation is required to abandon this unmerged carrier.
 
 ## Next gate
 
