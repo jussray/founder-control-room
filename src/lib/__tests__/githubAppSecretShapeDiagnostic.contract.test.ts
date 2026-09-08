@@ -16,8 +16,9 @@ describe('GitHub App secret-shape diagnostic contract', () => {
     expect(workflow).toContain(
       'Expected exactly: /diagnose-fcr-github-app-key <40-char-current-main-sha> <approval-reference>',
     );
-    expect(workflow).toContain('test "$actual" = "$EXPECTED_MAIN_SHA"');
+    expect(workflow).toContain('current_main="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/main" --jq .object.sha)"');
     expect(workflow).toContain('test "$current_main" = "$EXPECTED_MAIN_SHA"');
+    expect(workflow).not.toContain('git rev-parse HEAD');
   });
 
   it('reads only the existing production GitHub App credential pair', () => {
@@ -67,11 +68,13 @@ describe('GitHub App secret-shape diagnostic contract', () => {
     expect(workflow).toContain('artifacts/github-app-secret-shape.json');
   });
 
-  it('keeps production-secret execution off candidate-controlled pull-request events', () => {
+  it('keeps production-secret execution off candidate-controlled code and pull-request events', () => {
     expect(workflow).toContain('issue_comment:');
     expect(workflow).not.toContain('pull_request:');
     expect(workflow).not.toContain('push:');
     expect(workflow).not.toContain('workflow_dispatch:');
+    expect(workflow).not.toContain('actions/checkout');
+    expect(workflow).not.toContain('uses: actions/checkout');
     expect(workflow).toContain('environment: production');
     expect(workflow).toContain('permissions:');
     expect(workflow).toContain('contents: read');
