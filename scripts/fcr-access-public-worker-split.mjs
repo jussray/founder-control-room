@@ -1,13 +1,14 @@
 import { createHash } from 'node:crypto';
 import {
   FCR_CLOUDFLARE_ACCOUNT_ID,
-  FCR_PUBLIC_ACCESS_APP_NAME,
   FCR_PUBLIC_ZONE,
   isEveryoneBypassPolicy,
 } from './reconcile-cloudflare-access-public-zone.mjs';
 import { classifyProviderToken } from './provider-credential-contract.mjs';
 
 const API_BASE = 'https://api.cloudflare.com/client/v4';
+
+export const FCR_SPLIT_PUBLIC_ACCESS_APP_NAME = 'foundercontrolroom.org - public front door and version witness';
 
 function clean(value) {
   return typeof value === 'string' ? value.trim() : '';
@@ -22,6 +23,15 @@ function normalizePublicUri(value) {
     .toLowerCase()
     .replace(/^https?:\/\//, '')
     .replace(/\/$/, '');
+}
+
+function managedPublicUris(zone = FCR_PUBLIC_ZONE) {
+  const target = clean(zone).toLowerCase();
+  return [
+    `${target}/*`,
+    `www.${target}/*`,
+    `api.${target}/version`,
+  ];
 }
 
 export function isWholeSitePublicDestination(destination, zone = FCR_PUBLIC_ZONE) {
@@ -168,18 +178,20 @@ async function updateDestinations({ token, fetchImpl, appId, destinations }) {
 }
 
 async function createManagedPublicApplication({ token, fetchImpl, zone }) {
+  const destinations = managedPublicUris(zone)
+    .map((uri) => ({ type: 'public', uri }));
   return cloudflareJson(
     { token, fetchImpl },
     'POST',
     `/accounts/${FCR_CLOUDFLARE_ACCOUNT_ID}/access/apps`,
     {
-      name: FCR_PUBLIC_ACCESS_APP_NAME,
+      name: FCR_SPLIT_PUBLIC_ACCESS_APP_NAME,
       type: 'self_hosted',
-      domain: zone,
+      domain: `www.${zone}`,
       session_duration: '24h',
-      destinations: [{ type: 'public', uri: `${zone}/*` }],
+      destinations,
       policies: [{
-        name: 'Bypass public Founder Control Room apex',
+        name: 'Bypass public FCR front door and version witness',
         decision: 'bypass',
         include: [{ everyone: {} }],
         precedence: 1,
@@ -203,10 +215,16 @@ function wholeSitePublicApplications(applications, zone) {
 }
 
 function isExactManagedPublicApplication(application, zone) {
+  if (clean(application?.name) !== FCR_SPLIT_PUBLIC_ACCESS_APP_NAME) return false;
   const destinations = Array.isArray(application?.destinations) ? application.destinations : [];
-  return clean(application?.name) === FCR_PUBLIC_ACCESS_APP_NAME
-    && destinations.length === 1
-    && isWholeSitePublicDestination(destinations[0], zone);
+  if (destinations.length !== 3 || destinations.some((destination) => destinationType(destination) !== 'public')) {
+    return false;
+  }
+  const actual = destinations
+    .map((destination) => normalizePublicUri(destination?.uri || destination?.hostname))
+    .sort();
+  const expected = managedPublicUris(zone).map(normalizePublicUri).sort();
+  return JSON.stringify(actual) === JSON.stringify(expected);
 }
 
 function exactManagedPublicApplications(applications, zone) {
@@ -215,7 +233,7 @@ function exactManagedPublicApplications(applications, zone) {
 
 function namedManagedPublicApplications(applications) {
   return applications.filter(
-    (application) => clean(application?.name) === FCR_PUBLIC_ACCESS_APP_NAME,
+    (application) => clean(application?.name) === FCR_SPLIT_PUBLIC_ACCESS_APP_NAME,
   );
 }
 
@@ -320,7 +338,7 @@ export async function executeFcrPublicWorkerSplit({
   }
 
   const source = matching[0];
-  if (clean(source?.name) === FCR_PUBLIC_ACCESS_APP_NAME) {
+  if (clean(source?.name) === FCR_SPLIT_PUBLIC_ACCESS_APP_NAME) {
     throw errorWith(
       'split-managed-app-not-eligible',
       'The whole-site destination is already owned by the managed public application; split repair is not applicable.',
@@ -520,10 +538,11 @@ export async function executeFcrPublicWorkerSplit({
     managedApplicationId: managedId,
     originalDestinations,
     workerDestination: structuredClone(topology.workerDestination),
+    publicDestinations: managedPublicUris(zone),
     sourceIdentityFingerprint: sourceIdentityBefore,
     sourcePolicyFingerprint: policyFingerprintBefore,
     splitApplied: true,
-    nextAction: 'run anonymous/public and authorized/unauthorized Worker proofs; roll back if any required witness fails',
+    nextAction: 'run anonymous public-front-door, founder-containment, exact-version, and protected-Worker proofs; roll back if any required witness fails',
   };
 }
 
