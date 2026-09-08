@@ -166,6 +166,8 @@ api.foundercontrolroom.org
 
 Source dependence on that topology is not proof the live provider is configured correctly.
 
+The bounded FCR Access recovery lane also separates behavioral provider truth from rollback ownership. An existing Access application may count as an `already-public-bypass` only when one exact public destination for `foundercontrolroom.org/*` and `Bypass / Everyone` semantics are independently verified. A behaviorally equivalent non-managed application may support provider truth but never becomes a workflow-managed rollback target; broader, multi-destination, worker/preview-worker, policy-ambiguous, or otherwise unresolved destination profiles remain manual-review blockers. Anonymous public reachability and founder-only control-plane containment are separate browser assertions, and neither substitutes for the other.
+
 Production does not deploy merely because `main` moved or a Cloudflare build succeeded. A production claim remains incomplete until the authorized lane proves, for one exact candidate:
 
 - current deployment authority;

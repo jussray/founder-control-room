@@ -1,0 +1,38 @@
+{
+  "contract": "fcr/access-front-door-documentation-reconciliation@v1",
+  "purpose": "Reconcile the inherited Documentation Truth drift introduced by the 2026-09-07 FCR Access front-door incident range without relabeling historical commits as reviewed or claiming live Cloudflare provider state.",
+  "historicalReviewedBoundary": "3dbff157c5b51eb631c6d45398b2478e2ccb9143",
+  "historicalIncidentEnd": "bee281fc109f5231340da51998a58722bc90fc37",
+  "truthSensitiveIncidentCommits": [
+    "470b080918b5c489fd1802206bfbb9c4a63cc13d",
+    "3d2ffafd357ac2f07b69162894c636edb1807a23",
+    "0059e5d873354105d331c3fec95405468e7804c9",
+    "89b319e8ce350bb83d3a020cd336a2b8ab29ae35"
+  ],
+  "carrier": {
+    "pullRequest": 764,
+    "headBeforeReconciliation": "07d2c3b2d758d14850de2ff2ce81497d13fd4a0c"
+  },
+  "sourceSurface": ".github/workflows/fcr-access-front-door-recovery.yml",
+  "reconciledTruthSurfaces": [
+    "README.md",
+    "docs/CLOUDFLARE_REASONING.md",
+    "docs/deployment/CLOUDFLARE_WORKER_TARGETS.md",
+    "docs/DOCUMENTATION_TRUTH_RECEIPT.json"
+  ],
+  "reconciledInvariants": [
+    "Provider truth is semantic: exactly one existing public Access application may be recognized as already-public-bypass only when the exact foundercontrolroom.org/* destination and Bypass / Everyone semantics are independently verified.",
+    "Rollback authority is identity-bound: a behaviorally equivalent non-managed application can support provider truth but must never become the workflow-managed rollback target.",
+    "Broader, multi-destination, worker, preview-worker, policy-ambiguous, or otherwise unresolved destination profiles remain manual-review blockers; public evidence may expose only bounded destination-shape/profile classifications rather than raw provider payloads or application IDs.",
+    "Public stranger reachability and founder-only control-plane containment are independent browser assertions; neither can substitute for the other.",
+    "Source and documentation reconciliation do not prove current Cloudflare provider configuration, provider mutation, deployed runtime identity, merge authority, deploy authority, or review authority."
+  ],
+  "historicalTruth": "The listed incident commits remain historical direct-main facts. This reconciliation repairs present-tense operator documentation only and does not manufacture independent review provenance for that historical range.",
+  "authority": {
+    "merge": false,
+    "deploy": false,
+    "providerMutation": false,
+    "cloudflareAccessMutation": false,
+    "credentialMutation": false
+  }
+}
