@@ -8,9 +8,11 @@ The raw memory record remains permanently classified as `untrusted-import`. Auth
 
 ## Required proof
 
-A valid envelope requires a verified and fresh raw record, exact source SHA, fresh source-authentication witness, active canonical portfolio project, fresh project-authority witness, bounded opaque evidence references, and exact source/project/repository binding.
+A valid envelope requires a verified and fresh raw record, exact source SHA, an exact `continuityFingerprint` binding for that normalized record, fresh source-authentication witness, active canonical portfolio project, fresh project-authority witness, bounded opaque evidence references, and exact source/project/repository binding.
 
-At the use boundary, `authenticatedMemoryForDecisionSupport()` repeats source authentication and project-authority resolution. Cached envelopes therefore expire when source identity, project registration, witness freshness, or raw-memory freshness changes.
+The source witness therefore cannot authenticate merely “something from this repository commit.” It must bind the exact normalized memory record that was authenticated. The returned raw-record, source-witness, project-authority, and envelope snapshots are frozen so caller mutation cannot rewrite an authenticated fact after validation.
+
+At the use boundary, `authenticatedMemoryForDecisionSupport()` repeats source authentication and project-authority resolution. Cached envelopes therefore expire when source identity, exact record fingerprint, project registration, witness freshness, or raw-memory freshness changes.
 
 ## Authority ceiling
 
