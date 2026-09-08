@@ -2,7 +2,6 @@ name: FCR Cloudflare Bridge Contract
 
 on:
   pull_request:
-    branches: [main]
     paths:
       - '.github/workflows/fcr-access-front-door-recovery.yml'
       - '.github/workflows/fcr-cloudflare-command-bridge.yml'
@@ -17,6 +16,8 @@ on:
       - 'scripts/reconcile-cloudflare-access-public-zone.node-test.mjs'
       - 'scripts/fcr-access-public-worker-split.mjs'
       - 'scripts/fcr-access-public-worker-split.node-test.mjs'
+      - 'scripts/fcr-access-public-worker-split-cli.mjs'
+      - 'scripts/fcr-access-public-worker-split-cli.node-test.mjs'
       - 'scripts/reconcile-chief-proofmode-access.mjs'
       - 'scripts/reconcile-chief-proofmode-access.node-test.mjs'
       - 'scripts/chief-proofmode-access-bridge-contract.node-test.mjs'
@@ -42,6 +43,8 @@ on:
       - 'scripts/reconcile-cloudflare-access-public-zone.node-test.mjs'
       - 'scripts/fcr-access-public-worker-split.mjs'
       - 'scripts/fcr-access-public-worker-split.node-test.mjs'
+      - 'scripts/fcr-access-public-worker-split-cli.mjs'
+      - 'scripts/fcr-access-public-worker-split-cli.node-test.mjs'
       - 'scripts/reconcile-chief-proofmode-access.mjs'
       - 'scripts/reconcile-chief-proofmode-access.node-test.mjs'
       - 'scripts/chief-proofmode-access-bridge-contract.node-test.mjs'
@@ -90,12 +93,14 @@ jobs:
           node --check scripts/provider-credential-contract.mjs
           node --check scripts/reconcile-cloudflare-access-public-zone.mjs
           node --check scripts/fcr-access-public-worker-split.mjs
+          node --check scripts/fcr-access-public-worker-split-cli.mjs
           node --check scripts/reconcile-chief-proofmode-access.mjs
           node --check scripts/publish-chief-runtime-witness.mjs
           node --check scripts/verify-fcr-front-door-playwright.mjs
           node --test scripts/provider-credential-contract.node-test.mjs
           node --test scripts/reconcile-cloudflare-access-public-zone.node-test.mjs
           node --test scripts/fcr-access-public-worker-split.node-test.mjs
+          node --test scripts/fcr-access-public-worker-split-cli.node-test.mjs
           node --test scripts/reconcile-chief-proofmode-access.node-test.mjs
           node --test scripts/chief-proofmode-access-bridge-contract.node-test.mjs
           node --test scripts/publish-chief-runtime-witness.node-test.mjs
