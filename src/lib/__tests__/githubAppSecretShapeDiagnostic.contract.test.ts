@@ -21,10 +21,29 @@ describe('GitHub App secret-shape diagnostic contract', () => {
     expect(workflow).not.toContain('git rev-parse HEAD');
   });
 
-  it('reads only the existing production GitHub App credential pair', () => {
+  it('scopes the production GitHub App credential pair to the classification step only', () => {
+    const classifyMarker = '      - name: Classify private-key shape without exposing secret material';
+    const retainMarker = '      - name: Retain secret-safe diagnostic receipt';
+    const classifyStart = workflow.indexOf(classifyMarker);
+    const retainStart = workflow.indexOf(retainMarker);
+
+    expect(classifyStart).toBeGreaterThan(-1);
+    expect(retainStart).toBeGreaterThan(classifyStart);
+
+    const beforeClassification = workflow.slice(0, classifyStart);
+    const classificationStep = workflow.slice(classifyStart, retainStart);
+    const afterClassification = workflow.slice(retainStart);
+    const secretMappings = [
+      'GITHUB_APP_ID: ${{ secrets.APP_ID }}',
+      'GITHUB_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}',
+    ];
+
     expect(workflow).toContain('environment: production');
-    expect(workflow).toContain('GITHUB_APP_ID: ${{ secrets.APP_ID }}');
-    expect(workflow).toContain('GITHUB_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}');
+    for (const mapping of secretMappings) {
+      expect(beforeClassification).not.toContain(mapping);
+      expect(classificationStep).toContain(mapping);
+      expect(afterClassification).not.toContain(mapping);
+    }
     expect(workflow).not.toContain('secrets.GITHUB_APP_ID');
     expect(workflow).not.toContain('secrets.GITHUB_PRIVATE_KEY');
   });
