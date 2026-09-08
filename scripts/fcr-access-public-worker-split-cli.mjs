@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import {
@@ -6,8 +7,10 @@ import {
 } from './fcr-access-public-worker-split.mjs';
 
 export const SPLIT_RECEIPT_PATH = 'test-results/fcr-access-public-worker-split.json';
+export const SPLIT_ROLLBACK_RECEIPT_PATH = 'test-results/fcr-access-public-worker-split-rollback.json';
 export const SPLIT_ROLLBACK_ERROR_PATH = 'test-results/fcr-access-public-worker-split-rollback-error.json';
 const FCR_ZONE = 'foundercontrolroom.org';
+const IDEMPOTENCY_PREFIX = 'fcr-access-split-v1:';
 
 function clean(value) {
   return typeof value === 'string' ? value.trim() : '';
@@ -23,7 +26,19 @@ function exactHead(env) {
   return sha;
 }
 
-function workflowMetadata(env, expectedHeadSha) {
+function mutationIdempotencyKey(command, expectedHeadSha) {
+  const digest = createHash('sha256')
+    .update([
+      'fcr-access-public-worker-split/v1',
+      command,
+      FCR_ZONE,
+      expectedHeadSha,
+    ].join('\n'))
+    .digest('hex');
+  return `${IDEMPOTENCY_PREFIX}${digest}`;
+}
+
+function workflowMetadata(env, expectedHeadSha, command) {
   const workflowRunId = clean(env.GITHUB_RUN_ID) || null;
   const workflowRunAttempt = clean(env.GITHUB_RUN_ATTEMPT) || null;
   return {
@@ -31,6 +46,7 @@ function workflowMetadata(env, expectedHeadSha) {
     expectedHeadSha,
     workflowRunId,
     workflowRunAttempt,
+    idempotencyKey: mutationIdempotencyKey(command, expectedHeadSha),
   };
 }
 
@@ -47,6 +63,7 @@ function boundedError(error, metadata) {
     mutationOutcome,
     mutationPerformed: mutationOutcome === 'performed',
     rollbackPerformed: error?.rollbackPerformed === true,
+    currentTruthState: 'unknown',
     classification: clean(error?.classification) || 'split-execution-failed',
     sourceApplicationId: clean(error?.sourceApplicationId) || null,
     managedApplicationId: clean(error?.managedApplicationId) || null,
@@ -62,17 +79,22 @@ export async function runFcrAccessSplitCli({
   command,
   env = process.env,
   receiptPath = SPLIT_RECEIPT_PATH,
+  rollbackReceiptPath = SPLIT_ROLLBACK_RECEIPT_PATH,
   rollbackErrorPath = SPLIT_ROLLBACK_ERROR_PATH,
   execute = executeFcrPublicWorkerSplit,
   rollback = rollbackFcrPublicWorkerSplit,
 } = {}) {
   const expectedHeadSha = exactHead(env);
-  const metadata = workflowMetadata(env, expectedHeadSha);
 
   if (command === 'apply') {
+    const metadata = workflowMetadata(env, expectedHeadSha, 'apply');
     try {
       const receipt = await execute({ env });
-      const durable = { ...receipt, ...metadata };
+      const durable = {
+        ...receipt,
+        ...metadata,
+        currentTruthState: 'unknown',
+      };
       await writeJson(receiptPath, durable);
       return durable;
     } catch (error) {
@@ -84,22 +106,33 @@ export async function runFcrAccessSplitCli({
 
   if (command === 'rollback') {
     const original = JSON.parse(await readFile(receiptPath, 'utf8'));
+    const expectedApplyIdempotencyKey = mutationIdempotencyKey('apply', expectedHeadSha);
     if (original?.scope !== 'fcr-access-public-worker-split'
       || original?.expectedHeadSha !== expectedHeadSha
+      || original?.idempotencyKey !== expectedApplyIdempotencyKey
       || original?.mutationOutcome !== 'performed'
       || original?.splitApplied !== true) {
-      const error = new Error('Rollback requires the exact performed split receipt for the current approved head.');
+      const error = new Error('Rollback requires the exact performed split receipt for the current approved head and mutation identity.');
       error.classification = 'split-rollback-receipt-head-mismatch';
       throw error;
     }
 
+    const metadata = workflowMetadata(env, expectedHeadSha, 'rollback');
     try {
       const receipt = await rollback({ receipt: original, env });
-      const durable = { ...receipt, ...workflowMetadata(env, expectedHeadSha) };
-      await writeJson(receiptPath, durable);
+      const durable = {
+        ...receipt,
+        ...metadata,
+        appliedIdempotencyKey: original.idempotencyKey,
+        currentTruthState: 'fresh',
+      };
+      await writeJson(rollbackReceiptPath, durable);
       return durable;
     } catch (error) {
-      const failure = boundedError(error, workflowMetadata(env, expectedHeadSha));
+      const failure = {
+        ...boundedError(error, metadata),
+        appliedIdempotencyKey: original.idempotencyKey,
+      };
       await writeJson(rollbackErrorPath, failure);
       throw error;
     }
