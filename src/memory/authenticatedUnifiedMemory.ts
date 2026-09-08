@@ -7,6 +7,7 @@ import {
 } from './unifiedMemory.js';
 
 const EXACT_SHA = /^[0-9a-f]{40}$/i;
+const EXACT_CONTINUITY_FINGERPRINT = /^memfp:sha256:[0-9a-f]{64}$/i;
 const SAFE_EVIDENCE_REF = /^[A-Za-z0-9._:/#@-]{1,200}$/;
 const MAX_WITNESS_AGE_MS = 5 * 60 * 1000;
 const FUTURE_CLOCK_SKEW_MS = 60 * 1000;
@@ -20,6 +21,7 @@ export interface AuthenticatedMemorySourceWitness {
   projectSlug: string;
   repository: string;
   sourceSha: string;
+  continuityFingerprint: string;
   observedAt: string;
   expiresAt: string;
   evidenceRef: string;
@@ -72,6 +74,17 @@ function parseTime(value: string): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function immutableRecordSnapshot(record: UnifiedMemoryRecord): UnifiedMemoryRecord {
+  const snapshot: UnifiedMemoryRecord = {
+    ...record,
+    categoryKeys: [...record.categoryKeys],
+    provenanceRefs: [...record.provenanceRefs],
+  };
+  Object.freeze(snapshot.categoryKeys);
+  Object.freeze(snapshot.provenanceRefs);
+  return Object.freeze(snapshot);
+}
+
 function witnessWindowIsCurrent(observedAt: string, expiresAt: string, now: Date): boolean {
   const observed = parseTime(observedAt);
   const expires = parseTime(expiresAt);
@@ -103,6 +116,7 @@ function recordIsCurrentForDecisionSupport(record: UnifiedMemoryRecord, now: Dat
   }
 
   if (!record.sourceSha || !EXACT_SHA.test(record.sourceSha)) return false;
+  if (!EXACT_CONTINUITY_FINGERPRINT.test(record.continuityFingerprint)) return false;
   return true;
 }
 
@@ -120,6 +134,10 @@ function validateSourceWitness(
   if (witness.repository !== record.repository) errors.push('MEMORY_SOURCE_REPOSITORY_MISMATCH');
   if (!EXACT_SHA.test(witness.sourceSha) || witness.sourceSha.toLowerCase() !== record.sourceSha?.toLowerCase()) {
     errors.push('MEMORY_SOURCE_SHA_MISMATCH');
+  }
+  if (!EXACT_CONTINUITY_FINGERPRINT.test(witness.continuityFingerprint)
+    || witness.continuityFingerprint.toLowerCase() !== record.continuityFingerprint.toLowerCase()) {
+    errors.push('MEMORY_SOURCE_RECORD_MISMATCH');
   }
   if (!SAFE_EVIDENCE_REF.test(witness.evidenceRef)) errors.push('MEMORY_SOURCE_EVIDENCE_REF_INVALID');
   if (!witnessWindowIsCurrent(witness.observedAt, witness.expiresAt, now)) {
@@ -154,7 +172,8 @@ async function authenticateNormalizedRecord(
   trustRoot: AuthenticatedUnifiedMemoryTrustRoot,
   now: Date,
 ): Promise<AuthenticatedUnifiedMemoryResult> {
-  if (!recordIsCurrentForDecisionSupport(record, now)) {
+  const recordSnapshot = immutableRecordSnapshot(record);
+  if (!recordIsCurrentForDecisionSupport(recordSnapshot, now)) {
     return { ok: false, errors: ['MEMORY_RECORD_NOT_CURRENT_DECISION_EVIDENCE'] };
   }
 
@@ -162,33 +181,34 @@ async function authenticateNormalizedRecord(
   let projectAuthority: CurrentMemoryProjectAuthorityWitness | null;
   try {
     [sourceWitness, projectAuthority] = await Promise.all([
-      trustRoot.authenticateSource(record),
-      trustRoot.resolveCurrentProjectAuthority(record.projectSlug),
+      trustRoot.authenticateSource(recordSnapshot),
+      trustRoot.resolveCurrentProjectAuthority(recordSnapshot.projectSlug),
     ]);
   } catch {
     return { ok: false, errors: ['MEMORY_TRUST_ROOT_UNAVAILABLE'] };
   }
 
   const errors = [
-    ...validateSourceWitness(record, sourceWitness, now),
-    ...validateProjectAuthorityWitness(record, projectAuthority, now),
+    ...validateSourceWitness(recordSnapshot, sourceWitness, now),
+    ...validateProjectAuthorityWitness(recordSnapshot, projectAuthority, now),
   ];
   if (errors.length > 0 || !sourceWitness || !projectAuthority) return { ok: false, errors };
 
-  return {
-    ok: true,
-    envelope: {
-      version: 'fcr-authenticated-unified-memory@v1',
-      record,
-      sourceVerification: 'authenticated-source',
-      projectRegistration: 'registered',
-      sourceWitness,
-      projectAuthority,
-      authenticatedAt: now.toISOString(),
-      decisionSupportUsable: true,
-      executionAuthority: false,
-    },
+  const sourceWitnessSnapshot = Object.freeze({ ...sourceWitness });
+  const projectAuthoritySnapshot = Object.freeze({ ...projectAuthority });
+  const envelope: AuthenticatedUnifiedMemoryEnvelope = {
+    version: 'fcr-authenticated-unified-memory@v1',
+    record: recordSnapshot,
+    sourceVerification: 'authenticated-source',
+    projectRegistration: 'registered',
+    sourceWitness: sourceWitnessSnapshot,
+    projectAuthority: projectAuthoritySnapshot,
+    authenticatedAt: now.toISOString(),
+    decisionSupportUsable: true,
+    executionAuthority: false,
   };
+
+  return { ok: true, envelope: Object.freeze(envelope) };
 }
 
 /**
