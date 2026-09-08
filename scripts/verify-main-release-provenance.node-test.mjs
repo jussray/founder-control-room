@@ -4,6 +4,7 @@ import test from 'node:test';
 
 import { classifyMainReleaseProvenance } from './verify-main-release-provenance.mjs';
 import {
+  buildReceipt,
   observeMainReleaseProvenance,
   shouldEnforceMainReleaseProvenance,
 } from './verify-production-migration-ledger.mjs';
@@ -31,7 +32,7 @@ function response(body, status = 200) {
   };
 }
 
-test('accepts exactly one merged PR as provenance without claiming review or merge authorization', () => {
+test('accepts exactly one merged PR as provenance without claiming review, merge authorization, or production migration outcome', () => {
   assert.deepEqual(classifyMainReleaseProvenance({
     targetSha: SHA,
     currentMainSha: SHA,
@@ -42,13 +43,16 @@ test('accepts exactly one merged PR as provenance without claiming review or mer
     evidenceScope: 'pr_merge_only',
     reviewAuthority: 'not_evaluated',
     mergeAuthorization: 'not_evaluated',
+    productionMigrationOutcome: 'not_evaluated',
+    supabaseGitHubCheckAuthority: 'non_authoritative',
+    requiredProductionMigrationEvidence: 'canonical_deploy_remote_migration_ledger',
     targetSha: SHA,
     pullRequestNumber: 42,
     mergedAt: '2026-08-25T12:00:00Z',
   });
 });
 
-test('PR association cannot impersonate reviewed provenance', () => {
+test('PR association cannot impersonate reviewed provenance or provider migration outcome', () => {
   const result = classifyMainReleaseProvenance({
     targetSha: SHA,
     currentMainSha: SHA,
@@ -59,6 +63,9 @@ test('PR association cannot impersonate reviewed provenance', () => {
   assert.notEqual(result.reason, 'reviewed_pr_merge_provenance');
   assert.equal(result.reviewAuthority, 'not_evaluated');
   assert.equal(result.mergeAuthorization, 'not_evaluated');
+  assert.equal(result.productionMigrationOutcome, 'not_evaluated');
+  assert.equal(result.supabaseGitHubCheckAuthority, 'non_authoritative');
+  assert.equal(result.requiredProductionMigrationEvidence, 'canonical_deploy_remote_migration_ledger');
 });
 
 test('rejects a direct or otherwise unproven main commit', () => {
@@ -162,6 +169,8 @@ test('provider observation preserves provenance-only scope for merged PRs', asyn
   assert.equal(result.reason, 'pr_merge_provenance');
   assert.equal(result.reviewAuthority, 'not_evaluated');
   assert.equal(result.mergeAuthorization, 'not_evaluated');
+  assert.equal(result.productionMigrationOutcome, 'not_evaluated');
+  assert.equal(result.supabaseGitHubCheckAuthority, 'non_authoritative');
 });
 
 test('provider observation failure blocks instead of manufacturing green', async () => {
@@ -175,12 +184,62 @@ test('provider observation failure blocks instead of manufacturing green', async
   assert.equal(result.reason, 'provider_unavailable');
 });
 
+test('preflight migration ledger is evidence for safety but not production outcome', () => {
+  const receipt = buildReceipt({
+    phase: 'preflight',
+    localVersions: ['20260809072500', '20260907164500'],
+    remoteVersions: ['20260809072500'],
+    requiredVersions: ['20260809072500'],
+    remoteListSource: 'migration-ledger-before.txt',
+  });
+
+  assert.deepEqual(receipt.productionMigrationEvidence, {
+    authority: 'preflight_only',
+    outcome: 'not_evaluated',
+    supabaseGitHubCheckAcceptedAsOutcomeProof: false,
+  });
+  assert.deepEqual(receipt.localOnly, ['20260907164500']);
+});
+
+test('post-push remote migration ledger is the authoritative production migration outcome', () => {
+  const receipt = buildReceipt({
+    phase: 'post-push',
+    localVersions: ['20260809072500', '20260907164500'],
+    remoteVersions: ['20260809072500', '20260907164500'],
+    requiredVersions: ['20260809072500'],
+    remoteListSource: 'migration-ledger-after.txt',
+  });
+
+  assert.deepEqual(receipt.productionMigrationEvidence, {
+    authority: 'remote_migration_ledger',
+    outcome: 'verified',
+    supabaseGitHubCheckAcceptedAsOutcomeProof: false,
+  });
+});
+
+test('post-push ledger refuses VERIFIED while any local migration is absent remotely', () => {
+  const receipt = buildReceipt({
+    phase: 'post-push',
+    localVersions: ['20260809072500', '20260907164500'],
+    remoteVersions: ['20260809072500'],
+    requiredVersions: ['20260809072500'],
+    remoteListSource: 'migration-ledger-after.txt',
+  });
+
+  assert.equal(receipt.productionMigrationEvidence.authority, 'remote_migration_ledger');
+  assert.equal(receipt.productionMigrationEvidence.outcome, 'blocked');
+  assert.deepEqual(receipt.localOnly, ['20260907164500']);
+});
+
 test('preflight verifier is load-bearing before the first production mutation', () => {
   const deploy = readFileSync(new URL('../.github/workflows/deploy.yml', import.meta.url), 'utf8');
   const preflight = deploy.indexOf('MIGRATION_LEDGER_PHASE: preflight');
   const verifier = deploy.indexOf('node scripts/verify-production-migration-ledger.mjs', preflight);
   const mutationStep = deploy.indexOf('- name: Push migrations', verifier);
   const mutationYes = deploy.indexOf('--yes', mutationStep);
+  const postPush = deploy.indexOf('- name: Verify post-push migration ledger', mutationStep);
+  const postPushPhase = deploy.indexOf('MIGRATION_LEDGER_PHASE: post-push', postPush);
+  const postPushVerifier = deploy.indexOf('node scripts/verify-production-migration-ledger.mjs', postPushPhase);
   const worker = deploy.indexOf('worker-deploy:');
   const workerDependency = deploy.indexOf('needs: supabase-migrate', worker);
   const pages = deploy.indexOf('pages-release:');
@@ -190,6 +249,9 @@ test('preflight verifier is load-bearing before the first production mutation', 
   assert.ok(verifier > preflight, 'preflight verifier must execute in the preflight step');
   assert.ok(mutationStep > verifier, 'Supabase mutation step must remain downstream of provenance enforcement');
   assert.ok(mutationYes > mutationStep, 'Supabase mutation step must remain an acknowledged --yes mutation');
+  assert.ok(postPush > mutationYes, 'post-push provider readback must remain downstream of the mutation');
+  assert.ok(postPushPhase > postPush, 'post-push receipt must be explicitly typed as post-push');
+  assert.ok(postPushVerifier > postPushPhase, 'post-push remote ledger must run through the canonical verifier');
   assert.ok(workerDependency > worker, 'Worker deploy must remain dependent on the Supabase job');
   assert.ok(pagesDependency > pages, 'Pages release must remain dependent on Worker deploy');
 });
