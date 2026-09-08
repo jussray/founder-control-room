@@ -29,7 +29,7 @@ Raw `NativeMemoryObservation` payloads **cannot authenticate themselves**. The r
 
 Authenticated ingress does not rewrite that provenance. `authenticateUnifiedMemoryObservation()` first runs the raw normalizer, then asks a separately supplied trust root to authenticate the sanitized record's exact source identity and resolve current project authority outside the caller-controlled payload. A successful result is a separate `fcr-authenticated-unified-memory@v1` envelope. The embedded raw record remains `untrusted-import` and remains non-authorizing.
 
-The first authenticated boundary is deliberately conservative: current decision support requires a verified, fresh raw record with an exact source SHA; a fresh exact source-authentication witness; an active canonical portfolio project; and a fresh current project-authority witness. External continuity-only projects cannot be promoted through this path.
+The first authenticated boundary is deliberately conservative: current decision support requires a verified, fresh raw record with an exact source SHA; a source-authentication witness bound to that record's exact `continuityFingerprint`; an active canonical portfolio project; and a fresh current project-authority witness. External continuity-only projects cannot be promoted through this path.
 
 Every raw record and authenticated envelope carries `executionAuthority: false`. Memory continuity or decision support therefore cannot grant merge, deploy, provider, database, publication, payment, purchasing, credential, or destructive-action authority.
 
@@ -39,10 +39,12 @@ Every raw record and authenticated envelope carries `executionAuthority: false`.
 
 The adapter requires two independently supplied facts:
 
-1. an `fcr-memory-source-auth@v1` witness bound to exact source system, target project, source repository, exact source SHA, observation window, and opaque evidence reference; and
+1. an `fcr-memory-source-auth@v1` witness bound to exact source system, target project, source repository, exact source SHA, the exact normalized record `continuityFingerprint`, observation window, and opaque evidence reference; and
 2. an `fcr-memory-project-authority@v1` witness bound to the exact active project slug, canonical project repository, observation window, and opaque evidence reference.
 
-Witnesses older than the bounded authentication window, expired witnesses, future-dated witnesses beyond clock tolerance, malformed evidence references, wrong repositories, wrong projects, wrong source systems, and wrong source SHAs fail closed. A trust-root exception also fails closed rather than becoming implicit approval.
+Witnesses older than the bounded authentication window, expired witnesses, future-dated witnesses beyond clock tolerance, malformed evidence references, wrong repositories, wrong projects, wrong source systems, wrong source SHAs, and wrong continuity fingerprints fail closed. A trust-root exception also fails closed rather than becoming implicit approval.
+
+The adapter snapshots and freezes the normalized record, its category/provenance collections, the source witness, the project-authority witness, and the returned authenticated envelope. Caller mutation therefore cannot rewrite an authenticated fact after validation.
 
 The adapter intentionally does not include a provider implementation, secret, token, database write, HTTP route, or external mutation. Those belong in separately reviewed server-side integrations that implement this trust-root interface.
 
@@ -50,7 +52,7 @@ The adapter intentionally does not include a provider implementation, secret, to
 
 `authenticatedMemoryForDecisionSupport()` does not trust a cached authenticated envelope forever. At every decision-support use boundary it rechecks raw-record freshness and calls the trust root again for current source authentication and current project authority.
 
-If source identity changes, project registration disappears, either witness goes stale or expires, the raw observation ages out, the exact source SHA no longer binds, or the trust root is unavailable, the record is withheld from current decision support.
+If source identity changes, the exact record fingerprint no longer binds, project registration disappears, either witness goes stale or expires, the raw observation ages out, the exact source SHA no longer binds, or the trust root is unavailable, the record is withheld from current decision support.
 
 This is stronger than treating an earlier authentication receipt as permanent truth. The envelope is evidence about a bounded observation window, not a renewable authority lease.
 
@@ -92,7 +94,7 @@ Authenticated decision support uses the separate envelope path in `src/memory/au
 
 ## Fingerprints and receipts
 
-`continuityFingerprint` is SHA-256 based and is only a provenance/continuity convenience. It is non-authorizing. A matching fingerprint does not prove current provider state, current project registration, founder approval, runtime identity, or permission to execute.
+`continuityFingerprint` is SHA-256 based and is only a provenance/continuity convenience. It is non-authorizing. A matching fingerprint does not prove current provider state, current project registration, founder approval, runtime identity, or permission to execute. In authenticated ingress it serves only as the exact-record identity that an independent source witness must bind.
 
 Source-authentication and project-authority evidence references are also non-authorizing. They let operators bind an envelope to independently observed facts without turning the reference string itself into proof.
 
