@@ -43,6 +43,18 @@ function safeSessionRemove(key) {
   }
 }
 
+function installFriendEntry() {
+  const flow = document.querySelector('.stack-lane[data-lane="chat"] .lane-flow');
+  if (!(flow instanceof HTMLElement)) return;
+  if (flow.querySelector('a[href="/control-room/friend.html"]')) return;
+
+  const link = document.createElement('a');
+  link.className = 'stage';
+  link.href = '/control-room/friend.html';
+  link.innerHTML = '<small>Reflect</small>Friend';
+  flow.prepend(link);
+}
+
 function setConveyorReadiness(state, label) {
   const status = document.querySelector('[data-conveyor-readiness]');
   const text = document.querySelector('[data-conveyor-readiness-label]');
@@ -141,6 +153,8 @@ if (pendingTab && ALLOWED_TABS.has(pendingTab) && !activateTab(pendingTab)) {
     observer.observe(root, { childList: true, subtree: true });
   }
 }
+
+installFriendEntry();
 
 const launchDock = document.querySelector('.launch-dock');
 if (launchDock instanceof HTMLDetailsElement) {
