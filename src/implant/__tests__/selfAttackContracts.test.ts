@@ -211,7 +211,7 @@ describe('ULTRATHINK self-attack implant contracts', () => {
       '24.6 Memory minimization',
       '24.7 Tone Guard diff log',
       '24.8 Model failure posture',
-      '24.9 Provider capability manifest',
+      '24.9 Capability manifest',
       '24.10 Three primary founder jobs',
       '24.11 Non-binary roles',
       '24.12 Break-glass recovery',
