@@ -20,11 +20,11 @@ import {
 import type { MirrorIntentTag } from '../../mirror/types.js';
 import {
   requireFounder,
-  requireInteractiveFounder,
   type FounderRequest,
 } from '../middleware/requireFounder.js';
 
 type DbRecord = Record<string, unknown>;
+type LiveFriendRuntimeProvider = Exclude<FriendRuntimeProvider, 'deterministic'>;
 type RunFriendRuntime = (
   provider: FriendRuntimeProvider,
   input: FriendRuntimeInput,
@@ -44,7 +44,6 @@ interface FriendSummaryRecord {
   runId: string;
   founderUserId: string;
   redactedSummary: string;
-  intentTags: string[];
   runtimeProvider: FriendRuntimeProvider;
   model: string;
   provenanceId: string;
@@ -62,6 +61,20 @@ interface FriendFeedbackRecord {
   recordedAt: string;
 }
 
+interface FriendLiveBudget {
+  requestUsd: number;
+  dailyUsd: number;
+}
+
+interface FriendInferenceReservationRecord {
+  runId: string;
+  founderUserId: string;
+  provider: LiveFriendRuntimeProvider;
+  reservedBudgetUsd: number;
+  dailyBudgetUsd: number;
+  expiresAt: string;
+}
+
 export interface FriendIntakeRouteDependencies {
   runFriendRuntime?: RunFriendRuntime;
   resolveProjectId?: () => Promise<string>;
@@ -69,6 +82,15 @@ export interface FriendIntakeRouteDependencies {
   writeTimelineEvent?: (event: FriendTimelineEvent) => Promise<string>;
   writeCompletion?: (record: FriendCompletionRecord) => Promise<string>;
   writeFeedback?: (record: FriendFeedbackRecord) => Promise<void>;
+  reserveLiveInference?: (record: FriendInferenceReservationRecord) => Promise<string>;
+  resolveLiveInferenceBudget?: () => FriendLiveBudget | null;
+  isInteractiveFounderRequest?: (req: FounderRequest) => boolean;
+}
+
+function recordBody(value: unknown): DbRecord | null {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+    ? value as DbRecord
+    : null;
 }
 
 function boundedString(value: unknown, maxLength: number): string | null {
@@ -104,7 +126,7 @@ function usefulnessResponse(value: unknown): UsefulnessResponse | null {
     : null;
 }
 
-const PRIVATE_IDENTIFIER_PATTERN = /(?:\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b|\b(?:\+?1[-.\s]?)?(?:\(\d{3}\)|\d{3})[-.\s]?\d{3}[-.\s]?\d{4}\b|\b\d{3}-\d{2}-\d{4}\b|\b(?:sk(?:-proj)?|pk|rk|ghp|github_pat|xox[baprs])[-_A-Za-z0-9]{8,}\b|\b(?:routing|account|acct|card)(?:\s+(?:number|no\.?))?\s*[:=#-]?\s*\d{4,19}\b)/i;
+const PRIVATE_IDENTIFIER_PATTERN = /(?:\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b|\b(?:\+?1[-.\s]?)?(?:\(\d{3}\)|\d{3})[-.\s]?\d{3}[-.\s]?\d{4}\b|\b\d{3}-\d{2}-\d{4}\b|\b(?:sk(?:-proj)?|pk|rk|ghp|github_pat|xox[baprs])[-_A-Za-z0-9]{8,}\b|\b(?:routing|account|acct|card)(?:\s+(?:number|no\.?))?\s*[:=#-]?\s*\d{4,19}\b|\b(?:\d[ -]*?){13,19}\b)/i;
 
 export function detectSensitiveCategories(value: string): SensitiveCategory[] {
   const categories: SensitiveCategory[] = [];
@@ -189,6 +211,14 @@ export function redactFriendSummary(value: string): string {
     .slice(0, 1_200);
 }
 
+function configuredLiveInferenceBudget(env: NodeJS.ProcessEnv = process.env): FriendLiveBudget | null {
+  const requestUsd = Number(env.FRIEND_LIVE_REQUEST_BUDGET_USD);
+  const dailyUsd = Number(env.FRIEND_LIVE_DAILY_BUDGET_USD);
+  if (!Number.isFinite(requestUsd) || !Number.isFinite(dailyUsd)) return null;
+  if (requestUsd <= 0 || requestUsd > 10 || dailyUsd < requestUsd || dailyUsd > 100) return null;
+  return { requestUsd, dailyUsd };
+}
+
 async function defaultResolveProjectId(): Promise<string> {
   const { data, error } = await supabase
     .from('projects')
@@ -246,6 +276,22 @@ async function defaultWriteTimelineEvent(event: FriendTimelineEvent): Promise<st
   return id;
 }
 
+async function defaultReserveLiveInference(record: FriendInferenceReservationRecord): Promise<string> {
+  const { data, error } = await supabase.rpc('reserve_friend_inference_budget', {
+    p_run_id: record.runId,
+    p_founder_user_id: record.founderUserId,
+    p_provider: record.provider,
+    p_reserved_budget_usd: record.reservedBudgetUsd,
+    p_daily_budget_usd: record.dailyBudgetUsd,
+    p_expires_at: record.expiresAt,
+  });
+
+  if (error) throw new Error(`FRIEND_INFERENCE_RESERVATION_FAILED:${error.code ?? ''}:${error.message}`);
+  const id = typeof data === 'string' ? data : '';
+  if (!id) throw new Error('FRIEND_INFERENCE_RESERVATION_FAILED:NO_RESERVATION_ID');
+  return id;
+}
+
 async function defaultWriteCompletion(record: FriendCompletionRecord): Promise<string> {
   const summary = record.summary;
   const { data, error } = await supabase.rpc('record_friend_intake_completion', {
@@ -255,7 +301,6 @@ async function defaultWriteCompletion(record: FriendCompletionRecord): Promise<s
     p_metadata: record.timelineEvent.metadata,
     p_intake_id: summary?.intakeId ?? null,
     p_redacted_summary: summary?.redactedSummary ?? null,
-    p_intent_tags: summary?.intentTags ?? null,
     p_runtime_provider: summary?.runtimeProvider ?? null,
     p_model: summary?.model ?? null,
     p_provenance_id: summary?.provenanceId ?? null,
@@ -301,12 +346,24 @@ function providerFailureBody(error: unknown) {
   };
 }
 
-async function ensureInteractiveFounder(req: FounderRequest, res: Parameters<typeof requireInteractiveFounder>[1]): Promise<boolean> {
-  let allowed = false;
-  await requireInteractiveFounder(req, res, () => {
-    allowed = true;
-  });
-  return allowed;
+function reservationFailure(error: unknown) {
+  const message = error instanceof Error ? error.message : '';
+  if (message.includes('FRIEND_INFERENCE_DAILY_BUDGET_EXCEEDED')) {
+    return {
+      status: 429,
+      body: {
+        error: 'Friend live-inference daily budget is exhausted',
+        code: 'FRIEND_LIVE_DAILY_BUDGET_EXCEEDED',
+      },
+    };
+  }
+  return {
+    status: 503,
+    body: {
+      error: 'Friend live-inference budget reservation is unavailable',
+      code: 'FRIEND_LIVE_BUDGET_RESERVATION_UNAVAILABLE',
+    },
+  };
 }
 
 export function createFriendIntakeRouter(dependencies: FriendIntakeRouteDependencies = {}) {
@@ -317,11 +374,21 @@ export function createFriendIntakeRouter(dependencies: FriendIntakeRouteDependen
   const writeTimelineEvent = dependencies.writeTimelineEvent ?? defaultWriteTimelineEvent;
   const writeCompletion = dependencies.writeCompletion ?? defaultWriteCompletion;
   const writeFeedback = dependencies.writeFeedback ?? defaultWriteFeedback;
+  const reserveLiveInference = dependencies.reserveLiveInference ?? defaultReserveLiveInference;
+  const resolveLiveInferenceBudget = dependencies.resolveLiveInferenceBudget ?? configuredLiveInferenceBudget;
+  const isInteractiveFounderRequest = dependencies.isInteractiveFounderRequest
+    ?? ((req: FounderRequest) => req.founderAuthChannel === 'interactive');
 
   router.use(requireFounder);
 
   router.post('/', async (req: FounderRequest, res) => {
-    const body = req.body as DbRecord;
+    const body = recordBody(req.body);
+    if (!body) {
+      return res.status(400).json({
+        error: 'Friend Intake body must be a JSON object',
+        code: 'FRIEND_INVALID_INPUT',
+      });
+    }
 
     if (Object.prototype.hasOwnProperty.call(body, 'relatedMemories')) {
       return res.status(400).json({
@@ -383,9 +450,36 @@ export function createFriendIntakeRouter(dependencies: FriendIntakeRouteDependen
       [transcript, timeEnergyContext ?? '', voiceProfile ?? ''].join('\n'),
     );
 
+    let inferenceReservationId: string | null = null;
     if (sensitiveCategories.length === 0 && requestedProvider !== 'deterministic') {
-      const interactive = await ensureInteractiveFounder(req, res);
-      if (!interactive) return;
+      if (!isInteractiveFounderRequest(req)) {
+        return res.status(401).json({
+          error: 'Interactive founder session required for live Friend inference',
+          code: 'FRIEND_INTERACTIVE_FOUNDER_REQUIRED',
+        });
+      }
+
+      const budget = resolveLiveInferenceBudget();
+      if (!budget) {
+        return res.status(503).json({
+          error: 'Friend live-inference budget is not configured',
+          code: 'FRIEND_LIVE_BUDGET_NOT_CONFIGURED',
+        });
+      }
+
+      try {
+        inferenceReservationId = await reserveLiveInference({
+          runId,
+          founderUserId,
+          provider: requestedProvider,
+          reservedBudgetUsd: budget.requestUsd,
+          dailyBudgetUsd: budget.dailyUsd,
+          expiresAt: new Date(Date.now() + 2 * 60_000).toISOString(),
+        });
+      } catch (error) {
+        const failure = reservationFailure(error);
+        return res.status(failure.status).json(failure.body);
+      }
     }
 
     let result: FriendRuntimeResult;
@@ -410,10 +504,7 @@ export function createFriendIntakeRouter(dependencies: FriendIntakeRouteDependen
             requested_provider: requestedProvider,
             privacy_choice: selectedPrivacy,
             error_code: error instanceof FriendRuntimeError ? error.code : 'FRIEND_RUNTIME_FAILED',
-            ...(selectedPrivacy === 'save_redacted_summary' ? {
-              input_length: transcript.length,
-              sensitive_category_count: sensitiveCategories.length,
-            } : {}),
+            ...(inferenceReservationId ? { inference_reservation_id: inferenceReservationId } : {}),
           },
         });
       } catch {
@@ -459,21 +550,11 @@ export function createFriendIntakeRouter(dependencies: FriendIntakeRouteDependen
         runId,
         founderUserId,
         redactedSummary,
-        intentTags: result.tags,
         runtimeProvider: result.provenance.provider,
         model: result.provenance.model,
         provenanceId,
       };
     }
-
-    const contentMetadata = selectedPrivacy === 'save_redacted_summary'
-      ? {
-          input_length: transcript.length,
-          intent_tags: result.tags,
-          move_kind: result.move.kind,
-          sensitive_categories: sensitiveCategories,
-        }
-      : {};
 
     let timelineEventId: string;
     try {
@@ -494,15 +575,38 @@ export function createFriendIntakeRouter(dependencies: FriendIntakeRouteDependen
             input_persistence: selectedPrivacy === 'process_without_saving'
               ? 'none'
               : 'redacted_summary_only',
-            ...contentMetadata,
             provider_storage_mode: result.provenance.providerStorageMode,
             web_search_used: result.provenance.webSearchUsed,
             provenance_id: provenanceId,
+            ...(inferenceReservationId ? { inference_reservation_id: inferenceReservationId } : {}),
           },
         },
         summary: completionSummary,
       });
     } catch {
+      try {
+        await writeTimelineEvent({
+          sourceEventId: runId,
+          projectId,
+          founderUserId,
+          eventType: 'friend_intake_failed',
+          severity: 'error',
+          metadata: {
+            stage: 'completion_persistence',
+            requested_provider: requestedProvider,
+            runtime_provider: result.provenance.provider,
+            privacy_choice: selectedPrivacy,
+            error_code: 'FRIEND_COMPLETION_PERSISTENCE_FAILED',
+            ...(inferenceReservationId ? { inference_reservation_id: inferenceReservationId } : {}),
+          },
+        });
+      } catch {
+        return res.status(500).json({
+          error: 'Friend completion and failure-audit persistence are unavailable',
+          code: 'FRIEND_TIMELINE_PERSISTENCE_FAILED',
+        });
+      }
+
       return res.status(503).json({
         error: 'Friend completion persistence is unavailable',
         code: 'FRIEND_COMPLETION_PERSISTENCE_FAILED',
@@ -540,26 +644,30 @@ export function createFriendIntakeRouter(dependencies: FriendIntakeRouteDependen
         promptVersion: result.provenance.promptVersion,
         providerStorageMode: result.provenance.providerStorageMode,
         webSearchUsed: result.provenance.webSearchUsed,
+        inferenceReservationId,
         doesNotProve: [
-          'founder approval',
+          'founder approval beyond this Friend run',
           'external factual truth',
           'provider write outcome',
+          'provider billing amount',
           'memory retrieval',
         ],
       } satisfies FriendRuntimeProvenance & {
         id: string;
         source: 'deterministic' | 'model_inference';
+        inferenceReservationId: string | null;
         doesNotProve: string[];
       },
     });
   });
 
   router.post('/:runId/usefulness', async (req: FounderRequest, res) => {
+    const body = recordBody(req.body);
     const runId = boundedString(req.params.runId, 80);
-    const response = usefulnessResponse((req.body as DbRecord).response);
+    const response = body ? usefulnessResponse(body.response) : null;
     const founderUserId = req.founder?.userId ?? null;
 
-    if (!runId || !response) {
+    if (!body || !runId || !response) {
       return res.status(400).json({
         error: 'A valid runId and usefulness response are required',
         code: 'FRIEND_INVALID_USEFULNESS',
