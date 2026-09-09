@@ -25,6 +25,7 @@ const BEARER = 'Bearer test-token';
 type TimelineEventArg = Parameters<NonNullable<FriendIntakeRouteDependencies['writeTimelineEvent']>>[0];
 type CompletionArg = Parameters<NonNullable<FriendIntakeRouteDependencies['writeCompletion']>>[0];
 type FeedbackArg = Parameters<NonNullable<FriendIntakeRouteDependencies['writeFeedback']>>[0];
+type ReservationArg = Parameters<NonNullable<FriendIntakeRouteDependencies['reserveLiveInference']>>[0];
 
 function founderUsersRow() {
   return {
@@ -87,6 +88,8 @@ function buildApp(overrides: FriendIntakeRouteDependencies = {}) {
     writeTimelineEvent: vi.fn(async (_event: TimelineEventArg) => 'timeline-failure-1'),
     writeCompletion: vi.fn(async (_record: CompletionArg) => 'timeline-1'),
     writeFeedback: vi.fn(async (_record: FeedbackArg) => undefined),
+    reserveLiveInference: vi.fn(async (_record: ReservationArg) => 'reservation-1'),
+    resolveLiveInferenceBudget: () => ({ requestUsd: 0.25, dailyUsd: 1 }),
     ...overrides,
   }));
   return app;
@@ -165,24 +168,93 @@ describe('POST /mirror/friend-intake', () => {
     expect(serialized).not.toContain('input_length');
   });
 
-  it('requires an interactive founder session before non-sensitive live inference', async () => {
+  it('requires an interactive founder request before non-sensitive live inference', async () => {
     authenticate();
     const runFriendRuntime = vi.fn(async () => runtimeResult('openai'));
+    const reserveLiveInference = vi.fn(async (_record: ReservationArg) => 'reservation-1');
 
-    const response = await request(buildApp({ runFriendRuntime }))
+    const response = await request(buildApp({ runFriendRuntime, reserveLiveInference }))
       .post('/mirror/friend-intake')
       .set('Authorization', BEARER)
       .send({ ...validPayload(), provider: 'openai' });
 
     expect(response.status).toBe(401);
+    expect(response.body.code).toBe('FRIEND_INTERACTIVE_FOUNDER_REQUIRED');
+    expect(reserveLiveInference).not.toHaveBeenCalled();
     expect(runFriendRuntime).not.toHaveBeenCalled();
   });
 
-  it('passes only the redacted summary into the atomic completion when the founder opts in', async () => {
+  it('reserves bounded budget before one live provider call', async () => {
+    authenticate();
+    const order: string[] = [];
+    const reserveLiveInference = vi.fn(async (record: ReservationArg) => {
+      order.push('reserve');
+      expect(record).toMatchObject({
+        founderUserId: 'founder-user-1',
+        provider: 'openai',
+        reservedBudgetUsd: 0.25,
+        dailyBudgetUsd: 1,
+      });
+      return 'reservation-live-1';
+    });
+    const runFriendRuntime = vi.fn(async () => {
+      order.push('provider');
+      return runtimeResult('openai');
+    });
+
+    const response = await request(buildApp({
+      isInteractiveFounderRequest: () => true,
+      reserveLiveInference,
+      runFriendRuntime,
+    }))
+      .post('/mirror/friend-intake')
+      .set('Authorization', BEARER)
+      .send({ ...validPayload(), provider: 'openai' });
+
+    expect(response.status).toBe(200);
+    expect(order).toEqual(['reserve', 'provider']);
+    expect(response.body.provenance.inferenceReservationId).toBe('reservation-live-1');
+  });
+
+  it('fails closed before provider execution when the live budget is unavailable or exhausted', async () => {
+    authenticate();
+    const runFriendRuntime = vi.fn(async () => runtimeResult('openai'));
+
+    const notConfigured = await request(buildApp({
+      isInteractiveFounderRequest: () => true,
+      resolveLiveInferenceBudget: () => null,
+      runFriendRuntime,
+    }))
+      .post('/mirror/friend-intake')
+      .set('Authorization', BEARER)
+      .send({ ...validPayload(), provider: 'openai' });
+
+    expect(notConfigured.status).toBe(503);
+    expect(notConfigured.body.code).toBe('FRIEND_LIVE_BUDGET_NOT_CONFIGURED');
+    expect(runFriendRuntime).not.toHaveBeenCalled();
+
+    const exhausted = await request(buildApp({
+      isInteractiveFounderRequest: () => true,
+      reserveLiveInference: vi.fn(async () => {
+        throw new Error('FRIEND_INFERENCE_DAILY_BUDGET_EXCEEDED');
+      }),
+      runFriendRuntime,
+    }))
+      .post('/mirror/friend-intake')
+      .set('Authorization', BEARER)
+      .send({ ...validPayload(), provider: 'openai' });
+
+    expect(exhausted.status).toBe(429);
+    expect(exhausted.body.code).toBe('FRIEND_LIVE_DAILY_BUDGET_EXCEEDED');
+    expect(runFriendRuntime).not.toHaveBeenCalled();
+  });
+
+  it('passes only redacted founder content, not semantic tags, into opt-in persistence', async () => {
     authenticate();
     const writeCompletion = vi.fn(async (_record: CompletionArg) => 'timeline-1');
     const result = runtimeResult('deterministic');
     result.mirror.summary = 'Email me at founder@example.com and use password:supersecret for the demo.';
+    result.tags = ['health', 'kids'];
     const runFriendRuntime = vi.fn(async () => result);
 
     const response = await request(buildApp({ runFriendRuntime, writeCompletion }))
@@ -197,21 +269,26 @@ describe('POST /mirror/friend-intake', () => {
     expect(response.body.inputPersistence).toBe('redacted_summary_only');
     expect(writeCompletion).toHaveBeenCalledTimes(1);
 
-    const saved = writeCompletion.mock.calls[0]?.[0].summary;
+    const completion = writeCompletion.mock.calls[0]?.[0];
+    const saved = completion?.summary;
     expect(saved?.redactedSummary).toBe(
       'Email me at [redacted-email] and use password=[redacted] for the demo.',
     );
+    expect(saved).not.toHaveProperty('intentTags');
     expect(JSON.stringify(saved)).not.toContain(validPayload().transcript);
     expect(JSON.stringify(saved)).not.toContain('supersecret');
+    expect(JSON.stringify(completion?.timelineEvent.metadata)).not.toContain('intent_tags');
+    expect(JSON.stringify(completion?.timelineEvent.metadata)).not.toContain('sensitive_categories');
   });
 
-  it('does not return a success receipt when atomic completion persistence fails', async () => {
+  it('records a sanitized failure event when atomic completion persistence fails', async () => {
     authenticate();
     const writeCompletion = vi.fn(async (_record: CompletionArg) => {
       throw new Error('atomic completion unavailable');
     });
+    const writeTimelineEvent = vi.fn(async (_event: TimelineEventArg) => 'timeline-failure-1');
 
-    const response = await request(buildApp({ writeCompletion }))
+    const response = await request(buildApp({ writeCompletion, writeTimelineEvent }))
       .post('/mirror/friend-intake')
       .set('Authorization', BEARER)
       .send({
@@ -223,6 +300,14 @@ describe('POST /mirror/friend-intake', () => {
     expect(response.body.code).toBe('FRIEND_COMPLETION_PERSISTENCE_FAILED');
     expect(response.body.timelineEventId).toBeUndefined();
     expect(writeCompletion).toHaveBeenCalledTimes(1);
+    expect(writeTimelineEvent).toHaveBeenCalledWith(expect.objectContaining({
+      eventType: 'friend_intake_failed',
+      metadata: expect.objectContaining({
+        stage: 'completion_persistence',
+        error_code: 'FRIEND_COMPLETION_PERSISTENCE_FAILED',
+      }),
+    }));
+    expect(JSON.stringify(writeTimelineEvent.mock.calls[0]?.[0])).not.toContain(validPayload().transcript);
   });
 
   it('keeps sensitive input local even when a live provider was requested', async () => {
@@ -247,23 +332,39 @@ describe('POST /mirror/friend-intake', () => {
     });
   });
 
-  it('keeps bare private identifiers local before any provider call', async () => {
+  it('keeps bare private identifiers and card-like numbers local before any provider call', async () => {
     authenticate();
     const runFriendRuntime = vi.fn(async () => runtimeResult('anthropic'));
 
-    const response = await request(buildApp({ runFriendRuntime }))
+    for (const transcript of [
+      'customer@example.com 814-555-1212 ghp_abcdefghijk',
+      '4111 1111 1111 1111',
+    ]) {
+      const response = await request(buildApp({ runFriendRuntime }))
+        .post('/mirror/friend-intake')
+        .set('Authorization', BEARER)
+        .send({
+          ...validPayload(),
+          provider: 'anthropic',
+          transcript,
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.body.runtimeProvider).toBe('deterministic');
+      expect(response.body.move.kind).toBe('protective_move');
+    }
+    expect(runFriendRuntime).not.toHaveBeenCalled();
+  });
+
+  it('returns a bounded 400 for malformed JSON-body shapes', async () => {
+    authenticate();
+    const response = await request(buildApp())
       .post('/mirror/friend-intake')
       .set('Authorization', BEARER)
-      .send({
-        ...validPayload(),
-        provider: 'anthropic',
-        transcript: 'customer@example.com 814-555-1212 ghp_abcdefghijk',
-      });
+      .set('Content-Type', 'application/json')
+      .send('null');
 
-    expect(response.status).toBe(200);
-    expect(runFriendRuntime).not.toHaveBeenCalled();
-    expect(response.body.runtimeProvider).toBe('deterministic');
-    expect(response.body.move.kind).toBe('protective_move');
+    expect(response.status).toBe(400);
   });
 
   it('never returns more than one move', async () => {
@@ -313,6 +414,17 @@ describe('POST /mirror/friend-intake/:runId/usefulness', () => {
     expect(response.status).toBe(404);
     expect(response.body.code).toBe('FRIEND_COMPLETED_RUN_NOT_FOUND');
     expect(writeFeedback).not.toHaveBeenCalled();
+  });
+
+  it('returns a bounded 400 for malformed usefulness bodies', async () => {
+    authenticate();
+    const response = await request(buildApp())
+      .post('/mirror/friend-intake/11111111-1111-4111-8111-111111111111/usefulness')
+      .set('Authorization', BEARER)
+      .set('Content-Type', 'application/json')
+      .send('null');
+
+    expect(response.status).toBe(400);
   });
 });
 
