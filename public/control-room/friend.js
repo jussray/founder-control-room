@@ -73,13 +73,13 @@ function formHtml() {
           </label>
           <label>
             <input type="radio" name="privacyChoice" value="save_redacted_summary" />
-            <span>Save redacted summary <span class="fine">FCR stores only the redacted summary, never the raw transcript or embeddings. Live-provider handling remains governed by that provider's policy.</span></span>
+            <span>Save redacted summary <span class="fine">FCR stores only the redacted summary as founder content, never the raw transcript, semantic sensitivity tags, or embeddings. Live-provider handling remains governed by that provider's policy.</span></span>
           </label>
         </fieldset>
 
         <div class="actions">
           <button id="run-button" type="submit">Run Friend</button>
-          <span id="run-status" class="status">Live providers require an interactive founder session and fail closed if their allowlist or server credential is unavailable.</span>
+          <span id="run-status" class="status">Live providers require an interactive founder session, an atomic FCR budget reservation, an allowlisted provider, and a server credential.</span>
         </div>
         <div id="friend-error"></div>
       </form>
@@ -96,6 +96,7 @@ function provenanceRows(provenance) {
     ['Model', provenance?.model],
     ['Prompt', provenance?.promptVersion],
     ['Provider response', provenance?.responseId ?? 'not available'],
+    ['Budget reservation', provenance?.inferenceReservationId ?? 'not required'],
     ['Provider storage posture', provenance?.providerStorageMode],
     ['Web search used', provenance?.webSearchUsed === true ? 'yes' : 'no'],
   ];
@@ -173,6 +174,7 @@ async function submitFriend(form) {
   const button = document.getElementById('run-button');
   const status = document.getElementById('run-status');
   const errorBox = document.getElementById('friend-error');
+  const receipt = document.getElementById('friend-receipt');
   const formData = new FormData(form);
 
   const payload = {
@@ -186,6 +188,10 @@ async function submitFriend(form) {
   button.disabled = true;
   status.textContent = 'Running one bounded Friend pass…';
   errorBox.innerHTML = '';
+  if (receipt) {
+    receipt.hidden = true;
+    receipt.innerHTML = '';
+  }
 
   try {
     const response = await fetch('/mirror/friend-intake', {
