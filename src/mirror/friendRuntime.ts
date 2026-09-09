@@ -278,7 +278,7 @@ function deterministicResult(input: FriendRuntimeInput): FriendRuntimeResult {
 
 function runtimeProviderSet(env: NodeJS.ProcessEnv): Set<FriendRuntimeProvider> {
   const configured = env.FRIEND_RUNTIME_PROVIDERS?.trim();
-  if (!configured) return new Set<FriendRuntimeProvider>(['openai', 'anthropic', 'perplexity']);
+  if (!configured) return new Set<FriendRuntimeProvider>();
 
   const values = configured
     .split(',')
@@ -316,11 +316,16 @@ function modelPrompt(input: FriendRuntimeInput): string {
   });
 }
 
+function timedOut(error: unknown): boolean {
+  return error instanceof Error && (error.name === 'AbortError' || error.name === 'TimeoutError');
+}
+
 async function requestText(
   response: globalThis.Response,
   provider: FriendRuntimeProvider,
 ): Promise<{ raw: string; payload: unknown }> {
-  const declaredLength = Number(response.headers.get('content-length'));
+  const declared = response.headers.get('content-length');
+  const declaredLength = declared === null ? Number.NaN : Number(declared);
   if (Number.isFinite(declaredLength) && declaredLength > MAX_RESPONSE_BYTES) {
     throw new FriendRuntimeError(
       `${provider} response exceeded the allowed size`,
@@ -330,14 +335,46 @@ async function requestText(
     );
   }
 
-  const raw = await response.text();
-  if (Buffer.byteLength(raw, 'utf8') > MAX_RESPONSE_BYTES) {
-    throw new FriendRuntimeError(
-      `${provider} response exceeded the allowed size`,
-      'FRIEND_RESPONSE_TOO_LARGE',
-      'schema_invalid',
-      response.status,
-    );
+  let raw = '';
+  if (response.body) {
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let bytes = 0;
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (!value) continue;
+        bytes += value.byteLength;
+        if (bytes > MAX_RESPONSE_BYTES) {
+          await reader.cancel();
+          throw new FriendRuntimeError(
+            `${provider} response exceeded the allowed size`,
+            'FRIEND_RESPONSE_TOO_LARGE',
+            'schema_invalid',
+            response.status,
+          );
+        }
+        raw += decoder.decode(value, { stream: true });
+      }
+      raw += decoder.decode();
+    } catch (error) {
+      if (error instanceof FriendRuntimeError) throw error;
+      if (timedOut(error)) {
+        throw new FriendRuntimeError(
+          `${provider} Friend request timed out`,
+          'FRIEND_PROVIDER_TIMEOUT',
+          'timed_out',
+          response.status,
+        );
+      }
+      throw new FriendRuntimeError(
+        `${provider} response body could not be read`,
+        'FRIEND_PROVIDER_REQUEST_FAILED',
+        'provider_unavailable',
+        response.status,
+      );
+    }
   }
 
   let payload: unknown;
@@ -425,13 +462,12 @@ async function fetchWithTimeout(
   provider: FriendRuntimeProvider,
   env: NodeJS.ProcessEnv,
 ): Promise<globalThis.Response> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs(env));
+  const signal = AbortSignal.timeout(timeoutMs(env));
 
   try {
-    return await fetchFn(url, { ...init, signal: controller.signal });
+    return await fetchFn(url, { ...init, signal });
   } catch (error) {
-    if (error instanceof Error && error.name === 'AbortError') {
+    if (timedOut(error)) {
       throw new FriendRuntimeError(
         `${provider} Friend request timed out`,
         'FRIEND_PROVIDER_TIMEOUT',
@@ -443,8 +479,6 @@ async function fetchWithTimeout(
       'FRIEND_PROVIDER_REQUEST_FAILED',
       'provider_unavailable',
     );
-  } finally {
-    clearTimeout(timer);
   }
 }
 
