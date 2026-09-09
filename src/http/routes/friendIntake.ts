@@ -18,7 +18,11 @@ import {
   type FriendRuntimeResult,
 } from '../../mirror/friendRuntime.js';
 import type { MirrorIntentTag } from '../../mirror/types.js';
-import { requireFounder, type FounderRequest } from '../middleware/requireFounder.js';
+import {
+  requireFounder,
+  requireInteractiveFounder,
+  type FounderRequest,
+} from '../middleware/requireFounder.js';
 
 type DbRecord = Record<string, unknown>;
 type RunFriendRuntime = (
@@ -61,6 +65,7 @@ interface FriendFeedbackRecord {
 export interface FriendIntakeRouteDependencies {
   runFriendRuntime?: RunFriendRuntime;
   resolveProjectId?: () => Promise<string>;
+  resolveCompletedRunFounderId?: (runId: string) => Promise<string | null>;
   writeTimelineEvent?: (event: FriendTimelineEvent) => Promise<string>;
   writeCompletion?: (record: FriendCompletionRecord) => Promise<string>;
   writeFeedback?: (record: FriendFeedbackRecord) => Promise<void>;
@@ -99,18 +104,23 @@ function usefulnessResponse(value: unknown): UsefulnessResponse | null {
     : null;
 }
 
+const PRIVATE_IDENTIFIER_PATTERN = /(?:\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b|\b(?:\+?1[-.\s]?)?(?:\(\d{3}\)|\d{3})[-.\s]?\d{3}[-.\s]?\d{4}\b|\b\d{3}-\d{2}-\d{4}\b|\b(?:sk(?:-proj)?|pk|rk|ghp|github_pat|xox[baprs])[-_A-Za-z0-9]{8,}\b|\b(?:routing|account|acct|card)(?:\s+(?:number|no\.?))?\s*[:=#-]?\s*\d{4,19}\b)/i;
+
 export function detectSensitiveCategories(value: string): SensitiveCategory[] {
   const categories: SensitiveCategory[] = [];
   const rules: Array<[SensitiveCategory, RegExp]> = [
     ['credentials', /\b(password|passcode|credential|api[_ -]?key|service[_ -]?role|private[_ -]?key|bearer[_ -]?token|access[_ -]?token|secret)\b/i],
     ['legal', /\b(legal|lawyer|attorney|court|lawsuit|custody|charges?|arrest|police)\b/i],
-    ['health', /\b(health|medical|doctor|hospital|diagnos\w*|therapy|therapist|medication|pregnan\w*)\b/i],
+    ['health', /\b(health|medical|doctor|hospital|diagnos\w*|therapy|therapist|medication|pregnan\w*|suicid\w*|self[- ]?harm|hurt myself|kill myself)\b/i],
     ['teen', /\b(teen|minor|underage|under[ -]?18|child|children|kid|kids|school)\b/i],
     ['family_conflict', /\b(family conflict|domestic conflict|custody|fight with (?:my|our) family|argument with (?:my|our) family)\b/i],
   ];
 
   for (const [category, pattern] of rules) {
     if (pattern.test(value)) categories.push(category);
+  }
+  if (PRIVATE_IDENTIFIER_PATTERN.test(value) && !categories.includes('credentials')) {
+    categories.push('credentials');
   }
   return categories;
 }
@@ -125,15 +135,15 @@ function sensitiveTags(categories: SensitiveCategory[]): MirrorIntentTag[] {
 }
 
 function protectiveResult(categories: SensitiveCategory[]): FriendRuntimeResult {
-  const credential = categories.includes('credentials');
+  const privateIdentifier = categories.includes('credentials');
   const legal = categories.includes('legal');
   const health = categories.includes('health');
 
-  const move: FirstSliceMove = credential
+  const move: FirstSliceMove = privateIdentifier
     ? {
         kind: 'protective_move',
-        text: 'Keep the credential out of this note and use the governed credential-recovery path before taking any other action.',
-        rationale: 'Credential-sensitive input stays local and should not be forwarded to an external model.',
+        text: 'Keep private identifiers and credentials out of external model requests before taking any other action.',
+        rationale: 'Private identifiers and credential-shaped input stay local and are not forwarded to an external model.',
         timeEstimateMinutes: null,
         gateWarning: 'No external model call or provider mutation was made.',
       }
@@ -169,8 +179,11 @@ function protectiveResult(categories: SensitiveCategory[]): FriendRuntimeResult 
 export function redactFriendSummary(value: string): string {
   return value
     .replace(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi, '[redacted-email]')
+    .replace(/\b\d{3}-\d{2}-\d{4}\b/g, '[redacted-id]')
     .replace(/\b(?:\+?1[-.\s]?)?(?:\(\d{3}\)|\d{3})[-.\s]?\d{3}[-.\s]?\d{4}\b/g, '[redacted-phone]')
-    .replace(/\b(?:sk|pk|rk|ghp|github_pat|xox[baprs])[-_A-Za-z0-9]{8,}\b/g, '[redacted-credential]')
+    .replace(/\b(?:routing|account|acct|card)(?:\s+(?:number|no\.?))?\s*[:=#-]?\s*\d{4,19}\b/gi, '[redacted-financial]')
+    .replace(/\b(?:\d[ -]*?){13,19}\b/g, '[redacted-financial]')
+    .replace(/\b(?:sk(?:-proj)?|pk|rk|ghp|github_pat|xox[baprs])[-_A-Za-z0-9]{8,}\b/g, '[redacted-credential]')
     .replace(/\b(password|passcode|api[_ -]?key|access[_ -]?token|bearer[_ -]?token|secret)\s*[:=]\s*\S+/gi, '$1=[redacted]')
     .trim()
     .slice(0, 1_200);
@@ -187,6 +200,25 @@ async function defaultResolveProjectId(): Promise<string> {
   const id = data && typeof data.id === 'string' ? data.id.trim() : '';
   if (!id) throw new Error('FRIEND_PROJECT_NOT_REGISTERED');
   return id;
+}
+
+async function defaultResolveCompletedRunFounderId(runId: string): Promise<string | null> {
+  const { data, error } = await supabase
+    .from('project_events')
+    .select('metadata')
+    .eq('source_event_id', runId)
+    .eq('event_type', 'friend_intake_completed')
+    .eq('screen', 'friend-intake')
+    .maybeSingle();
+
+  if (error) throw new Error(`FRIEND_COMPLETED_RUN_LOOKUP_FAILED:${error.code ?? ''}:${error.message}`);
+  const metadata = data && typeof data.metadata === 'object' && data.metadata && !Array.isArray(data.metadata)
+    ? data.metadata as DbRecord
+    : null;
+  const founderUserId = metadata && typeof metadata.founder_user_id === 'string'
+    ? metadata.founder_user_id.trim()
+    : '';
+  return founderUserId || null;
 }
 
 async function defaultWriteTimelineEvent(event: FriendTimelineEvent): Promise<string> {
@@ -269,10 +301,19 @@ function providerFailureBody(error: unknown) {
   };
 }
 
+async function ensureInteractiveFounder(req: FounderRequest, res: Parameters<typeof requireInteractiveFounder>[1]): Promise<boolean> {
+  let allowed = false;
+  await requireInteractiveFounder(req, res, () => {
+    allowed = true;
+  });
+  return allowed;
+}
+
 export function createFriendIntakeRouter(dependencies: FriendIntakeRouteDependencies = {}) {
   const router = Router();
   const runFriendRuntime = dependencies.runFriendRuntime ?? createFriendRuntimeRunner();
   const resolveProjectId = dependencies.resolveProjectId ?? defaultResolveProjectId;
+  const resolveCompletedRunFounderId = dependencies.resolveCompletedRunFounderId ?? defaultResolveCompletedRunFounderId;
   const writeTimelineEvent = dependencies.writeTimelineEvent ?? defaultWriteTimelineEvent;
   const writeCompletion = dependencies.writeCompletion ?? defaultWriteCompletion;
   const writeFeedback = dependencies.writeFeedback ?? defaultWriteFeedback;
@@ -342,6 +383,11 @@ export function createFriendIntakeRouter(dependencies: FriendIntakeRouteDependen
       [transcript, timeEnergyContext ?? '', voiceProfile ?? ''].join('\n'),
     );
 
+    if (sensitiveCategories.length === 0 && requestedProvider !== 'deterministic') {
+      const interactive = await ensureInteractiveFounder(req, res);
+      if (!interactive) return;
+    }
+
     let result: FriendRuntimeResult;
     try {
       result = sensitiveCategories.length > 0
@@ -363,9 +409,11 @@ export function createFriendIntakeRouter(dependencies: FriendIntakeRouteDependen
             stage: 'runtime',
             requested_provider: requestedProvider,
             privacy_choice: selectedPrivacy,
-            input_length: transcript.length,
-            sensitive_category_count: sensitiveCategories.length,
             error_code: error instanceof FriendRuntimeError ? error.code : 'FRIEND_RUNTIME_FAILED',
+            ...(selectedPrivacy === 'save_redacted_summary' ? {
+              input_length: transcript.length,
+              sensitive_category_count: sensitiveCategories.length,
+            } : {}),
           },
         });
       } catch {
@@ -418,6 +466,15 @@ export function createFriendIntakeRouter(dependencies: FriendIntakeRouteDependen
       };
     }
 
+    const contentMetadata = selectedPrivacy === 'save_redacted_summary'
+      ? {
+          input_length: transcript.length,
+          intent_tags: result.tags,
+          move_kind: result.move.kind,
+          sensitive_categories: sensitiveCategories,
+        }
+      : {};
+
     let timelineEventId: string;
     try {
       timelineEventId = await writeCompletion({
@@ -437,10 +494,7 @@ export function createFriendIntakeRouter(dependencies: FriendIntakeRouteDependen
             input_persistence: selectedPrivacy === 'process_without_saving'
               ? 'none'
               : 'redacted_summary_only',
-            input_length: transcript.length,
-            intent_tags: result.tags,
-            move_kind: result.move.kind,
-            sensitive_categories: sensitiveCategories,
+            ...contentMetadata,
             provider_storage_mode: result.provenance.providerStorageMode,
             web_search_used: result.provenance.webSearchUsed,
             provenance_id: provenanceId,
@@ -513,6 +567,22 @@ export function createFriendIntakeRouter(dependencies: FriendIntakeRouteDependen
     }
     if (!founderUserId) {
       return res.status(401).json({ error: 'Founder identity is required', code: 'FRIEND_FOUNDER_REQUIRED' });
+    }
+
+    let completedRunFounderId: string | null;
+    try {
+      completedRunFounderId = await resolveCompletedRunFounderId(runId);
+    } catch {
+      return res.status(503).json({
+        error: 'Friend completed-run lookup is unavailable',
+        code: 'FRIEND_COMPLETED_RUN_LOOKUP_UNAVAILABLE',
+      });
+    }
+    if (!completedRunFounderId || completedRunFounderId !== founderUserId) {
+      return res.status(404).json({
+        error: 'Completed Friend run not found',
+        code: 'FRIEND_COMPLETED_RUN_NOT_FOUND',
+      });
     }
 
     const recordedAt = new Date().toISOString();
