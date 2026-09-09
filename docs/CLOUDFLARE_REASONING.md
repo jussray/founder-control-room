@@ -265,3 +265,7 @@ npx playwright test e2e/cloudflare-reasoning.spec.ts
 ```
 
 The browser/API suite verifies the public-safe contract, founder protection, absence of credential leakage, presence of the implementation stack, and absence of an accidental deployment endpoint. Unit tests verify exact-commit reasoning, stale evidence, duplicate authority, authentication failures, runtime failure, rollback preparation, first-principles deletion/simplification output, and approval boundaries.
+
+## Friend runtime Cloudflare boundary
+
+`wrangler.worker.toml` now pins the Friend source models and requires the `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, and `PERPLEXITY_API_KEY` binding names when the canonical Worker is deployed. Those declarations are fail-closed source intent only; they do not prove the secrets exist, the Friend migration is applied, the candidate Worker is deployed, or any provider inference has succeeded in production.
