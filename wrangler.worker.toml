@@ -77,11 +77,17 @@ FRIEND_OPENAI_MODEL = "gpt-5.6-luna"
 FRIEND_ANTHROPIC_MODEL = "claude-sonnet-5"
 FRIEND_PERPLEXITY_MODEL = "sonar"
 
+# Internal FCR authority budgets for live Friend inference. A live call must
+# atomically reserve one request allowance before provider execution. These are
+# authorization ceilings, not claims about the provider's final invoice.
+# Failed provider calls retain their reservation so retries cannot silently
+# restore spend authority.
+FRIEND_LIVE_REQUEST_BUDGET_USD = "0.25"
+FRIEND_LIVE_DAILY_BUDGET_USD = "1.00"
+
 # Founder-approved source activation for the governed founder-content n8n lane.
 # Buffer is the only enabled provider, share-now remains forbidden, and runtime
 # identity must match the exact workflow fingerprint and pinned n8n version.
-# These vars express source intent only. Production use still requires the four
-# provider-held secret bindings below, exact-main deployment, and live readback.
 N8N_FOUNDER_CONTENT_ENABLED = "true"
 N8N_FOUNDER_CONTENT_ENABLED_PROVIDERS = "buffer"
 N8N_FOUNDER_CONTENT_EXPECTED_WORKFLOW_ID = "fcrFounderContentV1"
