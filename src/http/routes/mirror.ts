@@ -10,6 +10,7 @@ import type {
   MirrorRunInput,
   MirrorRunResponse,
 } from '../../mirror/types.js';
+import { friendIntakeRouter } from './friendIntake.js';
 import { requireFounder, type FounderRequest } from '../middleware/requireFounder.js';
 
 type DbRecord = Record<string, unknown>;
@@ -94,6 +95,11 @@ export function createMirrorRouter(dependencies: MirrorRouteDependencies = {}) {
   const runMirror = dependencies.runMirror ?? createOpenAiMirrorRunner();
   const resolveProjectId = dependencies.resolveProjectId ?? defaultResolveProjectId;
   const writeAuditEvent = dependencies.writeAuditEvent ?? defaultWriteAuditEvent;
+
+  // Friend Intake owns its own founder gate and provider-neutral runtime
+  // contract. Mount it before the legacy Mirror gate so the two surfaces stay
+  // behaviorally separate while sharing the /mirror namespace.
+  router.use('/friend-intake', friendIntakeRouter);
 
   router.use(requireFounder);
 
