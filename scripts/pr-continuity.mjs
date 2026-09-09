@@ -20,6 +20,10 @@ export function assertExpectedHead(expected, actual) {
   return true;
 }
 
+export function isStackedUpdateUnsupported(status, message = '') {
+  return status === 403 && /updating a stacked PR's branch via this endpoint is not supported\.?/i.test(message);
+}
+
 export function replaceManagedBlock(body = '', block) {
   const starts = body.split(START_MARKER).length - 1;
   const ends = body.split(END_MARKER).length - 1;
@@ -191,8 +195,27 @@ async function updateOnePull(repository, number, rootRef) {
   const update = await github(`/repos/${repository}/pulls/${number}/update-branch`, {
     method: 'PUT',
     body: { expected_head_sha: before },
-    allow: [202, 422],
+    allow: [202, 403, 422],
   });
+
+  if (update.status === 403) {
+    if (!isStackedUpdateUnsupported(update.status, update.payload?.message || '')) {
+      throw new Error(`GITHUB_API_403: ${update.payload?.message || 'pull request branch update forbidden'}`);
+    }
+    pr = await getPull(repository, number);
+    baseSha = await liveBaseSha(repository, pr);
+    status = sameRepositoryPull(pr, repository) ? await compare(repository, baseSha, pr.head.sha) : 'fork';
+    if (isCurrentCompareStatus(status)) return updateOnePull(repository, number, rootRef);
+    const metadata = await patchBody(repository, pr, blockFor(repository, pr, rootRef, rootSha, baseSha, 'BLOCKED_STACK_REBASE_REQUIRED', 'BLOCKED'));
+    return {
+      number,
+      state: 'BLOCKED_STACK_REBASE_REQUIRED',
+      headRef: pr.head.ref,
+      headSha: pr.head.sha,
+      metadata,
+      providerMessage: update.payload?.message || null,
+    };
+  }
 
   if (update.status === 422) {
     pr = await getPull(repository, number);
