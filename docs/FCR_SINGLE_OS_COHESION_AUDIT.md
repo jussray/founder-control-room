@@ -55,6 +55,41 @@ A material FCR or cross-repository audit must verify all of the following:
    - A future capability must declare its input intent, required state, authority ceiling, action contract, evidence output, rollback, and next-gate behavior before becoming an FCR capability.
    - New functionality should extend FCR rather than create another OS beside it.
 
+8. **Consequence-only infrastructure attention**
+   - Provider change noise becomes founder work only when it can materially change security, reliability, cost, limits, runtime behavior, integration behavior, deployment viability, or a dated migration/deprecation obligation for the active stack.
+   - Prioritize official releases and deprecations, security or reliability incidents, limits/pricing/runtime changes, and important integration changes. Routine changelog noise is not a founder task.
+   - Bind every surfaced infrastructure claim to current provider evidence and the affected product path. A provider incident is provider-state evidence, not proof of an application defect.
+   - Collapse each infrastructure review to the one or two highest-value founder gates. Do not create six parallel vendor backlogs when no product action is required.
+
+## Infrastructure consequence filter
+
+For Cloudflare, Supabase, Firebase, Expo, n8n, Vercel, and future infrastructure providers, classify a newly observed provider change before routing it into founder work:
+
+```text
+MATERIAL
+= requires migration, security response, reliability mitigation, cost/limit review,
+  runtime adjustment, integration change, or evidence-model correction for an active product path
+
+WATCH
+= credible provider change with plausible future relevance but no current action gate
+
+NOISE
+= routine release/changelog activity with no material effect on an active founder goal
+
+UNKNOWN
+= impact cannot yet be tied to current provider evidence or a known product path
+```
+
+A `MATERIAL` classification must return:
+
+1. what changed and the authoritative provider evidence;
+2. which FCR-managed product path is affected;
+3. why the effect is consequential now;
+4. the smallest reversible review or repair;
+5. at most two founder review gates unless additional action becomes necessary as evidence changes.
+
+Do not convert `WATCH`, `NOISE`, or `UNKNOWN` into implementation work merely because a vendor announced something new.
+
 ## Architectural drift test
 
 Treat a change as **FCR cohesion drift** when it introduces any of these without an explicit compatibility reason and reconciliation path:
@@ -98,6 +133,9 @@ How is founder-goal progress distinguished from mere execution success?
 
 NEXT GATE
 What one decision/action returns to the founder?
+
+INFRA CONSEQUENCE
+Is any provider change MATERIAL, WATCH, NOISE, or UNKNOWN for this exact product path?
 
 COHESION
 Does this extend FCR, or accidentally create a parallel operating system?
