@@ -202,8 +202,12 @@ describe('Friend Intake route', () => {
 
     expect(reviewResponse.status).toBe(409);
     expect(reviewResponse.headers['cache-control']).toBe('no-store');
-    expect(reviewResponse.headers['set-cookie']?.join(';')).toContain('HttpOnly');
-    expect(reviewResponse.headers['set-cookie']?.join(';')).toContain('SameSite=Strict');
+    const setCookieHeader = reviewResponse.headers['set-cookie'];
+    const setCookieText = Array.isArray(setCookieHeader)
+      ? setCookieHeader.join(';')
+      : String(setCookieHeader ?? '');
+    expect(setCookieText).toContain('HttpOnly');
+    expect(setCookieText).toContain('SameSite=Strict');
     expect(reviewResponse.body).toMatchObject({
       code: 'SENSITIVE_SAVE_REVIEW_REQUIRED',
       review: {
