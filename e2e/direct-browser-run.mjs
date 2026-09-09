@@ -45,6 +45,18 @@ if (!process.env.FCR_E2E_SCENARIO) {
       stdio: 'inherit',
     });
   }
+
+  console.log('\n=== direct-browser proof: friend-intake ===');
+  execFileSync(process.platform === 'win32' ? 'npx.cmd' : 'npx', [
+    'playwright',
+    'test',
+    'e2e/friend-intake.spec.ts',
+    '--reporter=list',
+  ], {
+    cwd: process.cwd(),
+    env: { ...process.env },
+    stdio: 'inherit',
+  });
   process.exit(0);
 }
 
