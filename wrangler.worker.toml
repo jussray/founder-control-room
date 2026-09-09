@@ -67,6 +67,13 @@ FCR_V10_RECEIPT_PERSISTENCE_REQUIRED = "true"
 MCP_EXA_URL = "https://mcp.exa.ai/mcp"
 MCP_RESEND_URL = "https://mcp.resend.com/mcp"
 
+# Founder-approved Friend runtime model capability. These flags grant model
+# inference only. They grant no memory retrieval, provider mutation, publish,
+# merge, deploy, or external-action authority. Missing provider-held secrets
+# fail closed per provider instead of falling back silently.
+FRIEND_MODELS_ENABLED = "true"
+FRIEND_RUNTIME_PROVIDERS = "openai,anthropic,perplexity"
+
 # Founder-approved source activation for the governed founder-content n8n lane.
 # Buffer is the only enabled provider, share-now remains forbidden, and runtime
 # identity must match the exact workflow fingerprint and pinned n8n version.

@@ -1,0 +1,77 @@
+name: Friend Intake Proof
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/http/routes/friendIntake.ts'
+      - 'src/mirror/friendRuntime.ts'
+      - 'src/chief/firstSliceContracts.ts'
+      - 'src/model/execution.ts'
+      - 'public/control-room/friend.*'
+      - 'e2e/friend-intake.spec.ts'
+      - 'supabase/migrations/*friend_intake*'
+      - 'docs/FRIEND_INTAKE_V1.md'
+      - 'docs/FOUNDER_CONTROL_ROOM_AND_CHIEF_AI_MASTER_BUILD_SPEC_V1_5_ADDENDUM.md'
+      - '.github/workflows/friend-intake-proof.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'src/http/routes/friendIntake.ts'
+      - 'src/mirror/friendRuntime.ts'
+      - 'src/chief/firstSliceContracts.ts'
+      - 'src/model/execution.ts'
+      - 'public/control-room/friend.*'
+      - 'e2e/friend-intake.spec.ts'
+      - 'supabase/migrations/*friend_intake*'
+      - 'docs/FRIEND_INTAKE_V1.md'
+      - 'docs/FOUNDER_CONTROL_ROOM_AND_CHIEF_AI_MASTER_BUILD_SPEC_V1_5_ADDENDUM.md'
+      - '.github/workflows/friend-intake-proof.yml'
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  friend-intake:
+    name: Friend Intake exact-head proof
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify exact candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
+
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Focused Friend tests
+        run: npx vitest run src/mirror/__tests__/friendRuntime.test.ts src/http/routes/__tests__/friendIntake.integration.test.ts src/implant/__tests__/selfAttackContracts.test.ts
+
+      - name: Install Chromium
+        run: npx playwright install chromium --with-deps
+
+      - name: Friend desktop and mobile Playwright
+        run: npx playwright test e2e/friend-intake.spec.ts --reporter=list
