@@ -69,17 +69,17 @@ function formHtml() {
           <legend class="eyebrow">Privacy choice</legend>
           <label>
             <input type="radio" name="privacyChoice" value="process_without_saving" checked />
-            <span>Process without saving <span class="fine">No founder content is persisted.</span></span>
+            <span>Process without saving <span class="fine">FCR stores no founder content. If you choose a live provider, the submission is still sent to that provider under its own retention policy.</span></span>
           </label>
           <label>
             <input type="radio" name="privacyChoice" value="save_redacted_summary" />
-            <span>Save redacted summary <span class="fine">Never the raw transcript. No embeddings.</span></span>
+            <span>Save redacted summary <span class="fine">FCR stores only the redacted summary, never the raw transcript or embeddings. Live-provider handling remains governed by that provider's policy.</span></span>
           </label>
         </fieldset>
 
         <div class="actions">
           <button id="run-button" type="submit">Run Friend</button>
-          <span id="run-status" class="status">External models fail closed if their server credential is unavailable.</span>
+          <span id="run-status" class="status">Live providers require an interactive founder session and fail closed if their allowlist or server credential is unavailable.</span>
         </div>
         <div id="friend-error"></div>
       </form>
