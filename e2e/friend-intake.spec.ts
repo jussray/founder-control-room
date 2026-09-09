@@ -26,7 +26,7 @@ test.afterAll(async () => {
   await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
 });
 
-async function prepareFriendPage(page: Page) {
+async function prepareFriendPage(page: Page, options: { failSecondRun?: boolean } = {}) {
   await page.route('**/auth/me', async (route) => {
     await route.fulfill({
       status: 200,
@@ -37,13 +37,27 @@ async function prepareFriendPage(page: Page) {
     });
   });
 
+  let runCount = 0;
   await page.route('**/mirror/friend-intake', async (route) => {
     if (route.request().method() !== 'POST') {
       await route.continue();
       return;
     }
+    runCount += 1;
     const requestBody = route.request().postDataJSON();
     expect(requestBody).not.toHaveProperty('relatedMemories');
+
+    if (options.failSecondRun && runCount === 2) {
+      await route.fulfill({
+        status: 503,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          error: 'Friend completion persistence is unavailable',
+          code: 'FRIEND_COMPLETION_PERSISTENCE_FAILED',
+        }),
+      });
+      return;
+    }
 
     await route.fulfill({
       status: 200,
@@ -79,9 +93,16 @@ async function prepareFriendPage(page: Page) {
           model: requestBody.provider === 'deterministic' ? 'friend-deterministic-v1' : 'playwright-model',
           responseId: null,
           promptVersion: 'friend-intake-v1-2026-09-08',
+          inferenceReservationId: requestBody.provider === 'deterministic' ? null : 'reservation-playwright',
           providerStorageMode: requestBody.provider === 'deterministic' ? 'local_only' : 'provider_default',
           webSearchUsed: false,
-          doesNotProve: ['founder approval', 'external factual truth', 'provider write outcome', 'memory retrieval'],
+          doesNotProve: [
+            'founder approval beyond this Friend run',
+            'external factual truth',
+            'provider write outcome',
+            'provider billing amount',
+            'memory retrieval',
+          ],
         },
       }),
     });
@@ -130,6 +151,7 @@ for (const viewport of [
 
     await page.getByText('Provenance · what this does and does not prove').click();
     await expect(page.getByText('model_inference')).toBeVisible();
+    await expect(page.getByText('reservation-playwright')).toBeVisible();
     await expect(page.getByText('external factual truth')).toBeVisible();
 
     await page.getByRole('button', { name: 'Yes' }).click();
@@ -139,3 +161,19 @@ for (const viewport of [
     expect(overflow).toBe(false);
   });
 }
+
+test('Friend hides the previous receipt before a failed rerun', async ({ page }) => {
+  await prepareFriendPage(page, { failSecondRun: true });
+  await page.goto(`${origin}/control-room/friend.html`);
+
+  await page.getByLabel('What is on your mind?').fill('First run.');
+  await page.getByRole('button', { name: 'Run Friend' }).click();
+  await expect(page.getByText('One reflection, one move')).toBeVisible();
+
+  await page.getByLabel('What is on your mind?').fill('Second run.');
+  await page.getByRole('button', { name: 'Run Friend' }).click();
+
+  await expect(page.getByRole('alert')).toContainText('Friend completion persistence is unavailable');
+  await expect(page.locator('#friend-receipt')).toBeHidden();
+  await expect(page.getByText('One reflection, one move')).toHaveCount(0);
+});
