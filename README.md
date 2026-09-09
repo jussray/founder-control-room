@@ -280,3 +280,7 @@ Public-safe configuration may live in `.env.example`. Secret values do not belon
 - [`docs/GOALFIX_EXECUTION_WORKFLOW_V2.md`](docs/GOALFIX_EXECUTION_WORKFLOW_V2.md) — canonical repair/verification workflow
 
 Provider overlays may become stricter. They do not become competing constitutions or expand their own authority.
+
+### Friend Intake runtime boundary
+
+Friend Intake is source-enabled for deterministic, OpenAI, Anthropic, and Perplexity inference, with explicit model IDs and provider-held credential names declared in `wrangler.worker.toml`. This source state does not prove those credentials are installed, the privacy-store migration is applied, the Worker is deployed at the candidate SHA, or any live provider call has succeeded; those remain separate configuration, database, deployment, and runtime proof gates.
