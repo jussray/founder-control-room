@@ -13,6 +13,7 @@ import {
 
 export interface FounderRequest extends Request {
   founder?: { email: string; userId: string };
+  founderAuthChannel?: 'bearer' | 'interactive';
 }
 
 interface AuthenticatedIdentity {
@@ -53,6 +54,11 @@ async function founderAllowlisted(identity: AuthenticatedIdentity): Promise<'all
  * Cookie sessions may refresh once with their server-held refresh token. A
  * successful refresh rotates the opaque browser capability; Bearer sessions
  * never receive implicit refresh behavior so automated clients remain explicit.
+ *
+ * The validated authentication channel is carried on the current request. That
+ * lets downstream high-consequence handlers distinguish a real interactive
+ * browser request from bearer automation without re-reading a cookie that may
+ * have been rotated during this same authentication pass.
  */
 export async function requireFounder(
   req: FounderRequest,
@@ -108,6 +114,7 @@ export async function requireFounder(
   }
 
   req.founder = identity;
+  req.founderAuthChannel = explicitBearer ? 'bearer' : 'interactive';
   next();
 }
 
@@ -150,5 +157,6 @@ export async function requireInteractiveFounder(
   }
 
   req.founder = identity;
+  req.founderAuthChannel = 'interactive';
   next();
 }
