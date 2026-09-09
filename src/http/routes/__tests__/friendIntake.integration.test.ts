@@ -36,7 +36,7 @@ function founderUsersRow() {
   };
 }
 
-function runtimeResult(provider: 'deterministic' | 'openai' | 'anthropic' | 'perplexity' = 'openai'): FriendRuntimeResult {
+function runtimeResult(provider: 'deterministic' | 'openai' | 'anthropic' | 'perplexity' = 'deterministic'): FriendRuntimeResult {
   const live = provider !== 'deterministic';
   return {
     mirror: {
@@ -71,7 +71,7 @@ function validPayload() {
   return {
     transcript: 'I need to move the build with one focused proof.',
     privacyChoice: 'process_without_saving',
-    provider: 'openai',
+    provider: 'deterministic',
     timeEnergyContext: 'Ten minutes.',
     voiceProfile: 'Direct and short.',
   };
@@ -83,6 +83,7 @@ function buildApp(overrides: FriendIntakeRouteDependencies = {}) {
   app.use('/mirror/friend-intake', createFriendIntakeRouter({
     runFriendRuntime: vi.fn(async (provider) => runtimeResult(provider)),
     resolveProjectId: vi.fn(async () => 'project-1'),
+    resolveCompletedRunFounderId: vi.fn(async () => 'founder-user-1'),
     writeTimelineEvent: vi.fn(async (_event: TimelineEventArg) => 'timeline-failure-1'),
     writeCompletion: vi.fn(async (_record: CompletionArg) => 'timeline-1'),
     writeFeedback: vi.fn(async (_record: FeedbackArg) => undefined),
@@ -131,33 +132,25 @@ describe('POST /mirror/friend-intake', () => {
     expect(runFriendRuntime).not.toHaveBeenCalled();
   });
 
-  it('processes without saving founder content and emits one sanitized atomic completion receipt', async () => {
+  it('processes without saving founder content or content-derived semantic metadata', async () => {
     authenticate();
     const writeCompletion = vi.fn(async (_record: CompletionArg) => 'timeline-1');
-    const runFriendRuntime = vi.fn(async () => runtimeResult('anthropic'));
+    const runFriendRuntime = vi.fn(async () => runtimeResult('deterministic'));
 
-    const response = await request(buildApp({
-      runFriendRuntime,
-      writeCompletion,
-    }))
+    const response = await request(buildApp({ runFriendRuntime, writeCompletion }))
       .post('/mirror/friend-intake')
       .set('Authorization', BEARER)
-      .send({ ...validPayload(), provider: 'anthropic' });
+      .send(validPayload());
 
     expect(response.status).toBe(200);
     expect(response.body).toMatchObject({
       privacyChoice: 'process_without_saving',
       inputPersistence: 'none',
-      runtimeProvider: 'anthropic',
-      modelExecutionState: 'succeeded',
+      runtimeProvider: 'deterministic',
+      modelExecutionState: 'not_used',
       timelineEventId: 'timeline-1',
       intentTags: ['build'],
       move: { kind: 'tiny_move' },
-      provenance: {
-        source: 'model_inference',
-        provider: 'anthropic',
-        webSearchUsed: false,
-      },
     });
     expect(writeCompletion).toHaveBeenCalledTimes(1);
 
@@ -167,12 +160,28 @@ describe('POST /mirror/friend-intake', () => {
     expect(serialized).not.toContain(validPayload().transcript);
     expect(serialized).not.toContain(runtimeResult().mirror.summary);
     expect(serialized).not.toContain(runtimeResult().move.text);
+    expect(serialized).not.toContain('intent_tags');
+    expect(serialized).not.toContain('sensitive_categories');
+    expect(serialized).not.toContain('input_length');
+  });
+
+  it('requires an interactive founder session before non-sensitive live inference', async () => {
+    authenticate();
+    const runFriendRuntime = vi.fn(async () => runtimeResult('openai'));
+
+    const response = await request(buildApp({ runFriendRuntime }))
+      .post('/mirror/friend-intake')
+      .set('Authorization', BEARER)
+      .send({ ...validPayload(), provider: 'openai' });
+
+    expect(response.status).toBe(401);
+    expect(runFriendRuntime).not.toHaveBeenCalled();
   });
 
   it('passes only the redacted summary into the atomic completion when the founder opts in', async () => {
     authenticate();
     const writeCompletion = vi.fn(async (_record: CompletionArg) => 'timeline-1');
-    const result = runtimeResult('openai');
+    const result = runtimeResult('deterministic');
     result.mirror.summary = 'Email me at founder@example.com and use password:supersecret for the demo.';
     const runFriendRuntime = vi.fn(async () => result);
 
@@ -226,7 +235,7 @@ describe('POST /mirror/friend-intake', () => {
       .send({
         ...validPayload(),
         provider: 'perplexity',
-        transcript: 'I need to figure out a password and a legal court issue involving my kid.',
+        transcript: 'I need to handle a password and a legal court issue involving my kid.',
       });
 
     expect(response.status).toBe(200);
@@ -235,12 +244,26 @@ describe('POST /mirror/friend-intake', () => {
       runtimeProvider: 'deterministic',
       modelExecutionState: 'not_used',
       move: { kind: 'protective_move' },
-      provenance: {
-        source: 'deterministic',
-        provider: 'deterministic',
-        webSearchUsed: false,
-      },
     });
+  });
+
+  it('keeps bare private identifiers local before any provider call', async () => {
+    authenticate();
+    const runFriendRuntime = vi.fn(async () => runtimeResult('anthropic'));
+
+    const response = await request(buildApp({ runFriendRuntime }))
+      .post('/mirror/friend-intake')
+      .set('Authorization', BEARER)
+      .send({
+        ...validPayload(),
+        provider: 'anthropic',
+        transcript: 'customer@example.com 814-555-1212 ghp_abcdefghijk',
+      });
+
+    expect(response.status).toBe(200);
+    expect(runFriendRuntime).not.toHaveBeenCalled();
+    expect(response.body.runtimeProvider).toBe('deterministic');
+    expect(response.body.move.kind).toBe('protective_move');
   });
 
   it('never returns more than one move', async () => {
@@ -257,7 +280,7 @@ describe('POST /mirror/friend-intake', () => {
 });
 
 describe('POST /mirror/friend-intake/:runId/usefulness', () => {
-  it('records exactly one bounded usefulness response without founder content', async () => {
+  it('records exactly one bounded usefulness response for a completed run owned by the founder', async () => {
     authenticate();
     const writeFeedback = vi.fn(async (_record: FeedbackArg) => undefined);
 
@@ -273,16 +296,32 @@ describe('POST /mirror/friend-intake/:runId/usefulness', () => {
       founderUserId: 'founder-user-1',
       response: 'yes',
     }));
-    expect(JSON.stringify(writeFeedback.mock.calls[0]?.[0])).not.toContain('transcript');
+  });
+
+  it('rejects feedback when the completed run is absent or belongs to another founder', async () => {
+    authenticate();
+    const writeFeedback = vi.fn(async (_record: FeedbackArg) => undefined);
+
+    const response = await request(buildApp({
+      resolveCompletedRunFounderId: vi.fn(async () => 'other-founder'),
+      writeFeedback,
+    }))
+      .post('/mirror/friend-intake/11111111-1111-4111-8111-111111111111/usefulness')
+      .set('Authorization', BEARER)
+      .send({ response: 'yes' });
+
+    expect(response.status).toBe(404);
+    expect(response.body.code).toBe('FRIEND_COMPLETED_RUN_NOT_FOUND');
+    expect(writeFeedback).not.toHaveBeenCalled();
   });
 });
 
 describe('redactFriendSummary', () => {
-  it('redacts common contact and credential patterns', () => {
+  it('redacts common contact, credential, identity, and financial patterns', () => {
     expect(redactFriendSummary(
-      'Reach me at founder@example.com, 814-555-1212, api_key=abcdef123456.',
+      'Reach founder@example.com, 814-555-1212, api_key=abcdef123456, SSN 123-45-6789, routing number 123456789.',
     )).toBe(
-      'Reach me at [redacted-email], [redacted-phone], api_key=[redacted]',
+      'Reach [redacted-email], [redacted-phone], api_key=[redacted] SSN [redacted-id], [redacted-financial].',
     );
   });
 });
