@@ -46,6 +46,11 @@ interface FriendSummaryRecord {
   provenanceId: string;
 }
 
+interface FriendCompletionRecord {
+  timelineEvent: FriendTimelineEvent;
+  summary: FriendSummaryRecord | null;
+}
+
 interface FriendFeedbackRecord {
   runId: string;
   founderUserId: string;
@@ -57,7 +62,7 @@ export interface FriendIntakeRouteDependencies {
   runFriendRuntime?: RunFriendRuntime;
   resolveProjectId?: () => Promise<string>;
   writeTimelineEvent?: (event: FriendTimelineEvent) => Promise<string>;
-  writeSummary?: (record: FriendSummaryRecord) => Promise<void>;
+  writeCompletion?: (record: FriendCompletionRecord) => Promise<string>;
   writeFeedback?: (record: FriendFeedbackRecord) => Promise<void>;
 }
 
@@ -209,19 +214,25 @@ async function defaultWriteTimelineEvent(event: FriendTimelineEvent): Promise<st
   return id;
 }
 
-async function defaultWriteSummary(record: FriendSummaryRecord): Promise<void> {
-  const { error } = await supabase.from('friend_intake_summaries').insert({
-    intake_id: record.intakeId,
-    run_id: record.runId,
-    founder_user_id: record.founderUserId,
-    redacted_summary: record.redactedSummary,
-    intent_tags: record.intentTags,
-    runtime_provider: record.runtimeProvider,
-    model: record.model,
-    provenance_id: record.provenanceId,
+async function defaultWriteCompletion(record: FriendCompletionRecord): Promise<string> {
+  const summary = record.summary;
+  const { data, error } = await supabase.rpc('record_friend_intake_completion', {
+    p_source_event_id: record.timelineEvent.sourceEventId,
+    p_project_id: record.timelineEvent.projectId,
+    p_founder_user_id: record.timelineEvent.founderUserId,
+    p_metadata: record.timelineEvent.metadata,
+    p_intake_id: summary?.intakeId ?? null,
+    p_redacted_summary: summary?.redactedSummary ?? null,
+    p_intent_tags: summary?.intentTags ?? null,
+    p_runtime_provider: summary?.runtimeProvider ?? null,
+    p_model: summary?.model ?? null,
+    p_provenance_id: summary?.provenanceId ?? null,
   });
 
-  if (error) throw new Error(`FRIEND_SUMMARY_WRITE_FAILED:${error.code ?? ''}:${error.message}`);
+  if (error) throw new Error(`FRIEND_COMPLETION_WRITE_FAILED:${error.code ?? ''}:${error.message}`);
+  const id = typeof data === 'string' ? data : '';
+  if (!id) throw new Error('FRIEND_COMPLETION_WRITE_FAILED:NO_EVENT_ID');
+  return id;
 }
 
 async function defaultWriteFeedback(record: FriendFeedbackRecord): Promise<void> {
@@ -263,7 +274,7 @@ export function createFriendIntakeRouter(dependencies: FriendIntakeRouteDependen
   const runFriendRuntime = dependencies.runFriendRuntime ?? createFriendRuntimeRunner();
   const resolveProjectId = dependencies.resolveProjectId ?? defaultResolveProjectId;
   const writeTimelineEvent = dependencies.writeTimelineEvent ?? defaultWriteTimelineEvent;
-  const writeSummary = dependencies.writeSummary ?? defaultWriteSummary;
+  const writeCompletion = dependencies.writeCompletion ?? defaultWriteCompletion;
   const writeFeedback = dependencies.writeFeedback ?? defaultWriteFeedback;
 
   router.use(requireFounder);
@@ -385,6 +396,7 @@ export function createFriendIntakeRouter(dependencies: FriendIntakeRouteDependen
       });
     }
 
+    let completionSummary: FriendSummaryRecord | null = null;
     if (selectedPrivacy === 'save_redacted_summary') {
       const redactedSummary = redactFriendSummary(result.mirror.summary);
       if (!redactedSummary) {
@@ -394,56 +406,52 @@ export function createFriendIntakeRouter(dependencies: FriendIntakeRouteDependen
         });
       }
 
-      try {
-        await writeSummary({
-          intakeId,
-          runId,
-          founderUserId,
-          redactedSummary,
-          intentTags: result.tags,
-          runtimeProvider: result.provenance.provider,
-          model: result.provenance.model,
-          provenanceId,
-        });
-      } catch {
-        return res.status(503).json({
-          error: 'Friend redacted-summary storage is unavailable',
-          code: 'FRIEND_SUMMARY_STORAGE_UNAVAILABLE',
-        });
-      }
+      completionSummary = {
+        intakeId,
+        runId,
+        founderUserId,
+        redactedSummary,
+        intentTags: result.tags,
+        runtimeProvider: result.provenance.provider,
+        model: result.provenance.model,
+        provenanceId,
+      };
     }
 
     let timelineEventId: string;
     try {
-      timelineEventId = await writeTimelineEvent({
-        sourceEventId: runId,
-        projectId,
-        founderUserId,
-        eventType: 'friend_intake_completed',
-        severity: 'info',
-        metadata: {
-          stage: 'completed',
-          requested_provider: requestedProvider,
-          runtime_provider: result.provenance.provider,
-          model: result.provenance.model,
-          model_execution_state: result.modelExecutionState,
-          privacy_choice: selectedPrivacy,
-          input_persistence: selectedPrivacy === 'process_without_saving'
-            ? 'none'
-            : 'redacted_summary_only',
-          input_length: transcript.length,
-          intent_tags: result.tags,
-          move_kind: result.move.kind,
-          sensitive_categories: sensitiveCategories,
-          provider_storage_mode: result.provenance.providerStorageMode,
-          web_search_used: result.provenance.webSearchUsed,
-          provenance_id: provenanceId,
+      timelineEventId = await writeCompletion({
+        timelineEvent: {
+          sourceEventId: runId,
+          projectId,
+          founderUserId,
+          eventType: 'friend_intake_completed',
+          severity: 'info',
+          metadata: {
+            stage: 'completed',
+            requested_provider: requestedProvider,
+            runtime_provider: result.provenance.provider,
+            model: result.provenance.model,
+            model_execution_state: result.modelExecutionState,
+            privacy_choice: selectedPrivacy,
+            input_persistence: selectedPrivacy === 'process_without_saving'
+              ? 'none'
+              : 'redacted_summary_only',
+            input_length: transcript.length,
+            intent_tags: result.tags,
+            move_kind: result.move.kind,
+            sensitive_categories: sensitiveCategories,
+            provider_storage_mode: result.provenance.providerStorageMode,
+            web_search_used: result.provenance.webSearchUsed,
+            provenance_id: provenanceId,
+          },
         },
+        summary: completionSummary,
       });
     } catch {
-      return res.status(500).json({
-        error: 'Friend timeline persistence failed',
-        code: 'FRIEND_TIMELINE_PERSISTENCE_FAILED',
+      return res.status(503).json({
+        error: 'Friend completion persistence is unavailable',
+        code: 'FRIEND_COMPLETION_PERSISTENCE_FAILED',
       });
     }
 
