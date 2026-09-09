@@ -110,7 +110,7 @@ export function readSensitiveSaveReviewReceipt(req: Request): string | null {
 }
 
 function cookieAttributes(maxAgeSeconds: number): string {
-  const secure = process.env.NODE_ENV === 'production' ? '; Secure' : '';
+  const secure = process.env.NODE_ENV === 'test' ? '' : '; Secure';
   return `Path=/friend-intake; HttpOnly; SameSite=Strict; Max-Age=${maxAgeSeconds}${secure}`;
 }
 
