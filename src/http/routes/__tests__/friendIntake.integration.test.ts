@@ -22,6 +22,10 @@ import {
 const FOUNDER_EMAIL = 'founder@example.com';
 const BEARER = 'Bearer test-token';
 
+type TimelineEventArg = Parameters<NonNullable<FriendIntakeRouteDependencies['writeTimelineEvent']>>[0];
+type SummaryArg = Parameters<NonNullable<FriendIntakeRouteDependencies['writeSummary']>>[0];
+type FeedbackArg = Parameters<NonNullable<FriendIntakeRouteDependencies['writeFeedback']>>[0];
+
 function founderUsersRow() {
   return {
     select: () => ({
@@ -79,9 +83,9 @@ function buildApp(overrides: FriendIntakeRouteDependencies = {}) {
   app.use('/mirror/friend-intake', createFriendIntakeRouter({
     runFriendRuntime: vi.fn(async (provider) => runtimeResult(provider)),
     resolveProjectId: vi.fn(async () => 'project-1'),
-    writeTimelineEvent: vi.fn(async () => 'timeline-1'),
-    writeSummary: vi.fn(async () => undefined),
-    writeFeedback: vi.fn(async () => undefined),
+    writeTimelineEvent: vi.fn(async (_event: TimelineEventArg) => 'timeline-1'),
+    writeSummary: vi.fn(async (_record: SummaryArg) => undefined),
+    writeFeedback: vi.fn(async (_record: FeedbackArg) => undefined),
     ...overrides,
   }));
   return app;
@@ -129,8 +133,8 @@ describe('POST /mirror/friend-intake', () => {
 
   it('processes without saving raw or summary content and emits one sanitized timeline receipt', async () => {
     authenticate();
-    const writeSummary = vi.fn(async () => undefined);
-    const writeTimelineEvent = vi.fn(async () => 'timeline-1');
+    const writeSummary = vi.fn(async (_record: SummaryArg) => undefined);
+    const writeTimelineEvent = vi.fn(async (_event: TimelineEventArg) => 'timeline-1');
     const runFriendRuntime = vi.fn(async () => runtimeResult('anthropic'));
 
     const response = await request(buildApp({
@@ -169,7 +173,7 @@ describe('POST /mirror/friend-intake', () => {
 
   it('stores only the redacted summary when the founder opts in', async () => {
     authenticate();
-    const writeSummary = vi.fn(async () => undefined);
+    const writeSummary = vi.fn(async (_record: SummaryArg) => undefined);
     const result = runtimeResult('openai');
     result.mirror.summary = 'Email me at founder@example.com and use password:supersecret for the demo.';
     const runFriendRuntime = vi.fn(async () => result);
@@ -187,7 +191,7 @@ describe('POST /mirror/friend-intake', () => {
     expect(writeSummary).toHaveBeenCalledTimes(1);
 
     const saved = writeSummary.mock.calls[0]?.[0];
-    expect(saved.redactedSummary).toBe(
+    expect(saved?.redactedSummary).toBe(
       'Email me at [redacted-email] and use password=[redacted] for the demo.',
     );
     expect(JSON.stringify(saved)).not.toContain(validPayload().transcript);
@@ -237,7 +241,7 @@ describe('POST /mirror/friend-intake', () => {
 describe('POST /mirror/friend-intake/:runId/usefulness', () => {
   it('records exactly one bounded usefulness response without founder content', async () => {
     authenticate();
-    const writeFeedback = vi.fn(async () => undefined);
+    const writeFeedback = vi.fn(async (_record: FeedbackArg) => undefined);
 
     const response = await request(buildApp({ writeFeedback }))
       .post('/mirror/friend-intake/11111111-1111-4111-8111-111111111111/usefulness')
