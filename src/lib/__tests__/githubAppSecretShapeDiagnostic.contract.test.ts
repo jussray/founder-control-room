@@ -60,6 +60,15 @@ describe('GitHub App secret-shape diagnostic contract', () => {
     expect(workflow.slice(escapedIndex, rawIndex)).toContain("transportClass = 'escaped-newline-pem';");
   });
 
+  it('normalizes CRLF inside decoded base64 PEMs before boundary checks', () => {
+    const decodeStart = workflow.indexOf('function decodeBase64Pem(value) {');
+    const decodeEnd = workflow.indexOf("const trimmed = secret.trim()", decodeStart);
+    expect(decodeStart).toBeGreaterThan(-1);
+    expect(decodeEnd).toBeGreaterThan(decodeStart);
+    const decodeBody = workflow.slice(decodeStart, decodeEnd);
+    expect(decodeBody).toContain(".replace(/\\r\\n/g, '\\n')");
+  });
+
   it('emits only non-reconstructable shape classifications', () => {
     expect(workflow).toContain("schema: 'fcr/github-app-secret-shape@v1'");
     expect(workflow).toContain('appIdNumeric,');
