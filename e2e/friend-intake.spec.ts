@@ -117,9 +117,9 @@ for (const viewport of [
     await expect(page.getByText('One reflection, one move')).toBeVisible();
     await expect(page.locator('.move')).toHaveCount(1);
     await expect(page.locator('.tag-input')).toHaveCount(2);
-    await expect(page.getByText('model_inference')).toBeVisible();
 
     await page.getByText('Provenance · what this does and does not prove').click();
+    await expect(page.getByText('model_inference')).toBeVisible();
     await expect(page.getByText('external factual truth')).toBeVisible();
 
     await page.getByRole('button', { name: 'Yes' }).click();
