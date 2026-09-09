@@ -56,6 +56,25 @@ describe('Friend runtime providers', () => {
     });
   });
 
+  it('fails closed when the live-provider allowlist is missing', async () => {
+    const run = createFriendRuntimeRunner({
+      env: {
+        FRIEND_MODELS_ENABLED: 'true',
+        OPENAI_API_KEY: 'test-openai',
+      },
+      fetchFn: vi.fn() as typeof fetch,
+    });
+
+    await expect(run('openai', {
+      transcript: 'Build.',
+      timeEnergyContext: 'Ten minutes.',
+      voiceProfile: null,
+    })).rejects.toMatchObject({
+      code: 'FRIEND_PROVIDER_NOT_ALLOWED',
+      executionState: 'blocked',
+    });
+  });
+
   it('uses OpenAI structured output with provider storage disabled for the request', async () => {
     const fetchFn = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
       const body = JSON.parse(String(init?.body));
@@ -173,5 +192,34 @@ describe('Friend runtime providers', () => {
       webSearchUsed: false,
     });
     expect(result.modelExecutionState).toBe('succeeded');
+  });
+
+  it('cancels an oversized chunked provider response before buffering it all', async () => {
+    const oversized = new Uint8Array((128 * 1024) + 1);
+    oversized.fill(97);
+    const fetchFn = vi.fn(async () => new Response(new ReadableStream({
+      start(controller) {
+        controller.enqueue(oversized);
+        controller.close();
+      },
+    }), { status: 200 }));
+
+    const run = createFriendRuntimeRunner({
+      env: {
+        FRIEND_MODELS_ENABLED: 'true',
+        FRIEND_RUNTIME_PROVIDERS: 'openai',
+        OPENAI_API_KEY: 'test-openai',
+      },
+      fetchFn: fetchFn as typeof fetch,
+    });
+
+    await expect(run('openai', {
+      transcript: 'Move the build.',
+      timeEnergyContext: 'Ten minutes.',
+      voiceProfile: null,
+    })).rejects.toMatchObject({
+      code: 'FRIEND_RESPONSE_TOO_LARGE',
+      executionState: 'schema_invalid',
+    });
   });
 });
