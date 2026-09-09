@@ -99,6 +99,15 @@ async function prepareFriendPage(page: Page) {
   });
 }
 
+test('Control Room exposes Friend from the normal founder stack', async ({ page }) => {
+  await page.route('**/automation/conveyor/**', async (route) => {
+    await route.fulfill({ status: 401, contentType: 'application/json', body: '{}' });
+  });
+  await page.goto(`${origin}/control-room/`);
+  await expect(page.locator('a[href="/control-room/friend.html"]')).toHaveCount(1);
+  await expect(page.locator('a[href="/control-room/friend.html"]')).toContainText('Friend');
+});
+
 for (const viewport of [
   { label: 'desktop', width: 1280, height: 900 },
   { label: 'mobile', width: 390, height: 844 },
@@ -109,6 +118,7 @@ for (const viewport of [
 
     await page.goto(`${origin}/control-room/friend.html`);
     await expect(page.getByRole('heading', { name: 'One reflection. One move.' })).toBeVisible();
+    await expect(page.getByText('FCR stores no founder content.')).toBeVisible();
 
     await page.getByLabel('What is on your mind?').fill('I need one proof for the build.');
     await page.getByLabel('Runtime').selectOption('anthropic');
