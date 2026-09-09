@@ -5,26 +5,36 @@ on:
     branches: [main]
     paths:
       - 'src/http/routes/friendIntake.ts'
+      - 'src/http/routes/mirror.ts'
       - 'src/mirror/friendRuntime.ts'
       - 'src/chief/firstSliceContracts.ts'
       - 'src/model/execution.ts'
       - 'public/control-room/friend.*'
+      - 'public/control-room/index.html'
       - 'e2e/friend-intake.spec.ts'
       - 'supabase/migrations/*friend_intake*'
+      - 'wrangler.worker.toml'
       - 'docs/FRIEND_INTAKE_V1.md'
+      - 'docs/FCR_MULTI_AGENT_ENABLEMENT_CONTRACT.md'
+      - 'docs/DEEPSEEK_INSTRUCTOR_CONTRACT.md'
       - 'docs/FOUNDER_CONTROL_ROOM_AND_CHIEF_AI_MASTER_BUILD_SPEC_V1_5_ADDENDUM.md'
       - '.github/workflows/friend-intake-proof.yml'
   push:
     branches: [main]
     paths:
       - 'src/http/routes/friendIntake.ts'
+      - 'src/http/routes/mirror.ts'
       - 'src/mirror/friendRuntime.ts'
       - 'src/chief/firstSliceContracts.ts'
       - 'src/model/execution.ts'
       - 'public/control-room/friend.*'
+      - 'public/control-room/index.html'
       - 'e2e/friend-intake.spec.ts'
       - 'supabase/migrations/*friend_intake*'
+      - 'wrangler.worker.toml'
       - 'docs/FRIEND_INTAKE_V1.md'
+      - 'docs/FCR_MULTI_AGENT_ENABLEMENT_CONTRACT.md'
+      - 'docs/DEEPSEEK_INSTRUCTOR_CONTRACT.md'
       - 'docs/FOUNDER_CONTROL_ROOM_AND_CHIEF_AI_MASTER_BUILD_SPEC_V1_5_ADDENDUM.md'
       - '.github/workflows/friend-intake-proof.yml'
 
