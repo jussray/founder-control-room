@@ -23,7 +23,7 @@ const FOUNDER_EMAIL = 'founder@example.com';
 const BEARER = 'Bearer test-token';
 
 type TimelineEventArg = Parameters<NonNullable<FriendIntakeRouteDependencies['writeTimelineEvent']>>[0];
-type SummaryArg = Parameters<NonNullable<FriendIntakeRouteDependencies['writeSummary']>>[0];
+type CompletionArg = Parameters<NonNullable<FriendIntakeRouteDependencies['writeCompletion']>>[0];
 type FeedbackArg = Parameters<NonNullable<FriendIntakeRouteDependencies['writeFeedback']>>[0];
 
 function founderUsersRow() {
@@ -83,8 +83,8 @@ function buildApp(overrides: FriendIntakeRouteDependencies = {}) {
   app.use('/mirror/friend-intake', createFriendIntakeRouter({
     runFriendRuntime: vi.fn(async (provider) => runtimeResult(provider)),
     resolveProjectId: vi.fn(async () => 'project-1'),
-    writeTimelineEvent: vi.fn(async (_event: TimelineEventArg) => 'timeline-1'),
-    writeSummary: vi.fn(async (_record: SummaryArg) => undefined),
+    writeTimelineEvent: vi.fn(async (_event: TimelineEventArg) => 'timeline-failure-1'),
+    writeCompletion: vi.fn(async (_record: CompletionArg) => 'timeline-1'),
     writeFeedback: vi.fn(async (_record: FeedbackArg) => undefined),
     ...overrides,
   }));
@@ -131,16 +131,14 @@ describe('POST /mirror/friend-intake', () => {
     expect(runFriendRuntime).not.toHaveBeenCalled();
   });
 
-  it('processes without saving raw or summary content and emits one sanitized timeline receipt', async () => {
+  it('processes without saving founder content and emits one sanitized atomic completion receipt', async () => {
     authenticate();
-    const writeSummary = vi.fn(async (_record: SummaryArg) => undefined);
-    const writeTimelineEvent = vi.fn(async (_event: TimelineEventArg) => 'timeline-1');
+    const writeCompletion = vi.fn(async (_record: CompletionArg) => 'timeline-1');
     const runFriendRuntime = vi.fn(async () => runtimeResult('anthropic'));
 
     const response = await request(buildApp({
       runFriendRuntime,
-      writeSummary,
-      writeTimelineEvent,
+      writeCompletion,
     }))
       .post('/mirror/friend-intake')
       .set('Authorization', BEARER)
@@ -161,24 +159,24 @@ describe('POST /mirror/friend-intake', () => {
         webSearchUsed: false,
       },
     });
-    expect(writeSummary).not.toHaveBeenCalled();
-    expect(writeTimelineEvent).toHaveBeenCalledTimes(1);
+    expect(writeCompletion).toHaveBeenCalledTimes(1);
 
-    const timeline = writeTimelineEvent.mock.calls[0]?.[0];
-    const serialized = JSON.stringify(timeline);
+    const completion = writeCompletion.mock.calls[0]?.[0];
+    expect(completion?.summary).toBeNull();
+    const serialized = JSON.stringify(completion?.timelineEvent);
     expect(serialized).not.toContain(validPayload().transcript);
     expect(serialized).not.toContain(runtimeResult().mirror.summary);
     expect(serialized).not.toContain(runtimeResult().move.text);
   });
 
-  it('stores only the redacted summary when the founder opts in', async () => {
+  it('passes only the redacted summary into the atomic completion when the founder opts in', async () => {
     authenticate();
-    const writeSummary = vi.fn(async (_record: SummaryArg) => undefined);
+    const writeCompletion = vi.fn(async (_record: CompletionArg) => 'timeline-1');
     const result = runtimeResult('openai');
     result.mirror.summary = 'Email me at founder@example.com and use password:supersecret for the demo.';
     const runFriendRuntime = vi.fn(async () => result);
 
-    const response = await request(buildApp({ runFriendRuntime, writeSummary }))
+    const response = await request(buildApp({ runFriendRuntime, writeCompletion }))
       .post('/mirror/friend-intake')
       .set('Authorization', BEARER)
       .send({
@@ -188,14 +186,34 @@ describe('POST /mirror/friend-intake', () => {
 
     expect(response.status).toBe(200);
     expect(response.body.inputPersistence).toBe('redacted_summary_only');
-    expect(writeSummary).toHaveBeenCalledTimes(1);
+    expect(writeCompletion).toHaveBeenCalledTimes(1);
 
-    const saved = writeSummary.mock.calls[0]?.[0];
+    const saved = writeCompletion.mock.calls[0]?.[0].summary;
     expect(saved?.redactedSummary).toBe(
       'Email me at [redacted-email] and use password=[redacted] for the demo.',
     );
     expect(JSON.stringify(saved)).not.toContain(validPayload().transcript);
     expect(JSON.stringify(saved)).not.toContain('supersecret');
+  });
+
+  it('does not return a success receipt when atomic completion persistence fails', async () => {
+    authenticate();
+    const writeCompletion = vi.fn(async (_record: CompletionArg) => {
+      throw new Error('atomic completion unavailable');
+    });
+
+    const response = await request(buildApp({ writeCompletion }))
+      .post('/mirror/friend-intake')
+      .set('Authorization', BEARER)
+      .send({
+        ...validPayload(),
+        privacyChoice: 'save_redacted_summary',
+      });
+
+    expect(response.status).toBe(503);
+    expect(response.body.code).toBe('FRIEND_COMPLETION_PERSISTENCE_FAILED');
+    expect(response.body.timelineEventId).toBeUndefined();
+    expect(writeCompletion).toHaveBeenCalledTimes(1);
   });
 
   it('keeps sensitive input local even when a live provider was requested', async () => {
