@@ -1,14 +1,13 @@
 /**
- * Canonical multitool registry — mirrors the "Provider roles" section of
- * GLOBAL_AI.md. This is the single source of truth for which AI tools this
- * Control Room recognizes and what each is for.
+ * Canonical multitool registry for AI operators and model-provider identities
+ * recognized by Founder Control Room.
  *
  * Operator capability is coordination authority only. It never creates
  * credentials, provider access, merge authority, deploy authority, or founder
  * approval. Runtime model providers remain a separate concern.
  */
 
-export type AgentOperatorCapability = 'research' | 'propose' | 'review' | 'implement';
+export type AgentOperatorCapability = 'research' | 'propose' | 'review' | 'implement' | 'instruct';
 
 export interface AgentOperatorPolicy {
   enabled: boolean;
@@ -27,6 +26,7 @@ export interface AgentDescriptor {
 
 const FCR_V14 = 'docs/FOUNDER_CONTROL_ROOM_AND_CHIEF_AI_MASTER_BUILD_SPEC_V1_4_ADDENDUM.md';
 const MULTI_AGENT = 'docs/FCR_MULTI_AGENT_ENABLEMENT_CONTRACT.md';
+const DEEPSEEK_INSTRUCTOR = 'docs/DEEPSEEK_INSTRUCTOR_CONTRACT.md';
 
 export const AGENT_REGISTRY: readonly AgentDescriptor[] = [
   {
@@ -54,6 +54,18 @@ export const AGENT_REGISTRY: readonly AgentDescriptor[] = [
     },
   },
   {
+    id: 'deepseek-instructor',
+    label: 'DeepSeek Instructor',
+    role: 'Cross-project instruction, adversarial challenge, solution synthesis, and portable pattern extraction without direct implementation authority.',
+    operator: {
+      enabled: true,
+      capabilities: ['research', 'propose', 'review', 'instruct'],
+      firstSliceRuntimeModel: false,
+      externalWritesRequireBoundAuthority: true,
+      instructionContracts: [DEEPSEEK_INSTRUCTOR, FCR_V14, MULTI_AGENT],
+    },
+  },
+  {
     id: 'openai-platform',
     label: 'OpenAI Platform',
     role: 'Replaceable server-side model capability behind adapters; never client-side keys.',
@@ -62,6 +74,11 @@ export const AGENT_REGISTRY: readonly AgentDescriptor[] = [
     id: 'anthropic-platform',
     label: 'Anthropic Platform',
     role: 'Replaceable server-side model capability behind adapters; model context is not durable memory.',
+  },
+  {
+    id: 'deepseek-platform',
+    label: 'DeepSeek Platform',
+    role: 'Replaceable server-side reasoning/model capability behind adapters; provider availability never grants operator or mutation authority.',
   },
   {
     id: 'perplexity',
