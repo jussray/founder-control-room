@@ -61,6 +61,18 @@ A material FCR or cross-repository audit must verify all of the following:
    - Bind every surfaced infrastructure claim to current provider evidence and the affected product path. A provider incident is provider-state evidence, not proof of an application defect.
    - Collapse each infrastructure review to the one or two highest-value founder gates. Do not create six parallel vendor backlogs when no product action is required.
 
+9. **Revenue Proof OS attention**
+   - Money work optimizes for verified economic outcomes, not outreach volume, eligibility badges, clicks, meetings, or pipeline theater.
+   - Keep B2B customer revenue, owned/creator/affiliate commerce, and financing capital semantically and financially separate even when FCR coordinates all three.
+   - Reacquire authoritative evidence before advancing a money state. Gmail/provider acceptance can prove outreach; payment/order/commission/account evidence proves economic progression. Neither may substitute for the other.
+   - Customer work is reply-first: a new substantive buyer reply anywhere in the historical contacted set becomes the next conversion gate and blocks a fresh cold batch until reviewed.
+   - Historical recipients remain in the duplicate guard. Provider acceptance consumes a send lease; ambiguous acceptance or verification stops remaining serial sends without retry.
+   - Cold customer outreach may optimize for a bounded paid proof, diagnostic, verification/audit engagement, or similarly small first transaction, but pricing, discounts, negotiation, contracts, payment actions, follow-ups, retries, resends, alternate-channel contact, and unreviewed attachments remain outside standing authority unless explicitly approved.
+   - Investor discovery and tailored draft preparation may advance independently, but investor outreach is `REVIEW_REQUIRED` unless the founder explicitly changes authority. Investment, grants, loans, meetings, term sheets, commitments, and funded capital are financing, never customer revenue.
+   - Se’kret Bip is the sole flagship company for its current $500,000 pre-seed SAFE thesis. Internal FCR systems are founder-leverage capabilities, not co-equal recipients of that raise; unrelated portfolio projects must not silently consume the raise.
+   - Owned/creator commerce may use already active low/no-upfront-cost surfaces, but eligibility, storefront existence, traffic, followers, saves, or pending activity are not earnings. Do not claim product use without evidence or automatically buy products, spend on ads, change pricing, create paid subscriptions, enter contracts, or publish new endorsements.
+   - Collapse every money review to the smallest evidence-backed next gate most likely to advance a real transaction while preserving authority and truth boundaries.
+
 ## Infrastructure consequence filter
 
 For Cloudflare, Supabase, Firebase, Expo, n8n, Vercel, and future infrastructure providers, classify a newly observed provider change before routing it into founder work:
@@ -89,6 +101,38 @@ A `MATERIAL` classification must return:
 5. at most two founder review gates unless additional action becomes necessary as evidence changes.
 
 Do not convert `WATCH`, `NOISE`, or `UNKNOWN` into implementation work merely because a vendor announced something new.
+
+## Revenue Proof OS filter
+
+Classify money evidence by source and plane before routing it into founder work:
+
+```text
+CUSTOMER REVENUE
+ENGAGED → QUALIFIED → PROPOSAL_READY → PROPOSAL_SENT → NEGOTIATING
+→ SIGNED → INVOICED → CASH_COLLECTED → FULFILLED → CUSTOMER_VALUE_VERIFIED
+
+OWNED / CREATOR COMMERCE
+SETUP_VERIFIED → OFFER/LINK_LIVE → QUALIFIED_TRAFFIC → ORDER/COMMISSION_PENDING
+→ COMMISSION_EARNED → CASH_COLLECTED
+
+FINANCING CAPITAL
+IDENTIFIED → CONTACTABLE → ENGAGED → INTERESTED → DILIGENCE
+→ TERM_SHEET → COMMITTED → FUNDED
+```
+
+Do not merge these state machines into one vanity pipeline. `CASH_COLLECTED` must identify which economic plane produced the cash and be backed by an authoritative financial/payment/commission source with coverage limitations explicit.
+
+A money audit must return:
+
+1. current reality and source coverage;
+2. revenue delta since the prior observation;
+3. any reply-first customer blocker;
+4. historical-send and duplicate-guard defects that change eligibility;
+5. the exact authority boundary for the next mutation;
+6. the smallest conversion gate for customer revenue;
+7. the highest-leverage no/low-cost transaction-readiness gate for owned commerce;
+8. investor targets/drafts separately behind the review gate;
+9. one founder-readable next gate based on evidence rather than activity count.
 
 ## Architectural drift test
 
@@ -136,6 +180,9 @@ What one decision/action returns to the founder?
 
 INFRA CONSEQUENCE
 Is any provider change MATERIAL, WATCH, NOISE, or UNKNOWN for this exact product path?
+
+MONEY PLANE
+Is this customer revenue, owned/creator commerce, financing capital, or not economic work? Are its state and evidence being kept separate from the other planes?
 
 COHESION
 Does this extend FCR, or accidentally create a parallel operating system?
@@ -190,6 +237,6 @@ Do not call a project cohesive based on naming, documentation, or architecture d
 
 ## Rollback
 
-This document changes governance and audit expectations only. It does not itself migrate schemas, route traffic, merge repositories, rename products, or move data.
+This document changes governance and audit expectations only. It does not itself migrate schemas, route traffic, merge repositories, rename products, move data, send outreach, move money, or change provider authority.
 
-If this contract proves too broad, revert the governance commit and preserve the prior project boundaries while a narrower contract is reviewed. Never "fix" cohesion by collapsing privacy, security, billing, deployment, or product-data boundaries.
+If this contract proves too broad, revert the governance commit and preserve the prior project boundaries while a narrower contract is reviewed. Never "fix" cohesion by collapsing privacy, security, billing, deployment, financial, or product-data boundaries.
