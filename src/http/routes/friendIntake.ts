@@ -11,18 +11,28 @@ import {
   type FirstSlicePrivacyChoice,
   validateFirstSliceRun,
 } from '../../chief/firstSliceContracts.js';
+import { readFounderSession } from '../../auth/founderSession.js';
 import { supabase } from '../../lib/supabaseClient.js';
-import { requireFounder, type FounderRequest } from '../middleware/requireFounder.js';
+import {
+  requireFounder,
+  requireInteractiveFounder,
+  type FounderRequest,
+} from '../middleware/requireFounder.js';
 import {
   clearSensitiveSaveReviewReceipt,
   issueSensitiveSaveReviewReceipt,
   readSensitiveSaveReviewReceipt,
+  reviewReceiptDerivedUuid,
   setSensitiveSaveReviewReceipt,
   verifySensitiveSaveReviewReceipt,
+  type SensitiveSaveReviewBinding,
 } from './friendIntakeReviewReceipt.js';
 
 type DbRecord = Record<string, unknown>;
 type RunEngine = (input: DeterministicFriendIntakeInput) => DeterministicFriendIntakeResult;
+
+const FIRST_SLICE_ENGINE_VERSION = 'first-slice-v1';
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 type PersistRunInput = {
   intakeId: string;
@@ -52,14 +62,16 @@ type RecordUsefulnessInput = {
 
 export interface FriendIntakeRouteDependencies {
   authMiddleware?: RequestHandler;
+  interactiveAuthMiddleware?: RequestHandler;
   enabled?: () => boolean;
+  persistenceEnabled?: () => boolean;
   runEngine?: RunEngine;
   resolveProjectId?: () => Promise<string>;
+  resolveInteractiveSessionIdHash?: (req: FounderRequest) => Promise<string | null>;
   persistRun?: (input: PersistRunInput) => Promise<void>;
   recordUsefulness?: (input: RecordUsefulnessInput) => Promise<void>;
 }
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const rateLimitFriendIntake = rateLimit({
   windowMs: 60 * 1_000,
   limit: 60,
@@ -86,6 +98,10 @@ function friendIntakeEnabled(): boolean {
   return process.env.FCR_FRIEND_INTAKE_ENABLED?.trim().toLowerCase() === 'true';
 }
 
+function friendIntakePersistenceEnabled(): boolean {
+  return process.env.FCR_FRIEND_INTAKE_PERSISTENCE_ENABLED?.trim().toLowerCase() === 'true';
+}
+
 async function defaultResolveProjectId(): Promise<string> {
   const { data, error } = await supabase
     .from('projects')
@@ -97,6 +113,11 @@ async function defaultResolveProjectId(): Promise<string> {
   const id = data && typeof data.id === 'string' ? data.id.trim() : '';
   if (!id) throw new Error('FRIEND_INTAKE_PROJECT_NOT_REGISTERED');
   return id;
+}
+
+async function defaultResolveInteractiveSessionIdHash(req: FounderRequest): Promise<string | null> {
+  const session = await readFounderSession(req);
+  return session?.sessionIdHash ?? null;
 }
 
 async function defaultPersistRun(input: PersistRunInput): Promise<void> {
@@ -142,17 +163,24 @@ function moveGateWarningCode(result: DeterministicFriendIntakeResult): string | 
 export function createFriendIntakeRouter(dependencies: FriendIntakeRouteDependencies = {}) {
   const router = Router();
   const enabled = dependencies.enabled ?? friendIntakeEnabled;
+  const persistenceEnabled = dependencies.persistenceEnabled ?? friendIntakePersistenceEnabled;
   const authMiddleware = dependencies.authMiddleware ?? requireFounder;
+  const interactiveAuthMiddleware = dependencies.interactiveAuthMiddleware ?? requireInteractiveFounder;
   const engine = new FirstSliceEngine();
   const runEngine = dependencies.runEngine ?? ((input) => engine.run(input));
   const resolveProjectId = dependencies.resolveProjectId ?? defaultResolveProjectId;
+  const resolveInteractiveSessionIdHash = dependencies.resolveInteractiveSessionIdHash
+    ?? defaultResolveInteractiveSessionIdHash;
   const persistRun = dependencies.persistRun ?? defaultPersistRun;
   const recordUsefulness = dependencies.recordUsefulness ?? defaultRecordUsefulness;
 
   router.use(rateLimitFriendIntake);
   router.get('/status', (_req, res) => {
     res.set('Cache-Control', 'no-store');
-    return res.status(200).json({ enabled: enabled() });
+    return res.status(200).json({
+      enabled: enabled(),
+      persistenceEnabled: persistenceEnabled(),
+    });
   });
 
   router.use((req, res, next) => {
@@ -161,10 +189,18 @@ export function createFriendIntakeRouter(dependencies: FriendIntakeRouteDependen
     }
     next();
   });
-  router.use(authMiddleware);
 
-  router.post('/run', async (req: FounderRequest, res) => {
-    const body = req.body as DbRecord;
+  const authenticateRun: RequestHandler = (req, res, next) => {
+    const body = (req.body ?? {}) as DbRecord;
+    const privacyChoice = parsePrivacyChoice(body.privacyChoice);
+    const middleware = privacyChoice === 'save_redacted_summary'
+      ? interactiveAuthMiddleware
+      : authMiddleware;
+    return middleware(req, res, next);
+  };
+
+  router.post('/run', authenticateRun, async (req: FounderRequest, res) => {
+    const body = (req.body ?? {}) as DbRecord;
     const privacyChoice = parsePrivacyChoice(body.privacyChoice);
 
     if (!privacyChoice) {
@@ -179,6 +215,16 @@ export function createFriendIntakeRouter(dependencies: FriendIntakeRouteDependen
         privacyChoice: 'cancel',
         inputPersistence: 'none',
         timelineEventId: null,
+      });
+    }
+
+    if (privacyChoice === 'save_redacted_summary' && !persistenceEnabled()) {
+      clearSensitiveSaveReviewReceipt(res);
+      res.set('Cache-Control', 'no-store');
+      return res.status(503).json({
+        error: 'Friend Intake summary persistence is disabled on this runtime',
+        code: 'FRIEND_INTAKE_PERSISTENCE_DISABLED',
+        inputPersistence: 'none',
       });
     }
 
@@ -216,16 +262,35 @@ export function createFriendIntakeRouter(dependencies: FriendIntakeRouteDependen
     const isSensitiveSave = privacyChoice === 'save_redacted_summary'
       && result.sensitiveCategories.length > 0;
     let sensitiveSaveReviewed = false;
+    let confirmedReviewReceipt: string | null = null;
 
     if (isSensitiveSave) {
+      const browserSessionIdHash = await resolveInteractiveSessionIdHash(req);
+      if (!browserSessionIdHash) {
+        clearSensitiveSaveReviewReceipt(res);
+        res.set('Cache-Control', 'no-store');
+        return res.status(401).json({
+          error: 'Interactive founder session required for sensitive Friend Intake persistence',
+          code: 'SENSITIVE_SAVE_INTERACTIVE_SESSION_REQUIRED',
+        });
+      }
+
+      const reviewBinding: SensitiveSaveReviewBinding = {
+        founderId,
+        browserSessionIdHash,
+        rawText,
+        result,
+        engineVersion: FIRST_SLICE_ENGINE_VERSION,
+        moveGateWarningCode: moveGateWarningCode(result),
+      };
       const reviewReceipt = readSensitiveSaveReviewReceipt(req);
       sensitiveSaveReviewed = sensitiveSaveConfirmed
-        && verifySensitiveSaveReviewReceipt(reviewReceipt, founderId, rawText, result);
+        && verifySensitiveSaveReviewReceipt(reviewReceipt, reviewBinding);
 
       if (!sensitiveSaveReviewed) {
         let issuedReceipt: string;
         try {
-          issuedReceipt = issueSensitiveSaveReviewReceipt(founderId, rawText, result);
+          issuedReceipt = issueSensitiveSaveReviewReceipt(reviewBinding);
         } catch {
           return res.status(500).json({
             error: 'Sensitive Friend Intake review receipt is unavailable',
@@ -248,10 +313,16 @@ export function createFriendIntakeRouter(dependencies: FriendIntakeRouteDependen
           },
         });
       }
+
+      confirmedReviewReceipt = reviewReceipt;
     }
 
-    const intakeId = randomUUID();
-    const timelineEventId = randomUUID();
+    const intakeId = confirmedReviewReceipt
+      ? reviewReceiptDerivedUuid(confirmedReviewReceipt, 'intake')
+      : randomUUID();
+    const timelineEventId = confirmedReviewReceipt
+      ? reviewReceiptDerivedUuid(confirmedReviewReceipt, 'timeline')
+      : randomUUID();
     let projectId: string;
     try {
       projectId = await resolveProjectId();
@@ -273,7 +344,16 @@ export function createFriendIntakeRouter(dependencies: FriendIntakeRouteDependen
         provenanceId,
         timelineEventId,
       });
-    } catch {
+    } catch (error) {
+      const message = error instanceof Error ? error.message.toLowerCase() : '';
+      if (confirmedReviewReceipt && (message.includes('duplicate') || message.includes('unique'))) {
+        clearSensitiveSaveReviewReceipt(res);
+        res.set('Cache-Control', 'no-store');
+        return res.status(409).json({
+          error: 'This sensitive Friend Intake review was already consumed',
+          code: 'SENSITIVE_SAVE_REVIEW_ALREADY_USED',
+        });
+      }
       return res.status(500).json({
         error: 'Friend Intake receipt persistence failed',
         code: 'FRIEND_INTAKE_PERSISTENCE_FAILED',
@@ -289,7 +369,7 @@ export function createFriendIntakeRouter(dependencies: FriendIntakeRouteDependen
         runId: intakeId,
         privacyChoice,
         inputPersistence: privacyChoice === 'save_redacted_summary'
-          ? 'redacted_summary_only'
+          ? 'redacted_summary_and_derived_labels'
           : 'none',
         mirror: result.mirror,
         intentTags: result.intentTags,
@@ -303,7 +383,7 @@ export function createFriendIntakeRouter(dependencies: FriendIntakeRouteDependen
         provenance: {
           id: provenanceId,
           kind: 'deterministic_rule_engine',
-          engineVersion: 'first-slice-v1',
+          engineVersion: FIRST_SLICE_ENGINE_VERSION,
           externalModelCalled: false,
           relatedMemoryUsed: false,
         },
@@ -316,13 +396,17 @@ export function createFriendIntakeRouter(dependencies: FriendIntakeRouteDependen
     });
   });
 
-  router.post('/usefulness', async (req: FounderRequest, res) => {
-    const body = req.body as DbRecord;
+  router.post('/usefulness', authMiddleware, async (req: FounderRequest, res) => {
+    const body = (req.body ?? {}) as DbRecord;
     const runId = boundedString(body.runId, 64);
     const response = body.response;
+    const suppliedEventId = boundedString(body.eventId, 64);
 
     if (!runId || !UUID.test(runId)) {
       return res.status(400).json({ error: 'runId must be a UUID' });
+    }
+    if (suppliedEventId && !UUID.test(suppliedEventId)) {
+      return res.status(400).json({ error: 'eventId must be a UUID when supplied' });
     }
     if (response !== 'yes' && response !== 'not_really' && response !== 'wrong_time') {
       return res.status(400).json({ error: 'response is invalid' });
@@ -333,6 +417,7 @@ export function createFriendIntakeRouter(dependencies: FriendIntakeRouteDependen
       return res.status(401).json({ error: 'Founder session required' });
     }
 
+    const eventId = suppliedEventId ?? randomUUID();
     try {
       const projectId = await resolveProjectId();
       await recordUsefulness({
@@ -340,7 +425,7 @@ export function createFriendIntakeRouter(dependencies: FriendIntakeRouteDependen
         founderId,
         projectId,
         response,
-        eventId: randomUUID(),
+        eventId,
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : '';
@@ -354,7 +439,7 @@ export function createFriendIntakeRouter(dependencies: FriendIntakeRouteDependen
     }
 
     res.set('Cache-Control', 'no-store');
-    return res.status(200).json({ ok: true, runId, response });
+    return res.status(200).json({ ok: true, runId, response, eventId });
   });
 
   return router;
