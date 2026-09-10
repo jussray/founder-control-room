@@ -126,7 +126,7 @@ test('desktop saved-summary flow is model-free, bounded, and useful', async ({ p
   await page.screenshot({ path: 'test-results/friend-intake-desktop.png', fullPage: true });
 });
 
-test('sensitive saved-summary confirmation is serialized before persistence', async ({ page }) => {
+test('sensitive saved-summary confirmation reviews every persisted label and is serialized', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   const externalRequests = captureExternalRequests(page);
   const rawText = 'My child is involved in a custody issue.';
@@ -140,13 +140,17 @@ test('sensitive saved-summary confirmation is serialized before persistence', as
   await expect(review).toBeVisible();
   await expect(review).toContainText('Sensitive content detected.');
   await expect(review).toContainText('Nothing has been saved yet.');
+  await expect(review.locator('[data-reviewed-sensitive-categories]')).toContainText('teen');
+  await expect(review.locator('[data-reviewed-sensitive-categories]')).toContainText('legal');
+  await expect(review.locator('[data-reviewed-intent-tags]')).toContainText('kids');
+  await expect(review.locator('[data-reviewed-intent-tags]')).toContainText('legal');
   await expect(review).not.toContainText(rawText);
   expect(persistedRuns).toHaveLength(0);
   expect(externalRequests).toEqual([]);
 
   await page.screenshot({ path: 'test-results/friend-intake-sensitive-review.png', fullPage: true });
 
-  await page.getByRole('button', { name: 'Save this redacted summary' }).dblclick();
+  await page.getByRole('button', { name: 'Save reviewed summary and labels' }).dblclick();
   const receipt = page.locator('[data-friend-intake-receipt]');
   await expect(receipt).toBeVisible();
   await expect(receipt).toContainText('Redacted summary only');
@@ -156,9 +160,44 @@ test('sensitive saved-summary confirmation is serialized before persistence', as
   const persisted = persistedRuns[0];
   expect(persisted.privacyChoice).toBe('save_redacted_summary');
   expect(persisted.sensitiveCategories).toEqual(expect.arrayContaining(['teen', 'legal']));
+  expect(persisted.intentTagIds).toEqual(expect.arrayContaining(['kids', 'legal']));
   expect(String(persisted.redactedSummary)).not.toContain(rawText);
   expect(JSON.stringify(persisted)).not.toContain(rawText);
   expect(externalRequests).toEqual([]);
+});
+
+test('cancelling a sensitive review revokes the shared confirmation receipt', async ({ page, context }) => {
+  const rawText = 'My child is involved in a custody issue.';
+  await page.goto(`${baseUrl}/control-room/friend-intake.html`, { waitUntil: 'networkidle' });
+  await page.fill('#friend-input', rawText);
+  await page.check('input[value="save_redacted_summary"]');
+  await page.getByRole('button', { name: 'Mirror and give me one move' }).click();
+  await expect(page.locator('[data-sensitive-save-review]')).toBeVisible();
+
+  const secondPage = await context.newPage();
+  await secondPage.goto(`${baseUrl}/control-room/friend-intake.html`, { waitUntil: 'networkidle' });
+
+  await page.getByRole('button', { name: 'Cancel and clear' }).click();
+  await expect(page.locator('[data-sensitive-save-review]')).toHaveCount(0);
+
+  const status = await secondPage.evaluate(async (reviewedText) => {
+    const response = await fetch('/friend-intake/run', {
+      method: 'POST',
+      credentials: 'same-origin',
+      cache: 'no-store',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        rawText: reviewedText,
+        privacyChoice: 'save_redacted_summary',
+        sensitiveSaveConfirmed: true,
+      }),
+    });
+    return response.status;
+  }, rawText);
+
+  expect(status).toBe(409);
+  expect(persistedRuns).toHaveLength(0);
+  await secondPage.close();
 });
 
 test('control room hides Friend Intake navigation when runtime availability is false', async ({ page }) => {
@@ -171,7 +210,10 @@ test('control room hides Friend Intake navigation when runtime availability is f
   });
 
   await page.goto(`${baseUrl}/control-room/`, { waitUntil: 'networkidle' });
-  await expect(page.locator('[data-friend-intake-link]')).toBeHidden();
+  const link = page.locator('[data-friend-intake-link]');
+  await expect(link).toBeHidden();
+  await page.locator('.launch-dock summary').click();
+  await expect(link).toBeHidden();
 });
 
 test('mobile process-without-saving protects sensitive input and stores no intake content', async ({ page }) => {

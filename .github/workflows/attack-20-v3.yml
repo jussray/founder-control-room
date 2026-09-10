@@ -98,25 +98,33 @@ jobs:
         shell: bash
         env:
           EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_REF: ${{ github.event.pull_request.base.ref || '' }}
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha || '' }}
           PUSH_BEFORE_SHA: ${{ github.event.before || '' }}
         run: |
           set -euo pipefail
 
           if [ "$EVENT_NAME" = "pull_request" ]; then
-            live_base_sha="$PR_BASE_SHA"
+            if [ -z "$PR_BASE_REF" ]; then
+              echo "Attack-20 base resolution failed: pull request base ref is unavailable." >&2
+              exit 1
+            fi
+            live_base_sha="$(git ls-remote origin "refs/heads/$PR_BASE_REF" | awk 'NR == 1 { print $1 }')"
+            if [ "$live_base_sha" != "$PR_BASE_SHA" ]; then
+              printf 'Attack-20 observed base movement: event=%s live=%s\n' "$PR_BASE_SHA" "$live_base_sha"
+            fi
           else
             live_base_sha="$PUSH_BEFORE_SHA"
           fi
 
           if ! [[ "$live_base_sha" =~ ^[0-9a-f]{40}$ ]]; then
-            echo "Attack-20 base resolution failed: expected an exact event-bound base SHA." >&2
+            echo "Attack-20 base resolution failed: expected an exact provider-resolved base SHA." >&2
             exit 1
           fi
 
           git fetch --no-tags origin "$live_base_sha"
           if ! git merge-base --is-ancestor "$live_base_sha" "$EXPECTED_SHA"; then
-            echo "Attack-20 base resolution failed: event-bound base is not an ancestor of the exact candidate." >&2
+            echo "Attack-20 base resolution failed: current live base is not an ancestor of the exact candidate." >&2
             echo "live_base_sha=$live_base_sha" >&2
             echo "candidate_sha=$EXPECTED_SHA" >&2
             exit 1

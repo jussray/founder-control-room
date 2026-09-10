@@ -43,6 +43,15 @@ describe('Friend Intake sensitive-save review receipt', () => {
     expect(token).not.toContain(RESULT.redactedSummary ?? '');
   });
 
+  it('binds every persisted sensitive-review label into the receipt', () => {
+    const token = issueSensitiveSaveReviewReceipt(FOUNDER_ID, RAW_TEXT, RESULT, NOW);
+    const changedIntentTags = { ...RESULT, intentTags: ['general'] as DeterministicFriendIntakeResult['intentTags'] };
+    const changedCategories = { ...RESULT, sensitiveCategories: ['health'] as DeterministicFriendIntakeResult['sensitiveCategories'] };
+
+    expect(verifySensitiveSaveReviewReceipt(token, FOUNDER_ID, RAW_TEXT, changedIntentTags, NOW)).toBe(false);
+    expect(verifySensitiveSaveReviewReceipt(token, FOUNDER_ID, RAW_TEXT, changedCategories, NOW)).toBe(false);
+  });
+
   it('expires after the five-minute review window and rejects malformed receipts', () => {
     const token = issueSensitiveSaveReviewReceipt(FOUNDER_ID, RAW_TEXT, RESULT, NOW);
 

@@ -240,6 +240,8 @@ export function createFriendIntakeRouter(dependencies: FriendIntakeRouteDependen
           code: 'SENSITIVE_SAVE_REVIEW_REQUIRED',
           review: {
             redactedSummary: result.redactedSummary,
+            sensitiveCategories: result.sensitiveCategories,
+            intentTagIds: result.intentTags,
             inputPersistence: 'none',
             externalModelCalled: false,
             reviewReceiptIssued: true,

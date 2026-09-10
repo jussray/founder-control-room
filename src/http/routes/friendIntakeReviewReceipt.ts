@@ -54,6 +54,7 @@ function canonicalReviewInput(
     rawText,
     result.redactedSummary ?? '',
     [...result.sensitiveCategories].sort().join(','),
+    [...result.intentTags].sort().join(','),
     String(expiresAt),
   ].join('\n');
 }

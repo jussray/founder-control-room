@@ -8,6 +8,13 @@ function escapeHtml(value) {
   ));
 }
 
+function reviewLabels(values, dataAttribute) {
+  const labels = Array.isArray(values) ? values : [];
+  return `<div class="tag-list" ${dataAttribute}>${labels.map((label) => (
+    `<span class="tag-chip">${escapeHtml(String(label).replaceAll('_', ' '))}</span>`
+  )).join('')}</div>`;
+}
+
 async function loadFounderIdentity() {
   const response = await fetch('/auth/me', {
     credentials: 'same-origin',
@@ -34,8 +41,58 @@ function renderSignedOut() {
 
 function privacyMessage(choice) {
   return choice === 'save_redacted_summary'
-    ? 'A bounded category-level summary plus operational receipt metadata may be saved. Raw input is not stored. Sensitive saves require a review before persistence.'
+    ? 'A bounded category-level summary plus the displayed derived labels may be saved. Raw input is not stored. Sensitive saves require a review before persistence.'
     : 'Raw input and derived intake labels are not stored. A behavior-only timeline receipt is recorded.';
+}
+
+function clearIntakeForm(form) {
+  form.reset();
+  root.querySelector('#privacy-note').textContent = privacyMessage('process_without_saving');
+  root.querySelector('#friend-intake-result').innerHTML = '';
+  root.querySelector('#friend-input').focus();
+  activeReceipt = null;
+}
+
+async function revokeSensitiveReviewAndClear(form) {
+  if (intakeRequestInFlight) return;
+
+  const error = root.querySelector('#friend-intake-error');
+  const guardedControls = [...root.querySelectorAll('#friend-intake-form button, [data-sensitive-save-review] button')];
+  error.hidden = true;
+  error.textContent = '';
+  intakeRequestInFlight = true;
+  guardedControls.forEach((control) => {
+    if (control instanceof HTMLButtonElement) control.disabled = true;
+  });
+
+  try {
+    const response = await fetch('/friend-intake/run', {
+      method: 'POST',
+      credentials: 'same-origin',
+      cache: 'no-store',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ privacyChoice: 'cancel' }),
+    });
+    const body = await response.json().catch(() => null);
+
+    if (response.status === 401) {
+      renderSignedOut();
+      return;
+    }
+    if (!response.ok || body?.status !== 'cancelled') {
+      throw new Error(body?.error ?? `Friend Intake cancellation failed (${response.status}).`);
+    }
+
+    clearIntakeForm(form);
+  } catch (caught) {
+    error.textContent = caught instanceof Error ? caught.message : String(caught);
+    error.hidden = false;
+  } finally {
+    intakeRequestInFlight = false;
+    guardedControls.forEach((control) => {
+      if (control instanceof HTMLButtonElement && control.isConnected) control.disabled = false;
+    });
+  }
 }
 
 function renderForm(founder) {
@@ -60,7 +117,7 @@ function renderForm(founder) {
           </label>
           <label class="privacy-option">
             <input type="radio" name="privacyChoice" value="save_redacted_summary" />
-            <span>Save redacted summary<small>Stores only a bounded category-level summary, never your raw text.</small></span>
+            <span>Save redacted summary<small>Stores the bounded summary and displayed derived labels, never your raw text.</small></span>
           </label>
         </fieldset>
 
@@ -93,11 +150,11 @@ function renderForm(founder) {
   });
   root.querySelector('#cancel-intake').addEventListener('click', () => {
     if (intakeRequestInFlight) return;
-    form.reset();
-    privacyNote.textContent = privacyMessage('process_without_saving');
-    root.querySelector('#friend-intake-result').innerHTML = '';
-    root.querySelector('#friend-input').focus();
-    activeReceipt = null;
+    if (root.querySelector('[data-sensitive-save-review]')) {
+      void revokeSensitiveReviewAndClear(form);
+      return;
+    }
+    clearIntakeForm(form);
   });
 }
 
@@ -145,6 +202,8 @@ async function submitIntake(form, options = {}) {
       response.status === 409
       && body?.code === 'SENSITIVE_SAVE_REVIEW_REQUIRED'
       && typeof body?.review?.redactedSummary === 'string'
+      && Array.isArray(body?.review?.sensitiveCategories)
+      && Array.isArray(body?.review?.intentTagIds)
     ) {
       activeReceipt = null;
       renderSensitiveSaveReview(form, body.review, rawText);
@@ -173,14 +232,18 @@ function renderSensitiveSaveReview(form, review, reviewedRawText) {
     <article class="result-card" data-sensitive-save-review>
       <p class="eyebrow">Privacy review</p>
       <h2>Sensitive content detected.</h2>
-      <p>Nothing has been saved yet. Review the bounded summary below before deciding whether to store it.</p>
+      <p>Nothing has been saved yet. Review the bounded summary and derived labels below before deciding whether to store them.</p>
       <section class="receipt-section">
         <h3>What would be saved</h3>
         <p>${escapeHtml(review.redactedSummary)}</p>
-        <p class="muted">Raw input, Mirror text, and Move text will not be stored.</p>
+        <h4>Sensitive categories</h4>
+        ${reviewLabels(review.sensitiveCategories, 'data-reviewed-sensitive-categories')}
+        <h4>Intent tags</h4>
+        ${reviewLabels(review.intentTagIds, 'data-reviewed-intent-tags')}
+        <p class="muted">The displayed summary and labels are the intake content being reviewed. Raw input, Mirror text, and Move text will not be stored.</p>
       </section>
       <div class="actions">
-        <button class="primary" data-confirm-sensitive-save type="button">Save this redacted summary</button>
+        <button class="primary" data-confirm-sensitive-save type="button">Save reviewed summary and labels</button>
         <button class="secondary" data-process-unsaved type="button">Process without saving instead</button>
       </div>
       <p class="feedback-status" data-sensitive-review-status></p>

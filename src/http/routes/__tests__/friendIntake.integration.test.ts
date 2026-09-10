@@ -211,6 +211,8 @@ describe('Friend Intake route', () => {
     expect(reviewResponse.body).toMatchObject({
       code: 'SENSITIVE_SAVE_REVIEW_REQUIRED',
       review: {
+        sensitiveCategories: expect.arrayContaining(['teen', 'legal']),
+        intentTagIds: expect.arrayContaining(['kids', 'legal']),
         inputPersistence: 'none',
         externalModelCalled: false,
         reviewReceiptIssued: true,
@@ -238,7 +240,8 @@ describe('Friend Intake route', () => {
       sensitiveSaveReviewed: true,
       modelExecutionState: 'blocked',
     });
-    expect(persisted?.sensitiveCategories).toEqual(expect.arrayContaining(['teen', 'legal']));
+    expect(persisted?.sensitiveCategories).toEqual(reviewResponse.body.review.sensitiveCategories);
+    expect(persisted?.intentTagIds).toEqual(reviewResponse.body.review.intentTagIds);
     expect(persisted?.redactedSummary).toBeTruthy();
     expect(JSON.stringify(persisted)).not.toContain(rawText);
   });
@@ -290,6 +293,33 @@ describe('Friend Intake route', () => {
       timelineEventId: null,
     });
     expect(resolveProjectId).not.toHaveBeenCalled();
+    expect(persistRun).not.toHaveBeenCalled();
+  });
+
+  it('cancellation expires an issued sensitive-review receipt before any persistence', async () => {
+    authenticateFounder();
+    const persistRun = vi.fn(async (_input: PersistRunInput) => undefined);
+    const app = buildApp({ persistRun });
+    const agent = request.agent(app);
+
+    const reviewResponse = await agent
+      .post('/friend-intake/run')
+      .set('Authorization', BEARER)
+      .send({ rawText: 'My child is involved in a custody issue.', privacyChoice: 'save_redacted_summary' });
+    expect(reviewResponse.status).toBe(409);
+
+    const cancelResponse = await agent
+      .post('/friend-intake/run')
+      .set('Authorization', BEARER)
+      .send({ privacyChoice: 'cancel' });
+
+    expect(cancelResponse.status).toBe(200);
+    const setCookieHeader = cancelResponse.headers['set-cookie'];
+    const setCookieText = Array.isArray(setCookieHeader)
+      ? setCookieHeader.join(';')
+      : String(setCookieHeader ?? '');
+    expect(setCookieText).toContain('fcr_friend_intake_review=;');
+    expect(setCookieText).toContain('Max-Age=0');
     expect(persistRun).not.toHaveBeenCalled();
   });
 
