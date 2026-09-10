@@ -29,7 +29,15 @@ const manifest = JSON.parse(
   await readFile(new URL('../../../.control-room/plugin-management.json', import.meta.url), 'utf8'),
 ) as PluginManagementManifest;
 
-const expectedPlugins = ['GitHub', 'Supabase', 'Slack', 'Asana', 'HubSpot', 'Figma'];
+const expectedPlugins = [
+  'GitHub',
+  'Supabase',
+  'Slack',
+  'Asana',
+  'HubSpot',
+  'Figma',
+  'Metricool for Social Media',
+];
 const allowedManifestKeys = [
   'schemaVersion',
   'contract',
@@ -43,6 +51,7 @@ const allowedManifestKeys = [
   'permissionStateSource',
   'connectionStateSource',
   'truthBoundary',
+  'socialAnalyticsTruth',
   'plugins',
 ].sort();
 const allowedPluginKeys = ['name', 'role', 'runtimeDiscoveryRequired', 'defaultMode'].sort();
