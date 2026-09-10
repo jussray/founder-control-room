@@ -7,6 +7,7 @@ const REVIEW_TOKEN_VERSION = 'v1';
 const REVIEW_TTL_SECONDS = 5 * 60;
 const SESSION_KEY_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 const REVIEW_TOKEN_PATTERN = /^v1\.(\d{10})\.([A-Za-z0-9_-]{43})$/;
+const ENGINE_VERSION = 'first-slice-v1';
 
 function parseCookieHeader(header: string | undefined): Map<string, string> {
   const cookies = new Map<string, string>();
@@ -35,8 +36,6 @@ function signingKey(): Buffer {
     throw new Error('FOUNDER_SESSION_ENCRYPTION_KEY must decode to exactly 32 bytes');
   }
 
-  // Key separation: the founder-session master key is never used directly as
-  // the review MAC key. This deterministic subkey is scoped to Friend Intake.
   return createHmac('sha256', masterKey)
     .update('fcr-friend-intake-sensitive-review-key/v1', 'utf8')
     .digest();
@@ -55,6 +54,11 @@ function canonicalReviewInput(
     result.redactedSummary ?? '',
     [...result.sensitiveCategories].sort().join(','),
     [...result.intentTags].sort().join(','),
+    result.move.kind,
+    result.move.policy,
+    result.move.timeEstimateMinutes === null ? '' : String(result.move.timeEstimateMinutes),
+    result.move.gateWarning ?? '',
+    ENGINE_VERSION,
     String(expiresAt),
   ].join('\n');
 }
