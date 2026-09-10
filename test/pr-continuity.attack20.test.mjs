@@ -32,13 +32,13 @@ test('AT06 expected head mismatch fails', () => assert.throws(() => assertExpect
 test('AT07 exact head match passes', () => assert.equal(assertExpectedHead('a'.repeat(40), 'a'.repeat(40)), true));
 test('AT08 fork pull is not same-repository authority', () => assert.equal(sameRepositoryPull(pr(1, 'main', 'fork', 'open', { full_name: 'other/repo' }), repo), false));
 test('AT09 same-repo pull qualifies', () => assert.equal(sameRepositoryPull(pr(1, 'main', 'feature'), repo), true));
-test('AT10 managed current truth is prepended ahead of human prose', () => {
+test('AT10 managed continuity snapshot is prepended ahead of human prose', () => {
   const block = `${START_MARKER}\nreceipt\n${END_MARKER}`;
   const next = replaceManagedBlock('Human scope', block);
   assert.equal(next.startsWith(block), true);
   assert.ok(next.indexOf('Human scope') > next.indexOf(END_MARKER));
 });
-test('AT11 refresh relocates managed truth to the top while preserving human prose order', () => {
+test('AT11 refresh relocates managed snapshot to the top while preserving human prose order', () => {
   const body = `Before\n\n${START_MARKER}\nold\n${END_MARKER}\n\nAfter`;
   const block = `${START_MARKER}\nnew\n${END_MARKER}`;
   const next = replaceManagedBlock(body, block);
@@ -50,10 +50,15 @@ test('AT11 refresh relocates managed truth to the top while preserving human pro
 test('AT12 duplicate markers block metadata mutation', () => assert.throws(() => replaceManagedBlock(`${START_MARKER}${START_MARKER}${END_MARKER}`, 'x'), /MALFORMED/));
 test('AT13 orphan start marker blocks', () => assert.throws(() => replaceManagedBlock(`${START_MARKER}x`, 'x'), /MALFORMED/));
 test('AT14 orphan end marker blocks', () => assert.throws(() => replaceManagedBlock(`x${END_MARKER}`, 'x'), /MALFORMED/));
-test('AT15 proof subject equals live head', () => {
-  const block = continuityBlock({ repository: repo, prNumber: 7, rootBaseRef: 'main', rootBaseSha: '1'.repeat(40), baseRef: 'main', baseSha: '1'.repeat(40), headRef: 'feature', headSha: '2'.repeat(40), continuityState: 'CURRENT', proofState: 'EXACT_HEAD_PROOF_SEPARATE' });
+test('AT15 proof subject is immutable head evidence inside an observation snapshot', () => {
+  const observedAt = '2026-09-10T22:30:00.000Z';
+  const block = continuityBlock({ repository: repo, prNumber: 7, rootBaseRef: 'main', rootBaseSha: '1'.repeat(40), baseRef: 'main', baseSha: '1'.repeat(40), headRef: 'feature', headSha: '2'.repeat(40), continuityState: 'CURRENT', proofState: 'EXACT_HEAD_PROOF_SEPARATE', observedAt });
   assert.ok(block.includes(`proof_subject: \`${'2'.repeat(40)}\``));
-  assert.match(block, /MACHINE CURRENT TRUTH/);
+  assert.ok(block.includes(`observed_at: \`${observedAt}\``));
+  assert.match(block, /MACHINE OBSERVATION SNAPSHOT/);
+  assert.match(block, /snapshot_not_authority/);
+  assert.match(block, /Live GitHub metadata, current branch tips, exact-head workflow results, provider\/runtime readback, and cross-repository readback outrank this static snapshot/);
+  assert.doesNotMatch(block, /MACHINE CURRENT TRUTH/);
 });
 test('AT16 receipt explicitly denies merge authority', () => assert.match(continuityBlock({ repository: repo, prNumber: 1, rootBaseRef: 'main', rootBaseSha: '1', baseRef: 'main', baseSha: '1', headRef: 'x', headSha: '2', continuityState: 'CURRENT', proofState: 'SEPARATE' }), /merge_authority: \*\*false\*\*/));
 test('AT17 receipt explicitly denies deploy authority', () => assert.match(continuityBlock({ repository: repo, prNumber: 1, rootBaseRef: 'main', rootBaseSha: '1', baseRef: 'main', baseSha: '1', headRef: 'x', headSha: '2', continuityState: 'CURRENT', proofState: 'SEPARATE' }), /deploy_authority: \*\*false\*\*/));
@@ -82,5 +87,10 @@ test('AT25 stacked provider refusal becomes an explicit blocked receipt path', (
   assert.match(continuitySource, /allow: \[202, 403, 422\]/);
   assert.match(continuitySource, /BLOCKED_STACK_REBASE_REQUIRED/);
   assert.match(continuitySource, /providerMessage: update\.payload\?\.message \|\| null/);
+});
+test('AT26 metadata write refuses a PR that moved after the observation was built', () => {
+  assert.match(continuitySource, /latest\.head\?\.sha !== pr\.head\?\.sha/);
+  assert.match(continuitySource, /latest\.base\?\.ref !== pr\.base\?\.ref/);
+  assert.match(continuitySource, /PR_MOVED_DURING_METADATA/);
 });
 test('schema remains stable', () => assert.equal(SCHEMA, 'juss/pr-continuity@v1'));
