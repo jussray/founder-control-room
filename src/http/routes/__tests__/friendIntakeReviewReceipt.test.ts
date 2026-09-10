@@ -52,6 +52,19 @@ describe('Friend Intake sensitive-save review receipt', () => {
     expect(verifySensitiveSaveReviewReceipt(token, FOUNDER_ID, RAW_TEXT, changedCategories, NOW)).toBe(false);
   });
 
+  it('binds persisted move metadata into the review receipt', () => {
+    const token = issueSensitiveSaveReviewReceipt(FOUNDER_ID, RAW_TEXT, RESULT, NOW);
+    const changedKind = { ...RESULT, move: { ...RESULT.move, kind: 'clarifying_question' as const } };
+    const changedPolicy = { ...RESULT, move: { ...RESULT.move, policy: 'clarifying' as const } };
+    const changedDuration = { ...RESULT, move: { ...RESULT.move, timeEstimateMinutes: 10 } };
+    const changedWarning = { ...RESULT, move: { ...RESULT.move, gateWarning: 'Changed warning.' } };
+
+    expect(verifySensitiveSaveReviewReceipt(token, FOUNDER_ID, RAW_TEXT, changedKind, NOW)).toBe(false);
+    expect(verifySensitiveSaveReviewReceipt(token, FOUNDER_ID, RAW_TEXT, changedPolicy, NOW)).toBe(false);
+    expect(verifySensitiveSaveReviewReceipt(token, FOUNDER_ID, RAW_TEXT, changedDuration, NOW)).toBe(false);
+    expect(verifySensitiveSaveReviewReceipt(token, FOUNDER_ID, RAW_TEXT, changedWarning, NOW)).toBe(false);
+  });
+
   it('expires after the five-minute review window and rejects malformed receipts', () => {
     const token = issueSensitiveSaveReviewReceipt(FOUNDER_ID, RAW_TEXT, RESULT, NOW);
 
