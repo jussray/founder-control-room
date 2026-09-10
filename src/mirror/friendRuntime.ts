@@ -296,6 +296,44 @@ function runtimeProviderSet(env: NodeJS.ProcessEnv): Set<FriendRuntimeProvider> 
   );
 }
 
+function providerBaseUrl(
+  provider: Exclude<FriendRuntimeProvider, 'deterministic'>,
+  env: NodeJS.ProcessEnv,
+): string {
+  const configured = provider === 'openai'
+    ? env.OPENAI_API_BASE_URL
+    : provider === 'anthropic'
+      ? env.ANTHROPIC_API_BASE_URL
+      : env.PERPLEXITY_API_BASE_URL;
+  const fallback = provider === 'openai'
+    ? DEFAULT_OPENAI_BASE_URL
+    : provider === 'anthropic'
+      ? DEFAULT_ANTHROPIC_BASE_URL
+      : DEFAULT_PERPLEXITY_BASE_URL;
+  const candidate = configured?.trim() || fallback;
+
+  let parsed: URL;
+  try {
+    parsed = new URL(candidate);
+  } catch {
+    throw new FriendRuntimeError(
+      'Friend runtime provider base URL is invalid',
+      'FRIEND_PROVIDER_BASE_URL_INVALID',
+      'provider_unavailable',
+    );
+  }
+
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new FriendRuntimeError(
+      'Friend runtime provider base URL uses an unsupported scheme',
+      'FRIEND_PROVIDER_BASE_URL_INVALID',
+      'provider_unavailable',
+    );
+  }
+
+  return parsed.toString().replace(/\/$/, '');
+}
+
 export function assertFriendRuntimeProviderReady(
   provider: FriendRuntimeProvider,
   env: NodeJS.ProcessEnv = process.env,
@@ -332,6 +370,8 @@ export function assertFriendRuntimeProviderReady(
       'provider_unavailable',
     );
   }
+
+  providerBaseUrl(provider, env);
 }
 
 function timeoutMs(env: NodeJS.ProcessEnv): number {
@@ -339,10 +379,6 @@ function timeoutMs(env: NodeJS.ProcessEnv): number {
   return Number.isFinite(parsed) && parsed >= 1_000 && parsed <= 60_000
     ? parsed
     : DEFAULT_TIMEOUT_MS;
-}
-
-function baseUrl(value: string | undefined, fallback: string): string {
-  return (value?.trim() || fallback).replace(/\/$/, '');
 }
 
 function modelPrompt(input: FriendRuntimeInput): string {
@@ -537,7 +573,7 @@ async function runOpenAi(
 
   const response = await fetchWithTimeout(
     fetchFn,
-    `${baseUrl(env.OPENAI_API_BASE_URL, DEFAULT_OPENAI_BASE_URL)}/responses`,
+    `${providerBaseUrl('openai', env)}/responses`,
     {
       method: 'POST',
       headers: {
@@ -621,7 +657,7 @@ async function runAnthropic(
 
   const response = await fetchWithTimeout(
     fetchFn,
-    `${baseUrl(env.ANTHROPIC_API_BASE_URL, DEFAULT_ANTHROPIC_BASE_URL)}/messages`,
+    `${providerBaseUrl('anthropic', env)}/messages`,
     {
       method: 'POST',
       headers: {
@@ -695,7 +731,7 @@ async function runPerplexity(
 
   const response = await fetchWithTimeout(
     fetchFn,
-    `${baseUrl(env.PERPLEXITY_API_BASE_URL, DEFAULT_PERPLEXITY_BASE_URL)}/v1/sonar`,
+    `${providerBaseUrl('perplexity', env)}/v1/sonar`,
     {
       method: 'POST',
       headers: {
