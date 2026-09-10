@@ -39,7 +39,7 @@ for (const field of [
 for (const heading of [
   '## Who', '## What', '## When', '## Where', '## Why', '## How',
   '## Inputs', '## Outputs', '## Authority', '## Evidence',
-  '## Project separation', '## Failure and rollback',
+  '## Project reality audit', '## Project separation', '## Failure and rollback',
   '## Ten-year maintenance contract', '## Definition of done',
 ]) requireText('portfolio structure', files.portfolio, heading);
 
@@ -51,6 +51,20 @@ for (const invariant of [
   'private teen, family, journal, voice, media',
   'Never promise ten years of zero maintenance',
 ]) requireText('portfolio invariant', files.portfolio, invariant);
+
+for (const phrase of [
+  'do not infer health from repository existence',
+  'require targeted Playwright evidence for browser-observable UI or user-flow claims',
+  'require provider, API, job, database, webhook, or other direct runtime evidence',
+  '**VERIFIED**',
+  '**PARTIAL**',
+  '**UNKNOWN**',
+  '**BLOCKED**',
+  '**STALE**',
+  'Passing CI alone proves only the checks that actually ran',
+  'Historical runtime or Playwright proof does not renew itself',
+  'smallest next proof that could legitimately raise the classification',
+]) requireText('portfolio reality audit invariant', files.portfolio, phrase);
 
 for (const [label, source, metadata] of [
   ['sales', files.sales, ['name: sales', 'version: 1.0.0', 'status: active', 'scope: founder-control-room']],
