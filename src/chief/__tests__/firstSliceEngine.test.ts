@@ -51,6 +51,9 @@ describe('FirstSliceEngine', () => {
       expect(result.sensitiveCategories).toContain('health');
       expect(result.move.kind).toBe('protective_move');
       expect(result.move.policy).toBe('protective');
+      expect(result.move.text).toContain('trusted person');
+      expect(result.move.text).toContain('emergency or crisis support');
+      expect(result.move.gateWarning).toContain('human-support lane');
     }
   });
 
