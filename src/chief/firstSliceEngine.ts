@@ -44,6 +44,11 @@ const CRISIS_HEALTH_PATTERNS: readonly RegExp[] = [
   /\bdon['’]?t\s+want\s+to\s+(?:be\s+alive|live)\b/i,
 ];
 
+const TECHNICAL_TEEN_CONTEXT_PATTERNS: readonly RegExp[] = [
+  /\bminor\s+(?:css|ui|ux|bug|issue|fix|change|refactor|version|release|update)\b/gi,
+  /\bchild\s+(?:process(?:es)?|thread(?:s)?|worker(?:s)?|component(?:s)?|node(?:s)?|route(?:s)?)\b/gi,
+];
+
 const SENSITIVE_RULES: ReadonlyArray<{
   category: SensitiveCategory;
   patterns: readonly RegExp[];
@@ -111,9 +116,20 @@ function unique<T>(items: readonly T[]): T[] {
   return [...new Set(items)];
 }
 
+function textForSensitiveRule(text: string, category: SensitiveCategory): string {
+  if (category !== 'teen') return text;
+  return TECHNICAL_TEEN_CONTEXT_PATTERNS.reduce(
+    (current, pattern) => current.replace(pattern, ''),
+    text,
+  );
+}
+
 export function classifySensitiveCategories(text: string): SensitiveCategory[] {
   return SENSITIVE_RULES
-    .filter((rule) => rule.patterns.some((pattern) => pattern.test(text)))
+    .filter((rule) => {
+      const candidate = textForSensitiveRule(text, rule.category);
+      return rule.patterns.some((pattern) => pattern.test(candidate));
+    })
     .map((rule) => rule.category);
 }
 
