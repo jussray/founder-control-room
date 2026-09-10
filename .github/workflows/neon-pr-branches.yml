@@ -6,6 +6,7 @@ on:
 
 permissions:
   contents: read
+  pull-requests: read
 
 concurrency:
   group: neon-pr-${{ github.event.pull_request.number }}
@@ -23,7 +24,42 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
+      - name: Classify Neon preview scope
+        id: neon_scope
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          mapfile -t CHANGED_FILES < <(
+            gh api --paginate "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/files?per_page=100" --jq '.[].filename'
+          )
+
+          NEEDS_NEON=false
+          for path in "${CHANGED_FILES[@]}"; do
+            case "$path" in
+              supabase/*)
+                NEEDS_NEON=true
+                break
+                ;;
+            esac
+          done
+
+          echo "needs_neon=${NEEDS_NEON}" >> "$GITHUB_OUTPUT"
+          if [ "$NEEDS_NEON" = "true" ]; then
+            echo 'Supabase change detected; Neon preview branch is required.'
+          else
+            echo 'No supabase/ change detected; Neon preview branch is not required.'
+          fi
+
+      - name: Record non-database no-op
+        if: steps.neon_scope.outputs.needs_neon == 'false'
+        shell: bash
+        run: echo 'Neon preview skipped because this PR does not change supabase/.'
+
       - name: Validate Neon configuration
+        if: steps.neon_scope.outputs.needs_neon == 'true'
         shell: bash
         env:
           NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID }}
@@ -35,6 +71,7 @@ jobs:
 
       - name: Detect existing Neon branch
         id: neon_branch
+        if: steps.neon_scope.outputs.needs_neon == 'true'
         shell: bash
         env:
           NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID }}
@@ -60,13 +97,13 @@ jobs:
           fi
 
       - name: Set branch expiration
-        if: steps.neon_branch.outputs.exists != 'true'
+        if: steps.neon_scope.outputs.needs_neon == 'true' && steps.neon_branch.outputs.exists != 'true'
         shell: bash
         run: echo "EXPIRES_AT=$(date -u --date '+14 days' +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_ENV"
 
       - name: Create Neon Branch
         id: create_neon_branch
-        if: steps.neon_branch.outputs.exists != 'true'
+        if: steps.neon_scope.outputs.needs_neon == 'true' && steps.neon_branch.outputs.exists != 'true'
         uses: neondatabase/create-branch-action@fb620d43d4c565abaf088b848a4e28e5c4ea4d9c # v6
         with:
           project_id: ${{ vars.NEON_PROJECT_ID }}
@@ -75,6 +112,7 @@ jobs:
           expires_at: ${{ env.EXPIRES_AT }}
 
       - name: Verify branch creation result
+        if: steps.neon_scope.outputs.needs_neon == 'true'
         shell: bash
         env:
           NEON_EXISTING_BRANCH_ID: ${{ steps.neon_branch.outputs.branch_id }}
@@ -100,7 +138,42 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
+      - name: Classify Neon preview scope
+        id: neon_scope
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          mapfile -t CHANGED_FILES < <(
+            gh api --paginate "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/files?per_page=100" --jq '.[].filename'
+          )
+
+          NEEDS_NEON=false
+          for path in "${CHANGED_FILES[@]}"; do
+            case "$path" in
+              supabase/*)
+                NEEDS_NEON=true
+                break
+                ;;
+            esac
+          done
+
+          echo "needs_neon=${NEEDS_NEON}" >> "$GITHUB_OUTPUT"
+          if [ "$NEEDS_NEON" = "true" ]; then
+            echo 'Supabase change detected; Neon preview cleanup is required.'
+          else
+            echo 'No supabase/ change detected; no Neon preview is expected for this PR.'
+          fi
+
+      - name: Record non-database cleanup no-op
+        if: steps.neon_scope.outputs.needs_neon == 'false'
+        shell: bash
+        run: echo 'Neon cleanup skipped because this PR does not change supabase/.'
+
       - name: Validate Neon configuration
+        if: steps.neon_scope.outputs.needs_neon == 'true'
         shell: bash
         env:
           NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID }}
@@ -111,6 +184,7 @@ jobs:
           test -n "$NEON_API_KEY" || { echo 'NEON_API_KEY is not configured' >&2; exit 1; }
 
       - name: Delete Neon Branch
+        if: steps.neon_scope.outputs.needs_neon == 'true'
         uses: neondatabase/delete-branch-action@4468d825d5a88ef4012f1705a82f02ec3072f776 # v3
         with:
           project_id: ${{ vars.NEON_PROJECT_ID }}
