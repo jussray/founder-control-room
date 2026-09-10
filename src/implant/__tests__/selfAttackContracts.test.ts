@@ -20,7 +20,7 @@ import {
 } from '../contracts.js';
 
 describe('ULTRATHINK self-attack implant contracts', () => {
-  it('requires verified fresh compatible evidence before rendering green truth', () => {
+  it('requires authoritative fresh source-bound evidence before rendering green truth', () => {
     const evidence: ClaimEvidenceRecord = {
       id: 'e1',
       source: 'exact_target_verification',
@@ -46,24 +46,95 @@ describe('ULTRATHINK self-attack implant contracts', () => {
       conflictIds: [],
       provenanceId: 'p1',
     };
-
-    expect(canRenderVerifiedClaim(claim, {
+    const renderContext = {
       now: '2026-09-08T21:00:00Z',
       currentTargetFingerprint: 'sha:abc',
+    };
+
+    expect(canRenderVerifiedClaim(claim, {
+      ...renderContext,
       evidenceById: new Map([['e1', evidence]]),
     })).toBe(true);
 
     expect(canRenderVerifiedClaim(claim, {
-      now: '2026-09-08T21:00:00Z',
+      now: renderContext.now,
       currentTargetFingerprint: 'sha:other',
       evidenceById: new Map([['e1', evidence]]),
     })).toBe(false);
 
     expect(canRenderVerifiedClaim({ ...claim, status: 'inferred' }, {
-      now: '2026-09-08T21:00:00Z',
-      currentTargetFingerprint: 'sha:abc',
+      ...renderContext,
       evidenceById: new Map([['e1', evidence]]),
     })).toBe(false);
+
+    expect(canRenderVerifiedClaim(claim, {
+      ...renderContext,
+      evidenceById: new Map([['e1', { ...evidence, source: 'model_inference' }]]),
+    })).toBe(false);
+
+    expect(canRenderVerifiedClaim(claim, {
+      ...renderContext,
+      evidenceById: new Map([['e1', { ...evidence, source: 'founder_note' }]]),
+    })).toBe(false);
+
+    expect(canRenderVerifiedClaim(claim, {
+      ...renderContext,
+      evidenceById: new Map([['e1', { ...evidence, targetFingerprint: null }]]),
+    })).toBe(false);
+
+    const artifactClaim: TruthClaim = {
+      ...claim,
+      source: 'hashed_artifact',
+      targetFingerprint: null,
+      evidenceIds: ['artifact'],
+    };
+    const artifactEvidence: ClaimEvidenceRecord = {
+      ...evidence,
+      id: 'artifact',
+      source: 'hashed_artifact',
+      targetFingerprint: null,
+      integrityDigest: null,
+    };
+
+    expect(canRenderVerifiedClaim(artifactClaim, {
+      now: renderContext.now,
+      evidenceById: new Map([['artifact', artifactEvidence]]),
+    })).toBe(false);
+
+    expect(canRenderVerifiedClaim(artifactClaim, {
+      now: renderContext.now,
+      evidenceById: new Map([['artifact', {
+        ...artifactEvidence,
+        integrityDigest: 'sha256:artifact',
+      }]]),
+    })).toBe(true);
+
+    const testClaim: TruthClaim = {
+      ...claim,
+      source: 'test_execution',
+      evidenceScope: ['test_result'],
+      evidenceIds: ['test'],
+    };
+    const testEvidence: ClaimEvidenceRecord = {
+      ...evidence,
+      id: 'test',
+      source: 'test_execution',
+      scope: 'test_result',
+      targetFingerprint: null,
+    };
+
+    expect(canRenderVerifiedClaim(testClaim, {
+      ...renderContext,
+      evidenceById: new Map([['test', testEvidence]]),
+    })).toBe(false);
+
+    expect(canRenderVerifiedClaim(testClaim, {
+      ...renderContext,
+      evidenceById: new Map([['test', {
+        ...testEvidence,
+        targetFingerprint: 'sha:abc',
+      }]]),
+    })).toBe(true);
   });
 
   it('binds approval to canonical payload, actor, target fingerprint, expiry, and replay state', () => {
