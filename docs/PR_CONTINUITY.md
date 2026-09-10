@@ -15,20 +15,23 @@ main moves -> trusted main reacquires open PR graph -> same-repo branches roll f
 3. Forks, conflicts, races, malformed managed metadata, and provider uncertainty fail closed.
 4. Every head movement expires predecessor CI, review, runtime, provider, artifact, and browser proof.
 5. `CURRENT` ancestry is not completion; ordinary exact-head and real-path gates still apply.
-6. The machine-managed PR continuity block is always rendered first. It governs present-tense base/head/proof-subject identity and continuity status. Human prose is preserved below it as historical/contextual text; any SHA or status prose below is historical unless it matches the machine block.
+6. The machine-managed PR continuity block is always rendered first as an **observation snapshot**. It records the base/head/proof subject and continuity state observed at `observed_at`; it is not permanent present-tense authority. Live GitHub metadata and fresher provider/runtime/cross-repository reads outrank the static block.
 7. Continuity metadata mutation keeps exactly one start/end marker pair. Duplicate, orphaned, or reversed markers fail closed instead of rewriting the PR body.
 8. Continuity receipts never authorize merge, deploy, publish, provider mutation, spend, deletion, or authority expansion.
 9. Write authority runs only from trusted `main`; PR-head code receives read-only continuity verification.
-10. Moving the managed block to the top is a truth-ordering operation only. It never converts source ancestry into runtime, provider, review, Playwright, merge, or deploy proof.
+10. Moving the managed block to the top is a provenance-ordering operation only. It never converts source ancestry into runtime, provider, review, Playwright, merge, or deploy proof.
+11. Before a metadata write, the trusted writer re-reads the PR and refuses to write when the head SHA or base ref moved after the snapshot was built.
 
-## Machine current truth precedence
+## Machine observation snapshot precedence
 
-A PR may contain useful historical notes such as a predecessor exact candidate, an earlier workflow result, or a prior blocker. Those notes are not deleted. Instead the managed block is prepended on every metadata refresh and states that it is the authoritative present-tense identity receipt.
+A PR may contain useful historical notes such as a predecessor exact candidate, an earlier workflow result, or a prior blocker. Those notes are not deleted. The managed block is prepended on metadata refresh as a timestamped continuity observation, while the actual live GitHub/provider state remains authoritative at use time.
 
 ```text
 <!-- pr-continuity:start -->
 ## PR Continuity Receipt
-> MACHINE CURRENT TRUTH: ...
+> MACHINE OBSERVATION SNAPSHOT: ...
+observed_at: ...
+receipt_semantics: snapshot_not_authority
 live_base: ...
 live_head: ...
 proof_subject: ...
@@ -36,12 +39,14 @@ continuity: ...
 proof: ...
 merge_authority: false
 deploy_authority: false
+> Live GitHub metadata, current branch tips, exact-head workflow results,
+> provider/runtime readback, and cross-repository readback outrank this static snapshot.
 <!-- pr-continuity:end -->
 
 <human/history prose preserved below>
 ```
 
-This removes the ambiguity where stale prose could visually outrank a fresh machine receipt while retaining the historical record for auditability.
+This keeps the fresh machine observation visually prominent without creating a false promise that a static PR description remains current after the branch, base, provider, or peer repository moves.
 
 ## Founder Control Room boundary
 
@@ -49,4 +54,4 @@ Founder Control Room remains the authority/evidence boundary. Continuity may rol
 
 ## Attack 20
 
-`test/pr-continuity.attack20.test.mjs` attacks ancestry, divergence, unknown state, TOCTOU, forks, machine-truth ordering, human-body preservation, malformed markers, proof-subject binding, authority leakage, stacked propagation, unrelated stacks, and cycles before any write step.
+`test/pr-continuity.attack20.test.mjs` attacks ancestry, divergence, unknown state, TOCTOU, forks, observation ordering, human-body preservation, malformed markers, proof-subject binding, authority leakage, stacked propagation, unrelated stacks, cycles, and metadata-write races before any write step.
