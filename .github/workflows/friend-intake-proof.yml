@@ -4,6 +4,8 @@ on:
   pull_request:
     branches: [main]
     paths:
+      - 'src/auth/founderSession.ts'
+      - 'src/auth/__tests__/founderSession.integrity.test.ts'
       - 'src/http/middleware/requireFounder.ts'
       - 'src/http/middleware/__tests__/requireFounder.test.ts'
       - 'src/http/routes/friendIntake.ts'
@@ -25,6 +27,8 @@ on:
   push:
     branches: [main]
     paths:
+      - 'src/auth/founderSession.ts'
+      - 'src/auth/__tests__/founderSession.integrity.test.ts'
       - 'src/http/middleware/requireFounder.ts'
       - 'src/http/middleware/__tests__/requireFounder.test.ts'
       - 'src/http/routes/friendIntake.ts'
@@ -84,7 +88,7 @@ jobs:
         run: npm run typecheck
 
       - name: Focused Friend tests
-        run: npx vitest run src/http/middleware/__tests__/requireFounder.test.ts src/mirror/__tests__/friendRuntime.test.ts src/http/routes/__tests__/friendIntake.integration.test.ts src/implant/__tests__/selfAttackContracts.test.ts
+        run: npx vitest run src/auth/__tests__/founderSession.integrity.test.ts src/http/middleware/__tests__/requireFounder.test.ts src/mirror/__tests__/friendRuntime.test.ts src/http/routes/__tests__/friendIntake.integration.test.ts src/implant/__tests__/selfAttackContracts.test.ts
 
       - name: Install Chromium
         run: npx playwright install chromium --with-deps
