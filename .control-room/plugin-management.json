@@ -13,6 +13,8 @@
   "truthBoundary": "This file declares intended plugin capability only. It does not prove that a plugin is installed, connected, permitted, or that any action executed.",
   "socialAnalyticsTruth": {
     "analyticsMode": "observation_only",
+    "learningRequiresVerifiedPostLevelMeasurement": true,
+    "publishedWithoutMeasurementClassifyAs": "UNMEASURED",
     "sourcePrecedence": [
       "native-platform",
       "native-platform-export",
@@ -30,6 +32,19 @@
       "delayed_follower_attribution",
       "algorithmic_cause"
     ],
+    "linkedinNative": {
+      "role": "Primary authority for current post facts and native exports used for historical or account analytics.",
+      "authority": "primary",
+      "runtimeDiscoveryRequired": true
+    },
+    "cambiante": {
+      "role": "LinkedIn publishing and post-level analytics only when the live provider token exposes the required analytics capability.",
+      "authority": "secondary",
+      "runtimeDiscoveryRequired": true,
+      "requiredLinkedInPermission": "r_member_postAnalytics",
+      "missingPermissionClassifyAs": "BLOCKED_PROVIDER_SCOPE",
+      "mayOverrideNativePlatform": false
+    },
     "buffer": {
       "role": "Corroborating LinkedIn post-level analytics and scheduling when freshly connected through an authorized route.",
       "authority": "secondary",
@@ -42,6 +57,7 @@
       "authority": "secondary",
       "runtimeDiscoveryRequired": true,
       "emptyRowsMeanZero": false,
+      "historicalBackfillAssumed": false,
       "mayOverrideNativePlatform": false
     }
   },
@@ -79,6 +95,18 @@
     {
       "name": "Figma",
       "role": "Editable design evidence and handoff; never runtime proof.",
+      "runtimeDiscoveryRequired": true,
+      "defaultMode": "read-first"
+    },
+    {
+      "name": "LinkedIn",
+      "role": "Native LinkedIn account/profile surface. Treat native analytics or exports as primary evidence only when the runtime actually exposes them.",
+      "runtimeDiscoveryRequired": true,
+      "defaultMode": "read-first"
+    },
+    {
+      "name": "Cambiante: Content Manager",
+      "role": "LinkedIn content operations and secondary analytics observation; missing provider analytics scope is BLOCKED_PROVIDER_SCOPE, never zero performance.",
       "runtimeDiscoveryRequired": true,
       "defaultMode": "read-first"
     },
