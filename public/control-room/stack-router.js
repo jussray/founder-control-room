@@ -175,4 +175,3 @@ if (launchDock instanceof HTMLDetailsElement) {
 
 installMissionBoard();
 void refreshConveyorReadiness();
-void refreshFriendIntakeAvailability();
