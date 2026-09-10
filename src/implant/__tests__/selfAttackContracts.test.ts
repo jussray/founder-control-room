@@ -102,6 +102,21 @@ describe('ULTRATHINK self-attack implant contracts', () => {
       evidenceById: new Map([['e1', { ...evidence, source: 'founder_note' }]]),
     })).toBe(false);
 
+    const providerClaim: TruthClaim = {
+      ...claim,
+      source: 'live_provider',
+    };
+    const substituteArtifactEvidence: ClaimEvidenceRecord = {
+      ...evidence,
+      source: 'hashed_artifact',
+      integrityDigest: 'sha256:substitute',
+    };
+
+    expect(canRenderVerifiedClaim(providerClaim, {
+      ...renderContext,
+      evidenceById: new Map([['e1', substituteArtifactEvidence]]),
+    })).toBe(false);
+
     expect(canRenderVerifiedClaim(claim, {
       ...renderContext,
       evidenceById: new Map([['e1', { ...evidence, targetFingerprint: null }]]),
