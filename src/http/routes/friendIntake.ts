@@ -149,6 +149,7 @@ export function createFriendIntakeRouter(dependencies: FriendIntakeRouteDependen
   const persistRun = dependencies.persistRun ?? defaultPersistRun;
   const recordUsefulness = dependencies.recordUsefulness ?? defaultRecordUsefulness;
 
+  router.use(rateLimitFriendIntake);
   router.get('/status', (_req, res) => {
     res.set('Cache-Control', 'no-store');
     return res.status(200).json({ enabled: enabled() });
@@ -160,7 +161,6 @@ export function createFriendIntakeRouter(dependencies: FriendIntakeRouteDependen
     }
     next();
   });
-  router.use(rateLimitFriendIntake);
   router.use(authMiddleware);
 
   router.post('/run', async (req: FounderRequest, res) => {
