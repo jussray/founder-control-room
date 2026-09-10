@@ -153,15 +153,30 @@ function extractIntentTags(text: string, sensitiveCategories: readonly Sensitive
   return bounded.length > 0 ? bounded : ['general'];
 }
 
-function summaryFor(tags: readonly FirstSliceIntentTag[], sensitiveCategories: readonly SensitiveCategory[]): string {
+function subjectFor(tags: readonly FirstSliceIntentTag[]): string {
   const visibleTags = tags.filter((tag) => tag !== 'general').slice(0, 2);
-  const subject = visibleTags.length > 0 ? visibleTags.join(' and ') : 'general';
+  return visibleTags.length > 0 ? visibleTags.join(' and ') : 'general';
+}
+
+function summaryFor(tags: readonly FirstSliceIntentTag[], sensitiveCategories: readonly SensitiveCategory[]): string {
+  const subject = subjectFor(tags);
 
   if (sensitiveCategories.length > 0) {
     return `You shared a sensitive ${subject} situation. The first step is to protect context before taking action.`;
   }
 
   return `You want to move a ${subject} situation forward with one small, reversible next step.`;
+}
+
+function storedSummaryFor(
+  tags: readonly FirstSliceIntentTag[],
+  sensitiveCategories: readonly SensitiveCategory[],
+): string {
+  const subject = subjectFor(tags);
+  if (sensitiveCategories.length > 0) {
+    return `Sensitive ${subject} context. A bounded summary was retained only after the required review step.`;
+  }
+  return `${subject[0]?.toUpperCase() ?? 'G'}${subject.slice(1)} context. A bounded summary was retained for one small, reversible next step.`;
 }
 
 function tinyMoveFor(tags: readonly FirstSliceIntentTag[]): FirstSliceMove & { policy: 'tiny' } {
@@ -227,7 +242,7 @@ export class FirstSliceEngine {
       move,
       sensitiveCategories,
       redactedSummary: input.privacyChoice === 'save_redacted_summary'
-        ? summary.slice(0, 300)
+        ? storedSummaryFor(intentTags, sensitiveCategories).slice(0, 300)
         : null,
     };
   }
