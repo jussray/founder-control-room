@@ -174,9 +174,9 @@ function storedSummaryFor(
 ): string {
   const subject = subjectFor(tags);
   if (sensitiveCategories.length > 0) {
-    return `Sensitive ${subject} context. A bounded summary was retained only after the required review step.`;
+    return `Sensitive ${subject} context requiring a protected next step.`;
   }
-  return `${subject[0]?.toUpperCase() ?? 'G'}${subject.slice(1)} context. A bounded summary was retained for one small, reversible next step.`;
+  return `${subject[0]?.toUpperCase() ?? 'G'}${subject.slice(1)} context with one small, reversible next step.`;
 }
 
 function tinyMoveFor(tags: readonly FirstSliceIntentTag[]): FirstSliceMove & { policy: 'tiny' } {
