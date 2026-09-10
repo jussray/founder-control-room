@@ -30,6 +30,17 @@ const expectedLoop = [
   'Repeat',
 ];
 
+const expectedChallengeStack = [
+  'ULTRATHINK',
+  'Red Team 1 — premise',
+  'Lindy mode',
+  'L99',
+  'Red Team 2 — implementation',
+  'OODA',
+  'Proof',
+  'Rollback / Next Gate',
+];
+
 requireValue(registry.schemaVersion === 1, 'schemaVersion must be 1');
 requireValue(registry.owner === 'Juss', 'owner must remain Juss');
 requireValue(registry.authorityRepository === 'jussray/founder-control-room', 'authority repository mismatch');
@@ -92,6 +103,13 @@ requireValue(entrypoint.includes(cohesionAuditPath), 'Founder Intelligence entry
 requireValue(entrypoint.includes(registry.canonicalConstitution), 'Founder Intelligence entrypoint must link the canonical constitution');
 for (const step of expectedLoop) {
   requireValue(entrypoint.includes(step), `entrypoint missing loop step ${step}`);
+}
+let previousChallengeIndex = -1;
+for (const step of expectedChallengeStack) {
+  const index = entrypoint.indexOf(step);
+  requireValue(index >= 0, `entrypoint missing challenge-stack step ${step}`);
+  requireValue(index > previousChallengeIndex, `challenge-stack order drifted at ${step}`);
+  if (index >= 0) previousChallengeIndex = index;
 }
 for (const phrase of [
   'Build technology that leaves humans stronger than it found them.',
