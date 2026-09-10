@@ -102,6 +102,27 @@ async function refreshConveyorReadiness() {
   }
 }
 
+async function refreshFriendIntakeAvailability() {
+  const link = document.querySelector('[data-friend-intake-link]');
+  if (!(link instanceof HTMLAnchorElement)) return;
+
+  link.hidden = true;
+  try {
+    const response = await fetch('/friend-intake/status', {
+      method: 'GET',
+      cache: 'no-store',
+      credentials: 'same-origin',
+      headers: { Accept: 'application/json' },
+    });
+    if (!response.ok) return;
+
+    const body = await response.json();
+    link.hidden = body?.enabled !== true;
+  } catch {
+    link.hidden = true;
+  }
+}
+
 function requestedTabFromUrl() {
   const tab = new URL(window.location.href).searchParams.get('tab');
   return tab && ALLOWED_TABS.has(tab) ? tab : null;
@@ -145,9 +166,13 @@ if (pendingTab && ALLOWED_TABS.has(pendingTab) && !activateTab(pendingTab)) {
 const launchDock = document.querySelector('.launch-dock');
 if (launchDock instanceof HTMLDetailsElement) {
   launchDock.addEventListener('toggle', () => {
-    if (launchDock.open) void refreshConveyorReadiness();
+    if (launchDock.open) {
+      void refreshConveyorReadiness();
+      void refreshFriendIntakeAvailability();
+    }
   });
 }
 
 installMissionBoard();
 void refreshConveyorReadiness();
+void refreshFriendIntakeAvailability();
