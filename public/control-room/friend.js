@@ -207,7 +207,15 @@ async function submitFriend(form) {
 
     const body = await response.json().catch(() => ({}));
     if (!response.ok) {
-      throw new Error(body.error || `Friend failed with status ${response.status}`);
+      const message = body.error || `Friend failed with status ${response.status}`;
+      const failureState = typeof body.modelExecutionState === 'string'
+        ? body.modelExecutionState
+        : null;
+      errorBox.innerHTML = `<div class="error" role="alert"><span>${escapeHtml(message)}</span>${failureState ? `<span class="fine"> · Model state: ${escapeHtml(failureState)}</span>` : ''}</div>`;
+      status.textContent = failureState
+        ? `No successful receipt was created. Model state: ${failureState}.`
+        : 'No successful receipt was created.';
+      return;
     }
 
     form.elements.transcript.value = '';

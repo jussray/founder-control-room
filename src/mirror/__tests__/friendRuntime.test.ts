@@ -75,6 +75,27 @@ describe('Friend runtime providers', () => {
     });
   });
 
+  it('fails closed before fetch when an allowed live provider credential is missing', async () => {
+    const fetchFn = vi.fn();
+    const run = createFriendRuntimeRunner({
+      env: {
+        FRIEND_MODELS_ENABLED: 'true',
+        FRIEND_RUNTIME_PROVIDERS: 'openai',
+      },
+      fetchFn: fetchFn as typeof fetch,
+    });
+
+    await expect(run('openai', {
+      transcript: 'Build.',
+      timeEnergyContext: 'Ten minutes.',
+      voiceProfile: null,
+    })).rejects.toMatchObject({
+      code: 'FRIEND_OPENAI_NOT_CONFIGURED',
+      executionState: 'provider_unavailable',
+    });
+    expect(fetchFn).not.toHaveBeenCalled();
+  });
+
   it('uses OpenAI structured output with provider storage disabled for the request', async () => {
     const fetchFn = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
       const body = JSON.parse(String(init?.body));

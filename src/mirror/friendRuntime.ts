@@ -296,6 +296,44 @@ function runtimeProviderSet(env: NodeJS.ProcessEnv): Set<FriendRuntimeProvider> 
   );
 }
 
+export function assertFriendRuntimeProviderReady(
+  provider: FriendRuntimeProvider,
+  env: NodeJS.ProcessEnv = process.env,
+): void {
+  if (provider === 'deterministic') return;
+
+  if (env.FRIEND_MODELS_ENABLED?.trim().toLowerCase() !== 'true') {
+    throw new FriendRuntimeError(
+      'Friend runtime models are disabled',
+      'FRIEND_MODELS_DISABLED',
+      'blocked',
+    );
+  }
+
+  if (!runtimeProviderSet(env).has(provider)) {
+    throw new FriendRuntimeError(
+      'Requested Friend runtime provider is not allowed',
+      'FRIEND_PROVIDER_NOT_ALLOWED',
+      'blocked',
+    );
+  }
+
+  const credential = provider === 'openai'
+    ? env.OPENAI_API_KEY
+    : provider === 'anthropic'
+      ? env.ANTHROPIC_API_KEY
+      : env.PERPLEXITY_API_KEY;
+
+  if (!credential?.trim()) {
+    const label = provider === 'openai' ? 'OpenAI' : provider === 'anthropic' ? 'Anthropic' : 'Perplexity';
+    throw new FriendRuntimeError(
+      `${label} Friend runtime is not configured`,
+      `FRIEND_${provider.toUpperCase()}_NOT_CONFIGURED`,
+      'provider_unavailable',
+    );
+  }
+}
+
 function timeoutMs(env: NodeJS.ProcessEnv): number {
   const parsed = Number(env.FRIEND_MODEL_TIMEOUT_MS ?? DEFAULT_TIMEOUT_MS);
   return Number.isFinite(parsed) && parsed >= 1_000 && parsed <= 60_000
@@ -728,21 +766,7 @@ export function createFriendRuntimeRunner(dependencies: FriendRuntimeDependencie
   ): Promise<FriendRuntimeResult> {
     if (provider === 'deterministic') return deterministicResult(input);
 
-    if (env.FRIEND_MODELS_ENABLED?.trim().toLowerCase() !== 'true') {
-      throw new FriendRuntimeError(
-        'Friend runtime models are disabled',
-        'FRIEND_MODELS_DISABLED',
-        'blocked',
-      );
-    }
-
-    if (!runtimeProviderSet(env).has(provider)) {
-      throw new FriendRuntimeError(
-        'Requested Friend runtime provider is not allowed',
-        'FRIEND_PROVIDER_NOT_ALLOWED',
-        'blocked',
-      );
-    }
+    assertFriendRuntimeProviderReady(provider, env);
 
     if (provider === 'openai') return runOpenAi(input, env, fetchFn);
     if (provider === 'anthropic') return runAnthropic(input, env, fetchFn);

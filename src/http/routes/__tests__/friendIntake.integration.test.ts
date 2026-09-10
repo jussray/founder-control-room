@@ -12,7 +12,10 @@ vi.mock('../../../lib/supabaseClient.js', () => ({ supabase: supabaseMock }));
 
 import express from 'express';
 import request from 'supertest';
-import type { FriendRuntimeResult } from '../../../mirror/friendRuntime.js';
+import {
+  FriendRuntimeError,
+  type FriendRuntimeResult,
+} from '../../../mirror/friendRuntime.js';
 import {
   createFriendIntakeRouter,
   redactFriendSummary,
@@ -90,6 +93,7 @@ function buildApp(overrides: FriendIntakeRouteDependencies = {}) {
     writeFeedback: vi.fn(async (_record: FeedbackArg) => undefined),
     reserveLiveInference: vi.fn(async (_record: ReservationArg) => 'reservation-1'),
     resolveLiveInferenceBudget: () => ({ requestUsd: 0.25, dailyUsd: 1 }),
+    preflightLiveInference: vi.fn(),
     ...overrides,
   }));
   return app;
@@ -184,9 +188,12 @@ describe('POST /mirror/friend-intake', () => {
     expect(runFriendRuntime).not.toHaveBeenCalled();
   });
 
-  it('reserves bounded budget before one live provider call', async () => {
+  it('preflights readiness, reserves bounded budget, then makes one live provider call', async () => {
     authenticate();
     const order: string[] = [];
+    const preflightLiveInference = vi.fn(() => {
+      order.push('preflight');
+    });
     const reserveLiveInference = vi.fn(async (record: ReservationArg) => {
       order.push('reserve');
       expect(record).toMatchObject({
@@ -204,6 +211,7 @@ describe('POST /mirror/friend-intake', () => {
 
     const response = await request(buildApp({
       isInteractiveFounderRequest: () => true,
+      preflightLiveInference,
       reserveLiveInference,
       runFriendRuntime,
     }))
@@ -212,8 +220,40 @@ describe('POST /mirror/friend-intake', () => {
       .send({ ...validPayload(), provider: 'openai' });
 
     expect(response.status).toBe(200);
-    expect(order).toEqual(['reserve', 'provider']);
+    expect(order).toEqual(['preflight', 'reserve', 'provider']);
     expect(response.body.provenance.inferenceReservationId).toBe('reservation-live-1');
+  });
+
+  it('does not reserve budget when live-provider readiness fails before an attempt', async () => {
+    authenticate();
+    const reserveLiveInference = vi.fn(async (_record: ReservationArg) => 'reservation-should-not-exist');
+    const runFriendRuntime = vi.fn(async () => runtimeResult('openai'));
+    const preflightLiveInference = vi.fn(() => {
+      throw new FriendRuntimeError(
+        'OpenAI Friend runtime is not configured',
+        'FRIEND_OPENAI_NOT_CONFIGURED',
+        'provider_unavailable',
+      );
+    });
+
+    const response = await request(buildApp({
+      isInteractiveFounderRequest: () => true,
+      preflightLiveInference,
+      reserveLiveInference,
+      runFriendRuntime,
+    }))
+      .post('/mirror/friend-intake')
+      .set('Authorization', BEARER)
+      .send({ ...validPayload(), provider: 'openai' });
+
+    expect(response.status).toBe(503);
+    expect(response.body).toMatchObject({
+      code: 'FRIEND_OPENAI_NOT_CONFIGURED',
+      modelExecutionState: 'provider_unavailable',
+    });
+    expect(preflightLiveInference).toHaveBeenCalledWith('openai');
+    expect(reserveLiveInference).not.toHaveBeenCalled();
+    expect(runFriendRuntime).not.toHaveBeenCalled();
   });
 
   it('fails closed before provider execution when the live budget is unavailable or exhausted', async () => {
@@ -247,6 +287,43 @@ describe('POST /mirror/friend-intake', () => {
     expect(exhausted.status).toBe(429);
     expect(exhausted.body.code).toBe('FRIEND_LIVE_DAILY_BUDGET_EXCEEDED');
     expect(runFriendRuntime).not.toHaveBeenCalled();
+  });
+
+  it('keeps the reservation and returns precise state when an attempted provider call fails', async () => {
+    authenticate();
+    const reserveLiveInference = vi.fn(async (_record: ReservationArg) => 'reservation-live-failed');
+    const writeTimelineEvent = vi.fn(async (_event: TimelineEventArg) => 'timeline-failure-1');
+    const runFriendRuntime = vi.fn(async () => {
+      throw new FriendRuntimeError(
+        'OpenAI Friend request timed out',
+        'FRIEND_PROVIDER_TIMEOUT',
+        'timed_out',
+      );
+    });
+
+    const response = await request(buildApp({
+      isInteractiveFounderRequest: () => true,
+      reserveLiveInference,
+      writeTimelineEvent,
+      runFriendRuntime,
+    }))
+      .post('/mirror/friend-intake')
+      .set('Authorization', BEARER)
+      .send({ ...validPayload(), provider: 'openai' });
+
+    expect(response.status).toBe(504);
+    expect(response.body).toMatchObject({
+      code: 'FRIEND_PROVIDER_TIMEOUT',
+      modelExecutionState: 'timed_out',
+    });
+    expect(reserveLiveInference).toHaveBeenCalledTimes(1);
+    expect(runFriendRuntime).toHaveBeenCalledTimes(1);
+    expect(writeTimelineEvent).toHaveBeenCalledWith(expect.objectContaining({
+      metadata: expect.objectContaining({
+        inference_reservation_id: 'reservation-live-failed',
+        model_execution_state: 'timed_out',
+      }),
+    }));
   });
 
   it('passes only redacted founder content, not semantic tags, into opt-in persistence', async () => {
@@ -320,7 +397,7 @@ describe('POST /mirror/friend-intake', () => {
       .send({
         ...validPayload(),
         provider: 'perplexity',
-        transcript: 'I need to handle a password and a legal court issue involving my kid.',
+        transcript: 'I need to handle a private credential and a legal issue.',
       });
 
     expect(response.status).toBe(200);
@@ -332,12 +409,14 @@ describe('POST /mirror/friend-intake', () => {
     });
   });
 
-  it('keeps bare private identifiers and card-like numbers local before any provider call', async () => {
+  it('keeps private identifiers, international phone numbers, AWS keys, and card-like numbers local', async () => {
     authenticate();
     const runFriendRuntime = vi.fn(async () => runtimeResult('anthropic'));
 
     for (const transcript of [
       'customer@example.com 814-555-1212 ghp_abcdefghijk',
+      '+44 7700 900123',
+      'AKIAIOSFODNN7EXAMPLE',
       '4111 1111 1111 1111',
     ]) {
       const response = await request(buildApp({ runFriendRuntime }))
@@ -429,11 +508,11 @@ describe('POST /mirror/friend-intake/:runId/usefulness', () => {
 });
 
 describe('redactFriendSummary', () => {
-  it('redacts common contact, credential, identity, and financial patterns', () => {
+  it('redacts common contact, international phone, credential, identity, and financial patterns', () => {
     expect(redactFriendSummary(
-      'Reach founder@example.com, 814-555-1212, api_key=abcdef123456, SSN 123-45-6789, routing number 123456789.',
+      'Reach founder@example.com, 814-555-1212, +44 7700 900123, AKIAIOSFODNN7EXAMPLE, api_key=abcdef123456, SSN 123-45-6789, routing number 123456789.',
     )).toBe(
-      'Reach [redacted-email], [redacted-phone], api_key=[redacted] SSN [redacted-id], [redacted-financial].',
+      'Reach [redacted-email], [redacted-phone], [redacted-phone], [redacted-credential], api_key=[redacted] SSN [redacted-id], [redacted-financial].',
     );
   });
 });

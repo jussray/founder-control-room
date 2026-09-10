@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'src/http/middleware/requireFounder.ts'
+      - 'src/http/middleware/__tests__/requireFounder.test.ts'
       - 'src/http/routes/friendIntake.ts'
       - 'src/http/routes/mirror.ts'
       - 'src/mirror/friendRuntime.ts'
@@ -25,6 +26,7 @@ on:
     branches: [main]
     paths:
       - 'src/http/middleware/requireFounder.ts'
+      - 'src/http/middleware/__tests__/requireFounder.test.ts'
       - 'src/http/routes/friendIntake.ts'
       - 'src/http/routes/mirror.ts'
       - 'src/mirror/friendRuntime.ts'
@@ -82,7 +84,7 @@ jobs:
         run: npm run typecheck
 
       - name: Focused Friend tests
-        run: npx vitest run src/mirror/__tests__/friendRuntime.test.ts src/http/routes/__tests__/friendIntake.integration.test.ts src/implant/__tests__/selfAttackContracts.test.ts
+        run: npx vitest run src/http/middleware/__tests__/requireFounder.test.ts src/mirror/__tests__/friendRuntime.test.ts src/http/routes/__tests__/friendIntake.integration.test.ts src/implant/__tests__/selfAttackContracts.test.ts
 
       - name: Install Chromium
         run: npx playwright install chromium --with-deps

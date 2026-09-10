@@ -26,7 +26,13 @@ test.afterAll(async () => {
   await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
 });
 
-async function prepareFriendPage(page: Page, options: { failSecondRun?: boolean } = {}) {
+async function prepareFriendPage(
+  page: Page,
+  options: {
+    failSecondRun?: boolean;
+    modelFailureState?: 'blocked' | 'provider_unavailable' | 'timed_out' | 'schema_invalid';
+  } = {},
+) {
   await page.route('**/auth/me', async (route) => {
     await route.fulfill({
       status: 200,
@@ -46,6 +52,22 @@ async function prepareFriendPage(page: Page, options: { failSecondRun?: boolean 
     runCount += 1;
     const requestBody = route.request().postDataJSON();
     expect(requestBody).not.toHaveProperty('relatedMemories');
+
+    if (options.modelFailureState) {
+      const timedOut = options.modelFailureState === 'timed_out';
+      await route.fulfill({
+        status: timedOut ? 504 : 503,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          error: timedOut
+            ? 'Friend runtime provider timed out'
+            : 'Friend runtime provider failed',
+          code: timedOut ? 'FRIEND_PROVIDER_TIMEOUT' : 'FRIEND_RUNTIME_FAILED',
+          modelExecutionState: options.modelFailureState,
+        }),
+      });
+      return;
+    }
 
     if (options.failSecondRun && runCount === 2) {
       await route.fulfill({
@@ -176,4 +198,18 @@ test('Friend hides the previous receipt before a failed rerun', async ({ page })
   await expect(page.getByRole('alert')).toContainText('Friend completion persistence is unavailable');
   await expect(page.locator('#friend-receipt')).toBeHidden();
   await expect(page.getByText('One reflection, one move')).toHaveCount(0);
+});
+
+test('Friend renders a provider failure execution state distinctly', async ({ page }) => {
+  await prepareFriendPage(page, { modelFailureState: 'timed_out' });
+  await page.goto(`${origin}/control-room/friend.html`);
+
+  await page.getByLabel('What is on your mind?').fill('Try one bounded live reflection.');
+  await page.getByLabel('Runtime').selectOption('openai');
+  await page.getByRole('button', { name: 'Run Friend' }).click();
+
+  await expect(page.getByRole('alert')).toContainText('Friend runtime provider timed out');
+  await expect(page.getByRole('alert')).toContainText('Model state: timed_out');
+  await expect(page.getByText('No successful receipt was created. Model state: timed_out.')).toBeVisible();
+  await expect(page.locator('#friend-receipt')).toBeHidden();
 });

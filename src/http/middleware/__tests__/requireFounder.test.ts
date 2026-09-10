@@ -157,6 +157,17 @@ function createProbeApp() {
   return app;
 }
 
+function createAuthChannelProbeApp() {
+  const app = express();
+  app.get('/protected', requireFounder, (req: FounderRequest, res) => {
+    res.json({
+      founder: req.founder,
+      founderAuthChannel: req.founderAuthChannel,
+    });
+  });
+  return app;
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.browserSessions.clear();
@@ -303,6 +314,34 @@ describe('requireFounder', () => {
     expect(response.headers['set-cookie']?.[0]).toContain('__Host-fcr_session=');
     expect(response.headers['set-cookie']?.[0]).toContain('HttpOnly');
     expect(response.headers['cache-control']).toBe('private, no-store');
+  });
+
+  it('carries the interactive auth channel downstream after opaque-session refresh and rotation', async () => {
+    mocks.getUser.mockResolvedValue({
+      data: { user: null },
+      error: { message: 'expired access token' },
+    });
+    const session = refreshedSession();
+    mocks.refreshSession.mockResolvedValue({
+      data: { session, user: session.user },
+      error: null,
+    });
+    const cookie = await founderCookie();
+
+    const response = await request(createAuthChannelProbeApp())
+      .get('/protected')
+      .set('Cookie', cookie);
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      founder: {
+        email: 'founder@example.com',
+        userId: 'founder-user-1',
+      },
+      founderAuthChannel: 'interactive',
+    });
+    expect(mocks.refreshSession).toHaveBeenCalledTimes(1);
+    expect(response.headers['set-cookie']?.[0]).toContain('__Host-fcr_session=');
   });
 
   it('does not renew a refreshed cookie for an authenticated nonfounder', async () => {

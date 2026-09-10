@@ -11,6 +11,7 @@ import {
 } from '../../chief/firstSliceContracts.js';
 import { supabase } from '../../lib/supabaseClient.js';
 import {
+  assertFriendRuntimeProviderReady,
   createFriendRuntimeRunner,
   FriendRuntimeError,
   type FriendRuntimeInput,
@@ -85,6 +86,7 @@ export interface FriendIntakeRouteDependencies {
   reserveLiveInference?: (record: FriendInferenceReservationRecord) => Promise<string>;
   resolveLiveInferenceBudget?: () => FriendLiveBudget | null;
   isInteractiveFounderRequest?: (req: FounderRequest) => boolean;
+  preflightLiveInference?: (provider: LiveFriendRuntimeProvider) => void;
 }
 
 function recordBody(value: unknown): DbRecord | null {
@@ -126,7 +128,12 @@ function usefulnessResponse(value: unknown): UsefulnessResponse | null {
     : null;
 }
 
-const PRIVATE_IDENTIFIER_PATTERN = /(?:\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b|\b(?:\+?1[-.\s]?)?(?:\(\d{3}\)|\d{3})[-.\s]?\d{3}[-.\s]?\d{4}\b|\b\d{3}-\d{2}-\d{4}\b|\b(?:sk(?:-proj)?|pk|rk|ghp|github_pat|xox[baprs])[-_A-Za-z0-9]{8,}\b|\b(?:routing|account|acct|card)(?:\s+(?:number|no\.?))?\s*[:=#-]?\s*\d{4,19}\b|\b(?:\d[ -]*?){13,19}\b)/i;
+const INTERNATIONAL_PHONE_PATTERN = /\+\d(?:[\s().-]*\d){7,14}\b/;
+const AWS_ACCESS_KEY_ID_PATTERN = /\b(?:AKIA|ASIA|AIDA|AROA|AIPA|ANPA|ANVA)[A-Z0-9]{16}\b/i;
+const PRIVATE_IDENTIFIER_PATTERN = new RegExp(
+  `(?:${INTERNATIONAL_PHONE_PATTERN.source}|${AWS_ACCESS_KEY_ID_PATTERN.source}|\\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}\\b|\\b(?:\\+?1[-.\\s]?)?(?:\\(\\d{3}\\)|\\d{3})[-.\\s]?\\d{3}[-.\\s]?\\d{4}\\b|\\b\\d{3}-\\d{2}-\\d{4}\\b|\\b(?:sk(?:-proj)?|pk|rk|ghp|github_pat|xox[baprs])[-_A-Za-z0-9]{8,}\\b|\\b(?:routing|account|acct|card)(?:\\s+(?:number|no\\.?))?\\s*[:=#-]?\\s*\\d{4,19}\\b|\\b(?:\\d[ -]*?){13,19}\\b)`,
+  'i',
+);
 
 export function detectSensitiveCategories(value: string): SensitiveCategory[] {
   const categories: SensitiveCategory[] = [];
@@ -202,9 +209,11 @@ export function redactFriendSummary(value: string): string {
   return value
     .replace(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi, '[redacted-email]')
     .replace(/\b\d{3}-\d{2}-\d{4}\b/g, '[redacted-id]')
+    .replace(/\+\d(?:[\s().-]*\d){7,14}\b/g, '[redacted-phone]')
     .replace(/\b(?:\+?1[-.\s]?)?(?:\(\d{3}\)|\d{3})[-.\s]?\d{3}[-.\s]?\d{4}\b/g, '[redacted-phone]')
     .replace(/\b(?:routing|account|acct|card)(?:\s+(?:number|no\.?))?\s*[:=#-]?\s*\d{4,19}\b/gi, '[redacted-financial]')
     .replace(/\b(?:\d[ -]*?){13,19}\b/g, '[redacted-financial]')
+    .replace(/\b(?:AKIA|ASIA|AIDA|AROA|AIPA|ANPA|ANVA)[A-Z0-9]{16}\b/gi, '[redacted-credential]')
     .replace(/\b(?:sk(?:-proj)?|pk|rk|ghp|github_pat|xox[baprs])[-_A-Za-z0-9]{8,}\b/g, '[redacted-credential]')
     .replace(/\b(password|passcode|api[_ -]?key|access[_ -]?token|bearer[_ -]?token|secret)\s*[:=]\s*\S+/gi, '$1=[redacted]')
     .trim()
@@ -338,11 +347,15 @@ function providerFailureStatus(error: unknown): number {
 
 function providerFailureBody(error: unknown) {
   const code = error instanceof FriendRuntimeError ? error.code : 'FRIEND_RUNTIME_FAILED';
+  const modelExecutionState = error instanceof FriendRuntimeError
+    ? error.executionState
+    : 'provider_unavailable';
   return {
     error: providerFailureStatus(error) === 503
       ? 'Requested Friend runtime provider is unavailable'
       : 'Friend runtime provider failed',
     code,
+    modelExecutionState,
   };
 }
 
@@ -378,6 +391,8 @@ export function createFriendIntakeRouter(dependencies: FriendIntakeRouteDependen
   const resolveLiveInferenceBudget = dependencies.resolveLiveInferenceBudget ?? configuredLiveInferenceBudget;
   const isInteractiveFounderRequest = dependencies.isInteractiveFounderRequest
     ?? ((req: FounderRequest) => req.founderAuthChannel === 'interactive');
+  const preflightLiveInference = dependencies.preflightLiveInference
+    ?? ((provider: LiveFriendRuntimeProvider) => assertFriendRuntimeProviderReady(provider));
 
   router.use(requireFounder);
 
@@ -459,6 +474,12 @@ export function createFriendIntakeRouter(dependencies: FriendIntakeRouteDependen
         });
       }
 
+      try {
+        preflightLiveInference(requestedProvider);
+      } catch (error) {
+        return res.status(providerFailureStatus(error)).json(providerFailureBody(error));
+      }
+
       const budget = resolveLiveInferenceBudget();
       if (!budget) {
         return res.status(503).json({
@@ -492,6 +513,9 @@ export function createFriendIntakeRouter(dependencies: FriendIntakeRouteDependen
             voiceProfile,
           });
     } catch (error) {
+      const modelExecutionState = error instanceof FriendRuntimeError
+        ? error.executionState
+        : 'provider_unavailable';
       try {
         await writeTimelineEvent({
           sourceEventId: runId,
@@ -504,6 +528,7 @@ export function createFriendIntakeRouter(dependencies: FriendIntakeRouteDependen
             requested_provider: requestedProvider,
             privacy_choice: selectedPrivacy,
             error_code: error instanceof FriendRuntimeError ? error.code : 'FRIEND_RUNTIME_FAILED',
+            model_execution_state: modelExecutionState,
             ...(inferenceReservationId ? { inference_reservation_id: inferenceReservationId } : {}),
           },
         });
