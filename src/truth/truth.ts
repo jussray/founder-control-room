@@ -70,10 +70,41 @@ function parseInstant(value: string | null): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function hasText(value: string | null): value is string {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+/**
+ * Enforce the canonical truth precedence for evidence that is allowed to
+ * render a verified claim green. Model inference and founder notes may inform
+ * a claim, but they cannot independently verify one.
+ */
+function evidenceCanVerifyClaim(
+  claim: TruthClaim,
+  evidence: ClaimEvidenceRecord,
+): boolean {
+  switch (evidence.source) {
+    case 'live_provider':
+      return true;
+    case 'exact_target_verification':
+      return hasText(claim.targetFingerprint)
+        && evidence.targetFingerprint === claim.targetFingerprint;
+    case 'hashed_artifact':
+      return hasText(evidence.integrityDigest);
+    case 'test_execution':
+      return hasText(claim.targetFingerprint)
+        && evidence.targetFingerprint === claim.targetFingerprint;
+    case 'model_inference':
+    case 'founder_note':
+      return false;
+  }
+}
+
 /**
  * Green is a rendering decision, not a synonym for "looks good".
  * It is allowed only when the claim is verified, fresh, target-bound when
- * required, and backed by at least one compatible evidence record.
+ * required, and backed by at least one compatible authoritative evidence
+ * record that satisfies the canonical source-specific verification binding.
  */
 export function canRenderVerifiedClaim(
   claim: TruthClaim,
@@ -95,6 +126,7 @@ export function canRenderVerifiedClaim(
     const evidence = context.evidenceById.get(evidenceId);
     if (!evidence) return false;
     if (!claim.evidenceScope.includes(evidence.scope)) return false;
+    if (!evidenceCanVerifyClaim(claim, evidence)) return false;
 
     const evidenceExpires = parseInstant(evidence.freshnessExpiresAt);
     if (evidenceExpires !== null && evidenceExpires <= now) return false;
