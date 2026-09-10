@@ -11,6 +11,40 @@
   "permissionStateSource": "chatgpt-runtime",
   "connectionStateSource": "chatgpt-runtime",
   "truthBoundary": "This file declares intended plugin capability only. It does not prove that a plugin is installed, connected, permitted, or that any action executed.",
+  "socialAnalyticsTruth": {
+    "analyticsMode": "observation_only",
+    "sourcePrecedence": [
+      "native-platform",
+      "native-platform-export",
+      "official-api-partner",
+      "aggregator",
+      "inference"
+    ],
+    "nativePlatformWinsOnConflict": true,
+    "emptyProviderRowsClassifyAs": "UNKNOWN_NO_EVIDENCE",
+    "causalClaimsRequirePlatformAttributableEvidence": true,
+    "forbiddenUngroundedClaims": [
+      "ranking_suppression",
+      "distribution_restriction",
+      "post_to_follower_conversion",
+      "delayed_follower_attribution",
+      "algorithmic_cause"
+    ],
+    "buffer": {
+      "role": "Corroborating LinkedIn post-level analytics and scheduling when freshly connected through an authorized route.",
+      "authority": "secondary",
+      "runtimeDiscoveryRequired": true,
+      "mayOverrideNativePlatform": false,
+      "productionAnalyticsApiAssumed": false
+    },
+    "metricool": {
+      "role": "Secondary cross-network analytics and scheduling observation.",
+      "authority": "secondary",
+      "runtimeDiscoveryRequired": true,
+      "emptyRowsMeanZero": false,
+      "mayOverrideNativePlatform": false
+    }
+  },
   "plugins": [
     {
       "name": "GitHub",
@@ -45,6 +79,12 @@
     {
       "name": "Figma",
       "role": "Editable design evidence and handoff; never runtime proof.",
+      "runtimeDiscoveryRequired": true,
+      "defaultMode": "read-first"
+    },
+    {
+      "name": "Metricool for Social Media",
+      "role": "Secondary social analytics and scheduling observation; empty rows are no evidence, not zero performance.",
       "runtimeDiscoveryRequired": true,
       "defaultMode": "read-first"
     }
