@@ -1,5 +1,6 @@
 const root = document.getElementById('friend-intake-root');
 let activeReceipt = null;
+let intakeRequestInFlight = false;
 
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, (character) => (
@@ -91,6 +92,7 @@ function renderForm(founder) {
     void submitIntake(form);
   });
   root.querySelector('#cancel-intake').addEventListener('click', () => {
+    if (intakeRequestInFlight) return;
     form.reset();
     privacyNote.textContent = privacyMessage('process_without_saving');
     root.querySelector('#friend-intake-result').innerHTML = '';
@@ -100,15 +102,23 @@ function renderForm(founder) {
 }
 
 async function submitIntake(form, options = {}) {
+  if (intakeRequestInFlight) return;
+
   const error = root.querySelector('#friend-intake-error');
-  const button = form.querySelector('button[type="submit"]');
+  const submitButton = form.querySelector('button[type="submit"]');
+  const guardedControls = Array.isArray(options.guardedControls) && options.guardedControls.length > 0
+    ? options.guardedControls
+    : [submitButton];
   const data = new FormData(form);
   const rawText = String(data.get('rawText') ?? '').trim();
   const privacyChoice = String(data.get('privacyChoice') ?? '');
 
   error.hidden = true;
   error.textContent = '';
-  button.disabled = true;
+  intakeRequestInFlight = true;
+  guardedControls.forEach((control) => {
+    if (control instanceof HTMLButtonElement) control.disabled = true;
+  });
 
   try {
     const response = await fetch('/friend-intake/run', {
@@ -150,7 +160,10 @@ async function submitIntake(form, options = {}) {
     error.textContent = caught instanceof Error ? caught.message : String(caught);
     error.hidden = false;
   } finally {
-    button.disabled = false;
+    intakeRequestInFlight = false;
+    guardedControls.forEach((control) => {
+      if (control instanceof HTMLButtonElement && control.isConnected) control.disabled = false;
+    });
   }
 }
 
@@ -175,20 +188,27 @@ function renderSensitiveSaveReview(form, review, reviewedRawText) {
   `;
 
   const status = mount.querySelector('[data-sensitive-review-status]');
-  mount.querySelector('[data-confirm-sensitive-save]').addEventListener('click', () => {
+  const confirmButton = mount.querySelector('[data-confirm-sensitive-save]');
+  const unsavedButton = mount.querySelector('[data-process-unsaved]');
+  const reviewControls = [confirmButton, unsavedButton];
+
+  confirmButton.addEventListener('click', () => {
     const currentRawText = String(new FormData(form).get('rawText') ?? '').trim();
     if (currentRawText !== reviewedRawText) {
       status.textContent = 'The input changed after review. Run Friend Intake again before saving.';
       return;
     }
-    void submitIntake(form, { sensitiveSaveConfirmed: true });
+    void submitIntake(form, {
+      sensitiveSaveConfirmed: true,
+      guardedControls: reviewControls,
+    });
   });
 
-  mount.querySelector('[data-process-unsaved]').addEventListener('click', () => {
+  unsavedButton.addEventListener('click', () => {
     const unsavedChoice = form.querySelector('input[value="process_without_saving"]');
     unsavedChoice.checked = true;
     root.querySelector('#privacy-note').textContent = privacyMessage('process_without_saving');
-    void submitIntake(form);
+    void submitIntake(form, { guardedControls: reviewControls });
   });
 }
 
