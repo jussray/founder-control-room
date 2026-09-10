@@ -1,13 +1,22 @@
-import { createHmac, timingSafeEqual } from 'node:crypto';
+import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import type { Request, Response } from 'express';
 import type { DeterministicFriendIntakeResult } from '../../chief/firstSliceEngine.js';
 
 const REVIEW_COOKIE = 'fcr_friend_intake_review';
-const REVIEW_TOKEN_VERSION = 'v1';
+const REVIEW_TOKEN_VERSION = 'v2';
 const REVIEW_TTL_SECONDS = 5 * 60;
 const SESSION_KEY_PATTERN = /^[A-Za-z0-9_-]{43}$/;
-const REVIEW_TOKEN_PATTERN = /^v1\.(\d{10})\.([A-Za-z0-9_-]{43})$/;
-const ENGINE_VERSION = 'first-slice-v1';
+const SESSION_ID_HASH_PATTERN = /^[0-9a-f]{64}$/i;
+const REVIEW_TOKEN_PATTERN = /^v2\.(\d{10})\.([A-Za-z0-9_-]{22})\.([A-Za-z0-9_-]{43})$/;
+
+export interface SensitiveSaveReviewBinding {
+  founderId: string;
+  browserSessionIdHash: string;
+  rawText: string;
+  result: DeterministicFriendIntakeResult;
+  engineVersion: string;
+  moveGateWarningCode: string | null;
+}
 
 function parseCookieHeader(header: string | undefined): Map<string, string> {
   const cookies = new Map<string, string>();
@@ -37,76 +46,95 @@ function signingKey(): Buffer {
   }
 
   return createHmac('sha256', masterKey)
-    .update('fcr-friend-intake-sensitive-review-key/v1', 'utf8')
+    .update('fcr-friend-intake-sensitive-review-key/v2', 'utf8')
     .digest();
 }
 
 function canonicalReviewInput(
-  founderId: string,
-  rawText: string,
-  result: DeterministicFriendIntakeResult,
+  binding: SensitiveSaveReviewBinding,
+  nonce: string,
   expiresAt: number,
 ): string {
   return [
-    'fcr-friend-intake-sensitive-save-review/v1',
-    founderId,
-    rawText,
-    result.redactedSummary ?? '',
-    [...result.sensitiveCategories].sort().join(','),
-    [...result.intentTags].sort().join(','),
-    result.move.kind,
-    result.move.policy,
-    result.move.timeEstimateMinutes === null ? '' : String(result.move.timeEstimateMinutes),
-    result.move.gateWarning ?? '',
-    ENGINE_VERSION,
+    'fcr-friend-intake-sensitive-save-review/v2',
+    binding.founderId,
+    binding.browserSessionIdHash.toLowerCase(),
+    binding.rawText,
+    binding.result.redactedSummary ?? '',
+    [...binding.result.sensitiveCategories].sort().join(','),
+    [...binding.result.intentTags].sort().join(','),
+    binding.result.move.kind,
+    binding.result.move.policy,
+    binding.result.move.timeEstimateMinutes === null ? '' : String(binding.result.move.timeEstimateMinutes),
+    binding.moveGateWarningCode ?? '',
+    'blocked',
+    binding.engineVersion,
+    nonce,
     String(expiresAt),
   ].join('\n');
 }
 
 function signature(
-  founderId: string,
-  rawText: string,
-  result: DeterministicFriendIntakeResult,
+  binding: SensitiveSaveReviewBinding,
+  nonce: string,
   expiresAt: number,
 ): Buffer {
   return createHmac('sha256', signingKey())
-    .update(canonicalReviewInput(founderId, rawText, result, expiresAt), 'utf8')
+    .update(canonicalReviewInput(binding, nonce, expiresAt), 'utf8')
     .digest();
 }
 
 export function issueSensitiveSaveReviewReceipt(
-  founderId: string,
-  rawText: string,
-  result: DeterministicFriendIntakeResult,
+  binding: SensitiveSaveReviewBinding,
   nowSeconds = Math.floor(Date.now() / 1_000),
 ): string {
+  if (!SESSION_ID_HASH_PATTERN.test(binding.browserSessionIdHash)) {
+    throw new Error('Friend Intake review requires an exact founder browser-session identity hash');
+  }
   const expiresAt = nowSeconds + REVIEW_TTL_SECONDS;
-  const mac = signature(founderId, rawText, result, expiresAt).toString('base64url');
-  return `${REVIEW_TOKEN_VERSION}.${expiresAt}.${mac}`;
+  const nonce = randomBytes(16).toString('base64url');
+  const mac = signature(binding, nonce, expiresAt).toString('base64url');
+  return `${REVIEW_TOKEN_VERSION}.${expiresAt}.${nonce}.${mac}`;
 }
 
 export function verifySensitiveSaveReviewReceipt(
   token: string | null,
-  founderId: string,
-  rawText: string,
-  result: DeterministicFriendIntakeResult,
+  binding: SensitiveSaveReviewBinding,
   nowSeconds = Math.floor(Date.now() / 1_000),
 ): boolean {
-  if (!token) return false;
+  if (!token || !SESSION_ID_HASH_PATTERN.test(binding.browserSessionIdHash)) return false;
   const match = token.match(REVIEW_TOKEN_PATTERN);
   if (!match) return false;
 
   const expiresAt = Number(match[1]);
+  const nonce = match[2];
   if (!Number.isSafeInteger(expiresAt)) return false;
   if (expiresAt < nowSeconds || expiresAt > nowSeconds + REVIEW_TTL_SECONDS) return false;
 
   try {
-    const actual = Buffer.from(match[2], 'base64url');
-    const expected = signature(founderId, rawText, result, expiresAt);
+    const actual = Buffer.from(match[3], 'base64url');
+    const expected = signature(binding, nonce, expiresAt);
     return actual.length === expected.length && timingSafeEqual(actual, expected);
   } catch {
     return false;
   }
+}
+
+export function reviewReceiptDerivedUuid(
+  token: string,
+  purpose: 'intake' | 'timeline',
+): string {
+  if (!REVIEW_TOKEN_PATTERN.test(token)) {
+    throw new Error('Friend Intake review receipt is malformed');
+  }
+  const digest = createHash('sha256')
+    .update(`fcr-friend-intake-review-id/v1\n${purpose}\n${token}`, 'utf8')
+    .digest();
+  const bytes = Buffer.from(digest.subarray(0, 16));
+  bytes[6] = (bytes[6] & 0x0f) | 0x50;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = bytes.toString('hex');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
 export function readSensitiveSaveReviewReceipt(req: Request): string | null {
