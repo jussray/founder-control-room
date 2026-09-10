@@ -23,11 +23,6 @@ function fakeFounder(req: Request, _res: Response, next: NextFunction) {
 }
 
 test.beforeAll(async () => {
-  // The real compiled router imports FCR's default Supabase clients at module
-  // initialization even though this browser proof injects persistence/auth at
-  // their explicit dependency boundaries. Use FCR's code-owned local-test
-  // escape hatch and an unreachable loopback port so module initialization is
-  // valid while any accidental provider call fails locally.
   process.env.NODE_ENV = 'test';
   process.env.SUPABASE_ALLOW_LOCAL = 'true';
   process.env.SUPABASE_URL = 'http://127.0.0.1:9';
@@ -47,6 +42,7 @@ test.beforeAll(async () => {
     authMiddleware: fakeFounder,
     resolveProjectId: async () => PROJECT_ID,
     persistRun: async (input) => {
+      await new Promise((resolve) => setTimeout(resolve, 75));
       const record = { ...input } as Record<string, unknown>;
       persistedRuns.push(record);
       ownedRuns.set(String(record.intakeId), String(record.founderId));
@@ -130,7 +126,7 @@ test('desktop saved-summary flow is model-free, bounded, and useful', async ({ p
   await page.screenshot({ path: 'test-results/friend-intake-desktop.png', fullPage: true });
 });
 
-test('sensitive saved-summary flow requires explicit review before persistence', async ({ page }) => {
+test('sensitive saved-summary confirmation is serialized before persistence', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   const externalRequests = captureExternalRequests(page);
   const rawText = 'My child is involved in a custody issue.';
@@ -150,7 +146,7 @@ test('sensitive saved-summary flow requires explicit review before persistence',
 
   await page.screenshot({ path: 'test-results/friend-intake-sensitive-review.png', fullPage: true });
 
-  await page.getByRole('button', { name: 'Save this redacted summary' }).click();
+  await page.getByRole('button', { name: 'Save this redacted summary' }).dblclick();
   const receipt = page.locator('[data-friend-intake-receipt]');
   await expect(receipt).toBeVisible();
   await expect(receipt).toContainText('Redacted summary only');
@@ -163,6 +159,19 @@ test('sensitive saved-summary flow requires explicit review before persistence',
   expect(String(persisted.redactedSummary)).not.toContain(rawText);
   expect(JSON.stringify(persisted)).not.toContain(rawText);
   expect(externalRequests).toEqual([]);
+});
+
+test('control room hides Friend Intake navigation when runtime availability is false', async ({ page }) => {
+  await page.route('**/friend-intake/status', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ enabled: false }),
+    });
+  });
+
+  await page.goto(`${baseUrl}/control-room/`, { waitUntil: 'networkidle' });
+  await expect(page.locator('[data-friend-intake-link]')).toBeHidden();
 });
 
 test('mobile process-without-saving protects sensitive input and stores no intake content', async ({ page }) => {
