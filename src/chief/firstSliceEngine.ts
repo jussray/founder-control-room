@@ -74,6 +74,10 @@ const SENSITIVE_RULES: ReadonlyArray<{
       /\bcrisis\b/i,
       /\bself[ -]?harm\b/i,
       /\bsuicid(?:e|al)\b/i,
+      /\b(?:kill|hurt|injure)\s+myself\b/i,
+      /\b(?:want|wanna|going|gonna|plan(?:ning)?|intend(?:ing)?)\s+to\s+(?:kill|hurt|injure)\s+(?:myself|me)\b/i,
+      /\b(?:want|wanna|going|gonna|plan(?:ning)?|intend(?:ing)?)\s+to\s+die\b/i,
+      /\bdon['’]?t\s+want\s+to\s+(?:be\s+alive|live)\b/i,
     ],
   },
   {
