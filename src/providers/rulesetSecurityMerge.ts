@@ -105,7 +105,9 @@ export function fingerprintRulesetReconciliationObservation(observation: Ruleset
     bypassActors: observation.bypassActors,
     rules: observation.rules,
   });
-  return createHash("sha256").update(JSON.stringify(canonical)).digest("hex");
+  const serialized = JSON.stringify(canonical);
+  if (!serialized) throw new Error("ruleset reconciliation refused: provider state could not be fingerprinted");
+  return createHash("sha256").update(serialized).digest("hex");
 }
 
 export function mergeExistingRulesetSecurity({ existingRules, requestedRules, requiredStatusCheckNames, requirePullRequest, blockForcePushes, blockDeletion }: MergeExistingRulesetSecurityInput): RulesetRuleLike[] {
