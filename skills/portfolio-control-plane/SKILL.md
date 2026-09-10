@@ -165,6 +165,34 @@ Passing CI alone proves only the checks that actually ran. It does not prove a l
 
 For portfolio summaries, report at minimum: project, current head, decisive evidence, classification, what is known to work, what is not yet proven, and the smallest next proof that could legitimately raise the classification. Prefer one current truthful status over optimistic aggregation.
 
+## ULTRATHINK repair loop
+
+After the reality audit identifies a failing or incomplete claim, repair the portfolio by cause, not by symptom. Before changing code, classify the decisive blocker as one of these repair classes:
+
+- **CODE_DEFECT** — repository implementation is causally wrong or incomplete;
+- **PROOF_DEFECT** — the intended behavior may work, but the verifier, evidence binding, or claim scope is wrong;
+- **PROVENANCE_DEFECT** — valid founder/release history is rejected or cannot be bound to the exact head under the governing authority model;
+- **CREDENTIAL_AUTHORITY_BLOCKER** — a required secret, token, identity, permission, or protected-environment grant is missing, invalid, rejected, or outside current authority;
+- **PROVIDER_DEPLOYMENT_BLOCKER** — repository build/source is valid but the authoritative external provider has not deployed, routed, synchronized, or exposed the required current release;
+- **STALE_EVIDENCE_BLOCKER** — only older-head or expired evidence exists and no current failure has yet been proven.
+
+Apply the smallest safe fix only to the causal class. A code defect may receive a focused code patch. A proof or provenance defect may receive a focused verifier/governance repair only when the governing authority model supports it. Credential and provider blockers must remain blocked until the authorized external state changes; never bypass authentication, invent secrets, weaken protected environments, create a second deployment authority, or relabel missing provider proof as application success.
+
+Prefer an existing open repair branch or pull request when it already owns the same causal failure. Do not create a duplicate repair lane merely because a check is red. Preserve unrelated work, keep the blast radius bounded, and stop if the next step requires founder-only authority that has not been granted.
+
+For each attempted repair:
+
+1. capture the pre-fix exact head and decisive failing evidence;
+2. identify the repair class and the smallest causal file/provider surface;
+3. make only the authorized change;
+4. resolve the new exact head;
+5. rerun the narrowest decisive check first;
+6. rerun claim-appropriate integration, Playwright, provider, or production proof when the claim requires it;
+7. compare before/after evidence and update VERIFIED/PARTIAL/UNKNOWN/BLOCKED/STALE without optimistic carry-forward;
+8. record any remaining provider, credential, deployment, privacy, cost, or rollback gate as the next explicit founder action.
+
+A red check is not permission to make it green. The objective is truthful recovery of founder intent, not green dashboards.
+
 ## Project separation
 
 Shared philosophy may cross projects. Operational data may not.
