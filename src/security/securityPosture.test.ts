@@ -12,7 +12,7 @@ describe('strategic security posture', () => {
       v10Targets: 3,
       playwrightRequiredProjects: 3,
       totalStageObligations: 74,
-      uniqueControlCount: 57,
+      uniqueControlCount: 62,
       frameworkSignalCount: expect.any(Number),
       provenProjects: 0,
     });
