@@ -9,8 +9,11 @@ on:
       - 'src/http/middleware/requireFounder.ts'
       - 'src/http/middleware/__tests__/requireFounder.test.ts'
       - 'src/http/routes/friendIntake.ts'
+      - 'src/http/routes/__tests__/friendIntake.integration.test.ts'
+      - 'src/http/routes/__tests__/friendIntake.attack5000.test.ts'
       - 'src/http/routes/mirror.ts'
       - 'src/mirror/friendRuntime.ts'
+      - 'src/mirror/__tests__/friendRuntime.test.ts'
       - 'src/chief/firstSliceContracts.ts'
       - 'src/model/execution.ts'
       - 'public/control-room/friend.*'
@@ -32,8 +35,11 @@ on:
       - 'src/http/middleware/requireFounder.ts'
       - 'src/http/middleware/__tests__/requireFounder.test.ts'
       - 'src/http/routes/friendIntake.ts'
+      - 'src/http/routes/__tests__/friendIntake.integration.test.ts'
+      - 'src/http/routes/__tests__/friendIntake.attack5000.test.ts'
       - 'src/http/routes/mirror.ts'
       - 'src/mirror/friendRuntime.ts'
+      - 'src/mirror/__tests__/friendRuntime.test.ts'
       - 'src/chief/firstSliceContracts.ts'
       - 'src/model/execution.ts'
       - 'public/control-room/friend.*'
@@ -88,7 +94,7 @@ jobs:
         run: npm run typecheck
 
       - name: Focused Friend tests
-        run: npx vitest run src/auth/__tests__/founderSession.integrity.test.ts src/http/middleware/__tests__/requireFounder.test.ts src/mirror/__tests__/friendRuntime.test.ts src/http/routes/__tests__/friendIntake.integration.test.ts src/implant/__tests__/selfAttackContracts.test.ts
+        run: npx vitest run src/auth/__tests__/founderSession.integrity.test.ts src/http/middleware/__tests__/requireFounder.test.ts src/mirror/__tests__/friendRuntime.test.ts src/http/routes/__tests__/friendIntake.integration.test.ts src/http/routes/__tests__/friendIntake.attack5000.test.ts src/implant/__tests__/selfAttackContracts.test.ts
 
       - name: Install Chromium
         run: npx playwright install chromium --with-deps
