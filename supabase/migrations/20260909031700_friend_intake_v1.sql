@@ -3,14 +3,15 @@
 -- Privacy boundary:
 -- - raw founder input is never stored here;
 -- - process_without_saving creates no intake_sessions row;
--- - save_redacted_summary stores one bounded category-level summary only;
+-- - save_redacted_summary stores one bounded category-level summary plus allowed derived labels;
 -- - sensitive saved summaries require an explicit founder review receipt;
+-- - one sensitive review maps to deterministic intake/timeline UUIDs so database uniqueness enforces one-save consumption;
 -- - project_events receives behavior-only operational metadata, never intake labels, mirror/move content, or raw text.
 -- - intake_sessions is server-owned/service-role-only; direct browser roles do not receive table access.
 
 create table if not exists public.intake_sessions (
   intake_id uuid primary key,
-  founder_id uuid not null references auth.users(id) on delete cascade,
+  founder_id uuid not null references auth.users(id) on delete restrict,
   privacy_choice text not null check (privacy_choice = 'save_redacted_summary'),
   redacted_summary text not null check (char_length(redacted_summary) between 1 and 300),
   sensitive_categories text[] not null default '{}'::text[],
@@ -144,7 +145,7 @@ begin
       'privacy_choice', p_privacy_choice,
       'model_execution_state', p_model_execution_state,
       'input_persistence', case
-        when p_privacy_choice = 'save_redacted_summary' then 'redacted_summary_only'
+        when p_privacy_choice = 'save_redacted_summary' then 'redacted_summary_and_derived_labels'
         else 'none'
       end
     ),
@@ -212,12 +213,8 @@ begin
     raise exception 'friend_intake_run_not_owned';
   end if;
 
-  update public.intake_sessions
-  set usefulness_response = p_response,
-      usefulness_recorded_at = now()
-  where intake_id = p_run_id
-    and founder_id = p_founder_id;
-
+  -- Each founder feedback decision is append-only. The caller-supplied event UUID
+  -- makes retries idempotent without overwriting an earlier correction/history row.
   insert into public.project_events (
     id,
     project_id,
@@ -231,7 +228,7 @@ begin
   ) values (
     p_event_id,
     p_project_id,
-    'friend-intake-usefulness:' || p_run_id::text,
+    'friend-intake-usefulness:' || p_run_id::text || ':' || p_event_id::text,
     'friend_intake_usefulness',
     'info',
     'friend-intake',
@@ -245,11 +242,17 @@ begin
     ),
     now()
   )
-  on conflict (project_id, source_event_id)
-  do update set
-    decision = excluded.decision,
-    metadata = excluded.metadata,
-    created_at = now();
+  on conflict (project_id, source_event_id) do nothing;
+
+  if not found then
+    return;
+  end if;
+
+  update public.intake_sessions
+  set usefulness_response = p_response,
+      usefulness_recorded_at = now()
+  where intake_id = p_run_id
+    and founder_id = p_founder_id;
 end;
 $$;
 
