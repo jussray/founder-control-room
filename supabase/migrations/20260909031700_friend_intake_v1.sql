@@ -6,7 +6,8 @@
 -- - save_redacted_summary stores one bounded category-level summary plus allowed derived labels;
 -- - sensitive saved summaries require an explicit founder review receipt;
 -- - one sensitive review maps to deterministic intake/timeline UUIDs so database uniqueness enforces one-save consumption;
--- - project_events receives behavior-only operational metadata, never intake labels, mirror/move content, or raw text.
+-- - project_events receives behavior-only operational metadata, never intake labels, mirror/move content, or raw text;
+-- - provenance identity resolves through the linked timeline event without adding a parallel provenance store.
 -- - intake_sessions is server-owned/service-role-only; direct browser roles do not receive table access.
 
 create table if not exists public.intake_sessions (
@@ -142,6 +143,8 @@ begin
       'actor', 'founder',
       'founder_user_id', p_founder_id,
       'provenance_id', p_provenance_id,
+      'provenance_kind', 'deterministic_rule_engine',
+      'engine_version', 'first-slice-v1',
       'privacy_choice', p_privacy_choice,
       'model_execution_state', p_model_execution_state,
       'input_persistence', case
