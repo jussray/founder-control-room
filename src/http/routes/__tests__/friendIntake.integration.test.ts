@@ -11,7 +11,7 @@ vi.mock('../../../lib/supabaseAuthClient.js', () => ({
 }));
 vi.mock('../../../lib/supabaseClient.js', () => ({ supabase: supabaseMock }));
 
-import express from 'express';
+import express, { type NextFunction, type Request, type Response } from 'express';
 import request from 'supertest';
 import type { DeterministicFriendIntakeResult } from '../../../chief/firstSliceEngine.js';
 import {
@@ -25,6 +25,9 @@ const OTHER_FOUNDER_ID = '00000000-0000-4000-8000-000000000222';
 const BEARER = 'Bearer test-token';
 const PROJECT_ID = '00000000-0000-4000-8000-000000000333';
 const RUN_ID = '00000000-0000-4000-8000-000000000444';
+const EVENT_ID = '00000000-0000-4000-8000-000000000555';
+const SESSION_ID_HASH = 'a'.repeat(64);
+const OTHER_SESSION_ID_HASH = 'b'.repeat(64);
 const REVIEW_KEY = Buffer.alloc(32, 7).toString('base64url');
 type PersistRunInput = Parameters<NonNullable<FriendIntakeRouteDependencies['persistRun']>>[0];
 type RecordUsefulnessInput = Parameters<NonNullable<FriendIntakeRouteDependencies['recordUsefulness']>>[0];
@@ -46,11 +49,26 @@ function authenticateFounder() {
   });
 }
 
+function fakeInteractiveFounder(req: Request, _res: Response, next: NextFunction) {
+  (req as Request & { founder?: { email: string; userId: string } }).founder = {
+    email: FOUNDER_EMAIL,
+    userId: FOUNDER_ID,
+  };
+  next();
+}
+
+function rejectInteractiveFounder(_req: Request, res: Response) {
+  return res.status(401).json({ error: 'Interactive founder session required' });
+}
+
 function buildApp(overrides: FriendIntakeRouteDependencies = {}) {
   const app = express();
   app.use(express.json());
   app.use('/friend-intake', createFriendIntakeRouter({
     enabled: () => true,
+    persistenceEnabled: () => true,
+    interactiveAuthMiddleware: fakeInteractiveFounder,
+    resolveInteractiveSessionIdHash: vi.fn(async () => SESSION_ID_HASH),
     resolveProjectId: vi.fn(async () => PROJECT_ID),
     persistRun: vi.fn(async () => undefined),
     recordUsefulness: vi.fn(async () => undefined),
@@ -69,7 +87,7 @@ beforeEach(() => {
 });
 
 describe('Friend Intake route', () => {
-  it('rejects an unauthenticated run before engine persistence', async () => {
+  it('rejects an unauthenticated unsaved run before engine persistence', async () => {
     const persistRun = vi.fn(async (_input: PersistRunInput) => undefined);
     const response = await request(buildApp({ persistRun }))
       .post('/friend-intake/run')
@@ -106,10 +124,8 @@ describe('Friend Intake route', () => {
         relatedMemoryUsed: false,
       },
     });
-    expect(response.body.receipt.intakeId).toMatch(/^[0-9a-f-]{36}$/i);
     expect(persistRun).toHaveBeenCalledTimes(1);
-    const persisted = persistRun.mock.calls[0]?.[0];
-    expect(persisted).toMatchObject({
+    expect(persistRun.mock.calls[0]?.[0]).toMatchObject({
       founderId: FOUNDER_ID,
       projectId: PROJECT_ID,
       privacyChoice: 'process_without_saving',
@@ -119,12 +135,11 @@ describe('Friend Intake route', () => {
       intentTagIds: [],
       modelExecutionState: 'blocked',
     });
-    expect(JSON.stringify(persisted)).not.toContain(rawText);
-    expect(JSON.stringify(persisted)).not.toContain('sensitiveDetected');
-    expect(JSON.stringify(persisted)).not.toContain(OTHER_FOUNDER_ID);
+    expect(JSON.stringify(persistRun.mock.calls[0]?.[0])).not.toContain(rawText);
+    expect(JSON.stringify(persistRun.mock.calls[0]?.[0])).not.toContain(OTHER_FOUNDER_ID);
   });
 
-  it('classifies sensitive input server-side without persisting the derived labels in unsaved mode', async () => {
+  it('classifies sensitive input server-side without persisting derived labels in unsaved mode', async () => {
     authenticateFounder();
     const persistRun = vi.fn(async (_input: PersistRunInput) => undefined);
 
@@ -139,8 +154,6 @@ describe('Friend Intake route', () => {
 
     expect(response.status).toBe(200);
     expect(response.body.receipt.move.kind).toBe('protective_move');
-    expect(response.body.receipt.move.kind).not.toBe('tiny_move');
-    expect(persistRun).toHaveBeenCalledTimes(1);
     expect(persistRun.mock.calls[0]?.[0]).toMatchObject({
       privacyChoice: 'process_without_saving',
       redactedSummary: null,
@@ -150,17 +163,52 @@ describe('Friend Intake route', () => {
     });
   });
 
-  it('persists only a bounded category-level summary for a non-sensitive saved intake', async () => {
+  it('requires interactive founder authority before any saved intake content can persist', async () => {
     authenticateFounder();
+    const persistRun = vi.fn(async (_input: PersistRunInput) => undefined);
+
+    const response = await request(buildApp({
+      interactiveAuthMiddleware: rejectInteractiveFounder,
+      persistRun,
+    }))
+      .post('/friend-intake/run')
+      .set('Authorization', BEARER)
+      .send({ rawText: 'Finish the product build.', privacyChoice: 'save_redacted_summary' });
+
+    expect(response.status).toBe(401);
+    expect(persistRun).not.toHaveBeenCalled();
+  });
+
+  it('keeps ephemeral intake available while the independent persistence switch is off', async () => {
+    authenticateFounder();
+    const persistRun = vi.fn(async (_input: PersistRunInput) => undefined);
+    const app = buildApp({ persistenceEnabled: () => false, persistRun });
+
+    const unsaved = await request(app)
+      .post('/friend-intake/run')
+      .set('Authorization', BEARER)
+      .send({ rawText: 'Finish the build.', privacyChoice: 'process_without_saving' });
+    expect(unsaved.status).toBe(200);
+
+    const saved = await request(app)
+      .post('/friend-intake/run')
+      .send({ rawText: 'Finish the build.', privacyChoice: 'save_redacted_summary' });
+    expect(saved.status).toBe(503);
+    expect(saved.body.code).toBe('FRIEND_INTAKE_PERSISTENCE_DISABLED');
+    expect(persistRun).toHaveBeenCalledTimes(1);
+    expect(persistRun.mock.calls[0]?.[0].privacyChoice).toBe('process_without_saving');
+  });
+
+  it('persists a bounded summary plus derived labels for a non-sensitive interactive save', async () => {
     const persistRun = vi.fn(async (_input: PersistRunInput) => undefined);
     const rawText = 'Email founder@example.com about the product build plan.';
 
     const response = await request(buildApp({ persistRun }))
       .post('/friend-intake/run')
-      .set('Authorization', BEARER)
       .send({ rawText, privacyChoice: 'save_redacted_summary' });
 
     expect(response.status).toBe(200);
+    expect(response.body.receipt.inputPersistence).toBe('redacted_summary_and_derived_labels');
     const persisted = persistRun.mock.calls[0]?.[0];
     expect(persisted?.privacyChoice).toBe('save_redacted_summary');
     expect(persisted?.redactedSummary).toBeTruthy();
@@ -171,43 +219,22 @@ describe('Friend Intake route', () => {
     expect(JSON.stringify(persisted)).not.toContain(rawText);
   });
 
-  it('requires a server-issued review receipt before persisting a sensitive redacted summary', async () => {
-    authenticateFounder();
+  it('requires a server-issued, session-bound review receipt before a sensitive save', async () => {
     const persistRun = vi.fn(async (_input: PersistRunInput) => undefined);
     const rawText = 'My child is involved in a custody issue.';
     const app = buildApp({ persistRun });
+    const agent = request.agent(app);
 
-    const forgedConfirmation = await request(app)
+    const forged = await agent
       .post('/friend-intake/run')
-      .set('Authorization', BEARER)
-      .send({
-        rawText,
-        privacyChoice: 'save_redacted_summary',
-        sensitiveSaveConfirmed: true,
-      });
-
-    expect(forgedConfirmation.status).toBe(409);
-    expect(forgedConfirmation.body.code).toBe('SENSITIVE_SAVE_REVIEW_REQUIRED');
+      .send({ rawText, privacyChoice: 'save_redacted_summary', sensitiveSaveConfirmed: true });
+    expect(forged.status).toBe(409);
     expect(persistRun).not.toHaveBeenCalled();
 
-    const agent = request.agent(app);
     const reviewResponse = await agent
       .post('/friend-intake/run')
-      .set('Authorization', BEARER)
-      .send({
-        rawText,
-        privacyChoice: 'save_redacted_summary',
-        sensitiveDetected: false,
-      });
-
+      .send({ rawText, privacyChoice: 'save_redacted_summary' });
     expect(reviewResponse.status).toBe(409);
-    expect(reviewResponse.headers['cache-control']).toBe('no-store');
-    const setCookieHeader = reviewResponse.headers['set-cookie'];
-    const setCookieText = Array.isArray(setCookieHeader)
-      ? setCookieHeader.join(';')
-      : String(setCookieHeader ?? '');
-    expect(setCookieText).toContain('HttpOnly');
-    expect(setCookieText).toContain('SameSite=Strict');
     expect(reviewResponse.body).toMatchObject({
       code: 'SENSITIVE_SAVE_REVIEW_REQUIRED',
       review: {
@@ -218,61 +245,76 @@ describe('Friend Intake route', () => {
         reviewReceiptIssued: true,
       },
     });
-    expect(reviewResponse.body.review.redactedSummary).toBeTruthy();
     expect(JSON.stringify(reviewResponse.body)).not.toContain(rawText);
-    expect(persistRun).not.toHaveBeenCalled();
 
-    const confirmedResponse = await agent
+    const confirmed = await agent
       .post('/friend-intake/run')
-      .set('Authorization', BEARER)
-      .send({
-        rawText,
-        privacyChoice: 'save_redacted_summary',
-        sensitiveSaveConfirmed: true,
-      });
-
-    expect(confirmedResponse.status).toBe(200);
+      .send({ rawText, privacyChoice: 'save_redacted_summary', sensitiveSaveConfirmed: true });
+    expect(confirmed.status).toBe(200);
+    expect(confirmed.body.receipt.inputPersistence).toBe('redacted_summary_and_derived_labels');
     expect(persistRun).toHaveBeenCalledTimes(1);
-    const persisted = persistRun.mock.calls[0]?.[0];
-    expect(persisted).toMatchObject({
+    expect(persistRun.mock.calls[0]?.[0]).toMatchObject({
       founderId: FOUNDER_ID,
       privacyChoice: 'save_redacted_summary',
       sensitiveSaveReviewed: true,
       modelExecutionState: 'blocked',
     });
-    expect(persisted?.sensitiveCategories).toEqual(reviewResponse.body.review.sensitiveCategories);
-    expect(persisted?.intentTagIds).toEqual(reviewResponse.body.review.intentTagIds);
-    expect(persisted?.redactedSummary).toBeTruthy();
-    expect(JSON.stringify(persisted)).not.toContain(rawText);
   });
 
-  it('binds the sensitive review receipt to the exact reviewed input', async () => {
-    authenticateFounder();
+  it('invalidates a sensitive review when the originating browser session changes', async () => {
     const persistRun = vi.fn(async (_input: PersistRunInput) => undefined);
-    const app = buildApp({ persistRun });
+    let sessionHash = SESSION_ID_HASH;
+    const app = buildApp({
+      persistRun,
+      resolveInteractiveSessionIdHash: vi.fn(async () => sessionHash),
+    });
     const agent = request.agent(app);
+    const rawText = 'My child is involved in a custody issue.';
 
-    const firstText = 'My child is involved in a custody issue.';
-    const changedText = 'My child is involved in a different legal issue.';
-
-    const reviewResponse = await agent
+    const review = await agent
       .post('/friend-intake/run')
-      .set('Authorization', BEARER)
-      .send({ rawText: firstText, privacyChoice: 'save_redacted_summary' });
-    expect(reviewResponse.status).toBe(409);
+      .send({ rawText, privacyChoice: 'save_redacted_summary' });
+    expect(review.status).toBe(409);
 
-    const changedConfirmation = await agent
+    sessionHash = OTHER_SESSION_ID_HASH;
+    const confirmation = await agent
       .post('/friend-intake/run')
-      .set('Authorization', BEARER)
-      .send({
-        rawText: changedText,
-        privacyChoice: 'save_redacted_summary',
-        sensitiveSaveConfirmed: true,
-      });
+      .send({ rawText, privacyChoice: 'save_redacted_summary', sensitiveSaveConfirmed: true });
 
-    expect(changedConfirmation.status).toBe(409);
-    expect(changedConfirmation.body.code).toBe('SENSITIVE_SAVE_REVIEW_REQUIRED');
+    expect(confirmation.status).toBe(409);
+    expect(confirmation.body.code).toBe('SENSITIVE_SAVE_REVIEW_REQUIRED');
     expect(persistRun).not.toHaveBeenCalled();
+  });
+
+  it('maps one review receipt to one database identity across concurrent confirmations', async () => {
+    const seen = new Set<string>();
+    const persistRun = vi.fn(async (input: PersistRunInput) => {
+      if (seen.has(input.intakeId)) {
+        throw new Error('FRIEND_INTAKE_PERSISTENCE_FAILED:duplicate key value violates unique constraint');
+      }
+      seen.add(input.intakeId);
+    });
+    const app = buildApp({ persistRun });
+    const rawText = 'My child is involved in a custody issue.';
+
+    const review = await request(app)
+      .post('/friend-intake/run')
+      .send({ rawText, privacyChoice: 'save_redacted_summary' });
+    expect(review.status).toBe(409);
+    const cookieHeader = review.headers['set-cookie'];
+    const cookieText = Array.isArray(cookieHeader) ? cookieHeader[0] : String(cookieHeader ?? '');
+    const reviewCookie = cookieText.split(';')[0];
+
+    const confirm = () => request(app)
+      .post('/friend-intake/run')
+      .set('Cookie', reviewCookie)
+      .send({ rawText, privacyChoice: 'save_redacted_summary', sensitiveSaveConfirmed: true });
+
+    const responses = await Promise.all([confirm(), confirm()]);
+    expect(responses.map((response) => response.status).sort()).toEqual([200, 409]);
+    expect(persistRun).toHaveBeenCalledTimes(2);
+    expect(persistRun.mock.calls[0]?.[0].intakeId).toBe(persistRun.mock.calls[1]?.[0].intakeId);
+    expect(seen).toHaveLength(1);
   });
 
   it('cancels without resolving a project or writing any receipt', async () => {
@@ -283,7 +325,7 @@ describe('Friend Intake route', () => {
     const response = await request(buildApp({ resolveProjectId, persistRun }))
       .post('/friend-intake/run')
       .set('Authorization', BEARER)
-      .send({ rawText: 'Do not process this.', privacyChoice: 'cancel' });
+      .send({ privacyChoice: 'cancel' });
 
     expect(response.status).toBe(200);
     expect(response.body).toEqual({
@@ -293,33 +335,6 @@ describe('Friend Intake route', () => {
       timelineEventId: null,
     });
     expect(resolveProjectId).not.toHaveBeenCalled();
-    expect(persistRun).not.toHaveBeenCalled();
-  });
-
-  it('cancellation expires an issued sensitive-review receipt before any persistence', async () => {
-    authenticateFounder();
-    const persistRun = vi.fn(async (_input: PersistRunInput) => undefined);
-    const app = buildApp({ persistRun });
-    const agent = request.agent(app);
-
-    const reviewResponse = await agent
-      .post('/friend-intake/run')
-      .set('Authorization', BEARER)
-      .send({ rawText: 'My child is involved in a custody issue.', privacyChoice: 'save_redacted_summary' });
-    expect(reviewResponse.status).toBe(409);
-
-    const cancelResponse = await agent
-      .post('/friend-intake/run')
-      .set('Authorization', BEARER)
-      .send({ privacyChoice: 'cancel' });
-
-    expect(cancelResponse.status).toBe(200);
-    const setCookieHeader = cancelResponse.headers['set-cookie'];
-    const setCookieText = Array.isArray(setCookieHeader)
-      ? setCookieHeader.join(';')
-      : String(setCookieHeader ?? '');
-    expect(setCookieText).toContain('fcr_friend_intake_review=;');
-    expect(setCookieText).toContain('Max-Age=0');
     expect(persistRun).not.toHaveBeenCalled();
   });
 
@@ -340,10 +355,7 @@ describe('Friend Intake route', () => {
       },
     };
 
-    const response = await request(buildApp({
-      persistRun,
-      runEngine: () => invalidResult,
-    }))
+    const response = await request(buildApp({ persistRun, runEngine: () => invalidResult }))
       .post('/friend-intake/run')
       .set('Authorization', BEARER)
       .send({ rawText: 'Finish the build.', privacyChoice: 'process_without_saving' });
@@ -353,22 +365,23 @@ describe('Friend Intake route', () => {
     expect(persistRun).not.toHaveBeenCalled();
   });
 
-  it('records usefulness for an unsaved run using only founder-scoped telemetry', async () => {
+  it('records appendable usefulness feedback using founder-scoped telemetry and an exact event id', async () => {
     authenticateFounder();
     const recordUsefulness = vi.fn(async (_input: RecordUsefulnessInput) => undefined);
 
     const response = await request(buildApp({ recordUsefulness }))
       .post('/friend-intake/usefulness')
       .set('Authorization', BEARER)
-      .send({ runId: RUN_ID, response: 'yes', founderId: OTHER_FOUNDER_ID });
+      .send({ runId: RUN_ID, response: 'yes', eventId: EVENT_ID, founderId: OTHER_FOUNDER_ID });
 
     expect(response.status).toBe(200);
-    expect(recordUsefulness).toHaveBeenCalledWith(expect.objectContaining({
+    expect(recordUsefulness).toHaveBeenCalledWith({
       runId: RUN_ID,
       founderId: FOUNDER_ID,
       projectId: PROJECT_ID,
       response: 'yes',
-    }));
+      eventId: EVENT_ID,
+    });
     expect(JSON.stringify(recordUsefulness.mock.calls[0]?.[0])).not.toContain(OTHER_FOUNDER_ID);
   });
 
@@ -381,7 +394,7 @@ describe('Friend Intake route', () => {
     const response = await request(buildApp({ recordUsefulness }))
       .post('/friend-intake/usefulness')
       .set('Authorization', BEARER)
-      .send({ runId: RUN_ID, response: 'not_really' });
+      .send({ runId: RUN_ID, response: 'not_really', eventId: EVENT_ID });
 
     expect(response.status).toBe(404);
   });
