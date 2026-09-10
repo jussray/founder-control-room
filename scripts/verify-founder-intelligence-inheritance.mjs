@@ -118,6 +118,23 @@ for (const phrase of [
   requireValue(cohesionAudit.includes(phrase), `cohesion audit missing infrastructure consequence rule ${JSON.stringify(phrase)}`);
 }
 
+for (const phrase of [
+  '**Revenue Proof OS attention**',
+  '## Revenue Proof OS filter',
+  'reply-first',
+  'Historical recipients remain in the duplicate guard.',
+  'Investor discovery and tailored draft preparation may advance independently',
+  'investor outreach is `REVIEW_REQUIRED`',
+  'Se’kret Bip is the sole flagship company for its current $500,000 pre-seed SAFE thesis.',
+  'CUSTOMER REVENUE',
+  'OWNED / CREATOR COMMERCE',
+  'FINANCING CAPITAL',
+  'Do not merge these state machines into one vanity pipeline.',
+  'MONEY PLANE',
+]) {
+  requireValue(cohesionAudit.includes(phrase), `cohesion audit missing Revenue Proof OS rule ${JSON.stringify(phrase)}`);
+}
+
 if (failures.length > 0) {
   console.error('Founder Intelligence inheritance contract failed:');
   for (const failure of failures) console.error(` - ${failure}`);
