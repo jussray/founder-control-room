@@ -282,3 +282,24 @@ export function validateStrategicSecurityExecution(input: {
   if (input.proofRequirements.map((value) => value.trim()).filter(Boolean).length === 0) {
     errors.push('Strategic security execution requires declared proof requirements.');
   }
+  if (!input.providerAuthorityDeclared && input.requestedAuthority !== 'reason') {
+    errors.push('Provider authority must be declared before non-reasoning security execution.');
+  }
+  if (input.requestedAuthority === 'privileged' && !input.approvalBound) {
+    errors.push('Privileged strategic security execution requires approval bound to the exact plan and head.');
+  }
+  return errors;
+}
+
+export function strategicSecurityDecision(input: {
+  risk: 'low' | 'medium' | 'high' | 'critical';
+  evidenceConfidence: 'low' | 'medium' | 'high';
+  privilegedAction: boolean;
+  containmentAvailable: boolean;
+}): StrategicSecurityDecision {
+  if (input.risk === 'critical') return input.containmentAvailable ? 'isolate' : 'deny';
+  if (input.risk === 'high') return input.evidenceConfidence === 'high' ? 'deny' : 'challenge';
+  if (input.privilegedAction && input.evidenceConfidence !== 'high') return 'challenge';
+  if (input.risk === 'medium') return 'limit';
+  return 'allow';
+}
