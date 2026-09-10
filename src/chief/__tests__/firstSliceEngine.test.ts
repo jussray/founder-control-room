@@ -89,7 +89,7 @@ describe('FirstSliceEngine', () => {
     expect(result.redactedSummary).toBeNull();
   });
 
-  it('creates a bounded category-level saved summary without echoing raw identifiers', () => {
+  it('creates a bounded category-level saved summary without echoing raw identifiers or reusing Mirror text', () => {
     const rawText = 'Email founder@example.com about the product build plan.';
     const result = engine.run({
       rawText,
@@ -100,6 +100,7 @@ describe('FirstSliceEngine', () => {
     expect(result.redactedSummary?.length).toBeLessThanOrEqual(300);
     expect(result.redactedSummary).not.toContain('founder@example.com');
     expect(result.redactedSummary).not.toContain(rawText);
+    expect(result.redactedSummary).not.toBe(result.mirror.summary);
   });
 
   it('returns between one and three deterministic intent tags', () => {
