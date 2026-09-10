@@ -9,24 +9,43 @@ interface PluginEntry {
   defaultMode: 'read-first';
 }
 
-interface SocialAnalyticsProviderTruth {
-  role: string;
-  authority: 'secondary';
-  runtimeDiscoveryRequired: boolean;
-  mayOverrideNativePlatform: false;
-  productionAnalyticsApiAssumed?: false;
-  emptyRowsMeanZero?: false;
-}
-
 interface SocialAnalyticsTruth {
   analyticsMode: 'observation_only';
+  learningRequiresVerifiedPostLevelMeasurement: boolean;
+  publishedWithoutMeasurementClassifyAs: 'UNMEASURED';
   sourcePrecedence: string[];
-  nativePlatformWinsOnConflict: true;
+  nativePlatformWinsOnConflict: boolean;
   emptyProviderRowsClassifyAs: 'UNKNOWN_NO_EVIDENCE';
-  causalClaimsRequirePlatformAttributableEvidence: true;
+  causalClaimsRequirePlatformAttributableEvidence: boolean;
   forbiddenUngroundedClaims: string[];
-  buffer: SocialAnalyticsProviderTruth;
-  metricool: SocialAnalyticsProviderTruth;
+  linkedinNative: {
+    role: string;
+    authority: 'primary';
+    runtimeDiscoveryRequired: boolean;
+  };
+  cambiante: {
+    role: string;
+    authority: 'secondary';
+    runtimeDiscoveryRequired: boolean;
+    requiredLinkedInPermission: 'r_member_postAnalytics';
+    missingPermissionClassifyAs: 'BLOCKED_PROVIDER_SCOPE';
+    mayOverrideNativePlatform: boolean;
+  };
+  buffer: {
+    role: string;
+    authority: 'secondary';
+    runtimeDiscoveryRequired: boolean;
+    mayOverrideNativePlatform: boolean;
+    productionAnalyticsApiAssumed: boolean;
+  };
+  metricool: {
+    role: string;
+    authority: 'secondary';
+    runtimeDiscoveryRequired: boolean;
+    emptyRowsMeanZero: boolean;
+    historicalBackfillAssumed: boolean;
+    mayOverrideNativePlatform: boolean;
+  };
 }
 
 interface PluginManagementManifest {
@@ -57,6 +76,8 @@ const expectedPlugins = [
   'Asana',
   'HubSpot',
   'Figma',
+  'LinkedIn',
+  'Cambiante: Content Manager',
   'Metricool for Social Media',
 ];
 const allowedManifestKeys = [
@@ -133,6 +154,30 @@ describe('ChatGPT plugin management repository contract', () => {
     expect(forbiddenLiveStatePaths(manifest)).toEqual([]);
   });
 
+  it('keeps social analytics fail-closed and provider bounded', () => {
+    expect(manifest.socialAnalyticsTruth.analyticsMode).toBe('observation_only');
+    expect(manifest.socialAnalyticsTruth.learningRequiresVerifiedPostLevelMeasurement).toBe(true);
+    expect(manifest.socialAnalyticsTruth.publishedWithoutMeasurementClassifyAs).toBe('UNMEASURED');
+    expect(manifest.socialAnalyticsTruth.sourcePrecedence).toEqual([
+      'native-platform',
+      'native-platform-export',
+      'official-api-partner',
+      'aggregator',
+      'inference',
+    ]);
+    expect(manifest.socialAnalyticsTruth.nativePlatformWinsOnConflict).toBe(true);
+    expect(manifest.socialAnalyticsTruth.emptyProviderRowsClassifyAs).toBe('UNKNOWN_NO_EVIDENCE');
+    expect(manifest.socialAnalyticsTruth.linkedinNative.authority).toBe('primary');
+    expect(manifest.socialAnalyticsTruth.cambiante.requiredLinkedInPermission).toBe('r_member_postAnalytics');
+    expect(manifest.socialAnalyticsTruth.cambiante.missingPermissionClassifyAs).toBe(
+      'BLOCKED_PROVIDER_SCOPE',
+    );
+    expect(manifest.socialAnalyticsTruth.cambiante.mayOverrideNativePlatform).toBe(false);
+    expect(manifest.socialAnalyticsTruth.metricool.emptyRowsMeanZero).toBe(false);
+    expect(manifest.socialAnalyticsTruth.metricool.historicalBackfillAssumed).toBe(false);
+    expect(manifest.socialAnalyticsTruth.metricool.mayOverrideNativePlatform).toBe(false);
+  });
+
   it('keeps the active control-room plugin set explicit and runtime-discovered', () => {
     expect(manifest.plugins.map((plugin) => plugin.name)).toEqual(expectedPlugins);
     for (const plugin of manifest.plugins) {
@@ -141,42 +186,5 @@ describe('ChatGPT plugin management repository contract', () => {
       expect(plugin.runtimeDiscoveryRequired).toBe(true);
       expect(plugin.defaultMode).toBe('read-first');
     }
-  });
-
-  it('keeps social analytics observational and native-platform authoritative', () => {
-    expect(manifest.socialAnalyticsTruth).toEqual({
-      analyticsMode: 'observation_only',
-      sourcePrecedence: [
-        'native-platform',
-        'native-platform-export',
-        'official-api-partner',
-        'aggregator',
-        'inference',
-      ],
-      nativePlatformWinsOnConflict: true,
-      emptyProviderRowsClassifyAs: 'UNKNOWN_NO_EVIDENCE',
-      causalClaimsRequirePlatformAttributableEvidence: true,
-      forbiddenUngroundedClaims: [
-        'ranking_suppression',
-        'distribution_restriction',
-        'post_to_follower_conversion',
-        'delayed_follower_attribution',
-        'algorithmic_cause',
-      ],
-      buffer: {
-        role: 'Corroborating LinkedIn post-level analytics and scheduling when freshly connected through an authorized route.',
-        authority: 'secondary',
-        runtimeDiscoveryRequired: true,
-        mayOverrideNativePlatform: false,
-        productionAnalyticsApiAssumed: false,
-      },
-      metricool: {
-        role: 'Secondary cross-network analytics and scheduling observation.',
-        authority: 'secondary',
-        runtimeDiscoveryRequired: true,
-        emptyRowsMeanZero: false,
-        mayOverrideNativePlatform: false,
-      },
-    });
   });
 });
