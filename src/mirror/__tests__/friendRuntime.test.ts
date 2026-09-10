@@ -96,6 +96,50 @@ describe('Friend runtime providers', () => {
     expect(fetchFn).not.toHaveBeenCalled();
   });
 
+  it('fails closed before fetch for malformed or unsupported provider base URLs', async () => {
+    const cases = [
+      {
+        provider: 'openai' as const,
+        key: 'OPENAI_API_KEY',
+        baseKey: 'OPENAI_API_BASE_URL',
+        baseValue: 'not a url',
+      },
+      {
+        provider: 'anthropic' as const,
+        key: 'ANTHROPIC_API_KEY',
+        baseKey: 'ANTHROPIC_API_BASE_URL',
+        baseValue: 'file:///tmp/provider',
+      },
+      {
+        provider: 'perplexity' as const,
+        key: 'PERPLEXITY_API_KEY',
+        baseKey: 'PERPLEXITY_API_BASE_URL',
+        baseValue: 'ftp://provider.example.test',
+      },
+    ];
+
+    for (const testCase of cases) {
+      const fetchFn = vi.fn();
+      const env: NodeJS.ProcessEnv = {
+        FRIEND_MODELS_ENABLED: 'true',
+        FRIEND_RUNTIME_PROVIDERS: testCase.provider,
+        [testCase.key]: 'test-provider-key',
+        [testCase.baseKey]: testCase.baseValue,
+      };
+      const run = createFriendRuntimeRunner({ env, fetchFn: fetchFn as typeof fetch });
+
+      await expect(run(testCase.provider, {
+        transcript: 'Move the build.',
+        timeEnergyContext: 'Ten minutes.',
+        voiceProfile: null,
+      })).rejects.toMatchObject({
+        code: 'FRIEND_PROVIDER_BASE_URL_INVALID',
+        executionState: 'provider_unavailable',
+      });
+      expect(fetchFn).not.toHaveBeenCalled();
+    }
+  });
+
   it('uses OpenAI structured output with provider storage disabled for the request', async () => {
     const fetchFn = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
       const body = JSON.parse(String(init?.body));
