@@ -6,6 +6,8 @@ For portfolio or cross-repository work, also read [`config/founder-intelligence.
 
 When a task invokes ChatGPT Plugin Management or an external plugin, also read [`.control-room/plugin-management.json`](.control-room/plugin-management.json). That contract declares intended repository capability only. Live installation, connection, permission, and execution state must be discovered from the ChatGPT runtime before making any claim or taking a plugin-backed action.
 
+When a task analyzes social-media growth, attribution, post performance, or platform behavior, keep the evidence planes separate. Use current native social-platform evidence for live publication and current per-post facts; use native platform exports for historical/account analytics; treat official API-partner mirrors such as Buffer as corroborating evidence when freshly connected; treat aggregators such as Metricool as secondary cross-network observation; and place inference last. Empty provider or aggregator rows mean `UNKNOWN` / `NO_EVIDENCE`, never zero performance. Do not claim ranking suppression, conversion causality, delayed-follower attribution, or an algorithmic cause without platform-attributable evidence. Buffer, Metricool, or another intermediary may strengthen observation, but cannot override contradictory native-platform evidence or create publication or causal authority.
+
 Required loop:
 
 ```text
