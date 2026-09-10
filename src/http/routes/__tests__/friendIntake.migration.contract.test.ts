@@ -29,6 +29,17 @@ describe('Friend Intake migration privacy contract', () => {
     expect(eventBlock).not.toContain('p_redacted_summary');
   });
 
+  it('makes each stored provenance id durably resolvable through the linked timeline event', () => {
+    const sql = readFileSync(migrationPath, 'utf8');
+    const eventBlock = processRunEventBlock(sql);
+
+    expect(sql).toContain('provenance_id uuid not null');
+    expect(sql).toContain('timeline_event_id uuid not null references public.project_events(id) on delete restrict');
+    expect(eventBlock).toContain("'provenance_id', p_provenance_id");
+    expect(eventBlock).toContain("'provenance_kind', 'deterministic_rule_engine'");
+    expect(eventBlock).toContain("'engine_version', 'first-slice-v1'");
+  });
+
   it('keeps Friend Intake content persistence server-owned and service-role-only', () => {
     const sql = readFileSync(migrationPath, 'utf8');
 
