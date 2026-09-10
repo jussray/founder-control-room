@@ -211,10 +211,10 @@ async function submitIntake(form, options = {}) {
   const error = root.querySelector('#friend-intake-error');
   const extraControls = Array.isArray(options.guardedControls) ? options.guardedControls : [];
   const guardedControls = controlsForRequest(form, extraControls);
-  const previous = disableControls(guardedControls);
   const data = new FormData(form);
   const rawText = String(data.get('rawText') ?? '').trim();
   const privacyChoice = String(data.get('privacyChoice') ?? '');
+  const previous = disableControls(guardedControls);
 
   error.hidden = true;
   error.textContent = '';
@@ -272,11 +272,12 @@ async function submitIntake(form, options = {}) {
 
 function renderSensitiveSaveReview(form, review, reviewedRawText) {
   const mount = root.querySelector('#friend-intake-result');
+  const reviewedMove = review.move ?? {};
   mount.innerHTML = `
     <article class="result-card" data-sensitive-save-review>
       <p class="eyebrow">Privacy review</p>
       <h2>Sensitive content detected.</h2>
-      <p>Nothing has been saved yet. Review the bounded summary and derived labels below before deciding whether to store them.</p>
+      <p>Nothing has been saved yet. Review every derived field below before deciding whether to store it.</p>
       <section class="receipt-section">
         <h3>What would be saved</h3>
         <p>${escapeHtml(review.redactedSummary)}</p>
@@ -284,10 +285,17 @@ function renderSensitiveSaveReview(form, review, reviewedRawText) {
         ${reviewLabels(review.sensitiveCategories, 'data-reviewed-sensitive-categories')}
         <h4>Intent tags</h4>
         ${reviewLabels(review.intentTagIds, 'data-reviewed-intent-tags')}
-        <p class="muted">The displayed summary and labels are the intake content being reviewed. Raw input, Mirror text, and Move text will not be stored.</p>
+        <h4>Move metadata</h4>
+        <div data-reviewed-move-metadata>
+          <p>Kind: <code>${escapeHtml(reviewedMove.kind)}</code></p>
+          <p>Policy: <code>${escapeHtml(reviewedMove.policy)}</code></p>
+          ${reviewedMove.timeEstimateMinutes === null ? '<p>Time estimate: none</p>' : `<p>Time estimate: ${escapeHtml(reviewedMove.timeEstimateMinutes)} minutes</p>`}
+          <p>Gate warning code: <code>${escapeHtml(reviewedMove.gateWarningCode ?? 'none')}</code></p>
+        </div>
+        <p class="muted">The displayed bounded summary, labels, and Move metadata are the intake content being reviewed. Raw input, Mirror text, and Move text will not be stored.</p>
       </section>
       <div class="actions">
-        <button class="primary" data-confirm-sensitive-save type="button">Save reviewed summary and labels</button>
+        <button class="primary" data-confirm-sensitive-save type="button">Save reviewed summary, labels, and move metadata</button>
         <button class="secondary" data-process-unsaved type="button">Process without saving instead</button>
       </div>
       <p class="feedback-status" data-sensitive-review-status></p>
