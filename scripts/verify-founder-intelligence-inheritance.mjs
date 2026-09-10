@@ -2,11 +2,13 @@ import { readFile } from 'node:fs/promises';
 
 const root = new URL('../', import.meta.url);
 const registryPath = 'config/founder-intelligence.inheritance.json';
+const cohesionAuditPath = 'docs/FCR_SINGLE_OS_COHESION_AUDIT.md';
 const registry = JSON.parse(await readFile(new URL(registryPath, root), 'utf8'));
 const portfolio = await readFile(new URL('src/config/portfolio.ts', root), 'utf8');
 const l99Repository = await readFile(new URL('src/config/l99Repository.ts', root), 'utf8');
 const entrypoint = await readFile(new URL('AGENTS_FOUNDER_INTELLIGENCE.md', root), 'utf8');
 const constitution = await readFile(new URL('docs/FOUNDER_INTELLIGENCE_CONSTITUTION.md', root), 'utf8');
+const cohesionAudit = await readFile(new URL(cohesionAuditPath, root), 'utf8');
 
 const failures = [];
 const requireValue = (condition, message) => {
@@ -86,6 +88,7 @@ for (const [slug] of registryBySlug) {
 }
 
 requireValue(entrypoint.includes(registryPath), 'Founder Intelligence entrypoint must link the inheritance registry');
+requireValue(entrypoint.includes(cohesionAuditPath), 'Founder Intelligence entrypoint must link the FCR cohesion audit');
 requireValue(entrypoint.includes(registry.canonicalConstitution), 'Founder Intelligence entrypoint must link the canonical constitution');
 for (const step of expectedLoop) {
   requireValue(entrypoint.includes(step), `entrypoint missing loop step ${step}`);
@@ -99,6 +102,37 @@ for (const phrase of [
   'Founder Control Room and Chief AI paired evolution',
 ]) {
   requireValue(constitution.includes(phrase), `constitution missing ${JSON.stringify(phrase)}`);
+}
+
+for (const phrase of [
+  '## Infrastructure consequence filter',
+  '**Consequence-only infrastructure attention**',
+  'Routine changelog noise is not a founder task.',
+  'A provider incident is provider-state evidence, not proof of an application defect.',
+  'MATERIAL',
+  'WATCH',
+  'NOISE',
+  'UNKNOWN',
+  'at most two founder review gates',
+]) {
+  requireValue(cohesionAudit.includes(phrase), `cohesion audit missing infrastructure consequence rule ${JSON.stringify(phrase)}`);
+}
+
+for (const phrase of [
+  '**Revenue Proof OS attention**',
+  '## Revenue Proof OS filter',
+  'reply-first',
+  'Historical recipients remain in the duplicate guard.',
+  'Investor discovery and tailored draft preparation may advance independently',
+  'investor outreach is `REVIEW_REQUIRED`',
+  'Se’kret Bip is the sole flagship company for its current $500,000 pre-seed SAFE thesis.',
+  'CUSTOMER REVENUE',
+  'OWNED / CREATOR COMMERCE',
+  'FINANCING CAPITAL',
+  'Do not merge these state machines into one vanity pipeline.',
+  'MONEY PLANE',
+]) {
+  requireValue(cohesionAudit.includes(phrase), `cohesion audit missing Revenue Proof OS rule ${JSON.stringify(phrase)}`);
 }
 
 if (failures.length > 0) {
