@@ -37,14 +37,21 @@ describe('FirstSliceEngine', () => {
   });
 
   it('routes direct high-consequence health language into the protective lane', () => {
-    const result = engine.run({
-      rawText: 'I am worried about self-harm.',
-      privacyChoice: 'process_without_saving',
-    });
+    for (const rawText of [
+      'I am worried about self-harm.',
+      'I want to kill myself.',
+      'I want to die.',
+      "I don't want to be alive.",
+    ]) {
+      const result = engine.run({
+        rawText,
+        privacyChoice: 'process_without_saving',
+      });
 
-    expect(result.sensitiveCategories).toContain('health');
-    expect(result.move.kind).toBe('protective_move');
-    expect(result.move.policy).toBe('protective');
+      expect(result.sensitiveCategories).toContain('health');
+      expect(result.move.kind).toBe('protective_move');
+      expect(result.move.policy).toBe('protective');
+    }
   });
 
   it('keeps tiny moves inside the canonical 5-15 minute window', () => {
