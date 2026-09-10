@@ -2,23 +2,21 @@
 
 ## Incident
 
-A provenance audit found that the recovery scope is larger than the two DeepSeek/continuity commits that originally triggered this carrier.
+The provenance incident is larger than the two DeepSeek/continuity commits that originally triggered this carrier.
 
 The last confirmed PR-associated merge boundary before the direct-main sequence is:
 
-- `34ffe99e77455f278b437f4cfc67c76e3df59a25` — merge commit for PR #765.
-- tree: `0dfa1ba952ae01908301af4748a0b04fa55b5eb5`.
+- commit `34ffe99e77455f278b437f4cfc67c76e3df59a25` — merge commit for PR #765;
+- tree `0dfa1ba952ae01908301af4748a0b04fa55b5eb5`.
 
 The immutable direct-main incident tip audited by this recovery is:
 
-- `027dfdd42f032a5c614c147ae9e1a824c2f506b9`.
-- tree: `f12e305a953de062eab15143fa032d9e8c0e1fc8`.
+- commit `027dfdd42f032a5c614c147ae9e1a824c2f506b9`;
+- tree `f12e305a953de062eab15143fa032d9e8c0e1fc8`.
 
 GitHub comparison from the merge boundary to the incident tip is 9 commits ahead / 0 behind.
 
 ## Exact direct-main sequence
-
-The ratified historical range is exactly:
 
 1. `3b48e557e6f460fbcb46561bf350f7249e2430d9` — implant ULTRATHINK self-attack contracts.
 2. `3562df9d5f3f751b54c107ff502a5cc3b6615664` — align the first v1.4 implant marker.
@@ -61,91 +59,90 @@ The audited historical range changes exactly these 22 paths:
 
 ## Executable ratification boundary
 
-`src/lib/__tests__/mainReleaseHistoricalRatification.test.ts` makes the historical range machine-checkable.
+Historical Git proof belongs to the release-provenance lane, not the ordinary unit-test suite.
 
-It verifies all of the following from Git history on the exact candidate:
+`scripts/verify-main-release-historical-ratification.mjs` is the dedicated fail-closed verifier. The `Main Release Provenance` contract checks out the exact candidate with full Git history (`fetch-depth: 0`) and executes that verifier after the existing provenance adversarial tests.
+
+The verifier refuses a shallow repository and then proves:
 
 1. the merge-boundary commit resolves to tree `0dfa1ba952ae01908301af4748a0b04fa55b5eb5`;
 2. the incident tip resolves to tree `f12e305a953de062eab15143fa032d9e8c0e1fc8`;
-3. the first-parent commit sequence between those endpoints is exactly the nine SHAs listed above and in the same order;
-4. the file set changed by the range is exactly the 22 paths listed above;
-5. the incident tip remains an ancestor of the recovery candidate.
+3. the first-parent commit sequence between those endpoints is exactly the nine SHAs listed above and in that order;
+4. the file set changed by that range is exactly the 22 paths listed above;
+5. the immutable incident tip remains an ancestor of the exact recovery candidate.
 
-The test is a range-integrity witness. It does not itself perform semantic review and does not manufacture historical PR provenance.
+The predecessor Vitest implementation was removed because generic verification lanes legitimately use shallow exact-head checkouts. Requiring historical Git objects inside ordinary Vitest caused a false failure unrelated to source correctness. The dedicated provenance lane now owns the history requirement instead of globally widening every checkout.
+
+This verifier is a range-integrity witness. It does not perform semantic review, retroactively create PR provenance, or grant merge/deploy authority.
 
 ## Review obligation
 
-This carrier is not review-complete merely because its new receipt/test delta is clean.
+This carrier is not review-complete merely because its current PR delta is clean.
 
-A qualifying recovery review must explicitly treat the historical range
+A qualifying recovery review must explicitly treat
 
 `34ffe99e77455f278b437f4cfc67c76e3df59a25..027dfdd42f032a5c614c147ae9e1a824c2f506b9`
 
-as the subject being ratified, including the nine-commit identity and 22-file scope above. A review that inspects only the wrapper document or only the current PR delta is insufficient for the original provenance defect.
+as the historical subject being ratified, including its nine-commit identity and 22-file scope. A review that inspects only the recovery wrapper is insufficient for the original provenance defect.
 
-The two existing P1 review findings stay unresolved until a reviewer confirms that the repaired carrier addresses them. Do not self-resolve them merely because this document changed.
+The two existing P1 findings remain unresolved until reviewer-side disposition confirms that the repaired carrier addresses them. This carrier does not self-resolve its own material review findings.
 
 ## Current-base rule
 
-Current branch/base/head truth is owned by the machine-maintained PR Continuity Receipt in PR #775, not by a durable SHA sentence in this document.
+Current PR base/head truth is owned by the machine-maintained PR Continuity Receipt on PR #775, not by a durable current-main SHA in this document.
 
-Historical endpoints above are immutable incident evidence. They are not a claim that the current PR base remains any historical SHA.
+The two historical endpoint SHAs above are immutable incident evidence. They are not current-base claims.
 
 If `main` or the PR head moves, predecessor exact-head CI, Playwright, semantic review, deterministic review, and authority receipts expire and must be reacquired on the successor candidate.
 
-This directly replaces the stale acceptance wording that hard-coded `main@d022ef600a3ae62bef796bfde9f521b33d63d1a9` as though it were still current.
-
 ## Authority and product boundaries
 
-The historical source state remains bounded by the contracts it introduced:
+The historical source state keeps the authority ceilings it introduced:
 
-- DeepSeek remains instructor/challenger/proposal authority only; it gains no implementation, merge, deploy, provider-mutation, credential, or autonomous project-mutation authority.
+- DeepSeek remains instructor/challenger/proposal authority only, with no implementation, merge, deploy, provider-mutation, credential, or autonomous project-mutation authority.
 - Claude, Perplexity, Codex/ChatGPT, and model-provider identities remain separated by the FCR multi-agent contract.
-- the current Friend Intake first slice remains model-free.
-- FCR remains the single founder OS; internal agents, skills, workflows, providers, and future add-ons extend the shared founder-intent loop rather than becoming separate operating systems.
-- infrastructure monitoring remains consequence-only and does not convert routine provider noise into founder work.
-- stacked PR refusal remains fail-closed and does not authorize force-push or silent rebase.
+- Friend Intake remains model-free for the current first slice.
+- FCR remains the single founder OS. Internal agents, skills, workflows, providers, and future add-ons extend the shared founder-intent loop rather than becoming competing operating systems.
+- infrastructure monitoring remains consequence-only.
+- stacked-PR refusal remains fail-closed and does not authorize force-push or silent rebase.
 
 ## Historical proof
 
-Prior CI, Playwright, Verification Core, Documentation Truth, and focused continuity evidence remains historical evidence about the predecessor subjects on which it ran.
-
-It does not automatically become present-tense proof for a successor #775 head. Fresh exact-head evidence must be reacquired after every base/head movement.
+Prior CI, Playwright, Verification Core, Documentation Truth, and continuity results remain historical evidence for the exact subjects on which they ran. They do not automatically become present-tense proof for a successor #775 head.
 
 ## Recovery rule
 
-This pull request is a forward ratification carrier. It does not claim that the nine historical commits were originally merged through pull requests.
+This PR is a forward ratification carrier. It does not claim that the nine historical commits were originally merged through pull requests, and merging this recovery cannot retroactively make that statement true.
 
-It also does not claim that merging a wrapper document retroactively changes their historical provenance.
+The recovery instead:
 
-The intended recovery is narrower and truthful:
-
-- preserve historical facts;
-- bind the complete incident range instead of a cherry-picked subset;
-- make the range identity executable and reviewable;
-- obtain fresh review and machine proof on the recovery candidate;
-- keep merge/deploy authority false until the normal FCR authority chain explicitly permits integration.
+- preserves the historical facts;
+- binds the complete incident range instead of a cherry-picked subset;
+- makes the range identity executable in the existing provenance lane;
+- requires explicit semantic review of the historical subject;
+- reacquires current exact-head machine/browser evidence;
+- keeps merge/deploy authority false until the normal FCR authority chain permits integration.
 
 ## Acceptance criteria
 
 Recovery may advance only when all of the following are true:
 
-1. the PR Continuity Receipt says the carrier is current with authoritative `main`;
-2. the historical-ratification test proves the exact nine-commit / 22-file incident range and both tree identities;
+1. PR Continuity says the carrier is current with authoritative `main`;
+2. the dedicated historical-ratification verifier passes inside the full-history Main Release Provenance lane and proves the exact nine-commit / 22-file range plus both tree identities;
 3. required exact-head CI and browser/Playwright proof for the current PR head are terminal green;
 4. independent review explicitly covers the historical ratification range, not only the wrapper delta;
-5. both material P1 review threads are resolved by reviewer-side disposition after the repair;
+5. both material P1 review threads receive reviewer-side disposition after the repair;
 6. the normal trusted deterministic-review witness is successfully published and independently read back for the exact current candidate where required;
 7. authenticated Founder Final binds the exact current PR/base/head after review and freshness checks;
 8. merge, if authorized, occurs through the normal PR path without bypass;
-9. post-merge release provenance is reported with its truthful scope and does not relabel the nine historical direct commits as originally PR-merged;
+9. post-merge provenance is reported with truthful scope and does not relabel the nine historical direct commits as originally PR-merged;
 10. deployment and production-runtime equivalence remain separate claims with separate current evidence.
 
 ## Known separate blocker
 
 The trusted deterministic-review publisher previously failed before publication because the GitHub Actions `production` environment `APP_PRIVATE_KEY`, mapped to runtime `GITHUB_PRIVATE_KEY`, did not contain a complete supported RSA private-key PEM.
 
-That configuration defect is separate from the historical-range defect. Repairing the key cannot substitute for range review, and fixing the range cannot substitute for the provider credential repair.
+That configuration defect is separate from the historical-range defect. Repairing the key cannot substitute for range review, and ratifying the range cannot substitute for the provider credential repair.
 
 Never place the private key in this repository, PR, issue, log, artifact, or chat.
 
@@ -157,7 +154,7 @@ This receipt does not claim that:
 - DeepSeek has live provider credentials;
 - DeepSeek can mutate repositories;
 - production has been deployed;
-- the public FCR runtime serves the recovery candidate SHA;
+- the public FCR runtime serves this recovery candidate;
 - provider configuration is repaired;
 - merge authority is currently true.
 
