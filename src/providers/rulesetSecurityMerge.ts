@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 export interface RulesetRuleLike {
   type?: string;
   parameters?: Record<string, unknown>;
@@ -11,6 +13,43 @@ export interface MergeExistingRulesetSecurityInput {
   requirePullRequest: boolean;
   blockForcePushes: boolean;
   blockDeletion: boolean;
+}
+
+export interface RulesetReconciliationObservation {
+  id: string | number;
+  versionId: string | number;
+  name: string;
+  enforcement: string;
+  targetRefs: string[];
+  excludedTargetRefs: string[];
+  bypassActors: unknown[];
+  rules: RulesetRuleLike[];
+}
+
+export interface RulesetReconciliationPlanInput {
+  observation: RulesetReconciliationObservation;
+  expectedRulesetId: string;
+  expectedVersionId: string;
+  expectedFingerprint: string;
+  requestedRules: RulesetRuleLike[];
+  requiredStatusCheckNames: string[];
+  requirePullRequest: boolean;
+  blockForcePushes: boolean;
+  blockDeletion: boolean;
+}
+
+export interface RulesetReconciliationPlan {
+  rulesetId: string;
+  versionId: string;
+  observedFingerprint: string;
+  desired: RulesetReconciliationObservation;
+  statusChecks: {
+    added: string[];
+    removed: string[];
+    retained: string[];
+  };
+  executionAuthorized: false;
+  requiresFreshProviderReadback: true;
 }
 
 const MANAGED_RULE_TYPES = new Set(["pull_request", "required_status_checks", "non_fast_forward", "deletion"]);
@@ -35,6 +74,38 @@ function checkEntries(parameters: Record<string, unknown>): Array<Record<string,
 
 function contextOf(entry: Record<string, unknown>): string {
   return typeof entry["context"] === "string" ? entry["context"].trim() : "";
+}
+
+function requiredStatusContexts(rules: RulesetRuleLike[]): string[] {
+  const rule = rules.find((candidate) => candidate.type === "required_status_checks");
+  return checkEntries(asParameters(rule)).map(contextOf).filter((context) => context.length > 0);
+}
+
+function canonicalize(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonicalize);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .filter(([, entry]) => entry !== undefined)
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([key, entry]) => [key, canonicalize(entry)]),
+    );
+  }
+  return value;
+}
+
+export function fingerprintRulesetReconciliationObservation(observation: RulesetReconciliationObservation): string {
+  const canonical = canonicalize({
+    id: String(observation.id),
+    versionId: String(observation.versionId),
+    name: observation.name,
+    enforcement: observation.enforcement,
+    targetRefs: observation.targetRefs,
+    excludedTargetRefs: observation.excludedTargetRefs,
+    bypassActors: observation.bypassActors,
+    rules: observation.rules,
+  });
+  return createHash("sha256").update(JSON.stringify(canonical)).digest("hex");
 }
 
 export function mergeExistingRulesetSecurity({ existingRules, requestedRules, requiredStatusCheckNames, requirePullRequest, blockForcePushes, blockDeletion }: MergeExistingRulesetSecurityInput): RulesetRuleLike[] {
@@ -86,4 +157,81 @@ export function mergeExistingRulesetSecurity({ existingRules, requestedRules, re
   if (blockForcePushes || existingByType.has("non_fast_forward")) nextRules.push(structuredClone(existingByType.get("non_fast_forward") ?? requestedByType.get("non_fast_forward") ?? { type: "non_fast_forward" }));
   if (blockDeletion || existingByType.has("deletion")) nextRules.push(structuredClone(existingByType.get("deletion") ?? requestedByType.get("deletion") ?? { type: "deletion" }));
   return nextRules;
+}
+
+export function planExistingRulesetReconciliation({
+  observation,
+  expectedRulesetId,
+  expectedVersionId,
+  expectedFingerprint,
+  requestedRules,
+  requiredStatusCheckNames,
+  requirePullRequest,
+  blockForcePushes,
+  blockDeletion,
+}: RulesetReconciliationPlanInput): RulesetReconciliationPlan {
+  const rulesetId = String(observation.id);
+  const versionId = String(observation.versionId);
+  const observedFingerprint = fingerprintRulesetReconciliationObservation(observation);
+
+  if (rulesetId !== expectedRulesetId) {
+    throw new Error(`ruleset reconciliation refused: expected ruleset ${expectedRulesetId}, observed ${rulesetId}`);
+  }
+  if (versionId !== expectedVersionId) {
+    throw new Error(`ruleset reconciliation refused: expected version ${expectedVersionId}, observed ${versionId}`);
+  }
+  if (observedFingerprint !== expectedFingerprint) {
+    throw new Error("ruleset reconciliation refused: observed provider fingerprint changed");
+  }
+
+  const normalizedRequiredChecks = requiredStatusCheckNames.map((context) => context.trim());
+  if (normalizedRequiredChecks.some((context) => context.length === 0)) {
+    throw new Error("ruleset reconciliation refused: required status check names must be non-empty");
+  }
+  if (new Set(normalizedRequiredChecks).size !== normalizedRequiredChecks.length) {
+    throw new Error("ruleset reconciliation refused: required status check names must be unique");
+  }
+
+  for (const entry of checkEntries(asParameters(requestedRules.find((rule) => rule.type === "required_status_checks")))) {
+    const integrationId = entry["integration_id"];
+    if (integrationId !== undefined && (!Number.isInteger(integrationId) || Number(integrationId) <= 0)) {
+      throw new Error(`ruleset reconciliation refused: invalid integration_id for ${contextOf(entry) || "unnamed check"}`);
+    }
+  }
+
+  const nextRules = mergeExistingRulesetSecurity({
+    existingRules: observation.rules,
+    requestedRules,
+    requiredStatusCheckNames: normalizedRequiredChecks,
+    requirePullRequest,
+    blockForcePushes,
+    blockDeletion,
+  });
+  const currentChecks = requiredStatusContexts(observation.rules);
+  const desiredChecks = requiredStatusContexts(nextRules);
+  const currentSet = new Set(currentChecks);
+  const desiredSet = new Set(desiredChecks);
+
+  return {
+    rulesetId,
+    versionId,
+    observedFingerprint,
+    desired: {
+      id: observation.id,
+      versionId: observation.versionId,
+      name: observation.name,
+      enforcement: observation.enforcement,
+      targetRefs: structuredClone(observation.targetRefs),
+      excludedTargetRefs: structuredClone(observation.excludedTargetRefs),
+      bypassActors: structuredClone(observation.bypassActors),
+      rules: nextRules,
+    },
+    statusChecks: {
+      added: desiredChecks.filter((context) => !currentSet.has(context)),
+      removed: currentChecks.filter((context) => !desiredSet.has(context)),
+      retained: desiredChecks.filter((context) => currentSet.has(context)),
+    },
+    executionAuthorized: false,
+    requiresFreshProviderReadback: true,
+  };
 }
