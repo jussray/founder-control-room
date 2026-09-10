@@ -275,13 +275,14 @@ export function createFriendIntakeRouter(dependencies: FriendIntakeRouteDependen
         });
       }
 
+      const warningCode = moveGateWarningCode(result);
       const reviewBinding: SensitiveSaveReviewBinding = {
         founderId,
         browserSessionIdHash,
         rawText,
         result,
         engineVersion: FIRST_SLICE_ENGINE_VERSION,
-        moveGateWarningCode: moveGateWarningCode(result),
+        moveGateWarningCode: warningCode,
       };
       const reviewReceipt = readSensitiveSaveReviewReceipt(req);
       sensitiveSaveReviewed = sensitiveSaveConfirmed
@@ -307,6 +308,12 @@ export function createFriendIntakeRouter(dependencies: FriendIntakeRouteDependen
             redactedSummary: result.redactedSummary,
             sensitiveCategories: result.sensitiveCategories,
             intentTagIds: result.intentTags,
+            move: {
+              kind: result.move.kind,
+              policy: result.move.policy,
+              timeEstimateMinutes: result.move.timeEstimateMinutes,
+              gateWarningCode: warningCode,
+            },
             inputPersistence: 'none',
             externalModelCalled: false,
             reviewReceiptIssued: true,
