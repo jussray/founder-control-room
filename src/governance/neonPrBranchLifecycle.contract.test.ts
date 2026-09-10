@@ -14,11 +14,24 @@ describe('Neon pull-request branch lifecycle contract', () => {
     expect(workflow).toContain('neondatabase/delete-branch-action@4468d825d5a88ef4012f1705a82f02ec3072f776');
   });
 
+  it('treats synchronize as an idempotent reuse of an existing PR branch', () => {
+    expect(workflow).toContain('name: Detect existing Neon branch');
+    expect(workflow).toContain('NEON_BRANCH_NAME: preview/pr-${{ github.event.number }}');
+    expect(workflow).toContain('https://console.neon.tech/api/v2/projects/${NEON_PROJECT_ID}/branches');
+    expect(workflow).toContain('first(.branches[]? | select(.name == $name) | .id) // ""');
+    expect(workflow).toContain("if: steps.neon_branch.outputs.exists != 'true'");
+    expect(workflow).toContain('NEON_EXISTING_BRANCH_ID: ${{ steps.neon_branch.outputs.branch_id }}');
+    expect(workflow).toContain('NEON_EXISTING_BRANCH_STATE: ${{ steps.neon_branch.outputs.branch_state }}');
+    expect(workflow).toContain('NEON_CREATED_BRANCH_ID: ${{ steps.create_neon_branch.outputs.branch_id }}');
+    expect(workflow).toContain("test \"$NEON_EXISTING_BRANCH_STATE\" = 'ready'");
+  });
+
   it('keeps database credentials job-local and never exports database URLs', () => {
     expect(workflow).not.toContain('create_neon_branch_encode');
     expect(workflow).not.toContain('db_url');
     expect(workflow).not.toContain('db_url_pooled');
     expect(workflow).not.toContain('db_url_with_pooler');
+    expect(workflow).not.toContain('set -x');
     expect(workflow).toContain("echo 'NEON_API_KEY is not configured' >&2");
   });
 });
