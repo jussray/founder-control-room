@@ -142,7 +142,7 @@ test('desktop saved-summary flow freezes privacy state, stays model-free, and re
   await page.screenshot({ path: 'test-results/friend-intake-desktop.png', fullPage: true });
 });
 
-test('sensitive saved-summary confirmation reviews every persisted label and is serialized', async ({ page }) => {
+test('sensitive saved-summary confirmation reviews every persisted field and is serialized', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   const externalRequests = captureExternalRequests(page);
   const rawText = 'My child is involved in a custody issue.';
@@ -160,13 +160,18 @@ test('sensitive saved-summary confirmation reviews every persisted label and is 
   await expect(review.locator('[data-reviewed-sensitive-categories]')).toContainText('legal');
   await expect(review.locator('[data-reviewed-intent-tags]')).toContainText('kids');
   await expect(review.locator('[data-reviewed-intent-tags]')).toContainText('legal');
+  const reviewedMove = review.locator('[data-reviewed-move-metadata]');
+  await expect(reviewedMove).toContainText('Kind: protective_move');
+  await expect(reviewedMove).toContainText('Policy: protective');
+  await expect(reviewedMove).toContainText('Time estimate: 5 minutes');
+  await expect(reviewedMove).toContainText('Gate warning code: sensitive_protective');
   await expect(review).not.toContainText(rawText);
   expect(persistedRuns).toHaveLength(0);
   expect(externalRequests).toEqual([]);
 
   await page.screenshot({ path: 'test-results/friend-intake-sensitive-review.png', fullPage: true });
 
-  await page.getByRole('button', { name: 'Save reviewed summary and labels' }).dblclick();
+  await page.getByRole('button', { name: 'Save reviewed summary, labels, and move metadata' }).dblclick();
   const receipt = page.locator('[data-friend-intake-receipt]');
   await expect(receipt).toBeVisible();
   await expect(receipt).toContainText('Redacted summary + derived labels');
