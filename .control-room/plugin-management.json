@@ -14,6 +14,9 @@
   "socialAnalyticsTruth": {
     "analyticsMode": "observation_only",
     "learningRequiresVerifiedPostLevelMeasurement": true,
+    "nativeMeasurementSatisfiesLearningGate": true,
+    "secondarySensorFailureMayBlockVerifiedNativeMeasurement": false,
+    "paidSecondarySensorRequired": false,
     "publishedWithoutMeasurementClassifyAs": "UNMEASURED",
     "sourcePrecedence": [
       "native-platform",
