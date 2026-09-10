@@ -19,10 +19,24 @@
     "Teach the next builder",
     "Repeat"
   ],
+  "requiredChallengeStack": [
+    "ULTRATHINK",
+    "Red Team 1 — premise",
+    "Lindy mode",
+    "L99",
+    "Red Team 2 — implementation",
+    "OODA",
+    "Proof",
+    "Rollback / Next Gate"
+  ],
   "statusDefinitions": {
     "enforced": "The repository has a local entrypoint and constitution, and its primary AGENTS.md explicitly loads the entrypoint.",
     "partial": "The repository has a local entrypoint and constitution, but its primary AGENTS.md does not yet explicitly load the entrypoint.",
     "missing": "The repository is missing the local entrypoint, the local constitution, or both. Local repository rules remain authoritative until a focused inheritance PR is reviewed."
+  },
+  "challengeStackStatusDefinitions": {
+    "on-main": "The ordered founder challenge stack has been re-observed in the repository's current main carrier. This proves source-controlled instruction state only.",
+    "pending-main": "The ordered founder challenge stack exists on a bounded candidate or pull request but has not yet been re-observed on current main. It must not be reported as landed."
   },
   "projects": [
     {
@@ -33,7 +47,11 @@
       "constitution": "docs/FOUNDER_INTELLIGENCE_CONSTITUTION.md",
       "primaryAgentContract": "AGENTS.md",
       "status": "enforced",
-      "nextAction": "Preserve the explicit AGENTS.md entrypoint and keep the registry, constitution, and verifier aligned when portfolio membership or governance changes."
+      "nextAction": "Preserve the explicit AGENTS.md entrypoint and keep the registry, constitution, challenge-stack carrier, and verifier aligned when portfolio membership or governance changes.",
+      "challengeStackStatus": "on-main",
+      "challengeStackCarrier": "AGENTS_FOUNDER_INTELLIGENCE.md",
+      "challengeStackEvidence": "Re-read from current main on 2026-09-10 after later FCR movement; the ordered challenge stack remains present and scripts/verify-founder-intelligence-inheritance.mjs enforces its order.",
+      "challengeStackNextGate": "Future FCR main movement expires this observation for currentness; re-read the carrier and verifier before inheriting it into a consequential cross-project claim."
     },
     {
       "slug": "sekret-bip",
@@ -43,7 +61,11 @@
       "constitution": "docs/FOUNDER_INTELLIGENCE_CONSTITUTION.md",
       "primaryAgentContract": "AGENTS.md",
       "status": "enforced",
-      "nextAction": "Preserve the explicit AGENTS.md entrypoint merged in Se'kret Bip PR #644 and keep heightened teen privacy, consent, safety, dignity, and anti-surveillance duties intact."
+      "nextAction": "Preserve the explicit AGENTS.md entrypoint, ordered challenge stack, and heightened teen privacy, consent, safety, dignity, and anti-surveillance duties.",
+      "challengeStackStatus": "on-main",
+      "challengeStackCarrier": "AGENTS_FOUNDER_INTELLIGENCE.md",
+      "challengeStackEvidence": "Re-read from current main on 2026-09-10; the stack is ordered ULTRATHINK → premise Red Team → Lindy → L99 → implementation Red Team → OODA → Proof → Rollback / Next Gate, with a repo-local contract test enforcing the order.",
+      "challengeStackNextGate": "Keep Se’kret Bip safety, auth/RLS, provider, release, and browser/device proof boundaries stronger than the portable modes."
     },
     {
       "slug": "chief-ai-machine",
@@ -53,7 +75,11 @@
       "constitution": "docs/FOUNDER_INTELLIGENCE_CONSTITUTION.md",
       "primaryAgentContract": "AGENTS.md",
       "status": "enforced",
-      "nextAction": "Preserve the merged Future You loop and keep execution authority in Founder Control Room."
+      "nextAction": "Preserve existing Founder Intelligence inheritance on main while keeping execution authority in Founder Control Room; do not conflate that inherited status with the pending challenge-stack rollout.",
+      "challengeStackStatus": "pending-main",
+      "challengeStackCarrier": "AGENTS_FOUNDER_INTELLIGENCE.md",
+      "challengeStackEvidence": "Chief PR #148 carries the ordered stack at exact head bc88a5b0fe683a5c946d15d59423f525f107d699 and auto-merge is enabled. The patch has not been re-observed on main. The no-bypass exact-head gate still requires CodeQL plus successful Cloudflare Production and proofmode-access-admin deployment receipts; several additional governance-boundary contexts are absent for this agent-contract-only change because their workflows are path-filtered or post-main.",
+      "challengeStackNextGate": "Do not spoof checks or weaken governance. Repair or satisfy the existing required-check/deployment producer path, let GitHub auto-merge only after all native gates pass, then re-read current main and change this status to on-main."
     },
     {
       "slug": "l99",
@@ -63,7 +89,11 @@
       "constitution": "docs/FOUNDER_INTELLIGENCE_CONSTITUTION.md",
       "primaryAgentContract": "AGENTS.md",
       "status": "enforced",
-      "nextAction": "Preserve the existing primary AGENTS.md entrypoint and the authorship, provenance, tenant isolation, privacy, publication, rollback, and non-deletion boundaries it loads."
+      "nextAction": "Preserve the primary AGENTS.md entrypoint plus authorship, provenance, tenant isolation, privacy, publication, rollback, and non-deletion boundaries.",
+      "challengeStackStatus": "on-main",
+      "challengeStackCarrier": "AGENTS_FOUNDER_INTELLIGENCE.md",
+      "challengeStackEvidence": "Re-read from current main on 2026-09-10; the ordered stack is present and scripts/verify-juss-os-commands.mjs enforces its order.",
+      "challengeStackNextGate": "Keep StoryEngine event/provenance/canon/tenant truth stronger than generic workflow semantics and re-observe after relevant main movement."
     },
     {
       "slug": "juss-beautiful-hair",
@@ -73,7 +103,11 @@
       "constitution": "docs/FOUNDER_INTELLIGENCE_CONSTITUTION.md",
       "primaryAgentContract": "AGENTS.md",
       "status": "enforced",
-      "nextAction": "Preserve the commerce-specific constitution merged in jussbeautifulhair-site PR #25 and ensure future AGENTS.md changes retain its entrypoint."
+      "nextAction": "Preserve the public-commerce Founder Intelligence entrypoint, ordered challenge stack, exact-head checks, and customer-path proof boundaries.",
+      "challengeStackStatus": "on-main",
+      "challengeStackCarrier": "AGENTS_FOUNDER_INTELLIGENCE.md",
+      "challengeStackEvidence": "Re-read from current main on 2026-09-10; the ordered stack is present and scripts/verify-ai-skills.mjs enforces its order.",
+      "challengeStackNextGate": "Continue to separate repository, Shopify/catalog, deployment, checkout, payment, fulfillment, and customer-outcome truth."
     },
     {
       "slug": "juss-beautiful-hair-private",
@@ -83,7 +117,11 @@
       "constitution": "docs/FOUNDER_INTELLIGENCE_CONSTITUTION.md",
       "primaryAgentContract": "AGENTS.md",
       "status": "enforced",
-      "nextAction": "Preserve the explicit AGENTS.md entrypoint merged in jbh-private PR #16 and require overlapping PR #9 to retain it before integration."
+      "nextAction": "Preserve the private-operations Founder Intelligence entrypoint and keep private data, vendor, commerce, approval, evidence, rollback, and production gates stronger than portable modes.",
+      "challengeStackStatus": "on-main",
+      "challengeStackCarrier": "AGENTS_FOUNDER_INTELLIGENCE.md",
+      "challengeStackEvidence": "Re-read from current main on 2026-09-10; the ordered stack is present and scripts/verify-ai-skill-contract.mjs enforces its order.",
+      "challengeStackNextGate": "Never infer vendor/customer contact, purchase, pricing, refund, provider, database, deployment, or merge authority from workflow selection."
     },
     {
       "slug": "untold-stories",
@@ -93,7 +131,11 @@
       "constitution": "docs/FOUNDER_INTELLIGENCE_CONSTITUTION.md",
       "primaryAgentContract": "AGENTS.md",
       "status": "enforced",
-      "nextAction": "Preserve the existing primary AGENTS.md entrypoint and the truthful catalog, pricing, inventory, checkout, fulfillment, privacy, rollback, and non-deletion boundaries it loads."
+      "nextAction": "Preserve the primary AGENTS.md entrypoint, ordered challenge stack, and truthful catalog, pricing, inventory, checkout, fulfillment, privacy, rollback, and non-deletion boundaries.",
+      "challengeStackStatus": "on-main",
+      "challengeStackCarrier": "AGENTS_FOUNDER_INTELLIGENCE.md",
+      "challengeStackEvidence": "Re-read from current main on 2026-09-10; the ordered stack is present and scripts/verify-ai-skills.mjs enforces its order.",
+      "challengeStackNextGate": "Keep brand/story interpretation separate from catalog, checkout, fulfillment, publication, and customer-outcome proof."
     },
     {
       "slug": "promptos",
@@ -103,9 +145,52 @@
       "constitution": "docs/FOUNDER_INTELLIGENCE_CONSTITUTION.md",
       "primaryAgentContract": "AGENTS.md",
       "status": "enforced",
-      "nextAction": "Preserve the existing primary AGENTS.md entrypoint and the human agency, prompt provenance, privacy, evidence, disablement, rollback, and non-deletion boundaries it loads."
+      "nextAction": "Preserve the primary AGENTS.md entrypoint and keep the approved ULTRATHINK workflow registry, portable instruction boundaries, and challenge-stack verifier aligned.",
+      "challengeStackStatus": "on-main",
+      "challengeStackCarrier": "workflows/ultrathink.workflow.json",
+      "challengeStackEvidence": "Re-read from current main on 2026-09-10; ULTRATHINK v1.2 contains the exact engineering stack ultrathink → redteam-1 → lindymode → l99 → redteam-2 → ooda → proofmode, and the mission-compiler verifier enforces order plus registry/workflow version agreement.",
+      "challengeStackNextGate": "Any workflow or registry version movement must keep the ordered stack, registration authority, evidence planes, and no-self-expansion rule synchronized."
     }
   ],
-  "lastInspected": "2026-08-09",
+  "externalChallengeStackCoverage": [
+    {
+      "slug": "think-tank",
+      "repository": "jussray/THINK-TANK",
+      "authorityBoundary": "Identity/continuity evidence only. Presence here grants no FCR portfolio, MCP, decision, merge, deployment, provider, or execution authority.",
+      "challengeStackStatus": "on-main",
+      "challengeStackCarrier": "AGENTS.md",
+      "challengeStackEvidence": "Re-read from current main on 2026-09-10; the ordered stack is present and preserves THINK-TANK V0 as deterministic rather than production AI.",
+      "challengeStackNextGate": "Do not promote provider-backed AI, Supabase, auth, billing, Team, API, or production claims without separate implementation and proof."
+    },
+    {
+      "slug": "solcontinuity",
+      "repository": "jussray/solcontinuity",
+      "authorityBoundary": "Identity/continuity evidence only. Presence here grants no FCR portfolio, MCP, decision, merge, deployment, provider, or execution authority.",
+      "challengeStackStatus": "on-main",
+      "challengeStackCarrier": "AGENTS_FOUNDER_INTELLIGENCE.md",
+      "challengeStackEvidence": "Re-read from current main on 2026-09-10; the ordered stack is present and the repo-local Control Room verifier enforces its order.",
+      "challengeStackNextGate": "Keep local/CI evidence separate from founder-gated live Solana Devnet evidence."
+    },
+    {
+      "slug": "sleepwealth-agent",
+      "repository": "jussray/SleepWealth-Agent",
+      "authorityBoundary": "Identity/continuity evidence only. Presence here grants no FCR portfolio, MCP, decision, merge, deployment, provider, financial, or execution authority.",
+      "challengeStackStatus": "on-main",
+      "challengeStackCarrier": "AGENTS.md",
+      "challengeStackEvidence": "Re-read from current main on 2026-09-10; the ordered stack is present and remains explicitly paper/simulation only.",
+      "challengeStackNextGate": "Never infer live trading, real-money execution, increased risk ceilings, brokerage credentials, or bypass of human approval from workflow presence."
+    },
+    {
+      "slug": "sweats",
+      "repository": "jussray/Sweats",
+      "authorityBoundary": "Identity/continuity evidence only. Presence here grants no FCR portfolio, MCP, decision, merge, deployment, provider, commerce, or execution authority.",
+      "challengeStackStatus": "on-main",
+      "challengeStackCarrier": "AGENTS.md",
+      "challengeStackEvidence": "Re-read from current main on 2026-09-10; the ordered stack is present and preserves the storefront's preview-only commerce truth boundary.",
+      "challengeStackNextGate": "Require real Shopify catalog facts and exact customer-path proof before any catalog, pricing, inventory, checkout, or launch claim."
+    }
+  ],
+  "lastInspected": "2026-09-10",
+  "challengeStackTruthBoundary": "Challenge-stack coverage records source-controlled instruction state only. on-main does not prove an agent loaded the carrier, followed the sequence, executed a provider action, passed CI, deployed, changed runtime state, or achieved a human outcome. pending-main must never be reported as landed. External coverage is continuity evidence only and never promotes an external repository into FCR authority.",
   "truthBoundary": "This registry records repository instruction inheritance only. It does not prove runtime behavior, deployment, provider execution, user outcomes, compliance, or that an external agent actually loaded the files."
 }
