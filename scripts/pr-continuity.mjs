@@ -45,13 +45,16 @@ export function replaceManagedBlock(body = '', block) {
 }
 
 export function continuityBlock(value) {
+  const observedAt = value.observedAt || new Date().toISOString();
   return [
     START_MARKER,
     '## PR Continuity Receipt',
     '',
-    '> **MACHINE CURRENT TRUTH:** This block governs present-tense PR identity and continuity status. SHA/status prose below is historical unless it matches this receipt.',
+    '> **MACHINE OBSERVATION SNAPSHOT:** This block records repository continuity state observed at the timestamp below. It is evidence, not permanent present-tense authority.',
     '',
     `- schema: \`${SCHEMA}\``,
+    `- observed_at: \`${observedAt}\``,
+    '- receipt_semantics: **snapshot_not_authority**',
     `- repository: \`${value.repository}\``,
     `- pull_request: \`#${value.prNumber}\``,
     `- root_base: \`${value.rootBaseRef}@${value.rootBaseSha}\``,
@@ -63,6 +66,7 @@ export function continuityBlock(value) {
     '- merge_authority: **false**',
     '- deploy_authority: **false**',
     '',
+    '> Live GitHub metadata, current branch tips, exact-head workflow results, provider/runtime readback, and cross-repository readback outrank this static snapshot.',
     '> Base/head movement expires predecessor exact-head CI, review, runtime, and browser proof. A successful rollover preserves history but does not donate green proof to the successor head.',
     END_MARKER,
   ].join('\n');
@@ -145,19 +149,25 @@ async function listOpenPulls(repository) {
 }
 
 async function patchBody(repository, pr, block) {
+  const latest = await getPull(repository, pr.number);
+  if (latest.head?.sha !== pr.head?.sha || latest.base?.ref !== pr.base?.ref) {
+    return { updated: false, blocked: true, reason: 'PR_MOVED_DURING_METADATA' };
+  }
+
   let next;
   try {
-    next = replaceManagedBlock(pr.body || '', block);
+    next = replaceManagedBlock(latest.body || '', block);
   } catch (error) {
     return { updated: false, blocked: true, reason: error.message };
   }
-  if (next === (pr.body || '')) return { updated: false, blocked: false };
+  if (next === (latest.body || '')) return { updated: false, blocked: false };
   await github(`/repos/${repository}/pulls/${pr.number}`, { method: 'PATCH', body: { body: next } });
   return { updated: true, blocked: false };
 }
 
 const blockFor = (repository, pr, rootRef, rootSha, baseSha, state, proof) =>
   continuityBlock({
+    observedAt: new Date().toISOString(),
     repository,
     prNumber: pr.number,
     rootBaseRef: rootRef,
@@ -275,6 +285,7 @@ export async function auditMode() {
   const state = classifyCompareStatus(status);
   const receipt = {
     schema: SCHEMA,
+    observedAt: new Date().toISOString(),
     mode: 'audit',
     repository,
     prNumber: number,
@@ -313,7 +324,7 @@ export async function metadataMode() {
     pr,
     blockFor(repository, pr, rootRef, rootSha, baseSha, state, state === 'CURRENT' ? 'EXACT_HEAD_PROOF_SEPARATE' : 'REVERIFY_OR_ROLLOVER_REQUIRED'),
   );
-  const receipt = { schema: SCHEMA, mode: 'metadata', repository, prNumber: number, state, metadata, authorizesMerge: false, authorizesDeploy: false };
+  const receipt = { schema: SCHEMA, observedAt: new Date().toISOString(), mode: 'metadata', repository, prNumber: number, state, metadata, authorizesMerge: false, authorizesDeploy: false };
   writeReceipt(receipt);
   if (metadata.blocked) throw new Error(`METADATA_BLOCKED: ${metadata.reason}`);
   console.log(JSON.stringify(receipt));
@@ -330,6 +341,7 @@ export async function rolloverMode() {
   const blocked = results.filter((item) => item.state.startsWith('BLOCKED'));
   const receipt = {
     schema: SCHEMA,
+    observedAt: new Date().toISOString(),
     mode: 'rollover',
     repository,
     rootBaseRef: rootRef,
