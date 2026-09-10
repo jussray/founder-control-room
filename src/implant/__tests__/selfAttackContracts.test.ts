@@ -7,6 +7,7 @@ import {
 } from '../../approvals/approval.js';
 import {
   canRenderVerifiedClaim,
+  type ClaimEvidenceLink,
   type ClaimEvidenceRecord,
   type TruthClaim,
 } from '../../truth/truth.js';
@@ -20,7 +21,7 @@ import {
 } from '../contracts.js';
 
 describe('ULTRATHINK self-attack implant contracts', () => {
-  it('requires authoritative fresh source-bound evidence before rendering green truth', () => {
+  it('requires linked authoritative fresh source-bound evidence before rendering green truth', () => {
     const evidence: ClaimEvidenceRecord = {
       id: 'e1',
       source: 'exact_target_verification',
@@ -46,9 +47,15 @@ describe('ULTRATHINK self-attack implant contracts', () => {
       conflictIds: [],
       provenanceId: 'p1',
     };
+    const link: ClaimEvidenceLink = {
+      claimId: 'c1',
+      evidenceId: 'e1',
+      compatibleScope: 'repository_state',
+    };
     const renderContext = {
       now: '2026-09-08T21:00:00Z',
       currentTargetFingerprint: 'sha:abc',
+      evidenceLinks: [link],
     };
 
     expect(canRenderVerifiedClaim(claim, {
@@ -57,7 +64,25 @@ describe('ULTRATHINK self-attack implant contracts', () => {
     })).toBe(true);
 
     expect(canRenderVerifiedClaim(claim, {
-      now: renderContext.now,
+      ...renderContext,
+      evidenceLinks: [],
+      evidenceById: new Map([['e1', evidence]]),
+    })).toBe(false);
+
+    expect(canRenderVerifiedClaim(claim, {
+      ...renderContext,
+      evidenceLinks: [{ ...link, claimId: 'other-claim' }],
+      evidenceById: new Map([['e1', evidence]]),
+    })).toBe(false);
+
+    expect(canRenderVerifiedClaim(claim, {
+      ...renderContext,
+      evidenceLinks: [{ ...link, compatibleScope: 'runtime_health' }],
+      evidenceById: new Map([['e1', evidence]]),
+    })).toBe(false);
+
+    expect(canRenderVerifiedClaim(claim, {
+      ...renderContext,
       currentTargetFingerprint: 'sha:other',
       evidenceById: new Map([['e1', evidence]]),
     })).toBe(false);
@@ -95,14 +120,21 @@ describe('ULTRATHINK self-attack implant contracts', () => {
       targetFingerprint: null,
       integrityDigest: null,
     };
+    const artifactLink: ClaimEvidenceLink = {
+      claimId: artifactClaim.id,
+      evidenceId: artifactEvidence.id,
+      compatibleScope: artifactEvidence.scope,
+    };
 
     expect(canRenderVerifiedClaim(artifactClaim, {
       now: renderContext.now,
+      evidenceLinks: [artifactLink],
       evidenceById: new Map([['artifact', artifactEvidence]]),
     })).toBe(false);
 
     expect(canRenderVerifiedClaim(artifactClaim, {
       now: renderContext.now,
+      evidenceLinks: [artifactLink],
       evidenceById: new Map([['artifact', {
         ...artifactEvidence,
         integrityDigest: 'sha256:artifact',
@@ -122,14 +154,21 @@ describe('ULTRATHINK self-attack implant contracts', () => {
       scope: 'test_result',
       targetFingerprint: null,
     };
+    const testLink: ClaimEvidenceLink = {
+      claimId: testClaim.id,
+      evidenceId: testEvidence.id,
+      compatibleScope: testEvidence.scope,
+    };
 
     expect(canRenderVerifiedClaim(testClaim, {
       ...renderContext,
+      evidenceLinks: [testLink],
       evidenceById: new Map([['test', testEvidence]]),
     })).toBe(false);
 
     expect(canRenderVerifiedClaim(testClaim, {
       ...renderContext,
+      evidenceLinks: [testLink],
       evidenceById: new Map([['test', {
         ...testEvidence,
         targetFingerprint: 'sha:abc',
