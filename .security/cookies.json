@@ -45,7 +45,7 @@
     {
       "name": "fcr_friend_intake_review",
       "classification": "strictly_necessary",
-      "purpose": "Carry a short-lived, server-signed capability proving the authenticated founder reviewed the exact sensitive Friend Intake save payload before persistence.",
+      "purpose": "Carry a short-lived, server-signed capability proving the interactive founder reviewed the exact sensitive Friend Intake save payload before persistence.",
       "owner": "backend",
       "providers": ["cloudflare"],
       "sensitive": true,
@@ -55,9 +55,9 @@
       "path": "/friend-intake",
       "maxAgeSeconds": 300,
       "cacheControl": "private, no-store",
-      "integrity": "HMAC-SHA256 capability bound to founder identity, exact raw input, redacted summary, persisted sensitive categories, persisted intent tags, and five-minute expiry; it grants only the reviewed sensitive-save confirmation and no broader founder authority.",
-      "csrf": "SameSite=Strict and the Friend Intake route's authenticated founder boundary constrain browser submission; the receipt must also verify against the exact founder and reviewed payload before persistence.",
-      "deletion": "Cleared after successful confirmation, explicit cancellation, invalid confirmation, or expiry; any privacy-choice transition away from the reviewed sensitive save must revoke the receipt before the review state is discarded."
+      "integrity": "HMAC-SHA256 v2 capability with a fresh nonce, bound to founder identity, the originating opaque browser-session hash, exact raw input, redacted summary, persisted sensitive categories, persisted intent tags, persisted move kind/policy/duration/warning code, blocked model state, engine version, and five-minute expiry. Its token deterministically derives the sensitive intake/timeline UUID pair so database uniqueness enforces one-review/one-save consumption without storing the raw review token.",
+      "csrf": "SameSite=Strict plus the interactive opaque founder-session boundary constrain browser submission; the receipt must verify against the current browser session and exact reviewed persistence payload before storage.",
+      "deletion": "Cleared after successful confirmation, explicit cancellation, invalid confirmation, or expiry; privacy-choice transitions revoke it, and logout/session rotation makes any surviving copy unverifiable because the originating browser-session identity no longer matches."
     }
   ],
   "nonCookieState": [
