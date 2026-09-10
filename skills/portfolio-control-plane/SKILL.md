@@ -140,6 +140,31 @@ Evidence is valid only when it is bound to:
 
 Skipped, missing-log, `steps: null`, stale-SHA, transferred, manually asserted, or truncated-critical results cannot satisfy a proof gate.
 
+## Project reality audit
+
+When the founder asks whether a project, product, subsystem, storefront, or portfolio slice "works," do not infer health from repository existence, merged code, old screenshots, a successful deploy event, or a single green check. Reconstruct current truth from the strongest claim-appropriate evidence.
+
+Use this evidence ladder in order:
+
+1. resolve the authoritative repository, default or requested branch, and exact current head SHA;
+2. inspect required current-head CI, type, lint, unit, integration, security, migration, and contract checks;
+3. require targeted Playwright evidence for browser-observable UI or user-flow claims;
+4. require provider, API, job, database, webhook, or other direct runtime evidence for non-browser backend claims;
+5. for live or production claims, bind deployment/runtime identity to the same exact head or explicitly mark the proof stale;
+6. compare the newest decisive evidence with prior evidence only to explain change, never to renew current proof.
+
+Classify each audited project or claim as exactly one of:
+
+- **VERIFIED** — the exact current head has the required code-level checks and claim-appropriate runtime or Playwright evidence;
+- **PARTIAL** — a substantive path works, but exact-head, end-to-end, provider, deployment, or runtime proof is incomplete;
+- **UNKNOWN** — evidence is absent, inaccessible, too weak, or not tied to the claim;
+- **BLOCKED** — a known failing gate or unavailable authority prevents the claim from being proven;
+- **STALE** — previously valid evidence belongs to an older head, environment, deployment, or expired evidence window.
+
+Passing CI alone proves only the checks that actually ran. It does not prove a live product. Historical runtime or Playwright proof does not renew itself after the source head, deployment identity, authority, environment, or relevant evidence changes. A skipped, startup-failed, cancelled, missing-log, truncated-critical, or never-executed check is not green evidence.
+
+For portfolio summaries, report at minimum: project, current head, decisive evidence, classification, what is known to work, what is not yet proven, and the smallest next proof that could legitimately raise the classification. Prefer one current truthful status over optimistic aggregation.
+
 ## Project separation
 
 Shared philosophy may cross projects. Operational data may not.
