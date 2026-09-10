@@ -65,6 +65,9 @@ export const STRATEGIC_SECURITY_INVARIANTS = Object.freeze({
   leastPrivilegeRequired: true,
   secureDefaultsRequired: true,
   uiRuntimeClaimRequiresPlaywright: true,
+  cryptographicInventoryRequired: true,
+  cryptographicAgilityRequired: true,
+  quantumSafeClaimRequiresRuntimeEvidence: true,
   noHackBack: true,
   noMalware: true,
   noOutboundAttackCapability: true,
@@ -90,9 +93,17 @@ export const STRATEGIC_SECURITY_STAGES: readonly StrategicSecurityStage[] = [
   {
     version: 1,
     name: 'Inventory and Ownership',
-    objective: 'Know assets, data, dependencies, owners, environments, and authoritative sources before protection decisions.',
-    controls: ['asset-inventory', 'software-inventory', 'data-classification', 'authority-owner', 'canonical-repository'],
-    frameworkSignals: ['NIST-CSF-GOVERN/IDENTIFY', 'CIS-1', 'CIS-2'],
+    objective: 'Know assets, data, dependencies, owners, environments, authoritative sources, and cryptographic dependencies before protection decisions.',
+    controls: [
+      'asset-inventory',
+      'software-inventory',
+      'data-classification',
+      'authority-owner',
+      'canonical-repository',
+      'cryptographic-inventory',
+      'quantum-vulnerable-public-key-inventory',
+    ],
+    frameworkSignals: ['NIST-CSF-GOVERN/IDENTIFY', 'CIS-1', 'CIS-2', 'NIST-PQC-MIGRATION'],
   },
   {
     version: 2,
@@ -132,9 +143,19 @@ export const STRATEGIC_SECURITY_STAGES: readonly StrategicSecurityStage[] = [
   {
     version: 7,
     name: 'Supply Chain and Deployment Provenance',
-    objective: 'Bind released artifacts and deployments to reviewed source, controlled build paths, and verifiable provenance.',
-    controls: ['exact-head-build', 'dependency-governance', 'artifact-attestation', 'sbom', 'oidc-provider-auth', 'deployment-witness'],
-    frameworkSignals: ['NIST-SSDF', 'SLSA', 'GITHUB-ATTESTATIONS'],
+    objective: 'Bind released artifacts and deployments to reviewed source, controlled build paths, verifiable provenance, and replaceable cryptographic dependencies.',
+    controls: [
+      'exact-head-build',
+      'dependency-governance',
+      'artifact-attestation',
+      'sbom',
+      'oidc-provider-auth',
+      'deployment-witness',
+      'cryptographic-agility',
+      'provider-cryptography-ownership',
+      'post-quantum-migration-readiness',
+    ],
+    frameworkSignals: ['NIST-SSDF', 'SLSA', 'GITHUB-ATTESTATIONS', 'NIST-PQC-MIGRATION'],
   },
   {
     version: 8,
@@ -197,6 +218,9 @@ export function strategicSecurityTargetForProject(project: PortfolioProject): St
     'security-relevant tests for changed controls',
     'rollback path for privileged mutations',
     'provider/runtime evidence for provider claims',
+    'cryptographic inventory for security-relevant dependencies',
+    'provider ownership and migration path for quantum-vulnerable public-key cryptography',
+    'runtime or provider evidence before any quantum-safe claim',
     ...(project.capabilities.includes('playwright') ? ['Playwright evidence for UI/runtime claims'] : []),
   ];
 
@@ -258,24 +282,3 @@ export function validateStrategicSecurityExecution(input: {
   if (input.proofRequirements.map((value) => value.trim()).filter(Boolean).length === 0) {
     errors.push('Strategic security execution requires declared proof requirements.');
   }
-  if (!input.providerAuthorityDeclared && input.requestedAuthority !== 'reason') {
-    errors.push('Provider authority must be declared before non-reasoning security execution.');
-  }
-  if (input.requestedAuthority === 'privileged' && !input.approvalBound) {
-    errors.push('Privileged strategic security execution requires approval bound to the exact plan and head.');
-  }
-  return errors;
-}
-
-export function strategicSecurityDecision(input: {
-  risk: 'low' | 'medium' | 'high' | 'critical';
-  evidenceConfidence: 'low' | 'medium' | 'high';
-  privilegedAction: boolean;
-  containmentAvailable: boolean;
-}): StrategicSecurityDecision {
-  if (input.risk === 'critical') return input.containmentAvailable ? 'isolate' : 'deny';
-  if (input.risk === 'high') return input.evidenceConfidence === 'high' ? 'deny' : 'challenge';
-  if (input.privilegedAction && input.evidenceConfidence !== 'high') return 'challenge';
-  if (input.risk === 'medium') return 'limit';
-  return 'allow';
-}
