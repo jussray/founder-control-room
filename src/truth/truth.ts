@@ -62,6 +62,7 @@ export interface TruthRenderContext {
   now: string;
   currentTargetFingerprint?: string | null;
   evidenceById: ReadonlyMap<string, ClaimEvidenceRecord>;
+  evidenceLinks: readonly ClaimEvidenceLink[];
 }
 
 function parseInstant(value: string | null): number | null {
@@ -100,11 +101,25 @@ function evidenceCanVerifyClaim(
   }
 }
 
+function hasCompatibleEvidenceLink(
+  claim: TruthClaim,
+  evidence: ClaimEvidenceRecord,
+  links: readonly ClaimEvidenceLink[],
+): boolean {
+  return links.some((link) => (
+    link.claimId === claim.id
+    && link.evidenceId === evidence.id
+    && link.compatibleScope === evidence.scope
+    && claim.evidenceScope.includes(link.compatibleScope)
+  ));
+}
+
 /**
  * Green is a rendering decision, not a synonym for "looks good".
  * It is allowed only when the claim is verified, fresh, target-bound when
- * required, and backed by at least one compatible authoritative evidence
- * record that satisfies the canonical source-specific verification binding.
+ * required, and backed by at least one explicitly linked compatible
+ * authoritative evidence record that satisfies the canonical source-specific
+ * verification binding.
  */
 export function canRenderVerifiedClaim(
   claim: TruthClaim,
@@ -125,7 +140,7 @@ export function canRenderVerifiedClaim(
   return claim.evidenceIds.some((evidenceId) => {
     const evidence = context.evidenceById.get(evidenceId);
     if (!evidence) return false;
-    if (!claim.evidenceScope.includes(evidence.scope)) return false;
+    if (!hasCompatibleEvidenceLink(claim, evidence, context.evidenceLinks)) return false;
     if (!evidenceCanVerifyClaim(claim, evidence)) return false;
 
     const evidenceExpires = parseInstant(evidence.freshnessExpiresAt);
