@@ -3,7 +3,10 @@
   "repository": "jussray/founder-control-room",
   "defaultPolicy": "deny-undeclared",
   "scanRoots": ["src"],
-  "allowedCookieWriters": ["src/auth/founderSession.ts"],
+  "allowedCookieWriters": [
+    "src/auth/founderSession.ts",
+    "src/http/routes/friendIntakeReviewReceipt.ts"
+  ],
   "cookies": [
     {
       "name": "__Host-fcr_session",
@@ -38,6 +41,23 @@
       "integrity": "Never accepted for authentication after opaque-session cutover; emitted only with Max-Age=0 to remove historical self-contained token cookies.",
       "csrf": "Not accepted as an authentication or authorization input.",
       "deletion": "Expired whenever a new opaque session is issued or any founder browser session is cleared."
+    },
+    {
+      "name": "fcr_friend_intake_review",
+      "classification": "strictly_necessary",
+      "purpose": "Carry a short-lived, server-signed capability proving the authenticated founder reviewed the exact sensitive Friend Intake save payload before persistence.",
+      "owner": "backend",
+      "providers": ["cloudflare"],
+      "sensitive": true,
+      "httpOnly": true,
+      "secure": "production",
+      "sameSite": "strict",
+      "path": "/friend-intake",
+      "maxAgeSeconds": 300,
+      "cacheControl": "private, no-store",
+      "integrity": "HMAC-SHA256 capability bound to founder identity, exact raw input, redacted summary, persisted sensitive categories, persisted intent tags, and five-minute expiry; it grants only the reviewed sensitive-save confirmation and no broader founder authority.",
+      "csrf": "SameSite=Strict and the Friend Intake route's authenticated founder boundary constrain browser submission; the receipt must also verify against the exact founder and reviewed payload before persistence.",
+      "deletion": "Cleared after successful confirmation, explicit cancellation, invalid confirmation, or expiry; any privacy-choice transition away from the reviewed sensitive save must revoke the receipt before the review state is discarded."
     }
   ],
   "nonCookieState": [
