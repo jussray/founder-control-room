@@ -14,11 +14,28 @@ describe('Neon pull-request branch lifecycle contract', () => {
     expect(workflow).toContain('neondatabase/delete-branch-action@4468d825d5a88ef4012f1705a82f02ec3072f776');
   });
 
-  it('keeps database credentials job-local and never exports database URLs', () => {
+  it('allocates Neon only for Supabase-changing pull requests while preserving the required job identity', () => {
+    expect(workflow).toContain('name: Create Neon Branch');
+    expect(workflow).toContain('pull-requests: read');
+    expect(workflow.match(/- name: Classify Neon preview scope/g)).toHaveLength(2);
+    expect(workflow).toContain('gh api --paginate "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/files?per_page=100"');
+    expect(workflow).toContain('supabase/*)');
+    expect(workflow.match(/if: steps\.neon_scope\.outputs\.needs_neon == 'true'/g)?.length ?? 0).toBeGreaterThanOrEqual(5);
+    expect(workflow.match(/if: steps\.neon_scope\.outputs\.needs_neon == 'false'/g)).toHaveLength(2);
+    expect(workflow).toContain('Neon preview skipped because this PR does not change supabase/.');
+    expect(workflow).toContain('Neon cleanup skipped because this PR does not change supabase/.');
+  });
+
+  it('keeps Neon credentials behind the database-scope gate and never exports database URLs', () => {
     expect(workflow).not.toContain('create_neon_branch_encode');
     expect(workflow).not.toContain('db_url');
     expect(workflow).not.toContain('db_url_pooled');
     expect(workflow).not.toContain('db_url_with_pooler');
     expect(workflow).toContain("echo 'NEON_API_KEY is not configured' >&2");
+
+    const firstClassifier = workflow.indexOf('- name: Classify Neon preview scope');
+    const firstCredentialRead = workflow.indexOf('NEON_API_KEY: ${{ secrets.NEON_API_KEY }}');
+    expect(firstClassifier).toBeGreaterThan(-1);
+    expect(firstCredentialRead).toBeGreaterThan(firstClassifier);
   });
 });
