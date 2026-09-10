@@ -149,6 +149,11 @@ export function createFriendIntakeRouter(dependencies: FriendIntakeRouteDependen
   const persistRun = dependencies.persistRun ?? defaultPersistRun;
   const recordUsefulness = dependencies.recordUsefulness ?? defaultRecordUsefulness;
 
+  router.get('/status', (_req, res) => {
+    res.set('Cache-Control', 'no-store');
+    return res.status(200).json({ enabled: enabled() });
+  });
+
   router.use((req, res, next) => {
     if (!enabled()) {
       return res.status(404).json({ error: 'Friend Intake is not enabled on this runtime' });
