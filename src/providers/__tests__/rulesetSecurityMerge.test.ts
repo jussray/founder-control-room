@@ -76,8 +76,35 @@ function chiefGovernanceObservation(): RulesetReconciliationObservation {
   };
 }
 
+function chiefExactHeadObservation(): RulesetReconciliationObservation {
+  return {
+    id: 20818149,
+    versionId: 27,
+    name: "Chief AI main exact-head gate",
+    enforcement: "active",
+    targetRefs: ["~DEFAULT_BRANCH"],
+    excludedTargetRefs: [],
+    bypassActors: [],
+    rules: [
+      { type: "deletion" },
+      { type: "non_fast_forward" },
+      { type: "required_linear_history" },
+      { type: "pull_request", parameters: { required_approving_review_count: 0, required_review_thread_resolution: true } },
+      { type: "required_status_checks", parameters: { strict_required_status_checks_policy: false, required_status_checks: [
+        { context: "Typecheck" },
+        { context: "Lint" },
+        { context: "Unit Tests" },
+        { context: "SonarQube – Founder Intelligence" },
+        { context: "Verify test-ledger contract" },
+      ] } },
+      { type: "code_scanning", parameters: { code_scanning_tools: [{ tool: "CodeQL", alerts_threshold: "errors" }] } },
+      { type: "required_deployments", parameters: { required_deployment_environments: ["Cloudflare Production", "proofmode-access-admin"] } },
+    ],
+  };
+}
+
 describe("planExistingRulesetReconciliation", () => {
-  it("creates a version-fenced non-authorizing plan while preserving provider authority state", () => {
+  it("plans removal of legacy pre-merge ProofMode contexts without changing governance authority state", () => {
     const observation = chiefGovernanceObservation();
     const fingerprint = fingerprintRulesetReconciliationObservation(observation);
     const plan = planExistingRulesetReconciliation({
@@ -87,12 +114,9 @@ describe("planExistingRulesetReconciliation", () => {
       expectedFingerprint: fingerprint,
       requestedRules: [
         { type: "pull_request", parameters: { required_approving_review_count: 1, required_review_thread_resolution: true } },
-        { type: "required_status_checks", parameters: { strict_required_status_checks_policy: true, required_status_checks: [
-          { context: "Typecheck", integration_id: 15368 },
-          { context: "Verify candidate ProofMode runtime with Playwright", integration_id: 15368 },
-        ] } },
+        { type: "required_status_checks", parameters: { strict_required_status_checks_policy: true, required_status_checks: [{ context: "Typecheck", integration_id: 15368 }] } },
       ],
-      requiredStatusCheckNames: ["Typecheck", "Verify candidate ProofMode runtime with Playwright"],
+      requiredStatusCheckNames: ["Typecheck"],
       requirePullRequest: true,
       blockForcePushes: true,
       blockDeletion: true,
@@ -107,16 +131,56 @@ describe("planExistingRulesetReconciliation", () => {
     expect(plan.desired.excludedTargetRefs).toEqual(observation.excludedTargetRefs);
     expect(plan.desired.bypassActors).toEqual(observation.bypassActors);
     expect(plan.statusChecks).toEqual({
-      added: ["Verify candidate ProofMode runtime with Playwright"],
+      added: [],
       removed: ["Verify live ProofMode MCP with Playwright", "Verify production ProofMode MCP with Playwright"],
       retained: ["Typecheck"],
     });
     expect(plan.desired.rules.find((rule) => rule.type === "required_status_checks")?.parameters?.["required_status_checks"]).toEqual([
       { context: "Typecheck", integration_id: 15368 },
-      { context: "Verify candidate ProofMode runtime with Playwright", integration_id: 15368 },
     ]);
     expect(plan.desired.rules.find((rule) => rule.type === "required_status_checks")?.parameters?.["strict_required_status_checks_policy"]).toBe(true);
     expect(plan.desired.rules.find((rule) => rule.type === "code_scanning")).toEqual(observation.rules[5]);
+  });
+
+  it("plans the candidate ProofMode producer only on the no-bypass exact-head carrier", () => {
+    const observation = chiefExactHeadObservation();
+    const requiredStatusCheckNames = [
+      "Typecheck",
+      "Lint",
+      "Unit Tests",
+      "SonarQube – Founder Intelligence",
+      "Verify test-ledger contract",
+      "Verify candidate ProofMode runtime with Playwright",
+    ];
+    const plan = planExistingRulesetReconciliation({
+      observation,
+      expectedRulesetId: "20818149",
+      expectedVersionId: "27",
+      expectedFingerprint: fingerprintRulesetReconciliationObservation(observation),
+      requestedRules: [{ type: "required_status_checks", parameters: { strict_required_status_checks_policy: true, required_status_checks: [
+        { context: "Verify candidate ProofMode runtime with Playwright", integration_id: 15368 },
+      ] } }],
+      requiredStatusCheckNames,
+      requirePullRequest: true,
+      blockForcePushes: true,
+      blockDeletion: true,
+    });
+
+    expect(plan.desired.bypassActors).toEqual([]);
+    expect(plan.statusChecks).toEqual({
+      added: ["Verify candidate ProofMode runtime with Playwright"],
+      removed: [],
+      retained: requiredStatusCheckNames.slice(0, 5),
+    });
+    expect(plan.desired.rules.find((rule) => rule.type === "required_status_checks")?.parameters?.["required_status_checks"]).toEqual([
+      { context: "Typecheck" },
+      { context: "Lint" },
+      { context: "Unit Tests" },
+      { context: "SonarQube – Founder Intelligence" },
+      { context: "Verify test-ledger contract" },
+      { context: "Verify candidate ProofMode runtime with Playwright", integration_id: 15368 },
+    ]);
+    expect(plan.desired.rules.find((rule) => rule.type === "required_deployments")).toEqual(observation.rules[6]);
   });
 
   it("refuses a stale provider history version", () => {
@@ -169,11 +233,11 @@ describe("planExistingRulesetReconciliation", () => {
   });
 
   it("refuses an invalid requested check producer identity", () => {
-    const observation = chiefGovernanceObservation();
+    const observation = chiefExactHeadObservation();
     expect(() => planExistingRulesetReconciliation({
       observation,
-      expectedRulesetId: "21261587",
-      expectedVersionId: "19",
+      expectedRulesetId: "20818149",
+      expectedVersionId: "27",
       expectedFingerprint: fingerprintRulesetReconciliationObservation(observation),
       requestedRules: [{ type: "required_status_checks", parameters: { required_status_checks: [{ context: "Verify candidate ProofMode runtime with Playwright", integration_id: 0 }] } }],
       requiredStatusCheckNames: ["Verify candidate ProofMode runtime with Playwright"],
