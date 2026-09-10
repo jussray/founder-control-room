@@ -102,11 +102,20 @@ async function refreshConveyorReadiness() {
   }
 }
 
+function setFriendIntakeLinkAvailability(link, enabled) {
+  link.hidden = !enabled;
+  if (enabled) {
+    link.style.removeProperty('display');
+  } else {
+    link.style.display = 'none';
+  }
+}
+
 async function refreshFriendIntakeAvailability() {
   const link = document.querySelector('[data-friend-intake-link]');
   if (!(link instanceof HTMLAnchorElement)) return;
 
-  link.hidden = true;
+  setFriendIntakeLinkAvailability(link, false);
   try {
     const response = await fetch('/friend-intake/status', {
       method: 'GET',
@@ -117,9 +126,9 @@ async function refreshFriendIntakeAvailability() {
     if (!response.ok) return;
 
     const body = await response.json();
-    link.hidden = body?.enabled !== true;
+    setFriendIntakeLinkAvailability(link, body?.enabled === true);
   } catch {
-    link.hidden = true;
+    setFriendIntakeLinkAvailability(link, false);
   }
 }
 
