@@ -25,4 +25,29 @@ Required loop:
 → Repeat
 ```
 
+## Canonical founder challenge stack
+
+For nontrivial implementation, audit, review, repair, merge, deployment, migration, publication, or cross-project coordination selected by authenticated founder/operator intent, apply this sequence before claiming completion:
+
+```text
+ULTRATHINK
+→ Red Team 1 — premise
+→ Lindy mode
+→ L99
+→ Red Team 2 — implementation
+→ OODA
+→ Proof
+→ Rollback / Next Gate
+```
+
+1. **ULTRATHINK:** inspect current reality, reconcile constraints and evidence planes, widen the option space, and select the highest-leverage bounded problem frame.
+2. **Red Team 1 — premise:** attack whether the requested change should exist, whether the evidence establishes a real problem, whether scope is correct, and whether the work serves the founder's intended outcome.
+3. **Lindy mode:** choose the smallest durable, reversible existing carrier and preserve verified interfaces, authority boundaries, and working architecture unless evidence requires replacement.
+4. **L99:** bind the selected path to current subject fingerprints, provenance, state, scoped authority, evidence requirements, rollback, continuity, and drift so the decision remains legible later.
+5. **Red Team 2 — implementation:** attack the chosen patch for regressions, authority drift, privacy/security/safety failures, stale proof, hidden assumptions, overclaims, retry hazards, and missing recovery.
+6. **OODA:** observe the exact current state, orient to FCR's single-OS founder-intent contract, decide one bounded action, act only within existing authority, then re-observe and verify before the next loop.
+7. **Proof / Rollback / Next Gate:** separate source, execution, runtime, and outcome truth; record what changed, how to reverse it, what remains unknown, and the smallest next gate.
+
+A failed pass narrows, changes, or stops the work. No mode grants merge, deployment, publication, spending, provider mutation, credential, migration, destructive-write, or founder authority. Founder Control Room remains the single operating system; ULTRATHINK, Red Team, Lindy, L99, and OODA are coordinated internal reasoning/execution disciplines serving the same founder intent, not separate operating systems.
+
 This entrypoint supplements `AGENTS.md`, `GLOBAL_AI.md`, Juss Founder OS, Founder Merge Authority, and repository-local skills. It never weakens privacy, safety, approval, rollback, evidence, or non-deletion rules.
