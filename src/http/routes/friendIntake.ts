@@ -130,8 +130,9 @@ function usefulnessResponse(value: unknown): UsefulnessResponse | null {
 
 const INTERNATIONAL_PHONE_PATTERN = /\+\d(?:[\s().-]*\d){7,14}\b/;
 const AWS_ACCESS_KEY_ID_PATTERN = /\b(?:AKIA|ASIA|AIDA|AROA|AIPA|ANPA|ANVA)[A-Z0-9]{16}\b/i;
+const AWS_SECRET_ASSIGNMENT_PATTERN = /\bAWS_(?:SECRET_ACCESS_KEY|SESSION_TOKEN)\s*[:=]\s*(?:"[^"]+"|'[^']+'|[^\s]+)/i;
 const PRIVATE_IDENTIFIER_PATTERN = new RegExp(
-  `(?:${INTERNATIONAL_PHONE_PATTERN.source}|${AWS_ACCESS_KEY_ID_PATTERN.source}|\\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}\\b|\\b(?:\\+?1[-.\\s]?)?(?:\\(\\d{3}\\)|\\d{3})[-.\\s]?\\d{3}[-.\\s]?\\d{4}\\b|\\b\\d{3}-\\d{2}-\\d{4}\\b|\\b(?:sk(?:-proj)?|pk|rk|ghp|github_pat|xox[baprs])[-_A-Za-z0-9]{8,}\\b|\\b(?:routing|account|acct|card)(?:\\s+(?:number|no\\.?))?\\s*[:=#-]?\\s*\\d{4,19}\\b|\\b(?:\\d[ -]*?){13,19}\\b)`,
+  `(?:${INTERNATIONAL_PHONE_PATTERN.source}|${AWS_ACCESS_KEY_ID_PATTERN.source}|${AWS_SECRET_ASSIGNMENT_PATTERN.source}|\\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}\\b|\\b(?:\\+?1[-.\\s]?)?(?:\\(\\d{3}\\)|\\d{3})[-.\\s]?\\d{3}[-.\\s]?\\d{4}\\b|\\b\\d{3}-\\d{2}-\\d{4}\\b|\\b(?:sk(?:-proj)?|pk|rk|ghp|github_pat|xox[baprs])[-_A-Za-z0-9]{8,}\\b|\\b(?:routing|account|acct|card)(?:\\s+(?:number|no\\.?))?\\s*[:=#-]?\\s*\\d{4,19}\\b|\\b(?:\\d[ -]*?){13,19}\\b)`,
   'i',
 );
 
@@ -213,6 +214,7 @@ export function redactFriendSummary(value: string): string {
     .replace(/\b(?:\+?1[-.\s]?)?(?:\(\d{3}\)|\d{3})[-.\s]?\d{3}[-.\s]?\d{4}\b/g, '[redacted-phone]')
     .replace(/\b(?:routing|account|acct|card)(?:\s+(?:number|no\.?))?\s*[:=#-]?\s*\d{4,19}\b/gi, '[redacted-financial]')
     .replace(/\b(?:\d[ -]*?){13,19}\b/g, '[redacted-financial]')
+    .replace(/\b(AWS_(?:SECRET_ACCESS_KEY|SESSION_TOKEN))\s*[:=]\s*(?:"[^"]*"|'[^']*'|[^\s]+)/gi, '$1=[redacted-credential]')
     .replace(/\b(?:AKIA|ASIA|AIDA|AROA|AIPA|ANPA|ANVA)[A-Z0-9]{16}\b/gi, '[redacted-credential]')
     .replace(/\b(?:sk(?:-proj)?|pk|rk|ghp|github_pat|xox[baprs])[-_A-Za-z0-9]{8,}\b/g, '[redacted-credential]')
     .replace(/\b(password|passcode|api[_ -]?key|access[_ -]?token|bearer[_ -]?token|secret)\s*[:=]\s*\S+/gi, '$1=[redacted]')
@@ -337,6 +339,7 @@ function providerFailureStatus(error: unknown): number {
   if (
     error.code === 'FRIEND_MODELS_DISABLED'
     || error.code === 'FRIEND_PROVIDER_NOT_ALLOWED'
+    || error.code === 'FRIEND_PROVIDER_BASE_URL_INVALID'
     || error.code.endsWith('_NOT_CONFIGURED')
   ) {
     return 503;
