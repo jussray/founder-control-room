@@ -9,6 +9,26 @@ interface PluginEntry {
   defaultMode: 'read-first';
 }
 
+interface SocialAnalyticsProviderTruth {
+  role: string;
+  authority: 'secondary';
+  runtimeDiscoveryRequired: boolean;
+  mayOverrideNativePlatform: false;
+  productionAnalyticsApiAssumed?: false;
+  emptyRowsMeanZero?: false;
+}
+
+interface SocialAnalyticsTruth {
+  analyticsMode: 'observation_only';
+  sourcePrecedence: string[];
+  nativePlatformWinsOnConflict: true;
+  emptyProviderRowsClassifyAs: 'UNKNOWN_NO_EVIDENCE';
+  causalClaimsRequirePlatformAttributableEvidence: true;
+  forbiddenUngroundedClaims: string[];
+  buffer: SocialAnalyticsProviderTruth;
+  metricool: SocialAnalyticsProviderTruth;
+}
+
 interface PluginManagementManifest {
   schemaVersion: number;
   contract: string;
@@ -22,6 +42,7 @@ interface PluginManagementManifest {
   permissionStateSource: string;
   connectionStateSource: string;
   truthBoundary: string;
+  socialAnalyticsTruth: SocialAnalyticsTruth;
   plugins: PluginEntry[];
 }
 
@@ -29,7 +50,15 @@ const manifest = JSON.parse(
   await readFile(new URL('../../../.control-room/plugin-management.json', import.meta.url), 'utf8'),
 ) as PluginManagementManifest;
 
-const expectedPlugins = ['GitHub', 'Supabase', 'Slack', 'Asana', 'HubSpot', 'Figma'];
+const expectedPlugins = [
+  'GitHub',
+  'Supabase',
+  'Slack',
+  'Asana',
+  'HubSpot',
+  'Figma',
+  'Metricool for Social Media',
+];
 const allowedManifestKeys = [
   'schemaVersion',
   'contract',
@@ -43,6 +72,7 @@ const allowedManifestKeys = [
   'permissionStateSource',
   'connectionStateSource',
   'truthBoundary',
+  'socialAnalyticsTruth',
   'plugins',
 ].sort();
 const allowedPluginKeys = ['name', 'role', 'runtimeDiscoveryRequired', 'defaultMode'].sort();
@@ -111,5 +141,42 @@ describe('ChatGPT plugin management repository contract', () => {
       expect(plugin.runtimeDiscoveryRequired).toBe(true);
       expect(plugin.defaultMode).toBe('read-first');
     }
+  });
+
+  it('keeps social analytics observational and native-platform authoritative', () => {
+    expect(manifest.socialAnalyticsTruth).toEqual({
+      analyticsMode: 'observation_only',
+      sourcePrecedence: [
+        'native-platform',
+        'native-platform-export',
+        'official-api-partner',
+        'aggregator',
+        'inference',
+      ],
+      nativePlatformWinsOnConflict: true,
+      emptyProviderRowsClassifyAs: 'UNKNOWN_NO_EVIDENCE',
+      causalClaimsRequirePlatformAttributableEvidence: true,
+      forbiddenUngroundedClaims: [
+        'ranking_suppression',
+        'distribution_restriction',
+        'post_to_follower_conversion',
+        'delayed_follower_attribution',
+        'algorithmic_cause',
+      ],
+      buffer: {
+        role: 'Corroborating LinkedIn post-level analytics and scheduling when freshly connected through an authorized route.',
+        authority: 'secondary',
+        runtimeDiscoveryRequired: true,
+        mayOverrideNativePlatform: false,
+        productionAnalyticsApiAssumed: false,
+      },
+      metricool: {
+        role: 'Secondary cross-network analytics and scheduling observation.',
+        authority: 'secondary',
+        runtimeDiscoveryRequired: true,
+        emptyRowsMeanZero: false,
+        mayOverrideNativePlatform: false,
+      },
+    });
   });
 });
