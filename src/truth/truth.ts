@@ -78,12 +78,15 @@ function hasText(value: string | null): value is string {
 /**
  * Enforce the canonical truth precedence for evidence that is allowed to
  * render a verified claim green. Model inference and founder notes may inform
- * a claim, but they cannot independently verify one.
+ * a claim, but they cannot independently verify one. Evidence layers cannot
+ * silently substitute for the source the claim declares.
  */
 function evidenceCanVerifyClaim(
   claim: TruthClaim,
   evidence: ClaimEvidenceRecord,
 ): boolean {
+  if (evidence.source !== claim.source) return false;
+
   switch (evidence.source) {
     case 'live_provider':
       return true;
