@@ -314,7 +314,7 @@ describe('Friend Intake route', () => {
     expect(responses.map((response) => response.status).sort()).toEqual([200, 409]);
     expect(persistRun).toHaveBeenCalledTimes(2);
     expect(persistRun.mock.calls[0]?.[0].intakeId).toBe(persistRun.mock.calls[1]?.[0].intakeId);
-    expect(seen).toHaveLength(1);
+    expect(seen.size).toBe(1);
   });
 
   it('cancels without resolving a project or writing any receipt', async () => {
