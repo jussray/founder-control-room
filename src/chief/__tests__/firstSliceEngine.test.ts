@@ -25,6 +25,18 @@ describe('FirstSliceEngine', () => {
     expect(classifySensitiveCategories('Here is my API key and password.')).toEqual(['credentials']);
   });
 
+  it('does not treat established technical age terms as teen context', () => {
+    expect(classifySensitiveCategories('Fix a minor CSS bug in the product build.')).not.toContain('teen');
+    expect(classifySensitiveCategories('Restart the child process for the build worker.')).not.toContain('teen');
+
+    const result = engine.run({
+      rawText: 'Fix a minor CSS bug in the product build.',
+      privacyChoice: 'process_without_saving',
+    });
+    expect(result.move.kind).toBe('tiny_move');
+    expect(result.intentTags).toContain('build');
+  });
+
   it('never emits a tiny move for sensitive input', () => {
     const result = engine.run({
       rawText: 'My child is involved in a custody issue and I need to think clearly about it.',
