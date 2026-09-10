@@ -35,6 +35,15 @@ export interface DeterministicFriendIntakeResult {
   redactedSummary: string | null;
 }
 
+const CRISIS_HEALTH_PATTERNS: readonly RegExp[] = [
+  /\bself[ -]?harm\b/i,
+  /\bsuicid(?:e|al)\b/i,
+  /\b(?:kill|hurt|injure)\s+myself\b/i,
+  /\b(?:want|wanna|going|gonna|plan(?:ning)?|intend(?:ing)?)\s+to\s+(?:kill|hurt|injure)\s+(?:myself|me)\b/i,
+  /\b(?:want|wanna|going|gonna|plan(?:ning)?|intend(?:ing)?)\s+to\s+die\b/i,
+  /\bdon['’]?t\s+want\s+to\s+(?:be\s+alive|live)\b/i,
+];
+
 const SENSITIVE_RULES: ReadonlyArray<{
   category: SensitiveCategory;
   patterns: readonly RegExp[];
@@ -72,12 +81,7 @@ const SENSITIVE_RULES: ReadonlyArray<{
       /\btherapy\b/i,
       /\bmental health\b/i,
       /\bcrisis\b/i,
-      /\bself[ -]?harm\b/i,
-      /\bsuicid(?:e|al)\b/i,
-      /\b(?:kill|hurt|injure)\s+myself\b/i,
-      /\b(?:want|wanna|going|gonna|plan(?:ning)?|intend(?:ing)?)\s+to\s+(?:kill|hurt|injure)\s+(?:myself|me)\b/i,
-      /\b(?:want|wanna|going|gonna|plan(?:ning)?|intend(?:ing)?)\s+to\s+die\b/i,
-      /\bdon['’]?t\s+want\s+to\s+(?:be\s+alive|live)\b/i,
+      ...CRISIS_HEALTH_PATTERNS,
     ],
   },
   {
@@ -111,6 +115,10 @@ export function classifySensitiveCategories(text: string): SensitiveCategory[] {
   return SENSITIVE_RULES
     .filter((rule) => rule.patterns.some((pattern) => pattern.test(text)))
     .map((rule) => rule.category);
+}
+
+function isCrisisHealthInput(text: string): boolean {
+  return CRISIS_HEALTH_PATTERNS.some((pattern) => pattern.test(text));
 }
 
 function extractIntentTags(text: string, sensitiveCategories: readonly SensitiveCategory[]): FirstSliceIntentTag[] {
@@ -171,14 +179,26 @@ function protectiveMove(): FirstSliceMove & { policy: 'protective' } {
   };
 }
 
+function crisisMove(): FirstSliceMove & { policy: 'protective' } {
+  return {
+    kind: 'protective_move',
+    text: 'Pause this automated flow and reach a trusted person or appropriate local emergency or crisis support now.',
+    timeEstimateMinutes: 5,
+    gateWarning: 'High-consequence health language stays in a protected human-support lane and does not trigger an external action.',
+    policy: 'protective',
+  };
+}
+
 export class FirstSliceEngine {
   run(input: DeterministicFriendIntakeInput): DeterministicFriendIntakeResult {
     const sensitiveCategories = classifySensitiveCategories(input.rawText);
     const intentTags = extractIntentTags(input.rawText, sensitiveCategories);
     const summary = summaryFor(intentTags, sensitiveCategories);
-    const move = sensitiveCategories.length > 0
-      ? protectiveMove()
-      : tinyMoveFor(intentTags);
+    const move = isCrisisHealthInput(input.rawText)
+      ? crisisMove()
+      : sensitiveCategories.length > 0
+        ? protectiveMove()
+        : tinyMoveFor(intentTags);
 
     return {
       mirror: {
