@@ -11,7 +11,7 @@ function processRunEventBlock(sql: string): string {
 }
 
 describe('Friend Intake migration privacy contract', () => {
-  it('keeps the general run timeline receipt behavior-only', () => {
+  it('keeps the general run timeline receipt behavior-only and names saved derived labels truthfully', () => {
     const sql = readFileSync(migrationPath, 'utf8');
     const eventBlock = processRunEventBlock(sql);
 
@@ -20,6 +20,7 @@ describe('Friend Intake migration privacy contract', () => {
     expect(eventBlock).toContain("'model_execution_state', p_model_execution_state");
     expect(eventBlock).toContain("'provenance_id', p_provenance_id");
     expect(eventBlock).toContain("'input_persistence'");
+    expect(eventBlock).toContain("'redacted_summary_and_derived_labels'");
 
     expect(eventBlock).not.toContain("'sensitive_categories'");
     expect(eventBlock).not.toContain("'intent_tag_ids'");
@@ -42,9 +43,17 @@ describe('Friend Intake migration privacy contract', () => {
     expect(sql).not.toContain('create policy "Founder delete own friend intake"');
   });
 
-  it('makes sensitive-save review a database invariant instead of a UI-only promise', () => {
+  it('prevents auth-user deletion from silently cascading into saved intake history', () => {
     const sql = readFileSync(migrationPath, 'utf8');
 
+    expect(sql).toContain('founder_id uuid not null references auth.users(id) on delete restrict');
+    expect(sql).not.toContain('founder_id uuid not null references auth.users(id) on delete cascade');
+  });
+
+  it('makes sensitive-save review a database invariant and one review maps to one primary-key identity', () => {
+    const sql = readFileSync(migrationPath, 'utf8');
+
+    expect(sql).toContain('intake_id uuid primary key');
     expect(sql).toContain('sensitive_save_reviewed boolean not null default false');
     expect(sql).toContain('constraint intake_sessions_sensitive_save_reviewed check');
     expect(sql).toContain('cardinality(sensitive_categories) = 0 or sensitive_save_reviewed');
@@ -53,9 +62,13 @@ describe('Friend Intake migration privacy contract', () => {
     expect(sql).toContain('p_sensitive_save_reviewed,');
   });
 
-  it('binds usefulness idempotency to the canonical project/source unique key', () => {
+  it('appends usefulness corrections while keeping exact-event retries idempotent', () => {
     const sql = readFileSync(migrationPath, 'utf8');
-    expect(sql).toContain('on conflict (project_id, source_event_id)\n  do update set');
-    expect(sql).not.toContain('on conflict (project_id, source_event_id) where source_event_id is not null');
+
+    expect(sql).toContain("'friend-intake-usefulness:' || p_run_id::text || ':' || p_event_id::text");
+    expect(sql).toContain('on conflict (project_id, source_event_id) do nothing;');
+    expect(sql).toContain('if not found then\n    return;');
+    expect(sql).not.toContain('do update set\n    decision = excluded.decision');
+    expect(sql).toContain('set usefulness_response = p_response');
   });
 });
