@@ -15,6 +15,13 @@ export const FOUNDER_PERMISSION_STATUSES = [
   'rejected',
   'change_requested',
 ] as const;
+export const PROMPTOS_WORKFLOW_REGISTRY_ACTION = 'promptos_workflow_registry_promote' as const;
+export const PROMPTOS_WORKFLOW_REGISTRY_REPO = 'jussray/promptos' as const;
+export const PROMPTOS_WORKFLOW_REGISTRY_BRANCH = 'main' as const;
+export const PROMPTOS_WORKFLOW_REGISTRY_PATH = 'workflows/registry.json' as const;
+export const PROMPTOS_WORKFLOW_REGISTRY_CAPABILITY = 'promptos-workflow-registry@v1' as const;
+export const PROMPTOS_WORKFLOW_REGISTRY_PROVIDER = 'github:jussray/promptos' as const;
+export const PROMPTOS_WORKFLOW_REGISTRY_CONSEQUENCE = 'CONSEQUENTIAL_WRITE' as const;
 
 export type FounderPermissionStatus = (typeof FOUNDER_PERMISSION_STATUSES)[number];
 
@@ -26,7 +33,26 @@ export interface FounderPermissionMergeTarget {
   headSha: string;
 }
 
-export type FounderPermissionActionTarget = FounderPermissionMergeTarget | null;
+export interface FounderPermissionPromptOSWorkflowRegistryTarget {
+  type: typeof PROMPTOS_WORKFLOW_REGISTRY_ACTION;
+  repo: string;
+  branch: string;
+  headSha: string;
+  workflowId: string;
+  workflowVersion: string;
+  workflowContentHash: string;
+  registryContentHash: string;
+  registryPath: string;
+  workflowPath: string;
+  providerIdentity: typeof PROMPTOS_WORKFLOW_REGISTRY_PROVIDER;
+  capabilityVersion: typeof PROMPTOS_WORKFLOW_REGISTRY_CAPABILITY;
+  consequence: typeof PROMPTOS_WORKFLOW_REGISTRY_CONSEQUENCE;
+}
+
+export type FounderPermissionActionTarget =
+  | FounderPermissionMergeTarget
+  | FounderPermissionPromptOSWorkflowRegistryTarget
+  | null;
 
 export interface FounderPermissionRequest {
   contract: typeof FOUNDER_PERMISSION_REQUEST_CONTRACT;
@@ -64,7 +90,10 @@ export interface FounderPermissionResolution {
 
 const REQUEST_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{5,199}$/;
 const FULL_SHA = /^[0-9a-f]{40}$/i;
+const SHA256 = /^[0-9a-f]{64}$/i;
 const OWNED_REPO = /^jussray\/[A-Za-z0-9._-]+$/;
+const WORKFLOW_ID = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const WORKFLOW_VERSION = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
 
 function text(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
@@ -81,12 +110,106 @@ function normalizedProposal(input: FounderControlProposalBinding): FounderContro
   };
 }
 
+function exactSha256(value: unknown, label: string): string {
+  const candidate = text(value).toLowerCase();
+  const match = /^sha256:([0-9a-f]{64})$/i.exec(candidate);
+  if (!match || !SHA256.test(match[1] ?? '')) {
+    throw new Error(`${label} requires a sha256 content hash`);
+  }
+  return `sha256:${match[1]!.toLowerCase()}`;
+}
+
+function normalizedPromptOSWorkflowRegistryTarget(
+  proposal: FounderControlProposalBinding,
+  input: FounderPermissionPromptOSWorkflowRegistryTarget,
+): FounderPermissionPromptOSWorkflowRegistryTarget {
+  const repo = text(input.repo).toLowerCase();
+  const branch = text(input.branch).toLowerCase();
+  const headSha = text(input.headSha).toLowerCase();
+  const workflowId = text(input.workflowId);
+  const workflowVersion = text(input.workflowVersion);
+  const workflowContentHash = exactSha256(input.workflowContentHash, 'PromptOS workflow registry promotion');
+  const registryContentHash = exactSha256(input.registryContentHash, 'PromptOS workflow registry state');
+  const registryPath = text(input.registryPath);
+  const workflowPath = text(input.workflowPath);
+  const providerIdentity = text(input.providerIdentity).toLowerCase();
+  const capabilityVersion = text(input.capabilityVersion);
+  const consequence = text(input.consequence);
+  const workflowDigest = workflowContentHash.slice('sha256:'.length);
+
+  if (proposal.projectSlug !== 'promptos') {
+    throw new Error('PromptOS workflow registry promotion requires projectSlug promptos');
+  }
+  if (repo !== PROMPTOS_WORKFLOW_REGISTRY_REPO) {
+    throw new Error('PromptOS workflow registry promotion requires the canonical PromptOS repository');
+  }
+  if (branch !== PROMPTOS_WORKFLOW_REGISTRY_BRANCH) {
+    throw new Error('PromptOS workflow registry promotion is restricted to main');
+  }
+  if (!FULL_SHA.test(headSha)) {
+    throw new Error('PromptOS workflow registry promotion requires an exact head SHA');
+  }
+  if (!proposal.expectedHeadSha || proposal.expectedHeadSha.toLowerCase() !== headSha) {
+    throw new Error('PromptOS proposal expectedHeadSha must equal actionTarget headSha');
+  }
+  if (!WORKFLOW_ID.test(workflowId)) {
+    throw new Error('PromptOS workflow registry promotion requires a lowercase kebab-case workflow id');
+  }
+  if (!WORKFLOW_VERSION.test(workflowVersion)) {
+    throw new Error('PromptOS workflow registry promotion requires a stable workflow version');
+  }
+  if (proposal.proposalHash.toLowerCase() !== workflowDigest) {
+    throw new Error('PromptOS proposalHash must equal the exact workflow content hash');
+  }
+  if (registryPath !== PROMPTOS_WORKFLOW_REGISTRY_PATH) {
+    throw new Error('PromptOS workflow registry promotion requires the canonical registry path');
+  }
+  const expectedWorkflowPath = `workflows/${workflowId}.workflow.json`;
+  if (workflowPath !== expectedWorkflowPath) {
+    throw new Error('PromptOS workflow registry promotion workflowPath must match the workflow id');
+  }
+  if (providerIdentity !== PROMPTOS_WORKFLOW_REGISTRY_PROVIDER) {
+    throw new Error('PromptOS workflow registry promotion requires the canonical provider identity');
+  }
+  if (capabilityVersion !== PROMPTOS_WORKFLOW_REGISTRY_CAPABILITY) {
+    throw new Error('PromptOS workflow registry promotion requires the canonical capability version');
+  }
+  if (consequence !== PROMPTOS_WORKFLOW_REGISTRY_CONSEQUENCE) {
+    throw new Error('PromptOS workflow registry promotion requires consequential-write classification');
+  }
+
+  return {
+    type: PROMPTOS_WORKFLOW_REGISTRY_ACTION,
+    repo: PROMPTOS_WORKFLOW_REGISTRY_REPO,
+    branch: PROMPTOS_WORKFLOW_REGISTRY_BRANCH,
+    headSha,
+    workflowId,
+    workflowVersion,
+    workflowContentHash,
+    registryContentHash,
+    registryPath: PROMPTOS_WORKFLOW_REGISTRY_PATH,
+    workflowPath: expectedWorkflowPath,
+    providerIdentity: PROMPTOS_WORKFLOW_REGISTRY_PROVIDER,
+    capabilityVersion: PROMPTOS_WORKFLOW_REGISTRY_CAPABILITY,
+    consequence: PROMPTOS_WORKFLOW_REGISTRY_CONSEQUENCE,
+  };
+}
+
 function normalizedActionTarget(
   proposal: FounderControlProposalBinding,
   input: FounderPermissionActionTarget | undefined,
 ): FounderPermissionActionTarget {
+  if (proposal.actionType === PROMPTOS_WORKFLOW_REGISTRY_ACTION) {
+    if (!input || input.type !== PROMPTOS_WORKFLOW_REGISTRY_ACTION) {
+      throw new Error('PromptOS workflow registry promotion requires an exact actionTarget');
+    }
+    return normalizedPromptOSWorkflowRegistryTarget(proposal, input);
+  }
+
   if (proposal.actionType !== 'merge') {
-    if (input) throw new Error('actionTarget is only supported for merge requests in this broker version');
+    if (input) {
+      throw new Error('actionTarget is only supported for merge and PromptOS workflow registry promotion requests in this broker version');
+    }
     return null;
   }
 

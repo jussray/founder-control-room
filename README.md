@@ -123,6 +123,28 @@ canonical capability declaration
 -> observed outcome proof
 ```
 
+### Founder permission execution membrane
+
+Founder permission is not a transferable execution token. The Ask-Founder broker records exact founder decisions, while consequential execution remains a separate server-side membrane.
+
+For the PromptOS workflow-registry promotion action, source now binds the approved subject to the canonical repository and branch, exact head SHA, workflow id/version, workflow content hash, registry content hash, canonical workflow/registry paths, provider identity, capability version, and consequence class. Before one-shot consumption, FCR must re-observe the current PromptOS head and the approved workflow/registry bytes through its trusted repository provider. After consumption, it must revalidate that same provider state again at the effect boundary.
+
+```text
+exact founder decision
+-> trusted server-side provider observation
+-> exact subject/hash comparison
+-> atomic one-shot consume
+-> immediate effect-boundary revalidation
+-> separately gated provider effect
+-> provider-native outcome verification
+```
+
+A caller-supplied “live context,” copied consume response, binding fingerprint, approval row, continuity receipt, or provider acceptance cannot become reusable provider-write authority. Public consume responses remain `executionAuthorized: false`; they may expose sanitized verification evidence, but the internal execution permit stays server-side. State drift after consumption requires a new approval rather than a blind retry.
+
+This is **source-implemented authority plumbing**, not proof that a PromptOS registry mutation has occurred. A provider effect and its resulting registry state still require separate execution and provider-native readback before an outcome claim becomes `PROVEN`.
+
+See [`docs/PORTABLE_FOUNDER_APPROVALS.md`](docs/PORTABLE_FOUNDER_APPROVALS.md).
+
 ### Founder-content execution
 
 The founder-content architecture separates story, authority, transport, and outcome:
@@ -223,6 +245,7 @@ Repository manifests, operational packets, analytics, receipts, and public conte
 | Database migration | Separate migration/database authority |
 | Credentials / secrets | Separate credential authority |
 | Publication | Exact route-specific Current You authority + FCR one-shot approval claim + provider outcome proof |
+| PromptOS registry promotion | Exact founder decision + trusted live-state revalidation + atomic one-shot consume + server-side effect gate + provider-native outcome proof |
 | Investor email | Applicable policy + recipient qualification + send authority |
 | Billing / destructive action | Separate exact authority |
 | Rollback | Separate rollback authority |
@@ -273,6 +296,7 @@ Public-safe configuration may live in `.env.example`. Secret values do not belon
 - [`docs/REPOSITORY_FEDERATION.md`](docs/REPOSITORY_FEDERATION.md) — repository and bounded product-build federation
 - [`docs/JIRA_AUTOMATION.md`](docs/JIRA_AUTOMATION.md) — Jira/n8n bounded automation and activation gate
 - [`docs/FOUNDER_MERGE_AUTHORITY.md`](docs/FOUNDER_MERGE_AUTHORITY.md) — repository integration authority
+- [`docs/PORTABLE_FOUNDER_APPROVALS.md`](docs/PORTABLE_FOUNDER_APPROVALS.md) — exact founder decisions and server-side execution binding
 - [`docs/TRUTH_DECAY_AUDIT.md`](docs/TRUTH_DECAY_AUDIT.md) — truth aging and documentation drift
 - [`docs/PUBLIC_COMMUNICATION_TRUTH_CONTRACT.md`](docs/PUBLIC_COMMUNICATION_TRUTH_CONTRACT.md) — public truth and Sauce Guard
 - [`docs/PROVIDERS.md`](docs/PROVIDERS.md) — provider handoffs

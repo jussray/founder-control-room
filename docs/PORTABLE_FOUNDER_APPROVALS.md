@@ -26,13 +26,27 @@ The `/mcp/founder-permissions` Ask-Founder broker is an interim decision-capture
 - `requestedBySurface` records where the request came from. It is audit metadata only and cannot authenticate the founder or name the authoritative decision surface.
 - Until a registered console adapter supplies the attestation required by this document, the authoritative broker decision surface is derived server-side as `fcr`. A caller cannot label an FCR-browser decision as `chatgpt`, `claude`, or `perplexity`.
 - A merge request must bind the exact owned repository, pull-request number, base SHA, and head SHA. The target is included in the request hash and the proposal `expectedHeadSha` must equal the target head.
-- A recorded broker decision is deliberately non-authorizing: its decision record carries `executionAuthorized: false`. Exact action authority is still issued by the separately scoped FounderPermissionReceipt / execution-binding layer.
+- A recorded broker decision is deliberately non-authorizing: its decision record carries `executionAuthorized: false`. Exact action authority is still issued only inside the separately scoped server-side execution membrane.
 - Approved broker rows receive a bounded 20-minute decision window. Expired, revoked, or already-consumed rows do not satisfy founder permission.
-- Consumption is an atomic one-time ledger transition bound to both the exact request hash and exact decision hash. Consuming a broker decision does not itself perform the external action.
+- Consumption is an atomic one-time ledger transition bound to both the exact request hash and exact decision hash. Generic broker consumption does not itself imply an external effect; only a registered action-specific server-side executor may act after successful exact consumption.
 - Founder revocation is a separate interactive transition from an approved browser origin. Revoked decisions cannot become satisfiable again.
 - Founder permission and Independent Review remain separate gates. Neither one implies the other.
 
 This distinction is load-bearing: the Ask-Founder broker records a current founder decision; it does not let a model, bearer token, browser cookie, stored `approved` row, fingerprint, or continuity receipt manufacture reusable execution authority.
+
+### PromptOS workflow registry action-bound execution
+
+The `promptos_workflow_registry_promote` target is a deliberately narrow extension of the same broker. It must bind the canonical `jussray/promptos` repository, `main`, an exact 40-character head SHA, workflow id and version, exact workflow content hash, exact registry content hash, canonical registry/workflow paths, provider identity `github:jussray/promptos`, capability version `promptos-workflow-registry@v1`, and consequential-write classification. Any mismatch rejects the request instead of widening it.
+
+A recorded approval still carries `executionAuthorized: false`. Before one-shot consumption, the server-side execution membrane independently resolves current PromptOS `main` through the trusted repository provider and rereads both the workflow artifact and registry from the approved head. The observed head, workflow content hash, registry content hash, workflow id, and workflow version must exactly equal the approved subject. Caller-supplied “live” state is not accepted as proof.
+
+After the ledger atomically consumes the exact approved request once, the registered PromptOS executor revalidates provider state at the effect boundary and performs the registry promotion only inside the server process. The writer creates a commit whose parent is the exact founder-approved pre-head and advances `main` with a non-forced ref update. A concurrent branch move therefore fails instead of being silently absorbed. Ambiguous provider responses are reconciled only by authoritative branch readback.
+
+Success requires provider-native readback proving both that PromptOS `main` equals the newly created commit and that `workflows/registry.json` contains the exact intended approved workflow entry. Head movement, workflow drift, registry drift, binding tamper, expiry, revocation, replay, consumption race, non-fast-forward update, ambiguous unverified outcome, or readback mismatch fails closed. If the approval was already consumed, the system reports `retryAuthorized: false`; a new approval is required rather than blindly repeating a consequential write.
+
+The public consume response is evidence only. It continues to report `executionAuthorized: false` and returns a bounded effect receipt rather than the internal decision-bound execution permit. A public receipt, continuity receipt, copied JSON response, binding fingerprint, or prior approval cannot be replayed into provider-write authority.
+
+This source contract proves that the governed execution path exists in the repository. It does **not** prove that any live PromptOS registry promotion has occurred. A live promotion claim requires an actual approved request to traverse the runtime path plus its provider-native outcome receipt. Provider acceptance without exact readback is not completion truth.
 
 ## Browser cookie, continuity fingerprint, and proof cookie
 

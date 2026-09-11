@@ -53,6 +53,8 @@ const truthSensitiveRules = [
   { domain: 'repository-provider', match: /^src\/providers\/(?!__tests__\/)(?!.*\.test\.ts$)/ },
   { domain: 'publishing', match: /^src\/lib\/(?:firstPartyFounderContent|temporallyGovernedFounderContent|n8nFounderContent|n8nProviderNeutralFounderContent|founderSignal)/ },
   { domain: 'publishing', match: /^src\/http\/routes\/n8nConveyor\.ts$/ },
+  { domain: 'founder-permission-authority', match: /^src\/http\/routes\/founderPermissions\.ts$/ },
+  { domain: 'founder-permission-authority', match: /^src\/lib\/founderPermission(?:Broker|Execution)\.ts$/ },
   { domain: 'truth-governance', match: /^src\/governance\/(?!.*\.test\.ts$)/ },
   { domain: 'truth-governance', match: /^src\/futureyou\/(?!.*\.test\.ts$)/ },
   { domain: 'truth-governance', match: /^src\/buildEvents\/(?!__tests\/)(?!.*\.test\.ts$)/ },
@@ -90,6 +92,7 @@ if (domains.has('merge-authority') || domains.has('workflow-authority')) {
   requiredDocs.add('.ai/skills/juss-flow-launch-loop/SKILL.md');
 }
 if (domains.has('publishing')) requiredDocs.add('docs/PUBLIC_COMMUNICATION_TRUTH_CONTRACT.md');
+if (domains.has('founder-permission-authority')) requiredDocs.add('docs/PORTABLE_FOUNDER_APPROVALS.md');
 if (domains.has('truth-governance') || domains.has('evidence-authority')) requiredDocs.add('docs/TRUTH_DECAY_AUDIT.md');
 if (domains.has('repository-provider')) requiredDocs.add('docs/PROVIDERS.md');
 if (domains.has('cloudflare-authority')) {
@@ -245,6 +248,7 @@ const claude = read('CLAUDE.md');
 const perplexity = read('PERPLEXITY.md');
 const launchLoop = read('.ai/skills/juss-flow-launch-loop/SKILL.md');
 const publicTruth = read('docs/PUBLIC_COMMUNICATION_TRUTH_CONTRACT.md');
+const portableFounderApprovals = read('docs/PORTABLE_FOUNDER_APPROVALS.md');
 const truthDecay = read('docs/TRUTH_DECAY_AUDIT.md');
 const cloudflareTargets = read('docs/deployment/CLOUDFLARE_WORKER_TARGETS.md');
 const goalfixSkill = read('.ai/skills/goalfix/SKILL.md');
@@ -280,6 +284,11 @@ const consistencyChecks = [
   [readme.includes('Documentation truth gate'), 'README must describe the Documentation truth gate'],
   [readme.includes('first-party LinkedIn') && readme.includes('provider-neutral n8n'), 'README must describe the current founder-content execution mesh'],
   [readme.includes('`.control/capability.json`') && readme.includes('canonical capability authority'), 'README must name capability.json as canonical capability authority'],
+  [portableFounderApprovals.includes('PromptOS workflow registry')
+    && portableFounderApprovals.includes('server-side')
+    && portableFounderApprovals.includes('executionAuthorized: false')
+    && portableFounderApprovals.includes('registry content hash'),
+  'portable founder approvals must describe PromptOS action-bound authority and keep public receipts non-authorizing'],
   [mergeAuthority.includes('deterministic independent review') && mergeAuthority.includes('founder-final') && mergeAuthority.includes('FCR_TRUSTED_SEMANTIC_REVIEWER_IDS'), 'merge authority must describe canonical founder-final review plus legacy semantic-review compatibility'],
   [mergeAuthority.includes('live GitHub') && mergeAuthority.includes('separate provider gate'), 'merge authority must distinguish FCR source/runtime enforcement from live GitHub provider enforcement'],
   [mergeAuthority.includes('Documentation truth'), 'merge authority must require documentation truth reconciliation'],
