@@ -8,8 +8,10 @@ import {
   type FounderPermissionRequest,
 } from './founderPermissionBroker.js';
 import type { RepositoryProvider } from '../providers/RepositoryProvider.js';
+import type { PromptOSRegistryWriter } from '../providers/PromptOSRegistryWriter.js';
 
 export const FOUNDER_EXECUTION_BINDING_CONTRACT = 'juss-v10/founder-execution-binding@v1' as const;
+export const PROMPTOS_REGISTRY_EFFECT_RECEIPT_CONTRACT = 'juss-v10/promptos-registry-effect@v1' as const;
 
 export interface FounderExecutionBinding {
   contract: typeof FOUNDER_EXECUTION_BINDING_CONTRACT;
@@ -27,6 +29,22 @@ export interface FounderExecutionBinding {
   mustRevalidateBeforeEffect: true;
   executionAuthorized: true;
   bindingHash: string;
+}
+
+export interface PromptOSRegistryEffectReceipt {
+  contract: typeof PROMPTOS_REGISTRY_EFFECT_RECEIPT_CONTRACT;
+  requestHash: string;
+  actionType: typeof PROMPTOS_WORKFLOW_REGISTRY_ACTION;
+  workflowId: string;
+  workflowVersion: string;
+  preHeadSha: string;
+  postHeadSha: string;
+  workflowContentHash: string;
+  preRegistryContentHash: string;
+  postRegistryContentHash: string;
+  providerDisposition: 'COMMITTED' | 'RECONCILED_AFTER_AMBIGUOUS_RESPONSE';
+  outcomeVerified: true;
+  executionAuthorized: false;
 }
 
 function sha256Content(content: string): string {
@@ -65,6 +83,13 @@ function promptOSTarget(request: FounderPermissionRequest): FounderPermissionPro
   return request.actionTarget;
 }
 
+function jsonObject(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('PROMPTOS_REGISTRY_INVALID_JSON_OBJECT');
+  }
+  return value as Record<string, unknown>;
+}
+
 export async function observePromptOSExecutionState(input: {
   request: FounderPermissionRequest;
   provider: RepositoryProvider;
@@ -72,6 +97,8 @@ export async function observePromptOSExecutionState(input: {
   headSha: string;
   workflowContentHash: string;
   registryContentHash: string;
+  workflowContent: string;
+  registryContent: string;
 }> {
   const target = promptOSTarget(input.request);
   const headSha = (await input.provider.resolveRef('promptos', target.branch)).toLowerCase();
@@ -93,7 +120,14 @@ export async function observePromptOSExecutionState(input: {
     throw new Error('FOUNDER_EXECUTION_REGISTRY_DRIFT: registry state no longer matches the approved evidence');
   }
 
-  return { headSha, workflowContentHash, registryContentHash };
+  const workflow = jsonObject(JSON.parse(workflowContent) as unknown);
+  if (workflow.artifactType !== 'promptos-workflow'
+    || workflow.id !== target.workflowId
+    || workflow.version !== target.workflowVersion) {
+    throw new Error('FOUNDER_EXECUTION_WORKFLOW_IDENTITY_MISMATCH: workflow body does not match approved id/version');
+  }
+
+  return { headSha, workflowContentHash, registryContentHash, workflowContent, registryContent };
 }
 
 export async function createFounderExecutionBinding(input: {
@@ -155,4 +189,101 @@ export async function revalidateFounderExecutionBindingAtEffect(input: {
     || observation.registryContentHash !== input.binding.observedRegistryContentHash) {
     throw new Error('FOUNDER_EXECUTION_BINDING_STALE: provider state changed after the execution binding was issued');
   }
+}
+
+export function buildPromptOSApprovedRegistryContent(input: {
+  request: FounderPermissionRequest;
+  registryContent: string;
+}): string {
+  const target = promptOSTarget(input.request);
+  const registry = jsonObject(JSON.parse(input.registryContent) as unknown);
+  if (registry.schemaVersion !== 1 || registry.authority !== 'source-controlled-approved-workflows') {
+    throw new Error('PROMPTOS_REGISTRY_SCHEMA_UNSUPPORTED');
+  }
+  if (!Array.isArray(registry.workflows)) throw new Error('PROMPTOS_REGISTRY_WORKFLOWS_INVALID');
+
+  const workflows = registry.workflows.map((entry) => jsonObject(entry));
+  const sameVersion = workflows.find((entry) => entry.id === target.workflowId && entry.version === target.workflowVersion);
+  const expectedPath = target.workflowPath;
+  if (sameVersion) {
+    if (sameVersion.status === 'approved' && sameVersion.path === expectedPath) {
+      throw new Error('PROMPTOS_REGISTRY_ALREADY_APPROVED: exact workflow version is already registered');
+    }
+    throw new Error('PROMPTOS_REGISTRY_CONFLICT: workflow id/version already exists with different state');
+  }
+
+  workflows.push({
+    id: target.workflowId,
+    version: target.workflowVersion,
+    status: 'approved',
+    path: expectedPath,
+  });
+  return `${JSON.stringify({ ...registry, workflows }, null, 2)}\n`;
+}
+
+export async function executePromptOSWorkflowRegistryPromotion(input: {
+  request: FounderPermissionRequest;
+  binding: FounderExecutionBinding;
+  provider: RepositoryProvider;
+  writer: PromptOSRegistryWriter;
+}): Promise<PromptOSRegistryEffectReceipt> {
+  const target = promptOSTarget(input.request);
+  await revalidateFounderExecutionBindingAtEffect({
+    request: input.request,
+    binding: input.binding,
+    provider: input.provider,
+  });
+
+  const observation = await observePromptOSExecutionState({ request: input.request, provider: input.provider });
+  const nextRegistryContent = buildPromptOSApprovedRegistryContent({
+    request: input.request,
+    registryContent: observation.registryContent,
+  });
+  const nextRegistryContentHash = sha256Content(nextRegistryContent);
+
+  const commit = await input.writer.commitRegistryAtExpectedHead({
+    expectedHeadSha: target.headSha,
+    registryContent: nextRegistryContent,
+    message: `feat(workflows): approve ${target.workflowId}@${target.workflowVersion}`,
+    authorName: 'Founder Control Room',
+  });
+
+  const [postHeadSha, postRegistryContent] = await Promise.all([
+    input.provider.resolveRef('promptos', target.branch),
+    input.provider.readFile('promptos', commit.commitSha, target.registryPath),
+  ]);
+  if (postHeadSha.toLowerCase() !== commit.commitSha.toLowerCase()) {
+    throw new Error('PROMPTOS_REGISTRY_OUTCOME_HEAD_MISMATCH: main does not equal committed promotion');
+  }
+  if (sha256Content(postRegistryContent) !== nextRegistryContentHash) {
+    throw new Error('PROMPTOS_REGISTRY_OUTCOME_CONTENT_MISMATCH: provider readback does not equal intended registry');
+  }
+
+  const postRegistry = jsonObject(JSON.parse(postRegistryContent) as unknown);
+  if (!Array.isArray(postRegistry.workflows)
+    || !postRegistry.workflows.some((entry) => {
+      const row = jsonObject(entry);
+      return row.id === target.workflowId
+        && row.version === target.workflowVersion
+        && row.status === 'approved'
+        && row.path === target.workflowPath;
+    })) {
+    throw new Error('PROMPTOS_REGISTRY_OUTCOME_ENTRY_MISSING: provider readback lacks approved workflow');
+  }
+
+  return {
+    contract: PROMPTOS_REGISTRY_EFFECT_RECEIPT_CONTRACT,
+    requestHash: input.request.requestHash,
+    actionType: PROMPTOS_WORKFLOW_REGISTRY_ACTION,
+    workflowId: target.workflowId,
+    workflowVersion: target.workflowVersion,
+    preHeadSha: target.headSha,
+    postHeadSha: commit.commitSha,
+    workflowContentHash: target.workflowContentHash,
+    preRegistryContentHash: target.registryContentHash,
+    postRegistryContentHash: nextRegistryContentHash,
+    providerDisposition: commit.providerDisposition,
+    outcomeVerified: true,
+    executionAuthorized: false,
+  };
 }
