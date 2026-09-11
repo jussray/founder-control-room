@@ -12,6 +12,9 @@ interface PluginEntry {
 interface SocialAnalyticsTruth {
   analyticsMode: 'observation_only';
   learningRequiresVerifiedPostLevelMeasurement: boolean;
+  nativeMeasurementSatisfiesLearningGate: boolean;
+  secondarySensorFailureMayBlockVerifiedNativeMeasurement: boolean;
+  paidSecondarySensorRequired: boolean;
   publishedWithoutMeasurementClassifyAs: 'UNMEASURED';
   sourcePrecedence: string[];
   nativePlatformWinsOnConflict: boolean;
@@ -157,6 +160,9 @@ describe('ChatGPT plugin management repository contract', () => {
   it('keeps social analytics fail-closed and provider bounded', () => {
     expect(manifest.socialAnalyticsTruth.analyticsMode).toBe('observation_only');
     expect(manifest.socialAnalyticsTruth.learningRequiresVerifiedPostLevelMeasurement).toBe(true);
+    expect(manifest.socialAnalyticsTruth.nativeMeasurementSatisfiesLearningGate).toBe(true);
+    expect(manifest.socialAnalyticsTruth.secondarySensorFailureMayBlockVerifiedNativeMeasurement).toBe(false);
+    expect(manifest.socialAnalyticsTruth.paidSecondarySensorRequired).toBe(false);
     expect(manifest.socialAnalyticsTruth.publishedWithoutMeasurementClassifyAs).toBe('UNMEASURED');
     expect(manifest.socialAnalyticsTruth.sourcePrecedence).toEqual([
       'native-platform',
