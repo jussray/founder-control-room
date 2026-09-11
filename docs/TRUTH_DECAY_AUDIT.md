@@ -56,6 +56,16 @@ The correction is documentation-only with respect to the Capital Decision behavi
 
 This documentation repair does not retroactively prove the earlier feature branch, external financing activity, investor contact, or any provider/runtime outcome. It closes the durable truth-surface gap so future operators do not mistake a source-level capital recommendation for executable authority.
 
+## 2026-09 control correction: release-provenance and evidence registration
+
+A release-provenance workflow can be perfectly green while Documentation Truth remains blind to the files that decide what the green result means. That is a false documentation green: changing `.github/workflows/main-release-provenance.yml`, `scripts/verify-main-release-historical-ratification.mjs`, PR continuity, truth/interop/approval validation, or security evidence rendering can alter the authority or freshness semantics future operators rely on even when no previously registered documentation path moves.
+
+The correction registers release provenance as its own Documentation Truth domain and registers the current truth/evidence authority sources. The gate now requires a current README, this Truth Decay audit, and a path-bound `docs/DOCUMENTATION_TRUTH_RECEIPT.json` whenever those sources move. Registration does not turn historical direct-main commits into reviewed PR provenance, make a reviewer finding resolved, renew stale evidence, atomically consume an approval, grant model authority, prove a provider mutation, or authorize merge/deploy.
+
+The same correction closes two semantic time gaps. DeepSeek instruction validation must carry and revalidate the exact source packet, and source observations cannot come from the future. Verified truth evidence of any authoritative source must also have a valid observation timestamp no later than the use boundary. Live-provider evidence retains the stronger requirement for its own unexpired lease.
+
+Static cryptographic inventory is historical evidence after its zero-duration lease expires. The founder-facing security surface must therefore render `STALE`, the pinned source revision, the observation/expiry lease, the stale reason, and the required revalidation action. Browser proof must exercise that stale shape rather than passing against invented `OBSERVED` or `PROVIDER_MANAGED` fixture state.
+
 ## Root causes
 
 ### 1. Evidence lifetime was implicit
@@ -188,6 +198,8 @@ truth-sensitive implementation / authority / provider change
 The verifier classifies truth-sensitive changed files by domain and requires the relevant current-state docs rather than forcing documentation edits for every test-only change.
 
 Goalfix governance is explicitly part of that classification. Changes to `.ai/skills/goalfix/SKILL.md`, `.claude/skills/goalfix/SKILL.md`, `docs/FOUNDER_ADAPTIVE_KERNEL_V0.md`, `docs/GOALFIX_EXECUTION_WORKFLOW_V2.md`, `docs/CLAUDE_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC.md`, or `docs/PERPLEXITY_MCP_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC.md` must be treated as truth-sensitive because those files can change how future operators select targets, interpret proof, consume founder authority, or report post-merge state.
+
+Release-provenance, generic truth/interop/approval validation, PR continuity, and the security evidence surfaces are also explicitly classified now. A documentation green must therefore carry current path-bound invariants for those sources instead of reporting zero truth-sensitive files while their semantics change.
 
 It also checks cross-document invariants that are easy to regress during fast-moving work, including:
 
@@ -367,6 +379,10 @@ The strongest optimization is not faster claiming. It is shortening the distance
 30. A predecessor Playwright success cannot prove a cross-repository federation successor after either repository head, peer proof contract, peer runtime identity, or serialized wire shape moves.
 31. A privileged `workflow_run` witness may consume an upstream release SHA as evidence, but it cannot execute that upstream checkout or treat upstream success as executable trust.
 32. A capital decision card, recommendation, score, or HOLD state is evidence interpretation, not financing or execution authority; stale or missing capital evidence must remove derived certainty instead of preserving an earlier recommendation.
+33. A release-provenance workflow or ratification verifier that is absent from Documentation Truth can change the meaning of green release evidence without triggering a documentation refresh; that is a false documentation green.
+34. An instructor packet cannot be valid without its exact source-state packet, and no evidence source may claim an observation time later than the use boundary.
+35. A one-shot approval validator must fail closed without authoritative replay-state input, and canonical approval hashing must reject sparse arrays that serialize like a different dense JSON value.
+36. A static cryptographic inventory entry whose observation lease expired is historical `STALE` evidence; a fresh page render cannot renew it, and browser proof must exercise the stale state plus its revalidation path.
 
 ## Rollback
 
