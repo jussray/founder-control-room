@@ -175,9 +175,11 @@ try {
   assert(afterCreate.body?.projects?.[0]?.workspace_id === TENANT_WORKSPACE_ID, 'new project is persisted with the authenticated workspace id');
   assert(afterCreate.body?.projects?.[0]?.slug === 'tenant-demo', 'new project identity survives the round trip');
 
-  mkdirSync(join(REPO_ROOT, 'test-results'), { recursive: true });
+  // Persist tenant screenshots under logs/, which the existing Playwright
+  // workflow uploads after all later proofs have rebuilt test-results/.
+  mkdirSync(join(REPO_ROOT, 'logs'), { recursive: true });
   await page.screenshot({
-    path: join(REPO_ROOT, 'test-results', 'workspace-tenant-desktop.png'),
+    path: join(REPO_ROOT, 'logs', 'workspace-tenant-desktop.png'),
     fullPage: true,
   });
 
@@ -188,7 +190,7 @@ try {
     'tenant onboarding has no document-level horizontal overflow on mobile',
   );
   await page.screenshot({
-    path: join(REPO_ROOT, 'test-results', 'workspace-tenant-mobile.png'),
+    path: join(REPO_ROOT, 'logs', 'workspace-tenant-mobile.png'),
     fullPage: true,
   });
   assert(jsErrors.length === 0, `no uncaught tenant-browser JavaScript errors (saw ${JSON.stringify(jsErrors)})`);
