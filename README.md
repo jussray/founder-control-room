@@ -245,6 +245,8 @@ change operational truth
 -> re-observe provider/runtime facts after integration before reusing present-tense claims
 ```
 
+Release provenance is now explicitly truth-sensitive too. Changes to `.github/workflows/main-release-provenance.yml`, `scripts/verify-main-release-historical-ratification.mjs`, the PR-continuity writer, the generic truth/interop/approval validators, or the security evidence surfaces must be registered by Documentation Truth and accompanied by current path-bound invariants. A green documentation receipt proves coverage and consistency only; it cannot retroactively convert a direct-main commit into a reviewed PR merge, renew stale evidence, grant merge/deploy authority, or prove production runtime state.
+
 When a newer fingerprint contradicts an older present-tense statement, replace or classify the stale statement instead of leaving competing “current” truths.
 
 Documentation Truth proves documentation coverage/materiality. It does not independently prove provider configuration, deployment, browser behavior, security review, publication, or human outcome.
