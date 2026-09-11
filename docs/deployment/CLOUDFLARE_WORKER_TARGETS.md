@@ -182,6 +182,8 @@ A failing or unavailable enrichment read is `UNKNOWN`/blocked evidence in that e
 
 The canonical Worker runtime secret values belong in the Cloudflare Worker secret store. Canonical `.github/workflows/deploy.yml` preserves those provider-held values instead of copying them through GitHub Actions. The required runtime secret names are declared by `wrangler.worker.toml [secrets].required`, including `FOUNDER_SESSION_ENCRYPTION_KEY`; Wrangler must fail closed when a required binding name is absent before the Worker promotion can be treated as successful.
 
+For the governed Founder Content n8n production-source lane, the same canonical Worker additionally requires the provider-held binding names `N8N_FOUNDER_CONTENT_WEBHOOK_URL`, `N8N_FOUNDER_CONTENT_BEARER_TOKEN`, `N8N_FOUNDER_CONTENT_EXPECTED_WORKFLOW_FINGERPRINT`, and `N8N_FOUNDER_CONTENT_IDENTITY_HMAC_SECRET`. Public-safe source may declare `N8N_FOUNDER_CONTENT_ENABLED=true`, Buffer-only provider selection, workflow ID `fcrFounderContentV1`, and runtime `2.32.6`, but those declarations do not prove any of the four secret values exist or that production n8n is active. Canonical exact-main Deploy must verify required binding-name presence before Worker mutation, and production truth still requires exact deployed Worker identity, production n8n workflow/fingerprint/runtime readback, and provider-native Buffer outcome evidence.
+
 The canonical Deploy authority gate has a smaller GitHub production credential surface. It requires only the credentials needed to perform the release itself:
 
 ```text
