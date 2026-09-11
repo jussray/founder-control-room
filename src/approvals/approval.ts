@@ -69,6 +69,10 @@ function canonicalize(value: unknown, path = '$'): CanonicalJson {
     return value;
   }
   if (Array.isArray(value)) {
+    const keys = Object.keys(value);
+    if (keys.length !== value.length || keys.some((key, index) => key !== String(index))) {
+      throw new TypeError(`approval payload arrays must be dense and index-only at ${path}`);
+    }
     return value.map((item, index) => canonicalize(item, `${path}[${index}]`));
   }
   if (value && typeof value === 'object') {
