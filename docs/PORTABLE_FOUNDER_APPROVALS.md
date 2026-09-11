@@ -34,6 +34,18 @@ The `/mcp/founder-permissions` Ask-Founder broker is an interim decision-capture
 
 This distinction is load-bearing: the Ask-Founder broker records a current founder decision; it does not let a model, bearer token, browser cookie, stored `approved` row, fingerprint, or continuity receipt manufacture reusable execution authority.
 
+### PromptOS workflow registry action-bound execution
+
+The `promptos_workflow_registry_promote` target is a deliberately narrow extension of the same broker. It must bind the canonical `jussray/promptos` repository, `main`, an exact 40-character head SHA, workflow id and version, exact workflow content hash, exact registry content hash, canonical registry/workflow paths, provider identity `github:jussray/promptos`, capability version `promptos-workflow-registry@v1`, and consequential-write classification. Any mismatch rejects the request instead of widening it.
+
+A recorded approval still carries `executionAuthorized: false`. Before one-shot consumption, the server-side execution membrane must independently resolve current PromptOS `main` through the trusted repository provider and reread both the workflow artifact and registry from the approved head. The observed head, workflow content hash, and registry content hash must exactly equal the approved subject. Caller-supplied “live” state is not accepted as proof.
+
+After the ledger consumes the exact approved request once, the same server-side membrane revalidates the provider state again immediately at the effect boundary. Head movement, workflow drift, registry drift, binding tamper, expiry, revocation, replay, or a consumption race fails closed. If state changes after consumption, the approval remains consumed and a new approval is required; the system must not silently retry a consequential write.
+
+The public consume response is evidence only. It may return sanitized observed hashes and a binding fingerprint, but it must continue to report `executionAuthorized: false` and must never expose the internal decision-bound execution permit as a transferable bearer capability. A public receipt, continuity receipt, copied JSON response, or prior approval cannot be replayed into provider-write authority.
+
+This source contract does not claim that a PromptOS registry write occurred. Provider mutation remains a separately gated server-side effect, and a verified outcome requires provider-native readback after the effect rather than treating request consumption or provider acceptance as completion truth.
+
 ## Browser cookie, continuity fingerprint, and proof cookie
 
 Founder Control Room deliberately uses the word **cookie** for two different continuity concepts and keeps them technically separate.
