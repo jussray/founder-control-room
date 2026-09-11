@@ -88,7 +88,6 @@ class QueryBuilder {
       return { data: null, error: null };
     }
 
-    // select
     let result = sortRows(matched, this.orderCol, this.orderAsc);
     if (this.limitN != null) result = result.slice(0, this.limitN);
     return this._shapeResult(result, wantSingle, allowZero);
@@ -215,11 +214,33 @@ export function makeSupabaseClient() {
 }
 
 // Seed the founder allowlist synchronously at process start, mirroring what
-// migration 0002 does for real (`insert into founder_users ...`) — this
-// module is the first thing the loader redirects to, so this runs before
-// the HTTP server accepts any request.
+// migration 0002 does for real. Optional tenant fields let focused browser
+// proofs exercise workspace ownership without weakening the default harness.
 if (process.env.E2E_SEED_FOUNDER_EMAIL) {
-  table('founder_users').push({ email: process.env.E2E_SEED_FOUNDER_EMAIL, created_at: new Date().toISOString() });
+  const founderRow = {
+    email: process.env.E2E_SEED_FOUNDER_EMAIL,
+    created_at: new Date().toISOString(),
+  };
+  if (process.env.E2E_SEED_FOUNDER_ROLE) founderRow.account_role = process.env.E2E_SEED_FOUNDER_ROLE;
+  if (process.env.E2E_SEED_WORKSPACE_ID) founderRow.workspace_id = process.env.E2E_SEED_WORKSPACE_ID;
+  table('founder_users').push(founderRow);
+}
+
+// Focused tenant proofs may seed projects belonging to a different workspace
+// so the browser must prove the API filters them out. This is test-only state.
+if (process.env.E2E_SEED_PROJECTS_JSON) {
+  let seedProjects;
+  try {
+    seedProjects = JSON.parse(process.env.E2E_SEED_PROJECTS_JSON);
+  } catch {
+    throw new Error('E2E_SEED_PROJECTS_JSON must be valid JSON');
+  }
+  if (!Array.isArray(seedProjects)) {
+    throw new Error('E2E_SEED_PROJECTS_JSON must be a JSON array');
+  }
+  for (const project of seedProjects) {
+    table('projects').push(withDefaults(project, 'projects'));
+  }
 }
 
 // E2E-only mirror of the V10 founder approval boundary. The harness must
