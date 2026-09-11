@@ -36,6 +36,11 @@ export type FounderConveyorFailureClass =
   | 'TIMEOUT'
   | 'NETWORK';
 
+type StructuredFounderConveyorFailureClass = Extract<
+  FounderConveyorFailureClass,
+  'PAYLOAD_CONTRACT' | 'SHA_IDENTITY' | 'AUTHORITY' | 'CAPABILITY_CONTRACT'
+>;
+
 export interface FounderConveyorAdvanceInput {
   runId: string;
   projectSlug: string;
@@ -92,18 +97,12 @@ const MAX_GOAL_LENGTH = 4000;
 const MAX_ID_LENGTH = 200;
 const MAX_EVIDENCE_URLS = 20;
 const SECRETISH_PATTERN = /(github_pat_|gh[pousr]_[A-Za-z0-9_]{12,}|Bearer\s+[A-Za-z0-9._-]{12,}|SERVICE_ROLE|API_KEY|ACCESS_KEY|PASSWORD|SECRET|TOKEN)/i;
-const SAFE_N8N_FAILURE_CLASSES = new Set<FounderConveyorFailureClass>([
-  'PAYLOAD_CONTRACT',
-  'SHA_IDENTITY',
-  'AUTHORITY',
-  'CAPABILITY_CONTRACT',
-]);
-const SAFE_N8N_FAILURE_CODES = new Set([
-  'PAYLOAD_REJECTED',
-  'IDENTITY_REJECTED',
-  'AUTHORITY_REJECTED',
-  'CAPABILITY_REJECTED',
-]);
+const SAFE_N8N_FAILURE_CODE_BY_CLASS: Record<StructuredFounderConveyorFailureClass, string> = {
+  PAYLOAD_CONTRACT: 'PAYLOAD_REJECTED',
+  SHA_IDENTITY: 'IDENTITY_REJECTED',
+  AUTHORITY: 'AUTHORITY_REJECTED',
+  CAPABILITY_CONTRACT: 'CAPABILITY_REJECTED',
+};
 
 const NEXT_STAGE: Record<FounderConveyorStage, FounderConveyorStage> = {
   chat: 'workflows',
@@ -133,14 +132,19 @@ function validHttpUrl(value: string): boolean {
   }
 }
 
+function isStructuredFounderConveyorFailureClass(value: string): value is StructuredFounderConveyorFailureClass {
+  return Object.prototype.hasOwnProperty.call(SAFE_N8N_FAILURE_CODE_BY_CLASS, value);
+}
+
 function safeStructuredN8nFailure(value: unknown): SafeN8nFailure | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const record = value as Record<string, unknown>;
   if (record.contract !== FOUNDER_CONVEYOR_ERROR_CONTRACT) return null;
 
-  const failureClass = text(record.failureClass) as FounderConveyorFailureClass;
+  const failureClass = text(record.failureClass);
   const upstreamCode = text(record.errorCode);
-  if (!SAFE_N8N_FAILURE_CLASSES.has(failureClass) || !SAFE_N8N_FAILURE_CODES.has(upstreamCode)) return null;
+  if (!isStructuredFounderConveyorFailureClass(failureClass)) return null;
+  if (SAFE_N8N_FAILURE_CODE_BY_CLASS[failureClass] !== upstreamCode) return null;
 
   return {
     failureClass,
