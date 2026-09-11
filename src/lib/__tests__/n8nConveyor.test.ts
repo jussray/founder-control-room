@@ -8,6 +8,7 @@ import {
 import {
   dispatchFounderConveyorAdvance,
   expectedFounderConveyorReceiptId,
+  FOUNDER_CONVEYOR_ERROR_CONTRACT,
   founderConveyorIdempotencyKey,
   readFounderConveyorConfig,
   validateFounderConveyorAdvance,
@@ -182,6 +183,91 @@ describe('n8n founder conveyor contract', () => {
     });
 
     expect(result).toMatchObject({ ok: true, code: 'DISPATCHED', status: 202, receiptId: expectedReceipt });
+  });
+
+  it('preserves a safe structured n8n failure class without echoing arbitrary upstream detail', async () => {
+    const result = await dispatchFounderConveyorAdvance(candidate(), {
+      env: enabledEnv(),
+      fetchImpl: (async () => new Response(JSON.stringify({
+        contract: FOUNDER_CONVEYOR_ERROR_CONTRACT,
+        failureClass: 'SHA_IDENTITY',
+        errorCode: 'IDENTITY_REJECTED',
+        retryable: false,
+        message: 'Bearer should-never-cross-the-boundary',
+      }), {
+        status: 422,
+        headers: { 'Content-Type': 'application/json' },
+      })) as typeof fetch,
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      code: 'UPSTREAM_REJECTED',
+      failureClass: 'SHA_IDENTITY',
+      upstreamCode: 'IDENTITY_REJECTED',
+      retryable: false,
+    });
+    expect(JSON.stringify(result)).not.toContain('should-never-cross-the-boundary');
+  });
+
+  it('classifies webhook authentication rejection without exposing the upstream response body', async () => {
+    const result = await dispatchFounderConveyorAdvance(candidate(), {
+      env: enabledEnv(),
+      fetchImpl: (async () => new Response(JSON.stringify({
+        message: 'Bearer credential-shaped-material-that-must-stay-upstream',
+      }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' },
+      })) as typeof fetch,
+    });
+
+    expect(result).toMatchObject({
+      code: 'UPSTREAM_REJECTED',
+      failureClass: 'AUTH',
+      upstreamCode: 'HTTP_AUTH_REJECTED',
+      retryable: false,
+    });
+    expect(JSON.stringify(result)).not.toContain('credential-shaped-material-that-must-stay-upstream');
+  });
+
+  it('marks n8n rate limiting as a retryable failure class', async () => {
+    const result = await dispatchFounderConveyorAdvance(candidate(), {
+      env: enabledEnv(),
+      fetchImpl: (async () => new Response('', { status: 429 })) as typeof fetch,
+    });
+
+    expect(result).toMatchObject({
+      code: 'UPSTREAM_REJECTED',
+      failureClass: 'RATE_LIMIT',
+      upstreamCode: 'HTTP_RATE_LIMITED',
+      retryable: true,
+    });
+  });
+
+  it.each([
+    ['TimeoutError', 'TIMEOUT', 'REQUEST_TIMEOUT', 'timed out'],
+    ['TypeError', 'NETWORK', 'NETWORK_UNREACHABLE', 'unreachable'],
+  ] as const)('distinguishes %s transport failure from other n8n errors', async (
+    errorName,
+    failureClass,
+    upstreamCode,
+    reasonFragment,
+  ) => {
+    const error = new Error('transport detail must remain private');
+    error.name = errorName;
+    const result = await dispatchFounderConveyorAdvance(candidate(), {
+      env: enabledEnv(),
+      fetchImpl: (async () => { throw error; }) as typeof fetch,
+    });
+
+    expect(result).toMatchObject({
+      code: 'UPSTREAM_UNREACHABLE',
+      failureClass,
+      upstreamCode,
+      retryable: true,
+    });
+    expect(result.reasons.join(' ')).toContain(reasonFragment);
+    expect(JSON.stringify(result)).not.toContain('transport detail must remain private');
   });
 
   it('persists only sanitized V10 receipt identity when production persistence is required', async () => {
