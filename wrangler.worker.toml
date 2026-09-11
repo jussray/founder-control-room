@@ -67,11 +67,27 @@ FCR_V10_RECEIPT_PERSISTENCE_REQUIRED = "true"
 MCP_EXA_URL = "https://mcp.exa.ai/mcp"
 MCP_RESEND_URL = "https://mcp.resend.com/mcp"
 
+# Founder-approved Friend runtime model capability. These flags grant model
+# inference only. They grant no memory retrieval, provider mutation, publish,
+# merge, deploy, or external-action authority. Missing provider-held secrets
+# fail closed per provider instead of falling back silently.
+FRIEND_MODELS_ENABLED = "true"
+FRIEND_RUNTIME_PROVIDERS = "openai,anthropic,perplexity"
+FRIEND_OPENAI_MODEL = "gpt-5.6-luna"
+FRIEND_ANTHROPIC_MODEL = "claude-sonnet-5"
+FRIEND_PERPLEXITY_MODEL = "sonar"
+
+# Internal FCR authority budgets for live Friend inference. A live call must
+# atomically reserve one request allowance before provider execution. These are
+# authorization ceilings, not claims about the provider's final invoice.
+# Failed provider calls retain their reservation so retries cannot silently
+# restore spend authority.
+FRIEND_LIVE_REQUEST_BUDGET_USD = "0.25"
+FRIEND_LIVE_DAILY_BUDGET_USD = "1.00"
+
 # Founder-approved source activation for the governed founder-content n8n lane.
 # Buffer is the only enabled provider, share-now remains forbidden, and runtime
 # identity must match the exact workflow fingerprint and pinned n8n version.
-# These vars express source intent only. Production use still requires the four
-# provider-held secret bindings below, exact-main deployment, and live readback.
 N8N_FOUNDER_CONTENT_ENABLED = "true"
 N8N_FOUNDER_CONTENT_ENABLED_PROVIDERS = "buffer"
 N8N_FOUNDER_CONTENT_EXPECTED_WORKFLOW_ID = "fcrFounderContentV1"
@@ -93,6 +109,9 @@ required = [
   "FOUNDER_SIGNAL_ENGINE_MCP_TOKEN",
   "ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL",
   "FOUNDER_REVIEW_EMAIL_INGRESS_SECRET",
+  "OPENAI_API_KEY",
+  "ANTHROPIC_API_KEY",
+  "PERPLEXITY_API_KEY",
   "N8N_FOUNDER_CONTENT_WEBHOOK_URL",
   "N8N_FOUNDER_CONTENT_BEARER_TOKEN",
   "N8N_FOUNDER_CONTENT_EXPECTED_WORKFLOW_FINGERPRINT",

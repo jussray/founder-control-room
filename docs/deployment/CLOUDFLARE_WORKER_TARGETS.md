@@ -237,3 +237,7 @@ Current executable source and authoritative provider readback outrank an older v
 - Access: remove only the run-created managed `foundercontrolroom.org/*` public-bypass application when its receipt-bound identity and scope still match; otherwise stop for manual review.
 - Credentials: remove/revoke only the affected credential; do not rotate unrelated keys to repair binding drift.
 - Preserve build logs, deployment IDs, provider readback, browser traces, and runtime receipts.
+
+## Friend model deployment boundary
+
+The canonical Worker source pins Friend to `gpt-5.6-luna`, `claude-sonnet-5`, and `sonar` and requires the corresponding OpenAI, Anthropic, and Perplexity secret binding names. Those declarations must not be promoted into a claim that provider credentials are installed, the Friend database migration is applied, the Worker is deployed at the candidate SHA, or live model execution has been observed.

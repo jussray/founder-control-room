@@ -69,14 +69,41 @@ jobs:
           test -n "$NEON_PROJECT_ID" || { echo 'NEON_PROJECT_ID is not configured' >&2; exit 1; }
           test -n "$NEON_API_KEY" || { echo 'NEON_API_KEY is not configured' >&2; exit 1; }
 
-      - name: Set branch expiration
+      - name: Detect existing Neon branch
+        id: neon_branch
         if: steps.neon_scope.outputs.needs_neon == 'true'
+        shell: bash
+        env:
+          NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID }}
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          NEON_BRANCH_NAME: preview/pr-${{ github.event.number }}
+        run: |
+          set -euo pipefail
+          response="$(
+            curl --fail-with-body --silent --show-error \
+              --header "Authorization: Bearer ${NEON_API_KEY}" \
+              "https://console.neon.tech/api/v2/projects/${NEON_PROJECT_ID}/branches"
+          )"
+          branch_id="$(jq -r --arg name "$NEON_BRANCH_NAME" 'first(.branches[]? | select(.name == $name) | .id) // ""' <<<"$response")"
+          branch_state="$(jq -r --arg name "$NEON_BRANCH_NAME" 'first(.branches[]? | select(.name == $name) | .current_state) // ""' <<<"$response")"
+          if [ -n "$branch_id" ]; then
+            echo 'exists=true' >> "$GITHUB_OUTPUT"
+            echo "branch_id=$branch_id" >> "$GITHUB_OUTPUT"
+            echo "branch_state=$branch_state" >> "$GITHUB_OUTPUT"
+          else
+            echo 'exists=false' >> "$GITHUB_OUTPUT"
+            echo 'branch_id=' >> "$GITHUB_OUTPUT"
+            echo 'branch_state=' >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set branch expiration
+        if: steps.neon_scope.outputs.needs_neon == 'true' && steps.neon_branch.outputs.exists != 'true'
         shell: bash
         run: echo "EXPIRES_AT=$(date -u --date '+14 days' +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_ENV"
 
       - name: Create Neon Branch
-        if: steps.neon_scope.outputs.needs_neon == 'true'
         id: create_neon_branch
+        if: steps.neon_scope.outputs.needs_neon == 'true' && steps.neon_branch.outputs.exists != 'true'
         uses: neondatabase/create-branch-action@fb620d43d4c565abaf088b848a4e28e5c4ea4d9c # v6
         with:
           project_id: ${{ vars.NEON_PROJECT_ID }}
@@ -88,10 +115,19 @@ jobs:
         if: steps.neon_scope.outputs.needs_neon == 'true'
         shell: bash
         env:
-          NEON_BRANCH_ID: ${{ steps.create_neon_branch.outputs.branch_id }}
+          NEON_EXISTING_BRANCH_ID: ${{ steps.neon_branch.outputs.branch_id }}
+          NEON_EXISTING_BRANCH_STATE: ${{ steps.neon_branch.outputs.branch_state }}
+          NEON_CREATED_BRANCH_ID: ${{ steps.create_neon_branch.outputs.branch_id }}
         run: |
           set -euo pipefail
-          test -n "$NEON_BRANCH_ID" || { echo 'Neon create action returned no branch_id' >&2; exit 1; }
+          if [ -n "${NEON_EXISTING_BRANCH_ID:-}" ]; then
+            test "$NEON_EXISTING_BRANCH_STATE" = 'ready' || {
+              echo "Existing Neon PR branch is not ready: ${NEON_EXISTING_BRANCH_STATE:-unknown}" >&2
+              exit 1
+            }
+            exit 0
+          fi
+          test -n "${NEON_CREATED_BRANCH_ID:-}" || { echo 'Neon create action returned no branch_id' >&2; exit 1; }
 
   delete_neon_branch:
     name: Delete Neon Branch

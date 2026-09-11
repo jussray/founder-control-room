@@ -109,7 +109,9 @@ After usefulness is VERIFIED, the instructor may advance to `proposal_only` fede
 
 Registering the instructor does not create a DeepSeek API credential or enable a live runtime model call. Enabling a future server-side adapter requires a separately configured secret, bounded request/response handling, strict structured-output validation, timeouts, response-size limits, logging minimization, provider-failure handling, and focused tests.
 
-The Friend Intake first slice remains model-free. DeepSeek must not be inserted into that product path merely because the operator is registered.
+The former model-free-only Friend statement is superseded by `docs/FRIEND_INTAKE_V1.md` and the current Friend runtime addendum. Friend may use the deterministic local path or the explicitly governed OpenAI, Anthropic, and Perplexity runtime providers. **DeepSeek is not a Friend runtime provider** and must not be inserted into that product path merely because the instructor identity is registered.
+
+Friend live-provider use remains bounded by interactive founder authentication, sensitive-input local override, explicit provider allowlisting, server-held credentials, no memory retrieval, one-move output, provenance, provider-retention disclosure, response/time limits, and no external-action authority.
 
 ## Proof law
 

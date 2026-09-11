@@ -99,6 +99,9 @@ The former `founder-control-room2` Worker was deleted and must not be recreated 
 | `ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL` | secret | Private approved Zapier Catch Hook URL. |
 | `FOUNDER_SIGNAL_ENGINE_HOOK_TIMEOUT_MS` | protected variable | Optional bounded provider timeout. |
 | `FOUNDER_REVIEW_EMAIL_INGRESS_SECRET` | secret | Shared only with the review-email Worker when that route is activated. |
+| `OPENAI_API_KEY` | secret | Required provider-held OpenAI credential for governed Friend inference and existing server-side OpenAI consumers. Source name presence does not prove the credential is installed or valid. |
+| `ANTHROPIC_API_KEY` | secret | Required provider-held Anthropic credential for governed Friend inference. Source name presence does not prove the credential is installed or valid. |
+| `PERPLEXITY_API_KEY` | secret | Required provider-held Perplexity credential for governed Friend inference. Source name presence does not prove the credential is installed or valid. |
 | `N8N_FOUNDER_CONTENT_WEBHOOK_URL` | secret | Required private production webhook URL for the governed Founder Content n8n workflow. Source presence does not prove a live n8n deployment. |
 | `N8N_FOUNDER_CONTENT_BEARER_TOKEN` | secret | Bearer credential paired only with the governed Founder Content production webhook. |
 | `N8N_FOUNDER_CONTENT_EXPECTED_WORKFLOW_FINGERPRINT` | secret | Exact SHA-256 workflow fingerprint that binds FCR to the published n8n workflow identity. |
@@ -225,6 +228,9 @@ The client-ID names above are shared recovery/runtime-witness selectors; the cli
 [ ] FOUNDER_SIGNAL_ENGINE_MCP_TOKEN
 [ ] ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL
 [ ] FOUNDER_REVIEW_EMAIL_INGRESS_SECRET when email intake is active
+[ ] OPENAI_API_KEY
+[ ] ANTHROPIC_API_KEY
+[ ] PERPLEXITY_API_KEY
 [ ] N8N_FOUNDER_CONTENT_WEBHOOK_URL
 [ ] N8N_FOUNDER_CONTENT_BEARER_TOKEN
 [ ] N8N_FOUNDER_CONTENT_EXPECTED_WORKFLOW_FINGERPRINT
