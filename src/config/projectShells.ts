@@ -17,6 +17,7 @@ const inheritedFcrContracts = [
   'founder-intent',
   'authority',
   'evidence',
+  'multi-reality-truth',
   'outcome',
   'recovery',
   'continuity',
