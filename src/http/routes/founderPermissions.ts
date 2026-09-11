@@ -376,18 +376,34 @@ founderPermissionsRouter.post('/requests/:requestId/consume', rateLimitFounderPe
     } catch (bindingError) {
       return res.status(409).json({
         consumed: true,
+        ...projection(asJsonRecord(data)),
         executionAuthorized: false,
+        executionPreconditionsVerified: false,
         requiresNewApproval: true,
         error: bindingError instanceof Error ? bindingError.message : String(bindingError),
         code: 'FOUNDER_PERMISSION_POST_CONSUME_STATE_CHANGED',
-        ...projection(asJsonRecord(data)),
       });
     }
     return res.json({
       consumed: true,
-      executionAuthorized: true,
-      executionBinding,
       ...projection(asJsonRecord(data)),
+      executionAuthorized: false,
+      executionPreconditionsVerified: true,
+      effectGate: 'SERVER_SIDE_ONLY',
+      executionEvidence: {
+        contract: executionBinding.contract,
+        bindingHash: executionBinding.bindingHash,
+        actionType: executionBinding.actionType,
+        providerIdentity: executionBinding.providerIdentity,
+        capabilityVersion: executionBinding.capabilityVersion,
+        consequence: executionBinding.consequence,
+        observedHeadSha: executionBinding.observedHeadSha,
+        observedWorkflowContentHash: executionBinding.observedWorkflowContentHash,
+        observedRegistryContentHash: executionBinding.observedRegistryContentHash,
+        observedAt: executionBinding.observedAt,
+        singleUse: executionBinding.singleUse,
+        mustRevalidateBeforeEffect: executionBinding.mustRevalidateBeforeEffect,
+      },
     });
   }
 
