@@ -3,7 +3,7 @@ import { buildSecurityPostureSnapshot } from './securityPosture.js';
 
 describe('strategic security posture', () => {
   it('summarizes the current registered portfolio without claiming maturity proof', () => {
-    const snapshot = buildSecurityPostureSnapshot();
+    const snapshot = buildSecurityPostureSnapshot(new Date('2026-09-11T00:00:00.000Z'));
 
     expect(snapshot.summary).toEqual({
       totalProjects: 8,
@@ -30,7 +30,7 @@ describe('strategic security posture', () => {
   });
 
   it('keeps target assignment explainable and evidence-gated', () => {
-    const snapshot = buildSecurityPostureSnapshot();
+    const snapshot = buildSecurityPostureSnapshot(new Date('2026-09-11T00:00:00.000Z'));
     const bySlug = new Map(snapshot.projects.map((project) => [project.slug, project]));
 
     expect(bySlug.get('founder-control-room')?.targetVersion).toBe(10);
@@ -42,7 +42,7 @@ describe('strategic security posture', () => {
   });
 
   it('covers every active project with observed crypto evidence or an explicit review-required state', () => {
-    const snapshot = buildSecurityPostureSnapshot();
+    const snapshot = buildSecurityPostureSnapshot(new Date('2026-09-11T00:00:00.000Z'));
 
     expect(snapshot.cryptography.coverage).toEqual({
       activeProjectCount: 8,
@@ -75,7 +75,7 @@ describe('strategic security posture', () => {
   });
 
   it('separates provider PQC documentation from project runtime proof', () => {
-    const snapshot = buildSecurityPostureSnapshot();
+    const snapshot = buildSecurityPostureSnapshot(new Date('2026-09-11T00:00:00.000Z'));
     const evidence = snapshot.cryptography.providerPqcEvidence;
     const byId = new Map(evidence.entries.map((entry) => [entry.id, entry]));
 
@@ -117,8 +117,25 @@ describe('strategic security posture', () => {
     expect(evidence.entries.every((entry) => entry.requiredRuntimeEvidenceBeforeChange.length > 0)).toBe(true);
   });
 
+  it('expires CURRENT provider PQC claims when the bounded evidence lease lapses', () => {
+    const snapshot = buildSecurityPostureSnapshot(new Date('2026-09-18T00:00:00.000Z'));
+    const evidence = snapshot.cryptography.providerPqcEvidence;
+    const byId = new Map(evidence.entries.map((entry) => [entry.id, entry]));
+
+    expect(evidence.summary.currentCount).toBe(0);
+    expect(evidence.summary.unknownCount).toBe(4);
+    expect(byId.get('cloudflare-edge-tls-key-agreement')).toMatchObject({
+      state: 'UNKNOWN',
+      currentContract: expect.stringContaining('evidence lease expired'),
+    });
+    expect(byId.get('google-api-tls-key-agreement')).toMatchObject({
+      state: 'UNKNOWN',
+      currentContract: expect.stringContaining('evidence lease expired'),
+    });
+  });
+
   it('publishes defensive Lantern and truth boundaries without adding authority', () => {
-    const snapshot = buildSecurityPostureSnapshot();
+    const snapshot = buildSecurityPostureSnapshot(new Date('2026-09-11T00:00:00.000Z'));
 
     expect(snapshot.lantern.valid).toBe(true);
     expect(snapshot.lantern.errors).toEqual([]);
