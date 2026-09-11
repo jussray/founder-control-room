@@ -46,6 +46,7 @@ export type ApprovalValidationResult =
       code:
         | 'approval_not_executable'
         | 'approval_expired'
+        | 'approval_replay_state_missing'
         | 'approval_replay'
         | 'actor_mismatch'
         | 'action_mismatch'
@@ -101,12 +102,20 @@ export function hashApprovalPayload(payload: unknown): string {
  * Existing privileged V10 middleware remains authoritative until a separately
  * reviewed migration explicitly adopts this generic binding. This helper must
  * not be used to widen an existing authority ceiling.
+ *
+ * Replay state is mandatory and must come from the authoritative consumption
+ * carrier for the execution path. This helper only validates an observed
+ * consumption snapshot; it does not atomically consume an approval and cannot
+ * substitute for a separately reviewed atomic execution/consumption store.
  */
 export function validateApprovalExecution(
   binding: ApprovalBinding,
   attempt: ApprovalExecutionAttempt,
-  consumedIdempotencyKeys: ReadonlySet<string> = new Set(),
+  consumedIdempotencyKeys: ReadonlySet<string>,
 ): ApprovalValidationResult {
+  if (!consumedIdempotencyKeys) {
+    return { ok: false, code: 'approval_replay_state_missing' };
+  }
   if (binding.status !== 'approved_once') {
     return { ok: false, code: 'approval_not_executable' };
   }
