@@ -248,6 +248,18 @@ describe('ULTRATHINK self-attack implant contracts', () => {
       attempt,
       undefined as unknown as ReadonlySet<string>,
     )).toEqual({ ok: false, code: 'approval_replay_state_missing' });
+
+    const sparse = new Array(1);
+    expect(() => hashApprovalPayload(sparse)).toThrow(/dense and index-only/);
+    const arrayBinding: ApprovalBinding = {
+      ...binding,
+      payloadHash: hashApprovalPayload([null]),
+    };
+    expect(validateApprovalExecution(
+      arrayBinding,
+      { ...attempt, payload: sparse },
+      unconsumed,
+    )).toEqual({ ok: false, code: 'payload_invalid' });
   });
 
   it('requires exactly one protective or clarifying move for sensitive first-slice input', () => {
