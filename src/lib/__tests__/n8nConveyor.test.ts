@@ -210,6 +210,28 @@ describe('n8n founder conveyor contract', () => {
     expect(JSON.stringify(result)).not.toContain('should-never-cross-the-boundary');
   });
 
+  it('rejects a structured envelope whose failure class and code disagree', async () => {
+    const result = await dispatchFounderConveyorAdvance(candidate(), {
+      env: enabledEnv(),
+      fetchImpl: (async () => new Response(JSON.stringify({
+        contract: FOUNDER_CONVEYOR_ERROR_CONTRACT,
+        failureClass: 'SHA_IDENTITY',
+        errorCode: 'PAYLOAD_REJECTED',
+        retryable: false,
+      }), {
+        status: 422,
+        headers: { 'Content-Type': 'application/json' },
+      })) as typeof fetch,
+    });
+
+    expect(result).toMatchObject({
+      code: 'UPSTREAM_REJECTED',
+      failureClass: 'PAYLOAD_CONTRACT',
+      upstreamCode: 'HTTP_CONTRACT_REJECTED',
+      retryable: false,
+    });
+  });
+
   it('classifies webhook authentication rejection without exposing the upstream response body', async () => {
     const result = await dispatchFounderConveyorAdvance(candidate(), {
       env: enabledEnv(),
