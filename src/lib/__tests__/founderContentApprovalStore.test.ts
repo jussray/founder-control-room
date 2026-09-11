@@ -95,6 +95,22 @@ function repository(issueResult = true): FounderContentApprovalRepository {
   };
 }
 
+function uniqueApprovalRepository(): FounderContentApprovalRepository {
+  const issuedIds = new Set<string>();
+  return {
+    issue: vi.fn(async (input) => {
+      if (issuedIds.has(input.approvalId)) return false;
+      issuedIds.add(input.approvalId);
+      return true;
+    }),
+    claim: vi.fn(async () => ({
+      ok: false as const,
+      code: 'APPROVAL_NOT_FOUND' as const,
+      reason: 'not used in issuance tests',
+    })),
+  };
+}
+
 describe('authoritative founder-content approval issuance', () => {
   it('server-issues an exact founder/proposal/copy/source-bound approval with a bounded TTL', () => {
     const proposalValue = proposal();
@@ -105,7 +121,7 @@ describe('authoritative founder-content approval issuance', () => {
     });
     const identity = canonicalChiefIdentity(proposalValue);
 
-    expect(issued.approvalId).toMatch(/^fca:/);
+    expect(issued.approvalId).toMatch(/^fca:[0-9a-f]{64}$/);
     expect(issued.proposalHash).toBe(proposalValue.proposal_hash);
     expect(issued.publicPayloadHash).toBe(hashPublicPayload(identity.public_payload));
     expect(issued.authorizationHash).toMatch(/^[0-9a-f]{64}$/);
@@ -179,5 +195,62 @@ describe('authoritative founder-content approval issuance', () => {
       repository: store,
     })).rejects.toThrow(/could not be persisted/);
     expect(store.issue).toHaveBeenCalledTimes(1);
+  });
+
+  it('serializes the same public thesis and hook across evidence rotation within one current-you intent', async () => {
+    const store = uniqueApprovalRepository();
+    const firstProposal = proposal();
+    const rotatedProposal = proposal();
+    const rotatedSha = 'f'.repeat(40);
+    const rotatedEvidenceRef = `github:founder-control-room@${rotatedSha}#truth-decay-contract`;
+
+    rotatedProposal.source = { ...rotatedProposal.source, commit_sha: rotatedSha };
+    rotatedProposal.freshness = {
+      issued_at: '2026-08-19T07:01:00.000Z',
+      expires_at: '2026-08-19T08:01:00.000Z',
+    };
+    rotatedProposal.public_payload = {
+      ...rotatedProposal.public_payload,
+      public_claims: rotatedProposal.public_payload.public_claims.map((claim: Record<string, unknown>) => ({
+        ...claim,
+        evidence_ref: rotatedEvidenceRef,
+        temporal_version: rotatedSha,
+      })),
+    };
+    rotatedProposal.internal_evidence = {
+      ...rotatedProposal.internal_evidence,
+      ref: rotatedEvidenceRef,
+      digest: 'c'.repeat(64),
+      source_commit_sha: rotatedSha,
+    };
+    rotatedProposal.proposal_hash = hashPublicPayload(canonicalChiefIdentity(rotatedProposal));
+
+    expect(rotatedProposal.proposal_hash).not.toBe(firstProposal.proposal_hash);
+    expect(rotatedProposal.source.commit_sha).not.toBe(firstProposal.source.commit_sha);
+    expect(rotatedProposal.internal_evidence.digest).not.toBe(firstProposal.internal_evidence.digest);
+
+    const results = await Promise.allSettled([
+      issueFounderContentApproval({
+        proposal: firstProposal,
+        founderUserId: 'founder-user-1',
+        now: '2026-08-19T07:30:00.000Z',
+        repository: store,
+      }),
+      issueFounderContentApproval({
+        proposal: rotatedProposal,
+        founderUserId: 'founder-user-1',
+        now: '2026-08-19T07:30:00.010Z',
+        repository: store,
+      }),
+    ]);
+
+    expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+    expect(results.filter((result) => result.status === 'rejected')).toHaveLength(1);
+    expect(store.issue).toHaveBeenCalledTimes(2);
+
+    const firstId = vi.mocked(store.issue).mock.calls[0]?.[0].approvalId;
+    const secondId = vi.mocked(store.issue).mock.calls[1]?.[0].approvalId;
+    expect(firstId).toMatch(/^fca:[0-9a-f]{64}$/);
+    expect(secondId).toBe(firstId);
   });
 });

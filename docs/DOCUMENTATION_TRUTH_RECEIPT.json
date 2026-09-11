@@ -1,12 +1,13 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Preserve the existing #746 evidence-authority, Cloudflare Access recovery, Founder Capital Decision, and ATTACK-20 invariants while binding the governed Founder Content n8n production-source rescue to current documentation. This receipt keeps source intent, provider configuration, runtime identity, database application, publication outcome, merge authority, and deploy authority as separate proof planes and does not claim that production n8n, Buffer scheduling, Cloudflare bindings, or Supabase migrations are live merely because the source lane is enabled.",
+  "purpose": "Preserve the existing evidence-authority, Cloudflare Access recovery, Founder Capital Decision, ATTACK-20, and governed Founder Content n8n invariants while adding Attack 3000 content-observation truth and deterministic public-pattern approval reservation. This receipt keeps source intent, approval authority, provider configuration, runtime identity, database application, publication outcome, analytics, merge authority, and deploy authority as separate proof planes and does not claim provider mutation, production equivalence, publication, business demand, or deployment merely because source contracts exist.",
   "domains": [
     "repository-provider",
     "evidence-authority",
     "merge-authority",
     "cloudflare-authority",
-    "publishing"
+    "publishing",
+    "content-evidence"
   ],
   "changes": [
     {
@@ -108,6 +109,19 @@
       ]
     },
     {
+      "path": "src/lib/founderContentApprovalStore.ts",
+      "claims": [
+        "src/lib/founderContentApprovalStore.ts must derive the authoritative one-shot approval reservation from authenticated founder identity, platform, normalized public thesis and opening hook, and exact Current You intent id/version so source SHA, evidence reference, evidence digest, proposal hash, or proof-detail rotation cannot mint a second approval for the same public pattern within the same intent.",
+        "The deterministic approval reservation remains only an issuance identity. Publication still requires exact stored-row claim, execution-time revalidation, provider mutation through an authorized route, and provider outcome proof."
+      ]
+    },
+    {
+      "path": "src/lib/__tests__/founderContentApprovalStore.test.ts",
+      "claims": [
+        "src/lib/__tests__/founderContentApprovalStore.test.ts must adversarially rotate source SHA, evidence reference, evidence digest, and proposal hash while preserving public thesis/hook and Current You intent, and must prove both attempts resolve to the same fca sha256 reservation so only one authoritative approval persists."
+      ]
+    },
+    {
       "path": "src/lib/n8nFounderContentAuthorityAdapter.ts",
       "claims": [
         "src/lib/n8nFounderContentAuthorityAdapter.ts must perform non-consuming current approval readback, prepare the exact provider execution generation, then atomically consume one-shot founder authority only when that exact generation is still current; stale, expired, mismatched, or ambiguous authority must fail closed before provider mutation."
@@ -129,6 +143,40 @@
       "path": "src/lib/n8nProviderNeutralFounderContentPreparation.ts",
       "claims": [
         "src/lib/n8nProviderNeutralFounderContentPreparation.ts must reserve cadence and durable execution before approval consumption, preserve exact approval-expiry and generation fences, distinguish pre-provider retryable recovery from provider-attempted uncertainty, and never blindly retry an ambiguous external write."
+      ]
+    },
+    {
+      "path": "src/ultrathink-core/attack3000Content.ts",
+      "claims": [
+        "src/ultrathink-core/attack3000Content.ts must evaluate publication and content metrics only when they bind to one common observation identity with content fingerprint, provider, comparable window, observation timestamp, completed measurement state, current freshness classification, and evidence references; historical or stale observations remain provenance but cannot become current decision proof.",
+        "Content stop floors must use only the observation, publication state, metric inputs, and founder-defined floor relevant to that stop condition; they must not fire before verified publication or before measurement completion, and unrelated unknown metrics must not suppress an otherwise verified breach.",
+        "The content adapter must preserve profile-view evidence, must not treat publication or reach alone as external demand, and must not borrow generic metric evidence references to satisfy a VERIFIED/SUPPORTS external-demand assertion.",
+        "The content Attack 3000 verdict remains evidence-only and cannot authorize merge, deploy, publication, spend, fundraising, external contact, Buffer/n8n execution, or provider mutation."
+      ]
+    },
+    {
+      "path": "src/ultrathink-core/__tests__/attack3000Content.test.ts",
+      "claims": [
+        "src/ultrathink-core/__tests__/attack3000Content.test.ts must adversarially cover mixed observation identities, stale and incomplete windows, pre-publication floors, metric-local floor classification, profile-view derivation, missing direct demand evidence, reach-only demand rejection, invalid counts, and the non-authorizing Attack 3000 ceiling."
+      ]
+    },
+    {
+      "path": "src/ultrathink-core/index.ts",
+      "claims": [
+        "src/ultrathink-core/index.ts may expose the Attack 3000 content observation context and freshness types as evidence contracts only; exporting them must not imply provider activation or execution authority."
+      ]
+    },
+    {
+      "path": "docs/founder-signal-engine/linkedin-analytics-continuity.md",
+      "claims": [
+        "docs/founder-signal-engine/linkedin-analytics-continuity.md must bind Attack 3000 content decisions to per-post fingerprints, one comparable current observation window, completed measurement, direct demand evidence, and observation-only authority without rewriting historical analytics when freshness expires."
+      ]
+    },
+    {
+      "path": "README.md",
+      "claims": [
+        "README.md must document deterministic founder-content approval reservation as public-pattern identity distinct from evidence/proof rotation and must preserve one-shot claim plus provider-readback publication truth.",
+        "README.md must describe Attack 3000 as an evidence-evaluation kernel, document the content adapter's single-observation and current-window requirements, preserve publication/analytics/business-outcome separation, and keep the authority ceiling explicit."
       ]
     },
     {
