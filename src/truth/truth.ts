@@ -117,12 +117,32 @@ function hasCompatibleEvidenceLink(
   ));
 }
 
+function evidenceFreshnessAllowsVerification(
+  evidence: ClaimEvidenceRecord,
+  now: number,
+): boolean {
+  const observedAt = parseInstant(evidence.observedAt);
+  const expiresAt = parseInstant(evidence.freshnessExpiresAt);
+
+  if (evidence.source === 'live_provider') {
+    return observedAt !== null
+      && expiresAt !== null
+      && observedAt <= now
+      && observedAt < expiresAt
+      && expiresAt > now;
+  }
+
+  if (expiresAt !== null && expiresAt <= now) return false;
+  return true;
+}
+
 /**
  * Green is a rendering decision, not a synonym for "looks good".
  * It is allowed only when the claim is verified, fresh, target-bound when
  * required, and backed by at least one explicitly linked compatible
  * authoritative evidence record that satisfies the canonical source-specific
- * verification binding.
+ * verification binding. Live-provider evidence must itself carry a valid,
+ * unexpired observation lease; claim freshness cannot renew provider evidence.
  */
 export function canRenderVerifiedClaim(
   claim: TruthClaim,
@@ -145,9 +165,7 @@ export function canRenderVerifiedClaim(
     if (!evidence) return false;
     if (!hasCompatibleEvidenceLink(claim, evidence, context.evidenceLinks)) return false;
     if (!evidenceCanVerifyClaim(claim, evidence)) return false;
-
-    const evidenceExpires = parseInstant(evidence.freshnessExpiresAt);
-    if (evidenceExpires !== null && evidenceExpires <= now) return false;
+    if (!evidenceFreshnessAllowsVerification(evidence, now)) return false;
 
     if (
       claim.targetFingerprint !== null

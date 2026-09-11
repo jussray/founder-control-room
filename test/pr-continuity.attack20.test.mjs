@@ -93,4 +93,16 @@ test('AT26 metadata write refuses a PR that moved after the observation was buil
   assert.match(continuitySource, /latest\.base\?\.ref !== pr\.base\?\.ref/);
   assert.match(continuitySource, /PR_MOVED_DURING_METADATA/);
 });
+test('AT27 metadata write revalidates root and base branch tips before building the snapshot', () => {
+  assert.match(continuitySource, /const finalRootSha = await branchSha\(repository, rootRef\)/);
+  assert.match(continuitySource, /const finalBaseSha = await branchSha\(repository, latest\.base\.ref\)/);
+  assert.match(continuitySource, /finalRootSha !== observedRootSha \|\| finalBaseSha !== observedBaseSha/);
+  assert.match(continuitySource, /BASE_MOVED_DURING_METADATA/);
+});
+test('AT28 metadata PATCH has a second immediate base and PR race gate', () => {
+  assert.match(continuitySource, /const beforePatch = await getPull\(repository, pr\.number\)/);
+  assert.match(continuitySource, /const prePatchRootSha = await branchSha\(repository, rootRef\)/);
+  assert.match(continuitySource, /const prePatchBaseSha = await branchSha\(repository, beforePatch\.base\.ref\)/);
+  assert.match(continuitySource, /BASE_OR_PR_MOVED_BEFORE_METADATA_PATCH/);
+});
 test('schema remains stable', () => assert.equal(SCHEMA, 'juss/pr-continuity@v1'));

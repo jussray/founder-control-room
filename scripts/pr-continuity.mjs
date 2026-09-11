@@ -148,23 +148,6 @@ async function listOpenPulls(repository) {
   throw new Error('PULL_PAGINATION_LIMIT_EXCEEDED');
 }
 
-async function patchBody(repository, pr, block) {
-  const latest = await getPull(repository, pr.number);
-  if (latest.head?.sha !== pr.head?.sha || latest.base?.ref !== pr.base?.ref) {
-    return { updated: false, blocked: true, reason: 'PR_MOVED_DURING_METADATA' };
-  }
-
-  let next;
-  try {
-    next = replaceManagedBlock(latest.body || '', block);
-  } catch (error) {
-    return { updated: false, blocked: true, reason: error.message };
-  }
-  if (next === (latest.body || '')) return { updated: false, blocked: false };
-  await github(`/repos/${repository}/pulls/${pr.number}`, { method: 'PATCH', body: { body: next } });
-  return { updated: true, blocked: false };
-}
-
 const blockFor = (repository, pr, rootRef, rootSha, baseSha, state, proof) =>
   continuityBlock({
     observedAt: new Date().toISOString(),
@@ -180,18 +163,63 @@ const blockFor = (repository, pr, rootRef, rootSha, baseSha, state, proof) =>
     proofState: proof,
   });
 
+async function patchBody(repository, pr, rootRef, observedRootSha, observedBaseSha, state, proof) {
+  const latest = await getPull(repository, pr.number);
+  if (latest.head?.sha !== pr.head?.sha || latest.base?.ref !== pr.base?.ref) {
+    return { updated: false, blocked: true, reason: 'PR_MOVED_DURING_METADATA' };
+  }
+
+  const finalRootSha = await branchSha(repository, rootRef);
+  const finalBaseSha = await branchSha(repository, latest.base.ref);
+  if (finalRootSha !== observedRootSha || finalBaseSha !== observedBaseSha) {
+    return {
+      updated: false,
+      blocked: true,
+      reason: 'BASE_MOVED_DURING_METADATA',
+      observedRootSha,
+      liveRootSha: finalRootSha,
+      observedBaseSha,
+      liveBaseSha: finalBaseSha,
+    };
+  }
+
+  const block = blockFor(repository, latest, rootRef, finalRootSha, finalBaseSha, state, proof);
+  let next;
+  try {
+    next = replaceManagedBlock(latest.body || '', block);
+  } catch (error) {
+    return { updated: false, blocked: true, reason: error.message };
+  }
+  if (next === (latest.body || '')) return { updated: false, blocked: false };
+
+  const beforePatch = await getPull(repository, pr.number);
+  const prePatchRootSha = await branchSha(repository, rootRef);
+  const prePatchBaseSha = await branchSha(repository, beforePatch.base.ref);
+  if (
+    beforePatch.head?.sha !== latest.head?.sha
+    || beforePatch.base?.ref !== latest.base?.ref
+    || prePatchRootSha !== finalRootSha
+    || prePatchBaseSha !== finalBaseSha
+  ) {
+    return { updated: false, blocked: true, reason: 'BASE_OR_PR_MOVED_BEFORE_METADATA_PATCH' };
+  }
+
+  await github(`/repos/${repository}/pulls/${pr.number}`, { method: 'PATCH', body: { body: next } });
+  return { updated: true, blocked: false };
+}
+
 async function updateOnePull(repository, number, rootRef) {
   let pr = await getPull(repository, number);
-  const rootSha = await branchSha(repository, rootRef);
+  let rootSha = await branchSha(repository, rootRef);
   let baseSha = await liveBaseSha(repository, pr);
   if (!sameRepositoryPull(pr, repository)) {
-    const metadata = await patchBody(repository, pr, blockFor(repository, pr, rootRef, rootSha, baseSha, 'BLOCKED_FORK', 'BLOCKED'));
+    const metadata = await patchBody(repository, pr, rootRef, rootSha, baseSha, 'BLOCKED_FORK', 'BLOCKED');
     return { number, state: 'BLOCKED_FORK', headRef: pr.head.ref, metadata };
   }
 
   let status = await compare(repository, baseSha, pr.head.sha);
   if (isCurrentCompareStatus(status)) {
-    const metadata = await patchBody(repository, pr, blockFor(repository, pr, rootRef, rootSha, baseSha, 'CURRENT', 'EXACT_HEAD_PROOF_SEPARATE'));
+    const metadata = await patchBody(repository, pr, rootRef, rootSha, baseSha, 'CURRENT', 'EXACT_HEAD_PROOF_SEPARATE');
     return {
       number,
       state: metadata.blocked ? 'BLOCKED_METADATA' : 'CURRENT',
@@ -213,10 +241,11 @@ async function updateOnePull(repository, number, rootRef) {
       throw new Error(`GITHUB_API_403: ${update.payload?.message || 'pull request branch update forbidden'}`);
     }
     pr = await getPull(repository, number);
+    rootSha = await branchSha(repository, rootRef);
     baseSha = await liveBaseSha(repository, pr);
     status = sameRepositoryPull(pr, repository) ? await compare(repository, baseSha, pr.head.sha) : 'fork';
     if (isCurrentCompareStatus(status)) return updateOnePull(repository, number, rootRef);
-    const metadata = await patchBody(repository, pr, blockFor(repository, pr, rootRef, rootSha, baseSha, 'BLOCKED_STACK_REBASE_REQUIRED', 'BLOCKED'));
+    const metadata = await patchBody(repository, pr, rootRef, rootSha, baseSha, 'BLOCKED_STACK_REBASE_REQUIRED', 'BLOCKED');
     return {
       number,
       state: 'BLOCKED_STACK_REBASE_REQUIRED',
@@ -229,10 +258,11 @@ async function updateOnePull(repository, number, rootRef) {
 
   if (update.status === 422) {
     pr = await getPull(repository, number);
+    rootSha = await branchSha(repository, rootRef);
     baseSha = await liveBaseSha(repository, pr);
     status = sameRepositoryPull(pr, repository) ? await compare(repository, baseSha, pr.head.sha) : 'fork';
     if (isCurrentCompareStatus(status)) return updateOnePull(repository, number, rootRef);
-    const metadata = await patchBody(repository, pr, blockFor(repository, pr, rootRef, rootSha, baseSha, 'BLOCKED_CONFLICT_OR_RACE', 'BLOCKED'));
+    const metadata = await patchBody(repository, pr, rootRef, rootSha, baseSha, 'BLOCKED_CONFLICT_OR_RACE', 'BLOCKED');
     return {
       number,
       state: 'BLOCKED_CONFLICT_OR_RACE',
@@ -251,6 +281,7 @@ async function updateOnePull(repository, number, rootRef) {
     if (pr.head.sha !== before && isCurrentCompareStatus(status)) break;
   }
 
+  rootSha = await branchSha(repository, rootRef);
   baseSha = await liveBaseSha(repository, pr);
   status = await compare(repository, baseSha, pr.head.sha);
   let state = isCurrentCompareStatus(status)
@@ -261,7 +292,7 @@ async function updateOnePull(repository, number, rootRef) {
     : state === 'CURRENT_AFTER_RACE'
       ? 'EXACT_HEAD_PROOF_SEPARATE'
       : 'BLOCKED';
-  const metadata = await patchBody(repository, pr, blockFor(repository, pr, rootRef, rootSha, baseSha, state, proof));
+  const metadata = await patchBody(repository, pr, rootRef, rootSha, baseSha, state, proof);
   if (metadata.blocked) state = 'BLOCKED_METADATA';
   return { number, state, headRef: pr.head.ref, headBefore: before, headSha: pr.head.sha, metadata };
 }
@@ -322,7 +353,11 @@ export async function metadataMode() {
   const metadata = await patchBody(
     repository,
     pr,
-    blockFor(repository, pr, rootRef, rootSha, baseSha, state, state === 'CURRENT' ? 'EXACT_HEAD_PROOF_SEPARATE' : 'REVERIFY_OR_ROLLOVER_REQUIRED'),
+    rootRef,
+    rootSha,
+    baseSha,
+    state,
+    state === 'CURRENT' ? 'EXACT_HEAD_PROOF_SEPARATE' : 'REVERIFY_OR_ROLLOVER_REQUIRED',
   );
   const receipt = { schema: SCHEMA, observedAt: new Date().toISOString(), mode: 'metadata', repository, prNumber: number, state, metadata, authorizesMerge: false, authorizesDeploy: false };
   writeReceipt(receipt);

@@ -77,7 +77,7 @@ Exact affected set, 2 paths:
 - `AGENTS_FOUNDER_INTELLIGENCE.md`
 - `.control-room/plugin-management.json`
 
-Those files do not overlap the six-file effective recovery delta except that `AGENTS_FOUNDER_INTELLIGENCE.md` also appears historically in Incident A. Incident B is nevertheless a separate provenance interval and must not be hidden merely by rebasing or merging a future PR over it.
+Incident B is a separate provenance interval and must not be hidden merely by rebasing or merging a future PR over it. Its overlap with later recovery files is historical context only; the current effective recovery delta is measured independently below.
 
 ## Incident C - direct main after PR #778
 
@@ -139,9 +139,12 @@ The recovery branch incorporated Incident B through two-parent merge commit `ac2
 - `31869f3f970eb1cde310623a6555c752144103d0`, the recovery branch predecessor;
 - `b3b1d21ca0bf1f6929b155f188551de7e9977ee4`, the Incident B tip and then-current `main`.
 
-Incident C is not considered incorporated merely because this document and verifier name its immutable range. The recovery branch must gain a history-preserving successor with the current recovery branch as first parent and the exact Incident C/current-main tip as another parent before Incident C can satisfy the verifier's `incident tip is ancestor of HEAD` requirement.
+The recovery branch incorporated Incident C through two-parent merge commit `d145f1645a6e433a928cf832297f068a208e0294` with parents:
 
-No force push, history rewrite, or source dropping is authorized. Later recovery commits may supersede prior merge commits as the branch tip, but ancestry must preserve both histories.
+- `31497239ba169df33a8cf35dad33815eedd95cb0`, the recovery branch predecessor;
+- `81d05f7ae8f427e84db506cfa726520a8178dece`, the Incident C tip and observed current `main`.
+
+Later review-repair commits descend from that merge, so both recovery history and Incident C remain ancestors. No force push, history rewrite, or source dropping is authorized.
 
 ## Executable ratification boundary
 
@@ -167,21 +170,29 @@ The verifier refuses shallow history. It is an identity and scope witness only. 
 
 ## Truth-boundary repairs discovered during review
 
-Semantic review of the ratified historical source found that `canRenderVerifiedClaim` was too permissive. The recovery therefore repairs the existing truth contract rather than ratifying a known false-green path.
+Semantic review of the ratified historical source found multiple false-fresh or false-equivalence paths. The recovery repairs the existing contracts rather than ratifying known ambiguity.
 
-The repaired gate requires all of the following before a verified claim may render green:
+The verified-claim gate now requires all of the following before a claim may render green:
 
 - claim status is `verified` and conflict-free;
 - claim and evidence freshness requirements hold;
 - current target matches when the claim is target-bound;
 - an explicit `ClaimEvidenceLink` binds claim id, evidence id, and compatible scope;
 - evidence source exactly matches the source declared by the claim unless a future separately reviewed compatibility rule says otherwise;
+- `live_provider` evidence itself carries a valid observed-at / expiry lease and cannot borrow freshness from the claim;
 - `model_inference` and `founder_note` cannot independently verify;
 - `exact_target_verification` must match the claim target;
 - `hashed_artifact` must carry an integrity digest;
 - `test_execution` must be target-bound.
 
-Focused adversarial coverage lives in the existing `src/implant/__tests__/selfAttackContracts.test.ts`. No parallel truth framework was introduced.
+Additional review repairs keep adjacent authority boundaries fail-closed:
+
+- DeepSeek instruction validation revalidates the source project-state packet at consumption time, so an expired packet cannot keep authorizing a proposal-only instruction merely because its fingerprint still matches;
+- generic approval payload hashing accepts only plain JSON values and rejects non-plain objects such as `Date` rather than collapsing distinct semantic values into the same hash;
+- cryptographic inventory records pin the exact inspected repository revision and observation lease; static source evidence becomes `STALE` when that lease expires instead of being refreshed by a new HTTP response timestamp;
+- PR continuity metadata re-reads the PR, root branch tip, and actual base branch tip before PATCH and blocks if any observed identity moved.
+
+Focused adversarial coverage remains in the existing truth/continuity tests plus narrow review-regression tests. No parallel truth framework was introduced.
 
 ## Review obligation
 
@@ -189,13 +200,30 @@ A clean wrapper diff alone is insufficient. Qualifying semantic review must cove
 
 - Incident A: `34ffe99e77455f278b437f4cfc67c76e3df59a25..027dfdd42f032a5c614c147ae9e1a824c2f506b9`, 9 commits / 22 paths;
 - Incident B: `57e1ed8c2f21911d953587bfe8fe03cd92383a67..b3b1d21ca0bf1f6929b155f188551de7e9977ee4`, 2 commits / 2 paths;
-- Incident C: `f4e0439da4f43ef980e10eaf39b75e8d6bff21f8..81d05f7ae8f427e84db506cfa726520a8178dece`, 18 commits / 13 paths.
+- Incident C: `f4e0439da4f43ef980e10eaf39b75e8d6bff21f8..81d05f7ae8f427e84db506cfa726520a8178dece`, 18 commits / 13 paths;
+- current effective recovery delta relative to Incident C tip: 16 paths:
+  - `.github/workflows/main-release-provenance.yml`
+  - `docs/MAIN_RELEASE_PROVENANCE_RECOVERY_DEEPSEEK_CONTINUITY_2026-09-09.md`
+  - `docs/PR_CONTINUITY.md`
+  - `scripts/pr-continuity.mjs`
+  - `scripts/verify-main-release-historical-ratification.mjs`
+  - `security/portfolio-worker-security.json`
+  - `src/approvals/approval.ts`
+  - `src/implant/__tests__/selfAttackContracts.test.ts`
+  - `src/lib/__tests__/agentInterop.test.ts`
+  - `src/lib/agentInterop.ts`
+  - `src/security/cryptographicInventory.ts`
+  - `src/security/provenanceReviewP2.test.ts`
+  - `src/security/securityPosture.ts`
+  - `src/truth/truth.ts`
+  - `src/truth/truthFreshness.test.ts`
+  - `test/pr-continuity.attack20.test.mjs`
 
 Material review findings remain reviewer-owned until a successor-head review justifies disposition. Outdated or superseded locations do not automatically mean accepted.
 
 ## Current-base rule
 
-Current PR base/head truth is owned by the machine-maintained PR Continuity Receipt on PR #775. This document intentionally does not treat a mutable current-main SHA as permanent authority.
+Current PR base/head truth comes from a fresh live GitHub provider read of the PR plus the current root/base branch tips. The machine-maintained PR Continuity Receipt is a timestamped `snapshot_not_authority` observation only. It may corroborate a live read when identities still match, but it never outranks provider state or renews predecessor proof.
 
 The endpoint SHAs listed in Incidents A, B, and C are immutable historical evidence. If `main` or the PR head moves again, predecessor CI, Playwright, semantic review, deterministic-review witness, and authority receipts expire and must be reacquired.
 
@@ -215,10 +243,10 @@ The historical source state keeps its authority ceilings:
 
 Recovery may advance only when all of the following are true:
 
-1. PR Continuity says the exact carrier is current with authoritative `main`;
+1. a fresh live GitHub provider read proves the exact PR head is current with the exact current `main`/base tip; a static continuity snapshot may corroborate but cannot authorize this condition;
 2. the v2 historical-ratification verifier passes in the full-history Main Release Provenance lane for all three incidents;
 3. required exact-head CI and browser/Playwright proof are terminal green for the unchanged successor head;
-4. semantic review explicitly covers all three historical incident ranges plus current repairs;
+4. semantic review explicitly covers all three historical incident ranges plus the exact current recovery delta;
 5. material review findings receive reviewer-side disposition after their repairs;
 6. the trusted deterministic-review witness is successfully published and independently read back for the exact current candidate where required;
 7. authenticated Founder Final binds the exact current PR/base/head after freshness checks;
