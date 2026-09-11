@@ -42,6 +42,7 @@ export const controlRoomHtml = `<!doctype html>
           <p class="eyebrow">Authenticated founder</p>
           <h2 id="founder-email" class="founder-email">Founder</h2>
           <p>Identity verified. Execution authority remains locked behind separate proof and approval gates.</p>
+          <p id="workspace-boundary-note" class="field-help" hidden></p>
         </div>
         <button id="logout-button" class="secondary" type="button">Sign out</button>
       </div>
@@ -50,12 +51,12 @@ export const controlRoomHtml = `<!doctype html>
         <div class="onboarding-heading">
           <div>
             <p class="eyebrow">Workspace onboarding</p>
-            <h2>Build your first sovereign workspace.</h2>
-            <p>This creates Control Room records and disconnected provider slots. It does not store credentials, connect providers, merge code, or deploy production.</p>
+            <h2 id="workspace-heading">Build your first sovereign workspace.</h2>
+            <p id="workspace-description">This creates Control Room records and disconnected provider slots. It does not store credentials, connect providers, merge code, or deploy production.</p>
           </div>
           <ol class="steps" aria-label="Onboarding steps">
             <li class="active">1. Project</li>
-            <li>2. Tools</li>
+            <li id="tools-step">2. Tools</li>
             <li>3. Authority</li>
           </ol>
         </div>
@@ -83,7 +84,7 @@ export const controlRoomHtml = `<!doctype html>
             </div>
           </fieldset>
 
-          <fieldset>
+          <fieldset id="provider-slots-fieldset">
             <legend>Declare your tool slots</legend>
             <p class="field-help">Slots begin disconnected. Credentials remain in provider-held OAuth or server-side secret storage.</p>
             <div class="provider-grid">
@@ -121,7 +122,7 @@ export const controlRoomHtml = `<!doctype html>
           <button id="start-onboarding" class="secondary" type="button">Add another project</button>
         </div>
 
-        <div class="module-grid">
+        <div id="platform-modules" class="module-grid">
           <a class="module-card" href="/control-room/github-workspace.html"><small>Repository system</small><strong>GitHub Workspace</strong><span>Read files and commit only to mission branches.</span></a>
           <a class="module-card" href="/control-room/command-bridge.html"><small>Automation system</small><strong>Command Bridge</strong><span>Run allowlisted workflows with exact-head evidence.</span></a>
           <a class="module-card" href="/control-room/plugin-center.html"><small>CRM + providers</small><strong>Plugin Center</strong><span>Declare tool power, boundaries, and temporary grants.</span></a>
@@ -136,7 +137,7 @@ export const controlRoomHtml = `<!doctype html>
         </div>
       </section>
 
-      <section class="panel password">
+      <section id="password-panel" class="panel password">
         <div>
           <p class="eyebrow">Optional credential handoff</p>
           <h2>Set or change your founder password.</h2>
