@@ -8,6 +8,20 @@ When a task invokes ChatGPT Plugin Management or an external plugin, also read [
 
 When a task analyzes social-media growth, attribution, post performance, or platform behavior, keep the evidence planes separate. Use current native social-platform evidence for live publication and current per-post facts; use native platform exports for historical/account analytics; treat official API-partner mirrors such as Buffer as corroborating evidence when freshly connected; treat aggregators such as Metricool as secondary cross-network observation; and place inference last. Empty provider or aggregator rows mean `UNKNOWN` / `NO_EVIDENCE`, never zero performance. Do not claim ranking suppression, conversion causality, delayed-follower attribution, or an algorithmic cause without platform-attributable evidence. Buffer, Metricool, or another intermediary may strengthen observation, but cannot override contradictory native-platform evidence or create publication or causal authority.
 
+## Exact-head supersession truth
+
+For repository, CI, deployment, runtime, or cross-project claims, current authority belongs to the newest authoritative subject head and the evidence bound to that exact identity.
+
+- Resolve the current authoritative `main` or equivalent provider head at decision time before carrying forward a previous conclusion.
+- Evidence from a predecessor SHA remains provenance, not current proof. Mark it `HISTORICAL`, `STALE`, `SUPERSEDED`, `UNKNOWN`, or `BLOCKED` when the subject head, peer dependency, runtime identity, required proof set, authority state, or evidence contract changes.
+- Never inherit green checks, Playwright results, provider acceptance, runtime receipts, or outcome claims from a predecessor head merely because the newer head descends from it.
+- When a newer authoritative head has its own exact-head evidence, use that evidence as the current baseline and stop repairing failures that exist only on the superseded predecessor unless they reproduce on the current head.
+- If current exact-head evidence is still running, missing, or contradictory, keep the claim open. Do not patch historical failures speculatively just to make an old run green.
+- Cross-repository proof expires when either bound repository head or peer/runtime identity moves. Rebind and rerun the applicable witness against the new pair before restoring a current integration claim.
+- Supersession changes evidence authority only. It never widens execution, merge, deployment, provider, spending, credential, migration, or founder authority.
+
+This is a TruthMode rule, not a cleanup convenience: newest head does not automatically mean verified, and predecessor green does not automatically mean current green.
+
 Required loop:
 
 ```text
