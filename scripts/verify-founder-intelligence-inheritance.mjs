@@ -224,6 +224,30 @@ for (const phrase of [
   requireValue(cohesionAudit.includes(phrase), `cohesion audit missing Revenue Proof OS rule ${JSON.stringify(phrase)}`);
 }
 
+for (const phrase of [
+  '## Unified capability runtime',
+  'modalities',
+  'Capability discovery is not authority.',
+  'Credentials stay behind the capability boundary.',
+  'Progressive capability disclosure.',
+  '`READ`, `REVERSIBLE_WRITE`, and `CONSEQUENTIAL_WRITE`',
+  'Voice approval must bind to the exact pending proposal',
+  'PROPOSED',
+  'WAITING_APPROVAL',
+  'PRE_COMMIT',
+  'PROVIDER_ACCEPTED',
+  'VERIFIED | UNKNOWN | CONTRADICTED',
+  'Execution truth and outcome truth stay separate.',
+  'Receipts are modality-independent.',
+  'Accessibility cannot become an authority downgrade.',
+  'Reconnects must not replay old approvals or duplicate writes.',
+  'FCR remains the control plane.',
+  'SURFACE',
+  'CLAIM',
+]) {
+  requireValue(cohesionAudit.includes(phrase), `cohesion audit missing unified capability runtime rule ${JSON.stringify(phrase)}`);
+}
+
 if (failures.length > 0) {
   console.error('Founder Intelligence inheritance contract failed:');
   for (const failure of failures) console.error(` - ${failure}`);
