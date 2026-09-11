@@ -124,15 +124,13 @@ function evidenceFreshnessAllowsVerification(
   const observedAt = parseInstant(evidence.observedAt);
   const expiresAt = parseInstant(evidence.freshnessExpiresAt);
 
+  if (observedAt === null || observedAt > now) return false;
+  if (expiresAt !== null && (observedAt >= expiresAt || expiresAt <= now)) return false;
+
   if (evidence.source === 'live_provider') {
-    return observedAt !== null
-      && expiresAt !== null
-      && observedAt <= now
-      && observedAt < expiresAt
-      && expiresAt > now;
+    return expiresAt !== null;
   }
 
-  if (expiresAt !== null && expiresAt <= now) return false;
   return true;
 }
 
@@ -141,8 +139,10 @@ function evidenceFreshnessAllowsVerification(
  * It is allowed only when the claim is verified, fresh, target-bound when
  * required, and backed by at least one explicitly linked compatible
  * authoritative evidence record that satisfies the canonical source-specific
- * verification binding. Live-provider evidence must itself carry a valid,
- * unexpired observation lease; claim freshness cannot renew provider evidence.
+ * verification binding. Every evidence record must have a valid observation
+ * timestamp that is not in the future. Live-provider evidence additionally
+ * requires its own unexpired lease; claim freshness cannot renew provider
+ * evidence.
  */
 export function canRenderVerifiedClaim(
   claim: TruthClaim,
