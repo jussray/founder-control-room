@@ -1,15 +1,16 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Bind the PromptOS founder-permission execution membrane and the Documentation Truth registration repair to exact current path invariants without claiming provider mutation, deployment, or runtime outcome.",
+  "purpose": "Bind the PromptOS founder-permission execution membrane, exact-head provider effect, and Documentation Truth registration repair to current path invariants without claiming that any live PromptOS promotion has occurred.",
   "domains": [
     "founder-permission-authority",
+    "repository-provider",
     "truth-governance"
   ],
   "changes": [
     {
       "path": "src/http/routes/founderPermissions.ts",
       "claims": [
-        "src/http/routes/founderPermissions.ts must keep PromptOS consumption evidence non-authorizing, derive current state through the trusted server-side repository provider before one-shot consumption, revalidate immediately at the effect boundary, and fail closed on drift without exposing a reusable execution permit."
+        "src/http/routes/founderPermissions.ts must keep PromptOS client-visible receipts non-authorizing, verify trusted provider preconditions before one-shot consumption, execute the registered PromptOS effect only server-side after exact atomic consumption, require provider-native outcome verification, and forbid blind retry after a consumed ambiguous or failed effect."
       ]
     },
     {
@@ -21,7 +22,13 @@
     {
       "path": "src/lib/founderPermissionExecution.ts",
       "claims": [
-        "src/lib/founderPermissionExecution.ts must derive mutable execution state from the trusted repository provider, verify the exact workflow and registry content hashes, bind the decision internally, and revalidate provider state immediately before any effect."
+        "src/lib/founderPermissionExecution.ts must derive mutable execution state from the trusted repository provider, verify workflow body identity plus exact workflow and registry hashes, build only the approved registry entry, revalidate immediately before effect, and require exact post-write branch and registry readback before outcomeVerified true."
+      ]
+    },
+    {
+      "path": "src/providers/PromptOSRegistryWriter.ts",
+      "claims": [
+        "src/providers/PromptOSRegistryWriter.ts must restrict mutation to jussray/promptos main workflows/registry.json, require the founder-approved pre-head as the new commit parent, use a non-forced ref update, reconcile ambiguous responses only through authoritative provider readback, and never expose ambient repository write authority."
       ]
     },
     {
