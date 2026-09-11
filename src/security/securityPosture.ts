@@ -8,6 +8,7 @@ import {
 import {
   PROVIDER_PQC_CAPABILITIES,
   auditProviderPqcCapabilities,
+  providerPqcCapabilitiesAsOf,
   type ProviderPqcCapabilityEntry,
 } from './providerPqcCapability.js';
 import {
@@ -93,7 +94,7 @@ function unique(values: readonly string[]): string[] {
   return [...new Set(values)].sort();
 }
 
-export function buildSecurityPostureSnapshot(): SecurityPostureSnapshot {
+export function buildSecurityPostureSnapshot(asOf: Date = new Date()): SecurityPostureSnapshot {
   const audits = auditPortfolioStrategicSecurity();
   const projects: SecurityPostureProject[] = audits.map((audit) => ({
     slug: audit.projectSlug,
@@ -113,7 +114,8 @@ export function buildSecurityPostureSnapshot(): SecurityPostureSnapshot {
   const frameworkSignals = unique(STRATEGIC_SECURITY_STAGES.flatMap((stage) => stage.frameworkSignals));
   const lanternErrors = validateLanternPolicy({ ...DEFAULT_LANTERN_POLICY });
   const cryptoCoverage = auditCryptographicInventoryCoverage();
-  const providerPqcSummary = auditProviderPqcCapabilities();
+  const providerPqcEntries = providerPqcCapabilitiesAsOf(PROVIDER_PQC_CAPABILITIES, asOf);
+  const providerPqcSummary = auditProviderPqcCapabilities(providerPqcEntries);
 
   return {
     contract: SECURITY_POSTURE_CONTRACT,
@@ -144,7 +146,7 @@ export function buildSecurityPostureSnapshot(): SecurityPostureSnapshot {
       reviewRequired: CRYPTOGRAPHIC_REVIEW_REQUIRED,
       coverage: cryptoCoverage,
       providerPqcEvidence: {
-        entries: PROVIDER_PQC_CAPABILITIES,
+        entries: providerPqcEntries,
         summary: providerPqcSummary,
       },
     },
