@@ -19,12 +19,28 @@ export const CANONICAL_SHELL_CONTAINERS = [
 
 export type CanonicalShellContainer = (typeof CANONICAL_SHELL_CONTAINERS)[number];
 export type TruthClassification = 'verified' | 'inferred' | 'unknown' | 'blocked' | 'conflicted' | 'stale';
+export type RealityPlane = 'intent' | 'authority' | 'state' | 'execution' | 'provider' | 'runtime' | 'outcome' | 'human';
+export type RealityRelation = 'coherent' | 'temporal' | 'scoped' | 'evidence-conflict' | 'semantic-conflict' | 'contradiction';
+
+export interface RealityClaim {
+  id: string;
+  subject: string;
+  plane: RealityPlane;
+  classification: TruthClassification;
+  scope?: string;
+  observer?: string;
+  observedAt?: string;
+  evidence?: readonly unknown[];
+}
 
 export interface ProjectShellTruth {
   classification: TruthClassification;
   observedAt?: string;
   expiresAt?: string;
   conflicts?: readonly string[];
+  realities?: readonly RealityClaim[];
+  relation?: RealityRelation;
+  governingRealityId?: string;
 }
 
 export interface ProjectShellState {
@@ -52,6 +68,10 @@ export interface ProjectShellModel {
   truthMode: {
     label: 'TRUTHMODE / CONFESS';
     classification: TruthClassification;
+    realities: readonly RealityClaim[];
+    relation: RealityRelation;
+    governingRealityId?: string;
+    hasUnresolvedContradiction: boolean;
     mayClaimVerifiedOutcome: boolean;
   };
 }
@@ -62,7 +82,13 @@ export function buildProjectShellModel(projectSlug: string, state: ProjectShellS
   if (state.project.slug !== projectSlug) throw new Error(`project_shell_state_mismatch:${projectSlug}`);
 
   const classification = state.truth?.classification ?? 'unknown';
-  const mayClaimVerifiedOutcome = classification === 'verified' && Boolean(state.outcome) && Boolean(state.evidence);
+  const realities = state.truth?.realities ?? [];
+  const relation = state.truth?.relation ?? 'coherent';
+  const hasUnresolvedContradiction = relation === 'contradiction' || relation === 'evidence-conflict';
+  const mayClaimVerifiedOutcome = classification === 'verified'
+    && Boolean(state.outcome)
+    && Boolean(state.evidence)
+    && !hasUnresolvedContradiction;
 
   return {
     definition,
@@ -72,6 +98,10 @@ export function buildProjectShellModel(projectSlug: string, state: ProjectShellS
     truthMode: {
       label: 'TRUTHMODE / CONFESS',
       classification,
+      realities,
+      relation,
+      governingRealityId: state.truth?.governingRealityId,
+      hasUnresolvedContradiction,
       mayClaimVerifiedOutcome,
     },
   };
