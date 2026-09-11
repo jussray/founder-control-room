@@ -1,5 +1,3 @@
-import { supabase } from './supabaseClient.js';
-
 const TRUTH_CLASSIFICATIONS = new Set(['verified', 'inferred', 'unknown', 'blocked', 'conflicted', 'stale']);
 
 function normalizeTruthClassification(value: unknown) {
@@ -78,6 +76,7 @@ export function toProjectShellStateView(raw: {
 }
 
 export async function readProjectShellState(projectId: string) {
+  const { supabase } = await import('./supabaseClient.js');
   const [truth, continuity, outcome, resources, recovery] = await Promise.all([
     supabase.from('truth_snapshots').select('classification, observed_at, expires_at, conflicts').eq('project_id', projectId).order('observed_at', { ascending: false }).limit(1).maybeSingle(),
     supabase.from('continuity_records').select('valid_until, invalidated_at').eq('project_id', projectId).order('created_at', { ascending: false }).limit(1).maybeSingle(),
