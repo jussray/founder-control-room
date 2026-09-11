@@ -6,7 +6,7 @@ import { supabase } from '../../lib/supabaseClient.js';
 import { clearFounderSession, readFounderSession, revokeFounderSession, rotateFounderSession } from '../../auth/founderSession.js';
 import { respondError, respondSuccess } from '../apiResponse.js';
 import { FOUNDER_API_URL, rateLimitMagicLink } from '../middleware/security.js';
-import { requireFounder, requireInteractiveFounder, type FounderRequest } from '../middleware/requireFounder.js';
+import { requireFounder, requireInteractiveFounder, requireWorkspaceUser, type FounderRequest } from '../middleware/requireFounder.js';
 import { founderCallbackHtml } from './onboarding.js';
 
 export const authRouter = Router();
@@ -86,8 +86,6 @@ authRouter.get('/callback', rateLimitFounderOAuth, async (req, res) => {
     return res.status(503).type('html').send(founderCallbackHtml());
   }
 
-  // The opaque HttpOnly founder capability is now the only browser session handoff.
-  // Do not duplicate Supabase access/refresh credentials into a URL fragment.
   return res.redirect(303, '/');
 });
 
@@ -114,7 +112,7 @@ authRouter.post('/session', async (req, res) => {
   return respondSuccess(res, { founder: { email } }, 201);
 });
 
-authRouter.get('/me', requireFounder, (req: FounderRequest, res) => {
+authRouter.get('/me', requireWorkspaceUser, (req: FounderRequest, res) => {
   res.setHeader('Cache-Control', 'no-store');
   return respondSuccess(res, { founder: req.founder });
 });
