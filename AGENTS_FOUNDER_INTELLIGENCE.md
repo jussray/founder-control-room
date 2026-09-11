@@ -13,14 +13,15 @@ When a task analyzes social-media growth, attribution, post performance, or plat
 For repository, CI, deployment, runtime, or cross-project claims, current authority belongs to the newest authoritative subject head and the evidence bound to that exact identity.
 
 - Resolve the current authoritative `main` or equivalent provider head at decision time before carrying forward a previous conclusion.
-- Evidence from a predecessor SHA remains provenance, not current proof. Mark it `HISTORICAL`, `STALE`, `SUPERSEDED`, `UNKNOWN`, or `BLOCKED` when the subject head, peer dependency, runtime identity, required proof set, authority state, or evidence contract changes.
+- Evidence from a predecessor SHA remains durable provenance and must be preserved. It is not current proof, but it still matters as the last-known-good or last-known-bad baseline, regression comparator, rollback anchor, continuity witness, debugging evidence, causal-change reference, and record of what was actually verified at that earlier identity.
+- Mark predecessor evidence `HISTORICAL`, `STALE`, `SUPERSEDED`, `UNKNOWN`, or `BLOCKED` when the subject head, peer dependency, runtime identity, required proof set, authority state, or evidence contract changes. Those classifications change its authority for current claims, not its evidentiary value as history.
 - Never inherit green checks, Playwright results, provider acceptance, runtime receipts, or outcome claims from a predecessor head merely because the newer head descends from it.
-- When a newer authoritative head has its own exact-head evidence, use that evidence as the current baseline and stop repairing failures that exist only on the superseded predecessor unless they reproduce on the current head.
+- When a newer authoritative head has its own exact-head evidence, use that evidence as the current baseline. Keep predecessor proof linked for comparison and rollback, but stop repairing failures that exist only on the superseded predecessor unless they reproduce on the current head or are needed to explain a regression.
 - If current exact-head evidence is still running, missing, or contradictory, keep the claim open. Do not patch historical failures speculatively just to make an old run green.
-- Cross-repository proof expires when either bound repository head or peer/runtime identity moves. Rebind and rerun the applicable witness against the new pair before restoring a current integration claim.
+- Cross-repository proof expires when either bound repository head or peer/runtime identity moves. Preserve the old pair and its receipts as historical integration proof, then rebind and rerun the applicable witness against the new pair before restoring a current integration claim.
 - Supersession changes evidence authority only. It never widens execution, merge, deployment, provider, spending, credential, migration, or founder authority.
 
-This is a TruthMode rule, not a cleanup convenience: newest head does not automatically mean verified, and predecessor green does not automatically mean current green.
+This is a TruthMode rule, not a cleanup convenience: newest head does not automatically mean verified, predecessor green does not automatically mean current green, and predecessor proof must never be discarded merely because authority moved forward.
 
 Required loop:
 
