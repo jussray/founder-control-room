@@ -23,9 +23,28 @@ function issue() {
 describe('issueCreateBranchAuthority', () => {
   it('derives a valid exact-action envelope entirely on the server', () => {
     const issued = issue();
-    expect(issued.envelope.capability.id).toBe('github.repository.create_branch');
+    expect(issued.envelope.capability.id).toBe('github.repository.create-branch');
     expect(issued.envelope.consequenceClass).toBe('reversible');
     expect(issued.envelope.idempotencyKey).toBe('idem-789');
+    expect(validateAuthorityEnvelope(issued.envelope, issued.context)).toEqual([]);
+  });
+
+  it('derives deterministic fallback issuance from proof and idempotency identity', () => {
+    const issued = issueCreateBranchAuthority({
+      missionId: 'mission-123',
+      projectId: 'project-456',
+      actor: 'founder@example.com',
+      approvedBy: 'founder@example.com',
+      idempotencyKey: 'idem-789',
+      baseRef: 'main',
+      branchName: 'mission/mission-1',
+      state: { missionStatus: 'proposed', policySnapshot: { required: ['ci'] } },
+      proof: { id: 'proof-1', gateId: 'create_branch', createdAt: NOW },
+    });
+
+    expect(issued.envelope.issuedAt).toBe(NOW);
+    expect(issued.envelope.expiresAt).toBe('2026-09-11T08:15:00.000Z');
+    expect(issued.envelope.toolCallId).toBe('approval-execution:idem-789');
     expect(validateAuthorityEnvelope(issued.envelope, issued.context)).toEqual([]);
   });
 

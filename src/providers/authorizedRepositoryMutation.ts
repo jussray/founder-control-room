@@ -33,7 +33,7 @@ export async function executeAuthorizedCreateBranch(
 ): Promise<string> {
   const errors = validateAuthorityEnvelope(input.envelope, {
     ...input.context,
-    capabilityId: 'github.repository.create_branch',
+    capabilityId: 'github.repository.create-branch',
   });
 
   const expectedScope = `repository:${input.projectId}:branch:create`;
