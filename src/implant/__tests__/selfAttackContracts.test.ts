@@ -191,7 +191,7 @@ describe('ULTRATHINK self-attack implant contracts', () => {
     })).toBe(true);
   });
 
-  it('binds approval to canonical payload, actor, target fingerprint, expiry, and replay state', () => {
+  it('binds approval to canonical payload, actor, target fingerprint, expiry, and authoritative replay state', () => {
     const payload = { z: 2, a: { y: 1, x: true } };
     const binding: ApprovalBinding = {
       approvalId: 'a1',
@@ -225,8 +225,9 @@ describe('ULTRATHINK self-attack implant contracts', () => {
       branch: 'main',
       now: '2026-09-08T21:00:00Z',
     };
+    const unconsumed = new Set<string>();
 
-    expect(validateApprovalExecution(binding, attempt)).toEqual({
+    expect(validateApprovalExecution(binding, attempt, unconsumed)).toEqual({
       ok: true,
       payloadHash: binding.payloadHash,
     });
@@ -234,13 +235,19 @@ describe('ULTRATHINK self-attack implant contracts', () => {
     expect(validateApprovalExecution(binding, {
       ...attempt,
       targetFingerprint: 'moved',
-    })).toEqual({ ok: false, code: 'fingerprint_mismatch' });
+    }, unconsumed)).toEqual({ ok: false, code: 'fingerprint_mismatch' });
 
     expect(validateApprovalExecution(
       binding,
       attempt,
       new Set(['idem-1']),
     )).toEqual({ ok: false, code: 'approval_replay' });
+
+    expect(validateApprovalExecution(
+      binding,
+      attempt,
+      undefined as unknown as ReadonlySet<string>,
+    )).toEqual({ ok: false, code: 'approval_replay_state_missing' });
   });
 
   it('requires exactly one protective or clarifying move for sensitive first-slice input', () => {
