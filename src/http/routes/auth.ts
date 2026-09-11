@@ -6,7 +6,7 @@ import { supabase } from '../../lib/supabaseClient.js';
 import { clearFounderSession, readFounderSession, revokeFounderSession, rotateFounderSession } from '../../auth/founderSession.js';
 import { respondError, respondSuccess } from '../apiResponse.js';
 import { FOUNDER_API_URL, rateLimitMagicLink } from '../middleware/security.js';
-import { requireFounder, requireInteractiveFounder, requireWorkspaceUser, type FounderRequest } from '../middleware/requireFounder.js';
+import { requireInteractiveFounder, requireWorkspaceUser, type FounderRequest } from '../middleware/requireFounder.js';
 import { founderCallbackHtml } from './onboarding.js';
 
 export const authRouter = Router();
