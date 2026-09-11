@@ -1,4 +1,11 @@
 import {
+  CRYPTOGRAPHIC_INVENTORY,
+  CRYPTOGRAPHIC_REVIEW_REQUIRED,
+  auditCryptographicInventoryCoverage,
+  type CryptographicInventoryEntry,
+  type CryptographicReviewRequired,
+} from './cryptographicInventory.js';
+import {
   DEFAULT_LANTERN_POLICY,
   STRATEGIC_SECURITY_INVARIANTS,
   STRATEGIC_SECURITY_STAGES,
@@ -34,6 +41,9 @@ export interface SecurityPostureSummary {
   totalStageObligations: number;
   uniqueControlCount: number;
   frameworkSignalCount: number;
+  cryptographicInventoryEntries: number;
+  cryptographicReviewRequiredProjects: number;
+  publicKeyMigrationEntries: number;
   provenProjects: 0;
 }
 
@@ -43,6 +53,11 @@ export interface SecurityPostureSnapshot {
   stages: typeof STRATEGIC_SECURITY_STAGES;
   projects: SecurityPostureProject[];
   invariants: typeof STRATEGIC_SECURITY_INVARIANTS;
+  cryptography: {
+    inventory: readonly CryptographicInventoryEntry[];
+    reviewRequired: readonly CryptographicReviewRequired[];
+    coverage: ReturnType<typeof auditCryptographicInventoryCoverage>;
+  };
   lantern: {
     policy: typeof DEFAULT_LANTERN_POLICY;
     valid: boolean;
@@ -52,6 +67,7 @@ export interface SecurityPostureSnapshot {
     targetVersionIsNotCurrentMaturity: true;
     frameworkMappingIsNotCertification: true;
     providerClaimsRequireRuntimeEvidence: true;
+    cryptographicInventoryIsObservationNotQuantumSafety: true;
     securityPostureIsReadOnly: true;
     analyticsAreAggregateAndPrivacySafe: true;
     noHumanIdentityClaimFromNetworkSignal: true;
@@ -81,6 +97,7 @@ export function buildSecurityPostureSnapshot(): SecurityPostureSnapshot {
   const uniqueControls = unique(STRATEGIC_SECURITY_STAGES.flatMap((stage) => stage.controls));
   const frameworkSignals = unique(STRATEGIC_SECURITY_STAGES.flatMap((stage) => stage.frameworkSignals));
   const lanternErrors = validateLanternPolicy({ ...DEFAULT_LANTERN_POLICY });
+  const cryptoCoverage = auditCryptographicInventoryCoverage();
 
   return {
     contract: SECURITY_POSTURE_CONTRACT,
@@ -93,11 +110,19 @@ export function buildSecurityPostureSnapshot(): SecurityPostureSnapshot {
       totalStageObligations: projects.reduce((sum, project) => sum + project.requiredStageCount, 0),
       uniqueControlCount: uniqueControls.length,
       frameworkSignalCount: frameworkSignals.length,
+      cryptographicInventoryEntries: cryptoCoverage.inventoryEntryCount,
+      cryptographicReviewRequiredProjects: cryptoCoverage.reviewRequiredProjectCount,
+      publicKeyMigrationEntries: cryptoCoverage.publicKeyMigrationEntryCount,
       provenProjects: 0,
     },
     stages: STRATEGIC_SECURITY_STAGES,
     projects,
     invariants: STRATEGIC_SECURITY_INVARIANTS,
+    cryptography: {
+      inventory: CRYPTOGRAPHIC_INVENTORY,
+      reviewRequired: CRYPTOGRAPHIC_REVIEW_REQUIRED,
+      coverage: cryptoCoverage,
+    },
     lantern: {
       policy: DEFAULT_LANTERN_POLICY,
       valid: lanternErrors.length === 0,
@@ -107,6 +132,7 @@ export function buildSecurityPostureSnapshot(): SecurityPostureSnapshot {
       targetVersionIsNotCurrentMaturity: true,
       frameworkMappingIsNotCertification: true,
       providerClaimsRequireRuntimeEvidence: true,
+      cryptographicInventoryIsObservationNotQuantumSafety: true,
       securityPostureIsReadOnly: true,
       analyticsAreAggregateAndPrivacySafe: true,
       noHumanIdentityClaimFromNetworkSignal: true,
