@@ -6,6 +6,7 @@ import { authRouter } from './routes/auth.js';
 import { onboardingRouter } from './routes/onboarding.js';
 import { founderOnboardingRouter } from './routes/founderOnboarding.js';
 import { projectsRouter } from './routes/projects.js';
+import { projectShellStateRouter } from './routes/projectShellState.js';
 import { buildEventsRouter } from './routes/buildEvents.js';
 import { handleBuildEventReceiptIngest } from './routes/buildEventReceipts.js';
 import { reasoningRunsRouter } from './routes/reasoningRuns.js';
@@ -139,13 +140,6 @@ function deploymentVersion() {
 }
 
 export interface CreateServerOptions {
-  /**
-   * Serve the static Control Room frontend (public/control-room) from this
-   * process. Node-only — reads from the local filesystem, so it's off by
-   * default in the Cloudflare Worker entry point (cf-entry.ts), where the
-   * documented deployment path is Cloudflare Pages serving the frontend
-   * separately, not this Worker's filesystem.
-   */
   serveStatic?: boolean;
 }
 
@@ -167,200 +161,56 @@ export function createServer(options: CreateServerOptions = {}) {
     app.use('/control-room', express.static(path.join(publicDir, 'control-room')));
   }
 
-  // Webhooks, remote MCP calls, repo-runner pings, sanitized commerce
-  // receipts, downstream publication receipts, review contexts, and signed
-  // service receipts do not use browser cookies. Mount them before the
-  // browser same-origin mutation gate and give each endpoint strict parser/auth rules.
-  app.post(
-    '/webhooks/github',
-    express.raw({ type: 'application/json', limit: BODY_LIMIT }),
-    handleGitHubWebhook,
-  );
-  app.post(
-    '/webhooks/stripe-quickscan',
-    express.raw({ type: 'application/json', limit: '64kb' }),
-    handleStripeQuickScanWebhook,
-  );
-  app.post(
-    '/ingest/repository-verification',
-    express.raw({ type: 'application/json', limit: '512kb' }),
-    handleRepositoryVerificationIngest,
-  );
-  app.post(
-    '/ingest/build-events/:slug',
-    rateLimitGeneral,
-    express.json({ type: 'application/json', limit: '32kb' }),
-    handleBuildEventReceiptIngest,
-  );
-  app.post(
-    '/ingest/hair-commerce-receipts',
-    rateLimitGeneral,
-    express.json({ type: 'application/json', limit: '32kb' }),
-    handleHairCommerceReceiptIngest,
-  );
-  app.post(
-    '/ingest/proof-of-ship-receipts',
-    rateLimitGeneral,
-    express.json({ type: 'application/json', limit: '32kb' }),
-    handleProofOfShipReceiptIngest,
-  );
-  app.get(
-    '/ingest/proof-of-ship-receipts/by-commit/:owner/:repo/:sha',
-    rateLimitGeneral,
-    handleProofOfShipCommitLookup,
-  );
-  app.get(
-    '/ingest/proof-of-ship-receipts/:receiptId',
-    rateLimitGeneral,
-    handleProofOfShipReceiptLookup,
-  );
-  app.post(
-    '/ingest/founder-review-contexts',
-    rateLimitGeneral,
-    express.json({ type: 'application/json', limit: '32kb' }),
-    handleFounderSignalReviewContextIngest,
-  );
-  app.post(
-    '/ingest/founder-review-email',
-    rateLimitGeneral,
-    express.raw({ type: 'application/json', limit: '16kb' }),
-    handleFounderSignalReviewEmailIngest,
-  );
-  app.post(
-    '/ingest/jira-work-automation',
-    rateLimitJiraWorkAutomationIngress,
-    express.raw({ type: 'application/json', limit: '16kb' }),
-    handleJiraWorkAutomationIngress,
-  );
-  app.post(
-    '/ingest/product-build-receipts/storyengine',
-    rateLimitGeneral,
-    express.json({ type: 'application/json', limit: '32kb' }),
-    handleProductBuildReceiptIngest,
-  );
-  app.post(
-    '/mcp/founder-signal-engine',
-    rateLimitGeneral,
-    express.json({ type: 'application/json', limit: '64kb' }),
-    requireFounderSignalEngineMcpToken,
-    requireFounderSignalEngineReviewOnly,
-    handleFounderSignalEngineMcp,
-  );
-  app.post(
-    '/mcp/founder-signal-x-engagement',
-    rateLimitGeneral,
-    express.json({ type: 'application/json', limit: '16kb' }),
-    requireFounderSignalReadMcpToken,
-    handleXEngagementSignalMcp,
-  );
-  app.get(
-    '/.well-known/oauth-protected-resource',
-    handleRemoteMcpProtectedResourceMetadata,
-  );
-  app.get(
-    '/.well-known/oauth-protected-resource/mcp',
-    handleRemoteMcpProtectedResourceMetadata,
-  );
+  app.post('/webhooks/github', express.raw({ type: 'application/json', limit: BODY_LIMIT }), handleGitHubWebhook);
+  app.post('/webhooks/stripe-quickscan', express.raw({ type: 'application/json', limit: '64kb' }), handleStripeQuickScanWebhook);
+  app.post('/ingest/repository-verification', express.raw({ type: 'application/json', limit: '512kb' }), handleRepositoryVerificationIngest);
+  app.post('/ingest/build-events/:slug', rateLimitGeneral, express.json({ type: 'application/json', limit: '32kb' }), handleBuildEventReceiptIngest);
+  app.post('/ingest/hair-commerce-receipts', rateLimitGeneral, express.json({ type: 'application/json', limit: '32kb' }), handleHairCommerceReceiptIngest);
+  app.post('/ingest/proof-of-ship-receipts', rateLimitGeneral, express.json({ type: 'application/json', limit: '32kb' }), handleProofOfShipReceiptIngest);
+  app.get('/ingest/proof-of-ship-receipts/by-commit/:owner/:repo/:sha', rateLimitGeneral, handleProofOfShipCommitLookup);
+  app.get('/ingest/proof-of-ship-receipts/:receiptId', rateLimitGeneral, handleProofOfShipReceiptLookup);
+  app.post('/ingest/founder-review-contexts', rateLimitGeneral, express.json({ type: 'application/json', limit: '32kb' }), handleFounderSignalReviewContextIngest);
+  app.post('/ingest/founder-review-email', rateLimitGeneral, express.raw({ type: 'application/json', limit: '16kb' }), handleFounderSignalReviewEmailIngest);
+  app.post('/ingest/jira-work-automation', rateLimitJiraWorkAutomationIngress, express.raw({ type: 'application/json', limit: '16kb' }), handleJiraWorkAutomationIngress);
+  app.post('/ingest/product-build-receipts/storyengine', rateLimitGeneral, express.json({ type: 'application/json', limit: '32kb' }), handleProductBuildReceiptIngest);
+  app.post('/mcp/founder-signal-engine', rateLimitGeneral, express.json({ type: 'application/json', limit: '64kb' }), requireFounderSignalEngineMcpToken, requireFounderSignalEngineReviewOnly, handleFounderSignalEngineMcp);
+  app.post('/mcp/founder-signal-x-engagement', rateLimitGeneral, express.json({ type: 'application/json', limit: '16kb' }), requireFounderSignalReadMcpToken, handleXEngagementSignalMcp);
+  app.get('/.well-known/oauth-protected-resource', handleRemoteMcpProtectedResourceMetadata);
+  app.get('/.well-known/oauth-protected-resource/mcp', handleRemoteMcpProtectedResourceMetadata);
 
   app.use(requireSameOriginBrowserMutation);
   app.use(express.json({ limit: BODY_LIMIT }));
-
   app.get('/health', (_req, res) => res.json({ ok: true }));
-
   app.get('/version', (_req, res) => {
-    res.set({
-      'Cache-Control': 'no-store',
-      'Content-Type': 'application/json; charset=utf-8',
-      'Referrer-Policy': 'no-referrer',
-      'X-Content-Type-Options': 'nosniff',
-    });
+    res.set({ 'Cache-Control': 'no-store', 'Content-Type': 'application/json; charset=utf-8', 'Referrer-Policy': 'no-referrer', 'X-Content-Type-Options': 'nosniff' });
     res.status(200).json(deploymentVersion());
   });
-
   app.get('/guardrails', (_req, res) => {
-    res.set({
-      'Cache-Control': 'no-store',
-      'Content-Type': 'text/html; charset=utf-8',
-      'Content-Security-Policy':
-        "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'",
-      'Referrer-Policy': 'no-referrer',
-      'X-Content-Type-Options': 'nosniff',
-    });
+    res.set({ 'Cache-Control': 'no-store', 'Content-Type': 'text/html; charset=utf-8', 'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'", 'Referrer-Policy': 'no-referrer', 'X-Content-Type-Options': 'nosniff' });
     res.status(200).send(renderGuardrailStatusPage());
   });
-
   app.get('/guardrails.json', (_req, res) => {
-    res.set({
-      'Cache-Control': 'no-store',
-      'Content-Type': 'application/json; charset=utf-8',
-      'Referrer-Policy': 'no-referrer',
-      'X-Content-Type-Options': 'nosniff',
-    });
+    res.set({ 'Cache-Control': 'no-store', 'Content-Type': 'application/json; charset=utf-8', 'Referrer-Policy': 'no-referrer', 'X-Content-Type-Options': 'nosniff' });
     res.status(200).json(publicGuardrailSnapshot());
   });
 
   app.use(rateLimitGeneral);
-
-  app.post(
-    '/review/deterministic-witness/:pullRequestNumber',
-    requireFounder,
-    requirePortfolioSwitchOn('fcr-privileged-execution-master'),
-    async (req, res, next) => {
-      const pullRequestNumber = Number(req.params.pullRequestNumber);
-      if (!Number.isInteger(pullRequestNumber) || pullRequestNumber <= 0) {
-        return res.status(400).json({ error: 'pullRequestNumber must be a positive integer' });
-      }
-
-      try {
-        const runtimeSha = process.env.GIT_SHA?.trim() ?? '';
-        if (!EXACT_COMMIT_SHA.test(runtimeSha)) {
-          return res.status(503).json({ error: 'deterministic review witness requires the exact current main runtime' });
-        }
-
-        const provider = providerForProject(FCR_REVIEW_PROJECT);
-        const currentMainSha = await provider.resolveRef(FCR_REVIEW_PROJECT.slug, 'main');
-        if (currentMainSha.toLowerCase() !== runtimeSha.toLowerCase()) {
-          return res.status(409).json({ error: 'deterministic review witness requires the exact current main runtime' });
-        }
-
-        const { production, signal } = await publishDeterministicReviewWitness({
-          provider,
-          projectId: FCR_REVIEW_PROJECT.slug,
-          pullRequestNumber,
-        });
-
-        const currentMainAfter = await provider.resolveRef(FCR_REVIEW_PROJECT.slug, 'main');
-        if (currentMainAfter.toLowerCase() !== runtimeSha.toLowerCase()) {
-          throw new Error('Deterministic review witness main moved during publication; emitted signal is historical');
-        }
-
-        res.setHeader('Cache-Control', 'no-store');
-        return res.status(200).json({
-          contract: 'fcr/deterministic-review-witness-trigger@v1',
-          witnessPublished: true,
-          proposalOnly: true,
-          mergeAuthorized: false,
-          executionAuthorized: false,
-          receipt: production.receipt,
-          pullRequestNumber: production.receipt.pullRequestNumber,
-          baseSha: production.receipt.baseSha,
-          headSha: production.receipt.headSha,
-          reviewHash: production.receipt.reviewHash,
-          verdict: production.receipt.verdict,
-          findingCount: production.receipt.findings.length,
-          signal: {
-            name: signal.name,
-            status: signal.status,
-            commitSha: signal.commitSha,
-            evidenceFingerprint: signal.evidenceFingerprint ?? null,
-            issuer: signal.issuer ?? null,
-          },
-        });
-      } catch (error) {
-        return next(error);
-      }
-    },
-  );
+  app.post('/review/deterministic-witness/:pullRequestNumber', requireFounder, requirePortfolioSwitchOn('fcr-privileged-execution-master'), async (req, res, next) => {
+    const pullRequestNumber = Number(req.params.pullRequestNumber);
+    if (!Number.isInteger(pullRequestNumber) || pullRequestNumber <= 0) return res.status(400).json({ error: 'pullRequestNumber must be a positive integer' });
+    try {
+      const runtimeSha = process.env.GIT_SHA?.trim() ?? '';
+      if (!EXACT_COMMIT_SHA.test(runtimeSha)) return res.status(503).json({ error: 'deterministic review witness requires the exact current main runtime' });
+      const provider = providerForProject(FCR_REVIEW_PROJECT);
+      const currentMainSha = await provider.resolveRef(FCR_REVIEW_PROJECT.slug, 'main');
+      if (currentMainSha.toLowerCase() !== runtimeSha.toLowerCase()) return res.status(409).json({ error: 'deterministic review witness requires the exact current main runtime' });
+      const { production, signal } = await publishDeterministicReviewWitness({ provider, projectId: FCR_REVIEW_PROJECT.slug, pullRequestNumber });
+      const currentMainAfter = await provider.resolveRef(FCR_REVIEW_PROJECT.slug, 'main');
+      if (currentMainAfter.toLowerCase() !== runtimeSha.toLowerCase()) throw new Error('Deterministic review witness main moved during publication; emitted signal is historical');
+      res.setHeader('Cache-Control', 'no-store');
+      return res.status(200).json({ contract: 'fcr/deterministic-review-witness-trigger@v1', witnessPublished: true, proposalOnly: true, mergeAuthorized: false, executionAuthorized: false, receipt: production.receipt, pullRequestNumber: production.receipt.pullRequestNumber, baseSha: production.receipt.baseSha, headSha: production.receipt.headSha, reviewHash: production.receipt.reviewHash, verdict: production.receipt.verdict, findingCount: production.receipt.findings.length, signal: { name: signal.name, status: signal.status, commitSha: signal.commitSha, evidenceFingerprint: signal.evidenceFingerprint ?? null, issuer: signal.issuer ?? null } });
+    } catch (error) { return next(error); }
+  });
 
   app.use('/', onboardingRouter);
   app.use('/auth', authRouter);
@@ -371,47 +221,34 @@ export function createServer(options: CreateServerOptions = {}) {
   app.use('/projects', repositoryVerificationRouter);
   app.use('/projects', buildEventsRouter);
   app.use('/projects', reasoningRunsRouter);
+  app.use('/projects', requireProjectReadAudit, projectShellStateRouter);
   app.use('/projects', requireProjectReadAudit, projectsRouter);
-  // Privileged mission execution still uses the existing approvals router, but
-  // it must now pass founder authentication + founder master switch + V10
-  // plan/registry/exact-head binding + portable Chief/PromptOS/founder
-  // decision binding before the route may reserve an approval_executions row.
-  app.post(
-    '/approvals/:missionId/execute',
-    requireFounder,
-    requirePortfolioSwitchOn('fcr-privileged-execution-master'),
-    requireV10PrivilegedApprovalBinding,
-    requireV10DecisionFounderBinding,
-  );
+  app.post('/approvals/:missionId/execute', requireFounder, requirePortfolioSwitchOn('fcr-privileged-execution-master'), requireV10PrivilegedApprovalBinding, requireV10DecisionFounderBinding);
   app.use('/approvals', approvalsRouter);
   app.use('/l99', l99Router);
   app.use('/l99/product-build', productBuildRouter);
   app.use('/terminal', terminalRouter);
   app.use('/dashboard', dashboardRouter);
-  app.use('/futureyou', futureYouRouter);
-  app.use('/goalfix', goalfixRouter);
-  app.use('/founder-os', founderOsSkillsRouter);
-  app.use('/mirror', mirrorRouter);
   app.use('/missions', missionsRouter);
   app.use('/promptos', promptosRouter);
   app.use('/agents', agentsRouter);
   app.use('/capabilities', capabilitiesRouter);
   app.use('/authority-levels', authorityLevelsRouter);
-  app.use('/plugin-center', pluginCenterRouter);
-  app.use('/command-bridge', commandBridgeRouter);
-  app.use('/automation/conveyor', n8nConveyorRouter);
-  app.use('/quickscan', quickScanRouter);
+  app.use('/plugins', pluginCenterRouter);
+  app.use('/command', commandBridgeRouter);
   app.use('/design-os', designOsRouter);
-  app.use('/cloudflare', cloudflareReasoningRouter);
+  app.use('/cloudflare-reasoning', cloudflareReasoningRouter);
   app.use('/mcp', mcpRouter);
   app.use('/external-use', externalUseRouter);
+  app.use('/future-you', futureYouRouter);
+  app.use('/goalfix', goalfixRouter);
+  app.use('/founder-os-skills', founderOsSkillsRouter);
+  app.use('/mirror', mirrorRouter);
+  app.use('/automation/conveyor', n8nConveyorRouter);
+  app.use('/quickscan', quickScanRouter);
   app.use('/economic-intelligence', economicIntelligenceRouter);
-
-  // Debug routes — CI and founder inspection only (no secrets exposed).
-  app.use('/_debug', debugRouter);
-
+  app.use('/debug', debugRouter);
   app.use(jsonParseErrorHandler);
   app.use(errorHandler);
-
   return app;
 }
