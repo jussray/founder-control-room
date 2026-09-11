@@ -7,10 +7,13 @@ export const workspaceProjectsRouter = Router();
 
 const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
-function workspaceId(req: FounderRequest): string {
+function workspaceId(req: FounderRequest): string | null {
   const id = req.founder?.workspaceId;
-  if (!id) throw new Error('workspace identity missing after requireWorkspaceUser');
-  return id;
+  return typeof id === 'string' && id.trim() ? id.trim() : null;
+}
+
+function missingWorkspace(res: { status: (code: number) => { json: (body: object) => unknown } }) {
+  return res.status(503).json({ error: 'Founder workspace assignment is required' });
 }
 
 async function projectInWorkspace(slug: string, ownerWorkspaceId: string) {
@@ -31,6 +34,8 @@ async function projectInWorkspace(slug: string, ownerWorkspaceId: string) {
  */
 workspaceProjectsRouter.get('/', requireWorkspaceUser, async (req: FounderRequest, res) => {
   const ownerWorkspaceId = workspaceId(req);
+  if (!ownerWorkspaceId) return missingWorkspace(res);
+
   const { data: projects, error } = await supabase
     .from('projects')
     .select('id, workspace_id, slug, name, repo_provider, repo_identifier, stack, status, risk_level, created_at, updated_at')
@@ -43,6 +48,8 @@ workspaceProjectsRouter.get('/', requireWorkspaceUser, async (req: FounderReques
 
 workspaceProjectsRouter.get('/:slug', requireWorkspaceUser, async (req: FounderRequest, res) => {
   const ownerWorkspaceId = workspaceId(req);
+  if (!ownerWorkspaceId) return missingWorkspace(res);
+
   const slug = req.params.slug;
   const { data: project, error } = await projectInWorkspace(slug, ownerWorkspaceId);
 
@@ -53,6 +60,8 @@ workspaceProjectsRouter.get('/:slug', requireWorkspaceUser, async (req: FounderR
 
 workspaceProjectsRouter.post('/', requireWorkspaceUser, async (req: FounderRequest, res) => {
   const ownerWorkspaceId = workspaceId(req);
+  if (!ownerWorkspaceId) return missingWorkspace(res);
+
   const body = req.body as Record<string, unknown>;
   const slug = typeof body.slug === 'string' ? body.slug.trim() : '';
   const name = typeof body.name === 'string' ? body.name.trim() : '';
