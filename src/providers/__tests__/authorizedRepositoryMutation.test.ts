@@ -16,7 +16,7 @@ function envelope(overrides: Partial<AuthorityEnvelopeV1> = {}): AuthorityEnvelo
     intentId: 'mission-123',
     actor: 'founder@example.com',
     capability: capabilityIdentity('github.repository.create_branch'),
-    authorityScope: 'project:founder-control-room:branch:create',
+    authorityScope: 'repository:founder-control-room:branch:create',
     proposalHash: sha('a'),
     argumentsHash: sha('b'),
     stateFingerprint: sha('c'),
@@ -51,6 +51,7 @@ describe('executeAuthorizedCreateBranch', () => {
       projectId: 'founder-control-room',
       baseRef: 'main',
       branchName: 'mission/123',
+      idempotencyKey: 'idem-123',
       envelope: envelope(),
       context,
     });
@@ -60,17 +61,20 @@ describe('executeAuthorizedCreateBranch', () => {
   });
 
   it.each([
-    ['expired approval', envelope({ expiresAt: '2026-09-11T07:24:59.000Z' }), context],
-    ['changed arguments', envelope(), { ...context, argumentsHash: sha('d') }],
-    ['changed state', envelope(), { ...context, stateFingerprint: sha('e') }],
-    ['changed tool call', envelope(), { ...context, toolCallId: 'tool-call-other' }],
-  ])('blocks %s before the provider mutation', async (_name, authority, changedContext) => {
+    ['expired approval', envelope({ expiresAt: '2026-09-11T07:24:59.000Z' }), context, 'founder-control-room', 'idem-123'],
+    ['changed arguments', envelope(), { ...context, argumentsHash: sha('d') }, 'founder-control-room', 'idem-123'],
+    ['changed state', envelope(), { ...context, stateFingerprint: sha('e') }, 'founder-control-room', 'idem-123'],
+    ['changed tool call', envelope(), { ...context, toolCallId: 'tool-call-other' }, 'founder-control-room', 'idem-123'],
+    ['changed repository scope', envelope(), context, 'other-project', 'idem-123'],
+    ['changed idempotency key', envelope(), context, 'founder-control-room', 'idem-other'],
+  ])('blocks %s before the provider mutation', async (_name, authority, changedContext, projectId, idempotencyKey) => {
     const createBranch = vi.fn(async () => 'mission/123');
 
     await expect(executeAuthorizedCreateBranch(provider(createBranch), {
-      projectId: 'founder-control-room',
+      projectId,
       baseRef: 'main',
       branchName: 'mission/123',
+      idempotencyKey,
       envelope: authority,
       context: changedContext,
     })).rejects.toThrow('AUTHORITY_ENVELOPE_REJECTED');
