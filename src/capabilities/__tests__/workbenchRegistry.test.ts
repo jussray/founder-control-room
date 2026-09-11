@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { capabilities } from '../workbenchRegistry.js';
+import {
+  isCapabilityCandidateEligible,
+  selectFreeFirstCapability,
+  type CapabilityCandidate,
+} from '../freeFirstCapabilityPolicy.js';
 
 describe('capability workbench registry', () => {
   it('keeps every reviewed capability complete and uniquely addressable', () => {
@@ -32,5 +37,108 @@ describe('capability workbench registry', () => {
     expect(runtime?.implementation).toContain("type Surface = 'voice' | 'text' | 'mobile' | 'desktop' | 'automation' | 'future'");
     expect(runtime?.implementation).toContain("type Consequence = 'READ' | 'REVERSIBLE_WRITE' | 'CONSEQUENTIAL_WRITE'");
     expect(runtime?.implementation).toContain('Bind approval to proposalId');
+  });
+
+  it('uses cost only after safety, privacy, rights, quality, quota, and automation gates pass', () => {
+    const candidates: CapabilityCandidate[] = [
+      {
+        id: 'unsafe-local',
+        costClass: 'LOCAL_NO_PROVIDER_FEE',
+        safetyEligible: false,
+        privacyEligible: true,
+        commercialRights: 'VERIFIED',
+        quotaAvailable: true,
+        automationEligible: true,
+        licenseEvidence: 'verified-license',
+        quotaEvidence: 'local-runtime',
+        eligibilityRevision: 'r1',
+      },
+      {
+        id: 'hosted-free',
+        costClass: 'HOSTED_FREE_ALLOWANCE',
+        safetyEligible: true,
+        privacyEligible: true,
+        commercialRights: 'VERIFIED',
+        quotaAvailable: true,
+        automationEligible: true,
+        licenseEvidence: 'verified-license',
+        quotaEvidence: 'verified-free-quota',
+        eligibilityRevision: 'r2',
+      },
+      {
+        id: 'paid',
+        costClass: 'PAID',
+        safetyEligible: true,
+        privacyEligible: true,
+        commercialRights: 'VERIFIED',
+        quotaAvailable: true,
+        automationEligible: true,
+        licenseEvidence: 'verified-license',
+        quotaEvidence: 'paid-capacity',
+        eligibilityRevision: 'r3',
+      },
+    ];
+
+    const requirements = {
+      commercialUseRequired: true,
+      automationRequired: true,
+      minimumQualityMet: () => true,
+    };
+
+    expect(isCapabilityCandidateEligible(candidates[0], requirements)).toBe(false);
+    expect(selectFreeFirstCapability(candidates, requirements)).toEqual({
+      providerId: 'hosted-free',
+      costClass: 'HOSTED_FREE_ALLOWANCE',
+      eligibilityRevision: 'r2',
+      licenseEvidence: 'verified-license',
+      quotaEvidence: 'verified-free-quota',
+    });
+  });
+
+  it('falls back to paid only when lower-cost candidates fail current eligibility', () => {
+    const candidates: CapabilityCandidate[] = [
+      {
+        id: 'local-no-rights',
+        costClass: 'LOCAL_NO_PROVIDER_FEE',
+        safetyEligible: true,
+        privacyEligible: true,
+        commercialRights: 'UNKNOWN',
+        quotaAvailable: true,
+        automationEligible: true,
+        licenseEvidence: null,
+        quotaEvidence: 'local-runtime',
+        eligibilityRevision: 'r4',
+      },
+      {
+        id: 'free-no-automation',
+        costClass: 'HOSTED_FREE_ALLOWANCE',
+        safetyEligible: true,
+        privacyEligible: true,
+        commercialRights: 'VERIFIED',
+        quotaAvailable: true,
+        automationEligible: false,
+        licenseEvidence: 'verified-license',
+        quotaEvidence: 'verified-free-quota',
+        eligibilityRevision: 'r5',
+      },
+      {
+        id: 'paid-eligible',
+        costClass: 'PAID',
+        safetyEligible: true,
+        privacyEligible: true,
+        commercialRights: 'VERIFIED',
+        quotaAvailable: true,
+        automationEligible: true,
+        licenseEvidence: 'verified-license',
+        quotaEvidence: 'paid-capacity',
+        eligibilityRevision: 'r6',
+      },
+    ];
+
+    expect(selectFreeFirstCapability(candidates, {
+      commercialUseRequired: true,
+      automationRequired: true,
+      minimumQualityMet: () => true,
+    })?.providerId).toBe('paid-eligible');
   });
 });
