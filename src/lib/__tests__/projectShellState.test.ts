@@ -72,7 +72,7 @@ describe('project shell state view', () => {
     expect(view.mayClaimVerifiedOutcome).toBe(false);
   });
 
-  it('never treats continuity as authority and marks invalidated continuity invalid', () => {
+  it('never treats continuity as authority and invalid continuity makes verified truth stale', () => {
     const view = toProjectShellStateView(base({
       continuity: {
         valid_until: '2026-09-11T23:00:00.000Z',
@@ -85,6 +85,9 @@ describe('project shell state view', () => {
       validUntil: '2026-09-11T23:00:00.000Z',
       invalidatedAt: '2026-09-11T21:58:00.000Z',
     });
+    expect(view.classification).toBe('stale');
+    expect(view.reason).toBe('continuity_invalidated');
+    expect(view.mayClaimVerifiedOutcome).toBe(false);
   });
 
   it('returns only browser-safe resource and recovery summaries', () => {
