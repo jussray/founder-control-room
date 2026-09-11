@@ -70,6 +70,6 @@ describe('provenance recovery P2 contracts', () => {
       projectId: binding.projectId,
       branch: binding.branch,
       now: '2026-09-11T01:00:00Z',
-    })).toEqual({ ok: false, code: 'payload_invalid' });
+    }, new Set())).toEqual({ ok: false, code: 'payload_invalid' });
   });
 });
