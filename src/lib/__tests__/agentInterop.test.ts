@@ -70,6 +70,14 @@ function instruction(source: ProjectStatePacketV1): InstructionPacketV1 {
   return { ...withoutHash, instructionHash: instructionPacketHash(withoutHash) };
 }
 
+function withObservedAt(packet: ProjectStatePacketV1, observedAt: string): ProjectStatePacketV1 {
+  const withoutFingerprint: Omit<ProjectStatePacketV1, 'stateFingerprint'> = {
+    ...packet,
+    source: { ...packet.source, observedAt },
+  };
+  return { ...withoutFingerprint, stateFingerprint: projectStateFingerprint(withoutFingerprint) };
+}
+
 describe('DeepSeek AI-to-AI interop boundary', () => {
   it('accepts an exact-head, expiring project-state packet', () => {
     expect(validateProjectStatePacket(statePacket(), NOW)).toEqual([]);
@@ -80,9 +88,19 @@ describe('DeepSeek AI-to-AI interop boundary', () => {
     expect(validateProjectStatePacket(packet, Date.parse('2026-09-09T04:00:01Z'))).toContain('project state packet is expired');
   });
 
+  it('rejects source observations from the future', () => {
+    const packet = withObservedAt(statePacket(), '2026-09-09T03:05:00Z');
+    expect(validateProjectStatePacket(packet, NOW)).toContain('project state observedAt cannot be in the future');
+  });
+
   it('binds instructor output to the exact source project state', () => {
     const source = statePacket();
     expect(validateInstructionPacket(instruction(source), source, NOW)).toEqual([]);
+  });
+
+  it('requires the source packet for instruction validation', () => {
+    const source = statePacket();
+    expect(validateInstructionPacket(instruction(source), undefined, NOW)).toContain('instruction source packet is required');
   });
 
   it('revalidates the source packet lease when instructor output is consumed', () => {
@@ -92,6 +110,13 @@ describe('DeepSeek AI-to-AI interop boundary', () => {
       source,
       Date.parse('2026-09-09T04:00:01Z'),
     )).toContain('instruction source packet invalid: project state packet is expired');
+  });
+
+  it('rejects a future-dated source packet when instructor output is consumed', () => {
+    const source = withObservedAt(statePacket(), '2026-09-09T03:05:00Z');
+    expect(validateInstructionPacket(instruction(source), source, NOW)).toContain(
+      'instruction source packet invalid: project state observedAt cannot be in the future',
+    );
   });
 
   it('rejects any attempt to turn instructor output into mutation authority', () => {
