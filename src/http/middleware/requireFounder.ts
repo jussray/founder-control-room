@@ -16,8 +16,11 @@ export type FounderAccountRole = 'platform_owner' | 'workspace_owner';
 export interface FounderIdentity {
   email: string;
   userId: string;
-  role: FounderAccountRole;
-  workspaceId: string | null;
+  // Optional at the shared request type boundary so legacy tests/helpers that
+  // construct a FounderRequest remain source-compatible. Authorization
+  // middleware always populates both values before tenant-aware routes run.
+  role?: FounderAccountRole;
+  workspaceId?: string | null;
 }
 
 export interface FounderRequest extends Request {
@@ -34,6 +37,11 @@ interface FounderAccess {
   workspaceId: string | null;
 }
 
+type FounderAccessState =
+  | { state: 'allowed'; access: FounderAccess }
+  | { state: 'denied' }
+  | { state: 'error' };
+
 function authenticatedIdentity(user: unknown): AuthenticatedIdentity | null {
   if (!user || typeof user !== 'object' || Array.isArray(user)) return null;
   const record = user as Record<string, unknown>;
@@ -46,7 +54,7 @@ function authenticatedIdentity(user: unknown): AuthenticatedIdentity | null {
 
 async function founderAccess(
   identity: AuthenticatedIdentity,
-): Promise<{ state: 'allowed'; access: FounderAccess } | { state: 'denied' | 'error' }> {
+): Promise<FounderAccessState> {
   const { data: allowRow, error: allowError } = await supabase
     .from('founder_users')
     .select('*')
