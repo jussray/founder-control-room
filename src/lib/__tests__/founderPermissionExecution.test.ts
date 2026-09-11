@@ -3,12 +3,13 @@ import { describe, expect, it } from 'vitest';
 import type { RepositoryProvider } from '../../providers/RepositoryProvider.js';
 import { createFounderPermissionRequest } from '../founderPermissionBroker.js';
 import {
+  buildPromptOSApprovedRegistryContent,
   createFounderExecutionBinding,
   revalidateFounderExecutionBindingAtEffect,
 } from '../founderPermissionExecution.js';
 
-const workflowContent = '{"id":"repair-production-recovery","version":"1.0"}\n';
-const registryContent = '{"workflows":[]}\n';
+const workflowContent = '{"schemaVersion":1,"artifactType":"promptos-workflow","id":"repair-production-recovery","version":"1.0","status":"draft"}\n';
+const registryContent = '{"schemaVersion":1,"authority":"source-controlled-approved-workflows","registrationRule":"Founder approval required.","workflows":[]}\n';
 const hash = (value: string) => `sha256:${createHash('sha256').update(value).digest('hex')}`;
 const headSha = 'f'.repeat(40);
 
@@ -98,6 +99,25 @@ describe('Founder execution binding', () => {
     })).rejects.toThrow(/WORKFLOW_DRIFT/);
   });
 
+  it('fails closed when workflow body identity disagrees with its approved target', async () => {
+    const wrongIdentity = '{"schemaVersion":1,"artifactType":"promptos-workflow","id":"other","version":"1.0"}\n';
+    const req = request();
+    req.actionTarget = { ...req.actionTarget!, workflowContentHash: hash(wrongIdentity) } as typeof req.actionTarget;
+    req.proposal = { ...req.proposal, proposalHash: hash(wrongIdentity).slice('sha256:'.length) };
+    req.requestHash = createFounderPermissionRequest({
+      requestId: req.requestId,
+      requestedBySurface: req.requestedBySurface,
+      proposal: req.proposal,
+      actionTarget: req.actionTarget,
+      note: req.note,
+    }).requestHash;
+    await expect(createFounderExecutionBinding({
+      request: req,
+      decisionHash: 'a'.repeat(64),
+      provider: provider({ workflowContent: wrongIdentity }),
+    })).rejects.toThrow(/WORKFLOW_IDENTITY_MISMATCH/);
+  });
+
   it('fails closed when mutable registry state drifted', async () => {
     await expect(createFounderExecutionBinding({
       request: request(), decisionHash: 'a'.repeat(64), provider: provider({ registryContent: '{"workflows":["other"]}\n' }),
@@ -122,5 +142,33 @@ describe('Founder execution binding', () => {
     await expect(revalidateFounderExecutionBindingAtEffect({
       request: request(), binding, provider: provider({ headSha: '1'.repeat(40) }),
     })).rejects.toThrow(/TARGET_MOVED/);
+  });
+
+  it('plans exactly one approved registry entry without mutating the workflow artifact', () => {
+    const next = JSON.parse(buildPromptOSApprovedRegistryContent({
+      request: request(),
+      registryContent,
+    })) as { workflows: Array<Record<string, unknown>> };
+    expect(next.workflows).toEqual([{
+      id: 'repair-production-recovery',
+      version: '1.0',
+      status: 'approved',
+      path: 'workflows/repair-production-recovery.workflow.json',
+    }]);
+  });
+
+  it('refuses duplicate or conflicting registry promotion', () => {
+    const approved = JSON.stringify({
+      schemaVersion: 1,
+      authority: 'source-controlled-approved-workflows',
+      workflows: [{
+        id: 'repair-production-recovery',
+        version: '1.0',
+        status: 'approved',
+        path: 'workflows/repair-production-recovery.workflow.json',
+      }],
+    });
+    expect(() => buildPromptOSApprovedRegistryContent({ request: request(), registryContent: approved }))
+      .toThrow(/ALREADY_APPROVED/);
   });
 });
