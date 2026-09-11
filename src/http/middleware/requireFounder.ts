@@ -142,7 +142,11 @@ async function authorizeFounderRequest(
     return null;
   }
 
-  if (allowWorkspaceOwner && !accessState.access.workspaceId) {
+  if (
+    allowWorkspaceOwner
+    && accessState.access.role === 'workspace_owner'
+    && !accessState.access.workspaceId
+  ) {
     res.status(503).json({ error: 'Founder workspace assignment is required' });
     return null;
   }
@@ -179,9 +183,10 @@ export async function requireFounder(
 
 /**
  * Workspace-scoped routes may admit either the platform owner or a tenant
- * workspace owner, but only after a concrete workspace assignment exists.
- * Every route using this middleware must still filter service-role queries by
- * req.founder.workspaceId.
+ * workspace owner. Tenant workspace owners must always have a concrete
+ * workspace assignment. Platform owners may pass this middleware during the
+ * pre-migration compatibility window, but workspace routes themselves still
+ * require a workspace id before touching tenant data.
  */
 export async function requireWorkspaceUser(
   req: FounderRequest,
