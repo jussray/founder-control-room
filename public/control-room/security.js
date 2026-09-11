@@ -106,7 +106,13 @@ function projectMarkup(project) {
 
 function cryptoEntryMarkup(entry) {
   const migrationLabel = String(entry.quantumMigrationClass || '').replaceAll('_', ' ');
-  return `<article class="project-card crypto-entry-card" data-crypto-id="${escapeHtml(entry.id)}" data-migration-class="${escapeHtml(entry.quantumMigrationClass)}">
+  const stale = entry.observationState === 'STALE';
+  const provenance = [
+    entry.sourceRevision ? `Revision ${entry.sourceRevision}` : 'Revision unknown',
+    entry.observedAt ? `observed ${entry.observedAt}` : 'observation time unknown',
+    entry.freshnessExpiresAt ? `lease through ${entry.freshnessExpiresAt}` : 'freshness lease unknown',
+  ].join(' · ');
+  return `<article class="project-card crypto-entry-card" data-crypto-id="${escapeHtml(entry.id)}" data-migration-class="${escapeHtml(entry.quantumMigrationClass)}" data-observation-state="${escapeHtml(entry.observationState || 'UNKNOWN')}">
     <div class="project-head">
       <div>
         <p class="eyebrow">${escapeHtml(entry.observationState || 'UNKNOWN')}</p>
@@ -120,6 +126,8 @@ function cryptoEntryMarkup(entry) {
       <span class="chip">${escapeHtml(entry.primitive)}</span>
       <span class="chip">${escapeHtml(entry.confidentialityHorizon)}</span>
     </div>
+    <div class="detail-block"><h4>Evidence provenance</h4><p>${escapeHtml(provenance)}</p></div>
+    ${stale ? `<div class="detail-block"><h4>Revalidation required</h4><p>${escapeHtml(entry.staleReason || 'Observation lease is stale; revalidate the exact source revision before treating this entry as current.')}</p></div>` : ''}
     <div class="detail-block"><h4>Provider / owner</h4><p>${escapeHtml(entry.provider)}</p></div>
     <div class="detail-block"><h4>Migration authority</h4><p>${escapeHtml(entry.migrationAuthority)}</p></div>
   </article>`;
