@@ -39,8 +39,12 @@ const registryTarget = {
   workflowId: 'repair-production-recovery',
   workflowVersion: '1.0',
   workflowContentHash: `sha256:${'e'.repeat(64)}`,
+  registryContentHash: `sha256:${'2'.repeat(64)}`,
   registryPath: 'workflows/registry.json',
   workflowPath: 'workflows/repair-production-recovery.workflow.json',
+  providerIdentity: 'github:jussray/promptos' as const,
+  capabilityVersion: 'promptos-workflow-registry@v1' as const,
+  consequence: 'CONSEQUENTIAL_WRITE' as const,
 };
 
 describe('Founder Permission Broker', () => {
@@ -63,7 +67,7 @@ describe('Founder Permission Broker', () => {
     }));
   });
 
-  it('binds a PromptOS workflow registry request to exact source and content identity', () => {
+  it('binds a PromptOS workflow registry request to exact source, registry state, provider, capability, and consequence identity', () => {
     const request = createFounderPermissionRequest({
       requestId: 'permission:promptos-workflow-001',
       requestedBySurface: 'chatgpt',
@@ -132,6 +136,29 @@ describe('Founder Permission Broker', () => {
       proposal: registryProposal,
       actionTarget: { ...registryTarget, workflowPath: 'workflows/other.workflow.json' },
     })).toThrow(/workflowPath must match the workflow id/);
+  });
+
+  it('fails closed when execution context identities are widened or downgraded', () => {
+    expect(() => createFounderPermissionRequest({
+      requestId: 'permission:promptos-wrong-provider',
+      requestedBySurface: 'chatgpt',
+      proposal: registryProposal,
+      actionTarget: { ...registryTarget, providerIdentity: 'github:jussray/other' as never },
+    })).toThrow(/canonical provider identity/);
+
+    expect(() => createFounderPermissionRequest({
+      requestId: 'permission:promptos-wrong-capability',
+      requestedBySurface: 'chatgpt',
+      proposal: registryProposal,
+      actionTarget: { ...registryTarget, capabilityVersion: 'promptos-workflow-registry@v2' as never },
+    })).toThrow(/canonical capability version/);
+
+    expect(() => createFounderPermissionRequest({
+      requestId: 'permission:promptos-wrong-consequence',
+      requestedBySurface: 'chatgpt',
+      proposal: registryProposal,
+      actionTarget: { ...registryTarget, consequence: 'READ' as never },
+    })).toThrow(/consequential-write classification/);
   });
 
   it('records explicit founder approval as FCR provenance without execution authority', () => {
@@ -207,7 +234,7 @@ describe('Founder Permission Broker', () => {
     expect(() => resolveFounderPermissionRequest({
       request: {
         ...request,
-        actionTarget: { ...registryTarget, workflowVersion: '1.1' },
+        actionTarget: { ...registryTarget, registryContentHash: `sha256:${'3'.repeat(64)}` },
       },
       decision: 'approved',
     })).toThrow(/request hash/);
