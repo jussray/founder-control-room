@@ -1,8 +1,8 @@
 import {
-  CRYPTOGRAPHIC_INVENTORY,
   CRYPTOGRAPHIC_REVIEW_REQUIRED,
   auditCryptographicInventoryCoverage,
-  type CryptographicInventoryEntry,
+  cryptographicInventorySnapshot,
+  type CryptographicInventorySnapshotEntry,
   type CryptographicReviewRequired,
 } from './cryptographicInventory.js';
 import {
@@ -54,7 +54,7 @@ export interface SecurityPostureSnapshot {
   projects: SecurityPostureProject[];
   invariants: typeof STRATEGIC_SECURITY_INVARIANTS;
   cryptography: {
-    inventory: readonly CryptographicInventoryEntry[];
+    inventory: readonly CryptographicInventorySnapshotEntry[];
     reviewRequired: readonly CryptographicReviewRequired[];
     coverage: ReturnType<typeof auditCryptographicInventoryCoverage>;
   };
@@ -78,7 +78,7 @@ function unique(values: readonly string[]): string[] {
   return [...new Set(values)].sort();
 }
 
-export function buildSecurityPostureSnapshot(): SecurityPostureSnapshot {
+export function buildSecurityPostureSnapshot(nowMs = Date.now()): SecurityPostureSnapshot {
   const audits = auditPortfolioStrategicSecurity();
   const projects: SecurityPostureProject[] = audits.map((audit) => ({
     slug: audit.projectSlug,
@@ -98,6 +98,7 @@ export function buildSecurityPostureSnapshot(): SecurityPostureSnapshot {
   const frameworkSignals = unique(STRATEGIC_SECURITY_STAGES.flatMap((stage) => stage.frameworkSignals));
   const lanternErrors = validateLanternPolicy({ ...DEFAULT_LANTERN_POLICY });
   const cryptoCoverage = auditCryptographicInventoryCoverage();
+  const cryptoInventory = cryptographicInventorySnapshot(nowMs);
 
   return {
     contract: SECURITY_POSTURE_CONTRACT,
@@ -119,7 +120,7 @@ export function buildSecurityPostureSnapshot(): SecurityPostureSnapshot {
     projects,
     invariants: STRATEGIC_SECURITY_INVARIANTS,
     cryptography: {
-      inventory: CRYPTOGRAPHIC_INVENTORY,
+      inventory: cryptoInventory,
       reviewRequired: CRYPTOGRAPHIC_REVIEW_REQUIRED,
       coverage: cryptoCoverage,
     },

@@ -82,13 +82,22 @@ describe('DeepSeek AI-to-AI interop boundary', () => {
 
   it('binds instructor output to the exact source project state', () => {
     const source = statePacket();
-    expect(validateInstructionPacket(instruction(source), source)).toEqual([]);
+    expect(validateInstructionPacket(instruction(source), source, NOW)).toEqual([]);
+  });
+
+  it('revalidates the source packet lease when instructor output is consumed', () => {
+    const source = statePacket();
+    expect(validateInstructionPacket(
+      instruction(source),
+      source,
+      Date.parse('2026-09-09T04:00:01Z'),
+    )).toContain('instruction source packet invalid: project state packet is expired');
   });
 
   it('rejects any attempt to turn instructor output into mutation authority', () => {
     const source = statePacket();
     const unsafe = { ...instruction(source), projectMutationAuthorized: true };
-    expect(validateInstructionPacket(unsafe, source)).toContain('DeepSeek instructor cannot authorize project mutation');
+    expect(validateInstructionPacket(unsafe, source, NOW)).toContain('DeepSeek instructor cannot authorize project mutation');
   });
 
   it('keeps cross-project federation shadow-only until usefulness is verified', () => {

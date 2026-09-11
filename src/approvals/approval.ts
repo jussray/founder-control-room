@@ -49,6 +49,7 @@ export type ApprovalValidationResult =
         | 'approval_replay'
         | 'actor_mismatch'
         | 'action_mismatch'
+        | 'payload_invalid'
         | 'payload_mismatch'
         | 'target_mismatch'
         | 'fingerprint_mismatch'
@@ -58,17 +59,30 @@ export type ApprovalValidationResult =
         | 'invalid_timestamp';
     };
 
-function canonicalize(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(canonicalize);
+type CanonicalJson = string | number | boolean | null | CanonicalJson[] | { [key: string]: CanonicalJson };
+
+function canonicalize(value: unknown, path = '$'): CanonicalJson {
+  if (value === null || typeof value === 'string' || typeof value === 'boolean') return value;
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) throw new TypeError(`approval payload contains a non-finite number at ${path}`);
+    return value;
+  }
+  if (Array.isArray(value)) {
+    return value.map((item, index) => canonicalize(item, `${path}[${index}]`));
+  }
   if (value && typeof value === 'object') {
+    const prototype = Object.getPrototypeOf(value);
+    if (prototype !== Object.prototype && prototype !== null) {
+      throw new TypeError(`approval payload must contain only plain JSON objects at ${path}`);
+    }
     const object = value as Record<string, unknown>;
     return Object.fromEntries(
       Object.keys(object)
         .sort()
-        .map((key) => [key, canonicalize(object[key])]),
+        .map((key) => [key, canonicalize(object[key], `${path}.${key}`)]),
     );
   }
-  return value;
+  throw new TypeError(`approval payload contains a non-JSON value at ${path}`);
 }
 
 export function normalizeApprovalPayload(payload: unknown): string {
@@ -110,7 +124,12 @@ export function validateApprovalExecution(
   if (binding.actorId !== attempt.actorId) return { ok: false, code: 'actor_mismatch' };
   if (binding.action !== attempt.action) return { ok: false, code: 'action_mismatch' };
 
-  const payloadHash = hashApprovalPayload(attempt.payload);
+  let payloadHash: string;
+  try {
+    payloadHash = hashApprovalPayload(attempt.payload);
+  } catch {
+    return { ok: false, code: 'payload_invalid' };
+  }
   if (binding.payloadHash !== payloadHash) return { ok: false, code: 'payload_mismatch' };
   if (binding.targetId !== attempt.targetId) return { ok: false, code: 'target_mismatch' };
   if (binding.targetFingerprint !== attempt.targetFingerprint) {

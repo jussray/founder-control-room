@@ -256,7 +256,11 @@ export function validateProjectStatePacket(value: unknown, nowMs = Date.now()): 
   return [...new Set(errors)];
 }
 
-export function validateInstructionPacket(value: unknown, sourcePacket?: ProjectStatePacketV1): string[] {
+export function validateInstructionPacket(
+  value: unknown,
+  sourcePacket?: ProjectStatePacketV1,
+  nowMs = Date.now(),
+): string[] {
   const candidate = record(value);
   if (!candidate) return ['instruction packet shape is invalid'];
 
@@ -298,6 +302,8 @@ export function validateInstructionPacket(value: unknown, sourcePacket?: Project
   if (!SHA256.test(instructionHash)) errors.push('instruction instructionHash must be sha256');
 
   if (sourcePacket) {
+    const sourcePacketErrors = validateProjectStatePacket(sourcePacket, nowMs);
+    errors.push(...sourcePacketErrors.map((error) => `instruction source packet invalid: ${error}`));
     if (sourcePacketId !== sourcePacket.packetId) errors.push('instruction is not bound to the source packetId');
     if (sourceStateFingerprint !== sourcePacket.stateFingerprint) errors.push('instruction is not bound to the source state fingerprint');
     if (toProject !== sourcePacket.fromProject) errors.push('instruction must return to the source project');

@@ -2,7 +2,7 @@ import { PORTFOLIO_PROJECTS, type PortfolioProject } from '../config/portfolio.j
 
 export const CRYPTOGRAPHIC_INVENTORY_CONTRACT = 'juss-v10/cryptographic-inventory@v1' as const;
 
-export type CryptographicObservationState = 'OBSERVED' | 'PROVIDER_MANAGED';
+export type CryptographicObservationState = 'OBSERVED' | 'PROVIDER_MANAGED' | 'STALE';
 export type QuantumMigrationClass =
   | 'PUBLIC_KEY_MIGRATION_REQUIRED'
   | 'SYMMETRIC_MONITOR'
@@ -15,12 +15,20 @@ export interface CryptographicInventoryEntry {
   purpose: string;
   primitive: string;
   algorithm: string;
-  observationState: CryptographicObservationState;
+  observationState: Exclude<CryptographicObservationState, 'STALE'>;
   provider: string;
   migrationAuthority: string;
   quantumMigrationClass: QuantumMigrationClass;
   confidentialityHorizon: 'short-lived-auth' | 'stored-secret' | 'not-confidentiality-control' | 'provider-managed-unknown';
   sourceEvidence: string;
+  sourceRevision: string;
+  observedAt: string;
+  freshnessExpiresAt: string;
+}
+
+export interface CryptographicInventorySnapshotEntry extends Omit<CryptographicInventoryEntry, 'observationState'> {
+  observationState: CryptographicObservationState;
+  staleReason: string | null;
 }
 
 export interface CryptographicReviewRequired {
@@ -29,11 +37,21 @@ export interface CryptographicReviewRequired {
   nextEvidence: string;
 }
 
+const OBSERVED_AT = '2026-09-11T01:18:30.000Z';
+const STATIC_OBSERVATION_EXPIRES_AT = OBSERVED_AT;
+const FCR_REVISION = '81d05f7ae8f427e84db506cfa726520a8178dece';
+const SEKRET_BIP_REVISION = '2ab8fefa365eac4a2fac297447f277243a8ec5e7';
+const JBH_PRIVATE_REVISION = 'a5538c1ab7907283f373578e13d7c75d44757969';
+const STORYENGINE_REVISION = 'b9410a75f0e36cfc159bc1b6b31fb86e60c107fd';
+const UNTOLD_REVISION = 'fde1ce62089466377965d21edaea80de043b87cb';
+
 /**
- * Source-observed crypto boundaries only. This is an inventory of what the
- * portfolio can currently prove from repository evidence, not a claim that the
- * listed projects are quantum-safe or that no additional crypto dependencies
- * exist behind providers.
+ * Source-observed crypto boundaries only. Each record is pinned to the exact
+ * repository revision that was inspected. The checked-in records use a
+ * zero-duration freshness lease on purpose: static source evidence may preserve
+ * history, but it must be revalidated before a later response can call it
+ * current. A fresh /security-posture response therefore cannot refresh these
+ * observations merely by assigning a new generatedAt timestamp.
  */
 export const CRYPTOGRAPHIC_INVENTORY: readonly CryptographicInventoryEntry[] = [
   {
@@ -48,6 +66,9 @@ export const CRYPTOGRAPHIC_INVENTORY: readonly CryptographicInventoryEntry[] = [
     quantumMigrationClass: 'PUBLIC_KEY_MIGRATION_REQUIRED',
     confidentialityHorizon: 'not-confidentiality-control',
     sourceEvidence: 'jussray/founder-control-room:src/providers/githubAppAuth.ts',
+    sourceRevision: FCR_REVISION,
+    observedAt: OBSERVED_AT,
+    freshnessExpiresAt: STATIC_OBSERVATION_EXPIRES_AT,
   },
   {
     id: 'fcr-founder-session-aes256gcm',
@@ -61,6 +82,9 @@ export const CRYPTOGRAPHIC_INVENTORY: readonly CryptographicInventoryEntry[] = [
     quantumMigrationClass: 'SYMMETRIC_MONITOR',
     confidentialityHorizon: 'stored-secret',
     sourceEvidence: 'jussray/founder-control-room:src/auth/founderSession.ts',
+    sourceRevision: FCR_REVISION,
+    observedAt: OBSERVED_AT,
+    freshnessExpiresAt: STATIC_OBSERVATION_EXPIRES_AT,
   },
   {
     id: 'sekret-supabase-auth-jwks',
@@ -74,6 +98,9 @@ export const CRYPTOGRAPHIC_INVENTORY: readonly CryptographicInventoryEntry[] = [
     quantumMigrationClass: 'PUBLIC_KEY_MIGRATION_REQUIRED',
     confidentialityHorizon: 'short-lived-auth',
     sourceEvidence: 'jussray/Sekret-Bip:worker/auth.ts',
+    sourceRevision: SEKRET_BIP_REVISION,
+    observedAt: OBSERVED_AT,
+    freshnessExpiresAt: STATIC_OBSERVATION_EXPIRES_AT,
   },
   {
     id: 'sekret-firebase-appcheck-rs256',
@@ -87,6 +114,9 @@ export const CRYPTOGRAPHIC_INVENTORY: readonly CryptographicInventoryEntry[] = [
     quantumMigrationClass: 'PUBLIC_KEY_MIGRATION_REQUIRED',
     confidentialityHorizon: 'not-confidentiality-control',
     sourceEvidence: 'jussray/Sekret-Bip:worker/firebase-app-check.ts',
+    sourceRevision: SEKRET_BIP_REVISION,
+    observedAt: OBSERVED_AT,
+    freshnessExpiresAt: STATIC_OBSERVATION_EXPIRES_AT,
   },
   {
     id: 'jbh-private-cloudflare-access-rs256',
@@ -100,6 +130,9 @@ export const CRYPTOGRAPHIC_INVENTORY: readonly CryptographicInventoryEntry[] = [
     quantumMigrationClass: 'PUBLIC_KEY_MIGRATION_REQUIRED',
     confidentialityHorizon: 'short-lived-auth',
     sourceEvidence: 'jussray/jbh-private:admin/payment-worker/src/access.ts',
+    sourceRevision: JBH_PRIVATE_REVISION,
+    observedAt: OBSERVED_AT,
+    freshnessExpiresAt: STATIC_OBSERVATION_EXPIRES_AT,
   },
   {
     id: 'storyengine-supabase-service-role',
@@ -113,6 +146,9 @@ export const CRYPTOGRAPHIC_INVENTORY: readonly CryptographicInventoryEntry[] = [
     quantumMigrationClass: 'PROVIDER_MANAGED_UNKNOWN',
     confidentialityHorizon: 'provider-managed-unknown',
     sourceEvidence: 'jussray/StoryEngine:runtime/companion_logger.py',
+    sourceRevision: STORYENGINE_REVISION,
+    observedAt: OBSERVED_AT,
+    freshnessExpiresAt: STATIC_OBSERVATION_EXPIRES_AT,
   },
   {
     id: 'untold-shopify-webhook-hmac',
@@ -126,6 +162,9 @@ export const CRYPTOGRAPHIC_INVENTORY: readonly CryptographicInventoryEntry[] = [
     quantumMigrationClass: 'SYMMETRIC_MONITOR',
     confidentialityHorizon: 'not-confidentiality-control',
     sourceEvidence: 'jussray/untold-stories-storefront:src/lib/vendorRouting.server.ts',
+    sourceRevision: UNTOLD_REVISION,
+    observedAt: OBSERVED_AT,
+    freshnessExpiresAt: STATIC_OBSERVATION_EXPIRES_AT,
   },
 ] as const;
 
@@ -151,6 +190,20 @@ export const CRYPTOGRAPHIC_REVIEW_REQUIRED: readonly CryptographicReviewRequired
     nextEvidence: 'Confirm whether any production runtime auth/signing path exists; otherwise retain provider-managed transport as an external dependency rather than inventing an app crypto layer.',
   },
 ] as const;
+
+export function cryptographicInventorySnapshot(nowMs = Date.now()): readonly CryptographicInventorySnapshotEntry[] {
+  return CRYPTOGRAPHIC_INVENTORY.map((entry) => {
+    const freshnessExpiresAtMs = Date.parse(entry.freshnessExpiresAt);
+    const stale = !Number.isFinite(freshnessExpiresAtMs) || freshnessExpiresAtMs <= nowMs;
+    return {
+      ...entry,
+      observationState: stale ? 'STALE' : entry.observationState,
+      staleReason: stale
+        ? 'Static source observation lease expired; revalidate the exact source revision before treating this entry as current.'
+        : null,
+    };
+  });
+}
 
 export function cryptographicInventoryForProject(projectSlug: string): readonly CryptographicInventoryEntry[] {
   return CRYPTOGRAPHIC_INVENTORY.filter((entry) => entry.projectSlug === projectSlug);
