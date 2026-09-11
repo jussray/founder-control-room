@@ -62,8 +62,8 @@ const INCIDENTS = [
     id: 'direct-main-after-pr-778',
     anchorCommit: 'f4e0439da4f43ef980e10eaf39b75e8d6bff21f8',
     anchorTree: '8f881059b8bb40a460c274bcdedcf2ae502f2420',
-    incidentTip: 'da99d38cf3b43596cac3bd2ec43621a5a62be416',
-    incidentTree: '923d319900aaa92cc75b1212d198862d39b20cf3',
+    incidentTip: '2007eb07087aff46064188f694949ef410c235a9',
+    incidentTree: 'ed1eda84855a3a166169a5420f44755e753a08cf',
     directCommits: [
       '61411a7651c1589738ba88b20a11937f22003343',
       '2e346a8dbb55fbd423d2ebd7c817f091c5f10924',
@@ -90,6 +90,8 @@ const INCIDENTS = [
       'd9c333d9566c0f9389a72612f832a2a622fc33f7',
       '2b0a65a47703178a1c880c4e055b5a3127f922d5',
       'da99d38cf3b43596cac3bd2ec43621a5a62be416',
+      'd47ac0c8e164a2842d1ff1717f605924beba6556',
+      '2007eb07087aff46064188f694949ef410c235a9',
     ],
     affectedFiles: [
       '.agents/skills/control-room-cloudflare-agent-fleet/SKILL.md',
@@ -104,6 +106,7 @@ const INCIDENTS = [
       'scripts/verify-founder-intelligence-inheritance.mjs',
       'skills/portfolio-control-plane/SKILL.md',
       'src/capabilities/__tests__/workbenchRegistry.test.ts',
+      'src/capabilities/freeFirstCapabilityPolicy.ts',
       'src/capabilities/workbenchRegistry.ts',
       'src/founder-os-lab/__tests__/pluginManagement.contract.test.ts',
       'src/http/routes/securityPosture.test.ts',
