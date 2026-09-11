@@ -47,7 +47,7 @@ describe('n8n conveyor workflow artifact', () => {
     expect(code).toContain("fail('invalid evidence URL')");
 
     const validationStart = code.indexOf('const validPort = (value) =>');
-    const validationEnd = code.indexOf('\nfor (const value of evidenceUrls)', validationStart);
+    const validationEnd = code.indexOf('\n  for (const value of evidenceUrls)', validationStart);
     expect(validationStart).toBeGreaterThanOrEqual(0);
     expect(validationEnd).toBeGreaterThan(validationStart);
 
@@ -102,5 +102,25 @@ describe('n8n conveyor workflow artifact', () => {
     expect(code).not.toContain("chat:['intent-repair-reader'");
     expect(code).not.toContain('fcr-conveyor-v2:');
     expect(code).not.toContain('fcr-conveyor-receipt-v2:');
+  });
+
+  it('returns only a classified safe envelope for expected validation failures and rethrows unexpected workflow faults', () => {
+    const workflow = JSON.parse(fs.readFileSync(workflowPath, 'utf8'));
+    const validation = workflow.nodes.find((node: { name: string }) => node.name === 'Validate Capability Plan');
+    const receipt = workflow.nodes.find((node: { name: string }) => node.name === 'Create Bound Receipt');
+    const response = workflow.nodes.find((node: { name: string }) => node.name === 'Return Receipt');
+    const code = validation.parameters.jsCode as string;
+
+    expect(code).toContain("error.name = 'FcrConveyorValidationError'");
+    expect(code).toContain("error.name !== 'FcrConveyorValidationError') throw error");
+    expect(code).toContain("contract:'founder-control-room/n8n-conveyor-error@v1'");
+    expect(code).toContain("return ['SHA_IDENTITY','IDENTITY_REJECTED']");
+    expect(code).toContain("return ['AUTHORITY','AUTHORITY_REJECTED']");
+    expect(code).toContain("return ['CAPABILITY_CONTRACT','CAPABILITY_REJECTED']");
+    expect(code).toContain("return ['PAYLOAD_CONTRACT','PAYLOAD_REJECTED']");
+    expect(code).toContain("retryable:false");
+    expect(code).not.toContain('error.message,');
+    expect(receipt.parameters.jsCode).toContain("if ($json.accepted !== true) return [{json:$json}]");
+    expect(response.parameters.options.responseCode).toBe('={{ $json.accepted === false ? 422 : 202 }}');
   });
 });
