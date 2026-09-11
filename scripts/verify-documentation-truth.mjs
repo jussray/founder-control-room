@@ -59,10 +59,19 @@ const truthSensitiveRules = [
   { domain: 'truth-governance', match: /^src\/http\/routes\/(?:buildEvents|buildEventReceipts)\.ts$/ },
   { domain: 'truth-governance', match: /^src\/services\/buildEventStore\.ts$/ },
   { domain: 'truth-governance', match: /^scripts\/verify-documentation-truth\.mjs$/ },
+  { domain: 'truth-governance', match: /^scripts\/pr-continuity\.mjs$/ },
+  { domain: 'truth-governance', match: /^src\/truth\/(?!.*\.test\.ts$)/ },
+  { domain: 'truth-governance', match: /^src\/lib\/agentInterop\.ts$/ },
+  { domain: 'truth-governance', match: /^src\/approvals\/approval\.ts$/ },
   { domain: 'truth-governance', match: /^\.ai\/skills\/goalfix\/SKILL\.md$/ },
   { domain: 'truth-governance', match: /^\.claude\/skills\/goalfix\/SKILL\.md$/ },
   { domain: 'truth-governance', match: /^docs\/(?:FOUNDER_ADAPTIVE_KERNEL_V0|GOALFIX_EXECUTION_WORKFLOW_V2|CLAUDE_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC|PERPLEXITY_MCP_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC)\.md$/ },
+  { domain: 'release-provenance', match: /^\.github\/workflows\/main-release-provenance\.yml$/ },
+  { domain: 'release-provenance', match: /^scripts\/verify-main-release-historical-ratification\.mjs$/ },
   { domain: 'evidence-authority', match: /^src\/evidence\/(?!__tests__\/)(?!.*\.test\.ts$)/ },
+  { domain: 'evidence-authority', match: /^src\/security\/(?:cryptographicInventory|securityPosture)\.ts$/ },
+  { domain: 'evidence-authority', match: /^public\/control-room\/security\.js$/ },
+  { domain: 'evidence-authority', match: /^security\/portfolio-worker-security\.json$/ },
   { domain: 'evidence-authority', match: /^public\/control-room\/evidence-trust\.html$/ },
   { domain: 'evidence-authority', match: /^\.github\/workflows\/playwright\.yml$/ },
   { domain: 'capability-authority', match: /^\.control\/capability\.(?:json|yaml)$/ },
@@ -90,7 +99,9 @@ if (domains.has('merge-authority') || domains.has('workflow-authority')) {
   requiredDocs.add('.ai/skills/juss-flow-launch-loop/SKILL.md');
 }
 if (domains.has('publishing')) requiredDocs.add('docs/PUBLIC_COMMUNICATION_TRUTH_CONTRACT.md');
-if (domains.has('truth-governance') || domains.has('evidence-authority')) requiredDocs.add('docs/TRUTH_DECAY_AUDIT.md');
+if (domains.has('truth-governance') || domains.has('evidence-authority') || domains.has('release-provenance')) {
+  requiredDocs.add('docs/TRUTH_DECAY_AUDIT.md');
+}
 if (domains.has('repository-provider')) requiredDocs.add('docs/PROVIDERS.md');
 if (domains.has('cloudflare-authority')) {
   requiredDocs.add('docs/CLOUDFLARE_REASONING.md');
@@ -271,7 +282,7 @@ const goalfixInvariantChecks = goalfixExecutionPaths.flatMap(([label, content]) 
   [/verified target/i.test(content), `${label} must carry the verified target branch instead of assuming main`],
   [/Founder Final/i.test(content) && /authenticated founder/i.test(content), `${label} must require Founder Final through current authenticated founder authority`],
   [/after Founder Final/i.test(content) && /(?:re-?read|reread)/i.test(content) && /provider/i.test(content), `${label} must reread mutable provider/PR state after Founder Final and immediately before integration`],
-  [content.includes('MERGED_UNVERIFIED'), `${label} must preserve MERGED_UNVERIFIED until required runtime truth exists`],
+  [content.includes('MERGED_UNVERIFIED'), `${label} must preserve MERGED_UNVERIFIED until required runtime proof exists`],
 ]);
 
 const consistencyChecks = [
