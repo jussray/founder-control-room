@@ -28,6 +28,7 @@ describe('Strategic Security Posture API', () => {
     expect(response.body.truthBoundaries.targetVersionIsNotCurrentMaturity).toBe(true);
     expect(response.body.truthBoundaries.frameworkMappingIsNotCertification).toBe(true);
     expect(response.body.truthBoundaries.providerClaimsRequireRuntimeEvidence).toBe(true);
+    expect(response.body.truthBoundaries.providerRoadmapIsNotRuntimeProof).toBe(true);
   });
 
   it('returns cryptographic inventory as migration evidence rather than a quantum-safe claim', async () => {
@@ -42,6 +43,27 @@ describe('Strategic Security Posture API', () => {
     expect(response.body.cryptography.inventory).toHaveLength(7);
     expect(response.body.cryptography.reviewRequired).toHaveLength(3);
     expect(response.body.truthBoundaries.cryptographicInventoryIsObservationNotQuantumSafety).toBe(true);
+  });
+
+  it('returns provider PQC capability evidence without promoting roadmaps to runtime truth', async () => {
+    const response = await request(createTestApp()).get('/security-posture');
+
+    expect(response.status).toBe(200);
+    expect(response.body.summary.providerPqcEvidenceEntries).toBe(10);
+    expect(response.body.summary.providerPqcCurrentEntries).toBe(2);
+    expect(response.body.summary.providerPqcPlannedEntries).toBe(2);
+    expect(response.body.summary.providerPqcUnsupportedEntries).toBe(4);
+    expect(response.body.summary.providerPqcUnknownEntries).toBe(2);
+    expect(response.body.cryptography.providerPqcEvidence.entries).toHaveLength(10);
+    expect(response.body.cryptography.providerPqcEvidence.summary).toEqual({
+      entryCount: 10,
+      currentCount: 2,
+      plannedCount: 2,
+      unsupportedCount: 4,
+      unknownCount: 2,
+    });
+    expect(response.body.truthBoundaries.providerClaimsRequireRuntimeEvidence).toBe(true);
+    expect(response.body.truthBoundaries.providerRoadmapIsNotRuntimeProof).toBe(true);
   });
 
   it('publishes defensive Lantern constraints as read-only posture data', async () => {

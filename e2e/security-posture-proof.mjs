@@ -96,6 +96,33 @@ const cryptographicReviewRequired = [
   nextEvidence: `Collect the next provider or runtime evidence for ${projectSlug}.`,
 }));
 
+const providerPqcEvidence = [
+  ['github-app-jwt-signature', 'GitHub', 'GitHub App JWT signature', 'application-signature', 'UNSUPPORTED', ['founder-control-room']],
+  ['github-public-tls', 'GitHub', 'GitHub public TLS transport', 'transport-key-agreement', 'UNKNOWN', ['founder-control-room']],
+  ['supabase-auth-jwt-signature', 'Supabase', 'Supabase Auth JWT signing keys', 'application-signature', 'UNSUPPORTED', ['sekret-bip']],
+  ['supabase-public-tls', 'Supabase', 'Supabase hosted API TLS transport', 'transport-key-agreement', 'UNKNOWN', ['sekret-bip', 'l99']],
+  ['firebase-app-check-jwt-signature', 'Firebase / Google', 'Firebase App Check token signature', 'application-signature', 'UNSUPPORTED', ['sekret-bip']],
+  ['google-api-tls-key-agreement', 'Google Cloud', 'google.com and *.googleapis.com API TLS key agreement', 'transport-key-agreement', 'CURRENT', ['sekret-bip']],
+  ['google-identity-signature-roadmap', 'Google Cloud', 'Google identity and access quantum-safe authentication roadmap', 'provider-roadmap', 'PLANNED', ['sekret-bip']],
+  ['cloudflare-access-jwt-signature', 'Cloudflare', 'Cloudflare Access application-token signature', 'application-signature', 'UNSUPPORTED', ['juss-beautiful-hair-private']],
+  ['cloudflare-edge-tls-key-agreement', 'Cloudflare', 'Visitor-to-Cloudflare TLS 1.3 key agreement', 'transport-key-agreement', 'CURRENT', ['founder-control-room', 'juss-beautiful-hair-private']],
+  ['cloudflare-visitor-tls-signatures', 'Cloudflare', 'Visitor-to-Cloudflare TLS authentication signatures', 'transport-signature', 'PLANNED', ['founder-control-room', 'juss-beautiful-hair-private']],
+].map(([id, provider, surface, plane, state, projectSlugs]) => ({
+  id,
+  provider,
+  surface,
+  plane,
+  state,
+  projectSlugs,
+  currentContract: `${surface} has a provider-documented classical or transport contract.`,
+  pqcEvidence: `${state} provider evidence is recorded without becoming runtime proof.`,
+  providerTarget: `${provider} target remains evidence-scoped.`,
+  migrationAuthority: `${provider} owns provider capability; the application owns compatibility and verification.`,
+  requiredRuntimeEvidenceBeforeChange: `Require current provider and runtime evidence before changing ${surface}.`,
+  sources: [{ title: `${provider} official documentation`, url: 'https://example.invalid/provider-doc' }],
+  observedOn: '2026-09-10',
+}));
+
 const fixture = {
   contract: 'juss-v10/security-posture@v1',
   generatedAt: '2026-08-16T06:30:00.000Z',
@@ -111,6 +138,11 @@ const fixture = {
     cryptographicInventoryEntries: 7,
     cryptographicReviewRequiredProjects: 3,
     publicKeyMigrationEntries: 4,
+    providerPqcEvidenceEntries: 10,
+    providerPqcCurrentEntries: 2,
+    providerPqcPlannedEntries: 2,
+    providerPqcUnsupportedEntries: 4,
+    providerPqcUnknownEntries: 2,
     provenProjects: 0,
   },
   stages,
@@ -127,6 +159,16 @@ const fixture = {
       publicKeyMigrationEntryCount: 4,
       missingProjectSlugs: [],
       overlappingProjectSlugs: [],
+    },
+    providerPqcEvidence: {
+      entries: providerPqcEvidence,
+      summary: {
+        entryCount: 10,
+        currentCount: 2,
+        plannedCount: 2,
+        unsupportedCount: 4,
+        unknownCount: 2,
+      },
     },
   },
   lantern: {
@@ -151,6 +193,7 @@ const fixture = {
     targetVersionIsNotCurrentMaturity: true,
     frameworkMappingIsNotCertification: true,
     providerClaimsRequireRuntimeEvidence: true,
+    providerRoadmapIsNotRuntimeProof: true,
     cryptographicInventoryIsObservationNotQuantumSafety: true,
     securityPostureIsReadOnly: true,
     analyticsAreAggregateAndPrivacySafe: true,
@@ -188,18 +231,27 @@ async function proveViewport(browser, { name, width, height, isMobile = false })
 
   await page.getByRole('heading', { name: 'Security posture without the green-check theater.' }).waitFor({ state: 'visible' });
   assert.equal(await page.locator('.stage-card').count(), 10, `${name}: V1-V10 ladder renders all stages`);
-  assert.equal(await page.locator('.project-card:not(.crypto-entry-card):not(.crypto-review-card)').count(), 8, `${name}: registered portfolio renders all project cards`);
+  assert.equal(await page.locator('.project-card:not(.crypto-entry-card):not(.crypto-review-card):not(.pqc-provider-card)').count(), 8, `${name}: registered portfolio renders all project cards`);
   assert.equal(await page.locator('.project-card[data-target-version="10"]').count(), 3, `${name}: V10 target count is visible`);
   assert.equal(await page.locator('.target-badge span', { hasText: 'NOT PROVEN' }).count(), 8, `${name}: every project denies maturity proof`);
   assert.match(await page.locator('.truth-grid').innerText(), /TARGET ≠ PROOF/i, `${name}: target/proof boundary is visible`);
   assert.match(await page.locator('.truth-grid').innerText(), /FRAMEWORK ≠ CERTIFICATION/i, `${name}: framework/certification boundary is visible`);
+  assert.match(await page.locator('.truth-grid').innerText(), /ROADMAP ≠ RUNTIME/i, `${name}: provider roadmaps cannot become runtime truth`);
   assert.match(await page.locator('.truth-grid').innerText(), /INVENTORY ≠ QUANTUM SAFETY/i, `${name}: crypto inventory cannot become a quantum-safe claim`);
   assert.equal(await page.locator('.crypto-entry-card').count(), 7, `${name}: all observed crypto entries render`);
   assert.equal(await page.locator('.crypto-entry-card[data-migration-class="PUBLIC_KEY_MIGRATION_REQUIRED"]').count(), 4, `${name}: public-key migration entries stay explicit`);
   assert.equal(await page.locator('.crypto-review-card').count(), 3, `${name}: unresolved projects remain review-required`);
-  assert.match(await page.locator('.crypto-panel').innerText(), /Uncovered active projects\s+0/i, `${name}: active portfolio has no silent crypto coverage holes`);
-  assert.match(await page.locator('.crypto-panel').innerText(), /AES-256-GCM/i, `${name}: symmetric crypto remains separately classified`);
-  assert.match(await page.locator('.crypto-panel').innerText(), /HMAC-SHA-256/i, `${name}: webhook MAC remains separately classified`);
+  assert.match(await page.locator('.crypto-panel').first().innerText(), /Uncovered active projects\s+0/i, `${name}: active portfolio has no silent crypto coverage holes`);
+  assert.match(await page.locator('.crypto-panel').first().innerText(), /AES-256-GCM/i, `${name}: symmetric crypto remains separately classified`);
+  assert.match(await page.locator('.crypto-panel').first().innerText(), /HMAC-SHA-256/i, `${name}: webhook MAC remains separately classified`);
+  assert.equal(await page.locator('.pqc-provider-card').count(), 10, `${name}: all provider PQC evidence entries render`);
+  assert.equal(await page.locator('.pqc-provider-card[data-pqc-state="CURRENT"]').count(), 2, `${name}: CURRENT provider capability count stays explicit`);
+  assert.equal(await page.locator('.pqc-provider-card[data-pqc-state="PLANNED"]').count(), 2, `${name}: PLANNED provider capability count stays explicit`);
+  assert.equal(await page.locator('.pqc-provider-card[data-pqc-state="UNSUPPORTED"]').count(), 4, `${name}: UNSUPPORTED provider capability count stays explicit`);
+  assert.equal(await page.locator('.pqc-provider-card[data-pqc-state="UNKNOWN"]').count(), 2, `${name}: UNKNOWN provider capability count stays explicit`);
+  assert.match(await page.locator('.provider-pqc-panel').innerText(), /GitHub App JWT signature/i, `${name}: GitHub App signature evidence is visible`);
+  assert.match(await page.locator('.provider-pqc-panel').innerText(), /Visitor-to-Cloudflare TLS 1\.3 key agreement/i, `${name}: Cloudflare transport evidence is visible`);
+  assert.match(await page.locator('.provider-pqc-panel').innerText(), /Proof required before any change/i, `${name}: runtime proof gate is visible`);
   assert.match(await page.locator('.lantern-panel').innerText(), /Hack-back forbidden/i, `${name}: Lantern denies hack-back`);
   assert.match(await page.locator('.lantern-panel').innerText(), /Outbound attack forbidden/i, `${name}: Lantern denies outbound attack capability`);
   assert.match(await page.locator('.lantern-panel').innerText(), /Human attribution constrained/i, `${name}: network signals cannot become human identity claims`);
@@ -245,6 +297,12 @@ try {
       publicKeyMigrationEntries: 4,
       cryptoReviewRequiredProjects: 3,
       uncoveredActiveProjects: 0,
+      providerPqcEvidenceEntries: 10,
+      providerPqcCurrentEntries: 2,
+      providerPqcPlannedEntries: 2,
+      providerPqcUnsupportedEntries: 4,
+      providerPqcUnknownEntries: 2,
+      providerRoadmapIsNotRuntimeProof: true,
       inventoryIsNotQuantumSafety: true,
       allProjectsMarkedNotProven: true,
       mutationControls: 0,
