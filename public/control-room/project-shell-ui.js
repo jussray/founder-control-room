@@ -25,33 +25,72 @@ function selectedProjectSlug(panel) {
   const mono = panel.querySelector('h2 .mono');
   return mono?.textContent?.replace(/[()]/g, '').trim() ?? '';
 }
-function truthClass(panel) { return panel.querySelector('.error') ? 'BLOCKED' : 'UNKNOWN'; }
-function renderBipShell(panel) {
+function badgeClass(classification) {
+  if (classification === 'VERIFIED') return 'ok';
+  if (classification === 'BLOCKED' || classification === 'CONFLICTED') return 'danger';
+  return 'warn';
+}
+function describeRecovery(recovery) {
+  if (!recovery) return 'No canonical recovery plan recorded.';
+  return `${recovery.status ?? 'planned'} · rollback · retry · reconcile · compensate · abandon`;
+}
+function describeResources(resources) {
+  if (!Array.isArray(resources) || resources.length === 0) return 'No canonical resource budget recorded.';
+  return resources.map((r) => `${r.resource_type}: ${r.consumed ?? 0}${r.ceiling == null ? '' : ` / ${r.ceiling}`} ${r.unit ?? ''}`.trim()).join(' · ');
+}
+async function loadCanonicalState() {
+  const response = await fetch(`/projects/${encodeURIComponent(BIP_SLUG)}/shell-state`, {
+    method: 'GET', credentials: 'same-origin', cache: 'no-store', headers: { Accept: 'application/json' },
+  });
+  if (!response.ok) throw new Error(`shell-state HTTP ${response.status}`);
+  const body = await response.json();
+  if (body?.contract !== 'fcr/project-shell-state@v1') throw new Error('shell-state contract mismatch');
+  return body.canonical;
+}
+function shellMarkup(canonical) {
+  const classification = String(canonical?.classification ?? 'unknown').toUpperCase();
+  const truth = canonical?.truth;
+  const truthText = canonical?.available === false
+    ? 'Canonical shell state is unavailable. FCR will not manufacture verification.'
+    : truth
+      ? `Observed ${truth.observed_at ?? 'at an unknown time'}${truth.expires_at ? ` · expires ${truth.expires_at}` : ''}.`
+      : 'No canonical TruthSnapshot has been recorded. Classification remains UNKNOWN.';
+  const outcome = canonical?.outcome;
+  const outcomeText = outcome ? `${outcome.classification ?? 'unknown'}${outcome.actual_outcome ? ` · ${outcome.actual_outcome}` : ''}` : 'No canonical outcome recorded.';
+  const continuity = canonical?.continuity;
+  const continuityText = continuity ? `${continuity.invalidated_at ? 'Invalidated' : 'Present'}${continuity.valid_until ? ` · valid until ${continuity.valid_until}` : ''}. Continuity never renews authority.` : 'No continuity record. Authority is not inferred.';
+  return `
+    <div class="project-truth-shell__head"><div><p class="project-truth-shell__eyebrow">Se’kret Bip · individualized project shell</p><h3>TRUTHMODE / CONFESS</h3></div><span class="badge ${badgeClass(classification)}">${escapeHtml(classification)}</span></div>
+    <p class="muted">Customer safety and privacy stay inside Bip's boundary. FCR observes and operates only through bounded project authority.</p>
+    <div class="project-truth-shell__grid">
+      <div><strong>Intent</strong><span>Safe, verified emotional-wellness product progress</span></div>
+      <div><strong>Truth</strong><span>${escapeHtml(truthText)}</span></div>
+      <div><strong>Continuity</strong><span>${escapeHtml(continuityText)}</span></div>
+      <div><strong>Outcome</strong><span>${escapeHtml(outcomeText)}</span></div>
+      <div><strong>Resources</strong><span>${escapeHtml(describeResources(canonical?.resources))}</span></div>
+      <div><strong>Recovery</strong><span>${escapeHtml(describeRecovery(canonical?.recovery))}</span></div>
+      <div><strong>Safety</strong><span>Teen/family product boundary remains isolated from the FCR founder shell.</span></div>
+      <div><strong>Next gate</strong><span>Require exact runtime and Playwright evidence before promoting this shell to VERIFIED.</span></div>
+    </div>`;
+}
+async function renderBipShell(panel) {
   if (panel.querySelector('[data-project-shell="sekret-bip"]')) return;
-  const classification = truthClass(panel);
   const shell = document.createElement('section');
   shell.className = 'panel project-truth-shell';
   shell.dataset.projectShell = BIP_SLUG;
   shell.setAttribute('aria-label', 'Se’kret Bip project truth shell');
-  shell.innerHTML = `
-    <div class="project-truth-shell__head"><div><p class="project-truth-shell__eyebrow">Se’kret Bip · individualized project shell</p><h3>TRUTHMODE / CONFESS</h3></div><span class="badge ${classification === 'BLOCKED' ? 'danger' : 'warn'}">${escapeHtml(classification)}</span></div>
-    <p class="muted">Customer safety and privacy stay inside Bip's boundary. FCR observes and operates only through bounded project authority.</p>
-    <div class="project-truth-shell__grid">
-      <div><strong>Intent</strong><span>Safe, verified emotional-wellness product progress</span></div>
-      <div><strong>Truth</strong><span>${classification === 'BLOCKED' ? 'A visible project error blocks a verified claim.' : 'No canonical TruthSnapshot is exposed to this browser view yet.'}</span></div>
-      <div><strong>Authority</strong><span>Project-scoped. No authority is inferred from connection or continuity.</span></div>
-      <div><strong>Safety</strong><span>Teen/family product boundary remains isolated from the FCR founder shell.</span></div>
-      <div><strong>Runtime</strong><span>Mobile · Supabase · Cloudflare · Firebase</span></div>
-      <div><strong>Proof</strong><span>Playwright + runtime + provider + outcome evidence required.</span></div>
-      <div><strong>Recovery</strong><span>Rollback · retry · reconcile · compensate · abandon</span></div>
-      <div><strong>Next gate</strong><span>Expose canonical project-shell state through the founder-gated API, then verify this surface end to end.</span></div>
-    </div>`;
+  shell.innerHTML = shellMarkup({ classification: 'unknown', reason: 'loading' });
   panel.prepend(shell);
+  try {
+    shell.innerHTML = shellMarkup(await loadCanonicalState());
+  } catch {
+    shell.innerHTML = shellMarkup({ available: false, classification: 'unknown', reason: 'canonical_shell_state_unavailable' });
+  }
 }
 function reconcileProjectShell() {
   const panel = document.querySelector('#project-detail');
   if (!(panel instanceof HTMLElement) || panel.style.display === 'none') return;
-  if (selectedProjectSlug(panel) === BIP_SLUG) renderBipShell(panel);
+  if (selectedProjectSlug(panel) === BIP_SLUG) void renderBipShell(panel);
 }
 export function installProjectShellUi() {
   const root = document.getElementById('root');
