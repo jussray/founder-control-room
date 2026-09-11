@@ -215,7 +215,11 @@ export function validateProjectStatePacket(value: unknown, nowMs = Date.now()): 
   errors.push(...boundedTextErrors(branch, 'project state branch', 200));
   if (!FULL_SHA.test(headSha)) errors.push('project state headSha must be a full Git SHA');
   const observedAtMs = Date.parse(observedAt);
-  if (!Number.isFinite(observedAtMs)) errors.push('project state observedAt must be RFC3339-compatible');
+  if (!Number.isFinite(observedAtMs)) {
+    errors.push('project state observedAt must be RFC3339-compatible');
+  } else if (observedAtMs > nowMs) {
+    errors.push('project state observedAt cannot be in the future');
+  }
   const expiresAtMs = Date.parse(expiresAt);
   if (!Number.isFinite(expiresAtMs)) {
     errors.push('project state expiresAt must be RFC3339-compatible');
@@ -258,7 +262,7 @@ export function validateProjectStatePacket(value: unknown, nowMs = Date.now()): 
 
 export function validateInstructionPacket(
   value: unknown,
-  sourcePacket?: ProjectStatePacketV1,
+  sourcePacket: ProjectStatePacketV1 | undefined,
   nowMs = Date.now(),
 ): string[] {
   const candidate = record(value);
@@ -301,7 +305,9 @@ export function validateInstructionPacket(
   if (candidate.providerMutationAuthorized !== false) errors.push('DeepSeek instructor cannot authorize provider mutation');
   if (!SHA256.test(instructionHash)) errors.push('instruction instructionHash must be sha256');
 
-  if (sourcePacket) {
+  if (!sourcePacket) {
+    errors.push('instruction source packet is required');
+  } else {
     const sourcePacketErrors = validateProjectStatePacket(sourcePacket, nowMs);
     errors.push(...sourcePacketErrors.map((error) => `instruction source packet invalid: ${error}`));
     if (sourcePacketId !== sourcePacket.packetId) errors.push('instruction is not bound to the source packetId');
