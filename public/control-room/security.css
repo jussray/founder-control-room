@@ -130,6 +130,7 @@ button, input, select { font: inherit; }
   background: rgba(17, 21, 33, .94);
 }
 .project-head { display: flex; justify-content: space-between; align-items: flex-start; gap: .85rem; }
+.project-head > :first-child { min-width: 0; }
 .project-card h3 { margin: .12rem 0 .25rem; font-size: 1.05rem; }
 .repo { color: #8f98aa; font-size: .7rem; overflow-wrap: anywhere; }
 .target-badge {
@@ -144,6 +145,18 @@ button, input, select { font: inherit; }
 }
 .target-badge strong { font-size: 1.15rem; }
 .target-badge span { color: var(--warn); font-size: .56rem; font-weight: 820; letter-spacing: .07em; }
+.crypto-entry-card .target-badge {
+  min-width: 0;
+  max-width: 48%;
+  justify-items: start;
+}
+.crypto-entry-card .target-badge strong,
+.crypto-entry-card .target-badge span {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  text-align: left;
+}
 .detail-block { margin-top: .75rem; }
 .detail-block h4 { margin: 0 0 .35rem; color: #d8dce7; font-size: .7rem; text-transform: uppercase; letter-spacing: .07em; }
 .detail-block ul { margin: 0; padding-left: 1.1rem; color: #b7bece; font-size: .75rem; line-height: 1.55; }
@@ -194,5 +207,7 @@ button, input, select { font: inherit; }
   .section-head { display: block; }
   .section-head p { margin-top: .35rem; }
   .project-head { align-items: center; }
+  .crypto-entry-card .project-head { align-items: stretch; flex-direction: column; }
+  .crypto-entry-card .target-badge { width: 100%; max-width: 100%; }
   .hero h1 { max-width: none; }
 }

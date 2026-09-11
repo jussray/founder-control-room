@@ -52,13 +52,11 @@ describe('Founder deploy command authority contract', () => {
 
   it('keeps the canonical /deploy-fcr command Worker-only', () => {
     const workerDispatch = commandJobBlock('dispatch', 'dispatch-production');
-
     expect(commandWorkflow).toContain('actions: write');
     expect(workerDispatch).toContain('/actions/workflows/worker-reconcile.yml/dispatches');
     expect(workerDispatch).toContain('expected_head_sha: $sha');
     expect(workerDispatch).toContain('deployment_approval_id: $approval');
     expect(workerDispatch).not.toContain('/actions/workflows/deploy.yml/dispatches');
-
     expect(workerDispatch).not.toContain('wrangler deploy');
     expect(workerDispatch).not.toContain('supabase db push');
     expect(workerDispatch).not.toContain('CLOUDFLARE_API_TOKEN');
@@ -68,7 +66,6 @@ describe('Founder deploy command authority contract', () => {
 
   it('accepts a distinct founder production command only on Supabase incident 247', () => {
     const productionDispatch = commandJobBlock('dispatch-production', 'dispatch-review-email');
-
     expect(productionDispatch).toContain("github.event.issue.number == 247");
     expect(productionDispatch).toContain("github.event.comment.user.login == 'jussray'");
     expect(productionDispatch).toContain("startsWith(github.event.comment.body, '/deploy-fcr-production ')");
@@ -83,14 +80,12 @@ describe('Founder deploy command authority contract', () => {
 
   it('keeps the production bridge provider-blind and delegates mutation to canonical Deploy', () => {
     const productionDispatch = commandJobBlock('dispatch-production', 'dispatch-review-email');
-
     expect(productionDispatch).not.toContain('wrangler deploy');
     expect(productionDispatch).not.toContain('supabase db push');
     expect(productionDispatch).not.toContain('SUPABASE_DB_URL');
     expect(productionDispatch).not.toContain('CLOUDFLARE_API_TOKEN');
     expect(productionDispatch).not.toContain('CLOUDFLARE_ACCOUNT_ID');
     expect(productionDispatch).not.toContain('secrets.');
-
     expect(deployWorkflow).toContain('workflow_dispatch:');
     expect(deployWorkflow).toContain('expected_head_sha:');
     expect(deployWorkflow).toContain('deployment_approval_id:');
@@ -120,7 +115,6 @@ describe('Founder deploy command authority contract', () => {
     expect(commandWorkflow).not.toContain('CLOUDFLARE_API_TOKEN');
     expect(commandWorkflow).not.toContain('CLOUDFLARE_ACCOUNT_ID');
     expect(commandWorkflow).not.toContain('secrets.');
-
     expect(reviewEmailReconcileWorkflow).toContain('workflow_dispatch:');
     expect(reviewEmailReconcileWorkflow).toContain('environment: production');
     expect(reviewEmailReconcileWorkflow).toContain('test "$CURRENT_MAIN_SHA" = "$EXPECTED_HEAD_SHA"');
@@ -142,7 +136,6 @@ describe('Founder deploy command authority contract', () => {
     expect(reconcileWorkflow).toContain('x-founder-control-room-service');
     expect(reconcileWorkflow).toContain('.service == "founder-control-room" and .gitSha == $expected');
     expect(reconcileWorkflow).toContain('.founderSignalAutomationGrant.configured == true and .founderSignalAutomationGrant.enabled == false');
-
     expect(reconcileWorkflow).not.toContain('supabase db push');
     expect(reconcileWorkflow).not.toContain('SUPABASE_DB_URL');
     expect(reconcileWorkflow).not.toContain('proof-of-ship');
@@ -150,7 +143,7 @@ describe('Founder deploy command authority contract', () => {
     expect(reconcileWorkflow).not.toContain('PUBLISH_ALLOWED');
   });
 
-  it('preserves required Worker bindings while forcing the publication grant disabled through the canonical config', () => {
+  it('preserves every declared Worker secret name while forcing the publication grant disabled through the canonical config', () => {
     expect(reconcileWorkflow).toContain('Existing Worker runtime secrets: preserved except \\`FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON\\`, which this workflow forces disabled');
     expect(reconcileWorkflow).toContain('CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}');
     expect(reconcileWorkflow).not.toContain('CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}');
@@ -171,6 +164,10 @@ describe('Founder deploy command authority contract', () => {
       'FOUNDER_SIGNAL_ENGINE_MCP_TOKEN',
       'ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL',
       'FOUNDER_REVIEW_EMAIL_INGRESS_SECRET',
+      'N8N_FOUNDER_CONTENT_WEBHOOK_URL',
+      'N8N_FOUNDER_CONTENT_BEARER_TOKEN',
+      'N8N_FOUNDER_CONTENT_EXPECTED_WORKFLOW_FINGERPRINT',
+      'N8N_FOUNDER_CONTENT_IDENTITY_HMAC_SECRET',
     ]);
     expect(reconcileWorkflow).toContain('./node_modules/.bin/wrangler secret put FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON \\');
     expect(reconcileWorkflow).toContain('--config wrangler.worker.toml < "$grant_file"');

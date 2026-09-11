@@ -144,31 +144,9 @@ verified evidence
 
 A draft, provider acceptance, or n8n execution is not publication truth. **Provider readback** is the terminal external-state evidence for the route that actually ran.
 
+The governed Founder Content n8n production-source lane is source-enabled only when its reviewed configuration sets `N8N_FOUNDER_CONTENT_ENABLED=true`, restricts the enabled provider to Buffer, pins workflow identity `fcrFounderContentV1`, and pins n8n runtime `2.32.6`. That source state does not prove the canonical Worker was deployed with the four required provider-held n8n secret bindings, the production workflow was published at the exact expected fingerprint, the database migrations were applied, or Buffer accepted a schedule. CI may prove the checked workflow on an isolated real n8n runtime without proving production use. Present-tense `live`, `used`, `scheduled`, or `published` claims require exact deployed runtime identity plus provider-native readback.
+
 Investor email is a separate authority class and must not auto-send without the applicable policy, recipient-specific qualification, and send authority.
-
-### Attack 3000 decision evidence
-
-Attack 3000 is a cross-project evidence-evaluation kernel. Domain adapters translate bounded observations into the canonical `SUPPORTED`, `HOLD`, or `FALSIFIED` verdict without gaining authority from that verdict.
-
-The content adapter `content-outcome-learning@v1` requires one common outcome-observation identity across publication and all counters. That observation binds a content fingerprint, provider, comparable measurement window, observation timestamp, completion state, freshness classification, and evidence references. Mixed observation IDs, malformed windows, incomplete windows, or anything other than `CURRENT` freshness fail closed for present-tense decision evidence while preserving the historical observation as provenance.
-
-For content:
-
-```text
-one current comparable outcome observation
--> distribution + engagement + profile intent
--> attributed visits / qualified conversations / contacts / deals
--> direct dimension evidence
--> Attack 3000 verdict
-```
-
-Publishing, impressions, reactions, comments, and profile views do not by themselves prove external demand or business outcome. A supporting `external_demand` dimension must retain its own evidence references and at least one downstream attributed signal. Generic content metric references cannot be borrowed to manufacture evidence for the demand assertion.
-
-Founder-defined content floors evaluate only after verified publication and a completed current measurement window. Each floor is classified from the exact observation and metric inputs it governs, so an unrelated unknown metric cannot suppress a verified breach and pre-publication zeroes cannot create a false `FALSIFIED` outcome.
-
-The authority ceiling remains explicit: Attack 3000 does not authorize merge, deploy, publish, spend, fundraising, external contact, Buffer/n8n execution, provider mutation, or another consequential action. Source tests prove adapter behavior only; provider analytics freshness and real business outcomes remain separate evidence planes.
-
-See [`docs/founder-signal-engine/linkedin-analytics-continuity.md`](docs/founder-signal-engine/linkedin-analytics-continuity.md).
 
 ### Cloudflare and production release
 
