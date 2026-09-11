@@ -1,6 +1,6 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Preserve the existing #746 evidence-authority, Cloudflare Access recovery, Founder Capital Decision, and ATTACK-20 invariants while binding the governed Founder Content n8n production-source rescue to current documentation. This receipt keeps source intent, provider configuration, runtime identity, database application, publication outcome, merge authority, and deploy authority as separate proof planes and does not claim that production n8n, Buffer scheduling, Cloudflare bindings, or Supabase migrations are live merely because the source lane is enabled.",
+  "purpose": "Bind the recovered read-only Shopify child-provider observation contract to current repository-provider documentation without claiming live Shopify inventory, runtime integration, provider mutation, database mutation, merge authority, or deploy authority.",
   "domains": [
     "repository-provider",
     "evidence-authority",
@@ -135,6 +135,18 @@
       "path": "wrangler.worker.toml",
       "claims": [
         "wrangler.worker.toml may express Founder Content n8n production source intent with N8N_FOUNDER_CONTENT_ENABLED=true, Buffer-only provider selection, exact workflow ID fcrFounderContentV1, and pinned runtime version 2.32.6, but source intent is not deployed runtime truth; canonical exact-main deployment must independently verify the four required provider-held n8n secret binding names before Worker mutation."
+      ]
+    },
+    {
+      "path": "src/lib/providerObservation.ts",
+      "claims": [
+        "src/lib/providerObservation.ts must classify child-provider evidence as current, undeclared, scope drift, identity drift, stale, or unknown without granting execution authority, and it must fail closed when observation freshness, completeness, declaration identity, or scope equality is not proven."
+      ]
+    },
+    {
+      "path": "src/providers/ShopifyReadOnlyProvider.ts",
+      "claims": [
+        "src/providers/ShopifyReadOnlyProvider.ts must bind Shopify observation to the exact Founder Control Room permanent and branded store identities, require complete pagination and app scope inventory, withhold CURRENT on incomplete or mismatched provider evidence, keep reconciliation non-authorizing, and never persist provider inventory or perform Shopify mutation."
       ]
     }
   ]

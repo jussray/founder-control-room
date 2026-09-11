@@ -204,6 +204,14 @@ A terminal result is verification evidence only for the command and exact checko
 
 FCR can declare and govern bounded MCP/provider capabilities, including the source contract for a read-only FCR MCP bridge. Repository declarations prove wiring only. Live secret presence, provider authentication, endpoint health, deployed runtime identity, and mutation authority require separate current evidence.
 
+### Provider child observation and Shopify preflight
+
+Source includes a provider-neutral child-observation reconciler and an FCR-bound, read-only Shopify inventory preflight. A Shopify observation must bind to the exact permanent FCR Shopify domain `vercel-store-93a908b0-wcrkkq76.myshopify.com`, the exact branded primary domain `foundercontrolroom.org`, a fresh observation timestamp, complete pagination, installation/app identity, and complete scope inventory before it can be considered structurally complete.
+
+Child-app evidence is classified as `CURRENT`, `UNDECLARED`, `SCOPE_DRIFT`, `IDENTITY_DRIFT`, `STALE`, or `UNKNOWN`. `CURRENT` means only that fresh complete provider evidence matches the supplied founder-approved declaration identity and exact scope set. Reconciliation always retains `authorityGranted: false`; installation, display name, developer identity, or matching app metadata never silently grants execution authority or transfers an older installation's approval.
+
+This is **source implemented only**. The recovered preflight performs no Shopify network request, stores no provider inventory as local current truth, persists no Supabase row, changes no Shopify app or scope, and introduces no runtime credential. A future trusted runtime observer must re-observe the provider at use time, exhaust pagination, keep provider credentials server-side/provider-held, and fail closed on partial, stale, unavailable, or mismatched state before Plugin Center may display present-tense child-provider truth.
+
 ## Data boundary
 
 Founder Control Room uses its own data/control boundary. It must not become a broad back door into Se'kret Bip private user data or another product's customer data.
