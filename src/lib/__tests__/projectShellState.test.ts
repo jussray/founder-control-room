@@ -1,4 +1,9 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+vi.mock('../supabaseClient.js', () => ({
+  supabase: {},
+}));
+
 import { toProjectShellStateView } from '../projectShellState.js';
 
 const NOW = new Date('2026-09-11T22:00:00.000Z');
