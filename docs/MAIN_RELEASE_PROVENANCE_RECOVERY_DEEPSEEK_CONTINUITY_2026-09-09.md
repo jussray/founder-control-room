@@ -4,7 +4,7 @@
 
 PR #775 is a forward provenance-recovery carrier. It does not rewrite repository history and it does not claim that direct commits were originally merged through pull requests.
 
-Two direct-main incidents are now in scope because `main` moved again while this recovery was being reviewed.
+Three direct-main incidents are now in scope because `main` continued to move while this recovery was being reviewed.
 
 ## Incident A - direct main after PR #765
 
@@ -79,6 +79,59 @@ Exact affected set, 2 paths:
 
 Those files do not overlap the six-file effective recovery delta except that `AGENTS_FOUNDER_INTELLIGENCE.md` also appears historically in Incident A. Incident B is nevertheless a separate provenance interval and must not be hidden merely by rebasing or merging a future PR over it.
 
+## Incident C - direct main after PR #778
+
+A later clean GitHub merge established a new reviewed anchor:
+
+- commit `f4e0439da4f43ef980e10eaf39b75e8d6bff21f8`, merge commit for PR #778;
+- tree `8f881059b8bb40a460c274bcdedcf2ae502f2420`.
+
+After that merge, `main` advanced through 18 commits with no pull-request association at the observation point. The immutable Incident C snapshot tip is:
+
+- commit `81d05f7ae8f427e84db506cfa726520a8178dece`;
+- tree `f8b07c33ab910d63b49339a769b6a6fcc3117bb9`.
+
+Exact first-parent sequence, 18 commits:
+
+1. `61411a7651c1589738ba88b20a11937f22003343`
+2. `2e346a8dbb55fbd423d2ebd7c817f091c5f10924`
+3. `bfe78a978ddc0a2a9fc9bc60fd43f464a39806d9`
+4. `e0ac4576da3d66436be67731220d6b63acf838b3`
+5. `d99f7f639c89cdff7e7d9ba6c9f76723f1b58f41`
+6. `62358663d1215d8bd3df4dba2faee1ee2b0a0bab`
+7. `4af3109e3f84f2dc8f19a8ec159b6ebe037ea758`
+8. `24c457fbfcf8406487c1504cf34cd2b4278049ab`
+9. `dd740ecaceb684bb0478ecffd8778dba0deb0d53`
+10. `fb72627ab351c70feb0afbf2c3c3959903c48aa1`
+11. `0bfe2dfddeded56e7629b57ead9a9562e0842834`
+12. `0130111347a74386ddc0fb1ae7f1099ccb8ab8b9`
+13. `55ed2c22e213768f4e8ae9912e186c72e2948020`
+14. `622ab1d3e37b5e5aefa6343427fa5378f9dc83cf`
+15. `625704f8d75e076ef9c30b20214b280a30f618b3`
+16. `c6611b08176ef887a61ea3ef0b7cafab443c1402`
+17. `612159e876051eb05493e50af9562899b60a6bd6`
+18. `81d05f7ae8f427e84db506cfa726520a8178dece`
+
+Exact affected set, 13 paths:
+
+- `.control-room/plugin-management.json`
+- `e2e/security-posture-proof.mjs`
+- `public/control-room/security.css`
+- `public/control-room/security.js`
+- `scripts/verify-ai-skill-contract.mjs`
+- `skills/portfolio-control-plane/SKILL.md`
+- `src/founder-os-lab/__tests__/pluginManagement.contract.test.ts`
+- `src/http/routes/securityPosture.test.ts`
+- `src/security/cryptographicInventory.ts`
+- `src/security/securityPosture.test.ts`
+- `src/security/securityPosture.ts`
+- `src/security/strategicSecurity.test.ts`
+- `src/security/strategicSecurity.ts`
+
+Incident C spans portfolio audit rules, social-analytics configuration, security backend, security browser UI, and browser proof. It must not be summarized as only a crypto-UI incident.
+
+`81d05f7a...` is an immutable snapshot endpoint, not permanent present-tense authority. If `main` advances again without an intervening PR integration, a later incident snapshot or extension must be separately observed rather than silently donating authority to this endpoint.
+
 ## History-preserving reconciliation
 
 The recovery branch incorporated Incident B through two-parent merge commit `ac2f021ebc8b244e89f8f9e9ac17c07018be2e5f` with parents:
@@ -86,13 +139,15 @@ The recovery branch incorporated Incident B through two-parent merge commit `ac2
 - `31869f3f970eb1cde310623a6555c752144103d0`, the recovery branch predecessor;
 - `b3b1d21ca0bf1f6929b155f188551de7e9977ee4`, the Incident B tip and then-current `main`.
 
-No force push, history rewrite, or source dropping was used. Later recovery commits may supersede this merge as the branch tip, but its two-parent ancestry preserves both histories.
+Incident C is not considered incorporated merely because this document and verifier name its immutable range. The recovery branch must gain a history-preserving successor with the current recovery branch as first parent and the exact Incident C/current-main tip as another parent before Incident C can satisfy the verifier's `incident tip is ancestor of HEAD` requirement.
+
+No force push, history rewrite, or source dropping is authorized. Later recovery commits may supersede prior merge commits as the branch tip, but ancestry must preserve both histories.
 
 ## Executable ratification boundary
 
 `scripts/verify-main-release-historical-ratification.mjs` is the single existing fail-closed historical verifier. The Main Release Provenance contract checks out the exact candidate with full history before running it.
 
-The verifier now emits `fcr/main-release-historical-ratification@v2` and proves each incident independently:
+The verifier emits `fcr/main-release-historical-ratification@v2` and proves each incident independently:
 
 1. exact reviewed-anchor tree;
 2. exact incident-tip tree;
@@ -103,10 +158,10 @@ The verifier now emits `fcr/main-release-historical-ratification@v2` and proves 
 
 Aggregate receipt fields distinguish path instances from unique paths:
 
-- incident count: 2;
-- direct commits across incidents: 11;
-- affected path instances: 24;
-- unique affected paths across both incidents: 23.
+- incident count: 3;
+- direct commits across incidents: 29;
+- affected path instances: 37;
+- unique affected paths across all incidents: 35.
 
 The verifier refuses shallow history. It is an identity and scope witness only. It does not perform semantic review, create retrospective PR provenance, or grant merge/deploy authority.
 
@@ -130,18 +185,19 @@ Focused adversarial coverage lives in the existing `src/implant/__tests__/selfAt
 
 ## Review obligation
 
-A clean wrapper diff alone is insufficient. Qualifying semantic review must cover both historical incident subjects and the current recovery delta:
+A clean wrapper diff alone is insufficient. Qualifying semantic review must cover all three historical incident subjects and the current recovery delta:
 
 - Incident A: `34ffe99e77455f278b437f4cfc67c76e3df59a25..027dfdd42f032a5c614c147ae9e1a824c2f506b9`, 9 commits / 22 paths;
-- Incident B: `57e1ed8c2f21911d953587bfe8fe03cd92383a67..b3b1d21ca0bf1f6929b155f188551de7e9977ee4`, 2 commits / 2 paths.
+- Incident B: `57e1ed8c2f21911d953587bfe8fe03cd92383a67..b3b1d21ca0bf1f6929b155f188551de7e9977ee4`, 2 commits / 2 paths;
+- Incident C: `f4e0439da4f43ef980e10eaf39b75e8d6bff21f8..81d05f7ae8f427e84db506cfa726520a8178dece`, 18 commits / 13 paths.
 
-Material Codex findings remain reviewer-owned until a successor-head review justifies disposition. Outdated or superseded locations do not automatically mean accepted.
+Material review findings remain reviewer-owned until a successor-head review justifies disposition. Outdated or superseded locations do not automatically mean accepted.
 
 ## Current-base rule
 
 Current PR base/head truth is owned by the machine-maintained PR Continuity Receipt on PR #775. This document intentionally does not treat a mutable current-main SHA as permanent authority.
 
-The endpoint SHAs listed in Incident A and Incident B are immutable historical evidence. If `main` or the PR head moves again, predecessor CI, Playwright, semantic review, deterministic-review witness, and authority receipts expire and must be reacquired.
+The endpoint SHAs listed in Incidents A, B, and C are immutable historical evidence. If `main` or the PR head moves again, predecessor CI, Playwright, semantic review, deterministic-review witness, and authority receipts expire and must be reacquired.
 
 ## Authority and product boundaries
 
@@ -160,14 +216,14 @@ The historical source state keeps its authority ceilings:
 Recovery may advance only when all of the following are true:
 
 1. PR Continuity says the exact carrier is current with authoritative `main`;
-2. the v2 historical-ratification verifier passes in the full-history Main Release Provenance lane for both incidents;
+2. the v2 historical-ratification verifier passes in the full-history Main Release Provenance lane for all three incidents;
 3. required exact-head CI and browser/Playwright proof are terminal green for the unchanged successor head;
-4. semantic review explicitly covers both historical incident ranges plus current repairs;
+4. semantic review explicitly covers all three historical incident ranges plus current repairs;
 5. material review findings receive reviewer-side disposition after their repairs;
 6. the trusted deterministic-review witness is successfully published and independently read back for the exact current candidate where required;
 7. authenticated Founder Final binds the exact current PR/base/head after freshness checks;
 8. merge, if authorized, occurs through the normal PR path without bypass;
-9. post-merge provenance reports truthful scope and never relabels either incident as originally PR-merged;
+9. post-merge provenance reports truthful scope and never relabels any direct-main incident as originally PR-merged;
 10. deployment and production-runtime equivalence remain separate claims with separate evidence.
 
 ## Separate blockers
@@ -178,6 +234,12 @@ The trusted deterministic-review publisher previously failed before witness publ
 
 That configuration defect is separate from historical ratification. Never place the private key in this repository, PR, issue, log, artifact, or chat.
 
+### Provider governance topology
+
+The canonical FCR governance contract requires two provider membranes: a founder-only pull-request/review membrane with review-thread resolution and trusted-App pull-request-only bypass, plus a separate zero-bypass strict-freshness membrane for `Required Gate` and `Verify test-ledger contract`. A legacy monolithic ruleset is not equivalent proof.
+
+Governance reconciliation uses the same trusted App credential as deterministic witness publication. Do not attempt provider reconciliation while that credential is known invalid or before separately authorized provider mutation.
+
 ### Neon preview branch
 
 The PR preview workflow repeatedly validates local Neon configuration and expiration setup, then fails at the external `Create Neon Branch` step. Unless a shared source cause is proven, that remains a separate provider-preview failure and is not release-ratification proof.
@@ -186,11 +248,13 @@ The PR preview workflow repeatedly validates local Neon configuration and expira
 
 This receipt does not claim that:
 
-- either direct-main incident has been retroactively converted into PR merges;
+- any direct-main incident has been retroactively converted into a PR merge;
+- Incident C remains the terminal current-main interval after its observed tip if `main` later moves;
 - DeepSeek has live provider credentials or repository mutation authority;
 - social analytics intermediaries have native-platform or causal authority;
 - production serves the recovery candidate;
 - the GitHub App private-key configuration is repaired;
+- canonical GitHub governance has been reconciled;
 - the Neon preview branch exists;
 - merge authority is true.
 
