@@ -10,10 +10,14 @@ import {
 } from '../../lib/founderPermissionBroker.js';
 import {
   createFounderExecutionBinding,
-  revalidateFounderExecutionBindingAtEffect,
+  executePromptOSWorkflowRegistryPromotion,
 } from '../../lib/founderPermissionExecution.js';
 import { storedFounderPermissionDecisionMatches } from '../../lib/founderPermissionStoredDecision.js';
 import { createAppAwareRepositoryProvider } from '../../providers/RepositoryProviderFactory.js';
+import {
+  createAppAwarePromptOSRegistryWriter,
+  type PromptOSRegistryWriter,
+} from '../../providers/PromptOSRegistryWriter.js';
 import {
   FOUNDER_CONTROL_SURFACES,
   type FounderControlDecisionValue,
@@ -329,6 +333,7 @@ founderPermissionsRouter.post('/requests/:requestId/consume', rateLimitFounderPe
 
   let executionBinding = null;
   let executionProvider = null;
+  let executionWriter: PromptOSRegistryWriter | null = null;
   if (permissionRequest.actionTarget?.type === 'promptos_workflow_registry_promote') {
     try {
       executionProvider = await createAppAwareRepositoryProvider({
@@ -336,6 +341,7 @@ founderPermissionsRouter.post('/requests/:requestId/consume', rateLimitFounderPe
         repoProvider: 'github',
         repoIdentifier: permissionRequest.actionTarget.repo,
       });
+      executionWriter = await createAppAwarePromptOSRegistryWriter();
       executionBinding = await createFounderExecutionBinding({
         request: permissionRequest,
         decisionHash,
@@ -366,45 +372,36 @@ founderPermissionsRouter.post('/requests/:requestId/consume', rateLimitFounderPe
   if (error) return res.status(500).json({ error: 'Unable to consume founder permission.' });
   if (!data) return res.status(409).json({ error: 'Founder permission changed before it could be consumed.', code: 'FOUNDER_PERMISSION_CONSUMPTION_RACE' });
 
-  if (executionBinding && executionProvider) {
+  if (executionBinding && executionProvider && executionWriter) {
     try {
-      await revalidateFounderExecutionBindingAtEffect({
+      const effectReceipt = await executePromptOSWorkflowRegistryPromotion({
         request: permissionRequest,
         binding: executionBinding,
         provider: executionProvider,
+        writer: executionWriter,
       });
-    } catch (bindingError) {
+      return res.json({
+        consumed: true,
+        ...projection(asJsonRecord(data)),
+        executionAuthorized: false,
+        executionPreconditionsVerified: true,
+        effectGate: 'SERVER_SIDE_ONLY',
+        outcomeVerified: true,
+        effectReceipt,
+      });
+    } catch (effectError) {
       return res.status(409).json({
         consumed: true,
         ...projection(asJsonRecord(data)),
         executionAuthorized: false,
         executionPreconditionsVerified: false,
+        outcomeVerified: false,
         requiresNewApproval: true,
-        error: bindingError instanceof Error ? bindingError.message : String(bindingError),
-        code: 'FOUNDER_PERMISSION_POST_CONSUME_STATE_CHANGED',
+        retryAuthorized: false,
+        error: effectError instanceof Error ? effectError.message : String(effectError),
+        code: 'FOUNDER_PERMISSION_EFFECT_FAILED_OR_UNVERIFIED',
       });
     }
-    return res.json({
-      consumed: true,
-      ...projection(asJsonRecord(data)),
-      executionAuthorized: false,
-      executionPreconditionsVerified: true,
-      effectGate: 'SERVER_SIDE_ONLY',
-      executionEvidence: {
-        contract: executionBinding.contract,
-        bindingHash: executionBinding.bindingHash,
-        actionType: executionBinding.actionType,
-        providerIdentity: executionBinding.providerIdentity,
-        capabilityVersion: executionBinding.capabilityVersion,
-        consequence: executionBinding.consequence,
-        observedHeadSha: executionBinding.observedHeadSha,
-        observedWorkflowContentHash: executionBinding.observedWorkflowContentHash,
-        observedRegistryContentHash: executionBinding.observedRegistryContentHash,
-        observedAt: executionBinding.observedAt,
-        singleUse: executionBinding.singleUse,
-        mustRevalidateBeforeEffect: executionBinding.mustRevalidateBeforeEffect,
-      },
-    });
   }
 
   return res.json({ consumed: true, ...projection(asJsonRecord(data)) });
