@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash } from 'node:crypto';
 import type { SupabaseClient } from '@supabase/supabase-js';
 // @ts-expect-error -- canonical founder-content authority is the provider-neutral CommonJS firewall contract.
 import founderContentAuthorizationContract from '../../tools/founder-content-contracts/founder-content-authorization-contract.cjs';
@@ -19,6 +19,8 @@ const canonicalFounderContent = founderContentAuthorizationContract as Canonical
 
 export const FOUNDER_CONTENT_APPROVAL_STORE_CONTRACT = 'fcr/founder-content-approval-store@v1' as const;
 const MAX_APPROVAL_TTL_MS = 30 * 60 * 1000;
+const PUBLIC_PATTERN_CONTRACT = 'promptos/editorial-pattern@v1' as const;
+const APPROVAL_RESERVATION_CONTRACT = 'fcr/founder-content-approval-reservation@v2' as const;
 
 export interface FounderContentIssuedApproval {
   contract: typeof FOUNDER_CONTENT_APPROVAL_STORE_CONTRACT;
@@ -84,6 +86,68 @@ function parseTime(value: unknown, label: string): number {
   return ms;
 }
 
+function hash(value: unknown): string {
+  return createHash('sha256').update(JSON.stringify(value)).digest('hex');
+}
+
+function normalizePublicText(value: string): string {
+  return value
+    .normalize('NFKC')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function firstPublicHook(draft: string): string {
+  const line = draft.split(/\r?\n/).map((part) => part.trim()).find(Boolean) ?? '';
+  const sentence = line.split(/(?<=[.!?])\s+/)[0] ?? line;
+  return sentence.slice(0, 240).trim();
+}
+
+function publicClaimsText(payload: JsonRecord): string {
+  if (!Array.isArray(payload.public_claims)) return '';
+  return payload.public_claims
+    .map((claim) => text(record(claim).text))
+    .filter(Boolean)
+    .join(' ');
+}
+
+function publicPatternFingerprint(payload: JsonRecord): string {
+  const draft = text(payload.draft_text);
+  const thesis = publicClaimsText(payload) || draft.slice(0, 600);
+  const hook = firstPublicHook(draft);
+  return hash({
+    contract: PUBLIC_PATTERN_CONTRACT,
+    lane: 'founder-editorial',
+    thesis: normalizePublicText(thesis),
+    hook: normalizePublicText(hook),
+  });
+}
+
+function deterministicApprovalId({
+  founderUserId,
+  platform,
+  patternFingerprint,
+  intentId,
+  intentVersion,
+}: {
+  founderUserId: string;
+  platform: string;
+  patternFingerprint: string;
+  intentId: string;
+  intentVersion: unknown;
+}): string {
+  return `fca:${hash({
+    contract: APPROVAL_RESERVATION_CONTRACT,
+    founderUserId: text(founderUserId),
+    platform: text(platform).toLowerCase(),
+    publicPatternFingerprint: patternFingerprint.toLowerCase(),
+    currentYouIntentId: text(intentId),
+    currentYouIntentVersion: intentVersion,
+  })}`;
+}
+
 function canonicalIssue({
   proposal,
   founderUserId,
@@ -104,10 +168,16 @@ function canonicalIssue({
   const expiresMs = Math.min(nowMs + MAX_APPROVAL_TTL_MS, proposalExpiresMs);
   if (expiresMs <= nowMs) throw new Error('proposal is already expired');
 
-  const approvalId = `fca:${randomUUID()}`;
   const proposalHash = text(proposal.proposal_hash).toLowerCase();
   const publicPayloadHash = canonicalFounderContent.hashPublicPayload(payload).toLowerCase();
   const platform = text(payload.platform).toLowerCase();
+  const approvalId = deterministicApprovalId({
+    founderUserId,
+    platform,
+    patternFingerprint: publicPatternFingerprint(payload),
+    intentId: text(currentYou.intent_id),
+    intentVersion: currentYou.intent_version,
+  });
   const approvedAt = new Date(nowMs).toISOString();
   const expiresAt = new Date(expiresMs).toISOString();
   const approval: JsonRecord = {
@@ -329,7 +399,11 @@ export async function issueFounderContentApproval({
   const issued = buildFounderContentIssuedApproval({ proposal, founderUserId, now });
   const store = repository ?? await defaultRepository();
   const persisted = await store.issue({ ...issued, founderUserId });
-  if (!persisted) throw new Error('authoritative founder-content approval could not be persisted');
+  if (!persisted) {
+    throw new Error(
+      'authoritative founder-content approval could not be persisted; exact public pattern/current-intent approval is already reserved or store rejected issuance',
+    );
+  }
   return issued;
 }
 
