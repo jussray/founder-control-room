@@ -86,12 +86,12 @@ A later clean GitHub merge established a new reviewed anchor:
 - commit `f4e0439da4f43ef980e10eaf39b75e8d6bff21f8`, merge commit for PR #778;
 - tree `8f881059b8bb40a460c274bcdedcf2ae502f2420`.
 
-After that merge, `main` advanced through 20 commits with no intervening pull-request integration. The immutable Incident C tip now observed is:
+After that merge, `main` advanced through 27 commits with no intervening pull-request integration. The immutable Incident C tip now observed is:
 
-- commit `6dd040c6421663c72050cf3db63042320072096c`;
-- tree `54eff0f2063350dc139aebad76d2dd1c0778ce70`.
+- commit `2007eb07087aff46064188f694949ef410c235a9`;
+- tree `ed1eda84855a3a166169a5420f44755e753a08cf`.
 
-Exact first-parent sequence, 20 commits:
+Exact first-parent sequence, 27 commits:
 
 1. `61411a7651c1589738ba88b20a11937f22003343`
 2. `2e346a8dbb55fbd423d2ebd7c817f091c5f10924`
@@ -111,19 +111,32 @@ Exact first-parent sequence, 20 commits:
 16. `c6611b08176ef887a61ea3ef0b7cafab443c1402`
 17. `612159e876051eb05493e50af9562899b60a6bd6`
 18. `81d05f7ae8f427e84db506cfa726520a8178dece`
-19. `f9f1d671cfb701925b90c2c5a7cd21efe4ab294f` - add GitHub Copilot MCP routing;
-20. `6dd040c6421663c72050cf3db63042320072096c` - preserve public routes behind scoped Cloudflare Access.
+19. `f9f1d671cfb701925b90c2c5a7cd21efe4ab294f`
+20. `6dd040c6421663c72050cf3db63042320072096c`
+21. `6f16c62470e5f33b20da630d076acd4c09281325`
+22. `86c93735a5a0f68ca698ee60680ae055242f0968`
+23. `d9c333d9566c0f9389a72612f832a2a622fc33f7`
+24. `2b0a65a47703178a1c880c4e055b5a3127f922d5`
+25. `da99d38cf3b43596cac3bd2ec43621a5a62be416`
+26. `d47ac0c8e164a2842d1ff1717f605924beba6556`
+27. `2007eb07087aff46064188f694949ef410c235a9`
 
-Exact affected set, 15 paths:
+Exact affected set, 21 paths:
 
 - `.agents/skills/control-room-cloudflare-agent-fleet/SKILL.md`
 - `.control-room/plugin-management.json`
 - `.github/mcp.json`
+- `.github/workflows/capability-contract.yml`
+- `docs/FCR_SINGLE_OS_COHESION_AUDIT.md`
 - `e2e/security-posture-proof.mjs`
 - `public/control-room/security.css`
 - `public/control-room/security.js`
 - `scripts/verify-ai-skill-contract.mjs`
+- `scripts/verify-founder-intelligence-inheritance.mjs`
 - `skills/portfolio-control-plane/SKILL.md`
+- `src/capabilities/__tests__/workbenchRegistry.test.ts`
+- `src/capabilities/freeFirstCapabilityPolicy.ts`
+- `src/capabilities/workbenchRegistry.ts`
 - `src/founder-os-lab/__tests__/pluginManagement.contract.test.ts`
 - `src/http/routes/securityPosture.test.ts`
 - `src/security/cryptographicInventory.ts`
@@ -132,9 +145,9 @@ Exact affected set, 15 paths:
 - `src/security/strategicSecurity.test.ts`
 - `src/security/strategicSecurity.ts`
 
-Incident C spans portfolio audit rules, social-analytics configuration, security backend, security browser UI, browser proof, Cloudflare MCP routing, and the public/private route invariant. It must not be summarized as only a crypto-UI incident.
+Incident C spans portfolio audit rules, social-analytics configuration, security backend, security browser UI, browser proof, Cloudflare MCP routing, the public/private route invariant, the shared FCR capability runtime, and free-first capability selection. It must not be summarized as only a crypto-UI or voice-runtime incident.
 
-`81d05f7a...` remains an immutable intermediate Incident C snapshot. `6dd040c6...` is the later observed Incident C tip. Neither is permanent present-tense authority: if `main` advances again without an intervening PR integration, another explicit Incident C extension must be observed rather than silently donating authority to the old endpoint.
+`81d05f7a...`, `6dd040c6...`, and `da99d38c...` remain immutable intermediate Incident C snapshots. `2007eb07...` is the latest observed Incident C tip. None is permanent present-tense authority: if `main` advances again without an intervening PR integration, another explicit Incident C extension must be observed rather than silently donating authority to the old endpoint.
 
 ## History-preserving reconciliation
 
@@ -148,10 +161,15 @@ The recovery branch initially incorporated Incident C through two-parent merge c
 - `31497239ba169df33a8cf35dad33815eedd95cb0`, the recovery branch predecessor;
 - `81d05f7ae8f427e84db506cfa726520a8178dece`, the then-observed Incident C tip.
 
-After Incident C extended by two more direct-main commits, the recovery branch incorporated the extension through two-parent merge commit `0df0bb272581d6f0d0e78488036bd0bac05fdeeb` with parents:
+After Incident C extended by two more direct-main commits, the recovery branch incorporated that extension through two-parent merge commit `0df0bb272581d6f0d0e78488036bd0bac05fdeeb` with parents:
 
 - `b49be8de550b17fda383daaf095714e5990e92c4`, the recovery branch predecessor;
 - `6dd040c6421663c72050cf3db63042320072096c`, the extended Incident C tip and then-current `main`.
+
+After the shared capability-runtime and free-first changes extended Incident C again, the existing recovery carrier incorporated exact current `main` through two-parent merge commit `6c132d3959ab1a6598c52f1c43238af4484584d7` with parents:
+
+- `26aac78241c5e51218857664041481022a3a1d88`, the recovery branch predecessor;
+- `2007eb07087aff46064188f694949ef410c235a9`, the latest observed Incident C tip and then-current `main`.
 
 Later ratification-receipt commits descend from that merge, so recovery history and the complete observed Incident C range remain ancestors. No force push, history rewrite, or source dropping is authorized.
 
@@ -171,9 +189,9 @@ The verifier emits `fcr/main-release-historical-ratification@v2` and proves each
 Aggregate receipt fields distinguish path instances from unique paths:
 
 - incident count: 3;
-- direct commits across incidents: 31;
-- affected path instances: 39;
-- unique affected paths across all incidents: 37.
+- direct commits across incidents: 38;
+- affected path instances: 45;
+- unique affected paths across all incidents: 41.
 
 The verifier refuses shallow history. It is an identity and scope witness only. It does not perform semantic review, create retrospective PR provenance, or grant merge/deploy authority.
 
@@ -209,7 +227,7 @@ A clean wrapper diff alone is insufficient. Qualifying semantic review must cove
 
 - Incident A: `34ffe99e77455f278b437f4cfc67c76e3df59a25..027dfdd42f032a5c614c147ae9e1a824c2f506b9`, 9 commits / 22 paths;
 - Incident B: `57e1ed8c2f21911d953587bfe8fe03cd92383a67..b3b1d21ca0bf1f6929b155f188551de7e9977ee4`, 2 commits / 2 paths;
-- Incident C: `f4e0439da4f43ef980e10eaf39b75e8d6bff21f8..6dd040c6421663c72050cf3db63042320072096c`, 20 commits / 15 paths;
+- Incident C: `f4e0439da4f43ef980e10eaf39b75e8d6bff21f8..2007eb07087aff46064188f694949ef410c235a9`, 27 commits / 21 paths;
 - current effective recovery delta relative to Incident C tip: 16 paths:
   - `.github/workflows/main-release-provenance.yml`
   - `docs/MAIN_RELEASE_PROVENANCE_RECOVERY_DEEPSEEK_CONTINUITY_2026-09-09.md`
