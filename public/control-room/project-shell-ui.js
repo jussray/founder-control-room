@@ -32,11 +32,14 @@ function badgeClass(classification) {
 }
 function describeRecovery(recovery) {
   if (!recovery) return 'No canonical recovery plan recorded.';
-  return `${recovery.status ?? 'planned'} · rollback · retry · reconcile · compensate · abandon`;
+  const modes = Array.isArray(recovery.modesAvailable) && recovery.modesAvailable.length
+    ? recovery.modesAvailable.join(' · ')
+    : 'no recovery modes recorded';
+  return `${recovery.status ?? 'planned'} · ${modes}`;
 }
 function describeResources(resources) {
   if (!Array.isArray(resources) || resources.length === 0) return 'No canonical resource budget recorded.';
-  return resources.map((r) => `${r.resource_type}: ${r.consumed ?? 0}${r.ceiling == null ? '' : ` / ${r.ceiling}`} ${r.unit ?? ''}`.trim()).join(' · ');
+  return resources.map((r) => `${r.type}: ${r.consumed ?? 0}${r.ceiling == null ? '' : ` / ${r.ceiling}`} ${r.unit ?? ''}`.trim()).join(' · ');
 }
 async function loadCanonicalState() {
   const response = await fetch(`/projects/${encodeURIComponent(BIP_SLUG)}/shell-state`, {
@@ -53,12 +56,19 @@ function shellMarkup(canonical) {
   const truthText = canonical?.available === false
     ? 'Canonical shell state is unavailable. FCR will not manufacture verification.'
     : truth
-      ? `Observed ${truth.observed_at ?? 'at an unknown time'}${truth.expires_at ? ` · expires ${truth.expires_at}` : ''}.`
+      ? `Observed ${truth.observedAt ?? 'at an unknown time'}${truth.expiresAt ? ` · expires ${truth.expiresAt}` : ''}${truth.conflictCount ? ` · ${truth.conflictCount} conflict${truth.conflictCount === 1 ? '' : 's'}` : ''}.`
       : 'No canonical TruthSnapshot has been recorded. Classification remains UNKNOWN.';
   const outcome = canonical?.outcome;
-  const outcomeText = outcome ? `${outcome.classification ?? 'unknown'}${outcome.actual_outcome ? ` · ${outcome.actual_outcome}` : ''}` : 'No canonical outcome recorded.';
+  const outcomeText = outcome
+    ? `${outcome.classification ?? 'unknown'} · ${outcome.hasEvidence ? 'evidence recorded' : 'no outcome evidence'}`
+    : 'No canonical outcome recorded.';
   const continuity = canonical?.continuity;
-  const continuityText = continuity ? `${continuity.invalidated_at ? 'Invalidated' : 'Present'}${continuity.valid_until ? ` · valid until ${continuity.valid_until}` : ''}. Continuity never renews authority.` : 'No continuity record. Authority is not inferred.';
+  const continuityText = continuity?.present
+    ? `${continuity.valid ? 'Valid' : 'Invalid or expired'}${continuity.validUntil ? ` · valid until ${continuity.validUntil}` : ''}. Continuity never renews authority.`
+    : 'No continuity record. Authority is not inferred.';
+  const nextGate = canonical?.mayClaimVerifiedOutcome
+    ? 'Verified outcome claim is permitted by current canonical truth and outcome evidence.'
+    : 'Require verified truth plus achieved outcome evidence before promoting this shell to VERIFIED.';
   return `
     <div class="project-truth-shell__head"><div><p class="project-truth-shell__eyebrow">Se’kret Bip · individualized project shell</p><h3>TRUTHMODE / CONFESS</h3></div><span class="badge ${badgeClass(classification)}">${escapeHtml(classification)}</span></div>
     <p class="muted">Customer safety and privacy stay inside Bip's boundary. FCR observes and operates only through bounded project authority.</p>
@@ -70,7 +80,7 @@ function shellMarkup(canonical) {
       <div><strong>Resources</strong><span>${escapeHtml(describeResources(canonical?.resources))}</span></div>
       <div><strong>Recovery</strong><span>${escapeHtml(describeRecovery(canonical?.recovery))}</span></div>
       <div><strong>Safety</strong><span>Teen/family product boundary remains isolated from the FCR founder shell.</span></div>
-      <div><strong>Next gate</strong><span>Require exact runtime and Playwright evidence before promoting this shell to VERIFIED.</span></div>
+      <div><strong>Next gate</strong><span>${escapeHtml(nextGate)}</span></div>
     </div>`;
 }
 async function renderBipShell(panel) {
@@ -84,7 +94,7 @@ async function renderBipShell(panel) {
   try {
     shell.innerHTML = shellMarkup(await loadCanonicalState());
   } catch {
-    shell.innerHTML = shellMarkup({ available: false, classification: 'unknown', reason: 'canonical_shell_state_unavailable' });
+    shell.innerHTML = shellMarkup({ available: false, classification: 'unknown', reason: 'canonical_shell_state_unavailable', mayClaimVerifiedOutcome: false });
   }
 }
 function reconcileProjectShell() {
