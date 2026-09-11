@@ -21,16 +21,19 @@ export interface ProviderPqcCapabilityEntry {
   migrationAuthority: string;
   requiredRuntimeEvidenceBeforeChange: string;
   sources: readonly ProviderPqcEvidenceSource[];
-  observedOn: '2026-09-10';
+  observedOn: string;
 }
+
+export const PROVIDER_PQC_CURRENT_LEASE_DAYS = 7;
 
 /**
  * Official-provider documentation snapshot for cryptographic migration planning.
  *
  * These entries describe documented provider capability, not runtime negotiation,
  * project configuration, or permission to rotate keys. CURRENT means the provider
- * documents the capability today; a project still needs claim-appropriate runtime
- * evidence before FCR may describe that protection as active for the project.
+ * documentation was revalidated inside the bounded evidence lease; a project still
+ * needs claim-appropriate runtime evidence before FCR may describe that protection
+ * as active for the project.
  */
 export const PROVIDER_PQC_CAPABILITIES: readonly ProviderPqcCapabilityEntry[] = [
   {
@@ -250,6 +253,31 @@ export const PROVIDER_PQC_CAPABILITIES: readonly ProviderPqcCapabilityEntry[] = 
     observedOn: '2026-09-10',
   },
 ] as const;
+
+function observationExpiry(observedOn: string, leaseDays: number): number | null {
+  const observedAt = Date.parse(`${observedOn}T00:00:00.000Z`);
+  if (!Number.isFinite(observedAt)) return null;
+  return observedAt + leaseDays * 24 * 60 * 60 * 1_000;
+}
+
+export function providerPqcCapabilitiesAsOf(
+  entries: readonly ProviderPqcCapabilityEntry[] = PROVIDER_PQC_CAPABILITIES,
+  asOf: Date = new Date(),
+  currentLeaseDays = PROVIDER_PQC_CURRENT_LEASE_DAYS,
+): readonly ProviderPqcCapabilityEntry[] {
+  const asOfMs = asOf.getTime();
+  return entries.map((entry) => {
+    if (entry.state !== 'CURRENT') return entry;
+    const expiresAt = observationExpiry(entry.observedOn, currentLeaseDays);
+    if (expiresAt !== null && asOfMs <= expiresAt) return entry;
+    return {
+      ...entry,
+      state: 'UNKNOWN',
+      currentContract: `Provider evidence lease expired after ${entry.observedOn}; authoritative revalidation is required before treating this capability as current.`,
+      pqcEvidence: 'Prior provider documentation remains provenance only until it is revalidated against the authoritative source.',
+    };
+  });
+}
 
 export function auditProviderPqcCapabilities(entries: readonly ProviderPqcCapabilityEntry[] = PROVIDER_PQC_CAPABILITIES): {
   entryCount: number;
