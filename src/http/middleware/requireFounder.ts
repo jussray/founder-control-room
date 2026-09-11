@@ -16,9 +16,9 @@ export type FounderAccountRole = 'platform_owner' | 'workspace_owner';
 export interface FounderIdentity {
   email: string;
   userId: string;
-  // Optional at the shared request type boundary so legacy tests/helpers that
-  // construct a FounderRequest remain source-compatible. Authorization
-  // middleware always populates both values before tenant-aware routes run.
+  // Optional at the shared request type boundary so legacy tests/helpers and
+  // a code-before-migration rollout remain source-compatible. Migrated rows
+  // and all tenant rows expose both values.
   role?: FounderAccountRole;
   workspaceId?: string | null;
 }
@@ -35,6 +35,7 @@ interface AuthenticatedIdentity {
 interface FounderAccess {
   role: FounderAccountRole;
   workspaceId: string | null;
+  exposesWorkspaceIdentity: boolean;
 }
 
 type FounderAccessState =
@@ -68,13 +69,16 @@ async function founderAccess(
 
   const record = allowRow as Record<string, unknown>;
   const rawRole = record.account_role;
-  const role: FounderAccountRole = rawRole === undefined || rawRole === null
+  const hasExplicitRole = rawRole !== undefined && rawRole !== null;
+  const hasExplicitWorkspaceColumn = Object.prototype.hasOwnProperty.call(record, 'workspace_id');
+
+  const role: FounderAccountRole = !hasExplicitRole
     ? 'platform_owner'
     : rawRole === 'platform_owner' || rawRole === 'workspace_owner'
       ? rawRole
       : 'platform_owner';
 
-  if (rawRole !== undefined && rawRole !== null && rawRole !== 'platform_owner' && rawRole !== 'workspace_owner') {
+  if (hasExplicitRole && rawRole !== 'platform_owner' && rawRole !== 'workspace_owner') {
     return { state: 'error' };
   }
 
@@ -82,16 +86,32 @@ async function founderAccess(
     ? record.workspace_id.trim()
     : null;
 
-  return { state: 'allowed', access: { role, workspaceId } };
+  return {
+    state: 'allowed',
+    access: {
+      role,
+      workspaceId,
+      exposesWorkspaceIdentity: hasExplicitRole || hasExplicitWorkspaceColumn,
+    },
+  };
 }
 
 function founderIdentity(
   identity: AuthenticatedIdentity,
   access: FounderAccess,
 ): FounderIdentity {
-  return {
+  const base: FounderIdentity = {
     email: identity.email,
     userId: identity.userId,
+  };
+
+  // Before the migration lands, historical founder_users rows do not contain
+  // tenancy columns. Keep that response shape stable for the platform owner.
+  // After migration, and for every workspace_owner, tenancy metadata is
+  // explicit and therefore returned to the browser/API caller.
+  if (!access.exposesWorkspaceIdentity) return base;
+  return {
+    ...base,
     role: access.role,
     workspaceId: access.workspaceId,
   };
