@@ -22,7 +22,19 @@ export const FOUNDER_CONVEYOR_STAGES = [
   'skills',
 ] as const;
 
+export const FOUNDER_CONVEYOR_ERROR_CONTRACT = 'founder-control-room/n8n-conveyor-error@v1' as const;
+
 export type FounderConveyorStage = (typeof FOUNDER_CONVEYOR_STAGES)[number];
+export type FounderConveyorFailureClass =
+  | 'AUTH'
+  | 'PAYLOAD_CONTRACT'
+  | 'SHA_IDENTITY'
+  | 'AUTHORITY'
+  | 'CAPABILITY_CONTRACT'
+  | 'RATE_LIMIT'
+  | 'UPSTREAM_FAILURE'
+  | 'TIMEOUT'
+  | 'NETWORK';
 
 export interface FounderConveyorAdvanceInput {
   runId: string;
@@ -58,6 +70,9 @@ export interface FounderConveyorDispatchResult {
   status: number;
   receiptId: string | null;
   reasons: string[];
+  failureClass?: FounderConveyorFailureClass;
+  upstreamCode?: string;
+  retryable?: boolean;
 }
 
 interface DispatchOptions {
@@ -66,11 +81,29 @@ interface DispatchOptions {
   receiptStore?: V10ConveyorReceiptStore;
 }
 
+interface SafeN8nFailure {
+  failureClass: FounderConveyorFailureClass;
+  upstreamCode: string;
+  retryable: boolean;
+}
+
 const FULL_SHA = /^[0-9a-f]{40}$/i;
 const MAX_GOAL_LENGTH = 4000;
 const MAX_ID_LENGTH = 200;
 const MAX_EVIDENCE_URLS = 20;
 const SECRETISH_PATTERN = /(github_pat_|gh[pousr]_[A-Za-z0-9_]{12,}|Bearer\s+[A-Za-z0-9._-]{12,}|SERVICE_ROLE|API_KEY|ACCESS_KEY|PASSWORD|SECRET|TOKEN)/i;
+const SAFE_N8N_FAILURE_CLASSES = new Set<FounderConveyorFailureClass>([
+  'PAYLOAD_CONTRACT',
+  'SHA_IDENTITY',
+  'AUTHORITY',
+  'CAPABILITY_CONTRACT',
+]);
+const SAFE_N8N_FAILURE_CODES = new Set([
+  'PAYLOAD_REJECTED',
+  'IDENTITY_REJECTED',
+  'AUTHORITY_REJECTED',
+  'CAPABILITY_REJECTED',
+]);
 
 const NEXT_STAGE: Record<FounderConveyorStage, FounderConveyorStage> = {
   chat: 'workflows',
@@ -98,6 +131,46 @@ function validHttpUrl(value: string): boolean {
   } catch {
     return false;
   }
+}
+
+function safeStructuredN8nFailure(value: unknown): SafeN8nFailure | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const record = value as Record<string, unknown>;
+  if (record.contract !== FOUNDER_CONVEYOR_ERROR_CONTRACT) return null;
+
+  const failureClass = text(record.failureClass) as FounderConveyorFailureClass;
+  const upstreamCode = text(record.errorCode);
+  if (!SAFE_N8N_FAILURE_CLASSES.has(failureClass) || !SAFE_N8N_FAILURE_CODES.has(upstreamCode)) return null;
+
+  return {
+    failureClass,
+    upstreamCode,
+    retryable: false,
+  };
+}
+
+function safeFailureFromHttpStatus(status: number): SafeN8nFailure {
+  if (status === 401 || status === 403) {
+    return { failureClass: 'AUTH', upstreamCode: 'HTTP_AUTH_REJECTED', retryable: false };
+  }
+  if (status === 408 || status === 504) {
+    return { failureClass: 'TIMEOUT', upstreamCode: 'HTTP_TIMEOUT', retryable: true };
+  }
+  if (status === 429) {
+    return { failureClass: 'RATE_LIMIT', upstreamCode: 'HTTP_RATE_LIMITED', retryable: true };
+  }
+  if (status === 400 || status === 409 || status === 422) {
+    return { failureClass: 'PAYLOAD_CONTRACT', upstreamCode: 'HTTP_CONTRACT_REJECTED', retryable: false };
+  }
+  return {
+    failureClass: 'UPSTREAM_FAILURE',
+    upstreamCode: 'HTTP_UPSTREAM_REJECTED',
+    retryable: status >= 500,
+  };
+}
+
+function isTimeoutError(error: unknown): boolean {
+  return error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError');
 }
 
 export function readFounderConveyorConfig(env: NodeJS.ProcessEnv = process.env): FounderConveyorConfig {
@@ -320,12 +393,14 @@ export async function dispatchFounderConveyorAdvance(
     const receiptId = receiptIdFrom(responseBody);
 
     if (!response.ok) {
+      const failure = safeStructuredN8nFailure(responseBody) ?? safeFailureFromHttpStatus(response.status);
       return {
         ok: false,
         code: 'UPSTREAM_REJECTED',
         status: 502,
         receiptId,
         reasons: [`n8n rejected the conveyor transition with HTTP ${response.status}`],
+        ...failure,
       };
     }
 
@@ -384,13 +459,17 @@ export async function dispatchFounderConveyorAdvance(
       receiptId,
       reasons: [],
     };
-  } catch {
+  } catch (error) {
+    const timedOut = isTimeoutError(error);
     return {
       ok: false,
       code: 'UPSTREAM_UNREACHABLE',
       status: 502,
       receiptId: null,
-      reasons: ['n8n conveyor webhook was unreachable'],
+      reasons: [timedOut ? 'n8n conveyor webhook timed out' : 'n8n conveyor webhook was unreachable'],
+      failureClass: timedOut ? 'TIMEOUT' : 'NETWORK',
+      upstreamCode: timedOut ? 'REQUEST_TIMEOUT' : 'NETWORK_UNREACHABLE',
+      retryable: true,
     };
   }
 }
