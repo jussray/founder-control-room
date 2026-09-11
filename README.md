@@ -42,6 +42,26 @@ Exact SHAs belong in receipts, PRs, artifacts, incidents, and provenance. The RE
 
 ## What is implemented in source now
 
+### Friend Intake first slice
+
+FCR contains a bounded, founder-facing deterministic Friend Intake source candidate at `/friend-intake`. It is a capability inside the single Founder Control Room operating loop, not a separate operating system and not a replacement for the existing `/mirror/run` route.
+
+The source contract is deliberately narrow:
+
+- `FCR_FRIEND_INTAKE_ENABLED` is fail-closed by default; source presence is not runtime activation;
+- intake-content persistence has an independent `FCR_FRIEND_INTAKE_PERSISTENCE_ENABLED` fail-closed switch, so ephemeral processing can remain available while storage is disabled;
+- `process_without_saving` stores no intake summary, sensitive-category labels, or intent labels; its shared timeline entry is behavior/policy metadata only;
+- any saved intake content requires the interactive opaque founder-session boundary rather than Bearer automation;
+- saved mode retains only the bounded redacted summary plus the displayed derived labels, never raw founder input;
+- sensitive saved content requires explicit review of every retained label, with a short-lived receipt bound to the current opaque browser session, exact reviewed payload, persisted move fields, engine version, and one-review/one-save database identity;
+- privacy-choice changes and cancellation revoke the review capability, while session rotation/logout makes an older capability unverifiable;
+- usefulness corrections are append-only audit events while the latest answer may remain projected on the saved intake row;
+- the deterministic slice does not call an external model, retrieve related memory, publish, deploy, or perform another provider write.
+
+This is **source truth only**. It does not claim that either feature flag is enabled in production, that the Friend Intake migration has been applied, that a production Worker serves the candidate, or that production browser/runtime behavior has been proven. Those require their own current authority and evidence.
+
+See [`docs/PHASE_0_SELF_ATTACK_TRUTH_MAP_2026-09-08.md`](docs/PHASE_0_SELF_ATTACK_TRUTH_MAP_2026-09-08.md) for the preserved historical baseline and supersession note.
+
 ### Repository and mission control
 
 FCR models projects, proposals, missions, exact refs, verification runs, evidence, approval state, and bounded repository operations behind provider-neutral interfaces.

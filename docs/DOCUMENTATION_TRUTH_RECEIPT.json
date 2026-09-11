@@ -1,12 +1,13 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Preserve the existing #746 evidence-authority, Cloudflare Access recovery, Founder Capital Decision, and ATTACK-20 invariants while binding the governed Founder Content n8n production-source rescue to current documentation. This receipt keeps source intent, provider configuration, runtime identity, database application, publication outcome, merge authority, and deploy authority as separate proof planes and does not claim that production n8n, Buffer scheduling, Cloudflare bindings, or Supabase migrations are live merely because the source lane is enabled.",
+  "purpose": "Preserve the existing evidence-authority, Cloudflare Access recovery, Founder Capital Decision, ATTACK-20, and governed Founder Content invariants while binding the Friend Intake first-slice source candidate to current privacy and authority documentation. This receipt keeps source intent, provider configuration, runtime identity, database application, publication outcome, merge authority, and deploy authority as separate proof planes and does not claim that Friend Intake flags, production Supabase migrations, provider runtime, or browser production behavior are live merely because the source candidate exists.",
   "domains": [
     "repository-provider",
     "evidence-authority",
     "merge-authority",
     "cloudflare-authority",
-    "publishing"
+    "publishing",
+    "privacy"
   ],
   "changes": [
     {
@@ -135,6 +136,48 @@
       "path": "wrangler.worker.toml",
       "claims": [
         "wrangler.worker.toml may express Founder Content n8n production source intent with N8N_FOUNDER_CONTENT_ENABLED=true, Buffer-only provider selection, exact workflow ID fcrFounderContentV1, and pinned runtime version 2.32.6, but source intent is not deployed runtime truth; canonical exact-main deployment must independently verify the four required provider-held n8n secret binding names before Worker mutation."
+      ]
+    },
+    {
+      "path": "src/http/routes/friendIntake.ts",
+      "claims": [
+        "src/http/routes/friendIntake.ts must keep process_without_saving available behind normal founder authentication while requiring the interactive opaque founder-session boundary for every saved intake, enforce the independent persistence kill switch before any saved content is derived or written, and report retained summary-plus-derived-label state truthfully without granting model, merge, deploy, migration, or provider authority."
+      ]
+    },
+    {
+      "path": "src/http/routes/friendIntakeReviewReceipt.ts",
+      "claims": [
+        "src/http/routes/friendIntakeReviewReceipt.ts must issue only short-lived HttpOnly sensitive-save capabilities bound to the current opaque browser-session identity and every persisted reviewed field, use a fresh nonce and engine-version binding, and derive one deterministic intake/timeline identity pair per receipt so concurrent replay cannot create multiple sensitive saves."
+      ]
+    },
+    {
+      "path": "supabase/migrations/20260909031700_friend_intake_v1.sql",
+      "claims": [
+        "supabase/migrations/20260909031700_friend_intake_v1.sql must keep intake content service-role-only, prevent auth-user deletion from cascading into saved intake history, preserve behavior-only timeline metadata, enforce reviewed sensitive saves at the database boundary, and append usefulness corrections with idempotent exact-event retries rather than overwrite prior feedback history."
+      ]
+    },
+    {
+      "path": "public/control-room/friend-intake.js",
+      "claims": [
+        "public/control-room/friend-intake.js must freeze the submitted input/privacy controls while a request owns that snapshot, revoke a sensitive review capability before discarding or changing its privacy state, display every reviewed retained label, and describe saved retention as redacted summary plus derived labels rather than summary-only."
+      ]
+    },
+    {
+      "path": "src/chief/firstSliceEngine.ts",
+      "claims": [
+        "src/chief/firstSliceEngine.ts must preserve the protected human-support lane for high-consequence health language while disambiguating established technical uses of age-related terms so routine build work is not incorrectly classified as teen context."
+      ]
+    },
+    {
+      "path": "docs/PHASE_0_SELF_ATTACK_TRUTH_MAP_2026-09-08.md",
+      "claims": [
+        "docs/PHASE_0_SELF_ATTACK_TRUTH_MAP_2026-09-08.md must preserve its September 8 baseline as historical evidence while marking the old not-yet-wired first-slice source claim superseded by PR #774, without converting source implementation into production configuration, migration, deployment, runtime, or browser proof."
+      ]
+    },
+    {
+      "path": "README.md",
+      "claims": [
+        "README.md must describe Friend Intake as a bounded default-off FCR capability with separate feature and persistence gates, interactive authority for retention, model-free deterministic processing, and explicit separation between source implementation and production activation proof."
       ]
     }
   ]
