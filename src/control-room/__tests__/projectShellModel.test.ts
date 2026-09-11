@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { PROJECT_SHELLS } from '../../config/projectShells.js';
 import { buildProjectShellModel, CANONICAL_SHELL_CONTAINERS } from '../projectShellModel.js';
 
 describe('project shell canonical-container binding', () => {
@@ -33,6 +34,68 @@ describe('project shell canonical-container binding', () => {
       truth: { classification: 'verified' },
     });
     expect(model.truthMode.mayClaimVerifiedOutcome).toBe(false);
+  });
+
+  it('preserves simultaneous realities by plane instead of collapsing them', () => {
+    const model = buildProjectShellModel('founder-control-room', {
+      project: { slug: 'founder-control-room' },
+      evidence: [{ kind: 'github' }, { kind: 'runtime' }],
+      outcome: { classification: 'observed' },
+      truth: {
+        classification: 'verified',
+        relation: 'coherent',
+        governingRealityId: 'runtime',
+        realities: [
+          {
+            id: 'source',
+            subject: 'release',
+            plane: 'state',
+            classification: 'verified',
+            scope: 'main',
+            observer: 'github',
+          },
+          {
+            id: 'runtime',
+            subject: 'release',
+            plane: 'runtime',
+            classification: 'verified',
+            scope: 'production',
+            observer: 'deployment',
+          },
+        ],
+      },
+    });
+
+    expect(model.truthMode.realities).toHaveLength(2);
+    expect(model.truthMode.relation).toBe('coherent');
+    expect(model.truthMode.governingRealityId).toBe('runtime');
+    expect(model.truthMode.hasUnresolvedContradiction).toBe(false);
+    expect(model.truthMode.mayClaimVerifiedOutcome).toBe(true);
+  });
+
+  it('blocks a verified outcome claim when same-decision realities remain contradictory', () => {
+    const model = buildProjectShellModel('founder-control-room', {
+      project: { slug: 'founder-control-room' },
+      evidence: [{ kind: 'github' }, { kind: 'runtime' }],
+      outcome: { classification: 'achieved' },
+      truth: {
+        classification: 'verified',
+        relation: 'contradiction',
+        realities: [
+          { id: 'source', subject: 'release', plane: 'state', classification: 'verified' },
+          { id: 'runtime', subject: 'release', plane: 'runtime', classification: 'conflicted' },
+        ],
+      },
+    });
+
+    expect(model.truthMode.hasUnresolvedContradiction).toBe(true);
+    expect(model.truthMode.mayClaimVerifiedOutcome).toBe(false);
+  });
+
+  it('binds the multi-reality truth contract into every project control room', () => {
+    for (const shell of PROJECT_SHELLS) {
+      expect(shell.inheritedFcrContracts).toContain('multi-reality-truth');
+    }
   });
 
   it('rejects cross-project state injection', () => {
