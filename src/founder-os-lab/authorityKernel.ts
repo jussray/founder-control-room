@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 export const CAPABILITY_IDENTITY_CONTRACT = 'juss-fcr/capability-identity@v1' as const;
 export const AUTHORITY_ENVELOPE_CONTRACT = 'juss-fcr/authority-envelope@v1' as const;
 
-const CAPABILITY_ID = /^[a-z0-9]+(?:[.-][a-z0-9]+)*$/;
+const CAPABILITY_ID = /^[a-z0-9]+(?:[._-][a-z0-9]+)*$/;
 const SHA256 = /^[0-9a-f]{64}$/i;
 
 export interface CapabilityIdentityV1 {
