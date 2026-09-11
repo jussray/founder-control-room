@@ -8,7 +8,12 @@ import {
   type FounderPermissionRequest,
   type FounderPermissionStatus,
 } from '../../lib/founderPermissionBroker.js';
+import {
+  createFounderExecutionBinding,
+  revalidateFounderExecutionBindingAtEffect,
+} from '../../lib/founderPermissionExecution.js';
 import { storedFounderPermissionDecisionMatches } from '../../lib/founderPermissionStoredDecision.js';
+import { createAppAwareRepositoryProvider } from '../../providers/RepositoryProviderFactory.js';
 import {
   FOUNDER_CONTROL_SURFACES,
   type FounderControlDecisionValue,
@@ -92,8 +97,12 @@ function actionTargetFrom(value: unknown): FounderPermissionActionTarget {
       workflowId: text(value.workflowId),
       workflowVersion: text(value.workflowVersion),
       workflowContentHash: text(value.workflowContentHash),
+      registryContentHash: text(value.registryContentHash),
       registryPath: text(value.registryPath),
       workflowPath: text(value.workflowPath),
+      providerIdentity: text(value.providerIdentity) as 'github:jussray/promptos',
+      capabilityVersion: text(value.capabilityVersion) as 'promptos-workflow-registry@v1',
+      consequence: text(value.consequence) as 'CONSEQUENTIAL_WRITE',
     };
   }
   return null;
@@ -102,10 +111,6 @@ function errorCode(value: unknown): string {
   return isRecord(value) ? text(value.code) : '';
 }
 function interactiveBrowserContextPresent(req: FounderRequest): boolean {
-  // `corsMiddleware` runs before this router and rejects any Origin outside
-  // FOUNDER_ALLOWED_ORIGINS. Requiring an Origin here prevents bearer-auth
-  // requests from borrowing a founder cookie while preserving split-origin
-  // deployments where the approved frontend origin differs from the API URL.
   return Boolean(req.get('Origin'));
 }
 function rowRequest(row: JsonRecord): FounderPermissionRequest | null {
@@ -317,6 +322,34 @@ founderPermissionsRouter.post('/requests/:requestId/consume', rateLimitFounderPe
     return res.status(409).json({ error: 'Founder permission is not fresh and consumable.', code: 'FOUNDER_PERMISSION_NOT_CONSUMABLE' });
   }
 
+  const permissionRequest = rowRequest(row);
+  if (!permissionRequest) {
+    return res.status(409).json({ error: 'Stored founder permission request is malformed.', code: 'FOUNDER_PERMISSION_STORED_SCOPE_INVALID' });
+  }
+
+  let executionBinding = null;
+  let executionProvider = null;
+  if (permissionRequest.actionTarget?.type === 'promptos_workflow_registry_promote') {
+    try {
+      executionProvider = await createAppAwareRepositoryProvider({
+        slug: 'promptos',
+        repoProvider: 'github',
+        repoIdentifier: permissionRequest.actionTarget.repo,
+      });
+      executionBinding = await createFounderExecutionBinding({
+        request: permissionRequest,
+        decisionHash,
+        provider: executionProvider,
+      });
+    } catch (error) {
+      return res.status(409).json({
+        error: error instanceof Error ? error.message : String(error),
+        code: 'FOUNDER_PERMISSION_EXECUTION_PRECONDITION_FAILED',
+        executionAuthorized: false,
+      });
+    }
+  }
+
   const consumedAt = new Date().toISOString();
   const { data, error } = await supabase.from('founder_permission_requests').update({
     consumed_at: consumedAt,
@@ -332,6 +365,32 @@ founderPermissionsRouter.post('/requests/:requestId/consume', rateLimitFounderPe
     .select(REQUEST_SELECT).maybeSingle();
   if (error) return res.status(500).json({ error: 'Unable to consume founder permission.' });
   if (!data) return res.status(409).json({ error: 'Founder permission changed before it could be consumed.', code: 'FOUNDER_PERMISSION_CONSUMPTION_RACE' });
+
+  if (executionBinding && executionProvider) {
+    try {
+      await revalidateFounderExecutionBindingAtEffect({
+        request: permissionRequest,
+        binding: executionBinding,
+        provider: executionProvider,
+      });
+    } catch (bindingError) {
+      return res.status(409).json({
+        consumed: true,
+        executionAuthorized: false,
+        requiresNewApproval: true,
+        error: bindingError instanceof Error ? bindingError.message : String(bindingError),
+        code: 'FOUNDER_PERMISSION_POST_CONSUME_STATE_CHANGED',
+        ...projection(asJsonRecord(data)),
+      });
+    }
+    return res.json({
+      consumed: true,
+      executionAuthorized: true,
+      executionBinding,
+      ...projection(asJsonRecord(data)),
+    });
+  }
+
   return res.json({ consumed: true, ...projection(asJsonRecord(data)) });
 });
 
