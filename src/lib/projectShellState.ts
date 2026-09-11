@@ -30,14 +30,23 @@ export function toProjectShellStateView(raw: {
   const continuityValid = continuityPresent
     && !raw.continuity.invalidated_at
     && (!raw.continuity.valid_until || new Date(raw.continuity.valid_until).getTime() > now.getTime());
+  const continuityBreaksTruth = continuityPresent && !continuityValid;
   const outcomeHasEvidence = hasEvidence(raw.outcome?.evidence);
   const outcomeAchieved = raw.outcome?.classification === 'achieved';
-  const effectiveClassification = truthExpired && classification === 'verified' ? 'stale' : classification;
+  const effectiveClassification = (truthExpired || continuityBreaksTruth) && classification === 'verified'
+    ? 'stale'
+    : classification;
 
   return {
     available: true as const,
     classification: effectiveClassification,
-    reason: raw.truth ? (truthExpired ? 'truth_snapshot_expired' : null) : 'no_truth_snapshot',
+    reason: raw.truth
+      ? truthExpired
+        ? 'truth_snapshot_expired'
+        : continuityBreaksTruth
+          ? 'continuity_invalidated'
+          : null
+      : 'no_truth_snapshot',
     truth: raw.truth ? {
       observedAt: raw.truth.observed_at ?? null,
       expiresAt: raw.truth.expires_at ?? null,
