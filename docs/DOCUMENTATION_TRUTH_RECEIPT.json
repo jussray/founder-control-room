@@ -1,27 +1,14 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Bind the governed create-branch repository-provider membrane and deterministic authority issuance to current operator documentation without promoting source or CI evidence into a claim that a live provider branch mutation occurred.",
+  "purpose": "Bind the create-branch runtime authority membrane to current operator documentation without promoting source or CI evidence into a claim that a live GitHub branch mutation occurred.",
   "domains": [
-    "repository-provider",
     "merge-authority"
   ],
   "changes": [
     {
-      "path": "src/providers/authorizedRepositoryMutation.ts",
-      "claims": [
-        "src/providers/authorizedRepositoryMutation.ts must allow the governed FCR create_branch path to reach RepositoryProvider.createBranch only when the original FCR-issued AuthorityEnvelopeV1 still matches canonical capability github.repository.create-branch, exact repository scope, idempotency key, proposal, branch arguments, current mission-state fingerprint, tool-call identity, expiry, and envelope integrity; any drift fails closed before provider mutation."
-      ]
-    },
-    {
-      "path": "src/founder-os-lab/authorityIssuance.ts",
-      "claims": [
-        "src/founder-os-lab/authorityIssuance.ts must keep create-branch authority issuance deterministic and side-effect free: it cannot read the wall clock or generate randomness, defaults issuance to the server-observed proof timestamp, derives default tool-call identity from the already-bound idempotency key, and cannot by itself execute a provider mutation."
-      ]
-    },
-    {
       "path": "src/http/routes/approvals.ts",
       "claims": [
-        "src/http/routes/approvals.ts must reserve create_branch before external mutation, re-read current mission state and runtime time immediately before the provider sink, and validate the original exact-action envelope through executeAuthorizedCreateBranch; ambiguous pending outcomes require reconciliation before retry."
+        "src/http/routes/approvals.ts must allow create_branch to reach RepositoryProvider.createBranch only after fresh create_branch proof and authenticated founder intent issue a server-owned AuthorityEnvelopeV1, the execution is reserved under the same idempotency key, current mission state is re-read immediately before mutation, and the original envelope passes exact capability, scope, arguments, state, tool-call, expiry, idempotency, and integrity validation through executeAuthorizedCreateBranch; any drift must fail closed before provider mutation and an ambiguous pending outcome requires reconciliation before retry."
       ]
     }
   ]

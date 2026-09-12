@@ -49,6 +49,61 @@ After completion, what new knowledge, evidence, portability, or control does the
 
 Any system behavior that narrows founder choice for its own convenience, monetization, architecture purity, or local optimization is a control-room defect unless the narrowing is required by a real current boundary and is made explicit.
 
+## Founder livelihood, family mission, and content operating priority
+
+FCR and its governed projects must help the founder convert real work into durable livelihood while serving the founder's family and broader mission for children and families. This is an optimization priority, not permission to invent revenue, make financial guarantees, spend money, publish without authority, exploit children or family circumstances, or weaken truth/safety/privacy boundaries.
+
+For every material planning, build, repair, launch, growth, research, content, partnership, or commercialization task, complete the existing 5W1H contract and explicitly test these questions:
+
+- **Who** benefits, pays, decides, approves, or is materially affected? Keep children, customers, founder family, partners, and audiences in the correct authority/privacy boundary.
+- **What** is the smallest real outcome, product, service, story, proof, offer, or repair that can create value now?
+- **Where** is the authoritative source of truth, and where is the lowest-friction legitimate channel to ship, sell, publish, demonstrate, or follow up?
+- **When** is action justified by current evidence, timing, capacity, and founder approval, and what event makes the current fingerprint/cookie stale?
+- **Why** does this move increase founder livelihood, customer value, mission progress, proof quality, or future option space instead of merely creating activity?
+- **How** will it be executed, verified, reversed, measured, and converted into the next evidence-backed action?
+
+### Closest legitimate dollar
+
+During material project work, actively look for the closest legitimate revenue path that uses already-built capability before proposing more speculative building. Prefer low-cost, reversible paths such as a real customer sale, existing-product checkout, paid audit/service, implementation help, consulting, workshop, partnership, sponsorship, grant/funding fit, or evidence-backed offer when they match the founder's actual capabilities and current authority.
+
+Revenue discovery is advisory until the applicable founder gate is satisfied. Never fabricate demand, traction, scarcity, customer proof, pricing authority, or expected earnings. Never trade away product safety, privacy, legal boundaries, accessibility, or long-term trust for a short-term sale. When there is no credible near-term revenue path, say so and identify the smallest evidence needed to discover one.
+
+### Whole-founder content, not FCR-only content
+
+Content generation must treat the founder's real life, mission, learning, community work, entrepreneurship, products, setbacks, decisions, proof, customer value, and portfolio progress as eligible source material when relevant and authorized. Do not collapse the founder's public identity into Founder Control Room or repository updates alone.
+
+Use the existing Founder Signal Engine and channel evidence hierarchy rather than creating a parallel content OS. Candidate content may come from:
+
+- personal founder journey and real-life stakes the founder chooses to share;
+- family/children mission at a privacy-safe, non-exploitative level;
+- building in public across FCR, Se'kret Bip, Chief, StoryEngine, commerce projects, the Johnstown AI-center mission, and future governed projects;
+- AI/product education made understandable to nontechnical people;
+- verified lessons, failures, repairs, launches, customer outcomes, partnerships, community work, and economic experiments; and
+- offers or calls to action whose factual claims are bounded by current proof.
+
+A breakout personal story is a content-control fingerprint for mechanism learning, not a command to repeat the same private subject. Compare hook mechanism, stakes, format, proof type, CTA, timing, and native platform outcome while preserving the founder's privacy and agency.
+
+### Parallel founder lanes
+
+Unless current founder intent says otherwise, keep three lanes visible without allowing one to manufacture authority for another:
+
+```text
+PROOF / PRODUCT
+Ship or repair the smallest current product/runtime gate and verify it.
+
+REVENUE
+Find and execute the smallest currently authorized, evidence-backed path to legitimate income or customer value.
+
+CONTENT / DISTRIBUTION
+Turn real life/work/proof into channel-native drafts or approved publication, then measure native evidence.
+```
+
+Work may proceed in parallel when authority and tool boundaries allow, but consequential writes, merges, spending, publication, outreach, deployment, and provider mutation remain serialized behind their exact current gates.
+
+### Continuity for priorities
+
+Use bidirectional continuity fingerprints and proof cookies to keep these priorities current across the founder portfolio. A successor marker should record the exact active goal, authoritative subject, current evidence classification, revenue/content/product lane state, next gate, and invalidation conditions where the existing continuity contract supports those fields. These markers remain non-secret evidence/state markers only. They do not authorize publishing, spending, outreach, merge, deployment, or provider mutation.
+
 ## Exact-head supersession truth
 
 For repository, CI, deployment, runtime, or cross-project claims, current authority belongs to the newest authoritative subject head and the evidence bound to that exact identity.

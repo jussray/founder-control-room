@@ -12,6 +12,7 @@ This recovery path is intentionally narrow and creates no runtime capability:
 6. Advance `main` only through a normal pull request whose exact head satisfies the repository's applicable review, CI, security, and merge rules.
 7. After merge, require the new current `main` head to have current exact-head evidence and a valid merged-pull provenance relationship before making a present-tense release claim.
 8. If `main` moves before merge, the recovery candidate must be refreshed or replaced from the new current head. Predecessor green evidence does not transfer automatically.
+9. A recovery carrier whose intended diff is already present on current `main` is `SUPERSEDED`; it must carry a new bounded reviewable recovery change or stop, because an empty or already-landed diff cannot establish successor reviewed provenance.
 
 This recovery proves only the provenance of the successor reviewed merge. It does not retroactively certify predecessor direct commits, and it grants no deploy, publication, provider mutation, database, billing, credential, migration, or other execution authority.
 

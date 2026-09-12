@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import {
   AUTHORITY_ENVELOPE_CONTRACT,
   authorityEnvelopeHash,
@@ -7,30 +7,9 @@ import {
 } from './authorityKernel.js';
 
 const DEFAULT_AUTHORITY_TTL_MS = 15 * 60 * 1_000;
-const UTC_ISO_FORMATTER = new Intl.DateTimeFormat('en-US-u-ca-gregory-nu-latn', {
-  timeZone: 'UTC',
-  year: 'numeric',
-  month: '2-digit',
-  day: '2-digit',
-  hour: '2-digit',
-  minute: '2-digit',
-  second: '2-digit',
-  hourCycle: 'h23',
-});
 
 function sha256(value: unknown): string {
   return createHash('sha256').update(JSON.stringify(value)).digest('hex');
-}
-
-function isoFromEpochMs(epochMs: number): string {
-  const parts = Object.fromEntries(
-    UTC_ISO_FORMATTER
-      .formatToParts(epochMs)
-      .filter((part) => part.type !== 'literal')
-      .map((part) => [part.type, part.value]),
-  ) as Record<string, string>;
-  const milliseconds = (((Math.trunc(epochMs) % 1_000) + 1_000) % 1_000).toString().padStart(3, '0');
-  return `${parts['year']}-${parts['month']}-${parts['day']}T${parts['hour']}:${parts['minute']}:${parts['second']}.${milliseconds}Z`;
 }
 
 export interface CreateBranchAuthorityInput {
@@ -87,7 +66,7 @@ export function createBranchAuthorityContext(
   input: CreateBranchAuthorityInput & { now: string; toolCallId: string },
 ): CreateBranchAuthorityContext {
   validateCreateBranchAuthorityInput(input);
-  const capability = capabilityIdentity('github.repository.create-branch');
+  const capability = capabilityIdentity('github.repository.create_branch');
   return {
     now: input.now,
     capabilityId: capability.id,
@@ -111,17 +90,17 @@ export function createBranchAuthorityContext(
 }
 
 /**
- * Deterministic server-side issuance for the first governed repository mutation.
+ * Server-side issuance for the first governed repository mutation.
  *
- * The lab never reads the wall clock or generates randomness. Unless the runtime
- * supplies stricter values, issuance is anchored to the server proof timestamp
- * and the tool-call identity is derived from the already-bound idempotency key.
- * Expiry formatting is a pure transformation of that supplied timestamp.
+ * No caller supplies hashes or capability identity. FCR derives them from the
+ * authenticated founder, fresh proof receipt, exact proposed arguments, and
+ * observed mission state. The returned context is the execution-time binding
+ * that must be re-derived/revalidated immediately before provider mutation.
  */
 export function issueCreateBranchAuthority(input: CreateBranchAuthorityInput): IssuedCreateBranchAuthority {
   validateCreateBranchAuthorityInput(input);
 
-  const now = input.now ?? input.proof.createdAt;
+  const now = input.now ?? new Date().toISOString();
   const issuedAtMs = Date.parse(now);
   if (!Number.isFinite(issuedAtMs)) throw new Error('issuance time must be a valid ISO date');
   const ttlMs = input.ttlMs ?? DEFAULT_AUTHORITY_TTL_MS;
@@ -129,7 +108,7 @@ export function issueCreateBranchAuthority(input: CreateBranchAuthorityInput): I
     throw new Error('authority ttl must be positive and no greater than 15 minutes');
   }
 
-  const toolCallId = input.toolCallId ?? `approval-execution:${input.idempotencyKey}`;
+  const toolCallId = input.toolCallId ?? randomUUID();
   const context = createBranchAuthorityContext({ ...input, now, toolCallId });
   const capability = capabilityIdentity(context.capabilityId);
 
@@ -145,7 +124,7 @@ export function issueCreateBranchAuthority(input: CreateBranchAuthorityInput): I
     consequenceClass: 'reversible',
     toolCallId,
     issuedAt: now,
-    expiresAt: isoFromEpochMs(issuedAtMs + ttlMs),
+    expiresAt: new Date(issuedAtMs + ttlMs).toISOString(),
     approvedBy: input.approvedBy,
     idempotencyKey: input.idempotencyKey,
   };

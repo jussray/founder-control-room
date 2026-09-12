@@ -15,7 +15,7 @@ function envelope(overrides: Partial<AuthorityEnvelopeV1> = {}): AuthorityEnvelo
     contract: AUTHORITY_ENVELOPE_CONTRACT,
     intentId: 'mission-123',
     actor: 'founder@example.com',
-    capability: capabilityIdentity('github.repository.create-branch'),
+    capability: capabilityIdentity('github.repository.create_branch'),
     authorityScope: 'repository:founder-control-room:branch:create',
     proposalHash: sha('a'),
     argumentsHash: sha('b'),
