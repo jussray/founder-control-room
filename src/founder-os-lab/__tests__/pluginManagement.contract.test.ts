@@ -30,6 +30,17 @@ interface ConnectorBridgeTruth {
   recoveryRule: string;
 }
 
+interface EvidenceSourceTruth {
+  providerReadFailureClassifyAs: 'BLOCKED_SOURCE_ACCESS';
+  providerReadFailureDoesNotEraseAlternateEvidence: boolean;
+  providerNotFoundDoesNotProveArtifactAbsent: boolean;
+  userProvidedArtifactMaySatisfyEquivalentEvidenceNeed: boolean;
+  sourceSpecificBlockMayNotFreezeMissionWhenEquivalentEvidenceExists: boolean;
+  alternateEvidenceMustRetainOwnProvenance: boolean;
+  continuityMarkersAreNonAuthorizing: boolean;
+  recoveryRule: string;
+}
+
 interface SocialAnalyticsTruth {
   analyticsMode: 'observation_only';
   learningRequiresVerifiedPostLevelMeasurement: boolean;
@@ -63,14 +74,15 @@ interface PluginManagementManifest {
   truthBoundary: string;
   writeProofTruth: WriteProofTruth;
   connectorBridgeTruth: ConnectorBridgeTruth;
+  evidenceSourceTruth: EvidenceSourceTruth;
   socialAnalyticsTruth: SocialAnalyticsTruth;
   plugins: PluginEntry[];
 }
 
 const manifest = JSON.parse(await readFile(new URL('../../../.control-room/plugin-management.json', import.meta.url), 'utf8')) as PluginManagementManifest;
 
-const expectedPlugins = ['GitHub','Supabase','Slack','Asana','HubSpot','Figma','LinkedIn','Cambiante: Content Manager','Metricool for Social Media','Opera Browser Connector'];
-const allowedManifestKeys = ['schemaVersion','contract','repository','authorityRepository','controlPlane','runtimeDiscoveryRequired','liveStateStored','writesRequireExplicitUserIntent','writesRequireFreshRepositoryAuthority','permissionStateSource','connectionStateSource','truthBoundary','writeProofTruth','connectorBridgeTruth','socialAnalyticsTruth','plugins'].sort();
+const expectedPlugins = ['GitHub','Google Drive','Supabase','Slack','Asana','HubSpot','Figma','LinkedIn','Cambiante: Content Manager','Metricool for Social Media','Opera Browser Connector'];
+const allowedManifestKeys = ['schemaVersion','contract','repository','authorityRepository','controlPlane','runtimeDiscoveryRequired','liveStateStored','writesRequireExplicitUserIntent','writesRequireFreshRepositoryAuthority','permissionStateSource','connectionStateSource','truthBoundary','writeProofTruth','connectorBridgeTruth','evidenceSourceTruth','socialAnalyticsTruth','plugins'].sort();
 const allowedPluginKeys = ['name','role','runtimeDiscoveryRequired','defaultMode'].sort();
 const forbiddenLiveStateKeys = new Set(['installed','connected','connection','permission','permissions','permissionmode','oauthscopes','token','accesstoken','refreshtoken','secret','secrets']);
 function normalizedKey(key: string): string { return key.replace(/[_-]/g, '').toLowerCase(); }
@@ -122,6 +134,19 @@ describe('ChatGPT plugin management repository contract', () => {
     expect(manifest.connectorBridgeTruth.recoveryRule).toMatch(/fresh bridge evidence/i);
   });
 
+  it('preserves equivalent evidence when one provider source is unreadable', () => {
+    expect(manifest.evidenceSourceTruth.providerReadFailureClassifyAs).toBe('BLOCKED_SOURCE_ACCESS');
+    expect(manifest.evidenceSourceTruth.providerReadFailureDoesNotEraseAlternateEvidence).toBe(true);
+    expect(manifest.evidenceSourceTruth.providerNotFoundDoesNotProveArtifactAbsent).toBe(true);
+    expect(manifest.evidenceSourceTruth.userProvidedArtifactMaySatisfyEquivalentEvidenceNeed).toBe(true);
+    expect(manifest.evidenceSourceTruth.sourceSpecificBlockMayNotFreezeMissionWhenEquivalentEvidenceExists).toBe(true);
+    expect(manifest.evidenceSourceTruth.alternateEvidenceMustRetainOwnProvenance).toBe(true);
+    expect(manifest.evidenceSourceTruth.continuityMarkersAreNonAuthorizing).toBe(true);
+    expect(manifest.evidenceSourceTruth.recoveryRule).toMatch(/Google Drive 404/i);
+    expect(manifest.evidenceSourceTruth.recoveryRule).toMatch(/blocks only that source/i);
+    expect(manifest.evidenceSourceTruth.recoveryRule).toMatch(/continue from that evidence/i);
+  });
+
   it('keeps social analytics fail-closed and provider bounded', () => {
     expect(manifest.socialAnalyticsTruth.analyticsMode).toBe('observation_only');
     expect(manifest.socialAnalyticsTruth.learningRequiresVerifiedPostLevelMeasurement).toBe(true);
@@ -149,6 +174,9 @@ describe('ChatGPT plugin management repository contract', () => {
       expect(plugin.runtimeDiscoveryRequired).toBe(true);
       expect(plugin.defaultMode).toBe('read-first');
     }
+    const drive = manifest.plugins.find((plugin) => plugin.name === 'Google Drive');
+    expect(drive?.role).toMatch(/BLOCKED_SOURCE_ACCESS/);
+    expect(drive?.role).toMatch(/must not erase equivalent uploaded/i);
     const opera = manifest.plugins.find((plugin) => plugin.name === 'Opera Browser Connector');
     expect(opera?.role).toMatch(/separate evidence planes/i);
     expect(opera?.role).toMatch(/BLOCKED_CONNECTOR_BRIDGE/);
