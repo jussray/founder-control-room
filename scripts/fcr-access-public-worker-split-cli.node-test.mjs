@@ -16,6 +16,7 @@ function paths(label) {
     receiptPath: `test-results/fcr-access-split-cli-${label}.json`,
     rollbackReceiptPath: `test-results/fcr-access-split-cli-${label}-rollback.json`,
     rollbackErrorPath: `test-results/fcr-access-split-cli-${label}-rollback-error.json`,
+    compatibilityReceiptPath: `test-results/fcr-access-split-cli-${label}-compat.json`,
   };
 }
 
@@ -24,7 +25,12 @@ async function cleanup(...items) {
 }
 
 async function cleanupPaths(p) {
-  await cleanup(p.receiptPath, p.rollbackReceiptPath, p.rollbackErrorPath);
+  await cleanup(
+    p.receiptPath,
+    p.rollbackReceiptPath,
+    p.rollbackErrorPath,
+    p.compatibilityReceiptPath,
+  );
 }
 
 function performedReceipt() {
@@ -60,6 +66,21 @@ test('apply persists exact-head mutation identity without carrying raw approval 
   assert.match(receipt.idempotencyKey, /^fcr-access-split-v1:[0-9a-f]{64}$/);
   const raw = await readFile(p.receiptPath, 'utf8');
   assert.doesNotMatch(raw, /must-never-enter-cli-receipt/);
+
+  const compatRaw = await readFile(p.compatibilityReceiptPath, 'utf8');
+  const compat = JSON.parse(compatRaw);
+  assert.equal(compat.schemaVersion, 2);
+  assert.equal(compat.scope, 'fcr-access-front-door-recovery');
+  assert.equal(compat.expectedHeadSha, SHA);
+  assert.equal(compat.state, 'mutated-needs-browser-proof');
+  assert.equal(compat.action, 'created-public-bypass');
+  assert.equal(compat.credentialSource, 'CLOUDFLARE_ACCESS_ADMIN_API_TOKEN');
+  assert.equal(compat.mutationPerformed, true);
+  assert.equal(compat.rollbackPerformed, false);
+  assert.equal(compat.classification, null);
+  assert.equal('sourceApplicationId' in compat, false);
+  assert.equal('managedApplicationId' in compat, false);
+  assert.doesNotMatch(compatRaw, /must-never-enter-cli-receipt|source-1|public-1/);
   await cleanupPaths(p);
 });
 
@@ -116,6 +137,12 @@ test('ambiguous apply persists RECONCILE and never attempts rollback', async () 
   assert.equal(receipt.currentTruthState, 'unknown');
   assert.match(receipt.idempotencyKey, /^fcr-access-split-v1:[0-9a-f]{64}$/);
   assert.equal(receipt.classification, 'split-source-update-reconcile-required');
+
+  const compat = JSON.parse(await readFile(p.compatibilityReceiptPath, 'utf8'));
+  assert.equal(compat.state, 'blocked');
+  assert.equal(compat.mutationPerformed, true);
+  assert.equal(compat.rollbackPerformed, false);
+  assert.equal(compat.classification, 'provider-apply-failed');
   await cleanupPaths(p);
 });
 
@@ -141,6 +168,10 @@ test('rollback refuses a stale or non-performed receipt before calling provider 
     (error) => error?.classification === 'split-rollback-receipt-head-mismatch',
   );
   assert.equal(rollbackCalls, 0);
+  const compat = JSON.parse(await readFile(p.compatibilityReceiptPath, 'utf8'));
+  assert.equal(compat.state, 'blocked');
+  assert.equal(compat.classification, 'provider-recovery-failed');
+  assert.equal(compat.mutationPerformed, true);
   await cleanupPaths(p);
 });
 
@@ -170,6 +201,9 @@ test('rollback refuses a performed receipt whose mutation identity was tampered'
     (error) => error?.classification === 'split-rollback-receipt-head-mismatch',
   );
   assert.equal(rollbackCalls, 0);
+  const compat = JSON.parse(await readFile(p.compatibilityReceiptPath, 'utf8'));
+  assert.equal(compat.state, 'blocked');
+  assert.equal(compat.classification, 'provider-recovery-failed');
   await cleanupPaths(p);
 });
 
@@ -208,6 +242,11 @@ test('successful rollback preserves historical apply receipt and writes separate
   const rollbackReceipt = JSON.parse(await readFile(p.rollbackReceiptPath, 'utf8'));
   assert.equal(rollbackReceipt.currentTruthState, 'fresh');
   assert.equal(rollbackReceipt.appliedIdempotencyKey, applied.idempotencyKey);
+  const compat = JSON.parse(await readFile(p.compatibilityReceiptPath, 'utf8'));
+  assert.equal(compat.state, 'attention');
+  assert.equal(compat.action, 'rolled-back-public-bypass');
+  assert.equal(compat.mutationPerformed, true);
+  assert.equal(compat.rollbackPerformed, true);
   await cleanupPaths(p);
 });
 
@@ -243,5 +282,9 @@ test('rollback failure preserves original performed receipt and writes a separat
   assert.equal(failure.currentTruthState, 'unknown');
   assert.equal(failure.appliedIdempotencyKey, applied.idempotencyKey);
   assert.notEqual(failure.idempotencyKey, applied.idempotencyKey);
+  const compat = JSON.parse(await readFile(p.compatibilityReceiptPath, 'utf8'));
+  assert.equal(compat.state, 'blocked');
+  assert.equal(compat.classification, 'provider-recovery-failed');
+  assert.equal(compat.mutationPerformed, true);
   await cleanupPaths(p);
 });
