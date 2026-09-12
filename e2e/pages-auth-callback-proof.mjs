@@ -55,17 +55,6 @@ const env = {
           headers: { 'content-type': 'text/css; charset=utf-8', 'cache-control': 'no-store' },
         });
       }
-      if (url.pathname === '/auth/session' && request.method === 'POST') {
-        sessionBodies.push(await request.json());
-        return apiResponse(JSON.stringify({
-          success: true,
-          data: { founder: { email: 'proof@example.com' } },
-          meta: {},
-        }), {
-          status: 201,
-          headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'private, no-store' },
-        });
-      }
 
       return apiResponse('API route not found', { status: 404 });
     },
@@ -78,10 +67,28 @@ const server = createServer(async (req, res) => {
     const chunks = [];
     for await (const chunk of req) chunks.push(chunk);
     const body = chunks.length > 0 ? Buffer.concat(chunks) : undefined;
-    const request = new Request(new URL(req.url ?? '/', baseUrl), {
+    const requestUrl = new URL(req.url ?? '/', baseUrl);
+
+    // The proof target is the Pages routing seam that previously swallowed the
+    // API-generated callback assets. Capture the browser's session handoff at
+    // the HTTP boundary so Node's Request duplex requirement does not distort
+    // Cloudflare Workers POST semantics inside this local harness.
+    if (req.method === 'POST' && requestUrl.pathname === '/auth/session') {
+      sessionBodies.push(JSON.parse(body?.toString('utf8') || '{}'));
+      res.statusCode = 201;
+      res.setHeader('content-type', 'application/json; charset=utf-8');
+      res.setHeader('cache-control', 'private, no-store');
+      res.end(JSON.stringify({
+        success: true,
+        data: { founder: { email: 'proof@example.com' } },
+        meta: {},
+      }));
+      return;
+    }
+
+    const request = new Request(requestUrl, {
       method: req.method,
       headers: req.headers,
-      ...(body && req.method !== 'GET' && req.method !== 'HEAD' ? { body } : {}),
     });
     const response = await pagesWorker.fetch(request, env);
     res.statusCode = response.status;
@@ -117,7 +124,6 @@ try {
     '/auth/callback',
     '/assets/control-room.css',
     '/assets/auth-callback.js',
-    '/auth/session',
   ];
   for (const pathname of requiredApiPaths) {
     if (!apiPaths.includes(pathname)) {
