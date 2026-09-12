@@ -16,27 +16,45 @@
     "capabilityDiscoveryDoesNotProveAccountAuthority": true,
     "accountAuthorityDoesNotProveExecution": true,
     "providerAcceptanceDoesNotProveOutcome": true,
+    "proofDoesNotFreezeCapabilityUse": true,
+    "verifiedCapabilitiesMayBeUsedWithinFounderApproval": true,
+    "unknownWriteAuthorityMayBeProbedByAnExplicitlyApprovedBoundedWrite": true,
     "writeCapabilityClassifyUntilProviderAcceptance": "UNKNOWN_WRITE_AUTHORITY",
-    "successfulWriteRequires": [
-      "explicit-founder-intent",
-      "live-target-identity",
-      "fresh-write-authority",
-      "exact-final-payload",
-      "provider-acceptance-receipt"
-    ],
+    "successfulWriteRequires": ["explicit-founder-intent","live-target-identity","fresh-write-authority","exact-final-payload","provider-acceptance-receipt"],
     "verifiedOutcomeAdditionallyRequires": "outcome-evidence",
-    "forbiddenGraduations": [
-      "connected=>write-capable",
-      "tool-supports-write=>account-can-write",
-      "provider-accepted=>outcome-verified"
-    ]
+    "forbiddenGraduations": ["connected=>write-capable","tool-supports-write=>account-can-write","provider-accepted=>outcome-verified"]
+  },
+  "capabilityUnlockTruth": {
+    "appliesToAllFcrCapabilities": true,
+    "proofConstrainsClaimsNotProgress": true,
+    "verifiedReadCapabilitiesMayBeUsedImmediatelyForApprovedGoals": true,
+    "verifiedGenerationCapabilitiesMayBeUsedImmediatelyForApprovedGoals": true,
+    "verifiedEditingCapabilitiesMayBeUsedImmediatelyForApprovedGoals": true,
+    "verifiedAnalysisCapabilitiesMayBeUsedImmediatelyForApprovedGoals": true,
+    "verifiedAutomationCapabilitiesMayBeUsedWithinApprovedScope": true,
+    "verifiedWriteCapabilitiesMayBeUsedWithinApprovedScope": true,
+    "unknownAuthorityTriggersSmallestBoundedProbeNotPermanentFreeze": true,
+    "blockedProviderDoesNotFreezeUnrelatedCapabilities": true,
+    "successfulEvidenceMayAdvanceFixRectifyGeneratePublishOrOperate": true,
+    "continuityMarkersRemainNonAuthorizing": true,
+    "rule": "When evidence proves a capability is available and the founder has approved the relevant scope, use it to move the goal forward. Do not convert proof discipline into a freeze. Unknown authority should trigger the smallest safe bounded probe needed to establish authority. A block on one provider, write path, or evidence source must not freeze unrelated generation, analysis, editing, read, automation, or implementation capabilities. Every consequential action still requires the authority and approval appropriate to that action, and claims must remain bounded by receipts and outcome evidence."
+  },
+  "youtubeProductionTruth": {
+    "seriesIntentRemainsFounderDefined": true,
+    "videoCreationIndependentOfPublishProof": true,
+    "creationMayUseAvailableGenerationEditingVoiceAndCompositionCapabilities": true,
+    "publishingRequiresExplicitApprovalOfFinalVideoAndMetadata": true,
+    "publishAuthorityMustBeCheckedAtExecutionTime": true,
+    "providerAcceptanceMustProduceReceipt": true,
+    "publishedOutcomeRequiresYouTubeEvidence": true,
+    "workflow": ["series-idea","episode-concept","script-or-storyboard","generate-or-edit-video","review-final-asset","approve-publish-payload","publish-or-schedule","capture-provider-receipt","verify-youtube-outcome","measure-and-learn"]
   },
   "connectorBridgeTruth": {
-    "evidencePlanes": ["connector-surface", "live-session", "provider-page"],
+    "evidencePlanes": ["connector-surface","live-session","provider-page"],
     "bridgeBlockedClassifyAs": "BLOCKED_CONNECTOR_BRIDGE",
     "providerPageStateSurvivesBridgeFailure": true,
     "repeatProviderSetupWithoutProviderEvidence": false,
-    "blockedStateInvalidatedBy": ["live-session-exposed", "stronger-contradictory-bridge-evidence"],
+    "blockedStateInvalidatedBy": ["live-session-exposed","stronger-contradictory-bridge-evidence"],
     "continuityMarkersAreNonAuthorizing": true,
     "recoveryRule": "When the connector surface exists but the runtime reports Browser not connected and exposes no tabs, classify the connector bridge as blocked. Preserve separately observed or founder-reported provider-page state; do not blame or reset the page and do not repeat login/setup instructions without provider-level evidence. Re-probe the connector bridge and clear the blocked state only when fresh bridge evidence exposes a live session or stronger contradictory bridge evidence supersedes it."
   },
@@ -57,11 +75,11 @@
     "secondarySensorFailureMayBlockVerifiedNativeMeasurement": false,
     "paidSecondarySensorRequired": false,
     "publishedWithoutMeasurementClassifyAs": "UNMEASURED",
-    "sourcePrecedence": ["native-platform", "native-platform-export", "official-api-partner", "aggregator", "inference"],
+    "sourcePrecedence": ["native-platform","native-platform-export","official-api-partner","aggregator","inference"],
     "nativePlatformWinsOnConflict": true,
     "emptyProviderRowsClassifyAs": "UNKNOWN_NO_EVIDENCE",
     "causalClaimsRequirePlatformAttributableEvidence": true,
-    "forbiddenUngroundedClaims": ["ranking_suppression", "distribution_restriction", "post_to_follower_conversion", "delayed_follower_attribution", "algorithmic_cause"],
+    "forbiddenUngroundedClaims": ["ranking_suppression","distribution_restriction","post_to_follower_conversion","delayed_follower_attribution","algorithmic_cause"],
     "linkedinNative": {"role":"Primary authority for current post facts and native exports used for historical or account analytics.","authority":"primary","runtimeDiscoveryRequired":true},
     "cambiante": {"role":"LinkedIn publishing and post-level analytics only when the live provider token exposes the required analytics capability.","authority":"secondary","runtimeDiscoveryRequired":true,"requiredLinkedInPermission":"r_member_postAnalytics","missingPermissionClassifyAs":"BLOCKED_PROVIDER_SCOPE","mayOverrideNativePlatform":false},
     "buffer": {"role":"Corroborating LinkedIn post-level analytics and scheduling when freshly connected through an authorized route.","authority":"secondary","runtimeDiscoveryRequired":true,"mayOverrideNativePlatform":false,"productionAnalyticsApiAssumed":false},
