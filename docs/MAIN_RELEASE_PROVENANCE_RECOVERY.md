@@ -1,0 +1,18 @@
+# Main Release Provenance Recovery
+
+Founder Control Room treats a direct or otherwise unproven commit on `main` as historical source state, not as reviewed release provenance.
+
+This recovery path is intentionally narrow and creates no runtime capability:
+
+1. Do not weaken, bypass, or special-case `scripts/verify-main-release-provenance.mjs` to bless a direct commit after the fact.
+2. Do not manufacture an associated pull request, review receipt, or release receipt for historical direct-main lineage.
+3. Preserve that lineage as repository history and evidence.
+4. Start the recovery carrier from the current authoritative `main` head.
+5. Keep the recovery change documentation-only so provenance repair cannot smuggle unrelated product, authority, provider, or runtime changes through the gate.
+6. Advance `main` only through a normal pull request whose exact head satisfies the repository's applicable review, CI, security, and merge rules.
+7. After merge, require the new current `main` head to have current exact-head evidence and a valid merged-pull provenance relationship before making a present-tense release claim.
+8. If `main` moves before merge, the recovery candidate must be refreshed or replaced from the new current head. Predecessor green evidence does not transfer automatically.
+
+This recovery proves only the provenance of the successor reviewed merge. It does not retroactively certify predecessor direct commits, and it grants no deploy, publication, provider mutation, database, billing, credential, migration, or other execution authority.
+
+If the recovery pull request cannot pass the normal merge membrane, `main` remains provenance-blocked. Report the blocker rather than weakening the verifier.
