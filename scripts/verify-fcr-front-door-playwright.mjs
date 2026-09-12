@@ -5,7 +5,10 @@ const APEX_ORIGIN = 'https://foundercontrolroom.org';
 const PUBLIC_ORIGIN = 'https://www.foundercontrolroom.org';
 const CONTROL_ROOM_URL = `${PUBLIC_ORIGIN}/control-room/`;
 const AUTH_ME_URL = `${PUBLIC_ORIGIN}/auth/me`;
+const PUBLIC_HEALTH_URL = `${PUBLIC_ORIGIN}/health`;
 const API_VERSION_URL = 'https://api.foundercontrolroom.org/version';
+const PROTECTED_API_HEALTH_URL = 'https://api.foundercontrolroom.org/health';
+const EXPECTED_API_SERVICE = 'founder-control-room';
 const RECEIPT_PATH = 'test-results/fcr-access-front-door-browser-proof.json';
 const expectedHeadSha = process.env.EXPECTED_HEAD_SHA?.trim() ?? '';
 
@@ -34,8 +37,14 @@ const receipt = {
   founderShellVisible: false,
   authMeStatus: null,
   founderAuthorityContained: false,
+  publicHealthStatus: null,
+  publicHealthServiceIdentity: null,
+  publicHealthReachesCanonicalWorker: false,
   apiVersionStatus: null,
   apiVersionMatchesExpectedSha: false,
+  protectedApiHealthStatus: null,
+  protectedApiHealthRedirectIsAccess: false,
+  protectedApiHealthDeniedToStranger: false,
   state: 'unknown',
 };
 
@@ -167,6 +176,23 @@ try {
     fail('Founder authority containment was not proven for a random stranger.');
   }
 
+  // The normal browser API path is the Pages FCR_API Service Binding, not the
+  // externally Access-protected api.* hostname. Prove the public host reaches
+  // the canonical Worker through that binding before considering the front
+  // door healthy.
+  try {
+    const healthResponse = await context.request.get(PUBLIC_HEALTH_URL, { timeout: 20_000 });
+    receipt.publicHealthStatus = healthResponse.status();
+    receipt.publicHealthServiceIdentity = healthResponse.headers()['x-founder-control-room-service'] ?? null;
+    receipt.publicHealthReachesCanonicalWorker = healthResponse.ok()
+      && receipt.publicHealthServiceIdentity === EXPECTED_API_SERVICE;
+    if (!receipt.publicHealthReachesCanonicalWorker) {
+      fail(`Public /health did not prove the canonical ${EXPECTED_API_SERVICE} Worker through the Pages service binding.`);
+    }
+  } catch (error) {
+    fail(error instanceof Error ? error.message : String(error));
+  }
+
   try {
     const versionResponse = await context.request.get(API_VERSION_URL, { timeout: 20_000 });
     receipt.apiVersionStatus = versionResponse.status();
@@ -178,6 +204,27 @@ try {
       if (!receipt.apiVersionMatchesExpectedSha) {
         fail('API /version is not serving the exact approved current-main SHA.');
       }
+    }
+  } catch (error) {
+    fail(error instanceof Error ? error.message : String(error));
+  }
+
+  // /version is the only intentionally public api.* path in the split model.
+  // A different api.* route must still hit Access for a random stranger.
+  try {
+    const protectedResponse = await context.request.get(PROTECTED_API_HEALTH_URL, {
+      timeout: 20_000,
+      maxRedirects: 0,
+    });
+    receipt.protectedApiHealthStatus = protectedResponse.status();
+    const location = protectedResponse.headers().location ?? '';
+    receipt.protectedApiHealthRedirectIsAccess = /cloudflareaccess\.com/i.test(location);
+    receipt.protectedApiHealthDeniedToStranger = [401, 403].includes(receipt.protectedApiHealthStatus)
+      || (receipt.protectedApiHealthStatus >= 300
+        && receipt.protectedApiHealthStatus < 400
+        && receipt.protectedApiHealthRedirectIsAccess);
+    if (!receipt.protectedApiHealthDeniedToStranger) {
+      fail(`Protected API /health unexpectedly became public with HTTP ${receipt.protectedApiHealthStatus}.`);
     }
   } catch (error) {
     fail(error instanceof Error ? error.message : String(error));
