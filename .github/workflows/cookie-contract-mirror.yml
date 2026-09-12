@@ -1,6 +1,22 @@
 name: Founder Cookie Contract Mirror
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - '.security/cookies.json'
+      - 'scripts/verify-cookie-contract.mjs'
+      - 'scripts/verify-founder-onboarding.mjs'
+      - 'scripts/verify-guarded-terminal-contract.mjs'
+      - 'src/auth/**'
+      - 'src/lib/operatorContinuity.ts'
+      - 'src/lib/mediaContinuity.ts'
+      - 'src/lib/__tests__/operatorContinuity.test.ts'
+      - 'src/lib/__tests__/mediaContinuity.test.ts'
+      - 'src/http/middleware/**'
+      - 'src/http/routes/auth.ts'
+      - 'src/terminal/registry.ts'
+      - '.github/workflows/cookie-contract-mirror.yml'
   pull_request:
     paths:
       - '.security/cookies.json'
