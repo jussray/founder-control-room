@@ -66,6 +66,7 @@ export interface MediaProofCookieEvaluation extends OperatorContinuityEvaluation
 }
 
 const SHA256 = /^[0-9a-f]{64}$/i;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function text(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
@@ -92,7 +93,9 @@ function mediaContinuityInputErrors(input: MediaContinuityInput): string[] {
     ['runtimeFingerprint', input.runtimeFingerprint],
   ];
 
-  if (!text(input.missionId)) errors.push('missionId is required');
+  if (!UUID.test(text(input.missionId))) {
+    errors.push('missionId must be a Mission Engine UUID');
+  }
   if (!MEDIA_EVIDENCE_STATES.includes(input.evidenceState)) errors.push('unsupported media evidence state');
 
   for (const [field, value] of requiredFingerprints) {
@@ -192,7 +195,7 @@ export function validateMediaProofCookie(cookie: MediaProofCookie): string[] {
   const errors = [...validateOperatorContinuityReceiptV2(cookie.continuity)];
   if (cookie.contract !== MEDIA_CONTINUITY_CONTRACT) errors.push('media continuity contract is unsupported');
   if (cookie.cookieId !== cookie.continuity.fingerprint) errors.push('media cookieId must equal the bound continuity fingerprint');
-  if (!text(cookie.missionId)) errors.push('media proof cookie missionId is required');
+  if (!UUID.test(text(cookie.missionId))) errors.push('media proof cookie missionId must be a Mission Engine UUID');
   if (!MEDIA_EVIDENCE_STATES.includes(cookie.evidenceState)) errors.push('media proof cookie evidence state is unsupported');
   if (cookie.outputFingerprint !== null && !SHA256.test(cookie.outputFingerprint)) errors.push('media proof cookie output fingerprint is malformed');
   if (cookie.browserCookie !== false) errors.push('media proof cookie must never become a browser cookie');
@@ -208,6 +211,17 @@ export function evaluateMediaProofCookie(
   now: string,
 ): MediaProofCookieEvaluation {
   if (validateMediaProofCookie(cookie).length > 0) {
+    return {
+      state: 'invalid',
+      reasons: ['receipt_invalid'],
+      reacquireRequired: true,
+      continuityMayAuthorizeAction: false,
+      cookieMayAuthorizeAction: false,
+      cookieMayAuthorizePublish: false,
+    };
+  }
+
+  if (text(cookie.missionId) !== text(current.missionId)) {
     return {
       state: 'invalid',
       reasons: ['receipt_invalid'],
