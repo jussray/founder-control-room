@@ -35,7 +35,7 @@ function baseInput() {
 function successRpc() {
   const recipientFingerprint = revenueStrikeRecipientFingerprint('buyer@example.com');
   return {
-    rpc: vi.fn(async (name: string) => {
+    rpc: vi.fn(async (name: string, args: Record<string, unknown>) => {
       if (name === 'claim_revenue_strike_customer_send_lease') {
         return {
           data: [{
@@ -50,9 +50,9 @@ function successRpc() {
       }
       return {
         data: [{
-          claim_id: CLAIM_ID,
-          provider_outcome: 'accepted',
-          provider_receipt_id: 'gmail-receipt-1',
+          claim_id: args.p_claim_id,
+          provider_outcome: args.p_provider_outcome,
+          provider_receipt_id: args.p_provider_receipt_id ?? null,
           finalized_at: '2026-09-12T19:16:00.000Z',
         }],
         error: null,
@@ -149,6 +149,49 @@ describe('Revenue Strike customer send authority membrane', () => {
       code: 'PROVIDER_OUTCOME_UNKNOWN',
       providerCalls: 1,
       leaseConsumed: true,
+    });
+    expect(provider.send).toHaveBeenCalledTimes(1);
+  });
+
+  it('fails closed when terminal claim/outcome/receipt evidence does not exactly match the provider result', async () => {
+    const recipientFingerprint = revenueStrikeRecipientFingerprint('buyer@example.com');
+    const rpcClient = {
+      rpc: vi.fn(async (name: string) => {
+        if (name === 'claim_revenue_strike_customer_send_lease') {
+          return {
+            data: [{
+              claim_id: CLAIM_ID,
+              run_id: 'strike:2026-09-12',
+              slot: 1,
+              recipient_fingerprint: recipientFingerprint,
+              claimed_at: CLAIMED_AT,
+            }],
+            error: null,
+          };
+        }
+        return {
+          data: [{
+            claim_id: CLAIM_ID,
+            provider_outcome: 'accepted',
+            provider_receipt_id: 'different-provider-receipt',
+            finalized_at: '2026-09-12T19:16:00.000Z',
+          }],
+          error: null,
+        };
+      }),
+    } as RevenueStrikeRpcClient;
+    const provider = {
+      send: vi.fn(async () => ({ accepted: true, receiptId: 'gmail-receipt-1' })),
+    };
+
+    const result = await executeRevenueStrikeCustomerSend(baseInput(), { rpcClient, provider });
+
+    expect(result).toMatchObject({
+      ok: false,
+      code: 'POST_PROVIDER_RECONCILIATION_FAILED',
+      providerCalls: 1,
+      leaseConsumed: true,
+      claimId: CLAIM_ID,
     });
     expect(provider.send).toHaveBeenCalledTimes(1);
   });
