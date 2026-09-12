@@ -9,6 +9,17 @@ interface PluginEntry {
   defaultMode: 'read-first';
 }
 
+interface WriteProofTruth {
+  connectionDoesNotProveWriteAuthority: boolean;
+  capabilityDiscoveryDoesNotProveAccountAuthority: boolean;
+  accountAuthorityDoesNotProveExecution: boolean;
+  providerAcceptanceDoesNotProveOutcome: boolean;
+  writeCapabilityClassifyUntilProviderAcceptance: 'UNKNOWN_WRITE_AUTHORITY';
+  successfulWriteRequires: string[];
+  verifiedOutcomeAdditionallyRequires: 'outcome-evidence';
+  forbiddenGraduations: string[];
+}
+
 interface SocialAnalyticsTruth {
   analyticsMode: 'observation_only';
   learningRequiresVerifiedPostLevelMeasurement: boolean;
@@ -21,34 +32,10 @@ interface SocialAnalyticsTruth {
   emptyProviderRowsClassifyAs: 'UNKNOWN_NO_EVIDENCE';
   causalClaimsRequirePlatformAttributableEvidence: boolean;
   forbiddenUngroundedClaims: string[];
-  linkedinNative: {
-    role: string;
-    authority: 'primary';
-    runtimeDiscoveryRequired: boolean;
-  };
-  cambiante: {
-    role: string;
-    authority: 'secondary';
-    runtimeDiscoveryRequired: boolean;
-    requiredLinkedInPermission: 'r_member_postAnalytics';
-    missingPermissionClassifyAs: 'BLOCKED_PROVIDER_SCOPE';
-    mayOverrideNativePlatform: boolean;
-  };
-  buffer: {
-    role: string;
-    authority: 'secondary';
-    runtimeDiscoveryRequired: boolean;
-    mayOverrideNativePlatform: boolean;
-    productionAnalyticsApiAssumed: boolean;
-  };
-  metricool: {
-    role: string;
-    authority: 'secondary';
-    runtimeDiscoveryRequired: boolean;
-    emptyRowsMeanZero: boolean;
-    historicalBackfillAssumed: boolean;
-    mayOverrideNativePlatform: boolean;
-  };
+  linkedinNative: { role: string; authority: 'primary'; runtimeDiscoveryRequired: boolean };
+  cambiante: { role: string; authority: 'secondary'; runtimeDiscoveryRequired: boolean; requiredLinkedInPermission: 'r_member_postAnalytics'; missingPermissionClassifyAs: 'BLOCKED_PROVIDER_SCOPE'; mayOverrideNativePlatform: boolean };
+  buffer: { role: string; authority: 'secondary'; runtimeDiscoveryRequired: boolean; mayOverrideNativePlatform: boolean; productionAnalyticsApiAssumed: boolean };
+  metricool: { role: string; authority: 'secondary'; runtimeDiscoveryRequired: boolean; emptyRowsMeanZero: boolean; historicalBackfillAssumed: boolean; mayOverrideNativePlatform: boolean };
 }
 
 interface PluginManagementManifest {
@@ -64,67 +51,21 @@ interface PluginManagementManifest {
   permissionStateSource: string;
   connectionStateSource: string;
   truthBoundary: string;
+  writeProofTruth: WriteProofTruth;
   socialAnalyticsTruth: SocialAnalyticsTruth;
   plugins: PluginEntry[];
 }
 
-const manifest = JSON.parse(
-  await readFile(new URL('../../../.control-room/plugin-management.json', import.meta.url), 'utf8'),
-) as PluginManagementManifest;
+const manifest = JSON.parse(await readFile(new URL('../../../.control-room/plugin-management.json', import.meta.url), 'utf8')) as PluginManagementManifest;
 
-const expectedPlugins = [
-  'GitHub',
-  'Supabase',
-  'Slack',
-  'Asana',
-  'HubSpot',
-  'Figma',
-  'LinkedIn',
-  'Cambiante: Content Manager',
-  'Metricool for Social Media',
-];
-const allowedManifestKeys = [
-  'schemaVersion',
-  'contract',
-  'repository',
-  'authorityRepository',
-  'controlPlane',
-  'runtimeDiscoveryRequired',
-  'liveStateStored',
-  'writesRequireExplicitUserIntent',
-  'writesRequireFreshRepositoryAuthority',
-  'permissionStateSource',
-  'connectionStateSource',
-  'truthBoundary',
-  'socialAnalyticsTruth',
-  'plugins',
-].sort();
-const allowedPluginKeys = ['name', 'role', 'runtimeDiscoveryRequired', 'defaultMode'].sort();
-const forbiddenLiveStateKeys = new Set([
-  'installed',
-  'connected',
-  'connection',
-  'permission',
-  'permissions',
-  'permissionmode',
-  'oauthscopes',
-  'token',
-  'accesstoken',
-  'refreshtoken',
-  'secret',
-  'secrets',
-]);
-
-function normalizedKey(key: string): string {
-  return key.replace(/[_-]/g, '').toLowerCase();
-}
-
+const expectedPlugins = ['GitHub','Supabase','Slack','Asana','HubSpot','Figma','LinkedIn','Cambiante: Content Manager','Metricool for Social Media'];
+const allowedManifestKeys = ['schemaVersion','contract','repository','authorityRepository','controlPlane','runtimeDiscoveryRequired','liveStateStored','writesRequireExplicitUserIntent','writesRequireFreshRepositoryAuthority','permissionStateSource','connectionStateSource','truthBoundary','writeProofTruth','socialAnalyticsTruth','plugins'].sort();
+const allowedPluginKeys = ['name','role','runtimeDiscoveryRequired','defaultMode'].sort();
+const forbiddenLiveStateKeys = new Set(['installed','connected','connection','permission','permissions','permissionmode','oauthscopes','token','accesstoken','refreshtoken','secret','secrets']);
+function normalizedKey(key: string): string { return key.replace(/[_-]/g, '').toLowerCase(); }
 function forbiddenLiveStatePaths(value: unknown, path = 'manifest'): string[] {
-  if (Array.isArray(value)) {
-    return value.flatMap((entry, index) => forbiddenLiveStatePaths(entry, `${path}[${index}]`));
-  }
+  if (Array.isArray(value)) return value.flatMap((entry, index) => forbiddenLiveStatePaths(entry, `${path}[${index}]`));
   if (value === null || typeof value !== 'object') return [];
-
   const failures: string[] = [];
   for (const [key, child] of Object.entries(value)) {
     const childPath = `${path}.${key}`;
@@ -136,25 +77,26 @@ function forbiddenLiveStatePaths(value: unknown, path = 'manifest'): string[] {
 
 describe('ChatGPT plugin management repository contract', () => {
   it('declares intent without claiming live ChatGPT state', () => {
-    expect(manifest).toMatchObject({
-      schemaVersion: 1,
-      contract: 'juss/chatgpt-plugin-management@v1',
-      repository: 'jussray/founder-control-room',
-      authorityRepository: 'jussray/founder-control-room',
-      controlPlane: 'ChatGPT Plugin Management',
-      runtimeDiscoveryRequired: true,
-      liveStateStored: false,
-      writesRequireExplicitUserIntent: true,
-      writesRequireFreshRepositoryAuthority: true,
-      permissionStateSource: 'chatgpt-runtime',
-      connectionStateSource: 'chatgpt-runtime',
-    });
-    expect(manifest.truthBoundary).toMatch(/does not prove.*installed.*connected.*permitted.*executed/i);
+    expect(manifest).toMatchObject({schemaVersion:1,contract:'juss/chatgpt-plugin-management@v1',repository:'jussray/founder-control-room',authorityRepository:'jussray/founder-control-room',controlPlane:'ChatGPT Plugin Management',runtimeDiscoveryRequired:true,liveStateStored:false,writesRequireExplicitUserIntent:true,writesRequireFreshRepositoryAuthority:true,permissionStateSource:'chatgpt-runtime',connectionStateSource:'chatgpt-runtime'});
+    expect(manifest.truthBoundary).toMatch(/does not prove.*installed.*connected.*permitted.*write-authorized.*executed.*outcome/i);
   });
 
   it('uses a closed manifest schema and rejects live-state keys at any depth', () => {
     expect(Object.keys(manifest).sort()).toEqual(allowedManifestKeys);
     expect(forbiddenLiveStatePaths(manifest)).toEqual([]);
+  });
+
+  it('never graduates connection or discovery into write proof', () => {
+    expect(manifest.writeProofTruth).toMatchObject({
+      connectionDoesNotProveWriteAuthority: true,
+      capabilityDiscoveryDoesNotProveAccountAuthority: true,
+      accountAuthorityDoesNotProveExecution: true,
+      providerAcceptanceDoesNotProveOutcome: true,
+      writeCapabilityClassifyUntilProviderAcceptance: 'UNKNOWN_WRITE_AUTHORITY',
+      verifiedOutcomeAdditionallyRequires: 'outcome-evidence',
+    });
+    expect(manifest.writeProofTruth.successfulWriteRequires).toEqual(['explicit-founder-intent','live-target-identity','fresh-write-authority','exact-final-payload','provider-acceptance-receipt']);
+    expect(manifest.writeProofTruth.forbiddenGraduations).toEqual(['connected=>write-capable','tool-supports-write=>account-can-write','provider-accepted=>outcome-verified']);
   });
 
   it('keeps social analytics fail-closed and provider bounded', () => {
@@ -164,20 +106,12 @@ describe('ChatGPT plugin management repository contract', () => {
     expect(manifest.socialAnalyticsTruth.secondarySensorFailureMayBlockVerifiedNativeMeasurement).toBe(false);
     expect(manifest.socialAnalyticsTruth.paidSecondarySensorRequired).toBe(false);
     expect(manifest.socialAnalyticsTruth.publishedWithoutMeasurementClassifyAs).toBe('UNMEASURED');
-    expect(manifest.socialAnalyticsTruth.sourcePrecedence).toEqual([
-      'native-platform',
-      'native-platform-export',
-      'official-api-partner',
-      'aggregator',
-      'inference',
-    ]);
+    expect(manifest.socialAnalyticsTruth.sourcePrecedence).toEqual(['native-platform','native-platform-export','official-api-partner','aggregator','inference']);
     expect(manifest.socialAnalyticsTruth.nativePlatformWinsOnConflict).toBe(true);
     expect(manifest.socialAnalyticsTruth.emptyProviderRowsClassifyAs).toBe('UNKNOWN_NO_EVIDENCE');
     expect(manifest.socialAnalyticsTruth.linkedinNative.authority).toBe('primary');
     expect(manifest.socialAnalyticsTruth.cambiante.requiredLinkedInPermission).toBe('r_member_postAnalytics');
-    expect(manifest.socialAnalyticsTruth.cambiante.missingPermissionClassifyAs).toBe(
-      'BLOCKED_PROVIDER_SCOPE',
-    );
+    expect(manifest.socialAnalyticsTruth.cambiante.missingPermissionClassifyAs).toBe('BLOCKED_PROVIDER_SCOPE');
     expect(manifest.socialAnalyticsTruth.cambiante.mayOverrideNativePlatform).toBe(false);
     expect(manifest.socialAnalyticsTruth.metricool.emptyRowsMeanZero).toBe(false);
     expect(manifest.socialAnalyticsTruth.metricool.historicalBackfillAssumed).toBe(false);
