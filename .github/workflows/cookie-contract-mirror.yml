@@ -9,10 +9,13 @@ on:
       - 'scripts/verify-founder-onboarding.mjs'
       - 'scripts/verify-guarded-terminal-contract.mjs'
       - 'src/auth/**'
+      - 'src/reconciliation/types.ts'
       - 'src/lib/operatorContinuity.ts'
       - 'src/lib/mediaContinuity.ts'
+      - 'src/lib/mediaMissionContinuity.ts'
       - 'src/lib/__tests__/operatorContinuity.test.ts'
       - 'src/lib/__tests__/mediaContinuity.test.ts'
+      - 'src/lib/__tests__/mediaMissionContinuity.test.ts'
       - 'src/http/middleware/**'
       - 'src/http/routes/auth.ts'
       - 'src/terminal/registry.ts'
@@ -24,10 +27,13 @@ on:
       - 'scripts/verify-founder-onboarding.mjs'
       - 'scripts/verify-guarded-terminal-contract.mjs'
       - 'src/auth/**'
+      - 'src/reconciliation/types.ts'
       - 'src/lib/operatorContinuity.ts'
       - 'src/lib/mediaContinuity.ts'
+      - 'src/lib/mediaMissionContinuity.ts'
       - 'src/lib/__tests__/operatorContinuity.test.ts'
       - 'src/lib/__tests__/mediaContinuity.test.ts'
+      - 'src/lib/__tests__/mediaMissionContinuity.test.ts'
       - 'src/http/middleware/**'
       - 'src/http/routes/auth.ts'
       - 'src/terminal/registry.ts'
@@ -48,6 +54,6 @@ jobs:
           node-version: '24'
       - run: npm ci
       - run: node scripts/verify-cookie-contract.mjs
-      - run: npx vitest run src/lib/__tests__/operatorContinuity.test.ts src/lib/__tests__/mediaContinuity.test.ts
+      - run: npx vitest run src/lib/__tests__/operatorContinuity.test.ts src/lib/__tests__/mediaContinuity.test.ts src/lib/__tests__/mediaMissionContinuity.test.ts
       - run: node scripts/verify-founder-onboarding.mjs
       - run: node scripts/verify-guarded-terminal-contract.mjs
