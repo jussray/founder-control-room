@@ -23,6 +23,26 @@
 - When execution is unavailable, provide the exact verification command/test and label the result **NOT RUN**.
 - When live/current research is unavailable, label version-sensitive claims **UNVERIFIED** and preserve the exact source/query needed to verify them.
 
+### Connector bridge recovery
+
+When a browser or app connector surface exists but a live tool call reports a bridge/session failure such as `Browser not connected`, keep three evidence planes separate:
+
+1. **connector surface**: the plugin/tool exists in the current ChatGPT session;
+2. **live session**: the connector exposes a usable tab/session to the tool call;
+3. **provider page**: the founder's actual browser/app page may still be open, authenticated, and correctly configured.
+
+A live-session failure must be classified as **BLOCKED_CONNECTOR_BRIDGE**. It must not be promoted into claims that the founder is logged out, misconfigured, disconnected on the provider side, or needs to repeat setup when no provider-level evidence proves that.
+
+Recovery behavior:
+
+- preserve separately observed or founder-reported provider-page state with its provenance;
+- re-probe the bridge once when a fresh retry is useful;
+- do not repeat the same login/setup instructions after the founder has already established that setup is complete unless stronger provider evidence contradicts it;
+- prefer an equivalent direct provider capability when it can complete the approved goal without weakening authority or evidence;
+- if no equivalent path exists, stop at **BLOCKED_CONNECTOR_BRIDGE** with the exact missing handshake/session gate;
+- clear the blocked state only when fresh bridge evidence exposes a live session or stronger contradictory bridge evidence supersedes it;
+- continuity fingerprints and proof cookies remain non-secret state markers only and never authorize a browser action.
+
 ## Detailed Usage
 
 ### /redteam
@@ -108,6 +128,9 @@
 5. Selects the strongest approach
 6. Executes only where capability and authority exist
 7. Verifies the result, or marks the missing execution **NOT RUN**
+8. For connector/session failures, separates connector-surface, live-session, and provider-page truth before diagnosing the cause
+9. Classifies a tool-visible bridge/session failure as **BLOCKED_CONNECTOR_BRIDGE** rather than blaming provider setup without evidence
+10. Re-probes once when useful, then uses an equivalent direct capability if available or stops at the exact handshake gate instead of repeating stale setup instructions
 
 ---
 
