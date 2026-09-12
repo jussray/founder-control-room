@@ -6,11 +6,10 @@ import { join } from 'node:path';
 import test from 'node:test';
 import {
   FCR_CLOUDFLARE_ACCOUNT_ID,
-  FCR_PUBLIC_ACCESS_APP_NAME,
   FCR_PUBLIC_ZONE,
-  appHasOnlyEquivalentPublicDestination,
-  appHasOnlyManagedPublicDestination,
-  isEveryoneBypassPolicy,
+  appHasBrowserFacingFcrDestination,
+  browserFacingDestinationCount,
+  isBrowserFacingFcrPublicDestination,
   matchingAccessReasons,
   reconcileFcrPublicAccessZone,
   rollbackFcrPublicAccessZone,
@@ -31,33 +30,30 @@ function response(result, status = 200) {
   };
 }
 
-function managedApp(id = 'managed-1') {
+function mixedApp() {
   return {
-    id,
-    name: FCR_PUBLIC_ACCESS_APP_NAME,
+    id: 'mixed-1',
+    name: 'FCR mixed access',
     type: 'self_hosted',
     domain: FCR_PUBLIC_ZONE,
-    destinations: [{ type: 'public', uri: `${FCR_PUBLIC_ZONE}/*` }],
+    destinations: [
+      { type: 'public', uri: `${FCR_PUBLIC_ZONE}/*` },
+      { type: 'worker', uri: 'founder-control-room' },
+    ],
   };
 }
 
-function bypassPolicy() {
+function workerOnlyApp() {
   return {
-    id: 'policy-1',
-    decision: 'bypass',
-    include: [{ everyone: {} }],
-    require: [],
-    exclude: [],
+    id: 'worker-1',
+    name: 'FCR worker access',
+    type: 'self_hosted',
+    domain: FCR_PUBLIC_ZONE,
+    destinations: [{ type: 'worker', uri: 'founder-control-room' }],
   };
 }
 
-function fakeFetch({
-  applications = [],
-  policiesByApp = {},
-  onRequest,
-  onCreate,
-  onDelete,
-} = {}) {
+function fakeFetch({ applications = [], policiesByApp = {}, onRequest } = {}) {
   const state = {
     applications: applications.map((item) => structuredClone(item)),
     policiesByApp: structuredClone(policiesByApp),
@@ -71,28 +67,26 @@ function fakeFetch({
       return response(state.applications);
     }
 
+    const appGetMatch = url.match(/\/access\/apps\/([^/?]+)$/);
+    if (appGetMatch && method === 'GET') {
+      const appId = decodeURIComponent(appGetMatch[1]);
+      return response(state.applications.find((item) => item.id === appId) ?? null);
+    }
+
     const policyMatch = url.match(/\/access\/apps\/([^/]+)\/policies\?/);
     if (policyMatch && method === 'GET') {
       const appId = decodeURIComponent(policyMatch[1]);
       return response(state.policiesByApp[appId] ?? []);
     }
 
-    if (url.endsWith('/access/apps') && method === 'POST') {
+    const putMatch = url.match(/\/access\/apps\/([^/?]+)$/);
+    if (putMatch && method === 'PUT') {
+      const appId = decodeURIComponent(putMatch[1]);
       const body = JSON.parse(options.body);
-      const created = { id: 'created-1', ...body };
-      state.applications.push(created);
-      state.policiesByApp[created.id] = Array.isArray(body.policies) ? body.policies : [];
-      onCreate?.(created);
-      return response(created);
-    }
-
-    const deleteMatch = url.match(/\/access\/apps\/([^/]+)$/);
-    if (deleteMatch && method === 'DELETE') {
-      const appId = decodeURIComponent(deleteMatch[1]);
-      state.applications = state.applications.filter((item) => item.id !== appId);
-      delete state.policiesByApp[appId];
-      onDelete?.(appId);
-      return response({ id: appId });
+      const index = state.applications.findIndex((item) => item.id === appId);
+      if (index < 0) return response(null, 404);
+      state.applications[index] = { ...state.applications[index], ...body };
+      return response(state.applications[index]);
     }
 
     throw new Error(`Unexpected request: ${method} ${url}`);
@@ -109,66 +103,40 @@ const adminEnv = {
   CLOUDFLARE_ACCOUNT_ID: FCR_CLOUDFLARE_ACCOUNT_ID,
 };
 
-test('all-workers coverage can coexist with a narrower public destination', () => {
-  assert.deepEqual(
-    matchingAccessReasons({ destinations: [{ type: 'all_workers' }] }),
-    ['all-workers'],
-  );
+test('browser-facing Access means apex or www public destinations, not private Worker destinations', () => {
+  assert.equal(isBrowserFacingFcrPublicDestination({ type: 'public', uri: `${FCR_PUBLIC_ZONE}/*` }), true);
+  assert.equal(isBrowserFacingFcrPublicDestination({ type: 'public', uri: `www.${FCR_PUBLIC_ZONE}/control-room/*` }), true);
+  assert.equal(isBrowserFacingFcrPublicDestination({ type: 'public', uri: `api.${FCR_PUBLIC_ZONE}/version` }), false);
+  assert.equal(isBrowserFacingFcrPublicDestination({ type: 'worker', uri: 'founder-control-room' }), false);
+  assert.equal(appHasBrowserFacingFcrDestination(mixedApp()), true);
+  assert.equal(browserFacingDestinationCount(mixedApp()), 1);
+  assert.deepEqual(matchingAccessReasons(mixedApp()), ['browser-public-destination', 'worker']);
 });
 
-test('managed destination remains exact while bare apex is equivalent only for inspection', () => {
-  assert.equal(appHasOnlyManagedPublicDestination(managedApp(), FCR_PUBLIC_ZONE), true);
-  assert.equal(appHasOnlyEquivalentPublicDestination(managedApp(), FCR_PUBLIC_ZONE), true);
-  assert.equal(appHasOnlyEquivalentPublicDestination({
-    destinations: [{ type: 'public', uri: FCR_PUBLIC_ZONE }],
-  }, FCR_PUBLIC_ZONE), true);
-  assert.equal(appHasOnlyManagedPublicDestination({
-    destinations: [{ type: 'public', uri: FCR_PUBLIC_ZONE }],
-  }, FCR_PUBLIC_ZONE), false);
-  assert.equal(appHasOnlyEquivalentPublicDestination({
-    destinations: [{ type: 'public', uri: `${FCR_PUBLIC_ZONE}/admin` }],
-  }, FCR_PUBLIC_ZONE), false);
-  assert.equal(isEveryoneBypassPolicy(bypassPolicy()), true);
-  assert.equal(isEveryoneBypassPolicy({ decision: 'allow', include: [{ everyone: {} }] }), false);
-});
-
-test('rejects noncanonical FCR account authority before any provider request', async () => {
-  let requestCount = 0;
-  await assert.rejects(
-    reconcileFcrPublicAccessZone({
-      env: {
-        CLOUDFLARE_ACCESS_API_TOKEN: READ_TOKEN,
-        CLOUDFLARE_ACCOUNT_ID: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-      },
-      fetchImpl: async () => {
-        requestCount += 1;
-        throw new Error('must not fetch');
-      },
-    }),
-    (error) => error?.classification === 'account-authority-mismatch',
-  );
-  assert.equal(requestCount, 0);
-});
-
-test('inspect uses only the dedicated read token and plans exact public destination', async () => {
-  const requests = [];
+test('inspect reports clear when Access does not own the FCR browser doorway', async () => {
   const receipt = await reconcileFcrPublicAccessZone({
     env: readEnv,
-    fetchImpl: fakeFetch({
-      applications: [{ id: 'all-workers', name: 'workers', destinations: [{ type: 'all_workers' }] }],
-      onRequest(request) {
-        requests.push(request);
-      },
-    }),
+    fetchImpl: fakeFetch({ applications: [workerOnlyApp()] }),
   });
-
-  assert.equal(receipt.action, 'would-create-public-bypass');
-  assert.equal(receipt.state, 'attention');
+  assert.equal(receipt.state, 'clear');
+  assert.equal(receipt.action, 'browser-access-already-detached');
+  assert.equal(receipt.browserAccessDestinationCount, 0);
   assert.equal(receipt.mutationPerformed, false);
-  assert.ok(requests.every((request) => request.authorization === `Bearer ${READ_TOKEN}`));
 });
 
-test('inspect never falls back to the admin token', async () => {
+test('inspect plans detachment while preserving non-browser destinations', async () => {
+  const receipt = await reconcileFcrPublicAccessZone({
+    env: readEnv,
+    fetchImpl: fakeFetch({ applications: [mixedApp()] }),
+  });
+  assert.equal(receipt.state, 'attention');
+  assert.equal(receipt.action, 'would-detach-browser-access');
+  assert.equal(receipt.browserAccessDestinationCount, 1);
+  assert.equal(receipt.preservedNonBrowserDestinationCount, 1);
+  assert.equal(receipt.mutationPerformed, false);
+});
+
+test('inspect never falls back to admin authority', async () => {
   await assert.rejects(
     reconcileFcrPublicAccessZone({
       env: adminEnv,
@@ -179,263 +147,100 @@ test('inspect never falls back to the admin token', async () => {
   );
 });
 
-test('apply uses only admin authority and creates exact public destination with Everyone bypass', async () => {
+test('apply removes only browser-facing public destinations and preserves Worker access plus policies', async () => {
   const requests = [];
-  let created = null;
   const receipt = await reconcileFcrPublicAccessZone({
     env: adminEnv,
     apply: true,
     fetchImpl: fakeFetch({
-      applications: [{ id: 'all-workers', name: 'workers', destinations: [{ type: 'all_workers' }] }],
-      onRequest(request) {
-        requests.push(request);
+      applications: [mixedApp()],
+      policiesByApp: {
+        'mixed-1': [{ id: 'policy-1', decision: 'allow', include: [{ email: { email: 'founder@example.com' } }] }],
       },
-      onCreate(app) {
-        created = app;
-      },
+      onRequest(request) { requests.push(request); },
     }),
   });
 
-  assert.equal(receipt.action, 'created-public-bypass');
   assert.equal(receipt.state, 'mutated-needs-browser-proof');
+  assert.equal(receipt.action, 'detached-browser-access');
   assert.equal(receipt.mutationPerformed, true);
-  assert.equal(receipt.managedApplicationId, 'created-1');
-  assert.equal(created.name, FCR_PUBLIC_ACCESS_APP_NAME);
-  assert.deepEqual(created.destinations, [{ type: 'public', uri: `${FCR_PUBLIC_ZONE}/*` }]);
-  assert.equal(created.policies[0].decision, 'bypass');
-  assert.deepEqual(created.policies[0].include, [{ everyone: {} }]);
+  assert.equal(receipt.browserAccessDestinationCount, 0);
+  assert.equal(receipt.preservedNonBrowserDestinationCount, 1);
+  assert.deepEqual(receipt.expectedPostDestinations, [{ type: 'worker', uri: 'founder-control-room' }]);
+  const put = requests.find((request) => request.method === 'PUT');
+  assert.ok(put);
+  assert.deepEqual(JSON.parse(put.body).destinations, [{ type: 'worker', uri: 'founder-control-room' }]);
   assert.ok(requests.every((request) => request.authorization === `Bearer ${ADMIN_TOKEN}`));
 });
 
-test('existing exact managed public bypass is idempotent', async () => {
-  let createCount = 0;
-  const receipt = await reconcileFcrPublicAccessZone({
-    env: adminEnv,
-    apply: true,
-    fetchImpl: fakeFetch({
-      applications: [managedApp()],
-      policiesByApp: { 'managed-1': [bypassPolicy()] },
-      onCreate() {
-        createCount += 1;
-      },
-    }),
-  });
-
-  assert.equal(receipt.action, 'already-public-bypass');
-  assert.equal(receipt.alreadyExempt, true);
-  assert.equal(receipt.mutationPerformed, false);
-  assert.equal(createCount, 0);
-});
-
-test('foreign-named exact public bypass is accepted by semantics without being adopted for rollback', async () => {
-  const requests = [];
-  const receipt = await reconcileFcrPublicAccessZone({
-    env: readEnv,
-    fetchImpl: fakeFetch({
-      applications: [{
-        id: 'foreign-1',
-        name: 'existing FCR public app',
-        destinations: [{ type: 'public', uri: `${FCR_PUBLIC_ZONE}/*` }],
-      }],
-      policiesByApp: { 'foreign-1': [bypassPolicy()] },
-      onRequest(request) {
-        requests.push(request);
-      },
-    }),
-  });
-
-  assert.equal(receipt.state, 'clear');
-  assert.equal(receipt.action, 'already-public-bypass');
-  assert.equal(receipt.alreadyExempt, true);
-  assert.equal(receipt.mutationPerformed, false);
-  assert.equal(receipt.managedApplicationId, null);
-  assert.ok(requests.every((request) => request.authorization === `Bearer ${READ_TOKEN}`));
-});
-
-test('foreign-named bare apex bypass is accepted as Cloudflare whole-site semantics without rollback authority', async () => {
-  const receipt = await reconcileFcrPublicAccessZone({
-    env: readEnv,
-    fetchImpl: fakeFetch({
-      applications: [{
-        id: 'foreign-apex',
-        name: 'existing apex app',
-        destinations: [{ type: 'public', uri: FCR_PUBLIC_ZONE }],
-      }],
-      policiesByApp: { 'foreign-apex': [bypassPolicy()] },
-    }),
-  });
-
-  assert.equal(receipt.state, 'clear');
-  assert.equal(receipt.action, 'already-public-bypass');
-  assert.equal(receipt.alreadyExempt, true);
-  assert.equal(receipt.mutationPerformed, false);
-  assert.equal(receipt.managedApplicationId, null);
-});
-
-test('foreign subpath reads bypass semantics before the whole-site scope block', async () => {
-  const requests = [];
-  await assert.rejects(
-    reconcileFcrPublicAccessZone({
-      env: readEnv,
-      fetchImpl: fakeFetch({
-        applications: [{
-          id: 'foreign-subpath',
-          name: 'narrow app',
-          destinations: [{ type: 'public', uri: `${FCR_PUBLIC_ZONE}/admin` }],
-        }],
-        policiesByApp: { 'foreign-subpath': [bypassPolicy()] },
-        onRequest(request) {
-          requests.push(request);
-        },
-      }),
-    }),
-    (error) => error?.classification === 'existing-public-access-app-requires-review'
-      && error?.alreadyExempt === true,
-  );
-  assert.ok(requests.some((request) => request.url.includes('/access/apps/foreign-subpath/policies?')));
-});
-
-test('foreign multi-destination app reads Everyone bypass before destination-scope block', async () => {
-  const requests = [];
-  await assert.rejects(
-    reconcileFcrPublicAccessZone({
-      env: readEnv,
-      fetchImpl: fakeFetch({
-        applications: [{
-          id: 'foreign-multi',
-          name: 'existing multi app',
-          destinations: [
-            { type: 'public', uri: `${FCR_PUBLIC_ZONE}/*` },
-            { type: 'worker', uri: 'existing-worker' },
-          ],
-        }],
-        policiesByApp: { 'foreign-multi': [bypassPolicy()] },
-        onRequest(request) {
-          requests.push(request);
-        },
-      }),
-    }),
-    (error) => error?.classification === 'existing-public-access-app-requires-review'
-      && error?.alreadyExempt === true,
-  );
-  assert.ok(requests.some((request) => request.url.includes('/access/apps/foreign-multi/policies?')));
-});
-
-test('foreign multi-destination app reports missing Everyone bypass before destination-scope block', async () => {
-  await assert.rejects(
-    reconcileFcrPublicAccessZone({
-      env: readEnv,
-      fetchImpl: fakeFetch({
-        applications: [{
-          id: 'foreign-multi',
-          name: 'existing multi app',
-          destinations: [
-            { type: 'public', uri: `${FCR_PUBLIC_ZONE}/*` },
-            { type: 'worker', uri: 'existing-worker' },
-          ],
-        }],
-        policiesByApp: {
-          'foreign-multi': [{ decision: 'allow', include: [{ everyone: {} }], require: [], exclude: [] }],
-        },
-      }),
-    }),
-    (error) => error?.classification === 'existing-public-access-app-requires-review'
-      && error?.alreadyExempt === false,
-  );
-});
-
-test('foreign exact public destination without Everyone bypass blocks automatic mutation', async () => {
+test('automatic mutation blocks a public-only application instead of deleting unknown provider state', async () => {
   await assert.rejects(
     reconcileFcrPublicAccessZone({
       env: adminEnv,
       apply: true,
       fetchImpl: fakeFetch({
         applications: [{
-          id: 'foreign-1',
-          name: 'another-owner',
+          id: 'public-only',
+          name: 'unknown owner',
+          type: 'self_hosted',
+          domain: FCR_PUBLIC_ZONE,
           destinations: [{ type: 'public', uri: `${FCR_PUBLIC_ZONE}/*` }],
         }],
-        policiesByApp: {
-          'foreign-1': [{ decision: 'allow', include: [{ everyone: {} }], require: [], exclude: [] }],
-        },
       }),
     }),
-    (error) => error?.classification === 'existing-public-access-app-requires-review'
-      && error?.alreadyExempt === false,
+    (error) => error?.classification === 'public-only-access-app-requires-reviewed-deletion',
   );
 });
 
-test('multiple exact public destinations remain ambiguous and block automatic mutation', async () => {
+test('multiple browser-owning Access apps fail closed', async () => {
   await assert.rejects(
     reconcileFcrPublicAccessZone({
-      env: adminEnv,
-      apply: true,
+      env: readEnv,
       fetchImpl: fakeFetch({
         applications: [
-          managedApp('managed-1'),
+          mixedApp(),
           {
-            id: 'foreign-1',
-            name: 'another-owner',
-            destinations: [{ type: 'public', uri: `${FCR_PUBLIC_ZONE}/*` }],
+            id: 'second',
+            name: 'second',
+            type: 'self_hosted',
+            domain: `www.${FCR_PUBLIC_ZONE}`,
+            destinations: [{ type: 'public', uri: `www.${FCR_PUBLIC_ZONE}/*` }, { type: 'worker', uri: 'other-worker' }],
           },
         ],
       }),
     }),
-    (error) => error?.classification === 'existing-public-access-app-requires-review',
+    (error) => error?.classification === 'multiple-browser-access-apps-require-review',
   );
 });
 
-test('rollback deletes only the run-created exact managed public bypass', async () => {
+test('rollback restores only the exact receipt-bound pre-detachment destinations', async () => {
   const before = cwd();
-  const temp = await mkdtemp(join(tmpdir(), 'fcr-access-test-'));
+  const temp = await mkdtemp(join(tmpdir(), 'fcr-access-detach-test-'));
   try {
     chdir(temp);
     await mkdir('test-results', { recursive: true });
-    await writeFile(
-      'test-results/fcr-access-front-door-recovery.json',
-      `${JSON.stringify({
-        schemaVersion: 2,
-        scope: 'fcr-access-front-door-recovery',
-        accountId: FCR_CLOUDFLARE_ACCOUNT_ID,
-        zone: FCR_PUBLIC_ZONE,
-        state: 'mutated-needs-browser-proof',
-        mutationPerformed: true,
-        rollbackPerformed: false,
-        managedApplicationId: 'created-1',
-        action: 'created-public-bypass',
-      })}\n`,
-      'utf8',
-    );
-
-    let deleted = null;
-    const receipt = await rollbackFcrPublicAccessZone({
+    const policies = [{ id: 'policy-1', decision: 'allow', include: [{ email: { email: 'founder@example.com' } }] }];
+    const source = mixedApp();
+    const requests = [];
+    const applied = await reconcileFcrPublicAccessZone({
       env: adminEnv,
+      apply: true,
       fetchImpl: fakeFetch({
-        applications: [managedApp('created-1')],
-        policiesByApp: { 'created-1': [bypassPolicy()] },
-        onDelete(appId) {
-          deleted = appId;
-        },
+        applications: [source],
+        policiesByApp: { 'mixed-1': policies },
+        onRequest(request) { requests.push(request); },
       }),
     });
+    await writeFile('test-results/fcr-access-front-door-recovery.json', `${JSON.stringify(applied)}\n`, 'utf8');
 
-    assert.equal(deleted, 'created-1');
-    assert.equal(receipt.rollbackPerformed, true);
-    assert.equal(receipt.action, 'rolled-back-public-bypass');
+    const rollbackFetch = fakeFetch({
+      applications: [{ ...source, destinations: applied.expectedPostDestinations }],
+      policiesByApp: { 'mixed-1': policies },
+    });
+    const rolledBack = await rollbackFcrPublicAccessZone({ env: adminEnv, fetchImpl: rollbackFetch });
+    assert.equal(rolledBack.rollbackPerformed, true);
+    assert.equal(rolledBack.action, 'restored-browser-access-after-failed-provider-apply');
   } finally {
     chdir(before);
   }
-});
-
-test('raw whitespace token is rejected instead of silently trimmed', async () => {
-  await assert.rejects(
-    reconcileFcrPublicAccessZone({
-      env: {
-        CLOUDFLARE_ACCESS_API_TOKEN: ` ${READ_TOKEN} `,
-        CLOUDFLARE_ACCOUNT_ID: FCR_CLOUDFLARE_ACCOUNT_ID,
-      },
-      fetchImpl: fakeFetch(),
-    }),
-    /dedicated Cloudflare Access read credential could not read/,
-  );
 });

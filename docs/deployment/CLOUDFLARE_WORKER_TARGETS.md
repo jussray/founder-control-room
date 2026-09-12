@@ -128,38 +128,27 @@ This checked-in binding and sender allowlist prove repository intent only. They 
 
 ## Cloudflare Access recovery boundary
 
-Repository source contains a founder-gated Cloudflare Access inspection/recovery lane. Its existence does **not** prove current Access application state, exemption state, token permissions, or production front-door availability.
+The FCR browser doorway is intentionally **outside Cloudflare Access product login**. `foundercontrolroom.org` and `www.foundercontrolroom.org` must reach the public Pages experience without a Cloudflare Access challenge; `/control-room/` then applies FCR's own founder authentication and authorization. Separately scoped private Worker/internal destinations may remain protected by Access.
 
-The current recovery contract is intentionally narrower than general Access administration. The `FCR Access Front Door Recovery` workflow requires an exact requested SHA that still equals current `main`. Read-only inspection uses only `CLOUDFLARE_ACCESS_API_TOKEN`. Any apply or rollback uses only `CLOUDFLARE_ACCESS_ADMIN_API_TOKEN`, and `apply=true` additionally requires a fresh auditable founder approval reference whose raw value is not published.
+The trusted `FCR Access Front Door Recovery` workflow requires an exact requested SHA that still equals current `main`. `apply=false` is read-only and uses only `CLOUDFLARE_ACCESS_API_TOKEN`. `apply=true` additionally requires a fresh auditable founder approval reference and uses only `CLOUDFLARE_ACCESS_ADMIN_API_TOKEN`.
 
-The only permitted create target is:
-
-```text
-account: canonical FCR Cloudflare account
-zone: foundercontrolroom.org
-destination: foundercontrolroom.org/*
-managed app: foundercontrolroom.org - public apex bypass
-type: self_hosted
-policy: Bypass / Everyone
-```
-
-The recovery does not mutate DNS, Worker routes, the database, account-level `deny_unmatched_requests_exempted_zone_names`, unrelated Access applications, or existing all-workers protection. If a non-managed application already owns the exact public destination, or the managed application is duplicated or has destination/policy drift, automatic repair fails closed for manual review.
-
-A newly created public destination is only `mutated-needs-browser-proof`. Anonymous Playwright must then verify the recovered front door and exact runtime SHA. If that proof fails, rollback may delete only the run-created managed application after the receipt-bound account, zone, application ID, managed name, and exact destination are uniquely reacquired and still match. Ambiguity or drift blocks deletion rather than widening rollback authority.
-
-Only a bounded sanitized recovery receipt may be returned to the fixed founder-control issue or retained as an artifact. Raw provider/browser receipts, raw approval references, managed application IDs, final origins, raw errors, and blockers remain outside public proof.
-
-Keep these truths separate:
+The only permitted automatic mutation is destination detachment on one uniquely identified mixed Access application:
 
 ```text
-source capability
--> credential/configuration availability
--> provider inspection/readback
--> separately authorized bounded mutation when needed
--> deployed browser/runtime proof
+remove: browser-facing public destinations on foundercontrolroom.org / www.foundercontrolroom.org
+preserve: every non-browser destination, including private Worker destinations
+preserve: existing application identity and policies
+create public Access bypass app: never
+public-only Access application deletion: blocked for separate reviewed authority
+multiple/ambiguous matching applications: fail closed
+DNS / Worker routes / database / secrets / billing: no mutation
 ```
 
-Do not infer live provider configuration from a workflow file, secret name, token display label, or successful unrelated Cloudflare build.
+After apply, independent provider readback must prove the exact remaining destination set, unchanged application/policy fingerprints, and zero remaining Access-owned FCR browser destinations. Anonymous Playwright then verifies that the public pages are not intercepted by Cloudflare Access and that founder authority remains contained behind FCR's own sign-in surface.
+
+Provider detachment and runtime health remain different truth planes. If Access detachment is proven but `/version`, deployment identity, or another runtime witness fails, the workflow may remain red for production proof, but it must not automatically restore a Cloudflare Access login screen. Rollback is only for an incomplete or ambiguous provider apply and must use the receipt-bound original destination set after reacquiring an unchanged source application.
+
+Repository source proves the intended recovery contract only. Current provider configuration, token validity, successful detachment, public reachability, and exact runtime identity still require fresh provider/browser evidence.
 
 ## Read-only hostname inventory boundary
 
@@ -234,6 +223,6 @@ Current executable source and authoritative provider readback outrank an older v
 - API Worker: redeploy the prior exact Worker SHA through the authorized Worker release path.
 - Proxy: revert the focused `public/_worker.js` change and matching deployment contract together; do not silently point the browser at an unverified origin.
 - Service binding: revert only the affected Pages binding through separately authorized provider mutation; preserve unrelated bindings/configuration.
-- Access: remove only the run-created managed `foundercontrolroom.org/*` public-bypass application when its receipt-bound identity and scope still match; otherwise stop for manual review.
+- Access: roll back only an incomplete or ambiguous browser-destination detachment using the receipt-bound original destination set and unchanged application/policy identity; a later runtime/browser failure alone must not automatically reintroduce a Cloudflare Access product-login screen.
 - Credentials: remove/revoke only the affected credential; do not rotate unrelated keys to repair binding drift.
 - Preserve build logs, deployment IDs, provider readback, browser traces, and runtime receipts.

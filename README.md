@@ -164,6 +164,8 @@ api.foundercontrolroom.org
   -> canonical Worker: founder-control-room
 ```
 
+Cloudflare Access is **not** a Founder Control Room product-login surface. `foundercontrolroom.org` and `www.foundercontrolroom.org` must reach the public Pages/browser experience without a Cloudflare Access challenge; founder authentication begins inside FCR at `/control-room/`. Access may remain on separately scoped private Worker or internal destinations, but provider protection must not replace or precede FCR's own sign-in experience.
+
 Source dependence on that topology is not proof the live provider is configured correctly.
 
 Production does not deploy merely because `main` moved or a Cloudflare build succeeded. A production claim remains incomplete until the authorized lane proves, for one exact candidate:
