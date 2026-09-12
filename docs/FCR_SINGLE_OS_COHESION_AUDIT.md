@@ -73,6 +73,142 @@ A material FCR or cross-repository audit must verify all of the following:
    - Owned/creator commerce may use already active low/no-upfront-cost surfaces, but eligibility, storefront existence, traffic, followers, saves, or pending activity are not earnings. Do not claim product use without evidence or automatically buy products, spend on ads, change pricing, create paid subscriptions, enter contracts, or publish new endorsements.
    - Collapse every money review to the smallest evidence-backed next gate most likely to advance a real transaction while preserving authority and truth boundaries.
 
+10. **Founder Signal Engine is a capability, not an OS**
+   - Founder Signal Engine work, including Issue #73, extends FCR's `Grow` and `Prove` capabilities. It must not become a separate founder-facing control plane, mission state, approval system, truth model, or provider router.
+   - Canonical signal path:
+
+```text
+Founder Intent
+→ Project / Mission State
+→ Truth / Evidence Qualification
+→ Grow / Prove Capability
+→ Signal Candidate
+→ Audience / Target Fit
+→ Founder Approval when required
+→ Bounded Provider Execution
+→ Execution Receipt
+→ Measured Outcome
+→ Next Gate
+```
+
+   - GitHub is a proof/evidence surface, not the operating system. HubSpot is a CRM/execution/evidence surface. Buffer, LinkedIn, Facebook, Instagram, Zapier, OpenAI, and future publishing/outreach providers are bounded capabilities underneath FCR governance.
+   - A GitHub event, commit, PR, deploy, screenshot, test, or artifact may become a signal candidate only after its proof class is known. Provider acceptance or repository activity alone must not be promoted into a verified founder-outcome claim.
+   - Public proof must remain traceable to its authoritative project/evidence source. Draft generation does not grant publication authority. Outreach target discovery does not grant contact authority.
+   - Social analytics follow the FCR evidence hierarchy. Native platform evidence wins conflicts; secondary providers and aggregators may corroborate but may not manufacture causal conclusions or override authoritative platform truth.
+   - Existing Issue #73 work should be preserved and progressively reconnected to this shared path rather than rebuilt as a parallel automation stack.
+
+## Unified capability runtime
+
+Voice, text chat, mobile, desktop, Work/Codex-like surfaces, future devices, and future interaction modes are **modalities**, not separate operating systems and not separate sources of authority. They must all enter the same canonical founder-intent loop and use the same FCR-governed capability runtime.
+
+The shared capability runtime owns:
+
+```text
+Intent
+→ Capability Discovery
+→ Live Authority Check
+→ Consequence Classification
+→ Exact Proposal
+→ Approval when required
+→ Execution
+→ Execution Receipt
+→ Outcome Verification
+→ Completion Claim
+→ Next Gate
+```
+
+The following rules are mandatory:
+
+1. **Capability discovery is not authority.**
+   - A session-level capability snapshot is only a discovery hint about what the current surface may request.
+   - Authority must be checked again immediately before execution so revoked permissions, changed workspace policy, disconnected accounts, or changed capability versions fail closed.
+
+2. **Credentials stay behind the capability boundary.**
+   - Voice, text, agents, and model contexts receive bounded tool schemas and capability metadata, never provider credentials, OAuth tokens, passwords, signing secrets, or unrestricted account authority.
+   - Providers, plugins, apps, MCP servers, and connectors remain bounded execution or evidence surfaces underneath FCR governance.
+
+3. **Progressive capability disclosure.**
+   - Expose only the smallest tool schema needed for the current founder intent.
+   - Do not inject every installed capability into every session merely because it exists.
+
+4. **Consequence classes remain explicit.**
+   - At minimum distinguish `READ`, `REVERSIBLE_WRITE`, and `CONSEQUENTIAL_WRITE`.
+   - A modality may make approval accessible, but it may not weaken the approval rule because the founder is speaking instead of typing.
+   - Voice approval must bind to the exact pending proposal or approval identifier, not to an unscoped utterance such as a generic “yes.”
+
+5. **External actions use an explicit lifecycle.**
+
+```text
+PROPOSED
+→ WAITING_APPROVAL
+→ APPROVED
+→ PRE_COMMIT
+→ COMMITTING
+→ PROVIDER_ACCEPTED
+→ VERIFYING
+→ VERIFIED | UNKNOWN | CONTRADICTED
+```
+
+   - `DENIED`, `CANCELLED`, and `FAILED` are first-class terminal or retry states.
+   - Cancellation has priority before the commit boundary. If the provider may already have accepted the mutation, the system must state that cancellation is no longer guaranteed and reconcile the outcome instead of pretending the action was stopped.
+
+6. **Execution truth and outcome truth stay separate.**
+   - Provider acceptance proves execution state only.
+   - A founder-goal completion claim that requires an external outcome must wait for outcome evidence.
+   - A surface may not say “done,” “sent,” “merged,” “booked,” “published,” “paid,” “deleted,” or equivalent completion language without the receipt/evidence required by the common FCR proof model.
+
+7. **Receipts are modality-independent.**
+   - Every material external mutation must produce an execution receipt that identifies the action, bounded subject/account, proposal/approval binding when applicable, provider result, and timestamp/fingerprint sufficient for reconciliation.
+   - Voice, text, Work/Codex-like surfaces, automation, and future interfaces consume the same receipt model rather than inventing surface-local success states.
+
+8. **Accessibility cannot become an authority downgrade.**
+   - Material action state, pending approvals, failures, uncertainty, and completion evidence must be queryable without depending on a visual-only interface.
+   - A spoken or non-visual approval path must preserve the same exact proposal binding and consequence policy as a visual approval path.
+
+9. **Session state expires; authority does not silently persist.**
+   - Account choices, capability hints, pending proposals, and approvals are scoped to the appropriate session/action and must expire or be invalidated when subject, authority, runtime, provider connection, capability version, or evidence state changes.
+   - Reconnects must not replay old approvals or duplicate writes. Mutations require an idempotency/fingerprint strategy appropriate to the provider.
+
+10. **FCR remains the control plane.**
+    - A new voice agent, chat agent, mobile controller, plugin shell, automation runner, or device integration is cohesion drift if it can independently grant authority, issue conflicting mutations, maintain incompatible completion state, or bypass FCR receipts/evidence.
+    - New modalities should extend the shared capability runtime instead of creating a second tool router, second approval system, or second operating system.
+
+For a material interaction-surface or tool-integration audit, additionally answer:
+
+```text
+SURFACE
+Which modality received the founder intent?
+
+CAPABILITY
+What bounded capability was progressively disclosed?
+
+AUTHORITY
+What live source authorized the exact action immediately before execution?
+
+CONSEQUENCE
+Is it READ, REVERSIBLE_WRITE, or CONSEQUENTIAL_WRITE?
+
+PROPOSAL
+What exact subject, operation, arguments fingerprint, and approval binding define the mutation?
+
+COMMIT
+Where is the cancellation boundary, and did provider acceptance occur?
+
+RECEIPT
+What execution evidence exists?
+
+OUTCOME
+What outcome evidence exists, if required?
+
+CLAIM
+What completion language is actually justified?
+
+COHESION
+Did the modality extend FCR's shared runtime, or bypass it?
+```
+
+Any surface-specific authority expansion, unbound approval, receipt-free completion claim, credential exposure, replayed approval, duplicated mutation after reconnect, or parallel tool router is a blocker until reconciled.
+
 ## Infrastructure consequence filter
 
 For Cloudflare, Supabase, Firebase, Expo, n8n, Vercel, and future infrastructure providers, classify a newly observed provider change before routing it into founder work:
@@ -207,10 +343,13 @@ PromptOS
 StoryEngine-backed capability
 = story/content creation and provenance capability when invoked through FCR
 
+Founder Signal Engine
+= Grow/Prove capability that converts qualified project evidence into reviewable public proof and targeted outreach signals
+
 L99 / OODA / Lindy / Red Team / goalfix / Proof Mode
 = internal methods and verification disciplines
 
-Providers / plugins / n8n / GitHub / Cloudflare / Supabase / Shopify / other tools
+Providers / plugins / n8n / GitHub / Cloudflare / Supabase / Shopify / HubSpot / Buffer / LinkedIn / other tools
 = bounded execution or evidence surfaces
 ```
 

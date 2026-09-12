@@ -10,111 +10,92 @@
   "writesRequireFreshRepositoryAuthority": true,
   "permissionStateSource": "chatgpt-runtime",
   "connectionStateSource": "chatgpt-runtime",
-  "truthBoundary": "This file declares intended plugin capability only. It does not prove that a plugin is installed, connected, permitted, or that any action executed.",
+  "truthBoundary": "This file declares intended plugin capability only. It does not prove that a plugin is installed, connected, permitted, write-authorized, or that any action executed or produced an outcome.",
+  "writeProofTruth": {
+    "connectionDoesNotProveWriteAuthority": true,
+    "capabilityDiscoveryDoesNotProveAccountAuthority": true,
+    "accountAuthorityDoesNotProveExecution": true,
+    "providerAcceptanceDoesNotProveOutcome": true,
+    "proofDoesNotFreezeCapabilityUse": true,
+    "verifiedCapabilitiesMayBeUsedWithinFounderApproval": true,
+    "unknownWriteAuthorityMayBeProbedByAnExplicitlyApprovedBoundedWrite": true,
+    "writeCapabilityClassifyUntilProviderAcceptance": "UNKNOWN_WRITE_AUTHORITY",
+    "successfulWriteRequires": ["explicit-founder-intent","live-target-identity","fresh-write-authority","exact-final-payload","provider-acceptance-receipt"],
+    "verifiedOutcomeAdditionallyRequires": "outcome-evidence",
+    "forbiddenGraduations": ["connected=>write-capable","tool-supports-write=>account-can-write","provider-accepted=>outcome-verified"]
+  },
+  "capabilityUnlockTruth": {
+    "appliesToAllFcrCapabilities": true,
+    "proofConstrainsClaimsNotProgress": true,
+    "verifiedReadCapabilitiesMayBeUsedImmediatelyForApprovedGoals": true,
+    "verifiedGenerationCapabilitiesMayBeUsedImmediatelyForApprovedGoals": true,
+    "verifiedEditingCapabilitiesMayBeUsedImmediatelyForApprovedGoals": true,
+    "verifiedAnalysisCapabilitiesMayBeUsedImmediatelyForApprovedGoals": true,
+    "verifiedAutomationCapabilitiesMayBeUsedWithinApprovedScope": true,
+    "verifiedWriteCapabilitiesMayBeUsedWithinApprovedScope": true,
+    "unknownAuthorityTriggersSmallestBoundedProbeNotPermanentFreeze": true,
+    "blockedProviderDoesNotFreezeUnrelatedCapabilities": true,
+    "successfulEvidenceMayAdvanceFixRectifyGeneratePublishOrOperate": true,
+    "continuityMarkersRemainNonAuthorizing": true,
+    "rule": "When evidence proves a capability is available and the founder has approved the relevant scope, use it to move the goal forward. Do not convert proof discipline into a freeze. Unknown authority should trigger the smallest safe bounded probe needed to establish authority. A block on one provider, write path, or evidence source must not freeze unrelated generation, analysis, editing, read, automation, or implementation capabilities. Every consequential action still requires the authority and approval appropriate to that action, and claims must remain bounded by receipts and outcome evidence."
+  },
+  "youtubeProductionTruth": {
+    "seriesIntentRemainsFounderDefined": true,
+    "videoCreationIndependentOfPublishProof": true,
+    "creationMayUseAvailableGenerationEditingVoiceAndCompositionCapabilities": true,
+    "publishingRequiresExplicitApprovalOfFinalVideoAndMetadata": true,
+    "publishAuthorityMustBeCheckedAtExecutionTime": true,
+    "providerAcceptanceMustProduceReceipt": true,
+    "publishedOutcomeRequiresYouTubeEvidence": true,
+    "workflow": ["series-idea","episode-concept","script-or-storyboard","generate-or-edit-video","review-final-asset","approve-publish-payload","publish-or-schedule","capture-provider-receipt","verify-youtube-outcome","measure-and-learn"]
+  },
+  "connectorBridgeTruth": {
+    "evidencePlanes": ["connector-surface","live-session","provider-page"],
+    "bridgeBlockedClassifyAs": "BLOCKED_CONNECTOR_BRIDGE",
+    "providerPageStateSurvivesBridgeFailure": true,
+    "repeatProviderSetupWithoutProviderEvidence": false,
+    "blockedStateInvalidatedBy": ["live-session-exposed","stronger-contradictory-bridge-evidence"],
+    "continuityMarkersAreNonAuthorizing": true,
+    "recoveryRule": "When the connector surface exists but the runtime reports Browser not connected and exposes no tabs, classify the connector bridge as blocked. Preserve separately observed or founder-reported provider-page state; do not blame or reset the page and do not repeat login/setup instructions without provider-level evidence. Re-probe the connector bridge and clear the blocked state only when fresh bridge evidence exposes a live session or stronger contradictory bridge evidence supersedes it."
+  },
+  "evidenceSourceTruth": {
+    "providerReadFailureClassifyAs": "BLOCKED_SOURCE_ACCESS",
+    "providerReadFailureDoesNotEraseAlternateEvidence": true,
+    "providerNotFoundDoesNotProveArtifactAbsent": true,
+    "userProvidedArtifactMaySatisfyEquivalentEvidenceNeed": true,
+    "sourceSpecificBlockMayNotFreezeMissionWhenEquivalentEvidenceExists": true,
+    "alternateEvidenceMustRetainOwnProvenance": true,
+    "continuityMarkersAreNonAuthorizing": true,
+    "recoveryRule": "A provider-specific read failure such as Google Drive 404 or permission denial blocks only that source. Preserve separately uploaded, attached, repository, runtime, or provider evidence with its own provenance. Do not reinterpret a provider read failure as proof that the artifact does not exist. If equivalent evidence is already available and sufficient for the founder-approved goal, continue from that evidence; otherwise report the exact blocked source and required recovery gate."
+  },
   "socialAnalyticsTruth": {
     "analyticsMode": "observation_only",
     "learningRequiresVerifiedPostLevelMeasurement": true,
+    "nativeMeasurementSatisfiesLearningGate": true,
+    "secondarySensorFailureMayBlockVerifiedNativeMeasurement": false,
+    "paidSecondarySensorRequired": false,
     "publishedWithoutMeasurementClassifyAs": "UNMEASURED",
-    "sourcePrecedence": [
-      "native-platform",
-      "native-platform-export",
-      "official-api-partner",
-      "aggregator",
-      "inference"
-    ],
+    "sourcePrecedence": ["native-platform","native-platform-export","official-api-partner","aggregator","inference"],
     "nativePlatformWinsOnConflict": true,
     "emptyProviderRowsClassifyAs": "UNKNOWN_NO_EVIDENCE",
     "causalClaimsRequirePlatformAttributableEvidence": true,
-    "forbiddenUngroundedClaims": [
-      "ranking_suppression",
-      "distribution_restriction",
-      "post_to_follower_conversion",
-      "delayed_follower_attribution",
-      "algorithmic_cause"
-    ],
-    "linkedinNative": {
-      "role": "Primary authority for current post facts and native exports used for historical or account analytics.",
-      "authority": "primary",
-      "runtimeDiscoveryRequired": true
-    },
-    "cambiante": {
-      "role": "LinkedIn publishing and post-level analytics only when the live provider token exposes the required analytics capability.",
-      "authority": "secondary",
-      "runtimeDiscoveryRequired": true,
-      "requiredLinkedInPermission": "r_member_postAnalytics",
-      "missingPermissionClassifyAs": "BLOCKED_PROVIDER_SCOPE",
-      "mayOverrideNativePlatform": false
-    },
-    "buffer": {
-      "role": "Corroborating LinkedIn post-level analytics and scheduling when freshly connected through an authorized route.",
-      "authority": "secondary",
-      "runtimeDiscoveryRequired": true,
-      "mayOverrideNativePlatform": false,
-      "productionAnalyticsApiAssumed": false
-    },
-    "metricool": {
-      "role": "Secondary cross-network analytics and scheduling observation.",
-      "authority": "secondary",
-      "runtimeDiscoveryRequired": true,
-      "emptyRowsMeanZero": false,
-      "historicalBackfillAssumed": false,
-      "mayOverrideNativePlatform": false
-    }
+    "forbiddenUngroundedClaims": ["ranking_suppression","distribution_restriction","post_to_follower_conversion","delayed_follower_attribution","algorithmic_cause"],
+    "linkedinNative": {"role":"Primary authority for current post facts and native exports used for historical or account analytics.","authority":"primary","runtimeDiscoveryRequired":true},
+    "cambiante": {"role":"LinkedIn publishing and post-level analytics only when the live provider token exposes the required analytics capability.","authority":"secondary","runtimeDiscoveryRequired":true,"requiredLinkedInPermission":"r_member_postAnalytics","missingPermissionClassifyAs":"BLOCKED_PROVIDER_SCOPE","mayOverrideNativePlatform":false},
+    "buffer": {"role":"Corroborating LinkedIn post-level analytics and scheduling when freshly connected through an authorized route.","authority":"secondary","runtimeDiscoveryRequired":true,"mayOverrideNativePlatform":false,"productionAnalyticsApiAssumed":false},
+    "metricool": {"role":"Secondary cross-network analytics and scheduling observation. A connected network identifier proves connection only; write authority remains unknown until a live approved write receives provider acceptance.","authority":"secondary","runtimeDiscoveryRequired":true,"emptyRowsMeanZero":false,"historicalBackfillAssumed":false,"mayOverrideNativePlatform":false}
   },
   "plugins": [
-    {
-      "name": "GitHub",
-      "role": "Authoritative repository, branch, pull request, review, and exact-head evidence.",
-      "runtimeDiscoveryRequired": true,
-      "defaultMode": "read-first"
-    },
-    {
-      "name": "Supabase",
-      "role": "Database, auth, migration, advisor, and policy-readiness evidence.",
-      "runtimeDiscoveryRequired": true,
-      "defaultMode": "read-first"
-    },
-    {
-      "name": "Slack",
-      "role": "Founder and project status coordination after destination resolution.",
-      "runtimeDiscoveryRequired": true,
-      "defaultMode": "read-first"
-    },
-    {
-      "name": "Asana",
-      "role": "Project and task-state coordination with named-project scope.",
-      "runtimeDiscoveryRequired": true,
-      "defaultMode": "read-first"
-    },
-    {
-      "name": "HubSpot",
-      "role": "CRM evidence and gated follow-up coordination.",
-      "runtimeDiscoveryRequired": true,
-      "defaultMode": "read-first"
-    },
-    {
-      "name": "Figma",
-      "role": "Editable design evidence and handoff; never runtime proof.",
-      "runtimeDiscoveryRequired": true,
-      "defaultMode": "read-first"
-    },
-    {
-      "name": "LinkedIn",
-      "role": "Native LinkedIn account/profile surface. Treat native analytics or exports as primary evidence only when the runtime actually exposes them.",
-      "runtimeDiscoveryRequired": true,
-      "defaultMode": "read-first"
-    },
-    {
-      "name": "Cambiante: Content Manager",
-      "role": "LinkedIn content operations and secondary analytics observation; missing provider analytics scope is BLOCKED_PROVIDER_SCOPE, never zero performance.",
-      "runtimeDiscoveryRequired": true,
-      "defaultMode": "read-first"
-    },
-    {
-      "name": "Metricool for Social Media",
-      "role": "Secondary social analytics and scheduling observation; empty rows are no evidence, not zero performance.",
-      "runtimeDiscoveryRequired": true,
-      "defaultMode": "read-first"
-    }
+    {"name":"GitHub","role":"Authoritative repository, branch, pull request, review, and exact-head evidence.","runtimeDiscoveryRequired":true,"defaultMode":"read-first"},
+    {"name":"Google Drive","role":"Drive, Docs, Sheets, and Slides evidence. A provider-specific 404 or permission failure is BLOCKED_SOURCE_ACCESS for that source only and must not erase equivalent uploaded or separately observed evidence.","runtimeDiscoveryRequired":true,"defaultMode":"read-first"},
+    {"name":"Supabase","role":"Database, auth, migration, advisor, and policy-readiness evidence.","runtimeDiscoveryRequired":true,"defaultMode":"read-first"},
+    {"name":"Slack","role":"Founder and project status coordination after destination resolution.","runtimeDiscoveryRequired":true,"defaultMode":"read-first"},
+    {"name":"Asana","role":"Project and task-state coordination with named-project scope.","runtimeDiscoveryRequired":true,"defaultMode":"read-first"},
+    {"name":"HubSpot","role":"CRM evidence and gated follow-up coordination.","runtimeDiscoveryRequired":true,"defaultMode":"read-first"},
+    {"name":"Figma","role":"Editable design evidence and handoff; never runtime proof.","runtimeDiscoveryRequired":true,"defaultMode":"read-first"},
+    {"name":"LinkedIn","role":"Native LinkedIn account/profile surface. Treat native analytics or exports as primary evidence only when the runtime actually exposes them.","runtimeDiscoveryRequired":true,"defaultMode":"read-first"},
+    {"name":"Cambiante: Content Manager","role":"LinkedIn content operations and secondary analytics observation; missing provider analytics scope is BLOCKED_PROVIDER_SCOPE, never zero performance.","runtimeDiscoveryRequired":true,"defaultMode":"read-first"},
+    {"name":"Metricool for Social Media","role":"Secondary social analytics and scheduling observation; connection never proves write authority and empty rows are no evidence, not zero performance.","runtimeDiscoveryRequired":true,"defaultMode":"read-first"},
+    {"name":"Opera Browser Connector","role":"Browser-session bridge for founder-authorized tabs. Connector availability, live-session exposure, and provider-page state are separate evidence planes; a bridge failure is BLOCKED_CONNECTOR_BRIDGE and is not proof that the page is closed, logged out, or misconfigured.","runtimeDiscoveryRequired":true,"defaultMode":"read-first"}
   ]
 }

@@ -6,6 +6,7 @@ import { authRouter } from './routes/auth.js';
 import { onboardingRouter } from './routes/onboarding.js';
 import { founderOnboardingRouter } from './routes/founderOnboarding.js';
 import { projectsRouter } from './routes/projects.js';
+import { projectShellStateRouter } from './routes/projectShellState.js';
 import { buildEventsRouter } from './routes/buildEvents.js';
 import { handleBuildEventReceiptIngest } from './routes/buildEventReceipts.js';
 import { reasoningRunsRouter } from './routes/reasoningRuns.js';
@@ -371,6 +372,7 @@ export function createServer(options: CreateServerOptions = {}) {
   app.use('/projects', repositoryVerificationRouter);
   app.use('/projects', buildEventsRouter);
   app.use('/projects', reasoningRunsRouter);
+  app.use('/projects', requireProjectReadAudit, projectShellStateRouter);
   app.use('/projects', requireProjectReadAudit, projectsRouter);
   // Privileged mission execution still uses the existing approvals router, but
   // it must now pass founder authentication + founder master switch + V10
