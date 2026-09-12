@@ -39,6 +39,14 @@ A merge is appropriate only when:
 - rollback or safe forward-fix is understood;
 - the merge itself does not silently execute a separately gated action.
 
+## Governed branch-creation authority
+
+Repository branch creation is a separate reversible mutation class and does not inherit merge authority. In `src/http/routes/approvals.ts`, an authenticated founder execute request may reach `RepositoryProvider.createBranch(...)` only after a fresh `create_branch` proof is present, FCR issues an `AuthorityEnvelopeV1` for capability `github.repository.create_branch`, and the execution is durably reserved under the same idempotency key before provider mutation.
+
+The envelope binds the exact mission intent, authenticated actor/approver, repository scope, proposal hash, branch arguments, mission-state fingerprint, consequence class, tool-call identity, issuance/expiry window, and idempotency key. Immediately before the provider write, FCR must re-read current mission state, re-derive the execution context, and pass the original envelope through `executeAuthorizedCreateBranch()`. Changed state, arguments, repository scope, tool call, expiry, idempotency, capability, or envelope integrity must fail closed before GitHub can be mutated. A pending or ambiguous execution must reconcile before retry rather than minting a replacement write from uncertainty.
+
+This source/runtime membrane proves only that the branch-creation path is governed when that code executes. CI or unit green does not prove a live GitHub branch was created, and successful branch creation does not grant merge, deploy, publication, secret, database, billing, or destructive authority.
+
 ## Independent review + founder-final authority for Founder Control Room merges
 
 The Founder Control Room in-app merge path keeps **independent review load-bearing**, but the canonical FCR policy no longer requires a second human semantic reviewer merely because the founder authored the patch.

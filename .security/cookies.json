@@ -43,7 +43,8 @@
   "nonCookieState": [
     "founder_browser_sessions: service-role-only server-side session state keyed by a SHA-256 hash of the opaque browser capability",
     "continuity_fingerprint: deterministic server-state integrity evidence over the active session identity and lifetime; it is not a browser/device fingerprint, does not use network/device tracking entropy, and grants no action authority",
-    "portfolio proof cookie / continuity receipt: bounded audit metadata over an exact repository/target/base/head/scope/evidence fingerprint; browserCookie=false and actionAuthority=false; it is never emitted with Set-Cookie and becomes historical when its bound fingerprint moves"
+    "portfolio proof cookie / continuity receipt: bounded audit metadata over an exact repository/target/base/head/scope/evidence fingerprint; browserCookie=false and actionAuthority=false; it is never emitted with Set-Cookie and becomes historical when its bound fingerprint moves",
+    "media proof cookie / continuity receipt: bounded audit metadata over exact intent, subject, script, prompt, source-asset, intelligence, render-stack, runtime, output, review, evidence-state, and authority fingerprints; browserCookie=false, actionAuthority=false, publishAuthority=false, credentialsEmbedded=false; any bound-state movement or expiry makes the prior cookie stale/historical and requires proof reacquisition"
   ],
   "externalCookieProviders": [],
   "prohibited": [
@@ -51,7 +52,9 @@
     "client-readable founder auth tokens in the FCR browser-session cookie",
     "self-contained access or refresh token payloads in founder session cookies",
     "writing portfolio proof cookies or continuity receipts into browser cookie storage",
-    "treating continuity_fingerprint, a proof cookie, or a browser session cookie as Founder Final, merge, deployment, provider, database, publication, billing, or destructive-action authority",
+    "writing media proof cookies or media continuity receipts into browser cookie storage",
+    "treating continuity_fingerprint, a proof cookie, a media proof cookie, or a browser session cookie as Founder Final, merge, deployment, provider, database, publication, billing, destructive-action, or external-effect authority",
+    "renewing or inheriting a media proof cookie after intent, subject, script, prompt, source asset, intelligence provider, render stack, runtime, output, review, evidence state, or authority fingerprint movement without reacquiring evidence",
     "cross-project Se'kret Bip session reuse",
     "caching any response that writes, rotates, or clears the founder session"
   ]
