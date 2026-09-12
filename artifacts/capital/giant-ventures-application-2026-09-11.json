@@ -1,0 +1,117 @@
+{
+  "contract": "fcr/external-application-submission@v1",
+  "provider": "Giant Ventures",
+  "applicationUrl": "https://www.giant.vc/application",
+  "capturedLocalDate": "2026-09-11",
+  "state": "RECONSTRUCTED_AWAITING_EXACT_FOUNDER_APPROVAL",
+  "payloadSha256": "sha256:54ac471b3d5f025fa2658d85361d764c7b2b5be239c596d52de54a52e0d52062",
+  "fields": [
+    {
+      "id": "full_name",
+      "required": true,
+      "value": "Raylene McGill (Juss Ray)",
+      "status": "VERIFIED_FROM_INVESTOR_MATERIALS"
+    },
+    {
+      "id": "email",
+      "required": true,
+      "value": null,
+      "status": "UNKNOWN"
+    },
+    {
+      "id": "linkedin_url",
+      "required": true,
+      "value": null,
+      "status": "UNKNOWN"
+    },
+    {
+      "id": "location",
+      "required": true,
+      "value": "Johnstown, Pennsylvania, United States",
+      "status": "VERIFIED_USER_CONTEXT"
+    },
+    {
+      "id": "why_starting_company",
+      "required": true,
+      "maxChars": 250,
+      "value": "I’m building Se’kret Bip from lived family experience: teens need private space to process emotions, while parents need healthier ways to connect without turning care into surveillance.",
+      "status": "RECONSTRUCTED_FROM_VERIFIED_INVESTOR_MATERIALS"
+    },
+    {
+      "id": "company_name",
+      "required": true,
+      "value": "Se’kret Bip",
+      "status": "VERIFIED"
+    },
+    {
+      "id": "company_website",
+      "required": false,
+      "value": "https://sekretbip.net",
+      "status": "VERIFIED_FROM_INVESTOR_MATERIALS"
+    },
+    {
+      "id": "company_description",
+      "required": true,
+      "maxChars": 250,
+      "value": "Se’kret Bip is a private-by-default emotional growth and trusted-connection world for teens, combining reflection, creativity, calming tools, and consent-based pathways to trusted people.",
+      "status": "RECONSTRUCTED_FROM_VERIFIED_INVESTOR_MATERIALS"
+    },
+    {
+      "id": "unique_insight",
+      "required": true,
+      "value": "Privacy and connection are not enemies. Family emotional technology can give teens meaningful private space while making trusted connection intentional, scoped, and inspectable rather than defaulting to public feeds or surveillance.",
+      "status": "RECONSTRUCTED_FROM_VERIFIED_INVESTOR_MATERIALS"
+    },
+    {
+      "id": "raise_amount",
+      "required": true,
+      "value": "$500,000 USD",
+      "status": "VERIFIED"
+    },
+    {
+      "id": "why_right_founder",
+      "required": true,
+      "maxChars": 250,
+      "value": "I’m a mother of eight, family caregiver, and hands-on builder who has lived the communication problem and built both the product and its governance stack under tight constraints, without a conventional technical team or outside capital.",
+      "status": "RECONSTRUCTED_FROM_VERIFIED_INVESTOR_MATERIALS"
+    },
+    {
+      "id": "how_heard_about_giant",
+      "required": false,
+      "value": null,
+      "status": "UNKNOWN"
+    },
+    {
+      "id": "spoken_to_giant_before",
+      "required": true,
+      "value": null,
+      "status": "UNKNOWN"
+    }
+  ],
+  "uploads": [
+    {
+      "id": "pitch_deck",
+      "required": true,
+      "artifactRef": "Library:SeKret_Bip_Giant_Ventures_Pitch_Deck.pdf",
+      "sha256": "sha256:eee38fe8c5844089dc5b32070b8f37eb505c25076491ebb41bbab0e0a0d5faf2",
+      "status": "HASH_VERIFIED"
+    }
+  ],
+  "blockers": [
+    "missing_required_field:email",
+    "missing_required_field:linkedin_url",
+    "missing_required_field:spoken_to_giant_before",
+    "missing_exact_founder_approval_for_payload_hash",
+    "provider_browser_auth_execution_readiness_not_yet_rechecked"
+  ],
+  "authority": {
+    "submissionAuthorized": false,
+    "reason": "This reconstructed payload did not exist when the prior approval was given. Exact approval must bind to this payload hash before external submission."
+  },
+  "evidence": [
+    "SeKret_Bip_Giant_Ventures_Pitch_Deck.pdf",
+    "Juss_Ray_PreSeed_Funding_Kit_v2_2026-09-07.pdf",
+    "Juss_Ray_Investor_One_Pager.pdf",
+    "Giant Ventures live founder application form observed 2026-09-11"
+  ]
+}
