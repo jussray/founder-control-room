@@ -79,10 +79,12 @@
     button:hover { background: rgba(159,140,255,.22); }
     button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible { outline: 3px solid #d8d2ff; outline-offset: 3px; }
     .prepared {
+      display: grid;
+      gap: .25rem;
       margin-top: 1rem; padding: .9rem 1rem; border: 1px solid var(--line); border-radius: 1rem; background: #081525;
       overflow-wrap: anywhere;
     }
-    .prepared code { display: block; margin-top: .35rem; color: #fff; }
+    .prepared code { display: block; margin-top: .1rem; color: #fff; }
     .empty { padding: 2rem 1rem; text-align: center; color: var(--muted); border: 1px dashed var(--line); border-radius: 1rem; }
     .error { color: #ff9aab; }
     [hidden] { display: none !important; }
@@ -126,7 +128,7 @@
 
     <div class="prepared" id="prepared-wrap" role="status" aria-live="polite">
       <strong>Prepared command</strong>
-      <span class="muted">Choose an operation below. This creates a bounded handoff string only.</span>
+      <span class="muted" id="prepared-status">Choose an operation below. This creates a bounded handoff string only.</span>
       <code id="prepared-command">No command prepared yet.</code>
     </div>
 
@@ -141,6 +143,7 @@
       search: document.getElementById('command-search'),
       target: document.getElementById('command-target'),
       prepared: document.getElementById('prepared-command'),
+      status: document.getElementById('prepared-status'),
       law: document.getElementById('contract-law'),
     };
     const requestedProject = new URLSearchParams(window.location.search).get('project');
@@ -215,7 +218,15 @@
       const target = nodes.target.value.trim();
       const prepared = `${command.slash} project:${project}${target ? ` target:${target}` : ''}`;
       nodes.prepared.textContent = prepared;
-      try { await navigator.clipboard?.writeText(prepared); } catch { /* visible prepared string is authoritative */ }
+      nodes.status.textContent = 'Prepared. Copy the command below.';
+      try {
+        if (navigator.clipboard?.writeText) {
+          await navigator.clipboard.writeText(prepared);
+          nodes.status.textContent = 'Prepared and copied to clipboard.';
+        }
+      } catch {
+        /* The visible prepared string remains authoritative when clipboard access is unavailable. */
+      }
     }
 
     async function load() {
