@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths:
       - '.security/cookies.json'
+      - 'media/truthmode-live-action-founder-video.json'
+      - 'scripts/mint-media-script-cookie.ts'
       - 'scripts/verify-cookie-contract.mjs'
       - 'scripts/verify-founder-onboarding.mjs'
       - 'scripts/verify-guarded-terminal-contract.mjs'
@@ -23,6 +25,8 @@ on:
   pull_request:
     paths:
       - '.security/cookies.json'
+      - 'media/truthmode-live-action-founder-video.json'
+      - 'scripts/mint-media-script-cookie.ts'
       - 'scripts/verify-cookie-contract.mjs'
       - 'scripts/verify-founder-onboarding.mjs'
       - 'scripts/verify-guarded-terminal-contract.mjs'
@@ -43,6 +47,9 @@ on:
 permissions:
   contents: read
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   cookie-contract:
     name: Founder and portfolio cookie contract
@@ -55,5 +62,14 @@ jobs:
       - run: npm ci
       - run: node scripts/verify-cookie-contract.mjs
       - run: npx vitest run src/lib/__tests__/operatorContinuity.test.ts src/lib/__tests__/mediaContinuity.test.ts src/lib/__tests__/mediaMissionContinuity.test.ts
+      - name: Mint exact-head live-action script cookie
+        run: npx tsx scripts/mint-media-script-cookie.ts
+      - name: Upload media script cookie receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: media-script-cookie-${{ github.sha }}
+          path: .proof/media-script-cookie.json
+          if-no-files-found: error
+          retention-days: 7
       - run: node scripts/verify-founder-onboarding.mjs
       - run: node scripts/verify-guarded-terminal-contract.mjs
