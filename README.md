@@ -125,6 +125,28 @@ canonical capability declaration
 -> observed outcome proof
 ```
 
+### Authenticated browser connector truth
+
+Browser-capable connectors are governed capabilities, but their setup state is not their live runtime state.
+
+Keep these evidence layers separate:
+
+```text
+plugin/app installed or enabled
+-> connector tools surfaced
+-> live read-only connection probe succeeds
+-> authenticated target/page state observed
+-> exact action authority
+-> bounded action
+-> provider/outcome receipt
+```
+
+For Opera Browser Connector, FCR treats `list-tabs` as the canonical first live connection probe while that connector exposes it. `CONNECTED` is permitted only after that live probe succeeds in the current session. A surfaced tool namespace, installed plugin, enabled permission, or available app record does not prove the browser bridge is live. A provider response such as `Browser not connected` classifies the connection as `BLOCKED_RUNTIME_HANDSHAKE` until a later successful probe replaces that evidence.
+
+A successful connection probe proves only the bridge connection. It does not prove the target page is signed in, the requested data exists, an action is authorized, or an outcome occurred. Connection fingerprints/proof cookies are non-secret state correlators only; changes in live probe evidence expire predecessor connection claims.
+
+See [`docs/FCR_BROWSER_CAPABILITY_ROUTING_ADDENDUM.md`](docs/FCR_BROWSER_CAPABILITY_ROUTING_ADDENDUM.md).
+
 ### Founder-content execution
 
 The founder-content architecture separates story, authority, transport, and outcome:
