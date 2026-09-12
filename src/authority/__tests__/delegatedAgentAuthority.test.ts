@@ -3,7 +3,7 @@ import {
   DELEGATED_AGENT_AUTHORITY,
   evaluateDelegatedAgentAuthority,
   type DelegatedAgentAuthorityInput,
-} from '../delegatedAgentAuthority';
+} from '../delegatedAgentAuthority.js';
 
 const shaA = 'a'.repeat(40);
 const shaB = 'b'.repeat(40);
