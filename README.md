@@ -46,6 +46,8 @@ Exact SHAs belong in receipts, PRs, artifacts, incidents, and provenance. The RE
 
 FCR models projects, proposals, missions, exact refs, verification runs, evidence, approval state, and bounded repository operations behind provider-neutral interfaces.
 
+Branch creation through `src/http/routes/approvals.ts` is now an exact-action governed repository mutation. A fresh `create_branch` proof and authenticated founder execute request cause FCR to issue a server-derived `AuthorityEnvelopeV1` bound to `github.repository.create_branch`, repository scope, exact branch arguments, current mission-state fingerprint, tool-call identity, expiry, founder identity, and idempotency key. FCR reserves the execution before the external write, re-reads mission state immediately before mutation, and `executeAuthorizedCreateBranch()` must reject drift before `RepositoryProvider.createBranch(...)` can be reached. A pending or ambiguous execution remains reconcile-before-retry; source and CI proof of this membrane do not by themselves prove that a live GitHub branch was created.
+
 ### PR continuity
 
 The repository has machine-enforced PR continuity. Eligible same-repository branches may roll forward when their live base moves, but every head movement creates a new proof subject.
@@ -216,7 +218,7 @@ Repository manifests, operational packets, analytics, receipts, and public conte
 |---|---|
 | Read project/evidence | Founder-authenticated or explicitly public-safe read |
 | Run bounded verification | Applicable founder/repository authority |
-| Create branch | Separate repository write authority |
+| Create branch | Fresh `create_branch` proof + authenticated exact execute request + server-issued `AuthorityEnvelopeV1` + execution reservation + fresh mission-state revalidation + repository write authority |
 | Merge through FCR | Exact-head machine proof + deterministic independent review + authenticated exact-candidate founder-final approval + repository authority |
 | Merge through live GitHub | Separate live GitHub ruleset/provider authority and fresh readback |
 | Deploy / mutate production | Separate exact production authority |
