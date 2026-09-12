@@ -94,8 +94,8 @@ try {
   assert(prepared.includes('project:founder-control-room'), 'prepared handoff binds the selected project');
   assert(prepared.includes('target:welcome screen'), 'prepared handoff binds the target surface');
 
-  await desktop.fill('#command-search', 'recovery');
-  assert(await desktop.locator('.design-command-card').count() === 1, 'search narrows the deck without changing the canonical count');
+  await desktop.fill('#command-search', '/recovery');
+  assert(await desktop.locator('.design-command-card').count() === 1, 'slash search narrows the deck to /recovery');
   assert(await desktop.locator('[data-command-id="recovery"]').isVisible(), '/recovery remains visible after filtering');
   await desktop.fill('#command-search', '');
   assert(await desktop.locator('.design-command-card').count() === 23, 'clearing search restores all 23 commands');
