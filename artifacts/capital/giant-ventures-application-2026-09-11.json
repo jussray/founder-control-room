@@ -4,7 +4,7 @@
   "applicationUrl": "https://www.giant.vc/application",
   "capturedLocalDate": "2026-09-11",
   "state": "RECONSTRUCTED_AWAITING_EXACT_FOUNDER_APPROVAL",
-  "payloadSha256": "sha256:54ac471b3d5f025fa2658d85361d764c7b2b5be239c596d52de54a52e0d52062",
+  "payloadSha256": "sha256:32cd706e1018604f4296a71f46ecfc2445ec4b6ea377969162fe3d7c47b2c396",
   "fields": [
     {
       "id": "full_name",
@@ -15,8 +15,8 @@
     {
       "id": "email",
       "required": true,
-      "value": null,
-      "status": "UNKNOWN"
+      "value": "sekretbip@gmail.com",
+      "status": "VERIFIED_AUTHENTICATED_GOOGLE_PROFILE"
     },
     {
       "id": "linkedin_url",
@@ -85,7 +85,7 @@
       "id": "spoken_to_giant_before",
       "required": true,
       "value": null,
-      "status": "UNKNOWN"
+      "status": "UNKNOWN_NO_CONNECTED_GMAIL_EVIDENCE"
     }
   ],
   "uploads": [
@@ -98,7 +98,6 @@
     }
   ],
   "blockers": [
-    "missing_required_field:email",
     "missing_required_field:linkedin_url",
     "missing_required_field:spoken_to_giant_before",
     "missing_exact_founder_approval_for_payload_hash",
@@ -112,6 +111,8 @@
     "SeKret_Bip_Giant_Ventures_Pitch_Deck.pdf",
     "Juss_Ray_PreSeed_Funding_Kit_v2_2026-09-07.pdf",
     "Juss_Ray_Investor_One_Pager.pdf",
-    "Giant Ventures live founder application form observed 2026-09-11"
+    "Giant Ventures live founder application form observed 2026-09-11",
+    "Authenticated Google profile for application email",
+    "Connected Gmail audit: no Giant Ventures correspondence found; insufficient alone to answer prior-contact field"
   ]
 }
