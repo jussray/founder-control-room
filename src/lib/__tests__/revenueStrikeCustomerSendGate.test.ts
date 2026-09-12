@@ -176,7 +176,7 @@ describe('Revenue Strike customer send authority membrane', () => {
     expect(sql).toContain('unique (recipient_fingerprint)');
     expect(sql).toContain('unique (run_id, slot)');
     expect(sql).toContain('pg_advisory_xact_lock');
-    expect(sql).toContain("select count(*) from public.revenue_strike_customer_send_leases");
+    expect(sql).toMatch(/select\s+count\(\*\)\s+into\s+run_send_count\s+from public\.revenue_strike_customer_send_leases/i);
     expect(sql).toContain('>= 5');
     expect(sql).toContain("p_claimed_at - p_reply_gate_clear_at > interval '15 minutes'");
     expect(sql).toContain("provider_outcome = 'claimed'");
