@@ -40,6 +40,16 @@
     "continuityMarkersAreNonAuthorizing": true,
     "recoveryRule": "When the connector surface exists but the runtime reports Browser not connected and exposes no tabs, classify the connector bridge as blocked. Preserve separately observed or founder-reported provider-page state; do not blame or reset the page and do not repeat login/setup instructions without provider-level evidence. Re-probe the connector bridge and clear the blocked state only when fresh bridge evidence exposes a live session or stronger contradictory bridge evidence supersedes it."
   },
+  "evidenceSourceTruth": {
+    "providerReadFailureClassifyAs": "BLOCKED_SOURCE_ACCESS",
+    "providerReadFailureDoesNotEraseAlternateEvidence": true,
+    "providerNotFoundDoesNotProveArtifactAbsent": true,
+    "userProvidedArtifactMaySatisfyEquivalentEvidenceNeed": true,
+    "sourceSpecificBlockMayNotFreezeMissionWhenEquivalentEvidenceExists": true,
+    "alternateEvidenceMustRetainOwnProvenance": true,
+    "continuityMarkersAreNonAuthorizing": true,
+    "recoveryRule": "A provider-specific read failure such as Google Drive 404 or permission denial blocks only that source. Preserve separately uploaded, attached, repository, runtime, or provider evidence with its own provenance. Do not reinterpret a provider read failure as proof that the artifact does not exist. If equivalent evidence is already available and sufficient for the founder-approved goal, continue from that evidence; otherwise report the exact blocked source and required recovery gate."
+  },
   "socialAnalyticsTruth": {
     "analyticsMode": "observation_only",
     "learningRequiresVerifiedPostLevelMeasurement": true,
@@ -59,6 +69,7 @@
   },
   "plugins": [
     {"name":"GitHub","role":"Authoritative repository, branch, pull request, review, and exact-head evidence.","runtimeDiscoveryRequired":true,"defaultMode":"read-first"},
+    {"name":"Google Drive","role":"Drive, Docs, Sheets, and Slides evidence. A provider-specific 404 or permission failure is BLOCKED_SOURCE_ACCESS for that source only and must not erase equivalent uploaded or separately observed evidence.","runtimeDiscoveryRequired":true,"defaultMode":"read-first"},
     {"name":"Supabase","role":"Database, auth, migration, advisor, and policy-readiness evidence.","runtimeDiscoveryRequired":true,"defaultMode":"read-first"},
     {"name":"Slack","role":"Founder and project status coordination after destination resolution.","runtimeDiscoveryRequired":true,"defaultMode":"read-first"},
     {"name":"Asana","role":"Project and task-state coordination with named-project scope.","runtimeDiscoveryRequired":true,"defaultMode":"read-first"},
