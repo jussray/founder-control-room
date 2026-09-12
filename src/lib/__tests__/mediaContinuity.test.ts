@@ -10,6 +10,7 @@ import {
 } from '../mediaContinuity.js';
 
 const digest = (value: unknown) => mediaContinuityDigest(value);
+const MISSION_ID = '167d89a2-f4e5-4670-833d-5650c53142cc';
 
 const baseInput: MediaContinuityInput = {
   source: 'chatgpt',
@@ -17,7 +18,7 @@ const baseInput: MediaContinuityInput = {
   repositoryFullName: 'jussray/founder-control-room',
   targetBranch: 'main',
   targetSha: 'a'.repeat(40),
-  missionId: 'truthmode-live-action-video',
+  missionId: MISSION_ID,
   intentFingerprint: digest('show what FCR can prove without pretending full launch'),
   subjectFingerprint: digest('founder-control-room-live-action-manifesto'),
   scriptFingerprint: digest('script-v1'),
@@ -45,7 +46,7 @@ describe('media continuity proof cookie', () => {
     expect(cookie).toMatchObject({
       contract: 'founder-control-room/media-continuity@v1',
       kind: 'proof-cookie',
-      missionId: 'truthmode-live-action-video',
+      missionId: MISSION_ID,
       evidenceState: 'edit_verified',
       browserCookie: false,
       actionAuthority: false,
@@ -55,6 +56,13 @@ describe('media continuity proof cookie', () => {
     expect(cookie.cookieId).toBe(cookie.continuity.fingerprint);
     expect(cookie.cookieId).toMatch(/^[0-9a-f]{64}$/);
     expect(mediaProofCookieLabel(cookie)).toMatch(/^media-proof:edit_verified:[0-9a-f]{12}$/);
+  });
+
+  it('requires a real Mission Engine UUID instead of a free-form media slug', () => {
+    expect(() => createMediaProofCookie({
+      ...baseInput,
+      missionId: 'truthmode-live-action-video',
+    })).toThrow(/Mission Engine UUID/);
   });
 
   it('stores fingerprints instead of raw script, prompt, or source media in continuity state', () => {
@@ -87,6 +95,18 @@ describe('media continuity proof cookie', () => {
       cookieMayAuthorizeAction: false,
       cookieMayAuthorizePublish: false,
     });
+  });
+
+  it('rejects a cookie from another mission even when every other dimension matches', () => {
+    const cookie = createMediaProofCookie(baseInput);
+    const result = evaluateMediaProofCookie(cookie, {
+      ...baseInput,
+      missionId: '11111111-1111-4111-8111-111111111111',
+    }, NOW);
+    expect(result.state).toBe('invalid');
+    expect(result.reacquireRequired).toBe(true);
+    expect(result.cookieMayAuthorizeAction).toBe(false);
+    expect(result.cookieMayAuthorizePublish).toBe(false);
   });
 
   it.each([
