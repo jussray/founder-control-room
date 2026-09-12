@@ -1,0 +1,51 @@
+{
+  "contract": "fcr/delegated-agent-authority@v1",
+  "repository": "jussray/founder-control-room",
+  "founderDecision": {
+    "date": "2026-09-12",
+    "standing": true,
+    "principals": {
+      "codex-chat": {
+        "merge_authority": true,
+        "deploy_authority": true
+      },
+      "claude": {
+        "merge_authority": true,
+        "deploy_authority": true
+      }
+    }
+  },
+  "identity": {
+    "required": "registered-adapter-attestation",
+    "callerAssertionIsAuthority": false
+  },
+  "requiredBeforeMergeOrDeploy": [
+    "exact-repository",
+    "exact-current-base-or-main",
+    "exact-head-machine-proof",
+    "fresh-evidence-within-10-minutes",
+    "independent-review-not-by-acting-principal",
+    "zero-unresolved-blocking-findings",
+    "rollback-ready"
+  ],
+  "deployAdditionalRequirements": [
+    "head-equals-current-main",
+    "migration-state-aligned",
+    "provider-preflight-current"
+  ],
+  "notDelegated": [
+    "database_migration",
+    "database_destructive_write",
+    "credential_or_secret_mutation",
+    "authentication_or_rls_policy_mutation",
+    "billing_or_spend",
+    "public_publication_or_external_message",
+    "dns_or_provider_ownership_mutation",
+    "destructive_delete"
+  ],
+  "truthBoundary": {
+    "providerAcceptanceIsOutcomeVerification": false,
+    "mergeOrDeployExecutionImpliesVerifiedOutcome": false,
+    "postActionIndependentOutcomeEvidenceRequiredForVerifiedClaim": true
+  }
+}
