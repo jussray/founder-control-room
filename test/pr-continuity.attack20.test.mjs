@@ -8,6 +8,7 @@ import {
   isCurrentCompareStatus,
   classifyCompareStatus,
   assertExpectedHead,
+  isStackedUpdateUnsupported,
   replaceManagedBlock,
   continuityBlock,
   collectRolloverOrder,
@@ -70,5 +71,16 @@ test('AT22 continuity CLI actually invokes audit metadata or rollover', () => {
   assert.match(continuitySource, /if \(mode === 'metadata'\) return metadataMode\(\)/);
   assert.match(continuitySource, /if \(mode === 'rollover'\) return rolloverMode\(\)/);
   assert.match(continuitySource, /main\(\)\.catch/);
+});
+test('AT23 exact stacked update-branch refusal is classified fail-closed', () => {
+  assert.equal(isStackedUpdateUnsupported(403, "Updating a stacked PR's branch via this endpoint is not supported."), true);
+});
+test('AT24 unrelated provider 403 is not reclassified as a stack condition', () => {
+  assert.equal(isStackedUpdateUnsupported(403, 'Resource not accessible by integration'), false);
+});
+test('AT25 stacked provider refusal becomes an explicit blocked receipt path', () => {
+  assert.match(continuitySource, /allow: \[202, 403, 422\]/);
+  assert.match(continuitySource, /BLOCKED_STACK_REBASE_REQUIRED/);
+  assert.match(continuitySource, /providerMessage: update\.payload\?\.message \|\| null/);
 });
 test('schema remains stable', () => assert.equal(SCHEMA, 'juss/pr-continuity@v1'));
