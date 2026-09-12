@@ -21,6 +21,28 @@ describe('GitHub App secret-shape diagnostic contract', () => {
     expect(workflow).not.toContain('git rev-parse HEAD');
   });
 
+  it('rechecks exact current main inside the production-secret use boundary', () => {
+    const classifyMarker = '      - name: Classify private-key shape without exposing secret material';
+    const retainMarker = '      - name: Retain secret-safe diagnostic receipt';
+    const classifyStart = workflow.indexOf(classifyMarker);
+    const retainStart = workflow.indexOf(retainMarker);
+    expect(classifyStart).toBeGreaterThan(-1);
+    expect(retainStart).toBeGreaterThan(classifyStart);
+
+    const classificationStep = workflow.slice(classifyStart, retainStart);
+    const exactMainRead = 'current_main="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/main" --jq .object.sha)"';
+    const exactMainTest = 'test "$current_main" = "$EXPECTED_MAIN_SHA"';
+    const recheckIndex = classificationStep.indexOf(exactMainRead);
+    const testIndex = classificationStep.indexOf(exactMainTest, recheckIndex);
+    const nodeIndex = classificationStep.indexOf("node --input-type=module <<'NODE'");
+
+    expect(classificationStep).toContain('GH_TOKEN: ${{ github.token }}');
+    expect(recheckIndex).toBeGreaterThan(-1);
+    expect(testIndex).toBeGreaterThan(recheckIndex);
+    expect(nodeIndex).toBeGreaterThan(testIndex);
+    expect(classificationStep).toContain('exactMainRecheckedAtSecretUse: true');
+  });
+
   it('scopes the production GitHub App credential pair to the classification step only', () => {
     const classifyMarker = '      - name: Classify private-key shape without exposing secret material';
     const retainMarker = '      - name: Retain secret-safe diagnostic receipt';
