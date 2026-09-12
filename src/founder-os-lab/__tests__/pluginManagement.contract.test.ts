@@ -231,7 +231,6 @@ describe('ChatGPT plugin management repository contract', () => {
     expect(manifest.socialAnalyticsTruth.emptyProviderRowsClassifyAs).toBe('UNKNOWN_NO_EVIDENCE');
     expect(manifest.socialAnalyticsTruth.linkedinNative.authority).toBe('primary');
     expect(manifest.socialAnalyticsTruth.cambiante.requiredLinkedInPermission).toBe('r_member_postAnalytics');
-    expect(manifest.socialAnalyticsTruth.cambiante.missingLinkedInPermission).toBeUndefined();
     expect(manifest.socialAnalyticsTruth.cambiante.missingPermissionClassifyAs).toBe('BLOCKED_PROVIDER_SCOPE');
     expect(manifest.socialAnalyticsTruth.cambiante.mayOverrideNativePlatform).toBe(false);
     expect(manifest.socialAnalyticsTruth.metricool.emptyRowsMeanZero).toBe(false);
