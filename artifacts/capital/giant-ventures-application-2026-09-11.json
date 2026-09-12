@@ -3,7 +3,7 @@
   "provider": "Giant Ventures",
   "applicationUrl": "https://www.giant.vc/application",
   "capturedLocalDate": "2026-09-11",
-  "state": "RECONSTRUCTED_AWAITING_EXACT_FOUNDER_APPROVAL",
+  "state": "EXACT_PAYLOAD_APPROVED_BUT_NOT_SUBMITTABLE",
   "payloadSha256": "sha256:32cd706e1018604f4296a71f46ecfc2445ec4b6ea377969162fe3d7c47b2c396",
   "fields": [
     {
@@ -22,7 +22,7 @@
       "id": "linkedin_url",
       "required": true,
       "value": null,
-      "status": "UNKNOWN"
+      "status": "UNKNOWN_IN_APPROVED_PAYLOAD"
     },
     {
       "id": "location",
@@ -85,7 +85,7 @@
       "id": "spoken_to_giant_before",
       "required": true,
       "value": null,
-      "status": "UNKNOWN_NO_CONNECTED_GMAIL_EVIDENCE"
+      "status": "UNKNOWN_NO_USER_PROVIDED_EVIDENCE"
     }
   ],
   "uploads": [
@@ -97,15 +97,32 @@
       "status": "HASH_VERIFIED"
     }
   ],
+  "approval": {
+    "receiptId": "chat-founder-approval-giant-32cd706e-2026-09-11",
+    "payloadSha256": "sha256:32cd706e1018604f4296a71f46ecfc2445ec4b6ea377969162fe3d7c47b2c396",
+    "artifactSha256": [
+      "sha256:eee38fe8c5844089dc5b32070b8f37eb505c25076491ebb41bbab0e0a0d5faf2"
+    ],
+    "founderApproved": true,
+    "approvalSource": "User replied Approved immediately after exact payload hash was presented"
+  },
+  "recoveredAfterApproval": {
+    "linkedin_url": {
+      "value": "https://www.linkedin.com/in/juss-rayy-13ba691a1",
+      "status": "VERIFIED_FROM_PRIOR_USER_PROVIDED_CONTEXT",
+      "binding": "NOT_PART_OF_APPROVED_PAYLOAD_HASH"
+    }
+  },
   "blockers": [
-    "missing_required_field:linkedin_url",
+    "approved_payload_missing_required_field:linkedin_url",
     "missing_required_field:spoken_to_giant_before",
-    "missing_exact_founder_approval_for_payload_hash",
+    "new_payload_hash_and_exact_approval_required_if_linkedin_is_inserted",
     "provider_browser_auth_execution_readiness_not_yet_rechecked"
   ],
   "authority": {
+    "founderApprovedExactPayload": true,
     "submissionAuthorized": false,
-    "reason": "This reconstructed payload did not exist when the prior approval was given. Exact approval must bind to this payload hash before external submission."
+    "reason": "The exact 32cd706e payload is approved, but it still lacks required fields. Recovered LinkedIn evidence was discovered after approval and cannot be silently inserted without creating a new payload hash."
   },
   "evidence": [
     "SeKret_Bip_Giant_Ventures_Pitch_Deck.pdf",
@@ -113,6 +130,8 @@
     "Juss_Ray_Investor_One_Pager.pdf",
     "Giant Ventures live founder application form observed 2026-09-11",
     "Authenticated Google profile for application email",
-    "Connected Gmail audit: no Giant Ventures correspondence found; insufficient alone to answer prior-contact field"
+    "Prior user-provided canonical LinkedIn profile: https://www.linkedin.com/in/juss-rayy-13ba691a1",
+    "Connected Gmail audit: no Giant Ventures correspondence found; insufficient alone to answer prior-contact field",
+    "No explicit user-provided evidence found establishing whether founder has spoken with Giant Ventures before"
   ]
 }
