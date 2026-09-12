@@ -180,7 +180,8 @@ export function necessaryFixPolicyDisposition(input: NecessaryFixPolicyInput): N
     || input.spendsMoney === true
     || input.destructive === true
     || input.irreversible === true
-    || input.authorityExpansion === true;
+    || input.authorityExpansion === true
+    || !rule.reversible;
 
   if (crossesFounderGate || rule.mode === 'founder-required') return 'founder-required';
   if (rule.mode === 'proof-gated') return 'proof-gated';
