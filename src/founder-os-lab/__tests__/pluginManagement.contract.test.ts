@@ -27,6 +27,10 @@ interface ConnectorBridgeTruth {
   repeatProviderSetupWithoutProviderEvidence: boolean;
   blockedStateInvalidatedBy: string[];
   continuityMarkersAreNonAuthorizing: boolean;
+  installedOrToolSurfacedDoesNotProveLiveSession: boolean;
+  connectedClaimRequiresLiveProbe: boolean;
+  retryClaimRequiresProbeExecution: boolean;
+  canonicalReadOnlyProbeByConnector: Record<string, string>;
   recoveryRule: string;
 }
 
@@ -117,7 +121,13 @@ describe('ChatGPT plugin management repository contract', () => {
     expect(manifest.connectorBridgeTruth.repeatProviderSetupWithoutProviderEvidence).toBe(false);
     expect(manifest.connectorBridgeTruth.blockedStateInvalidatedBy).toEqual(['live-session-exposed','stronger-contradictory-bridge-evidence']);
     expect(manifest.connectorBridgeTruth.continuityMarkersAreNonAuthorizing).toBe(true);
+    expect(manifest.connectorBridgeTruth.installedOrToolSurfacedDoesNotProveLiveSession).toBe(true);
+    expect(manifest.connectorBridgeTruth.connectedClaimRequiresLiveProbe).toBe(true);
+    expect(manifest.connectorBridgeTruth.retryClaimRequiresProbeExecution).toBe(true);
+    expect(manifest.connectorBridgeTruth.canonicalReadOnlyProbeByConnector).toEqual({'Opera Browser Connector':'list-tabs'});
     expect(manifest.connectorBridgeTruth.recoveryRule).toMatch(/Browser not connected/i);
+    expect(manifest.connectorBridgeTruth.recoveryRule).toMatch(/does not prove a live browser session/i);
+    expect(manifest.connectorBridgeTruth.recoveryRule).toMatch(/Claim a retry only when the live read-only probe actually executes/i);
     expect(manifest.connectorBridgeTruth.recoveryRule).toMatch(/do not blame or reset the page/i);
     expect(manifest.connectorBridgeTruth.recoveryRule).toMatch(/fresh bridge evidence/i);
   });
