@@ -76,6 +76,23 @@ Reasoning may run in parallel. Writes, merges, deployments, provider mutations, 
 - Success may only be reported after the corresponding operation/evidence actually succeeds.
 - Analytics may observe and inform future proposals but may never authorize, renew truth, or widen authority.
 
+## Browser connector truth memory
+
+For browser connectors, preserve the distinction between **installed**, **tool-surfaced**, **live-connected**, **authenticated target state**, and **action authority**.
+
+- Installed/enabled plugin state does not prove a live browser session.
+- A surfaced connector namespace does not prove a live browser session.
+- Before saying a browser connector is connected, execute the smallest current read-only live probe and ground the claim in that provider result.
+- For Opera Browser Connector, `list-tabs` is the canonical first live probe while that connector exposes it.
+- If the provider returns `Browser not connected`, classify the state as `BLOCKED_RUNTIME_HANDSHAKE`; do not promote installation or tool availability into connection truth.
+- Never say a live connector probe was retried unless the probe was actually executed in that turn or execution context.
+- When the founder says setup changed or asks to continue, re-probe before recycling manual setup guidance.
+- Do not invent the cause of a failed handshake. Report only the observed provider result unless the cause is separately verified.
+- Update continuity fingerprints/proof cookies bidirectionally when live connection evidence changes. Those markers are non-secret state correlators only and never contain credentials, browser session tokens, or browsing history.
+- A successful connection probe is still not mutation authority and does not prove the target page is authenticated or the requested outcome succeeded.
+
+This connection-truth rule is durable across future FCR browser tasks and should be inherited rather than rediscovered from chat history.
+
 ## Truth Lease / FutureYou-ME safety
 
 A fact may have been true when observed and unsafe when reused later. A hash proves identity, not continuing reality.
