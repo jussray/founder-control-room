@@ -81,7 +81,9 @@ Use the existing Founder Signal Engine and channel evidence hierarchy rather tha
 - verified lessons, failures, repairs, launches, customer outcomes, partnerships, community work, and economic experiments; and
 - offers or calls to action whose factual claims are bounded by current proof.
 
-A breakout personal story is a content-control fingerprint for mechanism learning, not a command to repeat the same private subject. Compare hook mechanism, stakes, format, proof type, CTA, timing, and native platform outcome while preserving the founder's privacy and agency.
+A breakout personal story is a content-control fingerprint for mechanism learning, not a command to repeat the same private subject. Compare hook mechanism, stakes, format, proof type, **post job**, CTA, timing, and native platform outcome while preserving the founder's privacy and agency.
+
+Every content-control fingerprint must assign exactly one `POST_JOB` from `GROW`, `TRUST`, `SELL`, or `PROVE`. `POST_JOB` is a measurement hypothesis, not a fixed posting quota, virality formula, or publication authority. Do not hard-code a `4/2/1` cadence or any other frequency ratio unless current founder evidence independently justifies it. Measure the selected job against native platform evidence and the founder's own like-for-like baseline: `GROW` targets qualified distribution and audience entry; `TRUST` targets evidence that reached people found the work useful or credible; `SELL` targets legitimate downstream commercial action such as a qualified inquiry, conversation, checkout, or other approved conversion signal; `PROVE` targets successful transfer of verifiable evidence, capability, or outcome truth. Missing or unavailable native metrics stay `UNKNOWN`; they do not become zero or success by inference. Change one material distribution/content variable at a time when practical so future fingerprints can distinguish mechanism from noise.
 
 ### Parallel founder lanes
 
