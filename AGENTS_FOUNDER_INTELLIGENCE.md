@@ -8,6 +8,120 @@ When a task invokes ChatGPT Plugin Management or an external plugin, also read [
 
 When a task analyzes social-media growth, attribution, post performance, or platform behavior, keep the evidence planes separate. Use current native social-platform evidence for live publication and current per-post facts; use native platform exports for historical/account analytics; treat official API-partner mirrors such as Buffer as corroborating evidence when freshly connected; treat aggregators such as Metricool as secondary cross-network observation; and place inference last. Empty provider or aggregator rows mean `UNKNOWN` / `NO_EVIDENCE`, never zero performance. Do not claim ranking suppression, conversion causality, delayed-follower attribution, or an algorithmic cause without platform-attributable evidence. Buffer, Metricool, or another intermediary may strengthen observation, but cannot override contradictory native-platform evidence or create publication or causal authority.
 
+## Intent sovereignty / founder agency
+
+Founder Control Room exists to increase the founder's reachable, truthful option space, not to manufacture dependency on a model, provider, workflow, internal subsystem, paid tier, or unnecessary layer of FCR itself.
+
+For every FCR project, control-room audit, capability decision, and future add-on:
+
+- **Founder intent is the canonical outcome signal, not unlimited authority.** Preserve what the founder is actually trying to accomplish while still obeying privacy, safety, law, product isolation, live permissions, consequence rules, budget, and evidence requirements.
+- **Freedom is bounded by reality, not product appetite.** Never turn an internal preference, provider business model, upsell, quota, framework habit, repository layout, or agent limitation into a founder requirement unless current evidence proves it is a real boundary for the requested outcome.
+- **Expose the kind of constraint.** Classify material blockers as `REAL_BOUNDARY`, `CAPABILITY_GAP`, `EVIDENCE_GAP`, `PRODUCT_FRICTION`, or `PREFERENCE`. Do not blur “we cannot,” “we do not know,” “we have not verified,” and “our current design makes this awkward.”
+- **Preserve the goal when the path fails.** If the requested route is unavailable, search for the smallest truthful alternative that advances the same intent within current authority. Do not silently substitute a different goal because it is easier for the system.
+- **Prefer the smallest direct reversible path.** Do not create a new account, product, OS, framework, queue, dashboard, provider, subscription, migration, or agent lane when an existing bounded capability can accomplish the outcome.
+- **No artificial dependency.** A capability should leave the founder with more usable knowledge, evidence, portability, and control after the task than before it. Receipts and outputs should remain understandable outside the subsystem that produced them whenever practical.
+- **Automation reduces burden; it does not confiscate control.** Automate repetitive execution only after intent, authority, evidence, rollback, and interruption boundaries are clear. The founder must be able to understand what is happening and where consequential authority still lives.
+- **Unknown stays unknown.** If evidence is missing, say `UNKNOWN`, `BLOCKED`, or “I don't know” rather than inventing certainty, unnecessary work, or a paid dependency to fill the gap.
+- **Economic friction is evidence-bearing.** When two truthful paths satisfy the same intent, prefer the path with lower total founder cost, lock-in, maintenance burden, cognitive overhead, and irreversible commitment unless a higher-cost path has a verified compensating benefit.
+- **Capability growth compounds.** Favor fixes and interfaces that make future founder intent easier to express and execute across FCR without teaching the founder the internal boundaries between Chief, PromptOS, StoryEngine, providers, agents, repositories, or modalities.
+
+A material project/control-room audit must therefore answer:
+
+```text
+INTENT SOVEREIGNTY
+What outcome is the founder actually trying to make true?
+
+REAL BOUNDARIES
+Which constraints are externally real, current, and evidence-backed?
+
+ARTIFICIAL FRICTION
+Which constraints come from our product, architecture, provider choice, or workflow habit and can be removed or routed around safely?
+
+OPTION SPACE
+What is the smallest truthful, reversible path that preserves the widest useful future choice?
+
+DEPENDENCY
+Does this change create avoidable lock-in, recurring cost, hidden maintenance, or reliance on a subsystem that is not necessary for the outcome?
+
+FOUNDER CAPABILITY
+After completion, what new knowledge, evidence, portability, or control does the founder retain?
+```
+
+Any system behavior that narrows founder choice for its own convenience, monetization, architecture purity, or local optimization is a control-room defect unless the narrowing is required by a real current boundary and is made explicit.
+
+## Exact-head supersession truth
+
+For repository, CI, deployment, runtime, or cross-project claims, current authority belongs to the newest authoritative subject head and the evidence bound to that exact identity.
+
+- Resolve the current authoritative `main` or equivalent provider head at decision time before carrying forward a previous conclusion.
+- Evidence from a predecessor SHA remains durable provenance and must be preserved. It is not current proof, but it still matters as the last-known-good or last-known-bad baseline, regression comparator, rollback anchor, continuity witness, debugging evidence, causal-change reference, and record of what was actually verified at that earlier identity.
+- Mark predecessor evidence `HISTORICAL`, `STALE`, `SUPERSEDED`, `UNKNOWN`, or `BLOCKED` when the subject head, peer dependency, runtime identity, required proof set, authority state, or evidence contract changes. Those classifications change its authority for current claims, not its evidentiary value as history.
+- Never inherit green checks, Playwright results, provider acceptance, runtime receipts, or outcome claims from a predecessor head merely because the newer head descends from it.
+- When a newer authoritative head has its own exact-head evidence, use that evidence as the current baseline. Keep predecessor proof linked for comparison and rollback, but stop repairing failures that exist only on the superseded predecessor unless they reproduce on the current head or are needed to explain a regression.
+- If current exact-head evidence is still running, missing, or contradictory, keep the claim open. Do not patch historical failures speculatively just to make an old run green.
+- Cross-repository proof expires when either bound repository head or peer/runtime identity moves. Preserve the old pair and its receipts as historical integration proof, then rebind and rerun the applicable witness against the new pair before restoring a current integration claim.
+- Supersession changes evidence authority only. It never widens execution, merge, deployment, provider, spending, credential, migration, or founder authority.
+
+This is a TruthMode rule, not a cleanup convenience: newest head does not automatically mean verified, predecessor green does not automatically mean current green, and predecessor proof must never be discarded merely because authority moved forward.
+
+## Bidirectional continuity and proof-cookie reconciliation
+
+Continuity fingerprints and proof cookies must work in both directions across FCR and every governed project. They are non-secret state markers that bind observations to exact subject state. They never create, renew, inherit, or widen authority.
+
+### Inbound truth reconciliation
+
+Before a material recommendation, repair, implementation, merge, issue disposition, stale-proof cleanup, deployment, provider mutation, or completion claim:
+
+- resolve the current authoritative repository, branch/head, provider, runtime, and evidence subject needed for the decision;
+- compare the current subject, scope, proof, review, provider, runtime, and authority fingerprints or proof cookies against the predecessor markers when they exist;
+- treat movement in any load-bearing dimension as continuity movement that requires fresh evidence before a previous present-tense claim is reused;
+- preserve predecessor fingerprints, cookies, exact SHAs, receipts, and evidence as historical provenance even when they are no longer current; and
+- classify conflicting or insufficient observations `STALE`, `SUPERSEDED`, `UNKNOWN`, `BLOCKED`, or `CONTRADICTED` rather than forcing them into green.
+
+Fresh evidence may prove that code, configuration, documentation, an issue, a runtime assumption, a merge candidate, or a prior proof claim is stale, wrong, incomplete, or already resolved. That evidence may create an exact bounded reconciliation proposal. It does not authorize the proposal by itself.
+
+### Approval-to-action gate
+
+A verified fingerprint or proof cookie is evidence, not approval. Mutation requires the applicable current authority and, when founder approval is required, an explicit founder decision bound to the exact current proposal and subject.
+
+Under valid current founder approval, verified evidence may be used to take the smallest reversible action that aligns project state with reality, including:
+
+- merge an already focused candidate only when the repository's current merge gates are satisfied;
+- implement or repair the smallest cause proved by current evidence;
+- rectify code, configuration, documentation, or project state that current evidence proves stale or incorrect;
+- update, close, reopen, or otherwise reconcile an issue when current evidence proves its state changed;
+- replace a stale present-tense proof or claim while preserving the predecessor evidence as history; or
+- advance the next founder gate when the required evidence for that transition is current.
+
+Founder approval never converts a stale fingerprint into current proof and never waives required checks, exact-head review, Playwright for changed user-facing paths, provider/runtime verification, privacy or safety boundaries, rollback, or repository-specific merge authority. If the approved proposal's scope, subject, head, authority, or required evidence moves, reacquire evidence and approval as required before mutation.
+
+### Outbound continuity reconciliation
+
+After every approved material mutation:
+
+- re-resolve the authoritative repository/provider/runtime state instead of assuming the write succeeded;
+- verify the exact changed path and the outcome evidence required for the claim;
+- mint or record the successor continuity fingerprint or proof cookie linked to the predecessor and bounded evidence references;
+- make source, execution, runtime, provider, and human-outcome truth independently visible where applicable; and
+- if the post-action evidence does not match the intended result, classify the result `UNKNOWN`, `CONTRADICTED`, `STALE`, or `BLOCKED` and continue with the smallest new evidence-backed reconciliation rather than claiming completion.
+
+A successor fingerprint or proof cookie records what is now observed. It cannot replay the founder's approval, grant standing merge authority, authorize another mutation, or make future evidence current automatically.
+
+Required reconciliation loop:
+
+```text
+Observe current subject
+→ Compare predecessor fingerprint / proof cookie
+→ Classify continuity movement
+→ Build exact evidence-backed proposal
+→ Obtain current authority / founder approval when required
+→ Execute one bounded reversible action
+→ Re-observe authoritative state
+→ Verify outcome
+→ Emit successor fingerprint / proof cookie + receipt
+→ Next gate
+```
+
 Required loop:
 
 ```text

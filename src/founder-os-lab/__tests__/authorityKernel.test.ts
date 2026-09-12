@@ -46,6 +46,10 @@ describe('FCR authority kernel', () => {
       contract: CAPABILITY_IDENTITY_CONTRACT,
       id: 'github.issue.create',
     });
+    expect(capabilityIdentity('github.repository.create_branch')).toEqual({
+      contract: CAPABILITY_IDENTITY_CONTRACT,
+      id: 'github.repository.create_branch',
+    });
     expect(() => capabilityIdentity('create_issue')).toThrow(/provider\.domain\.action/);
   });
 
