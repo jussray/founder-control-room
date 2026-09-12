@@ -6,144 +6,49 @@ const commandBridge = readFileSync('.github/workflows/chief-proofmode-access-com
 const recoveryWorkflow = readFileSync('.github/workflows/chief-proofmode-access-recovery.yml', 'utf8');
 const runtimeWitness = readFileSync('.github/workflows/chief-proofmode-runtime-witness.yml', 'utf8');
 const reconciler = readFileSync('scripts/reconcile-chief-proofmode-access.mjs', 'utf8');
-const selectorResolver = readFileSync('scripts/resolve-chief-proofmode-access-selector.mjs', 'utf8');
-const reconciliationEvaluator = readFileSync('scripts/chief-proofmode-access-reconciliation-state.mjs', 'utf8');
 const recoveryDoc = readFileSync('docs/CHIEF_PROOFMODE_ACCESS_RECOVERY.md', 'utf8');
 
 const ACCOUNT_ID = '9b59861bd1747cf7525571b4c51d2aa0';
-const STORAGE_FIRST_SELECTOR = /secrets\.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID\s*\|\|\s*secrets\.CLOUDFLARE_ACCESS_CLIENT_ID\s*\|\|\s*vars\.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID/;
+const PROTECTED_CLIENT_ID_SOURCE = /CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID:\s*\$\{\{ secrets\.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID \|\| secrets\.CLOUDFLARE_ACCESS_CLIENT_ID \|\| vars\.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID \|\| vars\.CLOUDFLARE_ACCESS_CLIENT_ID \}\}/;
 
-test('Chief Access command bridge is founder-only, issue-scoped, exact-main bound, checkout-free, and cannot dispatch Actions directly', () => {
+test('Chief Access command bridge is founder-only, issue-scoped, and exact-FCR-main bound', () => {
   assert.match(commandBridge, /github\.event\.issue\.number == 485/);
   assert.match(commandBridge, /github\.event\.comment\.user\.login == 'jussray'/);
-  assert.match(commandBridge, /github\.event\.comment\.user\.id == 286642846/);
   assert.match(commandBridge, /\/cloudflare-chief-access/);
-  assert.match(commandBridge, /issues:\s*write/);
-  assert.doesNotMatch(commandBridge, /actions:\s*write/);
+  assert.match(commandBridge, /actions:\s*write/);
   assert.match(commandBridge, /commits\/main/);
   assert.match(commandBridge, /test "\$current_main" = "\$EXPECTED_HEAD_SHA"/);
-  assert.doesNotMatch(commandBridge, /actions\/checkout/);
-  assert.doesNotMatch(commandBridge, /node scripts\//);
-  assert.match(commandBridge, /uses:\s*\.\/\.github\/workflows\/chief-proofmode-access-recovery\.yml/);
-  assert.match(commandBridge, /authority_comment_id:\s*\$\{\{ needs\.authorize\.outputs\.authority_comment_id \}\}/);
-  assert.match(commandBridge, /secrets:\s*inherit/);
-  assert.doesNotMatch(commandBridge, /workflow_dispatch/);
-  assert.doesNotMatch(commandBridge, /\/dispatches/);
+  assert.match(commandBridge, /chief-proofmode-access-recovery\.yml\/dispatches/);
   assert.doesNotMatch(commandBridge, /CLOUDFLARE_ACCESS_API_TOKEN/);
   assert.doesNotMatch(commandBridge, /CLOUDFLARE_ACCESS_ADMIN_API_TOKEN/);
   assert.doesNotMatch(commandBridge, /CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID/);
   assert.doesNotMatch(commandBridge, /CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID/);
 });
 
-test('recovery is workflow-call only and rebinds the original founder issue-comment before provider capability', () => {
-  assert.match(recoveryWorkflow, /workflow_call:/);
-  assert.doesNotMatch(recoveryWorkflow, /workflow_dispatch:/);
-  assert.match(recoveryWorkflow, /authority_comment_id:/);
-
-  const authorityStep = recoveryWorkflow.match(
-    /- name: Verify founder-bound bridge invocation before provider capability([\s\S]*?)- name: Check out exact approved FCR current main/,
-  )?.[1] ?? '';
-  assert.ok(authorityStep);
-  assert.match(authorityStep, /test "\$GITHUB_EVENT_NAME" = 'issue_comment'/);
-  assert.match(authorityStep, /test "\$GITHUB_ACTOR" = 'jussray'/);
-  assert.match(authorityStep, /test "\$EVENT_ISSUE_NUMBER" = '485'/);
-  assert.match(authorityStep, /test "\$EVENT_COMMENT_LOGIN" = 'jussray'/);
-  assert.match(authorityStep, /test "\$EVENT_COMMENT_USER_ID" = '286642846'/);
-  assert.match(authorityStep, /test "\$EVENT_COMMENT_ID" = "\$AUTHORITY_COMMENT_ID"/);
-  assert.match(authorityStep, /read -r command mode sha target approval extra <<< "\$COMMENT_BODY"/);
-  assert.match(authorityStep, /test "\$command" = '\/cloudflare-chief-access'/);
-  assert.match(authorityStep, /test "\$mode" = "\$CHIEF_ACCESS_MODE"/);
-  assert.match(authorityStep, /test "\$sha" = "\$EXPECTED_HEAD_SHA"/);
-  assert.match(authorityStep, /test "\$target_origin" = "\$CHIEF_ACCESS_TARGET_URL"/);
-  assert.match(authorityStep, /test "\$approval" = "\$APPROVAL_REFERENCE"/);
-  assert.match(authorityStep, /Recovery is not directly dispatchable/);
-
-  const authorityIndex = recoveryWorkflow.indexOf('Verify founder-bound bridge invocation before provider capability');
-  const readCredentialIndex = recoveryWorkflow.indexOf('CLOUDFLARE_ACCESS_API_TOKEN:');
-  const adminCredentialIndex = recoveryWorkflow.indexOf('CLOUDFLARE_ACCESS_ADMIN_API_TOKEN:');
-  assert.ok(authorityIndex >= 0 && readCredentialIndex > authorityIndex && adminCredentialIndex > authorityIndex);
-});
-
-test('recovery latch is subject-bound and blocks blind duplicate repair', () => {
-  assert.doesNotMatch(commandBridge, /chief-proofmode-access-reconciliation-state\.mjs/);
-  const recoveryGate = recoveryWorkflow.match(
-    /- name: Refuse unresolved prior Chief Access repair([\s\S]*?)- name: Set up Node 24/,
-  )?.[1] ?? '';
-  const latchStep = recoveryWorkflow.match(
-    /- name: Persist repair-in-progress reconciliation latch([\s\S]*?)- name: Inspect current Chief Service Auth with dedicated read authority/,
-  )?.[1] ?? '';
-  const returnStep = recoveryWorkflow.match(
-    /- name: Return sanitized Chief Access receipt to founder control issue([\s\S]*?)- name: Upload sanitized Chief Access evidence/,
-  )?.[1] ?? '';
-
-  assert.match(recoveryGate, /gh api --paginate --slurp/);
-  assert.match(recoveryGate, /chief-proofmode-access-reconciliation-state\.mjs/);
-  assert.match(recoveryGate, /matching provider subject|subject-bound reconciliation/);
-  assert.doesNotMatch(recoveryGate, /chief-proofmode-access-reconciliation:v1/);
-
-  assert.match(latchStep, /steps\.selector\.outcome == 'success'/);
-  assert.match(latchStep, /chief-proofmode-access-reconciliation:v2/);
-  assert.match(latchStep, /disposition=REPAIR_IN_PROGRESS/);
-  assert.match(latchStep, /subject=pending/);
-  assert.match(recoveryWorkflow, /concurrency:\s*[\s\S]*cancel-in-progress:\s*false/);
-
-  assert.match(returnStep, /RECONCILIATION_GATE_OUTCOME/);
-  assert.match(returnStep, /REREAD_OUTCOME/);
-  assert.match(returnStep, /reconciliation_disposition='RECONCILE_REQUIRED'/);
-  assert.match(returnStep, /reconciliation_disposition='CLEAR'/);
-  assert.match(returnStep, /reconciliation_subject/);
-  assert.match(returnStep, /chief-proofmode-access-reconciliation:v2/);
-  assert.match(returnStep, /subject=\$reconciliation_subject/);
-  assert.match(returnStep, /mutation_outcome.*none/s);
-  assert.match(returnStep, /REREAD_OUTCOME.*success.*current_state.*configured.*current_subject/s);
-  assert.match(returnStep, /same unresolved provider subject/);
-  assert.match(returnStep, /cannot clear this latch/);
-
-  assert.match(reconciliationEvaluator, /unresolvedSubjects/);
-  assert.match(reconciliationEvaluator, /inProgressRuns/);
-  assert.match(reconciliationEvaluator, /unresolvedSubjects\.delete\(marker\.subject\)/);
-  assert.match(reconciliationEvaluator, /inProgressRuns\.delete\(marker\.run\)/);
-  assert.match(reconciliationEvaluator, /github-actions\[bot\]/);
-});
-
-test('recovery and runtime witness share one specificity-first selector resolver', () => {
+test('recovery keeps repair selector mandatory while check may discover one existing bound identity', () => {
   assert.match(recoveryWorkflow, /environment:\s*production/);
   assert.match(recoveryWorkflow, new RegExp(ACCOUNT_ID));
   assert.match(recoveryWorkflow, /CLOUDFLARE_ACCESS_API_TOKEN:\s*\$\{\{ secrets\.CLOUDFLARE_ACCESS_API_TOKEN \}\}/);
   assert.match(recoveryWorkflow, /CLOUDFLARE_ACCESS_ADMIN_API_TOKEN:\s*\$\{\{ secrets\.CLOUDFLARE_ACCESS_ADMIN_API_TOKEN \}\}/);
+  assert.match(recoveryWorkflow, PROTECTED_CLIENT_ID_SOURCE);
+  assert.match(runtimeWitness, PROTECTED_CLIENT_ID_SOURCE);
+  assert.match(
+    recoveryWorkflow,
+    /CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID:\s*\$\{\{ vars\.CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID \|\| vars\.CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID \}\}/,
+  );
+  assert.doesNotMatch(recoveryWorkflow, /secrets\.CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID/);
+  assert.doesNotMatch(recoveryWorkflow, /secrets\.CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID/);
 
-  for (const workflow of [recoveryWorkflow, runtimeWitness]) {
-    assert.match(workflow, /CHIEF_ACCESS_CLIENT_ID_SECRET:\s*\$\{\{ secrets\.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID \}\}/);
-    assert.match(workflow, /CHIEF_ACCESS_CLIENT_ID_VARIABLE:\s*\$\{\{ vars\.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID \}\}/);
-    assert.match(workflow, /GENERIC_ACCESS_CLIENT_ID_SECRET:\s*\$\{\{ secrets\.CLOUDFLARE_ACCESS_CLIENT_ID \}\}/);
-    assert.match(workflow, /GENERIC_ACCESS_CLIENT_ID_VARIABLE:\s*\$\{\{ vars\.CLOUDFLARE_ACCESS_CLIENT_ID \}\}/);
-    assert.match(workflow, /CHIEF_ACCESS_SERVICE_TOKEN_ID_VARIABLE:\s*\$\{\{ vars\.CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID \}\}/);
-    assert.match(workflow, /GENERIC_ACCESS_SERVICE_TOKEN_ID_VARIABLE:\s*\$\{\{ vars\.CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID \}\}/);
-    assert.match(workflow, /resolve-chief-proofmode-access-selector\.mjs/);
-    assert.doesNotMatch(workflow, STORAGE_FIRST_SELECTOR);
-  }
-
-  assert.match(recoveryWorkflow, /CHIEF_SELECTOR_REQUIRE_IDENTITY:\s*\$\{\{ inputs\.mode == 'repair' && 'true' \|\| 'false' \}\}/);
-  assert.match(runtimeWitness, /CHIEF_SELECTOR_REQUIRE_IDENTITY:\s*'true'/);
-  assert.match(runtimeWitness, /CHIEF_RUNTIME_ACCESS_CLIENT_SECRET:\s*\$\{\{ secrets\.CHIEF_CLOUDFLARE_ACCESS_CLIENT_SECRET \|\| secrets\.CLOUDFLARE_ACCESS_CLIENT_SECRET \}\}/);
-
-  assert.match(selectorResolver, /Chief-specific \$\{label\} conflicts with the generic fallback alias/);
-  assert.match(selectorResolver, /source: 'chief-specific'/);
-  assert.match(selectorResolver, /source: 'generic-fallback'/);
-  assert.match(selectorResolver, /selectorFingerprint/);
-  assert.doesNotMatch(selectorResolver, /console\.log\([^)]*clientId/);
-});
-
-test('repair requires an identity while read-only check may discover one policy-bound identity', () => {
   const selectorStep = recoveryWorkflow.match(
-    /- name: Resolve canonical Chief service-token identity([\s\S]*?)- name: Persist repair-in-progress reconciliation latch/,
+    /- name: Require configured Chief service-token identity before repair([\s\S]*?)- name: Inspect current Chief Service Auth with dedicated read authority/,
   )?.[1] ?? '';
-  assert.match(selectorStep, /id: selector/);
-  assert.match(selectorStep, /CHIEF_SELECTOR_REQUIRE_IDENTITY/);
-  assert.match(selectorStep, /resolve-chief-proofmode-access-selector\.mjs/);
+  assert.match(selectorStep, /if: inputs\.mode == 'repair'/);
+  assert.match(selectorStep, /-z "\$CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID" && -z "\$CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID"/);
+  assert.match(selectorStep, /repair requires CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID/);
+  assert.match(selectorStep, /protected selector in the FCR production environment/);
 
   assert.match(recoveryWorkflow, /- name: Inspect current Chief Service Auth with dedicated read authority\n\s+if: inputs\.mode == 'check'/);
-  assert.match(recoveryWorkflow, /- name: Apply exact-host Chief Service Auth with dedicated admin authority\n\s+id: apply\n\s+if: inputs\.mode == 'repair'/);
+  assert.match(recoveryWorkflow, /- name: Apply exact-host Chief Service Auth with dedicated admin authority\n\s+if: inputs\.mode == 'repair'/);
   assert.match(recoveryWorkflow, /current_main.*EXPECTED_HEAD_SHA/s);
 
   assert.match(reconciler, /discoverBoundServiceTokenId/);
@@ -154,7 +59,7 @@ test('repair requires an identity while read-only check may discover one policy-
 
 test('repair requires founder approval but never publishes the raw approval reference', () => {
   const authorityStep = recoveryWorkflow.match(
-    /- name: Verify exact FCR main, target, and founder mutation approval([\s\S]*?)- name: Refuse unresolved prior Chief Access repair/,
+    /- name: Verify exact FCR main, target, and founder mutation approval([\s\S]*?)- name: Set up Node 24/,
   )?.[1] ?? '';
   assert.match(authorityStep, /repair requires an auditable 8-200 character approval_reference/);
   assert.match(authorityStep, /sha256sum/);
@@ -197,26 +102,6 @@ test('selector-free discovery is policy-bound and rejects zero or multiple ident
   assert.match(reconciler, /rule\?\.service_token\?\.token_id/);
 });
 
-test('provider receipts bind reconciliation to a non-secret subject fingerprint', () => {
-  assert.match(reconciler, /createChiefAccessSubjectFingerprint/);
-  assert.match(reconciler, /chief-access-provider-subject\/v1/);
-  assert.match(reconciler, /targetOrigin/);
-  assert.match(reconciler, /applicationId/);
-  assert.match(reconciler, /serviceTokenId/);
-  assert.match(reconciler, /subjectFingerprint/);
-  assert.match(reconciler, /chiefAccessSubjectFingerprint/);
-
-  const returnStep = recoveryWorkflow.match(
-    /- name: Return sanitized Chief Access receipt to founder control issue([\s\S]*?)- name: Upload sanitized Chief Access evidence/,
-  )?.[1] ?? '';
-  assert.match(returnStep, /subjectFingerprint/);
-  assert.match(returnStep, /Reconciliation subject/);
-  assert.match(returnStep, /Client selector source class/);
-  assert.match(returnStep, /Service-token selector source class/);
-  assert.match(returnStep, /targetOrigin, accessScope, policyId, subjectFingerprint/);
-  assert.doesNotMatch(returnStep, /targetOrigin, accessScope, applicationId, policyId, serviceTokenId/);
-});
-
 test('raw provider receipts stay ephemeral and provider commands are suppressed from logs', () => {
   assert.match(recoveryWorkflow, /node scripts\/reconcile-chief-proofmode-access\.mjs >\/dev\/null 2>&1/);
   const artifactStep = recoveryWorkflow.match(
@@ -225,27 +110,6 @@ test('raw provider receipts stay ephemeral and provider commands are suppressed 
   assert.match(artifactStep, /chief-proofmode-access-public-receipt/);
   assert.doesNotMatch(artifactStep, /chief-proofmode-access-recovery\.json/);
   assert.doesNotMatch(artifactStep, /chief-proofmode-access-mutation\.json/);
-});
-
-test('repair preserves uncertain mutation receipt and rereads provider state before any retry', () => {
-  const applyStep = recoveryWorkflow.match(
-    /- name: Apply exact-host Chief Service Auth with dedicated admin authority([\s\S]*?)- name: Re-read repaired policy with provider authority/,
-  )?.[1] ?? '';
-  const rereadStep = recoveryWorkflow.match(
-    /- name: Re-read repaired policy with provider authority([\s\S]*?)- name: Return sanitized Chief Access receipt to founder control issue/,
-  )?.[1] ?? '';
-
-  assert.match(applyStep, /set \+e/);
-  assert.match(applyStep, /status=\$\?/);
-  assert.match(applyStep, /chief-proofmode-access-mutation\.json/);
-  assert.match(applyStep, /exit "\$status"/);
-  assert.match(rereadStep, /id: reread/);
-  assert.match(rereadStep, /always\(\)/);
-  assert.match(rereadStep, /steps\.selector\.outcome == 'success'/);
-  assert.match(rereadStep, /CHIEF_ACCESS_MODE: check/);
-  assert.match(reconciler, /provider-write-outcome-unknown/);
-  assert.match(reconciler, /provider-write-verification-failed/);
-  assert.match(reconciler, /mutationOutcome/);
 });
 
 test('public receipt explicitly keeps browser/runtime proof separate', () => {
@@ -257,25 +121,20 @@ test('public receipt explicitly keeps browser/runtime proof separate', () => {
   assert.match(returnStep, /Current provider truth: `UNKNOWN`/);
   assert.match(returnStep, /Current provider truth: `BLOCKED`/);
   assert.match(returnStep, /\.state == "configured" or \.state == "blocked"/);
-  assert.match(returnStep, /schemaVersion == 2/);
-  assert.match(returnStep, /mutationOutcome/);
-  assert.match(returnStep, /provider-write-outcome-unknown/);
   assert.match(returnStep, /reasonCode/);
-  assert.match(returnStep, /length == 1/);
+  assert.match(returnStep, /single-document|length == 1/);
   assert.doesNotMatch(returnStep, /cat "\$current_receipt"/);
   assert.doesNotMatch(returnStep, /cat "\$mutation_receipt"/);
   assert.doesNotMatch(returnStep, /error\.message|rawError|errorMessage/);
 });
 
-test('blocked diagnostics preserve none, performed, or unknown mutation truth without granting authority', () => {
+test('blocked diagnostics are allowlisted and cannot become provider mutation authority', () => {
   assert.match(reconciler, /BLOCKED_REASON_CODES/);
   assert.match(reconciler, /state: 'blocked'/);
-  assert.match(reconciler, /mutationOutcomeForError/);
-  assert.match(reconciler, /mutationPerformed/);
+  assert.match(reconciler, /mutationPerformed: false/);
   assert.match(reconciler, /reasonCode/);
   assert.match(recoveryWorkflow, /allowed_reason/);
-  assert.match(recoveryWorkflow, /allowed_mutation_outcome/);
-  assert.match(recoveryWorkflow, /\.mutationPerformed == null/);
+  assert.match(recoveryWorkflow, /\.mutationPerformed == false/);
 });
 
 test('dedicated recovery documentation keeps source, provider, and browser truth separate', () => {

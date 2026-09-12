@@ -60,6 +60,7 @@ function truthMarkup(snapshot) {
     <article class="truth-card"><strong>TARGET ≠ PROOF</strong><span>${boundaries.targetVersionIsNotCurrentMaturity ? 'A project target describes required maturity, not maturity already earned.' : 'Truth boundary missing.'}</span></article>
     <article class="truth-card"><strong>FRAMEWORK ≠ CERTIFICATION</strong><span>${boundaries.frameworkMappingIsNotCertification ? 'NIST, OWASP, CIS and other mappings are implementation signals, not certification claims.' : 'Truth boundary missing.'}</span></article>
     <article class="truth-card"><strong>PROVIDER CLAIMS NEED EVIDENCE</strong><span>${boundaries.providerClaimsRequireRuntimeEvidence ? 'Cloud, database, deployment and runtime claims stay unproven until provider evidence exists.' : 'Truth boundary missing.'}</span></article>
+    <article class="truth-card"><strong>INVENTORY ≠ QUANTUM SAFETY</strong><span>${boundaries.cryptographicInventoryIsObservationNotQuantumSafety ? 'Observed algorithms and provider boundaries map migration work; they do not prove a project quantum-safe.' : 'Truth boundary missing.'}</span></article>
   </section>`;
 }
 
@@ -103,6 +104,54 @@ function projectMarkup(project) {
   </article>`;
 }
 
+function cryptoEntryMarkup(entry) {
+  const migrationLabel = String(entry.quantumMigrationClass || '').replaceAll('_', ' ');
+  return `<article class="project-card crypto-entry-card" data-crypto-id="${escapeHtml(entry.id)}" data-migration-class="${escapeHtml(entry.quantumMigrationClass)}">
+    <div class="project-head">
+      <div>
+        <p class="eyebrow">${escapeHtml(entry.observationState || 'UNKNOWN')}</p>
+        <h3>${escapeHtml(entry.purpose)}</h3>
+        <div class="repo">${escapeHtml(entry.sourceEvidence)}</div>
+      </div>
+      <div class="target-badge"><strong>${escapeHtml(entry.algorithm)}</strong><span>${escapeHtml(migrationLabel)}</span></div>
+    </div>
+    <div class="project-meta">
+      <span class="chip">${escapeHtml(entry.projectSlug)}</span>
+      <span class="chip">${escapeHtml(entry.primitive)}</span>
+      <span class="chip">${escapeHtml(entry.confidentialityHorizon)}</span>
+    </div>
+    <div class="detail-block"><h4>Provider / owner</h4><p>${escapeHtml(entry.provider)}</p></div>
+    <div class="detail-block"><h4>Migration authority</h4><p>${escapeHtml(entry.migrationAuthority)}</p></div>
+  </article>`;
+}
+
+function cryptoReviewMarkup(entry) {
+  return `<article class="project-card crypto-review-card" data-review-project="${escapeHtml(entry.projectSlug)}">
+    <p class="eyebrow">REVIEW REQUIRED · UNKNOWN STAYS UNKNOWN</p>
+    <h3>${escapeHtml(entry.projectSlug)}</h3>
+    <div class="detail-block"><h4>Why unresolved</h4><p>${escapeHtml(entry.reason)}</p></div>
+    <div class="detail-block"><h4>Next evidence</h4><p>${escapeHtml(entry.nextEvidence)}</p></div>
+  </article>`;
+}
+
+function cryptographyMarkup(cryptography, summary) {
+  const inventory = Array.isArray(cryptography?.inventory) ? cryptography.inventory : [];
+  const reviewRequired = Array.isArray(cryptography?.reviewRequired) ? cryptography.reviewRequired : [];
+  const coverage = cryptography?.coverage || {};
+  return `<section class="crypto-panel" aria-label="Cryptographic migration inventory">
+    <div class="section-head"><div><p class="eyebrow">CRYPTOGRAPHIC INVENTORY</p><h2>Migration surfaces, not quantum-safety claims</h2></div><p>Observed source evidence is separated from provider-managed boundaries and unresolved reviews. Silence never becomes a green check.</p></div>
+    <div class="summary-grid" aria-label="Cryptographic inventory summary">
+      ${summaryCard('Observed inventory entries', summary.cryptographicInventoryEntries ?? inventory.length)}
+      ${summaryCard('Public-key migration entries', summary.publicKeyMigrationEntries ?? 0, 'v10')}
+      ${summaryCard('Review-required projects', summary.cryptographicReviewRequiredProjects ?? reviewRequired.length)}
+      ${summaryCard('Uncovered active projects', Array.isArray(coverage.missingProjectSlugs) ? coverage.missingProjectSlugs.length : 'UNKNOWN', 'proof')}
+    </div>
+    <div class="project-grid crypto-entry-grid">${inventory.map(cryptoEntryMarkup).join('')}</div>
+    <div class="section-head"><div><p class="eyebrow">UNKNOWN / NEEDS EVIDENCE</p><h3>Review-required projects</h3></div><p>These remain unresolved until source, provider, or runtime evidence is strong enough to classify them.</p></div>
+    <div class="project-grid crypto-review-grid">${reviewRequired.map(cryptoReviewMarkup).join('')}</div>
+  </section>`;
+}
+
 function lanternItem(label, detail, denied = false) {
   return `<article class="lantern-item" data-state="${denied ? 'deny' : 'require'}">
     <strong>${escapeHtml(label)}</strong><span>${escapeHtml(detail)}</span>
@@ -134,6 +183,9 @@ function analyticsMarkup(summary) {
     <article class="metric-card"><span>Stage obligations</span><strong>${escapeHtml(summary.totalStageObligations)}</strong></article>
     <article class="metric-card"><span>Unique V1–V10 controls</span><strong>${escapeHtml(summary.uniqueControlCount)}</strong></article>
     <article class="metric-card"><span>Framework signals</span><strong>${escapeHtml(summary.frameworkSignalCount)}</strong></article>
+    <article class="metric-card"><span>Crypto inventory entries</span><strong>${escapeHtml(summary.cryptographicInventoryEntries)}</strong></article>
+    <article class="metric-card"><span>Public-key migration entries</span><strong>${escapeHtml(summary.publicKeyMigrationEntries)}</strong></article>
+    <article class="metric-card"><span>Review-required crypto projects</span><strong>${escapeHtml(summary.cryptographicReviewRequiredProjects)}</strong></article>
     <article class="metric-card"><span>Maturity-proven projects</span><strong>${escapeHtml(summary.provenProjects)}</strong></article>
   </section>`;
 }
@@ -174,6 +226,8 @@ function render(snapshot) {
       <div class="section-head"><div><p class="eyebrow">PORTFOLIO</p><h2>Project targets and proof gates</h2></div><p>Every card is deliberately marked target-only until repository, provider and runtime evidence establish actual maturity.</p></div>
       <div class="project-grid">${projects.map(projectMarkup).join('')}</div>
     </section>
+
+    <section class="section">${cryptographyMarkup(snapshot.cryptography, summary)}</section>
 
     <section class="section">${lanternMarkup(snapshot.lantern)}</section>
 

@@ -46,6 +46,8 @@ Exact SHAs belong in receipts, PRs, artifacts, incidents, and provenance. The RE
 
 FCR models projects, proposals, missions, exact refs, verification runs, evidence, approval state, and bounded repository operations behind provider-neutral interfaces.
 
+Branch creation through `src/http/routes/approvals.ts` is now an exact-action governed repository mutation. A fresh `create_branch` proof and authenticated founder execute request cause FCR to issue a server-derived `AuthorityEnvelopeV1` bound to `github.repository.create_branch`, repository scope, exact branch arguments, current mission-state fingerprint, tool-call identity, expiry, founder identity, and idempotency key. FCR reserves the execution before the external write, re-reads mission state immediately before mutation, and `executeAuthorizedCreateBranch()` must reject drift before `RepositoryProvider.createBranch(...)` can be reached. A pending or ambiguous execution remains reconcile-before-retry; source and CI proof of this membrane do not by themselves prove that a live GitHub branch was created.
+
 ### PR continuity
 
 The repository has machine-enforced PR continuity. Eligible same-repository branches may roll forward when their live base moves, but every head movement creates a new proof subject.
@@ -102,8 +104,6 @@ The repository contains FCR's founder-final merge policy, deterministic independ
 Source policy is not live GitHub provider truth. Current rulesets, bypass actors, required checks, native review settings, and provider enforcement require fresh GitHub provider readback before a merge decision.
 
 Founder self-approval is not relabeled as independent review. The canonical path keeps deterministic independent review and authenticated exact-candidate founder-final approval separate.
-
-The canonical FCR governance target is now fail-closed in source at both observation and mutation-request boundaries: the constitutional review membrane and strict-freshness membrane may cover only `main` (represented by the exact main ref or the provider default-branch sentinel). `~ALL` or any additional branch target makes governance `NOT_READY`, and a canonical ruleset write that asks for more than `main` is rejected before provider mutation. This source hardening does **not** prove the live GitHub ruleset has been repaired; trusted provider readback is still required before claiming live compliance.
 
 For Chief governance, FCR contains a **read-only trusted observation and verification boundary** pinned to `jussray/chief-ai-machine` and Chief ruleset IDs `20818149` and `21261587`. It uses the repository-scoped FCR GitHub App installation-token path rather than caller-supplied PAT/token authority, preserves required-check `integration_id` producer identity, requires complete bypass and deployment readback, and fingerprints the provider observation. Under the current founder decision, ruleset `20818149` is accepted exactly as observed when it preserves zero bypass actors, its approved source checks, `Cloudflare Production`, `proofmode-access-admin`, and the unbound reserved candidate runtime context. A compliant observation returns `NO_CHANGE_REQUIRED` with `mutation:null`; drift blocks verification rather than producing a desired-state rewrite. This boundary never grants provider mutation, merge, deploy, or execution authority.
 
@@ -166,8 +166,6 @@ api.foundercontrolroom.org
 
 Source dependence on that topology is not proof the live provider is configured correctly.
 
-The bounded FCR Access recovery lane also separates behavioral provider truth from rollback ownership. An existing Access application may count as an `already-public-bypass` only when one exact public destination for `foundercontrolroom.org/*` and `Bypass / Everyone` semantics are independently verified. A behaviorally equivalent non-managed application may support provider truth but never becomes a workflow-managed rollback target; broader, multi-destination, worker/preview-worker, policy-ambiguous, or otherwise unresolved destination profiles remain manual-review blockers. Anonymous public reachability and founder-only control-plane containment are separate browser assertions, and neither substitutes for the other.
-
 Production does not deploy merely because `main` moved or a Cloudflare build succeeded. A production claim remains incomplete until the authorized lane proves, for one exact candidate:
 
 - current deployment authority;
@@ -220,7 +218,7 @@ Repository manifests, operational packets, analytics, receipts, and public conte
 |---|---|
 | Read project/evidence | Founder-authenticated or explicitly public-safe read |
 | Run bounded verification | Applicable founder/repository authority |
-| Create branch | Separate repository write authority |
+| Create branch | Fresh `create_branch` proof + authenticated exact execute request + server-issued `AuthorityEnvelopeV1` + execution reservation + fresh mission-state revalidation + repository write authority |
 | Merge through FCR | Exact-head machine proof + deterministic independent review + authenticated exact-candidate founder-final approval + repository authority |
 | Merge through live GitHub | Separate live GitHub ruleset/provider authority and fresh readback |
 | Deploy / mutate production | Separate exact production authority |

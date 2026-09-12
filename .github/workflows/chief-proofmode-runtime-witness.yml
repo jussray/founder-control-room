@@ -53,13 +53,9 @@ jobs:
     env:
       GITHUB_APP_ID: ${{ secrets.APP_ID }}
       GITHUB_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}
-      CHIEF_ACCESS_CLIENT_ID_SECRET: ${{ secrets.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID }}
-      CHIEF_ACCESS_CLIENT_ID_VARIABLE: ${{ vars.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID }}
-      GENERIC_ACCESS_CLIENT_ID_SECRET: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_ID }}
-      GENERIC_ACCESS_CLIENT_ID_VARIABLE: ${{ vars.CLOUDFLARE_ACCESS_CLIENT_ID }}
-      CHIEF_ACCESS_SERVICE_TOKEN_ID_VARIABLE: ${{ vars.CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID }}
-      GENERIC_ACCESS_SERVICE_TOKEN_ID_VARIABLE: ${{ vars.CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID }}
-      CHIEF_SELECTOR_REQUIRE_IDENTITY: 'true'
+      CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID: ${{ secrets.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID || secrets.CLOUDFLARE_ACCESS_CLIENT_ID || vars.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID || vars.CLOUDFLARE_ACCESS_CLIENT_ID }}
+      CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID: ${{ vars.CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID || vars.CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID }}
+      CHIEF_RUNTIME_ACCESS_CLIENT_ID: ${{ secrets.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID || secrets.CLOUDFLARE_ACCESS_CLIENT_ID || vars.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID || vars.CLOUDFLARE_ACCESS_CLIENT_ID }}
       CHIEF_RUNTIME_ACCESS_CLIENT_SECRET: ${{ secrets.CHIEF_CLOUDFLARE_ACCESS_CLIENT_SECRET || secrets.CLOUDFLARE_ACCESS_CLIENT_SECRET }}
 
     steps:
@@ -132,17 +128,10 @@ jobs:
       - name: Prove witness and Access contracts before provider access
         run: |
           node --check scripts/reconcile-chief-proofmode-access.mjs
-          node --check scripts/resolve-chief-proofmode-access-selector.mjs
           node --check scripts/publish-chief-runtime-witness.mjs
           node --test scripts/reconcile-chief-proofmode-access.node-test.mjs
-          node --test scripts/reconcile-chief-proofmode-access-subject.node-test.mjs
-          node --test scripts/resolve-chief-proofmode-access-selector.node-test.mjs
           node --test scripts/chief-proofmode-access-bridge-contract.node-test.mjs
           node --test scripts/publish-chief-runtime-witness.node-test.mjs
-
-      - name: Resolve canonical Chief Access selector without exposing identity
-        id: selector
-        run: node scripts/resolve-chief-proofmode-access-selector.mjs
 
       - name: Re-read exact Chief Service Auth without mutation
         env:

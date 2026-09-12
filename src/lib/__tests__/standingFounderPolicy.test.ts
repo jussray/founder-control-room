@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   STANDING_FOUNDER_POLICY,
   connectionCanSupportStandingAction,
+  necessaryFixPolicyDisposition,
   standingFounderRule,
 } from '../standingFounderPolicy.js';
 
@@ -37,10 +38,86 @@ describe('standing founder policy', () => {
     expect(standingFounderRule('provider_mutation').mode).toBe('proof-gated');
   });
 
+  it('defaults necessary reversible in-scope fixes to execution instead of founder homework', () => {
+    expect(STANDING_FOUNDER_POLICY.necessaryFixDefault).toMatchObject({
+      enabled: true,
+      doesNotGrantAuthority: true,
+      requiresCurrentAuthority: true,
+      proofGatedActionsRemainProofGated: true,
+    });
+    expect(STANDING_FOUNDER_POLICY.necessaryFixDefault.principle).toMatch(/implement it in the same loop/i);
+
+    expect(necessaryFixPolicyDisposition({
+      action: 'edit_branch',
+      necessary: true,
+      withinApprovedScope: true,
+    })).toBe('execute-now');
+
+    expect(necessaryFixPolicyDisposition({
+      action: 'run_tests',
+      necessary: true,
+      withinApprovedScope: true,
+    })).toBe('execute-now');
+
+    expect(necessaryFixPolicyDisposition({
+      action: 'edit_branch',
+      necessary: false,
+      withinApprovedScope: true,
+    })).toBe('not-necessary');
+  });
+
+  it('keeps reversible integration proof-gated rather than turning proof into founder interruption', () => {
+    expect(necessaryFixPolicyDisposition({
+      action: 'integrate_main',
+      necessary: true,
+      withinApprovedScope: true,
+    })).toBe('proof-gated');
+  });
+
+  it('requires founder authority when a necessary fix crosses the standing execution boundary', () => {
+    const base = {
+      action: 'edit_branch' as const,
+      necessary: true,
+      withinApprovedScope: true,
+    };
+
+    expect(necessaryFixPolicyDisposition({ ...base, withinApprovedScope: false })).toBe('founder-required');
+    expect(necessaryFixPolicyDisposition({ ...base, widensScope: true })).toBe('founder-required');
+    expect(necessaryFixPolicyDisposition({ ...base, externalPublication: true })).toBe('founder-required');
+    expect(necessaryFixPolicyDisposition({ ...base, spendsMoney: true })).toBe('founder-required');
+    expect(necessaryFixPolicyDisposition({ ...base, destructive: true })).toBe('founder-required');
+    expect(necessaryFixPolicyDisposition({ ...base, irreversible: true })).toBe('founder-required');
+    expect(necessaryFixPolicyDisposition({ ...base, authorityExpansion: true })).toBe('founder-required');
+
+    expect(necessaryFixPolicyDisposition({
+      action: 'external_communication',
+      necessary: true,
+      withinApprovedScope: true,
+    })).toBe('founder-required');
+
+    expect(necessaryFixPolicyDisposition({
+      action: 'deploy',
+      necessary: true,
+      withinApprovedScope: true,
+    })).toBe('founder-required');
+
+    expect(necessaryFixPolicyDisposition({
+      action: 'provider_mutation',
+      necessary: true,
+      withinApprovedScope: true,
+    })).toBe('founder-required');
+  });
+
   it('never lets the system grant itself more authority', () => {
     expect(STANDING_FOUNDER_POLICY.selfExpansionAllowed).toBe(false);
+    expect(STANDING_FOUNDER_POLICY.necessaryFixDefault.doesNotGrantAuthority).toBe(true);
     expect(standingFounderRule('authority_change').mode).toBe('founder-required');
     expect(standingFounderRule('authority_change').reason).toMatch(/never expand its own authority/i);
+    expect(necessaryFixPolicyDisposition({
+      action: 'authority_change',
+      necessary: true,
+      withinApprovedScope: true,
+    })).toBe('founder-required');
   });
 
   it('requires active authority, secret reference, provider type, and declared capability for L4+ actions', () => {

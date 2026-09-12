@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import { mkdirSync, writeFileSync } from 'node:fs';
 
 const API = 'https://api.cloudflare.com/client/v4';
@@ -18,8 +17,6 @@ const BLOCKED_REASON_CODES = Object.freeze([
   'access-scope-not-repair-eligible',
   'provider-read-credential-missing',
   'provider-read-failed',
-  'provider-write-outcome-unknown',
-  'provider-write-verification-failed',
   'bounded-check-failed',
 ]);
 
@@ -87,48 +84,6 @@ function discoverBoundServiceTokenId(policies) {
     throw new Error(`Multiple service-token identities are bound to the effective Chief Access application; found ${ids.length}; refusing ambiguous discovery.`);
   }
   return ids[0];
-}
-
-export function createChiefAccessSubjectFingerprint({ targetOrigin, applicationId, serviceTokenId }) {
-  const target = required(targetOrigin, 'Chief Access subject target');
-  const app = required(applicationId, 'Chief Access subject application ID');
-  const serviceToken = required(serviceTokenId, 'Chief Access subject service-token ID');
-  const canonical = JSON.stringify({
-    schema: 'chief-access-provider-subject/v1',
-    targetOrigin: target,
-    applicationId: app,
-    serviceTokenId: serviceToken,
-  });
-  return `sha256:${createHash('sha256').update(canonical).digest('hex')}`;
-}
-
-function markAccessSubject(error, subjectFingerprint) {
-  const normalized = error instanceof Error ? error : new Error('Chief Access provider operation failed.');
-  Object.defineProperty(normalized, 'chiefAccessSubjectFingerprint', {
-    value: subjectFingerprint,
-    configurable: true,
-    enumerable: false,
-    writable: true,
-  });
-  return normalized;
-}
-
-function markMutationOutcome(error, mutationOutcome) {
-  const normalized = error instanceof Error ? error : new Error('Chief Access mutation failed.');
-  Object.defineProperty(normalized, 'chiefAccessMutationOutcome', {
-    value: mutationOutcome,
-    configurable: true,
-    enumerable: false,
-    writable: true,
-  });
-  return normalized;
-}
-
-function mutationOutcomeForError(error, mode) {
-  if (mode !== 'repair') return 'none';
-  const outcome = error?.chiefAccessMutationOutcome;
-  if (outcome === 'performed' || outcome === 'unknown') return outcome;
-  return 'none';
 }
 
 async function cloudflareJson(fetchImpl, apiToken, path, init = {}) {
@@ -324,85 +279,41 @@ export async function ensureChiefProofModeAccessPolicy({
     serviceTokenId: identityTokenId,
     nowMs,
   });
-  const subjectFingerprint = createChiefAccessSubjectFingerprint({
-    targetOrigin: target.origin,
-    applicationId: appId,
-    serviceTokenId: serviceId,
-  });
 
   const exact = policies.find((policy) => hasSpecificServiceToken(policy, serviceId));
   if (exact) {
-    return {
-      state: 'configured',
-      changed: false,
-      appId,
-      policyId: exact.id || null,
-      scope: effective.scope,
-      serviceTokenId: serviceId,
-      targetOrigin: target.origin,
-      subjectFingerprint,
-    };
+    return { state: 'configured', changed: false, appId, policyId: exact.id || null, scope: effective.scope, serviceTokenId: serviceId, targetOrigin: target.origin };
   }
 
   const conflictingNamedPolicy = policies.find((policy) => policy?.name === POLICY_NAME);
   if (conflictingNamedPolicy) {
-    throw markAccessSubject(
-      new Error('A ProofMode CI service-auth policy exists for another rule; refusing automatic overwrite.'),
-      subjectFingerprint,
-    );
+    throw new Error('A ProofMode CI service-auth policy exists for another rule; refusing automatic overwrite.');
   }
   if (normalizedMode === 'check') {
-    throw markAccessSubject(
-      new Error(`No matching Chief Service Auth policy exists on effective scope ${effective.scope}.`),
-      subjectFingerprint,
-    );
+    throw new Error(`No matching Chief Service Auth policy exists on effective scope ${effective.scope}.`);
   }
   if (!effective.repairEligible) {
-    throw markAccessSubject(
-      new Error(`Effective Access scope ${effective.scope} is not the approved exact immutable-preview host; refusing repair.`),
-      subjectFingerprint,
-    );
+    throw new Error(`Effective Access scope ${effective.scope} is not the approved exact immutable-preview host; refusing repair.`);
   }
 
-  let created;
-  try {
-    const createPayload = await cloudflareJson(fetchImpl, token, policyPath, {
+  const created = unwrap(
+    await cloudflareJson(fetchImpl, token, policyPath, {
       method: 'POST',
       body: JSON.stringify({
         name: POLICY_NAME,
         decision: 'non_identity',
         include: [{ service_token: { token_id: serviceId } }],
       }),
-    });
-    created = unwrap(createPayload, 'Create Access application policy');
-  } catch (error) {
-    throw markMutationOutcome(markAccessSubject(error, subjectFingerprint), 'unknown');
-  }
-
+    }),
+    'Create Access application policy',
+  );
   if (!hasSpecificServiceToken(created, serviceId)) {
-    throw markMutationOutcome(
-      markAccessSubject(
-        new Error('Cloudflare created a policy that did not preserve the requested specific service-token rule.'),
-        subjectFingerprint,
-      ),
-      'performed',
-    );
+    throw new Error('Cloudflare created a policy that did not preserve the requested specific service-token rule.');
   }
-  return {
-    state: 'configured',
-    changed: true,
-    appId,
-    policyId: created.id || null,
-    scope: effective.scope,
-    serviceTokenId: serviceId,
-    targetOrigin: target.origin,
-    subjectFingerprint,
-  };
+  return { state: 'configured', changed: true, appId, policyId: created.id || null, scope: effective.scope, serviceTokenId: serviceId, targetOrigin: target.origin };
 }
 
 export function classifyChiefAccessError(error) {
-  if (error?.chiefAccessMutationOutcome === 'unknown') return 'provider-write-outcome-unknown';
-  if (error?.chiefAccessMutationOutcome === 'performed') return 'provider-write-verification-failed';
   const message = error instanceof Error ? error.message : '';
   if (/No existing non-identity service-token binding/.test(message)) return 'service-token-binding-missing';
   if (/Multiple service-token identities/.test(message)) return 'service-token-binding-ambiguous';
@@ -423,22 +334,19 @@ export function classifyChiefAccessError(error) {
 }
 
 function writeReceipt(result, mode) {
-  const mutationOutcome = result.changed ? 'performed' : 'none';
   mkdirSync('test-results', { recursive: true });
   writeFileSync(RECEIPT_PATH, `${JSON.stringify({
-    schemaVersion: 2,
+    schemaVersion: 1,
     scope: 'chief-proofmode-access-recovery',
     observedAt: new Date().toISOString(),
     mode,
     state: result.state,
-    mutationOutcome,
     mutationPerformed: result.changed,
     targetOrigin: result.targetOrigin,
     accessScope: result.scope,
     applicationId: result.appId,
     policyId: result.policyId,
     serviceTokenId: result.serviceTokenId,
-    subjectFingerprint: result.subjectFingerprint,
   })}\n`, 'utf8');
 }
 
@@ -451,27 +359,16 @@ function writeBlockedReceipt(error, mode, targetUrl) {
   }
   const reasonCode = classifyChiefAccessError(error);
   if (!BLOCKED_REASON_CODES.includes(reasonCode)) return;
-  const mutationOutcome = mutationOutcomeForError(error, mode);
-  const mutationPerformed = mutationOutcome === 'performed'
-    ? true
-    : mutationOutcome === 'unknown'
-      ? null
-      : false;
-  const subjectFingerprint = typeof error?.chiefAccessSubjectFingerprint === 'string'
-    ? error.chiefAccessSubjectFingerprint
-    : null;
   mkdirSync('test-results', { recursive: true });
   writeFileSync(RECEIPT_PATH, `${JSON.stringify({
-    schemaVersion: 2,
+    schemaVersion: 1,
     scope: 'chief-proofmode-access-recovery',
     observedAt: new Date().toISOString(),
     mode,
     state: 'blocked',
-    mutationOutcome,
-    mutationPerformed,
+    mutationPerformed: false,
     targetOrigin,
     reasonCode,
-    subjectFingerprint,
   })}\n`, 'utf8');
 }
 

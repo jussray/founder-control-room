@@ -25,33 +25,9 @@ export function parseRepository(value) {
   return { owner, repo };
 }
 
-function branchTargetConditions(ruleset) {
-  const refName = ruleset?.conditions?.ref_name ?? {};
-  const include = Array.isArray(refName.include)
-    ? refName.include.filter((value) => typeof value === 'string')
-    : [];
-  const exclude = Array.isArray(refName.exclude)
-    ? refName.exclude.filter((value) => typeof value === 'string')
-    : [];
-  return { include, exclude };
-}
-
-function escapeRegExp(value) {
-  return value.replace(/[.+^${}()|[\]\\]/g, '\\$&');
-}
-
-function refExclusionCoversTarget(pattern, targetRef, defaultBranch) {
-  const normalized = text(pattern);
-  if (!normalized) return false;
-  if (normalized === '~ALL') return true;
-  if (normalized === '~DEFAULT_BRANCH') return text(defaultBranch) === text(targetRef);
-
-  const literalTarget = `refs/heads/${targetRef}`;
-  if (normalized === literalTarget) return true;
-  if (!/[*?]/.test(normalized)) return false;
-
-  const matcher = new RegExp(`^${escapeRegExp(normalized).replace(/\*/g, '.*').replace(/\?/g, '.')}$`);
-  return matcher.test(literalTarget);
+function branchTargets(ruleset) {
+  const include = ruleset?.conditions?.ref_name?.include;
+  return Array.isArray(include) ? include.filter((value) => typeof value === 'string') : [];
 }
 
 function ruleOfType(ruleset, type) {
@@ -99,16 +75,9 @@ export function rulesetSnapshot(ruleset, targetRef = 'main', defaultBranch = tar
         bypassMode: text(actor?.bypass_mode),
       })).sort((a, b) => `${a.actorType}:${a.actorId}:${a.bypassMode}`.localeCompare(`${b.actorType}:${b.actorId}:${b.bypassMode}`))
     : null;
-  const { include: targets, exclude: excludedTargets } = branchTargetConditions(ruleset);
+  const targets = branchTargets(ruleset);
   const targetTokens = new Set([`refs/heads/${targetRef}`]);
   if (text(defaultBranch) === text(targetRef)) targetTokens.add('~DEFAULT_BRANCH');
-  const requestedRefExplicitlyIncluded = targets.some((target) => targetTokens.has(target));
-  const requestedRefExcludedBy = excludedTargets.filter((target) =>
-    refExclusionCoversTarget(target, targetRef, defaultBranch));
-  const requestedRefExcluded = requestedRefExcludedBy.length > 0;
-  const targetsRequestedRef = requestedRefExplicitlyIncluded && !requestedRefExcluded;
-  const targetsOnlyRequestedRef = targetsRequestedRef
-    && targets.every((target) => targetTokens.has(target));
 
   return {
     id: ruleset?.id == null ? '' : String(ruleset.id),
@@ -116,12 +85,7 @@ export function rulesetSnapshot(ruleset, targetRef = 'main', defaultBranch = tar
     enforcement: text(ruleset?.enforcement),
     target: text(ruleset?.target),
     targetRefs: targets,
-    excludedTargetRefs: excludedTargets,
-    requestedRefExplicitlyIncluded,
-    requestedRefExcludedBy,
-    requestedRefExcluded,
-    targetsRequestedRef,
-    targetsOnlyRequestedRef,
+    targetsRequestedRef: targets.some((target) => targetTokens.has(target)),
     ruleTypes,
     requirePullRequest: Boolean(pull),
     requiredApprovingReviewCount: Number(pull?.parameters?.required_approving_review_count ?? 0),
@@ -186,8 +150,6 @@ export function canonicalFloorSatisfied(
     && snapshot.enforcement === 'active'
     && snapshot.target === 'branch'
     && snapshot.targetsRequestedRef === true
-    && snapshot.targetsOnlyRequestedRef === true
-    && snapshot.requestedRefExcluded === false
     && exactRuleTypesMatch(snapshot, ['pull_request', 'code_scanning', 'non_fast_forward', 'deletion'])
     && snapshot.requirePullRequest === true
     && snapshot.requiredApprovingReviewCount === requiredNativeApprovals
@@ -209,8 +171,6 @@ export function freshnessFloorSatisfied(snapshot, expectedName = canonicalFreshn
     && snapshot.enforcement === 'active'
     && snapshot.target === 'branch'
     && snapshot.targetsRequestedRef === true
-    && snapshot.targetsOnlyRequestedRef === true
-    && snapshot.requestedRefExcluded === false
     && exactRuleTypesMatch(snapshot, ['required_status_checks'])
     && snapshot.requirePullRequest === false
     && snapshot.strictRequiredStatusChecks === true

@@ -30,6 +30,20 @@ describe('Strategic Security Posture API', () => {
     expect(response.body.truthBoundaries.providerClaimsRequireRuntimeEvidence).toBe(true);
   });
 
+  it('returns cryptographic inventory as migration evidence rather than a quantum-safe claim', async () => {
+    const response = await request(createTestApp()).get('/security-posture');
+
+    expect(response.status).toBe(200);
+    expect(response.body.summary.cryptographicInventoryEntries).toBe(7);
+    expect(response.body.summary.publicKeyMigrationEntries).toBe(4);
+    expect(response.body.summary.cryptographicReviewRequiredProjects).toBe(3);
+    expect(response.body.cryptography.coverage.missingProjectSlugs).toEqual([]);
+    expect(response.body.cryptography.coverage.overlappingProjectSlugs).toEqual([]);
+    expect(response.body.cryptography.inventory).toHaveLength(7);
+    expect(response.body.cryptography.reviewRequired).toHaveLength(3);
+    expect(response.body.truthBoundaries.cryptographicInventoryIsObservationNotQuantumSafety).toBe(true);
+  });
+
   it('publishes defensive Lantern constraints as read-only posture data', async () => {
     const response = await request(createTestApp()).get('/security-posture');
 

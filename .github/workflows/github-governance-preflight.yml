@@ -7,14 +7,12 @@ on:
       - '.github/workflows/github-governance-preflight.yml'
       - 'scripts/audit-github-governance-preflight.mjs'
       - 'scripts/audit-github-governance-preflight.node-test.mjs'
-      - 'scripts/audit-github-governance-target-scope.node-test.mjs'
   push:
     branches: [main]
     paths:
       - '.github/workflows/github-governance-preflight.yml'
       - 'scripts/audit-github-governance-preflight.mjs'
       - 'scripts/audit-github-governance-preflight.node-test.mjs'
-      - 'scripts/audit-github-governance-target-scope.node-test.mjs'
   workflow_dispatch:
 
 permissions:
@@ -37,10 +35,7 @@ jobs:
         with:
           node-version: '24'
       - name: Verify preflight contract
-        run: >-
-          node --test
-          scripts/audit-github-governance-preflight.node-test.mjs
-          scripts/audit-github-governance-target-scope.node-test.mjs
+        run: node --test scripts/audit-github-governance-preflight.node-test.mjs
 
   governance-provider-read:
     name: GitHub Governance Preflight Provider Read

@@ -48,34 +48,18 @@ export function buildReceipt({
 }) {
   const localSet = new Set(localVersions);
   const remoteSet = new Set(remoteVersions);
-  const localOnly = localVersions.filter((version) => !remoteSet.has(version));
-  const remoteOnly = remoteVersions.filter((version) => !localSet.has(version));
-  const missingRequiredLocal = requiredVersions.filter((version) => !localSet.has(version));
-  const missingRequiredRemote = requiredVersions.filter((version) => !remoteSet.has(version));
-  const remoteLedgerComplete = phase === 'post-push'
-    && localOnly.length === 0
-    && remoteOnly.length === 0
-    && missingRequiredLocal.length === 0
-    && missingRequiredRemote.length === 0;
 
   return {
     phase,
     generatedAt: new Date().toISOString(),
     localMigrationCount: localVersions.length,
     remoteMigrationCount: remoteVersions.length,
-    localOnly,
-    remoteOnly,
+    localOnly: localVersions.filter((version) => !remoteSet.has(version)),
+    remoteOnly: remoteVersions.filter((version) => !localSet.has(version)),
     requiredVersions,
-    missingRequiredLocal,
-    missingRequiredRemote,
+    missingRequiredLocal: requiredVersions.filter((version) => !localSet.has(version)),
+    missingRequiredRemote: requiredVersions.filter((version) => !remoteSet.has(version)),
     remoteListSource,
-    productionMigrationEvidence: {
-      authority: phase === 'post-push' ? 'remote_migration_ledger' : 'preflight_only',
-      outcome: phase === 'post-push'
-        ? (remoteLedgerComplete ? 'verified' : 'blocked')
-        : 'not_evaluated',
-      supabaseGitHubCheckAcceptedAsOutcomeProof: false,
-    },
   };
 }
 

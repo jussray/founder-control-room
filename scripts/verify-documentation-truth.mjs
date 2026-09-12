@@ -71,8 +71,6 @@ const truthSensitiveRules = [
   { domain: 'cloudflare-authority', match: /^\.github\/workflows\/(?:deploy|cloudflare-build-diagnostic|fcr-access-front-door-recovery)\.yml$/ },
   { domain: 'cloudflare-authority', match: /^config\/cloudflare-/ },
   { domain: 'cloudflare-authority', match: /^wrangler\./ },
-  { domain: 'chief-access-authority', match: /^\.github\/workflows\/chief-proofmode-(?:access-command-bridge|access-recovery|runtime-witness)\.yml$/ },
-  { domain: 'chief-access-authority', match: /^scripts\/(?:reconcile-chief-proofmode-access|resolve-chief-proofmode-access-selector|chief-proofmode-access-reconciliation-state)\.mjs$/ },
 ];
 
 const truthSensitiveChanges = changedFiles
@@ -98,7 +96,6 @@ if (domains.has('cloudflare-authority')) {
   requiredDocs.add('docs/CLOUDFLARE_REASONING.md');
   requiredDocs.add('docs/deployment/CLOUDFLARE_WORKER_TARGETS.md');
 }
-if (domains.has('chief-access-authority')) requiredDocs.add('docs/CHIEF_PROOFMODE_ACCESS_RECOVERY.md');
 
 const failures = [];
 

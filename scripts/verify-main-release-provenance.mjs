@@ -45,13 +45,7 @@ export function classifyMainReleaseProvenance({
   const [pull] = matches;
   return {
     ok: true,
-    reason: 'pr_merge_provenance',
-    evidenceScope: 'pr_merge_only',
-    reviewAuthority: 'not_evaluated',
-    mergeAuthorization: 'not_evaluated',
-    productionMigrationOutcome: 'not_evaluated',
-    supabaseGitHubCheckAuthority: 'non_authoritative',
-    requiredProductionMigrationEvidence: 'canonical_deploy_remote_migration_ledger',
+    reason: 'reviewed_pr_merge_provenance',
     targetSha: target,
     pullRequestNumber: pull.number,
     mergedAt: pull.merged_at,

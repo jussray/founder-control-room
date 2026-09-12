@@ -131,14 +131,7 @@ describe("Founder Control Room ruleset governance", () => {
     expect(() => assertRulesetGovernancePolicy("founder-control-room", {
       ...canonicalConfig,
       targetRefs: ["release"],
-    })).toThrow(/target exactly main/);
-  });
-
-  it("fails closed when the canonical FCR ruleset broadens beyond main", () => {
-    expect(() => assertRulesetGovernancePolicy("founder-control-room", {
-      ...canonicalConfig,
-      targetRefs: ["main", "release"],
-    })).toThrow(/target exactly main/);
+    })).toThrow(/continue targeting main/);
   });
 
   it("requires the active FCR main ruleset bypass to match the configured GitHub App id exactly", () => {

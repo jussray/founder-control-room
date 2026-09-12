@@ -32,6 +32,12 @@ import type { EvidenceKind } from '../../reconciliation/types.js';
 import { WEBHOOK_ONLY_EVIDENCE_KINDS } from '../../reconciliation/types.js';
 import type { PatchFileChange, RepositoryProvider } from '../../providers/RepositoryProvider.js';
 import {
+  createBranchAuthorityContext,
+  issueCreateBranchAuthority,
+  type IssuedCreateBranchAuthority,
+} from '../../founder-os-lab/authorityIssuance.js';
+import { executeAuthorizedCreateBranch } from '../../providers/authorizedRepositoryMutation.js';
+import {
   FCR_FOUNDER_FINAL_REVIEW_POLICY,
   evaluateIndependentReviewGate,
   independentReviewDiffHash,
@@ -676,6 +682,47 @@ approvalsRouter.post(
     }
     const provider = configured.provider;
 
+    let createBranchAuthority: IssuedCreateBranchAuthority | null = null;
+    let createBranchArgs: { branchName: string; baseRef: string } | null = null;
+    if (actionType === 'create_branch') {
+      if (mission.status !== 'proposed') {
+        return res.status(409).json({
+          ok: false,
+          code: 'MISSION_NOT_PROPOSED',
+          error: `Mission must be proposed before branch creation; current status is ${mission.status}.`,
+        });
+      }
+      const branchName = text(payload['branchName']) || `mission/${missionId.slice(0, 8)}`;
+      const baseRef = text(payload['baseRef']) || 'main';
+      createBranchArgs = { branchName, baseRef };
+      try {
+        createBranchAuthority = issueCreateBranchAuthority({
+          missionId,
+          projectId: project.slug,
+          actor: req.founder!.email,
+          approvedBy: req.founder!.email,
+          idempotencyKey,
+          baseRef,
+          branchName,
+          state: {
+            missionStatus: mission.status,
+            policySnapshot: (mission.policy_snapshot as Record<string, unknown> | null) ?? null,
+          },
+          proof: {
+            id: String(proofRecord.id),
+            gateId: String(proofRecord.gate_id),
+            createdAt: String(proofRecord.created_at),
+          },
+        });
+      } catch (error) {
+        return res.status(409).json({
+          ok: false,
+          code: 'AUTHORITY_ISSUANCE_FAILED',
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
     // Reserve before external mutation. The unique idempotency key is the final
     // race barrier if two requests pass the preceding lookup concurrently.
     const { data: reservation, error: reservationError } = await supabase
@@ -687,7 +734,9 @@ approvalsRouter.post(
         idempotency_key: idempotencyKey,
         executed_by: req.founder!.email,
         status: 'pending',
-        request: payload,
+        request: createBranchAuthority
+          ? { ...payload, authorityEnvelope: createBranchAuthority.envelope }
+          : payload,
         result: {},
         success: null,
         started_at: new Date().toISOString(),
@@ -728,32 +777,72 @@ approvalsRouter.post(
 
     try {
       if (actionType === 'create_branch') {
-        if (mission.status !== 'proposed') {
-          throw new Error(`Mission must be proposed before branch creation; current status is ${mission.status}.`);
+        if (!createBranchAuthority || !createBranchArgs) {
+          throw new Error('Create-branch authority was not issued for this execution.');
         }
-        const branchName = (payload['branchName'] as string) ?? `mission/${missionId.slice(0, 8)}`;
-        const baseRef = (payload['baseRef'] as string) ?? 'main';
-        await provider.createBranch(project.slug, baseRef, branchName);
+
+        const { data: freshMission, error: freshMissionError } = await supabase
+          .from('missions')
+          .select('status, policy_snapshot')
+          .eq('id', missionId)
+          .single();
+        if (freshMissionError || !freshMission) {
+          throw new Error('Create-branch authority could not reacquire current mission state.');
+        }
+
+        const freshContext = createBranchAuthorityContext({
+          missionId,
+          projectId: project.slug,
+          actor: req.founder!.email,
+          approvedBy: req.founder!.email,
+          idempotencyKey,
+          baseRef: createBranchArgs.baseRef,
+          branchName: createBranchArgs.branchName,
+          state: {
+            missionStatus: freshMission.status,
+            policySnapshot: (freshMission.policy_snapshot as Record<string, unknown> | null) ?? null,
+          },
+          proof: {
+            id: String(proofRecord.id),
+            gateId: String(proofRecord.gate_id),
+            createdAt: String(proofRecord.created_at),
+          },
+          now: new Date().toISOString(),
+          toolCallId: createBranchAuthority.envelope.toolCallId,
+        });
+
+        await executeAuthorizedCreateBranch(provider, {
+          projectId: project.slug,
+          baseRef: createBranchArgs.baseRef,
+          branchName: createBranchArgs.branchName,
+          idempotencyKey,
+          envelope: createBranchAuthority.envelope,
+          context: freshContext,
+        });
 
         let expectedHeadSha: string | null = null;
         try {
-          expectedHeadSha = await provider.resolveRef(project.slug, branchName);
+          expectedHeadSha = await provider.resolveRef(project.slug, createBranchArgs.branchName);
         } catch (resolveError) {
           warnings.push(
             `Branch was created, but its head commit could not be resolved and pinned: ${resolveError instanceof Error ? resolveError.message : String(resolveError)}`,
           );
         }
 
-        executionResult = { branchName, baseRef, ...(expectedHeadSha ? { expectedHeadSha } : {}) };
+        executionResult = {
+          branchName: createBranchArgs.branchName,
+          baseRef: createBranchArgs.baseRef,
+          ...(expectedHeadSha ? { expectedHeadSha } : {}),
+        };
 
         const { error: missionUpdateError } = await supabase
           .from('missions')
           .update({
-            branch_ref: branchName,
+            branch_ref: createBranchArgs.branchName,
             status: 'sandboxed',
             updated_at: new Date().toISOString(),
             ...(expectedHeadSha
-              ? { policy_snapshot: { ...(mission.policy_snapshot as Record<string, unknown> ?? {}), expectedHeadSha } }
+              ? { policy_snapshot: { ...(freshMission.policy_snapshot as Record<string, unknown> ?? {}), expectedHeadSha } }
               : {}),
           })
           .eq('id', missionId)
