@@ -1,0 +1,120 @@
+{
+  "schemaVersion": 1,
+  "contract": "founder-control-room/media-script-manifest@v1",
+  "projectId": "959a5532-da31-4bc8-af28-508ef1a2b640",
+  "projectSlug": "founder-control-room",
+  "repositoryFullName": "jussray/founder-control-room",
+  "targetBranch": "main",
+  "missionId": "167d89a2-f4e5-4670-833d-5650c53142cc",
+  "founderIntentId": "8f4ba218-01dd-44e1-b409-cecbbb6d3ef9",
+  "intent": {
+    "outcome": "Create a truth-guarded live-action Founder Control Room video that makes people curious about what the project actually does and could help with once fully launched.",
+    "truthBoundary": "Show current verified architecture and implementation without claiming the product is fully launched or that future outcomes have already occurred."
+  },
+  "subject": {
+    "name": "Founder Control Room",
+    "format": "live-action founder manifesto",
+    "stage": "script"
+  },
+  "direction": {
+    "liveActionOnly": true,
+    "avatarImpersonation": false,
+    "coreVisualLanguage": "real founder work, real screens, real evidence checks, restrained captions",
+    "noAnimatedExplainer": true,
+    "noHudAsPrimaryVisual": true,
+    "tone": "urgent, grounded, curious, evidence-bound"
+  },
+  "script": {
+    "durationTargetSeconds": 35,
+    "opening": {
+      "visual": "A founder working alone at a laptop. A screen appears to say DONE. The founder stops instead of celebrating, then checks the browser, commit, and evidence.",
+      "voiceover": "AI is getting very good at doing things. I am interested in whether it knows what actually happened."
+    },
+    "middle": {
+      "visual": "Fast live-action cuts of browser testing, code, project screens, a phone, infrastructure checks, and the founder comparing evidence before accepting a result.",
+      "voiceover": "I am building Founder Control Room so every system works toward one founder intent, and every claim has to survive the evidence.",
+      "captions": [
+        "VERIFIED",
+        "INFERRED",
+        "UNKNOWN",
+        "BLOCKED",
+        "BUILD · FIX · LAUNCH · GROW · DECIDE · OPERATE · PROVE"
+      ]
+    },
+    "truthDisclosure": {
+      "visual": "Hold briefly on the founder and the evidence screen instead of a product victory montage.",
+      "caption": "NOT FULLY LAUNCHED YET."
+    },
+    "closing": {
+      "visual": "Founder closes one evidence check, looks back to the work, then the Founder Control Room name appears over restrained live-action footage.",
+      "voiceover": "But if you want to understand where I think founder software is going, look closer.",
+      "caption": "Founder Control Room · AI that knows what it can prove."
+    }
+  },
+  "truthReview": {
+    "status": "reviewed",
+    "reviewer": "truthmode",
+    "rules": [
+      "Do not claim Founder Control Room is fully launched.",
+      "Do not claim a render, publication, customer outcome, or external action before outcome evidence exists.",
+      "Do not turn continuity evidence into action or publish authority.",
+      "Keep future usefulness framed as design intent or future capability, not present outcome."
+    ],
+    "publicClaims": [
+      {
+        "claim": "Founder Control Room has mission-bound media continuity and proof-cookie contracts in the repository.",
+        "classification": "VERIFIED",
+        "evidenceRefs": [
+          "github:src/lib/mediaContinuity.ts",
+          "github:src/lib/mediaMissionContinuity.ts",
+          "github:Founder Cookie Contract Mirror"
+        ]
+      },
+      {
+        "claim": "Founder Control Room is being built so internal capabilities work toward one founder intent and claims are evidence-bound.",
+        "classification": "VERIFIED",
+        "evidenceRefs": [
+          "github:founder-intent-runtime",
+          "supabase:founder-intent:8f4ba218-01dd-44e1-b409-cecbbb6d3ef9",
+          "supabase:mission:167d89a2-f4e5-4670-833d-5650c53142cc"
+        ]
+      },
+      {
+        "claim": "Once fully launched, the system could help founders coordinate Build, Fix, Launch, Grow, Decide, Operate, and Prove under one intent.",
+        "classification": "INFERRED",
+        "evidenceRefs": [
+          "fcr:product-design-intent"
+        ]
+      },
+      {
+        "claim": "This video has been rendered, published, or produced a customer outcome.",
+        "classification": "UNKNOWN",
+        "evidenceRefs": []
+      }
+    ]
+  },
+  "intelligence": {
+    "layer": "chatgpt",
+    "role": "reasoning-director-and-truth-review"
+  },
+  "renderStack": {
+    "state": "not-selected",
+    "renderAuthorized": false
+  },
+  "runtime": {
+    "stage": "planning",
+    "renderExecuted": false
+  },
+  "authority": {
+    "draft": true,
+    "render": false,
+    "publish": false,
+    "sendExternal": false,
+    "billingChange": false
+  },
+  "evidenceRefs": [
+    "github:media-script-manifest",
+    "github:media-continuity-contract",
+    "github:media-mission-continuity-contract"
+  ]
+}
