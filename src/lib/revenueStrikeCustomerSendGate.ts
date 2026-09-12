@@ -223,15 +223,23 @@ async function finalizeLease(input: {
   finalizedAt: string;
 }, rpcClient: RevenueStrikeRpcClient): Promise<boolean> {
   try {
+    const expectedReceiptId = text(input.providerReceiptId);
     const response = await rpcClient.rpc('finalize_revenue_strike_customer_send_lease', {
       p_claim_id: input.claimId,
       p_founder_user_id: text(input.founderUserId),
       p_provider_outcome: input.outcome,
-      p_provider_receipt_id: text(input.providerReceiptId) || null,
+      p_provider_receipt_id: expectedReceiptId || null,
       p_finalized_at: new Date(input.finalizedAt).toISOString(),
     });
     if (response.error) return false;
-    return Boolean(firstRow(response.data));
+
+    const row = firstRow(response.data);
+    if (!row) return false;
+
+    return text(row.claim_id) === input.claimId
+      && text(row.provider_outcome) === input.outcome
+      && text(row.provider_receipt_id) === expectedReceiptId
+      && validTime(row.finalized_at);
   } catch {
     return false;
   }
