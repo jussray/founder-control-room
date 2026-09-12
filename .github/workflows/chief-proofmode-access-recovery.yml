@@ -135,9 +135,27 @@ jobs:
       - name: Prove Chief Access bounded-repair contracts
         run: |
           node --check scripts/reconcile-chief-proofmode-access.mjs
+          node --check scripts/discover-chief-proofmode-access-service-token.mjs
           node --test scripts/reconcile-chief-proofmode-access.node-test.mjs
+          node --test scripts/discover-chief-proofmode-access-service-token.node-test.mjs
           node --test scripts/chief-proofmode-access-bridge-contract.node-test.mjs
           node --test scripts/fcr-cloudflare-bridge-contract.node-test.mjs
+
+      - name: Discover existing Chief-bound service-token selector before repair
+        if: inputs.mode == 'repair'
+        env:
+          CLOUDFLARE_ACCESS_API_TOKEN: ${{ secrets.CLOUDFLARE_ACCESS_API_TOKEN }}
+          CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID: ${{ secrets.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID || secrets.CLOUDFLARE_ACCESS_CLIENT_ID || vars.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID || vars.CLOUDFLARE_ACCESS_CLIENT_ID }}
+          CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID: ${{ vars.CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID || vars.CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -n "$CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID" || -n "$CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID" ]]; then
+            echo 'Explicit protected Chief service-token selector is already configured; bounded discovery not needed.'
+            exit 0
+          fi
+          node scripts/discover-chief-proofmode-access-service-token.mjs >/dev/null
+          echo 'Bounded Chief service-token selector discovery completed without exposing the selector value.'
 
       - name: Require configured Chief service-token identity before repair
         if: inputs.mode == 'repair'
@@ -147,8 +165,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [[ -z "$CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID" && -z "$CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID" ]]; then
-            echo '::error title=Missing Chief service-token identity::repair requires CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID (or canonical alias CLOUDFLARE_ACCESS_CLIENT_ID) or CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID (or alias CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID) as a protected selector in the FCR production environment.'
+          if [[ -z "$CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID" && -z "$CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID" && -z "${CHIEF_CLOUDFLARE_ACCESS_DISCOVERED_SERVICE_TOKEN_ID:-}" ]]; then
+            echo '::error title=Missing Chief service-token identity::repair requires CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID (or canonical alias CLOUDFLARE_ACCESS_CLIENT_ID), CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID (or alias CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID), or one uniquely discovered existing Chief-bound selector as a protected selector in the FCR production environment.'
             exit 1
           fi
 
@@ -169,6 +187,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          if [[ -z "$CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID" && -n "${CHIEF_CLOUDFLARE_ACCESS_DISCOVERED_SERVICE_TOKEN_ID:-}" ]]; then
+            export CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID="$CHIEF_CLOUDFLARE_ACCESS_DISCOVERED_SERVICE_TOKEN_ID"
+          fi
           node scripts/reconcile-chief-proofmode-access.mjs >/dev/null 2>&1
           cp test-results/chief-proofmode-access-recovery.json test-results/chief-proofmode-access-mutation.json
 
@@ -179,7 +200,13 @@ jobs:
           CLOUDFLARE_ACCESS_API_TOKEN: ${{ secrets.CLOUDFLARE_ACCESS_ADMIN_API_TOKEN }}
           CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID: ${{ secrets.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID || secrets.CLOUDFLARE_ACCESS_CLIENT_ID || vars.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID || vars.CLOUDFLARE_ACCESS_CLIENT_ID }}
           CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID: ${{ vars.CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID || vars.CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID }}
-        run: node scripts/reconcile-chief-proofmode-access.mjs >/dev/null 2>&1
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "$CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID" && -n "${CHIEF_CLOUDFLARE_ACCESS_DISCOVERED_SERVICE_TOKEN_ID:-}" ]]; then
+            export CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID="$CHIEF_CLOUDFLARE_ACCESS_DISCOVERED_SERVICE_TOKEN_ID"
+          fi
+          node scripts/reconcile-chief-proofmode-access.mjs >/dev/null 2>&1
 
       - name: Return sanitized Chief Access receipt to founder control issue
         if: always()
