@@ -5,6 +5,8 @@ import test from 'node:test';
 const commandBridge = readFileSync('.github/workflows/fcr-cloudflare-command-bridge.yml', 'utf8');
 const recoveryWorkflow = readFileSync('.github/workflows/fcr-access-front-door-recovery.yml', 'utf8');
 const reconciliation = readFileSync('scripts/reconcile-cloudflare-access-public-zone.mjs', 'utf8');
+const splitKernel = readFileSync('scripts/fcr-access-public-worker-split.mjs', 'utf8');
+const splitCli = readFileSync('scripts/fcr-access-public-worker-split-cli.mjs', 'utf8');
 const browserProof = readFileSync('scripts/verify-fcr-front-door-playwright.mjs', 'utf8');
 
 const ACCOUNT_ID = '9b59861bd1747cf7525571b4c51d2aa0';
@@ -28,7 +30,10 @@ test('recovery workflow is production-gated and separates read from mutation aut
   assert.match(recoveryWorkflow, /if: inputs\.apply == true/);
   assert.match(recoveryWorkflow, /current_main.*EXPECTED_HEAD_SHA/s);
   assert.match(recoveryWorkflow, /verify-fcr-front-door-playwright\.mjs/);
-  assert.match(recoveryWorkflow, /--rollback/);
+  assert.match(recoveryWorkflow, /fcr-access-public-worker-split-cli\.mjs apply/);
+  assert.match(recoveryWorkflow, /fcr-access-public-worker-split-cli\.mjs rollback/);
+  assert.doesNotMatch(recoveryWorkflow, /reconcile-cloudflare-access-public-zone\.mjs --apply/);
+  assert.doesNotMatch(recoveryWorkflow, /reconcile-cloudflare-access-public-zone\.mjs --rollback/);
   assert.match(recoveryWorkflow, /failure\(\) && inputs\.apply == true/);
 });
 
@@ -44,26 +49,30 @@ test('authority gate never publishes a raw approval reference', () => {
   assert.match(authorityStep, /Approval reference receipt: \\`\$approval_reference_receipt\\`/);
   assert.doesNotMatch(authorityStep, /Approval reference: \\`\$APPROVAL_REFERENCE\\`/);
   assert.match(authorityStep, /foundercontrolroom\.org\/\*/);
-  assert.match(authorityStep, /Existing all-workers protection: preserved/);
+  assert.match(authorityStep, /www\.foundercontrolroom\.org\/\*/);
+  assert.match(authorityStep, /api\.foundercontrolroom\.org\/version/);
+  assert.match(authorityStep, /every other Worker route remains behind Access/);
+  assert.match(authorityStep, /exact performed split receipt/);
 });
 
-test('raw recovery receipts remain ephemeral and are suppressed from workflow logs', () => {
+test('raw recovery receipts remain ephemeral and only the trusted split CLI mutates provider state', () => {
   assert.match(
     recoveryWorkflow,
     /node scripts\/reconcile-cloudflare-access-public-zone\.mjs >\/dev\/null 2>&1/,
   );
   assert.match(
     recoveryWorkflow,
-    /node scripts\/reconcile-cloudflare-access-public-zone\.mjs --apply >\/dev\/null 2>&1/,
+    /node scripts\/fcr-access-public-worker-split-cli\.mjs apply >\/dev\/null 2>&1/,
   );
   assert.match(
     recoveryWorkflow,
-    /node scripts\/reconcile-cloudflare-access-public-zone\.mjs --rollback >\/dev\/null 2>&1/,
+    /node scripts\/fcr-access-public-worker-split-cli\.mjs rollback >\/dev\/null 2>&1/,
   );
   assert.match(
     recoveryWorkflow,
     /node scripts\/verify-fcr-front-door-playwright\.mjs >\/dev\/null 2>&1/,
   );
+  assert.doesNotMatch(recoveryWorkflow, /reconcile-cloudflare-access-public-zone\.mjs --(?:apply|rollback)/);
 });
 
 test('always-path output independently sanitizes the requested head before publication', () => {
@@ -221,24 +230,45 @@ test('artifact persistence contains only the sanitized public receipt', () => {
   assert.match(artifactStep, /path:\s*test-results\/fcr-access-front-door-public-receipt\.md/);
   assert.doesNotMatch(artifactStep, /fcr-access-front-door-recovery\.json/);
   assert.doesNotMatch(artifactStep, /fcr-access-front-door-browser-proof\.json/);
+  assert.doesNotMatch(artifactStep, /fcr-access-public-worker-split/);
 });
 
-test('provider mutation is limited to exact public Access application create/delete', () => {
-  assert.doesNotMatch(reconciliation, /'PUT'/);
-  assert.match(reconciliation, /'POST'/);
-  assert.match(reconciliation, /'DELETE'/);
-  assert.match(reconciliation, /destinations: \[\{ type: 'public', uri: `\$\{zone\}\/\*` \}\]/);
-  assert.match(reconciliation, /decision: 'bypass'/);
-  assert.match(reconciliation, /include: \[\{ everyone: \{\} \}\]/);
+test('provider mutation is limited to the exact public/Worker split kernel', () => {
+  assert.match(splitKernel, /destinations\.length === 2/);
+  assert.match(splitKernel, /wholeSitePublic\.length === 1/);
+  assert.match(splitKernel, /workerDestinations\.length === 1/);
+  assert.match(splitKernel, /otherDestinations\.length === 0/);
+  assert.match(splitKernel, /'PUT'/);
+  assert.match(splitKernel, /'POST'/);
+  assert.match(splitKernel, /'DELETE'/);
+  assert.match(splitKernel, /`\$\{target\}\/\*`/);
+  assert.match(splitKernel, /`www\.\$\{target\}\/\*`/);
+  assert.match(splitKernel, /`api\.\$\{target\}\/version`/);
+  assert.match(splitKernel, /decision: 'bypass'/);
+  assert.match(splitKernel, /include: \[\{ everyone: \{\} \}\]/);
+  assert.match(splitKernel, /split-source-update-reconcile-required/);
+  assert.match(splitKernel, /rollbackFcrPublicWorkerSplit/);
+  assert.doesNotMatch(splitKernel, /deny_unmatched_requests_exempted_zone_names/);
+  assert.doesNotMatch(splitKernel, /\/dns_records|\/routes|wrangler|supabase/i);
+
+  assert.match(splitCli, /fcr-access-split-v1:/);
+  assert.match(splitCli, /split-rollback-receipt-head-mismatch/);
+  assert.match(splitCli, /FRONT_DOOR_COMPAT_RECEIPT_PATH/);
+  assert.doesNotMatch(splitCli, /APPROVAL_REFERENCE/);
+
+  // The predecessor remains the read-only topology observer in the trusted lane.
   assert.match(reconciliation, /existing-public-access-app-requires-review/);
-  assert.match(reconciliation, /rollbackFcrPublicAccessZone/);
-  assert.doesNotMatch(reconciliation, /deny_unmatched_requests_exempted_zone_names/);
-  assert.doesNotMatch(reconciliation, /\/dns_records|\/routes|wrangler|supabase/i);
 });
 
-test('browser proof binds public origin and API runtime to the exact approved SHA', () => {
+test('browser proof binds public origin, private Worker containment, and runtime to the exact approved SHA', () => {
   assert.match(browserProof, /https:\/\/www\.foundercontrolroom\.org/);
   assert.match(browserProof, /https:\/\/api\.foundercontrolroom\.org\/version/);
+  assert.match(browserProof, /https:\/\/api\.foundercontrolroom\.org\/health/);
+  assert.match(browserProof, /PUBLIC_HEALTH_URL/);
+  assert.match(browserProof, /EXPECTED_API_SERVICE = 'founder-control-room'/);
+  assert.match(browserProof, /publicHealthReachesCanonicalWorker/);
+  assert.match(browserProof, /protectedApiHealthDeniedToStranger/);
+  assert.match(browserProof, /maxRedirects:\s*0/);
   assert.match(browserProof, /receipt\.finalOrigin !== PUBLIC_ORIGIN/);
   assert.match(browserProof, /Always probe the canonical public origin independently/);
   assert.match(browserProof, /versionPayload\.includes\(expectedHeadSha\)/);
