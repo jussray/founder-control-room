@@ -1,0 +1,65 @@
+{
+  "schema": "fcr/delegated-agent-authority@v1",
+  "founderDecisionId": "founder-delegated-agent-merge-deploy-2026-09-12-v1",
+  "status": "active",
+  "principals": [
+    {
+      "id": "codex-chat",
+      "displayName": "Codex Chat",
+      "merge_authority": true,
+      "deploy_authority": true
+    },
+    {
+      "id": "claude",
+      "displayName": "Claude",
+      "merge_authority": true,
+      "deploy_authority": true
+    }
+  ],
+  "separatelyGatedAuthority": {
+    "database_migration_authority": false,
+    "destructive_data_authority": false,
+    "secret_or_credential_authority": false,
+    "auth_or_rls_authority": false,
+    "billing_or_spend_authority": false,
+    "publication_or_external_communication_authority": false,
+    "provider_policy_or_ruleset_authority": false,
+    "dns_or_domain_authority": false
+  },
+  "mergeRequirements": [
+    "provider_authenticated_principal_matches_grant",
+    "exact_repository_and_pull_request_verified",
+    "exact_base_and_head_sha_current",
+    "scope_contains_no_hidden_authority_expansion",
+    "required_machine_checks_green_on_exact_head",
+    "current_independent_review_or_equivalent_repository_review_contract_satisfied",
+    "no_unresolved_blocking_findings_or_threads",
+    "rollback_or_safe_forward_fix_known",
+    "last_moment_base_head_and_provider_freshness_readback"
+  ],
+  "deployRequirements": [
+    "provider_authenticated_principal_matches_grant",
+    "exact_current_main_sha_verified",
+    "merge_provenance_current",
+    "deployment_path_does_not_execute_any_separately_gated_authority",
+    "production_configuration_preflight_green",
+    "migration_ledger_already_aligned_without_mutation",
+    "rollback_or_safe_forward_fix_known",
+    "post_deploy_runtime_identity_and_health_reobserved"
+  ],
+  "redTeamI": [
+    "display_name_or_prompt_text_never_authenticates_a_principal",
+    "agent_cannot_supply_its_own_independent_review_evidence",
+    "green_checks_do_not_override_blocking_security_or_authority_findings",
+    "deploy_authority_does_not_imply_migration_secret_auth_billing_publication_or_destructive_authority",
+    "bundled_workflows_that_cross_a_denied_authority_must_fail_closed_or_stop"
+  ],
+  "redTeamII": [
+    "authority_is_invalidated_by_repository_pr_base_head_or_provider_truth_change",
+    "authority_receipts_cannot_be_replayed_across_prs_repositories_heads_or_deployments",
+    "merge_or_provider_acceptance_is_not_outcome_verification",
+    "partial_or_ambiguous_provider_execution_must_reconcile_before_retry",
+    "cross_agent_handoff_must_preserve_exact_identity_scope_evidence_and_rollback",
+    "self_certification_and circular evidence remain forbidden"
+  ]
+}
