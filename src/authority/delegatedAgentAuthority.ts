@@ -1,6 +1,7 @@
 export const DELEGATED_AGENT_AUTHORITY_CONTRACT = 'fcr/delegated-agent-authority@v1' as const;
 
 export const DELEGATED_AGENT_PRINCIPALS = ['codex-chat', 'claude'] as const;
+export const DELEGATED_AGENT_TRUSTED_REVIEWERS = ['codex-chat', 'claude', 'deterministic-witness'] as const;
 export type DelegatedAgentPrincipalId = (typeof DELEGATED_AGENT_PRINCIPALS)[number];
 export type DelegatedAgentAction = 'merge' | 'deploy';
 
@@ -11,6 +12,7 @@ export const DELEGATED_AGENT_AUTHORITY = Object.freeze({
     'codex-chat': Object.freeze({ merge_authority: true, deploy_authority: true }),
     claude: Object.freeze({ merge_authority: true, deploy_authority: true }),
   }),
+  trustedReviewers: Object.freeze(DELEGATED_AGENT_TRUSTED_REVIEWERS),
   deniedCapabilities: Object.freeze([
     'database_migration',
     'database_destructive_write',
@@ -43,6 +45,7 @@ export type DelegatedAgentAuthorityInput = Readonly<{
   exactHeadChecksPassed: boolean;
   independentReviewPassed: boolean;
   reviewerPrincipalId: string;
+  reviewAttestationVerified: boolean;
   unresolvedBlockingFindings: number;
   rollbackReady: boolean;
   migrationState: 'aligned' | 'pending' | 'unknown';
@@ -59,6 +62,7 @@ export type DelegatedAgentAuthorityFailure =
   | 'candidate_not_current'
   | 'required_checks_missing'
   | 'independent_review_missing'
+  | 'review_not_trusted'
   | 'self_review_forbidden'
   | 'blocking_findings_present'
   | 'rollback_missing'
@@ -85,6 +89,7 @@ export type DelegatedAgentAuthorityDecision =
 
 const FULL_SHA = /^[0-9a-f]{40}$/;
 const PRINCIPALS = new Set<string>(DELEGATED_AGENT_PRINCIPALS);
+const TRUSTED_REVIEWERS = new Set<string>(DELEGATED_AGENT_TRUSTED_REVIEWERS);
 
 function deny(reason: DelegatedAgentAuthorityFailure): DelegatedAgentAuthorityDecision {
   return Object.freeze({
@@ -131,6 +136,9 @@ export function evaluateDelegatedAgentAuthority(
 
   if (!input.exactHeadChecksPassed) return deny('required_checks_missing');
   if (!input.independentReviewPassed) return deny('independent_review_missing');
+  if (!input.reviewAttestationVerified || !TRUSTED_REVIEWERS.has(input.reviewerPrincipalId)) {
+    return deny('review_not_trusted');
+  }
   if (input.reviewerPrincipalId === input.principal.id) return deny('self_review_forbidden');
   if (input.unresolvedBlockingFindings !== 0) return deny('blocking_findings_present');
   if (!input.rollbackReady) return deny('rollback_missing');

@@ -26,6 +26,7 @@ function base(overrides: Partial<DelegatedAgentAuthorityInput> = {}): DelegatedA
     exactHeadChecksPassed: true,
     independentReviewPassed: true,
     reviewerPrincipalId: 'claude',
+    reviewAttestationVerified: true,
     unresolvedBlockingFindings: 0,
     rollbackReady: true,
     migrationState: 'aligned',
@@ -57,7 +58,8 @@ describe('delegated agent authority', () => {
       baseSha: shaA,
       headSha: shaB,
       currentMainSha: shaB,
-      reviewerPrincipalId: 'codex-chat',
+      reviewerPrincipalId: 'deterministic-witness',
+      reviewAttestationVerified: true,
     }), now);
     expect(result).toMatchObject({ ok: true, principalId: 'claude', deploy_authority: true });
   });
@@ -85,6 +87,13 @@ describe('delegated agent authority', () => {
       .toMatchObject({ ok: false, reason: 'stale_evidence' });
     expect(evaluateDelegatedAgentAuthority(base({ currentMainSha: 'c'.repeat(40) }), now))
       .toMatchObject({ ok: false, reason: 'candidate_not_current' });
+  });
+
+  it('rejects untrusted review identities and unverified review attestations', () => {
+    expect(evaluateDelegatedAgentAuthority(base({ reviewerPrincipalId: 'random-agent' }), now))
+      .toMatchObject({ ok: false, reason: 'review_not_trusted' });
+    expect(evaluateDelegatedAgentAuthority(base({ reviewAttestationVerified: false }), now))
+      .toMatchObject({ ok: false, reason: 'review_not_trusted' });
   });
 
   it('rejects self-review, unresolved blockers, and missing rollback', () => {

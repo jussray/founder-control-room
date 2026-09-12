@@ -16,12 +16,12 @@ The grant fails closed when any of these are missing or stale:
 1. exact repository, base SHA, head SHA, and current `main` identity;
 2. exact-head machine proof required by the repository;
 3. fresh evidence inside the policy window;
-4. independent review not authored by the acting principal;
+4. trusted independent review with its own verified attestation;
 5. zero unresolved blocking findings;
 6. rollback or safe forward-fix;
 7. for deploy, exact `head == current main` and an already-aligned migration state.
 
-A principal may not self-review its own material patch and then consume its own review as independent evidence. Codex Chat may review Claude-authored work and Claude may review Codex-authored work when the review is independently derived from exact provider state. A deterministic trusted witness may also satisfy the independent-proof layer when the repository contract permits it.
+A principal may not self-review its own material patch and then consume its own review as independent evidence. `codex-chat`, `claude`, and the trusted deterministic witness are the only v1 review identities accepted by this policy, and the review attestation must itself be verified.
 
 ## Red Team II — deeper authority attacks
 
@@ -29,6 +29,7 @@ The grant must resist:
 
 - stale-head or stale-base replay;
 - copied chat text pretending to be adapter identity;
+- arbitrary reviewer strings pretending to be independent review;
 - cross-repository scope bleed;
 - reusing a prior green packet after `main`, head, diff, provider, or review state changes;
 - using merge authority as database, secret, auth/RLS, billing, publication, DNS/provider-ownership, deletion, or migration authority;

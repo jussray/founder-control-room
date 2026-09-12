@@ -5,26 +5,25 @@
     "date": "2026-09-12",
     "standing": true,
     "principals": {
-      "codex-chat": {
-        "merge_authority": true,
-        "deploy_authority": true
-      },
-      "claude": {
-        "merge_authority": true,
-        "deploy_authority": true
-      }
+      "codex-chat": { "merge_authority": true, "deploy_authority": true },
+      "claude": { "merge_authority": true, "deploy_authority": true }
     }
   },
   "identity": {
     "required": "registered-adapter-attestation",
     "callerAssertionIsAuthority": false
   },
+  "review": {
+    "trustedReviewers": ["codex-chat", "claude", "deterministic-witness"],
+    "attestationRequired": true,
+    "actingPrincipalMayReviewOwnAction": false
+  },
   "requiredBeforeMergeOrDeploy": [
     "exact-repository",
     "exact-current-base-or-main",
     "exact-head-machine-proof",
     "fresh-evidence-within-10-minutes",
-    "independent-review-not-by-acting-principal",
+    "trusted-independent-review",
     "zero-unresolved-blocking-findings",
     "rollback-ready"
   ],
