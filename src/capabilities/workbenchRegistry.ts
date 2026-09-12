@@ -54,7 +54,7 @@ export const capabilities = [
     id: 'event-envelope-contract-v1', kind: 'Contract', category: 'contracts', score: 90,
     summary: 'One typed event shape across Workers, n8n, HubSpot, GitHub, and Python.',
     purpose: 'Make every automation identify source, tenant, correlation, time, and payload before execution.',
-    inputs: [['id', 'uuid', 'Idempotency identity'], ['type', 'string', 'Namespaced event type'], ['source', 'enum', 'Origin system'], ['correlationId', 'uuid', 'Cross-step trace']],
+    inputs: [['id', 'uuid', 'Idempotency identity'], ['type', 'string', 'Namespaced event type'], ['source', 'enum', 'Origin system'], ['correlationId', 'uuid', 'Evidence chain']],
     environment: ['No environment variables'],
     proof: ['Valid fixture accepted', 'Unknown source rejected', 'Malformed UUID rejected'],
     risk: 'Validation proves shape, not truth or authority. Provider identity and founder approval remain separate gates.',
