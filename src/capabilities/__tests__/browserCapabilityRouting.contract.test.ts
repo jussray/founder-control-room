@@ -20,7 +20,7 @@ describe('FCR browser capability routing contract', () => {
       expect(contract).toContain(token);
     }
 
-    expect(contract).toContain('Parent contract: `docs/FCR_SINGLE_OS_COHESION_AUDIT.md`');
+    expect(contract).toContain('**Parent contract:** `docs/FCR_SINGLE_OS_COHESION_AUDIT.md`');
     expect(contract).toContain('Opera is a preferred browser capability, not an architectural dependency.');
     expect(contract).toContain('A browser provider may not manufacture, inherit, widen, replay, or renew founder approval.');
   });
