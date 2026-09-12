@@ -64,6 +64,64 @@ For repository, CI, deployment, runtime, or cross-project claims, current author
 
 This is a TruthMode rule, not a cleanup convenience: newest head does not automatically mean verified, predecessor green does not automatically mean current green, and predecessor proof must never be discarded merely because authority moved forward.
 
+## Bidirectional continuity and proof-cookie reconciliation
+
+Continuity fingerprints and proof cookies must work in both directions across FCR and every governed project. They are non-secret state markers that bind observations to exact subject state. They never create, renew, inherit, or widen authority.
+
+### Inbound truth reconciliation
+
+Before a material recommendation, repair, implementation, merge, issue disposition, stale-proof cleanup, deployment, provider mutation, or completion claim:
+
+- resolve the current authoritative repository, branch/head, provider, runtime, and evidence subject needed for the decision;
+- compare the current subject, scope, proof, review, provider, runtime, and authority fingerprints or proof cookies against the predecessor markers when they exist;
+- treat movement in any load-bearing dimension as continuity movement that requires fresh evidence before a previous present-tense claim is reused;
+- preserve predecessor fingerprints, cookies, exact SHAs, receipts, and evidence as historical provenance even when they are no longer current; and
+- classify conflicting or insufficient observations `STALE`, `SUPERSEDED`, `UNKNOWN`, `BLOCKED`, or `CONTRADICTED` rather than forcing them into green.
+
+Fresh evidence may prove that code, configuration, documentation, an issue, a runtime assumption, a merge candidate, or a prior proof claim is stale, wrong, incomplete, or already resolved. That evidence may create an exact bounded reconciliation proposal. It does not authorize the proposal by itself.
+
+### Approval-to-action gate
+
+A verified fingerprint or proof cookie is evidence, not approval. Mutation requires the applicable current authority and, when founder approval is required, an explicit founder decision bound to the exact current proposal and subject.
+
+Under valid current founder approval, verified evidence may be used to take the smallest reversible action that aligns project state with reality, including:
+
+- merge an already focused candidate only when the repository's current merge gates are satisfied;
+- implement or repair the smallest cause proved by current evidence;
+- rectify code, configuration, documentation, or project state that current evidence proves stale or incorrect;
+- update, close, reopen, or otherwise reconcile an issue when current evidence proves its state changed;
+- replace a stale present-tense proof or claim while preserving the predecessor evidence as history; or
+- advance the next founder gate when the required evidence for that transition is current.
+
+Founder approval never converts a stale fingerprint into current proof and never waives required checks, exact-head review, Playwright for changed user-facing paths, provider/runtime verification, privacy or safety boundaries, rollback, or repository-specific merge authority. If the approved proposal's scope, subject, head, authority, or required evidence moves, reacquire evidence and approval as required before mutation.
+
+### Outbound continuity reconciliation
+
+After every approved material mutation:
+
+- re-resolve the authoritative repository/provider/runtime state instead of assuming the write succeeded;
+- verify the exact changed path and the outcome evidence required for the claim;
+- mint or record the successor continuity fingerprint or proof cookie linked to the predecessor and bounded evidence references;
+- make source, execution, runtime, provider, and human-outcome truth independently visible where applicable; and
+- if the post-action evidence does not match the intended result, classify the result `UNKNOWN`, `CONTRADICTED`, `STALE`, or `BLOCKED` and continue with the smallest new evidence-backed reconciliation rather than claiming completion.
+
+A successor fingerprint or proof cookie records what is now observed. It cannot replay the founder's approval, grant standing merge authority, authorize another mutation, or make future evidence current automatically.
+
+Required reconciliation loop:
+
+```text
+Observe current subject
+→ Compare predecessor fingerprint / proof cookie
+→ Classify continuity movement
+→ Build exact evidence-backed proposal
+→ Obtain current authority / founder approval when required
+→ Execute one bounded reversible action
+→ Re-observe authoritative state
+→ Verify outcome
+→ Emit successor fingerprint / proof cookie + receipt
+→ Next gate
+```
+
 Required loop:
 
 ```text
