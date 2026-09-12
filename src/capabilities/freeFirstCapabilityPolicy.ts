@@ -42,7 +42,7 @@ export interface CapabilitySelectionReceipt {
   eligibilityRevision: string;
   licenseEvidence: string | null;
   quotaEvidence: string | null;
-  transportEvidence: string | null;
+  transportEvidence?: string | null;
 }
 
 const COST_RANK: Record<CapabilityCostClass, number> = {
@@ -81,7 +81,9 @@ export function selectFreeFirstCapability(
     eligibilityRevision: selected.eligibilityRevision,
     licenseEvidence: selected.licenseEvidence,
     quotaEvidence: selected.quotaEvidence,
-    transportEvidence: selected.transportEvidence ?? null,
+    ...(selected.transportEvidence !== undefined
+      ? { transportEvidence: selected.transportEvidence }
+      : {}),
   };
 }
 
@@ -98,5 +100,5 @@ export function selectFreeFirstCapability(
  *
  * Fallback does not inherit authority from the failed provider. The selected
  * candidate still has to satisfy the same requirements and emits its own
- * eligibility/transport evidence in the selection receipt.
+ * eligibility/transport evidence in the selection receipt when observed.
  */
