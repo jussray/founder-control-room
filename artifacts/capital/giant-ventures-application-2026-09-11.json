@@ -116,17 +116,27 @@
     "browserReady": false,
     "authenticated": false,
     "executionReady": false,
-    "blocker": "TinyFish wallet available balance -0.408 USD as of 2026-09-12T01:39:48.613Z; live form preflight not executable from that provider"
+    "lastCheckedAt": "2026-09-12T04:17:19.107Z",
+    "provider": "TinyFish",
+    "walletBalanceUsd": -0.408,
+    "autoReload": "unconfigured",
+    "pendingTopUp": null,
+    "attemptStatus": "FAILED_BEFORE_START",
+    "attemptReason": "wallet_out_of_funds",
+    "retryable": false,
+    "minimumTopUpUsd": 10.0,
+    "blocker": "TinyFish refused to start the Giant browser run because the wallet balance is too low. The provider marked the failure non-retryable until funds are added."
   },
   "blockers": [
-    "provider_browser_unavailable",
+    "provider_wallet_out_of_funds",
+    "provider_browser_run_failed_before_start",
     "provider_not_authenticated",
     "provider_execution_not_ready"
   ],
   "authority": {
     "founderApprovedExactPayload": true,
     "submissionAuthorized": false,
-    "reason": "The exact completed payload and pitch-deck hash are founder-approved. Submission remains blocked until browser/provider readiness is verified live."
+    "reason": "The exact completed payload and pitch-deck hash are founder-approved. TinyFish refused the live browser run before start due to insufficient wallet funds; no Giant form mutation or submission occurred."
   },
   "evidence": [
     "SeKret_Bip_Giant_Ventures_Pitch_Deck.pdf",
@@ -136,6 +146,7 @@
     "Prior user-provided canonical LinkedIn profile: https://www.linkedin.com/in/juss-rayy-13ba691a1",
     "Founder answer in chat on 2026-09-11: spoken with Giant before = No",
     "Founder exact approval in chat on 2026-09-11 for payload sha256:2a04c32c888fd5ccb1d408dbbb8f2d5f61971aaf2d33b10db6a752cbf9444a7d",
-    "TinyFish wallet preflight: available balance -0.408 USD"
+    "TinyFish wallet preflight 2026-09-12T04:17:19.107Z: balance -0.408 USD, no pending top-up, auto-reload unconfigured",
+    "TinyFish Giant run attempt: failed before start, wallet_out_of_funds, non-retryable, minimum top-up 10.00 USD"
   ]
 }
