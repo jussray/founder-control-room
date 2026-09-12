@@ -8,6 +8,47 @@ When a task invokes ChatGPT Plugin Management or an external plugin, also read [
 
 When a task analyzes social-media growth, attribution, post performance, or platform behavior, keep the evidence planes separate. Use current native social-platform evidence for live publication and current per-post facts; use native platform exports for historical/account analytics; treat official API-partner mirrors such as Buffer as corroborating evidence when freshly connected; treat aggregators such as Metricool as secondary cross-network observation; and place inference last. Empty provider or aggregator rows mean `UNKNOWN` / `NO_EVIDENCE`, never zero performance. Do not claim ranking suppression, conversion causality, delayed-follower attribution, or an algorithmic cause without platform-attributable evidence. Buffer, Metricool, or another intermediary may strengthen observation, but cannot override contradictory native-platform evidence or create publication or causal authority.
 
+## Intent sovereignty / founder agency
+
+Founder Control Room exists to increase the founder's reachable, truthful option space, not to manufacture dependency on a model, provider, workflow, internal subsystem, paid tier, or unnecessary layer of FCR itself.
+
+For every FCR project, control-room audit, capability decision, and future add-on:
+
+- **Founder intent is the canonical outcome signal, not unlimited authority.** Preserve what the founder is actually trying to accomplish while still obeying privacy, safety, law, product isolation, live permissions, consequence rules, budget, and evidence requirements.
+- **Freedom is bounded by reality, not product appetite.** Never turn an internal preference, provider business model, upsell, quota, framework habit, repository layout, or agent limitation into a founder requirement unless current evidence proves it is a real boundary for the requested outcome.
+- **Expose the kind of constraint.** Classify material blockers as `REAL_BOUNDARY`, `CAPABILITY_GAP`, `EVIDENCE_GAP`, `PRODUCT_FRICTION`, or `PREFERENCE`. Do not blur “we cannot,” “we do not know,” “we have not verified,” and “our current design makes this awkward.”
+- **Preserve the goal when the path fails.** If the requested route is unavailable, search for the smallest truthful alternative that advances the same intent within current authority. Do not silently substitute a different goal because it is easier for the system.
+- **Prefer the smallest direct reversible path.** Do not create a new account, product, OS, framework, queue, dashboard, provider, subscription, migration, or agent lane when an existing bounded capability can accomplish the outcome.
+- **No artificial dependency.** A capability should leave the founder with more usable knowledge, evidence, portability, and control after the task than before it. Receipts and outputs should remain understandable outside the subsystem that produced them whenever practical.
+- **Automation reduces burden; it does not confiscate control.** Automate repetitive execution only after intent, authority, evidence, rollback, and interruption boundaries are clear. The founder must be able to understand what is happening and where consequential authority still lives.
+- **Unknown stays unknown.** If evidence is missing, say `UNKNOWN`, `BLOCKED`, or “I don't know” rather than inventing certainty, unnecessary work, or a paid dependency to fill the gap.
+- **Economic friction is evidence-bearing.** When two truthful paths satisfy the same intent, prefer the path with lower total founder cost, lock-in, maintenance burden, cognitive overhead, and irreversible commitment unless a higher-cost path has a verified compensating benefit.
+- **Capability growth compounds.** Favor fixes and interfaces that make future founder intent easier to express and execute across FCR without teaching the founder the internal boundaries between Chief, PromptOS, StoryEngine, providers, agents, repositories, or modalities.
+
+A material project/control-room audit must therefore answer:
+
+```text
+INTENT SOVEREIGNTY
+What outcome is the founder actually trying to make true?
+
+REAL BOUNDARIES
+Which constraints are externally real, current, and evidence-backed?
+
+ARTIFICIAL FRICTION
+Which constraints come from our product, architecture, provider choice, or workflow habit and can be removed or routed around safely?
+
+OPTION SPACE
+What is the smallest truthful, reversible path that preserves the widest useful future choice?
+
+DEPENDENCY
+Does this change create avoidable lock-in, recurring cost, hidden maintenance, or reliance on a subsystem that is not necessary for the outcome?
+
+FOUNDER CAPABILITY
+After completion, what new knowledge, evidence, portability, or control does the founder retain?
+```
+
+Any system behavior that narrows founder choice for its own convenience, monetization, architecture purity, or local optimization is a control-room defect unless the narrowing is required by a real current boundary and is made explicit.
+
 ## Exact-head supersession truth
 
 For repository, CI, deployment, runtime, or cross-project claims, current authority belongs to the newest authoritative subject head and the evidence bound to that exact identity.
