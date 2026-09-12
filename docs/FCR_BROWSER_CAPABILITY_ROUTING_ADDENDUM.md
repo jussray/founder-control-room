@@ -8,15 +8,24 @@
 
 Browser-capable providers extend Founder Control Room. They do not become a second operating system, authority plane, truth plane, or completion plane.
 
+Opera is an actively preferred authenticated-browser capability when a task genuinely requires live signed-in browser state or UI-only interaction and no narrower direct provider capability can complete the work.
+
 ## Routing order
 
 For each founder intent, select the narrowest capability that can safely complete the required action:
 
 1. **Direct provider API / connected plugin / scoped MCP capability first.**
-2. **Authenticated browser bridge second** when the task genuinely requires a live signed-in browser session or UI-only provider state. Opera Neon-class browser bridges belong here.
-3. **Generic browser automation last** when neither a direct provider capability nor an authenticated browser bridge can satisfy the task.
+2. **Opera Browser Connector / authenticated Opera bridge second** when the task genuinely requires a live signed-in browser session or UI-only provider state and Opera is connected, authorized, and sufficient.
+3. **Another authenticated browser bridge third** only when Opera is unavailable or insufficient for the required browser-only path.
+4. **Generic browser automation last** when no direct provider capability or authenticated browser bridge can safely satisfy the task.
 
 Do not add a browser layer merely because one is available. If a bounded direct provider capability can complete the task, introducing another browser provider is unnecessary dependency and evidence surface.
+
+## Use-Opera rule
+
+When Opera Browser Connector is connected and the founder intent requires authenticated browser interaction, FCR should actually route the browser-only portion through Opera rather than merely listing Opera as an architectural option.
+
+This preference does not override a safer or more direct provider API/plugin/MCP path. It also does not authorize installation, connection, credential use, or consequential browser action by itself. Those remain separate capability and authority gates.
 
 ## Authority boundary
 
@@ -52,7 +61,8 @@ Continuity fingerprints and proof cookies are non-secret correlation markers onl
 Founder Intent
 → Inspect current capability availability
 → Direct API/plugin/MCP available and sufficient? use it
-→ Otherwise browser-only authenticated state required? use authenticated browser bridge
+→ Otherwise browser-only authenticated state required and Opera connected/sufficient? use Opera
+→ Otherwise another authenticated browser bridge available and sufficient? use it
 → Otherwise use the smallest generic browser automation path
 → Recheck authority
 → Execute bounded action
@@ -63,15 +73,16 @@ Founder Intent
 
 ## Opera interpretation
 
-Opera Neon may be used as an authenticated browser execution surface when its current capabilities are appropriate and available. It remains subordinate to FCR and must not become a separate router, approval system, evidence model, or completion authority.
+Opera Browser Connector / Opera Neon-class browser capability may be used as the preferred authenticated browser execution surface when its current capabilities are appropriate, connected, and available. It remains subordinate to FCR and must not become a separate router, approval system, evidence model, or completion authority.
 
-The product architecture must remain provider-agnostic. Replacing Opera with another compatible authenticated browser bridge must not change FCR's authority or truth semantics.
+The product architecture remains provider-agnostic. Opera is a preferred browser capability, not an architectural dependency. Replacing it with another compatible authenticated browser bridge must not change FCR's authority or truth semantics.
 
 ## Blockers
 
 The following are cohesion blockers:
 
 - routing through a browser provider when a direct scoped provider capability already satisfies the task without a justified reason;
+- failing to use connected Opera for a browser-only authenticated task without an evidence-backed reason another path is safer or more capable;
 - treating browser login/session state as authorization;
 - unbound browser clicks after the approved proposal changed;
 - claiming completion from browser navigation without the required provider/outcome evidence;
