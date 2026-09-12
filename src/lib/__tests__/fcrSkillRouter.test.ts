@@ -167,6 +167,34 @@ describe('FCR skill router trust gate', () => {
     expect(decision.executionAllowed).toBe(false);
   });
 
+  it('routes every explicit project design command through one shared bounded capability', () => {
+    const goal = '/layout tighten the project control room.';
+    const blocked = route(goal, 'write', ['juss-chief-ai']);
+
+    expect(blocked.designCommandIds).toEqual(['layout']);
+    expect(blocked.policyRequiredCapabilityIds).toContain('control-room-design-implementation');
+    expect(blocked.missingPolicyCapabilityIds).toContain('control-room-design-implementation');
+    expect(blocked.requiredTools).toContain('playwright');
+    expect(blocked.requiredProof.join(' ')).toContain('/layout');
+    expect(blocked.status).toBe('blocked');
+
+    const ready = route(goal, 'write', ['control-room-design-implementation']);
+    expect(ready.status).toBe('ready_for_runtime_discovery');
+    expect(ready.designCommandIds).toEqual(['layout']);
+    expect(ready.requiredProof).toContain('exact-head Playwright evidence for UI/runtime claims');
+    expect(ready.executionAllowed).toBe(false);
+  });
+
+  it('deduplicates the shared capability while preserving the ordered design command chain', () => {
+    const goal = '/typeset /spacing tune the control room.';
+    const decision = route(goal, 'write', ['control-room-design-implementation']);
+
+    expect(decision.designCommandIds).toEqual(['typeset', 'spacing']);
+    expect(decision.policyRequiredCapabilityIds.filter((id) => id === 'control-room-design-implementation')).toHaveLength(1);
+    expect(decision.requiredTools).toContain('playwright');
+    expect(decision.status).toBe('ready_for_runtime_discovery');
+  });
+
   it('does not add merge-review gates to ordinary UI review language', () => {
     const goal = 'Review the mobile UI in Playwright.';
     const decision = route(goal, 'review', ['control-room-design-implementation']);

@@ -8,6 +8,9 @@
   "include": [
     "src/design-os/**/*.ts",
     "src/http/routes/designOs.ts",
-    "src/http/routes/designOs.test.ts"
+    "src/http/routes/designOs.test.ts",
+    "src/lib/fcrSkillRouter.ts",
+    "src/lib/__tests__/fcrSkillRouter.test.ts",
+    "e2e/design-commands-proof.ts"
   ]
 }

@@ -3,10 +3,15 @@ import { readFile } from "node:fs/promises";
 const files = {
   workflow: await readFile(new URL("../.github/workflows/design-os-contract.yml", import.meta.url), "utf8"),
   registry: await readFile(new URL("../src/design-os/registry.ts", import.meta.url), "utf8"),
+  commands: await readFile(new URL("../src/design-os/commands.ts", import.meta.url), "utf8"),
   l99Repository: await readFile(new URL("../src/config/l99Repository.ts", import.meta.url), "utf8"),
   types: await readFile(new URL("../src/design-os/types.ts", import.meta.url), "utf8"),
   route: await readFile(new URL("../src/http/routes/designOs.ts", import.meta.url), "utf8"),
   server: await readFile(new URL("../src/http/server.ts", import.meta.url), "utf8"),
+  skillRouter: await readFile(new URL("../src/lib/fcrSkillRouter.ts", import.meta.url), "utf8"),
+  designSkill: await readFile(new URL("../.agents/skills/control-room-design-implementation/SKILL.md", import.meta.url), "utf8"),
+  commandPage: await readFile(new URL("../public/control-room/design-commands.html", import.meta.url), "utf8"),
+  playwrightProof: await readFile(new URL("../e2e/design-commands-proof.ts", import.meta.url), "utf8"),
   packageJson: await readFile(new URL("../package.json", import.meta.url), "utf8"),
 };
 
@@ -25,6 +30,32 @@ const registryRepositories = [
   "jussray/jussbeautifulhair-site",
   "jussray/untold-stories-storefront",
   "jussray/jbh-private",
+];
+
+const designCommandIds = [
+  "intent",
+  "critique",
+  "hierarchy",
+  "flow",
+  "information",
+  "copy",
+  "typeset",
+  "layout",
+  "spacing",
+  "color",
+  "components",
+  "states",
+  "forms",
+  "responsive",
+  "touch",
+  "accessibility",
+  "motion",
+  "feedback",
+  "empty",
+  "recovery",
+  "brand",
+  "polish",
+  "prove",
 ];
 
 for (const repository of registryRepositories) {
@@ -65,8 +96,27 @@ requireFragment("registry", "deployment evidence gate", 'reference.kind === "dep
 requireFragment("registry", "Code Connect evidence count", "codeConnectMappings");
 requireFragment("route", "founder authentication", "designOsRouter.use(requireFounder)");
 requireFragment("route", "unknown-project failure", "DESIGN_OS_PROJECT_NOT_FOUND");
+requireFragment("route", "command deck response", "commands: DESIGN_COMMANDS");
+requireFragment("route", "unknown-command failure", "DESIGN_COMMAND_NOT_FOUND");
 requireFragment("server", "server mount", "app.use('/design-os', designOsRouter)");
 requireFragment("packageJson", "focused verification command", '"verify:design-os"');
+
+requireFragment("commands", "design command contract", 'juss/design-command-deck@v1');
+requireFragment("commands", "shared design capability", 'control-room-design-implementation');
+for (const commandId of designCommandIds) {
+  requireFragment("commands", `design command /${commandId}`, `"${commandId}"`);
+  requireFragment("designSkill", `skill command /${commandId}`, `\`/${commandId}\``);
+}
+requireFragment("skillRouter", "command router source", "DESIGN_COMMANDS");
+requireFragment("skillRouter", "shared command capability routing", "DESIGN_COMMAND_SHARED_CAPABILITY");
+requireFragment("commandPage", "project command control room title", "23 design commands");
+requireFragment("commandPage", "read-only Design OS loading", "fetch('/design-os'");
+requireFragment("commandPage", "prepared bounded handoff", "Prepare command");
+requireFragment("playwrightProof", "desktop browser proof", "width: 1440");
+requireFragment("playwrightProof", "mobile browser proof", "width: 390");
+requireFragment("playwrightProof", "exact command count proof", "count() === 23");
+requireFragment("workflow", "Playwright Chromium install", "playwright install --with-deps chromium");
+requireFragment("workflow", "Design Commands Playwright proof", "e2e/design-commands-proof.ts");
 
 for (const writeMethod of [".post(", ".put(", ".patch(", ".delete("]) {
   if (files.route.includes(writeMethod)) {
@@ -93,6 +143,8 @@ if (errors.length > 0) {
 
 console.log("Portfolio Design OS contract verified.");
 console.log(`Repositories covered: ${registryRepositories.length + 1}`);
+console.log(`Design commands: ${designCommandIds.length}`);
+console.log("Shared design capabilities: 1");
 console.log("Node runtime: 24");
 console.log("Write routes: 0");
 console.log("Embedded credential patterns: 0");
