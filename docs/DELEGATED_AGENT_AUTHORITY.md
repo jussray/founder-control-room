@@ -13,13 +13,14 @@ This is a bounded execution grant, not a name-based bypass. A model string, chat
 
 The grant fails closed when any of these are missing or stale:
 
-1. exact repository, base SHA, head SHA, and current `main` identity;
+1. exact repository, exact action target, base SHA, head SHA, and current `main` identity;
 2. exact-head machine proof required by the repository;
 3. fresh evidence inside the policy window;
 4. trusted independent review with its own verified attestation;
 5. zero unresolved blocking findings;
 6. rollback or safe forward-fix;
-7. for deploy, exact `head == current main` and an already-aligned migration state.
+7. durable idempotency reservation bound to the exact action/target/base/head before provider mutation;
+8. for deploy, exact `head == current main`, target environment `production`, and an already-aligned migration state.
 
 A principal may not self-review its own material patch and then consume its own review as independent evidence. `codex-chat`, `claude`, and the trusted deterministic witness are the only v1 review identities accepted by this policy, and the review attestation must itself be verified.
 
@@ -28,14 +29,22 @@ A principal may not self-review its own material patch and then consume its own 
 The grant must resist:
 
 - stale-head or stale-base replay;
+- replay of the same fresh authority lease against the same provider mutation;
 - copied chat text pretending to be adapter identity;
 - arbitrary reviewer strings pretending to be independent review;
 - cross-repository scope bleed;
+- changing a PR number, deploy environment, base SHA, or head SHA after reservation;
 - reusing a prior green packet after `main`, head, diff, provider, or review state changes;
 - using merge authority as database, secret, auth/RLS, billing, publication, DNS/provider-ownership, deletion, or migration authority;
 - using deploy authority to smuggle pending migrations through the existing bundled founder Deploy workflow;
 - treating provider acceptance, a Wrangler success, Pages success, or a green workflow badge as verified production outcome;
 - allowing the same acting principal to manufacture the independent review that unlocks its own consequential action.
+
+## Mutation identity and replay
+
+Standing authority is not a reusable mutation token. Each merge or deploy must first own one durable idempotency reservation. The reservation is valid only when it is still `reserved` and binds the exact action, exact target, exact base SHA, and exact head SHA. Missing, mismatched, or already-consumed reservations deny execution.
+
+The existing merge execution path already reserves `approval_executions` before provider integration. Any delegated executor must reuse an equivalent durable reservation/consumption boundary rather than calling the provider directly.
 
 ## Migration boundary
 
@@ -51,6 +60,7 @@ Merge/deploy authorization governs whether the transition may execute. It does n
 
 ```text
 authority granted
+→ durable mutation reservation
 → merge/deploy executes
 → provider acceptance = execution evidence
 → independent runtime/outcome evidence

@@ -37,6 +37,10 @@ export type DelegatedAgentAuthorityInput = Readonly<{
     attestationVerified: boolean;
   }>;
   action: DelegatedAgentAction;
+  actionTarget: Readonly<{
+    pullRequestNumber?: number;
+    environment?: 'production';
+  }>;
   repository: string;
   baseSha: string;
   headSha: string;
@@ -50,6 +54,14 @@ export type DelegatedAgentAuthorityInput = Readonly<{
   rollbackReady: boolean;
   migrationState: 'aligned' | 'pending' | 'unknown';
   restrictedCapabilities: readonly DelegatedAgentRestrictedCapability[];
+  idempotency: Readonly<{
+    key: string;
+    reservationState: 'reserved' | 'consumed' | 'missing';
+    reservedForAction: DelegatedAgentAction;
+    reservedForTarget: string;
+    reservedForBaseSha: string;
+    reservedForHeadSha: string;
+  }>;
   postActionOutcomeVerified?: boolean;
 }>;
 
@@ -58,6 +70,7 @@ export type DelegatedAgentAuthorityFailure =
   | 'principal_not_authenticated'
   | 'repository_out_of_scope'
   | 'invalid_sha'
+  | 'invalid_action_target'
   | 'stale_evidence'
   | 'candidate_not_current'
   | 'required_checks_missing'
@@ -67,7 +80,10 @@ export type DelegatedAgentAuthorityFailure =
   | 'blocking_findings_present'
   | 'rollback_missing'
   | 'restricted_capability_requested'
-  | 'migration_authority_not_delegated';
+  | 'migration_authority_not_delegated'
+  | 'idempotency_reservation_missing'
+  | 'idempotency_already_consumed'
+  | 'idempotency_mismatch';
 
 export type DelegatedAgentAuthorityDecision =
   | Readonly<{
@@ -88,6 +104,7 @@ export type DelegatedAgentAuthorityDecision =
     }>;
 
 const FULL_SHA = /^[0-9a-f]{40}$/;
+const IDEMPOTENCY_KEY = /^[A-Za-z0-9._:-]{16,200}$/;
 const PRINCIPALS = new Set<string>(DELEGATED_AGENT_PRINCIPALS);
 const TRUSTED_REVIEWERS = new Set<string>(DELEGATED_AGENT_TRUSTED_REVIEWERS);
 
@@ -100,6 +117,21 @@ function deny(reason: DelegatedAgentAuthorityFailure): DelegatedAgentAuthorityDe
     executionAuthorized: false,
     completionClaimAllowed: false,
   });
+}
+
+function expectedActionTarget(input: DelegatedAgentAuthorityInput): string | null {
+  if (input.action === 'merge') {
+    if (
+      !Number.isInteger(input.actionTarget.pullRequestNumber)
+      || Number(input.actionTarget.pullRequestNumber) <= 0
+      || input.actionTarget.environment !== undefined
+    ) return null;
+    return `merge:${input.repository}#${input.actionTarget.pullRequestNumber}`;
+  }
+  if (input.actionTarget.environment !== 'production' || input.actionTarget.pullRequestNumber !== undefined) {
+    return null;
+  }
+  return `deploy:${input.repository}:production`;
 }
 
 export function evaluateDelegatedAgentAuthority(
@@ -122,6 +154,9 @@ export function evaluateDelegatedAgentAuthority(
   if (!FULL_SHA.test(input.baseSha) || !FULL_SHA.test(input.headSha) || !FULL_SHA.test(input.currentMainSha)) {
     return deny('invalid_sha');
   }
+
+  const actionTarget = expectedActionTarget(input);
+  if (!actionTarget) return deny('invalid_action_target');
 
   const checkedAtMs = Date.parse(input.evidenceCheckedAt);
   const ageMs = now.getTime() - checkedAtMs;
@@ -146,6 +181,21 @@ export function evaluateDelegatedAgentAuthority(
 
   if (input.action === 'deploy' && input.migrationState !== 'aligned') {
     return deny('migration_authority_not_delegated');
+  }
+
+  if (input.idempotency.reservationState === 'missing' || !IDEMPOTENCY_KEY.test(input.idempotency.key)) {
+    return deny('idempotency_reservation_missing');
+  }
+  if (input.idempotency.reservationState === 'consumed') {
+    return deny('idempotency_already_consumed');
+  }
+  if (
+    input.idempotency.reservedForAction !== input.action
+    || input.idempotency.reservedForTarget !== actionTarget
+    || input.idempotency.reservedForBaseSha !== input.baseSha
+    || input.idempotency.reservedForHeadSha !== input.headSha
+  ) {
+    return deny('idempotency_mismatch');
   }
 
   const principalId = input.principal.id as DelegatedAgentPrincipalId;

@@ -18,17 +18,25 @@
     "attestationRequired": true,
     "actingPrincipalMayReviewOwnAction": false
   },
+  "mutationIdentity": {
+    "durableReservationRequiredBeforeProviderMutation": true,
+    "reservationMustBind": ["action", "target", "baseSha", "headSha"],
+    "consumedReservationMayBeReused": false
+  },
   "requiredBeforeMergeOrDeploy": [
     "exact-repository",
+    "exact-action-target",
     "exact-current-base-or-main",
     "exact-head-machine-proof",
     "fresh-evidence-within-10-minutes",
     "trusted-independent-review",
     "zero-unresolved-blocking-findings",
-    "rollback-ready"
+    "rollback-ready",
+    "durable-idempotency-reservation"
   ],
   "deployAdditionalRequirements": [
     "head-equals-current-main",
+    "environment-production",
     "migration-state-aligned",
     "provider-preflight-current"
   ],
