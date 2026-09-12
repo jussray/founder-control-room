@@ -14,10 +14,40 @@ interface WriteProofTruth {
   capabilityDiscoveryDoesNotProveAccountAuthority: boolean;
   accountAuthorityDoesNotProveExecution: boolean;
   providerAcceptanceDoesNotProveOutcome: boolean;
+  proofDoesNotFreezeCapabilityUse: boolean;
+  verifiedCapabilitiesMayBeUsedWithinFounderApproval: boolean;
+  unknownWriteAuthorityMayBeProbedByAnExplicitlyApprovedBoundedWrite: boolean;
   writeCapabilityClassifyUntilProviderAcceptance: 'UNKNOWN_WRITE_AUTHORITY';
   successfulWriteRequires: string[];
   verifiedOutcomeAdditionallyRequires: 'outcome-evidence';
   forbiddenGraduations: string[];
+}
+
+interface CapabilityUnlockTruth {
+  appliesToAllFcrCapabilities: boolean;
+  proofConstrainsClaimsNotProgress: boolean;
+  verifiedReadCapabilitiesMayBeUsedImmediatelyForApprovedGoals: boolean;
+  verifiedGenerationCapabilitiesMayBeUsedImmediatelyForApprovedGoals: boolean;
+  verifiedEditingCapabilitiesMayBeUsedImmediatelyForApprovedGoals: boolean;
+  verifiedAnalysisCapabilitiesMayBeUsedImmediatelyForApprovedGoals: boolean;
+  verifiedAutomationCapabilitiesMayBeUsedWithinApprovedScope: boolean;
+  verifiedWriteCapabilitiesMayBeUsedWithinApprovedScope: boolean;
+  unknownAuthorityTriggersSmallestBoundedProbeNotPermanentFreeze: boolean;
+  blockedProviderDoesNotFreezeUnrelatedCapabilities: boolean;
+  successfulEvidenceMayAdvanceFixRectifyGeneratePublishOrOperate: boolean;
+  continuityMarkersRemainNonAuthorizing: boolean;
+  rule: string;
+}
+
+interface YoutubeProductionTruth {
+  seriesIntentRemainsFounderDefined: boolean;
+  videoCreationIndependentOfPublishProof: boolean;
+  creationMayUseAvailableGenerationEditingVoiceAndCompositionCapabilities: boolean;
+  publishingRequiresExplicitApprovalOfFinalVideoAndMetadata: boolean;
+  publishAuthorityMustBeCheckedAtExecutionTime: boolean;
+  providerAcceptanceMustProduceReceipt: boolean;
+  publishedOutcomeRequiresYouTubeEvidence: boolean;
+  workflow: string[];
 }
 
 interface ConnectorBridgeTruth {
@@ -73,6 +103,8 @@ interface PluginManagementManifest {
   connectionStateSource: string;
   truthBoundary: string;
   writeProofTruth: WriteProofTruth;
+  capabilityUnlockTruth: CapabilityUnlockTruth;
+  youtubeProductionTruth: YoutubeProductionTruth;
   connectorBridgeTruth: ConnectorBridgeTruth;
   evidenceSourceTruth: EvidenceSourceTruth;
   socialAnalyticsTruth: SocialAnalyticsTruth;
@@ -82,7 +114,7 @@ interface PluginManagementManifest {
 const manifest = JSON.parse(await readFile(new URL('../../../.control-room/plugin-management.json', import.meta.url), 'utf8')) as PluginManagementManifest;
 
 const expectedPlugins = ['GitHub','Google Drive','Supabase','Slack','Asana','HubSpot','Figma','LinkedIn','Cambiante: Content Manager','Metricool for Social Media','Opera Browser Connector'];
-const allowedManifestKeys = ['schemaVersion','contract','repository','authorityRepository','controlPlane','runtimeDiscoveryRequired','liveStateStored','writesRequireExplicitUserIntent','writesRequireFreshRepositoryAuthority','permissionStateSource','connectionStateSource','truthBoundary','writeProofTruth','connectorBridgeTruth','evidenceSourceTruth','socialAnalyticsTruth','plugins'].sort();
+const allowedManifestKeys = ['schemaVersion','contract','repository','authorityRepository','controlPlane','runtimeDiscoveryRequired','liveStateStored','writesRequireExplicitUserIntent','writesRequireFreshRepositoryAuthority','permissionStateSource','connectionStateSource','truthBoundary','writeProofTruth','capabilityUnlockTruth','youtubeProductionTruth','connectorBridgeTruth','evidenceSourceTruth','socialAnalyticsTruth','plugins'].sort();
 const allowedPluginKeys = ['name','role','runtimeDiscoveryRequired','defaultMode'].sort();
 const forbiddenLiveStateKeys = new Set(['installed','connected','connection','permission','permissions','permissionmode','oauthscopes','token','accesstoken','refreshtoken','secret','secrets']);
 function normalizedKey(key: string): string { return key.replace(/[_-]/g, '').toLowerCase(); }
@@ -115,11 +147,41 @@ describe('ChatGPT plugin management repository contract', () => {
       capabilityDiscoveryDoesNotProveAccountAuthority: true,
       accountAuthorityDoesNotProveExecution: true,
       providerAcceptanceDoesNotProveOutcome: true,
+      proofDoesNotFreezeCapabilityUse: true,
+      verifiedCapabilitiesMayBeUsedWithinFounderApproval: true,
+      unknownWriteAuthorityMayBeProbedByAnExplicitlyApprovedBoundedWrite: true,
       writeCapabilityClassifyUntilProviderAcceptance: 'UNKNOWN_WRITE_AUTHORITY',
       verifiedOutcomeAdditionallyRequires: 'outcome-evidence',
     });
     expect(manifest.writeProofTruth.successfulWriteRequires).toEqual(['explicit-founder-intent','live-target-identity','fresh-write-authority','exact-final-payload','provider-acceptance-receipt']);
     expect(manifest.writeProofTruth.forbiddenGraduations).toEqual(['connected=>write-capable','tool-supports-write=>account-can-write','provider-accepted=>outcome-verified']);
+  });
+
+  it('uses proof to unlock approved capabilities instead of freezing the mission', () => {
+    expect(manifest.capabilityUnlockTruth.appliesToAllFcrCapabilities).toBe(true);
+    expect(manifest.capabilityUnlockTruth.proofConstrainsClaimsNotProgress).toBe(true);
+    expect(manifest.capabilityUnlockTruth.verifiedReadCapabilitiesMayBeUsedImmediatelyForApprovedGoals).toBe(true);
+    expect(manifest.capabilityUnlockTruth.verifiedGenerationCapabilitiesMayBeUsedImmediatelyForApprovedGoals).toBe(true);
+    expect(manifest.capabilityUnlockTruth.verifiedEditingCapabilitiesMayBeUsedImmediatelyForApprovedGoals).toBe(true);
+    expect(manifest.capabilityUnlockTruth.verifiedAnalysisCapabilitiesMayBeUsedImmediatelyForApprovedGoals).toBe(true);
+    expect(manifest.capabilityUnlockTruth.verifiedAutomationCapabilitiesMayBeUsedWithinApprovedScope).toBe(true);
+    expect(manifest.capabilityUnlockTruth.verifiedWriteCapabilitiesMayBeUsedWithinApprovedScope).toBe(true);
+    expect(manifest.capabilityUnlockTruth.unknownAuthorityTriggersSmallestBoundedProbeNotPermanentFreeze).toBe(true);
+    expect(manifest.capabilityUnlockTruth.blockedProviderDoesNotFreezeUnrelatedCapabilities).toBe(true);
+    expect(manifest.capabilityUnlockTruth.successfulEvidenceMayAdvanceFixRectifyGeneratePublishOrOperate).toBe(true);
+    expect(manifest.capabilityUnlockTruth.continuityMarkersRemainNonAuthorizing).toBe(true);
+    expect(manifest.capabilityUnlockTruth.rule).toMatch(/proof discipline into a freeze/i);
+  });
+
+  it('keeps YouTube creation active independently of publish proof', () => {
+    expect(manifest.youtubeProductionTruth.seriesIntentRemainsFounderDefined).toBe(true);
+    expect(manifest.youtubeProductionTruth.videoCreationIndependentOfPublishProof).toBe(true);
+    expect(manifest.youtubeProductionTruth.creationMayUseAvailableGenerationEditingVoiceAndCompositionCapabilities).toBe(true);
+    expect(manifest.youtubeProductionTruth.publishingRequiresExplicitApprovalOfFinalVideoAndMetadata).toBe(true);
+    expect(manifest.youtubeProductionTruth.publishAuthorityMustBeCheckedAtExecutionTime).toBe(true);
+    expect(manifest.youtubeProductionTruth.providerAcceptanceMustProduceReceipt).toBe(true);
+    expect(manifest.youtubeProductionTruth.publishedOutcomeRequiresYouTubeEvidence).toBe(true);
+    expect(manifest.youtubeProductionTruth.workflow).toEqual(['series-idea','episode-concept','script-or-storyboard','generate-or-edit-video','review-final-asset','approve-publish-payload','publish-or-schedule','capture-provider-receipt','verify-youtube-outcome','measure-and-learn']);
   });
 
   it('separates connector-bridge truth from provider-page truth and fails closed', () => {
