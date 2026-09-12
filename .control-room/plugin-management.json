@@ -31,6 +31,15 @@
       "provider-accepted=>outcome-verified"
     ]
   },
+  "connectorBridgeTruth": {
+    "evidencePlanes": ["connector-surface", "live-session", "provider-page"],
+    "bridgeBlockedClassifyAs": "BLOCKED_CONNECTOR_BRIDGE",
+    "providerPageStateSurvivesBridgeFailure": true,
+    "repeatProviderSetupWithoutProviderEvidence": false,
+    "blockedStateInvalidatedBy": ["live-session-exposed", "stronger-contradictory-bridge-evidence"],
+    "continuityMarkersAreNonAuthorizing": true,
+    "recoveryRule": "When the connector surface exists but the runtime reports Browser not connected and exposes no tabs, classify the connector bridge as blocked. Preserve separately observed or founder-reported provider-page state; do not blame or reset the page and do not repeat login/setup instructions without provider-level evidence. Re-probe the connector bridge and clear the blocked state only when fresh bridge evidence exposes a live session or stronger contradictory bridge evidence supersedes it."
+  },
   "socialAnalyticsTruth": {
     "analyticsMode": "observation_only",
     "learningRequiresVerifiedPostLevelMeasurement": true,
@@ -57,6 +66,7 @@
     {"name":"Figma","role":"Editable design evidence and handoff; never runtime proof.","runtimeDiscoveryRequired":true,"defaultMode":"read-first"},
     {"name":"LinkedIn","role":"Native LinkedIn account/profile surface. Treat native analytics or exports as primary evidence only when the runtime actually exposes them.","runtimeDiscoveryRequired":true,"defaultMode":"read-first"},
     {"name":"Cambiante: Content Manager","role":"LinkedIn content operations and secondary analytics observation; missing provider analytics scope is BLOCKED_PROVIDER_SCOPE, never zero performance.","runtimeDiscoveryRequired":true,"defaultMode":"read-first"},
-    {"name":"Metricool for Social Media","role":"Secondary social analytics and scheduling observation; connection never proves write authority and empty rows are no evidence, not zero performance.","runtimeDiscoveryRequired":true,"defaultMode":"read-first"}
+    {"name":"Metricool for Social Media","role":"Secondary social analytics and scheduling observation; connection never proves write authority and empty rows are no evidence, not zero performance.","runtimeDiscoveryRequired":true,"defaultMode":"read-first"},
+    {"name":"Opera Browser Connector","role":"Browser-session bridge for founder-authorized tabs. Connector availability, live-session exposure, and provider-page state are separate evidence planes; a bridge failure is BLOCKED_CONNECTOR_BRIDGE and is not proof that the page is closed, logged out, or misconfigured.","runtimeDiscoveryRequired":true,"defaultMode":"read-first"}
   ]
 }
