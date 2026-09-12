@@ -27,6 +27,28 @@ When Opera Browser Connector is connected and the founder intent requires authen
 
 This preference does not override a safer or more direct provider API/plugin/MCP path. It also does not authorize installation, connection, credential use, or consequential browser action by itself. Those remain separate capability and authority gates.
 
+## Live connection truth gate
+
+Installation state is not connection truth.
+
+Treat these as separate evidence layers:
+
+- plugin/app installed or enabled;
+- connector tools surfaced to the current ChatGPT/FCR session;
+- live browser-session handshake proven by a current read-only provider probe;
+- authenticated provider/page state observed after that handshake;
+- authority for any requested action.
+
+`CONNECTED` may be claimed only after a live read-only browser probe succeeds in the current session. For the current Opera connector, `list-tabs` is the canonical first probe. A successful provider response with zero tabs may still prove the browser bridge is connected; the existence of tabs is not the gate. A provider error such as `Browser not connected` classifies the state as `BLOCKED_RUNTIME_HANDSHAKE` and forbids a connected claim.
+
+Installed, enabled, available, permissioned, or tool-surfaced states must never be promoted into live connection truth. Likewise, saying that a connection was retried requires evidence that the live probe was actually executed in that turn or execution context.
+
+When the founder reports that setup or connection state changed, re-run the smallest read-only live probe before repeating setup guidance. Preserve the exact provider result as current evidence. Do not invent which local setting, account state, or browser condition caused a failed handshake unless that cause is separately observed.
+
+Connection continuity must fingerprint at least the provider identity, installation/tool-surface state when known, latest live-probe disposition, provider/session subject when returned, and evidence time or execution identity. A materially different live-probe result expires the predecessor connection claim. Fingerprints and proof cookies remain non-secret correlation markers and never contain browser credentials, session tokens, browsing history, or other secrets.
+
+A successful connection probe proves only that the bridge is live. It does not prove the requested page is authenticated, the target data exists, the requested action succeeded, or that FCR has authority to mutate anything.
+
 ## Authority boundary
 
 Browser access is capability, not authority.
@@ -71,6 +93,8 @@ Founder Intent
 → Next Gate
 ```
 
+For Opera, `connected/sufficient` in this selection rule means a current live connection probe succeeded. Tool visibility alone is not sufficient.
+
 ## Opera interpretation
 
 Opera Browser Connector / Opera Neon-class browser capability may be used as the preferred authenticated browser execution surface when its current capabilities are appropriate, connected, and available. It remains subordinate to FCR and must not become a separate router, approval system, evidence model, or completion authority.
@@ -83,6 +107,8 @@ The following are cohesion blockers:
 
 - routing through a browser provider when a direct scoped provider capability already satisfies the task without a justified reason;
 - failing to use connected Opera for a browser-only authenticated task without an evidence-backed reason another path is safer or more capable;
+- claiming Opera or another browser bridge is connected from installation, enablement, permission, or tool visibility without a successful live probe;
+- claiming a live probe was retried when no probe execution evidence exists;
 - treating browser login/session state as authorization;
 - unbound browser clicks after the approved proposal changed;
 - claiming completion from browser navigation without the required provider/outcome evidence;
