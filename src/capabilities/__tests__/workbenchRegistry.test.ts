@@ -1,10 +1,46 @@
 import { describe, expect, it } from 'vitest';
-import { capabilities } from '../workbenchRegistry.js';
+import {
+  EXTERNAL_APPLICATION_SUBMISSION_CONTRACT,
+  validateExternalApplicationConfirmation,
+  validateExternalApplicationSubmission,
+  type ExternalApplicationSubmissionBundle,
+} from '../externalApplicationSubmission.js';
 import {
   isCapabilityCandidateEligible,
   selectFreeFirstCapability,
   type CapabilityCandidate,
 } from '../freeFirstCapabilityPolicy.js';
+import { capabilities } from '../workbenchRegistry.js';
+
+const PAYLOAD_HASH = `sha256:${'a'.repeat(64)}`;
+const DECK_HASH = `sha256:${'b'.repeat(64)}`;
+
+function applicationBundle(): ExternalApplicationSubmissionBundle {
+  return {
+    contract: EXTERNAL_APPLICATION_SUBMISSION_CONTRACT,
+    provider: 'Giant Ventures',
+    applicationUrl: 'https://www.giant.vc/application',
+    payloadSnapshotRef: 'evidence:application-payload:giant-v1',
+    payloadSha256: PAYLOAD_HASH,
+    fields: [
+      { id: 'company_name', required: true, value: 'Se’kret Bip' },
+      { id: 'website', required: true, value: 'https://sekretbip.net' },
+    ],
+    uploads: [
+      { id: 'pitch_deck', required: true, artifactRef: 'artifact:giant-deck-v1', sha256: DECK_HASH },
+    ],
+    approval: {
+      receiptId: 'approval:giant-v1',
+      payloadSha256: PAYLOAD_HASH,
+      artifactSha256: [DECK_HASH],
+    },
+    providerReadiness: {
+      browserReady: true,
+      authenticated: true,
+      executionReady: true,
+    },
+  };
+}
 
 describe('capability workbench registry', () => {
   it('keeps every reviewed capability complete and uniquely addressable', () => {
@@ -37,6 +73,59 @@ describe('capability workbench registry', () => {
     expect(runtime?.implementation).toContain("type Surface = 'voice' | 'text' | 'mobile' | 'desktop' | 'automation' | 'future'");
     expect(runtime?.implementation).toContain("type Consequence = 'READ' | 'REVERSIBLE_WRITE' | 'CONSEQUENTIAL_WRITE'");
     expect(runtime?.implementation).toContain('Bind approval to proposalId');
+  });
+
+  it('keeps external application submission inside the shared evidence and authority spine', () => {
+    const submission = capabilities.find((capability) => capability.id === 'external-application-submission-v1');
+
+    expect(submission).toBeDefined();
+    expect(submission?.kind).toBe('Contract');
+    expect(submission?.environment).toContain('FCR remains the control plane');
+    expect(submission?.proof).toContain('Exact approved payload is durably referenced and hash-bound before form entry');
+    expect(submission?.proof).toContain('Provider browser/auth/execution readiness is checked before form mutation begins');
+    expect(submission?.proof).toContain('Completion requires provider confirmation evidence bound back to the same payload and artifacts');
+    expect(submission?.risk).toContain('does not create provider credentials');
+    expect(submission?.risk).toContain('invent missing application answers');
+  });
+
+  it('permits application submission only when the exact approved bundle and provider are ready', () => {
+    expect(validateExternalApplicationSubmission(applicationBundle())).toEqual({ ready: true, blockers: [] });
+  });
+
+  it('blocks missing required answers, provider execution failures, and approval drift before submit', () => {
+    const bundle = applicationBundle();
+    bundle.fields[0].value = '';
+    bundle.providerReadiness.executionReady = false;
+    bundle.providerReadiness.blocker = 'provider_wallet_unfunded';
+    bundle.approval.payloadSha256 = `sha256:${'c'.repeat(64)}`;
+
+    const result = validateExternalApplicationSubmission(bundle);
+    expect(result.ready).toBe(false);
+    expect(result.blockers).toContain('missing_required_field:company_name');
+    expect(result.blockers).toContain('provider_wallet_unfunded');
+    expect(result.blockers).toContain('approval_payload_mismatch');
+  });
+
+  it('requires confirmation evidence to bind back to the same approved payload and deck', () => {
+    const bundle = applicationBundle();
+    expect(validateExternalApplicationConfirmation({
+      contract: EXTERNAL_APPLICATION_SUBMISSION_CONTRACT,
+      provider: bundle.provider,
+      payloadSha256: PAYLOAD_HASH,
+      artifactSha256: [DECK_HASH],
+      submittedAt: '2026-09-12T00:55:00.000Z',
+      confirmationId: 'giant-confirmation-123',
+    }, bundle)).toEqual({ ready: true, blockers: [] });
+
+    const missingReceipt = validateExternalApplicationConfirmation({
+      contract: EXTERNAL_APPLICATION_SUBMISSION_CONTRACT,
+      provider: bundle.provider,
+      payloadSha256: PAYLOAD_HASH,
+      artifactSha256: [DECK_HASH],
+      submittedAt: '2026-09-12T00:55:00.000Z',
+    }, bundle);
+    expect(missingReceipt.ready).toBe(false);
+    expect(missingReceipt.blockers).toContain('missing_confirmation_evidence');
   });
 
   it('uses cost only after safety, privacy, rights, quality, quota, and automation gates pass', () => {
