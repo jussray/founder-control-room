@@ -21,7 +21,7 @@ describe('GitHub App secret-shape diagnostic contract', () => {
     expect(workflow).not.toContain('git rev-parse HEAD');
   });
 
-  it('rechecks exact current main inside the production-secret use boundary', () => {
+  it('rechecks exact current main inside the secret classifier before reading secret material', () => {
     const classifyMarker = '      - name: Classify private-key shape without exposing secret material';
     const retainMarker = '      - name: Retain secret-safe diagnostic receipt';
     const classifyStart = workflow.indexOf(classifyMarker);
@@ -30,16 +30,26 @@ describe('GitHub App secret-shape diagnostic contract', () => {
     expect(retainStart).toBeGreaterThan(classifyStart);
 
     const classificationStep = workflow.slice(classifyStart, retainStart);
-    const exactMainRead = 'current_main="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/main" --jq .object.sha)"';
-    const exactMainTest = 'test "$current_main" = "$EXPECTED_MAIN_SHA"';
-    const recheckIndex = classificationStep.indexOf(exactMainRead);
-    const testIndex = classificationStep.indexOf(exactMainTest, recheckIndex);
-    const nodeIndex = classificationStep.indexOf("node --input-type=module <<'NODE'");
+    const fetchIndex = classificationStep.indexOf(
+      '`https://api.github.com/repos/${repository}/git/ref/heads/main`',
+    );
+    const compareIndex = classificationStep.indexOf(
+      'if (currentMainSha !== expectedMainSha)',
+      fetchIndex,
+    );
+    const secretReadIndex = classificationStep.indexOf(
+      "const secret = String(process.env.GITHUB_PRIVATE_KEY ?? '');",
+      compareIndex,
+    );
 
     expect(classificationStep).toContain('GH_TOKEN: ${{ github.token }}');
-    expect(recheckIndex).toBeGreaterThan(-1);
-    expect(testIndex).toBeGreaterThan(recheckIndex);
-    expect(nodeIndex).toBeGreaterThan(testIndex);
+    expect(classificationStep).not.toContain('current_main="$(gh api');
+    expect(fetchIndex).toBeGreaterThan(-1);
+    expect(compareIndex).toBeGreaterThan(fetchIndex);
+    expect(secretReadIndex).toBeGreaterThan(compareIndex);
+    expect(classificationStep).toContain(
+      'Current main moved before GitHub App secret classification; refusing stale diagnostic.',
+    );
     expect(classificationStep).toContain('exactMainRecheckedAtSecretUse: true');
   });
 
