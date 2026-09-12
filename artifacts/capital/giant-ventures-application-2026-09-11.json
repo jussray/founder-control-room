@@ -3,7 +3,7 @@
   "provider": "Giant Ventures",
   "applicationUrl": "https://www.giant.vc/application",
   "capturedLocalDate": "2026-09-11",
-  "state": "COMPLETE_AWAITING_EXACT_FOUNDER_APPROVAL_AND_PROVIDER_READINESS",
+  "state": "EXACT_PAYLOAD_APPROVED_AWAITING_PROVIDER_READINESS",
   "payloadHashBasis": "SHA-256 over canonical JSON of provider, applicationUrl, ordered field id/value pairs, and upload id/hash pairs; UTF-8, keys sorted, compact separators",
   "payloadSha256": "sha256:2a04c32c888fd5ccb1d408dbbb8f2d5f61971aaf2d33b10db6a752cbf9444a7d",
   "fields": [
@@ -103,7 +103,15 @@
     "payloadSha256": "sha256:32cd706e1018604f4296a71f46ecfc2445ec4b6ea377969162fe3d7c47b2c396",
     "status": "SUPERSEDED_BY_COMPLETED_PAYLOAD"
   },
-  "approval": null,
+  "approval": {
+    "receiptId": "chat-founder-approval-giant-2a04c32c-2026-09-11",
+    "payloadSha256": "sha256:2a04c32c888fd5ccb1d408dbbb8f2d5f61971aaf2d33b10db6a752cbf9444a7d",
+    "artifactSha256": [
+      "sha256:eee38fe8c5844089dc5b32070b8f37eb505c25076491ebb41bbab0e0a0d5faf2"
+    ],
+    "founderApproved": true,
+    "approvalSource": "User replied Approved immediately after final completed payload hash was presented"
+  },
   "providerReadiness": {
     "browserReady": false,
     "authenticated": false,
@@ -111,15 +119,14 @@
     "blocker": "TinyFish wallet available balance -0.408 USD as of 2026-09-12T01:39:48.613Z; live form preflight not executable from that provider"
   },
   "blockers": [
-    "missing_exact_founder_approval_for_payload_hash:sha256:2a04c32c888fd5ccb1d408dbbb8f2d5f61971aaf2d33b10db6a752cbf9444a7d",
     "provider_browser_unavailable",
     "provider_not_authenticated",
     "provider_execution_not_ready"
   ],
   "authority": {
-    "founderApprovedExactPayload": false,
+    "founderApprovedExactPayload": true,
     "submissionAuthorized": false,
-    "reason": "All required application facts are now populated, but the completed payload has a new hash and requires exact founder approval. Browser/provider readiness must also pass before submission."
+    "reason": "The exact completed payload and pitch-deck hash are founder-approved. Submission remains blocked until browser/provider readiness is verified live."
   },
   "evidence": [
     "SeKret_Bip_Giant_Ventures_Pitch_Deck.pdf",
@@ -128,6 +135,7 @@
     "Authenticated Google profile for application email",
     "Prior user-provided canonical LinkedIn profile: https://www.linkedin.com/in/juss-rayy-13ba691a1",
     "Founder answer in chat on 2026-09-11: spoken with Giant before = No",
+    "Founder exact approval in chat on 2026-09-11 for payload sha256:2a04c32c888fd5ccb1d408dbbb8f2d5f61971aaf2d33b10db6a752cbf9444a7d",
     "TinyFish wallet preflight: available balance -0.408 USD"
   ]
 }
