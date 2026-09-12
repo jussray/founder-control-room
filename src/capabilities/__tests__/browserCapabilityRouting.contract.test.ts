@@ -24,4 +24,33 @@ describe('FCR browser capability routing contract', () => {
     expect(contract).toContain('Opera is a preferred browser capability, not an architectural dependency.');
     expect(contract).toContain('A browser provider may not manufacture, inherit, widen, replay, or renew founder approval.');
   });
+
+  it('requires live connection proof before claiming a browser bridge is connected', async () => {
+    const contract = await readFile('docs/FCR_BROWSER_CAPABILITY_ROUTING_ADDENDUM.md', 'utf8');
+    const chatgptContract = await readFile('CHATGPT.md', 'utf8');
+
+    for (const token of [
+      'Installation state is not connection truth.',
+      '`CONNECTED` may be claimed only after a live read-only browser probe succeeds in the current session.',
+      '`list-tabs` is the canonical first probe',
+      '`Browser not connected` classifies the state as `BLOCKED_RUNTIME_HANDSHAKE`',
+      'saying that a connection was retried requires evidence that the live probe was actually executed',
+      'A materially different live-probe result expires the predecessor connection claim.',
+      'A successful connection probe proves only that the bridge is live.',
+    ]) {
+      expect(contract).toContain(token);
+    }
+
+    for (const token of [
+      '## Browser connector truth memory',
+      'Installed/enabled plugin state does not prove a live browser session.',
+      'Before saying a browser connector is connected, execute the smallest current read-only live probe',
+      '`BLOCKED_RUNTIME_HANDSHAKE`',
+      'Never say a live connector probe was retried unless the probe was actually executed',
+      'Update continuity fingerprints/proof cookies bidirectionally when live connection evidence changes.',
+      'This connection-truth rule is durable across future FCR browser tasks',
+    ]) {
+      expect(chatgptContract).toContain(token);
+    }
+  });
 });
