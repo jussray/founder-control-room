@@ -21,6 +21,7 @@ This recovery path is intentionally narrow and creates no runtime capability:
 - predecessor carrier head: `6f3f0aa4329e6e8bc338b9c71de458be4ec1141b`
 - history-preserving reconciliation commit: `b162e7c9e52950457c9a92ce8509d90e818855b0`
 - reconciliation method: two-parent commit whose effective tree exactly equals the observed current `main` tree
+- GitHub PR base snapshot refreshed to the observed authoritative base before successor revalidation: `main@399265d476184ceef12ed39f53829256e6455810`
 - intended successor diff: this documentation-only receipt
 - predecessor CI, browser, review, runtime, and continuity proof: historical only; not inherited by the successor
 - current successor exact-head proof: **PENDING** until the refreshed carrier completes its applicable CI, security, continuity, and Playwright lanes
