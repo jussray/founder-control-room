@@ -143,6 +143,7 @@
       prepared: document.getElementById('prepared-command'),
       law: document.getElementById('contract-law'),
     };
+    const requestedProject = new URLSearchParams(window.location.search).get('project');
     let commands = [];
     let projects = [];
 
@@ -226,6 +227,9 @@
         projects = data.projects ?? [];
         if (commands.length !== 23) throw new Error(`Expected 23 design commands, received ${commands.length}`);
         nodes.project.innerHTML = projects.map((project) => `<option value="${escapeHtml(project.slug)}">${escapeHtml(project.name)}</option>`).join('');
+        if (requestedProject && projects.some((project) => project.slug === requestedProject)) {
+          nodes.project.value = requestedProject;
+        }
         if (data.commandContract?.sharedCapability) {
           nodes.law.textContent = `Shared capability: ${data.commandContract.sharedCapability}. Preparing a command does not authorize code changes. Mutating commands require founder approval; UI/runtime completion claims require exact-head Playwright proof.`;
         }

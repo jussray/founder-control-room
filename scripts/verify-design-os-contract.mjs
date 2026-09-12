@@ -10,6 +10,7 @@ const files = {
   server: await readFile(new URL("../src/http/server.ts", import.meta.url), "utf8"),
   skillRouter: await readFile(new URL("../src/lib/fcrSkillRouter.ts", import.meta.url), "utf8"),
   designSkill: await readFile(new URL("../.agents/skills/control-room-design-implementation/SKILL.md", import.meta.url), "utf8"),
+  controlRoom: await readFile(new URL("../public/control-room/index.html", import.meta.url), "utf8"),
   commandPage: await readFile(new URL("../public/control-room/design-commands.html", import.meta.url), "utf8"),
   playwrightProof: await readFile(new URL("../e2e/design-commands-proof.ts", import.meta.url), "utf8"),
   packageJson: await readFile(new URL("../package.json", import.meta.url), "utf8"),
@@ -109,9 +110,13 @@ for (const commandId of designCommandIds) {
 }
 requireFragment("skillRouter", "command router source", "DESIGN_COMMANDS");
 requireFragment("skillRouter", "shared command capability routing", "DESIGN_COMMAND_SHARED_CAPABILITY");
+requireFragment("controlRoom", "Projects Control Room design-command entry", "data-project-design-commands");
+requireFragment("controlRoom", "Projects Control Room design-command href", '/control-room/design-commands.html');
 requireFragment("commandPage", "project command control room title", "23 design commands");
 requireFragment("commandPage", "read-only Design OS loading", "fetch('/design-os'");
 requireFragment("commandPage", "prepared bounded handoff", "Prepare command");
+requireFragment("commandPage", "project query binding", "URLSearchParams(window.location.search).get('project')");
+requireFragment("playwrightProof", "Projects Control Room Playwright entry proof", "data-project-design-commands");
 requireFragment("playwrightProof", "desktop browser proof", "width: 1440");
 requireFragment("playwrightProof", "mobile browser proof", "width: 390");
 requireFragment("playwrightProof", "exact command count proof", "count() === 23");
@@ -145,6 +150,7 @@ console.log("Portfolio Design OS contract verified.");
 console.log(`Repositories covered: ${registryRepositories.length + 1}`);
 console.log(`Design commands: ${designCommandIds.length}`);
 console.log("Shared design capabilities: 1");
+console.log("Project Control Room entry points: 1");
 console.log("Node runtime: 24");
 console.log("Write routes: 0");
 console.log("Embedded credential patterns: 0");
