@@ -1,10 +1,10 @@
 import { createHash } from 'node:crypto';
 import { canonicalizeRelayJcsV31 } from './jcs.js';
 import {
+  type AcceptedKeyStateV31,
   type FederatedAgentRelayEnvelopeV31,
   type RelayEvidenceV31,
   type RelaySignatureVerifierV31,
-  type RelayVerifiedKeyV31,
   RelayV31Error,
 } from './v31-types.js';
 
@@ -90,7 +90,7 @@ export function canonicalUnsignedBytesV31(envelope: FederatedAgentRelayEnvelopeV
 export async function verifyRelaySignatureV31(
   envelope: FederatedAgentRelayEnvelopeV31,
   verifier: RelaySignatureVerifierV31,
-): Promise<RelayVerifiedKeyV31> {
+): Promise<AcceptedKeyStateV31> {
   const verified = await verifier.verify({
     member: envelope.source.member,
     keyId: envelope.signature.keyId,
@@ -111,5 +111,11 @@ export async function verifyRelaySignatureV31(
   assert(issued >= validFrom, 'relay_key_not_yet_valid');
   assert(issued <= validUntil, 'relay_key_expired');
 
-  return verified;
+  return {
+    member: verified.member,
+    keyId: verified.keyId,
+    state: verified.state,
+    validFrom: verified.validFrom,
+    validUntil: verified.validUntil,
+  };
 }
