@@ -236,7 +236,7 @@ function decodeBase64UrlV3(value: string): Uint8Array {
 }
 
 export async function sha256HexV3(value: string): Promise<string> {
-  const digest = await globalThis.crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
   return bytesToHex(new Uint8Array(digest));
 }
 
@@ -249,8 +249,8 @@ export async function verifyRelaySignatureV3(
   envelope: FederatedAgentRelayEnvelopeV3,
   publicKeyJwk: JsonWebKey,
 ): Promise<void> {
-  const key = await globalThis.crypto.subtle.importKey('jwk', publicKeyJwk, { name: 'Ed25519' }, false, ['verify']);
-  const valid = await globalThis.crypto.subtle.verify(
+  const key = await crypto.subtle.importKey('jwk', publicKeyJwk, { name: 'Ed25519' }, false, ['verify']);
+  const valid = await crypto.subtle.verify(
     'Ed25519',
     key,
     decodeBase64UrlV3(envelope.signature.valueBase64Url),
