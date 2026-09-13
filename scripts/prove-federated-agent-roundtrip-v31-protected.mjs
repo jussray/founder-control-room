@@ -9,6 +9,7 @@ const chiefExpectedBranch = String(process.env.CHIEF_FEDERATED_RELAY_TARGET_BRAN
 const accessClientId = String(process.env.CHIEF_RUNTIME_ACCESS_CLIENT_ID || '').trim();
 const accessClientSecret = String(process.env.CHIEF_RUNTIME_ACCESS_CLIENT_SECRET || '').trim();
 const SHA40 = /^[0-9a-f]{40}$/;
+const IMMUTABLE_FCR_HOST = /^[0-9a-f]{8}-founder-control-room\.[a-z0-9-]+\.workers\.dev$/i;
 const IMMUTABLE_CHIEF_HOST = /^[0-9a-f]{8}-chief-ai\.mcgill-raylene\.workers\.dev$/i;
 
 function fail(message) {
@@ -37,8 +38,8 @@ function exactHttpsOrigin(raw, label) {
 
 const fcrBase = exactHttpsOrigin(fcrBaseRaw, 'FCR exact candidate runtime');
 const chiefBase = exactHttpsOrigin(chiefBaseRaw, 'Chief exact candidate runtime');
-if (fcrBase.hostname === 'api.foundercontrolroom.org') {
-  fail('FCR production is not an acceptable pre-merge proof subject; supply an exact candidate runtime origin.');
+if (!IMMUTABLE_FCR_HOST.test(fcrBase.hostname)) {
+  fail('FCR runtime must be one exact immutable founder-control-room workers.dev commit preview origin.');
 }
 if (!IMMUTABLE_CHIEF_HOST.test(chiefBase.hostname)) {
   fail('Chief runtime must be one exact immutable Chief workers.dev preview origin.');
