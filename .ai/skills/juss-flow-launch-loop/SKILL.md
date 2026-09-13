@@ -5,7 +5,7 @@ description: >
   release, documentation truth, and full-app-launch work. Converts ULTRATHINK,
   Product Design, Data Analytics, Redteam, Lindy, L99, OODA, Hormozi, Bill Gates,
   Elon Musk, GoalFix, and Juss Flow into an evidence-gated loop.
-version: 1.1
+version: 1.2
 visibility: private
 owner: Juss
 ---
@@ -254,6 +254,12 @@ verified product progress
 ```
 
 Public-safe story may explain what changed, why it matters, what was learned, and approved public proof. Keep private prompts, raw diffs, credentials, customer/security data, internal proof references, unreleased roadmap, private metrics, provider payloads, and proprietary mechanics behind the curtain.
+
+## Governed repository mutation gate
+
+Operational branch creation is not ambient repository power. For the FCR `create_branch` path, the authenticated founder execute request plus a fresh proof record must produce a server-owned `AuthorityEnvelopeV1` bound to `github.repository.create_branch`, the exact repository scope, branch arguments, current mission-state fingerprint, tool-call identity, expiry, founder identity, and idempotency key.
+
+The execution must be reserved before provider mutation. Immediately before `RepositoryProvider.createBranch(...)`, FCR must reacquire mission state, re-derive the execution context, and validate the original envelope through `executeAuthorizedCreateBranch()`. Any state, argument, scope, idempotency, tool-call, capability, expiry, or integrity drift must fail closed. A pending or ambiguous provider outcome requires reconciliation before another mutation attempt. Branch authority never inherits merge, deploy, publication, credential, database, spend, or destructive authority.
 
 ## Implementation contract
 

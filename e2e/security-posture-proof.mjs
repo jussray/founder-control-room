@@ -40,7 +40,7 @@ const stages = stageNames.map((name, index) => ({
 const projects = [
   ['sekret-bip', 'Se’kret Bip', 'jussray/Sekret-Bip', 10, true],
   ['juss-beautiful-hair', 'Juss Beautiful Hair Storefront', 'jussray/jussbeautifulhair-site', 9, true],
-  ['jbh-private', 'Juss Beautiful Hair Private Operations', 'jussray/jbh-private', 9, false],
+  ['juss-beautiful-hair-private', 'Juss Beautiful Hair Private Operations', 'jussray/jbh-private', 9, false],
   ['l99', 'L99 StoryEngine', 'jussray/StoryEngine', 8, false],
   ['chief-ai-machine', 'Chief AI Prompt Machine', 'jussray/chief-ai-machine', 10, false],
   ['untold-stories', 'Untold Stories Storefront', 'jussray/untold-stories-storefront', 9, true],
@@ -64,6 +64,38 @@ const projects = [
   requiredControlCount: Number(targetVersion) * 2,
 }));
 
+const cryptographicInventory = [
+  ['fcr-github-app-rs256', 'founder-control-room', 'Authenticate GitHub App', 'RSA digital signature over JWT', 'RS256 / RSA-SHA256', 'OBSERVED', 'GitHub protocol', 'PUBLIC_KEY_MIGRATION_REQUIRED', 'not-confidentiality-control'],
+  ['fcr-founder-session-aes256gcm', 'founder-control-room', 'Encrypt founder credentials', 'authenticated symmetric encryption', 'AES-256-GCM', 'OBSERVED', 'FCR / Cloudflare secret plane', 'SYMMETRIC_MONITOR', 'stored-secret'],
+  ['sekret-supabase-auth-jwks', 'sekret-bip', 'Verify Supabase user tokens', 'provider-issued JWT', 'provider-selected asymmetric JWT', 'PROVIDER_MANAGED', 'Supabase Auth', 'PUBLIC_KEY_MIGRATION_REQUIRED', 'short-lived-auth'],
+  ['sekret-firebase-appcheck-rs256', 'sekret-bip', 'Verify Firebase App Check', 'RSA digital signature over JWT', 'RS256', 'PROVIDER_MANAGED', 'Firebase / Google', 'PUBLIC_KEY_MIGRATION_REQUIRED', 'not-confidentiality-control'],
+  ['jbh-private-cloudflare-access-rs256', 'juss-beautiful-hair-private', 'Verify Cloudflare Access owner assertions', 'RSA digital signature over JWT', 'RS256', 'PROVIDER_MANAGED', 'Cloudflare Access', 'PUBLIC_KEY_MIGRATION_REQUIRED', 'short-lived-auth'],
+  ['storyengine-supabase-service-role', 'l99', 'Authenticate bounded persistence writes', 'provider-managed opaque service credential', 'provider-managed', 'PROVIDER_MANAGED', 'Supabase', 'PROVIDER_MANAGED_UNKNOWN', 'provider-managed-unknown'],
+  ['untold-shopify-webhook-hmac', 'untold-stories', 'Authenticate Shopify order webhooks', 'message authentication code', 'HMAC-SHA-256', 'OBSERVED', 'Shopify', 'SYMMETRIC_MONITOR', 'not-confidentiality-control'],
+].map(([id, projectSlug, purpose, primitive, algorithm, observationState, provider, quantumMigrationClass, confidentialityHorizon]) => ({
+  id,
+  projectSlug,
+  purpose,
+  primitive,
+  algorithm,
+  observationState,
+  provider,
+  migrationAuthority: `${provider} and application ownership are explicitly separated.`,
+  quantumMigrationClass,
+  confidentialityHorizon,
+  sourceEvidence: `${projectSlug}:source-evidence`,
+}));
+
+const cryptographicReviewRequired = [
+  ['chief-ai-machine', 'Canonical runtime public-key boundary not proven.'],
+  ['juss-beautiful-hair', 'Provider-owned storefront crypto requires deeper evidence.'],
+  ['promptos', 'Canonical runtime auth/signing primitive not proven.'],
+].map(([projectSlug, reason]) => ({
+  projectSlug,
+  reason,
+  nextEvidence: `Collect the next provider or runtime evidence for ${projectSlug}.`,
+}));
+
 const fixture = {
   contract: 'juss-v10/security-posture@v1',
   generatedAt: '2026-08-16T06:30:00.000Z',
@@ -74,13 +106,29 @@ const fixture = {
     v10Targets: 3,
     playwrightRequiredProjects: 3,
     totalStageObligations: 74,
-    uniqueControlCount: 57,
+    uniqueControlCount: 62,
     frameworkSignalCount: 23,
+    cryptographicInventoryEntries: 7,
+    cryptographicReviewRequiredProjects: 3,
+    publicKeyMigrationEntries: 4,
     provenProjects: 0,
   },
   stages,
   projects,
   invariants: { noHackBack: true, noHumanIdentityClaimFromNetworkSignal: true },
+  cryptography: {
+    inventory: cryptographicInventory,
+    reviewRequired: cryptographicReviewRequired,
+    coverage: {
+      activeProjectCount: 8,
+      representedProjectCount: 8,
+      inventoryEntryCount: 7,
+      reviewRequiredProjectCount: 3,
+      publicKeyMigrationEntryCount: 4,
+      missingProjectSlugs: [],
+      overlappingProjectSlugs: [],
+    },
+  },
   lantern: {
     valid: true,
     errors: [],
@@ -103,6 +151,7 @@ const fixture = {
     targetVersionIsNotCurrentMaturity: true,
     frameworkMappingIsNotCertification: true,
     providerClaimsRequireRuntimeEvidence: true,
+    cryptographicInventoryIsObservationNotQuantumSafety: true,
     securityPostureIsReadOnly: true,
     analyticsAreAggregateAndPrivacySafe: true,
     noHumanIdentityClaimFromNetworkSignal: true,
@@ -139,11 +188,18 @@ async function proveViewport(browser, { name, width, height, isMobile = false })
 
   await page.getByRole('heading', { name: 'Security posture without the green-check theater.' }).waitFor({ state: 'visible' });
   assert.equal(await page.locator('.stage-card').count(), 10, `${name}: V1-V10 ladder renders all stages`);
-  assert.equal(await page.locator('.project-card').count(), 8, `${name}: registered portfolio renders all project cards`);
+  assert.equal(await page.locator('.project-card:not(.crypto-entry-card):not(.crypto-review-card)').count(), 8, `${name}: registered portfolio renders all project cards`);
   assert.equal(await page.locator('.project-card[data-target-version="10"]').count(), 3, `${name}: V10 target count is visible`);
   assert.equal(await page.locator('.target-badge span', { hasText: 'NOT PROVEN' }).count(), 8, `${name}: every project denies maturity proof`);
   assert.match(await page.locator('.truth-grid').innerText(), /TARGET ≠ PROOF/i, `${name}: target/proof boundary is visible`);
   assert.match(await page.locator('.truth-grid').innerText(), /FRAMEWORK ≠ CERTIFICATION/i, `${name}: framework/certification boundary is visible`);
+  assert.match(await page.locator('.truth-grid').innerText(), /INVENTORY ≠ QUANTUM SAFETY/i, `${name}: crypto inventory cannot become a quantum-safe claim`);
+  assert.equal(await page.locator('.crypto-entry-card').count(), 7, `${name}: all observed crypto entries render`);
+  assert.equal(await page.locator('.crypto-entry-card[data-migration-class="PUBLIC_KEY_MIGRATION_REQUIRED"]').count(), 4, `${name}: public-key migration entries stay explicit`);
+  assert.equal(await page.locator('.crypto-review-card').count(), 3, `${name}: unresolved projects remain review-required`);
+  assert.match(await page.locator('.crypto-panel').innerText(), /Uncovered active projects\s+0/i, `${name}: active portfolio has no silent crypto coverage holes`);
+  assert.match(await page.locator('.crypto-panel').innerText(), /AES-256-GCM/i, `${name}: symmetric crypto remains separately classified`);
+  assert.match(await page.locator('.crypto-panel').innerText(), /HMAC-SHA-256/i, `${name}: webhook MAC remains separately classified`);
   assert.match(await page.locator('.lantern-panel').innerText(), /Hack-back forbidden/i, `${name}: Lantern denies hack-back`);
   assert.match(await page.locator('.lantern-panel').innerText(), /Outbound attack forbidden/i, `${name}: Lantern denies outbound attack capability`);
   assert.match(await page.locator('.lantern-panel').innerText(), /Human attribution constrained/i, `${name}: network signals cannot become human identity claims`);
@@ -185,6 +241,11 @@ try {
       stages: 10,
       projects: 8,
       v10Targets: 3,
+      cryptoInventoryEntries: 7,
+      publicKeyMigrationEntries: 4,
+      cryptoReviewRequiredProjects: 3,
+      uncoveredActiveProjects: 0,
+      inventoryIsNotQuantumSafety: true,
       allProjectsMarkedNotProven: true,
       mutationControls: 0,
       lanternNoHackBack: true,

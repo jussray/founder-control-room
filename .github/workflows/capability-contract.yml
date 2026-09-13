@@ -37,5 +37,5 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run verify:capability-contract
-      - run: npx vitest run src/capabilities/__tests__/score.test.ts
+      - run: npx vitest run src/capabilities/__tests__/score.test.ts src/capabilities/__tests__/workbenchRegistry.test.ts
       - run: npm run typecheck
