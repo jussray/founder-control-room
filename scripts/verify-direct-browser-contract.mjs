@@ -16,7 +16,7 @@ assert.equal(pkg.scripts['test:e2e'], 'npm run build && npm run verify:direct-br
 assert.match(localPlaywrightProof, /from 'playwright'/);
 assert.match(localPlaywrightProof, /LOCAL_NO_PROVIDER_FEE/);
 assert.match(localPlaywrightProof, /providerWalletRequired: false/);
-assert.doesNotMatch(localPlaywrightProof, /TinyFish/i);
+assert.doesNotMatch(localPlaywrightProof, /providerWalletRequired:\s*true/);
 
 execFileSync(process.execPath, [fileURLToPath(localPlaywrightProofUrl)], {
   stdio: 'inherit',
