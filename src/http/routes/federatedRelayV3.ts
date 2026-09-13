@@ -9,7 +9,7 @@ import {
   sha256HexV3,
   verifyRelayEnvelopeV3,
   type FederatedAgentRelayEnvelopeV3,
-  type FederatedRelayPublicKeyV3,
+  type RelayPublicKeyRecordV3,
   type FederatedRelayReceiptV3,
 } from '../../founder-os-lab/federatedRelayV3.js';
 
@@ -70,7 +70,7 @@ function relayDatabaseError(error: unknown): FederatedRelayV3Error {
   return new FederatedRelayV3Error(matched ?? 'relay_database_error', message.slice(0, 1_000));
 }
 
-async function loadPublicKey(keyId: string): Promise<FederatedRelayPublicKeyV3> {
+async function loadPublicKey(keyId: string): Promise<RelayPublicKeyRecordV3> {
   const admin = makeSupabaseClient();
   const { data, error } = await admin
     .from('federated_relay_public_keys')
@@ -91,7 +91,7 @@ async function loadPublicKey(keyId: string): Promise<FederatedRelayPublicKeyV3> 
     validFrom: data.valid_from,
     validUntil: data.valid_until,
     revokedAt: data.revoked_at,
-  } as FederatedRelayPublicKeyV3;
+  } as RelayPublicKeyRecordV3;
 }
 
 async function findStoredMessage(messageId: string): Promise<StoredRelayMessage | null> {
