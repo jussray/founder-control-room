@@ -2,7 +2,10 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
-import { classifyMainReleaseProvenance } from './verify-main-release-provenance.mjs';
+import {
+  classifyMainReleaseProvenance,
+  classifyReviewedFirstParentSuccessors,
+} from './verify-main-release-provenance.mjs';
 import {
   observeMainReleaseProvenance,
   shouldEnforceMainReleaseProvenance,
@@ -10,6 +13,8 @@ import {
 
 const SHA = 'a'.repeat(40);
 const OTHER = 'b'.repeat(40);
+const TERMINAL = 'c'.repeat(40);
+const DIRECT = 'd'.repeat(40);
 
 function pr(overrides = {}) {
   return {
@@ -89,6 +94,66 @@ test('rejects ambiguous release provenance', () => {
   });
   assert.equal(result.reason, 'ambiguous_pr_provenance');
   assert.deepEqual(result.matchingPullRequestNumbers, [42, 43]);
+});
+
+test('accepts a fully reviewed first-parent successor chain after the terminal ratified tip', () => {
+  const result = classifyReviewedFirstParentSuccessors({
+    terminalRatifiedTip: TERMINAL,
+    targetSha: SHA,
+    successorCommits: [
+      { sha: OTHER, associatedPulls: [pr({ number: 51, merge_commit_sha: OTHER })] },
+      { sha: SHA, associatedPulls: [pr({ number: 52 })] },
+    ],
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.reason, 'reviewed_first_parent_successor_chain');
+  assert.equal(result.successorCount, 2);
+  assert.deepEqual(result.successors.map((entry) => entry.pullRequestNumber), [51, 52]);
+});
+
+test('rejects an unreviewed direct commit hidden before a later reviewed main merge', () => {
+  const result = classifyMainReleaseProvenance({
+    targetSha: SHA,
+    currentMainSha: SHA,
+    associatedPulls: [pr({ number: 52 })],
+    terminalRatifiedTip: TERMINAL,
+    successorCommits: [
+      { sha: DIRECT, associatedPulls: [] },
+      { sha: SHA, associatedPulls: [pr({ number: 52 })] },
+    ],
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.reason, 'unreviewed_first_parent_successor');
+  assert.equal(result.successorSha, DIRECT);
+});
+
+test('rejects a successor observation that does not terminate at the release target', () => {
+  const result = classifyReviewedFirstParentSuccessors({
+    terminalRatifiedTip: TERMINAL,
+    targetSha: SHA,
+    successorCommits: [
+      { sha: OTHER, associatedPulls: [pr({ number: 51, merge_commit_sha: OTHER })] },
+    ],
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.reason, 'successor_chain_not_bound_to_target');
+  assert.equal(result.observedTip, OTHER);
+});
+
+test('requires successor PR evidence whenever a terminal ratified tip is supplied', () => {
+  const result = classifyMainReleaseProvenance({
+    targetSha: SHA,
+    currentMainSha: SHA,
+    associatedPulls: [pr()],
+    terminalRatifiedTip: TERMINAL,
+    successorCommits: null,
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.reason, 'successor_pr_provenance_unavailable');
 });
 
 test('enforces provenance only in the canonical manual Deploy preflight', () => {
@@ -182,4 +247,14 @@ test('main provenance workflow cancels stale push runs without weakening provena
   assert.ok(unenforced > receipt, 'superseded receipt must not claim provenance enforcement');
   assert.ok(verifier > unenforced, 'current candidates must still reach the provenance verifier');
   assert.ok(verifierGuard > verifier, 'the verifier may be skipped only for an explicitly superseded push');
+});
+
+test('main provenance workflow observes every first-parent successor after historical ratification', () => {
+  const workflow = readFileSync(new URL('../.github/workflows/main-release-provenance.yml', import.meta.url), 'utf8');
+
+  assert.match(workflow, /fetch-depth: 0/);
+  assert.match(workflow, /verify-main-release-historical-ratification\.mjs > historical-ratification\.json/);
+  assert.match(workflow, /git rev-list --reverse --first-parent "\$\{terminal_tip\}\.\.\$\{TARGET_SHA\}"/);
+  assert.match(workflow, /SUCCESSOR_COMMITS_JSON/);
+  assert.match(workflow, /TERMINAL_RATIFIED_TIP/);
 });
