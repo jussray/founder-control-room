@@ -7,8 +7,8 @@
   "changes": [
     {
       "path": "src/providers/githubGovernanceReconciliation.ts",
-      "invariants": [
-        "Candidate-head ProofMode evidence belongs on Chief no-bypass ruleset 20818149 with GitHub Actions integration 15368; production deployment environments and path-conditional/post-main witnesses are not pre-merge requirements, production obligations remain post-merge truth, desired bypass actors are empty, strict status freshness is required, the plan is bound to trusted provider fingerprints, unmanaged provider security rules remain preservation obligations, and provider mutation, merge, deploy, and execution authority remain false until a separately authorized mutation receives fresh post-write provider readback."
+      "claims": [
+        "src/providers/githubGovernanceReconciliation.ts must keep Chief candidate proof pre-merge, keep production proof post-merge, require zero desired bypass actors and strict freshness, preserve unmanaged security, and withhold provider mutation and merge authority until fresh provider readback."
       ]
     }
   ]
