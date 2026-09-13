@@ -155,6 +155,20 @@ const INCIDENTS = [
       'src/goalfix/engine.ts',
     ],
   },
+  {
+    id: 'direct-main-continuation-after-c237',
+    anchorCommit: 'c2371390a84ceddb2bd20cc7972a63a51d460183',
+    anchorTree: '7024f3cc2e0d04a438d01fb792100b257af3713f',
+    incidentTip: 'ce3de5773676d4547d60c6d89387376ba8a2374b',
+    incidentTree: 'e59e26a0e9f4d061e603a0782ab154941706959c',
+    directCommits: [
+      '2a0ee25a5de8256a3b0d8f1acd3b4cca784ea2c7',
+      'ce3de5773676d4547d60c6d89387376ba8a2374b',
+    ],
+    affectedFiles: [
+      'scripts/prove-federated-agent-roundtrip.mjs',
+    ],
+  },
 ];
 
 function git(...args) {
