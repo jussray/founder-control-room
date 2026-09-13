@@ -11,13 +11,17 @@ import {
   type StoredRelayDeliveryV31,
 } from '../federatedRelay/v31-types.js';
 import { canonicalizeRelayJcsV31 } from '../federatedRelay/jcs.js';
-import { assertFederatedRelayEnvelopeV31 } from '../federatedRelay/validation.js';
+import {
+  assertFederatedRelayEnvelopeV31,
+  validateRelayFreshnessV31,
+} from '../federatedRelay/validation.js';
 import {
   decodeBase64UrlV31,
   relaySuccessorProofCookieV31,
   sha256HexV31,
 } from '../federatedRelay/crypto.js';
 import { acceptFederatedRelayV31 } from '../federatedRelay/accept.js';
+import { generateRelayAttack6000V31 } from '../federatedRelay/redteam.js';
 
 const FCR_SHA = 'a'.repeat(40);
 const CHIEF_SHA = 'b'.repeat(40);
@@ -191,6 +195,13 @@ describe('federated relay v3.1 validation', () => {
     expect(() => assertFederatedRelayEnvelopeV31(invalidJson)).toThrowError(/relay_payload_not_json/);
     expect(() => decodeBase64UrlV31('AA')).toThrowError(/relay_signature_length_invalid/);
   });
+
+  it('keeps supersession exclusive to revision relations', () => {
+    const invalid = envelope({
+      supersedesMessageIds: ['55555555-5555-4555-8555-555555555555'],
+    });
+    expect(() => assertFederatedRelayEnvelopeV31(invalid)).toThrowError(/relay_supersession_requires_revision/);
+  });
 });
 
 describe('federated relay v3.1 acceptance', () => {
@@ -255,6 +266,20 @@ describe('federated relay v3.1 acceptance', () => {
     expect(first).toMatch(/^Q4R:v3\.1:[0-9a-f]{64}$/);
     expect(first).not.toBe(otherChain);
     expect(first).not.toBe(otherDelivery);
+  });
+});
+
+describe('federated relay v3.1 ATTACK-6000', () => {
+  it('rejects 6,000 deterministic malformed/freshness permutations', () => {
+    let count = 0;
+    for (const attack of generateRelayAttack6000V31(envelope())) {
+      count += 1;
+      expect(() => {
+        assertFederatedRelayEnvelopeV31(attack.envelope);
+        validateRelayFreshnessV31(attack.envelope, NOW);
+      }, attack.name).toThrow();
+    }
+    expect(count).toBe(6000);
   });
 });
 
