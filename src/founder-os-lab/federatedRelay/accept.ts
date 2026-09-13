@@ -68,8 +68,9 @@ export async function acceptFederatedRelayV31(
   const deliveryFingerprint = relayDeliveryFingerprintV31(envelope);
   const evidenceDigest = relayEvidenceDigestV31(envelope.evidence);
   const successorProofCookie = relaySuccessorProofCookieV31({
+    chainId: envelope.ordering.chainId,
     predecessorProofCookie: envelope.predecessorProofCookie,
-    semanticFingerprint,
+    deliveryFingerprint,
     nonce: envelope.nonce,
     sourceMember: envelope.source.member,
     targetMember: envelope.target.member,
