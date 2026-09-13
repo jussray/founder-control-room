@@ -3,8 +3,13 @@ import { describe, expect, it } from 'vitest';
 
 const route = readFileSync('src/http/routes/federatedRelayV31.ts', 'utf8');
 const proof = readFileSync('scripts/prove-federated-agent-roundtrip-v31.mjs', 'utf8');
+const repoCycle = readFileSync('scripts/repo-cycle.mjs', 'utf8');
 const migration = readFileSync(
   'supabase/migrations/20260913224500_federated_relay_v31_observed_key_registration.sql',
+  'utf8',
+);
+const legacyPrivilegeHardening = readFileSync(
+  'supabase/migrations/20260913202114_harden_federated_relay_service_role_privileges.sql',
   'utf8',
 );
 
@@ -25,6 +30,19 @@ describe('federated relay v3.1 runtime hardening contract', () => {
     expect(route).toContain("branch: envelope.target.branch");
   });
 
+  it('revalidates runtime target and source reachability before returning a stored duplicate', () => {
+    const runtimeIdentity = route.indexOf("const runtimeHeadSha = process.env.GIT_SHA?.trim() ?? '';");
+    const targetResolution = route.indexOf('resolveBranchHead(envelope.target)');
+    const sourceReachability = route.indexOf('assertSourceCommitReachable(envelope.source)');
+    const storedLookup = route.indexOf('const stored = await findStored(envelope.messageId);');
+
+    expect(runtimeIdentity).toBeGreaterThan(-1);
+    expect(targetResolution).toBeGreaterThan(runtimeIdentity);
+    expect(sourceReachability).toBeGreaterThan(runtimeIdentity);
+    expect(storedLookup).toBeGreaterThan(targetResolution);
+    expect(storedLookup).toBeGreaterThan(sourceReachability);
+  });
+
   it('uses the receiver-owned durable key registry as the FCR acceptance trust root', () => {
     expect(route).toContain("return localPublicKey(envelope.source.member, envelope.signature.keyId)");
     expect(route).not.toContain("await runtimeSha(envelope.source.member");
@@ -40,5 +58,35 @@ describe('federated relay v3.1 runtime hardening contract', () => {
     expect(migration).toContain('set search_path = \'\'');
     expect(migration).toContain('from public, anon, authenticated');
     expect(migration).toContain('to service_role');
+  });
+
+  it('requires the compiled v3.1 kernel after build in verify and merge gate', () => {
+    expect(repoCycle).toContain('VERIFY_RELAY_BUILD');
+    expect(repoCycle).toContain("dist/founder-os-lab/federatedRelayV31.js");
+    expect((repoCycle.match(/VERIFY_RELAY_BUILD/g) ?? []).length).toBe(3);
+  });
+
+  it('clears provider-default legacy service-role grants before restoring the narrow relay privileges', () => {
+    expect(legacyPrivilegeHardening).toContain(
+      'revoke all privileges on table public.federated_relay_public_keys from service_role;',
+    );
+    expect(legacyPrivilegeHardening).toContain(
+      'revoke all privileges on table public.federated_relay_sequence_counters from service_role;',
+    );
+    expect(legacyPrivilegeHardening).toContain(
+      'revoke all privileges on table public.federated_relay_messages from service_role;',
+    );
+    expect(legacyPrivilegeHardening).toContain(
+      'revoke all privileges on table public.federated_relay_reply_reservations from service_role;',
+    );
+    expect(legacyPrivilegeHardening).toMatch(
+      /grant select, insert, update\s+on table public\.federated_relay_public_keys\s+to service_role;/u,
+    );
+    expect(legacyPrivilegeHardening).toMatch(
+      /grant select\s+on table public\.federated_relay_messages\s+to service_role;/u,
+    );
+    expect(legacyPrivilegeHardening).not.toMatch(
+      /grant\s+(insert|update|delete)[^;]*federated_relay_messages/iu,
+    );
   });
 });
