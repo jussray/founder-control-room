@@ -38,6 +38,7 @@ const requiredAssets = [
   'control-room/evidence-trust.html',
   'portable-founder-console/index.html',
   'juss-rayy/index.html',
+  'mom8/index.html',
 ];
 
 await rm(outputDirectory, { recursive: true, force: true });
