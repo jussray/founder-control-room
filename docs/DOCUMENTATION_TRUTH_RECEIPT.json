@@ -1,14 +1,38 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Bind the create-branch runtime authority membrane to current operator documentation without promoting source or CI evidence into a claim that a live GitHub branch mutation occurred.",
+  "purpose": "Bind the TinyFish production activation boundary to current Cloudflare deployment truth so source and CI readiness cannot be mistaken for a live provider-backed capability when the required Worker secret binding has not been observed.",
   "domains": [
-    "merge-authority"
+    "cloudflare-authority"
   ],
   "changes": [
     {
-      "path": "src/http/routes/approvals.ts",
+      "path": "wrangler.worker.toml",
       "claims": [
-        "src/http/routes/approvals.ts must allow create_branch to reach RepositoryProvider.createBranch only after fresh create_branch proof and authenticated founder intent issue a server-owned AuthorityEnvelopeV1, the execution is reserved under the same idempotency key, current mission state is re-read immediately before mutation, and the original envelope passes exact capability, scope, arguments, state, tool-call, expiry, idempotency, and integrity validation through executeAuthorizedCreateBranch; any drift must fail closed before provider mutation and an ambiguous pending outcome requires reconciliation before retry."
+        "`wrangler.worker.toml` must list `TINYFISH_API_KEY` under `[secrets].required`, so canonical exact-main Deploy rejects missing provider-held TinyFish activation before Worker mutation while never copying the secret value through GitHub Actions."
+      ]
+    },
+    {
+      "path": "README.md",
+      "claims": [
+        "`README.md` must keep TinyFish source and CI readiness separate from provider/runtime activation and state that canonical Deploy verifies only provider-held binding-name presence before promotion."
+      ]
+    },
+    {
+      "path": "docs/CLOUDFLARE_REASONING.md",
+      "claims": [
+        "`docs/CLOUDFLARE_REASONING.md` must treat `TINYFISH_API_KEY` as a provider-held Worker binding and require canonical Deploy to fail closed on a missing binding name without exposing or re-uploading its value."
+      ]
+    },
+    {
+      "path": "docs/deployment/CLOUDFLARE_WORKER_TARGETS.md",
+      "claims": [
+        "`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` must name `TINYFISH_API_KEY` as a required canonical Worker secret while preserving live provider observation and real TinyFish Search/Fetch as separate activation proof."
+      ]
+    },
+    {
+      "path": "docs/SECRETS.md",
+      "claims": [
+        "`docs/SECRETS.md` must keep the TinyFish key in the Cloudflare Worker secret plane and never recast the provider-held value as a GitHub Actions secret or proof artifact."
       ]
     }
   ]

@@ -64,6 +64,27 @@ describe('browser bridge recovery policy', () => {
     expect(decision.reason).toMatch(/not proof.*provider page.*logged out|bridge failure/i);
   });
 
+  it('classifies Resource not found as the same blocked connector bridge state', () => {
+    const decision = decideBrowserBridgeRecovery({
+      directCapabilitySufficient: false,
+      browserOnlyInteractionRequired: true,
+      operaConnectorAvailable: true,
+      operaLiveSessionExposed: false,
+      operaConnectorError: 'Resource not found',
+      operaRetryCount: 0,
+      providerPageEvidence: 'founder_reported_ready',
+      alternateAuthenticatedBridgeAvailable: false,
+      alternateAuthenticatedBridgeLive: false,
+      genericBrowserAvailable: false,
+      genericBrowserSufficient: false,
+    });
+
+    expect(decision.route).toBe('blocked_connector_bridge');
+    expect(decision.classification).toBe('BLOCKED_CONNECTOR_BRIDGE');
+    expect(decision.retryOperaBridge).toBe(true);
+    expect(decision.repeatProviderSetupInstructions).toBe(false);
+  });
+
   it('re-probes Opera only once and then stops at the handshake gate', () => {
     const decision = decideBrowserBridgeRecovery({
       directCapabilitySufficient: false,

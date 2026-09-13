@@ -1,4 +1,5 @@
 import type { RepositoryRef, VerificationSignal } from '../providers/RepositoryProvider.js';
+import { fingerprintNormalized, type ProofCookieContract } from '../security/attack20V3.js';
 
 export type GoalfixReadiness = 'ready_for_founder_decision' | 'blocked' | 'waiting_for_evidence';
 export type GoalfixBottleneckKind =
@@ -7,6 +8,7 @@ export type GoalfixBottleneckKind =
   | 'incomplete_verification'
   | 'founder_decision'
   | 'unknown';
+export type GoalfixDecisionPlaneState = 'SUPPORTED_BY_CURRENT_PROOF' | 'NOT_ESTABLISHED' | 'UNKNOWN';
 
 export interface FounderGoal {
   desiredOutcome: string;
@@ -48,6 +50,57 @@ export interface GoalfixBottleneck {
   freezesUnrelatedWork: false;
 }
 
+export interface GoalfixContinuity {
+  contract: 'goalfix-continuity-v1';
+  sourceFingerprint: string;
+  evidenceFingerprint: string;
+  proofCookie: ProofCookieContract;
+  authority: 'EVIDENCE_ONLY';
+  browserCookieStored: false;
+  invalidatesOn: readonly string[];
+}
+
+export interface GoalfixDecisionPlane {
+  state: GoalfixDecisionPlaneState;
+  basis: string[];
+}
+
+export interface GoalfixDecisionKernel {
+  contract: 'goalfix-decision-kernel-v1';
+  authority: 'DECISION_SUPPORT_ONLY';
+  affectsTechnicalReadiness: false;
+  strategy: {
+    diagnosis: string;
+    evidenceState: GoalfixBottleneck['evidenceState'];
+    guidingPolicy: string;
+    coherentAction: string;
+  };
+  customerTruth: {
+    behavior: GoalfixDecisionPlane;
+    commitment: GoalfixDecisionPlane;
+    rule: string;
+  };
+  productRisk: {
+    value: GoalfixDecisionPlane;
+    usability: GoalfixDecisionPlane;
+    feasibility: GoalfixDecisionPlane;
+    viability: GoalfixDecisionPlane;
+    rule: string;
+  };
+  financialTruth: {
+    revenue: GoalfixDecisionPlane;
+    profit: GoalfixDecisionPlane;
+    cash: GoalfixDecisionPlane;
+    rule: string;
+  };
+  leverage: {
+    founderEffort: GoalfixDecisionPlane;
+    reusableCapability: GoalfixDecisionPlane;
+    rule: string;
+  };
+  gaps: string[];
+}
+
 export interface GoalfixReport {
   version: 'goalfix-v1';
   observedAt: string;
@@ -62,6 +115,8 @@ export interface GoalfixReport {
   goal: FounderGoal;
   evidence: GoalfixEvidence;
   bottleneck: GoalfixBottleneck;
+  continuity: GoalfixContinuity;
+  decisionKernel: GoalfixDecisionKernel;
   reality: string[];
   fix: string[];
   proof: string[];
@@ -177,7 +232,161 @@ function resolveBottleneck(args: {
   };
 }
 
+function unknownDecisionPlane(reason: string): GoalfixDecisionPlane {
+  return { state: 'UNKNOWN', basis: [reason] };
+}
+
+function feasibilityDecisionPlane(args: {
+  readiness: GoalfixReadiness;
+  expectedVerificationNames: string[];
+  target: RepositoryRef;
+}): GoalfixDecisionPlane {
+  if (args.readiness === 'ready_for_founder_decision') {
+    return {
+      state: 'SUPPORTED_BY_CURRENT_PROOF',
+      basis: [
+        `Every named exact-head repository check passed for ${args.target.commitSha}: ${args.expectedVerificationNames.join(', ')}.`,
+        'This supports implementation feasibility only within the named proof set; it does not prove production behavior, customer value, usability, or business viability.',
+      ],
+    };
+  }
+
+  return {
+    state: 'NOT_ESTABLISHED',
+    basis: [
+      'Implementation feasibility is not established because the complete named exact-head proof set has not passed.',
+    ],
+  };
+}
+
+function buildDecisionKernel(args: {
+  bottleneck: GoalfixBottleneck;
+  readiness: GoalfixReadiness;
+  expectedVerificationNames: string[];
+  target: RepositoryRef;
+}): GoalfixDecisionKernel {
+  const value = unknownDecisionPlane('Repository verification does not observe whether customers value this outcome.');
+  const usability = unknownDecisionPlane('Repository or browser execution proof does not establish that real users can understand and use the product effectively.');
+  const viability = unknownDecisionPlane('Repository verification does not establish sustainable business, policy, support, or operating viability.');
+  const customerBehavior = unknownDecisionPlane('No customer-behavior evidence source is part of this repository-only Goalfix inspection.');
+  const customerCommitment = unknownDecisionPlane('No concrete customer commitment or advancement evidence source is part of this repository-only Goalfix inspection.');
+  const revenue = unknownDecisionPlane('Repository verification does not establish booked or collected revenue.');
+  const profit = unknownDecisionPlane('Repository verification does not establish profit after costs and obligations.');
+  const cash = unknownDecisionPlane('Repository verification does not establish cash movement or available cash.');
+  const founderEffort = unknownDecisionPlane('This Goalfix slice does not measure founder time or recurring effort reduced by the selected action.');
+  const reusableCapability = unknownDecisionPlane('This Goalfix slice does not measure reuse or compounding output created by the selected action.');
+  const feasibility = feasibilityDecisionPlane(args);
+
+  const planes = [
+    ['customer behavior', customerBehavior],
+    ['customer commitment', customerCommitment],
+    ['product value', value],
+    ['product usability', usability],
+    ['product feasibility', feasibility],
+    ['product viability', viability],
+    ['revenue', revenue],
+    ['profit', profit],
+    ['cash', cash],
+    ['founder effort', founderEffort],
+    ['reusable capability', reusableCapability],
+  ] as const;
+
+  return {
+    contract: 'goalfix-decision-kernel-v1',
+    authority: 'DECISION_SUPPORT_ONLY',
+    affectsTechnicalReadiness: false,
+    strategy: {
+      diagnosis: args.bottleneck.statement,
+      evidenceState: args.bottleneck.evidenceState,
+      guidingPolicy: 'Concentrate the next action on the current verified limiting constraint without broadening into unrelated symptoms.',
+      coherentAction: args.bottleneck.smallestSafeRemoval,
+    },
+    customerTruth: {
+      behavior: customerBehavior,
+      commitment: customerCommitment,
+      rule: 'Praise and stated enthusiasm do not establish demand. Prefer observed past behavior plus concrete commitment or advancement evidence.',
+    },
+    productRisk: {
+      value,
+      usability,
+      feasibility,
+      viability,
+      rule: 'Value, usability, feasibility, and viability are separate evidence planes. One green plane never proves the other three.',
+    },
+    financialTruth: {
+      revenue,
+      profit,
+      cash,
+      rule: 'Revenue, profit, and cash are separate financial truths. Never use one as proof of another.',
+    },
+    leverage: {
+      founderEffort,
+      reusableCapability,
+      rule: 'Prefer actions that reduce repeated founder effort or create reusable capability, but do not call leverage verified without measured evidence.',
+    },
+    gaps: planes
+      .filter(([, plane]) => plane.state !== 'SUPPORTED_BY_CURRENT_PROOF')
+      .map(([name, plane]) => `${name}: ${plane.state}`),
+  };
+}
+
+function buildContinuity(input: {
+  project: GoalfixProject;
+  target: RepositoryRef;
+  expectedVerificationNames: string[];
+  latestSignals: VerificationSignal[];
+  readiness: GoalfixReadiness;
+  observedAt: string;
+}): GoalfixContinuity {
+  const sourceFingerprint = fingerprintNormalized({
+    repository: input.project.repository,
+    provider: input.project.provider,
+    ref: input.target.name,
+    commitSha: input.target.commitSha.toLowerCase(),
+  });
+  const evidenceFingerprint = fingerprintNormalized({
+    sourceFingerprint,
+    readiness: input.readiness,
+    requiredChecks: input.expectedVerificationNames.map(normalizeSignalName).sort(),
+    signals: input.latestSignals
+      .map((signal) => ({
+        id: signal.id,
+        name: normalizeSignalName(signal.name),
+        status: signal.status,
+        commitSha: signal.commitSha.toLowerCase(),
+        provider: signal.provider,
+        startedAt: signal.startedAt ?? null,
+        completedAt: signal.completedAt ?? null,
+      }))
+      .sort((left, right) => `${left.name}:${left.id}`.localeCompare(`${right.name}:${right.id}`)),
+  });
+  const proofCookie: ProofCookieContract = {
+    cookieId: `goalfix-proof-${fingerprintNormalized({ sourceFingerprint, evidenceFingerprint, observedAt: input.observedAt }).slice(0, 24)}`,
+    contextType: 'verification-run',
+    owner: 'goalfix-read-only-inspector',
+    createdAt: input.observedAt,
+    expiresAt: null,
+    parentCookieId: null,
+  };
+
+  return {
+    contract: 'goalfix-continuity-v1',
+    sourceFingerprint,
+    evidenceFingerprint,
+    proofCookie,
+    authority: 'EVIDENCE_ONLY',
+    browserCookieStored: false,
+    invalidatesOn: [
+      'authoritative target commit changes',
+      'required exact-head check set changes',
+      'exact-head verification evidence changes',
+      'repository or provider binding changes',
+    ],
+  };
+}
+
 export function buildGoalfixReport(input: BuildGoalfixReportInput): GoalfixReport {
+  const observedAt = (input.observedAt ?? new Date()).toISOString();
   const expectedSha = input.target.commitSha.toLowerCase();
   const expectedVerificationNames = uniqueExpectedNames(input.goal.expectedVerificationNames);
   const expectedNameKeys = new Set(expectedVerificationNames.map(normalizeSignalName));
@@ -197,9 +406,9 @@ export function buildGoalfixReport(input: BuildGoalfixReportInput): GoalfixRepor
   const expectedSignals = latestSignals.filter(
     (signal) => expectedNameKeys.has(normalizeSignalName(signal.name)),
   );
-  const failures = latestSignals.filter((signal) => TERMINAL_FAILURES.has(signal.status));
-  const incomplete = latestSignals.filter((signal) => INCOMPLETE_SIGNALS.has(signal.status));
-  const passed = latestSignals.filter((signal) => signal.status === 'passed');
+  const failures = expectedSignals.filter((signal) => TERMINAL_FAILURES.has(signal.status));
+  const incomplete = expectedSignals.filter((signal) => INCOMPLETE_SIGNALS.has(signal.status));
+  const passed = expectedSignals.filter((signal) => signal.status === 'passed');
   const everyExpectedNamePassed = expectedVerificationNames.length > 0
     && missingExpectedNames.length === 0
     && expectedVerificationNames.every((name) => {
@@ -212,6 +421,15 @@ export function buildGoalfixReport(input: BuildGoalfixReportInput): GoalfixRepor
   else if (everyExpectedNamePassed && incomplete.length === 0) {
     readiness = 'ready_for_founder_decision';
   }
+
+  const continuity = buildContinuity({
+    project: input.project,
+    target: input.target,
+    expectedVerificationNames,
+    latestSignals,
+    readiness,
+    observedAt,
+  });
 
   const verified = [
     `Resolved ${input.target.name} to immutable commit ${input.target.commitSha}.`,
@@ -246,6 +464,9 @@ export function buildGoalfixReport(input: BuildGoalfixReportInput): GoalfixRepor
     ...(latestSignals.length > 0
       ? latestSignals.map(describeSignal)
       : [`No exact-head provider proof exists yet for ${input.target.commitSha}.`]),
+    `Continuity source fingerprint: ${continuity.sourceFingerprint}.`,
+    `Continuity evidence fingerprint: ${continuity.evidenceFingerprint}.`,
+    `Proof cookie: ${continuity.proofCookie.cookieId} (evidence-only; never authorization).`,
   ];
 
   const nextGate = readiness === 'blocked'
@@ -261,10 +482,16 @@ export function buildGoalfixReport(input: BuildGoalfixReportInput): GoalfixRepor
     expectedVerificationNames,
     readiness,
   });
+  const decisionKernel = buildDecisionKernel({
+    bottleneck,
+    readiness,
+    expectedVerificationNames,
+    target: input.target,
+  });
 
   return {
     version: 'goalfix-v1',
-    observedAt: (input.observedAt ?? new Date()).toISOString(),
+    observedAt,
     readiness,
     routing: {
       skill: 'goalfix',
@@ -284,19 +511,25 @@ export function buildGoalfixReport(input: BuildGoalfixReportInput): GoalfixRepor
     },
     evidence: { verified, inferred, unknown, blocked },
     bottleneck,
+    continuity,
+    decisionKernel,
     reality: [
       `The authoritative repository ref is ${input.target.name} at ${input.target.commitSha}.`,
       `${exactHeadSignals.length} exact-head verification signal(s) were inspected against ${expectedVerificationNames.length} required name(s).`,
       `${expectedSignals.length} exact-head signal(s) matched the required proof set.`,
       `Bottleneck: ${bottleneck.statement}`,
+      'Customer truth, product risk, financial truth, and leverage remain separate from repository readiness in the founder decision kernel.',
       'This inspection performed no repository, provider, deployment, product-data, CRM, or publication mutation. The route may retain one sanitized internal access-audit event.',
     ],
     fix: ['No fix was applied. Goalfix v1 stops at inspection and founder decision authority.'],
     proof,
     risk: [
       'Passing repository checks prove only the checks that actually ran, not production behavior or the founder outcome.',
+      'Technical green may support bounded implementation feasibility, but it never proves customer value, usability, business viability, revenue, profit, cash, or leverage.',
+      'Decision-kernel gaps never upgrade or downgrade technical readiness automatically; each evidence plane keeps its own state.',
       'Missing named checks, skipped, running, unknown, or mismatched-head evidence must not be presented as green.',
       'A bottleneck may block the dependent claim or action without freezing unrelated capabilities that already have current authority and proof.',
+      'The proof cookie is a non-secret evidence marker in the report, not a browser cookie, founder session, approval token, merge token, or mutation authority.',
     ],
     rollback: ['No target-system rollback is required. Revert the Goalfix code change to remove the surface; retain any sanitized audit event as historical evidence.'],
     nextGate,
