@@ -70,7 +70,10 @@ function sanitizeAttempt(value) {
 }
 
 function attemptSignature(attempt) {
-  return attempt.failureSignature || `verification:${normalizeSignalName(attempt.verificationName)}` || attempt.approach;
+  if (attempt.failureSignature) return attempt.failureSignature;
+  const verificationName = normalizeSignalName(attempt.verificationName);
+  if (verificationName) return `verification:${verificationName}`;
+  return `approach:${attempt.approach}`;
 }
 
 function boundAttempts(attempts) {
