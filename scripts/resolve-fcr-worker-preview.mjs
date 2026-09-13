@@ -1,9 +1,14 @@
 #!/usr/bin/env node
 
 import { mkdir, writeFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 const API = 'https://api.cloudflare.com/client/v4';
 const SHA40 = /^[0-9a-f]{40}$/;
+const MAX_BUILD_PAGES = 20;
+const MAX_LOG_PAGES = 20;
+const BUILDS_PER_PAGE = 200;
 
 function required(value, name) {
   const normalized = typeof value === 'string' ? value.trim() : '';
@@ -68,7 +73,7 @@ export function extractImmutablePreviewOrigin(logResult, workerName = 'founder-c
   return origins[0];
 }
 
-async function cloudflareJson(fetchImpl, apiToken, path) {
+async function cloudflarePayload(fetchImpl, apiToken, path) {
   const response = await fetchImpl(`${API}${path}`, {
     headers: { Accept: 'application/json', Authorization: `Bearer ${apiToken}` },
   });
@@ -77,7 +82,60 @@ async function cloudflareJson(fetchImpl, apiToken, path) {
     const code = payload?.errors?.[0]?.code;
     throw new Error(`Cloudflare read failed with HTTP ${response.status}${code ? ` (code ${code})` : ''}.`);
   }
-  return payload.result;
+  return payload;
+}
+
+async function cloudflareResult(fetchImpl, apiToken, path) {
+  return (await cloudflarePayload(fetchImpl, apiToken, path)).result;
+}
+
+export async function listBuildsBounded(fetchImpl, apiToken, account, workerTag) {
+  const builds = [];
+  for (let page = 1; page <= MAX_BUILD_PAGES; page += 1) {
+    const payload = await cloudflarePayload(
+      fetchImpl,
+      apiToken,
+      `/accounts/${encodeURIComponent(account)}/builds/workers/${encodeURIComponent(workerTag)}/builds?page=${page}&per_page=${BUILDS_PER_PAGE}`,
+    );
+    const current = normalizeBuilds(payload.result);
+    builds.push(...current);
+
+    const totalPages = Number(payload?.result_info?.total_pages || 0);
+    if (totalPages > MAX_BUILD_PAGES) {
+      throw new Error(`FCR_PREVIEW_BUILD_PAGE_LIMIT: Cloudflare reported ${totalPages} build pages, above the bounded limit ${MAX_BUILD_PAGES}.`);
+    }
+    if (totalPages > 0) {
+      if (page >= totalPages) return builds;
+      continue;
+    }
+    if (current.length < BUILDS_PER_PAGE) return builds;
+  }
+  throw new Error(`FCR_PREVIEW_BUILD_PAGE_LIMIT: Cloudflare build listing exceeded ${MAX_BUILD_PAGES} pages.`);
+}
+
+export async function readBuildLogsBounded(fetchImpl, apiToken, account, buildUuid) {
+  const lines = [];
+  let cursor = '';
+  const seenCursors = new Set();
+
+  for (let page = 1; page <= MAX_LOG_PAGES; page += 1) {
+    const suffix = cursor ? `?cursor=${encodeURIComponent(cursor)}` : '';
+    const result = await cloudflareResult(
+      fetchImpl,
+      apiToken,
+      `/accounts/${encodeURIComponent(account)}/builds/builds/${encodeURIComponent(buildUuid)}/logs${suffix}`,
+    );
+    if (Array.isArray(result?.lines)) lines.push(...result.lines);
+    if (result?.truncated !== true) return { lines };
+
+    const nextCursor = String(result?.cursor || '').trim();
+    if (!nextCursor) throw new Error('FCR_PREVIEW_LOG_CURSOR_MISSING: Cloudflare truncated build logs without returning a cursor.');
+    if (seenCursors.has(nextCursor)) throw new Error('FCR_PREVIEW_LOG_CURSOR_REPEATED: Cloudflare repeated a build-log cursor.');
+    seenCursors.add(nextCursor);
+    cursor = nextCursor;
+  }
+
+  throw new Error(`FCR_PREVIEW_LOG_PAGE_LIMIT: Cloudflare build logs exceeded ${MAX_LOG_PAGES} pages.`);
 }
 
 export async function resolveExactFcrPreview({
@@ -96,24 +154,16 @@ export async function resolveExactFcrPreview({
   const branch = required(expectedBranch, 'expected branch');
   if (!SHA40.test(sha)) throw new Error('expected SHA must be a lowercase 40-character commit SHA.');
 
-  const scripts = await cloudflareJson(fetchImpl, token, `/accounts/${encodeURIComponent(account)}/workers/scripts`);
+  const scripts = await cloudflareResult(fetchImpl, token, `/accounts/${encodeURIComponent(account)}/workers/scripts`);
   const matchedWorkers = (Array.isArray(scripts) ? scripts : []).filter((entry) => entry?.id === worker && entry?.tag);
   if (matchedWorkers.length !== 1) {
     throw new Error(`FCR_WORKER_IDENTITY_AMBIGUOUS: expected one Worker named ${worker}, found ${matchedWorkers.length}.`);
   }
 
   const workerTag = matchedWorkers[0].tag;
-  const builds = await cloudflareJson(
-    fetchImpl,
-    token,
-    `/accounts/${encodeURIComponent(account)}/builds/workers/${encodeURIComponent(workerTag)}/builds`,
-  );
+  const builds = await listBuildsBounded(fetchImpl, token, account, workerTag);
   const build = findExactSuccessfulBuild(builds, sha, branch);
-  const logs = await cloudflareJson(
-    fetchImpl,
-    token,
-    `/accounts/${encodeURIComponent(account)}/builds/builds/${encodeURIComponent(build.build_uuid)}/logs`,
-  );
+  const logs = await readBuildLogsBounded(fetchImpl, token, account, build.build_uuid);
   const previewOrigin = extractImmutablePreviewOrigin(logs, worker);
 
   return {
@@ -151,7 +201,8 @@ async function main() {
   }
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+const invokedPath = process.argv[1] ? pathToFileURL(resolve(process.argv[1])).href : '';
+if (invokedPath && import.meta.url === invokedPath) {
   main().catch((error) => {
     console.error(error instanceof Error ? error.message : String(error));
     process.exitCode = 1;
