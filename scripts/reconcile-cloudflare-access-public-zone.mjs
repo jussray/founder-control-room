@@ -664,10 +664,12 @@ if (invokedDirectly) {
     })
     .catch(async (error) => {
       let previous = {};
-      try {
-        previous = JSON.parse(await readFile(RECEIPT_PATH, 'utf8'));
-      } catch {
-        previous = {};
+      if (rollback) {
+        try {
+          previous = JSON.parse(await readFile(RECEIPT_PATH, 'utf8'));
+        } catch {
+          previous = {};
+        }
       }
       const recoveryEvidence = error?.recoveryEvidence && typeof error.recoveryEvidence === 'object'
         ? error.recoveryEvidence
