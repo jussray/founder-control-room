@@ -27,6 +27,7 @@ export type RelayTruthStateV31 = 'verified' | 'inferred' | 'unknown' | 'stale' |
 export type RelayContentTypeV31 = 'text/plain' | 'application/json';
 export type RelayKeyStateV31 = 'active' | 'retiring' | 'revoked';
 export type RelayRelationTypeV31 = 'root' | 'reply' | 'revision' | 'reconcile';
+export type RelayCurrentStateV31 = 'accepted' | 'superseded' | 'revoked';
 
 export class RelayV31Error extends Error {
   constructor(public readonly code: string) {
@@ -104,6 +105,14 @@ export interface AcceptedKeyStateV31 {
   validUntil: string | null;
 }
 
+export interface SourceCommitEvidenceV31 {
+  repository: string;
+  branch: string;
+  headSha: string;
+  state: 'reachable_at_acceptance' | 'exists_not_currently_reachable';
+  checkedAt: string;
+}
+
 export interface FederatedAgentRelayReceiptV31Unsigned {
   contract: typeof FEDERATED_AGENT_RELAY_RECEIPT_V31;
   status: 'accepted';
@@ -116,7 +125,7 @@ export interface FederatedAgentRelayReceiptV31Unsigned {
   receiver: RelayMemberIdentityV31;
   sourceHeadSha: string;
   targetObservedHeadSha: string;
-  sourceReachableFromClaimedBranch: boolean;
+  sourceCommitEvidence: SourceCommitEvidenceV31;
   predecessorProofCookie: string;
   successorProofCookie: string;
   evidenceDigest: string;
@@ -163,6 +172,15 @@ export interface RelayLocalIdentityV31 {
   currentHeadSha: string;
 }
 
+export interface StoredRelayDeliveryV31 {
+  messageId: string;
+  semanticFingerprint: string;
+  deliveryFingerprint: string;
+  receipt: FederatedAgentRelayReceiptV31;
+  currentState: RelayCurrentStateV31;
+  supersededByMessageId: string | null;
+}
+
 export interface RelayLedgerAcceptInputV31 {
   envelope: FederatedAgentRelayEnvelopeV31;
   semanticFingerprint: string;
@@ -175,11 +193,12 @@ export interface RelayLedgerAcceptInputV31 {
 export interface RelayLedgerAcceptResultV31 {
   outcome: 'accepted' | 'duplicate';
   receipt: FederatedAgentRelayReceiptV31;
-  currentState: 'accepted' | 'superseded' | 'revoked';
+  currentState: RelayCurrentStateV31;
   supersededByMessageId: string | null;
 }
 
 export interface RelayLedgerV31 {
+  findByMessageId(messageId: string): Promise<StoredRelayDeliveryV31 | null>;
   accept(input: RelayLedgerAcceptInputV31): Promise<RelayLedgerAcceptResultV31>;
 }
 
