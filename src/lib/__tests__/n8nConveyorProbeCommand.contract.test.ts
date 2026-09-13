@@ -27,7 +27,7 @@ describe('n8n conveyor probe founder command contract', () => {
     expect(commandWorkflow).toContain("capability.get('id') != 'n8n-live-probe'");
     expect(commandWorkflow).toContain("capability.get('origin') != 'repo-native'");
     expect(commandWorkflow).toContain("capability.get('owner') != 'chief-ai-machine'");
-    expect(commandWorkflow).toContain("capability.get('authorityCeiling') not in {'reason', 'draft'}");
+    expect(commandWorkflow).toContain("capability.get('authorityCeiling') != 'draft'");
     expect(commandWorkflow).toContain("str(plan.get('expectedHeadSha', '')).lower() != sha");
   });
 
