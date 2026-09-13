@@ -184,3 +184,7 @@ Those actions still require their own exact approval unless a later founder dire
 Do not merge merely because a PR exists, because a badge looks green, because `merge_authority` is true, or because the founder asked for review/implementation. **Before every merge, ask for and obtain explicit founder approval for the exact current repository, PR, base SHA, and head SHA unless that exact approval is already present and still current.**
 
 Immediately before merge, re-read current `main`, the exact PR head, required checks, review state, founder-final receipt state, exact-candidate founder approval, and applicable provider state. If base or head moved after approval, stop and ask again. After merge, re-read the resulting `main`, Documentation Truth, and the next release/runtime gate. Old-head green and old approval remain historical evidence only.
+
+## Load-bearing regression execution
+
+A required test contributes to merge readiness only when the exact-head workflow that feeds the applicable gate actually executes it. A committed but uninvoked test is source evidence, not CI proof. For LinkedIn analytics continuity, `.github/workflows/ci.yml` must keep `scripts.test_linkedin_analytics_continuity` inside the load-bearing `python-tests` job, and `Required Gate` must continue to depend on that job. Missing LinkedIn activity rows must remain `UNKNOWN_NO_EVIDENCE` with null metrics, never synthetic zero impressions or engagements.

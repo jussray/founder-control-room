@@ -46,7 +46,8 @@ export interface BrowserBridgeRecoveryDecision {
 }
 
 function isBridgeSessionFailure(error: string | null | undefined): boolean {
-  return typeof error === 'string' && /browser not connected|session.*not connected|connector.*not connected/i.test(error);
+  return typeof error === 'string'
+    && /browser not connected|session.*not connected|connector.*not connected|resource not found/i.test(error);
 }
 
 export function decideBrowserBridgeRecovery(
