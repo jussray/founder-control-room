@@ -7,7 +7,9 @@ import {
   FEDERATED_RELAY_KEY_QUERY_V31,
   FEDERATED_RELAY_V31_MEMBER_REPOSITORIES,
   FederatedRelayV31Error,
+  assertRelayKeyUsableV31,
   canonicalTransportByteLengthV31,
+  canonicalizeRelayJsonV31,
   deliveryFingerprintV31,
   parseFederatedAgentRelayEnvelopeV31,
   signRelayReceiptV31,
@@ -113,6 +115,15 @@ async function localPublicKey(member: FederatedRelayMemberV31, keyId: string): P
   };
 }
 
+function sameEd25519PublicMaterial(left: JsonWebKey, right: JsonWebKey): boolean {
+  return left.kty === 'OKP'
+    && right.kty === 'OKP'
+    && left.crv === 'Ed25519'
+    && right.crv === 'Ed25519'
+    && typeof left.x === 'string'
+    && left.x === right.x;
+}
+
 async function sourcePublicKey(envelope: FederatedAgentRelayEnvelopeV31): Promise<FederatedRelayPublicKeyV31> {
   const base = runtimeBase(envelope.source.member);
   const requestBody = JSON.stringify({ contract: FEDERATED_RELAY_KEY_QUERY_V31, member: envelope.source.member, keyId: envelope.signature.keyId });
@@ -123,7 +134,7 @@ async function sourcePublicKey(envelope: FederatedAgentRelayEnvelopeV31): Promis
   const result = await response.json() as Record<string, unknown>;
   if (result.contract !== FEDERATED_RELAY_KEY_QUERY_V31 || !isRecord(result.key)) throw new FederatedRelayV31Error('relay_key_query_invalid', 503);
   const key = result.key;
-  return {
+  const remote: FederatedRelayPublicKeyV31 = {
     member: key.member as FederatedRelayMemberV31,
     keyId: String(key.keyId ?? ''),
     publicKeyJwk: key.publicKeyJwk as JsonWebKey,
@@ -132,15 +143,24 @@ async function sourcePublicKey(envelope: FederatedAgentRelayEnvelopeV31): Promis
     validUntil: key.validUntil == null ? null : String(key.validUntil),
     revokedAt: key.revokedAt == null ? null : String(key.revokedAt),
   };
+  if (remote.member !== envelope.source.member || remote.keyId !== envelope.signature.keyId) {
+    throw new FederatedRelayV31Error('relay_key_registry_identity_mismatch', 401);
+  }
+  const pinned = await localPublicKey(envelope.source.member, envelope.signature.keyId);
+  if (!sameEd25519PublicMaterial(remote.publicKeyJwk, pinned.publicKeyJwk)) {
+    throw new FederatedRelayV31Error('relay_key_registry_material_mismatch', 401);
+  }
+  return pinned;
 }
 
-async function receiverSigner(runtimeHeadSha: string): Promise<{ key: FederatedRelayPublicKeyV31; privateKey: CryptoKey }> {
+async function receiverSigner(runtimeHeadSha: string, acceptedAt: Date): Promise<{ key: FederatedRelayPublicKeyV31; privateKey: CryptoKey }> {
   const keyId = process.env.FEDERATED_RELAY_RECEIVER_KEY_ID?.trim() ?? '';
   const privateJwkRaw = process.env.FEDERATED_RELAY_RECEIVER_PRIVATE_JWK?.trim() ?? '';
   if (!keyId || !privateJwkRaw) throw new FederatedRelayV31Error('relay_receiver_signing_key_unconfigured', 503);
   let privateJwk: JsonWebKey;
   try { privateJwk = JSON.parse(privateJwkRaw) as JsonWebKey; } catch { throw new FederatedRelayV31Error('relay_receiver_signing_key_invalid', 503); }
   const key = await localPublicKey(LOCAL_MEMBER, keyId);
+  assertRelayKeyUsableV31(key, LOCAL_MEMBER, acceptedAt.toISOString(), acceptedAt.toISOString());
   if (privateJwk.kty !== key.publicKeyJwk.kty || privateJwk.crv !== key.publicKeyJwk.crv || privateJwk.x !== key.publicKeyJwk.x) {
     throw new FederatedRelayV31Error('relay_receiver_signing_key_mismatch', 503);
   }
@@ -236,13 +256,18 @@ export const handleFederatedRelayV31: RequestHandler = async function handleFede
     if (isRecord(req.body) && req.body.contract === FEDERATED_RELAY_KEY_QUERY_V31) return await handleKeyQuery(req, res);
     const envelope = parseFederatedAgentRelayEnvelopeV31(req.body);
 
-    // Express v3 transport currently parses JSON before this handler. For v3.1 we
-    // require byte length equality with canonical JCS. Duplicate-key bodies necessarily
-    // add bytes beyond the canonical parsed object and fail closed here; Chief's Worker
-    // additionally performs raw duplicate-key rejection before JSON.parse.
+    // This route is parsed before the general JSON middleware. Until raw-body
+    // capture becomes part of the shared HTTP contract, require both the exact
+    // canonical object serialization and exact canonical byte length. The pair
+    // rejects reordered keys, insignificant whitespace, alternate escaping, and
+    // duplicate-key transports instead of using byte length alone as a proxy.
+    const canonicalTransport = canonicalizeRelayJsonV31(envelope);
+    const normalizedTransport = JSON.stringify(req.body);
     const declaredLength = Number(req.headers['content-length']);
-    if (!Number.isSafeInteger(declaredLength) || declaredLength !== canonicalTransportByteLengthV31(envelope)) {
-      throw new FederatedRelayV31Error('relay_transport_not_canonical_length');
+    if (normalizedTransport !== canonicalTransport
+        || !Number.isSafeInteger(declaredLength)
+        || declaredLength !== canonicalTransportByteLengthV31(envelope)) {
+      throw new FederatedRelayV31Error('relay_transport_not_canonical_jcs');
     }
 
     const deliveryFingerprint = await deliveryFingerprintV31(envelope);
@@ -273,7 +298,7 @@ export const handleFederatedRelayV31: RequestHandler = async function handleFede
     const acceptedAt = new Date();
     const sourceKey = await sourcePublicKey(envelope);
     const verified = await verifyRelayEnvelopeV31({ envelope, key: sourceKey, acceptedAt });
-    const signer = await receiverSigner(runtimeHeadSha);
+    const signer = await receiverSigner(runtimeHeadSha, acceptedAt);
     const receiptId = crypto.randomUUID();
     const unsignedReceipt: FederatedRelayUnsignedReceiptV31 = {
       contract: FEDERATED_AGENT_RELAY_RECEIPT_V31,
