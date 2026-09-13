@@ -160,6 +160,7 @@ describe('Founder deploy command authority contract', () => {
       'GITHUB_APP_ID',
       'GITHUB_PRIVATE_KEY',
       'FCR_REMOTE_MCP_READ_TOKEN',
+      'TINYFISH_API_KEY',
       'FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON',
       'FOUNDER_SIGNAL_ENGINE_MCP_TOKEN',
       'ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL',
