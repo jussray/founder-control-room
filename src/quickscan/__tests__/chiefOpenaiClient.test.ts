@@ -31,18 +31,24 @@ function openAiPayload(output: Record<string, unknown>, responseId = 'resp_test_
   return { id: responseId, output_text: JSON.stringify(output) };
 }
 
+function localPayload(output: Record<string, unknown>) {
+  return { created_at: '2026-09-13T17:00:00Z', message: { content: JSON.stringify(output) } };
+}
+
+const validOutput = {
+  summary: 'Clear evidence of missed booking requests.',
+  next_action: 'approve_outreach',
+  message_draft: 'Hey Maya — do booking requests in comments ever slip through?',
+};
+
 describe('createOpenAiQuickScanChiefRunner', () => {
-  it('refuses to run without OPENAI_API_KEY configured', async () => {
+  it('refuses to run without any provider configured', async () => {
     const runner = createOpenAiQuickScanChiefRunner({ env: {}, fetchFn: vi.fn() });
     await expect(runner(promptInput())).rejects.toMatchObject({ code: 'OPENAI_NOT_CONFIGURED' });
   });
 
   it('returns a recommendation stamped with the canonical PromptOS workflow', async () => {
-    const fetchFn = vi.fn(async () => fakeResponse(openAiPayload({
-      summary: 'Clear evidence of missed booking requests.',
-      next_action: 'approve_outreach',
-      message_draft: 'Hey Maya — do booking requests in comments ever slip through?',
-    })));
+    const fetchFn = vi.fn(async () => fakeResponse(openAiPayload(validOutput)));
     const runner = createOpenAiQuickScanChiefRunner({ env: { OPENAI_API_KEY: 'sk-test' }, fetchFn });
     const result = await runner(promptInput());
 
@@ -53,6 +59,90 @@ describe('createOpenAiQuickScanChiefRunner', () => {
       promptWorkflow: QUICKSCAN_CHIEF_WORKFLOW,
     });
     expect(result.provenance).toMatchObject({ provider: 'openai', model: 'gpt-5-mini', responseId: 'resp_test_1' });
+  });
+
+  it('selects an eligible verified local runtime before the paid provider', async () => {
+    const fetchFn = vi.fn(async (url: string | URL | Request) => {
+      const target = String(url);
+      if (target.endsWith('/api/chat')) return fakeResponse(localPayload(validOutput));
+      return fakeResponse(openAiPayload(validOutput));
+    });
+    const runner = createOpenAiQuickScanChiefRunner({
+      env: {
+        QUICKSCAN_LOCAL_ENABLED: 'true',
+        QUICKSCAN_LOCAL_QUALITY_VERIFIED: 'true',
+        QUICKSCAN_LOCAL_COMMERCIAL_RIGHTS: 'verified',
+        QUICKSCAN_LOCAL_LICENSE_EVIDENCE: 'license-reviewed',
+        QUICKSCAN_LOCAL_BASE_URL: 'http://127.0.0.1:11434',
+        QUICKSCAN_LOCAL_MODEL: 'qwen3:8b',
+        OPENAI_API_KEY: 'sk-test',
+      },
+      fetchFn,
+    });
+
+    const result = await runner(promptInput());
+
+    expect(result.provenance.provider).toBe('local-ollama');
+    expect(result.provenance.model).toBe('qwen3:8b');
+    expect(result.provenance.selection).toMatchObject({ providerId: 'local-ollama', costClass: 'LOCAL_NO_PROVIDER_FEE' });
+    expect(result.provenance.fallbackReason).toBeNull();
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+    expect(String(fetchFn.mock.calls[0][0])).toBe('http://127.0.0.1:11434/api/chat');
+  });
+
+  it('falls back to paid only after a selected local runtime fails and records why', async () => {
+    const fetchFn = vi.fn(async (url: string | URL | Request) => {
+      const target = String(url);
+      if (target.endsWith('/api/chat')) throw Object.assign(new Error('local refused connection'), { code: 'ECONNREFUSED' });
+      return fakeResponse(openAiPayload(validOutput, 'resp_paid_fallback'));
+    });
+    const runner = createOpenAiQuickScanChiefRunner({
+      env: {
+        QUICKSCAN_LOCAL_ENABLED: 'true',
+        QUICKSCAN_LOCAL_QUALITY_VERIFIED: 'true',
+        QUICKSCAN_LOCAL_COMMERCIAL_RIGHTS: 'verified',
+        QUICKSCAN_LOCAL_LICENSE_EVIDENCE: 'license-reviewed',
+        QUICKSCAN_LOCAL_BASE_URL: 'http://127.0.0.1:11434',
+        QUICKSCAN_LOCAL_MODEL: 'qwen3:8b',
+        OPENAI_API_KEY: 'sk-test',
+      },
+      fetchFn,
+    });
+
+    const result = await runner(promptInput());
+
+    expect(result.provenance).toMatchObject({
+      provider: 'openai',
+      responseId: 'resp_paid_fallback',
+      fallbackReason: 'LOCAL_CHIEF_REQUEST_FAILED',
+      selection: { providerId: 'openai', costClass: 'PAID' },
+    });
+    expect(result.provenance.decisionTrace).toEqual(expect.arrayContaining([
+      expect.objectContaining({ providerId: 'local-ollama', eligible: false, reasons: expect.arrayContaining(['transport']) }),
+      expect.objectContaining({ providerId: 'openai', eligible: true }),
+    ]));
+    expect(fetchFn).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not select local just because it is free when quality proof is missing', async () => {
+    const fetchFn = vi.fn(async () => fakeResponse(openAiPayload(validOutput)));
+    const runner = createOpenAiQuickScanChiefRunner({
+      env: {
+        QUICKSCAN_LOCAL_ENABLED: 'true',
+        QUICKSCAN_LOCAL_COMMERCIAL_RIGHTS: 'verified',
+        QUICKSCAN_LOCAL_BASE_URL: 'http://127.0.0.1:11434',
+        QUICKSCAN_LOCAL_MODEL: 'qwen3:8b',
+        OPENAI_API_KEY: 'sk-test',
+      },
+      fetchFn,
+    });
+
+    const result = await runner(promptInput());
+
+    expect(result.provenance.provider).toBe('openai');
+    expect(result.provenance.decisionTrace).toEqual(expect.arrayContaining([
+      expect.objectContaining({ providerId: 'local-ollama', eligible: false, reasons: expect.arrayContaining(['quality']) }),
+    ]));
   });
 
   it('uses the configured model override in the request body', async () => {
@@ -119,7 +209,7 @@ describe('createOpenAiQuickScanChiefRunner', () => {
       headers: { 'content-length': String(200 * 1024) },
     }));
     const runner = createOpenAiQuickScanChiefRunner({ env: { OPENAI_API_KEY: 'sk-test' }, fetchFn });
-    await expect(runner(promptInput())).rejects.toMatchObject({ code: 'OPENAI_RESPONSE_TOO_LARGE' });
+    await expect(runner(promptInput())).rejects.toMatchObject({ code: 'CHIEF_RESPONSE_TOO_LARGE' });
   });
 
   it('treats an abort as a timeout error', async () => {
