@@ -8,7 +8,7 @@ Turn a messy founder goal into one bounded, proof-first repository inspection wi
 
 Founder Control Room is an AI-powered founder operating system. Model-backed intelligence runs through bounded FCR capabilities, while Goalfix / TruthMode is the truth, authority, evidence, continuity, and verification layer that governs what may be claimed or acted on.
 
-Goalfix v1 does **not** currently claim to call a language model directly. Its job is to establish repository reality, classify evidence, bind proof to the exact source state, expose stale-proof drift, and stop before mutation unless a separate founder-approved action exists.
+Goalfix v1 does **not** currently claim to call a language model directly. Its job is to establish repository reality, classify evidence, bind proof to the exact source state, expose stale-proof drift, preserve separate decision-truth planes, and stop before mutation unless a separate founder-approved action exists.
 
 Submission-safe framing:
 
@@ -31,6 +31,7 @@ Founder session
 → RepositoryProvider.getRef
 → RepositoryProvider.listVerificationSignals
 → exact-head evidence classifier
+→ strategy/crux + customer/product/financial/leverage decision kernel
 → continuity source fingerprint + evidence fingerprint + proof cookie
 → sanitized project_events completion or failure audit
 → REALITY / FIX / PROOF / RISK / ROLLBACK / NEXT GATE report
@@ -70,6 +71,7 @@ It may:
 - read verification signals for that exact commit;
 - compare exact-head signals against a founder-supplied required proof set;
 - classify evidence as verified, inferred, unknown, or blocked;
+- expose a decision-support kernel that keeps strategy/crux, customer truth, product risk, financial truth, and leverage separate from technical readiness;
 - emit non-secret continuity fingerprints and a proof cookie that describe the inspected source/evidence state;
 - persist one sanitized internal access-audit event for completed or failed provider-read attempts;
 - recommend one next gate.
@@ -86,9 +88,39 @@ It may not:
 - store the founder's desired outcome, reason, constraints, supplied file names, or required check names in the access-audit event;
 - use credentials beyond the existing repository read provider;
 - present missing required checks, stale proof, skipped, running, unknown, or wrong-head evidence as green;
+- promote repository green into customer demand, usability, business viability, revenue, profit, cash, or measured leverage;
 - treat a fingerprint or proof cookie as approval, authentication, merge authority, session authority, mutation authority, or permission renewal.
 
 The route fails closed when its sanitized access audit cannot persist. A provider factory, ref-resolution, or verification-signal failure is audited before the error is returned when the audit store remains available. Any future target-system mutation requires a separate founder-approved action through the existing approval and idempotency system.
+
+## Founder decision kernel
+
+`goalfix-decision-kernel-v1` is decision support only. It never changes Goalfix technical readiness and never grants mutation authority.
+
+The strategy surface separates:
+
+```text
+diagnosis / current limiting constraint
+→ guiding policy
+→ one coherent bounded action
+```
+
+The customer surface keeps observed behavior and concrete commitment/advancement distinct from praise or stated enthusiasm. Repository-only inspection has no customer source, so both customer planes remain `UNKNOWN` until separately authoritative evidence exists.
+
+The product surface keeps four risks independent:
+
+- **value**: whether customers value the outcome;
+- **usability**: whether real users can understand and use it effectively;
+- **feasibility**: whether the implementation is supported by the current named exact-head proof set;
+- **viability**: whether the business, policy, support, and operating model can sustain it.
+
+When every founder-named exact-head repository check passes, Goalfix may mark only bounded implementation feasibility as `SUPPORTED_BY_CURRENT_PROOF`. That state is limited to the named checks and does not prove production behavior, value, usability, or viability. When the proof set is incomplete or failing, feasibility is `NOT_ESTABLISHED` rather than silently inheriting an older green.
+
+The financial surface keeps **revenue**, **profit**, and **cash** as separate `UNKNOWN` planes because repository verification does not observe financial books or bank movement. One must never be used as proof of another.
+
+The leverage surface keeps **founder effort reduced** and **reusable capability created** separate and `UNKNOWN` until measured evidence exists. Goalfix may prefer high-leverage actions as a decision rule, but preference is not proof.
+
+Commercial, customer, financial, and leverage gaps do not freeze an otherwise bounded technical repair. Conversely, technical green cannot erase or promote those gaps. Each plane keeps its own receipt and classification.
 
 ## Continuity contract
 
@@ -106,11 +138,13 @@ Continuity is bidirectional:
 3. A stale fingerprint or proof cookie may explain historical state, but it may not make a newer head green.
 4. If code changes after proof, the previous proof remains historical evidence and the new exact head must reacquire the proof required for its claim.
 
+The decision kernel derives only from the current Goalfix report and repository proof available to that inspection. It does not convert unknown customer, financial, or leverage evidence into continuity-authoritative facts.
+
 ## Readiness states
 
-- `blocked`: at least one exact-head signal failed or was cancelled.
+- `blocked`: at least one **named required** exact-head signal failed or was cancelled.
 - `waiting_for_evidence`: a named required exact-head signal is absent, incomplete, skipped, unknown, only available for a different commit, or no required proof set was supplied to the engine.
-- `ready_for_founder_decision`: every named required check has at least one passing signal on the exact commit, with no exact-head failed, cancelled, queued, running, skipped, or unknown signal. This does not prove production behavior or the founder outcome.
+- `ready_for_founder_decision`: every named required check has at least one passing signal on the exact commit, with no named required exact-head failed, cancelled, queued, running, skipped, or unknown signal. Unrelated exact-head signals remain visible in the proof transcript but do not impersonate the founder's required proof set. This state does not prove production behavior, customer demand, usability, viability, financial outcomes, leverage, or the founder outcome.
 
 ## Verification
 
@@ -121,7 +155,7 @@ npx playwright install --with-deps chromium
 npm run proof:goalfix
 ```
 
-The dedicated `Goalfix Vertical Slice Proof` workflow checks out the immutable exact head, reruns the focused contracts, renders the founder-facing report in real Chromium at desktop and mobile sizes, proves the continuity markers are visible evidence rather than browser authority, and uploads screenshots plus the JSON report.
+The dedicated `Goalfix Vertical Slice Proof` workflow checks out the immutable exact head, reruns the focused contracts, renders the founder-facing report in real Chromium at desktop and mobile sizes, proves the continuity markers are visible evidence rather than browser authority, exercises the decision-kernel rendering, and uploads screenshots plus the JSON report.
 
 ## Evidence-ledger rule
 
