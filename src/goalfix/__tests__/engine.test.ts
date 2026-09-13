@@ -110,11 +110,11 @@ describe('buildGoalfixReport', () => {
     expect(changedSubject.continuity.evidenceFingerprint).not.toBe(first.continuity.evidenceFingerprint);
   });
 
-  it('blocks on any exact-head failed signal and names it as the bottleneck', () => {
+  it('blocks on a named required exact-head failed signal and names it as the bottleneck', () => {
     const report = buildGoalfixReport(baseInput({
       verificationSignals: [{
         id: 'check-1',
-        name: 'Product Design Playwright Proof',
+        name: 'Playwright',
         status: 'failed',
         commitSha: SHA,
         provider: 'github',
@@ -123,16 +123,35 @@ describe('buildGoalfixReport', () => {
 
     expect(report.readiness).toBe('blocked');
     expect(report.evidence.blocked).toEqual([
-      `Product Design Playwright Proof: failed at ${SHA}`,
+      `Playwright: failed at ${SHA}`,
     ]);
     expect(report.bottleneck).toMatchObject({
       kind: 'failed_verification',
       evidenceState: 'VERIFIED',
       freezesUnrelatedWork: false,
     });
-    expect(report.bottleneck.statement).toContain('Product Design Playwright Proof');
+    expect(report.bottleneck.statement).toContain('Playwright');
     expect(report.bottleneck.smallestSafeRemoval).toContain('repair only its verified root cause');
     expect(report.nextGate).toContain('repair only its verified root cause');
+  });
+
+  it('keeps unrelated exact-head failures visible without letting them block a complete named proof set', () => {
+    const report = buildGoalfixReport(baseInput({
+      verificationSignals: [
+        { id: 'typecheck', name: 'Typecheck', status: 'passed', commitSha: SHA, provider: 'github' },
+        { id: 'playwright', name: 'Playwright', status: 'passed', commitSha: SHA, provider: 'github' },
+        { id: 'docs', name: 'Unrelated Documentation Proof', status: 'failed', commitSha: SHA, provider: 'github' },
+      ],
+    }));
+
+    expect(report.readiness).toBe('ready_for_founder_decision');
+    expect(report.evidence.blocked).toEqual([]);
+    expect(report.proof).toContain(`Unrelated Documentation Proof: failed at ${SHA}`);
+    expect(report.bottleneck).toMatchObject({
+      kind: 'founder_decision',
+      evidenceState: 'VERIFIED',
+      freezesUnrelatedWork: false,
+    });
   });
 
   it('uses the latest same-SHA signal when a check rerun replaces an older failure', () => {
