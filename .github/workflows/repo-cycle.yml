@@ -60,6 +60,31 @@ on:
         description: Founder approval receipt/decision ID; required by merge_gate
         required: false
         type: string
+      verify_federated_relay_v3:
+        description: Run the FCR-owned signed durable FCR → Chief → FCR v3 roundtrip
+        required: false
+        default: false
+        type: boolean
+      fcr_relay_base_url:
+        description: Exact FCR runtime base URL for relay proof
+        required: false
+        default: https://api.foundercontrolroom.org
+        type: string
+      chief_relay_base_url:
+        description: Exact Chief runtime base URL for relay proof
+        required: false
+        default: ''
+        type: string
+      chief_relay_target_sha:
+        description: Exact Chief runtime SHA for relay proof
+        required: false
+        default: ''
+        type: string
+      chief_relay_target_branch:
+        description: Chief branch identity carried by the relay envelope
+        required: false
+        default: main
+        type: string
 
 permissions:
   contents: read
@@ -147,6 +172,41 @@ jobs:
           "--approval-source=${APPROVAL_SOURCE}"
           "--approval-id=${FOUNDER_APPROVAL_ID}"
 
+      - name: Validate federated relay v3 proof inputs
+        if: github.event_name == 'workflow_dispatch' && inputs.verify_federated_relay_v3
+        shell: bash
+        env:
+          CHIEF_RELAY_BASE_URL: ${{ inputs.chief_relay_base_url }}
+          CHIEF_RELAY_TARGET_SHA: ${{ inputs.chief_relay_target_sha }}
+        run: |
+          set -euo pipefail
+          if [ "${REPO_CYCLE_OPERATION}" != "verify" ]; then
+            echo "::error title=Wrong relay proof operation::Federated relay v3 proof requires operation=verify."
+            exit 1
+          fi
+          if [[ ! "${CHIEF_RELAY_BASE_URL}" =~ ^https:// ]]; then
+            echo "::error title=Missing Chief runtime::chief_relay_base_url must be an HTTPS runtime URL."
+            exit 1
+          fi
+          if [[ ! "${CHIEF_RELAY_TARGET_SHA}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error title=Missing Chief exact head::chief_relay_target_sha must be a lowercase 40-character SHA."
+            exit 1
+          fi
+
+      - name: Prove signed durable FCR to Chief to FCR v3 roundtrip
+        if: github.event_name == 'workflow_dispatch' && inputs.verify_federated_relay_v3
+        shell: bash
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          FCR_RELAY_SUPABASE_URL: https://oojzfmmywbvficgybaxd.supabase.co
+          FCR_FEDERATED_RELAY_BASE_URL: ${{ inputs.fcr_relay_base_url }}
+          FCR_FEDERATED_RELAY_SOURCE_SHA: ${{ env.EXPECTED_HEAD_SHA }}
+          FCR_FEDERATED_RELAY_SOURCE_BRANCH: ${{ env.TARGET_BRANCH }}
+          CHIEF_FEDERATED_RELAY_BASE_URL: ${{ inputs.chief_relay_base_url }}
+          CHIEF_FEDERATED_RELAY_TARGET_SHA: ${{ inputs.chief_relay_target_sha }}
+          CHIEF_FEDERATED_RELAY_TARGET_BRANCH: ${{ inputs.chief_relay_target_branch }}
+        run: node scripts/prove-federated-agent-roundtrip.mjs
+
       - name: Publish job summary
         if: always()
         shell: bash
@@ -164,8 +224,11 @@ jobs:
             echo "- Approval source: \`founder\`"
             echo "- Approval ID: \`${FOUNDER_APPROVAL_ID:-not supplied}\`"
             echo "- Merge authorized: \`${MERGE_AUTHORIZED}\`"
+            if [ -f federated-agent-roundtrip.json ]; then
+              echo "- Federated relay v3 roundtrip: \`VERIFIED\`"
+            fi
             echo
-            echo "> Only a founder-issued receipt can authorize this exact SHA. This workflow remains evidence-only and read-only; the exact-SHA receipt is consumed by a separate merge executor."
+            echo "> Only a founder-issued receipt can authorize this exact SHA. This workflow remains evidence-only and read-only except for the explicitly requested relay proof, which writes only non-authorizing relay evidence to the FCR ledger. The exact-SHA merge receipt is consumed by a separate merge executor."
             if [ -f repo-cycle-result.json ]; then
               echo
               echo "### Result"
@@ -180,6 +243,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: repo-cycle-${{ env.REPO_CYCLE_OPERATION }}-${{ github.run_id }}-${{ github.run_attempt }}
-          path: repo-cycle-result.json
+          path: |
+            repo-cycle-result.json
+            federated-agent-roundtrip.json
           if-no-files-found: warn
           retention-days: 30
