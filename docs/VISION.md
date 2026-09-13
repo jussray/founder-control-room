@@ -8,7 +8,7 @@ Give the founder one trusted place to understand project truth, integrate approp
 
 ## Product promises
 
-1. **Founder authority is explicit.** Evidence-backed merges may use the standing authority in `docs/FOUNDER_MERGE_AUTHORITY.md`. Deployment, migration, rollback, auth, secrets, billing, deletion, publication, and external actions remain separate gates.
+1. **Founder authority is explicit.** Merge authority may be available as a system capability, but every repository merge requires fresh explicit founder approval bound to the exact repository, PR, base SHA, and head SHA. If that approval is absent, the system asks and stops. Deployment, migration, rollback, auth, secrets, billing, deletion, publication, and external actions remain separate gates.
 2. **Projects keep their own data boundaries.** Control Room receives narrow operational evidence, not broad copies of private product data.
 3. **Providers remain adapters.** GitHub is the first repository provider. Model and infrastructure providers remain replaceable.
 4. **Evidence outranks summaries.** Current repository state, CI, runtime observations, schemas, and approved decisions beat model memory.

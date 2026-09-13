@@ -7,10 +7,16 @@ on:
       - agent/design-os-registry-refresh
     paths:
       - '.github/workflows/design-os-contract.yml'
+      - '.agents/skills/control-room-design-implementation/SKILL.md'
       - 'src/design-os/**'
       - 'src/http/routes/designOs.ts'
       - 'src/http/routes/designOs.test.ts'
       - 'src/http/server.ts'
+      - 'src/lib/fcrSkillRouter.ts'
+      - 'src/lib/__tests__/fcrSkillRouter.test.ts'
+      - 'public/control-room/index.html'
+      - 'public/control-room/design-commands.html'
+      - 'e2e/design-commands-proof.ts'
       - 'scripts/verify-design-os-contract.mjs'
       - 'docs/PORTFOLIO_DESIGN_OS.md'
       - 'artifacts/truthmode/PORTFOLIO_DESIGN_OS_PROOF.md'
@@ -21,10 +27,16 @@ on:
   pull_request:
     paths:
       - '.github/workflows/design-os-contract.yml'
+      - '.agents/skills/control-room-design-implementation/SKILL.md'
       - 'src/design-os/**'
       - 'src/http/routes/designOs.ts'
       - 'src/http/routes/designOs.test.ts'
       - 'src/http/server.ts'
+      - 'src/lib/fcrSkillRouter.ts'
+      - 'src/lib/__tests__/fcrSkillRouter.test.ts'
+      - 'public/control-room/index.html'
+      - 'public/control-room/design-commands.html'
+      - 'e2e/design-commands-proof.ts'
       - 'scripts/verify-design-os-contract.mjs'
       - 'docs/PORTFOLIO_DESIGN_OS.md'
       - 'artifacts/truthmode/PORTFOLIO_DESIGN_OS_PROOF.md'
@@ -45,7 +57,7 @@ jobs:
   exact-head-design-os:
     name: Exact-head Design OS proof
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
 
     steps:
       - name: Checkout exact event head
@@ -88,6 +100,21 @@ jobs:
         run: |
           set -o pipefail
           npm run lint:design-os 2>&1 | tee logs/lint-design-os.log
+
+      - name: Verify design command skill routing
+        shell: bash
+        run: |
+          set -o pipefail
+          npx vitest run src/lib/__tests__/fcrSkillRouter.test.ts 2>&1 | tee logs/design-command-routing.log
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Prove project Design Commands in Chromium
+        shell: bash
+        run: |
+          set -o pipefail
+          npx tsx e2e/design-commands-proof.ts 2>&1 | tee logs/design-commands-playwright.log
 
       - name: Repository typecheck diagnostic
         continue-on-error: true
