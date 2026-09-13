@@ -39,6 +39,20 @@ export interface ShadowDecisionReceipt {
   failureReceipts: ShadowFailureReceipt[];
 }
 
+export interface ShadowSettlementReceipt {
+  contract: typeof BUBBLE_LAB_SHADOW_CONTRACT;
+  decisionFingerprint: string;
+  startingShadowBalance: number;
+  simulatedStake: number;
+  simulatedPnl: number;
+  endingShadowBalance: number;
+  settled: boolean;
+  simulatedOnly: true;
+  externalTransferAttempted: false;
+  connectedAccountCredited: false;
+  liveFundsMoved: false;
+}
+
 function finitePositive(value: number): boolean {
   return Number.isFinite(value) && value > 0;
 }
@@ -136,5 +150,35 @@ export function evaluateShadowExit(observation: ShadowPositionObservation): Shad
     privateKeyAccepted: false,
     liveOrderAllowed: false,
     failureReceipts,
+  };
+}
+
+export function settleShadowDecision(
+  receipt: ShadowDecisionReceipt,
+  startingShadowBalance: number,
+  simulatedStake: number,
+): ShadowSettlementReceipt {
+  if (!Number.isFinite(startingShadowBalance) || startingShadowBalance < 0) {
+    throw new Error('startingShadowBalance must be a finite non-negative number');
+  }
+  if (!finitePositive(simulatedStake) || simulatedStake > startingShadowBalance) {
+    throw new Error('simulatedStake must be positive and no greater than the shadow balance');
+  }
+
+  const settled = receipt.failureReceipts.length === 0 && receipt.decision !== 'HOLD';
+  const simulatedPnl = settled ? simulatedStake * receipt.pnlPct : 0;
+
+  return {
+    contract: BUBBLE_LAB_SHADOW_CONTRACT,
+    decisionFingerprint: receipt.fingerprint,
+    startingShadowBalance,
+    simulatedStake,
+    simulatedPnl,
+    endingShadowBalance: startingShadowBalance + simulatedPnl,
+    settled,
+    simulatedOnly: true,
+    externalTransferAttempted: false,
+    connectedAccountCredited: false,
+    liveFundsMoved: false,
   };
 }
