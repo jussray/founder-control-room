@@ -6,7 +6,7 @@ import {
   FEDERATED_AGENT_RELAY_CONTRACT,
   acceptFederatedAgentRelay,
   parseFederatedAgentRelayEnvelope,
-} from '../src/founder-os-lab/federatedRelay.js';
+} from '../dist/founder-os-lab/federatedRelay.js';
 
 const SHA40 = /^[0-9a-f]{40}$/i;
 const baseUrl = (process.env.CHIEF_FEDERATED_RELAY_BASE_URL || process.argv[2] || '').replace(/\/$/, '');
