@@ -76,6 +76,7 @@ globalThis.fetch = async (input, init = {}) => {
   overrides.forEach((value, key) => headers.set(key, value));
   headers.set('CF-Access-Client-Id', accessClientId);
   headers.set('CF-Access-Client-Secret', accessClientSecret);
+  headers.set('X-Federated-Relay-Source-Origin', fcrOrigin);
   return nativeFetch(input, { ...init, headers });
 };
 
