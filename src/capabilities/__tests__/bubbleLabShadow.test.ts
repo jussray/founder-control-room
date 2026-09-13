@@ -3,6 +3,7 @@ import {
   BUBBLE_LAB_STOP_LOSS_PCT,
   BUBBLE_LAB_TAKE_PROFIT_PCT,
   evaluateShadowExit,
+  settleShadowDecision,
 } from '../bubbleLabShadow.js';
 
 const BASE = {
@@ -40,6 +41,38 @@ describe('Bubble Lab shadow exit engine', () => {
     const receipt = evaluateShadowExit({ ...BASE, observedPrice: 120 });
     expect(receipt.decision).toBe('HOLD');
     expect(receipt.pnlPct).toBeCloseTo(0.2);
+  });
+
+  it('credits simulated wins only to the shadow balance', () => {
+    const decision = evaluateShadowExit({ ...BASE, observedPrice: 150 });
+    const settlement = settleShadowDecision(decision, 30, 2);
+
+    expect(settlement.settled).toBe(true);
+    expect(settlement.simulatedPnl).toBeCloseTo(1);
+    expect(settlement.endingShadowBalance).toBeCloseTo(31);
+    expect(settlement.simulatedOnly).toBe(true);
+    expect(settlement.externalTransferAttempted).toBe(false);
+    expect(settlement.connectedAccountCredited).toBe(false);
+    expect(settlement.liveFundsMoved).toBe(false);
+  });
+
+  it('applies simulated losses to the shadow balance without moving live funds', () => {
+    const decision = evaluateShadowExit({ ...BASE, observedPrice: 85 });
+    const settlement = settleShadowDecision(decision, 30, 2);
+
+    expect(settlement.settled).toBe(true);
+    expect(settlement.simulatedPnl).toBeCloseTo(-0.3);
+    expect(settlement.endingShadowBalance).toBeCloseTo(29.7);
+    expect(settlement.liveFundsMoved).toBe(false);
+  });
+
+  it('does not settle while the decision is HOLD', () => {
+    const decision = evaluateShadowExit({ ...BASE, observedPrice: 120 });
+    const settlement = settleShadowDecision(decision, 30, 2);
+
+    expect(settlement.settled).toBe(false);
+    expect(settlement.simulatedPnl).toBe(0);
+    expect(settlement.endingShadowBalance).toBe(30);
   });
 
   it('never collapses distinct invalid observations into one failure receipt', () => {
