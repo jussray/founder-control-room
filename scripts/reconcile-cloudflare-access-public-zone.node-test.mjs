@@ -61,7 +61,13 @@ function fakeFetch({ applications = [], policiesByApp = {}, onRequest } = {}) {
 
   return async (url, options = {}) => {
     const method = options.method ?? 'GET';
-    onRequest?.({ url, method, authorization: options.headers?.Authorization ?? null, body: options.body ?? null });
+    onRequest?.({
+      url,
+      method,
+      authorization: options.headers?.Authorization ?? null,
+      body: options.body ?? null,
+      state,
+    });
 
     if (url.includes('/access/apps?') && method === 'GET') {
       return response(state.applications);
@@ -173,6 +179,33 @@ test('apply removes only browser-facing public destinations and preserves Worker
   assert.ok(requests.every((request) => request.authorization === `Bearer ${ADMIN_TOKEN}`));
 });
 
+test('apply refuses destination drift at the effect boundary before any PUT', async () => {
+  const requests = [];
+  let driftInjected = false;
+  await assert.rejects(
+    reconcileFcrPublicAccessZone({
+      env: adminEnv,
+      apply: true,
+      fetchImpl: fakeFetch({
+        applications: [mixedApp()],
+        policiesByApp: { 'mixed-1': [] },
+        onRequest(request) {
+          requests.push(request);
+          if (!driftInjected
+            && request.method === 'GET'
+            && /\/access\/apps\/mixed-1$/.test(request.url)) {
+            request.state.applications[0].destinations.push({ type: 'worker', uri: 'concurrent-worker' });
+            driftInjected = true;
+          }
+        },
+      }),
+    }),
+    (error) => error?.classification === 'browser-access-source-drift-before-write'
+      && error?.mutationOutcome === 'not-attempted',
+  );
+  assert.equal(requests.some((request) => request.method === 'PUT'), false);
+});
+
 test('automatic mutation blocks a public-only application instead of deleting unknown provider state', async () => {
   await assert.rejects(
     reconcileFcrPublicAccessZone({
@@ -221,14 +254,12 @@ test('rollback restores only the exact receipt-bound pre-detachment destinations
     await mkdir('test-results', { recursive: true });
     const policies = [{ id: 'policy-1', decision: 'allow', include: [{ email: { email: 'founder@example.com' } }] }];
     const source = mixedApp();
-    const requests = [];
     const applied = await reconcileFcrPublicAccessZone({
       env: adminEnv,
       apply: true,
       fetchImpl: fakeFetch({
         applications: [source],
         policiesByApp: { 'mixed-1': policies },
-        onRequest(request) { requests.push(request); },
       }),
     });
     await writeFile('test-results/fcr-access-front-door-recovery.json', `${JSON.stringify(applied)}\n`, 'utf8');
@@ -240,6 +271,51 @@ test('rollback restores only the exact receipt-bound pre-detachment destinations
     const rolledBack = await rollbackFcrPublicAccessZone({ env: adminEnv, fetchImpl: rollbackFetch });
     assert.equal(rolledBack.rollbackPerformed, true);
     assert.equal(rolledBack.action, 'restored-browser-access-after-failed-provider-apply');
+  } finally {
+    chdir(before);
+  }
+});
+
+test('rollback refuses concurrent destination drift before restoration PUT', async () => {
+  const before = cwd();
+  const temp = await mkdtemp(join(tmpdir(), 'fcr-access-rollback-drift-test-'));
+  try {
+    chdir(temp);
+    await mkdir('test-results', { recursive: true });
+    const policies = [{ id: 'policy-1', decision: 'allow', include: [{ email: { email: 'founder@example.com' } }] }];
+    const source = mixedApp();
+    const applied = await reconcileFcrPublicAccessZone({
+      env: adminEnv,
+      apply: true,
+      fetchImpl: fakeFetch({
+        applications: [source],
+        policiesByApp: { 'mixed-1': policies },
+      }),
+    });
+    await writeFile('test-results/fcr-access-front-door-recovery.json', `${JSON.stringify(applied)}\n`, 'utf8');
+
+    const requests = [];
+    let driftInjected = false;
+    const rollbackFetch = fakeFetch({
+      applications: [{ ...source, destinations: applied.expectedPostDestinations }],
+      policiesByApp: { 'mixed-1': policies },
+      onRequest(request) {
+        requests.push(request);
+        if (!driftInjected
+          && request.method === 'GET'
+          && /\/access\/apps\/mixed-1$/.test(request.url)) {
+          request.state.applications[0].destinations.push({ type: 'worker', uri: 'concurrent-worker' });
+          driftInjected = true;
+        }
+      },
+    });
+
+    await assert.rejects(
+      rollbackFcrPublicAccessZone({ env: adminEnv, fetchImpl: rollbackFetch }),
+      (error) => error?.classification === 'browser-access-source-drift-before-write'
+        && error?.mutationOutcome === 'not-attempted',
+    );
+    assert.equal(requests.some((request) => request.method === 'PUT'), false);
   } finally {
     chdir(before);
   }
