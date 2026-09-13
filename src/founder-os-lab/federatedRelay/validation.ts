@@ -148,6 +148,8 @@ export function assertFederatedRelayEnvelopeV31(input: unknown): asserts input i
   }
   if (input.ordering.relation.type === 'revision') {
     assert(input.supersedesMessageIds.length > 0, 'relay_revision_without_supersession');
+  } else {
+    assert(input.supersedesMessageIds.length === 0, 'relay_supersession_requires_revision');
   }
 
   assert(isPlainRecord(input.signature), 'relay_signature');
