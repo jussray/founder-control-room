@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from 'node:crypto';
+import { createHash } from 'node:crypto';
 import {
   AUTHORITY_ENVELOPE_CONTRACT,
   authorityEnvelopeHash,
@@ -96,11 +96,15 @@ export function createBranchAuthorityContext(
  * authenticated founder, fresh proof receipt, exact proposed arguments, and
  * observed mission state. The returned context is the execution-time binding
  * that must be re-derived/revalidated immediately before provider mutation.
+ *
+ * The isolated lab never reads ambient time or randomness. If the HTTP edge
+ * does not inject them, the already-observed proof timestamp and idempotency
+ * key are used as conservative deterministic fallbacks.
  */
 export function issueCreateBranchAuthority(input: CreateBranchAuthorityInput): IssuedCreateBranchAuthority {
   validateCreateBranchAuthorityInput(input);
 
-  const now = input.now ?? new Date().toISOString();
+  const now = input.now ?? input.proof.createdAt;
   const issuedAtMs = Date.parse(now);
   if (!Number.isFinite(issuedAtMs)) throw new Error('issuance time must be a valid ISO date');
   const ttlMs = input.ttlMs ?? DEFAULT_AUTHORITY_TTL_MS;
@@ -108,7 +112,7 @@ export function issueCreateBranchAuthority(input: CreateBranchAuthorityInput): I
     throw new Error('authority ttl must be positive and no greater than 15 minutes');
   }
 
-  const toolCallId = input.toolCallId ?? randomUUID();
+  const toolCallId = input.toolCallId ?? input.idempotencyKey;
   const context = createBranchAuthorityContext({ ...input, now, toolCallId });
   const capability = capabilityIdentity(context.capabilityId);
 
