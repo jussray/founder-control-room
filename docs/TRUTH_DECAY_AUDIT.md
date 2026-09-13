@@ -56,6 +56,14 @@ The correction is documentation-only with respect to the Capital Decision behavi
 
 This documentation repair does not retroactively prove the earlier feature branch, external financing activity, investor contact, or any provider/runtime outcome. It closes the durable truth-surface gap so future operators do not mistake a source-level capital recommendation for executable authority.
 
+## 2026-09 control correction: merge authority availability versus exact approval
+
+A merge-governance ambiguity treated the existence of merge capability and the founder's approval of one exact candidate as if they were the same state. That ambiguity can cause a truthful capability statement such as `merge_authority: true` to decay into an unsafe execution assumption after a review request, green CI, a broad “approved,” or a later base/head movement.
+
+The corrected canon separates the planes. `merge_authority: true` means only that the governed merge capability/authority class exists. Every merge still requires fresh explicit founder approval bound to the exact repository, pull request number, current base SHA, and current head SHA. If that exact approval is absent, ambiguous, or stale, the agent or operator must ask and stop. Review requests, `merge review`, `approved`, `cont`, `continue`, `implement`, mergeability, continuity metadata, or green proof cannot manufacture candidate approval. Any base/head movement invalidates the prior merge approval and requires a new founder decision.
+
+This is an authority-freshness correction, not a relaxation of review or proof. Exact-head evidence still constrains what can be claimed and integrated, while founder approval controls whether the exact candidate may cross the merge boundary. Deployment, publication, billing, secrets, database mutation, deletion, and other consequential classes remain separately gated.
+
 ## Root causes
 
 ### 1. Evidence lifetime was implicit
@@ -201,6 +209,8 @@ It also checks cross-document invariants that are easy to regress during fast-mo
 - the founder-content story keeps first-party LinkedIn, provider-neutral n8n, exact Current You authority, provider readback, and Sauce Guard distinct;
 - `.control/capability.json` remains the canonical capability authority while YAML remains a compatibility pointer; and
 - post-merge truth/documentation re-observation exists in the shared AI workflow.
+
+The merge-approval split is also a documentation-truth invariant. A future agent may read `merge_authority: true` only as capability availability; it must never infer current candidate approval. Exact founder approval must be bound to the live repository, PR, base SHA, and head SHA, and any candidate movement makes the prior approval historical rather than reusable authority.
 
 The verifier emits a sanitized `fcr/documentation-truth@v1` receipt with counts, domains, documentation coverage, and failure reasons. It does not store credentials, private proof, raw diffs, private prompts, customer data, private metrics, or provider payloads.
 
@@ -367,6 +377,7 @@ The strongest optimization is not faster claiming. It is shortening the distance
 30. A predecessor Playwright success cannot prove a cross-repository federation successor after either repository head, peer proof contract, peer runtime identity, or serialized wire shape moves.
 31. A privileged `workflow_run` witness may consume an upstream release SHA as evidence, but it cannot execute that upstream checkout or treat upstream success as executable trust.
 32. A capital decision card, recommendation, score, or HOLD state is evidence interpretation, not financing or execution authority; stale or missing capital evidence must remove derived certainty instead of preserving an earlier recommendation.
+33. `merge_authority: true` cannot be reused as candidate approval; every merge requires a fresh explicit founder decision for the exact live repository/PR/base/head, and candidate movement expires that approval.
 
 ## Rollback
 

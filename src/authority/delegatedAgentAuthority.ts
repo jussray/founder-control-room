@@ -24,6 +24,7 @@ export const DELEGATED_AGENT_AUTHORITY = Object.freeze({
     'destructive_delete',
   ]),
   maxEvidenceAgeMs: 10 * 60 * 1000,
+  founderApprovalTtlMs: 15 * 60 * 1000,
 } as const);
 
 export type DelegatedAgentRestrictedCapability =
@@ -54,6 +55,16 @@ export type DelegatedAgentAuthorityInput = Readonly<{
   rollbackReady: boolean;
   migrationState: 'aligned' | 'pending' | 'unknown';
   restrictedCapabilities: readonly DelegatedAgentRestrictedCapability[];
+  founderApproval: Readonly<{
+    verified: boolean;
+    decisionRef: string;
+    approvedAction: DelegatedAgentAction;
+    approvedTarget: string;
+    approvedRepository: string;
+    approvedBaseSha: string;
+    approvedHeadSha: string;
+    approvedAt: string;
+  }>;
   idempotency: Readonly<{
     key: string;
     reservationState: 'reserved' | 'consumed' | 'missing';
@@ -81,6 +92,9 @@ export type DelegatedAgentAuthorityFailure =
   | 'rollback_missing'
   | 'restricted_capability_requested'
   | 'migration_authority_not_delegated'
+  | 'founder_approval_missing'
+  | 'founder_approval_stale'
+  | 'founder_approval_mismatch'
   | 'idempotency_reservation_missing'
   | 'idempotency_already_consumed'
   | 'idempotency_mismatch';
@@ -89,6 +103,7 @@ export type DelegatedAgentAuthorityDecision =
   | Readonly<{
       ok: true;
       principalId: DelegatedAgentPrincipalId;
+      founderDecisionRef: string;
       merge_authority: boolean;
       deploy_authority: boolean;
       executionAuthorized: true;
@@ -104,6 +119,7 @@ export type DelegatedAgentAuthorityDecision =
     }>;
 
 const FULL_SHA = /^[0-9a-f]{40}$/;
+const AUDIT_REF = /^[A-Za-z0-9._:-]{8,200}$/;
 const IDEMPOTENCY_KEY = /^[A-Za-z0-9._:-]{16,200}$/;
 const PRINCIPALS = new Set<string>(DELEGATED_AGENT_PRINCIPALS);
 const TRUSTED_REVIEWERS = new Set<string>(DELEGATED_AGENT_TRUSTED_REVIEWERS);
@@ -183,6 +199,28 @@ export function evaluateDelegatedAgentAuthority(
     return deny('migration_authority_not_delegated');
   }
 
+  if (!input.founderApproval.verified || !AUDIT_REF.test(input.founderApproval.decisionRef)) {
+    return deny('founder_approval_missing');
+  }
+  const approvedAtMs = Date.parse(input.founderApproval.approvedAt);
+  const approvalAgeMs = now.getTime() - approvedAtMs;
+  if (
+    !Number.isFinite(approvedAtMs)
+    || approvalAgeMs < 0
+    || approvalAgeMs > DELEGATED_AGENT_AUTHORITY.founderApprovalTtlMs
+  ) {
+    return deny('founder_approval_stale');
+  }
+  if (
+    input.founderApproval.approvedAction !== input.action
+    || input.founderApproval.approvedTarget !== actionTarget
+    || input.founderApproval.approvedRepository !== input.repository
+    || input.founderApproval.approvedBaseSha !== input.baseSha
+    || input.founderApproval.approvedHeadSha !== input.headSha
+  ) {
+    return deny('founder_approval_mismatch');
+  }
+
   if (input.idempotency.reservationState === 'missing' || !IDEMPOTENCY_KEY.test(input.idempotency.key)) {
     return deny('idempotency_reservation_missing');
   }
@@ -203,6 +241,7 @@ export function evaluateDelegatedAgentAuthority(
   return Object.freeze({
     ok: true,
     principalId,
+    founderDecisionRef: input.founderApproval.decisionRef,
     merge_authority: input.action === 'merge' && grant.merge_authority,
     deploy_authority: input.action === 'deploy' && grant.deploy_authority,
     executionAuthorized: true,

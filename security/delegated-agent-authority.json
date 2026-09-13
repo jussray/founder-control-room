@@ -3,7 +3,9 @@
   "repository": "jussray/founder-control-room",
   "founderDecision": {
     "date": "2026-09-12",
-    "standing": true,
+    "standingCapability": true,
+    "standingExecutionApproval": false,
+    "exactFounderApprovalRequiredPerAction": true,
     "principals": {
       "codex-chat": { "merge_authority": true, "deploy_authority": true },
       "claude": { "merge_authority": true, "deploy_authority": true }
@@ -17,6 +19,13 @@
     "trustedReviewers": ["codex-chat", "claude", "deterministic-witness"],
     "attestationRequired": true,
     "actingPrincipalMayReviewOwnAction": false
+  },
+  "founderApproval": {
+    "required": true,
+    "maxAgeMinutes": 15,
+    "mustBind": ["action", "target", "repository", "baseSha", "headSha"],
+    "auditableDecisionRefRequired": true,
+    "baseOrHeadMovementInvalidatesApproval": true
   },
   "mutationIdentity": {
     "durableReservationRequiredBeforeProviderMutation": true,
@@ -32,6 +41,7 @@
     "trusted-independent-review",
     "zero-unresolved-blocking-findings",
     "rollback-ready",
+    "fresh-exact-founder-approval",
     "durable-idempotency-reservation"
   ],
   "deployAdditionalRequirements": [
@@ -51,6 +61,8 @@
     "destructive_delete"
   ],
   "truthBoundary": {
+    "mergeAuthorityMeansStandingApproval": false,
+    "deployAuthorityMeansStandingApproval": false,
     "providerAcceptanceIsOutcomeVerification": false,
     "mergeOrDeployExecutionImpliesVerifiedOutcome": false,
     "postActionIndependentOutcomeEvidenceRequiredForVerifiedClaim": true

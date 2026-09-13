@@ -32,6 +32,16 @@ function base(overrides: Partial<DelegatedAgentAuthorityInput> = {}): DelegatedA
     rollbackReady: true,
     migrationState: 'aligned',
     restrictedCapabilities: [],
+    founderApproval: {
+      verified: true,
+      decisionRef: 'founder:merge:797:0001',
+      approvedAction: 'merge',
+      approvedTarget: 'merge:jussray/founder-control-room#797',
+      approvedRepository: 'jussray/founder-control-room',
+      approvedBaseSha: shaA,
+      approvedHeadSha: shaB,
+      approvedAt: '2026-09-12T23:06:00.000Z',
+    },
     idempotency: {
       key: 'fcr:delegated:merge:797:0001',
       reservationState: 'reserved',
@@ -44,40 +54,61 @@ function base(overrides: Partial<DelegatedAgentAuthorityInput> = {}): DelegatedA
   };
 }
 
+function deploy(overrides: Partial<DelegatedAgentAuthorityInput> = {}): DelegatedAgentAuthorityInput {
+  return base({
+    action: 'deploy',
+    actionTarget: { environment: 'production' },
+    headSha: shaB,
+    currentMainSha: shaB,
+    reviewerPrincipalId: 'deterministic-witness',
+    founderApproval: {
+      verified: true,
+      decisionRef: 'founder:deploy:production:0001',
+      approvedAction: 'deploy',
+      approvedTarget: 'deploy:jussray/founder-control-room:production',
+      approvedRepository: 'jussray/founder-control-room',
+      approvedBaseSha: shaA,
+      approvedHeadSha: shaB,
+      approvedAt: '2026-09-12T23:06:00.000Z',
+    },
+    idempotency: {
+      key: 'fcr:delegated:deploy:production:0001',
+      reservationState: 'reserved',
+      reservedForAction: 'deploy',
+      reservedForTarget: 'deploy:jussray/founder-control-room:production',
+      reservedForBaseSha: shaA,
+      reservedForHeadSha: shaB,
+    },
+    ...overrides,
+  });
+}
+
 describe('delegated agent authority', () => {
-  it('grants exact merge authority to authenticated Codex Chat', () => {
+  it('grants exact merge execution only with authenticated principal and exact founder approval', () => {
     expect(evaluateDelegatedAgentAuthority(base(), now)).toMatchObject({
       ok: true,
       principalId: 'codex-chat',
+      founderDecisionRef: 'founder:merge:797:0001',
       merge_authority: true,
       deploy_authority: false,
       executionAuthorized: true,
     });
   });
 
-  it('grants deploy authority to authenticated Claude only on exact current main with aligned migrations', () => {
-    const result = evaluateDelegatedAgentAuthority(base({
+  it('grants exact production deploy execution only with exact founder approval and aligned migrations', () => {
+    expect(evaluateDelegatedAgentAuthority(deploy({
       principal: {
         id: 'claude',
         authenticatedBy: 'registered-adapter-attestation',
         adapterRef: 'anthropic:claude:v1',
         attestationVerified: true,
       },
-      action: 'deploy',
-      actionTarget: { environment: 'production' },
-      headSha: shaB,
-      currentMainSha: shaB,
-      reviewerPrincipalId: 'deterministic-witness',
-      idempotency: {
-        key: 'fcr:delegated:deploy:production:0001',
-        reservationState: 'reserved',
-        reservedForAction: 'deploy',
-        reservedForTarget: 'deploy:jussray/founder-control-room:production',
-        reservedForBaseSha: shaA,
-        reservedForHeadSha: shaB,
-      },
-    }), now);
-    expect(result).toMatchObject({ ok: true, principalId: 'claude', deploy_authority: true });
+    }), now)).toMatchObject({
+      ok: true,
+      principalId: 'claude',
+      founderDecisionRef: 'founder:deploy:production:0001',
+      deploy_authority: true,
+    });
   });
 
   it('rejects self-asserted identity, unknown principals, and cross-repository scope', () => {
@@ -111,26 +142,26 @@ describe('delegated agent authority', () => {
       .toMatchObject({ ok: false, reason: 'rollback_missing' });
   });
 
+  it('requires fresh exact founder approval for every merge or deploy', () => {
+    expect(evaluateDelegatedAgentAuthority(base({ founderApproval: { ...base().founderApproval, verified: false } }), now))
+      .toMatchObject({ ok: false, reason: 'founder_approval_missing' });
+    expect(evaluateDelegatedAgentAuthority(base({ founderApproval: { ...base().founderApproval, decisionRef: '' } }), now))
+      .toMatchObject({ ok: false, reason: 'founder_approval_missing' });
+    expect(evaluateDelegatedAgentAuthority(base({ founderApproval: { ...base().founderApproval, approvedAt: '2026-09-12T22:00:00.000Z' } }), now))
+      .toMatchObject({ ok: false, reason: 'founder_approval_stale' });
+    expect(evaluateDelegatedAgentAuthority(base({ founderApproval: { ...base().founderApproval, approvedHeadSha: 'c'.repeat(40) } }), now))
+      .toMatchObject({ ok: false, reason: 'founder_approval_mismatch' });
+    expect(evaluateDelegatedAgentAuthority(base({ founderApproval: { ...base().founderApproval, approvedTarget: 'merge:jussray/founder-control-room#798' } }), now))
+      .toMatchObject({ ok: false, reason: 'founder_approval_mismatch' });
+  });
+
   it('does not inherit migrations or other restricted capabilities', () => {
     for (const capability of DELEGATED_AGENT_AUTHORITY.deniedCapabilities) {
       expect(evaluateDelegatedAgentAuthority(base({ restrictedCapabilities: [capability] }), now))
         .toMatchObject({ ok: false, reason: 'restricted_capability_requested' });
     }
-    expect(evaluateDelegatedAgentAuthority(base({
-      action: 'deploy',
-      actionTarget: { environment: 'production' },
-      headSha: shaB,
-      currentMainSha: shaB,
-      migrationState: 'pending',
-      idempotency: {
-        key: 'fcr:delegated:deploy:production:0002',
-        reservationState: 'reserved',
-        reservedForAction: 'deploy',
-        reservedForTarget: 'deploy:jussray/founder-control-room:production',
-        reservedForBaseSha: shaA,
-        reservedForHeadSha: shaB,
-      },
-    }), now)).toMatchObject({ ok: false, reason: 'migration_authority_not_delegated' });
+    expect(evaluateDelegatedAgentAuthority(deploy({ migrationState: 'pending' }), now))
+      .toMatchObject({ ok: false, reason: 'migration_authority_not_delegated' });
   });
 
   it('rejects missing, consumed, or mismatched execution reservations', () => {
@@ -145,24 +176,13 @@ describe('delegated agent authority', () => {
   });
 
   it('keeps execution authority separate from outcome truth', () => {
-    const deploy = base({
-      action: 'deploy',
-      actionTarget: { environment: 'production' },
-      headSha: shaB,
-      currentMainSha: shaB,
-      reviewerPrincipalId: 'claude',
-      idempotency: {
-        key: 'fcr:delegated:deploy:production:0003',
-        reservationState: 'reserved',
-        reservedForAction: 'deploy',
-        reservedForTarget: 'deploy:jussray/founder-control-room:production',
-        reservedForBaseSha: shaA,
-        reservedForHeadSha: shaB,
-      },
-      postActionOutcomeVerified: false,
+    const accepted = deploy({ postActionOutcomeVerified: false });
+    expect(evaluateDelegatedAgentAuthority(accepted, now)).toMatchObject({
+      ok: true,
+      deploy_authority: true,
+      completionClaimAllowed: false,
     });
-    expect(evaluateDelegatedAgentAuthority(deploy, now)).toMatchObject({ ok: true, deploy_authority: true, completionClaimAllowed: false });
-    expect(evaluateDelegatedAgentAuthority({ ...deploy, postActionOutcomeVerified: true }, now))
+    expect(evaluateDelegatedAgentAuthority({ ...accepted, postActionOutcomeVerified: true }, now))
       .toMatchObject({ ok: true, completionClaimAllowed: true });
   });
 });
