@@ -66,9 +66,9 @@ on:
         default: false
         type: boolean
       fcr_relay_base_url:
-        description: Exact FCR runtime base URL for relay proof
+        description: Optional exact FCR candidate runtime origin override; leave blank to resolve it read-only from Cloudflare Builds
         required: false
-        default: https://api.foundercontrolroom.org
+        default: ''
         type: string
       chief_relay_base_url:
         description: Exact immutable Chief workers.dev preview origin
@@ -220,7 +220,7 @@ jobs:
       EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha }}
       TARGET_BRANCH: ${{ inputs.target_branch }}
       FOUNDER_APPROVAL_ID: ${{ inputs.founder_approval_id || '' }}
-      FCR_FEDERATED_RELAY_BASE_URL: ${{ inputs.fcr_relay_base_url }}
+      FCR_FEDERATED_RELAY_BASE_URL: ${{ inputs.fcr_relay_base_url || '' }}
       FCR_FEDERATED_RELAY_SOURCE_SHA: ${{ inputs.expected_head_sha }}
       FCR_FEDERATED_RELAY_SOURCE_BRANCH: ${{ inputs.target_branch }}
       CHIEF_FEDERATED_RELAY_BASE_URL: ${{ inputs.chief_relay_base_url }}
@@ -305,8 +305,21 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
 
+      - name: Verify exact FCR preview resolver contract
+        run: |
+          node --check scripts/resolve-fcr-worker-preview.mjs
+          node --test scripts/resolve-fcr-worker-preview.node-test.mjs
+
       - name: Build exact FCR proof subject
         run: npm run build
+
+      - name: Resolve exact FCR Worker preview read-only
+        if: inputs.fcr_relay_base_url == ''
+        env:
+          CLOUDFLARE_ACCOUNT_ID: 9b59861bd1747cf7525571b4c51d2aa0
+          FCR_CLOUDFLARE_BUILDS_USER_TOKEN: ${{ secrets.FCR_CLOUDFLARE_BUILDS_USER_TOKEN }}
+          FCR_CLOUDFLARE_WORKER_NAME: founder-control-room
+        run: node scripts/resolve-fcr-worker-preview.mjs
 
       - name: Prove protected signed durable FCR to Chief to FCR v3.1 roundtrip
         env:
@@ -325,6 +338,7 @@ jobs:
             echo
             echo "- FCR exact head: \`${EXPECTED_HEAD_SHA}\`"
             echo "- FCR branch: \`${TARGET_BRANCH}\`"
+            echo "- FCR candidate runtime: \`${FCR_FEDERATED_RELAY_BASE_URL:-unresolved}\`"
             echo "- Chief exact head: \`${CHIEF_FEDERATED_RELAY_TARGET_SHA}\`"
             echo "- Chief branch: \`${CHIEF_FEDERATED_RELAY_TARGET_BRANCH}\`"
             echo "- Founder proof approval reference: \`${FOUNDER_APPROVAL_ID}\`"
@@ -342,6 +356,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: federated-relay-v31-${{ inputs.expected_head_sha }}-${{ github.run_id }}-${{ github.run_attempt }}
-          path: federated-agent-roundtrip-v31.json
+          path: |
+            federated-agent-roundtrip-v31.json
+            test-results/fcr-worker-preview-resolution.json
           if-no-files-found: warn
           retention-days: 30
