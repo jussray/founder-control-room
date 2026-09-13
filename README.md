@@ -166,6 +166,8 @@ api.foundercontrolroom.org
   -> canonical Worker: founder-control-room
 ```
 
+Cloudflare Access is **not** a Founder Control Room product-login surface. `foundercontrolroom.org` and `www.foundercontrolroom.org` must reach the public Pages/browser experience without a Cloudflare Access challenge; founder authentication begins inside FCR at `/control-room/`. Access may remain on separately scoped private Worker or internal destinations. Provider detachment, deployed runtime identity, and browser proof remain separate evidence planes.
+
 Source dependence on that topology is not proof the live provider is configured correctly.
 
 `wrangler.worker.toml [secrets].required` is the canonical production binding-name gate for provider-held Worker secrets. A provider-backed capability such as `tinyfish-web-observation-v1` must name `TINYFISH_API_KEY` there before canonical Worker promotion; Deploy verifies only binding-name presence in Cloudflare and never copies the secret value through GitHub Actions. Source and CI readiness therefore remain distinct from live TinyFish provider/runtime activation.
