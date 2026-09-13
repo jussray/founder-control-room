@@ -124,16 +124,17 @@ def canonical_post_identity(value: str) -> dict[str, str]:
         post_id = urn_match.group(2)
         return {"urn": f"urn:li:{kind}:{post_id}", "id": post_id, "kind": kind}
 
-    embedded_urn = EMBEDDED_POST_URN_RE.search(raw)
+    parts = urlsplit(raw)
+    if parts.scheme.lower() != "https" or parts.netloc.lower() not in {"linkedin.com", "www.linkedin.com"}:
+        raise ValueError("post identity must be a LinkedIn post URN or https LinkedIn URL")
+    normalized = _normalize_url(raw)
+
+    embedded_urn = EMBEDDED_POST_URN_RE.search(normalized)
     if embedded_urn:
         kind = _canonical_post_kind(embedded_urn.group(1))
         post_id = embedded_urn.group(2)
         return {"urn": f"urn:li:{kind}:{post_id}", "id": post_id, "kind": kind}
 
-    parts = urlsplit(raw)
-    if parts.scheme.lower() != "https" or parts.netloc.lower() not in {"linkedin.com", "www.linkedin.com"}:
-        raise ValueError("post identity must be a LinkedIn post URN or https LinkedIn URL")
-    normalized = _normalize_url(raw)
     url_match = POST_URL_ID_RE.search(normalized)
     if not url_match:
         raise ValueError("LinkedIn URL does not contain a canonical share or ugcPost identity")
@@ -341,6 +342,8 @@ def exact_post_measurement(
             "kind": "linkedin_native_export",
             "filename": report.get("source", {}).get("filename"),
             "export_capped": export_capped,
+            "window": report.get("window"),
+            "freshness_state": "NOT_ESTABLISHED_BY_THIS_RECEIPT",
         },
         "metrics": {
             "impressions": post.get("impressions") if post else None,
@@ -351,16 +354,17 @@ def exact_post_measurement(
             "engagements": "UNAVAILABLE_POST_LEVEL_IN_THIS_EXPORT",
         },
         "post_observation": {
-            "visible_in_export": post is not None,
+            "visible_in_export": len(matches) > 0,
+            "visible_match_count": len(matches),
             "publish_date": post.get("publish_date") if post else None,
             "post_url": post.get("post_url") if post else None,
             "fingerprint": post.get("fingerprint") if post else None,
         },
         "absence_semantics": (
             "TARGET_NOT_VISIBLE_IN_CAPPED_EXPORT_IS_NOT_ZERO_OR_FAILURE"
-            if post is None and export_capped
+            if post is None and not matches and export_capped
             else "TARGET_NOT_VISIBLE_IN_EXPORT_IS_NOT_ZERO_OR_FAILURE"
-            if post is None
+            if post is None and not matches
             else None
         ),
         "learning": {
@@ -368,6 +372,7 @@ def exact_post_measurement(
             "next_gate": gate,
             "requires": [
                 "provider_authenticated_account_binding",
+                "current_native_export_freshness",
                 "exact_experiment_binding",
                 "sufficient_exact_post_metrics_for_requested_verdict",
             ],

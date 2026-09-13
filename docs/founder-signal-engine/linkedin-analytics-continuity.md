@@ -36,6 +36,7 @@ normalized native export
 -> visible-native-post match
 -> exact post impressions when present
 -> explicit null for unavailable post-level engagement
+-> export-window receipt with freshness still unproved
 -> non-authorizing identity receipt
 -> separate provider-authenticated account binding still required before learning
 ```
@@ -53,6 +54,8 @@ experiment = exact FCR experiment identity
 
 `linkedin-native-post-measurement@v1` deliberately distinguishes exact post visibility from account authentication. A caller-supplied `--account-id` is recorded as `DECLARED_FCR_IDENTITY_NOT_PROVIDER_AUTHENTICATED`; it does not prove the XLSX belongs to that account. A caller-supplied experiment id is likewise a declared FCR mapping, not provider evidence.
 
+The targeted receipt also carries the analyzed export window but marks `freshness_state = NOT_ESTABLISHED_BY_THIS_RECEIPT`. The window says what dates were analyzed; freshness is not established by this receipt. A downstream decision must separately prove the native export is current enough for the verdict being requested.
+
 Therefore the targeted receipt always emits:
 
 ```text
@@ -61,7 +64,7 @@ publication_authority = false
 strategy_mutation_authority = false
 ```
 
-A downstream learning decision must independently establish provider-authenticated account binding, preserve the exact experiment mapping, and have sufficient exact-post metrics for the requested verdict.
+A downstream learning decision must independently establish provider-authenticated account binding, current native-export freshness, preserve the exact experiment mapping, and have sufficient exact-post metrics for the requested verdict.
 
 ### Exact post semantics
 
@@ -72,11 +75,13 @@ urn:li:share:<numeric-id>
 urn:li:ugcPost:<numeric-id>
 ```
 
-The same identity may be supplied as a canonical URN, a LinkedIn `/posts/` URL containing the share/ugcPost id, or a LinkedIn feed URL containing the URN. Non-LinkedIn hosts and malformed identities fail closed.
+The same identity may be supplied as a canonical URN, a LinkedIn `/posts/` URL containing the share/ugcPost id, or a LinkedIn feed URL containing the URN. Embedded URNs inside URLs are accepted only after the URL host is verified as `linkedin.com` or `www.linkedin.com`. Non-LinkedIn hosts, free-form text containing a URN, and malformed identities fail closed.
 
 When the exact post is visible in TOP POSTS, the receipt may use that row's exact-post impressions. The ENGAGEMENT sheet is date-level activity and may include engagement from multiple or older posts, so its engagement value must never be promoted to an exact-post engagement metric. Until a native source supplies exact-post engagement, targeted `metrics.engagements` remains `null`.
 
 When the exact post is not visible, the targeted receipt is `UNKNOWN_NO_EVIDENCE`. This remains true even when the provider TOP POSTS list is capped. Absence from a capped or uncapped visible export is not zero impressions, not zero engagement, not deletion, and not proof the post failed.
+
+If the same canonical post identity appears more than once in the normalized visible set, the targeted receipt becomes `BLOCKED_AMBIGUOUS_NATIVE_IDENTITY`. It may report that the identity was visible, but it must not choose one duplicate row as authoritative or convert that ambiguity into a success/failure verdict.
 
 ### Fingerprints
 
@@ -158,4 +163,4 @@ python3 -m unittest scripts/test_linkedin_analytics_continuity.py
 
 ## Interpretation order
 
-For content decisions, prefer qualified engagement and follower/profile conversion, then relevant reach, then raw impressions. Comparable windows and per-post fingerprints should be used before inferring that a content theme improved. Exact-post native visibility does not by itself authenticate the account or create learning eligibility. Analytics conclusions remain proposals for founder review and can feed the existing `linkedin_experiments` record only after the required identity/evidence gates are independently satisfied; they do not authorize Buffer, LinkedIn, n8n, Zapier, or another distribution provider.
+For content decisions, prefer qualified engagement and follower/profile conversion, then relevant reach, then raw impressions. Comparable windows and per-post fingerprints should be used before inferring that a content theme improved. Exact-post native visibility does not by itself authenticate the account, establish freshness, or create learning eligibility. Analytics conclusions remain proposals for founder review and can feed the existing `linkedin_experiments` record only after the required identity/evidence gates are independently satisfied; they do not authorize Buffer, LinkedIn, n8n, Zapier, or another distribution provider.

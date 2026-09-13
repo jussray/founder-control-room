@@ -127,6 +127,9 @@ class LinkedInAnalyticsContinuityTest(unittest.TestCase):
         self.assertIsNone(receipt['metrics']['engagements'])
         self.assertEqual(receipt['metric_provenance']['engagements'], 'UNAVAILABLE_POST_LEVEL_IN_THIS_EXPORT')
         self.assertEqual(receipt['identity_binding']['account_binding'], 'DECLARED_FCR_IDENTITY_NOT_PROVIDER_AUTHENTICATED')
+        self.assertEqual(receipt['source']['window'], {'start': '2026-08-02', 'end': '2026-08-03', 'calendar_days': 2})
+        self.assertEqual(receipt['source']['freshness_state'], 'NOT_ESTABLISHED_BY_THIS_RECEIPT')
+        self.assertIn('current_native_export_freshness', receipt['learning']['requires'])
         self.assertFalse(receipt['learning']['eligible_from_this_receipt'])
         self.assertEqual(receipt['learning']['next_gate'], 'REQUIRES_PROVIDER_AUTHENTICATED_ACCOUNT_BINDING')
         self.assertFalse(receipt['publication_authority'])
@@ -165,7 +168,7 @@ class LinkedInAnalyticsContinuityTest(unittest.TestCase):
         self.assertEqual(receipt['absence_semantics'], 'TARGET_NOT_VISIBLE_IN_CAPPED_EXPORT_IS_NOT_ZERO_OR_FAILURE')
         self.assertFalse(receipt['learning']['eligible_from_this_receipt'])
 
-    def test_canonical_post_identity_accepts_share_and_ugcpost_but_rejects_other_hosts(self):
+    def test_canonical_post_identity_accepts_only_canonical_urn_or_linkedin_host(self):
         self.assertEqual(mod.canonical_post_identity('urn:li:share:123')['urn'], 'urn:li:share:123')
         self.assertEqual(mod.canonical_post_identity('urn:li:ugcPost:456')['urn'], 'urn:li:ugcPost:456')
         self.assertEqual(
@@ -174,9 +177,13 @@ class LinkedInAnalyticsContinuityTest(unittest.TestCase):
         )
         with self.assertRaises(ValueError):
             mod.canonical_post_identity('https://example.com/posts/share-123-test')
+        with self.assertRaises(ValueError):
+            mod.canonical_post_identity('https://example.com/urn:li:share:123')
+        with self.assertRaises(ValueError):
+            mod.canonical_post_identity('prefix urn:li:share:123 suffix')
 
     def test_declared_binding_rejects_empty_or_multiline_identity(self):
-        report = {'posts': [], 'summary': {}, 'source': {}}
+        report = {'posts': [], 'summary': {}, 'source': {}, 'window': {}}
         with self.assertRaises(ValueError):
             mod.exact_post_measurement(report, account_id='', experiment_id='exp', post_identity='urn:li:share:1')
         with self.assertRaises(ValueError):
@@ -192,6 +199,7 @@ class LinkedInAnalyticsContinuityTest(unittest.TestCase):
             'strategy_mutation_authority = false',
             'UNKNOWN_NO_EVIDENCE',
             'must never be promoted to an exact-post engagement metric',
+            'freshness is not established by this receipt',
         ]
         for marker in required:
             self.assertIn(marker, doc)
