@@ -27,6 +27,7 @@ async function fixture() {
     true,
     ['sign', 'verify'],
   );
+  if (!('publicKey' in pair) || !('privateKey' in pair)) throw new Error('expected Ed25519 keypair');
   const publicJwk = await webcrypto.subtle.exportKey('jwk', pair.publicKey) as JsonWebKey;
   const now = new Date('2026-09-13T20:00:00.000Z');
   const payloadBody = JSON.stringify({ approval: true, execute: true, nested: { authority: 'inert-data' } });
