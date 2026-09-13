@@ -17,8 +17,8 @@ const MEMBER_REPOSITORIES_V31: Readonly<Record<FederatedAgentMemberV31, string>>
   promptos: 'jussray/promptos',
 };
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const SHA40_RE = /^[0-9a-f]{40}$/i;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+const SHA40_RE = /^[0-9a-f]{40}$/;
 const SHA256_RE = /^[0-9a-f]{64}$/;
 const BASE64URL_RE = /^[A-Za-z0-9_-]+$/;
 
@@ -49,10 +49,11 @@ function assertIsoTimestamp(value: unknown, code: string): asserts value is stri
 
 function assertMemberIdentity(value: unknown, code: string): asserts value is RelayMemberIdentityV31 {
   assert(isPlainRecord(value), code);
+  assertNoUnsupportedKeys(value, ['member', 'repository', 'branch', 'headSha'], `${code}_field`);
   assert(typeof value.member === 'string' && FEDERATED_AGENT_MEMBERS_V31.includes(value.member as FederatedAgentMemberV31), `${code}_member`);
   const member = value.member as FederatedAgentMemberV31;
   assert(value.repository === MEMBER_REPOSITORIES_V31[member], `${code}_repository`);
-  assert(typeof value.branch === 'string' && value.branch.length > 0 && value.branch.length <= 120, `${code}_branch`);
+  assert(typeof value.branch === 'string' && value.branch.length > 0 && value.branch.length <= 120 && !/[\u0000\r\n]/.test(value.branch), `${code}_branch`);
   assert(typeof value.headSha === 'string' && SHA40_RE.test(value.headSha), `${code}_head_sha`);
 }
 
@@ -156,7 +157,7 @@ export function assertFederatedRelayEnvelopeV31(input: unknown): asserts input i
   assertNoUnsupportedKeys(input.signature, ['algorithm', 'keyId', 'valueBase64Url'], 'relay_signature_field');
   assert(input.signature.algorithm === 'Ed25519', 'relay_signature_algorithm');
   assert(typeof input.signature.keyId === 'string' && input.signature.keyId.length > 0 && input.signature.keyId.length <= 200, 'relay_signature_key_id');
-  assert(typeof input.signature.valueBase64Url === 'string' && BASE64URL_RE.test(input.signature.valueBase64Url), 'relay_signature_value');
+  assert(typeof input.signature.valueBase64Url === 'string' && input.signature.valueBase64Url.length === 86 && BASE64URL_RE.test(input.signature.valueBase64Url), 'relay_signature_value');
 }
 
 export function validateRelayFreshnessV31(envelope: FederatedAgentRelayEnvelopeV31, now = Date.now()): void {
@@ -175,18 +176,14 @@ export function parseBoundedJsonPayloadV31(body: string, maxDepth = RELAY_V31_LI
   } catch {
     throw new RelayV31Error('relay_payload_not_json');
   }
-
   const stack: Array<{ value: unknown; depth: number }> = [{ value: parsed, depth: 0 }];
   while (stack.length > 0) {
     const current = stack.pop();
     if (!current) continue;
     assert(current.depth <= maxDepth, 'relay_payload_json_depth');
     if (current.value === null || typeof current.value !== 'object') continue;
-    const children = Array.isArray(current.value)
-      ? current.value
-      : Object.values(current.value as Record<string, unknown>);
+    const children = Array.isArray(current.value) ? current.value : Object.values(current.value as Record<string, unknown>);
     for (const child of children) stack.push({ value: child, depth: current.depth + 1 });
   }
-
   return parsed;
 }
