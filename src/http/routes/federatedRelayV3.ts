@@ -220,6 +220,7 @@ export const handleFederatedRelayV3: RequestHandler = async function handleFeder
         envelope,
         key: sourceKey,
         expectedTarget,
+        now: new Date(),
       });
       durable = await persistVerified(verified);
     }

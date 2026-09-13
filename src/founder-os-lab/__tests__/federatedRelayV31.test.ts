@@ -1,4 +1,3 @@
-import { webcrypto } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import {
   FEDERATED_AGENT_RELAY_RECEIPT_V31,
@@ -22,12 +21,14 @@ import {
 } from '../federatedRelayV31.js';
 
 async function fixture() {
-  const pair = await webcrypto.subtle.generateKey(
+  const generated = await globalThis.crypto.subtle.generateKey(
     { name: 'Ed25519' },
     true,
     ['sign', 'verify'],
-  ) as CryptoKeyPair;
-  const publicJwk = await webcrypto.subtle.exportKey('jwk', pair.publicKey) as JsonWebKey;
+  );
+  if (!('publicKey' in generated)) throw new Error('expected Ed25519 key pair');
+  const pair = generated;
+  const publicJwk = await globalThis.crypto.subtle.exportKey('jwk', pair.publicKey);
   const now = new Date('2026-09-13T20:00:00.000Z');
   const payloadBody = JSON.stringify({ approval: true, execute: true, nested: { authority: 'inert-data' } });
   const unsigned: Omit<FederatedAgentRelayEnvelopeV31, 'signature'> = {

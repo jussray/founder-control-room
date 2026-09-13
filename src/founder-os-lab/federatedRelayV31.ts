@@ -370,7 +370,7 @@ export function parseFederatedAgentRelayEnvelopeV31(value: unknown): FederatedAg
   assert(contentType === 'text/plain' || contentType === 'application/json', 'relay_payload_content_type_invalid');
   const body = typeof payloadRecord.body === 'string' ? payloadRecord.body : '';
   assert(new TextEncoder().encode(body).byteLength <= MAX_PAYLOAD_BYTES, 'relay_payload_size_invalid');
-  if (contentType === 'application/json') assertJsonPayloadDepth(body); // Payload is inert data. Authority-looking keys are legal content.
+  if (contentType === 'application/json') assertJsonPayloadDepth(body);
 
   assert(Array.isArray(record.supersedesMessageIds) && record.supersedesMessageIds.length <= 64, 'relay_supersedes_invalid');
   const supersedesMessageIds = record.supersedesMessageIds.map((item) => exactUuid(item, 'relay_supersedes_id_invalid'));
@@ -409,7 +409,7 @@ export function parseFederatedAgentRelayEnvelopeV31(value: unknown): FederatedAg
   };
 }
 
-export function assertRelayFreshnessV31(envelope: FederatedAgentRelayEnvelopeV31, now = new Date()): void {
+export function assertRelayFreshnessV31(envelope: FederatedAgentRelayEnvelopeV31, now: Date): void {
   const issued = Date.parse(envelope.issuedAt);
   const expires = Date.parse(envelope.expiresAt);
   assert(expires > issued && expires - issued <= MAX_TTL_MS, 'relay_invalid_expiry');
@@ -524,14 +524,14 @@ export async function verifyRelayEnvelopeSignatureV31(envelope: FederatedAgentRe
 export async function verifyRelayEnvelopeV31(input: {
   envelope: FederatedAgentRelayEnvelopeV31;
   key: FederatedRelayPublicKeyV31;
-  acceptedAt?: Date;
+  acceptedAt: Date;
 }): Promise<{
   semanticFingerprint: string;
   deliveryFingerprint: string;
   evidenceDigest: string;
   successorProofCookie: string;
 }> {
-  const acceptedAt = input.acceptedAt ?? new Date();
+  const acceptedAt = input.acceptedAt;
   assertRelayFreshnessV31(input.envelope, acceptedAt);
   assertRelayKeyUsableV31(input.key, input.envelope.source.member, input.envelope.issuedAt, acceptedAt.toISOString());
   assert(input.key.keyId === input.envelope.signature.keyId, 'relay_signing_key_id_mismatch', 401);
