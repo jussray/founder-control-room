@@ -144,6 +144,8 @@ For truth-sensitive architecture, authority, publishing, capability, provider, w
 - bind default test-discovery debt to the exact base so a candidate cannot launder a new excluded test into its own baseline; and
 - re-read provider/runtime truth after merge before reusing present-tense production claims.
 
+For pull requests, agents must resolve the provider-backed live target branch from `base.ref` before load-bearing Documentation Truth or default test-discovery proof. `pull_request.base.sha` is only event-snapshot evidence and must never be promoted to current proof authority. The live base must be an exact valid SHA and an ancestor of the exact candidate; otherwise the applicable gate must fail closed.
+
 Do not hard-code a durable “current main SHA” into prose and pretend it renews itself. Exact SHAs belong in receipts and historical evidence; current identity is resolved at use time.
 
 A docs-only truth-sync merge closes an earlier drift cycle. Its post-merge verification receipt closes that transition without requiring another self-referential docs edit.
