@@ -109,6 +109,42 @@ const adminEnv = {
   CLOUDFLARE_ACCOUNT_ID: FCR_CLOUDFLARE_ACCOUNT_ID,
 };
 
+test('rejects noncanonical FCR account authority before any provider request', async () => {
+  let requestCount = 0;
+  await assert.rejects(
+    reconcileFcrPublicAccessZone({
+      env: {
+        CLOUDFLARE_ACCESS_API_TOKEN: READ_TOKEN,
+        CLOUDFLARE_ACCOUNT_ID: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      },
+      fetchImpl: async () => {
+        requestCount += 1;
+        throw new Error('provider must not be called');
+      },
+    }),
+    (error) => error?.classification === 'account-authority-mismatch',
+  );
+  assert.equal(requestCount, 0);
+});
+
+test('raw whitespace token is rejected instead of silently normalized', async () => {
+  let requestCount = 0;
+  await assert.rejects(
+    reconcileFcrPublicAccessZone({
+      env: {
+        CLOUDFLARE_ACCESS_API_TOKEN: ` ${READ_TOKEN} `,
+        CLOUDFLARE_ACCOUNT_ID: FCR_CLOUDFLARE_ACCOUNT_ID,
+      },
+      fetchImpl: async () => {
+        requestCount += 1;
+        throw new Error('provider must not be called for malformed token shape');
+      },
+    }),
+    (error) => error?.classification === 'provider-credential-invalid',
+  );
+  assert.equal(requestCount, 0);
+});
+
 test('browser-facing Access means apex or www public destinations, not private Worker destinations', () => {
   assert.equal(isBrowserFacingFcrPublicDestination({ type: 'public', uri: `${FCR_PUBLIC_ZONE}/*` }), true);
   assert.equal(isBrowserFacingFcrPublicDestination({ type: 'public', uri: `www.${FCR_PUBLIC_ZONE}/control-room/*` }), true);
