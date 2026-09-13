@@ -55,4 +55,39 @@ prior decision
 
 Every correction should leave a reusable fingerprint so the same discovery cost is not paid twice. Prefer exact issue, PR, SHA, route, function, provider, evidence receipt, or prior decision before broad scans.
 
+## Federated continuity quartet
+
+Founder Control Room, Chief AI Machine, Sol Continuity, and PromptOS are sovereign repositories that cooperate through evidence, not through inherited authority.
+
+- **FCR** is the founder control plane for consequential execution, current approval binding, provider/runtime mutation, merge/deploy boundaries, and verified operational receipts.
+- **Chief AI Machine** is the reasoning, capability-composition, governance, challenge, and test-ledger plane. It may prove or invalidate assumptions but cannot self-authorize consequential FCR action.
+- **Sol Continuity** is the assistant/model continuity and capability-routing plane. It carries current state between sessions, models, tools, and adapters without turning conversational continuity into proof or authority.
+- **PromptOS** is the intent/workflow compiler and prompt-governance plane. It may structure the mission and constraints but cannot create execution authority.
+
+The quartet is federated, not merged. Each repository must remain independently understandable, testable, reversible, and operable within its own authority ceiling. No repository becomes the identity, datastore, runtime, or standing authority of another merely because their fingerprints are linked.
+
+### Bidirectional cookie rule
+
+Whenever material work crosses any two quartet members, reconcile continuity in both directions:
+
+```text
+source exact repo + branch + head
+→ subject / evidence / runtime / provider fingerprints
+→ non-secret continuity or proof cookie
+→ receiving repo re-verifies current source and local authority
+→ bounded action or no-op
+→ re-observe outcome
+→ successor fingerprint / cookie + receipt back to the federation
+```
+
+A cross-repo cookie must be treated as a state/evidence marker only. It is not a browser cookie, secret, credential, approval token, merge token, deploy token, publish token, or standing mutation authority. A source repo's approval or authority never transfers through the cookie.
+
+Movement in any load-bearing source or target dimension, including repository head, subject, scope, authority, runtime, provider, evidence requirement, or founder proposal, expires the affected present-tense continuity claim until revalidated. Preserve predecessor markers and receipts as historical provenance.
+
+Fresh verified evidence may update or invalidate a receiving repo's stale fingerprint, proof cookie, issue state, assumption, code claim, or next gate. Evidence alone never mutates. Under current founder approval bound to the exact proposal, and only when the target repository's own authority and checks are satisfied, that verified evidence may drive the smallest reversible merge, repair, implementation, rectification, stale-proof replacement, issue reconciliation, or forward gate.
+
+After any approved mutation, the target repo must re-resolve its authoritative state, verify the real outcome, and emit a successor marker linked to the predecessor. If outcome proof is missing or contradictory, classify it honestly instead of exporting a green cookie.
+
+Any model, agent, connector, or future interface working through FCR must preserve this quartet boundary. Models may exchange context and evidence; they may not manufacture shared standing authority.
+
 This protocol supplements `AGENTS.md`, Founder Intelligence, merge authority, truth-decay, public-communication, and portfolio-control-plane contracts. It never overrides stricter authority or grants mutation permission by itself.

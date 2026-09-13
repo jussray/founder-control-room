@@ -1,6 +1,13 @@
 import type { RepositoryRef, VerificationSignal } from '../providers/RepositoryProvider.js';
+import { fingerprintNormalized, type ProofCookieContract } from '../security/attack20V3.js';
 
 export type GoalfixReadiness = 'ready_for_founder_decision' | 'blocked' | 'waiting_for_evidence';
+export type GoalfixBottleneckKind =
+  | 'failed_verification'
+  | 'missing_verification'
+  | 'incomplete_verification'
+  | 'founder_decision'
+  | 'unknown';
 
 export interface FounderGoal {
   desiredOutcome: string;
@@ -34,6 +41,24 @@ export interface GoalfixAuthority {
   requiresExplicitApprovalForMutation: true;
 }
 
+export interface GoalfixBottleneck {
+  kind: GoalfixBottleneckKind;
+  statement: string;
+  evidenceState: 'VERIFIED' | 'UNKNOWN';
+  smallestSafeRemoval: string;
+  freezesUnrelatedWork: false;
+}
+
+export interface GoalfixContinuity {
+  contract: 'goalfix-continuity-v1';
+  sourceFingerprint: string;
+  evidenceFingerprint: string;
+  proofCookie: ProofCookieContract;
+  authority: 'EVIDENCE_ONLY';
+  browserCookieStored: false;
+  invalidatesOn: readonly string[];
+}
+
 export interface GoalfixReport {
   version: 'goalfix-v1';
   observedAt: string;
@@ -47,6 +72,8 @@ export interface GoalfixReport {
   target: RepositoryRef;
   goal: FounderGoal;
   evidence: GoalfixEvidence;
+  bottleneck: GoalfixBottleneck;
+  continuity: GoalfixContinuity;
   reality: string[];
   fix: string[];
   proof: string[];
@@ -101,7 +128,124 @@ function uniqueExpectedNames(names: string[]): string[] {
   return unique;
 }
 
+function resolveBottleneck(args: {
+  failures: VerificationSignal[];
+  incomplete: VerificationSignal[];
+  missingExpectedNames: string[];
+  expectedVerificationNames: string[];
+  readiness: GoalfixReadiness;
+}): GoalfixBottleneck {
+  const { failures, incomplete, missingExpectedNames, expectedVerificationNames, readiness } = args;
+
+  if (failures.length > 0) {
+    const signal = failures[0];
+    return {
+      kind: 'failed_verification',
+      statement: `The current limiting constraint is the exact-head verification failure: ${describeSignal(signal)}.`,
+      evidenceState: 'VERIFIED',
+      smallestSafeRemoval: 'Inspect this failing signal, repair only its verified root cause, rerun the focused proof, and preserve unrelated work.',
+      freezesUnrelatedWork: false,
+    };
+  }
+
+  if (missingExpectedNames.length > 0 || expectedVerificationNames.length === 0) {
+    return {
+      kind: 'missing_verification',
+      statement: expectedVerificationNames.length === 0
+        ? 'The current limiting constraint is missing proof definition: no required exact-head verification names were supplied.'
+        : `The current limiting constraint is missing exact-head proof: ${missingExpectedNames.join(', ')}.`,
+      evidenceState: 'VERIFIED',
+      smallestSafeRemoval: 'Acquire only the missing named proof needed for the current claim; do not freeze unrelated capabilities or broaden the mission.',
+      freezesUnrelatedWork: false,
+    };
+  }
+
+  if (incomplete.length > 0) {
+    return {
+      kind: 'incomplete_verification',
+      statement: `The current limiting constraint is unfinished exact-head proof: ${describeSignal(incomplete[0])}.`,
+      evidenceState: 'VERIFIED',
+      smallestSafeRemoval: 'Finish or reacquire the incomplete proof and continue any unrelated already-authorized work that does not depend on it.',
+      freezesUnrelatedWork: false,
+    };
+  }
+
+  if (readiness === 'ready_for_founder_decision') {
+    return {
+      kind: 'founder_decision',
+      statement: 'No technical proof bottleneck is currently observed; the next limiting gate is an explicit founder decision for the bounded next action.',
+      evidenceState: 'VERIFIED',
+      smallestSafeRemoval: 'Present the bounded action and current proof for founder approval, then execute only within that approved scope.',
+      freezesUnrelatedWork: false,
+    };
+  }
+
+  return {
+    kind: 'unknown',
+    statement: 'The current bottleneck cannot yet be isolated from available evidence.',
+    evidenceState: 'UNKNOWN',
+    smallestSafeRemoval: 'Acquire the cheapest evidence that distinguishes the likely constraints, then remove only the verified limiting cause.',
+    freezesUnrelatedWork: false,
+  };
+}
+
+function buildContinuity(input: {
+  project: GoalfixProject;
+  target: RepositoryRef;
+  expectedVerificationNames: string[];
+  latestSignals: VerificationSignal[];
+  readiness: GoalfixReadiness;
+  observedAt: string;
+}): GoalfixContinuity {
+  const sourceFingerprint = fingerprintNormalized({
+    repository: input.project.repository,
+    provider: input.project.provider,
+    ref: input.target.name,
+    commitSha: input.target.commitSha.toLowerCase(),
+  });
+  const evidenceFingerprint = fingerprintNormalized({
+    sourceFingerprint,
+    readiness: input.readiness,
+    requiredChecks: input.expectedVerificationNames.map(normalizeSignalName).sort(),
+    signals: input.latestSignals
+      .map((signal) => ({
+        id: signal.id,
+        name: normalizeSignalName(signal.name),
+        status: signal.status,
+        commitSha: signal.commitSha.toLowerCase(),
+        provider: signal.provider,
+        startedAt: signal.startedAt ?? null,
+        completedAt: signal.completedAt ?? null,
+      }))
+      .sort((left, right) => `${left.name}:${left.id}`.localeCompare(`${right.name}:${right.id}`)),
+  });
+  const proofCookie: ProofCookieContract = {
+    cookieId: `goalfix-proof-${fingerprintNormalized({ sourceFingerprint, evidenceFingerprint, observedAt: input.observedAt }).slice(0, 24)}`,
+    contextType: 'verification-run',
+    owner: 'goalfix-read-only-inspector',
+    createdAt: input.observedAt,
+    expiresAt: null,
+    parentCookieId: null,
+  };
+
+  return {
+    contract: 'goalfix-continuity-v1',
+    sourceFingerprint,
+    evidenceFingerprint,
+    proofCookie,
+    authority: 'EVIDENCE_ONLY',
+    browserCookieStored: false,
+    invalidatesOn: [
+      'authoritative target commit changes',
+      'required exact-head check set changes',
+      'exact-head verification evidence changes',
+      'repository or provider binding changes',
+    ],
+  };
+}
+
 export function buildGoalfixReport(input: BuildGoalfixReportInput): GoalfixReport {
+  const observedAt = (input.observedAt ?? new Date()).toISOString();
   const expectedSha = input.target.commitSha.toLowerCase();
   const expectedVerificationNames = uniqueExpectedNames(input.goal.expectedVerificationNames);
   const expectedNameKeys = new Set(expectedVerificationNames.map(normalizeSignalName));
@@ -137,12 +281,21 @@ export function buildGoalfixReport(input: BuildGoalfixReportInput): GoalfixRepor
     readiness = 'ready_for_founder_decision';
   }
 
+  const continuity = buildContinuity({
+    project: input.project,
+    target: input.target,
+    expectedVerificationNames,
+    latestSignals,
+    readiness,
+    observedAt,
+  });
+
   const verified = [
     `Resolved ${input.target.name} to immutable commit ${input.target.commitSha}.`,
     ...passed.map(describeSignal),
   ];
   const inferred = [
-    'The smallest safe next action should target the first failing or missing proof signal, not broaden into unrelated repository work.',
+    'The smallest safe next action should target the verified limiting constraint, not broaden into unrelated repository work.',
   ];
   const unknown: string[] = [];
   const blocked: string[] = failures.map(describeSignal);
@@ -170,17 +323,28 @@ export function buildGoalfixReport(input: BuildGoalfixReportInput): GoalfixRepor
     ...(latestSignals.length > 0
       ? latestSignals.map(describeSignal)
       : [`No exact-head provider proof exists yet for ${input.target.commitSha}.`]),
+    `Continuity source fingerprint: ${continuity.sourceFingerprint}.`,
+    `Continuity evidence fingerprint: ${continuity.evidenceFingerprint}.`,
+    `Proof cookie: ${continuity.proofCookie.cookieId} (evidence-only; never authorization).`,
   ];
 
   const nextGate = readiness === 'blocked'
     ? 'Inspect the first exact-head failed or cancelled signal, repair only its verified root cause, then rerun the focused check.'
     : readiness === 'waiting_for_evidence'
-      ? 'Run or finish every named required exact-head verification, retain its logs or artifact, and inspect the result before any mutation.'
+      ? 'Run or finish every named required exact-head verification, retain its logs or artifact, and inspect the result before any mutation that depends on that proof.'
       : 'Founder reviews the complete named proof set and explicitly approves one bounded mutation, or closes the goal with no change.';
+
+  const bottleneck = resolveBottleneck({
+    failures,
+    incomplete,
+    missingExpectedNames,
+    expectedVerificationNames,
+    readiness,
+  });
 
   return {
     version: 'goalfix-v1',
-    observedAt: (input.observedAt ?? new Date()).toISOString(),
+    observedAt,
     readiness,
     routing: {
       skill: 'goalfix',
@@ -199,10 +363,13 @@ export function buildGoalfixReport(input: BuildGoalfixReportInput): GoalfixRepor
       expectedVerificationNames,
     },
     evidence: { verified, inferred, unknown, blocked },
+    bottleneck,
+    continuity,
     reality: [
       `The authoritative repository ref is ${input.target.name} at ${input.target.commitSha}.`,
       `${exactHeadSignals.length} exact-head verification signal(s) were inspected against ${expectedVerificationNames.length} required name(s).`,
       `${expectedSignals.length} exact-head signal(s) matched the required proof set.`,
+      `Bottleneck: ${bottleneck.statement}`,
       'This inspection performed no repository, provider, deployment, product-data, CRM, or publication mutation. The route may retain one sanitized internal access-audit event.',
     ],
     fix: ['No fix was applied. Goalfix v1 stops at inspection and founder decision authority.'],
@@ -210,6 +377,8 @@ export function buildGoalfixReport(input: BuildGoalfixReportInput): GoalfixRepor
     risk: [
       'Passing repository checks prove only the checks that actually ran, not production behavior or the founder outcome.',
       'Missing named checks, skipped, running, unknown, or mismatched-head evidence must not be presented as green.',
+      'A bottleneck may block the dependent claim or action without freezing unrelated capabilities that already have current authority and proof.',
+      'The proof cookie is a non-secret evidence marker in the report, not a browser cookie, founder session, approval token, merge token, or mutation authority.',
     ],
     rollback: ['No target-system rollback is required. Revert the Goalfix code change to remove the surface; retain any sanitized audit event as historical evidence.'],
     nextGate,

@@ -29,13 +29,11 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          BASE_REF: ${{ github.event.pull_request.base.ref }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           set -euo pipefail
-          LIVE_BASE_SHA="$(gh api "repos/${GITHUB_REPOSITORY}/branches/${BASE_REF}" --jq '.commit.sha')"
           mapfile -t CHANGED_FILES < <(
-            gh api --paginate "repos/${GITHUB_REPOSITORY}/compare/${LIVE_BASE_SHA}...${HEAD_SHA}?per_page=100" --jq '.files[].filename'
+            gh api --paginate "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/files?per_page=100" --jq '.[].filename'
           )
 
           NEEDS_NEON=false
@@ -49,17 +47,16 @@ jobs:
           done
 
           echo "needs_neon=${NEEDS_NEON}" >> "$GITHUB_OUTPUT"
-          echo "live_base_sha=${LIVE_BASE_SHA}" >> "$GITHUB_OUTPUT"
           if [ "$NEEDS_NEON" = "true" ]; then
-            echo "Supabase change detected between live ${BASE_REF}@${LIVE_BASE_SHA} and ${HEAD_SHA}; Neon preview branch is required."
+            echo 'Supabase change detected; Neon preview branch is required.'
           else
-            echo "No supabase/ change detected between live ${BASE_REF}@${LIVE_BASE_SHA} and ${HEAD_SHA}; Neon preview branch is not required."
+            echo 'No supabase/ change detected; Neon preview branch is not required.'
           fi
 
       - name: Record non-database no-op
         if: steps.neon_scope.outputs.needs_neon == 'false'
         shell: bash
-        run: echo 'Neon preview skipped because the current effective PR diff does not change supabase/.'
+        run: echo 'Neon preview skipped because this PR does not change supabase/.'
 
       - name: Validate Neon configuration
         if: steps.neon_scope.outputs.needs_neon == 'true'
@@ -110,13 +107,11 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          BASE_REF: ${{ github.event.pull_request.base.ref }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           set -euo pipefail
-          LIVE_BASE_SHA="$(gh api "repos/${GITHUB_REPOSITORY}/branches/${BASE_REF}" --jq '.commit.sha')"
           mapfile -t CHANGED_FILES < <(
-            gh api --paginate "repos/${GITHUB_REPOSITORY}/compare/${LIVE_BASE_SHA}...${HEAD_SHA}?per_page=100" --jq '.files[].filename'
+            gh api --paginate "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/files?per_page=100" --jq '.[].filename'
           )
 
           NEEDS_NEON=false
@@ -130,17 +125,16 @@ jobs:
           done
 
           echo "needs_neon=${NEEDS_NEON}" >> "$GITHUB_OUTPUT"
-          echo "live_base_sha=${LIVE_BASE_SHA}" >> "$GITHUB_OUTPUT"
           if [ "$NEEDS_NEON" = "true" ]; then
-            echo "Supabase change detected between live ${BASE_REF}@${LIVE_BASE_SHA} and ${HEAD_SHA}; Neon preview cleanup is required."
+            echo 'Supabase change detected; Neon preview cleanup is required.'
           else
-            echo "No supabase/ change detected between live ${BASE_REF}@${LIVE_BASE_SHA} and ${HEAD_SHA}; no Neon preview is expected for this PR."
+            echo 'No supabase/ change detected; no Neon preview is expected for this PR.'
           fi
 
       - name: Record non-database cleanup no-op
         if: steps.neon_scope.outputs.needs_neon == 'false'
         shell: bash
-        run: echo 'Neon cleanup skipped because the current effective PR diff does not change supabase/.'
+        run: echo 'Neon cleanup skipped because this PR does not change supabase/.'
 
       - name: Validate Neon configuration
         if: steps.neon_scope.outputs.needs_neon == 'true'

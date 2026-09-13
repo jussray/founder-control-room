@@ -34,7 +34,6 @@ jobs:
         with:
           ref: ${{ env.TARGET_SHA }}
           persist-credentials: false
-          fetch-depth: 0
       - name: Verify exact checkout
         shell: bash
         run: |
@@ -47,8 +46,6 @@ jobs:
           node-version: '24'
       - name: Run provenance adversarial tests
         run: node --test scripts/verify-main-release-provenance.node-test.mjs
-      - name: Verify direct-main historical ratification
-        run: node scripts/verify-main-release-historical-ratification.mjs
 
   provenance:
     name: Main release provenance

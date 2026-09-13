@@ -53,7 +53,7 @@ export const CONTROL_ROOM_GUARDRAILS: readonly Guardrail[] = Object.freeze([
     id: 'FCR-APPROVAL-001',
     status: 'active',
     summary:
-      'Evidence-backed merges may use standing founder authority; deployment, migration, rollback, auth, secrets, billing, deletion, and publication remain separate gates.',
+      'Merge authority is available, but every merge requires fresh explicit founder approval bound to the exact repository, pull request, base SHA, and head SHA; approval never carries forward across candidate movement. Deployment, migration, rollback, auth, secrets, billing, deletion, and publication remain separate gates.',
     evidence: ['docs/FOUNDER_MERGE_AUTHORITY.md', 'GLOBAL_AI.md'],
   }),
   Object.freeze({
@@ -123,7 +123,7 @@ export const CONTROL_ROOM_GUARDRAILS: readonly Guardrail[] = Object.freeze([
 
 export function publicGuardrailSnapshot() {
   return Object.freeze({
-    version: '1.7.0',
+    version: '1.8.0',
     vision: CONTROL_ROOM_VISION,
     guardrails: CONTROL_ROOM_GUARDRAILS.map(({ id, status, summary }) => ({
       id,
@@ -132,6 +132,7 @@ export function publicGuardrailSnapshot() {
     })),
     sensitiveFieldsIncluded: false,
     standingMergeAuthority: true,
+    mergeApprovalAlwaysRequired: true,
     approvalCarryForward: false,
   });
 }
@@ -180,6 +181,7 @@ export function renderGuardrailStatusPage() {
     </section>
     <p data-testid="sensitive-status"><code>sensitiveFieldsIncluded=false</code></p>
     <p data-testid="merge-authority-status"><code>standingMergeAuthority=true</code></p>
+    <p data-testid="merge-approval-status"><code>mergeApprovalAlwaysRequired=true</code></p>
     <p data-testid="approval-status"><code>approvalCarryForward=false</code></p>
   </main>
 </body>

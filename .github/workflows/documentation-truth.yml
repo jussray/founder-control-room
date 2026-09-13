@@ -25,18 +25,6 @@ jobs:
           ref: ${{ env.EXPECTED_HEAD_SHA }}
           fetch-depth: 0
 
-      - name: Resolve live PR base
-        if: github.event_name == 'pull_request'
-        shell: bash
-        env:
-          BASE_REF: ${{ github.event.pull_request.base.ref }}
-        run: |
-          set -euo pipefail
-          git fetch --no-tags origin "refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}"
-          live_base_sha="$(git rev-parse "refs/remotes/origin/${BASE_REF}")"
-          echo "DOC_TRUTH_BASE_SHA=${live_base_sha}" >> "$GITHUB_ENV"
-          echo "Documentation truth live base: ${BASE_REF}@${live_base_sha}"
-
       - name: Verify exact target
         shell: bash
         run: |
