@@ -234,6 +234,35 @@ test('deploy observer rejects a direct first-parent successor before a reviewed 
   assert.equal(result.successorSha, DIRECT);
 });
 
+test('deploy observer re-reads mutable main after the successor walk', async () => {
+  let mainReads = 0;
+  const fetchImpl = async (url) => {
+    const value = String(url);
+    if (value.endsWith('/branches/main')) {
+      mainReads += 1;
+      return response({ commit: { sha: mainReads === 1 ? SHA : OTHER } });
+    }
+    if (value.endsWith(`/commits/${SHA}/pulls`)) return response([pr()]);
+    if (value.endsWith(`/commits/${SHA}`)) {
+      return response({ sha: SHA, parents: [{ sha: TERMINAL_RATIFIED_MAIN_TIP }] });
+    }
+    return response({}, 404);
+  };
+
+  const result = await observeMainReleaseProvenance({
+    repository: 'jussray/founder-control-room',
+    targetSha: SHA,
+    terminalRatifiedTip: TERMINAL_RATIFIED_MAIN_TIP,
+    fetchImpl,
+    token: '',
+  });
+
+  assert.equal(mainReads, 2);
+  assert.equal(result.ok, false);
+  assert.equal(result.reason, 'stale_target');
+  assert.equal(result.currentMainSha, OTHER);
+});
+
 test('deploy ratification boundary stays bound to the extended ratification verifier', () => {
   const extension = readFileSync(new URL('./verify-main-release-ratification-extension.mjs', import.meta.url), 'utf8');
   assert.match(
