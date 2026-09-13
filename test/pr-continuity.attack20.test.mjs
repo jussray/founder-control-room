@@ -9,6 +9,7 @@ import {
   classifyCompareStatus,
   assertExpectedHead,
   isStackedUpdateUnsupported,
+  classifyUpdateBranchFailure,
   replaceManagedBlock,
   continuityBlock,
   collectRolloverOrder,
@@ -81,13 +82,20 @@ test('AT22 continuity CLI actually invokes audit metadata or rollover', () => {
 });
 test('AT23 exact stacked update-branch refusal is classified fail-closed', () => {
   assert.equal(isStackedUpdateUnsupported(403, "Updating a stacked PR's branch via this endpoint is not supported."), true);
+  const failure = classifyUpdateBranchFailure(403, "Updating a stacked PR's branch via this endpoint is not supported.");
+  assert.equal(failure.state, 'BLOCKED_STACK_REBASE_REQUIRED');
+  assert.deepEqual(failure.failureReceipts.map((receipt) => receipt.code), ['STACKED_UPDATE_UNSUPPORTED']);
 });
 test('AT24 unrelated provider 403 is not reclassified as a stack condition', () => {
   assert.equal(isStackedUpdateUnsupported(403, 'Resource not accessible by integration'), false);
+  const failure = classifyUpdateBranchFailure(403, 'Resource not accessible by integration');
+  assert.equal(failure.state, 'BLOCKED_PROVIDER_FORBIDDEN');
+  assert.deepEqual(failure.failureReceipts.map((receipt) => receipt.code), ['PROVIDER_FORBIDDEN']);
 });
 test('AT25 stacked provider refusal becomes an explicit blocked receipt path', () => {
   assert.match(continuitySource, /allow: \[202, 403, 422\]/);
   assert.match(continuitySource, /BLOCKED_STACK_REBASE_REQUIRED/);
+  assert.match(continuitySource, /failureReceipts/);
   assert.match(continuitySource, /providerMessage: update\.payload\?\.message \|\| null/);
 });
 test('AT26 JSON receipts keep merge capability separate from merge execution authorization', () => {
@@ -95,5 +103,31 @@ test('AT26 JSON receipts keep merge capability separate from merge execution aut
   assert.match(continuitySource, /mergeApprovalRequired: true/);
   assert.match(continuitySource, /mergeApproved: false/);
   assert.match(continuitySource, /authorizesMerge: false/);
+});
+test('AT27 repository rules keep each provider violation as a separate failure receipt', () => {
+  const failure = classifyUpdateBranchFailure(422, 'Repository rule violations found\n\nChanges must be made through a pull request.\n\nRequired status check "Required Gate" is expected.\n\nWaiting for Code Scanning results. Code Scanning may not be configured for the target branch.\n');
+  assert.equal(failure.state, 'BLOCKED_REPOSITORY_RULES');
+  assert.deepEqual(failure.failureReceipts.map((receipt) => receipt.code), [
+    'CHANGES_REQUIRE_PULL_REQUEST',
+    'REQUIRED_STATUS_CHECK_EXPECTED',
+    'CODE_SCANNING_PENDING_OR_UNCONFIGURED',
+  ]);
+  assert.equal(failure.failureReceipts[1].checkName, 'Required Gate');
+});
+test('AT28 merge conflicts are not collapsed into repository-rule blockers', () => {
+  const failure = classifyUpdateBranchFailure(422, 'merge conflict between base and head');
+  assert.equal(failure.state, 'BLOCKED_MERGE_CONFLICT');
+  assert.deepEqual(failure.failureReceipts.map((receipt) => receipt.code), ['MERGE_CONFLICT']);
+});
+test('AT29 unknown 422 rejection keeps a separate provider-rejected receipt', () => {
+  const failure = classifyUpdateBranchFailure(422, 'Validation Failed');
+  assert.equal(failure.state, 'BLOCKED_PROVIDER_REJECTED');
+  assert.deepEqual(failure.failureReceipts.map((receipt) => receipt.code), ['PROVIDER_UPDATE_REJECTED']);
+});
+test('AT30 rollover aggregate preserves per-state and per-failure receipt fields', () => {
+  assert.match(continuitySource, /blockedByState/);
+  assert.match(continuitySource, /failureReceiptCount/);
+  assert.match(continuitySource, /failureReceipts/);
+  assert.match(continuitySource, /receiptId: `pr-\$\{number\}:\$\{receipt\.code\}`/);
 });
 test('schema remains stable', () => assert.equal(SCHEMA, 'juss/pr-continuity@v1'));

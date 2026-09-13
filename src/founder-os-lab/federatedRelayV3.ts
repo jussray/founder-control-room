@@ -1,25 +1,23 @@
 export const FEDERATED_AGENT_RELAY_V3 = 'juss/federated-agent-relay@v3' as const;
 
-export const FEDERATED_AGENT_MEMBERS_V3 = [
-  'founder-control-room',
-  'chief-ai-machine',
-  'solcontinuity',
-  'promptos',
-] as const;
+export const FEDERATED_RELAY_MEMBER_REPOSITORIES = {
+  'founder-control-room': 'jussray/founder-control-room',
+  'chief-ai-machine': 'jussray/chief-ai-machine',
+  solcontinuity: 'jussray/solcontinuity',
+  promptos: 'jussray/promptos',
+} as const;
 
-export type FederatedAgentMemberV3 = typeof FEDERATED_AGENT_MEMBERS_V3[number];
-export type RelayDispositionV3 = 'observe' | 'reconcile' | 'propose';
-export type RelayTruthStateV3 = 'verified' | 'inferred' | 'unknown' | 'stale' | 'blocked' | 'failed';
-export type RelayContentTypeV3 = 'text/plain' | 'application/json';
+export type FederatedRelayMemberV3 = keyof typeof FEDERATED_RELAY_MEMBER_REPOSITORIES;
+export type FederatedRelayEvidenceStateV3 = 'verified' | 'inferred' | 'unknown' | 'stale' | 'blocked' | 'failed';
 
-export interface RelayMemberIdentityV3 {
-  member: FederatedAgentMemberV3;
+export interface FederatedRelayIdentityV3 {
+  member: FederatedRelayMemberV3;
   repository: string;
   branch: string;
   headSha: string;
 }
 
-export interface RelayOrderingV3 {
+export interface FederatedRelayOrderingV3 {
   chainId: string;
   sourceSequence: number;
   chainPosition: number;
@@ -27,14 +25,14 @@ export interface RelayOrderingV3 {
   predecessorMessageId?: string;
 }
 
-export interface RelayEvidenceV3 {
+export interface FederatedRelayEvidenceV3 {
   ref: string;
-  state: RelayTruthStateV3;
+  state: FederatedRelayEvidenceStateV3;
   sha256?: string;
   proofReceiptId?: string;
 }
 
-export interface RelaySignatureV3 {
+export interface FederatedRelaySignatureV3 {
   algorithm: 'Ed25519';
   keyId: string;
   valueBase64Url: string;
@@ -44,29 +42,39 @@ export interface FederatedAgentRelayEnvelopeV3 {
   contract: typeof FEDERATED_AGENT_RELAY_V3;
   messageId: string;
   replyToMessageId?: string;
-  ordering: RelayOrderingV3;
-  source: RelayMemberIdentityV3;
-  target: RelayMemberIdentityV3;
+  ordering: FederatedRelayOrderingV3;
+  source: FederatedRelayIdentityV3;
+  target: FederatedRelayIdentityV3;
   issuedAt: string;
   expiresAt: string;
   nonce: string;
-  disposition: RelayDispositionV3;
+  disposition: 'observe' | 'reconcile' | 'propose';
   subject: string;
   payload: {
-    contentType: RelayContentTypeV3;
+    contentType: 'text/plain' | 'application/json';
     body: string;
     sha256: string;
   };
   contextFingerprint: string;
   predecessorProofCookie: string;
-  evidence: RelayEvidenceV3[];
+  evidence: FederatedRelayEvidenceV3[];
   supersedesMessageIds: string[];
-  signature: RelaySignatureV3;
+  signature: FederatedRelaySignatureV3;
+}
+
+export interface FederatedRelayPublicKeyV3 {
+  member: FederatedRelayMemberV3;
+  keyId: string;
+  publicKeyJwk: JsonWebKey;
+  state: string;
+  validFrom: string;
+  validUntil?: string | null;
+  revokedAt?: string | null;
 }
 
 export interface FederatedRelayReceiptV3 {
   contract: typeof FEDERATED_AGENT_RELAY_V3;
-  status: 'accepted' | 'duplicate';
+  status: 'accepted';
   messageId: string;
   messageFingerprint: string;
   sourceKeyId: string;
@@ -85,38 +93,7 @@ export interface FederatedRelayReceiptV3 {
   acceptedAt: string;
 }
 
-export interface RelayPublicKeyRecordV3 {
-  member: FederatedAgentMemberV3;
-  keyId: string;
-  publicKeyJwk: JsonWebKey;
-  state: 'active' | 'retiring' | 'revoked';
-  validFrom: string;
-  validUntil?: string | null;
-  revokedAt?: string | null;
-}
-
-export interface VerifiedRelayV3 {
-  envelope: FederatedAgentRelayEnvelopeV3;
-  messageFingerprint: string;
-  evidenceDigest: string;
-  successorProofCookie: string;
-  receipt: FederatedRelayReceiptV3;
-}
-
-export class FederatedRelayV3Error extends Error {
-  constructor(readonly code: string, message = code) {
-    super(message);
-    this.name = 'FederatedRelayV3Error';
-  }
-}
-
-const MEMBER_REPOSITORIES: Readonly<Record<FederatedAgentMemberV3, string>> = Object.freeze({
-  'founder-control-room': 'jussray/founder-control-room',
-  'chief-ai-machine': 'jussray/chief-ai-machine',
-  solcontinuity: 'jussray/solcontinuity',
-  promptos: 'jussray/promptos',
-});
-
+const MEMBERS = Object.keys(FEDERATED_RELAY_MEMBER_REPOSITORIES) as FederatedRelayMemberV3[];
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const SHA40 = /^[0-9a-f]{40}$/i;
 const SHA256 = /^[0-9a-f]{64}$/i;
@@ -134,19 +111,27 @@ const TOP_LEVEL_FIELDS = new Set([
   'contextFingerprint', 'predecessorProofCookie', 'evidence',
   'supersedesMessageIds', 'signature',
 ]);
-const ORDERING_FIELDS = new Set([
-  'chainId', 'sourceSequence', 'chainPosition', 'logicalOperationId', 'predecessorMessageId',
-]);
+const ORDERING_FIELDS = new Set(['chainId', 'sourceSequence', 'chainPosition', 'logicalOperationId', 'predecessorMessageId']);
 const IDENTITY_FIELDS = new Set(['member', 'repository', 'branch', 'headSha']);
 const PAYLOAD_FIELDS = new Set(['contentType', 'body', 'sha256']);
 const EVIDENCE_FIELDS = new Set(['ref', 'state', 'sha256', 'proofReceiptId']);
 const SIGNATURE_FIELDS = new Set(['algorithm', 'keyId', 'valueBase64Url']);
 
+export class FederatedRelayV3Error extends Error {
+  readonly code: string;
+
+  constructor(code: string, message = code) {
+    super(message);
+    this.name = 'FederatedRelayV3Error';
+    this.code = code;
+  }
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
-function requireRecord(value: unknown, code: string, allowed: ReadonlySet<string>): Record<string, unknown> {
+function requireRecord(value: unknown, code: string, allowed: Set<string>): Record<string, unknown> {
   if (!isRecord(value) || Object.keys(value).some((key) => !allowed.has(key))) {
     throw new FederatedRelayV3Error(code);
   }
@@ -161,8 +146,8 @@ function boundedString(value: unknown, min: number, max: number, code: string): 
 }
 
 function exactInteger(value: unknown, min: number, code: string): number {
-  if (!Number.isSafeInteger(value) || Number(value) < min) throw new FederatedRelayV3Error(code);
-  return Number(value);
+  if (!Number.isSafeInteger(value) || (value as number) < min) throw new FederatedRelayV3Error(code);
+  return value as number;
 }
 
 function parseUuid(value: unknown, code: string): string {
@@ -183,20 +168,11 @@ function parseSha256(value: unknown, code: string): string {
   return normalized;
 }
 
-function parseMember(value: unknown, code: string): FederatedAgentMemberV3 {
-  if (typeof value !== 'string' || !FEDERATED_AGENT_MEMBERS_V3.includes(value as FederatedAgentMemberV3)) {
-    throw new FederatedRelayV3Error(code);
-  }
-  return value as FederatedAgentMemberV3;
-}
-
 function parseIso(value: unknown, code: string): string {
   const raw = boundedString(value, 20, 40, code);
   const time = Date.parse(raw);
-  if (!Number.isFinite(time)) throw new FederatedRelayV3Error(code);
-  const canonical = new Date(time).toISOString();
-  if (canonical !== raw) throw new FederatedRelayV3Error(code);
-  return canonical;
+  if (!Number.isFinite(time) || new Date(time).toISOString() !== raw) throw new FederatedRelayV3Error(code);
+  return raw;
 }
 
 function containsLoneSurrogate(value: string): boolean {
@@ -213,10 +189,6 @@ function containsLoneSurrogate(value: string): boolean {
   return false;
 }
 
-function assertJsonString(value: string): void {
-  if (containsLoneSurrogate(value)) throw new FederatedRelayV3Error('relay_jcs_invalid_unicode');
-}
-
 export function canonicalizeRelayJsonV3(value: unknown): string {
   const serialize = (input: unknown): string => {
     if (input === null) return 'null';
@@ -226,14 +198,14 @@ export function canonicalizeRelayJsonV3(value: unknown): string {
       return JSON.stringify(input);
     }
     if (typeof input === 'string') {
-      assertJsonString(input);
+      if (containsLoneSurrogate(input)) throw new FederatedRelayV3Error('relay_jcs_invalid_unicode');
       return JSON.stringify(input);
     }
     if (Array.isArray(input)) return `[${input.map((item) => serialize(item)).join(',')}]`;
     if (isRecord(input)) {
       const keys = Object.keys(input).sort();
       return `{${keys.map((key) => {
-        assertJsonString(key);
+        if (containsLoneSurrogate(key)) throw new FederatedRelayV3Error('relay_jcs_invalid_unicode');
         const child = input[key];
         if (child === undefined || typeof child === 'function' || typeof child === 'symbol' || typeof child === 'bigint') {
           throw new FederatedRelayV3Error('relay_jcs_non_json_value');
@@ -250,19 +222,13 @@ function bytesToHex(bytes: Uint8Array): string {
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
-function bytesToBase64Url(bytes: Uint8Array): string {
-  let binary = '';
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
-}
-
-export function decodeBase64UrlV3(value: string): Uint8Array {
+function decodeBase64UrlV3(value: string): Uint8Array {
   if (!value || !BASE64URL.test(value)) throw new FederatedRelayV3Error('relay_signature_encoding_invalid');
   const normalized = value.replace(/-/g, '+').replace(/_/g, '/');
   const padding = '='.repeat((4 - (normalized.length % 4)) % 4);
   let binary: string;
   try {
-    binary = atob(normalized + padding);
+    binary = globalThis.atob(normalized + padding);
   } catch {
     throw new FederatedRelayV3Error('relay_signature_encoding_invalid');
   }
@@ -279,32 +245,10 @@ function unsignedRelayV3(envelope: FederatedAgentRelayEnvelopeV3): Omit<Federate
   return unsigned;
 }
 
-export async function signRelayEnvelopeV3(
-  unsigned: Omit<FederatedAgentRelayEnvelopeV3, 'signature'>,
-  privateKeyJwk: JsonWebKey,
-  keyId: string,
-): Promise<FederatedAgentRelayEnvelopeV3> {
-  if (!KEY_ID.test(keyId)) throw new FederatedRelayV3Error('relay_signing_key_id_invalid');
-  const key = await crypto.subtle.importKey('jwk', privateKeyJwk, { name: 'Ed25519' }, false, ['sign']);
-  const canonical = canonicalizeRelayJsonV3(unsigned);
-  const signature = await crypto.subtle.sign('Ed25519', key, new TextEncoder().encode(canonical));
-  return {
-    ...unsigned,
-    signature: {
-      algorithm: 'Ed25519',
-      keyId,
-      valueBase64Url: bytesToBase64Url(new Uint8Array(signature)),
-    },
-  };
-}
-
 export async function verifyRelaySignatureV3(
   envelope: FederatedAgentRelayEnvelopeV3,
   publicKeyJwk: JsonWebKey,
 ): Promise<void> {
-  if (envelope.signature.algorithm !== 'Ed25519') {
-    throw new FederatedRelayV3Error('relay_signature_algorithm_rejected');
-  }
   const key = await crypto.subtle.importKey('jwk', publicKeyJwk, { name: 'Ed25519' }, false, ['verify']);
   const valid = await crypto.subtle.verify(
     'Ed25519',
@@ -315,17 +259,26 @@ export async function verifyRelaySignatureV3(
   if (!valid) throw new FederatedRelayV3Error('relay_signature_invalid');
 }
 
-function parseIdentity(value: unknown, label: 'source' | 'target'): RelayMemberIdentityV3 {
+function parseMember(value: unknown, code: string): FederatedRelayMemberV3 {
+  if (typeof value !== 'string' || !MEMBERS.includes(value as FederatedRelayMemberV3)) {
+    throw new FederatedRelayV3Error(code);
+  }
+  return value as FederatedRelayMemberV3;
+}
+
+function parseIdentity(value: unknown, label: string): FederatedRelayIdentityV3 {
   const record = requireRecord(value, `relay_${label}_invalid`, IDENTITY_FIELDS);
   const member = parseMember(record.member, `relay_${label}_member_invalid`);
   const repository = boundedString(record.repository, 3, 300, `relay_${label}_repository_invalid`);
   const branch = boundedString(record.branch, 1, 120, `relay_${label}_branch_invalid`);
   const headSha = parseSha40(record.headSha, `relay_${label}_head_invalid`);
-  if (repository !== MEMBER_REPOSITORIES[member]) throw new FederatedRelayV3Error(`relay_${label}_repository_mismatch`);
+  if (repository !== FEDERATED_RELAY_MEMBER_REPOSITORIES[member]) {
+    throw new FederatedRelayV3Error(`relay_${label}_repository_mismatch`);
+  }
   return { member, repository, branch, headSha };
 }
 
-function parseOrdering(value: unknown): RelayOrderingV3 {
+function parseOrdering(value: unknown): FederatedRelayOrderingV3 {
   const record = requireRecord(value, 'relay_ordering_invalid', ORDERING_FIELDS);
   const predecessorMessageId = record.predecessorMessageId === undefined
     ? undefined
@@ -339,10 +292,10 @@ function parseOrdering(value: unknown): RelayOrderingV3 {
   };
 }
 
-function assertNoAuthorityShapedProtocolFields(value: unknown, depth = 0): void {
+function rejectAuthorityFields(value: unknown, depth = 0): void {
   if (depth > 24) throw new FederatedRelayV3Error('relay_payload_depth_exceeded');
   if (Array.isArray(value)) {
-    for (const item of value) assertNoAuthorityShapedProtocolFields(item, depth + 1);
+    value.forEach((item) => rejectAuthorityFields(item, depth + 1));
     return;
   }
   if (!isRecord(value)) return;
@@ -350,11 +303,11 @@ function assertNoAuthorityShapedProtocolFields(value: unknown, depth = 0): void 
     if (FORBIDDEN_AUTHORITY_KEYS.has(key.toLowerCase().replace(/[^a-z]/g, ''))) {
       throw new FederatedRelayV3Error('relay_authority_smuggling_rejected');
     }
-    assertNoAuthorityShapedProtocolFields(child, depth + 1);
+    rejectAuthorityFields(child, depth + 1);
   }
 }
 
-function parseEvidence(value: unknown): RelayEvidenceV3[] {
+function parseEvidence(value: unknown): FederatedRelayEvidenceV3[] {
   if (!Array.isArray(value) || value.length > 20) throw new FederatedRelayV3Error('relay_evidence_invalid');
   return value.map((entry) => {
     const record = requireRecord(entry, 'relay_evidence_entry_invalid', EVIDENCE_FIELDS);
@@ -369,21 +322,25 @@ function parseEvidence(value: unknown): RelayEvidenceV3[] {
         if (parsed.username || parsed.password) throw new FederatedRelayV3Error('relay_evidence_credentials_rejected');
       }
     }
-    const state = boundedString(record.state, 5, 20, 'relay_evidence_state_invalid') as RelayTruthStateV3;
+    const state = boundedString(record.state, 5, 20, 'relay_evidence_state_invalid') as FederatedRelayEvidenceStateV3;
     if (!['verified', 'inferred', 'unknown', 'stale', 'blocked', 'failed'].includes(state)) {
       throw new FederatedRelayV3Error('relay_evidence_state_invalid');
     }
-    const sha256 = record.sha256 === undefined ? undefined : parseSha256(record.sha256, 'relay_evidence_sha_invalid');
-    const proofReceiptId = record.proofReceiptId === undefined
-      ? undefined
-      : boundedString(record.proofReceiptId, 3, 300, 'relay_evidence_receipt_invalid');
-    return { ref, state, ...(sha256 ? { sha256 } : {}), ...(proofReceiptId ? { proofReceiptId } : {}) };
+    return {
+      ref,
+      state,
+      ...(record.sha256 === undefined ? {} : { sha256: parseSha256(record.sha256, 'relay_evidence_sha_invalid') }),
+      ...(record.proofReceiptId === undefined
+        ? {}
+        : { proofReceiptId: boundedString(record.proofReceiptId, 3, 300, 'relay_evidence_receipt_invalid') }),
+    };
   });
 }
 
 export function parseFederatedAgentRelayEnvelopeV3(value: unknown): FederatedAgentRelayEnvelopeV3 {
   const record = requireRecord(value, 'relay_envelope_invalid', TOP_LEVEL_FIELDS);
   if (record.contract !== FEDERATED_AGENT_RELAY_V3) throw new FederatedRelayV3Error('relay_contract_unsupported');
+
   const messageId = parseUuid(record.messageId, 'relay_message_id_invalid');
   const replyToMessageId = record.replyToMessageId === undefined
     ? undefined
@@ -392,8 +349,9 @@ export function parseFederatedAgentRelayEnvelopeV3(value: unknown): FederatedAge
   const source = parseIdentity(record.source, 'source');
   const target = parseIdentity(record.target, 'target');
   if (source.member === target.member) throw new FederatedRelayV3Error('relay_same_member_rejected');
+
   const payloadRecord = requireRecord(record.payload, 'relay_payload_invalid', PAYLOAD_FIELDS);
-  const contentType = boundedString(payloadRecord.contentType, 9, 24, 'relay_payload_content_type_invalid') as RelayContentTypeV3;
+  const contentType = boundedString(payloadRecord.contentType, 9, 24, 'relay_payload_content_type_invalid');
   if (contentType !== 'text/plain' && contentType !== 'application/json') {
     throw new FederatedRelayV3Error('relay_payload_content_type_invalid');
   }
@@ -403,28 +361,43 @@ export function parseFederatedAgentRelayEnvelopeV3(value: unknown): FederatedAge
   }
   if (contentType === 'application/json') {
     let parsed: unknown;
-    try { parsed = JSON.parse(body); } catch { throw new FederatedRelayV3Error('relay_payload_json_invalid'); }
-    assertNoAuthorityShapedProtocolFields(parsed);
+    try {
+      parsed = JSON.parse(body);
+    } catch {
+      throw new FederatedRelayV3Error('relay_payload_json_invalid');
+    }
+    rejectAuthorityFields(parsed);
   }
+
   const signatureRecord = requireRecord(record.signature, 'relay_signature_invalid', SIGNATURE_FIELDS);
   if (signatureRecord.algorithm !== 'Ed25519') throw new FederatedRelayV3Error('relay_signature_algorithm_rejected');
   const keyId = boundedString(signatureRecord.keyId, 3, 200, 'relay_signing_key_id_invalid');
   if (!KEY_ID.test(keyId)) throw new FederatedRelayV3Error('relay_signing_key_id_invalid');
   const valueBase64Url = boundedString(signatureRecord.valueBase64Url, 32, 256, 'relay_signature_encoding_invalid');
   if (!BASE64URL.test(valueBase64Url)) throw new FederatedRelayV3Error('relay_signature_encoding_invalid');
-  const supersedesMessageIds = Array.isArray(record.supersedesMessageIds)
-    ? record.supersedesMessageIds.map((id) => parseUuid(id, 'relay_supersedes_id_invalid'))
-    : (() => { throw new FederatedRelayV3Error('relay_supersedes_invalid'); })();
-  if (supersedesMessageIds.length > 20 || new Set(supersedesMessageIds).size !== supersedesMessageIds.length) {
+
+  if (!Array.isArray(record.supersedesMessageIds) || record.supersedesMessageIds.length > 20) {
     throw new FederatedRelayV3Error('relay_supersedes_invalid');
   }
-  if (supersedesMessageIds.includes(messageId)) throw new FederatedRelayV3Error('relay_self_supersession');
+  const supersedesMessageIds = record.supersedesMessageIds.map((id) => parseUuid(id, 'relay_supersedes_id_invalid'));
+  if (new Set(supersedesMessageIds).size !== supersedesMessageIds.length || supersedesMessageIds.includes(messageId)) {
+    throw new FederatedRelayV3Error('relay_supersedes_invalid');
+  }
+
   if (replyToMessageId) {
     if (ordering.predecessorMessageId !== replyToMessageId) throw new FederatedRelayV3Error('relay_reply_predecessor_mismatch');
     if (ordering.chainPosition === 0) throw new FederatedRelayV3Error('relay_reply_chain_position');
   } else if (ordering.predecessorMessageId !== undefined || ordering.chainPosition !== 0) {
     throw new FederatedRelayV3Error('relay_root_lineage_invalid');
   }
+
+  const disposition = boundedString(record.disposition, 7, 9, 'relay_disposition_invalid');
+  if (disposition !== 'observe' && disposition !== 'reconcile' && disposition !== 'propose') {
+    throw new FederatedRelayV3Error('relay_disposition_invalid');
+  }
+  const predecessorProofCookie = boundedString(record.predecessorProofCookie, 8, 300, 'relay_proof_cookie_invalid');
+  if (!PROOF_COOKIE.test(predecessorProofCookie)) throw new FederatedRelayV3Error('relay_proof_cookie_invalid');
+
   return {
     contract: FEDERATED_AGENT_RELAY_V3,
     messageId,
@@ -435,28 +408,28 @@ export function parseFederatedAgentRelayEnvelopeV3(value: unknown): FederatedAge
     issuedAt: parseIso(record.issuedAt, 'relay_issued_at_invalid'),
     expiresAt: parseIso(record.expiresAt, 'relay_expires_at_invalid'),
     nonce: parseUuid(record.nonce, 'relay_nonce_invalid'),
-    disposition: (() => {
-      const value = boundedString(record.disposition, 7, 9, 'relay_disposition_invalid') as RelayDispositionV3;
-      if (!['observe', 'reconcile', 'propose'].includes(value)) throw new FederatedRelayV3Error('relay_disposition_invalid');
-      return value;
-    })(),
+    disposition,
     subject: boundedString(record.subject, 1, 500, 'relay_subject_invalid'),
-    payload: { contentType, body, sha256: parseSha256(payloadRecord.sha256, 'relay_payload_sha_invalid') },
+    payload: {
+      contentType,
+      body,
+      sha256: parseSha256(payloadRecord.sha256, 'relay_payload_sha_invalid'),
+    },
     contextFingerprint: parseSha256(record.contextFingerprint, 'relay_context_fingerprint_invalid'),
-    predecessorProofCookie: (() => {
-      const value = boundedString(record.predecessorProofCookie, 8, 300, 'relay_proof_cookie_invalid');
-      if (!PROOF_COOKIE.test(value)) throw new FederatedRelayV3Error('relay_proof_cookie_invalid');
-      return value;
-    })(),
+    predecessorProofCookie,
     evidence: parseEvidence(record.evidence),
     supersedesMessageIds,
-    signature: { algorithm: 'Ed25519', keyId, valueBase64Url },
+    signature: {
+      algorithm: 'Ed25519',
+      keyId,
+      valueBase64Url,
+    },
   };
 }
 
 export function assertRelayKeyUsableV3(
-  key: RelayPublicKeyRecordV3,
-  sourceMember: FederatedAgentMemberV3,
+  key: FederatedRelayPublicKeyV3,
+  sourceMember: FederatedRelayMemberV3,
   now = new Date(),
 ): void {
   if (key.member !== sourceMember) throw new FederatedRelayV3Error('relay_source_key_member_mismatch');
@@ -473,8 +446,8 @@ export function assertRelayFreshnessV3(
   now = new Date(),
   options: { maxTtlMs?: number; futureSkewMs?: number } = {},
 ): void {
-  const maxTtlMs = options.maxTtlMs ?? 10 * 60_000;
-  const futureSkewMs = options.futureSkewMs ?? 2 * 60_000;
+  const maxTtlMs = options.maxTtlMs ?? 600_000;
+  const futureSkewMs = options.futureSkewMs ?? 120_000;
   const issuedAt = Date.parse(envelope.issuedAt);
   const expiresAt = Date.parse(envelope.expiresAt);
   if (expiresAt <= issuedAt) throw new FederatedRelayV3Error('relay_invalid_expiry');
@@ -485,7 +458,7 @@ export function assertRelayFreshnessV3(
 
 export function assertRelayTargetV3(
   envelope: FederatedAgentRelayEnvelopeV3,
-  expected: RelayMemberIdentityV3,
+  expected: FederatedRelayIdentityV3,
 ): void {
   if (
     envelope.target.member !== expected.member
@@ -499,18 +472,27 @@ export function assertRelayTargetV3(
 
 export async function verifyRelayEnvelopeV3(input: {
   envelope: FederatedAgentRelayEnvelopeV3;
-  key: RelayPublicKeyRecordV3;
-  expectedTarget: RelayMemberIdentityV3;
+  key: FederatedRelayPublicKeyV3;
+  expectedTarget: FederatedRelayIdentityV3;
   now?: Date;
-}): Promise<VerifiedRelayV3> {
-  const { envelope, key, expectedTarget, now = new Date() } = input;
+}): Promise<{
+  envelope: FederatedAgentRelayEnvelopeV3;
+  messageFingerprint: string;
+  evidenceDigest: string;
+  successorProofCookie: string;
+  receipt: FederatedRelayReceiptV3;
+}> {
+  const now = input.now ?? new Date();
+  const { envelope, key, expectedTarget } = input;
   assertRelayFreshnessV3(envelope, now);
   assertRelayTargetV3(envelope, expectedTarget);
   assertRelayKeyUsableV3(key, envelope.source.member, now);
   if (key.keyId !== envelope.signature.keyId) throw new FederatedRelayV3Error('relay_signing_key_id_mismatch');
+
   const payloadDigest = await sha256HexV3(envelope.payload.body);
   if (payloadDigest !== envelope.payload.sha256) throw new FederatedRelayV3Error('relay_payload_digest_mismatch');
   await verifyRelaySignatureV3(envelope, key.publicKeyJwk);
+
   const messageFingerprint = await sha256HexV3(canonicalizeRelayJsonV3(envelope));
   const evidenceDigest = await sha256HexV3(canonicalizeRelayJsonV3(envelope.evidence));
   const successorProofCookie = `Q4R:v3:${await sha256HexV3(`${envelope.predecessorProofCookie}:${messageFingerprint}`)}`;

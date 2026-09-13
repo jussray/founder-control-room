@@ -271,3 +271,7 @@ For material work report:
 17. Next approval gate
 
 The Control Room exists to preserve founder authority, not automate it out of existence because a workflow diagram got overexcited.
+
+## Load-bearing regression execution
+
+A committed regression test is source evidence only until the exact-head workflow that feeds `Required Gate` actually executes it. For LinkedIn analytics continuity, `.github/workflows/ci.yml` must keep `scripts.test_linkedin_analytics_continuity` inside the load-bearing `python-tests` job, and `Required Gate` must continue to depend on that job. Missing LinkedIn activity rows must remain `UNKNOWN_NO_EVIDENCE` with null metrics, never synthetic zero impressions or engagements.
