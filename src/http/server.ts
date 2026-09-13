@@ -42,6 +42,7 @@ import { handleFounderSignalReviewContextIngest } from './routes/founderSignalRe
 import { handleFounderSignalReviewEmailIngest } from './routes/founderSignalReviewEmailIngress.js';
 import { handleJiraWorkAutomationIngress } from './routes/jiraWorkAutomationIngress.js';
 import { handleHairCommerceReceiptIngest } from './routes/hairCommerceReceipts.js';
+import { handleFederatedRelayV3 } from './routes/federatedRelayV3.js';
 import {
   handleProofOfShipCommitLookup,
   handleProofOfShipReceiptIngest,
@@ -238,6 +239,12 @@ export function createServer(options: CreateServerOptions = {}) {
     rateLimitGeneral,
     express.json({ type: 'application/json', limit: '32kb' }),
     handleProductBuildReceiptIngest,
+  );
+  app.post(
+    '/api/federated-relay/v3',
+    rateLimitGeneral,
+    express.json({ type: 'application/json', limit: '64kb' }),
+    handleFederatedRelayV3,
   );
   app.post(
     '/mcp/founder-signal-engine',
