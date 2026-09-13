@@ -12,6 +12,10 @@ const legacyPrivilegeHardening = readFileSync(
   'supabase/migrations/20260913202114_harden_federated_relay_service_role_privileges.sql',
   'utf8',
 );
+const keyValidityHardening = readFileSync(
+  'supabase/migrations/20260913232000_harden_federated_relay_v31_key_validity.sql',
+  'utf8',
+);
 
 describe('federated relay v3.1 runtime hardening contract', () => {
   it('accepts historical source commits reachable from the claimed branch without requiring current-head equality', () => {
@@ -88,5 +92,16 @@ describe('federated relay v3.1 runtime hardening contract', () => {
     expect(legacyPrivilegeHardening).not.toMatch(
       /grant\s+(insert|update|delete)[^;]*federated_relay_messages/iu,
     );
+  });
+
+  it('keeps v3.1 key validity monotonic and ephemeral keys finite and public-only', () => {
+    expect(keyValidityHardening).toContain('old.valid_until is not null and new.valid_until is null');
+    expect(keyValidityHardening).toContain("raise exception 'relay_key_validity_extension_rejected'");
+    expect(keyValidityHardening).toContain('p_valid_until is null');
+    expect(keyValidityHardening).toContain("p_public_key_jwk->>'kty' <> 'OKP'");
+    expect(keyValidityHardening).toContain("p_public_key_jwk->>'crv' <> 'Ed25519'");
+    expect(keyValidityHardening).toContain("p_public_key_jwk ? 'd'");
+    expect(keyValidityHardening).toContain('from public, anon, authenticated');
+    expect(keyValidityHardening).toContain('to service_role');
   });
 });
