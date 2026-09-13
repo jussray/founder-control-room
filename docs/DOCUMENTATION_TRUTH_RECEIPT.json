@@ -1,38 +1,27 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Bind the TinyFish production activation boundary to current Cloudflare deployment truth so source and CI readiness cannot be mistaken for a live provider-backed capability when the required Worker secret binding has not been observed.",
+  "purpose": "Make delegated Codex Chat and Claude authority policy changes mechanically truth-sensitive so capability-source edits cannot report a false zero-file Documentation Truth green or bypass the founder-final execution boundary.",
   "domains": [
-    "cloudflare-authority"
+    "capability-authority",
+    "truth-governance"
   ],
   "changes": [
     {
-      "path": "wrangler.worker.toml",
+      "path": "src/authority/delegatedAgentAuthority.ts",
       "claims": [
-        "`wrangler.worker.toml` must list `TINYFISH_API_KEY` under `[secrets].required`, so canonical exact-main Deploy rejects missing provider-held TinyFish activation before Worker mutation while never copying the secret value through GitHub Actions."
+        "`src/authority/delegatedAgentAuthority.ts` must remain a policy-only eligibility layer that never authorizes provider mutation or verified completion and requires a separately trusted activation path before merge or deploy execution."
       ]
     },
     {
-      "path": "README.md",
+      "path": "security/delegated-agent-authority.json",
       "claims": [
-        "`README.md` must keep TinyFish source and CI readiness separate from provider/runtime activation and state that canonical Deploy verifies only provider-held binding-name presence before promotion."
+        "`security/delegated-agent-authority.json` must preserve standing capability separately from standing execution approval and must keep database, secret, auth/RLS, billing, publication, provider-ownership, and destructive authority outside the delegated policy."
       ]
     },
     {
-      "path": "docs/CLOUDFLARE_REASONING.md",
+      "path": "scripts/verify-documentation-truth.mjs",
       "claims": [
-        "`docs/CLOUDFLARE_REASONING.md` must treat `TINYFISH_API_KEY` as a provider-held Worker binding and require canonical Deploy to fail closed on a missing binding name without exposing or re-uploading its value."
-      ]
-    },
-    {
-      "path": "docs/deployment/CLOUDFLARE_WORKER_TARGETS.md",
-      "claims": [
-        "`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` must name `TINYFISH_API_KEY` as a required canonical Worker secret while preserving live provider observation and real TinyFish Search/Fetch as separate activation proof."
-      ]
-    },
-    {
-      "path": "docs/SECRETS.md",
-      "claims": [
-        "`docs/SECRETS.md` must keep the TinyFish key in the Cloudflare Worker secret plane and never recast the provider-held value as a GitHub Actions secret or proof artifact."
+        "`scripts/verify-documentation-truth.mjs` must classify non-test `src/authority/` policy source and `security/delegated-agent-authority.json` as capability-authority so future delegated-authority changes cannot pass with zero truth-sensitive files."
       ]
     }
   ]
