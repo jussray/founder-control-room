@@ -58,14 +58,28 @@ export async function acceptFederatedRelayV31(
   const envelope = input;
   const now = deps.now ?? Date.now();
 
-  validateRelayFreshnessV31(envelope, now);
-  assert(sha256HexV31(envelope.payload.body) === envelope.payload.sha256, 'relay_payload_digest_mismatch');
-
-  const verifiedKey = await verifyRelaySignatureV31(envelope, deps.signatureVerifier);
-  const binding = await validateRelayEndpointBindingsV31({ envelope, deps });
-
   const semanticFingerprint = relaySemanticFingerprintV31(envelope);
   const deliveryFingerprint = relayDeliveryFingerprintV31(envelope);
+
+  // Every presented delivery is authenticated. Exact retries then reuse the
+  // one immutable receipt already persisted for this message ID.
+  const verifiedKey = await verifyRelaySignatureV31(envelope, deps.signatureVerifier);
+  const existing = await deps.ledger.findByMessageId(envelope.messageId);
+  if (existing) {
+    assert(existing.semanticFingerprint === semanticFingerprint, 'relay_message_id_collision');
+    assert(existing.deliveryFingerprint === deliveryFingerprint, 'relay_delivery_fingerprint_collision');
+    return {
+      outcome: 'duplicate',
+      receipt: existing.receipt,
+      currentState: existing.currentState,
+      supersededByMessageId: existing.supersededByMessageId,
+    };
+  }
+
+  validateRelayFreshnessV31(envelope, now);
+  assert(sha256HexV31(envelope.payload.body) === envelope.payload.sha256, 'relay_payload_digest_mismatch');
+  const binding = await validateRelayEndpointBindingsV31({ envelope, deps });
+
   const evidenceDigest = relayEvidenceDigestV31(envelope.evidence);
   const successorProofCookie = relaySuccessorProofCookieV31({
     chainId: envelope.ordering.chainId,
@@ -93,7 +107,15 @@ export async function acceptFederatedRelayV31(
     },
     sourceHeadSha: envelope.source.headSha,
     targetObservedHeadSha: deps.localIdentity.currentHeadSha,
-    sourceReachableFromClaimedBranch: binding.sourceReachableFromClaimedBranch,
+    sourceCommitEvidence: {
+      repository: envelope.source.repository,
+      branch: envelope.source.branch,
+      headSha: envelope.source.headSha,
+      state: binding.sourceReachableFromClaimedBranch
+        ? 'reachable_at_acceptance'
+        : 'exists_not_currently_reachable',
+      checkedAt: new Date(now).toISOString(),
+    },
     predecessorProofCookie: envelope.predecessorProofCookie,
     successorProofCookie,
     evidenceDigest,
