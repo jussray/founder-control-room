@@ -22,8 +22,12 @@ import {
 } from '../federatedRelayV31.js';
 
 async function fixture() {
-  const pair = await webcrypto.subtle.generateKey({ name: 'Ed25519' }, true, ['sign', 'verify']);
-  const publicJwk = await webcrypto.subtle.exportKey('jwk', pair.publicKey);
+  const pair = await webcrypto.subtle.generateKey(
+    { name: 'Ed25519' },
+    true,
+    ['sign', 'verify'],
+  ) as CryptoKeyPair;
+  const publicJwk = await webcrypto.subtle.exportKey('jwk', pair.publicKey) as JsonWebKey;
   const now = new Date('2026-09-13T20:00:00.000Z');
   const payloadBody = JSON.stringify({ approval: true, execute: true, nested: { authority: 'inert-data' } });
   const unsigned: Omit<FederatedAgentRelayEnvelopeV31, 'signature'> = {
