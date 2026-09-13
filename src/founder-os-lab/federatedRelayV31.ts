@@ -368,7 +368,8 @@ export function parseFederatedAgentRelayEnvelopeV31(value: unknown): FederatedAg
   const payloadRecord = exactKeys(record.payload, ['contentType','body','sha256'], ['contentType','body','sha256'], 'relay_payload_invalid');
   const contentType = boundedString(payloadRecord.contentType, 9, 24, 'relay_payload_content_type_invalid');
   assert(contentType === 'text/plain' || contentType === 'application/json', 'relay_payload_content_type_invalid');
-  const body = typeof payloadRecord.body === 'string' ? payloadRecord.body : '';
+  assert(typeof payloadRecord.body === 'string', 'relay_payload_body_invalid');
+  const body = payloadRecord.body;
   assert(new TextEncoder().encode(body).byteLength <= MAX_PAYLOAD_BYTES, 'relay_payload_size_invalid');
   if (contentType === 'application/json') assertJsonPayloadDepth(body); // Payload is inert data. Authority-looking keys are legal content.
 
@@ -409,7 +410,7 @@ export function parseFederatedAgentRelayEnvelopeV31(value: unknown): FederatedAg
   };
 }
 
-export function assertRelayFreshnessV31(envelope: FederatedAgentRelayEnvelopeV31, now?: Date): void {
+export function assertRelayFreshnessV31(envelope: FederatedAgentRelayEnvelopeV31, now: Date): void {
   assert(now instanceof Date && Number.isFinite(now.getTime()), 'relay_observed_time_required');
   const issued = Date.parse(envelope.issuedAt);
   const expires = Date.parse(envelope.expiresAt);
@@ -525,7 +526,7 @@ export async function verifyRelayEnvelopeSignatureV31(envelope: FederatedAgentRe
 export async function verifyRelayEnvelopeV31(input: {
   envelope: FederatedAgentRelayEnvelopeV31;
   key: FederatedRelayPublicKeyV31;
-  acceptedAt?: Date;
+  acceptedAt: Date;
 }): Promise<{
   semanticFingerprint: string;
   deliveryFingerprint: string;
