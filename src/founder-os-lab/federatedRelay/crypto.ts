@@ -32,25 +32,13 @@ export function relayDeliveryFingerprintV31(envelope: FederatedAgentRelayEnvelop
 }
 
 export function relayEvidenceDigestV31(evidence: RelayEvidenceV31[]): string {
-  return sha256HexV31(`evidence.v3.1\u0000${canonicalizeRelayJcsV31(evidence)}`);
+  return taggedDigestV31('juss.federated-relay.evidence.v3.1', [canonicalizeRelayJcsV31(evidence)]);
 }
 
-export function relaySuccessorProofCookieV31(input: {
-  predecessorProofCookie: string;
-  semanticFingerprint: string;
-  nonce: string;
-  sourceMember: string;
-  targetMember: string;
-}): string {
-  const parts = [
-    input.predecessorProofCookie,
-    input.semanticFingerprint,
-    input.nonce,
-    input.sourceMember,
-    input.targetMember,
-  ];
+export function taggedDigestV31(tag: string, parts: readonly string[]): string {
   const hash = createHash('sha256');
-  hash.update('cookie.v3.1\u0000', 'utf8');
+  hash.update(tag, 'utf8');
+  hash.update('\u0000', 'utf8');
   for (const part of parts) {
     const bytes = Buffer.from(part, 'utf8');
     hash.update(String(bytes.byteLength), 'utf8');
@@ -58,14 +46,40 @@ export function relaySuccessorProofCookieV31(input: {
     hash.update(bytes);
     hash.update('\u0000', 'utf8');
   }
-  return `Q4R:v3.1:${hash.digest('hex')}`;
+  return hash.digest('hex');
+}
+
+export function relaySuccessorProofCookieV31(input: {
+  chainId: string;
+  predecessorProofCookie: string;
+  deliveryFingerprint: string;
+  nonce: string;
+  sourceMember: string;
+  targetMember: string;
+}): string {
+  const digest = taggedDigestV31('juss.federated-relay.cookie.v3.1', [
+    input.chainId,
+    input.predecessorProofCookie,
+    input.deliveryFingerprint,
+    input.nonce,
+    input.sourceMember,
+    input.targetMember,
+  ]);
+  return `Q4R:v3.1:${digest}`;
 }
 
 export function decodeBase64UrlV31(value: string): Uint8Array {
-  assert(/^[A-Za-z0-9_-]+$/.test(value), 'relay_base64url_chars');
+  assert(value.length > 0 && /^[A-Za-z0-9_-]+$/.test(value), 'relay_signature_base64url_invalid');
   const normalized = value.replace(/-/g, '+').replace(/_/g, '/');
   const padding = '='.repeat((4 - (normalized.length % 4)) % 4);
-  return Uint8Array.from(Buffer.from(`${normalized}${padding}`, 'base64'));
+  let decoded: Buffer;
+  try {
+    decoded = Buffer.from(`${normalized}${padding}`, 'base64');
+  } catch {
+    throw new RelayV31Error('relay_signature_base64url_invalid');
+  }
+  assert(decoded.byteLength === 64, 'relay_signature_length_invalid');
+  return Uint8Array.from(decoded);
 }
 
 export function canonicalUnsignedBytesV31(envelope: FederatedAgentRelayEnvelopeV31): Uint8Array {
