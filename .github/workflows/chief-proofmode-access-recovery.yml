@@ -142,13 +142,13 @@ jobs:
       - name: Require configured Chief service-token identity before repair
         if: inputs.mode == 'repair'
         env:
-          CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID: ${{ vars.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID || vars.CLOUDFLARE_ACCESS_CLIENT_ID }}
+          CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID: ${{ secrets.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID || secrets.CLOUDFLARE_ACCESS_CLIENT_ID || vars.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID || vars.CLOUDFLARE_ACCESS_CLIENT_ID }}
           CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID: ${{ vars.CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID || vars.CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID }}
         shell: bash
         run: |
           set -euo pipefail
           if [[ -z "$CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID" && -z "$CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID" ]]; then
-            echo '::error title=Missing Chief service-token identity::repair requires CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID (or canonical alias CLOUDFLARE_ACCESS_CLIENT_ID) or CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID (or alias CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID) as a protected variable in the FCR production environment.'
+            echo '::error title=Missing Chief service-token identity::repair requires CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID (or canonical alias CLOUDFLARE_ACCESS_CLIENT_ID) or CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID (or alias CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID) as a protected selector in the FCR production environment.'
             exit 1
           fi
 
@@ -156,7 +156,7 @@ jobs:
         if: inputs.mode == 'check'
         env:
           CLOUDFLARE_ACCESS_API_TOKEN: ${{ secrets.CLOUDFLARE_ACCESS_API_TOKEN }}
-          CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID: ${{ vars.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID || vars.CLOUDFLARE_ACCESS_CLIENT_ID }}
+          CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID: ${{ secrets.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID || secrets.CLOUDFLARE_ACCESS_CLIENT_ID || vars.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID || vars.CLOUDFLARE_ACCESS_CLIENT_ID }}
           CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID: ${{ vars.CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID || vars.CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID }}
         run: node scripts/reconcile-chief-proofmode-access.mjs >/dev/null 2>&1
 
@@ -164,7 +164,7 @@ jobs:
         if: inputs.mode == 'repair'
         env:
           CLOUDFLARE_ACCESS_ADMIN_API_TOKEN: ${{ secrets.CLOUDFLARE_ACCESS_ADMIN_API_TOKEN }}
-          CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID: ${{ vars.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID || vars.CLOUDFLARE_ACCESS_CLIENT_ID }}
+          CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID: ${{ secrets.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID || secrets.CLOUDFLARE_ACCESS_CLIENT_ID || vars.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID || vars.CLOUDFLARE_ACCESS_CLIENT_ID }}
           CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID: ${{ vars.CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID || vars.CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID }}
         shell: bash
         run: |
@@ -177,7 +177,7 @@ jobs:
         env:
           CHIEF_ACCESS_MODE: check
           CLOUDFLARE_ACCESS_API_TOKEN: ${{ secrets.CLOUDFLARE_ACCESS_ADMIN_API_TOKEN }}
-          CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID: ${{ vars.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID || vars.CLOUDFLARE_ACCESS_CLIENT_ID }}
+          CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID: ${{ secrets.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID || secrets.CLOUDFLARE_ACCESS_CLIENT_ID || vars.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID || vars.CLOUDFLARE_ACCESS_CLIENT_ID }}
           CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID: ${{ vars.CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID || vars.CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID }}
         run: node scripts/reconcile-chief-proofmode-access.mjs >/dev/null 2>&1
 
@@ -211,19 +211,42 @@ jobs:
             local path="$1"
             jq -e -s --arg target "$safe_target" '
               def iso8601: type == "string" and test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$");
+              def allowed_scope: . == "public_exact_host" or . == "public_path_or_multi_destination" or . == "preview_worker" or . == "worker";
+              def allowed_reason: . == "service-token-binding-missing"
+                or . == "service-token-binding-ambiguous"
+                or . == "service-auth-policy-missing"
+                or . == "service-auth-policy-conflict"
+                or . == "access-application-ambiguous-or-unresolved"
+                or . == "service-token-invalid-or-ambiguous"
+                or . == "access-scope-not-repair-eligible"
+                or . == "provider-read-credential-missing"
+                or . == "provider-read-failed"
+                or . == "bounded-check-failed";
               length == 1 and (.[0]
                 | type == "object"
                 and .schemaVersion == 1
                 and .scope == "chief-proofmode-access-recovery"
                 and (.observedAt | iso8601)
                 and (.mode == "check" or .mode == "repair")
-                and .state == "configured"
+                and (.state == "configured" or .state == "blocked")
                 and (.mutationPerformed | type == "boolean")
                 and .targetOrigin == $target
-                and (.accessScope == "public_exact_host" or .accessScope == "public_path_or_multi_destination" or .accessScope == "preview_worker" or .accessScope == "worker")
-                and (.applicationId | type == "string" and length > 0 and length <= 200)
-                and (.policyId == null or (.policyId | type == "string" and length <= 200))
-                and (.serviceTokenId | type == "string" and length > 0 and length <= 200)
+                and (
+                  if .state == "configured" then
+                    (.accessScope | allowed_scope)
+                    and (.applicationId | type == "string" and length > 0 and length <= 200)
+                    and (.policyId == null or (.policyId | type == "string" and length <= 200))
+                    and (.serviceTokenId | type == "string" and length > 0 and length <= 200)
+                    and (.reasonCode == null)
+                  else
+                    .mutationPerformed == false
+                    and (.reasonCode | allowed_reason)
+                    and (.accessScope == null)
+                    and (.applicationId == null)
+                    and (.policyId == null)
+                    and (.serviceTokenId == null)
+                  end
+                )
               )
             ' "$path" >/dev/null 2>&1
           }
@@ -243,9 +266,15 @@ jobs:
               echo '- Current provider truth: `UNKNOWN`'
             else
               echo '- Current provider receipt: `present`'
+              receipt_state="$(jq -r '.state' "$current_receipt")"
+              if [[ "$receipt_state" == 'blocked' ]]; then
+                echo '- Current provider truth: `BLOCKED`'
+              else
+                echo '- Current provider truth: `CONFIGURED`'
+              fi
               echo
               echo '```json'
-              jq -s '.[0] | {schemaVersion, scope, observedAt, mode, state, mutationPerformed, targetOrigin, accessScope, applicationId, policyId, serviceTokenId}' "$current_receipt"
+              jq -s '.[0] | if .state == "blocked" then {schemaVersion, scope, observedAt, mode, state, mutationPerformed, targetOrigin, reasonCode} else {schemaVersion, scope, observedAt, mode, state, mutationPerformed, targetOrigin, accessScope, applicationId, policyId, serviceTokenId} end' "$current_receipt"
               echo '```'
             fi
 
@@ -256,7 +285,7 @@ jobs:
                 echo '- Mutation receipt: `present`'
                 echo
                 echo '```json'
-                jq -s '.[0] | {schemaVersion, scope, observedAt, mode, state, mutationPerformed, targetOrigin, accessScope, applicationId, policyId, serviceTokenId}' "$mutation_receipt"
+                jq -s '.[0] | if .state == "blocked" then {schemaVersion, scope, observedAt, mode, state, mutationPerformed, targetOrigin, reasonCode} else {schemaVersion, scope, observedAt, mode, state, mutationPerformed, targetOrigin, accessScope, applicationId, policyId, serviceTokenId} end' "$mutation_receipt"
                 echo '```'
               fi
             fi

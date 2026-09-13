@@ -4,6 +4,7 @@
   const nativeFetch = window.fetch.bind(window);
   const privilegedActions = new Set(['create_branch', 'merge']);
   const executePath = /^\/approvals\/([^/]+)\/execute$/;
+  const proofGatePath = /^\/approvals\/([^/]+)\/run-proof-gate$/;
   const HASH = /^[0-9a-f]{64}$/i;
   const FULL_SHA = /^[0-9a-f]{40}$/i;
   const FOUNDER_DECISION_CONTRACT = 'juss-v10/founder-control-decision@v1';
@@ -57,6 +58,60 @@
       throw new Error('PromptOS decision hash must be the exact 64-character SHA-256 from the validated Chief decision.');
     }
     return value;
+  }
+
+  function readFounderFinalReview(form) {
+    const rawPullRequestNumber = form?.querySelector('input[name="founderFinalPullRequestNumber"]')?.value.trim() ?? '';
+    const confirmExactCandidate = form?.querySelector('input[name="founderFinalConfirmExactCandidate"]')?.checked === true;
+
+    if (!rawPullRequestNumber && !confirmExactCandidate) return null;
+    if (!rawPullRequestNumber) {
+      throw new Error('Founder Final requires the exact pull request number.');
+    }
+
+    const pullRequestNumber = Number(rawPullRequestNumber);
+    if (!Number.isInteger(pullRequestNumber) || pullRequestNumber <= 0) {
+      throw new Error('Founder Final pull request number must be a positive integer.');
+    }
+    if (!confirmExactCandidate) {
+      throw new Error('Founder Final requires explicit confirmation of the exact PR/base/head candidate.');
+    }
+
+    return { pullRequestNumber, confirmExactCandidate: true };
+  }
+
+  function addFounderFinalFields(form, surface) {
+    if (!form || form.querySelector('[data-founder-final-bridge]')) return;
+
+    const wrapper = document.createElement('div');
+    wrapper.dataset.founderFinalBridge = surface;
+    wrapper.innerHTML = `
+      <label>FCR pull request number (Founder Final)</label>
+      <input
+        name="founderFinalPullRequestNumber"
+        inputmode="numeric"
+        pattern="[1-9][0-9]*"
+        autocomplete="off"
+        aria-describedby="founder-final-help-${surface}"
+        placeholder="787"
+      />
+      <label style="display:flex; align-items:flex-start; gap:0.5rem; margin-top:0.5rem;">
+        <input
+          type="checkbox"
+          name="founderFinalConfirmExactCandidate"
+          value="true"
+          style="width:auto; margin-top:0.2rem;"
+        />
+        <span>I confirm this exact PR/base/head candidate.</span>
+      </label>
+      <p class="muted" id="founder-final-help-${surface}">
+        Required for Founder Control Room merges only. The PR number is scope metadata, not authority by itself.
+        The authenticated founder action, fresh proof, exact provider readback, and server-owned policy remain load-bearing.
+      </p>
+    `;
+
+    const submitRow = form.querySelector('button[type="submit"]')?.parentElement ?? null;
+    form.insertBefore(wrapper, submitRow);
   }
 
   function addAuthorityFields(form, actionType) {
@@ -250,6 +305,8 @@
   }
 
   function augmentPrivilegedForms() {
+    addFounderFinalFields(document.querySelector('#proof-gate-form'), 'proof-gate');
+    addFounderFinalFields(document.querySelector('#execute-merge-form'), 'execute-merge');
     addAuthorityFields(document.querySelector('#create-branch-form'), 'create_branch');
     addAuthorityFields(document.querySelector('#execute-merge-form'), 'merge');
     applyEvidenceBackedCompletionClaim();
@@ -266,8 +323,9 @@
     const url = new URL(requestUrl, window.location.origin);
     const method = String(init.method ?? (input instanceof Request ? input.method : 'GET')).toUpperCase();
     const executeMatch = url.pathname.match(executePath);
+    const proofGateMatch = url.pathname.match(proofGatePath);
 
-    if (method !== 'POST' || !executeMatch || typeof init.body !== 'string') {
+    if (method !== 'POST' || typeof init.body !== 'string') {
       return nativeFetch(input, init);
     }
 
@@ -278,7 +336,17 @@
       return nativeFetch(input, init);
     }
 
-    if (!body || !privilegedActions.has(body.actionType)) {
+    if (proofGateMatch && body?.gateId === 'merge') {
+      const founderFinalReview = body.founderFinalReview
+        ?? readFounderFinalReview(document.querySelector('#proof-gate-form'));
+      if (!founderFinalReview) return nativeFetch(input, init);
+      return nativeFetch(input, {
+        ...init,
+        body: JSON.stringify({ ...body, founderFinalReview }),
+      });
+    }
+
+    if (!executeMatch || !body || !privilegedActions.has(body.actionType)) {
       return nativeFetch(input, init);
     }
 
@@ -290,8 +358,14 @@
       const promptOSDecisionHash = String(body.promptOSDecisionHash ?? readPromptOSDecisionHash()).trim().toLowerCase();
       const founderDecision = body.founderDecision
         ?? await createFounderMergeDecision(decodeURIComponent(executeMatch[1]), capabilityPlan, decisionReceipt);
+      const payload = body.payload && typeof body.payload === 'object' && !Array.isArray(body.payload)
+        ? body.payload
+        : {};
+      const founderFinalReview = payload.founderFinalReview
+        ?? readFounderFinalReview(formForAction('merge'));
       nextBody = {
         ...nextBody,
+        ...(founderFinalReview ? { payload: { ...payload, founderFinalReview } } : {}),
         decisionReceipt,
         promptOSDecisionHash,
         founderDecision,

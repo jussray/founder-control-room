@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<meta name="description" content="Founder Control Room experience architecture: public user view, member founder workspace, and the founder-only FCR owner control plane." />
+<title>FCR experience architecture · Founder Control Room</title>
+<link rel="stylesheet" href="/control-room/founder-shell.css" />
+</head>
+<body>
+<main class="experience-shell" data-fcr-experience>
+  <header class="masthead">
+    <a class="brand" href="/" aria-label="Founder Control Room home">
+      <span class="brand-mark" aria-hidden="true">F</span>
+      <span><strong>FCR</strong><small>Founder Control Room</small></span>
+    </a>
+    <a class="model-pill" href="#account-boundary">Two account classes · three views</a>
+  </header>
+
+  <section class="hero" aria-labelledby="experience-title">
+    <div class="hero-copy">
+      <p class="eyebrow">People · ideas · progress</p>
+      <h1 id="experience-title">One mission.<br /><span>Three lenses.</span></h1>
+      <p class="lede">The cinematic FCR look, grounded in the real product: a public discovery layer, a bounded founder workspace, and a separate owner control plane where authority, proof, portfolio operations, and recovery live.</p>
+      <div class="hero-actions">
+        <a class="button button-primary" href="#views">See the views</a>
+        <a class="button" href="/control-room/">Enter owner Control Room</a>
+      </div>
+    </div>
+    <div class="mission-card" aria-label="FCR mission">
+      <span class="mission-line">Truth.</span>
+      <span class="mission-line">Proof.</span>
+      <span class="mission-line accent">Move one thing forward.</span>
+      <p>Same mission. Different authority.</p>
+    </div>
+  </section>
+
+  <section class="views-section" id="views" aria-labelledby="views-title">
+    <div class="section-heading">
+      <p class="eyebrow">Experience architecture</p>
+      <h2 id="views-title">Simple outside. Serious underneath.</h2>
+      <p>Visual language is shared. Permissions are not.</p>
+    </div>
+
+    <div class="role-grid">
+      <article class="view-card user-view" data-account-class="member" data-account-view="user" aria-labelledby="user-view-title">
+        <header class="view-topbar">
+          <span class="view-brand">FCR</span>
+          <span class="view-badge">User view</span>
+        </header>
+        <div class="view-hero">
+          <p class="micro">Discover · learn · support · belong</p>
+          <h3 id="user-view-title">Back founders.<br />Build a brighter tomorrow.</h3>
+          <p>Explore real products, useful ideas, founder stories, and ways to participate without exposing private operating state.</p>
+          <a class="mini-cta" href="/">Explore FCR <span aria-hidden="true">→</span></a>
+        </div>
+        <div class="platform-strip" aria-label="Featured ecosystem surfaces">
+          <div><span class="platform-icon blue">B</span><strong>Se’kret Bip</strong><small>Platform</small></div>
+          <div><span class="platform-icon violet">C</span><strong>Chief AI</strong><small>FCR capability</small></div>
+          <div><span class="platform-icon pink">S</span><strong>StoryEngine</strong><small>Media capability</small></div>
+          <div><span class="platform-icon gold">J</span><strong>Juss Beautiful Hair</strong><small>Commerce</small></div>
+        </div>
+        <div class="view-footer"><span>Public/member surface</span><span>No owner authority</span></div>
+      </article>
+
+      <article class="view-card founder-view" data-account-class="member" data-account-view="founder" aria-labelledby="founder-view-title">
+        <header class="view-topbar">
+          <span class="view-brand">FCR</span>
+          <span class="view-badge">Founder view</span>
+        </header>
+        <div class="view-hero compact">
+          <p class="micro">Build · fix · grow · prove</p>
+          <h3 id="founder-view-title">Your work. Your evidence. Your next gate.</h3>
+          <p>A founder workspace is scoped to that founder’s own projects and evidence. It never inherits the FCR owner’s portfolio authority.</p>
+        </div>
+        <div class="metric-grid" aria-label="Founder workspace priorities">
+          <div><small>Projects</small><strong>Own work</strong></div>
+          <div><small>Proof</small><strong>Evidence</strong></div>
+          <div><small>Growth</small><strong>Signals</strong></div>
+          <div><small>Next</small><strong>One gate</strong></div>
+        </div>
+        <div class="focus-panel">
+          <p class="panel-label">Today’s focus</p>
+          <ul>
+            <li><span class="check">✓</span> See project reality</li>
+            <li><span class="dot"></span> Repair one blocker</li>
+            <li><span class="dot"></span> Verify the real path</li>
+          </ul>
+        </div>
+        <div class="view-footer"><span>Member account · founder mode</span><span>Project-scoped</span></div>
+      </article>
+
+      <article class="view-card owner-view" data-account-class="owner" data-account-view="fcr-owner" aria-labelledby="owner-view-title">
+        <header class="view-topbar">
+          <span class="view-brand crown">♛ FCR</span>
+          <span class="view-badge owner-badge">THE FCR Founder</span>
+        </header>
+        <div class="view-hero compact">
+          <p class="micro">Portfolio owner · control plane</p>
+          <h3 id="owner-view-title">See the whole system without blurring truth.</h3>
+          <p>The existing founder-gated Control Room remains the only surface with portfolio operating authority.</p>
+        </div>
+        <div class="metric-grid owner-metrics" aria-label="Owner control plane priorities">
+          <div><small>Portfolio</small><strong>Truth-bound</strong></div>
+          <div><small>Proof</small><strong>Exact-head</strong></div>
+          <div><small>Authority</small><strong>Founder-gated</strong></div>
+          <div><small>Recovery</small><strong>Reversible</strong></div>
+        </div>
+        <div class="control-stack">
+          <a href="/control-room/?tab=projects"><span>Projects</span><small>Reality + status</small></a>
+          <a href="/control-room/evidence-trust.html"><span>Proof</span><small>Evidence planes</small></a>
+          <a href="/control-room/plugin-center.html"><span>Capabilities</span><small>Connection ≠ authority</small></a>
+          <a href="/control-room/founder-shell.html#account-boundary"><span>Account boundary</span><small>No privilege inheritance</small></a>
+        </div>
+        <a class="owner-cta" href="/control-room/">Enter authenticated Control Room <span aria-hidden="true">→</span></a>
+        <div class="view-footer"><span>Owner account</span><span>Founder-gated</span></div>
+      </article>
+    </div>
+  </section>
+
+  <section class="authority-map" id="account-boundary" aria-labelledby="boundary-title">
+    <div>
+      <p class="eyebrow">Authority boundary</p>
+      <h2 id="boundary-title">Two account classes. No accidental crown.</h2>
+    </div>
+    <div class="boundary-grid">
+      <article>
+        <span class="class-label">Class 01 · Member</span>
+        <h3>User or founder mode</h3>
+        <p>A member may use the public user view or a founder workspace scoped to their own work. Switching views changes presentation and available product features, never owner authority.</p>
+      </article>
+      <article class="owner-boundary">
+        <span class="class-label">Class 02 · FCR owner</span>
+        <h3>THE FCR Founder</h3>
+        <p>The owner account is a separate authority class. It controls portfolio-level operations, approvals, evidence, recovery, and system configuration through the existing founder-gated session.</p>
+      </article>
+    </div>
+    <p class="truth-note"><strong>Runtime truth:</strong> the owner/founder-gated session exists today. General member authentication and founder multi-tenancy are an explicit future implementation gate, not something this visual shell pretends is already live.</p>
+  </section>
+
+  <footer>
+    <span>FCR · People. Ideas. Progress.</span>
+    <span>Truth · Proof · Impact</span>
+  </footer>
+</main>
+</body>
+</html>

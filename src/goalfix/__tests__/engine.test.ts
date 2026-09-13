@@ -43,10 +43,17 @@ describe('buildGoalfixReport', () => {
     expect(report.evidence.unknown).toContain('Missing required exact-head verification signal: Typecheck.');
     expect(report.evidence.unknown).toContain('Missing required exact-head verification signal: Playwright.');
     expect(report.evidence.unknown).toContain(`No exact-head verification signals were returned for ${SHA}.`);
+    expect(report.bottleneck).toMatchObject({
+      kind: 'missing_verification',
+      evidenceState: 'VERIFIED',
+      freezesUnrelatedWork: false,
+    });
+    expect(report.bottleneck.statement).toContain('Typecheck, Playwright');
+    expect(report.bottleneck.smallestSafeRemoval).toContain('do not freeze unrelated capabilities');
     expect(report.fix).toEqual(['No fix was applied. Goalfix v1 stops at inspection and founder decision authority.']);
   });
 
-  it('blocks on any exact-head failed signal', () => {
+  it('blocks on any exact-head failed signal and names it as the bottleneck', () => {
     const report = buildGoalfixReport(baseInput({
       verificationSignals: [{
         id: 'check-1',
@@ -61,6 +68,13 @@ describe('buildGoalfixReport', () => {
     expect(report.evidence.blocked).toEqual([
       `Product Design Playwright Proof: failed at ${SHA}`,
     ]);
+    expect(report.bottleneck).toMatchObject({
+      kind: 'failed_verification',
+      evidenceState: 'VERIFIED',
+      freezesUnrelatedWork: false,
+    });
+    expect(report.bottleneck.statement).toContain('Product Design Playwright Proof');
+    expect(report.bottleneck.smallestSafeRemoval).toContain('repair only its verified root cause');
     expect(report.nextGate).toContain('repair only its verified root cause');
   });
 
@@ -99,6 +113,12 @@ describe('buildGoalfixReport', () => {
     expect(report.evidence.blocked).toEqual([]);
     expect(report.proof).toContain(`Playwright: passed at ${SHA}`);
     expect(report.proof).not.toContain(`Playwright: failed at ${SHA}`);
+    expect(report.bottleneck).toMatchObject({
+      kind: 'founder_decision',
+      evidenceState: 'VERIFIED',
+      freezesUnrelatedWork: false,
+    });
+    expect(report.bottleneck.statement).toContain('No technical proof bottleneck');
   });
 
   it('does not declare readiness when one named required check is absent', () => {
@@ -110,7 +130,26 @@ describe('buildGoalfixReport', () => {
 
     expect(report.readiness).toBe('waiting_for_evidence');
     expect(report.evidence.unknown).toContain('Missing required exact-head verification signal: Playwright.');
+    expect(report.bottleneck.kind).toBe('missing_verification');
+    expect(report.bottleneck.statement).toContain('Playwright');
     expect(report.nextGate).toContain('every named required exact-head verification');
+  });
+
+  it('identifies unfinished proof without freezing unrelated work', () => {
+    const report = buildGoalfixReport(baseInput({
+      verificationSignals: [
+        { id: 'check-1', name: 'Typecheck', status: 'passed', commitSha: SHA, provider: 'github' },
+        { id: 'check-2', name: 'Playwright', status: 'running', commitSha: SHA, provider: 'github' },
+      ],
+    }));
+
+    expect(report.readiness).toBe('waiting_for_evidence');
+    expect(report.bottleneck).toMatchObject({
+      kind: 'incomplete_verification',
+      evidenceState: 'VERIFIED',
+      freezesUnrelatedWork: false,
+    });
+    expect(report.bottleneck.smallestSafeRemoval).toContain('unrelated already-authorized work');
   });
 
   it('becomes decision-ready only when every named exact-head signal passed', () => {
@@ -128,6 +167,7 @@ describe('buildGoalfixReport', () => {
     expect(report.reality).toContain(
       'This inspection performed no repository, provider, deployment, product-data, CRM, or publication mutation. The route may retain one sanitized internal access-audit event.',
     );
+    expect(report.reality.some((line) => line.startsWith('Bottleneck:'))).toBe(true);
     expect(report.rollback[0]).toContain('retain any sanitized audit event as historical evidence');
   });
 
@@ -148,6 +188,8 @@ describe('buildGoalfixReport', () => {
     expect(report.evidence.unknown).toContain(
       'No required verification signal names were supplied; decision readiness cannot be established.',
     );
+    expect(report.bottleneck.kind).toBe('missing_verification');
+    expect(report.bottleneck.statement).toContain('no required exact-head verification names');
   });
 
   it('ignores proof from a different commit instead of creating a false green', () => {
@@ -166,5 +208,6 @@ describe('buildGoalfixReport', () => {
     expect(report.evidence.unknown).toContain(
       '1 verification signal(s) were ignored because their commit SHA did not match the inspected head.',
     );
+    expect(report.bottleneck.kind).toBe('missing_verification');
   });
 });
