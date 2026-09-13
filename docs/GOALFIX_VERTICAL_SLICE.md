@@ -4,6 +4,23 @@
 
 Turn a messy founder goal into one bounded, proof-first repository inspection without granting the Control Room standing target-system mutation authority.
 
+## AI role and honest submission framing
+
+Founder Control Room is an AI-powered founder operating system. Model-backed intelligence runs through bounded FCR capabilities, while Goalfix / TruthMode is the truth, authority, evidence, continuity, and verification layer that governs what may be claimed or acted on.
+
+Goalfix v1 does **not** currently claim to call a language model directly. Its job is to establish repository reality, classify evidence, bind proof to the exact source state, expose stale-proof drift, and stop before mutation unless a separate founder-approved action exists.
+
+Submission-safe framing:
+
+> Founder Control Room is an AI-powered founder operating system where model-backed intelligence operates inside a governed truth-and-evidence layer. TruthMode / Goalfix establishes reality, constrains authority, tracks continuity, and requires verifiable proof before completion claims are promoted.
+
+Truth boundary:
+
+- model-backed intelligence elsewhere in FCR does not make every Goalfix operation model-generated;
+- do not describe a Goalfix result as LLM-generated unless an actual Goalfix model call is proved for that path;
+- provider acceptance or model output is not a verified founder outcome;
+- continuity fingerprints and proof cookies remain evidence-only and never become AI authority, founder approval, authentication, merge authority, or mutation permission.
+
 ## Runtime path
 
 ```text
