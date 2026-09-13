@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { Router } from 'express';
+import { localDocumentToMarkdownCapability } from '../../capabilities/localDocumentConversion.js';
 import { capabilities } from '../../capabilities/workbenchRegistry.js';
 import { enqueueReconcile } from '../../events/outbox.js';
 import { supabase } from '../../lib/supabaseClient.js';
@@ -11,12 +12,13 @@ capabilitiesRouter.use(requireFounder);
 
 const PROJECT_HEALTH_CAPABILITY_ID = 'project-health-refresh-v1';
 const PROJECT_HEALTH_RESOURCE_PREFIX = `capability:${PROJECT_HEALTH_CAPABILITY_ID}:invocation:`;
+const REVIEWED_CAPABILITIES = [localDocumentToMarkdownCapability, ...capabilities];
 const DYNAMIC_CAPABILITIES = new Map([
   [PROJECT_HEALTH_CAPABILITY_ID, { controller: 'ProjectController', resourcePrefix: PROJECT_HEALTH_RESOURCE_PREFIX }],
 ]);
 
 capabilitiesRouter.get('/', (_req, res) => {
-  res.set('Cache-Control', 'no-store').json({ capabilities });
+  res.set('Cache-Control', 'no-store').json({ capabilities: REVIEWED_CAPABILITIES });
 });
 
 capabilitiesRouter.post('/:capabilityId/runs', async (req: FounderRequest, res) => {
