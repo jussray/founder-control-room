@@ -168,7 +168,7 @@ export async function observeMainReleaseProvenance({
   }
 
   try {
-    const [mainBranch, associatedPulls] = await Promise.all([
+    const [initialMainBranch, associatedPulls] = await Promise.all([
       fetchGithubJson(fetchImpl, `${GITHUB_API_BASE}/repos/${repo}/branches/main`, token),
       fetchGithubJson(fetchImpl, `${GITHUB_API_BASE}/repos/${repo}/commits/${target}/pulls`, token),
     ]);
@@ -177,7 +177,7 @@ export async function observeMainReleaseProvenance({
     // keeps a missing reviewed tip from being laundered by successor evidence.
     const tipResult = classifyMainReleaseProvenance({
       targetSha: target,
-      currentMainSha: mainBranch?.commit?.sha,
+      currentMainSha: initialMainBranch?.commit?.sha,
       associatedPulls,
     });
     if (!tipResult.ok) {
@@ -196,9 +196,18 @@ export async function observeMainReleaseProvenance({
       token,
     });
 
+    // Main is mutable while the immutable successor chain is being observed.
+    // Re-read it at the final decision boundary so a target that became stale
+    // during the provider walk cannot inherit the earlier current-main read.
+    const finalMainBranch = await fetchGithubJson(
+      fetchImpl,
+      `${GITHUB_API_BASE}/repos/${repo}/branches/main`,
+      token,
+    );
+
     const result = classifyMainReleaseProvenance({
       targetSha: target,
-      currentMainSha: mainBranch?.commit?.sha,
+      currentMainSha: finalMainBranch?.commit?.sha,
       associatedPulls,
       terminalRatifiedTip: terminal,
       successorCommits,
