@@ -1,0 +1,159 @@
+name: n8n Conveyor Probe Command
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  actions: write
+  issues: read
+
+concurrency:
+  group: n8n-conveyor-probe-command
+  cancel-in-progress: false
+
+jobs:
+  dispatch:
+    name: Dispatch bounded exact-head n8n conveyor probe
+    if: >-
+      github.event.issue.number == 299 &&
+      github.event.comment.user.login == 'jussray' &&
+      startsWith(github.event.comment.body, '/probe-n8n-conveyor ')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Parse founder probe command
+        id: command
+        env:
+          COMMAND_BODY: ${{ github.event.comment.body }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import base64
+          import json
+          import os
+          import re
+
+          body = os.environ.get('COMMAND_BODY', '').strip()
+          parts = body.split()
+          if len(parts) != 3 or parts[0] != '/probe-n8n-conveyor':
+              raise SystemExit('Expected exactly: /probe-n8n-conveyor <40-char-main-sha> <base64url-capability-plan-json>')
+
+          sha, encoded_plan = parts[1], parts[2]
+          if not re.fullmatch(r'[0-9a-f]{40}', sha):
+              raise SystemExit('Probe SHA must be a lowercase 40-character commit SHA.')
+          if not re.fullmatch(r'[A-Za-z0-9_-]{16,12000}', encoded_plan):
+              raise SystemExit('Capability plan token must be unpadded base64url and remain within the bounded command size.')
+
+          padding = '=' * (-len(encoded_plan) % 4)
+          try:
+              raw = base64.urlsafe_b64decode(encoded_plan + padding)
+              if len(raw) > 9000:
+                  raise ValueError('decoded capability plan exceeds 9000 bytes')
+              plan = json.loads(raw.decode('utf-8'))
+          except Exception as error:
+              raise SystemExit(f'Capability plan could not be decoded as bounded UTF-8 JSON: {error}')
+
+          if not isinstance(plan, dict):
+              raise SystemExit('Capability plan must be one JSON object.')
+
+          plan_fields = {
+              'contract', 'selectedBy', 'goal', 'projectSlug', 'expectedHeadSha',
+              'registryHash', 'requestedAuthority', 'strategicLenses', 'routingReason',
+              'capabilities', 'proofRequirements', 'outcomeSignals', 'rollback', 'planHash',
+          }
+          if set(plan) != plan_fields:
+              raise SystemExit('Capability plan must contain exactly the canonical v1 fields.')
+          if plan.get('contract') != 'juss-v10/capability-plan@v1':
+              raise SystemExit('Capability plan contract is unsupported.')
+          if plan.get('selectedBy') != 'chief-ai-machine':
+              raise SystemExit('Capability plan must be selected by Chief AI Machine.')
+          if plan.get('projectSlug') != 'founder-control-room':
+              raise SystemExit('Capability plan project must be founder-control-room.')
+          if str(plan.get('expectedHeadSha', '')).lower() != sha:
+              raise SystemExit('Capability plan expectedHeadSha must equal the exact command SHA.')
+          if plan.get('requestedAuthority') != 'draft':
+              raise SystemExit('n8n activation probe command is draft-authority only.')
+          if not re.fullmatch(r'[0-9a-f]{64}', str(plan.get('registryHash', '')).lower()):
+              raise SystemExit('Capability plan registryHash must be sha256.')
+          if not re.fullmatch(r'[0-9a-f]{64}', str(plan.get('planHash', '')).lower()):
+              raise SystemExit('Capability plan planHash must be sha256.')
+
+          capabilities = plan.get('capabilities')
+          if not isinstance(capabilities, list) or len(capabilities) != 1:
+              raise SystemExit('Probe capability plan must contain exactly one capability.')
+          capability = capabilities[0]
+          capability_fields = {'id', 'version', 'origin', 'owner', 'sourceHash', 'authorityCeiling'}
+          if not isinstance(capability, dict) or set(capability) != capability_fields:
+              raise SystemExit('Probe capability must contain exactly the canonical capability fields.')
+          if capability.get('id') != 'n8n-live-probe':
+              raise SystemExit('Probe capability id must be n8n-live-probe.')
+          if capability.get('origin') != 'repo-native':
+              raise SystemExit('Probe capability must remain repo-native.')
+          if capability.get('owner') != 'chief-ai-machine':
+              raise SystemExit('Probe capability owner must remain chief-ai-machine.')
+          if capability.get('authorityCeiling') not in {'reason', 'draft'}:
+              raise SystemExit('Probe capability authority ceiling may not exceed draft.')
+          if not re.fullmatch(r'[0-9a-f]{64}', str(capability.get('sourceHash', '')).lower()):
+              raise SystemExit('Probe capability sourceHash must be sha256.')
+
+          compact_plan = json.dumps(plan, separators=(',', ':'), ensure_ascii=False)
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
+              output.write(f'target_sha={sha}\n')
+              output.write(f'capability_plan_json={compact_plan}\n')
+          PY
+
+      - name: Verify requested SHA is current main
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_SHA: ${{ steps.command.outputs.target_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          CURRENT_MAIN_SHA="$(curl --fail --silent --show-error \
+            -H 'Accept: application/vnd.github+json' \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H 'X-GitHub-Api-Version: 2022-11-28' \
+            "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/git/ref/heads/main" \
+            | jq -r '.object.sha')"
+
+          echo "Requested exact head: $TARGET_SHA"
+          echo "Current main:         $CURRENT_MAIN_SHA"
+          test "$CURRENT_MAIN_SHA" = "$TARGET_SHA"
+
+      - name: Dispatch manual n8n conveyor live probe
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_SHA: ${{ steps.command.outputs.target_sha }}
+          CAPABILITY_PLAN_JSON: ${{ steps.command.outputs.capability_plan_json }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          payload="$(jq -n \
+            --arg ref main \
+            --arg sha "$TARGET_SHA" \
+            --arg plan "$CAPABILITY_PLAN_JSON" \
+            '{ref:$ref, inputs:{target_sha:$sha, capability_plan_json:$plan}}')"
+
+          curl --fail --silent --show-error \
+            -X POST \
+            -H 'Accept: application/vnd.github+json' \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H 'X-GitHub-Api-Version: 2022-11-28' \
+            "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/actions/workflows/n8n-conveyor-live-probe.yml/dispatches" \
+            --data "$payload"
+
+          {
+            echo '## n8n conveyor live probe dispatched'
+            echo
+            echo "- Exact head: \`$TARGET_SHA\`"
+            echo '- Authority: founder comment on canonical downstream provider issue #299'
+            echo "- Evidence cookie: issue comment \`${{ github.event.comment.id }}\`"
+            echo '- Target workflow: `.github/workflows/n8n-conveyor-live-probe.yml`'
+            echo '- Capability authority: draft only'
+            echo '- Merge/deploy/publish/send-external authority: none'
+            echo '- Direct provider/database/secret mutation in this bridge: none'
+          } >> "$GITHUB_STEP_SUMMARY"
