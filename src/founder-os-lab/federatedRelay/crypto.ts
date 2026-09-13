@@ -79,6 +79,7 @@ export function decodeBase64UrlV31(value: string): Uint8Array {
     throw new RelayV31Error('relay_signature_base64url_invalid');
   }
   assert(decoded.byteLength === 64, 'relay_signature_length_invalid');
+  assert(decoded.toString('base64url') === value, 'relay_signature_base64url_noncanonical');
   return Uint8Array.from(decoded);
 }
 
