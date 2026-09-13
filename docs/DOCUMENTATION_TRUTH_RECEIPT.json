@@ -1,14 +1,14 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Bind the create-branch runtime authority membrane to current operator documentation without promoting source or CI evidence into a claim that a live GitHub branch mutation occurred.",
+  "purpose": "Bind the merge-authority canon refresh to current operator documentation while preserving the distinction between available merge capability, exact-candidate founder approval, exact-head proof, and execution authority.",
   "domains": [
-    "merge-authority"
+    "truth-governance"
   ],
   "changes": [
     {
-      "path": "src/http/routes/approvals.ts",
+      "path": "docs/CLAUDE_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC.md",
       "claims": [
-        "src/http/routes/approvals.ts must allow create_branch to reach RepositoryProvider.createBranch only after fresh create_branch proof and authenticated founder intent issue a server-owned AuthorityEnvelopeV1, the execution is reserved under the same idempotency key, current mission state is re-read immediately before mutation, and the original envelope passes exact capability, scope, arguments, state, tool-call, expiry, idempotency, and integrity validation through executeAuthorizedCreateBranch; any drift must fail closed before provider mutation and an ambiguous pending outcome requires reconciliation before retry."
+        "docs/CLAUDE_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC.md must require fresh explicit founder merge approval bound to the exact repository, pull request, current base SHA, and current head SHA; it must never treat merge_authority: true, review requests, broad approval language, mergeability, or green checks as candidate-specific merge authorization, and any base/head movement requires a new founder ask before integration."
       ]
     }
   ]

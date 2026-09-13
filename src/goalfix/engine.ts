@@ -1,4 +1,5 @@
 import type { RepositoryRef, VerificationSignal } from '../providers/RepositoryProvider.js';
+import { fingerprintNormalized, type ProofCookieContract } from '../security/attack20V3.js';
 
 export type GoalfixReadiness = 'ready_for_founder_decision' | 'blocked' | 'waiting_for_evidence';
 export type GoalfixBottleneckKind =
@@ -48,6 +49,16 @@ export interface GoalfixBottleneck {
   freezesUnrelatedWork: false;
 }
 
+export interface GoalfixContinuity {
+  contract: 'goalfix-continuity-v1';
+  sourceFingerprint: string;
+  evidenceFingerprint: string;
+  proofCookie: ProofCookieContract;
+  authority: 'EVIDENCE_ONLY';
+  browserCookieStored: false;
+  invalidatesOn: readonly string[];
+}
+
 export interface GoalfixReport {
   version: 'goalfix-v1';
   observedAt: string;
@@ -62,6 +73,7 @@ export interface GoalfixReport {
   goal: FounderGoal;
   evidence: GoalfixEvidence;
   bottleneck: GoalfixBottleneck;
+  continuity: GoalfixContinuity;
   reality: string[];
   fix: string[];
   proof: string[];
@@ -177,7 +189,63 @@ function resolveBottleneck(args: {
   };
 }
 
+function buildContinuity(input: {
+  project: GoalfixProject;
+  target: RepositoryRef;
+  expectedVerificationNames: string[];
+  latestSignals: VerificationSignal[];
+  readiness: GoalfixReadiness;
+  observedAt: string;
+}): GoalfixContinuity {
+  const sourceFingerprint = fingerprintNormalized({
+    repository: input.project.repository,
+    provider: input.project.provider,
+    ref: input.target.name,
+    commitSha: input.target.commitSha.toLowerCase(),
+  });
+  const evidenceFingerprint = fingerprintNormalized({
+    sourceFingerprint,
+    readiness: input.readiness,
+    requiredChecks: input.expectedVerificationNames.map(normalizeSignalName).sort(),
+    signals: input.latestSignals
+      .map((signal) => ({
+        id: signal.id,
+        name: normalizeSignalName(signal.name),
+        status: signal.status,
+        commitSha: signal.commitSha.toLowerCase(),
+        provider: signal.provider,
+        startedAt: signal.startedAt ?? null,
+        completedAt: signal.completedAt ?? null,
+      }))
+      .sort((left, right) => `${left.name}:${left.id}`.localeCompare(`${right.name}:${right.id}`)),
+  });
+  const proofCookie: ProofCookieContract = {
+    cookieId: `goalfix-proof-${fingerprintNormalized({ sourceFingerprint, evidenceFingerprint, observedAt: input.observedAt }).slice(0, 24)}`,
+    contextType: 'verification-run',
+    owner: 'goalfix-read-only-inspector',
+    createdAt: input.observedAt,
+    expiresAt: null,
+    parentCookieId: null,
+  };
+
+  return {
+    contract: 'goalfix-continuity-v1',
+    sourceFingerprint,
+    evidenceFingerprint,
+    proofCookie,
+    authority: 'EVIDENCE_ONLY',
+    browserCookieStored: false,
+    invalidatesOn: [
+      'authoritative target commit changes',
+      'required exact-head check set changes',
+      'exact-head verification evidence changes',
+      'repository or provider binding changes',
+    ],
+  };
+}
+
 export function buildGoalfixReport(input: BuildGoalfixReportInput): GoalfixReport {
+  const observedAt = (input.observedAt ?? new Date()).toISOString();
   const expectedSha = input.target.commitSha.toLowerCase();
   const expectedVerificationNames = uniqueExpectedNames(input.goal.expectedVerificationNames);
   const expectedNameKeys = new Set(expectedVerificationNames.map(normalizeSignalName));
@@ -213,6 +281,15 @@ export function buildGoalfixReport(input: BuildGoalfixReportInput): GoalfixRepor
     readiness = 'ready_for_founder_decision';
   }
 
+  const continuity = buildContinuity({
+    project: input.project,
+    target: input.target,
+    expectedVerificationNames,
+    latestSignals,
+    readiness,
+    observedAt,
+  });
+
   const verified = [
     `Resolved ${input.target.name} to immutable commit ${input.target.commitSha}.`,
     ...passed.map(describeSignal),
@@ -246,6 +323,9 @@ export function buildGoalfixReport(input: BuildGoalfixReportInput): GoalfixRepor
     ...(latestSignals.length > 0
       ? latestSignals.map(describeSignal)
       : [`No exact-head provider proof exists yet for ${input.target.commitSha}.`]),
+    `Continuity source fingerprint: ${continuity.sourceFingerprint}.`,
+    `Continuity evidence fingerprint: ${continuity.evidenceFingerprint}.`,
+    `Proof cookie: ${continuity.proofCookie.cookieId} (evidence-only; never authorization).`,
   ];
 
   const nextGate = readiness === 'blocked'
@@ -264,7 +344,7 @@ export function buildGoalfixReport(input: BuildGoalfixReportInput): GoalfixRepor
 
   return {
     version: 'goalfix-v1',
-    observedAt: (input.observedAt ?? new Date()).toISOString(),
+    observedAt,
     readiness,
     routing: {
       skill: 'goalfix',
@@ -284,6 +364,7 @@ export function buildGoalfixReport(input: BuildGoalfixReportInput): GoalfixRepor
     },
     evidence: { verified, inferred, unknown, blocked },
     bottleneck,
+    continuity,
     reality: [
       `The authoritative repository ref is ${input.target.name} at ${input.target.commitSha}.`,
       `${exactHeadSignals.length} exact-head verification signal(s) were inspected against ${expectedVerificationNames.length} required name(s).`,
@@ -297,6 +378,7 @@ export function buildGoalfixReport(input: BuildGoalfixReportInput): GoalfixRepor
       'Passing repository checks prove only the checks that actually ran, not production behavior or the founder outcome.',
       'Missing named checks, skipped, running, unknown, or mismatched-head evidence must not be presented as green.',
       'A bottleneck may block the dependent claim or action without freezing unrelated capabilities that already have current authority and proof.',
+      'The proof cookie is a non-secret evidence marker in the report, not a browser cookie, founder session, approval token, merge token, or mutation authority.',
     ],
     rollback: ['No target-system rollback is required. Revert the Goalfix code change to remove the surface; retain any sanitized audit event as historical evidence.'],
     nextGate,

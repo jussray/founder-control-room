@@ -5,7 +5,7 @@
 This repository treats pull-request continuity as a machine-enforced proof contract, not a manual cleanup habit.
 
 ```text
-main moves -> trusted main reacquires open PR graph -> same-repo branches roll forward conflict-free -> successor head is a new proof subject -> predecessor CI/review/runtime/Playwright proof expires -> exact-head gates rerun -> merge/deploy authority remains separate
+main moves -> trusted main reacquires open PR graph -> same-repo branches roll forward conflict-free -> successor head is a new proof subject -> predecessor CI/review/runtime/Playwright proof expires -> exact-head gates rerun -> merge capability remains available but exact-candidate founder approval must be reacquired before merge
 ```
 
 ## Rules
@@ -13,13 +13,15 @@ main moves -> trusted main reacquires open PR graph -> same-repo branches roll f
 1. `main` is the root authority; stacked PRs are followed through live base branches.
 2. Rollover uses GitHub `update-branch` with `expected_head_sha`. Never force-push, reset, rebase, delete, or guess through conflicts.
 3. Forks, conflicts, races, malformed managed metadata, and provider uncertainty fail closed.
-4. Every head movement expires predecessor CI, review, runtime, provider, artifact, and browser proof.
+4. Every head movement expires predecessor CI, review, runtime, provider, artifact, browser proof, and any merge approval bound to the predecessor candidate.
 5. `CURRENT` ancestry is not completion; ordinary exact-head and real-path gates still apply.
 6. The machine-managed PR continuity block is always rendered first. It governs present-tense base/head/proof-subject identity and continuity status. Human prose is preserved below it as historical/contextual text; any SHA or status prose below is historical unless it matches the machine block.
 7. Continuity metadata mutation keeps exactly one start/end marker pair. Duplicate, orphaned, or reversed markers fail closed instead of rewriting the PR body.
-8. Continuity receipts never authorize merge, deploy, publish, provider mutation, spend, deletion, or authority expansion.
-9. Write authority runs only from trusted `main`; PR-head code receives read-only continuity verification.
-10. Moving the managed block to the top is a truth-ordering operation only. It never converts source ancestry into runtime, provider, review, Playwright, merge, or deploy proof.
+8. `merge_authority: true` means the merge capability/authority class is available. It does **not** approve the current candidate. Continuity receipts remain non-authorizing and must also state that exact-candidate merge approval is required and currently absent unless a separate authenticated approval receipt proves otherwise.
+9. If explicit founder approval for the exact repository, PR number, live base SHA, and live head SHA is absent, ambiguous, or stale, the agent/operator must ask and stop. Approval never carries across base/head movement.
+10. Continuity receipts never authorize deploy, publish, provider mutation, spend, deletion, or authority expansion.
+11. Write authority runs only from trusted `main`; PR-head code receives read-only continuity verification.
+12. Moving the managed block to the top is a truth-ordering operation only. It never converts source ancestry into runtime, provider, review, Playwright, merge-approval, or deploy proof.
 
 ## Machine current truth precedence
 
@@ -34,19 +36,22 @@ live_head: ...
 proof_subject: ...
 continuity: ...
 proof: ...
-merge_authority: false
+merge_authority: true
+merge_approval: REQUIRED_EXACT_CANDIDATE
+merge_approved: false
+authorizes_merge: false
 deploy_authority: false
 <!-- pr-continuity:end -->
 
 <human/history prose preserved below>
 ```
 
-This removes the ambiguity where stale prose could visually outrank a fresh machine receipt while retaining the historical record for auditability.
+This removes the ambiguity where stale prose could visually outrank a fresh machine receipt while retaining the historical record for auditability. It also prevents the availability of merge authority from being confused with founder approval to execute a specific merge.
 
 ## Founder Control Room boundary
 
-Founder Control Room remains the authority/evidence boundary. Continuity may roll an eligible same-repository branch forward and record proof expiry, but it does not approve a proposal, grant founder authority, merge, deploy, publish, mutate providers, spend, delete, or convert repository ancestry into runtime truth. After any rollover, FCR must reacquire exact-head CI, review, provider/runtime, artifact, and Playwright evidence before a consequential claim or merge decision.
+Founder Control Room remains the authority/evidence boundary. Continuity may roll an eligible same-repository branch forward and record proof expiry, but it does not approve a proposal, grant candidate-specific founder approval, merge, deploy, publish, mutate providers, spend, delete, or convert repository ancestry into runtime truth. After any rollover, FCR must reacquire exact-head CI, review, provider/runtime, artifact, and Playwright evidence. Before any merge execution, it must also reacquire a fresh explicit founder approval bound to the exact current repository, PR, base SHA, and head SHA.
 
 ## Attack 20
 
-`test/pr-continuity.attack20.test.mjs` attacks ancestry, divergence, unknown state, TOCTOU, forks, machine-truth ordering, human-body preservation, malformed markers, proof-subject binding, authority leakage, stacked propagation, unrelated stacks, and cycles before any write step.
+`test/pr-continuity.attack20.test.mjs` attacks ancestry, divergence, unknown state, TOCTOU, forks, machine-truth ordering, human-body preservation, malformed markers, proof-subject binding, authority/approval separation, stacked propagation, unrelated stacks, and cycles before any write step.

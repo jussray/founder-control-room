@@ -53,6 +53,63 @@ describe('buildGoalfixReport', () => {
     expect(report.fix).toEqual(['No fix was applied. Goalfix v1 stops at inspection and founder decision authority.']);
   });
 
+  it('emits source/evidence fingerprints and an evidence-only proof cookie', () => {
+    const report = buildGoalfixReport(baseInput({
+      verificationSignals: [
+        { id: 'check-1', name: 'Typecheck', status: 'passed', commitSha: SHA, provider: 'github' },
+        { id: 'check-2', name: 'Playwright', status: 'passed', commitSha: SHA, provider: 'github' },
+      ],
+    }));
+
+    expect(report.continuity.contract).toBe('goalfix-continuity-v1');
+    expect(report.continuity.sourceFingerprint).toMatch(/^[a-f0-9]{64}$/);
+    expect(report.continuity.evidenceFingerprint).toMatch(/^[a-f0-9]{64}$/);
+    expect(report.continuity.authority).toBe('EVIDENCE_ONLY');
+    expect(report.continuity.browserCookieStored).toBe(false);
+    expect(report.continuity.proofCookie).toMatchObject({
+      contextType: 'verification-run',
+      owner: 'goalfix-read-only-inspector',
+      createdAt: '2026-07-27T20:00:00.000Z',
+      expiresAt: null,
+      parentCookieId: null,
+    });
+    expect(report.continuity.proofCookie.cookieId).toMatch(/^goalfix-proof-[a-f0-9]{24}$/);
+    expect(report.proof.some((line) => line.includes(report.continuity.sourceFingerprint))).toBe(true);
+    expect(report.proof.some((line) => line.includes(report.continuity.evidenceFingerprint))).toBe(true);
+    expect(report.proof.some((line) => line.includes(report.continuity.proofCookie.cookieId))).toBe(true);
+    expect(report.risk).toContain(
+      'The proof cookie is a non-secret evidence marker in the report, not a browser cookie, founder session, approval token, merge token, or mutation authority.',
+    );
+  });
+
+  it('changes continuity when the exact subject or evidence changes', () => {
+    const first = buildGoalfixReport(baseInput({
+      verificationSignals: [
+        { id: 'check-1', name: 'Typecheck', status: 'passed', commitSha: SHA, provider: 'github' },
+        { id: 'check-2', name: 'Playwright', status: 'failed', commitSha: SHA, provider: 'github' },
+      ],
+    }));
+    const changedEvidence = buildGoalfixReport(baseInput({
+      verificationSignals: [
+        { id: 'check-1', name: 'Typecheck', status: 'passed', commitSha: SHA, provider: 'github' },
+        { id: 'check-2', name: 'Playwright', status: 'passed', commitSha: SHA, provider: 'github' },
+      ],
+    }));
+    const newSha = 'def456def456def456def456def456def456def4';
+    const changedSubject = buildGoalfixReport(baseInput({
+      target: { name: 'main', commitSha: newSha },
+      verificationSignals: [
+        { id: 'check-1', name: 'Typecheck', status: 'passed', commitSha: newSha, provider: 'github' },
+        { id: 'check-2', name: 'Playwright', status: 'passed', commitSha: newSha, provider: 'github' },
+      ],
+    }));
+
+    expect(changedEvidence.continuity.sourceFingerprint).toBe(first.continuity.sourceFingerprint);
+    expect(changedEvidence.continuity.evidenceFingerprint).not.toBe(first.continuity.evidenceFingerprint);
+    expect(changedSubject.continuity.sourceFingerprint).not.toBe(first.continuity.sourceFingerprint);
+    expect(changedSubject.continuity.evidenceFingerprint).not.toBe(first.continuity.evidenceFingerprint);
+  });
+
   it('blocks on any exact-head failed signal and names it as the bottleneck', () => {
     const report = buildGoalfixReport(baseInput({
       verificationSignals: [{
@@ -161,7 +218,7 @@ describe('buildGoalfixReport', () => {
     }));
 
     expect(report.readiness).toBe('ready_for_founder_decision');
-    expect(report.proof).toHaveLength(3);
+    expect(report.proof).toHaveLength(6);
     expect(report.proof[0]).toBe('Required exact-head checks: Typecheck, Playwright.');
     expect(report.nextGate).toContain('complete named proof set');
     expect(report.reality).toContain(

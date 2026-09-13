@@ -55,7 +55,14 @@ test('AT15 proof subject equals live head', () => {
   assert.ok(block.includes(`proof_subject: \`${'2'.repeat(40)}\``));
   assert.match(block, /MACHINE CURRENT TRUTH/);
 });
-test('AT16 receipt explicitly denies merge authority', () => assert.match(continuityBlock({ repository: repo, prNumber: 1, rootBaseRef: 'main', rootBaseSha: '1', baseRef: 'main', baseSha: '1', headRef: 'x', headSha: '2', continuityState: 'CURRENT', proofState: 'SEPARATE' }), /merge_authority: \*\*false\*\*/));
+test('AT16 receipt exposes merge authority while denying candidate approval and execution', () => {
+  const block = continuityBlock({ repository: repo, prNumber: 1, rootBaseRef: 'main', rootBaseSha: '1', baseRef: 'main', baseSha: '1', headRef: 'x', headSha: '2', continuityState: 'CURRENT', proofState: 'SEPARATE' });
+  assert.match(block, /merge_authority: \*\*true\*\*/);
+  assert.match(block, /merge_approval: \*\*REQUIRED_EXACT_CANDIDATE\*\*/);
+  assert.match(block, /merge_approved: \*\*false\*\*/);
+  assert.match(block, /authorizes_merge: \*\*false\*\*/);
+  assert.match(block, /must not execute/);
+});
 test('AT17 receipt explicitly denies deploy authority', () => assert.match(continuityBlock({ repository: repo, prNumber: 1, rootBaseRef: 'main', rootBaseSha: '1', baseRef: 'main', baseSha: '1', headRef: 'x', headSha: '2', continuityState: 'CURRENT', proofState: 'SEPARATE' }), /deploy_authority: \*\*false\*\*/));
 test('AT18 stacked dependency graph rolls parent before child', () => assert.deepEqual(collectRolloverOrder([pr(10, 'main', 'parent'), pr(11, 'parent', 'child')]), [10, 11]));
 test('AT19 unrelated stack is excluded', () => assert.deepEqual(collectRolloverOrder([pr(10, 'other', 'child')]), []));
@@ -82,5 +89,11 @@ test('AT25 stacked provider refusal becomes an explicit blocked receipt path', (
   assert.match(continuitySource, /allow: \[202, 403, 422\]/);
   assert.match(continuitySource, /BLOCKED_STACK_REBASE_REQUIRED/);
   assert.match(continuitySource, /providerMessage: update\.payload\?\.message \|\| null/);
+});
+test('AT26 JSON receipts keep merge capability separate from merge execution authorization', () => {
+  assert.match(continuitySource, /mergeAuthorityAvailable: true/);
+  assert.match(continuitySource, /mergeApprovalRequired: true/);
+  assert.match(continuitySource, /mergeApproved: false/);
+  assert.match(continuitySource, /authorizesMerge: false/);
 });
 test('schema remains stable', () => assert.equal(SCHEMA, 'juss/pr-continuity@v1'));
