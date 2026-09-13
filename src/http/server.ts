@@ -243,7 +243,7 @@ export function createServer(options: CreateServerOptions = {}) {
   app.post(
     '/api/federated-relay/v3',
     rateLimitGeneral,
-    express.json({ type: 'application/json', limit: '64kb' }),
+    express.json({ type: 'application/json', limit: '512kb' }),
     handleFederatedRelayV3,
   );
   app.post(
