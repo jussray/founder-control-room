@@ -1,4 +1,5 @@
 export const DELEGATED_AGENT_AUTHORITY_CONTRACT = 'fcr/delegated-agent-authority@v1' as const;
+export const DELEGATED_AGENT_ACTIVATION_STATE = 'policy-only' as const;
 
 export const DELEGATED_AGENT_PRINCIPALS = ['codex-chat', 'claude'] as const;
 export const DELEGATED_AGENT_TRUSTED_REVIEWERS = ['codex-chat', 'claude', 'deterministic-witness'] as const;
@@ -7,6 +8,7 @@ export type DelegatedAgentAction = 'merge' | 'deploy';
 
 export const DELEGATED_AGENT_AUTHORITY = Object.freeze({
   contract: DELEGATED_AGENT_AUTHORITY_CONTRACT,
+  activationState: DELEGATED_AGENT_ACTIVATION_STATE,
   repository: 'jussray/founder-control-room',
   principals: Object.freeze({
     'codex-chat': Object.freeze({ merge_authority: true, deploy_authority: true }),
@@ -25,12 +27,30 @@ export const DELEGATED_AGENT_AUTHORITY = Object.freeze({
   ]),
   maxEvidenceAgeMs: 10 * 60 * 1000,
   founderApprovalTtlMs: 15 * 60 * 1000,
+  trustedActivationRequirements: Object.freeze([
+    'server-owned-principal-resolution',
+    'provider-resolved-pr-base-head-author-diff',
+    'provider-backed-independent-review-gate',
+    'validated-founder-decision-receipt',
+    'server-derived-execution-path-capability-classification',
+    'current-provider-preflight-receipt',
+    'durable-idempotency-reservation',
+    'independent-post-action-outcome-verifier',
+  ]),
 } as const);
 
 export type DelegatedAgentRestrictedCapability =
   (typeof DELEGATED_AGENT_AUTHORITY.deniedCapabilities)[number];
 
-export type DelegatedAgentAuthorityInput = Readonly<{
+/**
+ * Policy-eligibility input only.
+ *
+ * IMPORTANT: this object is not a trusted execution context. Its fields may be
+ * assembled from candidate/caller observations and therefore can never mint
+ * provider mutation authority. The future activation layer must independently
+ * derive every load-bearing identity/evidence field from server-owned kernels.
+ */
+export type DelegatedAgentPolicyInput = Readonly<{
   principal: Readonly<{
     id: string;
     authenticatedBy: 'registered-adapter-attestation' | 'caller-assertion';
@@ -73,10 +93,10 @@ export type DelegatedAgentAuthorityInput = Readonly<{
     reservedForBaseSha: string;
     reservedForHeadSha: string;
   }>;
-  postActionOutcomeVerified?: boolean;
 }>;
 
-export type DelegatedAgentAuthorityFailure =
+export type DelegatedAgentPolicyFailure =
+  | 'unsupported_action'
   | 'principal_not_registered'
   | 'principal_not_authenticated'
   | 'repository_out_of_scope'
@@ -99,43 +119,50 @@ export type DelegatedAgentAuthorityFailure =
   | 'idempotency_already_consumed'
   | 'idempotency_mismatch';
 
-export type DelegatedAgentAuthorityDecision =
+export type DelegatedAgentPolicyDecision =
   | Readonly<{
-      ok: true;
+      eligibleForTrustedResolver: true;
+      activationState: typeof DELEGATED_AGENT_ACTIVATION_STATE;
       principalId: DelegatedAgentPrincipalId;
       founderDecisionRef: string;
       merge_authority: boolean;
       deploy_authority: boolean;
-      executionAuthorized: true;
-      completionClaimAllowed: boolean;
+      executionAuthorized: false;
+      completionClaimAllowed: false;
+      activationRequired: true;
     }>
   | Readonly<{
-      ok: false;
-      reason: DelegatedAgentAuthorityFailure;
+      eligibleForTrustedResolver: false;
+      activationState: typeof DELEGATED_AGENT_ACTIVATION_STATE;
+      reason: DelegatedAgentPolicyFailure;
       merge_authority: false;
       deploy_authority: false;
       executionAuthorized: false;
       completionClaimAllowed: false;
+      activationRequired: true;
     }>;
 
 const FULL_SHA = /^[0-9a-f]{40}$/;
 const AUDIT_REF = /^[A-Za-z0-9._:-]{8,200}$/;
 const IDEMPOTENCY_KEY = /^[A-Za-z0-9._:-]{16,200}$/;
+const ACTIONS = new Set<string>(['merge', 'deploy']);
 const PRINCIPALS = new Set<string>(DELEGATED_AGENT_PRINCIPALS);
 const TRUSTED_REVIEWERS = new Set<string>(DELEGATED_AGENT_TRUSTED_REVIEWERS);
 
-function deny(reason: DelegatedAgentAuthorityFailure): DelegatedAgentAuthorityDecision {
+function deny(reason: DelegatedAgentPolicyFailure): DelegatedAgentPolicyDecision {
   return Object.freeze({
-    ok: false,
+    eligibleForTrustedResolver: false,
+    activationState: DELEGATED_AGENT_ACTIVATION_STATE,
     reason,
     merge_authority: false,
     deploy_authority: false,
     executionAuthorized: false,
     completionClaimAllowed: false,
+    activationRequired: true,
   });
 }
 
-function expectedActionTarget(input: DelegatedAgentAuthorityInput): string | null {
+function expectedActionTarget(input: DelegatedAgentPolicyInput): string | null {
   if (input.action === 'merge') {
     if (
       !Number.isInteger(input.actionTarget.pullRequestNumber)
@@ -144,16 +171,22 @@ function expectedActionTarget(input: DelegatedAgentAuthorityInput): string | nul
     ) return null;
     return `merge:${input.repository}#${input.actionTarget.pullRequestNumber}`;
   }
+  if (input.action !== 'deploy') return null;
   if (input.actionTarget.environment !== 'production' || input.actionTarget.pullRequestNumber !== undefined) {
     return null;
   }
   return `deploy:${input.repository}:production`;
 }
 
-export function evaluateDelegatedAgentAuthority(
-  input: DelegatedAgentAuthorityInput,
+/**
+ * Evaluates whether an observed request is even eligible to enter the future
+ * trusted resolver. It NEVER authorizes provider mutation.
+ */
+export function evaluateDelegatedAgentPolicyEligibility(
+  input: DelegatedAgentPolicyInput,
   now = new Date(),
-): DelegatedAgentAuthorityDecision {
+): DelegatedAgentPolicyDecision {
+  if (!ACTIONS.has(input.action as string)) return deny('unsupported_action');
   if (!PRINCIPALS.has(input.principal.id)) return deny('principal_not_registered');
   if (
     input.principal.authenticatedBy !== 'registered-adapter-attestation'
@@ -239,12 +272,14 @@ export function evaluateDelegatedAgentAuthority(
   const principalId = input.principal.id as DelegatedAgentPrincipalId;
   const grant = DELEGATED_AGENT_AUTHORITY.principals[principalId];
   return Object.freeze({
-    ok: true,
+    eligibleForTrustedResolver: true,
+    activationState: DELEGATED_AGENT_ACTIVATION_STATE,
     principalId,
     founderDecisionRef: input.founderApproval.decisionRef,
     merge_authority: input.action === 'merge' && grant.merge_authority,
     deploy_authority: input.action === 'deploy' && grant.deploy_authority,
-    executionAuthorized: true,
-    completionClaimAllowed: input.action === 'deploy' && input.postActionOutcomeVerified === true,
+    executionAuthorized: false,
+    completionClaimAllowed: false,
+    activationRequired: true,
   });
 }

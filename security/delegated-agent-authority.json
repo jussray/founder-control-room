@@ -1,6 +1,7 @@
 {
   "contract": "fcr/delegated-agent-authority@v1",
   "repository": "jussray/founder-control-room",
+  "activationState": "policy-only",
   "founderDecision": {
     "date": "2026-09-12",
     "standingCapability": true,
@@ -11,43 +12,49 @@
       "claude": { "merge_authority": true, "deploy_authority": true }
     }
   },
+  "sourceEvaluator": {
+    "authorizesProviderMutation": false,
+    "authorizesCompletionClaim": false,
+    "purpose": "policy eligibility only"
+  },
   "identity": {
-    "required": "registered-adapter-attestation",
-    "callerAssertionIsAuthority": false
+    "requiredForActivation": "server-owned-principal-resolution",
+    "callerAssertionIsAuthority": false,
+    "callerAttestationBooleanIsAuthority": false
   },
   "review": {
-    "trustedReviewers": ["codex-chat", "claude", "deterministic-witness"],
-    "attestationRequired": true,
-    "actingPrincipalMayReviewOwnAction": false
+    "requiredForActivation": "provider-backed-independent-review-gate",
+    "candidateAuthorMaySatisfyIndependentReview": false,
+    "callerReviewBooleanIsAuthority": false
   },
   "founderApproval": {
     "required": true,
     "maxAgeMinutes": 15,
     "mustBind": ["action", "target", "repository", "baseSha", "headSha"],
     "auditableDecisionRefRequired": true,
-    "baseOrHeadMovementInvalidatesApproval": true
+    "baseOrHeadMovementInvalidatesApproval": true,
+    "activationMustUseValidatedFounderDecisionReceipt": true
   },
   "mutationIdentity": {
     "durableReservationRequiredBeforeProviderMutation": true,
     "reservationMustBind": ["action", "target", "baseSha", "headSha"],
     "consumedReservationMayBeReused": false
   },
-  "requiredBeforeMergeOrDeploy": [
-    "exact-repository",
-    "exact-action-target",
-    "exact-current-base-or-main",
-    "exact-head-machine-proof",
-    "fresh-evidence-within-10-minutes",
-    "trusted-independent-review",
-    "zero-unresolved-blocking-findings",
-    "rollback-ready",
-    "fresh-exact-founder-approval",
-    "durable-idempotency-reservation"
+  "trustedActivationRequirements": [
+    "server-owned-principal-resolution",
+    "provider-resolved-pr-base-head-author-diff",
+    "provider-backed-independent-review-gate",
+    "validated-founder-decision-receipt",
+    "server-derived-execution-path-capability-classification",
+    "current-provider-preflight-receipt",
+    "durable-idempotency-reservation",
+    "independent-post-action-outcome-verifier"
   ],
   "deployAdditionalRequirements": [
     "head-equals-current-main",
     "environment-production",
     "migration-state-aligned",
+    "non-migrating-execution-path",
     "provider-preflight-current"
   ],
   "notDelegated": [
@@ -63,6 +70,7 @@
   "truthBoundary": {
     "mergeAuthorityMeansStandingApproval": false,
     "deployAuthorityMeansStandingApproval": false,
+    "policyEligibilityMeansExecutionAuthority": false,
     "providerAcceptanceIsOutcomeVerification": false,
     "mergeOrDeployExecutionImpliesVerifiedOutcome": false,
     "postActionIndependentOutcomeEvidenceRequiredForVerifiedClaim": true

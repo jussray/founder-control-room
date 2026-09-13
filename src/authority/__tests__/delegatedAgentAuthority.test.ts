@@ -1,15 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import {
   DELEGATED_AGENT_AUTHORITY,
-  evaluateDelegatedAgentAuthority,
-  type DelegatedAgentAuthorityInput,
+  evaluateDelegatedAgentPolicyEligibility,
+  type DelegatedAgentAction,
+  type DelegatedAgentPolicyInput,
 } from '../delegatedAgentAuthority.js';
 
 const shaA = 'a'.repeat(40);
 const shaB = 'b'.repeat(40);
 const now = new Date('2026-09-12T23:10:00.000Z');
 
-function base(overrides: Partial<DelegatedAgentAuthorityInput> = {}): DelegatedAgentAuthorityInput {
+function base(overrides: Partial<DelegatedAgentPolicyInput> = {}): DelegatedAgentPolicyInput {
   return {
     principal: {
       id: 'codex-chat',
@@ -54,7 +55,7 @@ function base(overrides: Partial<DelegatedAgentAuthorityInput> = {}): DelegatedA
   };
 }
 
-function deploy(overrides: Partial<DelegatedAgentAuthorityInput> = {}): DelegatedAgentAuthorityInput {
+function deploy(overrides: Partial<DelegatedAgentPolicyInput> = {}): DelegatedAgentPolicyInput {
   return base({
     action: 'deploy',
     actionTarget: { environment: 'production' },
@@ -83,20 +84,23 @@ function deploy(overrides: Partial<DelegatedAgentAuthorityInput> = {}): Delegate
   });
 }
 
-describe('delegated agent authority', () => {
-  it('grants exact merge execution only with authenticated principal and exact founder approval', () => {
-    expect(evaluateDelegatedAgentAuthority(base(), now)).toMatchObject({
-      ok: true,
+describe('delegated agent policy eligibility', () => {
+  it('records merge capability but never authorizes provider mutation', () => {
+    expect(evaluateDelegatedAgentPolicyEligibility(base(), now)).toMatchObject({
+      eligibleForTrustedResolver: true,
+      activationState: 'policy-only',
       principalId: 'codex-chat',
       founderDecisionRef: 'founder:merge:797:0001',
       merge_authority: true,
       deploy_authority: false,
-      executionAuthorized: true,
+      executionAuthorized: false,
+      completionClaimAllowed: false,
+      activationRequired: true,
     });
   });
 
-  it('grants exact production deploy execution only with exact founder approval and aligned migrations', () => {
-    expect(evaluateDelegatedAgentAuthority(deploy({
+  it('records deploy capability but remains non-authorizing until a trusted activation layer exists', () => {
+    expect(evaluateDelegatedAgentPolicyEligibility(deploy({
       principal: {
         id: 'claude',
         authenticatedBy: 'registered-adapter-attestation',
@@ -104,85 +108,86 @@ describe('delegated agent authority', () => {
         attestationVerified: true,
       },
     }), now)).toMatchObject({
-      ok: true,
+      eligibleForTrustedResolver: true,
+      activationState: 'policy-only',
       principalId: 'claude',
-      founderDecisionRef: 'founder:deploy:production:0001',
       deploy_authority: true,
+      executionAuthorized: false,
+      completionClaimAllowed: false,
     });
   });
 
+  it('rejects unknown runtime actions before any eligibility result', () => {
+    const untypedAction = 'public_publication_or_external_message' as unknown as DelegatedAgentAction;
+    expect(evaluateDelegatedAgentPolicyEligibility(base({ action: untypedAction }), now))
+      .toMatchObject({ eligibleForTrustedResolver: false, reason: 'unsupported_action', executionAuthorized: false });
+  });
+
   it('rejects self-asserted identity, unknown principals, and cross-repository scope', () => {
-    expect(evaluateDelegatedAgentAuthority(base({ principal: { id: 'codex-chat', authenticatedBy: 'caller-assertion', adapterRef: 'claimed', attestationVerified: false } }), now))
-      .toMatchObject({ ok: false, reason: 'principal_not_authenticated' });
-    expect(evaluateDelegatedAgentAuthority(base({ principal: { id: 'other-agent', authenticatedBy: 'registered-adapter-attestation', adapterRef: 'x', attestationVerified: true } }), now))
-      .toMatchObject({ ok: false, reason: 'principal_not_registered' });
-    expect(evaluateDelegatedAgentAuthority(base({ repository: 'jussray/other-repo' }), now))
-      .toMatchObject({ ok: false, reason: 'repository_out_of_scope' });
+    expect(evaluateDelegatedAgentPolicyEligibility(base({ principal: { id: 'codex-chat', authenticatedBy: 'caller-assertion', adapterRef: 'claimed', attestationVerified: false } }), now))
+      .toMatchObject({ eligibleForTrustedResolver: false, reason: 'principal_not_authenticated' });
+    expect(evaluateDelegatedAgentPolicyEligibility(base({ principal: { id: 'other-agent', authenticatedBy: 'registered-adapter-attestation', adapterRef: 'x', attestationVerified: true } }), now))
+      .toMatchObject({ eligibleForTrustedResolver: false, reason: 'principal_not_registered' });
+    expect(evaluateDelegatedAgentPolicyEligibility(base({ repository: 'jussray/other-repo' }), now))
+      .toMatchObject({ eligibleForTrustedResolver: false, reason: 'repository_out_of_scope' });
   });
 
   it('rejects stale proof, stale candidates, and malformed action targets', () => {
-    expect(evaluateDelegatedAgentAuthority(base({ evidenceCheckedAt: '2026-09-12T22:00:00.000Z' }), now))
-      .toMatchObject({ ok: false, reason: 'stale_evidence' });
-    expect(evaluateDelegatedAgentAuthority(base({ currentMainSha: 'c'.repeat(40) }), now))
-      .toMatchObject({ ok: false, reason: 'candidate_not_current' });
-    expect(evaluateDelegatedAgentAuthority(base({ actionTarget: { environment: 'production' } }), now))
-      .toMatchObject({ ok: false, reason: 'invalid_action_target' });
+    expect(evaluateDelegatedAgentPolicyEligibility(base({ evidenceCheckedAt: '2026-09-12T22:00:00.000Z' }), now))
+      .toMatchObject({ eligibleForTrustedResolver: false, reason: 'stale_evidence' });
+    expect(evaluateDelegatedAgentPolicyEligibility(base({ currentMainSha: 'c'.repeat(40) }), now))
+      .toMatchObject({ eligibleForTrustedResolver: false, reason: 'candidate_not_current' });
+    expect(evaluateDelegatedAgentPolicyEligibility(base({ actionTarget: { environment: 'production' } }), now))
+      .toMatchObject({ eligibleForTrustedResolver: false, reason: 'invalid_action_target' });
   });
 
-  it('rejects untrusted or self review and unresolved blockers', () => {
-    expect(evaluateDelegatedAgentAuthority(base({ reviewerPrincipalId: 'random-agent' }), now))
-      .toMatchObject({ ok: false, reason: 'review_not_trusted' });
-    expect(evaluateDelegatedAgentAuthority(base({ reviewAttestationVerified: false }), now))
-      .toMatchObject({ ok: false, reason: 'review_not_trusted' });
-    expect(evaluateDelegatedAgentAuthority(base({ reviewerPrincipalId: 'codex-chat' }), now))
-      .toMatchObject({ ok: false, reason: 'self_review_forbidden' });
-    expect(evaluateDelegatedAgentAuthority(base({ unresolvedBlockingFindings: 1 }), now))
-      .toMatchObject({ ok: false, reason: 'blocking_findings_present' });
-    expect(evaluateDelegatedAgentAuthority(base({ rollbackReady: false }), now))
-      .toMatchObject({ ok: false, reason: 'rollback_missing' });
+  it('rejects untrusted or self review and unresolved blockers at the policy preflight', () => {
+    expect(evaluateDelegatedAgentPolicyEligibility(base({ reviewerPrincipalId: 'random-agent' }), now))
+      .toMatchObject({ eligibleForTrustedResolver: false, reason: 'review_not_trusted' });
+    expect(evaluateDelegatedAgentPolicyEligibility(base({ reviewAttestationVerified: false }), now))
+      .toMatchObject({ eligibleForTrustedResolver: false, reason: 'review_not_trusted' });
+    expect(evaluateDelegatedAgentPolicyEligibility(base({ reviewerPrincipalId: 'codex-chat' }), now))
+      .toMatchObject({ eligibleForTrustedResolver: false, reason: 'self_review_forbidden' });
+    expect(evaluateDelegatedAgentPolicyEligibility(base({ unresolvedBlockingFindings: 1 }), now))
+      .toMatchObject({ eligibleForTrustedResolver: false, reason: 'blocking_findings_present' });
+    expect(evaluateDelegatedAgentPolicyEligibility(base({ rollbackReady: false }), now))
+      .toMatchObject({ eligibleForTrustedResolver: false, reason: 'rollback_missing' });
   });
 
-  it('requires fresh exact founder approval for every merge or deploy', () => {
-    expect(evaluateDelegatedAgentAuthority(base({ founderApproval: { ...base().founderApproval, verified: false } }), now))
-      .toMatchObject({ ok: false, reason: 'founder_approval_missing' });
-    expect(evaluateDelegatedAgentAuthority(base({ founderApproval: { ...base().founderApproval, decisionRef: '' } }), now))
-      .toMatchObject({ ok: false, reason: 'founder_approval_missing' });
-    expect(evaluateDelegatedAgentAuthority(base({ founderApproval: { ...base().founderApproval, approvedAt: '2026-09-12T22:00:00.000Z' } }), now))
-      .toMatchObject({ ok: false, reason: 'founder_approval_stale' });
-    expect(evaluateDelegatedAgentAuthority(base({ founderApproval: { ...base().founderApproval, approvedHeadSha: 'c'.repeat(40) } }), now))
-      .toMatchObject({ ok: false, reason: 'founder_approval_mismatch' });
-    expect(evaluateDelegatedAgentAuthority(base({ founderApproval: { ...base().founderApproval, approvedTarget: 'merge:jussray/founder-control-room#798' } }), now))
-      .toMatchObject({ ok: false, reason: 'founder_approval_mismatch' });
+  it('requires fresh exact founder approval before a request can even reach the trusted resolver', () => {
+    expect(evaluateDelegatedAgentPolicyEligibility(base({ founderApproval: { ...base().founderApproval, verified: false } }), now))
+      .toMatchObject({ eligibleForTrustedResolver: false, reason: 'founder_approval_missing' });
+    expect(evaluateDelegatedAgentPolicyEligibility(base({ founderApproval: { ...base().founderApproval, approvedAt: '2026-09-12T22:00:00.000Z' } }), now))
+      .toMatchObject({ eligibleForTrustedResolver: false, reason: 'founder_approval_stale' });
+    expect(evaluateDelegatedAgentPolicyEligibility(base({ founderApproval: { ...base().founderApproval, approvedHeadSha: 'c'.repeat(40) } }), now))
+      .toMatchObject({ eligibleForTrustedResolver: false, reason: 'founder_approval_mismatch' });
   });
 
   it('does not inherit migrations or other restricted capabilities', () => {
     for (const capability of DELEGATED_AGENT_AUTHORITY.deniedCapabilities) {
-      expect(evaluateDelegatedAgentAuthority(base({ restrictedCapabilities: [capability] }), now))
-        .toMatchObject({ ok: false, reason: 'restricted_capability_requested' });
+      expect(evaluateDelegatedAgentPolicyEligibility(base({ restrictedCapabilities: [capability] }), now))
+        .toMatchObject({ eligibleForTrustedResolver: false, reason: 'restricted_capability_requested' });
     }
-    expect(evaluateDelegatedAgentAuthority(deploy({ migrationState: 'pending' }), now))
-      .toMatchObject({ ok: false, reason: 'migration_authority_not_delegated' });
+    expect(evaluateDelegatedAgentPolicyEligibility(deploy({ migrationState: 'pending' }), now))
+      .toMatchObject({ eligibleForTrustedResolver: false, reason: 'migration_authority_not_delegated' });
   });
 
   it('rejects missing, consumed, or mismatched execution reservations', () => {
-    expect(evaluateDelegatedAgentAuthority(base({ idempotency: { ...base().idempotency, reservationState: 'missing' } }), now))
-      .toMatchObject({ ok: false, reason: 'idempotency_reservation_missing' });
-    expect(evaluateDelegatedAgentAuthority(base({ idempotency: { ...base().idempotency, reservationState: 'consumed' } }), now))
-      .toMatchObject({ ok: false, reason: 'idempotency_already_consumed' });
-    expect(evaluateDelegatedAgentAuthority(base({ idempotency: { ...base().idempotency, reservedForHeadSha: 'c'.repeat(40) } }), now))
-      .toMatchObject({ ok: false, reason: 'idempotency_mismatch' });
-    expect(evaluateDelegatedAgentAuthority(base({ idempotency: { ...base().idempotency, reservedForTarget: 'merge:jussray/founder-control-room#999' } }), now))
-      .toMatchObject({ ok: false, reason: 'idempotency_mismatch' });
+    expect(evaluateDelegatedAgentPolicyEligibility(base({ idempotency: { ...base().idempotency, reservationState: 'missing' } }), now))
+      .toMatchObject({ eligibleForTrustedResolver: false, reason: 'idempotency_reservation_missing' });
+    expect(evaluateDelegatedAgentPolicyEligibility(base({ idempotency: { ...base().idempotency, reservationState: 'consumed' } }), now))
+      .toMatchObject({ eligibleForTrustedResolver: false, reason: 'idempotency_already_consumed' });
+    expect(evaluateDelegatedAgentPolicyEligibility(base({ idempotency: { ...base().idempotency, reservedForHeadSha: 'c'.repeat(40) } }), now))
+      .toMatchObject({ eligibleForTrustedResolver: false, reason: 'idempotency_mismatch' });
   });
 
-  it('keeps execution authority separate from outcome truth', () => {
-    const accepted = deploy({ postActionOutcomeVerified: false });
-    expect(evaluateDelegatedAgentAuthority(accepted, now)).toMatchObject({
-      ok: true,
-      deploy_authority: true,
+  it('cannot promote any policy-eligibility packet into a completion claim', () => {
+    const eligible = evaluateDelegatedAgentPolicyEligibility(deploy(), now);
+    expect(eligible).toMatchObject({
+      eligibleForTrustedResolver: true,
+      executionAuthorized: false,
       completionClaimAllowed: false,
+      activationRequired: true,
     });
-    expect(evaluateDelegatedAgentAuthority({ ...accepted, postActionOutcomeVerified: true }, now))
-      .toMatchObject({ ok: true, completionClaimAllowed: true });
   });
 });
