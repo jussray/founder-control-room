@@ -47,8 +47,8 @@ jobs:
           node-version: '24'
       - name: Run provenance adversarial tests
         run: node --test scripts/verify-main-release-provenance.node-test.mjs
-      - name: Verify direct-main historical ratification
-        run: node scripts/verify-main-release-historical-ratification.mjs
+      - name: Verify historical ratification chain
+        run: node scripts/verify-main-release-ratification-extension.mjs
 
   provenance:
     name: Main release provenance
@@ -76,7 +76,7 @@ jobs:
             "repos/${GITHUB_REPOSITORY}/commits/${TARGET_SHA}/pulls" \
             > associated-pulls.json
 
-          node scripts/verify-main-release-historical-ratification.mjs > historical-ratification.json
+          node scripts/verify-main-release-ratification-extension.mjs > historical-ratification.json
           terminal_tip="$(node --input-type=module -e "import { readFileSync } from 'node:fs'; const receipt = JSON.parse(readFileSync('historical-ratification.json', 'utf8')); const tip = receipt.incidents?.at(-1)?.incidentTip; if (!tip) process.exit(1); process.stdout.write(tip);")"
           git merge-base --is-ancestor "$terminal_tip" "$TARGET_SHA"
 
