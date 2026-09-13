@@ -60,10 +60,14 @@ export function continuityBlock(value) {
     `- proof_subject: \`${value.headSha}\``,
     `- continuity: **${value.continuityState}**`,
     `- proof: **${value.proofState}**`,
-    '- merge_authority: **false**',
+    '- merge_authority: **true**',
+    '- merge_approval: **REQUIRED_EXACT_CANDIDATE**',
+    '- merge_approved: **false**',
+    '- authorizes_merge: **false**',
     '- deploy_authority: **false**',
     '',
-    '> Base/head movement expires predecessor exact-head CI, review, runtime, and browser proof. A successful rollover preserves history but does not donate green proof to the successor head.',
+    '> Merge authority means the merge capability exists; it is not candidate approval. Without fresh explicit founder approval bound to this exact repository, PR, base SHA, and head SHA, the merge must not execute. Base/head movement expires any prior approval.',
+    '> Base/head movement also expires predecessor exact-head CI, review, runtime, and browser proof. A successful rollover preserves history but does not donate green proof to the successor head.',
     END_MARKER,
   ].join('\n');
 }
@@ -92,6 +96,14 @@ export const sameRepositoryPull = (pr, repository) =>
 
 const env = (name, fallback = '') => process.env[name] || fallback;
 const artifactPath = () => env('ARTIFACT_PATH', 'artifacts/pr-continuity.json');
+
+const nonAuthorizingMergeState = Object.freeze({
+  mergeAuthorityAvailable: true,
+  mergeApprovalRequired: true,
+  mergeApproved: false,
+  authorizesMerge: false,
+  authorizesDeploy: false,
+});
 
 function writeReceipt(value) {
   const target = path.resolve(artifactPath());
@@ -266,7 +278,7 @@ export async function auditMode() {
   const pr = await getPull(repository, number);
   assertExpectedHead(expected, pr.head.sha);
   if (!sameRepositoryPull(pr, repository)) {
-    writeReceipt({ schema: SCHEMA, mode: 'audit', repository, prNumber: number, state: 'BLOCKED_FORK', authorizesMerge: false, authorizesDeploy: false });
+    writeReceipt({ schema: SCHEMA, mode: 'audit', repository, prNumber: number, state: 'BLOCKED_FORK', ...nonAuthorizingMergeState });
     throw new Error('BLOCKED_FORK');
   }
 
@@ -288,8 +300,7 @@ export async function auditMode() {
     state,
     proofSubjectSha: pr.head.sha,
     predecessorProofExpiresOnHeadMove: true,
-    authorizesMerge: false,
-    authorizesDeploy: false,
+    ...nonAuthorizingMergeState,
   };
   writeReceipt(receipt);
   if (state !== 'CURRENT') throw new Error(`${state}: ${baseSha} is not an ancestor of ${pr.head.sha}`);
@@ -313,7 +324,7 @@ export async function metadataMode() {
     pr,
     blockFor(repository, pr, rootRef, rootSha, baseSha, state, state === 'CURRENT' ? 'EXACT_HEAD_PROOF_SEPARATE' : 'REVERIFY_OR_ROLLOVER_REQUIRED'),
   );
-  const receipt = { schema: SCHEMA, mode: 'metadata', repository, prNumber: number, state, metadata, authorizesMerge: false, authorizesDeploy: false };
+  const receipt = { schema: SCHEMA, mode: 'metadata', repository, prNumber: number, state, metadata, ...nonAuthorizingMergeState };
   writeReceipt(receipt);
   if (metadata.blocked) throw new Error(`METADATA_BLOCKED: ${metadata.reason}`);
   console.log(JSON.stringify(receipt));
@@ -338,8 +349,7 @@ export async function rolloverMode() {
     results,
     blockedCount: blocked.length,
     predecessorProofExpiresOnHeadMove: true,
-    authorizesMerge: false,
-    authorizesDeploy: false,
+    ...nonAuthorizingMergeState,
   };
   writeReceipt(receipt);
   console.log(JSON.stringify(receipt));
