@@ -265,9 +265,9 @@ export function buildGoalfixReport(input: BuildGoalfixReportInput): GoalfixRepor
   const expectedSignals = latestSignals.filter(
     (signal) => expectedNameKeys.has(normalizeSignalName(signal.name)),
   );
-  const failures = latestSignals.filter((signal) => TERMINAL_FAILURES.has(signal.status));
-  const incomplete = latestSignals.filter((signal) => INCOMPLETE_SIGNALS.has(signal.status));
-  const passed = latestSignals.filter((signal) => signal.status === 'passed');
+  const failures = expectedSignals.filter((signal) => TERMINAL_FAILURES.has(signal.status));
+  const incomplete = expectedSignals.filter((signal) => INCOMPLETE_SIGNALS.has(signal.status));
+  const passed = expectedSignals.filter((signal) => signal.status === 'passed');
   const everyExpectedNamePassed = expectedVerificationNames.length > 0
     && missingExpectedNames.length === 0
     && expectedVerificationNames.every((name) => {
