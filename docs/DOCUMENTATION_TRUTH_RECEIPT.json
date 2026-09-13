@@ -1,39 +1,26 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Bind the load-bearing LinkedIn analytics regression to the exact CI workflow that Required Gate consumes, so a committed test cannot be mistaken for CI proof when the workflow does not execute it.",
+  "purpose": "Bind LinkedIn native-export post measurement to the exact FCR platform, account, post, and experiment identity while preserving the boundary that caller-declared identity is not provider authentication and missing/capped export evidence is never a zero-performance claim.",
   "domains": [
-    "workflow-authority"
+    "evidence-authority"
   ],
   "changes": [
     {
-      "path": ".github/workflows/ci.yml",
+      "path": "scripts/linkedin_analytics_continuity.py",
       "claims": [
-        "The load-bearing `python-tests` job must execute `scripts.test_linkedin_analytics_continuity` on the exact head, and `Required Gate` must continue to depend on that job; source presence alone is not CI proof.",
-        "The LinkedIn analytics continuity regression preserves missing activity as `UNKNOWN_NO_EVIDENCE` with null metrics rather than manufacturing zero impressions or zero engagements."
+        "scripts/linkedin_analytics_continuity.py must bind targeted native-export observations to an exact canonical LinkedIn post plus declared FCR account and experiment identities, must withhold learning eligibility until provider-authenticated account binding and sufficient exact-post metrics exist, and must never promote capped-export absence or date-level ENGAGEMENT totals into exact-post zero/failure or engagement claims."
       ]
     },
     {
-      "path": "README.md",
+      "path": "scripts/test_linkedin_analytics_continuity.py",
       "claims": [
-        "Operator-facing CI truth now states that load-bearing regression evidence requires exact-head workflow execution, including the LinkedIn missing-not-zero regression."
+        "scripts/test_linkedin_analytics_continuity.py must reject false greens for capped-export absence, daily aggregate engagement leakage, malformed or spoof-shaped identity input, and any receipt that would grant learning, publication, or strategy-mutation authority from caller-declared identity alone."
       ]
     },
     {
-      "path": "GLOBAL_AI.md",
+      "path": "docs/founder-signal-engine/linkedin-analytics-continuity.md",
       "claims": [
-        "Global implementation discipline now distinguishes a committed regression from a regression actually executed by the load-bearing exact-head workflow."
-      ]
-    },
-    {
-      "path": "docs/FOUNDER_MERGE_AUTHORITY.md",
-      "claims": [
-        "Merge readiness now requires load-bearing CI to execute the regressions it relies on; an uninvoked test cannot satisfy exact-head machine proof."
-      ]
-    },
-    {
-      "path": ".ai/skills/juss-flow-launch-loop/SKILL.md",
-      "claims": [
-        "The launch loop now requires load-bearing regression tests to be explicitly invoked by the exact-head workflow before they may be promoted to CI evidence."
+        "docs/founder-signal-engine/linkedin-analytics-continuity.md must state that exact-post native visibility and exact-post impressions are observation evidence only, caller-declared account identity cannot authenticate provider ownership, unavailable exact-post engagement remains null, and missing visible post evidence remains UNKNOWN_NO_EVIDENCE rather than zero or failure."
       ]
     }
   ]
