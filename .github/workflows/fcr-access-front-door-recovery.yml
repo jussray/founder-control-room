@@ -282,6 +282,42 @@ jobs:
             if [[ ! -f "$browser_receipt" ]]; then
               echo
               echo '- Browser proof receipt: `missing` (stranger-path)'
+            elif [[ "$safe_expected_head_sha" == 'UNKNOWN' ]] || ! jq -e -s \
+              --arg expectedHeadSha "$safe_expected_head_sha" '
+                def iso8601:
+                  type == "string"
+                  and test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$");
+                def status_or_null:
+                  . == null or (type == "number" and floor == . and . >= 100 and . <= 599);
+                def origin_or_null:
+                  . == null or (type == "string" and test("^https://[A-Za-z0-9.-]+(?::[0-9]{1,5})?$"));
+                length == 1
+                and (
+                  .[0]
+                  | type == "object"
+                  and .schemaVersion == 1
+                  and .scope == "fcr-access-front-door-browser-proof"
+                  and (.observedAt | iso8601)
+                  and .expectedHeadSha == $expectedHeadSha
+                  and .audience == "random-stranger"
+                  and .requestedOrigin == "https://foundercontrolroom.org"
+                  and .publicOrigin == "https://www.foundercontrolroom.org"
+                  and (.finalOrigin | origin_or_null)
+                  and (.navigationStatus | status_or_null)
+                  and (.controlRoomStatus | status_or_null)
+                  and (.founderSignInVisible | type == "boolean")
+                  and (.founderShellVisible | type == "boolean")
+                  and (.authMeStatus | status_or_null)
+                  and (.founderAuthorityContained | type == "boolean")
+                  and (.apiVersionStatus | status_or_null)
+                  and (.apiVersionMatchesExpectedSha | type == "boolean")
+                  and (.state == "unknown" or .state == "proven" or .state == "failed")
+                  and ((has("error") | not) or .error == null or (.error | type == "string" and length <= 2000))
+                )
+              ' "$browser_receipt" >/dev/null 2>&1; then
+              echo
+              echo '- Browser proof receipt: `malformed` (stranger-path)'
+              echo '- Browser proof: `UNKNOWN` because the structured stranger-path receipt failed the single-document public schema allowlist.'
             else
               echo
               echo '- Browser proof receipt: `present` (stranger-path)'
