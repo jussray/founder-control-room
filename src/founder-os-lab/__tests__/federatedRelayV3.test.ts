@@ -12,12 +12,14 @@ import {
 const FCR_SHA = 'a'.repeat(40);
 const CHIEF_SHA = 'b'.repeat(40);
 
-async function keyPair() {
-  const pair = await crypto.subtle.generateKey({ name: 'Ed25519' }, true, ['sign', 'verify']);
-  return {
-    privateJwk: await crypto.subtle.exportKey('jwk', pair.privateKey),
-    publicJwk: await crypto.subtle.exportKey('jwk', pair.publicKey),
-  };
+async function keyPair(): Promise<{ privateJwk: JsonWebKey; publicJwk: JsonWebKey }> {
+  const generated = await crypto.subtle.generateKey({ name: 'Ed25519' }, true, ['sign', 'verify']);
+  if (!('privateKey' in generated) || !('publicKey' in generated)) {
+    throw new Error('Ed25519 key generation did not return a key pair');
+  }
+  const privateJwk = await crypto.subtle.exportKey('jwk', generated.privateKey) as JsonWebKey;
+  const publicJwk = await crypto.subtle.exportKey('jwk', generated.publicKey) as JsonWebKey;
+  return { privateJwk, publicJwk };
 }
 
 async function signedRoot(overrides: Record<string, unknown> = {}) {
