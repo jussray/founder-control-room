@@ -231,6 +231,8 @@ For every truth-sensitive change to architecture, authority, publishing, provide
 8. run the same verifier on the merged-main transition; and
 9. if provider/runtime reality changes after merge, re-observe and repair the affected current-state doc before reusing its present-tense claim.
 
+For pull requests, Documentation Truth and default test-discovery proof must bind to the provider-resolved live target branch from `base.ref` at execution time. Treat `pull_request.base.sha` only as historical event-snapshot evidence. Reject an invalid live base or a live base that is not an ancestor of the exact candidate before merge review; never let stale target history become a proof baseline.
+
 A docs-only truth-sync merge closes an existing drift cycle. The post-merge verifier closes the transition; it does not create an infinite requirement to rewrite itself again.
 
 Do not hard-code a durable “current main SHA” into prose. Exact SHAs belong in evidence/provenance; resolve current identity at use time.
