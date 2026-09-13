@@ -26,6 +26,7 @@ const chiefSha = String(process.env.CHIEF_FEDERATED_RELAY_TARGET_SHA || '').trim
 const fcrBranch = String(process.env.FCR_FEDERATED_RELAY_SOURCE_BRANCH || process.env.TARGET_BRANCH || 'main').trim();
 const chiefBranch = String(process.env.CHIEF_FEDERATED_RELAY_TARGET_BRANCH || 'main').trim();
 const DELIVERY_ACK_CONTRACT = 'juss/federated-agent-relay-delivery-ack@v3.1';
+const SOURCE_ORIGIN_HEADER = 'X-Federated-Relay-Source-Origin';
 
 function fail(message) { throw new Error(`Federated relay v3.1 roundtrip proof failed: ${message}`); }
 function requireHttps(name, value) { if (!value.startsWith('https://')) fail(`${name} must be HTTPS.`); }
@@ -86,6 +87,22 @@ async function registerFcrKey() {
   });
   return { pair, keyId, publicJwk, validFrom, validUntil };
 }
+async function registerObservedKey(key) {
+  if (!key || typeof key.member !== 'string' || typeof key.keyId !== 'string' || !key.publicKeyJwk) {
+    fail('Observed relay public key is malformed.');
+  }
+  await db('rpc/federated_relay_v31_register_observed_key', {
+    method: 'POST',
+    body: {
+      p_member: key.member,
+      p_key_id: key.keyId,
+      p_public_key_jwk: key.publicKeyJwk,
+      p_state: key.state,
+      p_valid_from: key.validFrom,
+      p_valid_until: key.validUntil ?? null,
+    },
+  });
+}
 async function reserveRoot(keyId, messageId, chainId, logicalOperationId) {
   const result = await db('rpc/federated_relay_v31_reserve_outbound', {
     method: 'POST',
@@ -137,10 +154,13 @@ async function resolveRoot(messageId, result) {
     },
   });
 }
-async function postCanonical(baseUrl, endpoint, envelope) {
+async function postCanonical(baseUrl, endpoint, envelope, extraHeaders = {}) {
   const canonical = canonicalizeRelayJsonV31(envelope);
   const response = await fetch(`${baseUrl}${endpoint}`, {
-    method: 'POST', headers: { Accept: 'application/json', 'Content-Type': 'application/json' }, body: canonical, redirect: 'manual',
+    method: 'POST',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json', ...extraHeaders },
+    body: canonical,
+    redirect: 'manual',
   });
   const text = await response.text();
   let body = null;
@@ -212,12 +232,18 @@ const rootDeliveryFingerprint = await deliveryFingerprintV31(root);
 const rootSuccessorCookie = await successorProofCookieV31(root, rootDeliveryFingerprint);
 await finalizeRoot(root, rootSemanticFingerprint, rootDeliveryFingerprint, rootSuccessorCookie);
 
-const chiefAccepted = await postCanonical(chiefBaseUrl, '/api/federated-relay', root);
+const chiefAccepted = await postCanonical(
+  chiefBaseUrl,
+  '/api/federated-relay',
+  root,
+  { [SOURCE_ORIGIN_HEADER]: fcrBaseUrl },
+);
 assertAuthorityFalse(chiefAccepted, 'Chief root acceptance');
 if (!['accepted','duplicate'].includes(chiefAccepted?.delivery) || !chiefAccepted?.receipt || !chiefAccepted?.replyEnvelope) fail('Chief did not return durable v3.1 acceptance + reply evidence.');
 if (chiefAccepted.receipt.messageId !== messageId || chiefAccepted.receipt.successorProofCookie !== rootSuccessorCookie) fail('Chief root receipt is not bound to the FCR root.');
 const chiefReceiptKey = await keyQuery(chiefBaseUrl, '/api/federated-relay', 'chief-ai-machine', chiefAccepted.receipt.signature?.keyId);
 await verifyRelayReceiptV31(chiefAccepted.receipt, chiefReceiptKey);
+await registerObservedKey(chiefReceiptKey);
 await resolveRoot(messageId, chiefAccepted);
 
 const replyCanonical = canonicalizeRelayJsonV31(chiefAccepted.replyEnvelope);
@@ -228,6 +254,7 @@ if (reply.replyToMessageId !== messageId || reply.ordering.relation.type !== 're
   fail('Chief reply lineage is not bound to the accepted FCR root.');
 }
 const chiefReplyKey = await keyQuery(chiefBaseUrl, '/api/federated-relay', 'chief-ai-machine', reply.signature.keyId);
+await registerObservedKey(chiefReplyKey);
 const verifiedReply = await verifyRelayEnvelopeV31({ envelope: reply, key: chiefReplyKey });
 const fcrAccepted = await postCanonical(fcrBaseUrl, '/api/federated-relay/v3', reply);
 assertAuthorityFalse(fcrAccepted, 'FCR reply acceptance');
@@ -237,7 +264,12 @@ const fcrReceiptKey = await keyQuery(fcrBaseUrl, '/api/federated-relay/v3', 'fou
 await verifyRelayReceiptV31(fcrAccepted.receipt, fcrReceiptKey);
 const firstAck = await acknowledgeChiefReply(fcrAccepted);
 
-const chiefRetry = await postCanonical(chiefBaseUrl, '/api/federated-relay', root);
+const chiefRetry = await postCanonical(
+  chiefBaseUrl,
+  '/api/federated-relay',
+  root,
+  { [SOURCE_ORIGIN_HEADER]: fcrBaseUrl },
+);
 if (chiefRetry?.delivery !== 'duplicate') fail('Chief exact root retry was not classified duplicate.');
 if (canonicalizeRelayJsonV31(chiefRetry.replyEnvelope) !== replyCanonical) fail('Chief exact retry did not reproduce the identical durable signed reply.');
 const fcrRetry = await postCanonical(fcrBaseUrl, '/api/federated-relay/v3', reply);
