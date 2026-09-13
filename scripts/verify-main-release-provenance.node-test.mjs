@@ -253,7 +253,7 @@ test('main provenance workflow observes every first-parent successor after histo
   const workflow = readFileSync(new URL('../.github/workflows/main-release-provenance.yml', import.meta.url), 'utf8');
 
   assert.match(workflow, /fetch-depth: 0/);
-  assert.match(workflow, /verify-main-release-historical-ratification\.mjs > historical-ratification\.json/);
+  assert.match(workflow, /verify-main-release-ratification-extension\.mjs > historical-ratification\.json/);
   assert.match(workflow, /git rev-list --reverse --first-parent "\$\{terminal_tip\}\.\.\$\{TARGET_SHA\}"/);
   assert.match(workflow, /SUCCESSOR_COMMITS_JSON/);
   assert.match(workflow, /TERMINAL_RATIFIED_TIP/);
