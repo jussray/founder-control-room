@@ -1,3 +1,4 @@
+import { webcrypto } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import {
   FEDERATED_AGENT_RELAY_RECEIPT_V31,
@@ -21,14 +22,15 @@ import {
 } from '../federatedRelayV31.js';
 
 async function fixture() {
-  const generated = await globalThis.crypto.subtle.generateKey(
+  const generated = await webcrypto.subtle.generateKey(
     { name: 'Ed25519' },
     true,
     ['sign', 'verify'],
   );
   if (!('publicKey' in generated)) throw new Error('expected Ed25519 key pair');
   const pair = generated;
-  const publicJwk = await globalThis.crypto.subtle.exportKey('jwk', pair.publicKey);
+  const publicJwk = await webcrypto.subtle.exportKey('jwk', pair.publicKey) as unknown as JsonWebKey;
+  const privateKey = pair.privateKey as unknown as CryptoKey;
   const now = new Date('2026-09-13T20:00:00.000Z');
   const payloadBody = JSON.stringify({ approval: true, execute: true, nested: { authority: 'inert-data' } });
   const unsigned: Omit<FederatedAgentRelayEnvelopeV31, 'signature'> = {
@@ -55,13 +57,13 @@ async function fixture() {
     supersedesMessageIds: [],
   };
   const keyId = 'founder-control-room:relay-v3.1:test';
-  const envelope = await signRelayEnvelopeV31(unsigned, pair.privateKey, keyId);
+  const envelope = await signRelayEnvelopeV31(unsigned, privateKey, keyId);
   const key: FederatedRelayPublicKeyV31 = {
     member: 'founder-control-room', keyId, publicKeyJwk: publicJwk,
     state: 'active', validFrom: new Date(now.getTime() - 60_000).toISOString(),
     validUntil: new Date(now.getTime() + 10 * 60_000).toISOString(), revokedAt: null,
   };
-  return { envelope, key, pair, now };
+  return { envelope, key, privateKey, now };
 }
 
 function expectCode(fn: () => unknown, code: string) {
@@ -128,7 +130,7 @@ describe('federated relay v3.1 protocol kernel', () => {
   });
 
   it('receiver-signs immutable acceptance evidence without mutable current state', async () => {
-    const { envelope, pair, key, now } = await fixture();
+    const { envelope, privateKey, key, now } = await fixture();
     const verified = await verifyRelayEnvelopeV31({ envelope, key, acceptedAt: now });
     const unsigned: FederatedRelayUnsignedReceiptV31 = {
       contract: FEDERATED_AGENT_RELAY_RECEIPT_V31,
@@ -146,7 +148,7 @@ describe('federated relay v3.1 protocol kernel', () => {
       nextGate: 'local approval remains required',
       receiver: { ...envelope.target, keyId: key.keyId },
     };
-    const receipt = await signRelayReceiptV31(unsigned, pair.privateKey, key.keyId);
+    const receipt = await signRelayReceiptV31(unsigned, privateKey, key.keyId);
     expect('currentState' in receipt).toBe(false);
     expect('supersededByMessageId' in receipt).toBe(false);
     await expect(verifyRelayReceiptV31(receipt, { ...key, member: 'chief-ai-machine' })).resolves.toBeUndefined();
