@@ -140,7 +140,7 @@ jobs:
         with:
           python-version: '3.11'
       - name: Run Python unit tests
-        run: python3 -m unittest scripts.test_whoami scripts.test_capability_receipt -v
+        run: python3 -m unittest scripts.test_whoami scripts.test_capability_receipt scripts.test_linkedin_analytics_continuity -v
 
   rls-contract:
     name: RLS migration contract

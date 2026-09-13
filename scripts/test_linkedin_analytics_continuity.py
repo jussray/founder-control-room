@@ -76,6 +76,18 @@ class LinkedInAnalyticsContinuityTest(unittest.TestCase):
         self.assertTrue(report['days'][0]['day_cookie'].startswith('LI-DAY-20260802-P02-'))
         self.assertNotIn('utm_source', report['posts'][0]['post_url'])
 
+    def test_missing_activity_row_remains_unknown_instead_of_zero(self):
+        with tempfile.TemporaryDirectory() as td:
+            path = Path(td) / 'analytics.xlsx'
+            write_fixture(path)
+            report = mod.analyze_export(path, date(2026,8,2), date(2026,8,4), export_limit=3)
+
+        missing_day = report['days'][2]
+        self.assertEqual(missing_day['date'], '2026-08-04')
+        self.assertIsNone(missing_day['activity_impressions'])
+        self.assertIsNone(missing_day['activity_engagements'])
+        self.assertEqual(missing_day['activity_evidence_state'], 'UNKNOWN_NO_EVIDENCE')
+
     def test_fingerprint_is_stable_across_tracking_query_noise(self):
         day = date(2026,8,2)
         base = 'https://www.linkedin.com/posts/juss-rayy_share-111-A'
