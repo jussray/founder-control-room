@@ -1,6 +1,7 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import {
   FederatedRelayV3Error,
+  assertRelayTargetV3,
   canonicalizeRelayJsonV3,
   parseFederatedAgentRelayEnvelopeV3,
   sha256HexV3,
@@ -110,14 +111,20 @@ export async function handleFederatedRelayV3WorkerRequest(
     if (!/^[0-9a-f]{40}$/.test(runtimeSha)) throw new FederatedRelayV3Error('relay_runtime_identity_unavailable');
     const input = await request.json();
     const envelope = parseFederatedAgentRelayEnvelopeV3(input);
+    const expectedTarget = {
+      member: 'founder-control-room' as const,
+      repository: 'jussray/founder-control-room',
+      branch: 'main',
+      headSha: runtimeSha,
+    };
+    assertRelayTargetV3(envelope, expectedTarget);
     const client = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
       auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
     });
 
-    // Exact signed retries are idempotent even if the original TTL has elapsed
-    // or the receiving runtime has moved. They return historical evidence only;
-    // they never reacquire authority. Modified reuse of the same message id is a
-    // collision and still fails closed.
+    // Exact signed retries are idempotent for the same exact receiver identity.
+    // They return historical evidence only and never reacquire authority.
+    // Once the receiver SHA moves, the old packet is stale and must be rebound.
     const fingerprint = await sha256HexV3(canonicalizeRelayJsonV3(envelope));
     const existing = await findStoredMessage(client, envelope.messageId);
     if (existing) {
@@ -133,12 +140,7 @@ export async function handleFederatedRelayV3WorkerRequest(
     const verified = await verifyRelayEnvelopeV3({
       envelope,
       key,
-      expectedTarget: {
-        member: 'founder-control-room',
-        repository: 'jussray/founder-control-room',
-        branch: 'main',
-        headSha: runtimeSha,
-      },
+      expectedTarget,
     });
 
     const { data, error } = await client.rpc('federated_relay_accept_v3', {
