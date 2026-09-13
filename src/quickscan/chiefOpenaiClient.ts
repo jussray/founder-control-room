@@ -32,9 +32,9 @@ export interface QuickScanChiefProvenance {
   model: string;
   responseId: string | null;
   promptVersion: string;
-  selection: CapabilitySelectionReceipt;
-  decisionTrace: CapabilityDecisionTrace[];
-  fallbackReason: string | null;
+  selection?: CapabilitySelectionReceipt;
+  decisionTrace?: CapabilityDecisionTrace[];
+  fallbackReason?: string | null;
 }
 
 export interface QuickScanChiefResult {
