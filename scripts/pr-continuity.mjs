@@ -24,6 +24,57 @@ export function isStackedUpdateUnsupported(status, message = '') {
   return status === 403 && /updating a stacked PR's branch via this endpoint is not supported\.?/i.test(message);
 }
 
+export function classifyUpdateBranchFailure(status, message = '') {
+  const providerMessage = String(message || '');
+  if (isStackedUpdateUnsupported(status, providerMessage)) {
+    return {
+      state: 'BLOCKED_STACK_REBASE_REQUIRED',
+      failureReceipts: [{ code: 'STACKED_UPDATE_UNSUPPORTED', providerStatus: status, evidence: providerMessage }],
+    };
+  }
+
+  if ((status === 403 || status === 422) && /repository rule violations found/i.test(providerMessage)) {
+    const failureReceipts = [];
+    if (/changes must be made through a pull request/i.test(providerMessage)) {
+      failureReceipts.push({ code: 'CHANGES_REQUIRE_PULL_REQUEST', providerStatus: status, evidence: 'Changes must be made through a pull request.' });
+    }
+    const requiredCheck = providerMessage.match(/Required status check "([^"]+)" is expected\.?/i);
+    if (requiredCheck) {
+      failureReceipts.push({ code: 'REQUIRED_STATUS_CHECK_EXPECTED', providerStatus: status, checkName: requiredCheck[1], evidence: requiredCheck[0] });
+    }
+    if (/waiting for code scanning results/i.test(providerMessage)) {
+      failureReceipts.push({ code: 'CODE_SCANNING_PENDING_OR_UNCONFIGURED', providerStatus: status, evidence: 'Waiting for Code Scanning results.' });
+    }
+    if (!failureReceipts.length) {
+      failureReceipts.push({ code: 'REPOSITORY_RULE_VIOLATION', providerStatus: status, evidence: providerMessage });
+    }
+    return { state: 'BLOCKED_REPOSITORY_RULES', failureReceipts };
+  }
+
+  if (status === 422 && /merge conflict between base and head/i.test(providerMessage)) {
+    return {
+      state: 'BLOCKED_MERGE_CONFLICT',
+      failureReceipts: [{ code: 'MERGE_CONFLICT', providerStatus: status, evidence: providerMessage }],
+    };
+  }
+
+  if (status === 403) {
+    return {
+      state: 'BLOCKED_PROVIDER_FORBIDDEN',
+      failureReceipts: [{ code: 'PROVIDER_FORBIDDEN', providerStatus: status, evidence: providerMessage || 'GitHub rejected the branch update.' }],
+    };
+  }
+
+  if (status === 422) {
+    return {
+      state: 'BLOCKED_PROVIDER_REJECTED',
+      failureReceipts: [{ code: 'PROVIDER_UPDATE_REJECTED', providerStatus: status, evidence: providerMessage || 'GitHub rejected the branch update.' }],
+    };
+  }
+
+  return null;
+}
+
 export function replaceManagedBlock(body = '', block) {
   const starts = body.split(START_MARKER).length - 1;
   const ends = body.split(END_MARKER).length - 1;
@@ -210,38 +261,29 @@ async function updateOnePull(repository, number, rootRef) {
     allow: [202, 403, 422],
   });
 
-  if (update.status === 403) {
-    if (!isStackedUpdateUnsupported(update.status, update.payload?.message || '')) {
-      throw new Error(`GITHUB_API_403: ${update.payload?.message || 'pull request branch update forbidden'}`);
-    }
+  if (update.status === 403 || update.status === 422) {
     pr = await getPull(repository, number);
     baseSha = await liveBaseSha(repository, pr);
     status = sameRepositoryPull(pr, repository) ? await compare(repository, baseSha, pr.head.sha) : 'fork';
     if (isCurrentCompareStatus(status)) return updateOnePull(repository, number, rootRef);
-    const metadata = await patchBody(repository, pr, blockFor(repository, pr, rootRef, rootSha, baseSha, 'BLOCKED_STACK_REBASE_REQUIRED', 'BLOCKED'));
-    return {
-      number,
-      state: 'BLOCKED_STACK_REBASE_REQUIRED',
-      headRef: pr.head.ref,
-      headSha: pr.head.sha,
-      metadata,
-      providerMessage: update.payload?.message || null,
-    };
-  }
 
-  if (update.status === 422) {
-    pr = await getPull(repository, number);
-    baseSha = await liveBaseSha(repository, pr);
-    status = sameRepositoryPull(pr, repository) ? await compare(repository, baseSha, pr.head.sha) : 'fork';
-    if (isCurrentCompareStatus(status)) return updateOnePull(repository, number, rootRef);
-    const metadata = await patchBody(repository, pr, blockFor(repository, pr, rootRef, rootSha, baseSha, 'BLOCKED_CONFLICT_OR_RACE', 'BLOCKED'));
+    const failure = classifyUpdateBranchFailure(update.status, update.payload?.message || '');
+    if (!failure) {
+      throw new Error(`GITHUB_API_${update.status}: ${update.payload?.message || 'pull request branch update rejected'}`);
+    }
+    const metadata = await patchBody(repository, pr, blockFor(repository, pr, rootRef, rootSha, baseSha, failure.state, 'BLOCKED'));
     return {
       number,
-      state: 'BLOCKED_CONFLICT_OR_RACE',
+      state: failure.state,
       headRef: pr.head.ref,
       headSha: pr.head.sha,
       metadata,
+      providerStatus: update.status,
       providerMessage: update.payload?.message || null,
+      failureReceipts: failure.failureReceipts.map((receipt) => ({
+        receiptId: `pr-${number}:${receipt.code}`,
+        ...receipt,
+      })),
     };
   }
 
@@ -339,6 +381,15 @@ export async function rolloverMode() {
   const results = [];
   for (const number of order) results.push(await updateOnePull(repository, number, rootRef));
   const blocked = results.filter((item) => item.state.startsWith('BLOCKED'));
+  const blockedByState = blocked.reduce((counts, item) => {
+    counts[item.state] = (counts[item.state] || 0) + 1;
+    return counts;
+  }, {});
+  const failureReceipts = blocked.flatMap((item) =>
+    item.failureReceipts?.length
+      ? item.failureReceipts.map((receipt) => ({ pullRequest: item.number, state: item.state, ...receipt }))
+      : [{ pullRequest: item.number, state: item.state, receiptId: `pr-${item.number}:${item.state}`, code: item.state }],
+  );
   const receipt = {
     schema: SCHEMA,
     mode: 'rollover',
@@ -348,6 +399,9 @@ export async function rolloverMode() {
     order,
     results,
     blockedCount: blocked.length,
+    blockedByState,
+    failureReceiptCount: failureReceipts.length,
+    failureReceipts,
     predecessorProofExpiresOnHeadMove: true,
     ...nonAuthorizingMergeState,
   };
