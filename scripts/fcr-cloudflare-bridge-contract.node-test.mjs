@@ -90,6 +90,28 @@ test('Access public receipt is schema-v3, exact-head bound, and exposes only bou
   assert.doesNotMatch(returnStep, /cat "\$browser_receipt"/);
 });
 
+test('browser receipt must pass one-document bounded schema before public projection', () => {
+  const returnStep = workflowSection(
+    '- name: Return sanitized recovery receipt to founder control issue',
+    '- name: Upload sanitized recovery evidence',
+  );
+  assert.equal((returnStep.match(/jq -e -s/g) ?? []).length, 2);
+  assert.equal((returnStep.match(/length == 1/g) ?? []).length, 2);
+  assert.match(returnStep, /\.schemaVersion == 1/);
+  assert.match(returnStep, /\.scope == "fcr-access-front-door-browser-proof"/);
+  assert.match(returnStep, /\.expectedHeadSha == \$expectedHeadSha/);
+  assert.match(returnStep, /\.audience == "random-stranger"/);
+  assert.match(returnStep, /\.requestedOrigin == "https:\/\/foundercontrolroom\.org"/);
+  assert.match(returnStep, /\.publicOrigin == "https:\/\/www\.foundercontrolroom\.org"/);
+  assert.match(returnStep, /\.founderSignInVisible \| type == "boolean"/);
+  assert.match(returnStep, /\.founderShellVisible \| type == "boolean"/);
+  assert.match(returnStep, /\.founderAuthorityContained \| type == "boolean"/);
+  assert.match(returnStep, /\.apiVersionMatchesExpectedSha \| type == "boolean"/);
+  assert.match(returnStep, /\.state == "unknown" or \.state == "proven" or \.state == "failed"/);
+  assert.match(returnStep, /Browser proof receipt: `malformed`/);
+  assert.match(returnStep, /single-document public schema allowlist/);
+});
+
 test('provider mutation is update-only on one existing mixed Access application', () => {
   assert.match(reconciliation, /'PUT'/);
   assert.doesNotMatch(reconciliation, /'POST'/);
@@ -99,6 +121,8 @@ test('provider mutation is update-only on one existing mixed Access application'
   assert.match(reconciliation, /withoutBrowserDestinations/);
   assert.match(reconciliation, /sourcePolicyFingerprint/);
   assert.match(reconciliation, /sourceIdentityFingerprint/);
+  assert.match(reconciliation, /browser-access-source-drift-before-write/);
+  assert.match(reconciliation, /mutationOutcome = 'not-attempted'/);
   assert.match(reconciliation, /rollbackFcrPublicAccessZone/);
   assert.doesNotMatch(reconciliation, /\/dns_records|\/routes|wrangler|supabase/i);
 });
