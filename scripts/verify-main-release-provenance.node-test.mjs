@@ -324,3 +324,14 @@ test('main provenance workflow observes every first-parent successor after histo
   assert.match(workflow, /SUCCESSOR_COMMITS_JSON/);
   assert.match(workflow, /TERMINAL_RATIFIED_TIP/);
 });
+
+test('main provenance workflow re-reads mutable main at the final decision boundary', () => {
+  const workflow = readFileSync(new URL('../.github/workflows/main-release-provenance.yml', import.meta.url), 'utf8');
+  const verifier = workflow.indexOf('- name: Verify release provenance against live GitHub state');
+  const liveRead = workflow.indexOf('export CURRENT_MAIN_SHA="$(gh api', verifier);
+  const classifier = workflow.indexOf('node scripts/verify-main-release-provenance.mjs', verifier);
+
+  assert.ok(verifier >= 0, 'live provenance verifier step must exist');
+  assert.ok(liveRead > verifier, 'verifier must re-read current main after successor observation');
+  assert.ok(classifier > liveRead, 'classifier must consume the final current-main read');
+});
