@@ -95,8 +95,8 @@ jobs:
               raise SystemExit('Probe capability must remain repo-native.')
           if capability.get('owner') != 'chief-ai-machine':
               raise SystemExit('Probe capability owner must remain chief-ai-machine.')
-          if capability.get('authorityCeiling') not in {'reason', 'draft'}:
-              raise SystemExit('Probe capability authority ceiling may not exceed draft.')
+          if capability.get('authorityCeiling') != 'draft':
+              raise SystemExit('Probe capability authority ceiling must be draft.')
           if not re.fullmatch(r'[0-9a-f]{64}', str(capability.get('sourceHash', '')).lower()):
               raise SystemExit('Probe capability sourceHash must be sha256.')
 
