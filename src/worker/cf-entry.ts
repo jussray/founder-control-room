@@ -19,6 +19,7 @@ import {
   validateWorkerEnv,
   type ControlRoomWorkerEnv,
 } from './handler.js';
+import { handleFederatedRelayV3WorkerRequest } from './federatedRelayV3.js';
 
 export { ReleaseProofWorkflowV0 } from '../workflows/releaseProofWorkflow.js';
 
@@ -28,9 +29,24 @@ const { createServer: createExpressApp } = await import('../http/server.js');
 const app = createExpressApp();
 const nodeServer = createNodeHttpServer(app);
 const httpHandler = httpServerHandler(nodeServer) as ExportedHandler<ControlRoomWorkerEnv>;
+const httpFetch = httpHandler.fetch;
+if (!httpFetch) throw new Error('Cloudflare HTTP handler is missing fetch');
+
+const relayAwareHttpHandler: ExportedHandler<ControlRoomWorkerEnv> = {
+  async fetch(request, workerEnv, ctx) {
+    const url = new URL(request.url);
+    if (url.pathname === '/api/federated-relay/v3') {
+      return handleFederatedRelayV3WorkerRequest(
+        request,
+        workerEnv as ControlRoomWorkerEnv & { GIT_SHA?: string },
+      );
+    }
+    return httpFetch.call(httpHandler, request, workerEnv, ctx);
+  },
+};
 
 export default composeWorkerHandler(
-  httpHandler,
+  relayAwareHttpHandler,
   async () => {
     const [
       { runReconcilerCycle },
