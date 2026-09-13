@@ -2,10 +2,98 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 
 const FULL_SHA = /^[0-9a-f]{40}$/i;
 
+function mergedMainPullsForCommit(associatedPulls) {
+  if (!Array.isArray(associatedPulls)) return null;
+  return associatedPulls.filter((pull) => {
+    if (!pull || typeof pull !== 'object') return false;
+    return Boolean(pull.merged_at) && String(pull.base?.ref || '').trim() === 'main';
+  });
+}
+
+export function classifyReviewedFirstParentSuccessors({
+  terminalRatifiedTip,
+  targetSha,
+  successorCommits,
+}) {
+  const terminal = String(terminalRatifiedTip || '').trim().toLowerCase();
+  const target = String(targetSha || '').trim().toLowerCase();
+
+  if (!FULL_SHA.test(terminal) || !FULL_SHA.test(target)) {
+    return { ok: false, reason: 'invalid_successor_chain_sha' };
+  }
+  if (!Array.isArray(successorCommits)) {
+    return { ok: false, reason: 'successor_pr_provenance_unavailable', terminalRatifiedTip: terminal, targetSha: target };
+  }
+  if (terminal === target) {
+    if (successorCommits.length !== 0) {
+      return { ok: false, reason: 'unexpected_successor_commits_at_terminal_tip', terminalRatifiedTip: terminal, targetSha: target };
+    }
+    return { ok: true, reason: 'ratified_tip_is_current_main', terminalRatifiedTip: terminal, targetSha: target, successorCount: 0, successors: [] };
+  }
+  if (successorCommits.length === 0) {
+    return { ok: false, reason: 'successor_chain_missing', terminalRatifiedTip: terminal, targetSha: target };
+  }
+
+  const seen = new Set();
+  const successors = [];
+  for (const successor of successorCommits) {
+    const sha = String(successor?.sha || '').trim().toLowerCase();
+    if (!FULL_SHA.test(sha) || sha === terminal || seen.has(sha)) {
+      return { ok: false, reason: 'invalid_successor_chain', terminalRatifiedTip: terminal, targetSha: target, successorSha: sha || null };
+    }
+    seen.add(sha);
+
+    const matches = mergedMainPullsForCommit(successor?.associatedPulls);
+    if (matches === null) {
+      return { ok: false, reason: 'successor_pr_provenance_unavailable', terminalRatifiedTip: terminal, targetSha: target, successorSha: sha };
+    }
+    if (matches.length === 0) {
+      return { ok: false, reason: 'unreviewed_first_parent_successor', terminalRatifiedTip: terminal, targetSha: target, successorSha: sha };
+    }
+    if (matches.length !== 1) {
+      return {
+        ok: false,
+        reason: 'ambiguous_successor_pr_provenance',
+        terminalRatifiedTip: terminal,
+        targetSha: target,
+        successorSha: sha,
+        matchingPullRequestNumbers: matches.map((pull) => pull.number),
+      };
+    }
+
+    successors.push({
+      sha,
+      pullRequestNumber: matches[0].number,
+      mergedAt: matches[0].merged_at,
+    });
+  }
+
+  if (successors.at(-1)?.sha !== target) {
+    return {
+      ok: false,
+      reason: 'successor_chain_not_bound_to_target',
+      terminalRatifiedTip: terminal,
+      targetSha: target,
+      observedTip: successors.at(-1)?.sha ?? null,
+    };
+  }
+
+  return {
+    ok: true,
+    reason: 'reviewed_first_parent_successor_chain',
+    terminalRatifiedTip: terminal,
+    targetSha: target,
+    successorCount: successors.length,
+    successors,
+  };
+}
+
 export function classifyMainReleaseProvenance({
   targetSha,
   currentMainSha,
   associatedPulls,
+  terminalRatifiedTip = null,
+  successorCommits = null,
 }) {
   const target = String(targetSha || '').trim().toLowerCase();
   const current = String(currentMainSha || '').trim().toLowerCase();
@@ -42,6 +130,16 @@ export function classifyMainReleaseProvenance({
     };
   }
 
+  let successorChain = null;
+  if (terminalRatifiedTip !== null) {
+    successorChain = classifyReviewedFirstParentSuccessors({
+      terminalRatifiedTip,
+      targetSha: target,
+      successorCommits,
+    });
+    if (!successorChain.ok) return successorChain;
+  }
+
   const [pull] = matches;
   return {
     ok: true,
@@ -49,20 +147,36 @@ export function classifyMainReleaseProvenance({
     targetSha: target,
     pullRequestNumber: pull.number,
     mergedAt: pull.merged_at,
+    ...(successorChain ? { successorChain } : {}),
   };
 }
 
 function cli() {
   const targetSha = process.env.TARGET_SHA;
   const currentMainSha = process.env.CURRENT_MAIN_SHA;
+  const terminalRatifiedTip = process.env.TERMINAL_RATIFIED_TIP?.trim() || null;
   let associatedPulls;
+  let successorCommits = null;
   try {
     associatedPulls = JSON.parse(process.env.ASSOCIATED_PULLS_JSON || 'null');
   } catch {
     associatedPulls = null;
   }
+  if (terminalRatifiedTip !== null) {
+    try {
+      successorCommits = JSON.parse(process.env.SUCCESSOR_COMMITS_JSON || 'null');
+    } catch {
+      successorCommits = null;
+    }
+  }
 
-  const result = classifyMainReleaseProvenance({ targetSha, currentMainSha, associatedPulls });
+  const result = classifyMainReleaseProvenance({
+    targetSha,
+    currentMainSha,
+    associatedPulls,
+    terminalRatifiedTip,
+    successorCommits,
+  });
   mkdirSync('artifacts', { recursive: true });
   writeFileSync('artifacts/main-release-provenance.json', `${JSON.stringify(result, null, 2)}\n`, 'utf8');
   process.stdout.write(`${JSON.stringify(result)}\n`);
