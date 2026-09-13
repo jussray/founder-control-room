@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import {
@@ -21,12 +22,96 @@ function rawSecret(env, name) {
   return typeof env?.[name] === 'string' ? env[name] : '';
 }
 
-function tokenCandidates(env, { apply = false } = {}) {
-  const name = apply
-    ? 'CLOUDFLARE_ACCESS_ADMIN_API_TOKEN'
-    : 'CLOUDFLARE_ACCESS_API_TOKEN';
-  const value = rawSecret(env, name);
-  return value.length > 0 ? [[name, value]] : [];
+function destinationType(destination) {
+  return clean(destination?.type).toLowerCase();
+}
+
+function normalizePublicUri(value) {
+  return clean(value)
+    .toLowerCase()
+    .replace(/^https?:\/\//, '')
+    .replace(/\/$/, '');
+}
+
+function publicHost(value) {
+  return normalizePublicUri(value).split('/')[0];
+}
+
+function browserHosts(zone = FCR_PUBLIC_ZONE) {
+  const target = clean(zone).toLowerCase();
+  return new Set([target, `www.${target}`]);
+}
+
+export function isBrowserFacingFcrPublicDestination(destination, zone = FCR_PUBLIC_ZONE) {
+  if (destinationType(destination) !== 'public') return false;
+  return browserHosts(zone).has(publicHost(destination?.uri || destination?.hostname));
+}
+
+export function appHasBrowserFacingFcrDestination(application, zone = FCR_PUBLIC_ZONE) {
+  return (Array.isArray(application?.destinations) ? application.destinations : [])
+    .some((destination) => isBrowserFacingFcrPublicDestination(destination, zone));
+}
+
+export function browserFacingDestinationCount(application, zone = FCR_PUBLIC_ZONE) {
+  return (Array.isArray(application?.destinations) ? application.destinations : [])
+    .filter((destination) => isBrowserFacingFcrPublicDestination(destination, zone))
+    .length;
+}
+
+export function matchingAccessReasons(application, zone = FCR_PUBLIC_ZONE) {
+  const reasons = [];
+  if (appHasBrowserFacingFcrDestination(application, zone)) reasons.push('browser-public-destination');
+  const destinations = Array.isArray(application?.destinations) ? application.destinations : [];
+  if (destinations.some((destination) => destinationType(destination) === 'all_workers')) {
+    reasons.push('all-workers');
+  }
+  if (destinations.some((destination) => destinationType(destination) === 'worker')) {
+    reasons.push('worker');
+  }
+  return reasons;
+}
+
+export function isEveryoneBypassPolicy(policy) {
+  if (clean(policy?.decision).toLowerCase() !== 'bypass') return false;
+  const include = Array.isArray(policy?.include) ? policy.include : [];
+  const require = Array.isArray(policy?.require) ? policy.require : [];
+  const exclude = Array.isArray(policy?.exclude) ? policy.exclude : [];
+  if (require.length > 0 || exclude.length > 0) return false;
+  return include.some(
+    (rule) => rule && typeof rule === 'object' && rule.everyone && typeof rule.everyone === 'object',
+  );
+}
+
+function stableValue(value) {
+  if (Array.isArray(value)) return value.map(stableValue);
+  if (!value || typeof value !== 'object') return value;
+  return Object.fromEntries(
+    Object.entries(value)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, item]) => [key, stableValue(item)]),
+  );
+}
+
+function fingerprint(value) {
+  return createHash('sha256')
+    .update(JSON.stringify(stableValue(value)))
+    .digest('hex');
+}
+
+function applicationIdentityFingerprint(application) {
+  const copy = structuredClone(application ?? {});
+  delete copy.destinations;
+  delete copy.created_at;
+  delete copy.updated_at;
+  return fingerprint(copy);
+}
+
+function policyFingerprint(policies) {
+  return fingerprint(Array.isArray(policies) ? policies : []);
+}
+
+function destinationsFingerprint(destinations) {
+  return fingerprint(Array.isArray(destinations) ? destinations : []);
 }
 
 function assertCanonicalAccountAuthority(accountId) {
@@ -43,64 +128,12 @@ function assertCanonicalAccountAuthority(accountId) {
   throw error;
 }
 
-function normalizePublicUri(value) {
-  return clean(value)
-    .toLowerCase()
-    .replace(/^https?:\/\//, '')
-    .replace(/\/$/, '');
-}
-
-export function publicDestinationTargetsHost(destination, hostname = FCR_PUBLIC_ZONE) {
-  if (clean(destination?.type).toLowerCase() !== 'public') return false;
-  const uri = normalizePublicUri(destination?.uri || destination?.hostname);
-  const target = clean(hostname).toLowerCase();
-  return uri === target || uri === `${target}/*` || uri.startsWith(`${target}/`);
-}
-
-export function appHasExactPublicDestination(app, hostname = FCR_PUBLIC_ZONE) {
-  return (Array.isArray(app?.destinations) ? app.destinations : [])
-    .some((destination) => publicDestinationTargetsHost(destination, hostname));
-}
-
-export function appHasOnlyManagedPublicDestination(app, hostname = FCR_PUBLIC_ZONE) {
-  const destinations = Array.isArray(app?.destinations) ? app.destinations : [];
-  return destinations.length === 1
-    && clean(destinations[0]?.type).toLowerCase() === 'public'
-    && normalizePublicUri(destinations[0]?.uri || destinations[0]?.hostname)
-      === `${clean(hostname).toLowerCase()}/*`;
-}
-
-export function appHasOnlyEquivalentPublicDestination(app, hostname = FCR_PUBLIC_ZONE) {
-  const destinations = Array.isArray(app?.destinations) ? app.destinations : [];
-  if (destinations.length !== 1 || clean(destinations[0]?.type).toLowerCase() !== 'public') return false;
-  const uri = normalizePublicUri(destinations[0]?.uri || destinations[0]?.hostname);
-  const target = clean(hostname).toLowerCase();
-  // Cloudflare documents an apex-domain Access application as protecting the
-  // entire website. Treat that provider shape as equivalent to an explicit /*
-  // only for read-only semantic recognition. Creation and rollback remain
-  // pinned to the explicit managed /* representation.
-  return uri === target || uri === `${target}/*`;
-}
-
-export function isEveryoneBypassPolicy(policy) {
-  if (clean(policy?.decision).toLowerCase() !== 'bypass') return false;
-  const include = Array.isArray(policy?.include) ? policy.include : [];
-  const require = Array.isArray(policy?.require) ? policy.require : [];
-  const exclude = Array.isArray(policy?.exclude) ? policy.exclude : [];
-  if (require.length > 0 || exclude.length > 0) return false;
-  return include.some(
-    (rule) => rule && typeof rule === 'object' && rule.everyone && typeof rule.everyone === 'object',
-  );
-}
-
-export function matchingAccessReasons(application, zone = FCR_PUBLIC_ZONE) {
-  const reasons = [];
-  if (appHasExactPublicDestination(application, zone)) reasons.push('public-destination');
-  const destinations = Array.isArray(application?.destinations) ? application.destinations : [];
-  if (destinations.some((destination) => clean(destination?.type).toLowerCase() === 'all_workers')) {
-    reasons.push('all-workers');
-  }
-  return reasons;
+function tokenCandidates(env, { apply = false } = {}) {
+  const name = apply
+    ? 'CLOUDFLARE_ACCESS_ADMIN_API_TOKEN'
+    : 'CLOUDFLARE_ACCESS_API_TOKEN';
+  const value = rawSecret(env, name);
+  return value.length > 0 ? [[name, value]] : [];
 }
 
 async function cloudflareJson({ token, fetchImpl }, method, path, body) {
@@ -126,6 +159,49 @@ async function cloudflareJson({ token, fetchImpl }, method, path, body) {
   return payload?.result ?? null;
 }
 
+async function listApplications({ token, fetchImpl, accountId }) {
+  const result = await cloudflareJson(
+    { token, fetchImpl },
+    'GET',
+    `/accounts/${accountId}/access/apps?per_page=1000`,
+  );
+  return Array.isArray(result) ? result : [];
+}
+
+async function getApplication({ token, fetchImpl, accountId, appId }) {
+  return cloudflareJson(
+    { token, fetchImpl },
+    'GET',
+    `/accounts/${accountId}/access/apps/${encodeURIComponent(appId)}`,
+  );
+}
+
+async function listPolicies({ token, fetchImpl, accountId, appId }) {
+  const result = await cloudflareJson(
+    { token, fetchImpl },
+    'GET',
+    `/accounts/${accountId}/access/apps/${encodeURIComponent(appId)}/policies?per_page=1000`,
+  );
+  return Array.isArray(result) ? result : [];
+}
+
+async function updateDestinations({ token, fetchImpl, accountId, appId, destinations }) {
+  const current = await getApplication({ token, fetchImpl, accountId, appId });
+  const domain = clean(current?.domain);
+  const type = clean(current?.type);
+  if (!domain || type !== 'self_hosted') {
+    const error = new Error('Access destination mutation requires a self-hosted application with a stable provider domain.');
+    error.classification = 'browser-access-source-shape-unsupported';
+    throw error;
+  }
+  return cloudflareJson(
+    { token, fetchImpl },
+    'PUT',
+    `/accounts/${accountId}/access/apps/${encodeURIComponent(appId)}`,
+    { domain, type, destinations },
+  );
+}
+
 async function selectCredential({ env, accountId, fetchImpl, apply }) {
   const failures = [];
   const candidates = tokenCandidates(env, { apply });
@@ -136,8 +212,8 @@ async function selectCredential({ env, accountId, fetchImpl, apply }) {
   if (candidates.length === 0) {
     const error = new Error(
       apply
-        ? 'CLOUDFLARE_ACCESS_ADMIN_API_TOKEN is required for Access mutation; read-only or general-purpose credentials are not mutation authority.'
-        : 'CLOUDFLARE_ACCESS_API_TOKEN is required for Access inspection; admin or general-purpose credentials are not read-authority fallbacks.',
+        ? 'CLOUDFLARE_ACCESS_ADMIN_API_TOKEN is required to detach browser-facing Access destinations.'
+        : 'CLOUDFLARE_ACCESS_API_TOKEN is required for Access inspection.',
     );
     error.classification = apply
       ? 'dedicated-admin-credential-required'
@@ -162,15 +238,11 @@ async function selectCredential({ env, accountId, fetchImpl, apply }) {
     }
 
     try {
-      const applications = await cloudflareJson(
-        { token, fetchImpl },
-        'GET',
-        `/accounts/${accountId}/access/apps?per_page=1000`,
-      );
+      const applications = await listApplications({ token, fetchImpl, accountId });
       return {
         source,
         token,
-        applications: Array.isArray(applications) ? applications : [],
+        applications,
         failures,
       };
     } catch (error) {
@@ -179,71 +251,24 @@ async function selectCredential({ env, accountId, fetchImpl, apply }) {
         reason: 'provider-read-failed',
         status: Number.isInteger(error?.providerStatus) ? error.providerStatus : null,
         providerCodes: Array.isArray(error?.providerCodes) ? error.providerCodes : [],
-        nextAction: 'verify token scope and Cloudflare Access Apps and Policies permissions for this account',
+        nextAction: 'verify the dedicated FCR Access token scope and account binding',
       });
     }
   }
 
-  const error = new Error(
-    apply
-      ? 'The dedicated Cloudflare Access admin credential could not read Access applications; mutation is blocked.'
-      : 'The dedicated Cloudflare Access read credential could not read Access applications.',
-  );
+  const error = new Error('The dedicated Cloudflare Access credential could not inspect Access applications.');
   error.classification = failures.some((failure) => failure.reason === 'provider-read-failed')
     ? 'provider-read-failed'
     : 'provider-credential-invalid';
-  error.credentialFailures = failures.length > 0
-    ? failures
-    : [{
-        source: requiredName,
-        reason: 'missing',
-        nextAction: nextCredentialAction(requiredName, 'missing'),
-      }];
+  error.credentialFailures = failures;
   throw error;
-}
-
-async function listPolicies({ token, fetchImpl, accountId, appId }) {
-  const result = await cloudflareJson(
-    { token, fetchImpl },
-    'GET',
-    `/accounts/${accountId}/access/apps/${encodeURIComponent(appId)}/policies?per_page=1000`,
-  );
-  return Array.isArray(result) ? result : [];
-}
-
-async function createPublicBypassApplication({ token, fetchImpl, accountId, zone }) {
-  return cloudflareJson(
-    { token, fetchImpl },
-    'POST',
-    `/accounts/${accountId}/access/apps`,
-    {
-      name: FCR_PUBLIC_ACCESS_APP_NAME,
-      type: 'self_hosted',
-      domain: zone,
-      session_duration: '24h',
-      destinations: [{ type: 'public', uri: `${zone}/*` }],
-      policies: [{
-        name: 'Bypass public Founder Control Room apex',
-        decision: 'bypass',
-        include: [{ everyone: {} }],
-        precedence: 1,
-      }],
-    },
-  );
-}
-
-async function deleteApplication({ token, fetchImpl, accountId, appId }) {
-  await cloudflareJson(
-    { token, fetchImpl },
-    'DELETE',
-    `/accounts/${accountId}/access/apps/${encodeURIComponent(appId)}`,
-  );
 }
 
 function receiptBase({ apply, accountId, zone }) {
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     scope: 'fcr-access-front-door-recovery',
+    desiredState: 'fcr-product-auth-without-cloudflare-access-screen',
     observedAt: new Date().toISOString(),
     workflowRunId: process.env.GITHUB_RUN_ID || null,
     workflowRunAttempt: process.env.GITHUB_RUN_ATTEMPT || null,
@@ -256,13 +281,18 @@ function receiptBase({ apply, accountId, zone }) {
     zone,
     credentialSource: null,
     credentialFailures: [],
-    denyUnmatchedRequests: null,
-    alreadyExempt: null,
     matchingApplicationCount: null,
+    browserAccessDestinationCount: null,
+    preservedNonBrowserDestinationCount: null,
     action: 'none',
+    classification: null,
     blocker: null,
     nextAction: null,
-    managedApplicationId: null,
+    sourceApplicationId: null,
+    originalDestinations: null,
+    expectedPostDestinations: null,
+    sourceIdentityFingerprint: null,
+    sourcePolicyFingerprint: null,
   };
 }
 
@@ -272,20 +302,24 @@ function attachCredentialFailure(error, credential) {
   return error;
 }
 
-function providerPolicyReadFailure(error, credential) {
-  error.classification = 'provider-read-failed';
-  error.credentialSource = credential.source;
-  error.credentialFailures = [
-    ...credential.failures,
-    {
-      source: credential.source,
-      reason: 'provider-read-failed',
-      status: Number.isInteger(error?.providerStatus) ? error.providerStatus : null,
-      providerCodes: Array.isArray(error?.providerCodes) ? error.providerCodes : [],
-      nextAction: 'grant the dedicated FCR Access credential Access Apps and Policies read authority, then rerun inspection',
-    },
-  ];
-  return error;
+function browserApplications(applications, zone) {
+  return (Array.isArray(applications) ? applications : [])
+    .filter((application) => appHasBrowserFacingFcrDestination(application, zone));
+}
+
+function totalBrowserDestinations(applications, zone) {
+  return browserApplications(applications, zone)
+    .reduce((total, application) => total + browserFacingDestinationCount(application, zone), 0);
+}
+
+function withoutBrowserDestinations(application, zone) {
+  return (Array.isArray(application?.destinations) ? application.destinations : [])
+    .filter((destination) => !isBrowserFacingFcrPublicDestination(destination, zone))
+    .map((destination) => structuredClone(destination));
+}
+
+function sameDestinations(left, right) {
+  return destinationsFingerprint(left) === destinationsFingerprint(right);
 }
 
 export async function reconcileFcrPublicAccessZone({
@@ -302,169 +336,165 @@ export async function reconcileFcrPublicAccessZone({
     fetchImpl,
     apply,
   });
-
-  const exactPublicApps = credential.applications
-    .filter((application) => appHasExactPublicDestination(application, zone));
-  const namedManagedApps = exactPublicApps
-    .filter((application) => clean(application?.name) === FCR_PUBLIC_ACCESS_APP_NAME);
-
+  const matching = browserApplications(credential.applications, zone);
   const receipt = {
     ...receiptBase({ apply, accountId: canonicalAccountId, zone }),
     credentialSource: credential.source,
     credentialFailures: credential.failures,
-    matchingApplicationCount: exactPublicApps.length,
+    matchingApplicationCount: matching.length,
+    browserAccessDestinationCount: totalBrowserDestinations(credential.applications, zone),
   };
 
-  if (exactPublicApps.length > 1) {
-    const error = new Error('More than one Access application targets the FCR public apex; refusing to infer ownership or mutate automatically.');
-    error.classification = namedManagedApps.length > 1
-      ? 'duplicate-managed-public-bypass'
-      : 'existing-public-access-app-requires-review';
-    error.matchingApplications = exactPublicApps;
-    throw attachCredentialFailure(error, credential);
-  }
-
-  const existingPublic = exactPublicApps[0] || null;
-  if (existingPublic) {
-    const isNamedManaged = clean(existingPublic?.name) === FCR_PUBLIC_ACCESS_APP_NAME;
-    const isExactManagedDestination = appHasOnlyManagedPublicDestination(existingPublic, zone);
-
-    if (!appHasOnlyEquivalentPublicDestination(existingPublic, zone)) {
-      let policies;
-      try {
-        policies = await listPolicies({
-          token: credential.token,
-          fetchImpl,
-          accountId: canonicalAccountId,
-          appId: existingPublic.id,
-        });
-      } catch (error) {
-        throw providerPolicyReadFailure(error, credential);
-      }
-
-      const error = new Error(
-        isNamedManaged
-          ? 'The managed FCR public-bypass application destination drifted from the exact public apex scope.'
-          : 'An existing non-managed Access application targets the FCR apex with broader or different destination scope; manual review is required before mutation.',
-      );
-      error.classification = isNamedManaged
-        ? 'managed-public-bypass-drift'
-        : 'existing-public-access-app-requires-review';
-      error.matchingApplications = [existingPublic];
-      error.alreadyExempt = policies.some(isEveryoneBypassPolicy);
-      throw attachCredentialFailure(error, credential);
-    }
-
-    let policies;
-    try {
-      policies = await listPolicies({
-        token: credential.token,
-        fetchImpl,
-        accountId: canonicalAccountId,
-        appId: existingPublic.id,
-      });
-    } catch (error) {
-      throw providerPolicyReadFailure(error, credential);
-    }
-
-    if (!policies.some(isEveryoneBypassPolicy)) {
-      const error = new Error(
-        isNamedManaged
-          ? 'The managed FCR public-bypass application is missing the required Everyone bypass policy.'
-          : 'An existing non-managed Access application owns the exact FCR public destination but is not an Everyone bypass; manual review is required before mutation.',
-      );
-      error.classification = isNamedManaged
-        ? 'managed-public-bypass-policy-drift'
-        : 'existing-public-access-app-requires-review';
-      error.matchingApplications = [existingPublic];
-      error.alreadyExempt = false;
-      throw attachCredentialFailure(error, credential);
-    }
-
+  if (matching.length === 0) {
     return {
       ...receipt,
       state: 'clear',
-      alreadyExempt: true,
-      action: 'already-public-bypass',
-      // A behaviorally equivalent app may be recognized as provider truth,
-      // but only the exact workflow-managed shape can become a rollback target.
-      managedApplicationId: isNamedManaged && isExactManagedDestination
-        ? (clean(existingPublic.id) || null)
-        : null,
-      nextAction: 'run exact-head anonymous Playwright and verify the public front door',
+      action: 'browser-access-already-detached',
+      nextAction: 'verify the FCR-owned sign-in surface and runtime identity with stranger-path Playwright',
     };
+  }
+
+  if (matching.length > 1) {
+    const error = new Error('More than one Access application owns an FCR browser-facing destination; refusing to guess provider ownership.');
+    error.classification = 'multiple-browser-access-apps-require-review';
+    error.matchingApplications = matching;
+    throw attachCredentialFailure(error, credential);
+  }
+
+  const source = matching[0];
+  const sourceId = clean(source?.id);
+  if (!sourceId) {
+    const error = new Error('The browser-facing Access application has no stable provider ID.');
+    error.classification = 'browser-access-source-id-missing';
+    throw attachCredentialFailure(error, credential);
+  }
+
+  const remainingDestinations = withoutBrowserDestinations(source, zone);
+  const originalDestinations = (Array.isArray(source?.destinations) ? source.destinations : [])
+    .map((destination) => structuredClone(destination));
+
+  if (remainingDestinations.length === 0) {
+    const error = new Error(
+      'The only matching Access application is public-only. Automatic deletion is intentionally blocked; remove it through a separately reviewed exact provider action.',
+    );
+    error.classification = 'public-only-access-app-requires-reviewed-deletion';
+    error.matchingApplications = [source];
+    throw attachCredentialFailure(error, credential);
   }
 
   if (!apply) {
     return {
       ...receipt,
       state: 'attention',
-      action: 'would-create-public-bypass',
-      blocker: 'no exact managed public Access destination exists for foundercontrolroom.org/*',
-      nextAction: 'founder-approved apply may create only the exact public apex destination with an Everyone bypass policy',
+      action: 'would-detach-browser-access',
+      preservedNonBrowserDestinationCount: remainingDestinations.length,
+      blocker: 'Cloudflare Access currently owns one or more FCR browser-facing destinations.',
+      nextAction: 'founder-approved apply may remove only the browser-facing public destinations while preserving every non-browser destination and policy',
     };
   }
 
   if (credential.source !== 'CLOUDFLARE_ACCESS_ADMIN_API_TOKEN') {
-    throw new Error('Mutation authority must come from CLOUDFLARE_ACCESS_ADMIN_API_TOKEN.');
+    const error = new Error('Browser Access detachment requires the dedicated Access admin credential.');
+    error.classification = 'dedicated-admin-credential-required';
+    throw attachCredentialFailure(error, credential);
   }
 
-  let createdApp = null;
+  let policiesBefore;
   try {
-    createdApp = await createPublicBypassApplication({
+    policiesBefore = await listPolicies({
       token: credential.token,
       fetchImpl,
       accountId: canonicalAccountId,
-      zone,
+      appId: sourceId,
     });
-    const appId = clean(createdApp?.id);
-    if (!appId) throw new Error('CREATED_ACCESS_APP_ID_MISSING');
-    if (clean(createdApp?.name) !== FCR_PUBLIC_ACCESS_APP_NAME
-      || !appHasOnlyManagedPublicDestination(createdApp, zone)) {
-      throw new Error('CREATED_PUBLIC_BYPASS_SCOPE_MISMATCH');
-    }
-
-    const policies = await listPolicies({
-      token: credential.token,
-      fetchImpl,
-      accountId: canonicalAccountId,
-      appId,
-    });
-    if (!policies.some(isEveryoneBypassPolicy)) {
-      throw new Error('CREATED_PUBLIC_BYPASS_POLICY_MISSING');
-    }
-
-    return {
-      ...receipt,
-      state: 'mutated-needs-browser-proof',
-      mutationPerformed: true,
-      matchingApplicationCount: 1,
-      action: 'created-public-bypass',
-      managedApplicationId: appId,
-      nextAction: 'run exact-head anonymous Playwright; rollback this created app if browser proof fails',
-    };
   } catch (error) {
-    let rollbackPerformed = false;
-    if (clean(createdApp?.id)) {
-      try {
-        await deleteApplication({
-          token: credential.token,
-          fetchImpl,
-          accountId: canonicalAccountId,
-          appId: clean(createdApp.id),
-        });
-        rollbackPerformed = true;
-      } catch {
-        rollbackPerformed = false;
-      }
-    }
-    error.classification = error.classification || 'provider-apply-failed';
-    error.credentialSource = credential.source;
-    error.credentialFailures = credential.failures;
-    error.rollbackPerformed = rollbackPerformed;
-    error.managedApplicationId = clean(createdApp?.id) || null;
-    throw error;
+    error.classification = 'provider-read-failed';
+    throw attachCredentialFailure(error, credential);
   }
+
+  const evidence = {
+    sourceApplicationId: sourceId,
+    originalDestinations,
+    expectedPostDestinations: remainingDestinations,
+    sourceIdentityFingerprint: applicationIdentityFingerprint(source),
+    sourcePolicyFingerprint: policyFingerprint(policiesBefore),
+  };
+
+  try {
+    await updateDestinations({
+      token: credential.token,
+      fetchImpl,
+      accountId: canonicalAccountId,
+      appId: sourceId,
+      destinations: remainingDestinations,
+    });
+  } catch (error) {
+    error.classification = error.classification || 'browser-access-detach-write-failed';
+    error.recoveryEvidence = evidence;
+    error.mutationOutcome = 'unknown';
+    throw attachCredentialFailure(error, credential);
+  }
+
+  let applicationsAfter;
+  let sourceAfter;
+  try {
+    applicationsAfter = await listApplications({
+      token: credential.token,
+      fetchImpl,
+      accountId: canonicalAccountId,
+    });
+    sourceAfter = applicationsAfter.find((application) => clean(application?.id) === sourceId) ?? null;
+  } catch (error) {
+    error.classification = 'browser-access-detach-reconcile-required';
+    error.recoveryEvidence = evidence;
+    error.mutationOutcome = 'unknown';
+    throw attachCredentialFailure(error, credential);
+  }
+
+  if (!sourceAfter || !sameDestinations(sourceAfter.destinations, remainingDestinations)) {
+    const error = new Error('Provider readback did not prove the exact browser-destination detachment.');
+    error.classification = 'browser-access-detach-reconcile-required';
+    error.recoveryEvidence = evidence;
+    error.mutationOutcome = 'unknown';
+    throw attachCredentialFailure(error, credential);
+  }
+
+  const policiesAfter = await listPolicies({
+    token: credential.token,
+    fetchImpl,
+    accountId: canonicalAccountId,
+    appId: sourceId,
+  });
+  if (applicationIdentityFingerprint(sourceAfter) !== evidence.sourceIdentityFingerprint
+    || policyFingerprint(policiesAfter) !== evidence.sourcePolicyFingerprint) {
+    const error = new Error('The Access application changed beyond its browser-facing destination list; provider reconciliation is required.');
+    error.classification = 'browser-access-source-identity-drift';
+    error.recoveryEvidence = evidence;
+    error.mutationOutcome = 'performed';
+    throw attachCredentialFailure(error, credential);
+  }
+
+  const remainingBrowserApps = browserApplications(applicationsAfter, zone);
+  if (remainingBrowserApps.length !== 0) {
+    const error = new Error('Provider readback still shows Cloudflare Access owning an FCR browser-facing destination.');
+    error.classification = 'browser-access-detach-incomplete';
+    error.recoveryEvidence = evidence;
+    error.mutationOutcome = 'performed';
+    error.matchingApplications = remainingBrowserApps;
+    throw attachCredentialFailure(error, credential);
+  }
+
+  return {
+    ...receipt,
+    ...evidence,
+    state: 'mutated-needs-browser-proof',
+    mutationPerformed: true,
+    matchingApplicationCount: 0,
+    browserAccessDestinationCount: 0,
+    preservedNonBrowserDestinationCount: remainingDestinations.length,
+    action: 'detached-browser-access',
+    nextAction: 'run anonymous Playwright; Cloudflare Access must not intercept the public FCR experience, while FCR-owned founder authentication remains contained',
+  };
 }
 
 export async function rollbackFcrPublicAccessZone({
@@ -474,8 +504,7 @@ export async function rollbackFcrPublicAccessZone({
   zone = FCR_PUBLIC_ZONE,
 } = {}) {
   const canonicalAccountId = assertCanonicalAccountAuthority(accountId);
-  const raw = await readFile(RECEIPT_PATH, 'utf8');
-  const evidence = JSON.parse(raw);
+  const evidence = JSON.parse(await readFile(RECEIPT_PATH, 'utf8'));
 
   if (evidence?.scope !== 'fcr-access-front-door-recovery'
     || evidence?.accountId !== canonicalAccountId
@@ -488,15 +517,22 @@ export async function rollbackFcrPublicAccessZone({
   if (evidence?.mutationPerformed !== true || evidence?.rollbackPerformed === true) {
     return {
       ...evidence,
+      observedAt: new Date().toISOString(),
       state: evidence?.state || 'unknown',
       action: evidence?.action || 'none',
     };
   }
 
-  const appId = clean(evidence?.managedApplicationId);
-  if (!appId) {
-    const error = new Error('Rollback receipt is missing the managed application ID.');
-    error.classification = 'rollback-managed-app-id-missing';
+  const sourceId = clean(evidence?.sourceApplicationId);
+  const originalDestinations = Array.isArray(evidence?.originalDestinations)
+    ? evidence.originalDestinations
+    : null;
+  const expectedPostDestinations = Array.isArray(evidence?.expectedPostDestinations)
+    ? evidence.expectedPostDestinations
+    : null;
+  if (!sourceId || !originalDestinations || !expectedPostDestinations) {
+    const error = new Error('Rollback receipt is missing the exact Access source/destination evidence.');
+    error.classification = 'rollback-source-evidence-missing';
     throw error;
   }
 
@@ -506,35 +542,54 @@ export async function rollbackFcrPublicAccessZone({
     fetchImpl,
     apply: true,
   });
-  const candidates = credential.applications.filter((application) => clean(application?.id) === appId);
-  if (candidates.length !== 1) {
-    const error = new Error('Rollback could not uniquely reacquire the run-created managed Access application.');
-    error.classification = 'rollback-managed-app-not-unique';
+
+  const source = credential.applications.find((application) => clean(application?.id) === sourceId) ?? null;
+  if (!source || !sameDestinations(source.destinations, expectedPostDestinations)) {
+    const error = new Error('Rollback source no longer matches the exact post-detachment destination state.');
+    error.classification = 'rollback-source-drift';
     throw attachCredentialFailure(error, credential);
   }
 
-  const candidate = candidates[0];
-  if (clean(candidate?.name) !== FCR_PUBLIC_ACCESS_APP_NAME
-    || !appHasOnlyManagedPublicDestination(candidate, zone)) {
-    const error = new Error('Rollback candidate no longer matches the exact managed FCR public-bypass scope.');
-    error.classification = 'rollback-managed-app-drift';
-    throw attachCredentialFailure(error, credential);
-  }
-
-  await deleteApplication({
+  const policies = await listPolicies({
     token: credential.token,
     fetchImpl,
     accountId: canonicalAccountId,
-    appId,
+    appId: sourceId,
   });
+  if (applicationIdentityFingerprint(source) !== clean(evidence?.sourceIdentityFingerprint)
+    || policyFingerprint(policies) !== clean(evidence?.sourcePolicyFingerprint)) {
+    const error = new Error('Rollback source identity or policies drifted after browser Access detachment.');
+    error.classification = 'rollback-source-drift';
+    throw attachCredentialFailure(error, credential);
+  }
+
+  await updateDestinations({
+    token: credential.token,
+    fetchImpl,
+    accountId: canonicalAccountId,
+    appId: sourceId,
+    destinations: originalDestinations,
+  });
+
+  const restored = await getApplication({
+    token: credential.token,
+    fetchImpl,
+    accountId: canonicalAccountId,
+    appId: sourceId,
+  });
+  if (!sameDestinations(restored?.destinations, originalDestinations)) {
+    const error = new Error('Provider readback did not prove restoration of the exact pre-detachment destinations.');
+    error.classification = 'rollback-reconcile-required';
+    throw attachCredentialFailure(error, credential);
+  }
 
   return {
     ...evidence,
     observedAt: new Date().toISOString(),
     state: 'blocked',
     rollbackPerformed: true,
-    action: 'rolled-back-public-bypass',
-    nextAction: 'inspect browser/provider evidence before any retry',
+    action: 'restored-browser-access-after-failed-provider-apply',
+    nextAction: 'review provider evidence before another authorized attempt; do not treat the restored Access screen as intended product UX',
   };
 }
 
@@ -574,9 +629,13 @@ if (invokedDirectly) {
       } catch {
         previous = {};
       }
+      const recoveryEvidence = error?.recoveryEvidence && typeof error.recoveryEvidence === 'object'
+        ? error.recoveryEvidence
+        : {};
       const receipt = {
         ...base,
         ...(rollback ? previous : {}),
+        ...recoveryEvidence,
         observedAt: new Date().toISOString(),
         state: 'blocked',
         accountAuthority: {
@@ -584,22 +643,20 @@ if (invokedDirectly) {
           suppliedAccountIdPresent: Boolean(suppliedAccountId),
           matchesCanonical: !suppliedAccountId || suppliedAccountId === FCR_CLOUDFLARE_ACCOUNT_ID,
         },
-        credentialSource: error?.credentialSource ?? null,
+        credentialSource: error?.credentialSource ?? previous?.credentialSource ?? null,
         credentialFailures: Array.isArray(error?.credentialFailures)
           ? error.credentialFailures
-          : [],
-        alreadyExempt: typeof error?.alreadyExempt === 'boolean'
-          ? error.alreadyExempt
-          : (rollback ? previous?.alreadyExempt ?? null : null),
+          : (previous?.credentialFailures ?? []),
         matchingApplications: Array.isArray(error?.matchingApplications)
           ? error.matchingApplications
           : [],
         matchingApplicationCount: Array.isArray(error?.matchingApplications)
           ? error.matchingApplications.length
           : (previous?.matchingApplicationCount ?? null),
-        mutationPerformed: previous?.mutationPerformed === true || Boolean(error?.managedApplicationId),
+        mutationPerformed: previous?.mutationPerformed === true
+          || error?.mutationOutcome === 'performed'
+          || error?.mutationOutcome === 'unknown',
         rollbackPerformed: previous?.rollbackPerformed === true || error?.rollbackPerformed === true,
-        managedApplicationId: clean(error?.managedApplicationId) || previous?.managedApplicationId || null,
         blocker: error instanceof Error ? error.message : String(error),
         classification: error?.classification || (rollback ? 'rollback-failed' : 'provider-recovery-failed'),
         nextAction: error?.nextAction

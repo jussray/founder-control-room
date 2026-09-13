@@ -1,14 +1,14 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Bind the create-branch runtime authority membrane to current operator documentation without promoting source or CI evidence into a claim that a live GitHub branch mutation occurred.",
+  "purpose": "Bind Founder Control Room browser-authentication intent to the current Cloudflare recovery workflow without promoting source or CI evidence into a claim that live Cloudflare Access state has already changed.",
   "domains": [
-    "merge-authority"
+    "cloudflare-authority"
   ],
   "changes": [
     {
-      "path": "src/http/routes/approvals.ts",
+      "path": ".github/workflows/fcr-access-front-door-recovery.yml",
       "claims": [
-        "src/http/routes/approvals.ts must allow create_branch to reach RepositoryProvider.createBranch only after fresh create_branch proof and authenticated founder intent issue a server-owned AuthorityEnvelopeV1, the execution is reserved under the same idempotency key, current mission state is re-read immediately before mutation, and the original envelope passes exact capability, scope, arguments, state, tool-call, expiry, idempotency, and integrity validation through executeAuthorizedCreateBranch; any drift must fail closed before provider mutation and an ambiguous pending outcome requires reconciliation before retry."
+        ".github/workflows/fcr-access-front-door-recovery.yml must never restore Cloudflare Access as the Founder Control Room product-login surface: read-only inspection may observe browser-facing Access ownership, apply may detach only apex/www public browser destinations from one uniquely identified mixed application while preserving non-browser destinations and policies, ambiguous or public-only topology must fail closed, and successful detachment requires independent provider/browser evidence without granting broader provider-mutation authority."
       ]
     }
   ]
