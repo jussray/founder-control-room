@@ -37,19 +37,23 @@ describe('GitHub App secret-shape diagnostic contract', () => {
       'if (currentMainSha !== expectedMainSha)',
       fetchIndex,
     );
+    const guardThrowIndex = classificationStep.indexOf(
+      "throw new Error('Current main moved before GitHub App secret classification; refusing stale diagnostic.');",
+      compareIndex,
+    );
+    const guardCloseIndex = classificationStep.indexOf('\n          }', guardThrowIndex);
     const secretReadIndex = classificationStep.indexOf(
       "const secret = String(process.env.GITHUB_PRIVATE_KEY ?? '');",
       compareIndex,
     );
 
     expect(classificationStep).toContain('GH_TOKEN: ${{ github.token }}');
-    expect(classificationStep).not.toContain('current_main="$(gh api');
+    expect(classificationStep).not.toMatch(/\bgh\s+api\b/);
     expect(fetchIndex).toBeGreaterThan(-1);
     expect(compareIndex).toBeGreaterThan(fetchIndex);
-    expect(secretReadIndex).toBeGreaterThan(compareIndex);
-    expect(classificationStep).toContain(
-      'Current main moved before GitHub App secret classification; refusing stale diagnostic.',
-    );
+    expect(guardThrowIndex).toBeGreaterThan(compareIndex);
+    expect(guardCloseIndex).toBeGreaterThan(guardThrowIndex);
+    expect(secretReadIndex).toBeGreaterThan(guardCloseIndex);
     expect(classificationStep).toContain('exactMainRecheckedAtSecretUse: true');
   });
 
