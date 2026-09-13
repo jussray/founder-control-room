@@ -12,6 +12,8 @@
 -- 8. Supersession mutates live state but never rewrites historical acceptance receipts.
 -- 9. Relay payload is evidence/data only; it never transfers execution authority.
 -- 10. Any failure rolls back message insert, receipt, cursor advancement, supersession edges, and state changes together.
+-- 11. Only revision messages may supersede prior accepted evidence.
+-- 12. Sender retries reuse the exact durable outbox envelope and source sequence.
 
 create extension if not exists "pgcrypto";
 
@@ -360,9 +362,15 @@ begin
     if not found then
       raise exception 'relay_parent_missing';
     end if;
+    if parent_record.status <> 'accepted' then
+      raise exception 'relay_parent_inactive';
+    end if;
     if parent_record.chain_id <> p_chain_id
       or parent_record.chain_position <> chain_cursor.last_position then
       raise exception 'relay_parent_chain_mismatch';
+    end if;
+    if parent_record.logical_operation_id <> p_logical_operation_id then
+      raise exception 'relay_parent_operation_mismatch';
     end if;
 
     if p_relation_type = 'reply' then
@@ -382,12 +390,15 @@ begin
     end if;
   end if;
 
-  if p_relation_type = 'revision'
-    and coalesce(array_length(p_supersedes_message_ids, 1), 0) = 0 then
-    raise exception 'relay_revision_without_supersession';
+  if p_relation_type = 'revision' then
+    if coalesce(array_length(p_supersedes_message_ids, 1), 0) = 0 then
+      raise exception 'relay_revision_without_supersession';
+    end if;
+  elsif coalesce(array_length(p_supersedes_message_ids, 1), 0) > 0 then
+    raise exception 'relay_supersession_requires_revision';
   end if;
 
-  -- Lock every message whose live state the successor intends to retire.
+  -- Lock every message whose live state the revision intends to retire.
   foreach superseded_id in array coalesce(p_supersedes_message_ids, '{}'::uuid[])
   loop
     if superseded_id = p_message_id then
