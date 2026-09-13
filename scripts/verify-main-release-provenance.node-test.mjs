@@ -9,6 +9,7 @@ import {
 import {
   observeMainReleaseProvenance,
   shouldEnforceMainReleaseProvenance,
+  TERMINAL_RATIFIED_MAIN_TIP,
 } from './verify-production-migration-ledger.mjs';
 
 const SHA = 'a'.repeat(40);
@@ -203,6 +204,42 @@ test('provider observation failure blocks instead of manufacturing green', async
   });
   assert.equal(result.ok, false);
   assert.equal(result.reason, 'provider_unavailable');
+});
+
+test('deploy observer rejects a direct first-parent successor before a reviewed release tip', async () => {
+  const fetchImpl = async (url) => {
+    const value = String(url);
+    if (value.endsWith('/branches/main')) return response({ commit: { sha: SHA } });
+    if (value.endsWith(`/commits/${SHA}/pulls`)) return response([pr({ number: 52 })]);
+    if (value.endsWith(`/commits/${SHA}`)) {
+      return response({ sha: SHA, parents: [{ sha: DIRECT }] });
+    }
+    if (value.endsWith(`/commits/${DIRECT}/pulls`)) return response([]);
+    if (value.endsWith(`/commits/${DIRECT}`)) {
+      return response({ sha: DIRECT, parents: [{ sha: TERMINAL_RATIFIED_MAIN_TIP }] });
+    }
+    return response({}, 404);
+  };
+
+  const result = await observeMainReleaseProvenance({
+    repository: 'jussray/founder-control-room',
+    targetSha: SHA,
+    terminalRatifiedTip: TERMINAL_RATIFIED_MAIN_TIP,
+    fetchImpl,
+    token: '',
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.reason, 'unreviewed_first_parent_successor');
+  assert.equal(result.successorSha, DIRECT);
+});
+
+test('deploy ratification boundary stays bound to the extended ratification verifier', () => {
+  const extension = readFileSync(new URL('./verify-main-release-ratification-extension.mjs', import.meta.url), 'utf8');
+  assert.match(
+    extension,
+    new RegExp(`const INCIDENT_TIP = '${TERMINAL_RATIFIED_MAIN_TIP}'`),
+  );
 });
 
 test('preflight verifier is load-bearing before the first production mutation', () => {
