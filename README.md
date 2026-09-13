@@ -46,7 +46,7 @@ Exact SHAs belong in receipts, PRs, artifacts, incidents, and provenance. The RE
 
 FCR models projects, proposals, missions, exact refs, verification runs, evidence, approval state, and bounded repository operations behind provider-neutral interfaces.
 
-Branch creation through `src/http/routes/approvals.ts` is now an exact-action governed repository mutation. A fresh `create_branch` proof and authenticated founder execute request cause FCR to issue a server-derived `AuthorityEnvelopeV1` bound to `github.repository.create_branch`, repository scope, exact branch arguments, current mission-state fingerprint, tool-call identity, expiry, founder identity, and idempotency key. FCR reserves the execution before the external write, re-reads mission state immediately before mutation, and `executeAuthorizedCreateBranch()` must reject drift before `RepositoryProvider.createBranch(...)` can be reached. A pending or ambiguous execution remains reconcile-before-retry; source and CI proof of this membrane do not by themselves prove that a live GitHub branch was created.
+Branch creation through `src/http/routes/approvals.ts` is now an exact-action governed repository mutation. A fresh `create_branch` proof and authenticated founder execute request cause FCR to issue a server-derived `AuthorityEnvelopeV1` bound to `github.repository.create_branch`, repository scope, exact branch arguments, current mission-state fingerprint, tool-call identity, expiry, founder identity, and idempotency key. FCR reserves the execution before the external write, re-reads mission state immediately before mutation, and `executeAuthorizedCreateBranch()` must reject drift before `RepositoryProvider.createBranch(...)` can be reached. A pending or ambiguous execution remains reconcile-before-retry; source and CI proof of this membrane do not by themselves prove a live GitHub branch was created.
 
 ### PR continuity
 
@@ -254,6 +254,8 @@ change operational truth
 When a newer fingerprint contradicts an older present-tense statement, replace or classify the stale statement instead of leaving competing “current” truths.
 
 Documentation Truth proves documentation coverage/materiality. It does not independently prove provider configuration, deployment, browser behavior, security review, publication, or human outcome.
+
+For pull requests, the load-bearing Documentation Truth and default test-discovery baselines must resolve the provider-backed live target branch from `base.ref` at execution time. `pull_request.base.sha` is historical event-snapshot evidence only and must never serve as current proof authority. If the resolved live base is not an exact valid SHA or is not an ancestor of the exact candidate, the gate must fail closed instead of diffing against stale history.
 
 See [`docs/TRUTH_DECAY_AUDIT.md`](docs/TRUTH_DECAY_AUDIT.md).
 
