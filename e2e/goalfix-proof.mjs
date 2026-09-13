@@ -233,7 +233,13 @@ async function proveViewport(name, viewport) {
   assert(text.includes('Typecheck: passed'), `${name}: passing required proof remains visible`);
   assert(text.includes('Product Design Playwright Proof: failed'), `${name}: failed required proof remains visible`);
   assert(text.includes('Unrelated proof 24: passed'), `${name}: provider proof noise remains visible in the report`);
+  assert(/Continuity source fingerprint: [a-f0-9]{64}\./.test(text), `${name}: source fingerprint renders as exact evidence marker`);
+  assert(/Continuity evidence fingerprint: [a-f0-9]{64}\./.test(text), `${name}: evidence fingerprint renders as exact evidence marker`);
+  assert(/Proof cookie: goalfix-proof-[a-f0-9]{24} \(evidence-only; never authorization\)\./.test(text), `${name}: proof cookie renders with evidence-only boundary`);
   assert(text.includes('NEXT GATE'), `${name}: founder next gate renders`);
+  const browserCookies = await context.cookies();
+  assert(browserCookies.some((cookie) => cookie.name === SESSION_COOKIE_NAME), `${name}: opaque founder session remains the only authority-bearing browser cookie in this proof`);
+  assert(browserCookies.every((cookie) => !cookie.name.startsWith('goalfix-proof-')), `${name}: proof cookie is not written into browser cookie storage`);
   assert(JSON.stringify(await storedAttemptCounts(page)) === JSON.stringify([2]), `${name}: duplicate suites collapse to one observation per required check`);
 
   const secondResponse = await submitInspection(page);
@@ -283,5 +289,5 @@ if (failures > 0) {
   console.error(`Goalfix browser proof failed with ${failures} assertion(s).`);
   process.exitCode = 1;
 } else {
-  console.log('Goalfix browser proof passed for desktop and mobile with opaque-cookie auth, duplicate-suite collapse, exact-head recovery, and bounded required-check history.');
+  console.log('Goalfix browser proof passed for desktop and mobile with opaque-cookie auth, continuity fingerprints, evidence-only proof cookies, duplicate-suite collapse, exact-head recovery, and bounded required-check history.');
 }
