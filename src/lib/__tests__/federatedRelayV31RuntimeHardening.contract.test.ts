@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 const route = readFileSync('src/http/routes/federatedRelayV31.ts', 'utf8');
 const proof = readFileSync('scripts/prove-federated-agent-roundtrip-v31.mjs', 'utf8');
+const protectedProof = readFileSync('scripts/prove-federated-agent-roundtrip-v31-protected.mjs', 'utf8');
 const repoCycle = readFileSync('scripts/repo-cycle.mjs', 'utf8');
 const migration = readFileSync(
   'supabase/migrations/20260913224500_federated_relay_v31_observed_key_registration.sql',
@@ -103,5 +104,13 @@ describe('federated relay v3.1 runtime hardening contract', () => {
     expect(keyValidityHardening).toContain("p_public_key_jwk ? 'd'");
     expect(keyValidityHardening).toContain('from public, anon, authenticated');
     expect(keyValidityHardening).toContain('to service_role');
+  });
+
+  it('requires both proof subjects to be immutable commit-preview Worker origins', () => {
+    expect(protectedProof).toContain('IMMUTABLE_FCR_HOST');
+    expect(protectedProof).toContain("^[0-9a-f]{8}-founder-control-room\\.[a-z0-9-]+\\.workers\\.dev$");
+    expect(protectedProof).toContain('IMMUTABLE_CHIEF_HOST');
+    expect(protectedProof).toContain('if (!IMMUTABLE_FCR_HOST.test(fcrBase.hostname))');
+    expect(protectedProof).toContain('if (!IMMUTABLE_CHIEF_HOST.test(chiefBase.hostname))');
   });
 });
