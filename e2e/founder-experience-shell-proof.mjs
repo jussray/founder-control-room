@@ -50,6 +50,16 @@ async function proveViewport(label, viewport) {
   await page.goto(`${BASE_URL}/control-room/founder-shell.html`, { waitUntil: 'networkidle' });
   await page.locator('[data-fcr-experience]').waitFor({ state: 'visible' });
 
+  const signatureRootCount = await page.locator('[data-fcr-signature="cinematic-proof-v1"]').count();
+  if (signatureRootCount !== 1) {
+    throw new Error(`${label}: FCR cinematic-proof visual signature missing or duplicated`);
+  }
+
+  const signatureCopy = await page.locator('[data-signature-strip]').innerText();
+  if (!signatureCopy.includes('Same mission. Bigger impact.') || !signatureCopy.includes('A brighter tomorrow.')) {
+    throw new Error(`${label}: FCR signature phrases drifted: ${signatureCopy}`);
+  }
+
   const viewCount = await page.locator('[data-account-view]').count();
   if (viewCount !== 3) throw new Error(`${label}: expected exactly 3 experience views, got ${viewCount}`);
 
@@ -62,6 +72,11 @@ async function proveViewport(label, viewport) {
   for (const view of ['user', 'founder', 'fcr-owner']) {
     const count = await page.locator(`[data-account-view="${view}"]`).count();
     if (count !== 1) throw new Error(`${label}: missing unique ${view} view`);
+  }
+
+  const crownCount = await page.locator('.view-brand.crown').count();
+  if (crownCount !== 1) {
+    throw new Error(`${label}: crown must remain owner-only visual authority; found ${crownCount}`);
   }
 
   const bipCard = page.locator('[data-account-view="user"] .platform-strip').getByText('Se’kret Bip').locator('..');
@@ -114,7 +129,7 @@ async function proveViewport(label, viewport) {
 try {
   await proveViewport('desktop-1440', { width: 1440, height: 1100 });
   await proveViewport('mobile-390', { width: 390, height: 844 });
-  console.log('PASS: FCR user, founder, and owner views preserve two account classes, Bip platform identity, owner authority separation, responsive layout, and keyboard focus.');
+  console.log('PASS: FCR visual signature, user/founder/owner views, owner-only crown authority, Bip platform identity, responsive layout, and keyboard focus are preserved.');
 } finally {
   await browser.close();
   await new Promise((resolve) => server.close(resolve));
