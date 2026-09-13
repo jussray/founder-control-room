@@ -296,22 +296,6 @@ export const handleFederatedRelayV31: RequestHandler = async function handleFede
     }
 
     const deliveryFingerprint = await deliveryFingerprintV31(envelope);
-    const stored = await findStored(envelope.messageId);
-    if (stored) {
-      if (stored.deliveryFingerprint !== deliveryFingerprint) {
-        throw new FederatedRelayV31Error('relay_message_id_collision', 409);
-      }
-      return res.status(200).json({
-        contract: FEDERATED_AGENT_RELAY_V31,
-        delivery: 'duplicate',
-        receipt: stored.receipt,
-        currentState: stored.currentState,
-        supersededByMessageId: stored.supersededByMessageId,
-        executionAuthorized: false,
-        authorityTransferred: false,
-        approvalCarriedForward: false,
-      });
-    }
 
     const runtimeHeadSha = process.env.GIT_SHA?.trim() ?? '';
     if (!SHA40.test(runtimeHeadSha)) {
@@ -331,6 +315,26 @@ export const handleFederatedRelayV31: RequestHandler = async function handleFede
     ]);
     if (targetHead !== envelope.target.headSha || targetHead !== runtimeHeadSha) {
       throw new FederatedRelayV31Error('relay_target_identity_stale', 409);
+    }
+
+    // Exact retries remain idempotent only after the current runtime, target
+    // branch, and source reachability membranes have been revalidated. A stored
+    // receipt cannot make stale deployment identity current again.
+    const stored = await findStored(envelope.messageId);
+    if (stored) {
+      if (stored.deliveryFingerprint !== deliveryFingerprint) {
+        throw new FederatedRelayV31Error('relay_message_id_collision', 409);
+      }
+      return res.status(200).json({
+        contract: FEDERATED_AGENT_RELAY_V31,
+        delivery: 'duplicate',
+        receipt: stored.receipt,
+        currentState: stored.currentState,
+        supersededByMessageId: stored.supersededByMessageId,
+        executionAuthorized: false,
+        authorityTransferred: false,
+        approvalCarriedForward: false,
+      });
     }
 
     const acceptedAt = new Date();
