@@ -114,6 +114,10 @@ function destinationsFingerprint(destinations) {
   return fingerprint(Array.isArray(destinations) ? destinations : []);
 }
 
+function sameDestinations(left, right) {
+  return destinationsFingerprint(left) === destinationsFingerprint(right);
+}
+
 function assertCanonicalAccountAuthority(accountId) {
   const effectiveAccountId = clean(accountId);
   if (effectiveAccountId === FCR_CLOUDFLARE_ACCOUNT_ID) return FCR_CLOUDFLARE_ACCOUNT_ID;
@@ -185,13 +189,36 @@ async function listPolicies({ token, fetchImpl, accountId, appId }) {
   return Array.isArray(result) ? result : [];
 }
 
-async function updateDestinations({ token, fetchImpl, accountId, appId, destinations }) {
+async function updateDestinations({
+  token,
+  fetchImpl,
+  accountId,
+  appId,
+  destinations,
+  expectedCurrentDestinations = null,
+  expectedIdentityFingerprint = null,
+}) {
   const current = await getApplication({ token, fetchImpl, accountId, appId });
   const domain = clean(current?.domain);
   const type = clean(current?.type);
   if (!domain || type !== 'self_hosted') {
     const error = new Error('Access destination mutation requires a self-hosted application with a stable provider domain.');
     error.classification = 'browser-access-source-shape-unsupported';
+    error.mutationOutcome = 'not-attempted';
+    throw error;
+  }
+  if (expectedCurrentDestinations
+    && !sameDestinations(current?.destinations, expectedCurrentDestinations)) {
+    const error = new Error('Access destinations changed after observation; refusing to overwrite newer provider state.');
+    error.classification = 'browser-access-source-drift-before-write';
+    error.mutationOutcome = 'not-attempted';
+    throw error;
+  }
+  if (expectedIdentityFingerprint
+    && applicationIdentityFingerprint(current) !== expectedIdentityFingerprint) {
+    const error = new Error('Access application identity changed after observation; refusing provider mutation.');
+    error.classification = 'browser-access-source-drift-before-write';
+    error.mutationOutcome = 'not-attempted';
     throw error;
   }
   return cloudflareJson(
@@ -318,10 +345,6 @@ function withoutBrowserDestinations(application, zone) {
     .map((destination) => structuredClone(destination));
 }
 
-function sameDestinations(left, right) {
-  return destinationsFingerprint(left) === destinationsFingerprint(right);
-}
-
 export async function reconcileFcrPublicAccessZone({
   env = process.env,
   fetchImpl = fetch,
@@ -427,11 +450,13 @@ export async function reconcileFcrPublicAccessZone({
       accountId: canonicalAccountId,
       appId: sourceId,
       destinations: remainingDestinations,
+      expectedCurrentDestinations: originalDestinations,
+      expectedIdentityFingerprint: evidence.sourceIdentityFingerprint,
     });
   } catch (error) {
     error.classification = error.classification || 'browser-access-detach-write-failed';
     error.recoveryEvidence = evidence;
-    error.mutationOutcome = 'unknown';
+    error.mutationOutcome = error?.mutationOutcome || 'unknown';
     throw attachCredentialFailure(error, credential);
   }
 
@@ -569,6 +594,8 @@ export async function rollbackFcrPublicAccessZone({
     accountId: canonicalAccountId,
     appId: sourceId,
     destinations: originalDestinations,
+    expectedCurrentDestinations: expectedPostDestinations,
+    expectedIdentityFingerprint: clean(evidence?.sourceIdentityFingerprint),
   });
 
   const restored = await getApplication({
@@ -579,6 +606,19 @@ export async function rollbackFcrPublicAccessZone({
   });
   if (!sameDestinations(restored?.destinations, originalDestinations)) {
     const error = new Error('Provider readback did not prove restoration of the exact pre-detachment destinations.');
+    error.classification = 'rollback-reconcile-required';
+    throw attachCredentialFailure(error, credential);
+  }
+
+  const restoredPolicies = await listPolicies({
+    token: credential.token,
+    fetchImpl,
+    accountId: canonicalAccountId,
+    appId: sourceId,
+  });
+  if (applicationIdentityFingerprint(restored) !== clean(evidence?.sourceIdentityFingerprint)
+    || policyFingerprint(restoredPolicies) !== clean(evidence?.sourcePolicyFingerprint)) {
+    const error = new Error('Rollback readback detected application identity or policy drift.');
     error.classification = 'rollback-reconcile-required';
     throw attachCredentialFailure(error, credential);
   }
