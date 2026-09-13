@@ -11,6 +11,13 @@ const VERSION_PATTERN = /^\d{14}$/;
 const FULL_SHA = /^[0-9a-f]{40}$/;
 const REPOSITORY_PATTERN = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
 const GITHUB_API_BASE = 'https://api.github.com';
+const MAX_FIRST_PARENT_SUCCESSORS = 256;
+
+// This is the immutable terminal tip of the currently ratified direct-main
+// history. Keep it bound to verify-main-release-ratification-extension.mjs.
+// Everything after this commit must earn live reviewed-PR provenance.
+export const TERMINAL_RATIFIED_MAIN_TIP = 'cad41a5880b213d31242812906a24203e6131929';
+
 export const CONSTITUTIONAL_REQUIRED_MIGRATIONS = Object.freeze([
   '20260809072500',
 ]);
@@ -94,20 +101,70 @@ async function fetchGithubJson(fetchImpl, url, token) {
   return response.json();
 }
 
+async function observeReviewedFirstParentSuccessors({
+  repository,
+  targetSha,
+  terminalRatifiedTip,
+  fetchImpl,
+  token,
+}) {
+  const target = String(targetSha || '').trim().toLowerCase();
+  const terminal = String(terminalRatifiedTip || '').trim().toLowerCase();
+
+  if (!FULL_SHA.test(target) || !FULL_SHA.test(terminal)) {
+    throw new Error('Invalid target or terminal ratification SHA');
+  }
+  if (target === terminal) return [];
+
+  const newestFirst = [];
+  let cursor = target;
+
+  for (let index = 0; index < MAX_FIRST_PARENT_SUCCESSORS && cursor !== terminal; index += 1) {
+    const [commit, associatedPulls] = await Promise.all([
+      fetchGithubJson(fetchImpl, `${GITHUB_API_BASE}/repos/${repository}/commits/${cursor}`, token),
+      fetchGithubJson(fetchImpl, `${GITHUB_API_BASE}/repos/${repository}/commits/${cursor}/pulls`, token),
+    ]);
+
+    const observedSha = String(commit?.sha || '').trim().toLowerCase();
+    if (observedSha !== cursor) {
+      throw new Error(`GitHub commit identity mismatch for ${cursor}`);
+    }
+
+    newestFirst.push({ sha: cursor, associatedPulls });
+
+    const parentSha = String(commit?.parents?.[0]?.sha || '').trim().toLowerCase();
+    if (!FULL_SHA.test(parentSha)) {
+      throw new Error(`First-parent history ended before terminal ratified tip ${terminal}`);
+    }
+    cursor = parentSha;
+  }
+
+  if (cursor !== terminal) {
+    throw new Error(`Terminal ratified tip ${terminal} was not reached within ${MAX_FIRST_PARENT_SUCCESSORS} first-parent successors`);
+  }
+
+  return newestFirst.reverse();
+}
+
 export async function observeMainReleaseProvenance({
   repository,
   targetSha,
+  terminalRatifiedTip = TERMINAL_RATIFIED_MAIN_TIP,
   fetchImpl = globalThis.fetch,
   token = process.env.GITHUB_TOKEN || process.env.GH_TOKEN || '',
 } = {}) {
   const repo = String(repository || '').trim();
   const target = String(targetSha || '').trim().toLowerCase();
+  const terminal = String(terminalRatifiedTip || '').trim().toLowerCase();
 
   if (!REPOSITORY_PATTERN.test(repo)) {
     return { ok: false, reason: 'invalid_repository', targetSha: target || null };
   }
   if (!FULL_SHA.test(target)) {
     return { ok: false, reason: 'invalid_sha', targetSha: target || null };
+  }
+  if (!FULL_SHA.test(terminal)) {
+    return { ok: false, reason: 'invalid_terminal_ratified_tip', targetSha: target, terminalRatifiedTip: terminal || null };
   }
 
   try {
@@ -116,10 +173,35 @@ export async function observeMainReleaseProvenance({
       fetchGithubJson(fetchImpl, `${GITHUB_API_BASE}/repos/${repo}/commits/${target}/pulls`, token),
     ]);
 
+    // Fail stale/direct/ambiguous release tips before walking history. This also
+    // keeps a missing reviewed tip from being laundered by successor evidence.
+    const tipResult = classifyMainReleaseProvenance({
+      targetSha: target,
+      currentMainSha: mainBranch?.commit?.sha,
+      associatedPulls,
+    });
+    if (!tipResult.ok) {
+      return {
+        ...tipResult,
+        repository: repo,
+        provider: 'github',
+      };
+    }
+
+    const successorCommits = await observeReviewedFirstParentSuccessors({
+      repository: repo,
+      targetSha: target,
+      terminalRatifiedTip: terminal,
+      fetchImpl,
+      token,
+    });
+
     const result = classifyMainReleaseProvenance({
       targetSha: target,
       currentMainSha: mainBranch?.commit?.sha,
       associatedPulls,
+      terminalRatifiedTip: terminal,
+      successorCommits,
     });
 
     return {
@@ -132,6 +214,7 @@ export async function observeMainReleaseProvenance({
       ok: false,
       reason: 'provider_unavailable',
       targetSha: target,
+      terminalRatifiedTip: terminal,
       repository: repo,
       provider: 'github',
       detail: error instanceof Error ? error.message.slice(0, 200) : 'unknown provider failure',
@@ -179,6 +262,7 @@ export async function main() {
     releaseProvenance = await observeMainReleaseProvenance({
       repository: process.env.GITHUB_REPOSITORY,
       targetSha: checkedOutHeadSha(),
+      terminalRatifiedTip: TERMINAL_RATIFIED_MAIN_TIP,
     });
   }
 
@@ -218,7 +302,7 @@ export async function main() {
     failures.push(`local migrations absent remotely after push: ${receipt.localOnly.join(', ')}`);
   }
   if (phase === 'post-push' && receipt.missingRequiredRemote.length > 0) {
-    failures.push(`required migrations absent remotely after push: ${receipt.missingRequiredRemote.join(', ')}`);
+    failures.push(`required migrations absent remotely: ${receipt.missingRequiredRemote.join(', ')}`);
   }
 
   if (failures.length > 0) {
