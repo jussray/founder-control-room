@@ -1,14 +1,14 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Bind the merge-authority canon refresh to current operator documentation while preserving the distinction between available merge capability, exact-candidate founder approval, exact-head proof, and execution authority.",
+  "purpose": "Bind the founder-approved Chief governance reconciliation plan to current provider documentation without claiming live ruleset mutation, merge authority, deployment authority, or production proof.",
   "domains": [
-    "truth-governance"
+    "repository-provider"
   ],
   "changes": [
     {
-      "path": "docs/CLAUDE_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC.md",
+      "path": "src/providers/githubGovernanceReconciliation.ts",
       "claims": [
-        "docs/CLAUDE_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC.md must require fresh explicit founder merge approval bound to the exact repository, pull request, current base SHA, and current head SHA; it must never treat merge_authority: true, review requests, broad approval language, mergeability, or green checks as candidate-specific merge authorization, and any base/head movement requires a new founder ask before integration."
+        "src/providers/githubGovernanceReconciliation.ts must keep Chief candidate proof pre-merge, keep production proof post-merge, require zero desired bypass actors and strict freshness, preserve unmanaged security, and withhold provider mutation and merge authority until fresh provider readback."
       ]
     }
   ]
