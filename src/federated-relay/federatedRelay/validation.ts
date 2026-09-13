@@ -99,7 +99,7 @@ export function assertFederatedRelayEnvelopeV31(input: unknown): asserts input i
   } else {
     assertNoUnsupportedKeys(input.ordering.relation, ['type', 'parentMessageId'], 'relay_relation_field');
     assertRelayUuidV31(input.ordering.relation.parentMessageId, 'relay_parent_message_id');
-    assert(input.ordering.chainPosition > 0, 'relay_nonroot_chain_position');
+    assert((input.ordering.chainPosition as number) > 0, 'relay_nonroot_chain_position');
     if (input.ordering.relation.type === 'reply') {
       assert(input.replyToMessageId === input.ordering.relation.parentMessageId, 'relay_reply_parent_mismatch');
     } else {
