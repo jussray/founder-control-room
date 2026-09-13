@@ -62,6 +62,8 @@ main/base moves
 
 Continuity never rolls founder approval, merge authority, deploy authority, publication authority, provider-mutation authority, spend, deletion, or destructive authority forward automatically. **Proof rollover is allowed only by re-verification. Authority rollover is not.**
 
+Under the current merge canon, `merge_authority: true` means only that the governed merge capability/authority class is available. It never means the current candidate is approved. Every merge requires fresh explicit founder approval bound to the exact repository, pull request number, current base SHA, and current head SHA. If that exact approval is absent, ambiguous, or stale, the agent or operator must ask and stop. Any base/head movement expires both predecessor proof and predecessor merge approval.
+
 See [`docs/PR_CONTINUITY.md`](docs/PR_CONTINUITY.md).
 
 ### Repository federation and StoryEngine
@@ -103,7 +105,7 @@ The repository contains FCR's founder-final merge policy, deterministic independ
 
 Source policy is not live GitHub provider truth. Current rulesets, bypass actors, required checks, native review settings, and provider enforcement require fresh GitHub provider readback before a merge decision.
 
-Founder self-approval is not relabeled as independent review. The canonical path keeps deterministic independent review and authenticated exact-candidate founder-final approval separate.
+Founder self-approval is not relabeled as independent review. The canonical path keeps deterministic independent review and authenticated exact-candidate founder-final approval separate. Merge capability and merge approval are also separate: green evidence, mergeability, review requests, `merge review`, broad `approved`/`cont` language, or `merge_authority: true` cannot silently authorize integration. Before every merge, the founder must explicitly approve the exact current repository, PR, base SHA, and head SHA; if the candidate moves, approval expires and must be requested again.
 
 For Chief governance, FCR contains a **read-only trusted observation and verification boundary** pinned to `jussray/chief-ai-machine` and Chief ruleset IDs `20818149` and `21261587`. It uses the repository-scoped FCR GitHub App installation-token path rather than caller-supplied PAT/token authority, preserves required-check `integration_id` producer identity, requires complete bypass and deployment readback, and fingerprints the provider observation. Under the current founder decision, ruleset `20818149` is accepted exactly as observed when it preserves zero bypass actors, its approved source checks, `Cloudflare Production`, `proofmode-access-admin`, and the unbound reserved candidate runtime context. A compliant observation returns `NO_CHANGE_REQUIRED` with `mutation:null`; drift blocks verification rather than producing a desired-state rewrite. This boundary never grants provider mutation, merge, deploy, or execution authority.
 
@@ -219,8 +221,8 @@ Repository manifests, operational packets, analytics, receipts, and public conte
 | Read project/evidence | Founder-authenticated or explicitly public-safe read |
 | Run bounded verification | Applicable founder/repository authority |
 | Create branch | Fresh `create_branch` proof + authenticated exact execute request + server-issued `AuthorityEnvelopeV1` + execution reservation + fresh mission-state revalidation + repository write authority |
-| Merge through FCR | Exact-head machine proof + deterministic independent review + authenticated exact-candidate founder-final approval + repository authority |
-| Merge through live GitHub | Separate live GitHub ruleset/provider authority and fresh readback |
+| Merge through FCR | Exact-head machine proof + deterministic independent review + fresh explicit founder approval bound to exact repo/PR/base/head + authenticated exact-candidate founder-final receipt + repository authority |
+| Merge through live GitHub | Same fresh explicit exact-candidate founder approval + separate live GitHub ruleset/provider authority and fresh readback |
 | Deploy / mutate production | Separate exact production authority |
 | Database migration | Separate migration/database authority |
 | Credentials / secrets | Separate credential authority |
@@ -229,7 +231,7 @@ Repository manifests, operational packets, analytics, receipts, and public conte
 | Billing / destructive action | Separate exact authority |
 | Rollback | Separate rollback authority |
 
-No approval silently carries into another authority class.
+No approval silently carries into another authority class, and merge approval does not carry into a different repo/PR/base/head candidate.
 
 ## Documentation truth gate
 

@@ -1,11 +1,11 @@
 # Founder Control Room + Chief AI
 ## Claude Master Build Execution Specification
 
-Version: 1.3
-Date: 2026-08-26
+Version: 1.4
+Date: 2026-09-12
 Owner: Juss Ray
 Repository: `jussray/founder-control-room`
-Target branch: `claude/founder-control-room-master-build-spec-20260811`
+Target branch: `policy/necessary-fix-default`
 Canonical product contract: `docs/FOUNDER_CONTROL_ROOM_AND_CHIEF_AI_MASTER_BUILD_SPEC.md`
 Canonical execution contract: `docs/GOALFIX_EXECUTION_WORKFLOW_V2.md`
 Product Design companion: `docs/PRODUCT_DESIGN_PARALLEL_BUILD_SPEC.md`
@@ -72,7 +72,7 @@ Founder Intent
 -> Independent Verifier
 -> Independent Red Team / Devil
 -> Exact-head Merge Gate
--> Founder Final through current authenticated founder authority
+-> Ask for / capture Founder Final for the exact unchanged candidate
 -> Final Provider / PR / Target / Base / Head / Diff / Check / Review Reread
 -> Merge With Expected Head
 -> Reacquire Verified Target Branch
@@ -96,10 +96,11 @@ Translate `/goalfix` into this concrete loop:
 8. Use targeted Playwright for browser-observable UI/user-flow claims; use focused integration/provider/runtime evidence for non-browser Worker APIs, webhooks, background jobs, provider adapters, database paths, and other backend claims.
 9. Run independent Red Team / Devil review on the unchanged exact candidate.
 10. Re-read the verified target/base/head, diff/scope, CI, reviews/threads, and mutable provider/PR state before Founder Final.
-11. Accept Founder Final only through the repository's current authenticated founder-authority mechanism bound to the unchanged candidate and intended action/scope.
-12. After Founder Final and immediately before integration, re-read provider PR identity, verified target/base/head, diff/scope, required checks, review/thread state, and other load-bearing mutable provider state. Any change invalidates the prior approval for merge-readiness and returns the lane to revalidation.
-13. Merge only with expected-head protection under current authority.
-14. Reacquire the resulting verified target branch and obtain required post-merge/runtime proof. Report `MERGED_UNVERIFIED` until required runtime truth exists; use `RUNTIME_VERIFIED` only after the intended environment/path is proven.
+11. Require a fresh explicit founder merge approval for the exact repository, PR number, current base SHA, and current head SHA. If that approval is absent, ambiguous, or stale, ask and stop. `merge_authority: true`, a review request, `merge review`, `approved`, `cont`, successful checks, or mergeability do not substitute for exact-candidate merge approval.
+12. Accept Founder Final only through the repository's current authenticated founder-authority mechanism bound to the unchanged candidate and intended action/scope.
+13. After Founder Final and immediately before integration, re-read provider PR identity, verified target/base/head, diff/scope, required checks, review/thread state, and other load-bearing mutable provider state. Any change invalidates the prior approval and returns the lane to revalidation and a new founder ask.
+14. Merge only with expected-head protection under current authority and exact-candidate approval.
+15. Reacquire the resulting verified target branch and obtain required post-merge/runtime proof. Report `MERGED_UNVERIFIED` until required runtime truth exists; use `RUNTIME_VERIFIED` only after the intended environment/path is proven.
 
 ---
 
@@ -126,7 +127,7 @@ Use focused diffs. No unrelated refactors. Never create duplicate replacement br
 
 ### Merge
 
-A green patch is not self-authorizing. Merge only under the exact standing or portable founder authority defined by repository policy, with current required evidence.
+A green patch is not self-authorizing. `merge_authority: true` means merge capability exists, not that the current candidate is approved. Before every merge, Claude must have fresh explicit founder approval bound to the exact repository, PR, current base SHA, and current head SHA. If absent, ambiguous, or stale, Claude must ask and stop. Any base/head movement expires the approval.
 
 ### Production or external writes
 
@@ -218,7 +219,7 @@ STOP CONDITION
 Stop and report instead of wandering when:
 
 - the requested outcome is proven;
-- the next action requires separate founder authority;
+- the next action requires separate founder authority or exact-candidate merge approval;
 - the authoritative source cannot be resolved;
 - required credentials/provider access are unavailable;
 - evidence contradicts the proposed fix;
