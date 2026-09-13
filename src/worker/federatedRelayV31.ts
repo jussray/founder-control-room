@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import type { ControlRoomWorkerEnv } from './handler.js';
+import { providerForProject } from '../providers/providerFactory.js';
 import {
   acceptFederatedRelayV31,
   canonicalizeRelayJcsV31,
@@ -123,30 +124,41 @@ function makeReceiptSigner(env: RelayWorkerEnv): RelayReceiptSignerV31 {
   };
 }
 
-function githubHeaders(env: RelayWorkerEnv): HeadersInit {
-  const headers: Record<string, string> = { Accept: 'application/vnd.github+json', 'User-Agent': 'fcr-federated-relay-v31' };
-  if (env.GITHUB_TOKEN?.trim()) headers.Authorization = `Bearer ${env.GITHUB_TOKEN.trim()}`;
-  return headers;
-}
-
-function makeSourceResolver(env: RelayWorkerEnv): RelaySourceEvidenceResolverV31 {
+function makeRepositoryResolver(): RelaySourceEvidenceResolverV31 {
+  const cache = new Map<string, { slug: string; provider: ReturnType<typeof providerForProject> }>();
+  const providerForRepository = (repository: string) => {
+    const existing = cache.get(repository);
+    if (existing) return existing;
+    const slug = `relay-${repository.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
+    const provider = providerForProject({ repo_provider: 'github', slug, repo_identifier: repository });
+    const value = { slug, provider };
+    cache.set(repository, value);
+    return value;
+  };
+  const isNotFound = (error: unknown) => error instanceof Error && /\b404\b|not found/i.test(error.message);
   const currentBranchHeadSha = async ({ repository, branch }: { repository: string; branch: string }) => {
-    const response = await fetch(`https://api.github.com/repos/${repository}/branches/${encodeURIComponent(branch)}`, { headers: githubHeaders(env) });
-    if (response.status === 404) return null;
-    if (!response.ok) throw new RelayIngressError('relay_source_head_provider_failed', 503);
-    const body = await response.json() as { commit?: { sha?: unknown } };
-    return typeof body.commit?.sha === 'string' && SHA40.test(body.commit.sha) ? body.commit.sha : null;
+    const { slug, provider } = providerForRepository(repository);
+    try {
+      const resolved = (await provider.resolveRef(slug, branch)).trim().toLowerCase();
+      return SHA40.test(resolved) ? resolved : null;
+    } catch (error) {
+      if (isNotFound(error)) return null;
+      throw new RelayIngressError('relay_head_provider_failed', 503);
+    }
   };
   return {
     currentBranchHeadSha,
     async commitExists({ repository, sha }) {
-      const response = await fetch(`https://api.github.com/repos/${repository}/commits/${sha}`, { headers: githubHeaders(env) });
-      if (response.status === 404) return false;
-      if (!response.ok) throw new RelayIngressError('relay_source_commit_provider_failed', 503);
-      return true;
+      const { slug, provider } = providerForRepository(repository);
+      try {
+        return (await provider.resolveRef(slug, sha)).trim().toLowerCase() === sha.toLowerCase();
+      } catch (error) {
+        if (isNotFound(error)) return false;
+        throw new RelayIngressError('relay_commit_provider_failed', 503);
+      }
     },
     async isCommitReachableFromBranch({ repository, branch, sha }) {
-      return (await currentBranchHeadSha({ repository, branch })) === sha;
+      return (await currentBranchHeadSha({ repository, branch })) === sha.toLowerCase();
     },
   };
 }
@@ -156,7 +168,7 @@ function statusFor(error: unknown): number {
   if (error instanceof RelayTransientErrorV31) return 503;
   if (error instanceof RelayV31Error) {
     if (/signature|key_/.test(error.code)) return 401;
-    if (/stale|collision|sequence|lineage|parent|supersession|cookie/.test(error.code)) return 409;
+    if (/stale|collision|sequence|lineage|parent|supersession|cookie|current_head/.test(error.code)) return 409;
     return 400;
   }
   if (error instanceof Error && /^relay_/.test(error.message)) return 409;
@@ -178,7 +190,7 @@ export async function handleFederatedRelayV31Worker(request: Request, workerEnv:
     const client = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
     const result = await acceptFederatedRelayV31(envelope, {
       localIdentity: { member: 'founder-control-room', repository: 'jussray/founder-control-room', branch, currentHeadSha: runtimeSha },
-      sourceEvidence: makeSourceResolver(env),
+      sourceEvidence: makeRepositoryResolver(),
       signatureVerifier: makeSignatureVerifier(env),
       receiptSigner: makeReceiptSigner(env),
       ledger: createSupabaseRelayLedgerV31(client),

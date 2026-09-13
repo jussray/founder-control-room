@@ -6,17 +6,24 @@ import { assertFederatedRelayEnvelopeV31, validateRelayFreshnessV31 } from './fe
 
 function assert(condition: unknown, code: string): asserts condition { if (!condition) throw new RelayV31Error(code); }
 
-export async function validateRelayEndpointBindingsV31(input: { envelope: FederatedAgentRelayEnvelopeV31; deps: RelayAcceptDepsV31 }): Promise<{ sourceCurrentHeadSha: string }> {
+export async function validateRelayEndpointBindingsV31(input: { envelope: FederatedAgentRelayEnvelopeV31; deps: RelayAcceptDepsV31 }): Promise<{ sourceCurrentHeadSha: string; targetCurrentHeadSha: string }> {
   const { envelope, deps } = input;
   const local = deps.localIdentity;
   assert(local.member === envelope.target.member, 'relay_target_member_mismatch');
   assert(local.repository === envelope.target.repository, 'relay_target_repository_mismatch');
   assert(local.branch === envelope.target.branch, 'relay_target_branch_mismatch');
-  assert(local.currentHeadSha === envelope.target.headSha, 'relay_target_head_stale');
-  const sourceCurrentHeadSha = await deps.sourceEvidence.currentBranchHeadSha({ repository: envelope.source.repository, branch: envelope.source.branch });
+  assert(local.currentHeadSha === envelope.target.headSha, 'relay_target_runtime_stale');
+
+  const [sourceCurrentHeadSha, targetCurrentHeadSha] = await Promise.all([
+    deps.sourceEvidence.currentBranchHeadSha({ repository: envelope.source.repository, branch: envelope.source.branch }),
+    deps.sourceEvidence.currentBranchHeadSha({ repository: envelope.target.repository, branch: envelope.target.branch }),
+  ]);
   assert(sourceCurrentHeadSha !== null, 'relay_source_branch_unknown');
+  assert(targetCurrentHeadSha !== null, 'relay_target_branch_unknown');
   assert(sourceCurrentHeadSha === envelope.source.headSha, 'relay_source_head_stale');
-  return { sourceCurrentHeadSha };
+  assert(targetCurrentHeadSha === envelope.target.headSha, 'relay_target_head_stale');
+  assert(targetCurrentHeadSha === local.currentHeadSha, 'relay_target_runtime_not_current_head');
+  return { sourceCurrentHeadSha, targetCurrentHeadSha };
 }
 
 export async function acceptFederatedRelayV31(input: unknown, deps: RelayAcceptDepsV31): Promise<RelayLedgerAcceptResultV31> {
@@ -26,12 +33,17 @@ export async function acceptFederatedRelayV31(input: unknown, deps: RelayAcceptD
   const semanticFingerprint = relaySemanticFingerprintV31(envelope);
   const deliveryFingerprint = relayDeliveryFingerprintV31(envelope);
   const verifiedKey = await verifyRelaySignatureV31(envelope, deps.signatureVerifier);
+
+  // Exact retries authenticate first, then return immutable historical acceptance
+  // plus mutable current state. They intentionally do not reacquire freshness/head
+  // evidence because retry delivery is not a new acceptance event.
   const existing = await deps.ledger.findByMessageId(envelope.messageId);
   if (existing) {
     assert(existing.semanticFingerprint === semanticFingerprint, 'relay_message_id_collision');
     assert(existing.deliveryFingerprint === deliveryFingerprint, 'relay_delivery_fingerprint_collision');
     return { outcome: 'duplicate', receipt: existing.receipt, currentState: existing.currentState, supersededByMessageId: existing.supersededByMessageId };
   }
+
   validateRelayFreshnessV31(envelope, now);
   assert(sha256HexV31(envelope.payload.body) === envelope.payload.sha256, 'relay_payload_digest_mismatch');
   await validateRelayEndpointBindingsV31({ envelope, deps });
