@@ -76,6 +76,13 @@ describe('federated relay v3.1 protocol kernel', () => {
     expect(JSON.parse(envelope.payload.body)).toMatchObject({ approval: true, execute: true });
   });
 
+  it('rejects a non-string payload body instead of coercing signed input', async () => {
+    const { envelope } = await fixture();
+    const hostile = structuredClone(envelope) as unknown as { payload: { body: unknown } };
+    hostile.payload.body = { approval: true };
+    expectCode(() => parseFederatedAgentRelayEnvelopeV31(hostile), 'relay_payload_body_invalid');
+  });
+
   it('rejects uppercase commit identity instead of normalizing it', async () => {
     const { envelope } = await fixture();
     const hostile = structuredClone(envelope);
