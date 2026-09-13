@@ -226,12 +226,13 @@ jobs:
       CHIEF_FEDERATED_RELAY_BASE_URL: ${{ inputs.chief_relay_base_url }}
       CHIEF_FEDERATED_RELAY_TARGET_SHA: ${{ inputs.chief_relay_target_sha }}
       CHIEF_FEDERATED_RELAY_TARGET_BRANCH: ${{ inputs.chief_relay_target_branch }}
-      CHIEF_RUNTIME_ACCESS_CLIENT_ID: ${{ secrets.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID || secrets.CLOUDFLARE_ACCESS_CLIENT_ID || vars.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID || vars.CLOUDFLARE_ACCESS_CLIENT_ID }}
-      CHIEF_RUNTIME_ACCESS_CLIENT_SECRET: ${{ secrets.CHIEF_CLOUDFLARE_ACCESS_CLIENT_SECRET || secrets.CLOUDFLARE_ACCESS_CLIENT_SECRET }}
 
     steps:
       - name: Validate protected relay proof authority and inputs
         shell: bash
+        env:
+          CHIEF_RUNTIME_ACCESS_CLIENT_ID: ${{ secrets.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID || secrets.CLOUDFLARE_ACCESS_CLIENT_ID || vars.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID || vars.CLOUDFLARE_ACCESS_CLIENT_ID }}
+          CHIEF_RUNTIME_ACCESS_CLIENT_SECRET: ${{ secrets.CHIEF_CLOUDFLARE_ACCESS_CLIENT_SECRET || secrets.CLOUDFLARE_ACCESS_CLIENT_SECRET }}
         run: |
           set -euo pipefail
           if [ "${{ inputs.operation }}" != 'verify' ]; then
@@ -311,6 +312,8 @@ jobs:
         env:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           FCR_RELAY_SUPABASE_URL: https://oojzfmmywbvficgybaxd.supabase.co
+          CHIEF_RUNTIME_ACCESS_CLIENT_ID: ${{ secrets.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID || secrets.CLOUDFLARE_ACCESS_CLIENT_ID || vars.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID || vars.CLOUDFLARE_ACCESS_CLIENT_ID }}
+          CHIEF_RUNTIME_ACCESS_CLIENT_SECRET: ${{ secrets.CHIEF_CLOUDFLARE_ACCESS_CLIENT_SECRET || secrets.CLOUDFLARE_ACCESS_CLIENT_SECRET }}
         run: node scripts/prove-federated-agent-roundtrip-v31-protected.mjs
 
       - name: Publish protected relay proof summary
