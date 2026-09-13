@@ -1,6 +1,7 @@
 import unittest
 
 from scripts.capability_receipt import build_receipt
+from scripts.test_markitdown_local import MarkItDownLocalTests  # noqa: F401
 
 
 SHA = "a" * 40

@@ -1,3 +1,10 @@
+import {
+  runStructuredJson,
+  StructuredProviderError,
+  type StructuredJsonResult,
+  type StructuredProviderConfig,
+  type StructuredProviderName,
+} from '../aiRuntime/structuredProvider.js';
 import type { ChiefQuickScanRecommendation } from './contracts.js';
 import {
   QUICKSCAN_CHIEF_OUTPUT_SCHEMA,
@@ -8,7 +15,6 @@ import {
   type QuickScanChiefPromptInput,
 } from './chiefPrompts.js';
 
-const DEFAULT_OPENAI_BASE_URL = 'https://api.openai.com/v1';
 const DEFAULT_MODEL = 'gpt-5-mini';
 const DEFAULT_TIMEOUT_MS = 25_000;
 const MAX_RESPONSE_BYTES = 128 * 1024;
@@ -18,7 +24,7 @@ interface JsonRecord {
 }
 
 export interface QuickScanChiefProvenance {
-  provider: 'openai';
+  provider: 'openai' | 'anthropic';
   model: string;
   responseId: string | null;
   promptVersion: string;
@@ -106,31 +112,69 @@ function modelOutput(value: unknown): ChiefQuickScanRecommendation {
   };
 }
 
-function responseText(payload: JsonRecord): string | null {
-  if (typeof payload.output_text === 'string' && payload.output_text.trim()) {
-    return payload.output_text.trim();
-  }
-  if (!Array.isArray(payload.output)) return null;
-
-  for (const item of payload.output) {
-    if (!isRecord(item) || !Array.isArray(item.content)) continue;
-    for (const content of item.content) {
-      if (!isRecord(content)) continue;
-      if (content.type === 'output_text' && typeof content.text === 'string' && content.text.trim()) {
-        return content.text.trim();
-      }
-    }
-  }
-  return null;
-}
-
 function timeoutMs(env: NodeJS.ProcessEnv): number {
   const raw = Number(env.QUICKSCAN_CHIEF_TIMEOUT_MS ?? DEFAULT_TIMEOUT_MS);
   return Number.isFinite(raw) && raw >= 1_000 && raw <= 60_000 ? raw : DEFAULT_TIMEOUT_MS;
 }
 
-function baseUrl(env: NodeJS.ProcessEnv): string {
-  return (env.OPENAI_API_BASE_URL?.trim() || DEFAULT_OPENAI_BASE_URL).replace(/\/$/, '');
+function providerName(value: string | undefined, fallback: StructuredProviderName): StructuredProviderName {
+  const normalized = value?.trim().toLowerCase();
+  if (!normalized) return fallback;
+  if (normalized === 'openai' || normalized === 'anthropic') return normalized;
+  throw new QuickScanChiefProviderError(`Unsupported QuickScan Chief provider: ${normalized}`, 'MODEL_PROVIDER_INVALID');
+}
+
+function providerConfig(
+  env: NodeJS.ProcessEnv,
+  provider: StructuredProviderName,
+  required: boolean,
+): StructuredProviderConfig | null {
+  if (provider === 'openai') {
+    const apiKey = env.OPENAI_API_KEY?.trim();
+    if (!apiKey) {
+      if (required) {
+        throw new QuickScanChiefProviderError('OPENAI_API_KEY is not configured for QuickScan Chief', 'OPENAI_NOT_CONFIGURED');
+      }
+      return null;
+    }
+    return {
+      provider,
+      apiKey,
+      model: env.QUICKSCAN_CHIEF_MODEL?.trim() || DEFAULT_MODEL,
+      baseUrl: env.OPENAI_API_BASE_URL?.trim(),
+    };
+  }
+
+  const apiKey = env.ANTHROPIC_API_KEY?.trim();
+  const model = env.QUICKSCAN_CHIEF_ANTHROPIC_MODEL?.trim();
+  if (!apiKey || !model) {
+    if (required) {
+      throw new QuickScanChiefProviderError(
+        'ANTHROPIC_API_KEY and QUICKSCAN_CHIEF_ANTHROPIC_MODEL are required for Anthropic QuickScan Chief',
+        'ANTHROPIC_NOT_CONFIGURED',
+      );
+    }
+    return null;
+  }
+  return {
+    provider,
+    apiKey,
+    model,
+    baseUrl: env.ANTHROPIC_API_BASE_URL?.trim(),
+  };
+}
+
+function providerChain(env: NodeJS.ProcessEnv): StructuredProviderConfig[] {
+  const primaryName = providerName(env.QUICKSCAN_CHIEF_PROVIDER, 'openai');
+  const primary = providerConfig(env, primaryName, true);
+  if (!primary) return [];
+
+  const fallbackRaw = env.QUICKSCAN_CHIEF_FALLBACK_PROVIDER?.trim();
+  if (!fallbackRaw) return [primary];
+  const fallbackName = providerName(fallbackRaw, primaryName);
+  if (fallbackName === primaryName) return [primary];
+  const fallback = providerConfig(env, fallbackName, false);
+  return fallback ? [primary, fallback] : [primary];
 }
 
 export function createOpenAiQuickScanChiefRunner(dependencies: OpenAiQuickScanChiefDependencies = {}) {
@@ -138,113 +182,37 @@ export function createOpenAiQuickScanChiefRunner(dependencies: OpenAiQuickScanCh
   const fetchFn = dependencies.fetchFn ?? fetch;
 
   return async function runQuickScanChief(input: QuickScanChiefPromptInput): Promise<QuickScanChiefResult> {
-    const apiKey = env.OPENAI_API_KEY?.trim();
-    if (!apiKey) {
-      throw new QuickScanChiefProviderError('OPENAI_API_KEY is not configured for QuickScan Chief', 'OPENAI_NOT_CONFIGURED');
-    }
-
-    const model = env.QUICKSCAN_CHIEF_MODEL?.trim() || DEFAULT_MODEL;
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs(env));
-
-    // The abort timer must stay armed through the full response body read,
-    // not just the initial fetch() call: a provider or proxy that returns
-    // headers promptly but then stalls mid-body would otherwise hang past
-    // QUICKSCAN_CHIEF_TIMEOUT_MS once the timer was cleared too early.
-    let response: globalThis.Response;
-    let raw: string;
+    let result: StructuredJsonResult;
     try {
-      response = await fetchFn(`${baseUrl(env)}/responses`, {
-        method: 'POST',
-        headers: {
-          authorization: `Bearer ${apiKey}`,
-          'content-type': 'application/json',
+      result = await runStructuredJson(
+        providerChain(env),
+        {
+          schemaName: 'quickscan_chief_output',
+          schema: QUICKSCAN_CHIEF_OUTPUT_SCHEMA,
+          systemPrompt: QUICKSCAN_CHIEF_SYSTEM_PROMPT,
+          userPrompt: quickScanChiefUserPrompt(input),
+          maxOutputTokens: 800,
         },
-        body: JSON.stringify({
-          model,
-          store: false,
-          max_output_tokens: 800,
-          input: [
-            {
-              role: 'system',
-              content: [{ type: 'input_text', text: QUICKSCAN_CHIEF_SYSTEM_PROMPT }],
-            },
-            {
-              role: 'user',
-              content: [{ type: 'input_text', text: quickScanChiefUserPrompt(input) }],
-            },
-          ],
-          text: {
-            format: {
-              type: 'json_schema',
-              name: 'quickscan_chief_output',
-              strict: true,
-              schema: QUICKSCAN_CHIEF_OUTPUT_SCHEMA,
-            },
-          },
-        }),
-        signal: controller.signal,
-      });
-
-      const declaredLength = Number(response.headers.get('content-length'));
-      if (Number.isFinite(declaredLength) && declaredLength > MAX_RESPONSE_BYTES) {
-        throw new QuickScanChiefProviderError('OpenAI response exceeded the allowed size', 'OPENAI_RESPONSE_TOO_LARGE', response.status);
-      }
-
-      raw = await response.text();
+        {
+          fetchFn,
+          timeoutMs: timeoutMs(env),
+          maxResponseBytes: MAX_RESPONSE_BYTES,
+        },
+      );
     } catch (error) {
       if (error instanceof QuickScanChiefProviderError) throw error;
-      if (error instanceof Error && error.name === 'AbortError') {
-        throw new QuickScanChiefProviderError('OpenAI QuickScan Chief request timed out', 'OPENAI_TIMEOUT');
+      if (error instanceof StructuredProviderError) {
+        throw new QuickScanChiefProviderError(error.message, error.code, error.status);
       }
-      throw new QuickScanChiefProviderError(
-        error instanceof Error ? error.message : 'OpenAI QuickScan Chief request failed',
-        'OPENAI_REQUEST_FAILED',
-      );
-    } finally {
-      clearTimeout(timer);
-    }
-
-    if (Buffer.byteLength(raw, 'utf8') > MAX_RESPONSE_BYTES) {
-      throw new QuickScanChiefProviderError('OpenAI response exceeded the allowed size', 'OPENAI_RESPONSE_TOO_LARGE', response.status);
-    }
-
-    let payload: unknown;
-    try {
-      payload = raw ? JSON.parse(raw) : null;
-    } catch {
-      throw new QuickScanChiefProviderError('OpenAI returned invalid JSON', 'OPENAI_INVALID_RESPONSE', response.status);
-    }
-
-    if (!response.ok) {
-      const errorRecord = isRecord(payload) && isRecord(payload.error) ? payload.error : null;
-      const providerMessage = errorRecord && typeof errorRecord.message === 'string'
-        ? errorRecord.message
-        : `OpenAI request failed with status ${response.status}`;
-      throw new QuickScanChiefProviderError(providerMessage, 'OPENAI_HTTP_ERROR', response.status);
-    }
-    if (!isRecord(payload)) {
-      throw new QuickScanChiefProviderError('OpenAI response body was empty or malformed', 'OPENAI_INVALID_RESPONSE', response.status);
-    }
-
-    const outputText = responseText(payload);
-    if (!outputText) {
-      throw new QuickScanChiefProviderError('OpenAI response did not contain structured output text', 'OPENAI_MISSING_OUTPUT', response.status);
-    }
-
-    let parsedOutput: unknown;
-    try {
-      parsedOutput = JSON.parse(outputText);
-    } catch {
-      throw new QuickScanChiefProviderError('OpenAI structured output was not valid JSON', 'OPENAI_INVALID_OUTPUT_JSON', response.status);
+      throw error;
     }
 
     return {
-      recommendation: modelOutput(parsedOutput),
+      recommendation: modelOutput(result.output),
       provenance: {
-        provider: 'openai',
-        model,
-        responseId: typeof payload.id === 'string' ? payload.id : null,
+        provider: result.provider,
+        model: result.model,
+        responseId: result.responseId,
         promptVersion: QUICKSCAN_CHIEF_PROMPT_VERSION,
       },
     };
