@@ -141,7 +141,13 @@ export interface FederatedAgentRelayReceiptV31 extends FederatedAgentRelayReceip
   signature: RelaySignatureV31;
 }
 
-export interface RelayVerifiedKeyV31 extends AcceptedKeyStateV31 {}
+export interface RelayVerifiedKeyV31 {
+  member: FederatedAgentMemberV31;
+  keyId: string;
+  state: RelayKeyStateV31;
+  validFrom: string;
+  validUntil: string | null;
+}
 
 export interface RelaySignatureVerifierV31 {
   verify(input: {
