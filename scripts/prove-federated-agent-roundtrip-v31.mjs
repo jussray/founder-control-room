@@ -255,7 +255,7 @@ if (reply.replyToMessageId !== messageId || reply.ordering.relation.type !== 're
 }
 const chiefReplyKey = await keyQuery(chiefBaseUrl, '/api/federated-relay', 'chief-ai-machine', reply.signature.keyId);
 await registerObservedKey(chiefReplyKey);
-const verifiedReply = await verifyRelayEnvelopeV31({ envelope: reply, key: chiefReplyKey });
+const verifiedReply = await verifyRelayEnvelopeV31({ envelope: reply, key: chiefReplyKey, acceptedAt: new Date() });
 const fcrAccepted = await postCanonical(fcrBaseUrl, '/api/federated-relay/v3', reply);
 assertAuthorityFalse(fcrAccepted, 'FCR reply acceptance');
 if (!['accepted','duplicate'].includes(fcrAccepted?.delivery) || !fcrAccepted?.receipt) fail('FCR did not durably accept the Chief v3.1 reply.');
