@@ -409,7 +409,8 @@ export function parseFederatedAgentRelayEnvelopeV31(value: unknown): FederatedAg
   };
 }
 
-export function assertRelayFreshnessV31(envelope: FederatedAgentRelayEnvelopeV31, now = new Date()): void {
+export function assertRelayFreshnessV31(envelope: FederatedAgentRelayEnvelopeV31, now?: Date): void {
+  assert(now instanceof Date && Number.isFinite(now.getTime()), 'relay_observed_time_required');
   const issued = Date.parse(envelope.issuedAt);
   const expires = Date.parse(envelope.expiresAt);
   assert(expires > issued && expires - issued <= MAX_TTL_MS, 'relay_invalid_expiry');
@@ -531,7 +532,8 @@ export async function verifyRelayEnvelopeV31(input: {
   evidenceDigest: string;
   successorProofCookie: string;
 }> {
-  const acceptedAt = input.acceptedAt ?? new Date();
+  const acceptedAt = input.acceptedAt;
+  assert(acceptedAt instanceof Date && Number.isFinite(acceptedAt.getTime()), 'relay_observed_time_required');
   assertRelayFreshnessV31(input.envelope, acceptedAt);
   assertRelayKeyUsableV31(input.key, input.envelope.source.member, input.envelope.issuedAt, acceptedAt.toISOString());
   assert(input.key.keyId === input.envelope.signature.keyId, 'relay_signing_key_id_mismatch', 401);
