@@ -97,6 +97,21 @@ export {
 } from './attack3000Content.js';
 
 export {
+  evaluateContentTrendRadar,
+  type RankedTrendRadarCandidate,
+  type TrendAngleKind,
+  type TrendContentAngle,
+  type TrendEvidenceRef,
+  type TrendEvidenceState,
+  type TrendFingerprintComparison,
+  type TrendRadarCandidate,
+  type TrendRadarReason,
+  type TrendRadarResult,
+  type TrendRadarScores,
+  type TrendSaturation,
+} from './contentTrendRadar.js';
+
+export {
   evaluateAuthorityLease,
   type AuthorityBinding,
   type AuthorityConsequence,
