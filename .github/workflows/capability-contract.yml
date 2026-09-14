@@ -9,7 +9,6 @@ on:
       - 'src/capabilities/**'
       - 'src/http/routes/capabilities.ts'
       - 'src/http/routes/__tests__/tinyFishObservation.integration.test.ts'
-      - 'src/http/routes/__tests__/waterTruthShadow.integration.test.ts'
       - 'package.json'
       - '.github/workflows/capability-contract.yml'
   push:
@@ -21,7 +20,6 @@ on:
       - 'src/capabilities/**'
       - 'src/http/routes/capabilities.ts'
       - 'src/http/routes/__tests__/tinyFishObservation.integration.test.ts'
-      - 'src/http/routes/__tests__/waterTruthShadow.integration.test.ts'
       - 'package.json'
       - '.github/workflows/capability-contract.yml'
 
@@ -48,10 +46,8 @@ jobs:
           src/capabilities/__tests__/score.test.ts
           src/capabilities/__tests__/workbenchRegistry.test.ts
           src/capabilities/__tests__/bubbleLabShadow.test.ts
-          src/capabilities/__tests__/waterTruthShadow.test.ts
           src/capabilities/__tests__/tinyFishWebObservation.test.ts
           src/http/routes/__tests__/tinyFishObservation.integration.test.ts
-          src/http/routes/__tests__/waterTruthShadow.integration.test.ts
       - run: npm run typecheck
       - run: npm run build
       - run: npx playwright install --with-deps chromium

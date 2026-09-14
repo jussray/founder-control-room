@@ -7,13 +7,6 @@ import {
   TinyFishReadOnlyError,
   type TinyFishContinuityInput,
 } from '../../capabilities/tinyFishWebObservation.js';
-import {
-  evaluateWaterTruthShadow,
-  parseWaterTruthShadowInput,
-  WATERTRUTH_SHADOW_CAPABILITY,
-  WATERTRUTH_SHADOW_CAPABILITY_ID,
-  WaterTruthShadowError,
-} from '../../capabilities/waterTruthShadow.js';
 import { capabilities } from '../../capabilities/workbenchRegistry.js';
 import { enqueueReconcile } from '../../events/outbox.js';
 import { supabase } from '../../lib/supabaseClient.js';
@@ -31,7 +24,6 @@ const DYNAMIC_CAPABILITIES = new Map([
 const WORKBENCH_CAPABILITIES = Object.freeze([
   ...capabilities,
   TINYFISH_WEB_OBSERVATION_CAPABILITY,
-  WATERTRUTH_SHADOW_CAPABILITY,
 ]);
 
 function continuityValue(value: unknown): string | null {
@@ -96,41 +88,6 @@ async function runTinyFishObservation(
   }
 }
 
-function runWaterTruthShadow(
-  res: Response,
-  body: Record<string, unknown>,
-) {
-  try {
-    const input = parseWaterTruthShadowInput(body);
-    const receipt = evaluateWaterTruthShadow(input);
-
-    return res.status(200).set('Cache-Control', 'no-store').json({
-      run: {
-        id: `watertruth-shadow:${randomUUID()}`,
-        capabilityId: WATERTRUTH_SHADOW_CAPABILITY_ID,
-        state: 'completed',
-        authority: 'shadow_only',
-        consequence: 'READ',
-        mutationAllowed: false,
-        liveWaterControlAllowed: false,
-        potabilityClaimAllowed: false,
-        receipt,
-      },
-    });
-  } catch (error) {
-    if (error instanceof WaterTruthShadowError) {
-      return res.status(400).set('Cache-Control', 'no-store').json({
-        error: error.message,
-        code: error.code,
-      });
-    }
-    return res.status(500).set('Cache-Control', 'no-store').json({
-      error: 'WaterTruth shadow evaluation failed.',
-      code: 'watertruth_shadow_failure',
-    });
-  }
-}
-
 capabilitiesRouter.get('/', (_req, res) => {
   res.set('Cache-Control', 'no-store').json({ capabilities: WORKBENCH_CAPABILITIES });
 });
@@ -143,10 +100,6 @@ capabilitiesRouter.post('/:capabilityId/runs', async (req: FounderRequest, res) 
 
   if (capabilityId === TINYFISH_WEB_OBSERVATION_CAPABILITY_ID) {
     return runTinyFishObservation(req, res, body);
-  }
-
-  if (capabilityId === WATERTRUTH_SHADOW_CAPABILITY_ID) {
-    return runWaterTruthShadow(res, body);
   }
 
   const runtime = DYNAMIC_CAPABILITIES.get(capabilityId);
