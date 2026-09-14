@@ -52,6 +52,14 @@ export interface FounderContentApprovalClaimFailure {
 
 export interface FounderContentApprovalRepository {
   issue(input: FounderContentIssuedApproval & { founderUserId: string }): Promise<boolean>;
+  readReserved?(input: {
+    founderUserId: string;
+    approvalId: string;
+    proposalHash: string;
+    publicPayloadHash: string;
+    platform: string;
+    now: string;
+  }): Promise<FounderContentIssuedApproval | FounderContentApprovalClaimFailure>;
   readCurrent?(input: {
     founderUserId: string;
     approvalId: string;
@@ -239,6 +247,49 @@ function normalizeStoredApproval(data: Record<string, unknown>): FounderContentA
   };
 }
 
+function normalizeStoredIssuedApproval(data: Record<string, unknown>): FounderContentIssuedApproval {
+  return Object.freeze({
+    contract: FOUNDER_CONTENT_APPROVAL_STORE_CONTRACT,
+    approvalId: text(data.approval_id),
+    proposalHash: text(data.proposal_hash).toLowerCase(),
+    publicPayloadHash: text(data.public_payload_hash).toLowerCase(),
+    authorizationHash: text(data.authorization_hash).toLowerCase(),
+    platform: text(data.platform).toLowerCase(),
+    sourceRepo: text(data.source_repo),
+    sourceCommitSha: text(data.source_commit_sha).toLowerCase(),
+    approvedAt: text(data.approved_at),
+    expiresAt: text(data.expires_at),
+    approval: Object.freeze(record(data.approval)),
+  });
+}
+
+async function missingApprovalResult(
+  client: SupabaseClient,
+  founderUserId: string,
+  approvalId: string,
+): Promise<FounderContentApprovalClaimFailure> {
+  const { data: existing, error: lookupError } = await client
+    .from('founder_content_approvals')
+    .select('approval_id')
+    .eq('approval_id', approvalId)
+    .eq('founder_user_id', founderUserId)
+    .maybeSingle();
+  if (lookupError) {
+    return { ok: false, code: 'APPROVAL_STORE_FAILED', reason: lookupError.message };
+  }
+  return existing
+    ? {
+        ok: false,
+        code: 'APPROVAL_NOT_CURRENT',
+        reason: 'authoritative approval is expired, revoked, consumed, or no longer matches the exact proposal/copy',
+      }
+    : {
+        ok: false,
+        code: 'APPROVAL_NOT_FOUND',
+        reason: 'authoritative approval was not issued to this founder',
+      };
+}
+
 function supabaseRepository(client: SupabaseClient): FounderContentApprovalRepository {
   return {
     async issue(input) {
@@ -263,6 +314,27 @@ function supabaseRepository(client: SupabaseClient): FounderContentApprovalRepos
       return !error;
     },
 
+    async readReserved(input) {
+      const { data, error } = await client
+        .from('founder_content_approvals')
+        .select('approval, approval_id, proposal_hash, public_payload_hash, authorization_hash, platform, source_repo, source_commit_sha, approved_at, expires_at')
+        .eq('approval_id', input.approvalId)
+        .eq('founder_user_id', input.founderUserId)
+        .eq('proposal_hash', input.proposalHash)
+        .eq('public_payload_hash', input.publicPayloadHash)
+        .eq('platform', input.platform)
+        .is('revoked_at', null)
+        .is('consumed_at', null)
+        .gt('expires_at', input.now)
+        .maybeSingle();
+
+      if (error) {
+        return { ok: false, code: 'APPROVAL_STORE_FAILED', reason: error.message } as const;
+      }
+      if (!data) return missingApprovalResult(client, input.founderUserId, input.approvalId);
+      return normalizeStoredIssuedApproval(data);
+    },
+
     async readCurrent(input) {
       const { data, error } = await client
         .from('founder_content_approvals')
@@ -280,21 +352,7 @@ function supabaseRepository(client: SupabaseClient): FounderContentApprovalRepos
       if (error) {
         return { ok: false, code: 'APPROVAL_STORE_FAILED', reason: error.message } as const;
       }
-      if (!data) {
-        const { data: existing, error: lookupError } = await client
-          .from('founder_content_approvals')
-          .select('approval_id')
-          .eq('approval_id', input.approvalId)
-          .eq('founder_user_id', input.founderUserId)
-          .maybeSingle();
-        if (lookupError) {
-          return { ok: false, code: 'APPROVAL_STORE_FAILED', reason: lookupError.message } as const;
-        }
-        return existing
-          ? { ok: false, code: 'APPROVAL_NOT_CURRENT', reason: 'authoritative approval is expired, revoked, consumed, or no longer matches the exact proposal/copy' } as const
-          : { ok: false, code: 'APPROVAL_NOT_FOUND', reason: 'authoritative approval was not issued to this founder' } as const;
-      }
-
+      if (!data) return missingApprovalResult(client, input.founderUserId, input.approvalId);
       return normalizeStoredApproval(data);
     },
 
@@ -319,21 +377,7 @@ function supabaseRepository(client: SupabaseClient): FounderContentApprovalRepos
       if (error) {
         return { ok: false, code: 'APPROVAL_STORE_FAILED', reason: error.message } as const;
       }
-      if (!data) {
-        const { data: existing, error: lookupError } = await client
-          .from('founder_content_approvals')
-          .select('approval_id')
-          .eq('approval_id', input.approvalId)
-          .eq('founder_user_id', input.founderUserId)
-          .maybeSingle();
-        if (lookupError) {
-          return { ok: false, code: 'APPROVAL_STORE_FAILED', reason: lookupError.message } as const;
-        }
-        return existing
-          ? { ok: false, code: 'APPROVAL_NOT_CURRENT', reason: 'authoritative approval is expired, revoked, consumed, or no longer matches the exact proposal/copy' } as const
-          : { ok: false, code: 'APPROVAL_NOT_FOUND', reason: 'authoritative approval was not issued to this founder' } as const;
-      }
-
+      if (!data) return missingApprovalResult(client, input.founderUserId, input.approvalId);
       return normalizeStoredApproval(data);
     },
   };
@@ -399,12 +443,23 @@ export async function issueFounderContentApproval({
   const issued = buildFounderContentIssuedApproval({ proposal, founderUserId, now });
   const store = repository ?? await defaultRepository();
   const persisted = await store.issue({ ...issued, founderUserId });
-  if (!persisted) {
-    throw new Error(
-      'authoritative founder-content approval could not be persisted; exact public pattern/current-intent approval is already reserved or store rejected issuance',
-    );
+  if (persisted) return issued;
+
+  if (store.readReserved) {
+    const recovered = await store.readReserved({
+      founderUserId: text(founderUserId),
+      approvalId: issued.approvalId,
+      proposalHash: issued.proposalHash,
+      publicPayloadHash: issued.publicPayloadHash,
+      platform: issued.platform,
+      now,
+    });
+    if (!('ok' in recovered && recovered.ok === false)) return recovered;
   }
-  return issued;
+
+  throw new Error(
+    'authoritative founder-content approval could not be persisted; exact public pattern/current-intent approval is already reserved or store rejected issuance',
+  );
 }
 
 export async function readCurrentFounderContentApproval({
