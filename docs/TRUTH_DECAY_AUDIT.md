@@ -64,6 +64,14 @@ The corrected canon separates the planes. `merge_authority: true` means only tha
 
 This is an authority-freshness correction, not a relaxation of review or proof. Exact-head evidence still constrains what can be claimed and integrated, while founder approval controls whether the exact candidate may cross the merge boundary. Deployment, publication, billing, secrets, database mutation, deletion, and other consequential classes remain separately gated.
 
+## 2026-09 control correction: delegated authority documentation coverage
+
+Delegated Codex Chat / Claude authority exposed another false-green class: `src/authority/**` and `security/delegated-agent-authority.json` could change a standing merge/deploy capability policy while Documentation Truth reported zero truth-sensitive files. That allowed a narrower green documentation receipt to coexist with a broader authority-documentation red.
+
+The corrected verifier registers non-test `src/authority/**` source plus `security/delegated-agent-authority.json` as `capability-authority`. A change to either path therefore must refresh `README.md`, update `docs/DOCUMENTATION_TRUTH_RECEIPT.json` with path-bound invariants, and satisfy every additional documentation requirement triggered by the verifier change itself. This registration does not activate delegated execution: the current policy remains policy-only, `executionAuthorized=false`, `completionClaimAllowed=false`, and founder-final exact-candidate authority remains load-bearing.
+
+This control is deliberately broader than PR #797. Future authority-policy edits must not be able to restore the old false green simply by moving or changing the evaluator while leaving the durable truth surface untouched.
+
 ## Root causes
 
 ### 1. Evidence lifetime was implicit
@@ -197,6 +205,8 @@ The verifier classifies truth-sensitive changed files by domain and requires the
 
 Goalfix governance is explicitly part of that classification. Changes to `.ai/skills/goalfix/SKILL.md`, `.claude/skills/goalfix/SKILL.md`, `docs/FOUNDER_ADAPTIVE_KERNEL_V0.md`, `docs/GOALFIX_EXECUTION_WORKFLOW_V2.md`, `docs/CLAUDE_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC.md`, or `docs/PERPLEXITY_MCP_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC.md` must be treated as truth-sensitive because those files can change how future operators select targets, interpret proof, consume founder authority, or report post-merge state.
 
+Delegated authority is now explicitly part of that classification too. Changes to non-test files under `src/authority/` or to `security/delegated-agent-authority.json` are `capability-authority` changes and must not report `truthSensitiveFileCount: 0`; they require current documentation plus path-bound invariants before Documentation Truth may report `CURRENT`.
+
 It also checks cross-document invariants that are easy to regress during fast-moving work, including:
 
 - README does not freeze a manual “Last refreshed” date as current authority;
@@ -232,7 +242,7 @@ That registration does not mean durable evidence persistence exists. The current
 
 A signed rollout-coverage receipt is still sender-supplied observation. For a `passed` coverage claim, Founder Control Room must re-read current repository `main` and independently read a fresh production deployment witness from the Cloudflare provider-observation lane. The witness must be tied to a processed provider event and must not reuse `project_events`, where the receipt itself is stored.
 
-If main, deployment SHA, freshness, health, or independent provenance cannot be verified, the receipt is retained only as non-passing history or blocked from persistence; it cannot render a current green coverage fact. Current Truth hides SHA-mismatched coverage and withholds coverage unless the display read completes a fresh GitHub `main` revalidation; a received webhook main fact is last-observed history, not a substitute.
+If main, deployment SHA, freshness, health, or independent provenance cannot be verified, the receipt is retained only as non-passing history or blocked from persistence; it cannot render a current green coverage fact. Current Truth hides SHA-mismatched coverage and withholds coverage unless the display read completes a fresh GitHub `main` revalidation`; a received webhook main fact is last-observed history, not a substitute.
 
 Legacy external receipt shapes are also not grandfathered into durable operational truth. Current Truth renders runtime only from a server-owned event and renders provider or verification facts only from GitHub or system observation bound to the enrolled repository. Tightening a producer's capability therefore closes both future ingestion and historical projection paths.
 
@@ -378,6 +388,7 @@ The strongest optimization is not faster claiming. It is shortening the distance
 31. A privileged `workflow_run` witness may consume an upstream release SHA as evidence, but it cannot execute that upstream checkout or treat upstream success as executable trust.
 32. A capital decision card, recommendation, score, or HOLD state is evidence interpretation, not financing or execution authority; stale or missing capital evidence must remove derived certainty instead of preserving an earlier recommendation.
 33. `merge_authority: true` cannot be reused as candidate approval; every merge requires a fresh explicit founder decision for the exact live repository/PR/base/head, and candidate movement expires that approval.
+34. A delegated-agent authority policy change cannot be invisible to Documentation Truth; changes under `src/authority/` or to `security/delegated-agent-authority.json` must trigger capability-authority documentation and path-bound receipt proof before current use.
 
 ## Rollback
 

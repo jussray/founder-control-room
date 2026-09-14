@@ -117,6 +117,8 @@ See [`docs/FOUNDER_MERGE_AUTHORITY.md`](docs/FOUNDER_MERGE_AUTHORITY.md).
 
 `.control/capability.yaml` is a compatibility pointer, not a second source of capability, deploy, runtime, health, or rollback truth.
 
+The delegated Codex Chat / Claude policy under `src/authority/` and `security/delegated-agent-authority.json` is also a truth-sensitive capability-authority surface. It records standing merge/deploy capability only; it cannot authorize provider mutation, cannot carry approval across base/head movement, and cannot produce a verified completion claim. Any future change to that policy must trigger Documentation Truth and refresh the applicable current-state documentation before it may be treated as current.
+
 Keep the layers separate:
 
 ```text

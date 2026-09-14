@@ -66,6 +66,8 @@ const truthSensitiveRules = [
   { domain: 'evidence-authority', match: /^public\/control-room\/evidence-trust\.html$/ },
   { domain: 'evidence-authority', match: /^\.github\/workflows\/playwright\.yml$/ },
   { domain: 'capability-authority', match: /^\.control\/capability\.(?:json|yaml)$/ },
+  { domain: 'capability-authority', match: /^src\/authority\/(?!__tests__\/)(?!.*\.test\.ts$)/ },
+  { domain: 'capability-authority', match: /^security\/delegated-agent-authority\.json$/ },
   { domain: 'workflow-authority', match: /^\.github\/workflows\/(?:ci|quality-gate|pr-recovery-exact-head|founder-repo-cycle|documentation-truth)\.yml$/ },
   { domain: 'cloudflare-authority', match: /^public\/_worker\.js$/ },
   { domain: 'cloudflare-authority', match: /^\.github\/workflows\/(?:deploy|cloudflare-build-diagnostic|fcr-access-front-door-recovery)\.yml$/ },
