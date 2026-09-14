@@ -20,7 +20,7 @@ assert.match(localPlaywrightProof, /LOCAL_NO_PROVIDER_FEE/);
 assert.match(localPlaywrightProof, /providerWalletRequired: false/);
 assert.doesNotMatch(localPlaywrightProof, /providerWalletRequired:\s*true/);
 assert.match(ultrathinkPluginProof, /from 'playwright'/);
-assert.match(ultrathinkPluginProof, /data-plugin-id=\\"ultrathink\\"/);
+assert.match(ultrathinkPluginProof, /data-plugin-id="ultrathink"/);
 assert.match(ultrathinkPluginProof, /non-authorizing/);
 assert.match(ultrathinkPluginProof, /plugin-center-ultrathink-/);
 
