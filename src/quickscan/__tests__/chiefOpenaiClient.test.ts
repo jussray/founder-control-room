@@ -182,9 +182,9 @@ describe('createOpenAiQuickScanChiefRunner', () => {
   });
 
   it('uses the configured model override in the request body', async () => {
-    let observedRequestBody: Record<string, unknown> | null = null;
+    const observedRequestBody: { current?: Record<string, unknown> } = {};
     const fetchFn = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
-      observedRequestBody = JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>;
+      observedRequestBody.current = JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>;
       return fakeResponse(openAiPayload({
         summary: 'Not enough evidence yet.',
         next_action: 'capture_more_evidence',
@@ -195,7 +195,7 @@ describe('createOpenAiQuickScanChiefRunner', () => {
     const result = await runner(promptInput());
 
     expect(result.provenance.model).toBe('gpt-5-nano');
-    expect(observedRequestBody?.model).toBe('gpt-5-nano');
+    expect(observedRequestBody.current?.model).toBe('gpt-5-nano');
   });
 
   it('allows a null message_draft for a purely informational next action', async () => {
