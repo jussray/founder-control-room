@@ -123,6 +123,7 @@ founderOnboardingRouter.get('/state', async (_req: FounderRequest, res) => {
 
   let connectionRows: DbRecord[] = [];
   let onboardingEventRows: DbRecord[] = [];
+  let composerProfileEvidenceStatus: 'available' | 'unavailable' = 'available';
   if (projectIds.length > 0) {
     const { data, error } = await supabase
       .from('project_connections')
@@ -139,8 +140,11 @@ founderOnboardingRouter.get('/state', async (_req: FounderRequest, res) => {
       .in('project_id', projectIds)
       .order('created_at', { ascending: false });
 
-    if (eventError) return res.status(500).json({ error: eventError.message });
-    onboardingEventRows = (eventData ?? []) as DbRecord[];
+    if (eventError) {
+      composerProfileEvidenceStatus = 'unavailable';
+    } else {
+      onboardingEventRows = (eventData ?? []) as DbRecord[];
+    }
   }
 
   const connectionsByProject = new Map<string, DbRecord[]>();
@@ -191,6 +195,11 @@ founderOnboardingRouter.get('/state', async (_req: FounderRequest, res) => {
   return res.json({
     complete: normalizedProjects.length > 0,
     projects: normalizedProjects,
+    composerProfileEvidence: {
+      status: composerProfileEvidenceStatus,
+      founderDeclared: true,
+      authorityGranted: false,
+    },
     composerOptions: {
       projectTypes: [...PROJECT_TYPES],
       missions: [...MISSIONS],
@@ -355,6 +364,7 @@ founderOnboardingRouter.post('/bootstrap', async (req: FounderRequest, res) => {
       requestedProviders,
       createdProviders: createdConnections.map((connection) => connection.connection_type),
       controlRoomProfile: suppliedProfile,
+      controlRoomProfileAuthority: 'founder-declared',
       authorityGranted: false,
       credentialsStored: false,
     },
@@ -371,6 +381,7 @@ founderOnboardingRouter.post('/bootstrap', async (req: FounderRequest, res) => {
     ok: true,
     project,
     controlRoomProfile: suppliedProfile,
+    controlRoomProfileAuthority: suppliedProfile ? 'founder-declared' : null,
     projectCreated,
     connectionsCreated: createdConnections,
     connectionsAlreadyPresent: requestedProviders.filter((provider) => existingTypes.has(provider)),
