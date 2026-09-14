@@ -200,7 +200,10 @@ export interface FounderOsLabCapabilityPlanRoute {
   planHash: string | null;
   registryHash: string | null;
   capabilityIds: string[];
+  /** Strategic lenses exactly as declared in the hash-bound Chief plan. */
   strategicLenses: string[];
+  /** FCR-owned advisory council applied at runtime without changing the Chief plan hash. */
+  effectiveStrategicLenses?: string[];
   outcomeSignals: string[];
   errors: string[];
 }
