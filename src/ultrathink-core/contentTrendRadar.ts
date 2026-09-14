@@ -49,8 +49,20 @@ export interface TrendRadarCandidate {
   fingerprint?: TrendFingerprintComparison;
 }
 
+export interface TrendRadarEvaluationContext {
+  evaluatedAt: string;
+  maxEvidenceAgeMs?: number;
+  futureSkewMs?: number;
+  firstWaveLimit?: number;
+}
+
 export type TrendRadarReason =
   | 'missing_evidence'
+  | 'missing_evidence_provenance'
+  | 'invalid_evidence_time'
+  | 'stale_evidence'
+  | 'future_evidence'
+  | 'invalid_evaluation_time'
   | 'prediction_only'
   | 'missing_required_angles'
   | 'near_duplicate_fingerprint'
@@ -67,6 +79,7 @@ export interface RankedTrendRadarCandidate extends TrendRadarCandidate {
 export interface TrendRadarResult {
   ranked: readonly RankedTrendRadarCandidate[];
   firstWave: readonly RankedTrendRadarCandidate[];
+  evaluatedAt: string;
   authority: {
     authorizesPublish: false;
     authorizesSchedule: false;
@@ -74,6 +87,8 @@ export interface TrendRadarResult {
   };
 }
 
+const DEFAULT_MAX_EVIDENCE_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+const DEFAULT_FUTURE_SKEW_MS = 2 * 60 * 1000;
 const EVIDENCE_FACTOR: Readonly<Record<TrendEvidenceState, number>> = {
   VERIFIED: 1,
   EMERGING_SIGNAL: 0.95,
@@ -100,12 +115,67 @@ function boundedScore(value: number): number {
   return Math.min(100, Math.max(0, value));
 }
 
-function normalized(value: string): string {
-  return value.trim();
+function normalized(value: string | undefined): string {
+  return value?.trim() ?? '';
+}
+
+function positiveFinite(value: number | undefined, fallback: number): number {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : fallback;
 }
 
 function hasEvidence(candidate: TrendRadarCandidate): boolean {
   return candidate.evidenceRefs.some((ref) => normalized(ref.id).length > 0);
+}
+
+function evidenceProvenanceReasons(
+  candidate: TrendRadarCandidate,
+  context: TrendRadarEvaluationContext,
+): TrendRadarReason[] {
+  if (!hasEvidence(candidate)) return ['missing_evidence'];
+
+  const evaluatedAt = Date.parse(context.evaluatedAt);
+  if (!Number.isFinite(evaluatedAt)) return ['invalid_evaluation_time'];
+
+  const maxEvidenceAgeMs = positiveFinite(
+    context.maxEvidenceAgeMs,
+    DEFAULT_MAX_EVIDENCE_AGE_MS,
+  );
+  const futureSkewMs = positiveFinite(context.futureSkewMs, DEFAULT_FUTURE_SKEW_MS);
+  const reasons = new Set<TrendRadarReason>();
+  let hasCurrentProvenance = false;
+
+  for (const ref of candidate.evidenceRefs) {
+    if (!normalized(ref.id)) continue;
+    if (!normalized(ref.source) || !normalized(ref.observedAt)) {
+      reasons.add('missing_evidence_provenance');
+      continue;
+    }
+
+    const observedAt = Date.parse(ref.observedAt!);
+    if (!Number.isFinite(observedAt)) {
+      reasons.add('invalid_evidence_time');
+      continue;
+    }
+    if (observedAt > evaluatedAt + futureSkewMs) {
+      reasons.add('future_evidence');
+      continue;
+    }
+    if (evaluatedAt - observedAt > maxEvidenceAgeMs) {
+      reasons.add('stale_evidence');
+      continue;
+    }
+
+    hasCurrentProvenance = true;
+  }
+
+  if (hasCurrentProvenance) {
+    reasons.delete('missing_evidence_provenance');
+    reasons.delete('invalid_evidence_time');
+    reasons.delete('stale_evidence');
+    reasons.delete('future_evidence');
+  }
+
+  return [...reasons];
 }
 
 function hasRequiredAngles(candidate: TrendRadarCandidate): boolean {
@@ -128,9 +198,11 @@ function weightedOpportunity(scores: TrendRadarScores): number {
   );
 }
 
-function classifyReasons(candidate: TrendRadarCandidate): TrendRadarReason[] {
-  const reasons: TrendRadarReason[] = [];
-  if (!hasEvidence(candidate)) reasons.push('missing_evidence');
+function classifyReasons(
+  candidate: TrendRadarCandidate,
+  context: TrendRadarEvaluationContext,
+): TrendRadarReason[] {
+  const reasons = evidenceProvenanceReasons(candidate, context);
   if (candidate.evidenceState === 'PREDICTION') reasons.push('prediction_only');
   if (!hasRequiredAngles(candidate)) reasons.push('missing_required_angles');
   if (candidate.fingerprint && boundedScore(candidate.fingerprint.similarity) >= 85) {
@@ -139,7 +211,7 @@ function classifyReasons(candidate: TrendRadarCandidate): TrendRadarReason[] {
   if (candidate.saturation === 'CROWDED') reasons.push('crowded');
   if (candidate.saturation === 'OVERSATURATED') reasons.push('oversaturated');
   if (candidate.saturation === 'UNKNOWN') reasons.push('unknown_saturation');
-  return reasons;
+  return [...new Set(reasons)];
 }
 
 function duplicatePenalty(candidate: TrendRadarCandidate): number {
@@ -148,8 +220,11 @@ function duplicatePenalty(candidate: TrendRadarCandidate): number {
     : 0;
 }
 
-function rankCandidate(candidate: TrendRadarCandidate): RankedTrendRadarCandidate {
-  const reasons = classifyReasons(candidate);
+function rankCandidate(
+  candidate: TrendRadarCandidate,
+  context: TrendRadarEvaluationContext,
+): RankedTrendRadarCandidate {
+  const reasons = classifyReasons(candidate, context);
   const raw = weightedOpportunity(candidate.scores) * EVIDENCE_FACTOR[candidate.evidenceState];
   const score = Math.max(
     0,
@@ -157,6 +232,11 @@ function rankCandidate(candidate: TrendRadarCandidate): RankedTrendRadarCandidat
   );
   const blockingReasons: readonly TrendRadarReason[] = [
     'missing_evidence',
+    'missing_evidence_provenance',
+    'invalid_evidence_time',
+    'stale_evidence',
+    'future_evidence',
+    'invalid_evaluation_time',
     'prediction_only',
     'missing_required_angles',
   ];
@@ -172,26 +252,27 @@ function rankCandidate(candidate: TrendRadarCandidate): RankedTrendRadarCandidat
 /**
  * Rank content opportunities from sourced market signals.
  *
- * The radar separates observation from prediction, penalizes saturation and
- * repeated content fingerprints, and gives explicit weight to founder receipts
- * and the closest legitimate revenue path. Ranking is advisory only: it never
- * grants publish, scheduling, spend, or provider authority.
+ * First-wave eligibility requires current provenance evaluated at an explicit
+ * time boundary. A caller-provided VERIFIED/EMERGING label cannot make stale,
+ * unattributed, malformed, or future-dated evidence current. The radar remains
+ * advisory only: it never grants publish, scheduling, spend, or provider authority.
  */
 export function evaluateContentTrendRadar(
   candidates: readonly TrendRadarCandidate[],
-  firstWaveLimit = 3,
+  context: TrendRadarEvaluationContext,
 ): TrendRadarResult {
   const ranked = candidates
-    .map(rankCandidate)
+    .map((candidate) => rankCandidate(candidate, context))
     .sort((left, right) => right.score - left.score || left.id.localeCompare(right.id));
 
-  const safeLimit = Number.isInteger(firstWaveLimit) && firstWaveLimit > 0
-    ? firstWaveLimit
+  const safeLimit = Number.isInteger(context.firstWaveLimit) && (context.firstWaveLimit ?? 0) > 0
+    ? context.firstWaveLimit!
     : 3;
 
   return {
     ranked,
     firstWave: ranked.filter((candidate) => candidate.eligibleForFirstWave).slice(0, safeLimit),
+    evaluatedAt: context.evaluatedAt,
     authority: {
       authorizesPublish: false,
       authorizesSchedule: false,
