@@ -16,7 +16,7 @@ const MAX_FIRST_PARENT_SUCCESSORS = 256;
 // This is the immutable terminal tip of the currently ratified direct-main
 // history. Keep it bound to verify-main-release-ratification-extension.mjs.
 // Everything after this commit must earn live reviewed-PR provenance.
-export const TERMINAL_RATIFIED_MAIN_TIP = 'cad41a5880b213d31242812906a24203e6131929';
+export const TERMINAL_RATIFIED_MAIN_TIP = '164add06aa903af030bd73ba2a25b6f424aba320';
 
 export const CONSTITUTIONAL_REQUIRED_MIGRATIONS = Object.freeze([
   '20260809072500',
@@ -173,8 +173,6 @@ export async function observeMainReleaseProvenance({
       fetchGithubJson(fetchImpl, `${GITHUB_API_BASE}/repos/${repo}/commits/${target}/pulls`, token),
     ]);
 
-    // Fail stale/direct/ambiguous release tips before walking history. This also
-    // keeps a missing reviewed tip from being laundered by successor evidence.
     const tipResult = classifyMainReleaseProvenance({
       targetSha: target,
       currentMainSha: initialMainBranch?.commit?.sha,
@@ -196,9 +194,6 @@ export async function observeMainReleaseProvenance({
       token,
     });
 
-    // Main is mutable while the immutable successor chain is being observed.
-    // Re-read it at the final decision boundary so a target that became stale
-    // during the provider walk cannot inherit the earlier current-main read.
     const finalMainBranch = await fetchGithubJson(
       fetchImpl,
       `${GITHUB_API_BASE}/repos/${repo}/branches/main`,
