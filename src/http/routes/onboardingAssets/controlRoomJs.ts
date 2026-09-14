@@ -15,8 +15,13 @@ const flow = id('onboarding-flow');
 const ready = id('workspace-ready');
 const startOnboarding = id('start-onboarding');
 const cancelOnboarding = id('cancel-onboarding');
+const chiefComposer = id('chief-composer-fieldset');
+const chiefRecommendButton = id('chief-recommend-button');
+const chiefRecommendationPanel = id('chief-recommendation');
+const chiefApproval = id('chief-approval');
 let founder = null;
 let state = null;
+let chiefRecommendation = null;
 
 const say = (text, bad = false) => {
   notice.textContent = text;
@@ -59,6 +64,25 @@ async function health() {
   }
 }
 
+function composerPayload() {
+  const formData = new FormData(workspaceForm);
+  return {
+    name: String(formData.get('projectName') || ''),
+    slug: String(formData.get('projectSlug') || ''),
+    projectType: String(formData.get('projectType') || ''),
+    mission: String(formData.get('mission') || ''),
+    currentState: String(formData.get('currentState') || ''),
+    evidenceNotes: String(formData.get('evidenceNotes') || ''),
+  };
+}
+
+function resetChiefRecommendation() {
+  chiefRecommendation = null;
+  chiefRecommendationPanel.hidden = true;
+  chiefApproval.checked = false;
+  if (isWorkspaceOwner()) workspaceButton.disabled = true;
+}
+
 function applyAccountMode() {
   const tenant = isWorkspaceOwner();
   const boundary = id('workspace-boundary-note');
@@ -69,12 +93,18 @@ function applyAccountMode() {
   id('provider-slots-fieldset').hidden = tenant;
   id('platform-modules').hidden = tenant;
   id('password-panel').hidden = tenant;
+  chiefComposer.hidden = !tenant;
+
+  id('project-type').required = tenant;
+  id('project-mission').required = tenant;
+  chiefApproval.required = tenant;
 
   if (tenant) {
-    id('workspace-heading').textContent = 'Add a project to your private workspace.';
-    id('workspace-description').textContent = 'This project stays isolated inside your workspace. Provider connections, Chief execution, merge, deployment, spending, and external mutations remain locked until separately authorized and tenant-safe.';
-    id('tools-step').textContent = '2. Isolation';
-    workspaceButton.textContent = 'Add project to my workspace';
+    id('workspace-heading').textContent = 'Meet Chief. Compose your first Control Room.';
+    id('workspace-description').textContent = 'Tell Chief what you are building, what must become true, and what is true now. Chief recommends the first gate; only your explicit approval creates the project.';
+    id('tools-step').textContent = '2. Chief';
+    workspaceButton.textContent = 'Approve plan & create Control Room';
+    resetChiefRecommendation();
   }
 }
 
@@ -98,7 +128,7 @@ function renderWorkspace(nextState) {
   const primary = projects.find((project) => project.slug === 'founder-control-room') || projects[0];
   id('workspace-title').textContent = (primary && primary.name ? primary.name : 'Founder Control Room') + ' is online.';
   id('workspace-summary').textContent = isWorkspaceOwner()
-    ? projects.length + ' isolated project' + (projects.length === 1 ? '' : 's') + ' in this workspace. Provider connections and Chief execution remain locked until their tenant-safe capability gates are proved.'
+    ? projects.length + ' isolated project' + (projects.length === 1 ? '' : 's') + ' in this workspace. Chief recommendation was configuration only; provider connections and Chief execution remain locked until their tenant-safe capability gates are proved.'
     : projects.length + ' project' + (projects.length === 1 ? '' : 's') + ' and ' + connections + ' declared tool slot' + (connections === 1 ? ' was' : 's were') + '. Provider slots remain disconnected until separately authorized and verified.';
   flow.hidden = true;
   ready.hidden = false;
@@ -122,6 +152,7 @@ function openOnboarding() {
   flow.hidden = false;
   ready.hidden = true;
   cancelOnboarding.hidden = !(state && Array.isArray(state.projects) && state.projects.length > 0);
+  if (isWorkspaceOwner()) resetChiefRecommendation();
   flow.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
@@ -166,11 +197,56 @@ loginForm.addEventListener('submit', async (event) => {
   }
 });
 
+chiefRecommendButton.addEventListener('click', async () => {
+  chiefRecommendButton.disabled = true;
+  workspaceButton.disabled = true;
+  chiefApproval.checked = false;
+  say('Chief is composing the smallest useful first gate…');
+  try {
+    const data = await api('/workspace/projects/recommendation', {
+      method: 'POST',
+      body: JSON.stringify(composerPayload()),
+    });
+    chiefRecommendation = data.recommendation;
+    id('chief-recommendation-title').textContent = chiefRecommendation.title;
+    id('chief-first-gate').textContent = chiefRecommendation.firstGate;
+    id('chief-reasoning').textContent = chiefRecommendation.reasoning;
+    id('chief-authority-boundary').textContent = chiefRecommendation.authorityBoundary;
+    chiefRecommendationPanel.hidden = false;
+    say('Chief recommendation ready. Review it, then approve this exact plan to create the Control Room.');
+    chiefRecommendationPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  } catch (error) {
+    resetChiefRecommendation();
+    say(error instanceof Error ? error.message : 'Unable to compose a Chief recommendation', true);
+  } finally {
+    chiefRecommendButton.disabled = false;
+  }
+});
+
+chiefApproval.addEventListener('change', () => {
+  workspaceButton.disabled = !chiefApproval.checked || !chiefRecommendation;
+});
+
+for (const fieldId of ['project-name', 'project-slug', 'project-type', 'project-mission', 'project-current-state', 'project-evidence-notes']) {
+  id(fieldId).addEventListener('input', () => {
+    if (isWorkspaceOwner() && chiefRecommendation) resetChiefRecommendation();
+  });
+  id(fieldId).addEventListener('change', () => {
+    if (isWorkspaceOwner() && chiefRecommendation) resetChiefRecommendation();
+  });
+}
+
 workspaceForm.addEventListener('submit', async (event) => {
   event.preventDefault();
-  workspaceButton.disabled = true;
   const tenant = isWorkspaceOwner();
-  say(tenant ? 'Adding the project inside your isolated workspace…' : 'Creating the workspace and declaring provider boundaries…');
+  if (tenant && (!chiefRecommendation || !chiefApproval.checked)) {
+    say('Request and approve the current Chief recommendation before creating this Control Room.', true);
+    workspaceButton.disabled = !chiefRecommendation || !chiefApproval.checked;
+    return;
+  }
+
+  workspaceButton.disabled = true;
+  say(tenant ? 'Creating the approved Control Room inside your isolated workspace…' : 'Creating the workspace and declaring provider boundaries…');
   try {
     const formData = new FormData(workspaceForm);
     const project = {
@@ -183,11 +259,21 @@ workspaceForm.addEventListener('submit', async (event) => {
     };
 
     if (tenant) {
-      await api('/workspace/projects', {
+      const composer = composerPayload();
+      const result = await api('/workspace/projects', {
         method: 'POST',
-        body: JSON.stringify(project),
+        body: JSON.stringify({
+          ...project,
+          ...composer,
+          chiefRecommendationId: chiefRecommendation.id,
+          chiefApproval: true,
+        }),
       });
-      say('Project added to your isolated workspace. Provider connections and Chief execution remain locked.');
+      const recommendationTitle = result && result.chief && result.chief.recommendation
+        ? result.chief.recommendation.title
+        : 'Chief configuration recorded';
+      say('Control Room created from the approved Chief plan. ' + recommendationTitle + '. No execution authority was granted.');
+      resetChiefRecommendation();
     } else {
       const providers = formData.getAll('providers').map(String);
       const result = await api('/onboarding/bootstrap', {
@@ -200,8 +286,9 @@ workspaceForm.addEventListener('submit', async (event) => {
     await loadState();
   } catch (error) {
     say(error instanceof Error ? error.message : 'Unable to create workspace', true);
+    if (tenant) workspaceButton.disabled = !chiefApproval.checked || !chiefRecommendation;
   } finally {
-    workspaceButton.disabled = false;
+    if (!tenant) workspaceButton.disabled = false;
   }
 });
 
