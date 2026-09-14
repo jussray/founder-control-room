@@ -46,6 +46,8 @@ Exact SHAs belong in receipts, PRs, artifacts, incidents, and provenance. The RE
 
 FCR models projects, proposals, missions, exact refs, verification runs, evidence, approval state, and bounded repository operations behind provider-neutral interfaces.
 
+Branch creation through `src/http/routes/approvals.ts` is now an exact-action governed repository mutation. A fresh `create_branch` proof and authenticated founder execute request cause FCR to issue a server-derived `AuthorityEnvelopeV1` bound to `github.repository.create_branch`, repository scope, exact branch arguments, current mission-state fingerprint, tool-call identity, expiry, founder identity, and idempotency key. FCR reserves the execution before the external write, re-reads mission state immediately before mutation, and `executeAuthorizedCreateBranch()` must reject drift before `RepositoryProvider.createBranch(...)` can be reached. A pending or ambiguous execution remains reconcile-before-retry; source and CI proof of this membrane do not by themselves prove that a live GitHub branch was created.
+
 ### PR continuity
 
 The repository has machine-enforced PR continuity. Eligible same-repository branches may roll forward when their live base moves, but every head movement creates a new proof subject.
@@ -59,6 +61,8 @@ main/base moves
 ```
 
 Continuity never rolls founder approval, merge authority, deploy authority, publication authority, provider-mutation authority, spend, deletion, or destructive authority forward automatically. **Proof rollover is allowed only by re-verification. Authority rollover is not.**
+
+Under the current merge canon, `merge_authority: true` means only that the governed merge capability/authority class is available. It never means the current candidate is approved. Every merge requires fresh explicit founder approval bound to the exact repository, pull request number, current base SHA, and current head SHA. If that exact approval is absent, ambiguous, or stale, the agent or operator must ask and stop. Any base/head movement expires both predecessor proof and predecessor merge approval.
 
 See [`docs/PR_CONTINUITY.md`](docs/PR_CONTINUITY.md).
 
@@ -101,7 +105,7 @@ The repository contains FCR's founder-final merge policy, deterministic independ
 
 Source policy is not live GitHub provider truth. Current rulesets, bypass actors, required checks, native review settings, and provider enforcement require fresh GitHub provider readback before a merge decision.
 
-Founder self-approval is not relabeled as independent review. The canonical path keeps deterministic independent review and authenticated exact-candidate founder-final approval separate.
+Founder self-approval is not relabeled as independent review. The canonical path keeps deterministic independent review and authenticated exact-candidate founder-final approval separate. Merge capability and merge approval are also separate: green evidence, mergeability, review requests, `merge review`, broad `approved`/`cont` language, or `merge_authority: true` cannot silently authorize integration. Before every merge, the founder must explicitly approve the exact current repository, PR, base SHA, and head SHA; if the candidate moves, approval expires and must be requested again.
 
 For Chief governance, FCR contains a **read-only trusted observation and verification boundary** pinned to `jussray/chief-ai-machine` and Chief ruleset IDs `20818149` and `21261587`. It uses the repository-scoped FCR GitHub App installation-token path rather than caller-supplied PAT/token authority, preserves required-check `integration_id` producer identity, requires complete bypass and deployment readback, and fingerprints the provider observation. Under the current founder decision, ruleset `20818149` is accepted exactly as observed when it preserves zero bypass actors, its approved source checks, `Cloudflare Production`, `proofmode-access-admin`, and the unbound reserved candidate runtime context. A compliant observation returns `NO_CHANGE_REQUIRED` with `mutation:null`; drift blocks verification rather than producing a desired-state rewrite. This boundary never grants provider mutation, merge, deploy, or execution authority.
 
@@ -144,35 +148,21 @@ verified evidence
 
 A draft, provider acceptance, or n8n execution is not publication truth. **Provider readback** is the terminal external-state evidence for the route that actually ran.
 
-Approval identity now separates public editorial identity from proof rotation. Within one authenticated founder, platform, and exact Current You intent/version, FCR derives a deterministic `fca:<sha256>` reservation from the normalized public thesis and opening hook. Rotating source SHA, evidence reference, evidence digest, proposal hash, or proof details cannot mint a second approval for the same public thesis/hook. The existing `founder_content_approvals.approval_id` primary key is the atomic reservation boundary. A materially different public pattern or a newer explicit Current You intent may derive a different reservation; neither path grants publication authority without the normal one-shot claim and provider outcome proof.
-
 The governed Founder Content n8n production-source lane is source-enabled only when its reviewed configuration sets `N8N_FOUNDER_CONTENT_ENABLED=true`, restricts the enabled provider to Buffer, pins workflow identity `fcrFounderContentV1`, and pins n8n runtime `2.32.6`. That source state does not prove the canonical Worker was deployed with the four required provider-held n8n secret bindings, the production workflow was published at the exact expected fingerprint, the database migrations were applied, or Buffer accepted a schedule. CI may prove the checked workflow on an isolated real n8n runtime without proving production use. Present-tense `live`, `used`, `scheduled`, or `published` claims require exact deployed runtime identity plus provider-native readback.
 
 Investor email is a separate authority class and must not auto-send without the applicable policy, recipient-specific qualification, and send authority.
 
-### Attack 3000 decision evidence
+### Content evidence and Trend Radar
 
-Attack 3000 is a cross-project evidence-evaluation kernel. Domain adapters translate bounded observations into the canonical `SUPPORTED`, `HOLD`, or `FALSIFIED` verdict without gaining authority from that verdict.
+FCR's `content-outcome-learning@v1` Attack 3000 adapter and `evaluateContentTrendRadar` are source-level observation and recommendation capabilities inside the existing ULTRATHINK content lane. They do not create a separate publishing system and do not make analytics or trends authoritative merely because a caller labels them `CURRENT`, `VERIFIED`, or `EMERGING_SIGNAL`.
 
-The content adapter `content-outcome-learning@v1` requires one common outcome-observation identity across publication and all counters. That observation binds a content fingerprint, provider, comparable measurement window, observation timestamp, completion state, freshness classification, and evidence references. Mixed observation IDs, malformed windows, incomplete windows, or anything other than `CURRENT` freshness fail closed for present-tense decision evidence while preserving the historical observation as provenance.
+Attack 3000 content evidence must bind publication and metrics to one observation identity, content fingerprint, provider, comparable window, completed measurement state, and explicit evaluation time. The adapter independently checks observation/window timestamps, bounded future skew, and an explicit freshness expiry; `CURRENT` alone is insufficient. Distribution evidence such as publication, impressions, reactions, comments, and profile views is not business demand by itself. Supporting external-demand evidence must retain its own evidence references plus a downstream attributed signal. Metric stop floors are evaluated only from their relevant current observation and cannot fire before verified publication and a completed measurement window.
 
-For content:
+The Trend Radar ranks sourced signals using timeliness, audience interest, content potential, founder fit, closest-legitimate-dollar relevance, competition opportunity, saturation, and content-fingerprint similarity. First-wave eligibility requires evidence id + source + `observedAt` that is current against the explicit evaluation time; the default evidence window is seven days with a two-minute future-skew tolerance. Evidence-less, unattributed, malformed, stale, future-dated, prediction-only, or incompletely framed candidates cannot enter the first wave. Rankings remain advisory and authorize **no publish, scheduling, spend, provider, merge, deploy, or external-contact action**.
 
-```text
-one current comparable outcome observation
--> distribution + engagement + profile intent
--> attributed visits / qualified conversations / contacts / deals
--> direct dimension evidence
--> Attack 3000 verdict
-```
+Founder-content approval reservations are deterministic for the same founder, platform, normalized public thesis/opening hook, and Current You intent. A retry after a lost issuance response may recover only the exact still-active stored reservation with matching approval id, founder, proposal hash, public payload hash, and platform. Mismatched, consumed, revoked, expired, or otherwise non-current reservations do not recover and do not create fresh authority.
 
-Publishing, impressions, reactions, comments, and profile views do not by themselves prove external demand or business outcome. A supporting `external_demand` dimension must retain its own evidence references and at least one downstream attributed signal. Generic content metric references cannot be borrowed to manufacture evidence for the demand assertion.
-
-Founder-defined content floors evaluate only after verified publication and a completed current measurement window. Each floor is classified from the exact observation and metric inputs it governs, so an unrelated unknown metric cannot suppress a verified breach and pre-publication zeroes cannot create a false `FALSIFIED` outcome.
-
-The authority ceiling remains explicit: Attack 3000 does not authorize merge, deploy, publish, spend, fundraising, external contact, Buffer/n8n execution, provider mutation, or another consequential action. Source tests prove adapter behavior only; provider analytics freshness and real business outcomes remain separate evidence planes.
-
-See [`docs/founder-signal-engine/linkedin-analytics-continuity.md`](docs/founder-signal-engine/linkedin-analytics-continuity.md).
+See [`docs/founder-signal-engine/linkedin-analytics-continuity.md`](docs/founder-signal-engine/linkedin-analytics-continuity.md) for the bounded analytics, Trend Radar, and approval-retry evidence contract.
 
 ### Cloudflare and production release
 
@@ -189,6 +179,8 @@ api.foundercontrolroom.org
 ```
 
 Source dependence on that topology is not proof the live provider is configured correctly.
+
+`wrangler.worker.toml [secrets].required` is the canonical production binding-name gate for provider-held Worker secrets. A provider-backed capability such as `tinyfish-web-observation-v1` must name `TINYFISH_API_KEY` there before canonical Worker promotion; Deploy verifies only binding-name presence in Cloudflare and never copies the secret value through GitHub Actions. Source and CI readiness therefore remain distinct from live TinyFish provider/runtime activation.
 
 Production does not deploy merely because `main` moved or a Cloudflare build succeeded. A production claim remains incomplete until the authorized lane proves, for one exact candidate:
 
@@ -218,7 +210,7 @@ Even a valid current receipt cannot by itself authorize merge, deploy, productio
 
 The Founder Capital Decision surface is an evidence-evaluation capability, not a financing actuator. It can turn founder-supplied and verified fundraising context into a decision card, surface dilution and option tradeoffs, and return `HOLD` when required evidence is stale, missing, or insufficient.
 
-Its authority ceiling is explicit: a capital decision card, score, option set, or browser rendering **does not grant financing, spend, investor-contact, merge, deploy, publication, or execution authority**. Missing or stale evidence removes derived certainty rather than preserving an earlier recommendation. Browser and route tests prove only the source behavior they exercise; they do not prove that financing occurred, that an investor was contacted, or that a current external outcome exists.
+Its authority ceiling is explicit: a capital decision card, score, option set, or browser rendering **does not grant financing, spend, investor-contact, fundraise, merge, deploy, publication, or execution authority**. Missing or stale evidence removes derived certainty rather than preserving an earlier recommendation. Browser and route tests prove only the source behavior they exercise; they do not prove that financing occurred, that an investor was contacted, or that a current external outcome exists.
 
 ### Guarded terminal
 
@@ -242,9 +234,9 @@ Repository manifests, operational packets, analytics, receipts, and public conte
 |---|---|
 | Read project/evidence | Founder-authenticated or explicitly public-safe read |
 | Run bounded verification | Applicable founder/repository authority |
-| Create branch | Separate repository write authority |
-| Merge through FCR | Exact-head machine proof + deterministic independent review + authenticated exact-candidate founder-final approval + repository authority |
-| Merge through live GitHub | Separate live GitHub ruleset/provider authority and fresh readback |
+| Create branch | Fresh `create_branch` proof + authenticated exact execute request + server-issued `AuthorityEnvelopeV1` + execution reservation + fresh mission-state revalidation + repository write authority |
+| Merge through FCR | Exact-head machine proof + deterministic independent review + fresh explicit founder approval bound to exact repo/PR/base/head + authenticated exact-candidate founder-final receipt + repository authority |
+| Merge through live GitHub | Same fresh explicit exact-candidate founder approval + separate live GitHub ruleset/provider authority and fresh readback |
 | Deploy / mutate production | Separate exact production authority |
 | Database migration | Separate migration/database authority |
 | Credentials / secrets | Separate credential authority |
@@ -253,7 +245,7 @@ Repository manifests, operational packets, analytics, receipts, and public conte
 | Billing / destructive action | Separate exact authority |
 | Rollback | Separate rollback authority |
 
-No approval silently carries into another authority class.
+No approval silently carries into another authority class, and merge approval does not carry into a different repo/PR/base/head candidate.
 
 ## Documentation truth gate
 
@@ -306,3 +298,13 @@ Public-safe configuration may live in `.env.example`. Secret values do not belon
 - [`docs/GOALFIX_EXECUTION_WORKFLOW_V2.md`](docs/GOALFIX_EXECUTION_WORKFLOW_V2.md) — canonical repair/verification workflow
 
 Provider overlays may become stricter. They do not become competing constitutions or expand their own authority.
+
+## Load-bearing regression execution
+
+A committed regression test is source evidence only until the exact-head workflow that feeds `Required Gate` actually executes it. For LinkedIn analytics continuity, `.github/workflows/ci.yml` must keep `scripts.test_linkedin_analytics_continuity` inside the load-bearing `python-tests` job, and `Required Gate` must continue to depend on that job. Missing LinkedIn activity rows must remain `UNKNOWN_NO_EVIDENCE` with null metrics, never synthetic zero impressions or engagements.
+
+## Shopify child-provider observation
+
+FCR now includes a source-only, read-only Shopify child-provider observation contract. `src/providers/ShopifyReadOnlyProvider.ts` is pinned to the Founder Control Room store identity and consumes only an already authenticated, sanitized provider snapshot. It performs no Shopify network mutation, persists no provider inventory as current truth, and grants no execution authority.
+
+A child-app reconciliation may classify evidence as `CURRENT`, `UNDECLARED`, `SCOPE_DRIFT`, `IDENTITY_DRIFT`, `STALE`, or `UNKNOWN`. `CURRENT` means only that fresh, complete evidence matches the supplied declaration identity and exact approved scope set; it still returns `authorityGranted: false`. Live installed-app state, credentials, provider authentication, runtime display, Supabase connection state, production equivalence, or any Shopify write remain separately unproven until independently observed at use time.
