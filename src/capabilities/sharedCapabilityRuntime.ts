@@ -108,6 +108,10 @@ function sha256(value: unknown): string {
   return `sha256:${createHash('sha256').update(JSON.stringify(value)).digest('hex')}`;
 }
 
+function isSha256(value: unknown): value is string {
+  return typeof value === 'string' && /^sha256:[0-9a-f]{64}$/i.test(value);
+}
+
 function normalizeSurface(value: unknown): InteractionSurface {
   if (value === undefined || value === null || value === '') return 'text';
   if (typeof value !== 'string' || !INTERACTION_SURFACES.includes(value as InteractionSurface)) {
@@ -129,6 +133,41 @@ function founderSubject(identity: SharedRuntimeFounderIdentity | undefined): str
     );
   }
   return sha256({ userId, email });
+}
+
+function validateReadOnlyObservation(observation: SharedReadOnlyObservation): void {
+  const provider = typeof observation.provider === 'string' ? observation.provider.trim() : '';
+  const truthState = typeof observation.truthState === 'string' ? observation.truthState.trim() : '';
+  const transition = typeof observation.continuity?.transition === 'string'
+    ? observation.continuity.transition.trim()
+    : '';
+  const proofCookie = typeof observation.continuity?.proofCookie === 'string'
+    ? observation.continuity.proofCookie.trim()
+    : '';
+
+  if (
+    !provider
+    || provider.length > 128
+    || observation.providerAccepted !== true
+    || !truthState
+    || !isSha256(observation.requestFingerprint)
+    || !isSha256(observation.continuity?.evidenceFingerprint)
+    || !proofCookie
+    || proofCookie.length > 256
+    || !transition
+  ) {
+    throw new SharedCapabilityRuntimeError(
+      'shared_runtime_invalid_request',
+      'Provider observation is missing required bounded read-only receipt evidence.',
+    );
+  }
+
+  if (observation.continuity.authorityEffect !== 'none') {
+    throw new SharedCapabilityRuntimeError(
+      'shared_runtime_authority_denied',
+      'Read-only provider evidence cannot change shared runtime authority.',
+    );
+  }
 }
 
 export function prepareSharedReadOnlyCapabilityRun(
@@ -177,12 +216,7 @@ export function finalizeSharedReadOnlyCapabilityRun(
   prepared: PreparedSharedReadOnlyInvocation,
   observation: SharedReadOnlyObservation,
 ): { receipt: SharedCapabilityRuntimeReceipt; presentation: SharedCapabilityPresentation } {
-  if (observation.continuity.authorityEffect !== 'none') {
-    throw new SharedCapabilityRuntimeError(
-      'shared_runtime_authority_denied',
-      'Read-only provider evidence cannot change shared runtime authority.',
-    );
-  }
+  validateReadOnlyObservation(observation);
 
   const receipt: SharedCapabilityRuntimeReceipt = {
     contract: SHARED_CAPABILITY_RUNTIME_RECEIPT,
@@ -193,16 +227,16 @@ export function finalizeSharedReadOnlyCapabilityRun(
     intentFingerprint: prepared.intentFingerprint,
     authority: prepared.authority,
     provider: {
-      name: observation.provider,
-      accepted: observation.providerAccepted,
+      name: observation.provider.trim(),
+      accepted: true,
       requestFingerprint: observation.requestFingerprint,
     },
     evidence: {
-      truthState: observation.truthState,
+      truthState: observation.truthState.trim(),
       evidenceFingerprint: observation.continuity.evidenceFingerprint,
-      proofCookie: observation.continuity.proofCookie,
-      continuityTransition: observation.continuity.transition,
-      authorityEffect: observation.continuity.authorityEffect,
+      proofCookie: observation.continuity.proofCookie.trim(),
+      continuityTransition: observation.continuity.transition.trim(),
+      authorityEffect: 'none',
     },
     completionClaim: {
       allowed: false,
@@ -215,7 +249,7 @@ export function finalizeSharedReadOnlyCapabilityRun(
     contract: SHARED_CAPABILITY_PRESENTATION,
     surface: prepared.surface,
     channel: prepared.surface === 'voice' ? 'speech_and_text' : 'text',
-    summary: `Observed ${count} result${count === 1 ? '' : 's'} through ${observation.provider}. Provider acceptance is not a verified founder outcome.`,
+    summary: `Observed ${count} result${count === 1 ? '' : 's'} through ${observation.provider.trim()}. Provider acceptance is not a verified founder outcome.`,
     dataRef: 'run.observation.data',
   };
 
