@@ -17,8 +17,22 @@ const css = exportedTemplate('../src/http/routes/onboardingAssets/controlRoomCss
 const proofDir = 'test-results/control-room-composer';
 mkdirSync(proofDir, { recursive: true });
 
+async function assertNoHorizontalOverflow(page, label) {
+  const dimensions = await page.evaluate(() => ({
+    scrollWidth: document.documentElement.scrollWidth,
+    clientWidth: document.documentElement.clientWidth,
+  }));
+  assert.ok(
+    dimensions.scrollWidth <= dimensions.clientWidth,
+    `${label}: horizontal overflow ${dimensions.scrollWidth}px > ${dimensions.clientWidth}px`,
+  );
+}
+
 async function proveComposer(browser, scenario) {
   const page = await browser.newPage({ viewport: scenario.viewport });
+  const pageErrors = [];
+  page.on('pageerror', (error) => pageErrors.push(error.message));
+
   let createdProject = null;
   let submittedPayload = null;
 
@@ -34,6 +48,9 @@ async function proveComposer(browser, scenario) {
     }
     if (url.pathname === '/assets/control-room.js') {
       return route.fulfill({ status: 200, contentType: 'text/javascript', body: js });
+    }
+    if (url.pathname === '/favicon.ico') {
+      return route.fulfill({ status: 204, body: '' });
     }
     if (url.pathname === '/health') {
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true }) });
@@ -53,6 +70,11 @@ async function proveComposer(browser, scenario) {
         body: JSON.stringify({
           complete: projects.length > 0,
           projects,
+          composerProfileEvidence: {
+            status: 'available',
+            founderDeclared: true,
+            authorityGranted: false,
+          },
           authorityBoundary: {
             loginGrantsExecution: false,
             mergeRequiresSeparateApproval: true,
@@ -90,6 +112,7 @@ async function proveComposer(browser, scenario) {
           ok: true,
           project: createdProject,
           controlRoomProfile: submittedPayload.controlRoom,
+          controlRoomProfileAuthority: 'founder-declared',
           projectCreated: true,
           connectionsCreated: connections,
           truth: {
@@ -111,18 +134,19 @@ async function proveComposer(browser, scenario) {
   assert.equal(await page.locator('#workspace-ready').isHidden(), true);
   assert.equal(await page.locator('#account-secondary').isHidden(), true);
   await page.getByText('What are you working on?', { exact: true }).waitFor();
+  await assertNoHorizontalOverflow(page, `${scenario.name}: project step`);
 
-  await page.locator(`input[name="projectType"][value="${scenario.projectType}"]`).check();
+  await page.locator(`label.choice-card:has(input[name="projectType"][value="${scenario.projectType}"])`).click();
   await page.locator('[data-next-step="2"]').click();
   await page.getByText('What do you need FCR to do?', { exact: true }).waitFor();
 
-  await page.locator(`input[name="mission"][value="${scenario.mission}"]`).check();
+  await page.locator(`label.choice-card:has(input[name="mission"][value="${scenario.mission}"])`).click();
   await page.locator('[data-next-step="3"]').click();
   await page.locator('#project-name').fill(scenario.projectName);
   await page.locator('#project-slug').waitFor();
   assert.equal(await page.locator('#project-slug').inputValue(), scenario.expectedSlug);
   await page.locator('#repo-identifier').fill('jussray/example-project');
-  await page.locator(`input[name="currentState"][value="${scenario.currentState}"]`).check();
+  await page.locator(`label.state-chip:has(input[name="currentState"][value="${scenario.currentState}"])`).click();
   await page.locator('[data-next-step="4"]').click();
 
   await page.locator('#authority-confirm').check();
@@ -143,6 +167,8 @@ async function proveComposer(browser, scenario) {
   assert.equal(await page.locator('#profile-mission').textContent(), scenario.missionLabel);
   assert.equal(await page.locator('#profile-current-state').textContent(), scenario.currentStateLabel);
   assert.equal(await page.locator('#account-secondary').isVisible(), true);
+  await assertNoHorizontalOverflow(page, `${scenario.name}: ready room`);
+  assert.deepEqual(pageErrors, [], `${scenario.name}: browser page errors must stay empty`);
 
   await page.screenshot({
     path: `${proofDir}/${scenario.name}.png`,
@@ -183,4 +209,4 @@ try {
   await browser.close();
 }
 
-console.log('Control Room Composer Playwright proof passed: desktop + mobile first-run flow, payload binding, and ready-room restoration.');
+console.log('Control Room Composer Playwright proof passed: desktop + mobile first-run flow, visible-card interaction, payload binding, overflow checks, and ready-room restoration.');
