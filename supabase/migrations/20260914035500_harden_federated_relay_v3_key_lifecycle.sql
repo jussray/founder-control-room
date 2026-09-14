@@ -52,7 +52,7 @@ revoke all on function public.guard_federated_relay_public_key_lifecycle_v3()
   from public, anon, authenticated, service_role;
 
 revoke update on table public.federated_relay_public_keys from service_role;
-grant update (state, valid_until, revoked_at)
+grant update (state, valid_until)
   on table public.federated_relay_public_keys
   to service_role;
 

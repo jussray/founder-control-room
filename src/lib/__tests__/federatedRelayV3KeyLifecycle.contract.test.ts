@@ -43,13 +43,14 @@ describe('federated relay v3 key lifecycle hardening', () => {
     expect(hardening).toContain(
       'revoke update on table public.federated_relay_public_keys from service_role;',
     );
-    expect(hardening).toContain('grant update (state, valid_until, revoked_at)');
+    expect(hardening).toContain('grant update (state, valid_until)');
+    expect(hardening).not.toContain('grant update (state, valid_until, revoked_at)');
     for (const immutable of ['member', 'key_id', 'algorithm', 'public_key_jwk', 'valid_from', 'created_at']) {
       expect(hardening).toContain(`new.${immutable} is distinct from old.${immutable}`);
     }
   });
 
-  it('makes retirement, revocation, and bounded validity monotonic', () => {
+  it('makes retirement, revocation, and bounded validity monotonic with database-owned timestamps', () => {
     expect(hardening).toContain("old.state = 'revoked' and new.state <> 'revoked'");
     expect(hardening).toContain("old.state = 'retired' and new.state = 'active'");
     expect(hardening).toContain('old.revoked_at is not null and new.revoked_at is distinct from old.revoked_at');

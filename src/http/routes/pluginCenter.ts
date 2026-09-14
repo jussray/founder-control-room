@@ -313,6 +313,18 @@ pluginCenterRouter.post('/grants/:grantId/revoke', async (req: FounderRequest, r
   const projectId = stringOrNull(existingRow.project_id);
   if (!projectId) return res.status(500).json({ error: 'Temporary grant is missing project_id' });
 
+  const existingRevokedAt = stringOrNull(existingRow.revoked_at);
+  if (existingRevokedAt) {
+    return res.json({
+      grant: {
+        id: stringOrNull(existingRow.id) ?? grantId,
+        project_id: projectId,
+        revoked_at: existingRevokedAt,
+      },
+      alreadyRevoked: true,
+    });
+  }
+
   const revokedAt = new Date().toISOString();
   const { data: grant, error } = await supabase
     .from('plugin_permission_grants')
