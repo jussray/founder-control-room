@@ -98,7 +98,19 @@ function digestVisualWonderBrief(brief) {
   if (!brief || brief.kind !== 'juss/visual-wonder-brief') {
     fail(['brief must be a validated juss/visual-wonder-brief']);
   }
-  return sha256(stableJson(brief));
+
+  let canonicalBrief;
+  try {
+    canonicalBrief = buildVisualWonderBrief(brief);
+  } catch (error) {
+    fail(error?.details || ['brief must be a validated juss/visual-wonder-brief']);
+  }
+
+  if (stableJson(canonicalBrief) !== stableJson(brief)) {
+    fail(['brief must exactly match canonical validated juss/visual-wonder-brief state']);
+  }
+
+  return sha256(stableJson(canonicalBrief));
 }
 
 function normalizePhrase(value) {
