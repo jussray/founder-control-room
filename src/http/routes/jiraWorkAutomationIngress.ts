@@ -10,6 +10,7 @@ import {
 const MAX_OBSERVATION_AGE_MS = 5 * 60 * 1000;
 const MAX_OBSERVATION_FUTURE_SKEW_MS = 30 * 1000;
 const MIN_INGRESS_TOKEN_LENGTH = 32;
+const FULL_SHA = /^[0-9a-f]{40}$/i;
 const ALLOWED_FIELDS = new Set([
   'event',
   'projectKey',
@@ -33,6 +34,11 @@ function isRecord(value: unknown): value is JsonRecord {
 
 function tokenDigest(value: string): Uint8Array {
   return createHash('sha256').update(value, 'utf8').digest();
+}
+
+function currentRuntimeHeadSha(): string | null {
+  const candidate = process.env.GIT_SHA?.trim().toLowerCase() ?? '';
+  return FULL_SHA.test(candidate) ? candidate : null;
 }
 
 export function verifyJiraWorkAutomationIngressBearer(
@@ -151,6 +157,7 @@ export function createJiraWorkAutomationIngressHandler(
         ok: result.ok,
         code: result.code,
         receiptId: result.receiptId,
+        ...(result.code === 'DISPATCHED' ? { runtimeHeadSha: currentRuntimeHeadSha() } : {}),
       });
     } catch {
       return res.status(503).json({
