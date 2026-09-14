@@ -1,6 +1,8 @@
 name: Capability Contract
 
 on:
+  # Manual dispatch reacquires exact-head proof when main moves through a workflow-authored push
+  # that GitHub intentionally does not fan out into downstream Actions.
   workflow_dispatch:
   pull_request:
     paths:
