@@ -1,6 +1,6 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Preserve the current TinyFish Cloudflare and Shopify read-only provider boundaries while documenting the standalone Founder Control Room and Chief AI peer authority contract without claiming shared runtime, transferred authority, merge, deploy, publication, provider mutation, or runtime activation.",
+  "purpose": "Preserve the current TinyFish Cloudflare and Shopify read-only provider boundaries while documenting the standalone Founder Control Room and Chief AI peer authority contract, including exact candidate peer-head bindings that fail closed on drift without claiming shared runtime, transferred authority, merge, deploy, publication, provider mutation, or runtime activation.",
   "domains": [
     "cloudflare-authority",
     "repository-provider",
@@ -60,9 +60,27 @@
       ]
     },
     {
+      "path": ".control-room/founder-chief-pair-peer-lock.json",
+      "claims": [
+        "`.control-room/founder-chief-pair-peer-lock.json` must bind FCR PR #781 to the exact observed Chief pair and necessary-fix candidate head SHAs while remaining non-authorizing evidence that cannot grant merge, deployment, provider mutation, or runtime truth."
+      ]
+    },
+    {
+      "path": "scripts/verify-founder-chief-pair.mjs",
+      "claims": [
+        "`scripts/verify-founder-chief-pair.mjs` must remain the load-bearing local and cross-repository pair-policy verifier; changes to it require current pair-authority documentation truth even when the shared JSON contract itself is unchanged."
+      ]
+    },
+    {
+      "path": ".github/workflows/founder-chief-pair-contract.yml",
+      "claims": [
+        "`.github/workflows/founder-chief-pair-contract.yml` must resolve both live Chief pull requests from GitHub, require each provider head to equal the immutable FCR candidate peer lock, and fail closed before cross-repository verification when either peer head drifts."
+      ]
+    },
+    {
       "path": "scripts/verify-documentation-truth.mjs",
       "claims": [
-        "`scripts/verify-documentation-truth.mjs` must classify pair-authority, publishing, and truth-governance changes as truth-sensitive and fail closed when the README, required truth docs, or current path-bound documentation receipt are missing."
+        "`scripts/verify-documentation-truth.mjs` must classify the shared pair contract, FCR candidate peer lock, pair verifier, and pair workflow as pair-authority truth-sensitive surfaces and fail closed when the README, required truth docs, or current path-bound documentation receipt are missing."
       ]
     }
   ]
