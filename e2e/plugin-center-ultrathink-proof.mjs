@@ -1,5 +1,5 @@
 import { createServer } from 'node:http';
-import { mkdirSync, readFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, readFileSync } from 'node:fs';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
@@ -7,6 +7,7 @@ import { chromium } from 'playwright';
 const REPO_ROOT = fileURLToPath(new URL('../', import.meta.url));
 const PUBLIC_ROOT = join(REPO_ROOT, 'public');
 const RESULTS_ROOT = join(REPO_ROOT, 'test-results');
+const DURABLE_RESULTS_ROOT = join(REPO_ROOT, 'logs', 'plugin-center-ultrathink');
 
 const mime = {
   '.html': 'text/html; charset=utf-8',
@@ -66,6 +67,7 @@ const address = server.address();
 if (!address || typeof address === 'string') throw new Error('Plugin Center proof server did not bind');
 const BASE_URL = `http://127.0.0.1:${address.port}`;
 mkdirSync(RESULTS_ROOT, { recursive: true });
+mkdirSync(DURABLE_RESULTS_ROOT, { recursive: true });
 
 const browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
 
@@ -121,10 +123,11 @@ async function proveViewport(label, viewport) {
   if (pageErrors.length > 0) throw new Error(`${label}: browser errors: ${pageErrors.join(' | ')}`);
   if (failedRequests.length > 0) throw new Error(`${label}: failed requests: ${failedRequests.join(' | ')}`);
 
-  await page.screenshot({
-    path: join(RESULTS_ROOT, `plugin-center-ultrathink-${label}.png`),
-    fullPage: true,
-  });
+  const screenshotName = `plugin-center-ultrathink-${label}.png`;
+  const ephemeralPath = join(RESULTS_ROOT, screenshotName);
+  const durablePath = join(DURABLE_RESULTS_ROOT, screenshotName);
+  await page.screenshot({ path: ephemeralPath, fullPage: true });
+  copyFileSync(ephemeralPath, durablePath);
 
   await context.close();
 }
@@ -132,7 +135,7 @@ async function proveViewport(label, viewport) {
 try {
   await proveViewport('desktop-1440', { width: 1440, height: 1100 });
   await proveViewport('mobile-390', { width: 390, height: 844 });
-  console.log('PASS: ULTRATHINK Plugin Center artwork, command identity, non-authorizing boundary, responsive layout, and browser asset loading are proven on desktop and mobile.');
+  console.log('PASS: ULTRATHINK Plugin Center artwork, command identity, non-authorizing boundary, responsive layout, browser asset loading, and durable screenshot receipts are proven on desktop and mobile.');
 } finally {
   await browser.close();
   await new Promise((resolve) => server.close(resolve));
