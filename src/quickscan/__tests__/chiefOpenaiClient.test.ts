@@ -42,9 +42,22 @@ const validOutput = {
 };
 
 describe('createOpenAiQuickScanChiefRunner', () => {
-  it('refuses to run without any provider configured', async () => {
-    const runner = createOpenAiQuickScanChiefRunner({ env: {}, fetchFn: vi.fn() });
-    await expect(runner(promptInput())).rejects.toMatchObject({ code: 'OPENAI_NOT_CONFIGURED' });
+  it('keeps Chief operational without any model provider configured', async () => {
+    const fetchFn = vi.fn();
+    const runner = createOpenAiQuickScanChiefRunner({ env: {}, fetchFn });
+    const result = await runner(promptInput());
+
+    expect(result.recommendation).toMatchObject({
+      nextAction: 'capture_more_evidence',
+      promptWorkflow: QUICKSCAN_CHIEF_WORKFLOW,
+    });
+    expect(result.provenance).toMatchObject({
+      provider: 'deterministic-kernel',
+      model: 'quickscan-rules-v1',
+      responseId: null,
+      fallbackReason: 'NO_MODEL_PROVIDER_CONFIGURED',
+    });
+    expect(fetchFn).not.toHaveBeenCalled();
   });
 
   it('returns a recommendation stamped with the canonical PromptOS workflow', async () => {
@@ -124,6 +137,29 @@ describe('createOpenAiQuickScanChiefRunner', () => {
     expect(fetchFn).toHaveBeenCalledTimes(2);
   });
 
+  it('falls back to the deterministic kernel when the only local runtime is unavailable', async () => {
+    const fetchFn = vi.fn(async () => { throw new Error('local offline'); });
+    const runner = createOpenAiQuickScanChiefRunner({
+      env: {
+        QUICKSCAN_LOCAL_ENABLED: 'true',
+        QUICKSCAN_LOCAL_QUALITY_VERIFIED: 'true',
+        QUICKSCAN_LOCAL_COMMERCIAL_RIGHTS: 'verified',
+        QUICKSCAN_LOCAL_LICENSE_EVIDENCE: 'license-reviewed',
+        QUICKSCAN_LOCAL_BASE_URL: 'http://127.0.0.1:11434',
+        QUICKSCAN_LOCAL_MODEL: 'qwen3:8b',
+      },
+      fetchFn,
+    });
+
+    const result = await runner(promptInput());
+
+    expect(result.provenance).toMatchObject({
+      provider: 'deterministic-kernel',
+      fallbackReason: 'LOCAL_CHIEF_REQUEST_FAILED',
+    });
+    expect(result.recommendation.nextAction).toBe('capture_more_evidence');
+  });
+
   it('does not select local just because it is free when quality proof is missing', async () => {
     const fetchFn = vi.fn(async () => fakeResponse(openAiPayload(validOutput)));
     const runner = createOpenAiQuickScanChiefRunner({
@@ -146,7 +182,7 @@ describe('createOpenAiQuickScanChiefRunner', () => {
   });
 
   it('uses the configured model override in the request body', async () => {
-    const fetchFn = vi.fn(async (_url: string | URL | Request, _init?: RequestInit) => fakeResponse(openAiPayload({
+    const fetchFn = vi.fn(async () => fakeResponse(openAiPayload({
       summary: 'Not enough evidence yet.',
       next_action: 'capture_more_evidence',
       message_draft: null,
@@ -192,10 +228,13 @@ describe('createOpenAiQuickScanChiefRunner', () => {
     await expect(runner(promptInput())).rejects.toMatchObject({ code: 'INVALID_MODEL_OUTPUT' });
   });
 
-  it('surfaces a non-2xx OpenAI response as a provider error', async () => {
+  it('degrades to deterministic mode when OpenAI is unavailable', async () => {
     const fetchFn = vi.fn(async () => fakeResponse({ error: { message: 'rate limited' } }, { status: 429 }));
     const runner = createOpenAiQuickScanChiefRunner({ env: { OPENAI_API_KEY: 'sk-test' }, fetchFn });
-    await expect(runner(promptInput())).rejects.toMatchObject({ code: 'OPENAI_HTTP_ERROR', status: 429 });
+    const result = await runner(promptInput());
+
+    expect(result.provenance).toMatchObject({ provider: 'deterministic-kernel', fallbackReason: 'OPENAI_HTTP_ERROR' });
+    expect(result.recommendation.nextAction).toBe('capture_more_evidence');
   });
 
   it('refuses a response body that is not valid JSON', async () => {
@@ -212,17 +251,18 @@ describe('createOpenAiQuickScanChiefRunner', () => {
     await expect(runner(promptInput())).rejects.toMatchObject({ code: 'CHIEF_RESPONSE_TOO_LARGE' });
   });
 
-  it('treats an abort as a timeout error', async () => {
+  it('degrades to deterministic mode when the provider request times out', async () => {
     const fetchFn = vi.fn(async () => {
       const abortError = new Error('aborted');
       abortError.name = 'AbortError';
       throw abortError;
     });
     const runner = createOpenAiQuickScanChiefRunner({ env: { OPENAI_API_KEY: 'sk-test' }, fetchFn });
-    await expect(runner(promptInput())).rejects.toMatchObject({ code: 'OPENAI_TIMEOUT' });
+    const result = await runner(promptInput());
+    expect(result.provenance).toMatchObject({ provider: 'deterministic-kernel', fallbackReason: 'OPENAI_TIMEOUT' });
   });
 
-  it('exposes QuickScanChiefProviderError as the error class for provider failures', async () => {
+  it('exposes QuickScanChiefProviderError as the error class for invalid provider output', async () => {
     const fetchFn = vi.fn(async () => fakeResponse('not json'));
     const runner = createOpenAiQuickScanChiefRunner({ env: { OPENAI_API_KEY: 'sk-test' }, fetchFn });
     await expect(runner(promptInput())).rejects.toBeInstanceOf(QuickScanChiefProviderError);
@@ -257,7 +297,7 @@ describe('createOpenAiQuickScanChiefRunner', () => {
     }
   });
 
-  it('treats an abort that fires while reading the response body as a timeout error', async () => {
+  it('degrades to deterministic mode when an abort fires while reading the response body', async () => {
     const fetchFn = vi.fn(async () => ({
       ok: true,
       status: 200,
@@ -269,6 +309,7 @@ describe('createOpenAiQuickScanChiefRunner', () => {
       },
     } as unknown as Response));
     const runner = createOpenAiQuickScanChiefRunner({ env: { OPENAI_API_KEY: 'sk-test' }, fetchFn });
-    await expect(runner(promptInput())).rejects.toMatchObject({ code: 'OPENAI_TIMEOUT' });
+    const result = await runner(promptInput());
+    expect(result.provenance).toMatchObject({ provider: 'deterministic-kernel', fallbackReason: 'OPENAI_TIMEOUT' });
   });
 });
