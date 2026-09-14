@@ -6,29 +6,13 @@ const TERMINAL_STATUSES = new Set(['integrated', 'deployed', 'rejected', 'rolled
 const STYLE_ID = 'fcr-mission-board-styles';
 const proofCache = new Map();
 
-function sessionToken() {
-  try {
-    const raw = sessionStorage.getItem('fcr_session');
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    return typeof parsed?.access_token === 'string' && parsed.access_token.trim()
-      ? parsed.access_token.trim()
-      : null;
-  } catch {
-    return null;
-  }
-}
-
 async function founderGet(path) {
-  const token = sessionToken();
-  if (!token) throw new Error('Founder session required');
-
   const response = await fetch(path, {
     method: 'GET',
     cache: 'no-store',
+    credentials: 'same-origin',
     headers: {
       Accept: 'application/json',
-      Authorization: `Bearer ${token}`,
     },
   });
 
@@ -139,8 +123,6 @@ function ensureStyles() {
 }
 
 function cachedProof(task) {
-  // Approved work is consequence-bearing. Re-read its Bench proof on every
-  // board render so a founder gate never rests on a short-lived UI cache.
   if (task.status === 'approved') return null;
   const cached = proofCache.get(task.id);
   if (!cached) return null;
@@ -242,10 +224,6 @@ async function enhanceMissionBoard(board) {
 
   board.dataset.missionBoardState = 'loading';
   try {
-    // The existing Missions renderer already fetched /dashboard/tasks. Derive
-    // id + lifecycle state from that rendered board instead of creating a
-    // second task read path. Only consequence-bearing review stages need a
-    // separate read-only Bench lookup.
     const tasks = tasksFromBoard(board);
     const proofById = await collectProof(tasks);
     ensureStyles();

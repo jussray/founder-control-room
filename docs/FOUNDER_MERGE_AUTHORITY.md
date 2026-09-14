@@ -2,9 +2,11 @@
 
 ## Current founder decision
 
-Juss authorizes repository changes to be merged when the acting AI or operator determines that the merge is appropriate and the evidence supports that conclusion.
+Juss grants Founder Control Room and its governed operators the merge capability/authority class, but **does not grant standing approval to execute any specific merge**.
 
-This standing authority replaces blanket `do not merge` language in active operating instructions. It does not require another merge-only confirmation when every applicable merge condition below is satisfied.
+Every repository merge requires a fresh, explicit founder approval bound to the exact repository, pull request number, current base SHA, and current head SHA. If that exact approval is absent, ambiguous, or stale, the acting AI or operator must ask and stop. `review`, `merge review`, `approved`, `cont`, `continue`, `implement`, successful CI, mergeability, or `merge_authority: true` do not by themselves authorize the merge unless the founder explicitly approves that exact candidate for merge. Any base/head movement expires the approval and requires a new one.
+
+`merge_authority: true` therefore means the merge capability is available. It does **not** mean `merge_approved: true`, and it must never be treated as an execution token.
 
 For Founder Control Room itself, the canonical human authority model is now **founder-final review**:
 
@@ -18,11 +20,25 @@ deterministic independent review
 
 Founder final approval is a separate authority class. It must never be mislabeled as independent semantic review.
 
+## Canonical merge-approval rule
+
+For every governed repository:
+
+```text
+merge capability available
++ exact-head evidence sufficient
++ explicit founder approval for exact repo/PR/base/head
+= merge may execute
+```
+
+If the last term is missing, the system asks. It does not infer approval from prior conversation, a review request, a previous candidate, another repository, successful checks, or a continuity marker. Approval is single-candidate and non-transferable.
+
 ## Merge conditions
 
 A merge is appropriate only when:
 
 - the repository, pull request, target branch, and exact head SHA are verified;
+- fresh explicit founder approval is bound to that exact repository, PR number, current base SHA, and current head SHA;
 - the intended scope is understood and no unrelated work is being smuggled into the change;
 - code, configuration, docs, schemas, generated artifacts, and release-impacting changes have been reviewed;
 - required checks have genuinely executed and passed, or a documented infrastructure failure has been classified and distinguished from code-test evidence;
@@ -38,6 +54,14 @@ A merge is appropriate only when:
 - privacy, security, brand, IP, credential, sauce, and user-data boundaries remain intact;
 - rollback or safe forward-fix is understood;
 - the merge itself does not silently execute a separately gated action.
+
+## Governed branch-creation authority
+
+Repository branch creation is a separate reversible mutation class and does not inherit merge authority. In `src/http/routes/approvals.ts`, an authenticated founder execute request may reach `RepositoryProvider.createBranch(...)` only after a fresh `create_branch` proof is present, FCR issues an `AuthorityEnvelopeV1` for capability `github.repository.create_branch`, and the execution is durably reserved under the same idempotency key before provider mutation.
+
+The envelope binds the exact mission intent, authenticated actor/approver, repository scope, proposal hash, branch arguments, mission-state fingerprint, consequence class, tool-call identity, issuance/expiry window, and idempotency key. Immediately before the provider write, FCR must re-read current mission state, re-derive the execution context, and pass the original envelope through `executeAuthorizedCreateBranch()`. Changed state, arguments, repository scope, tool call, expiry, idempotency, capability, or envelope integrity must fail closed before GitHub can be mutated. A pending or ambiguous execution must reconcile before retry rather than minting a replacement write from uncertainty.
+
+This source/runtime membrane proves only that the branch-creation path is governed when that code executes. CI or unit green does not prove a live GitHub branch was created, and successful branch creation does not grant merge, deploy, publication, secret, database, billing, or destructive authority.
 
 ## Independent review + founder-final authority for Founder Control Room merges
 
@@ -68,6 +92,26 @@ founderFinalApprovalRequired: true
 
 A caller cannot turn deterministic review off, weaken P2 handling, substitute model output for founder authority, redefine the policy, or reuse a founder approval against another PR/base/head. The deterministic review receipt itself remains proposal-only and non-authorizing. The authenticated founder-final receipt supplies the final human authority after the independent proof layer passes.
 
+### Current native GitHub human-review phase
+
+The canonical **current** provider-governance phase is `founder-only` on the human side. That means the GitHub-native pull-request membrane requests **zero native approving reviews** and does not require Code Owner or last-push human approval merely to satisfy a reviewer role that does not yet exist.
+
+This phase does **not** remove the rest of the merge membrane. FCR still requires the pull-request path, deterministic independent review evidence, authenticated founder-final authority, exact-head machine gates, review-thread resolution, stale-review invalidation semantics, CodeQL security scanning, force-push protection, deletion protection, exact provider readback, and the separate zero-bypass strict-freshness ruleset containing `Required Gate` plus `Verify test-ledger contract`.
+
+The phase is intentionally upgradeable rather than permanent. When the founder deliberately activates a future-team phase by setting the canonical native approving-review count above zero, the GitHub provider must automatically require Code Owner review and last-push approval again, while preserving every existing machine, freshness, CodeQL, founder-final, and rollback boundary.
+
+Repository source policy and live provider state remain separate truths. Merely changing this source declaration does not prove GitHub is enforcing the founder-only phase. Provider reconciliation may occur only through the trusted current-main governance path with an exact founder-bound main SHA, an auditable approval reference, canonical GitHub App authority, and authoritative post-write readback. Until that reconciliation succeeds, the observed live ruleset must be reported exactly as observed rather than relabeled to match source intent.
+
+### Deterministic witness production and bootstrap truth
+
+The deterministic-review producer must derive repository, pull request, base/head identity, author, complete diff identity, rule version, findings, verdict, and receipt hash from provider-observed state. A caller cannot supply a trusted reviewer identity, verdict, policy, check conclusion, witness name, or trusted App identity and have that become review authority.
+
+A clear proposal-only receipt may be published as the exact derived `Independent Review / ...` GitHub Check Run only through the repository provider's narrow deterministic-review witness capability. For Founder Control Room production construction, that capability requires the repository-scoped installation credential minted from server-owned `GITHUB_APP_ID` plus `GITHUB_PRIVATE_KEY`; the bounded `GITHUB_TOKEN` local/development fallback must fail closed for deterministic witness publication. After publication, FCR must read the exact-head signal back from GitHub and require the provider-recorded Check Run App issuer to equal the trusted numeric `GITHUB_APP_ID` before treating the witness as current evidence.
+
+Trusted witness ignition must execute from code that is already integrated and running as exact current FCR `main`; candidate-controlled pull-request workflows, candidate preview deployments, stale deployed releases, and PAT-only environments are not trusted witness issuers. The founder-runtime `POST /review/deterministic-witness/:pullRequestNumber` surface is the canonical ignition shape once that code is lawfully integrated, deployed, and re-observed as the exact merged release. It accepts only a positive pull-request number after the existing same-origin, rate-limit, authenticated-founder, and privileged-execution membranes; repository/provider identity remains server-owned; the running full `GIT_SHA` must equal provider-resolved GitHub `main` before witness production and again after publication/reconciliation; the producer returns the complete deterministic receipt; and retry uses reconcile-before-create so an already-existing exact trusted witness is reused rather than blindly duplicated. A default-branch workflow is only an equivalent ignition surface if it preserves those same invariants. The runtime route, any equivalent dispatch workflow, its runner, the deterministic producer/publisher, and the credential-bearing invocation boundary are deterministic-review trust roots and cannot certify their own bootstrap through the normal producer.
+
+Receipt production, Check Run creation, readback, complete receipt handoff, and route success remain non-authorizing on their own. They never supply founder-final, merge, deploy, secret, provider-policy, database, billing, publication, or destructive-action authority. A candidate that changes the deterministic producer, independent-review gate, merge consumer, trusted witness publication boundary, or trusted ignition surface is a trust-root self-modification and must not certify itself through that same producer. Initial trust-root integration remains blocked until the separately explicit, exact-candidate, auditable constitutional authority path in issue #418 is invoked; ordinary `approved`, `cont`, machine green, mergeability, model review, or bypass capability do not invoke that exception.
+
 ### Legacy pinned semantic-review missions
 
 Missions already approved under the earlier server-owned semantic-review policy may continue to validate that pinned policy for compatibility. In that historical mode, `FCR_TRUSTED_SEMANTIC_REVIEWER_IDS` remains the server-owned trusted semantic reviewer set and author self-review still cannot satisfy independent semantic review.
@@ -78,9 +122,15 @@ New canonical FCR founder-final approvals do **not** depend on `FCR_TRUSTED_SEMA
 
 The source/runtime FCR merge membrane and the **live GitHub repository ruleset are a separate provider gate**.
 
-A correct in-app founder-final review engine does not prove that GitHub's web/API merge surface independently enforces the same approval count, stale-review dismissal, last-push approval, thread resolution, strict status freshness, bypass actors, or bypass modes. Those provider protections require their own current GitHub readback.
+A correct in-app founder-final review engine does not prove that GitHub's web/API merge surface independently enforces the intended current phase, stale-review dismissal, thread resolution, strict status freshness, bypass actors, or bypass modes. Those provider protections require their own current GitHub readback.
 
 Do not claim repository-wide GitHub governance is fixed merely because the FCR source gate is strong. Conversely, a GitHub merge that occurred outside the in-app FCR path does not prove the in-app deterministic-review + founder-final contract was satisfied.
+
+### Chief candidate-proof producer boundary
+
+For Chief pre-merge ProofMode authority, a required status-check name plus GitHub Actions integration `15368` is **not** sufficient evidence of the workflow file or event that produced the check. PR-controlled Chief Actions could otherwise manufacture the same context under the same GitHub Actions App.
+
+Under the current founder decision, Chief ruleset `20818149` is the approved governance object **as-is**. FCR must therefore verify that the exact live topology remains unchanged: zero bypass actors, the approved source checks, `Cloudflare Production`, and `proofmode-access-admin` all remain present, while the reserved candidate runtime context remains unbound. External candidate-producer provenance and trusted runtime/browser proof are separate evidence gates; their absence blocks those claims but does not authorize FCR to rewrite the approved ruleset. Observation, a same-named check, deployment acceptance, or producer capability never grants GitHub ruleset mutation, merge, deploy, provider-policy, or self-certification authority.
 
 ## Documentation truth
 
@@ -109,7 +159,7 @@ A GitHub Actions infrastructure outage can gate merge and release truth without 
 
 When jobs have no executed steps or no logs, agents must not blame the diff. They must record the exact PR, head SHA, workflow, run, job evidence, classification, impact, Cloudflare/runtime evidence if available, and the next gate in Founder Control Room.
 
-If remaining evidence is sufficient for a docs-only, policy-only, or otherwise low-risk focused change, a merge may still be appropriate only when every other applicable authority gate is satisfied. If the change requires executed CI, deterministic review, Playwright, deployment proof, auth proof, migration proof, runtime proof, or Documentation Truth proof that is unavailable, leave the PR open and state the exact blocker.
+If remaining evidence is sufficient for a docs-only, policy-only, or otherwise low-risk focused change, a merge may still be appropriate only when every other applicable authority gate is satisfied, including fresh explicit founder approval for that exact candidate. If the change requires executed CI, deterministic review, Playwright, deployment proof, auth proof, migration proof, runtime proof, Documentation Truth proof, or explicit merge approval that is unavailable, leave the PR open and state the exact blocker.
 
 ## Canonical project routing
 
@@ -117,7 +167,7 @@ Only `jussray/Sekret-Bip` is the active Se’kret Bip working repository. Other 
 
 ## Separate gates remain separate
 
-This standing merge authority does not automatically authorize:
+Merge authority and exact-candidate merge approval do not automatically authorize:
 
 - production deployment or public release;
 - database migration or destructive data writes;
@@ -131,6 +181,10 @@ Those actions still require their own exact approval unless a later founder dire
 
 ## Operating rule
 
-Do not merge merely because a PR exists or because a badge looks green. Merge when it is the correct, evidence-backed integration step and the current authority membrane is satisfied.
+Do not merge merely because a PR exists, because a badge looks green, because `merge_authority` is true, or because the founder asked for review/implementation. **Before every merge, ask for and obtain explicit founder approval for the exact current repository, PR, base SHA, and head SHA unless that exact approval is already present and still current.**
 
-Immediately before merge, re-read current `main`, the exact PR head, required checks, review state, founder-final receipt state, and applicable provider state. After merge, re-read the resulting `main`, Documentation Truth, and the next release/runtime gate. Old-head green remains historical evidence only.
+Immediately before merge, re-read current `main`, the exact PR head, required checks, review state, founder-final receipt state, exact-candidate founder approval, and applicable provider state. If base or head moved after approval, stop and ask again. After merge, re-read the resulting `main`, Documentation Truth, and the next release/runtime gate. Old-head green and old approval remain historical evidence only.
+
+## Load-bearing regression execution
+
+A required test contributes to merge readiness only when the exact-head workflow that feeds the applicable gate actually executes it. A committed but uninvoked test is source evidence, not CI proof. For LinkedIn analytics continuity, `.github/workflows/ci.yml` must keep `scripts.test_linkedin_analytics_continuity` inside the load-bearing `python-tests` job, and `Required Gate` must continue to depend on that job. Missing LinkedIn activity rows must remain `UNKNOWN_NO_EVIDENCE` with null metrics, never synthetic zero impressions or engagements.

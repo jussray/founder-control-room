@@ -1,0 +1,124 @@
+name: Chief ProofMode Access Command Bridge
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  dispatch:
+    if: ${{ github.event.issue.number == 485 && github.event.comment.user.login == 'jussray' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Parse exact founder Chief Access command
+        id: parse
+        env:
+          COMMENT_BODY: ${{ github.event.comment.body }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          read -r command mode sha target approval extra <<< "$COMMENT_BODY"
+
+          if [[ "$command" != '/cloudflare-chief-access' ]]; then
+            echo 'Not a Chief Access command; exiting without dispatch.'
+            exit 0
+          fi
+          if [[ "$mode" != 'check' && "$mode" != 'repair' ]]; then
+            echo '::error title=Invalid Chief Access command::mode must be check or repair.'
+            exit 1
+          fi
+          if [[ ! "$sha" =~ ^[0-9a-f]{40}$ ]]; then
+            echo '::error title=Invalid exact head::command must bind to a lowercase 40-character FCR main SHA.'
+            exit 1
+          fi
+          target_origin="$(node -e '
+            try {
+              const url = new URL(process.argv[1]);
+              if (
+                url.protocol !== "https:"
+                || url.username
+                || url.password
+                || url.search
+                || url.hash
+                || (url.pathname !== "/" && url.pathname !== "")
+                || !/^[0-9a-f]{8}-chief-ai\.mcgill-raylene\.workers\.dev$/i.test(url.hostname)
+              ) process.exit(1);
+              process.stdout.write(url.origin);
+            } catch { process.exit(1); }
+          ' "$target")" || {
+            echo '::error title=Invalid Chief target::target must be one immutable Chief workers.dev preview origin.'
+            exit 1
+          }
+          if [[ -n "${extra:-}" ]]; then
+            echo '::error title=Unexpected arguments::command contains extra fields.'
+            exit 1
+          fi
+
+          if [[ "$mode" == 'check' ]]; then
+            if [[ -n "${approval:-}" ]]; then
+              echo '::error title=Unexpected approval::check accepts no approval reference.'
+              exit 1
+            fi
+            approval_reference=''
+          else
+            if [[ ! "${approval:-}" =~ ^[A-Za-z0-9._:-]{8,200}$ ]]; then
+              echo '::error title=Missing mutation approval::repair requires an auditable 8-200 character approval reference.'
+              exit 1
+            fi
+            approval_reference="$approval"
+          fi
+
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "mode=$mode" >> "$GITHUB_OUTPUT"
+          echo "target=$target_origin" >> "$GITHUB_OUTPUT"
+          echo "approval_reference=$approval_reference" >> "$GITHUB_OUTPUT"
+
+      - name: Verify command SHA is exact FCR current main
+        if: steps.parse.outputs.sha != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_HEAD_SHA: ${{ steps.parse.outputs.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          current_main="$(gh api "repos/${GITHUB_REPOSITORY}/commits/main" --jq .sha)"
+          printf 'expected=%s\ncurrent_main=%s\n' "$EXPECTED_HEAD_SHA" "$current_main"
+          test "$current_main" = "$EXPECTED_HEAD_SHA"
+
+      - name: Dispatch bounded Chief Access recovery
+        if: steps.parse.outputs.sha != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_HEAD_SHA: ${{ steps.parse.outputs.sha }}
+          MODE: ${{ steps.parse.outputs.mode }}
+          TARGET: ${{ steps.parse.outputs.target }}
+          APPROVAL_REFERENCE: ${{ steps.parse.outputs.approval_reference }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          payload="$(jq -n \
+            --arg ref main \
+            --arg sha "$EXPECTED_HEAD_SHA" \
+            --arg mode "$MODE" \
+            --arg target "$TARGET" \
+            --arg approval "$APPROVAL_REFERENCE" \
+            '{ref:$ref, inputs:{expected_head_sha:$sha, mode:$mode, target_url:$target, approval_reference:$approval}}')"
+
+          gh api \
+            --method POST \
+            "repos/${GITHUB_REPOSITORY}/actions/workflows/chief-proofmode-access-recovery.yml/dispatches" \
+            --input - <<< "$payload"
+
+          {
+            echo '## Chief ProofMode Access command dispatched'
+            echo
+            echo "- Exact FCR current main: \`$EXPECTED_HEAD_SHA\`"
+            echo "- Mode: \`$MODE\`"
+            echo "- Target: \`$TARGET\`"
+            echo '- Scope: one exact immutable Chief preview Service Auth policy only'
+          } >> "$GITHUB_STEP_SUMMARY"

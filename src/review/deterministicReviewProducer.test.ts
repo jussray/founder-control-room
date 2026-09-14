@@ -1,0 +1,377 @@
+import { describe, expect, it } from "vitest";
+import type {
+  Diff,
+  PullRequestReviewContext,
+  RepositoryProvider,
+} from "../providers/RepositoryProvider.js";
+import {
+  FCR_FOUNDER_FINAL_REVIEW_POLICY,
+  independentReviewPolicyHash,
+} from "./independentReviewGate.js";
+import {
+  DETERMINISTIC_REVIEWER_ID,
+  DETERMINISTIC_REVIEW_RULESET,
+  evaluateDeterministicReviewRules,
+  produceDeterministicReview,
+} from "./deterministicReviewProducer.js";
+
+const BASE = "a".repeat(40);
+const HEAD = "b".repeat(40);
+
+const defaultContext: PullRequestReviewContext = {
+  number: 706,
+  repository: "jussray/founder-control-room",
+  headRepository: "jussray/founder-control-room",
+  baseRef: "main",
+  headRef: "fix/test-discovery",
+  baseSha: BASE,
+  headSha: HEAD,
+  authorIdentity: "jussray",
+};
+
+const defaultDiff: Diff = {
+  base: BASE,
+  head: HEAD,
+  aheadBy: 1,
+  behindBy: 0,
+  files: [{
+    path: "src/example.ts",
+    status: "modified",
+    additions: 1,
+    deletions: 1,
+    patch: "@@ -1 +1 @@\n-old\n+new",
+  }],
+};
+
+function providerFor({
+  context = defaultContext,
+  diff = defaultDiff,
+  currentBase = BASE,
+  currentHead = HEAD,
+}: {
+  context?: PullRequestReviewContext;
+  diff?: Diff;
+  currentBase?: string;
+  currentHead?: string;
+} = {}): RepositoryProvider {
+  return {
+    name: "github",
+    getPullRequestReviewContext: async () => context,
+    resolveRef: async (_projectId: string, ref: string) => ref === context.baseRef ? currentBase : currentHead,
+    compare: async () => diff,
+  } as unknown as RepositoryProvider;
+}
+
+function file(path: string) {
+  return {
+    path,
+    status: "modified" as const,
+    additions: 1,
+    deletions: 1,
+    patch: `@@ -1 +1 @@\n-old ${path}\n+new ${path}`,
+  };
+}
+
+describe("deterministic review producer", () => {
+  it("produces the same canonical receipt hash for the same provider truth", async () => {
+    const provider = providerFor();
+    const first = await produceDeterministicReview({ provider, projectId: "founder-control-room", pullRequestNumber: 706 });
+    const second = await produceDeterministicReview({ provider, projectId: "founder-control-room", pullRequestNumber: 706 });
+
+    expect(first.receipt).toEqual(second.receipt);
+    expect(first.receipt.reviewHash).toMatch(/^[0-9a-f]{64}$/);
+    expect(first.receipt.reviewer).toEqual({
+      id: DETERMINISTIC_REVIEWER_ID,
+      kind: "deterministic",
+      provider: "github",
+      runtime: DETERMINISTIC_REVIEW_RULESET,
+    });
+    expect(first.receipt.policyHash).toBe(independentReviewPolicyHash(FCR_FOUNDER_FINAL_REVIEW_POLICY));
+    expect(first.receipt.proposalOnly).toBe(true);
+    expect(first.receipt.mergeAuthorized).toBe(false);
+    expect(first.receipt.executionAuthorized).toBe(false);
+    expect(first.receipt.verdict).toBe("clear");
+    expect(first.publishable).toBe(true);
+  });
+
+  it("changes the receipt identity when the exact diff changes", async () => {
+    const first = await produceDeterministicReview({
+      provider: providerFor(),
+      projectId: "founder-control-room",
+      pullRequestNumber: 706,
+    });
+    const changedDiff = {
+      ...defaultDiff,
+      files: [file("src/another.ts")],
+    };
+    const second = await produceDeterministicReview({
+      provider: providerFor({ diff: changedDiff }),
+      projectId: "founder-control-room",
+      pullRequestNumber: 706,
+    });
+
+    expect(second.receipt.diffHash).not.toBe(first.receipt.diffHash);
+    expect(second.receipt.reviewHash).not.toBe(first.receipt.reviewHash);
+  });
+
+  it("fails closed when the provider base or head moves after PR context read", async () => {
+    await expect(produceDeterministicReview({
+      provider: providerFor({ currentBase: "c".repeat(40) }),
+      projectId: "founder-control-room",
+      pullRequestNumber: 706,
+    })).rejects.toThrow(/base moved/i);
+
+    await expect(produceDeterministicReview({
+      provider: providerFor({ currentHead: "c".repeat(40) }),
+      projectId: "founder-control-room",
+      pullRequestNumber: 706,
+    })).rejects.toThrow(/head moved/i);
+  });
+
+  it("fails closed when provider diff content is incomplete", async () => {
+    const incomplete: Diff = {
+      ...defaultDiff,
+      files: [{
+        path: "src/incomplete.ts",
+        status: "modified",
+        additions: 1,
+        deletions: 1,
+      }],
+    };
+    await expect(produceDeterministicReview({
+      provider: providerFor({ diff: incomplete }),
+      projectId: "founder-control-room",
+      pullRequestNumber: 706,
+    })).rejects.toThrow(/diff content is incomplete/i);
+  });
+
+  it("fails closed when the candidate is behind its provider base", async () => {
+    await expect(produceDeterministicReview({
+      provider: providerFor({ diff: { ...defaultDiff, behindBy: 1 } }),
+      projectId: "founder-control-room",
+      pullRequestNumber: 706,
+    })).rejects.toThrow(/fresh candidate/i);
+  });
+
+  it("blocks trust-root self-modification instead of self-certifying it", async () => {
+    const diff: Diff = {
+      ...defaultDiff,
+      files: [
+        file("src/review/deterministicReviewProducer.ts"),
+        file("README.md"),
+        file("docs/FOUNDER_MERGE_AUTHORITY.md"),
+        file("GLOBAL_AI.md"),
+        file(".ai/skills/juss-flow-launch-loop/SKILL.md"),
+        file("docs/DOCUMENTATION_TRUTH_RECEIPT.json"),
+      ],
+    };
+    const result = await produceDeterministicReview({
+      provider: providerFor({ diff }),
+      projectId: "founder-control-room",
+      pullRequestNumber: 706,
+    });
+
+    expect(result.receipt.verdict).toBe("blocked");
+    expect(result.publishable).toBe(false);
+    expect(result.receipt.findings).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: "trust-root-self-modification", severity: "P1" }),
+    ]));
+  });
+
+  it("treats the deterministic witness publisher as a P1 trust root", () => {
+    const findings = evaluateDeterministicReviewRules([
+      file("src/review/deterministicReviewWitnessPublisher.ts"),
+    ]);
+    expect(findings).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: "trust-root-self-modification", severity: "P1" }),
+    ]));
+  });
+
+  it.each([
+    "src/providers/DeterministicReviewGitHubProvider.ts",
+    "src/providers/SecurityPreservingGitHubProvider.ts",
+    "src/providers/githubAppAuth.ts",
+  ])("treats %s as deterministic witness trust root", (path) => {
+    const findings = evaluateDeterministicReviewRules([file(path)]);
+    expect(findings).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: "trust-root-self-modification",
+        severity: "P1",
+        path,
+      }),
+    ]));
+  });
+
+  it.each([
+    "src/http/middleware/requireFounder.ts",
+    "src/http/middleware/requirePortfolioSwitchOn.ts",
+    "src/http/middleware/v10PrivilegedApprovalBinding.ts",
+    "src/http/middleware/v10DecisionFounderBinding.ts",
+    "src/http/server.ts",
+  ])("treats executable merge-authority path %s as a P1 trust root", (path) => {
+    const findings = evaluateDeterministicReviewRules([file(path)]);
+    expect(findings).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: "trust-root-self-modification",
+        severity: "P1",
+        path,
+      }),
+    ]));
+  });
+
+  it.each([
+    "src/auth/founderSession.ts",
+    "src/switchboard/store.ts",
+    "src/founder-os-lab/capabilityKernel.ts",
+    "src/lib/v10DecisionAuthorityGate.ts",
+    "src/lib/founderControlDecision.ts",
+  ])("treats direct merge-authority decision module %s as a P1 trust root", (path) => {
+    const findings = evaluateDeterministicReviewRules([file(path)]);
+    expect(findings).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: "trust-root-self-modification",
+        severity: "P1",
+        path,
+      }),
+    ]));
+  });
+
+  it.each([
+    "src/controllers/ProofGateController.ts",
+    "src/proof-gate/gate.ts",
+    "src/proof-gate/persist.ts",
+    "src/proof-gate/types.ts",
+  ])("treats proof-gate merge-authority module %s as a P1 trust root", (path) => {
+    const findings = evaluateDeterministicReviewRules([file(path)]);
+    expect(findings).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: "trust-root-self-modification",
+        severity: "P1",
+        path,
+      }),
+    ]));
+  });
+
+  it.each([
+    "wrangler.worker.toml",
+    "src/worker/cf-entry.ts",
+    "src/worker/handler.ts",
+    "src/worker/reconciler.ts",
+    "src/worker/scheduler.ts",
+    "src/controllers/base.ts",
+    "src/controllers/CheckRunController.ts",
+    "src/controllers/ChangeProposalController.ts",
+    "src/controllers/ManifestController.ts",
+    "src/controllers/MergeIntentController.ts",
+    "src/controllers/MissionController.ts",
+    "src/controllers/ProjectController.ts",
+    "src/controllers/ReleaseController.ts",
+    "src/controllers/StripeSyncWitnessController.ts",
+  ])("treats autonomous execution owner %s as a P1 trust root", (path) => {
+    const findings = evaluateDeterministicReviewRules([file(path)]);
+    expect(findings).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: "trust-root-self-modification",
+        severity: "P1",
+        path,
+      }),
+    ]));
+  });
+
+  it.each([
+    '+await provider.integrate(projectId, "main", head);',
+    '+await provider["integrate"](projectId, "main", head);',
+    '+const { integrate: mergeNow } = provider;\n+await mergeNow(projectId, "main", head);',
+  ])("blocks a newly introduced provider integration sink: %s", (addedLines) => {
+    const findings = evaluateDeterministicReviewRules([{
+      path: "src/experimental/unsafeMergeWorker.ts",
+      status: "added",
+      additions: addedLines.split("\n").length,
+      deletions: 0,
+      patch: `@@ -0,0 +1 @@\n${addedLines}`,
+    }]);
+
+    expect(findings).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: "new-provider-integration-sink",
+        severity: "P1",
+        path: "src/experimental/unsafeMergeWorker.ts",
+      }),
+    ]));
+  });
+
+  it("does not classify a new read-only provider source as an integration sink", () => {
+    const findings = evaluateDeterministicReviewRules([{
+      path: "src/experimental/readOnlyWorker.ts",
+      status: "added",
+      additions: 1,
+      deletions: 0,
+      patch: '@@ -0,0 +1 @@\n+await provider.resolveRef(projectId, "main");',
+    }]);
+
+    expect(findings.some((item) => item.id === "new-provider-integration-sink")).toBe(false);
+    expect(findings.some((item) => item.severity === "P1")).toBe(false);
+  });
+
+  it("requires discovery adversarial tests and runbook when discovery core changes", () => {
+    const findings = evaluateDeterministicReviewRules([
+      file("scripts/verify-test-discovery.mjs"),
+    ]);
+    expect(findings).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: "test-discovery-proof-coupling", severity: "P2" }),
+    ]));
+
+    const repaired = evaluateDeterministicReviewRules([
+      file("scripts/verify-test-discovery.mjs"),
+      file("scripts/verify-test-discovery.node-test.mjs"),
+      file("docs/TEST_DISCOVERY_DEBT.md"),
+    ]);
+    expect(repaired.some((item) => item.id === "test-discovery-proof-coupling")).toBe(false);
+  });
+
+  it("treats discovery baseline changes as discovery-core changes", () => {
+    const findings = evaluateDeterministicReviewRules([
+      file("scripts/test-discovery-baseline.json"),
+    ]);
+    expect(findings).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: "test-discovery-proof-coupling", severity: "P2" }),
+    ]));
+
+    const repaired = evaluateDeterministicReviewRules([
+      file("scripts/test-discovery-baseline.json"),
+      file("scripts/verify-test-discovery.node-test.mjs"),
+      file("docs/TEST_DISCOVERY_DEBT.md"),
+    ]);
+    expect(repaired.some((item) => item.id === "test-discovery-proof-coupling")).toBe(false);
+  });
+
+  it("requires canonical truth companions for merge-authority and provider source", () => {
+    const mergeFindings = evaluateDeterministicReviewRules([file("src/review/exampleAuthority.ts")]);
+    expect(mergeFindings).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: "merge-authority-truth-coupling", severity: "P2" }),
+    ]));
+
+    const providerFindings = evaluateDeterministicReviewRules([file("src/providers/exampleProvider.ts")]);
+    expect(providerFindings).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: "provider-authority-truth-coupling", severity: "P2" }),
+    ]));
+  });
+
+  it("rejects caller attempts to redirect the producer to another repository/provider", async () => {
+    await expect(produceDeterministicReview({
+      provider: providerFor({
+        context: { ...defaultContext, repository: "attacker/repo", headRepository: "attacker/repo" },
+      }),
+      projectId: "founder-control-room",
+      pullRequestNumber: 706,
+    })).rejects.toThrow(/canonical Founder Control Room repository/i);
+
+    const nonGitHub = providerFor();
+    Object.defineProperty(nonGitHub, "name", { value: "gitlab" });
+    await expect(produceDeterministicReview({
+      provider: nonGitHub,
+      projectId: "founder-control-room",
+      pullRequestNumber: 706,
+    })).rejects.toThrow(/GitHub repository provider/i);
+  });
+});

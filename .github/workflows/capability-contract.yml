@@ -7,6 +7,8 @@ on:
       - 'schemas/capability-contract.v1.schema.json'
       - 'scripts/verify-capability-contract.mjs'
       - 'src/capabilities/**'
+      - 'src/http/routes/capabilities.ts'
+      - 'src/http/routes/__tests__/tinyFishObservation.integration.test.ts'
       - 'package.json'
       - '.github/workflows/capability-contract.yml'
   push:
@@ -16,6 +18,8 @@ on:
       - 'schemas/capability-contract.v1.schema.json'
       - 'scripts/verify-capability-contract.mjs'
       - 'src/capabilities/**'
+      - 'src/http/routes/capabilities.ts'
+      - 'src/http/routes/__tests__/tinyFishObservation.integration.test.ts'
       - 'package.json'
       - '.github/workflows/capability-contract.yml'
 
@@ -28,7 +32,7 @@ env:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -37,5 +41,22 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run verify:capability-contract
-      - run: npx vitest run src/capabilities/__tests__/score.test.ts
+      - run: >-
+          npx vitest run
+          src/capabilities/__tests__/score.test.ts
+          src/capabilities/__tests__/workbenchRegistry.test.ts
+          src/capabilities/__tests__/bubbleLabShadow.test.ts
+          src/capabilities/__tests__/tinyFishWebObservation.test.ts
+          src/http/routes/__tests__/tinyFishObservation.integration.test.ts
       - run: npm run typecheck
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - name: Capability Workbench Playwright
+        run: FCR_E2E_SCENARIO=capability-workbench node e2e/direct-browser-run.mjs
+      - name: Upload capability browser proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: capability-workbench-mobile-${{ github.sha }}
+          path: test-results/capabilities-workbench-mobile.png
+          if-no-files-found: ignore

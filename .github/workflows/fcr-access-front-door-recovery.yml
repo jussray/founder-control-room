@@ -8,7 +8,7 @@ on:
         required: true
         type: string
       apply:
-        description: 'Apply only the bounded foundercontrolroom.org Access exemption after inspection'
+        description: 'Apply only the exact foundercontrolroom.org public Access destination bypass'
         required: true
         type: boolean
         default: false
@@ -76,16 +76,19 @@ jobs:
           fi
 
           {
-            echo '## FCR Access front-door authority gate'
+            echo '## FCR front-door authority gate'
             echo
             echo "- Exact current main: \`$EXPECTED_HEAD_SHA\`"
             echo "- Apply requested: \`$APPLY\`"
             echo "- Approval reference receipt: \`$approval_reference_receipt\`"
-            echo '- Mutation scope: add foundercontrolroom.org to the existing Access organization exemption list only'
-            echo '- Explicit matching Access application: blocks automatic mutation'
+            echo '- Random stranger contract: public front door reachable; founder control plane remains founder-authorized'
+            echo '- Mutation scope: create only foundercontrolroom.org/* as a public Access destination with Bypass Everyone'
+            echo '- Existing non-managed public destination: accepted only when exact destination and Everyone bypass semantics are independently verified'
+            echo '- Existing all-workers protection: preserved'
             echo '- DNS mutation: none'
             echo '- Worker route mutation: none'
             echo '- Database mutation: none'
+            echo '- Failed stranger browser proof: rollback only the run-created managed Access application'
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Set up Node 24
@@ -98,36 +101,92 @@ jobs:
         run: npm ci
 
       - name: Prove credential and bounded recovery contracts
+        id: contracts
         run: |
           node --test scripts/provider-credential-contract.node-test.mjs
           node --test scripts/reconcile-cloudflare-access-public-zone.node-test.mjs
           node --test scripts/fcr-cloudflare-bridge-contract.node-test.mjs
+          node --test scripts/fcr-stranger-front-door-contract.node-test.mjs
 
       - name: Inspect live Access state without mutation
+        id: access_inspect
+        if: inputs.apply != true
+        continue-on-error: true
         env:
           CLOUDFLARE_ACCESS_API_TOKEN: ${{ secrets.CLOUDFLARE_ACCESS_API_TOKEN }}
         run: node scripts/reconcile-cloudflare-access-public-zone.mjs >/dev/null 2>&1
 
-      - name: Apply bounded Access exemption with dedicated admin authority
+      - name: Apply exact public destination with dedicated admin authority
+        id: access_apply
         if: inputs.apply == true
+        continue-on-error: true
         env:
           CLOUDFLARE_ACCESS_ADMIN_API_TOKEN: ${{ secrets.CLOUDFLARE_ACCESS_ADMIN_API_TOKEN }}
         run: node scripts/reconcile-cloudflare-access-public-zone.mjs --apply >/dev/null 2>&1
 
-      - name: Install Chromium for post-apply proof
-        if: inputs.apply == true
+      - name: Install Chromium for stranger front-door proof
+        id: chromium
+        if: always() && steps.contracts.outcome == 'success'
+        continue-on-error: true
         run: npx playwright install --with-deps chromium
 
-      - name: Verify recovered front door and exact runtime SHA with Playwright
-        if: inputs.apply == true
+      - name: Verify stranger reachability and founder containment with Playwright
+        id: stranger_browser
+        if: always() && steps.contracts.outcome == 'success' && steps.chromium.outcome == 'success'
+        continue-on-error: true
         run: node scripts/verify-fcr-front-door-playwright.mjs >/dev/null 2>&1
+
+      - name: Roll back run-created public destination after failed apply or stranger proof
+        id: rollback
+        if: (failure() && inputs.apply == true) || (always() && inputs.apply == true && (steps.access_apply.outcome == 'failure' || steps.stranger_browser.outcome == 'failure'))
+        continue-on-error: true
+        env:
+          CLOUDFLARE_ACCESS_ADMIN_API_TOKEN: ${{ secrets.CLOUDFLARE_ACCESS_ADMIN_API_TOKEN }}
+        run: node scripts/reconcile-cloudflare-access-public-zone.mjs --rollback >/dev/null 2>&1
+
+      - name: Evaluate independent provider and stranger evidence
+        id: evidence_gate
+        if: always()
+        continue-on-error: true
+        env:
+          APPLY: ${{ inputs.apply }}
+          CONTRACTS_OUTCOME: ${{ steps.contracts.outcome }}
+          ACCESS_INSPECT_OUTCOME: ${{ steps.access_inspect.outcome }}
+          ACCESS_APPLY_OUTCOME: ${{ steps.access_apply.outcome }}
+          CHROMIUM_OUTCOME: ${{ steps.chromium.outcome }}
+          STRANGER_BROWSER_OUTCOME: ${{ steps.stranger_browser.outcome }}
+          ROLLBACK_OUTCOME: ${{ steps.rollback.outcome }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          provider_outcome="$ACCESS_INSPECT_OUTCOME"
+          if [[ "$APPLY" == 'true' ]]; then
+            provider_outcome="$ACCESS_APPLY_OUTCOME"
+          fi
+
+          printf 'contracts=%s\nprovider=%s\nchromium=%s\nstranger_browser=%s\nrollback=%s\n' \
+            "$CONTRACTS_OUTCOME" \
+            "$provider_outcome" \
+            "$CHROMIUM_OUTCOME" \
+            "$STRANGER_BROWSER_OUTCOME" \
+            "$ROLLBACK_OUTCOME"
+
+          test "$CONTRACTS_OUTCOME" = 'success'
+          test "$provider_outcome" = 'success'
+          test "$CHROMIUM_OUTCOME" = 'success'
+          test "$STRANGER_BROWSER_OUTCOME" = 'success'
+
+          if [[ "$APPLY" == 'true' && "$ROLLBACK_OUTCOME" == 'failure' ]]; then
+            echo '::error title=Rollback failed::A bounded Access mutation may require manual review.'
+            exit 1
+          fi
 
       - name: Return sanitized recovery receipt to founder control issue
         if: always()
         env:
           GH_TOKEN: ${{ github.token }}
           RETURN_ISSUE: '485'
-          JOB_STATUS: ${{ job.status }}
+          EVIDENCE_GATE_OUTCOME: ${{ steps.evidence_gate.outcome }}
           WORKFLOW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         shell: bash
         run: |
@@ -143,11 +202,11 @@ jobs:
           fi
 
           {
-            echo '## FCR Cloudflare Access receipt'
+            echo '## FCR Cloudflare Access + stranger-path receipt'
             echo
             echo "- Exact head: \`$safe_expected_head_sha\`"
             echo "- Workflow run: $WORKFLOW_RUN_URL"
-            echo "- Job status: \`$JOB_STATUS\`"
+            echo "- Evidence gate: \`$EVIDENCE_GATE_OUTCOME\`"
 
             if [[ ! -f "$access_receipt" ]]; then
               echo '- Access provider receipt: `missing`'
@@ -201,6 +260,7 @@ jobs:
                   )
                   and (.applyRequested | type == "boolean")
                   and (.mutationPerformed | type == "boolean")
+                  and (.rollbackPerformed | type == "boolean")
                   and .accountId == $accountId
                   and .zone == "foundercontrolroom.org"
                   and (.credentialSource | credential_source)
@@ -210,10 +270,10 @@ jobs:
                   and (.matchingApplicationCount == null or (.matchingApplicationCount | type == "number" and floor == . and . >= 0))
                   and (
                     .action == "none"
-                    or .action == "deny-unmatched-disabled"
-                    or .action == "already-exempt"
-                    or .action == "would-add-zone-exemption"
-                    or .action == "added-zone-exemption"
+                    or .action == "would-create-public-bypass"
+                    or .action == "already-public-bypass"
+                    or .action == "created-public-bypass"
+                    or .action == "rolled-back-public-bypass"
                   )
                   and (
                     .classification == null
@@ -222,8 +282,17 @@ jobs:
                     or .classification == "dedicated-read-credential-required"
                     or .classification == "provider-read-failed"
                     or .classification == "provider-credential-invalid"
-                    or .classification == "explicit-access-application-match"
+                    or .classification == "duplicate-managed-public-bypass"
+                    or .classification == "managed-public-bypass-drift"
+                    or .classification == "managed-public-bypass-policy-drift"
+                    or .classification == "existing-public-access-app-requires-review"
+                    or .classification == "provider-apply-failed"
                     or .classification == "provider-recovery-failed"
+                    or .classification == "rollback-scope-mismatch"
+                    or .classification == "rollback-managed-app-id-missing"
+                    or .classification == "rollback-managed-app-not-unique"
+                    or .classification == "rollback-managed-app-drift"
+                    or .classification == "rollback-failed"
                   )
                 )
               ' "$access_receipt" >/dev/null 2>&1; then
@@ -243,6 +312,7 @@ jobs:
                 state,
                 applyRequested,
                 mutationPerformed,
+                rollbackPerformed,
                 accountId,
                 zone,
                 credentialSource,
@@ -251,14 +321,62 @@ jobs:
                 alreadyExempt,
                 matchingApplicationCount,
                 action,
-                classification
+                classification,
+                destinationShape: (
+                  if .classification != "existing-public-access-app-requires-review" then null
+                  elif .blocker != "An existing non-managed Access application targets the FCR apex with broader or different destination scope; manual review is required before mutation." then null
+                  else
+                    (.matchingApplications | if type == "array" then . else [] end) as $apps
+                    | if ($apps | length) != 1 then null
+                      else (($apps[0].destinations // []) | if type == "array" then . else [] end) as $destinations
+                      | if ($destinations | length) == 1 then "single-subpath"
+                        elif ($destinations | length) > 1 then "multi-destination"
+                        else null
+                        end
+                      end
+                  end
+                ),
+                destinationProfile: (
+                  if .classification != "existing-public-access-app-requires-review" then null
+                  elif .blocker != "An existing non-managed Access application targets the FCR apex with broader or different destination scope; manual review is required before mutation." then null
+                  else
+                    (.matchingApplications | if type == "array" then . else [] end) as $apps
+                    | if ($apps | length) != 1 then null
+                      else (($apps[0].destinations // []) | if type == "array" then . else [] end) as $destinations
+                      | def destination_type: ((.type // "") | if type == "string" then ascii_downcase else "" end);
+                        def public_uri:
+                          ((.uri // .hostname // "") | if type == "string" then ascii_downcase else "" end)
+                          | sub("^https?://"; "")
+                          | sub("/$"; "");
+                        {
+                          total: ($destinations | length),
+                          public: ([$destinations[] | select(destination_type == "public")] | length),
+                          allWorkers: ([$destinations[] | select(destination_type == "all_workers")] | length),
+                          worker: ([$destinations[] | select(destination_type == "worker")] | length),
+                          previewWorker: ([$destinations[] | select(destination_type == "preview_worker")] | length),
+                          other: ([$destinations[] | select((destination_type != "public") and (destination_type != "all_workers") and (destination_type != "worker") and (destination_type != "preview_worker"))] | length),
+                          hasWholeSitePublic: any($destinations[]; (destination_type == "public") and ((public_uri == "foundercontrolroom.org") or (public_uri == "foundercontrolroom.org/*"))),
+                          hasNarrowPublic: any($destinations[]; (destination_type == "public") and (public_uri | startswith("foundercontrolroom.org/")) and (public_uri != "foundercontrolroom.org/*")),
+                          hasAllWorkers: any($destinations[]; destination_type == "all_workers")
+                        }
+                      end
+                  end
+                ),
+                reviewReason: (
+                  if .classification != "existing-public-access-app-requires-review" then null
+                  elif .blocker == "More than one Access application targets the FCR public apex; refusing to infer ownership or mutate automatically." then "multiple-matching-apps"
+                  elif .blocker == "An existing non-managed Access application targets the FCR apex with broader or different destination scope; manual review is required before mutation." then "destination-scope"
+                  elif .blocker == "An existing non-managed Access application owns the exact FCR public destination but is not an Everyone bypass; manual review is required before mutation." then "missing-everyone-bypass"
+                  else "unspecified"
+                  end
+                )
               }' "$access_receipt"
               echo '```'
             fi
 
             if [[ ! -f "$browser_receipt" ]]; then
               echo
-              echo '- Browser proof receipt: `missing`'
+              echo '- Browser proof receipt: `missing` (stranger-path)'
             elif [[ "$safe_expected_head_sha" == 'UNKNOWN' ]] || ! jq -e -s \
               --arg expectedHeadSha "$safe_expected_head_sha" '
                 def iso8601:
@@ -276,9 +394,16 @@ jobs:
                   and .scope == "fcr-access-front-door-browser-proof"
                   and (.observedAt | iso8601)
                   and .expectedHeadSha == $expectedHeadSha
+                  and .audience == "random-stranger"
                   and .requestedOrigin == "https://foundercontrolroom.org"
+                  and .publicOrigin == "https://www.foundercontrolroom.org"
                   and (.finalOrigin | origin_or_null)
                   and (.navigationStatus | status_or_null)
+                  and (.controlRoomStatus | status_or_null)
+                  and (.founderSignInVisible | type == "boolean")
+                  and (.founderShellVisible | type == "boolean")
+                  and (.authMeStatus | status_or_null)
+                  and (.founderAuthorityContained | type == "boolean")
                   and (.apiVersionStatus | status_or_null)
                   and (.apiVersionMatchesExpectedSha | type == "boolean")
                   and (.state == "unknown" or .state == "proven" or .state == "failed")
@@ -286,11 +411,11 @@ jobs:
                 )
               ' "$browser_receipt" >/dev/null 2>&1; then
               echo
-              echo '- Browser proof receipt: `malformed`'
-              echo '- Browser proof: `UNKNOWN` because the structured browser receipt failed the single-document public schema allowlist.'
+              echo '- Browser proof receipt: `malformed` (stranger-path)'
+              echo '- Browser proof: `UNKNOWN` because the structured stranger-path receipt failed the single-document public schema allowlist.'
             else
               echo
-              echo '- Browser proof receipt: `present`'
+              echo '- Browser proof receipt: `present` (stranger-path)'
               echo
               echo '```json'
               jq -s '.[0] | {
@@ -298,11 +423,17 @@ jobs:
                 scope,
                 observedAt,
                 expectedHeadSha,
+                audience,
                 requestedOrigin,
-                finalOriginMatchesExpected: (.finalOrigin != null and .finalOrigin == .requestedOrigin),
-                unexpectedOriginDetected: (.finalOrigin != null and .finalOrigin != .requestedOrigin),
+                publicOrigin,
+                finalOriginIsFcr: (.finalOrigin != null and (.finalOrigin == .requestedOrigin or .finalOrigin == .publicOrigin)),
                 accessInterceptDetected: (((.finalOrigin // "") | test("cloudflareaccess\\.com"; "i")) or ((.error // "") | test("Cloudflare Access"; "i"))),
                 navigationStatus,
+                controlRoomStatus,
+                founderSignInVisible,
+                founderShellVisible,
+                authMeStatus,
+                founderAuthorityContained,
                 apiVersionStatus,
                 apiVersionMatchesExpectedSha,
                 state,
@@ -323,3 +454,10 @@ jobs:
           path: test-results/fcr-access-front-door-public-receipt.md
           if-no-files-found: ignore
           retention-days: 30
+
+      - name: Fail closed after retaining independent provider and stranger evidence
+        if: always() && steps.evidence_gate.outcome != 'success'
+        shell: bash
+        run: |
+          echo '::error title=FCR front-door authority not proven::Provider and stranger-path evidence were retained; at least one required witness is not green.'
+          exit 1

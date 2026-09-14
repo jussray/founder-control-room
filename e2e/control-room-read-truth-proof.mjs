@@ -8,6 +8,7 @@ const REPO_ROOT = fileURLToPath(new URL('../', import.meta.url));
 const PUBLIC_ROOT = join(REPO_ROOT, 'public');
 const RESULTS_ROOT = join(REPO_ROOT, 'test-results');
 const serverRequests = [];
+const OPAQUE_SESSION_COOKIE = `v1.${'a'.repeat(43)}`;
 
 const mime = {
   '.html': 'text/html; charset=utf-8',
@@ -31,7 +32,11 @@ const server = createServer((req, res) => {
 
   try {
     const body = readFileSync(filePath);
-    res.writeHead(200, { 'Content-Type': mime[extname(filePath)] ?? 'application/octet-stream' });
+    const headers = { 'Content-Type': mime[extname(filePath)] ?? 'application/octet-stream' };
+    if (url.pathname === '/control-room/') {
+      headers['Set-Cookie'] = `__Host-fcr_session=${OPAQUE_SESSION_COOKIE}; Path=/; Secure; HttpOnly; SameSite=Strict`;
+    }
+    res.writeHead(200, headers);
     res.end(body);
   } catch {
     res.writeHead(404).end('not found');
@@ -60,6 +65,24 @@ await page.route(`${BASE_URL}/**`, async (route) => {
 
   if (url.pathname.startsWith('/control-room/')) {
     await route.continue();
+    return;
+  }
+
+  if (request.method() === 'GET' && url.pathname === '/auth/me') {
+    const cookie = request.headers()['cookie'] ?? '';
+    if (!cookie.includes(`__Host-fcr_session=${OPAQUE_SESSION_COOKIE}`)) {
+      await route.fulfill({
+        status: 401,
+        contentType: 'application/json',
+        body: JSON.stringify({ error: 'proof fixture: opaque founder session required' }),
+      });
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ success: true, data: { founder: { email: 'founder@example.com' } } }),
+    });
     return;
   }
 
@@ -117,13 +140,7 @@ async function waitForFounderProjects(label) {
 try {
   mkdirSync(RESULTS_ROOT, { recursive: true });
 
-  const founderFragment = new URLSearchParams({
-    access_token: 'proof-token',
-    refresh_token: '',
-    expires_at: '4102444800',
-    email: 'founder@example.com',
-  });
-  await page.goto(`${BASE_URL}/control-room/#${founderFragment.toString()}`, {
+  await page.goto(`${BASE_URL}/control-room/`, {
     waitUntil: 'commit',
     timeout: 10_000,
   });
@@ -134,17 +151,28 @@ try {
     fullPage: true,
   });
 
-  const shellState = await page.evaluate(() => ({
-    sessionPresent: Boolean(sessionStorage.getItem('fcr_session')),
-    projectListPresent: Boolean(document.querySelector('#project-list')),
-    founderEmail: document.querySelector('.founder-email')?.textContent ?? null,
-    bodyText: document.body.innerText.slice(0, 600),
-    readTruth: window.__FCR_READ_TRUTH__?.projects?.() ?? null,
-  }));
+  const shellState = await page.evaluate(() => {
+    const rawSession = sessionStorage.getItem('fcr_session');
+    let session = null;
+    try { session = rawSession ? JSON.parse(rawSession) : null; } catch { session = null; }
+    return {
+      sessionPresent: Boolean(rawSession),
+      sessionTransport: session?.transport ?? null,
+      readableAccessToken: session?.access_token ?? null,
+      readableRefreshToken: session?.refresh_token ?? null,
+      projectListPresent: Boolean(document.querySelector('#project-list')),
+      founderEmail: document.querySelector('.founder-email')?.textContent ?? null,
+      bodyText: document.body.innerText.slice(0, 600),
+      readTruth: window.__FCR_READ_TRUTH__?.projects?.() ?? null,
+    };
+  });
   console.log('founder-shell snapshot', JSON.stringify(shellState));
 
-  if (!shellState.sessionPresent || shellState.founderEmail !== 'founder@example.com') {
-    throw new Error(`Canonical founder session handoff did not reach the shell: ${JSON.stringify(shellState)}`);
+  if (!shellState.sessionPresent || shellState.founderEmail !== 'founder@example.com' || shellState.sessionTransport !== 'opaque-http-only-cookie') {
+    throw new Error(`Canonical opaque founder session did not reach the shell: ${JSON.stringify(shellState)}`);
+  }
+  if (shellState.readableAccessToken || shellState.readableRefreshToken) {
+    throw new Error(`Browser-readable Supabase credentials regressed into the legacy shell: ${JSON.stringify(shellState)}`);
   }
   if (!shellState.projectListPresent) {
     throw new Error(`Founder shell rendered without the Projects surface: ${JSON.stringify(shellState)} pageErrors=${JSON.stringify(pageErrors)}`);
@@ -197,7 +225,7 @@ try {
     throw new Error(`Unexpected browser request failures: ${requestFailures.join(' | ')}`);
   }
 
-  console.log('PASS: failed project reads render UNKNOWN; successful empty reads render verified empty state.');
+  console.log('PASS: opaque founder session boots the shell; failed project reads render UNKNOWN; successful empty reads render verified empty state.');
 } finally {
   await browser.close();
   await new Promise((resolve) => server.close(resolve));

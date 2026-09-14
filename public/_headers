@@ -7,3 +7,11 @@
 
 /control-room/*
   Cache-Control: no-store
+
+/demo/*
+  Cache-Control: no-store
+
+/.well-known/sekret-bip-control-room.json
+  Access-Control-Allow-Origin: https://sekret-bip-audit.p9s5nbwqyt.chatgpt.site
+  Cache-Control: no-store
+  Vary: Origin

@@ -72,6 +72,7 @@ function providerFor(
       status: signalStatus,
       commitSha: HEAD,
       provider: "github",
+      evidenceFingerprint: review.reviewHash,
       ...(issuerId === null ? {} : { issuer: { kind: "app" as const, id: issuerId, name: "fcr-review" } }),
     }],
   } as unknown as RepositoryProvider;

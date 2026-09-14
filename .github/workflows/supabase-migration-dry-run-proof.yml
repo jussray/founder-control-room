@@ -1,0 +1,125 @@
+name: Supabase Migration Candidate Proof
+
+on:
+  push:
+    branches:
+      - fix/proof-of-ship-migration-identity-main-20260809
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supabase-migration-candidate-proof-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  EXPECTED_MAIN_SHA: 31f0fe133c23ed6decf70f0cba16e0364112227c
+  EXPECTED_BRANCH: fix/proof-of-ship-migration-identity-main-20260809
+
+jobs:
+  candidate-proof:
+    name: Supabase secretless exact-head candidate proof
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact pushed head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify exact candidate and unchanged main
+        shell: bash
+        env:
+          EXPECTED_HEAD_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          test "$GITHUB_REF" = "refs/heads/$EXPECTED_BRANCH"
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
+
+          git fetch --no-tags origin \
+            "refs/heads/main:refs/remotes/origin/main" \
+            "refs/heads/$EXPECTED_BRANCH:refs/remotes/origin/$EXPECTED_BRANCH"
+
+          CURRENT_MAIN_SHA="$(git rev-parse refs/remotes/origin/main)"
+          CURRENT_BRANCH_SHA="$(git rev-parse "refs/remotes/origin/$EXPECTED_BRANCH")"
+
+          printf 'expected_main=%s\ncurrent_main=%s\nexpected_head=%s\ncurrent_branch=%s\n' \
+            "$EXPECTED_MAIN_SHA" "$CURRENT_MAIN_SHA" "$EXPECTED_HEAD_SHA" "$CURRENT_BRANCH_SHA"
+
+          test "$CURRENT_MAIN_SHA" = "$EXPECTED_MAIN_SHA"
+          test "$CURRENT_BRANCH_SHA" = "$EXPECTED_HEAD_SHA"
+          git merge-base --is-ancestor "$EXPECTED_MAIN_SHA" "$EXPECTED_HEAD_SHA"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Verify migration ledger regression contract
+        run: npx vitest run src/lib/__tests__/productionMigrationLedger.contract.test.ts src/lib/__tests__/migrationSecurityReconciliation.contract.test.ts
+
+      - name: Record immutable local migration manifest
+        shell: bash
+        env:
+          EXPECTED_HEAD_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p test-results
+          find supabase/migrations -maxdepth 1 -type f -name '*.sql' -print0 \
+            | sort -z \
+            | xargs -0 sha256sum \
+            > test-results/supabase-migration-candidate-sha256.txt
+          {
+            echo "candidate_head=$EXPECTED_HEAD_SHA"
+            echo "base_main=$EXPECTED_MAIN_SHA"
+            echo "credentialed_database_query=false"
+            echo "production_secret_access=false"
+          } > test-results/supabase-migration-candidate-receipt.txt
+
+      - name: Reverify exact candidate and unchanged main
+        shell: bash
+        env:
+          EXPECTED_HEAD_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin \
+            "refs/heads/main:refs/remotes/origin/main" \
+            "refs/heads/$EXPECTED_BRANCH:refs/remotes/origin/$EXPECTED_BRANCH"
+          test "$(git rev-parse refs/remotes/origin/main)" = "$EXPECTED_MAIN_SHA"
+          test "$(git rev-parse "refs/remotes/origin/$EXPECTED_BRANCH")" = "$EXPECTED_HEAD_SHA"
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
+
+      - name: Record proof summary
+        if: always()
+        shell: bash
+        env:
+          EXPECTED_HEAD_SHA: ${{ github.sha }}
+        run: |
+          {
+            echo "## Supabase migration candidate proof"
+            echo
+            echo "- Candidate head: \`$EXPECTED_HEAD_SHA\`"
+            echo "- Required base main: \`$EXPECTED_MAIN_SHA\`"
+            echo "- Production environment requested: no"
+            echo "- Production secrets requested: no"
+            echo "- Database query or mutation command present: no"
+            echo "- Credentialed migration list/dry-run remains a trusted default-branch/deployment authority step, not branch-controlled proof."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload candidate receipts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: supabase-migration-candidate-${{ github.sha }}
+          path: |
+            test-results/supabase-migration-candidate-sha256.txt
+            test-results/supabase-migration-candidate-receipt.txt
+          if-no-files-found: error
+          retention-days: 30

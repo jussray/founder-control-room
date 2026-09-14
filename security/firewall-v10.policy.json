@@ -46,7 +46,8 @@
         "n8n",
         "mcp",
         "proof-of-ship-receipts",
-        "founder-review-email-ingress"
+        "founder-review-email-ingress",
+        "storyengine-product-build-receipts"
       ]
     },
     "authenticatedOriginPulls": {
@@ -62,6 +63,24 @@
       "fullMutationPath": "/automation/conveyor/advance",
       "founderAuthMiddleware": "requireFounder",
       "sameOriginBrowserMutationGateBeforeMount": true
+    },
+    "productBuild": {
+      "mountPath": "/l99/product-build",
+      "directivePath": "/storyengine/directive",
+      "executePath": "/storyengine/execute",
+      "fullDirectivePath": "/l99/product-build/storyengine/directive",
+      "fullExecutePath": "/l99/product-build/storyengine/execute",
+      "receiptIngressPath": "/ingest/product-build-receipts/storyengine",
+      "founderAuthMiddleware": "requireFounder",
+      "founderMasterSwitch": "fcr-privileged-execution-master",
+      "applicationRateLimitMiddleware": "rateLimitFounderPermissions",
+      "sameOriginBrowserMutationGateBeforeMount": true,
+      "receiptIngressIsServerToServer": true,
+      "receiptIngressRateLimitMiddleware": "rateLimitGeneral",
+      "blindRetryAllowed": false,
+      "mergeAuthorized": false,
+      "deployAuthorized": false,
+      "providerMutationAuthorized": false
     }
   },
   "controls": {
@@ -71,7 +90,8 @@
       "strategy": "edge-observe-then-enforce-plus-application-baseline",
       "applicationBaseline": {
         "generalPerIp": { "limit": 60, "periodSeconds": 60 },
-        "magicLinkPerIp": { "limit": 5, "periodSeconds": 900 }
+        "magicLinkPerIp": { "limit": 5, "periodSeconds": 900 },
+        "founderPermissionPerIp": { "limit": 60, "periodSeconds": 60 }
       },
       "edgeRoutes": [
         {
@@ -87,6 +107,20 @@
           "limit": 20,
           "periodSeconds": 60,
           "enforcement": "observe-before-block"
+        },
+        {
+          "method": "POST",
+          "path": "/l99/product-build/storyengine/directive",
+          "limit": 60,
+          "periodSeconds": 60,
+          "enforcement": "observe-before-block"
+        },
+        {
+          "method": "POST",
+          "path": "/l99/product-build/storyengine/execute",
+          "limit": 60,
+          "periodSeconds": 60,
+          "enforcement": "observe-before-block"
         }
       ]
     },
@@ -97,7 +131,7 @@
       "founderAllowlist": "founder_users",
       "edgeJwtRequired": false,
       "forbiddenClientSecrets": true,
-      "criticalServerOnlySecrets": ["SUPABASE_SERVICE_ROLE_KEY", "N8N_CONVEYOR_BEARER_TOKEN"]
+      "criticalServerOnlySecrets": ["SUPABASE_SERVICE_ROLE_KEY", "N8N_CONVEYOR_BEARER_TOKEN", "STORYENGINE_PRODUCT_CONTROL_ROOM_API_KEY"]
     },
     "headers": {
       "runtimeObserved": {

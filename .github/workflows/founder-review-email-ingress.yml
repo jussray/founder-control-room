@@ -7,6 +7,7 @@ on:
       - '.github/workflows/founder-review-email-ingress.yml'
       - 'package.json'
       - 'scripts/verify-founder-review-email-ingress.mjs'
+      - 'scripts/verify-founder-review-email-routing.mjs'
       - 'scripts/verify-rls-contract.mjs'
       - 'src/founderSignalEmailIngress/**'
       - 'src/http/routes/founderSignalReviewContexts.ts'
@@ -16,8 +17,8 @@ on:
       - 'src/http/server.ts'
       - 'src/worker/founderSignalReviewEmail.ts'
       - 'src/worker/founderSignalReviewEmail.test.ts'
-      - 'supabase/migrations/20260802224500_founder_signal_review_email_receipts.sql'
-      - 'supabase/migrations/20260803030000_harden_founder_signal_review_email_receipts.sql'
+      - 'supabase/migrations/20260811004830_founder_signal_review_email_receipts.sql'
+      - 'supabase/migrations/20260811004844_harden_founder_signal_review_email_receipts.sql'
       - 'supabase/migrations/20260812004000_founder_signal_review_execution_bridge.sql'
       - 'tools/zapier/buffer-review-window.cjs'
       - 'tools/zapier/test-buffer-review-window.cjs'
@@ -78,6 +79,10 @@ jobs:
       - name: Verify TypeScript contracts
         if: steps.scope.outputs.in_scope == 'true'
         run: npm run typecheck
+
+      - name: Verify email routing trigger contract
+        if: steps.scope.outputs.in_scope == 'true'
+        run: node scripts/verify-founder-review-email-routing.mjs
 
       - name: Verify intake isolation, bounded execution bridge, tests, and email Worker bundle
         if: steps.scope.outputs.in_scope == 'true'

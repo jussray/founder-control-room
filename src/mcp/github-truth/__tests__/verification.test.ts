@@ -1,201 +1,154 @@
 import { describe, expect, it } from 'vitest';
 import type {
-  CiAuditObservation,
   EvaluatePrAuditEvidenceInput,
+  NormalizedCheck,
+  RequiredCheckDiscovery,
+  RequiredCheckIdentity,
 } from '../types.js';
 import { evaluatePrAuditEvidence } from '../verification.js';
 
-const BASE_SHA = 'a'.repeat(40);
 const HEAD_SHA = 'b'.repeat(40);
 const OLD_HEAD_SHA = 'c'.repeat(40);
-const NOW = '2026-08-25T18:00:00.000Z';
-const OBSERVED_AT = '2026-08-25T17:59:00.000Z';
+const OTHER_HEAD_SHA = 'd'.repeat(40);
+const NOW = '2026-08-25T20:00:00.000Z';
+const OBSERVED_AT = '2026-08-25T19:59:00.000Z';
+const WINDOW_MS = 5 * 60 * 1000;
+const CHECK_RUN: RequiredCheckIdentity = { kind: 'check_run', context: 'Required Gate', appId: 101 };
 
-function completedSuccess(overrides: Partial<CiAuditObservation> = {}): CiAuditObservation {
+function discovery(requiredChecks: RequiredCheckIdentity[] = [CHECK_RUN], observedAt = OBSERVED_AT): RequiredCheckDiscovery {
+  return { state: 'complete', source: 'branch_protection', requiredChecks, observedAt, findings: [] };
+}
+function success(overrides: Partial<NormalizedCheck> = {}): NormalizedCheck {
   return {
-    id: 'check-1',
-    name: 'Required Gate',
-    headSha: HEAD_SHA,
-    status: 'completed',
-    conclusion: 'success',
-    observedAt: OBSERVED_AT,
-    ...overrides,
+    kind: 'check_run', context: 'Required Gate', appId: 101, headSha: HEAD_SHA,
+    observedAt: OBSERVED_AT, status: 'completed', conclusion: 'success', providerRunId: 'run-1', ...overrides,
   };
 }
-
-function auditInput(
-  overrides: Partial<EvaluatePrAuditEvidenceInput> = {},
-): EvaluatePrAuditEvidenceInput {
+function input(overrides: Partial<EvaluatePrAuditEvidenceInput> = {}): EvaluatePrAuditEvidenceInput {
   return {
-    pullRequest: {
-      number: 700,
-      state: 'open',
-      baseSha: BASE_SHA,
-      headSha: HEAD_SHA,
-      observedAt: OBSERVED_AT,
-      expectedHeadSha: HEAD_SHA,
-      finalHeadSha: HEAD_SHA,
-    },
-    checks: [completedSuccess()],
-    workflows: [],
-    now: NOW,
-    ...overrides,
+    initialPr: { number: 703, state: 'open', headSha: HEAD_SHA, observedAt: OBSERVED_AT },
+    finalPr: { number: 703, state: 'open', headSha: HEAD_SHA, observedAt: OBSERVED_AT },
+    requiredChecks: discovery(), checks: [success()], findings: [], auditedAt: NOW,
+    freshnessWindowMs: WINDOW_MS, emptyRequiredSetPolicy: 'require_observation', ...overrides,
   };
 }
 
 describe('evaluatePrAuditEvidence', () => {
-  it('classifies fresh completed CI bound to the current PR head as complete', () => {
-    const result = evaluatePrAuditEvidence(auditInput());
-
-    expect(result).toEqual({
-      verdict: 'evidence_complete',
-      ciConclusion: 'pass',
-      findings: [],
-      verification: {
-        checkedAt: NOW,
-        headShaBound: true,
-        ciBoundToHeadSha: true,
-        freshness: 'current',
-      },
+  it('completes only a fresh exact-PR exact-head discovered successful check', () => {
+    expect(evaluatePrAuditEvidence(input())).toEqual({
+      state: 'evidence_complete', currentHeadSha: HEAD_SHA, requiredCheckCoverage: 'complete', findings: [],
     });
   });
 
-  it('rejects a passing check from an older SHA as stale-head evidence', () => {
-    const result = evaluatePrAuditEvidence(auditInput({
-      checks: [completedSuccess({ headSha: OLD_HEAD_SHA })],
-    }));
-
-    expect(result.verdict).toBe('evidence_incomplete');
-    expect(result.ciConclusion).toBe('unknown');
-    expect(result.verification.ciBoundToHeadSha).toBe(false);
-    expect(result.findings.map((finding) => finding.code)).toContain('ci_stale_for_head_sha');
-  });
-
-  it('does not classify a failed check from an older SHA as current-head failure', () => {
-    const result = evaluatePrAuditEvidence(auditInput({
-      checks: [completedSuccess({ headSha: OLD_HEAD_SHA, conclusion: 'failure' })],
-    }));
-
-    expect(result.verdict).toBe('evidence_incomplete');
-    expect(result.ciConclusion).toBe('unknown');
-    expect(result.findings.map((finding) => finding.code)).toContain('ci_stale_for_head_sha');
-  });
-
-  it('never reports complete evidence when CI observations are absent', () => {
-    const result = evaluatePrAuditEvidence(auditInput({ checks: [], workflows: [] }));
-
-    expect(result.verdict).toBe('evidence_incomplete');
-    expect(result.ciConclusion).toBe('unknown');
-    expect(result.findings.map((finding) => finding.code)).toContain('ci_missing');
-  });
-
-  it('classifies failed and pending current-head CI without false green', () => {
-    const failed = evaluatePrAuditEvidence(auditInput({
-      checks: [completedSuccess({ conclusion: 'failure' })],
-    }));
-    const pending = evaluatePrAuditEvidence(auditInput({
-      checks: [completedSuccess({ status: 'in_progress', conclusion: null })],
-    }));
-
-    expect(failed).toMatchObject({ verdict: 'evidence_incomplete', ciConclusion: 'fail' });
-    expect(failed.findings.map((finding) => finding.code)).toContain('ci_failed');
-    expect(pending).toMatchObject({ verdict: 'evidence_incomplete', ciConclusion: 'pending' });
-    expect(pending.findings.map((finding) => finding.code)).toContain('ci_pending');
-  });
-
-  it('reports a conflict when the PR head changes during collection', () => {
-    const result = evaluatePrAuditEvidence(auditInput({
-      pullRequest: {
-        ...auditInput().pullRequest,
-        finalHeadSha: OLD_HEAD_SHA,
-      },
-    }));
-
-    expect(result.verdict).toBe('evidence_conflicted');
-    expect(result.verification.headShaBound).toBe(false);
-    expect(result.findings.map((finding) => finding.code)).toContain('head_sha_changed_during_audit');
-  });
-
-  it('reports a conflict when the provider head differs from the caller expectation', () => {
-    const result = evaluatePrAuditEvidence(auditInput({
-      pullRequest: {
-        ...auditInput().pullRequest,
-        expectedHeadSha: OLD_HEAD_SHA,
-      },
-    }));
-
-    expect(result.verdict).toBe('evidence_conflicted');
-    expect(result.verification.headShaBound).toBe(false);
-    expect(result.findings.map((finding) => finding.code)).toContain('expected_head_sha_mismatch');
-  });
-
-  it('reports contradictory duplicate CI outcomes as conflicted evidence', () => {
-    const result = evaluatePrAuditEvidence(auditInput({
+  it('keeps check runs and commit statuses with the same context independent', () => {
+    const requirements: RequiredCheckIdentity[] = [
+      { kind: 'check_run', context: 'gate' }, { kind: 'commit_status', context: 'gate' },
+    ];
+    const result = evaluatePrAuditEvidence(input({
+      requiredChecks: discovery(requirements),
       checks: [
-        completedSuccess(),
-        completedSuccess({ id: 'check-2', conclusion: 'failure' }),
+        success({ context: 'gate', appId: undefined }),
+        success({ kind: 'commit_status', context: 'gate', appId: undefined, status: 'success', conclusion: null }),
       ],
     }));
-
-    expect(result.verdict).toBe('evidence_conflicted');
-    expect(result.ciConclusion).toBe('unknown');
-    expect(result.findings.map((finding) => finding.code)).toContain('ci_evidence_conflicted');
+    expect(result.state).toBe('evidence_complete');
   });
 
-  it('fails closed when timestamps are stale, malformed, or in the future', () => {
-    const stale = evaluatePrAuditEvidence(auditInput({
-      checks: [completedSuccess({ observedAt: '2026-08-25T17:00:00.000Z' })],
-    }));
-    const malformed = evaluatePrAuditEvidence(auditInput({
-      checks: [completedSuccess({ observedAt: 'not-a-time' })],
-    }));
-    const future = evaluatePrAuditEvidence(auditInput({
-      checks: [completedSuccess({ observedAt: '2026-08-25T18:01:00.000Z' })],
-    }));
-
-    expect(stale).toMatchObject({ verdict: 'evidence_incomplete' });
-    expect(stale.verification.freshness).toBe('stale');
-    expect(stale.findings.map((finding) => finding.code)).toContain('evidence_stale');
-    expect(malformed.verification.freshness).toBe('unknown');
-    expect(malformed.findings.map((finding) => finding.code)).toContain('evidence_time_unknown');
-    expect(future.verification.freshness).toBe('unknown');
-    expect(future.findings.map((finding) => finding.code)).toContain('evidence_time_unknown');
+  it('requires exact app identity when required', () => {
+    const result = evaluatePrAuditEvidence(input({ checks: [success({ appId: 202 })] }));
+    expect(result.state).toBe('evidence_incomplete');
+    expect(result.findings).toContain('required_check_missing');
   });
 
-  it('does not promote neutral or skipped terminal conclusions into a pass', () => {
-    const neutral = evaluatePrAuditEvidence(auditInput({
-      checks: [completedSuccess({ conclusion: 'neutral' })],
+  it('fails closed on partial required-check discovery', () => {
+    const result = evaluatePrAuditEvidence(input({
+      requiredChecks: { state: 'partial', source: 'branch_protection', requiredChecks: [CHECK_RUN], observedAt: OBSERVED_AT, findings: ['required_check_discovery_truncated'] },
     }));
-    const skipped = evaluatePrAuditEvidence(auditInput({
-      checks: [completedSuccess({ conclusion: 'skipped' })],
-    }));
-
-    expect(neutral).toMatchObject({ verdict: 'evidence_incomplete', ciConclusion: 'unknown' });
-    expect(skipped).toMatchObject({ verdict: 'evidence_incomplete', ciConclusion: 'unknown' });
-    expect(neutral.findings.map((finding) => finding.code)).toContain('ci_unknown');
-    expect(skipped.findings.map((finding) => finding.code)).toContain('ci_unknown');
+    expect(result.requiredCheckCoverage).toBe('incomplete');
+    expect(result.findings).toEqual(expect.arrayContaining(['required_check_visibility_incomplete', 'required_check_discovery_truncated']));
   });
 
-  it('fails closed when the requested freshness window is outside policy', () => {
-    const result = evaluatePrAuditEvidence(auditInput({ freshnessWindowMs: 60 * 60 * 1000 + 1 }));
-
-    expect(result.verdict).toBe('evidence_incomplete');
-    expect(result.verification.freshness).toBe('unknown');
-    expect(result.findings.map((finding) => finding.code)).toContain('invalid_freshness_window');
+  it('fails closed when required-check discovery is stale', () => {
+    const result = evaluatePrAuditEvidence(input({ requiredChecks: discovery([CHECK_RUN], '2026-08-25T19:54:59.999Z') }));
+    expect(result.state).toBe('evidence_incomplete');
+    expect(result.requiredCheckCoverage).toBe('incomplete');
+    expect(result.findings).toContain('required_check_discovery_stale');
   });
 
-  it('produces the same finding order when CI input order changes', () => {
-    const first = completedSuccess({ id: 'check-pass', name: 'Alpha' });
-    const second = completedSuccess({
-      id: 'check-pending',
-      name: 'Beta',
-      status: 'queued',
-      conclusion: null,
-    });
+  it.each(['not-a-time', '2026-08-25T20:00:00.001Z'])('fails closed when discovery time is %s', (observedAt: string) => {
+    const result = evaluatePrAuditEvidence(input({ requiredChecks: discovery([CHECK_RUN], observedAt) }));
+    expect(result.state).toBe('evidence_incomplete');
+    expect(result.findings).toContain('required_check_discovery_time_unknown');
+  });
 
-    const forward = evaluatePrAuditEvidence(auditInput({ checks: [first, second] }));
-    const reverse = evaluatePrAuditEvidence(auditInput({ checks: [second, first] }));
+  it('rejects cross-wired PR identities even when heads match', () => {
+    const result = evaluatePrAuditEvidence(input({
+      finalPr: { number: 704, state: 'open', headSha: HEAD_SHA, observedAt: OBSERVED_AT },
+    }));
+    expect(result.state).toBe('evidence_conflicted');
+    expect(result.findings).toContain('pr_identity_changed_during_collection');
+  });
 
-    expect(reverse).toEqual(forward);
+  it.each([0, -1])('rejects malformed PR number %s', (number: number) => {
+    const result = evaluatePrAuditEvidence(input({
+      initialPr: { number, state: 'open', headSha: HEAD_SHA, observedAt: OBSERVED_AT },
+      finalPr: { number, state: 'open', headSha: HEAD_SHA, observedAt: OBSERVED_AT },
+    }));
+    expect(result.state).toBe('evidence_conflicted');
+    expect(result.findings).toContain('pr_identity_changed_during_collection');
+  });
+
+  it('rejects stale PR identity observations', () => {
+    const stale = '2026-08-25T19:54:59.999Z';
+    const result = evaluatePrAuditEvidence(input({
+      initialPr: { number: 703, state: 'open', headSha: HEAD_SHA, observedAt: stale },
+      finalPr: { number: 703, state: 'open', headSha: HEAD_SHA, observedAt: stale },
+    }));
+    expect(result.state).toBe('evidence_incomplete');
+    expect(result.findings).toContain('pr_observation_stale');
+  });
+
+  it.each([null, 'not-a-time', '2026-08-25T20:00:00.001Z'])('rejects unknown/future PR observation %s', (observedAt: string | null) => {
+    const result = evaluatePrAuditEvidence(input({
+      finalPr: { number: 703, state: 'open', headSha: HEAD_SHA, observedAt },
+    }));
+    expect(result.state).toBe('evidence_incomplete');
+    expect(result.findings).toContain('pr_observation_time_unknown');
+  });
+
+  it('conflicts when the PR head moves during collection', () => {
+    const result = evaluatePrAuditEvidence(input({ finalPr: { number: 703, state: 'open', headSha: OTHER_HEAD_SHA, observedAt: OBSERVED_AT } }));
+    expect(result.state).toBe('evidence_conflicted');
+    expect(result.findings).toContain('pr_head_changed_during_collection');
+  });
+
+  it('treats prior-head success as stale, never current proof', () => {
+    const result = evaluatePrAuditEvidence(input({ checks: [success({ headSha: OLD_HEAD_SHA })] }));
+    expect(result.state).toBe('evidence_incomplete');
+    expect(result.findings).toContain('ci_stale_for_head_sha');
+  });
+
+  it('does not let success hide a pending duplicate', () => {
+    const result = evaluatePrAuditEvidence(input({ checks: [success(), success({ providerRunId: 'run-2', status: 'in_progress', conclusion: null })] }));
+    expect(result.state).toBe('evidence_incomplete');
+    expect(result.findings).toContain('required_check_pending');
+  });
+
+  it('conflicts on duplicate current-head terminal disagreement', () => {
+    const result = evaluatePrAuditEvidence(input({ checks: [success(), success({ providerRunId: 'run-2', conclusion: 'failure' })] }));
+    expect(result.state).toBe('evidence_conflicted');
+    expect(result.findings).toContain('duplicate_current_head_check_conflict');
+  });
+
+  it('rejects stale and future check observations', () => {
+    const stale = evaluatePrAuditEvidence(input({ checks: [success({ observedAt: '2026-08-25T19:54:59.999Z' })] }));
+    const future = evaluatePrAuditEvidence(input({ checks: [success({ observedAt: '2026-08-25T20:00:00.001Z' })] }));
+    expect(stale.findings).toContain('ci_observation_stale');
+    expect(future.findings).toContain('ci_observation_time_unknown');
+  });
+
+  it('keeps explicit empty required set fail-closed unless separately allowed', () => {
+    expect(evaluatePrAuditEvidence(input({ requiredChecks: discovery([]), checks: [] })).findings).toContain('required_check_missing');
+    expect(evaluatePrAuditEvidence(input({ requiredChecks: discovery([]), checks: [], emptyRequiredSetPolicy: 'allow' })).state).toBe('evidence_complete');
   });
 });

@@ -13,7 +13,7 @@ const files = {
   localWorkspaceDocs: await readFile(new URL('../docs/LOCAL_WORKSPACE.md', import.meta.url), 'utf8'),
   localWorkspaceUx: await readFile(new URL('../docs/product-design/LOCAL_WORKSPACE_MISSION_UX.md', import.meta.url), 'utf8'),
   migration: await readFile(
-    new URL('../supabase/migrations/20260717195000_guarded_terminal_and_schema_reconciliation.sql', import.meta.url),
+    new URL('../supabase/migrations/20260718032552_guarded_terminal_and_schema_reconciliation.sql', import.meta.url),
     'utf8',
   ),
 };

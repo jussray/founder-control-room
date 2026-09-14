@@ -13,8 +13,8 @@ const webhook = read("src/http/webhooks/github.ts");
 const reconciler = read("src/worker/reconciler.ts");
 const worker = read("src/worker/cf-entry.ts");
 const baseController = read("src/controllers/base.ts");
-const scheduleMigration = read("supabase/migrations/20260715072000_schedule_portfolio_repository_verification.sql");
-const queueMigration = read("supabase/migrations/20260715073000_harden_reconciliation_queue_and_leases.sql");
+const scheduleMigration = read("supabase/migrations/20260715104718_schedule_portfolio_repository_verification.sql");
+const queueMigration = read("supabase/migrations/20260715104852_harden_reconciliation_queue_and_leases.sql");
 
 describe("scheduled portfolio repository verification", () => {
   it("enqueues only enabled active repositories that are due and not already pending", () => {
@@ -46,7 +46,7 @@ describe("provider and schema truth", () => {
     expect(providerFactory).toContain("GITHUB_TOKEN remains a local/development fallback only");
     expect(appAuth).toContain("apps.getRepoInstallation");
     expect(appAuth).toContain("apps.createInstallationAccessToken");
-    expect(appAuth).toContain("repositories: [repo]");
+    expect(appAuth).toContain("repositories: [repository.repo]");
   });
 
   it("observes projects through the live registry instead of obsolete connection columns", () => {

@@ -1,9 +1,11 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import type { RulesetConfig } from "../RepositoryProvider.js";
 import {
   assertFounderControlRoomTrustedBypassActor,
   assertRulesetGovernancePolicy,
   FOUNDER_CONTROL_ROOM_CANONICAL_RULESET_NAME,
+  FOUNDER_CONTROL_ROOM_REQUIRED_NATIVE_APPROVALS,
   governanceProjectIdForRepository,
 } from "../providerFactory.js";
 
@@ -14,7 +16,7 @@ const baseConfig: RulesetConfig = {
   enforcement: "active",
   targetRefs: ["main"],
   requirePullRequest: true,
-  requiredApprovingReviewCount: 1,
+  requiredApprovingReviewCount: FOUNDER_CONTROL_ROOM_REQUIRED_NATIVE_APPROVALS,
   requiredStatusCheckNames: ["Playwright E2E", "Required Gate", "Verify test-ledger contract"],
   blockForcePushes: true,
   blockDeletion: true,
@@ -26,8 +28,20 @@ const canonicalConfig: RulesetConfig = {
 };
 
 describe("Founder Control Room ruleset governance", () => {
-  it("accepts an active FCR main ruleset only when the constitutional floor is preserved", () => {
+  it("accepts the current founder-only FCR main constitutional floor", () => {
+    expect(FOUNDER_CONTROL_ROOM_REQUIRED_NATIVE_APPROVALS).toBe(0);
     expect(() => assertRulesetGovernancePolicy("founder-control-room", baseConfig)).not.toThrow();
+  });
+
+  it("keeps provider and preflight native-review phase constants in lockstep", () => {
+    const preflight = readFileSync(
+      new URL("../../../scripts/audit-github-governance-preflight.mjs", import.meta.url),
+      "utf8",
+    );
+
+    expect(preflight).toContain(
+      `export const CANONICAL_NATIVE_APPROVAL_COUNT = ${FOUNDER_CONTROL_ROOM_REQUIRED_NATIVE_APPROVALS};`,
+    );
   });
 
   it("binds FCR constitutional identity to repository identity instead of a mutable project slug", () => {
@@ -43,11 +57,18 @@ describe("Founder Control Room ruleset governance", () => {
     expect(governanceProjectIdForRepository("fcr-alias", "jussray/other-repo")).toBe("fcr-alias");
   });
 
-  it("fails closed when FCR main requests zero approving reviews", () => {
+  it("rejects caller-supplied native-review phase drift", () => {
     expect(() => assertRulesetGovernancePolicy("founder-control-room", {
       ...baseConfig,
-      requiredApprovingReviewCount: 0,
-    })).toThrow(/at least one approving review/);
+      requiredApprovingReviewCount: FOUNDER_CONTROL_ROOM_REQUIRED_NATIVE_APPROVALS + 1,
+    })).toThrow(/requires exactly 0 native approving reviews for the checked-in phase/);
+  });
+
+  it("fails closed when FCR main requests a negative approving-review count", () => {
+    expect(() => assertRulesetGovernancePolicy("founder-control-room", {
+      ...baseConfig,
+      requiredApprovingReviewCount: -1,
+    })).toThrow(/requires exactly 0 native approving reviews for the checked-in phase/);
   });
 
   it("fails closed when FCR main disables pull-request enforcement", () => {
@@ -61,7 +82,7 @@ describe("Founder Control Room ruleset governance", () => {
     expect(() => assertRulesetGovernancePolicy("founder-control-room", {
       ...baseConfig,
       requiredApprovingReviewCount: Number.NaN,
-    })).toThrow(/at least one approving review/);
+    })).toThrow(/requires exactly 0 native approving reviews for the checked-in phase/);
   });
 
   it("fails closed when FCR main drops the Required Gate status check", () => {

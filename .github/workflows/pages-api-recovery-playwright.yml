@@ -1,10 +1,20 @@
 name: Pages API Recovery Playwright
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'public/_worker.js'
+      - 'public/juss-rayy/**'
+      - 'scripts/build-pages.mjs'
+      - 'e2e/pages-api-recovery.spec.ts'
+      - '.github/workflows/pages-api-recovery-playwright.yml'
   pull_request:
     branches: [main]
     paths:
       - 'public/_worker.js'
+      - 'public/juss-rayy/**'
+      - 'scripts/build-pages.mjs'
       - 'src/http/server.ts'
       - 'src/http/__tests__/pagesEdgeProxy.test.ts'
       - 'src/http/__tests__/server.integration.test.ts'
@@ -54,6 +64,9 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
 
+      - name: Build Cloudflare Pages bundle
+        run: npm run build:pages
+
       - name: Run focused behavior tests
         run: >-
           npx vitest run
@@ -69,7 +82,7 @@ jobs:
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
-      - name: Run rendered desktop and mobile recovery proof
+      - name: Run rendered Pages recovery and founder identity proof
         run: npx playwright test -c playwright.config.ts e2e/pages-api-recovery.spec.ts
 
       - name: Upload Playwright report

@@ -87,11 +87,12 @@ Implementation rules:
 - Search for existing interfaces, providers, routes, schemas, events, docs, and historical decisions before adding another.
 - Preserve unrelated work and history.
 - Prefer focused, reversible patches over broad rewrites.
-- Re-observe after every meaningful edit, test result, review, merge, provider write, or documentation transition.
+- Re-observe after every meaningful edit, test result, review, merge, deploy, provider write, or documentation transition.
 - Map code paths to explicit guardrails, evidence sources, temporal validity, and approval boundaries.
 - Treat compilation as syntax evidence, tests as behavioral evidence, CI as repository workflow evidence, provider readback as provider evidence, and runtime observation as deployment evidence. None substitutes for all the others.
 - A pull-request Quality Gate must checkout and verify `github.event.pull_request.head.sha` in every job; a successful synthetic PR merge-ref run is merge-simulation evidence, never exact-head candidate proof.
 - FCR CI must keep the secret-free exact-head Cloudflare bridge authority contract load-bearing inside `Required Gate`; that repository check does not substitute for live Cloudflare or GitHub provider readback.
+- Repository branch creation through `src/http/routes/approvals.ts` must use fresh `create_branch` proof plus the authenticated exact execute request to issue a server-owned `AuthorityEnvelopeV1`, reserve the idempotent execution before mutation, re-read mission state immediately before the write, and pass the original envelope through `executeAuthorizedCreateBranch()`; direct provider branch creation from that route is forbidden.
 - Never code around an unknown provider state, schema state, credential state, review state, or failed workflow merely to make a patch appear complete.
 - Delete duplicate authority and dead workflow paths before adding another abstraction, credential, retry, or dashboard.
 - Do not remove behavior merely to make tests pass.
@@ -134,6 +135,8 @@ README files, current-state docs, PR descriptions, issues, AI operating prompts,
 For truth-sensitive architecture, authority, publishing, capability, provider, workflow, deployment, or launch changes:
 
 - refresh `README.md` and the applicable current-state docs in the same bounded change;
+- when a newly verified fingerprint supersedes a contradictory current-state assertion, delete or replace that stale assertion in the same bounded change instead of leaving two competing present-tense truths;
+- preserve historical commits, receipts, exact SHAs, and evidence as provenance; a bounded continuity cookie should name the predecessor fingerprint, replacement base/head/scope, and the evidence that justified retirement, but never become authority by itself;
 - mark contradictory older material historical/superseded or point it to the newer authority rather than deleting provenance;
 - run `Documentation Truth` on the exact PR head;
 - require Documentation Truth inside CI / Required Gate;
@@ -186,11 +189,21 @@ The canonical in-app FCR merge path uses **deterministic independent review foll
 
 The deterministic review receipt remains proposal-only and cannot authorize the merge. Founder final approval is the separate human authority layer and must never be described as independent review. New founder-final approvals use a server-owned policy with zero required semantic humans and cannot be weakened by caller-supplied policy.
 
+Deterministic witness production is itself a narrow server-owned provider operation. `src/review/deterministicReviewProducer.ts` must derive review identity and verdict from provider-observed state; `src/review/deterministicReviewWitnessPublisher.ts` may publish only a clear derived receipt through `RepositoryProvider.publishDeterministicReviewWitness(...)`; and Founder Control Room production construction may expose that write only from a repository-scoped installation token minted by server-owned `GITHUB_APP_ID` plus `GITHUB_PRIVATE_KEY`. A PAT-only `GITHUB_TOKEN` fallback cannot mint deterministic review evidence. After publication, the exact-head signal must be read back and its provider-recorded App issuer must equal the trusted numeric `GITHUB_APP_ID`. None of these operations supplies founder-final or merge authority, and a candidate that changes this trust root cannot certify itself through the same producer.
+
+Trusted ignition must run from code already integrated and deployed as exact current FCR `main`, never from candidate-controlled pull-request workflow code, candidate previews, stale releases, or PAT-only environments. The founder-runtime `POST /review/deterministic-witness/:pullRequestNumber` shape accepts only a positive PR number after the existing same-origin, rate-limit, authenticated-founder, and privileged-execution membranes; server-owned code derives repository/provider/PR/base/head/diff/verdict/hash/App identity; full runtime `GIT_SHA` must equal provider-resolved `main` before and after witness publication/reconciliation; retry must reconcile an existing exact trusted witness before any create; and the response returns the complete deterministic receipt needed by Founder Final without granting merge authority. A default-branch dispatch is an equivalent ignition surface only if it preserves those same invariants. The ignition surface, producer/publisher, credential boundary, and any equivalent workflow/runner are trust roots; changes to them must P1-block normal self-certification and use the separately explicit exact-candidate bootstrap/constitutional path.
+
 The older `FCR_TRUSTED_SEMANTIC_REVIEWER_IDS` policy is compatibility-only for missions already pinned under the prior non-author semantic-review model. It is not a prerequisite for new canonical founder-final approvals.
 
 This source/runtime membrane does **not** prove the live GitHub repository ruleset independently enforces the same protections. Required approvals, stale-review dismissal, last-push approval, review-thread requirements, strict status freshness, and bypass actor/mode configuration are separate live-provider facts requiring current GitHub readback.
 
 Never use a GitHub merge that occurred outside the in-app FCR path as proof that the in-app founder-final contract executed.
+
+### Chief candidate-proof producer boundary
+
+For Chief pre-merge ProofMode authority, a required status-check context plus GitHub Actions integration `15368` authenticates the GitHub Actions App, not the exact workflow file or event that produced the check. Because Chief pull requests can modify `.github/workflows/**`, FCR must not treat that pair as sufficient producer provenance.
+
+FCR governance reconciliation must fail closed until the candidate ProofMode context is bound to a provider-observed external GitHub App/check producer unavailable to PR-authored Chief Actions. It must also keep post-merge-only `Cloudflare Production` out of the pre-merge required-deployment set. Observation, planning, or a same-named check never grants ruleset mutation, merge, deploy, provider-policy, or self-certification authority.
 
 ## Provider roles
 
@@ -223,7 +236,7 @@ Never use a GitHub merge that occurred outside the in-app FCR path as proof that
 
 Require the applicable exact founder/provider authority before:
 
-- creating operational branches or sandboxes when current policy requires it;
+- creating operational branches or sandboxes when current policy requires it; branch creation must remain bound to the exact authenticated execute request, server-issued authority envelope, execution reservation, and fresh mission-state revalidation;
 - force-pushing, production deploying, or rolling back;
 - changing founder identity, auth, authorization, allowlists, sessions, or RLS;
 - adding, rotating, deleting, or exposing credentials;
@@ -258,3 +271,7 @@ For material work report:
 17. Next approval gate
 
 The Control Room exists to preserve founder authority, not automate it out of existence because a workflow diagram got overexcited.
+
+## Load-bearing regression execution
+
+A committed regression test is source evidence only until the exact-head workflow that feeds `Required Gate` actually executes it. For LinkedIn analytics continuity, `.github/workflows/ci.yml` must keep `scripts.test_linkedin_analytics_continuity` inside the load-bearing `python-tests` job, and `Required Gate` must continue to depend on that job. Missing LinkedIn activity rows must remain `UNKNOWN_NO_EVIDENCE` with null metrics, never synthetic zero impressions or engagements.

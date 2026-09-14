@@ -1,16 +1,38 @@
 import { Router } from "express";
+import { PORTFOLIO_PROJECTS } from "../../config/portfolio.js";
 import { requireFounder, type FounderRequest } from "../middleware/requireFounder.js";
 import { McpHub, advertisedToolNames } from "../../mcp/hub.js";
 import type { McpInvocationRequest } from "../../mcp/types.js";
 import { hubForMcpProject } from "../../mcp/vaultHub.js";
 import { connectionVaultRouter } from "./connectionVault.js";
-import {
-  handlePairedRemoteMcp,
-  handleRemoteReadMcp,
-} from "./remoteReadMcp.js";
+import { founderPermissionsRouter } from "./founderPermissions.js";
+import { createRemoteReadMcpHandler } from "./remoteReadMcp.js";
 
 export const mcpRouter = Router();
 const registryHub = new McpHub();
+
+const portfolioRemoteReadScope = PORTFOLIO_PROJECTS
+  .map((project) => project.slug)
+  .join(",");
+
+// The authority-bearing portfolio registry is the single source of server-side
+// MCP project scope. Provider/runtime configuration may supply credentials,
+// origins, OAuth audience/client IDs, and other transport details, but it
+// cannot widen this project grant beyond PORTFOLIO_PROJECTS.
+const portfolioRemoteMcpEnv: NodeJS.ProcessEnv = {
+  ...process.env,
+  FCR_REMOTE_MCP_READ_PROJECTS: portfolioRemoteReadScope,
+};
+
+const handlePairedRemoteMcp = createRemoteReadMcpHandler({
+  authMode: "oauth",
+  env: portfolioRemoteMcpEnv,
+});
+
+const handleRemoteReadMcp = createRemoteReadMcpHandler({
+  authMode: "static",
+  env: portfolioRemoteMcpEnv,
+});
 
 function projectIdFrom(value: unknown): string {
   if (typeof value !== "string" || !value.trim()) {
@@ -40,8 +62,9 @@ function invocationFromRequest(
   };
 }
 
-// Canonical ChatGPT/Claude connector lane. Supabase OAuth, token-bound project
-// scope, narrow named tools, and evidence persistence all fail closed.
+// Canonical ChatGPT/Claude/Manus connector lane. Supabase OAuth, token-bound
+// project scope, narrow named tools, and evidence persistence all fail closed.
+// OAuth project claims are intersected with the server-owned portfolio scope.
 mcpRouter.post("/", handlePairedRemoteMcp);
 
 // Temporary compatibility lane for existing server-held static-token clients.
@@ -52,6 +75,11 @@ mcpRouter.post("/read", handleRemoteReadMcp);
 // workflow-facing resolver uses short-lived hashed FCR bearer tokens; founder
 // administration routes remain protected by requireFounder inside the router.
 mcpRouter.use("/vault", connectionVaultRouter);
+
+// Portable Ask-Founder broker. Requests carry zero execution authority. A
+// separate interactive founder decision persists exact-scope decision state;
+// independent review remains outside this router.
+mcpRouter.use("/founder-permissions", founderPermissionsRouter);
 
 mcpRouter.get("/servers", requireFounder, (_req, res) => {
   return res.json({ servers: registryHub.listServers() });

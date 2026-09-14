@@ -1,8 +1,8 @@
 # L99 OODA Implementation Plan
 
 > **Red Team / Lindy / Elon / Bill Gates / OODA**  
-> Last updated: 2026-07-13  
-> Status: **ACTIVE — standalone launch track**
+> Last updated: 2026-09-04  
+> Status: **ACTIVE — standalone launch track + exact-head federation proof contract**
 
 ---
 
@@ -20,6 +20,69 @@ Strip L99 to the mandatory truths:
 Everything not required for those six steps is deferred.  
 No Bip integration. No generic external-entry contract. No second persona.  
 The rule: if removing it does not break the six steps, it is not in V1.
+
+The original five-gate standalone launch plan below remains the durable product baseline. The September 4 federation section adds a proof contract for FCR-to-StoryEngine execution; it does not replace the creator journey or manufacture launch readiness.
+
+---
+
+## FCR -> StoryEngine exact-head federation contract
+
+The bounded FCR -> StoryEngine product-build seam is a separate proof lane from the five advisory L99 launch gates. It exists to prove that founder-authorized FCR execution can reach one exact StoryEngine runtime, perform only the reviewed bounded actuator, and return a receipt that FCR can independently reconcile.
+
+```text
+founder-approved FCR decision
+-> exact StoryEngine proposal + expected head
+-> FCR local peer-contract validation
+-> canonical directive JSON at request-body root
+-> exact StoryEngine runtime identity
+-> StoryEngine independent validation
+-> control-room:event-log actuator
+-> exact product-build receipt
+-> FCR reconciliation
+-> exact-head Playwright witness
+```
+
+### Mandatory invariants
+
+1. **Exact target identity**: the directive targets project `l99`, repository `jussray/StoryEngine`, and product control room `storyengine-control-room`.
+2. **Exact runtime head**: `proposal.expectedHeadSha` is a full Git SHA and must equal the StoryEngine runtime identity immediately before and after execution.
+3. **Proof contract**: `requiredProof` must include both `node-test` and `playwright`. FCR rejects a directive that drifts from the peer proof contract before dispatch; StoryEngine validates the same boundary independently.
+4. **Bounded capability and mutation**: the federation capability is explicitly allowed and the first actuator is limited to `control-room:event-log`.
+5. **Canonical wire shape**: FCR sends the canonical directive object at the HTTP request body root. The stale `{ directive: ... }` wrapper is not part of the contract.
+6. **Receipt binding**: the returned `juss-v10/product-build-receipt@v1` receipt must bind to the exact directive and exact repository/control-room identities.
+7. **No authority expansion**: merge, deploy, provider mutation, publication, spend, deletion, and destructive authority remain false unless separately granted through their own founder-controlled boundaries.
+8. **No blind retry after ambiguity**: when transport outcome is uncertain, do not automatically replay the directive because the bounded actuator may already have executed.
+9. **Proof freshness**: a new FCR head, StoryEngine head, runtime identity, contract version, proof set, wire shape, provider context, or browser subject expires predecessor federation proof.
+10. **Source is not live proof**: source wiring, a green unit test, or a reachable endpoint does not establish current federation success. Current proof requires the exact FCR head, exact StoryEngine runtime head, valid receipt reconciliation, and the applicable real-path Playwright evidence.
+
+### OODA treatment of federation failures
+
+- **Observe**: identify the first boundary that failed: local contract, transport, peer validator, actuator, receipt, runtime identity, or browser witness.
+- **Orient**: classify source defect versus stale proof versus provider/runtime failure. Never patch StoryEngine merely because it correctly rejected a stale FCR client.
+- **Decide**: repair the narrowest causal mismatch on the existing carrier.
+- **Act**: rerun the exact successor head. Any head movement makes predecessor CI and browser proof historical.
+
+### Red Team / Lindy checks
+
+The federation seam must survive at least these recurring attacks:
+
+- missing `node-test` or `playwright` proof;
+- wrong StoryEngine SHA;
+- changed runtime SHA during the request;
+- nested or otherwise stale wire shape;
+- receipt not bound to the exact directive;
+- capability or mutation-scope widening;
+- transport ambiguity followed by unsafe replay;
+- predecessor green inherited after either repository head moves;
+- source-green being mislabeled as live runtime success;
+- merge/deploy/provider authority leaking from bounded execution.
+
+The Lindy rule is simple: preserve the smallest contract that can still prove the same trustworthy round trip after repeated repository, runner, runtime, and browser changes.
+
+Canonical companion contracts:
+
+- [`REPOSITORY_FEDERATION.md`](REPOSITORY_FEDERATION.md)
+- [`PR_CONTINUITY.md`](PR_CONTINUITY.md)
 
 ---
 

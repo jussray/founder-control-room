@@ -143,10 +143,13 @@ if (failures.length) {
   process.exit(1);
 }
 
-const headSha = process.env.GITHUB_SHA?.trim() || null;
+const expectedSha = process.env.EXPECTED_SHA?.trim() || null;
+const githubSha = process.env.GITHUB_SHA?.trim() || null;
+const headSha = expectedSha || githubSha;
+const receiptShaSource = expectedSha ? 'EXPECTED_SHA' : githubSha ? 'GITHUB_SHA' : 'none';
 if (process.env.GITHUB_ACTIONS === 'true' && !/^[0-9a-f]{40}$/i.test(headSha ?? '')) {
   console.error('Firewall v10 policy failed verification:');
-  console.error('- GITHUB_SHA must be an exact 40-character commit SHA in CI');
+  console.error('- EXPECTED_SHA or GITHUB_SHA must provide an exact 40-character commit SHA in CI');
   process.exit(1);
 }
 
@@ -155,6 +158,7 @@ writeFileSync('artifacts/firewall-v10-proof.json', `${JSON.stringify({
   schema: 'founder-control-room/firewall-v10-proof@v2',
   repository: policy.repository,
   headSha,
+  receiptShaSource,
   policyVersion: policy.version,
   activationStage: policy.activationStage,
   providerState: policy.evidence.productionCloudflareApplied,

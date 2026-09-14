@@ -6,22 +6,21 @@ const EXACT_COMMIT_SHA = /^[0-9a-f]{40}$/i;
 const HTTPS_URL = /^https:\/\//i;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const BUFFER_PROVIDER_ACTION = 'buffer_add_to_queue';
-const BUFFER_PROVIDER_METHOD = 'schedule';
-const BUFFER_API_SHARING_MODE = 'customScheduled';
-const BUFFER_API_SAVE_TO_DRAFT = false;
-const BUFFER_REVIEW_WINDOW_MINUTES = 20;
-const BUFFER_REVIEW_WINDOW_MS = BUFFER_REVIEW_WINDOW_MINUTES * 60 * 1000;
+const BUFFER_PROVIDER_METHOD = 'draft';
+const BUFFER_API_SHARING_MODE = 'addToQueue';
+const BUFFER_API_SAVE_TO_DRAFT = true;
+const BUFFER_REVIEW_WINDOW_MINUTES = 0;
 const MAX_GENERATION_AGE_MS = 5 * 60 * 1000;
 const MAX_CLOCK_SKEW_MS = 60 * 1000;
 const MAX_STEERING_GRANT_ID_LENGTH = 100;
 const MAX_AUTHORIZATION_RECEIPT_LENGTH = 200;
-const BUFFER_SCHEDULE_POLICY_ID = 'buffer-20-minute-review-v1';
+const BUFFER_SCHEDULE_POLICY_ID = 'buffer-draft-review-v1';
 const BUFFER_AUTHORIZATION_MODE = 'standing-policy';
 const BUFFER_NOTIFICATION_MODE = 'gmail_campaign_digest';
 const LINKEDIN_CHANNEL = 'juss_rayy_linkedin';
 const LINKEDIN_MIN_STRATEGY_TEXT = 20;
 const LINKEDIN_UNKNOWN_BASELINE_VALUES = new Set(['unknown', 'none', 'n/a', 'na', 'unverified']);
-const ALLOWED_DESTINATION_MODES = new Set(['schedule']);
+const ALLOWED_DESTINATION_MODES = new Set(['draft']);
 const ALLOWED_CONTENT_FIELDS = new Set([
   'linkedin_draft',
   'facebook_founder_draft',
@@ -68,6 +67,10 @@ function asBoolean(value) {
   return value === true || value === 'true';
 }
 
+function isExplicitFalse(value) {
+  return value === false || value === 'false';
+}
+
 function asInteger(value) {
   const parsed = typeof value === 'number' ? value : Number.parseInt(String(value ?? ''), 10);
   return Number.isInteger(parsed) ? parsed : null;
@@ -88,7 +91,7 @@ function validateLinkedInRisingFloor(input, errors) {
   const linkedinNextMutation = asTrimmedString(input.linkedin_next_mutation);
 
   if (!linkedinRisingFloorReady) {
-    errors.push('linkedin_rising_floor_ready must be true before LinkedIn can be scheduled');
+    errors.push('linkedin_rising_floor_ready must be true before LinkedIn can enter Buffer drafts');
   }
 
   if (
@@ -121,13 +124,37 @@ function validateLinkedInRisingFloor(input, errors) {
   };
 }
 
+function validateBufferProviderActionContract({ action, method } = {}) {
+  const normalizedAction = asTrimmedString(action);
+  const normalizedMethod = asTrimmedString(method).toLowerCase();
+  const errors = [];
+
+  if (normalizedAction !== BUFFER_PROVIDER_ACTION) {
+    errors.push(`action must be ${BUFFER_PROVIDER_ACTION}`);
+  }
+  if (normalizedMethod !== BUFFER_PROVIDER_METHOD) {
+    errors.push('method must be draft; never rely on the Buffer default');
+  }
+
+  if (errors.length > 0) {
+    const error = new Error(`BUFFER_PROVIDER_CONTRACT_REJECTED: ${errors.join('; ')}`);
+    error.code = 'BUFFER_PROVIDER_CONTRACT_REJECTED';
+    error.details = errors;
+    throw error;
+  }
+
+  return {
+    buffer_action: BUFFER_PROVIDER_ACTION,
+    buffer_method: BUFFER_PROVIDER_METHOD,
+  };
+}
+
 function validateBufferPublishInput(input = {}, options = {}) {
   const postText = asTrimmedString(input.post_text);
   const contentField = asTrimmedString(input.content_field);
   const destinationMode = asTrimmedString(input.destination_mode).toLowerCase();
   const proofUrl = asTrimmedString(input.proof_url);
   const sourceCommitSha = asTrimmedString(input.source_commit_sha);
-  const publishAllowed = asBoolean(input.publish_allowed);
   const channel = asTrimmedString(input.channel);
   const batchId = asTrimmedString(input.batch_id);
   const batchSize = asInteger(input.batch_size);
@@ -156,17 +183,17 @@ function validateBufferPublishInput(input = {}, options = {}) {
   let linkedinStrategy = null;
   if (channel === LINKEDIN_CHANNEL) {
     if (contentField !== 'linkedin_draft') {
-      errors.push('juss_rayy_linkedin must publish only linkedin_draft');
+      errors.push('juss_rayy_linkedin must use only linkedin_draft');
     }
     linkedinStrategy = validateLinkedInRisingFloor(input, errors);
   }
 
   if (!ALLOWED_DESTINATION_MODES.has(destinationMode)) {
-    errors.push('destination_mode must be schedule under the 20-minute review-window contract');
+    errors.push('destination_mode must be draft under the review-only contract');
   }
 
-  if (!publishAllowed) {
-    errors.push('publish_allowed must be true for the approved schedule-with-review-window contract');
+  if (!isExplicitFalse(input.publish_allowed)) {
+    errors.push('publish_allowed must be explicitly false in draft-only mode');
   }
 
   if (!UUID.test(invocationId)) errors.push('invocation_id must be a UUID');
@@ -190,7 +217,7 @@ function validateBufferPublishInput(input = {}, options = {}) {
     errors.push('founder_approval_id must be the runtime-minted receipt for this grant and invocation');
   }
   if (schedulePolicyId !== BUFFER_SCHEDULE_POLICY_ID) {
-    errors.push('schedule_policy_id does not match the checked-in scheduling contract');
+    errors.push('schedule_policy_id does not match the checked-in draft-review contract');
   }
 
   if (notificationMode !== BUFFER_NOTIFICATION_MODE) {
@@ -227,7 +254,7 @@ function validateBufferPublishInput(input = {}, options = {}) {
   } else {
     const generationAgeMs = nowMs - generatedAtMs;
     if (generationAgeMs > MAX_GENERATION_AGE_MS) {
-      errors.push('generated_at is too stale to preserve a meaningful review window');
+      errors.push('generated_at is too stale for a fresh draft handoff');
     }
     if (generationAgeMs < -MAX_CLOCK_SKEW_MS) {
       errors.push('generated_at is too far in the future');
@@ -241,22 +268,18 @@ function validateBufferPublishInput(input = {}, options = {}) {
     throw error;
   }
 
-  const scheduledAtMs = generatedAtMs + BUFFER_REVIEW_WINDOW_MS;
-  if (scheduledAtMs <= nowMs) {
-    const error = new Error('FOUNDER_SIGNAL_CONTENT_REJECTED: scheduled_at must remain in the future');
-    error.code = 'FOUNDER_SIGNAL_CONTENT_REJECTED';
-    error.details = ['scheduled_at must remain in the future'];
-    throw error;
-  }
-  const scheduledAt = new Date(scheduledAtMs).toISOString();
+  const provider = validateBufferProviderActionContract({
+    action: BUFFER_PROVIDER_ACTION,
+    method: BUFFER_PROVIDER_METHOD,
+  });
 
   return {
     validated_post_text: postText,
     content_validated: true,
     content_field: contentField,
     channel,
-    destination_mode: 'schedule',
-    publish_allowed: true,
+    destination_mode: 'draft',
+    publish_allowed: false,
     proof_url: proofUrl,
     source_commit_sha: sourceCommitSha,
     invocation_id: invocationId,
@@ -268,18 +291,17 @@ function validateBufferPublishInput(input = {}, options = {}) {
     batch_size: batchSize,
     batch_index: batchIndex,
     generated_at: new Date(generatedAtMs).toISOString(),
-    scheduled_at: scheduledAt,
-    review_deadline: scheduledAt,
+    scheduled_at: null,
+    review_deadline: null,
     review_window_minutes: BUFFER_REVIEW_WINDOW_MINUTES,
-    review_state: 'pending_notification',
+    review_state: 'draft_pending_founder_review',
     notification_mode: BUFFER_NOTIFICATION_MODE,
-    notification_required: true,
-    notification_failure_policy: 'cancel_scheduled_batch',
-    buffer_action: BUFFER_PROVIDER_ACTION,
-    buffer_method: BUFFER_PROVIDER_METHOD,
+    notification_required: false,
+    notification_failure_policy: 'retain_draft',
+    ...provider,
     buffer_save_to_draft: BUFFER_API_SAVE_TO_DRAFT,
     buffer_api_sharing_mode: BUFFER_API_SHARING_MODE,
-    buffer_api_due_at: scheduledAt,
+    buffer_api_due_at: null,
     share_now_allowed: false,
     ...(linkedinStrategy ?? {}),
   };
@@ -292,6 +314,7 @@ if (typeof inputData !== 'undefined') {
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     validateBufferPublishInput,
+    validateBufferProviderActionContract,
     validateLinkedInRisingFloor,
     BUFFER_PROVIDER_ACTION,
     BUFFER_PROVIDER_METHOD,

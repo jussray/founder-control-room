@@ -18,6 +18,52 @@ Even a correctly accepted coverage receipt is not permanent truth. Current Truth
 
 The Documentation Truth gate had a parallel weakness: it treated a touched document path as a refresh. It now rejects punctuation-only and hidden-comment edits, and requires a meaningful structured receipt that maps every changed truth-sensitive source path to a path-bound invariant. That receipt establishes review traceability, not a claim that a provider, deployment, public outcome, or source change has been independently proven semantically true.
 
+Goalfix governance exposed another false-green class: canonical execution/adaptive documents and their portable Claude/Perplexity entry points could change while the verifier reported zero truth-sensitive files. Those paths are now registered as `truth-governance`. The gate must therefore require a current README/truth-decay refresh and path-bound receipt whenever the canonical Goalfix workflow, adaptive kernel, portable Goalfix skills, or Claude/Perplexity master execution overlays move. Registration is documentation consistency evidence only; it does not prove `/goalfix/inspect` runtime adoption, independent review, Founder Final, merge authority, provider configuration, deployment, or publication.
+
+## 2026-09 control correction: deployment-plane secrets versus runtime-secret authority
+
+Canonical Deploy #218 exposed a second truth-decay pattern: documentation still described Worker runtime secret values as GitHub production configuration even though those values belong to the Cloudflare Worker secret plane. The exact-head authority check was correct, but an old secret-copy model made the deployment gate fail before any migration or provider mutation. Treating that failure as evidence that the runtime secret was absent in Cloudflare would have crossed an authority boundary without provider readback.
+
+The corrected contract keeps one authority per secret plane. GitHub production validates only the deployment credentials that canonical Deploy itself needs: `SUPABASE_DB_URL`, `CLOUDFLARE_API_TOKEN`, and `CLOUDFLARE_ACCOUNT_ID`. Worker runtime secret values remain provider-held in Cloudflare and are named by `wrangler.worker.toml [secrets].required`, including `FOUNDER_SESSION_ENCRYPTION_KEY`. Canonical Deploy preserves those values and actively writes only the fail-closed `FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON` with `enabled:false`.
+
+`https://api.foundercontrolroom.org` is public release configuration, not a secret. The post-Deploy Playwright witness derives its expected identity from the successful Deploy run and must prove both the direct Worker and public Pages/proxy `/version` identities equal that exact SHA before and after the browser journey. A source declaration, required-name membrane, or green PR still does not prove that provider-held secrets are currently installed or that production serves the candidate. Those remain provider/runtime observations at the use boundary.
+
+## 2026-09 control correction: cross-repository Playwright federation proof drift
+
+The FCR → StoryEngine product-build lane exposed a cross-repository version of the same failure. An FCR browser fixture could remain locally valid while the separately versioned StoryEngine control-room contract changed its proof requirements or request wire shape. Reusing predecessor Playwright green after either repository head, peer runtime identity, required-proof set, or serialized directive shape moved would falsely convert historical integration evidence into current authority.
+
+The corrected evidence-authority rule is explicit: `.github/workflows/playwright.yml` must exercise the canonical product-build directive at the request-body root, require both `node-test` and `playwright` proof, bind the exact StoryEngine runtime identity before and after execution, and treat every FCR or StoryEngine head movement as a new proof subject. FCR also validates the peer proof boundary before dispatch, but that source guard does not replace the browser/runtime witness.
+
+A unit test, source declaration, reachable endpoint, or earlier successful Playwright run cannot prove the current peer loop. Current federation proof requires one exact FCR head, one exact StoryEngine runtime head, the expected directive/receipt binding, and applicable real-path browser evidence. The receipt remains non-authorizing for merge, deploy, production promotion, or provider mutation.
+
+This is why the exact-head Playwright workflow is registered as `evidence-authority`: changing what the browser witness sends or accepts can change what future operators believe has been proven even when the underlying actuator remains intentionally bounded.
+
+A September peer-rollover incident made the freshness rule concrete. FCR `af87c67e05584203b04610eb25e6f89ad8c1e7a0` completed a real federation lap against its pinned StoryEngine peer `abd4aab9f33e6c67d7863bd1a03c917901a00668`, but StoryEngine PR #89 had already advanced to separately exact-head-proven `f78492230e88c66b04d4d8c9d6210c6380ba0db1`. The earlier FCR green therefore remains historical for the old peer rather than current integration authority. Refreshing the peer pin is only the start of recovery: the successor FCR head must rerun the entire browser/runtime/receipt witness against the newly bound StoryEngine SHA, and movement on either side expires that successor proof again.
+
+## 2026-09 control correction: privileged production witness isolation
+
+A post-Deploy `workflow_run` witness is privileged even when its purpose is read-only verification. Treating the triggering workflow's `head_sha` as both the release identity to observe and the code to execute collapses evidence identity into executable authority. A successful upstream workflow must not make its checkout trusted merely by becoming a completed run.
+
+The corrected rule keeps those roles separate: `.github/workflows/playwright.yml` restricts the production witness to successful `workflow_dispatch` Deploy runs from `main`, executes only the trusted witness source associated with the privileged workflow context, and carries `workflow_run.head_sha` only as the expected release identity to compare against production. The witness can prove that deployed Worker and browser/runtime identity match the Deploy run SHA, but it cannot execute the Deploy-run checkout or use upstream success as authority to widen what code runs in the privileged phase.
+
+This remains a proof contract, not production proof by itself. The witness must actually run for the relevant release and return terminal exact-SHA evidence before a production-runtime claim becomes current.
+
+## 2026-09 control correction: Capital Decision documentation drift
+
+The Founder Capital Decision feature introduced a founder-facing evidence-evaluation surface with freshness-sensitive recommendations, dilution and option-set reasoning, and an explicit authority ceiling. Its source and browser proof correctly keep financing authority false and allow `HOLD` when broader or fresher evidence is missing, but the feature landed without the required durable README, truth-decay audit, and documentation receipt refresh for its evidence-authority semantics.
+
+The correction is documentation-only with respect to the Capital Decision behavior: `README.md`, this audit, and `docs/DOCUMENTATION_TRUTH_RECEIPT.json` now state that a decision card, score, option set, or browser rendering is evidence interpretation rather than authority. Stale or missing evidence must remove derived certainty instead of silently carrying an earlier recommendation forward. Financing, spend, investor-contact, fundraise, merge, deploy, publication, and execution authority remain separate and require their own explicit gates.
+
+This documentation repair does not retroactively prove the earlier feature branch, external financing activity, investor contact, or any provider/runtime outcome. It closes the durable truth-surface gap so future operators do not mistake a source-level capital recommendation for executable authority.
+
+## 2026-09 control correction: merge authority availability versus exact approval
+
+A merge-governance ambiguity treated the existence of merge capability and the founder's approval of one exact candidate as if they were the same state. That ambiguity can cause a truthful capability statement such as `merge_authority: true` to decay into an unsafe execution assumption after a review request, green CI, a broad “approved,” or a later base/head movement.
+
+The corrected canon separates the planes. `merge_authority: true` means only that the governed merge capability/authority class exists. Every merge still requires fresh explicit founder approval bound to the exact repository, pull request number, current base SHA, and current head SHA. If that exact approval is absent, ambiguous, or stale, the agent or operator must ask and stop. Review requests, `merge review`, `approved`, `cont`, `continue`, `implement`, mergeability, continuity metadata, or green proof cannot manufacture candidate approval. Any base/head movement invalidates the prior merge approval and requires a new founder decision.
+
+This is an authority-freshness correction, not a relaxation of review or proof. Exact-head evidence still constrains what can be claimed and integrated, while founder approval controls whether the exact candidate may cross the merge boundary. Deployment, publication, billing, secrets, database mutation, deletion, and other consequential classes remain separately gated.
+
 ## Root causes
 
 ### 1. Evidence lifetime was implicit
@@ -149,15 +195,22 @@ truth-sensitive implementation / authority / provider change
 
 The verifier classifies truth-sensitive changed files by domain and requires the relevant current-state docs rather than forcing documentation edits for every test-only change.
 
+Goalfix governance is explicitly part of that classification. Changes to `.ai/skills/goalfix/SKILL.md`, `.claude/skills/goalfix/SKILL.md`, `docs/FOUNDER_ADAPTIVE_KERNEL_V0.md`, `docs/GOALFIX_EXECUTION_WORKFLOW_V2.md`, `docs/CLAUDE_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC.md`, or `docs/PERPLEXITY_MCP_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC.md` must be treated as truth-sensitive because those files can change how future operators select targets, interpret proof, consume founder authority, or report post-merge state.
+
 It also checks cross-document invariants that are easy to regress during fast-moving work, including:
 
 - README does not freeze a manual “Last refreshed” date as current authority;
 - current repository identity is resolved at use time only by separately authorized provider revalidation, while webhook facts remain historical last-observed provenance;
 - FCR merge docs describe the independent-review membrane and server-owned reviewer trust;
 - live GitHub ruleset enforcement stays a separate provider truth;
+- Goalfix carries the verified target branch rather than assuming `main`, authenticates Founder Final through the checked-in authority contract, rereads mutable provider/PR/base/head/diff/check/review state immediately before integration, distinguishes browser Playwright proof from backend/provider evidence, and reports `MERGED_UNVERIFIED` until required runtime proof exists;
+- Claude and Perplexity master execution overlays defer Goalfix execution order to the canonical workflow rather than maintaining weaker parallel loops;
+- the adaptive kernel remains a governance/source contract until runtime/API/UI integration is separately implemented and proven;
 - the founder-content story keeps first-party LinkedIn, provider-neutral n8n, exact Current You authority, provider readback, and Sauce Guard distinct;
 - `.control/capability.json` remains the canonical capability authority while YAML remains a compatibility pointer; and
 - post-merge truth/documentation re-observation exists in the shared AI workflow.
+
+The merge-approval split is also a documentation-truth invariant. A future agent may read `merge_authority: true` only as capability availability; it must never infer current candidate approval. Exact founder approval must be bound to the live repository, PR, base SHA, and head SHA, and any candidate movement makes the prior approval historical rather than reusable authority.
 
 The verifier emits a sanitized `fcr/documentation-truth@v1` receipt with counts, domains, documentation coverage, and failure reasons. It does not store credentials, private proof, raw diffs, private prompts, customer data, private metrics, or provider payloads.
 
@@ -168,6 +221,10 @@ A durable README should not hard-code a “current SHA” and pretend that value
 ### Evidence-authority registration
 
 The Evidence Trust Plane is now explicitly part of Documentation Truth. Changes under `src/evidence/`, the founder-facing `public/control-room/evidence-trust.html`, or its exact-head Playwright workflow are truth-sensitive because they can change what future operators believe evidence may unlock. The documentation gate must therefore fail if those paths move without current documentation and a path-bound receipt.
+
+For cross-repository product-build proof, `.github/workflows/playwright.yml` is part of that same evidence-authority surface. Its StoryEngine federation fixture must preserve the canonical root directive wire shape, require `node-test` and `playwright`, and prove the exact peer runtime identity before and after the browser-governed execution. A source/test change that touches this witness therefore requires current documentation, but documentation cannot promote an unexecuted successor head into browser truth.
+
+The same workflow also contains a privileged post-Deploy production witness. That witness must not execute `workflow_run.head_sha`; it must execute trusted witness source and carry the successful main-bound Deploy run SHA only as release evidence. Separating witness code from observed release identity is part of the evidence-authority contract, because upstream workflow success cannot itself grant executable trust to an arbitrary checkout.
 
 That registration does not mean durable evidence persistence exists. The current Evidence Trust Plane slice defines receipt, validity, and action-ceiling contracts only; `ledgerState` is supplied state until a separately reviewed persistence writer/store exists. Current receipt use must also re-evaluate expiration and bind merge-review preparation to GitHub API evidence for an exact repository, full SHA, workflow, and run identity. Rejected or non-GitHub evidence cannot be relabeled as merge-review-ready merely because readback completed.
 
@@ -314,6 +371,13 @@ The strongest optimization is not faster claiming. It is shortening the distance
 24. Independent green receipts do not compose into production truth unless they bind the same exact candidate and remain current together at the declared use boundary.
 25. A stored `validity: current` flag does not outrank an elapsed `expiresAt`; evidence authority must re-evaluate expiration when the receipt is used.
 26. Readback completion is not the same as a verified verdict, and an unscoped or wrong-authority receipt cannot prepare merge review.
+27. A governance document that changes future agent execution order is truth-sensitive even when no runtime source changes; failing to register it with Documentation Truth is a false green, not a harmless docs-only omission.
+28. A missing GitHub copy of a provider-held Worker runtime secret does not prove the Cloudflare runtime secret is absent; read the provider-held binding plane before making that claim.
+29. A public deployment origin must not be mislabeled as a secret merely because a workflow consumes it; authority classification must follow the sensitivity and mutation boundary of the value.
+30. A predecessor Playwright success cannot prove a cross-repository federation successor after either repository head, peer proof contract, peer runtime identity, or serialized wire shape moves.
+31. A privileged `workflow_run` witness may consume an upstream release SHA as evidence, but it cannot execute that upstream checkout or treat upstream success as executable trust.
+32. A capital decision card, recommendation, score, or HOLD state is evidence interpretation, not financing or execution authority; stale or missing capital evidence must remove derived certainty instead of preserving an earlier recommendation.
+33. `merge_authority: true` cannot be reused as candidate approval; every merge requires a fresh explicit founder decision for the exact live repository/PR/base/head, and candidate movement expires that approval.
 
 ## Rollback
 

@@ -1,0 +1,173 @@
+name: Attack-20 V3
+
+on:
+  pull_request:
+    paths:
+      - .gitignore
+      - '.env*'
+      - '**/.env*'
+      - '.dev.vars*'
+      - '**/.dev.vars*'
+      - security/attack-20-v3.policy.json
+      - security/portfolio-worker-security.json
+      - src/security/attack20V3.ts
+      - src/security/attack20V3.test.ts
+      - src/goalfix/executionWorkflow.ts
+      - src/goalfix/executionWorkflow.test.ts
+      - src/goalfix/executionWorkflow.redteam.test.ts
+      - src/worker/handler.ts
+      - docs/GOALFIX_EXECUTION_WORKFLOW_V2.md
+      - docs/SECRETS.md
+      - docs/FIREWALL_V10.md
+      - scripts/verify-env-contract.mjs
+      - scripts/verify-attack-20-v3.mjs
+      - '.github/workflows/*.yml'
+      - '.github/workflows/*.yaml'
+      - '.github/workflows/**/*.yml'
+      - '.github/workflows/**/*.yaml'
+      - security/firewall-v10.policy.json
+      - scripts/verify-firewall-v10.mjs
+      - test/firewall.product-build.attack10.test.mjs
+      - src/http/routes/productBuild.ts
+      - src/http/server.ts
+      - .security/cookies.json
+      - scripts/verify-cookie-contract.mjs
+      - 'wrangler*.toml'
+  push:
+    branches:
+      - main
+    paths:
+      - .gitignore
+      - '.env*'
+      - '**/.env*'
+      - '.dev.vars*'
+      - '**/.dev.vars*'
+      - security/attack-20-v3.policy.json
+      - security/portfolio-worker-security.json
+      - src/security/attack20V3.ts
+      - src/security/attack20V3.test.ts
+      - src/goalfix/executionWorkflow.ts
+      - src/goalfix/executionWorkflow.test.ts
+      - src/goalfix/executionWorkflow.redteam.test.ts
+      - src/worker/handler.ts
+      - docs/GOALFIX_EXECUTION_WORKFLOW_V2.md
+      - docs/SECRETS.md
+      - docs/FIREWALL_V10.md
+      - scripts/verify-env-contract.mjs
+      - scripts/verify-attack-20-v3.mjs
+      - '.github/workflows/*.yml'
+      - '.github/workflows/*.yaml'
+      - '.github/workflows/**/*.yml'
+      - '.github/workflows/**/*.yaml'
+      - security/firewall-v10.policy.json
+      - scripts/verify-firewall-v10.mjs
+      - test/firewall.product-build.attack10.test.mjs
+      - src/http/routes/productBuild.ts
+      - src/http/server.ts
+      - .security/cookies.json
+      - scripts/verify-cookie-contract.mjs
+      - 'wrangler*.toml'
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  source-contract:
+    name: Source contract and proof bindings
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - name: Checkout exact target
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Verify immutable target
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+
+      - name: Resolve exact live base
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.event.pull_request.base.ref || '' }}
+          PUSH_BEFORE_SHA: ${{ github.event.before || '' }}
+        run: |
+          set -euo pipefail
+
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            test -n "$BASE_REF"
+            live_base_sha="$(git ls-remote --heads origin "refs/heads/${BASE_REF}" | awk 'NR == 1 {print $1}')"
+          else
+            live_base_sha="$PUSH_BEFORE_SHA"
+          fi
+
+          if ! [[ "$live_base_sha" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "Attack-20 base resolution failed: expected an exact live base SHA." >&2
+            exit 1
+          fi
+
+          git fetch --no-tags origin "$live_base_sha"
+          if ! git merge-base --is-ancestor "$live_base_sha" "$EXPECTED_SHA"; then
+            echo "Attack-20 base resolution failed: live base is not an ancestor of the exact candidate." >&2
+            echo "live_base_sha=$live_base_sha" >&2
+            echo "candidate_sha=$EXPECTED_SHA" >&2
+            exit 1
+          fi
+
+          printf 'EXPECTED_BASE_SHA=%s\n' "$live_base_sha" >> "$GITHUB_ENV"
+          printf 'resolved_base_sha=%s\n' "$live_base_sha"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify environment contract
+        run: node scripts/verify-env-contract.mjs
+
+      - name: Verify ATTACK-20 V3 source contract
+        env:
+          GITHUB_SHA: ${{ env.EXPECTED_SHA }}
+        run: node scripts/verify-attack-20-v3.mjs
+
+      - name: Preserve Firewall v10 parent proof
+        env:
+          GITHUB_SHA: ${{ env.EXPECTED_SHA }}
+        run: |
+          node scripts/verify-firewall-v10.mjs
+          node --test test/firewall.product-build.attack10.test.mjs
+
+      - name: Preserve browser-cookie contract boundary
+        run: npm run verify:cookies
+
+      - name: Focused ATTACK-20 and Goalfix workflow tests
+        run: npx vitest run src/security/attack20V3.test.ts src/goalfix/executionWorkflow.test.ts src/goalfix/executionWorkflow.redteam.test.ts
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint touched TypeScript
+        run: npx eslint src/security/attack20V3.ts src/security/attack20V3.test.ts src/goalfix/executionWorkflow.ts src/goalfix/executionWorkflow.test.ts src/goalfix/executionWorkflow.redteam.test.ts --max-warnings 0
+
+      - name: Upload exact-head source proofs
+        uses: actions/upload-artifact@v4
+        with:
+          name: attack-20-v3-source-proof-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            artifacts/attack-20-v3-source-proof.json
+            artifacts/firewall-v10-proof.json
+          if-no-files-found: error
+          retention-days: 30

@@ -10,6 +10,7 @@ const {
   mockGetUser,
   mockRefreshSession,
   supabaseMock,
+  browserSessions,
 } = vi.hoisted(() => ({
   mockSignInWithOAuth: vi.fn(),
   mockSignInWithOtp: vi.fn(),
@@ -18,6 +19,7 @@ const {
   mockGetUser: vi.fn(),
   mockRefreshSession: vi.fn(),
   supabaseMock: { from: vi.fn() },
+  browserSessions: new Map<string, Record<string, unknown>>(),
 }));
 
 vi.mock('../../../lib/supabaseAuthClient.js', () => ({
@@ -48,7 +50,7 @@ import { onboardingRouter } from '../onboarding.js';
 const EMAIL = 'sekretbip@gmail.com';
 const ACCESS_TOKEN = 'access-token-value';
 const REFRESH_TOKEN = 'refresh-token-value';
-const TEST_SIGNING_SECRET = 'founder-session-test-signing-secret-0123456789abcdef';
+const FOUNDER_SESSION_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString('base64url');
 
 function app() {
   const instance = express();
@@ -58,9 +60,59 @@ function app() {
   return instance;
 }
 
+function browserSessionTable() {
+  let operation: 'read' | 'update' = 'read';
+  let updatePayload: Record<string, unknown> = {};
+  let sessionHash = '';
+  let requireUnrevoked = false;
+  let expiresAfter = '';
+  const chain: any = {
+    select: () => chain,
+    eq: (field: string, value: unknown) => {
+      if (field === 'session_id_hash') sessionHash = String(value);
+      return chain;
+    },
+    is: (field: string, value: unknown) => {
+      if (field === 'revoked_at' && value === null) requireUnrevoked = true;
+      return chain;
+    },
+    gt: (field: string, value: unknown) => {
+      if (field === 'expires_at') expiresAfter = String(value);
+      return chain;
+    },
+    insert: async (value: Record<string, unknown>) => {
+      browserSessions.set(String(value.session_id_hash), { ...value, revoked_at: null, revoke_reason: null });
+      return { data: null, error: null };
+    },
+    update: (value: Record<string, unknown>) => {
+      operation = 'update';
+      updatePayload = value;
+      return chain;
+    },
+    maybeSingle: async () => {
+      const row = browserSessions.get(sessionHash) ?? null;
+      if (!row) return { data: null, error: null };
+      if (requireUnrevoked && row.revoked_at != null) return { data: null, error: null };
+      if (expiresAfter && String(row.expires_at ?? '') <= expiresAfter) return { data: null, error: null };
+      return { data: row, error: null };
+    },
+    then: (resolve: (value: unknown) => void, reject: (reason: unknown) => void) => {
+      if (operation === 'update') {
+        const row = browserSessions.get(sessionHash);
+        if (row && (!requireUnrevoked || row.revoked_at == null)) {
+          browserSessions.set(sessionHash, { ...row, ...updatePayload });
+        }
+      }
+      return Promise.resolve({ data: null, error: null }).then(resolve, reject);
+    },
+  };
+  return chain;
+}
+
 function setAllowlist(allowed: boolean) {
   supabaseMock.from.mockImplementation((table: string) => {
-    if (table !== 'founder_users') return {};
+    if (table === 'founder_browser_sessions') return browserSessionTable();
+    if (table !== 'founder_users') throw new Error(`unexpected table: ${table}`);
     return {
       select: () => ({
         eq: () => ({
@@ -85,24 +137,26 @@ function validSession() {
   };
 }
 
-function browserCookie() {
-  let setCookie = '';
+async function browserCookie() {
+  let setCookie: unknown = '';
   const res = {
     setHeader(name: string, value: unknown) {
-      if (name.toLowerCase() === 'set-cookie') setCookie = String(value);
+      if (name.toLowerCase() === 'set-cookie') setCookie = value;
       return res;
     },
   } as unknown as Response;
-  writeFounderSession(res, validSession() as unknown as Session);
-  return setCookie.split(';', 1)[0] ?? '';
+  await writeFounderSession(res, validSession() as unknown as Session);
+  const cookies = Array.isArray(setCookie) ? setCookie.map(String) : [String(setCookie)];
+  return (cookies[0] ?? '').split(';', 1)[0] ?? '';
 }
 
 describe('founder browser onboarding', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    browserSessions.clear();
     vi.stubEnv('NODE_ENV', 'test');
     vi.stubEnv('FOUNDER_API_URL', 'https://control.example.com');
-    vi.stubEnv('FOUNDER_SESSION_SIGNING_SECRET', TEST_SIGNING_SECRET);
+    vi.stubEnv('FOUNDER_SESSION_ENCRYPTION_KEY', FOUNDER_SESSION_ENCRYPTION_KEY);
     setAllowlist(true);
     mockSignInWithOAuth.mockResolvedValue({
       data: { provider: 'google', url: 'https://supabase.example/authorize/google' },
@@ -190,7 +244,7 @@ describe('founder browser onboarding', () => {
     expect(mockSignInWithOtp).not.toHaveBeenCalled();
   });
 
-  it('verifies fragment credentials and establishes one strict secure HttpOnly session cookie', async () => {
+  it('verifies fragment credentials and establishes one strict opaque secure HttpOnly session cookie', async () => {
     mockSetSession.mockResolvedValue({
       data: { session: validSession(), user: { id: 'founder-user', email: EMAIL } },
       error: null,
@@ -207,15 +261,18 @@ describe('founder browser onboarding', () => {
       meta: {},
     });
     const cookie = response.headers['set-cookie']?.[0] ?? '';
-    expect(cookie).toContain('fcr_session=');
+    expect(cookie).toContain('__Host-fcr_session=');
     expect(cookie).toContain('HttpOnly');
     expect(cookie).toContain('SameSite=Strict');
     expect(cookie).toContain('Secure');
     expect(cookie).not.toContain(ACCESS_TOKEN);
+    expect(cookie).not.toContain(REFRESH_TOKEN);
     expect(response.headers['cache-control']).toBe('private, no-store');
+    expect(browserSessions.size).toBe(1);
   });
 
-  it('rejects a valid Supabase session when the email is not allowlisted', async () => {
+  it('rejects a valid Supabase session when the email is not allowlisted without erasing the existing founder capability', async () => {
+    const existingCookie = await browserCookie();
     setAllowlist(false);
     mockSetSession.mockResolvedValue({
       data: { session: validSession(), user: { id: 'outsider', email: 'outsider@example.com' } },
@@ -224,18 +281,19 @@ describe('founder browser onboarding', () => {
 
     const response = await request(app())
       .post('/auth/session')
+      .set('Cookie', existingCookie)
       .send({ access_token: ACCESS_TOKEN, refresh_token: REFRESH_TOKEN });
 
     expect(response.status).toBe(403);
     expect(response.body.error.code).toBe('FORBIDDEN');
-    expect(response.headers['set-cookie']?.[0]).toContain('Max-Age=0');
+    expect(response.headers['set-cookie']).toBeUndefined();
     expect(response.headers['cache-control']).toBe('private, no-store');
   });
 
-  it('authenticates browser requests from the HttpOnly session cookie', async () => {
+  it('authenticates browser requests by resolving the opaque capability server-side', async () => {
     const response = await request(app())
       .get('/auth/me')
-      .set('Cookie', browserCookie());
+      .set('Cookie', await browserCookie());
 
     expect(response.status).toBe(200);
     expect(response.body.data.founder).toEqual({ email: EMAIL, userId: 'founder-user' });

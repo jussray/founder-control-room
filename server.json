@@ -1,0 +1,17 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.jussray/founder-control-room",
+  "title": "Founder Control Room",
+  "description": "Governed founder operations and repository evidence MCP with scoped project access, read-only capability inspection, repository auditing, and evidence receipts.",
+  "version": "0.2.0",
+  "repository": {
+    "url": "https://github.com/jussray/founder-control-room",
+    "source": "github"
+  },
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://api.foundercontrolroom.org/mcp"
+    }
+  ]
+}

@@ -60,11 +60,26 @@ export interface VerificationSignal {
   status: VerificationSignalStatus;
   commitSha: string;
   provider: string;
+  /** Full provider-backed evidence identity when the host exposes one (GitHub Check Run external_id). */
+  evidenceFingerprint?: string;
   /** Optional because not every provider exposes an issuer. Authority gates must fail closed when issuer identity is required. */
   issuer?: VerificationSignalIssuer;
   startedAt?: string;
   completedAt?: string;
   detailsUrl?: string;
+}
+
+/**
+ * Narrow provider write used only to publish one already-produced deterministic
+ * review witness. It is intentionally not a generic "create check" surface:
+ * the exact head, derived signal name, full review hash, and bounded summary
+ * must all survive provider validation before a host mutation is attempted.
+ */
+export interface DeterministicReviewWitnessPublication {
+  headSha: string;
+  name: string;
+  reviewHash: string;
+  summary: string;
 }
 
 export type ReviewSignalState =
@@ -222,6 +237,16 @@ export interface RepositoryProvider {
 
   /** Returns provider CI/check evidence for the exact ref/commit. */
   listVerificationSignals(projectId: string, ref: string): Promise<VerificationSignal[]>;
+
+  /**
+   * Publishes one deterministic-review verification witness. Optional because
+   * not every provider can mint a provider-backed App check. Review issuance
+   * must fail closed when this capability is unavailable.
+   */
+  publishDeterministicReviewWitness?(
+    projectId: string,
+    publication: DeterministicReviewWitnessPublication,
+  ): Promise<void>;
 
   /**
    * Returns provider-recorded pull-request review events. Optional because

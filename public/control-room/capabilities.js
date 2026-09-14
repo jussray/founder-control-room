@@ -60,6 +60,7 @@ function render() {
       <header class="workbench-header">
         <a href="/control-room/" class="brand">Founder Control Room</a>
         <span>Capabilities Workbench</span>
+        <a href="/control-room/capital-decision.html">Capital Decision</a>
         <a href="/guardrails" class="guardrail-link">Guardrails</a>
       </header>
       <section class="search-area" aria-label="Capability search">

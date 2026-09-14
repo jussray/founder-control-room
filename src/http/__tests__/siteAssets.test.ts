@@ -24,14 +24,31 @@ describe('Founder Control Room Cloudflare topology', () => {
     expect(buildScript).toContain("'portable-founder-console/index.html'");
   });
 
-  it('provides a root front door into the founder-authenticated app', () => {
+  it('provides a five-screen public front door into the founder-authenticated app', () => {
     const landing = read('public/index.html');
     const app = read('public/control-room/index.html');
+    const bootstrap = read('public/control-room/opaque-session-bootstrap.js');
 
-    expect(landing).toContain('href="/control-room/"');
-    expect(landing).toContain('The four jobs');
-    expect(landing).toContain('View safety boundary');
-    expect(app).toContain('src="/control-room/app.js"');
+    expect(landing).toContain('<link rel="canonical" href="https://www.foundercontrolroom.org/" />');
+    expect(landing).toContain('href="https://www.foundercontrolroom.org/control-room/"');
+    expect(landing).toContain('href="https://www.foundercontrolroom.org/guardrails"');
+    expect(landing).not.toContain('href="/control-room/"');
+    expect(landing).toContain('data-bottom-nav="five-screen"');
+    for (const screen of ['home', 'control-room', 'chief', 'promptos', 'proof']) {
+      expect(landing).toContain(`data-public-screen="${screen}"`);
+      expect(landing).toContain(`data-nav-screen="${screen}"`);
+    }
+    expect(landing).toContain('Chief turns founder intent into governed execution.');
+    expect(landing).toContain('PromptOS is an intention compiler.');
+    expect(landing).toContain('Private projects, approvals, credentials, and operating evidence stay behind founder authentication.');
+    expect(app).toContain('src="/control-room/opaque-session-bootstrap.js"');
+    expect(app).not.toContain('src="/control-room/app.js"');
+    expect(bootstrap).toContain("await import('/control-room/app.js')");
+    expect(bootstrap).toContain("fetch('/auth/me'");
+    expect(bootstrap).toContain("credentials: 'same-origin'");
+    expect(bootstrap).toContain("sessionStorage.removeItem(LEGACY_SESSION_KEY)");
+    expect(bootstrap).not.toMatch(/sessionStorage\.setItem\([^\n]*(?:access_token|refresh_token)/i);
+    expect(bootstrap).not.toMatch(/JSON\.stringify\([^\n]*(?:access_token|refresh_token)/i);
     expect(existsSync(resolve(repoRoot, 'public/portable-founder-console/index.html'))).toBe(true);
   });
 
@@ -91,6 +108,7 @@ describe('Founder Control Room Cloudflare topology', () => {
     expect(playwrightProof).toContain("'content-manager-mobile.png'");
     expect(playwrightProof).toContain('page must not overflow the mobile viewport');
     expect(playwrightProof).toContain('capability must not be presented as an already-authorized publish control');
+    expect(playwrightProof).toContain('approved post may expose publish gate without being authorized to execute it');
   });
 
   it('keeps browser API calls same-origin and binds them directly to the API Worker', () => {

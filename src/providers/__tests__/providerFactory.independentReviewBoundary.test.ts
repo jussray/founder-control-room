@@ -32,7 +32,7 @@ vi.mock("../GitLabProvider.js", () => ({
   },
 }));
 
-const { providerForProject } = await import("../providerFactory.js");
+const { providerConfigurationError, providerForProject } = await import("../providerFactory.js");
 
 const BASE_SHA = "a".repeat(40);
 const HEAD_SHA = "b".repeat(40);
@@ -71,6 +71,8 @@ describe("LazyRepositoryProvider independent-review boundary", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.stubEnv("GITHUB_TOKEN", "test-token");
+    vi.stubEnv("GITHUB_APP_ID", "");
+    vi.stubEnv("GITHUB_PRIVATE_KEY", "");
     mockGetPullRequestReviewContext.mockResolvedValue(reviewContext);
     mockListReviewSignals.mockResolvedValue([{ id: "review-1" }]);
     mockResolveRef.mockImplementation(async (_projectId: string, ref: string) =>
@@ -92,6 +94,24 @@ describe("LazyRepositoryProvider independent-review boundary", () => {
 
     expect(mockGetPullRequestReviewContext).toHaveBeenCalledWith("founder-control-room", 474);
     expect(mockListReviewSignals).toHaveBeenCalledWith("founder-control-room", 474);
+  });
+
+  it("does not expose deterministic witness authority through the GITHUB_TOKEN fallback", async () => {
+    const provider = providerForProject(FCR_PROJECT);
+
+    await expect(provider.publishDeterministicReviewWitness!("founder-control-room", {
+      headSha: HEAD_SHA,
+      name: "Independent Review / fcr-deterministic-review-v1 / abcdef123456",
+      reviewHash: "d".repeat(64),
+      summary: "must not publish with fallback token authority",
+    })).rejects.toThrow(/requires GitHub App authority/i);
+  });
+
+  it.each([
+    { GITHUB_TOKEN: "test-token", GITHUB_APP_ID: "12345", GITHUB_PRIVATE_KEY: "" },
+    { GITHUB_TOKEN: "test-token", GITHUB_APP_ID: "", GITHUB_PRIVATE_KEY: "private-key" },
+  ])("rejects partial GitHub App credentials even when a fallback token exists", (env) => {
+    expect(providerConfigurationError(FCR_PROJECT, env)).toMatch(/GitHub App authentication is incomplete/i);
   });
 
   it("canonicalizes an alias of the FCR repository before review and integration authority", async () => {

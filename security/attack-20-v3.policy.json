@@ -1,0 +1,105 @@
+{
+  "schema": "founder-control-room/attack-20-v3-policy@v1",
+  "suiteVersion": "attack-20-v3",
+  "status": "DESIGNED_UNVERIFIED",
+  "lineage": {
+    "parent": "Founder Firewall v10",
+    "parentPolicy": "security/firewall-v10.policy.json",
+    "strategicContract": "juss-v10/strategic-security@v1"
+  },
+  "layers": {
+    "A01-A07": "NETWORK_INGRESS",
+    "A08-A09": "IDENTITY",
+    "A10-A14": "APPLICATION_DATA",
+    "A15-A17": "AUTHORITY_EXECUTION",
+    "A18-A19": "RUNTIME_TRUTH",
+    "A20": "FRESHNESS"
+  },
+  "anchors": {
+    "A07": "alternate-ingress-bypass",
+    "A10": "webhook-forgery-replay",
+    "A11": "bola",
+    "A12": "bopla-mass-assignment",
+    "A15": "self-approval-authority-scope-escalation",
+    "A18": "provider-runtime-false-success",
+    "A19": "independent-observability-witness",
+    "A20": "dependency-fingerprint-freshness"
+  },
+  "statusSemantics": {
+    "FAILED": "A required protection is absent, a required policy is missing, or a bypass demonstrably reaches prohibited behavior.",
+    "UNVERIFIED": "A surface or policy cannot be observed, telemetry or evidence is absent, a receipt is stale, or a required test has not executed.",
+    "PASS": "Every applicable control has fresh correlated proof for the exact deployed runtime and policy graph."
+  },
+  "applicabilityStates": [
+    "PASS_REQUIRED",
+    "NOT_APPLICABLE",
+    "BLOCKED_BY_DISCOVERY"
+  ],
+  "fingerprintClasses": [
+    "sourceSha",
+    "runtime",
+    "ingress",
+    "routes",
+    "access",
+    "waf",
+    "rateLimit",
+    "schema",
+    "bindings",
+    "rls",
+    "authority",
+    "provider",
+    "fixture",
+    "evidenceBundle"
+  ],
+  "cookieContextTypes": [
+    "founder-session",
+    "builder-run",
+    "verification-run",
+    "provider-run",
+    "exception-review"
+  ],
+  "cookieSemanticBoundary": {
+    "meaning": "Declared proof provenance and continuity metadata only.",
+    "not": [
+      "HTTP/browser cookie",
+      "authentication token",
+      "credential or secret",
+      "user-tracking identifier"
+    ]
+  },
+  "invariants": {
+    "noAveraging": true,
+    "noPortfolioInheritance": true,
+    "noSimulatedOnlyPassForConsequentialControls": true,
+    "noSelfCertificationOfAuthority": true,
+    "noStaleGreen": true,
+    "notApplicableRequiresCapabilityAbsenceEvidence": true,
+    "unknownTelemetryResolvesUnverified": true,
+    "independentWitnessRequiredForA19": true,
+    "cookieCarriesNoRawSecret": true,
+    "fingerprintCarriesNoRawSecret": true,
+    "serviceOnlyWorkersPreferBindings": true
+  },
+  "attacks": [
+    { "id": "A01", "layer": "NETWORK_INGRESS", "name": "unknown-route-enumeration" },
+    { "id": "A02", "layer": "NETWORK_INGRESS", "name": "method-confusion" },
+    { "id": "A03", "layer": "NETWORK_INGRESS", "name": "payload-abuse" },
+    { "id": "A04", "layer": "NETWORK_INGRESS", "name": "schema-enforcement" },
+    { "id": "A05", "layer": "NETWORK_INGRESS", "name": "rate-resource-pressure" },
+    { "id": "A06", "layer": "NETWORK_INGRESS", "name": "bot-scanner-protocol-anomaly" },
+    { "id": "A07", "layer": "NETWORK_INGRESS", "name": "alternate-ingress-bypass" },
+    { "id": "A08", "layer": "IDENTITY", "name": "invalid-user-credential" },
+    { "id": "A09", "layer": "IDENTITY", "name": "invalid-service-identity" },
+    { "id": "A10", "layer": "APPLICATION_DATA", "name": "webhook-forgery-replay" },
+    { "id": "A11", "layer": "APPLICATION_DATA", "name": "bola" },
+    { "id": "A12", "layer": "APPLICATION_DATA", "name": "bopla-mass-assignment" },
+    { "id": "A13", "layer": "APPLICATION_DATA", "name": "business-flow-abuse" },
+    { "id": "A14", "layer": "APPLICATION_DATA", "name": "supabase-rls-bypass" },
+    { "id": "A15", "layer": "AUTHORITY_EXECUTION", "name": "self-approval-scope-escalation" },
+    { "id": "A16", "layer": "AUTHORITY_EXECUTION", "name": "stale-authority-replay" },
+    { "id": "A17", "layer": "AUTHORITY_EXECUTION", "name": "duplicate-reordered-execution" },
+    { "id": "A18", "layer": "RUNTIME_TRUTH", "name": "provider-runtime-false-success" },
+    { "id": "A19", "layer": "RUNTIME_TRUTH", "name": "observability-failure" },
+    { "id": "A20", "layer": "FRESHNESS", "name": "dependency-fingerprint-freshness" }
+  ]
+}

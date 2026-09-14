@@ -5,9 +5,12 @@ on:
     paths:
       - security/firewall-v10.policy.json
       - scripts/verify-firewall-v10.mjs
+      - test/firewall.product-build.attack10.test.mjs
+      - docs/FIREWALL_V10.md
       - .github/workflows/firewall-v10.yml
       - src/http/server.ts
       - src/http/routes/n8nConveyor.ts
+      - src/http/routes/productBuild.ts
       - src/http/middleware/requireFounder.ts
       - src/http/middleware/csrf.ts
       - src/http/middleware/security.ts
@@ -17,9 +20,12 @@ on:
     paths:
       - security/firewall-v10.policy.json
       - scripts/verify-firewall-v10.mjs
+      - test/firewall.product-build.attack10.test.mjs
+      - docs/FIREWALL_V10.md
       - .github/workflows/firewall-v10.yml
       - src/http/server.ts
       - src/http/routes/n8nConveyor.ts
+      - src/http/routes/productBuild.ts
       - src/http/middleware/requireFounder.ts
       - src/http/middleware/csrf.ts
       - src/http/middleware/security.ts
@@ -54,7 +60,12 @@ jobs:
           node-version: '24'
 
       - name: Verify policy-as-code against runtime bindings
+        env:
+          GITHUB_SHA: ${{ env.EXPECTED_SHA }}
         run: node scripts/verify-firewall-v10.mjs
+
+      - name: Attack product-build firewall ten ways
+        run: node --test test/firewall.product-build.attack10.test.mjs
 
       - name: Upload exact-head firewall proof
         uses: actions/upload-artifact@v4

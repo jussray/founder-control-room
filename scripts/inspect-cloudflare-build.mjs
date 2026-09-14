@@ -50,6 +50,17 @@ function isNonPromotingDeployCommand(command) {
   return /\bwrangler\s+versions\s+upload\b/i.test(String(command ?? ""));
 }
 
+function normalizeDeployCommand(command) {
+  return String(command ?? "").trim().replace(/\s+/g, " ");
+}
+
+function matchesDesiredDeployCommand(command, policy) {
+  return (
+    normalizeDeployCommand(command) ===
+    normalizeDeployCommand(policy?.currentDesiredDeployCommand)
+  );
+}
+
 async function loadAuthorityPolicy(path) {
   const raw = await readFile(path, "utf8");
   const policy = JSON.parse(raw);
@@ -332,6 +343,7 @@ const receipt = {
     state: "unknown",
     activeTriggerCount: null,
     promotingTriggerCount: null,
+    desiredDeployCommandMatched: null,
     triggers: [],
   },
   truthLanes: {
@@ -381,7 +393,7 @@ const receipt = {
   error: null,
 };
 
-function applyAuthorityPolicy(observedState) {
+function applyAuthorityPolicy(observedState, desiredDeployCommandMatched = true) {
   receipt.truthLanes.observed.state = observedState;
   receipt.analytics.observedMode = observedState;
 
@@ -389,7 +401,9 @@ function applyAuthorityPolicy(observedState) {
 
   const safetySatisfied = authorityPolicy.allowedSafeStates.includes(observedState);
   const currentPreferenceMatched =
-    safetySatisfied && observedState === authorityPolicy.currentDesiredState;
+    safetySatisfied &&
+    observedState === authorityPolicy.currentDesiredState &&
+    (observedState !== "non-promoting" || desiredDeployCommandMatched);
   const driftClass = !safetySatisfied
     ? "unsafe"
     : currentPreferenceMatched
@@ -526,11 +540,19 @@ try {
                 trigger.canTargetProductionBranch &&
                 !trigger.nonPromotingDeployCommand,
             );
+            const desiredDeployCommandMatched = sanitizedTriggers.some(
+              (trigger) =>
+                trigger.canTargetProductionBranch &&
+                trigger.nonPromotingDeployCommand &&
+                matchesDesiredDeployCommand(trigger.deployCommand, authorityPolicy),
+            );
 
             receipt.workerGitAuthority.activeTriggerCount =
               sanitizedTriggers.length;
             receipt.workerGitAuthority.promotingTriggerCount =
               promotingTriggers.length;
+            receipt.workerGitAuthority.desiredDeployCommandMatched =
+              desiredDeployCommandMatched;
             receipt.workerGitAuthority.triggers = sanitizedTriggers;
 
             if (sanitizedTriggers.length === 0) {
@@ -541,13 +563,21 @@ try {
               );
             } else if (promotingTriggers.length === 0) {
               receipt.workerGitAuthority.state = "non-promoting";
-              applyAuthorityPolicy("non-promoting");
+              applyAuthorityPolicy(
+                "non-promoting",
+                desiredDeployCommandMatched,
+              );
+              if (!desiredDeployCommandMatched) {
+                fail(
+                  `WORKER_GIT_DESIRED_DEPLOY_COMMAND_DRIFT: active Worker Git is non-promoting but does not use the current desired deploy command "${authorityPolicy.currentDesiredDeployCommand}".`,
+                );
+              }
             } else {
               receipt.workerGitAuthority.state =
                 "automatic-production-deploy-conflict";
               applyAuthorityPolicy("automatic-production-deploy-conflict");
               fail(
-                `WORKER_GIT_AUTO_DEPLOY_AUTHORITY_CONFLICT: found ${promotingTriggers.length} active Worker Git trigger(s) that can promote production. Current desired topology keeps Worker Git connected but non-promoting with "wrangler versions upload"; production promotion remains a separately approved GitHub manual deploy.`,
+                `WORKER_GIT_AUTO_DEPLOY_AUTHORITY_CONFLICT: found ${promotingTriggers.length} active Worker Git trigger(s) that can promote production. Current desired topology keeps Worker Git connected but non-promoting with "${authorityPolicy.currentDesiredDeployCommand}"; production promotion remains a separately approved GitHub manual deploy.`,
               );
             }
           }

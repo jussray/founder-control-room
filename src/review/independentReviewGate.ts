@@ -305,7 +305,11 @@ function isMatchingDeterministicWitness(
     && signal.status === "passed"
     && lower(signal.commitSha) === lower(review.headSha)
     && (expectedIssuerId === undefined
-      || (signal.issuer?.kind === "app" && signal.issuer.id === expectedIssuerId));
+      || (
+        signal.issuer?.kind === "app"
+        && signal.issuer.id === expectedIssuerId
+        && lower(signal.evidenceFingerprint) === lower(review.reviewHash)
+      ));
 }
 
 function expectedSemanticReviewState(review: IndependentReviewReceipt): ReviewSignal["state"] {
@@ -454,7 +458,7 @@ export async function evaluateIndependentReviewGate(
         review.reviewer.kind === "semantic"
           ? `Missing current exact-head provider PR-review witness for ${review.reviewer.id}`
           : founderFinalMode && lower(context.repository) === FCR_REPOSITORY
-            ? `Missing passed exact-head deterministic witness from trusted GitHub App issuer for ${review.reviewer.id}`
+            ? `Missing passed exact-head deterministic witness with full receipt fingerprint from trusted GitHub App issuer for ${review.reviewer.id}`
             : `Missing passed exact-head deterministic witness for ${review.reviewer.id}`,
       );
       continue;

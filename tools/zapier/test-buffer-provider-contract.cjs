@@ -5,6 +5,7 @@ const { readFileSync } = require('node:fs');
 const { join, resolve } = require('node:path');
 const {
   validateBufferPublishInput,
+  validateBufferProviderActionContract,
   BUFFER_PROVIDER_ACTION,
   BUFFER_PROVIDER_METHOD,
   BUFFER_API_SHARING_MODE,
@@ -13,73 +14,80 @@ const {
   BUFFER_SCHEDULE_POLICY_ID,
   BUFFER_AUTHORIZATION_MODE,
   BUFFER_NOTIFICATION_MODE,
-  MAX_STEERING_GRANT_ID_LENGTH,
-  MAX_AUTHORIZATION_RECEIPT_LENGTH,
 } = require('./buffer-content-firewall.cjs');
 
 const ROOT = resolve(__dirname, '../..');
 const contract = JSON.parse(readFileSync(join(ROOT, 'config', 'buffer-provider-contract.json'), 'utf8'));
 
-assert.equal(contract.version, 2);
-assert.equal(contract.status, 'implemented-awaiting-live-provider-and-ingress-proof');
+assert.equal(contract.version, 3);
+assert.equal(contract.status, 'draft-only-source-enforced-awaiting-live-drafts-proof');
 assert.equal(contract.provider, 'buffer');
 assert.equal(contract.zapier.action, BUFFER_PROVIDER_ACTION);
 assert.equal(contract.zapier.requiredMethod, BUFFER_PROVIDER_METHOD);
-assert.deepEqual(contract.zapier.allowedMethods, [BUFFER_PROVIDER_METHOD]);
+assert.equal(contract.zapier.requiredMethod, 'draft');
+assert.deepEqual(contract.zapier.allowedMethods, ['draft']);
+assert.equal(contract.zapier.mappingComment, 'method: draft # required; never rely on Buffer default');
 assert.equal(contract.api.mutation, 'createPost');
 assert.equal(contract.api.required.sharingMode, BUFFER_API_SHARING_MODE);
-assert.equal(contract.api.required.sharingMode, 'customScheduled');
-assert.equal(contract.api.required.dueAtSource, 'scheduled_at');
+assert.equal(contract.api.required.sharingMode, 'addToQueue');
+assert.equal(contract.api.required.dueAtSource, null);
 assert.equal(contract.api.required.saveToDraft, BUFFER_API_SAVE_TO_DRAFT);
+assert.equal(contract.api.required.saveToDraft, true);
 assert.equal(contract.reviewWindow.minutes, BUFFER_REVIEW_WINDOW_MINUTES);
+assert.equal(contract.reviewWindow.minutes, 0);
+assert.equal(contract.reviewWindow.fireTimeOwnedByFirewall, false);
+assert.equal(contract.reviewWindow.noReplyBehavior, 'remain_draft_until_explicit_founder_action');
 assert.equal(contract.reviewWindow.shareNowAllowed, false);
-assert.equal(contract.notification.provider, 'gmail');
-assert.equal(contract.notification.required, true);
-assert.equal(contract.notification.failurePolicy, 'cancel_scheduled_batch');
-assert.ok(contract.notification.requiredFields.includes('reply_context_id'));
-assert.ok(contract.notification.requiredFields.includes('gmail_thread_id'));
-assert.deepEqual(contract.notification.replyAuthorizationFields, [
-  'founder_sender',
-  'reply_to',
-  'reply_context_id',
-  'review_token',
-  'review_deadline',
-]);
-assert.deepEqual(contract.notification.evidenceOnlyFields, ['gmail_thread_id']);
-assert.equal(contract.notification.replyIdentityPolicy, 'exact_founder_sender_private_recipient_and_uuid_review_context');
-assert.equal(contract.notification.replyParsingPolicy, 'exactly_one_unquoted_command_on_first_nonempty_line');
-assert.equal(contract.notification.ambiguousReplyPolicy, 'reject_multiple_unquoted_command_lines');
-assert.equal(contract.notification.replyIngress.requiredLatencyClass, 'instant_private_ingress');
-assert.equal(contract.notification.replyIngress.gmailPollingAllowed, false);
-assert.equal(contract.notification.replyIngress.preferredImplementation, 'cloudflare_email_routing_worker');
-assert.equal(contract.authority.publishAllowed, true);
+assert.equal(contract.notification.required, false);
+assert.equal(contract.notification.failurePolicy, 'retain_draft');
+assert.equal(contract.authority.publishAllowed, false);
 assert.equal(contract.authority.schedulePolicyId, BUFFER_SCHEDULE_POLICY_ID);
-assert.equal(contract.authority.requiredAuthorizationMode, BUFFER_AUTHORIZATION_MODE);
-assert.equal(contract.authority.requiresRuntimeMintedReceipt, true);
-assert.equal(contract.authority.receiptPurpose, 'exact runtime correlation');
-assert.equal(contract.authority.maximumGrantIdLength, MAX_STEERING_GRANT_ID_LENGTH);
-assert.equal(contract.authority.maximumReceiptLength, MAX_AUTHORIZATION_RECEIPT_LENGTH);
 assert.equal(contract.authority.liveProviderMutationIncluded, false);
-assert.equal(contract.activationGates.freeTwoStepZapAloneSufficient, false);
-assert.equal(contract.activationGates.gmailPollingTriggerAcceptedForDeadlineCommands, false);
-assert.equal(contract.activationGates.controlledSyntheticRunRequired, true);
+
+assert.deepEqual(
+  validateBufferProviderActionContract({
+    action: 'buffer_add_to_queue',
+    method: 'draft',
+  }),
+  {
+    buffer_action: 'buffer_add_to_queue',
+    buffer_method: 'draft',
+  },
+);
+
+for (const method of [undefined, '', 'queue', 'schedule', 'share_next', 'share_now', 'schedule_draft', 'publish', 'future_unknown']) {
+  assert.throws(
+    () => validateBufferProviderActionContract({
+      action: 'buffer_add_to_queue',
+      method,
+    }),
+    /method must be draft/,
+    `${String(method)} must fail closed for buffer_add_to_queue`,
+  );
+}
+
+assert.throws(
+  () => validateBufferProviderActionContract({ method: 'draft' }),
+  /action must be buffer_add_to_queue/,
+  'missing action must fail closed',
+);
 
 const baseInput = {
   post_text: [
-    'The repository now computes a Buffer schedule exactly twenty minutes after verified content generation.',
-    'A required Gmail digest exposes each caption, channel, fire time, and cancellation path before the posts can fire.',
-    'Proof: https://github.com/jussray/founder-control-room/pull/222',
+    'The repository now forces Buffer handoffs into a draft that cannot publish on its own.',
+    'A human must explicitly move the draft forward after review.',
+    'Proof: https://github.com/jussray/founder-control-room/pull/570',
   ].join('\n\n'),
   content_field: 'linkedin_draft',
   channel: 'juss_rayy_linkedin',
-  destination_mode: 'schedule',
-  publish_allowed: true,
-  proof_url: 'https://github.com/jussray/founder-control-room/pull/222',
+  destination_mode: 'draft',
+  publish_allowed: false,
+  proof_url: 'https://github.com/jussray/founder-control-room/pull/570',
   source_commit_sha: '38d8e5bd40594915407126915177f98c6ef983d9',
-  generated_at: '2026-08-02T21:00:00.000Z',
+  generated_at: '2026-08-27T06:00:00.000Z',
   invocation_id: '3f10e0f9-b0b4-4e64-b9ff-c5f10f848067',
-  steering_grant_id: 'founder-approved-auto-distribution-v1',
-  founder_approval_id: 'standing-policy:founder-approved-auto-distribution-v1:3f10e0f9-b0b4-4e64-b9ff-c5f10f848067',
+  steering_grant_id: 'founder-draft-review-v1',
+  founder_approval_id: 'standing-policy:founder-draft-review-v1:3f10e0f9-b0b4-4e64-b9ff-c5f10f848067',
   authorization_mode: BUFFER_AUTHORIZATION_MODE,
   batch_id: '66cf315f-e1a0-4aad-9c76-355f1df30b54',
   batch_size: 1,
@@ -87,70 +95,57 @@ const baseInput = {
   schedule_policy_id: BUFFER_SCHEDULE_POLICY_ID,
   notification_mode: BUFFER_NOTIFICATION_MODE,
   linkedin_rising_floor_ready: true,
-  linkedin_baseline_ref: 'linkedin-export:2026-08-02..2026-08-08',
-  linkedin_growth_hypothesis: 'Preserve proof-first resonance while testing for stronger distribution and business relevance.',
-  linkedin_24h_gate: 'Compare 24-hour reach, engagement quality, and warm conversation conversion to the verified prior floor.',
-  linkedin_48h_gate: 'Compare 48-hour impressions, engagement rate, quality comments, and profile or follower conversion.',
-  linkedin_next_mutation: 'Carry the winning hook, proof mechanic, format, visual, or conversion behavior into the next post.',
+  linkedin_baseline_ref: 'linkedin-export:2026-08-20..2026-08-26',
+  linkedin_growth_hypothesis: 'Preserve proof-first resonance while testing stronger founder clarity.',
+  linkedin_24h_gate: 'Compare reach, engagement quality, and warm conversation conversion to the prior floor.',
+  linkedin_48h_gate: 'Compare impressions, engagement quality, profile movement, and useful replies.',
+  linkedin_next_mutation: 'Carry the strongest hook and proof mechanic into the next reviewed draft.',
 };
 
-const nowMs = Date.parse('2026-08-02T21:00:30.000Z');
+const nowMs = Date.parse('2026-08-27T06:00:30.000Z');
 const prepared = validateBufferPublishInput(baseInput, { nowMs });
 assert.equal(prepared.buffer_action, contract.zapier.action);
-assert.equal(prepared.buffer_method, contract.zapier.requiredMethod);
-assert.equal(prepared.buffer_api_sharing_mode, contract.api.required.sharingMode);
-assert.equal(prepared.buffer_api_due_at, prepared.scheduled_at);
-assert.equal(prepared.buffer_save_to_draft, contract.api.required.saveToDraft);
-assert.equal(prepared.destination_mode, 'schedule');
-assert.equal(prepared.publish_allowed, true);
-assert.equal(prepared.review_window_minutes, contract.reviewWindow.minutes);
-assert.equal(prepared.notification_mode, BUFFER_NOTIFICATION_MODE);
-assert.equal(prepared.authorization_receipt_verified, true);
-assert.equal(prepared.linkedin_rising_floor_ready, true);
-assert.equal(prepared.linkedin_baseline_ref, baseInput.linkedin_baseline_ref);
+assert.equal(prepared.buffer_method, 'draft');
+assert.equal(prepared.buffer_save_to_draft, true);
+assert.equal(prepared.buffer_api_sharing_mode, 'addToQueue');
+assert.equal(prepared.buffer_api_due_at, null);
+assert.equal(prepared.destination_mode, 'draft');
+assert.equal(prepared.publish_allowed, false);
+assert.equal(prepared.scheduled_at, null);
+assert.equal(prepared.review_deadline, null);
+assert.equal(prepared.review_state, 'draft_pending_founder_review');
+assert.equal(prepared.notification_required, false);
+assert.equal(prepared.share_now_allowed, false);
 
-for (const destinationMode of contract.zapier.rejectedMethods) {
+for (const destinationMode of ['queue', 'schedule', 'share_next', 'share_now', 'schedule_draft', 'publish', 'future_unknown', '']) {
   assert.throws(
     () => validateBufferPublishInput({ ...baseInput, destination_mode: destinationMode }, { nowMs }),
-    /destination_mode must be schedule/,
-    `${destinationMode} must fail closed in executable code`,
+    /destination_mode must be draft/,
+    `${destinationMode || '<missing>'} destination must fail closed`,
   );
 }
 
-assert.throws(
-  () => validateBufferPublishInput({ ...baseInput, destination_mode: '' }, { nowMs }),
-  /destination_mode must be schedule/,
-);
-
-assert.throws(
-  () => validateBufferPublishInput({ ...baseInput, publish_allowed: false }, { nowMs }),
-  /publish_allowed must be true/,
-);
-
-assert.throws(
-  () => validateBufferPublishInput({ ...baseInput, founder_approval_id: 'standing-policy:wrong:receipt' }, { nowMs }),
-  /runtime-minted receipt/,
-);
-
-assert.throws(
-  () => validateBufferPublishInput({ ...baseInput, linkedin_rising_floor_ready: false }, { nowMs }),
-  /linkedin_rising_floor_ready must be true/,
-);
+for (const publishAllowed of [true, 'true', undefined, null, '']) {
+  assert.throws(
+    () => validateBufferPublishInput({ ...baseInput, publish_allowed: publishAllowed }, { nowMs }),
+    /publish_allowed must be explicitly false/,
+  );
+}
 
 const callerOverride = validateBufferPublishInput({
   ...baseInput,
   method: 'share_now',
   buffer_method: 'share_now',
-  saveToDraft: true,
-  buffer_save_to_draft: true,
+  saveToDraft: false,
+  buffer_save_to_draft: false,
   buffer_api_sharing_mode: 'shareNow',
-  buffer_api_due_at: '2026-08-02T21:00:31.000Z',
-  scheduled_at: '2026-08-02T21:00:31.000Z',
+  buffer_api_due_at: '2026-08-27T06:01:00.000Z',
+  scheduled_at: '2026-08-27T06:01:00.000Z',
 }, { nowMs });
-assert.equal(callerOverride.buffer_method, 'schedule');
-assert.equal(callerOverride.buffer_api_sharing_mode, 'customScheduled');
-assert.equal(callerOverride.buffer_api_due_at, '2026-08-02T21:20:00.000Z');
-assert.equal(callerOverride.buffer_save_to_draft, false);
-assert.equal(callerOverride.scheduled_at, '2026-08-02T21:20:00.000Z');
+assert.equal(callerOverride.buffer_method, 'draft');
+assert.equal(callerOverride.buffer_save_to_draft, true);
+assert.equal(callerOverride.buffer_api_sharing_mode, 'addToQueue');
+assert.equal(callerOverride.buffer_api_due_at, null);
+assert.equal(callerOverride.scheduled_at, null);
 
-console.log('Buffer provider contract verified against executable scheduling code: exact customScheduled/dueAt mapping, LinkedIn rising-floor receipt, runtime receipt correlation, private recipient/context authority, Gmail thread evidence separation, instant reply-ingress gate, fail-closed compensation, and no share-now override.');
+console.log('Buffer provider contract verified: buffer_add_to_queue is fail-closed to explicit method=draft, API saveToDraft=true, publish authority=false, and no scheduled fire time.');

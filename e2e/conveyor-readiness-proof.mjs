@@ -8,9 +8,9 @@ import { chromium } from 'playwright';
 const here = dirname(fileURLToPath(import.meta.url));
 const publicDir = resolve(here, '../public');
 const outputDir = resolve(here, '../test-results');
-const SESSION_KEY = 'fcr_session';
 const CONTRACT = 'founder-control-room/n8n-conveyor@v3';
-const TOKEN = 'proof-token';
+const SESSION_COOKIE = 'fcr-proof-session';
+const SESSION_VALUE = 'proof-session';
 const EXACT_SHA = 'a'.repeat(40);
 const STALE_SHA = 'b'.repeat(40);
 
@@ -20,6 +20,7 @@ let readinessState = 'ready-for-probe';
 let proofState = 'not-observed';
 let proofHead = null;
 let lastAuthorization = null;
+let lastCookie = null;
 
 const contentTypes = {
   '.html': 'text/html; charset=utf-8',
@@ -33,6 +34,11 @@ function json(res, status, body) {
     'Cache-Control': 'no-store',
   });
   res.end(JSON.stringify(body));
+}
+
+function hasOpaqueProofSession(req) {
+  const cookie = req.headers.cookie ?? '';
+  return cookie.split(';').some((entry) => entry.trim() === `${SESSION_COOKIE}=${SESSION_VALUE}`);
 }
 
 async function serveControlRoomAsset(req, res, pathname) {
@@ -61,9 +67,22 @@ async function serveControlRoomAsset(req, res, pathname) {
 const server = createServer(async (req, res) => {
   const url = new URL(req.url ?? '/', 'http://127.0.0.1');
 
+  if (url.pathname === '/auth/me') {
+    if (!hasOpaqueProofSession(req)) {
+      json(res, 401, { error: 'unauthorized' });
+      return;
+    }
+    json(res, 200, {
+      success: true,
+      data: { founder: { email: 'founder@example.com' } },
+    });
+    return;
+  }
+
   if (url.pathname === '/automation/conveyor/' || url.pathname === '/automation/conveyor') {
     lastAuthorization = req.headers.authorization ?? null;
-    if (lastAuthorization !== `Bearer ${TOKEN}`) {
+    lastCookie = req.headers.cookie ?? null;
+    if (!hasOpaqueProofSession(req)) {
       json(res, 401, { error: 'unauthorized' });
       return;
     }
@@ -111,21 +130,20 @@ assert(address && typeof address === 'object');
 const baseUrl = `http://127.0.0.1:${address.port}`;
 
 const browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
-const page = await browser.newPage({
+const context = await browser.newContext({
   viewport: { width: 390, height: 844 },
   deviceScaleFactor: 1,
   isMobile: true,
   hasTouch: true,
 });
-
-await page.addInitScript(({ key, token }) => {
-  sessionStorage.setItem(key, JSON.stringify({
-    access_token: token,
-    refresh_token: '',
-    expires_at: null,
-    email: 'founder@example.com',
-  }));
-}, { key: SESSION_KEY, token: TOKEN });
+await context.addCookies([{
+  name: SESSION_COOKIE,
+  value: SESSION_VALUE,
+  url: baseUrl,
+  httpOnly: true,
+  sameSite: 'Strict',
+}]);
+const page = await context.newPage();
 
 async function expectReadiness(state, label) {
   const status = page.locator('[data-conveyor-readiness]');
@@ -155,7 +173,15 @@ try {
   // Open the real dock first, which also triggers a fresh authenticated readiness read.
   await page.locator('.launch-dock > summary').click();
   await expectReadiness('ready-for-probe', 'n8n configured · live probe required');
-  assert.equal(lastAuthorization, `Bearer ${TOKEN}`);
+  assert.equal(lastAuthorization, null, 'opaque browser session must not emit a bearer Authorization header');
+  assert.match(lastCookie ?? '', new RegExp(`(?:^|;\\s*)${SESSION_COOKIE}=${SESSION_VALUE}(?:;|$)`));
+  const legacySession = await page.evaluate(() => sessionStorage.getItem('fcr_session'));
+  assert(legacySession, 'opaque bootstrap should expose only a non-secret founder identity marker');
+  const parsedLegacySession = JSON.parse(legacySession);
+  assert.equal(parsedLegacySession.email, 'founder@example.com');
+  assert.equal(parsedLegacySession.transport, 'opaque-http-only-cookie');
+  assert.equal(Object.prototype.hasOwnProperty.call(parsedLegacySession, 'access_token'), false);
+  assert.equal(Object.prototype.hasOwnProperty.call(parsedLegacySession, 'refresh_token'), false);
   await page.locator('[data-conveyor-readiness]').scrollIntoViewIfNeeded();
 
   const genesisLink = page.locator('[data-genesis-evidence]');
@@ -231,7 +257,8 @@ try {
       'enabled-live-verified',
       'not-configured',
     ],
-    authorization: 'Bearer <redacted>',
+    browserAuthority: 'opaque-http-only-cookie',
+    bearerAuthorizationObserved: false,
     genesisRoute: '/control-room/genesis.html',
     screenshot: 'test-results/conveyor-readiness-live-verified-mobile.png',
     overflow: dimensions,
