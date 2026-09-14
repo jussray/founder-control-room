@@ -4,8 +4,10 @@ on:
   pull_request:
     paths:
       - 'config/founder-chief-pair.contract.json'
+      - '.control-room/founder-chief-pair-peer-lock.json'
       - 'docs/FOUNDER_INTELLIGENCE_CONSTITUTION.md'
       - 'scripts/verify-founder-chief-pair.mjs'
+      - 'test/founder-chief-pair-peer-lock.test.mjs'
       - 'src/lib/standingFounderPolicy.ts'
       - 'src/founder-os-lab/projectAdapters.ts'
       - 'src/founder-os-lab/capabilityKernel.ts'
@@ -18,8 +20,10 @@ on:
     branches: [main]
     paths:
       - 'config/founder-chief-pair.contract.json'
+      - '.control-room/founder-chief-pair-peer-lock.json'
       - 'docs/FOUNDER_INTELLIGENCE_CONSTITUTION.md'
       - 'scripts/verify-founder-chief-pair.mjs'
+      - 'test/founder-chief-pair-peer-lock.test.mjs'
       - 'src/lib/standingFounderPolicy.ts'
       - 'src/founder-os-lab/projectAdapters.ts'
       - 'src/founder-os-lab/capabilityKernel.ts'
@@ -58,6 +62,7 @@ jobs:
         run: |
           set -euo pipefail
           contract="founder-control-room/config/founder-chief-pair.contract.json"
+          peer_lock="founder-control-room/.control-room/founder-chief-pair-peer-lock.json"
           remote="https://github.com/jussray/chief-ai-machine.git"
 
           jq -e '
@@ -91,6 +96,20 @@ jobs:
             and (.relationship.cooperationBoundary | contains("never silently replaces"))
           ' "$contract" >/dev/null
 
+          jq -e '
+            .schema == "fcr/founder-chief-pair-peer-lock@v1"
+            and .repository == "jussray/founder-control-room"
+            and .scope == "pull-request-candidate-only"
+            and .chiefAIPair.repository == "jussray/chief-ai-machine"
+            and .chiefAINecessaryFixPolicy.repository == "jussray/chief-ai-machine"
+            and (.chiefAIPair.expectedHeadSha | test("^[0-9a-f]{40}$"))
+            and (.chiefAINecessaryFixPolicy.expectedHeadSha | test("^[0-9a-f]{40}$"))
+            and .authorizesMerge == false
+            and .authorizesDeployment == false
+            and .authorizesProviderMutation == false
+            and .runtimeTruthProven == false
+          ' "$peer_lock" >/dev/null
+
           pair_ref="main"
           pair_sha=""
           policy_ref="main"
@@ -102,10 +121,21 @@ jobs:
             configured_fcr_pr="$(jq -r '.candidatePairing.founderControlRoomPullRequest' "$contract")"
             chief_pr="$(jq -r '.candidatePairing.chiefAIPullRequest' "$contract")"
             policy_pr="$(jq -r '.candidatePairing.chiefAINecessaryFixPolicyPullRequest' "$contract")"
+            locked_fcr_pr="$(jq -r '.founderControlRoom.pullRequest' "$peer_lock")"
+            locked_pair_pr="$(jq -r '.chiefAIPair.pullRequest' "$peer_lock")"
+            locked_pair_sha="$(jq -r '.chiefAIPair.expectedHeadSha' "$peer_lock")"
+            locked_policy_pr="$(jq -r '.chiefAINecessaryFixPolicy.pullRequest' "$peer_lock")"
+            locked_policy_sha="$(jq -r '.chiefAINecessaryFixPolicy.expectedHeadSha' "$peer_lock")"
+
             test "$configured_fcr_pr" = "$CURRENT_FCR_PR"
+            test "$locked_fcr_pr" = "$CURRENT_FCR_PR"
             printf '%s' "$chief_pr" | grep -Eq '^[1-9][0-9]*$'
             printf '%s' "$policy_pr" | grep -Eq '^[1-9][0-9]*$'
             test "$policy_pr" != "$chief_pr"
+            test "$locked_pair_pr" = "$chief_pr"
+            test "$locked_policy_pr" = "$policy_pr"
+            printf '%s' "$locked_pair_sha" | grep -Eq '^[0-9a-f]{40}$'
+            printf '%s' "$locked_policy_sha" | grep -Eq '^[0-9a-f]{40}$'
 
             pair_json="$(curl --fail-with-body --silent --show-error --location \
               -H 'Accept: application/vnd.github+json' \
@@ -121,8 +151,9 @@ jobs:
             ' <<<"$pair_json" >/dev/null
             pair_ref="refs/pull/${chief_pr}/head"
             pair_sha="$(jq -r '.head.sha' <<<"$pair_json")"
+            test "$pair_sha" = "$locked_pair_sha"
             test "$(git ls-remote --exit-code "$remote" "$pair_ref" | awk 'NR==1 {print $1}')" = "$pair_sha"
-            pair_source="contract-paired-chief-pr-${chief_pr}"
+            pair_source="candidate-locked-chief-pr-${chief_pr}"
 
             policy_json="$(curl --fail-with-body --silent --show-error --location \
               -H 'Accept: application/vnd.github+json' \
@@ -138,8 +169,9 @@ jobs:
             ' <<<"$policy_json" >/dev/null
             policy_ref="refs/pull/${policy_pr}/head"
             policy_sha="$(jq -r '.head.sha' <<<"$policy_json")"
+            test "$policy_sha" = "$locked_policy_sha"
             test "$(git ls-remote --exit-code "$remote" "$policy_ref" | awk 'NR==1 {print $1}')" = "$policy_sha"
-            policy_source="separate-chief-policy-pr-${policy_pr}"
+            policy_source="candidate-locked-chief-policy-pr-${policy_pr}"
           else
             pair_sha="$(git ls-remote --exit-code "$remote" 'refs/heads/main' | awk 'NR==1 {print $1}')"
             policy_sha="$pair_sha"
@@ -161,6 +193,7 @@ jobs:
             printf -- '- Chief policy ref / SHA: `%s` / `%s`\n' "$policy_ref" "$policy_sha"
             printf -- '- Pair selection mode: `%s`\n' "$pair_source"
             printf -- '- Policy selection mode: `%s`\n' "$policy_source"
+            echo '- Candidate peer SHAs are immutable FCR-local evidence bindings; any live peer-head movement fails closed.'
             echo '- Topology: `standalone-peers`'
             echo '- Pair and policy carriers remain separate proof subjects.'
           } >> "$GITHUB_STEP_SUMMARY"
@@ -195,12 +228,17 @@ jobs:
         with:
           node-version: '24'
 
+      - name: Verify peer-lock source contract
+        working-directory: founder-control-room
+        run: node --test test/founder-chief-pair-peer-lock.test.mjs
+
       - name: Verify local and cross-repository pair contract
         working-directory: founder-control-room
         env:
           PAIR_CONTRACT_PATH: ../chief-ai-machine/config/founder-chief-pair.contract.json
           PAIR_NECESSARY_FIX_POLICY_PATH: ../chief-ai-policy/.control-room/necessary-fix-policy.json
           PAIR_CROSS_REPO_REQUIRED: 'true'
+          PAIR_PEER_LOCK_REQUIRED: ${{ github.event_name == 'pull_request' && 'true' || 'false' }}
           PAIR_SELECTED_REF: ${{ steps.pair-ref.outputs.pair_ref }}
           PAIR_SELECTED_SHA: ${{ steps.pair-ref.outputs.pair_sha }}
           PAIR_SELECTION_MODE: ${{ steps.pair-ref.outputs.pair_source }}
