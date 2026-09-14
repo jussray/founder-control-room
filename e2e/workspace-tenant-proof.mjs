@@ -151,13 +151,46 @@ try {
   assert(await page.locator('#platform-modules').isHidden(), 'legacy platform capability links stay hidden from tenant accounts');
   assert(await page.locator('#password-panel').isHidden(), 'platform-only password mutation is not offered to tenant accounts');
 
-  console.log('\n[tenant-3] Create one project through the real tenant browser path');
+  console.log('\n[tenant-3] Chief Composer recommends; founder approval creates exactly one Control Room');
   await page.waitForSelector('#onboarding-flow:not([hidden])');
+  assert(await page.locator('#chief-composer-fieldset').isVisible(), 'zero-project tenant sees the Chief first-run Composer');
+  assert(await page.locator('#workspace-button').isDisabled(), 'project creation is locked before a current Chief recommendation and founder approval');
+
   await page.fill('#project-name', 'Tenant Demo');
   await page.fill('#project-slug', 'tenant-demo');
   await page.fill('#repo-identifier', 'tenant-founder/demo');
   await page.fill('#project-stack', 'TypeScript + Supabase');
+  await page.selectOption('#project-type', 'software_product');
+  await page.fill('#project-mission', 'Help one founder ship a verified product outcome without widening authority.');
+  await page.fill('#project-current-state', 'The project exists, but the first complete user path has not been proved yet.');
+  await page.fill('#project-evidence-notes', 'Require desktop and mobile browser proof before the first gate can graduate.');
   await page.check('#authority-confirm');
+  await page.click('#chief-recommend-button');
+  await page.waitForSelector('#chief-recommendation:not([hidden])');
+
+  assert((await page.locator('#chief-recommendation-title').innerText()).includes('Prove one real user path'), 'Chief returns the product-specific first-gate recommendation');
+  assert((await page.locator('#chief-authority-boundary').innerText()).includes('founder approves'), 'Chief exposes the founder authority boundary before creation');
+  assert(await page.locator('#workspace-button').isDisabled(), 'recommendation alone still cannot create the project');
+
+  mkdirSync(join(REPO_ROOT, 'logs'), { recursive: true });
+  await page.screenshot({
+    path: join(REPO_ROOT, 'logs', 'workspace-chief-composer-desktop.png'),
+    fullPage: true,
+  });
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  assert(
+    await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+    'Chief Composer has no document-level horizontal overflow on mobile',
+  );
+  await page.screenshot({
+    path: join(REPO_ROOT, 'logs', 'workspace-chief-composer-mobile.png'),
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 1280, height: 900 });
+
+  await page.check('#chief-approval');
+  assert(!(await page.locator('#workspace-button').isDisabled()), 'exact Chief recommendation becomes creatable only after founder approval');
   await page.click('#workspace-button');
   await page.waitForSelector('#workspace-ready:not([hidden])');
 
@@ -175,25 +208,18 @@ try {
   assert(afterCreate.body?.projects?.[0]?.workspace_id === TENANT_WORKSPACE_ID, 'new project is persisted with the authenticated workspace id');
   assert(afterCreate.body?.projects?.[0]?.slug === 'tenant-demo', 'new project identity survives the round trip');
 
-  // Persist tenant screenshots under logs/, which the existing Playwright
-  // workflow uploads after all later proofs have rebuilt test-results/.
-  mkdirSync(join(REPO_ROOT, 'logs'), { recursive: true });
-  await page.screenshot({
-    path: join(REPO_ROOT, 'logs', 'workspace-tenant-desktop.png'),
-    fullPage: true,
-  });
-
-  console.log('\n[tenant-4] Mobile tenant boundary');
-  await page.setViewportSize({ width: 390, height: 844 });
-  assert(
-    await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
-    'tenant onboarding has no document-level horizontal overflow on mobile',
-  );
-  await page.screenshot({
-    path: join(REPO_ROOT, 'logs', 'workspace-tenant-mobile.png'),
-    fullPage: true,
-  });
+  console.log('\n[tenant-4] Existing project reload bypasses first-run Composer');
+  await page.reload({ waitUntil: 'networkidle' });
+  await page.waitForSelector('#workspace-ready:not([hidden])');
+  assert(await page.locator('#onboarding-flow').isHidden(), 'existing tenant project bypasses first-run onboarding after reload');
+  assert((await page.locator('#project-count').innerText()) === '1', 'reload preserves the one-project tenant state');
+  assert(await page.locator('#platform-modules').isHidden(), 'reload does not widen platform capability visibility');
   assert(jsErrors.length === 0, `no uncaught tenant-browser JavaScript errors (saw ${JSON.stringify(jsErrors)})`);
+
+  await page.screenshot({
+    path: join(REPO_ROOT, 'logs', 'workspace-tenant-ready-desktop.png'),
+    fullPage: true,
+  });
 
   await page.close();
 } catch (error) {
@@ -210,4 +236,4 @@ if (failures > 0) {
   throw new Error(`Workspace tenant Playwright proof failed with ${failures} assertion(s)`);
 }
 
-console.log('\nWorkspace tenant Playwright proof passed.');
+console.log('\nWorkspace tenant + Chief Composer Playwright proof passed.');
