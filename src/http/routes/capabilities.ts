@@ -1,6 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import { Router, type Response } from 'express';
 import {
+  finalizeSharedReadOnlyCapabilityRun,
+  prepareSharedReadOnlyCapabilityRun,
+  SharedCapabilityRuntimeError,
+} from '../../capabilities/sharedCapabilityRuntime.js';
+import {
   TINYFISH_WEB_OBSERVATION_CAPABILITY,
   TINYFISH_WEB_OBSERVATION_CAPABILITY_ID,
   TinyFishReadOnlyClient,
@@ -38,6 +43,17 @@ function tinyFishErrorStatus(error: TinyFishReadOnlyError): number {
   return 502;
 }
 
+function sharedRuntimeErrorStatus(error: SharedCapabilityRuntimeError): number {
+  return error.code === 'shared_runtime_invalid_request' ? 400 : 403;
+}
+
+function boundedIntent(body: Record<string, unknown>, operation: 'search' | 'fetch'): string {
+  if (typeof body.intent === 'string' && body.intent.trim()) return body.intent.trim();
+  return operation === 'search'
+    ? 'Observe the requested public-web search through the bounded read-only capability.'
+    : 'Observe the requested public URLs through the bounded read-only capability.';
+}
+
 async function runTinyFishObservation(
   req: FounderRequest,
   res: Response,
@@ -48,6 +64,15 @@ async function runTinyFishObservation(
     if (operation !== 'search' && operation !== 'fetch') {
       throw new TinyFishReadOnlyError('tinyfish_invalid_request', 'TinyFish operation must be search or fetch.');
     }
+
+    const executionId = `tinyfish-observation:${randomUUID()}`;
+    const sharedInvocation = prepareSharedReadOnlyCapabilityRun({
+      executionId,
+      capabilityId: TINYFISH_WEB_OBSERVATION_CAPABILITY_ID,
+      surface: body.surface,
+      intent: boundedIntent(body, operation),
+      founder: req.founder,
+    });
 
     const continuity: TinyFishContinuityInput = {
       priorEvidenceFingerprint: continuityValue(body.priorEvidenceFingerprint),
@@ -62,19 +87,28 @@ async function runTinyFishObservation(
           : [],
         continuity,
       );
+    const sharedResult = finalizeSharedReadOnlyCapabilityRun(sharedInvocation, observation);
 
     return res.status(200).set('Cache-Control', 'no-store').json({
       run: {
-        id: `tinyfish-observation:${randomUUID()}`,
+        id: executionId,
         capabilityId: TINYFISH_WEB_OBSERVATION_CAPABILITY_ID,
         state: 'completed',
         authority: 'read_only',
         consequence: 'READ',
         mutationAllowed: false,
+        sharedRuntime: sharedResult.receipt,
+        presentation: sharedResult.presentation,
         observation,
       },
     });
   } catch (error) {
+    if (error instanceof SharedCapabilityRuntimeError) {
+      return res.status(sharedRuntimeErrorStatus(error)).set('Cache-Control', 'no-store').json({
+        error: error.message,
+        code: error.code,
+      });
+    }
     if (error instanceof TinyFishReadOnlyError) {
       return res.status(tinyFishErrorStatus(error)).set('Cache-Control', 'no-store').json({
         error: error.message,
