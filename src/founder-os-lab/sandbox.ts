@@ -148,7 +148,7 @@ export function effectiveFounderCouncilLenses(
 }
 
 function applyAutomaticFounderCouncil(plan: FounderOsLabPlan): FounderOsLabPlan {
-  plan.route.capabilityPlan.strategicLenses = effectiveFounderCouncilLenses(
+  plan.route.capabilityPlan.effectiveStrategicLenses = effectiveFounderCouncilLenses(
     plan.route.capabilityPlan.strategicLenses,
   );
 
