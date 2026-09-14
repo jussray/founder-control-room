@@ -1,5 +1,22 @@
 import { randomUUID } from 'node:crypto';
-import { Router } from 'express';
+import { Router, type Response } from 'express';
+import {
+  finalizeSharedReadOnlyCapabilityRun,
+  prepareSharedReadOnlyCapabilityRun,
+  SharedCapabilityRuntimeError,
+} from '../../capabilities/sharedCapabilityRuntime.js';
+import {
+  TINYFISH_WEB_OBSERVATION_CAPABILITY,
+  TINYFISH_WEB_OBSERVATION_CAPABILITY_ID,
+  TinyFishReadOnlyClient,
+  TinyFishReadOnlyError,
+  type TinyFishContinuityInput,
+} from '../../capabilities/tinyFishWebObservation.js';
+import {
+  resolveUltrathinkSharedReasoning,
+  ULTRATHINK_SHARED_REASONING_CAPABILITY,
+  ULTRATHINK_SHARED_REASONING_CAPABILITY_ID,
+} from '../../capabilities/ultrathinkSharedReasoning.js';
 import { capabilities } from '../../capabilities/workbenchRegistry.js';
 import { enqueueReconcile } from '../../events/outbox.js';
 import { supabase } from '../../lib/supabaseClient.js';
@@ -14,21 +31,169 @@ const PROJECT_HEALTH_RESOURCE_PREFIX = `capability:${PROJECT_HEALTH_CAPABILITY_I
 const DYNAMIC_CAPABILITIES = new Map([
   [PROJECT_HEALTH_CAPABILITY_ID, { controller: 'ProjectController', resourcePrefix: PROJECT_HEALTH_RESOURCE_PREFIX }],
 ]);
+const WORKBENCH_CAPABILITIES = Object.freeze([
+  ...capabilities,
+  TINYFISH_WEB_OBSERVATION_CAPABILITY,
+  ULTRATHINK_SHARED_REASONING_CAPABILITY,
+]);
+
+function continuityValue(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const normalized = value.trim();
+  return normalized ? normalized.slice(0, 256) : null;
+}
+
+function tinyFishErrorStatus(error: TinyFishReadOnlyError): number {
+  if (error.code === 'tinyfish_invalid_request') return 400;
+  if (error.code === 'tinyfish_not_configured') return 503;
+  return 502;
+}
+
+function sharedRuntimeErrorStatus(error: SharedCapabilityRuntimeError): number {
+  return error.code === 'shared_runtime_invalid_request' ? 400 : 403;
+}
+
+function boundedIntent(body: Record<string, unknown>, operation: 'search' | 'fetch'): string {
+  if (typeof body.intent === 'string' && body.intent.trim()) return body.intent.trim();
+  return operation === 'search'
+    ? 'Observe the requested public-web search through the bounded read-only capability.'
+    : 'Observe the requested public URLs through the bounded read-only capability.';
+}
+
+function runUltrathinkReasoning(
+  req: FounderRequest,
+  res: Response,
+  body: Record<string, unknown>,
+) {
+  try {
+    const executionId = `ultrathink-reasoning:${randomUUID()}`;
+    const result = resolveUltrathinkSharedReasoning({
+      executionId,
+      surface: body.surface,
+      intent: typeof body.intent === 'string' ? body.intent : '',
+      founder: req.founder,
+      priorEvidenceFingerprint: continuityValue(body.priorEvidenceFingerprint),
+      priorProofCookie: continuityValue(body.priorProofCookie),
+    });
+
+    return res.status(200).set('Cache-Control', 'no-store').json({
+      run: {
+        id: executionId,
+        capabilityId: ULTRATHINK_SHARED_REASONING_CAPABILITY_ID,
+        state: 'completed',
+        authority: 'reason_only',
+        consequence: 'READ',
+        mutationAllowed: false,
+        providerExecution: false,
+        sharedRuntime: result.receipt,
+        presentation: result.presentation,
+      },
+    });
+  } catch (error) {
+    if (error instanceof SharedCapabilityRuntimeError) {
+      return res.status(sharedRuntimeErrorStatus(error)).set('Cache-Control', 'no-store').json({
+        error: error.message,
+        code: error.code,
+      });
+    }
+    return res.status(500).set('Cache-Control', 'no-store').json({
+      error: 'ULTRATHINK shared-runtime resolution failed.',
+      code: 'shared_runtime_resolution_failure',
+    });
+  }
+}
+
+async function runTinyFishObservation(
+  req: FounderRequest,
+  res: Response,
+  body: Record<string, unknown>,
+) {
+  try {
+    const operation = typeof body.operation === 'string' ? body.operation.trim() : '';
+    if (operation !== 'search' && operation !== 'fetch') {
+      throw new TinyFishReadOnlyError('tinyfish_invalid_request', 'TinyFish operation must be search or fetch.');
+    }
+
+    const executionId = `tinyfish-observation:${randomUUID()}`;
+    const sharedInvocation = prepareSharedReadOnlyCapabilityRun({
+      executionId,
+      capabilityId: TINYFISH_WEB_OBSERVATION_CAPABILITY_ID,
+      surface: body.surface,
+      intent: boundedIntent(body, operation),
+      founder: req.founder,
+    });
+
+    const continuity: TinyFishContinuityInput = {
+      priorEvidenceFingerprint: continuityValue(body.priorEvidenceFingerprint),
+      priorProofCookie: continuityValue(body.priorProofCookie),
+    };
+    const client = TinyFishReadOnlyClient.fromEnvironment();
+    const observation = operation === 'search'
+      ? await client.search(typeof body.query === 'string' ? body.query : '', continuity)
+      : await client.fetchUrls(
+        Array.isArray(body.urls)
+          ? body.urls.map((value) => typeof value === 'string' ? value : '')
+          : [],
+        continuity,
+      );
+    const sharedResult = finalizeSharedReadOnlyCapabilityRun(sharedInvocation, observation);
+
+    return res.status(200).set('Cache-Control', 'no-store').json({
+      run: {
+        id: executionId,
+        capabilityId: TINYFISH_WEB_OBSERVATION_CAPABILITY_ID,
+        state: 'completed',
+        authority: 'read_only',
+        consequence: 'READ',
+        mutationAllowed: false,
+        sharedRuntime: sharedResult.receipt,
+        presentation: sharedResult.presentation,
+        observation,
+      },
+    });
+  } catch (error) {
+    if (error instanceof SharedCapabilityRuntimeError) {
+      return res.status(sharedRuntimeErrorStatus(error)).set('Cache-Control', 'no-store').json({
+        error: error.message,
+        code: error.code,
+      });
+    }
+    if (error instanceof TinyFishReadOnlyError) {
+      return res.status(tinyFishErrorStatus(error)).set('Cache-Control', 'no-store').json({
+        error: error.message,
+        code: error.code,
+      });
+    }
+    return res.status(502).set('Cache-Control', 'no-store').json({
+      error: 'TinyFish observation failed.',
+      code: 'tinyfish_upstream_failure',
+    });
+  }
+}
 
 capabilitiesRouter.get('/', (_req, res) => {
-  res.set('Cache-Control', 'no-store').json({ capabilities });
+  res.set('Cache-Control', 'no-store').json({ capabilities: WORKBENCH_CAPABILITIES });
 });
 
 capabilitiesRouter.post('/:capabilityId/runs', async (req: FounderRequest, res) => {
   const capabilityId = req.params.capabilityId;
+  const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body)
+    ? req.body as Record<string, unknown>
+    : {};
+
+  if (capabilityId === ULTRATHINK_SHARED_REASONING_CAPABILITY_ID) {
+    return runUltrathinkReasoning(req, res, body);
+  }
+
+  if (capabilityId === TINYFISH_WEB_OBSERVATION_CAPABILITY_ID) {
+    return runTinyFishObservation(req, res, body);
+  }
+
   const runtime = DYNAMIC_CAPABILITIES.get(capabilityId);
   if (!runtime) {
     return res.status(404).json({ error: 'Capability does not have a dynamic runtime.' });
   }
 
-  const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body)
-    ? req.body as Record<string, unknown>
-    : {};
   const projectSlug = typeof body.projectSlug === 'string' ? body.projectSlug.trim() : '';
   if (!projectSlug) {
     return res.status(400).json({ error: 'projectSlug is required' });
