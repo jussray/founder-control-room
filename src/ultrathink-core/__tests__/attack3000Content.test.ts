@@ -44,6 +44,7 @@ function baseline(): ContentAttack3000Input {
   return {
     subject: { decisionId: 'content-wave-1', projectId: 'fcr' },
     terms: {
+      evaluatedAt: '2026-09-07T00:10:00Z',
       observation: {
         observationId: OBSERVATION_ID,
         contentFingerprint: '7c4c0474120e8f5a',
@@ -51,6 +52,7 @@ function baseline(): ContentAttack3000Input {
         windowStart: '2026-08-31T00:00:00Z',
         windowEnd: '2026-09-07T00:00:00Z',
         observedAt: '2026-09-07T00:05:00Z',
+        expiresAt: '2026-09-07T06:05:00Z',
         measurementComplete: true,
         freshness: 'CURRENT',
         classification: 'VERIFIED',
@@ -97,6 +99,7 @@ describe('Attack 3000 content adapter', () => {
   it('derives distribution-to-outcome rates from one current observation window', () => {
     const terms = deriveContentTerms(baseline().terms);
     expect(terms.classification).toBe('VERIFIED');
+    expect(terms.evaluatedAt).toBe('2026-09-07T00:10:00Z');
     expect(terms.observation.observationId).toBe(OBSERVATION_ID);
     expect(terms.observation.freshness).toBe('CURRENT');
     expect(terms.published).toBe(true);
@@ -129,6 +132,37 @@ describe('Attack 3000 content adapter', () => {
     expect(result.terms.observation.freshness).toBe('STALE');
     expect(result.terms.classification).toBe('UNKNOWN');
     expect(result.terms.reasons).toContain('observation:freshness_stale');
+    expect(result.evaluation.verdict).toBe('HOLD');
+  });
+
+  it('does not trust CURRENT when the observation lease is expired at evaluation', () => {
+    const input = baseline();
+    input.terms.evaluatedAt = '2026-09-07T06:05:00Z';
+    const result = evaluateContentAttack3000(input);
+    expect(result.terms.observation.freshness).toBe('CURRENT');
+    expect(result.terms.classification).toBe('UNKNOWN');
+    expect(result.terms.reasons).toContain('observation:stale_at_evaluation');
+    expect(result.evaluation.verdict).toBe('HOLD');
+  });
+
+  it('rejects future-dated observations even when the caller labels them CURRENT', () => {
+    const input = baseline();
+    input.terms.observation.windowEnd = '2026-09-07T01:00:00Z';
+    input.terms.observation.observedAt = '2026-09-07T01:05:00Z';
+    input.terms.observation.expiresAt = '2026-09-07T07:05:00Z';
+    const result = evaluateContentAttack3000(input);
+    expect(result.terms.classification).toBe('UNKNOWN');
+    expect(result.terms.reasons).toContain('observation:window_from_future');
+    expect(result.terms.reasons).toContain('observation:observed_from_future');
+    expect(result.evaluation.verdict).toBe('HOLD');
+  });
+
+  it('rejects an unbounded CURRENT freshness lease', () => {
+    const input = baseline();
+    input.terms.observation.expiresAt = '2026-09-10T00:05:00Z';
+    const result = evaluateContentAttack3000(input);
+    expect(result.terms.classification).toBe('UNKNOWN');
+    expect(result.terms.reasons).toContain('observation:invalid_freshness_lease');
     expect(result.evaluation.verdict).toBe('HOLD');
   });
 
