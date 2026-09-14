@@ -290,3 +290,9 @@ Provider overlays may become stricter. They do not become competing constitution
 ## Load-bearing regression execution
 
 A committed regression test is source evidence only until the exact-head workflow that feeds `Required Gate` actually executes it. For LinkedIn analytics continuity, `.github/workflows/ci.yml` must keep `scripts.test_linkedin_analytics_continuity` inside the load-bearing `python-tests` job, and `Required Gate` must continue to depend on that job. Missing LinkedIn activity rows must remain `UNKNOWN_NO_EVIDENCE` with null metrics, never synthetic zero impressions or engagements.
+
+## Shopify child-provider observation
+
+FCR now includes a source-only, read-only Shopify child-provider observation contract. `src/providers/ShopifyReadOnlyProvider.ts` is pinned to the Founder Control Room store identity and consumes only an already authenticated, sanitized provider snapshot. It performs no Shopify network mutation, persists no provider inventory as current truth, and grants no execution authority.
+
+A child-app reconciliation may classify evidence as `CURRENT`, `UNDECLARED`, `SCOPE_DRIFT`, `IDENTITY_DRIFT`, `STALE`, or `UNKNOWN`. `CURRENT` means only that fresh, complete evidence matches the supplied declaration identity and exact approved scope set; it still returns `authorityGranted: false`. Live installed-app state, credentials, provider authentication, runtime display, Supabase connection state, production equivalence, or any Shopify write remain separately unproven until independently observed at use time.

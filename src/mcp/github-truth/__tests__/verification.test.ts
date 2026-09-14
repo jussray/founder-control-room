@@ -40,6 +40,24 @@ describe('evaluatePrAuditEvidence', () => {
     });
   });
 
+  it('accepts a caller-bound expected head only when it matches provider observation', () => {
+    expect(evaluatePrAuditEvidence(input({ expectedHeadSha: HEAD_SHA.toUpperCase() }))).toEqual({
+      state: 'evidence_complete', currentHeadSha: HEAD_SHA, requiredCheckCoverage: 'complete', findings: [],
+    });
+  });
+
+  it('conflicts when caller-bound expected head disagrees with provider observation', () => {
+    const result = evaluatePrAuditEvidence(input({ expectedHeadSha: OTHER_HEAD_SHA }));
+    expect(result.state).toBe('evidence_conflicted');
+    expect(result.findings).toContain('expected_head_sha_mismatch');
+  });
+
+  it('conflicts on a malformed caller-bound expected head without laundering it as current', () => {
+    const result = evaluatePrAuditEvidence(input({ expectedHeadSha: 'not-a-full-sha' }));
+    expect(result.state).toBe('evidence_conflicted');
+    expect(result.findings).toContain('expected_head_sha_malformed');
+  });
+
   it('keeps check runs and commit statuses with the same context independent', () => {
     const requirements: RequiredCheckIdentity[] = [
       { kind: 'check_run', context: 'gate' }, { kind: 'commit_status', context: 'gate' },

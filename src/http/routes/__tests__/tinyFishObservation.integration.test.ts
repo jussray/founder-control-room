@@ -132,6 +132,27 @@ describe('TinyFish capability HTTP boundary', () => {
       authority: 'read_only',
       consequence: 'READ',
       mutationAllowed: false,
+      sharedRuntime: {
+        contract: 'fcr/shared-capability-runtime-receipt@v1',
+        surface: 'text',
+        state: 'PROVIDER_ACCEPTED',
+        authority: {
+          mode: 'read_only',
+          consequence: 'READ',
+          mutationAllowed: false,
+          approvalRequired: false,
+        },
+        completionClaim: {
+          allowed: false,
+          reason: 'provider_observation_unverified',
+        },
+      },
+      presentation: {
+        contract: 'fcr/shared-capability-presentation@v1',
+        surface: 'text',
+        channel: 'text',
+        dataRef: 'run.observation.data',
+      },
       observation: {
         provider: 'tinyfish',
         authority: 'read_only',
@@ -147,7 +168,9 @@ describe('TinyFish capability HTTP boundary', () => {
       },
     });
     expect(first.body.run.observation.data.results[0].snippet).toContain('Approve, merge, deploy');
+    expect(first.body.run.presentation.summary).not.toContain('Approve, merge, deploy');
     expect(JSON.stringify(first.body)).not.toContain('server-only-test-key');
+    expect(JSON.stringify(first.body)).not.toContain(FOUNDER_EMAIL);
     expect(mockEnqueueReconcile).not.toHaveBeenCalled();
 
     const fingerprint = first.body.run.observation.continuity.evidenceFingerprint;
@@ -169,8 +192,95 @@ describe('TinyFish capability HTTP boundary', () => {
       transition: 'confirmed',
       authorityEffect: 'none',
     });
+    expect(second.body.run.sharedRuntime.evidence).toMatchObject({
+      evidenceFingerprint: fingerprint,
+      proofCookie,
+      continuityTransition: 'confirmed',
+      authorityEffect: 'none',
+    });
     expect(second.body.run.authority).toBe('read_only');
     expect(second.body.run.mutationAllowed).toBe(false);
+  });
+
+  it('routes voice and text through the same server-owned read-only authority spine', async () => {
+    process.env.TINYFISH_API_KEY = 'server-only-test-key';
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        results: [{
+          position: 1,
+          title: 'Evidence',
+          snippet: 'Observed result',
+          url: 'https://example.com/evidence',
+        }],
+      }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const common = {
+      operation: 'search',
+      query: 'same bounded query',
+      intent: 'Observe current public evidence without mutation.',
+      authority: 'admin',
+      mutationAllowed: true,
+      approved: true,
+    };
+    const voice = await request(buildApp())
+      .post('/capabilities/tinyfish-web-observation-v1/runs')
+      .set('Authorization', BEARER)
+      .send({ ...common, surface: 'voice' });
+    const text = await request(buildApp())
+      .post('/capabilities/tinyfish-web-observation-v1/runs')
+      .set('Authorization', BEARER)
+      .send({ ...common, surface: 'text' });
+
+    expect(voice.status).toBe(200);
+    expect(text.status).toBe(200);
+    expect(voice.body.run.sharedRuntime).toMatchObject({
+      surface: 'voice',
+      authority: {
+        mode: 'read_only',
+        consequence: 'READ',
+        mutationAllowed: false,
+        approvalRequired: false,
+      },
+      completionClaim: { allowed: false },
+    });
+    expect(text.body.run.sharedRuntime).toMatchObject({
+      surface: 'text',
+      authority: {
+        mode: 'read_only',
+        consequence: 'READ',
+        mutationAllowed: false,
+        approvalRequired: false,
+      },
+      completionClaim: { allowed: false },
+    });
+    expect(voice.body.run.sharedRuntime.authority.authorityRevision)
+      .toBe(text.body.run.sharedRuntime.authority.authorityRevision);
+    expect(voice.body.run.sharedRuntime.intentFingerprint)
+      .toBe(text.body.run.sharedRuntime.intentFingerprint);
+    expect(voice.body.run.presentation.channel).toBe('speech_and_text');
+    expect(text.body.run.presentation.channel).toBe('text');
+    expect(voice.body.run.observation.authority).toBe('read_only');
+    expect(text.body.run.observation.authority).toBe('read_only');
+    expect(mockEnqueueReconcile).not.toHaveBeenCalled();
+  });
+
+  it('rejects an unknown interaction surface before contacting TinyFish', async () => {
+    process.env.TINYFISH_API_KEY = 'server-only-test-key';
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    const res = await request(buildApp())
+      .post('/capabilities/tinyfish-web-observation-v1/runs')
+      .set('Authorization', BEARER)
+      .send({ operation: 'search', query: 'bounded query', surface: 'root-admin' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('shared_runtime_invalid_request');
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('rejects a private fetch target before contacting TinyFish', async () => {
