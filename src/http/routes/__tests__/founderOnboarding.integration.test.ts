@@ -15,6 +15,7 @@ import request from 'supertest';
 import { founderOnboardingRouter } from '../founderOnboarding.js';
 
 const FOUNDER_EMAIL = 'founder@example.com';
+const WORKSPACE_ID = 'workspace-1';
 const BEARER = 'Bearer test-token';
 
 function app() {
@@ -37,6 +38,22 @@ function founderUsersRow() {
   };
 }
 
+function workspaceMembersRow(memberships: Record<string, unknown>[] = [{
+  workspace_id: WORKSPACE_ID,
+  role: 'owner',
+  created_at: '2026-09-07T00:00:00.000Z',
+}]) {
+  return {
+    select: () => ({
+      eq: () => ({
+        eq: () => ({
+          order: () => Promise.resolve({ data: memberships, error: null }),
+        }),
+      }),
+    }),
+  };
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   mockGetUser.mockResolvedValue({
@@ -46,24 +63,33 @@ beforeEach(() => {
 });
 
 describe('GET /onboarding/state', () => {
-  it('returns real project and connection state plus the founder authority boundary', async () => {
+  it('returns only the active workspace project graph plus the founder authority boundary', async () => {
+    const projectFilters: Array<[string, unknown]> = [];
+
     supabaseMock.from.mockImplementation((table: string) => {
       if (table === 'founder_users') return founderUsersRow();
+      if (table === 'workspace_members') return workspaceMembersRow();
       if (table === 'projects') {
         return {
           select: () => ({
-            order: () => Promise.resolve({
-              data: [{
-                id: 'project-1',
-                slug: 'founder-control-room',
-                name: 'Founder Control Room',
-                repo_provider: 'github',
-                repo_identifier: 'jussray/founder-control-room',
-                status: 'active',
-                risk_level: 'high',
-              }],
-              error: null,
-            }),
+            eq: (field: string, value: unknown) => {
+              projectFilters.push([field, value]);
+              return {
+                order: () => Promise.resolve({
+                  data: [{
+                    id: 'project-1',
+                    workspace_id: WORKSPACE_ID,
+                    slug: 'founder-control-room',
+                    name: 'Founder Control Room',
+                    repo_provider: 'github',
+                    repo_identifier: 'jussray/founder-control-room',
+                    status: 'active',
+                    risk_level: 'high',
+                  }],
+                  error: null,
+                }),
+              };
+            },
           }),
         };
       }
@@ -95,7 +121,13 @@ describe('GET /onboarding/state', () => {
       .set('Authorization', BEARER);
 
     expect(response.status).toBe(200);
+    expect(projectFilters).toContainEqual(['workspace_id', WORKSPACE_ID]);
+    expect(response.body.activeWorkspace).toEqual({ id: WORKSPACE_ID, role: 'owner' });
     expect(response.body.complete).toBe(true);
+    expect(response.body.projects[0]).toMatchObject({
+      workspaceId: WORKSPACE_ID,
+      slug: 'founder-control-room',
+    });
     expect(response.body.projects[0].connections[0]).toMatchObject({
       type: 'github',
       status: 'disconnected',
@@ -108,33 +140,65 @@ describe('GET /onboarding/state', () => {
       mergeRequiresSeparateApproval: true,
       deployRequiresSeparateApproval: true,
       connectionSlotsStoreCredentials: false,
+      publicSignupEnabled: false,
     }));
+  });
+
+  it('refuses a workspace id that is not in the founder membership set', async () => {
+    supabaseMock.from.mockImplementation((table: string) => {
+      if (table === 'founder_users') return founderUsersRow();
+      if (table === 'workspace_members') return workspaceMembersRow();
+      return {};
+    });
+
+    const response = await request(app())
+      .get('/onboarding/state')
+      .set('Authorization', BEARER)
+      .set('x-fcr-workspace-id', 'workspace-bob');
+
+    expect(response.status).toBe(403);
+    expect(response.body.error).toMatch(/not available to this founder/i);
+    expect(supabaseMock.from.mock.calls.some(([table]) => table === 'projects')).toBe(false);
   });
 });
 
 describe('POST /onboarding/bootstrap', () => {
-  it('creates an idempotent project foundation and disconnected provider slots without credentials or execution authority', async () => {
+  it('creates an idempotent project inside the active workspace and disconnected provider slots', async () => {
     const insertedConnections: Record<string, unknown>[] = [];
+    const insertedProjects: Record<string, unknown>[] = [];
+    const projectFilters: Array<[string, unknown]> = [];
     let eventRow: Record<string, unknown> | null = null;
 
     supabaseMock.from.mockImplementation((table: string) => {
       if (table === 'founder_users') return founderUsersRow();
+      if (table === 'workspace_members') return workspaceMembersRow();
 
       if (table === 'projects') {
         return {
           select: () => ({
-            eq: () => ({
-              maybeSingle: () => Promise.resolve({ data: null, error: null }),
-            }),
+            eq: (field: string, value: unknown) => {
+              projectFilters.push([field, value]);
+              return {
+                eq: (nextField: string, nextValue: unknown) => {
+                  projectFilters.push([nextField, nextValue]);
+                  return {
+                    maybeSingle: () => Promise.resolve({ data: null, error: null }),
+                  };
+                },
+              };
+            },
           }),
-          insert: (row: Record<string, unknown>) => ({
-            select: () => ({
-              single: () => Promise.resolve({
-                data: { id: 'project-1', ...row },
-                error: null,
+          insert: (row: Record<string, unknown>) => {
+            insertedProjects.push(row);
+            return {
+              select: () => ({
+                single: () => Promise.resolve({
+                  data: { id: 'project-1', ...row },
+                  error: null,
+                }),
               }),
-            }),
-          }),
+            };
+          },
         };
       }
 
@@ -183,6 +247,14 @@ describe('POST /onboarding/bootstrap', () => {
       });
 
     expect(response.status).toBe(201);
+    expect(projectFilters).toEqual([
+      ['workspace_id', WORKSPACE_ID],
+      ['slug', 'founder-control-room'],
+    ]);
+    expect(insertedProjects[0]).toMatchObject({
+      workspace_id: WORKSPACE_ID,
+      slug: 'founder-control-room',
+    });
     expect(insertedConnections.map((row) => row.connection_type)).toEqual([
       'github',
       'openai',
@@ -192,24 +264,28 @@ describe('POST /onboarding/bootstrap', () => {
     expect(insertedConnections.every((row) => row.status === 'disconnected')).toBe(true);
     expect(insertedConnections.every((row) => row.secret_ref === null)).toBe(true);
     expect(JSON.stringify(insertedConnections)).not.toMatch(/api[_-]?key|access[_-]?token|bearer/i);
+    expect(response.body.activeWorkspace).toEqual({ id: WORKSPACE_ID, role: 'owner' });
     expect(response.body.truth).toEqual({
       credentialsStored: false,
       providersConnected: false,
       mergeApproved: false,
       deploymentApproved: false,
+      publicSignupEnabled: false,
     });
     expect(eventRow).toMatchObject({
       event_type: 'founder_onboarding_bootstrapped',
       metadata: expect.objectContaining({
+        workspaceId: WORKSPACE_ID,
         authorityGranted: false,
         credentialsStored: false,
       }),
     });
   });
 
-  it('rejects undeclared providers before attempting a workspace mutation', async () => {
+  it('rejects undeclared providers before attempting a project mutation', async () => {
     supabaseMock.from.mockImplementation((table: string) => {
       if (table === 'founder_users') return founderUsersRow();
+      if (table === 'workspace_members') return workspaceMembersRow();
       return {};
     });
 

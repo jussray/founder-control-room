@@ -12,6 +12,7 @@ export const founderOnboardingRouter = Router();
 founderOnboardingRouter.use(requireFounder);
 
 type DbRecord = Record<string, unknown>;
+type WorkspaceContext = { id: string; role: string | null };
 
 const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const RECOMMENDED_PROVIDER_TYPES = [
@@ -57,12 +58,50 @@ function recommendedCatalog() {
     }));
 }
 
-founderOnboardingRouter.get('/state', async (_req: FounderRequest, res) => {
+async function resolveWorkspace(req: FounderRequest): Promise<WorkspaceContext> {
+  const email = stringValue(req.founder?.email).toLowerCase();
+  if (!email) throw new Error('Authenticated founder email is unavailable');
+
+  const { data, error } = await supabase
+    .from('workspace_members')
+    .select('workspace_id, role, created_at')
+    .eq('email', email)
+    .eq('status', 'active')
+    .order('created_at', { ascending: true });
+
+  if (error) throw new Error(`Workspace membership lookup failed: ${error.message}`);
+
+  const memberships = (data ?? []) as DbRecord[];
+  const requestedWorkspaceId = optionalString(req.get('x-fcr-workspace-id'));
+  const selected = requestedWorkspaceId
+    ? memberships.find((membership) => optionalString(membership.workspace_id) === requestedWorkspaceId)
+    : memberships[0];
+
+  const workspaceId = optionalString(selected?.workspace_id);
+  if (!workspaceId) {
+    if (requestedWorkspaceId) throw new Error('Requested workspace is not available to this founder');
+    throw new Error('No active Control Room workspace membership exists for this founder');
+  }
+
+  return { id: workspaceId, role: optionalString(selected?.role) };
+}
+
+founderOnboardingRouter.get('/state', async (req: FounderRequest, res) => {
   res.setHeader('Cache-Control', 'private, no-store');
+
+  let workspace: WorkspaceContext;
+  try {
+    workspace = await resolveWorkspace(req);
+  } catch (error) {
+    return res.status(403).json({
+      error: error instanceof Error ? error.message : 'Workspace access denied',
+    });
+  }
 
   const { data: projectRows, error: projectsError } = await supabase
     .from('projects')
-    .select('id, slug, name, repo_provider, repo_identifier, stack, status, risk_level, created_at, updated_at')
+    .select('id, workspace_id, slug, name, repo_provider, repo_identifier, stack, status, risk_level, created_at, updated_at')
+    .eq('workspace_id', workspace.id)
     .order('created_at', { ascending: true });
 
   if (projectsError) return res.status(500).json({ error: projectsError.message });
@@ -97,6 +136,7 @@ founderOnboardingRouter.get('/state', async (_req: FounderRequest, res) => {
     const projectId = optionalString(project.id) ?? '';
     return {
       id: projectId,
+      workspaceId: optionalString(project.workspace_id),
       slug: optionalString(project.slug),
       name: optionalString(project.name),
       repoProvider: optionalString(project.repo_provider),
@@ -120,6 +160,7 @@ founderOnboardingRouter.get('/state', async (_req: FounderRequest, res) => {
 
   return res.json({
     complete: normalizedProjects.length > 0,
+    activeWorkspace: workspace,
     projects: normalizedProjects,
     recommendedProviders: recommendedCatalog(),
     authorityBoundary: {
@@ -128,12 +169,22 @@ founderOnboardingRouter.get('/state', async (_req: FounderRequest, res) => {
       deployRequiresSeparateApproval: true,
       productionMutationRequiresSeparateApproval: true,
       connectionSlotsStoreCredentials: false,
+      publicSignupEnabled: false,
     },
   });
 });
 
 founderOnboardingRouter.post('/bootstrap', async (req: FounderRequest, res) => {
   res.setHeader('Cache-Control', 'private, no-store');
+
+  let workspace: WorkspaceContext;
+  try {
+    workspace = await resolveWorkspace(req);
+  } catch (error) {
+    return res.status(403).json({
+      error: error instanceof Error ? error.message : 'Workspace access denied',
+    });
+  }
 
   const body = req.body as DbRecord;
   const projectInput = body.project && typeof body.project === 'object'
@@ -167,7 +218,8 @@ founderOnboardingRouter.post('/bootstrap', async (req: FounderRequest, res) => {
 
   const { data: existingProject, error: existingProjectError } = await supabase
     .from('projects')
-    .select('id, slug, name, repo_provider, repo_identifier, stack, status, risk_level')
+    .select('id, workspace_id, slug, name, repo_provider, repo_identifier, stack, status, risk_level')
+    .eq('workspace_id', workspace.id)
     .eq('slug', slug)
     .maybeSingle();
 
@@ -182,6 +234,7 @@ founderOnboardingRouter.post('/bootstrap', async (req: FounderRequest, res) => {
     const { data, error } = await supabase
       .from('projects')
       .insert({
+        workspace_id: workspace.id,
         slug,
         name,
         repo_provider: repoProvider,
@@ -190,7 +243,7 @@ founderOnboardingRouter.post('/bootstrap', async (req: FounderRequest, res) => {
         status: 'active',
         risk_level: riskLevel,
       })
-      .select('id, slug, name, repo_provider, repo_identifier, stack, status, risk_level')
+      .select('id, workspace_id, slug, name, repo_provider, repo_identifier, stack, status, risk_level')
       .single();
 
     if (error || !data) {
@@ -269,6 +322,7 @@ founderOnboardingRouter.post('/bootstrap', async (req: FounderRequest, res) => {
     metadata: {
       route: 'POST /onboarding/bootstrap',
       founder: req.founder?.email,
+      workspaceId: workspace.id,
       projectCreated,
       requestedProviders,
       createdProviders: createdConnections.map((connection) => connection.connection_type),
@@ -286,6 +340,7 @@ founderOnboardingRouter.post('/bootstrap', async (req: FounderRequest, res) => {
 
   return res.status(projectCreated ? 201 : 200).json({
     ok: true,
+    activeWorkspace: workspace,
     project,
     projectCreated,
     connectionsCreated: createdConnections,
@@ -301,6 +356,7 @@ founderOnboardingRouter.post('/bootstrap', async (req: FounderRequest, res) => {
       providersConnected: false,
       mergeApproved: false,
       deploymentApproved: false,
+      publicSignupEnabled: false,
     },
   });
 });

@@ -11,10 +11,12 @@ import {
 } from '../../lib/commandBridge.js';
 import { supabase } from '../../lib/supabaseClient.js';
 import { getTerminalCommand, listTerminalCommands } from '../../terminal/registry.js';
+import { requireCommandBridgeWorkspace } from '../middleware/commandBridgeWorkspace.js';
 import { requireFounder, type FounderRequest } from '../middleware/requireFounder.js';
 
 export const commandBridgeRouter = Router();
 commandBridgeRouter.use(requireFounder);
+commandBridgeRouter.use(requireCommandBridgeWorkspace);
 
 type DbRecord = Record<string, unknown>;
 
