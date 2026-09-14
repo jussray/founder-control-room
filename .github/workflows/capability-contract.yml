@@ -47,6 +47,7 @@ jobs:
           src/capabilities/__tests__/workbenchRegistry.test.ts
           src/capabilities/__tests__/bubbleLabShadow.test.ts
           src/capabilities/__tests__/tinyFishWebObservation.test.ts
+          src/capabilities/__tests__/sharedCapabilityRuntime.test.ts
           src/http/routes/__tests__/tinyFishObservation.integration.test.ts
       - run: npm run typecheck
       - run: npm run build

@@ -62,6 +62,8 @@ export type AuditFinding =
   | 'pr_identity_changed_during_collection'
   | 'pr_head_changed_during_collection'
   | 'pr_head_sha_malformed'
+  | 'expected_head_sha_malformed'
+  | 'expected_head_sha_mismatch'
   | 'pr_observation_stale'
   | 'pr_observation_time_unknown'
   | 'required_check_visibility_incomplete'
@@ -100,6 +102,8 @@ export type PullRequestObservation = {
 };
 
 export type EvaluatePrAuditEvidenceInput = {
+  /** Optional caller-bound candidate identity captured before provider observation. */
+  expectedHeadSha?: string;
   initialPr: PullRequestObservation;
   finalPr: PullRequestObservation;
   requiredChecks: RequiredCheckDiscovery;

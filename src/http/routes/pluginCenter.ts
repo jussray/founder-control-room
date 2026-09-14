@@ -165,6 +165,8 @@ async function connectionBelongsToProject(connectionId: string, projectId: strin
 }
 
 pluginCenterRouter.get('/', async (_req: FounderRequest, res) => {
+  res.set('Cache-Control', 'no-store');
+
   const { data: connectionRows, error: connectionsError } = await supabase
     .from('project_connections')
     .select('id, project_id, connection_type, label, status, authority_level, capabilities, data_boundary, required_approval, secret_ref, last_checked_at, updated_at, projects(id, slug, name)')
@@ -176,6 +178,7 @@ pluginCenterRouter.get('/', async (_req: FounderRequest, res) => {
     .from('plugin_permission_grants')
     .select('id, project_id, connection_id, grant_type, tool_rule, reason, requested_by, usage_limit, expires_at, revoked_at, created_at, projects(id, slug, name)')
     .is('revoked_at', null)
+    .gt('expires_at', new Date().toISOString())
     .order('expires_at', { ascending: true })
     .limit(50);
 
@@ -312,6 +315,13 @@ pluginCenterRouter.post('/grants/:grantId/revoke', async (req: FounderRequest, r
     },
   });
 
-  if (auditError) return res.status(500).json({ error: 'PLUGIN_REVOKE_AUDIT_INCOMPLETE', detail: auditError.message });
+  if (auditError) {
+    return res.status(500).json({
+      error: 'PLUGIN_REVOKE_AUDIT_INCOMPLETE',
+      detail: auditError.message,
+      revocationSucceeded: true,
+      grant,
+    });
+  }
   return res.json({ grant });
 });
