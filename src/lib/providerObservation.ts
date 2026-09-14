@@ -75,8 +75,18 @@ function normalizedIdentityValue(value: string | null | undefined): string | nul
   return trimmed.length > 0 ? trimmed : null;
 }
 
-function canonicalScopes(scopes: readonly string[]): string[] {
-  return [...new Set(scopes.map((scope) => scope.trim()).filter((scope) => scope.length > 0))].sort();
+function scopeInventoryIsValid(value: unknown): value is readonly string[] {
+  return Array.isArray(value) && value.every((scope) => typeof scope === 'string');
+}
+
+function canonicalScopes(scopes: unknown): string[] {
+  if (!Array.isArray(scopes)) return [];
+  return [...new Set(
+    scopes
+      .filter((scope): scope is string => typeof scope === 'string')
+      .map((scope) => scope.trim())
+      .filter((scope) => scope.length > 0),
+  )].sort();
 }
 
 function result(
@@ -91,8 +101,8 @@ function result(
     authorityGranted: false,
     reasons,
     identityMismatches: extras.identityMismatches ?? [],
-    observedScopes: canonicalScopes(observation?.scopes ?? []),
-    approvedScopes: canonicalScopes(declaration?.approvedScopes ?? []),
+    observedScopes: canonicalScopes(observation?.scopes),
+    approvedScopes: canonicalScopes(declaration?.approvedScopes),
     addedScopes: extras.addedScopes ?? [],
     missingScopes: extras.missingScopes ?? [],
     observedAt: observation?.observedAt ?? null,
@@ -105,7 +115,8 @@ function requiredObservationIdentityIsValid(observation: ProviderChildObservatio
     observation.providerType,
     observation.providerAccountId,
     observation.installationId,
-  ].every((value) => normalizedIdentityValue(value) !== null);
+  ].every((value) => normalizedIdentityValue(value) !== null)
+    && scopeInventoryIsValid(observation.scopes);
 }
 
 function requiredDeclarationIdentityIsValid(declaration: ProviderChildDeclaration): boolean {
@@ -115,7 +126,8 @@ function requiredDeclarationIdentityIsValid(declaration: ProviderChildDeclaratio
     declaration.providerAccountId,
     declaration.installationId,
     declaration.approvalRef,
-  ].every((value) => normalizedIdentityValue(value) !== null);
+  ].every((value) => normalizedIdentityValue(value) !== null)
+    && scopeInventoryIsValid(declaration.approvedScopes);
 }
 
 function identityMismatches(
