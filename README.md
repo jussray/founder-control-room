@@ -290,3 +290,7 @@ Provider overlays may become stricter. They do not become competing constitution
 ## Load-bearing regression execution
 
 A committed regression test is source evidence only until the exact-head workflow that feeds `Required Gate` actually executes it. For LinkedIn analytics continuity, `.github/workflows/ci.yml` must keep `scripts.test_linkedin_analytics_continuity` inside the load-bearing `python-tests` job, and `Required Gate` must continue to depend on that job. Missing LinkedIn activity rows must remain `UNKNOWN_NO_EVIDENCE` with null metrics, never synthetic zero impressions or engagements.
+
+## Founder-Chief pair contract truth
+
+`config/founder-chief-pair.contract.json` is a load-bearing control-plane contract. Changes to standalone-peer identity, cross-system authority boundaries, automated-posting authorization, exact-proposal approval, or provider-readback semantics require Documentation Truth classification, current durable docs, and a path-bound receipt. The pair contract coordinates evidence between FCR and Chief but never collapses their separate receipts, failure states, continuity markers, or authority classes.
