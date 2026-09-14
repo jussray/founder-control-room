@@ -53,6 +53,8 @@ const truthSensitiveRules = [
   { domain: 'repository-provider', match: /^src\/providers\/(?!__tests__\/)(?!.*\.test\.ts$)/ },
   { domain: 'publishing', match: /^src\/lib\/(?:firstPartyFounderContent|temporallyGovernedFounderContent|n8nFounderContent|n8nProviderNeutralFounderContent|founderSignal)/ },
   { domain: 'publishing', match: /^src\/http\/routes\/n8nConveyor\.ts$/ },
+  { domain: 'pair-authority', match: /^config\/founder-chief-pair\.contract\.json$/ },
+  { domain: 'publishing', match: /^config\/founder-chief-pair\.contract\.json$/ },
   { domain: 'truth-governance', match: /^src\/governance\/(?!.*\.test\.ts$)/ },
   { domain: 'truth-governance', match: /^src\/futureyou\/(?!.*\.test\.ts$)/ },
   { domain: 'truth-governance', match: /^src\/buildEvents\/(?!__tests\/)(?!.*\.test\.ts$)/ },
@@ -89,6 +91,7 @@ if (domains.has('merge-authority') || domains.has('workflow-authority')) {
   requiredDocs.add('GLOBAL_AI.md');
   requiredDocs.add('.ai/skills/juss-flow-launch-loop/SKILL.md');
 }
+if (domains.has('pair-authority')) requiredDocs.add('docs/FOUNDER_MERGE_AUTHORITY.md');
 if (domains.has('publishing')) requiredDocs.add('docs/PUBLIC_COMMUNICATION_TRUTH_CONTRACT.md');
 if (domains.has('truth-governance') || domains.has('evidence-authority')) requiredDocs.add('docs/TRUTH_DECAY_AUDIT.md');
 if (domains.has('repository-provider')) requiredDocs.add('docs/PROVIDERS.md');
@@ -283,6 +286,7 @@ const consistencyChecks = [
   [mergeAuthority.includes('deterministic independent review') && mergeAuthority.includes('founder-final') && mergeAuthority.includes('FCR_TRUSTED_SEMANTIC_REVIEWER_IDS'), 'merge authority must describe canonical founder-final review plus legacy semantic-review compatibility'],
   [mergeAuthority.includes('live GitHub') && mergeAuthority.includes('separate provider gate'), 'merge authority must distinguish FCR source/runtime enforcement from live GitHub provider enforcement'],
   [mergeAuthority.includes('Documentation truth'), 'merge authority must require documentation truth reconciliation'],
+  [mergeAuthority.includes('config/founder-chief-pair.contract.json') && mergeAuthority.includes('standalone-peer'), 'merge authority must keep the founder-chief pair contract load-bearing'],
   [globalAi.includes('Truth Lease') && globalAi.includes('Documentation truth'), 'GLOBAL_AI must include truth-aging and documentation-truth rules'],
   [globalAi.includes('Product Design') && globalAi.includes('Data Analytics') && globalAi.includes('Hormozi'), 'GLOBAL_AI must include product, analytics, and value lenses'],
   [globalAi.includes('/garyvee lindymode redteam l99 redteam ooda'), 'GLOBAL_AI must preserve the legacy founder-stack compatibility alias'],
@@ -298,8 +302,10 @@ const consistencyChecks = [
   [!claude.includes('Current provider truth:'), 'Claude contract must not freeze provider routing as durable current truth'],
   [perplexity.includes('GLOBAL_AI.md') && perplexity.includes('provider-neutral n8n') && perplexity.includes('Truth Lease') && perplexity.includes('Documentation Truth'), 'Perplexity contract must inherit current provider-neutral truth-aging rules'],
   [publicTruth.includes('Temporal reuse and truth decay') && publicTruth.includes('Sauce boundary'), 'public communication contract must preserve temporal truth and sauce boundaries'],
+  [publicTruth.includes('config/founder-chief-pair.contract.json') && publicTruth.includes('exact Current You'), 'public communication truth must keep pair-contract publication approval load-bearing'],
   [truthDecay.includes('Documentation truth gate'), 'truth-decay audit must record the documentation drift control'],
   [truthDecay.includes('Analytics remains observation-only'), 'truth-decay audit must keep analytics observation-only'],
+  [truthDecay.includes('config/founder-chief-pair.contract.json') && truthDecay.includes('pair-authority'), 'truth-decay audit must record founder-chief pair-contract classification'],
   [cloudflareTargets.includes('FCR_API') && cloudflareTargets.includes('Service Binding'), 'Cloudflare target docs must describe the Pages FCR_API service-binding dependency'],
   [cloudflareTargets.includes('not a claim that the current Cloudflare Pages project is configured correctly'), 'Cloudflare target docs must keep source dependency separate from live provider proof'],
   [goalfixWorkflow.includes('FINAL PROVIDER / PR / TARGET / BASE / HEAD / DIFF / CHECK / REVIEW REREAD') && goalfixWorkflow.includes('MERGED_UNVERIFIED'), 'Goalfix workflow must preserve final mutable provider reread and merged-unverified runtime state'],
