@@ -16,7 +16,7 @@ const MAX_FIRST_PARENT_SUCCESSORS = 256;
 // This is the immutable terminal tip of the currently ratified direct-main
 // history. Keep it bound to verify-main-release-ratification-extension.mjs.
 // Everything after this commit must earn live reviewed-PR provenance.
-export const TERMINAL_RATIFIED_MAIN_TIP = '035c849b59a89a53f2e07f4de6494068696bf9e7';
+export const TERMINAL_RATIFIED_MAIN_TIP = '0f8e2efec63eee9f31db6e64c1d9ca1ff6b3c2f8';
 
 export const CONSTITUTIONAL_REQUIRED_MIGRATIONS = Object.freeze([
   '20260809072500',
