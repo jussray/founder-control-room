@@ -117,6 +117,58 @@ describe('preflightFounderShopifyInventory', () => {
     expect(result.apps[0]?.reconciliation.state).toBe('STALE');
     expect(result.apps[0]?.reconciliation.authorityGranted).toBe(false);
   });
+
+  it('fails closed on an invalid evaluation Date instead of throwing', () => {
+    const result = reconcileFounderShopifyInventory(
+      snapshot,
+      [declaration],
+      true,
+      { ...options, now: new Date('invalid') },
+    );
+
+    expect(result.preflight.status).toBe('blocked');
+    expect(result.preflight.errors.some((error) => error.includes('evaluation time must be a valid Date'))).toBe(true);
+    expect(result.apps[0]?.reconciliation.state).toBe('UNKNOWN');
+    expect(result.apps[0]?.reconciliation.reasons).toEqual(['INVALID_NOW']);
+    expect(result.apps[0]?.reconciliation.authorityGranted).toBe(false);
+  });
+
+  it('fails closed on an invalid explicit freshness window instead of silently defaulting it', () => {
+    const result = reconcileFounderShopifyInventory(
+      snapshot,
+      [declaration],
+      true,
+      { ...options, maxSnapshotAgeMs: Number.NaN },
+    );
+
+    expect(result.preflight.status).toBe('blocked');
+    expect(result.preflight.errors.some((error) => error.includes('maximum snapshot age must be a positive finite number'))).toBe(true);
+    expect(result.apps[0]?.reconciliation.state).toBe('UNKNOWN');
+    expect(result.apps[0]?.reconciliation.reasons).toEqual(['INVALID_FRESHNESS_WINDOW']);
+    expect(result.apps[0]?.reconciliation.authorityGranted).toBe(false);
+  });
+
+  it('preserves malformed scope inventory as blocked UNKNOWN evidence instead of throwing or hiding the app', () => {
+    const malformed = {
+      ...snapshot,
+      apps: [
+        {
+          ...snapshot.apps![0]!,
+          scopes: ['read_orders', null] as unknown as string[],
+        },
+        snapshot.apps![1]!,
+      ],
+    };
+    const result = reconcileFounderShopifyInventory(malformed, [declaration], true, options);
+
+    expect(result.preflight.status).toBe('blocked');
+    expect(result.preflight.observedAppCount).toBe(2);
+    expect(result.preflight.errors.some((error) => error.includes('invalid scope inventory'))).toBe(true);
+    expect(result.apps[0]?.reconciliation.state).toBe('UNKNOWN');
+    expect(result.apps[0]?.reconciliation.reasons).toEqual(['OBSERVATION_INCOMPLETE']);
+    expect(result.apps[0]?.reconciliation.observedScopes).toEqual(['read_orders']);
+    expect(result.apps[0]?.reconciliation.authorityGranted).toBe(false);
+  });
 });
 
 describe('reconcileFounderShopifyInventory', () => {
