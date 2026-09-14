@@ -9,6 +9,8 @@ on:
       - 'src/capabilities/**'
       - 'src/http/routes/capabilities.ts'
       - 'src/http/routes/__tests__/tinyFishObservation.integration.test.ts'
+      - 'src/http/routes/__tests__/ultrathinkSharedReasoning.integration.test.ts'
+      - 'e2e/ultrathink-shared-runtime-proof.mjs'
       - 'package.json'
       - '.github/workflows/capability-contract.yml'
   push:
@@ -20,6 +22,8 @@ on:
       - 'src/capabilities/**'
       - 'src/http/routes/capabilities.ts'
       - 'src/http/routes/__tests__/tinyFishObservation.integration.test.ts'
+      - 'src/http/routes/__tests__/ultrathinkSharedReasoning.integration.test.ts'
+      - 'e2e/ultrathink-shared-runtime-proof.mjs'
       - 'package.json'
       - '.github/workflows/capability-contract.yml'
 
@@ -48,12 +52,16 @@ jobs:
           src/capabilities/__tests__/bubbleLabShadow.test.ts
           src/capabilities/__tests__/tinyFishWebObservation.test.ts
           src/capabilities/__tests__/sharedCapabilityRuntime.test.ts
+          src/capabilities/__tests__/ultrathinkSharedReasoning.test.ts
           src/http/routes/__tests__/tinyFishObservation.integration.test.ts
+          src/http/routes/__tests__/ultrathinkSharedReasoning.integration.test.ts
       - run: npm run typecheck
       - run: npm run build
       - run: npx playwright install --with-deps chromium
       - name: Capability Workbench Playwright
         run: FCR_E2E_SCENARIO=capability-workbench node e2e/direct-browser-run.mjs
+      - name: ULTRATHINK Shared Runtime Playwright
+        run: node e2e/ultrathink-shared-runtime-proof.mjs
       - name: Upload capability browser proof
         if: always()
         uses: actions/upload-artifact@v4
@@ -61,3 +69,12 @@ jobs:
           name: capability-workbench-mobile-${{ github.sha }}
           path: test-results/capabilities-workbench-mobile.png
           if-no-files-found: ignore
+      - name: Upload ULTRATHINK shared runtime proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ultrathink-shared-runtime-${{ github.sha }}
+          path: |
+            test-results/ultrathink-shared-runtime-receipt.json
+            test-results/ultrathink-shared-runtime-mobile.png
+          if-no-files-found: error
