@@ -2,8 +2,16 @@ import { execFileSync } from 'node:child_process';
 
 const ANCHOR_COMMIT = '1143b2757ddb257019b62db7c31e6e19bc32c61a';
 const ANCHOR_TREE = '82e370ec22cedbb941288af593393ee502fb4a58';
-const INCIDENT_TIP = 'cad41a5880b213d31242812906a24203e6131929';
-const INCIDENT_TREE = '3e227bc2c51cd75c66a0aa20ecfbb17ed97438a0';
+const LEGACY_INCIDENT_TIP = 'cad41a5880b213d31242812906a24203e6131929';
+const LEGACY_INCIDENT_TREE = '3e227bc2c51cd75c66a0aa20ecfbb17ed97438a0';
+
+// Current direct-main incident after reviewed PR #799. Keep this constant name
+// aligned with verify-production-migration-ledger.mjs; the contract test binds
+// Deploy's production boundary to this exact terminal ratified tip.
+const INCIDENT_TIP = '164add06aa903af030bd73ba2a25b6f424aba320';
+const INCIDENT_TREE = 'c9b182b84c2daa3da77ecd6417df1d0331e5a258';
+const CURRENT_INCIDENT_ANCHOR = '6ab517a381cd3068a1b5f39f386a8b5cd3e5d5f7';
+const CURRENT_INCIDENT_ANCHOR_TREE = '48225f9fd075911c0de4df6fd43de3445a9d201d';
 
 const FIRST_PARENT_COMMITS = [
   '88ca9b7a70bbea278493d32635a2a821c120d282',
@@ -105,6 +113,17 @@ const AFFECTED_FILES = [
   'wrangler.worker.toml',
 ];
 
+const CURRENT_DIRECT_COMMITS = [
+  '164add06aa903af030bd73ba2a25b6f424aba320',
+];
+
+const CURRENT_AFFECTED_FILES = [
+  'config/mom8-public-challenge-v1.json',
+  'public/mom8/index.html',
+  'scripts/build-pages.mjs',
+  'src/lib/__tests__/mom8PublicChallenge.test.ts',
+];
+
 function git(...args) {
   return execFileSync('git', args, {
     encoding: 'utf8',
@@ -144,39 +163,67 @@ if (predecessorTip !== ANCHOR_COMMIT) {
 if (git('show', '-s', '--format=%T', ANCHOR_COMMIT) !== ANCHOR_TREE) {
   throw new Error('Ratification extension anchor tree mismatch');
 }
-if (git('show', '-s', '--format=%T', INCIDENT_TIP) !== INCIDENT_TREE) {
-  throw new Error('Ratification extension tip tree mismatch');
+if (git('show', '-s', '--format=%T', LEGACY_INCIDENT_TIP) !== LEGACY_INCIDENT_TREE) {
+  throw new Error('Ratification extension historical tip tree mismatch');
 }
 
-const commits = lines(git('rev-list', '--reverse', '--first-parent', `${ANCHOR_COMMIT}..${INCIDENT_TIP}`));
+const commits = lines(git('rev-list', '--reverse', '--first-parent', `${ANCHOR_COMMIT}..${LEGACY_INCIDENT_TIP}`));
 equalList(commits, FIRST_PARENT_COMMITS, 'main successor first-parent sequence');
 
-const files = lines(git('diff', '--name-only', ANCHOR_COMMIT, INCIDENT_TIP)).sort();
+const files = lines(git('diff', '--name-only', ANCHOR_COMMIT, LEGACY_INCIDENT_TIP)).sort();
 equalList(files, AFFECTED_FILES, 'main successor affected file set');
 
-execFileSync('git', ['merge-base', '--is-ancestor', ANCHOR_COMMIT, INCIDENT_TIP], { stdio: 'ignore' });
+execFileSync('git', ['merge-base', '--is-ancestor', ANCHOR_COMMIT, LEGACY_INCIDENT_TIP], { stdio: 'ignore' });
+
+if (git('show', '-s', '--format=%T', CURRENT_INCIDENT_ANCHOR) !== CURRENT_INCIDENT_ANCHOR_TREE) {
+  throw new Error('Current direct-main incident anchor tree mismatch');
+}
+if (git('show', '-s', '--format=%T', INCIDENT_TIP) !== INCIDENT_TREE) {
+  throw new Error('Current direct-main incident tip tree mismatch');
+}
+
+const currentCommits = lines(git('rev-list', '--reverse', '--first-parent', `${CURRENT_INCIDENT_ANCHOR}..${INCIDENT_TIP}`));
+equalList(currentCommits, CURRENT_DIRECT_COMMITS, 'current direct-main first-parent sequence');
+
+const currentFiles = lines(git('diff', '--name-only', CURRENT_INCIDENT_ANCHOR, INCIDENT_TIP)).sort();
+equalList(currentFiles, CURRENT_AFFECTED_FILES, 'current direct-main affected file set');
+
+execFileSync('git', ['merge-base', '--is-ancestor', LEGACY_INCIDENT_TIP, CURRENT_INCIDENT_ANCHOR], { stdio: 'ignore' });
+execFileSync('git', ['merge-base', '--is-ancestor', CURRENT_INCIDENT_ANCHOR, INCIDENT_TIP], { stdio: 'ignore' });
 execFileSync('git', ['merge-base', '--is-ancestor', INCIDENT_TIP, 'HEAD'], { stdio: 'ignore' });
 
 const extensionIncident = {
   id: 'main-first-parent-after-browser-recovery',
   anchorCommit: ANCHOR_COMMIT,
   anchorTree: ANCHOR_TREE,
-  incidentTip: INCIDENT_TIP,
-  incidentTree: INCIDENT_TREE,
+  incidentTip: LEGACY_INCIDENT_TIP,
+  incidentTree: LEGACY_INCIDENT_TREE,
   firstParentCommitCount: FIRST_PARENT_COMMITS.length,
   affectedFileCount: AFFECTED_FILES.length,
+};
+
+const currentDirectIncident = {
+  id: 'direct-main-after-pr-799-mom8',
+  anchorCommit: CURRENT_INCIDENT_ANCHOR,
+  anchorTree: CURRENT_INCIDENT_ANCHOR_TREE,
+  incidentTip: INCIDENT_TIP,
+  incidentTree: INCIDENT_TREE,
+  directCommits: CURRENT_DIRECT_COMMITS,
+  directCommitCount: CURRENT_DIRECT_COMMITS.length,
+  affectedFiles: CURRENT_AFFECTED_FILES,
+  affectedFileCount: CURRENT_AFFECTED_FILES.length,
 };
 
 const receipt = {
   kind: 'fcr/main-release-historical-ratification@v3',
   ok: true,
-  incidentCount: predecessor.incidentCount + 1,
-  incidents: [...predecessor.incidents, extensionIncident],
+  incidentCount: predecessor.incidentCount + 2,
+  incidents: [...predecessor.incidents, extensionIncident, currentDirectIncident],
   predecessorKind: predecessor.kind,
-  directCommitCount: predecessor.directCommitCount,
+  directCommitCount: predecessor.directCommitCount + CURRENT_DIRECT_COMMITS.length,
   firstParentSuccessorCommitCount: FIRST_PARENT_COMMITS.length,
-  affectedPathInstances: predecessor.affectedPathInstances + AFFECTED_FILES.length,
-  extensionAffectedPathCount: AFFECTED_FILES.length,
+  affectedPathInstances: predecessor.affectedPathInstances + AFFECTED_FILES.length + CURRENT_AFFECTED_FILES.length,
+  extensionAffectedPathCount: AFFECTED_FILES.length + CURRENT_AFFECTED_FILES.length,
   candidateHead: git('rev-parse', 'HEAD'),
   historicalProvenanceRelabeled: false,
   mergeAuthorityGranted: false,
