@@ -1,6 +1,7 @@
 name: Capability Contract
 
 on:
+  workflow_dispatch:
   pull_request:
     paths:
       - '.control/**'
