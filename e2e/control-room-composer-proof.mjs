@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdirSync, readFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, readFileSync } from 'node:fs';
 import { chromium } from 'playwright';
 
 function exportedTemplate(relativePath) {
@@ -15,7 +15,9 @@ const js = exportedTemplate('../src/http/routes/onboardingAssets/controlRoomJs.t
 const css = exportedTemplate('../src/http/routes/onboardingAssets/controlRoomCss.ts');
 
 const proofDir = 'test-results/control-room-composer';
+const durableProofDir = 'logs/control-room-composer';
 mkdirSync(proofDir, { recursive: true });
+mkdirSync(durableProofDir, { recursive: true });
 
 async function assertNoHorizontalOverflow(page, label) {
   const dimensions = await page.evaluate(() => ({
@@ -170,10 +172,13 @@ async function proveComposer(browser, scenario) {
   await assertNoHorizontalOverflow(page, `${scenario.name}: ready room`);
   assert.deepEqual(pageErrors, [], `${scenario.name}: browser page errors must stay empty`);
 
+  const screenshotPath = `${proofDir}/${scenario.name}.png`;
+  const durableScreenshotPath = `${durableProofDir}/${scenario.name}.png`;
   await page.screenshot({
-    path: `${proofDir}/${scenario.name}.png`,
+    path: screenshotPath,
     fullPage: true,
   });
+  copyFileSync(screenshotPath, durableScreenshotPath);
 
   await page.close();
 }
@@ -209,4 +214,4 @@ try {
   await browser.close();
 }
 
-console.log('Control Room Composer Playwright proof passed: desktop + mobile first-run flow, visible-card interaction, payload binding, overflow checks, and ready-room restoration.');
+console.log('Control Room Composer Playwright proof passed: desktop + mobile first-run flow, visible-card interaction, payload binding, overflow checks, ready-room restoration, and durable screenshot receipts.');
