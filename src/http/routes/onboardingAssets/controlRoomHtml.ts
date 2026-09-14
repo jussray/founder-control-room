@@ -62,7 +62,66 @@ export const controlRoomHtml = `<!doctype html>
         </div>
 
         <form id="workspace-form">
-          <fieldset>
+          <fieldset id="chief-composer-fieldset" class="chief-composer" hidden>
+            <div class="chief-header">
+              <div class="chief-mark" aria-hidden="true">♛</div>
+              <div>
+                <p class="chief-kicker">CHIEF · LEAD · BUILD · EXECUTE</p>
+                <legend>Compose the Control Room around the outcome.</legend>
+                <p>Chief can recommend the first operating gate. It cannot create the project, widen authority, or act on the recommendation until you approve this exact plan.</p>
+              </div>
+            </div>
+
+            <div class="composer-grid">
+              <div>
+                <label for="project-type">What are you building?</label>
+                <select id="project-type" name="projectType">
+                  <option value="software_product">Software / product</option>
+                  <option value="service_business">Service / business</option>
+                  <option value="commerce">Commerce</option>
+                  <option value="content_community">Content / community</option>
+                  <option value="research_decision">Research / decision</option>
+                  <option value="internal_ops">Internal operations</option>
+                </select>
+              </div>
+              <div class="composer-wide">
+                <label for="project-mission">Mission</label>
+                <textarea id="project-mission" name="mission" rows="3" maxlength="500" placeholder="What must become true for this project to matter?"></textarea>
+              </div>
+              <div class="composer-wide">
+                <label for="project-current-state">What is true right now?</label>
+                <textarea id="project-current-state" name="currentState" rows="3" maxlength="700" placeholder="Existing product, blocker, stage, customer signal, or current reality."></textarea>
+              </div>
+              <div class="composer-wide">
+                <label for="project-evidence-notes">Evidence or constraints <span class="optional">optional</span></label>
+                <textarea id="project-evidence-notes" name="evidenceNotes" rows="3" maxlength="1000" placeholder="Links, proof expectations, budget, deadlines, dependencies, or non-negotiables."></textarea>
+              </div>
+            </div>
+
+            <button id="chief-recommend-button" class="chief-button" type="button">Ask Chief for the first gate</button>
+
+            <div id="chief-recommendation" class="chief-recommendation" hidden>
+              <p class="chief-kicker">CHIEF RECOMMENDATION</p>
+              <h3 id="chief-recommendation-title"></h3>
+              <div class="chief-recommendation-grid">
+                <div>
+                  <small>FIRST GATE</small>
+                  <p id="chief-first-gate"></p>
+                </div>
+                <div>
+                  <small>WHY</small>
+                  <p id="chief-reasoning"></p>
+                </div>
+              </div>
+              <p id="chief-authority-boundary" class="chief-boundary"></p>
+              <label id="chief-approval-row" class="chief-approval">
+                <input id="chief-approval" type="checkbox">
+                <span>I approve this exact Chief recommendation as the starting configuration for this Control Room. This approval creates the project only.</span>
+              </label>
+            </div>
+          </fieldset>
+
+          <fieldset id="project-foundation-fieldset">
             <legend>Project foundation</legend>
             <div class="form-grid">
               <div>
