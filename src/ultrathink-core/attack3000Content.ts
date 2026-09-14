@@ -26,6 +26,7 @@ export interface ContentObservationContext {
   windowStart: string;
   windowEnd: string;
   observedAt: string;
+  expiresAt: string;
   measurementComplete: boolean;
   freshness: ContentObservationFreshness;
   classification: Attack3000Reality;
@@ -47,6 +48,7 @@ export interface ContentMetricObservation {
 }
 
 export interface ContentTermsInput {
+  evaluatedAt: string;
   observation: ContentObservationContext;
   publication: ContentPublicationObservation;
   impressions: ContentMetricObservation;
@@ -61,6 +63,7 @@ export interface ContentTermsInput {
 
 export interface ContentTermsDerivation {
   classification: Attack3000Reality;
+  evaluatedAt: string;
   observation: Readonly<ContentObservationContext>;
   published: boolean;
   engagementRatePct: number | null;
@@ -117,6 +120,9 @@ export interface ContentAttack3000Result {
   evaluation: Attack3000Evaluation;
 }
 
+const MAX_CONTENT_OBSERVATION_LEASE_MS = 24 * 60 * 60 * 1000;
+const MAX_CONTENT_FUTURE_SKEW_MS = 2 * 60 * 1000;
+
 const REALITY_RANK: Readonly<Record<Attack3000Reality, number>> = {
   VERIFIED: 0,
   INFERRED: 1,
@@ -155,6 +161,7 @@ function validTime(value: string): number | null {
 
 function observationContextReality(
   observation: ContentObservationContext,
+  evaluatedAtRaw: string,
   reasons: Set<string>,
 ): Attack3000Reality {
   let classification = observation.classification;
@@ -175,7 +182,16 @@ function observationContextReality(
   const windowStart = validTime(observation.windowStart);
   const windowEnd = validTime(observation.windowEnd);
   const observedAt = validTime(observation.observedAt);
-  if (windowStart === null || windowEnd === null || observedAt === null) {
+  const expiresAt = validTime(observation.expiresAt);
+  const evaluatedAt = validTime(evaluatedAtRaw);
+
+  if (
+    windowStart === null
+    || windowEnd === null
+    || observedAt === null
+    || expiresAt === null
+    || evaluatedAt === null
+  ) {
     reasons.add('observation:invalid_time');
     classification = weakestReality(classification, 'UNKNOWN');
   } else {
@@ -185,6 +201,24 @@ function observationContextReality(
     }
     if (observedAt < windowEnd) {
       reasons.add('observation:observed_before_window_end');
+      classification = weakestReality(classification, 'UNKNOWN');
+    }
+    if (windowEnd > evaluatedAt + MAX_CONTENT_FUTURE_SKEW_MS) {
+      reasons.add('observation:window_from_future');
+      classification = weakestReality(classification, 'UNKNOWN');
+    }
+    if (observedAt > evaluatedAt + MAX_CONTENT_FUTURE_SKEW_MS) {
+      reasons.add('observation:observed_from_future');
+      classification = weakestReality(classification, 'UNKNOWN');
+    }
+    if (
+      expiresAt <= observedAt
+      || expiresAt - observedAt > MAX_CONTENT_OBSERVATION_LEASE_MS
+    ) {
+      reasons.add('observation:invalid_freshness_lease');
+      classification = weakestReality(classification, 'UNKNOWN');
+    } else if (evaluatedAt >= expiresAt) {
+      reasons.add('observation:stale_at_evaluation');
       classification = weakestReality(classification, 'UNKNOWN');
     }
   }
@@ -280,29 +314,23 @@ function metricReality(
 }
 
 /**
- * Founder content already has an outcome observation contract. This adapter
- * translates one current, comparable observation window into third-order
- * decision evidence rather than inventing a second analytics vocabulary.
- * Publishing, reach, and engagement are not proof of demand or business
- * outcome by themselves.
+ * Translate one current, comparable content observation into third-order
+ * decision evidence. CURRENT is only a caller label: the adapter independently
+ * derives temporal validity from evaluatedAt, the observed window, and a bounded
+ * freshness lease before it can emit VERIFIED terms.
  */
 export function deriveContentTerms(input: ContentTermsInput): ContentTermsDerivation {
   const reasons = new Set<string>();
   const observationId = input.observation.observationId;
   const realities = [
-    observationContextReality(input.observation, reasons),
+    observationContextReality(input.observation, input.evaluatedAt, reasons),
     publicationReality(input.publication, observationId, reasons),
     metricReality('impressions', input.impressions, observationId, reasons),
     metricReality('reactions', input.reactions, observationId, reasons),
     metricReality('comments', input.comments, observationId, reasons),
     metricReality('profile_views', input.profileViews, observationId, reasons),
     metricReality('attributed_visits', input.attributedVisits, observationId, reasons),
-    metricReality(
-      'qualified_conversations',
-      input.qualifiedConversations,
-      observationId,
-      reasons,
-    ),
+    metricReality('qualified_conversations', input.qualifiedConversations, observationId, reasons),
     metricReality('attributed_contacts', input.attributedContacts, observationId, reasons),
     metricReality('attributed_deals', input.attributedDeals, observationId, reasons),
   ];
@@ -338,6 +366,7 @@ export function deriveContentTerms(input: ContentTermsInput): ContentTermsDeriva
 
   return {
     classification: weakestReality(...realities),
+    evaluatedAt: input.evaluatedAt,
     observation: {
       ...input.observation,
       evidenceRefs: cleanRefs(input.observation.evidenceRefs),
@@ -393,7 +422,7 @@ function stopObservationReality(
   const reasons = new Set<string>();
   const observationId = input.observation.observationId;
   let classification = weakestReality(
-    observationContextReality(input.observation, reasons),
+    observationContextReality(input.observation, input.evaluatedAt, reasons),
     publicationReality(input.publication, observationId, reasons),
     ...metrics.map(([label, metric]) => metricReality(label, metric, observationId, reasons)),
   );
@@ -473,12 +502,11 @@ function externalDemandEvidence(
 ): Attack3000Evidence {
   const impressions = validCount(input.impressions.count) ? input.impressions.count : null;
   const observedDemandSignal =
-    terms.published &&
-    terms.observation.freshness === 'CURRENT' &&
-    terms.observation.measurementComplete &&
-    impressions !== null &&
-    impressions > 0 &&
-    [
+    terms.classification === 'VERIFIED'
+    && terms.published
+    && impressions !== null
+    && impressions > 0
+    && [
       input.attributedVisits,
       input.qualifiedConversations,
       input.attributedContacts,
@@ -497,7 +525,7 @@ function externalDemandEvidence(
     evidenceRefs: directDemandRefs,
     note: [
       evidence.note?.trim(),
-      `observationId=${terms.observation.observationId}; contentFingerprint=${terms.observation.contentFingerprint}; provider=${terms.observation.provider}; window=${terms.observation.windowStart}..${terms.observation.windowEnd}; observedAt=${terms.observation.observedAt}; freshness=${terms.observation.freshness}; published=${terms.published}; demandSignal=${observedDemandSignal}; engagementRatePct=${terms.engagementRatePct ?? 'unknown'}; profileViewRatePct=${terms.profileViewRatePct ?? 'unknown'}; visitRatePct=${terms.visitRatePct ?? 'unknown'}; qualifiedConversationRatePct=${terms.qualifiedConversationRatePct ?? 'unknown'}; dealConversionPct=${terms.dealConversionPct ?? 'unknown'}; termClassification=${terms.classification}`,
+      `observationId=${terms.observation.observationId}; contentFingerprint=${terms.observation.contentFingerprint}; provider=${terms.observation.provider}; window=${terms.observation.windowStart}..${terms.observation.windowEnd}; observedAt=${terms.observation.observedAt}; expiresAt=${terms.observation.expiresAt}; evaluatedAt=${terms.evaluatedAt}; freshness=${terms.observation.freshness}; published=${terms.published}; demandSignal=${observedDemandSignal}; engagementRatePct=${terms.engagementRatePct ?? 'unknown'}; profileViewRatePct=${terms.profileViewRatePct ?? 'unknown'}; visitRatePct=${terms.visitRatePct ?? 'unknown'}; qualifiedConversationRatePct=${terms.qualifiedConversationRatePct ?? 'unknown'}; dealConversionPct=${terms.dealConversionPct ?? 'unknown'}; termClassification=${terms.classification}`,
     ]
       .filter(Boolean)
       .join(' | '),
