@@ -39,7 +39,7 @@ for (const field of [
 for (const heading of [
   '## Who', '## What', '## When', '## Where', '## Why', '## How',
   '## Inputs', '## Outputs', '## Authority', '## Evidence',
-  '## Project separation', '## Failure and rollback',
+  '## Project reality audit', '## ULTRATHINK repair loop', '## Project separation', '## Failure and rollback',
   '## Ten-year maintenance contract', '## Definition of done',
 ]) requireText('portfolio structure', files.portfolio, heading);
 
@@ -52,8 +52,37 @@ for (const invariant of [
   'Never promise ten years of zero maintenance',
 ]) requireText('portfolio invariant', files.portfolio, invariant);
 
+for (const phrase of [
+  'do not infer health from repository existence',
+  'require targeted Playwright evidence for browser-observable UI or user-flow claims',
+  'require provider, API, job, database, webhook, or other direct runtime evidence',
+  '**VERIFIED**',
+  '**PARTIAL**',
+  '**UNKNOWN**',
+  '**BLOCKED**',
+  '**STALE**',
+  'Passing CI alone proves only the checks that actually ran',
+  'Historical runtime or Playwright proof does not renew itself',
+  'smallest next proof that could legitimately raise the classification',
+]) requireText('portfolio reality audit invariant', files.portfolio, phrase);
+
+for (const phrase of [
+  '**CODE_DEFECT**',
+  '**PROOF_DEFECT**',
+  '**PROVENANCE_DEFECT**',
+  '**CREDENTIAL_AUTHORITY_BLOCKER**',
+  '**PROVIDER_DEPLOYMENT_BLOCKER**',
+  '**STALE_EVIDENCE_BLOCKER**',
+  'Apply the smallest safe fix only to the causal class',
+  'never bypass authentication, invent secrets, weaken protected environments, create a second deployment authority',
+  'Prefer an existing open repair branch or pull request',
+  'Do not create a duplicate repair lane merely because a check is red',
+  'A red check is not permission to make it green',
+  'truthful recovery of founder intent, not green dashboards',
+]) requireText('ULTRATHINK repair invariant', files.portfolio, phrase);
+
 for (const [label, source, metadata] of [
-  ['sales', files.sales, ['name: sales', 'version: 1.0.0', 'status: active', 'scope: founder-control-room']],
+  ['sales', files.sales, ['name: sales', 'version: 1.1.0', 'status: active', 'scope: founder-control-room']],
   ['devil', files.devil, ['name: devil', 'version: 1.0.0', 'status: active', 'scope: founder-control-room']],
   ['typescript-audit', files.typescriptAudit, ['name: typescript-audit', 'version: 1.0.0', 'status: active', 'scope: founder-control-room']],
   ['typescript-root-cause-debugger', files.typescriptDebugger, ['name: typescript-root-cause-debugger', 'version: 1.0.0', 'status: active', 'scope: founder-control-room']],

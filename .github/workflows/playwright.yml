@@ -231,6 +231,12 @@ jobs:
           set -euo pipefail
           node e2e/security-posture-proof.mjs 2>&1 | tee logs/security-posture-proof.log
 
+      - name: Prove FCR account experience shell
+        shell: bash
+        run: |
+          set -euo pipefail
+          node e2e/founder-experience-shell-proof.mjs 2>&1 | tee logs/founder-experience-shell-proof.log
+
       - name: Upload Playwright HTML report
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

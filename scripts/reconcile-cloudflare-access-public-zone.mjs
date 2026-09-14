@@ -330,6 +330,18 @@ export async function reconcileFcrPublicAccessZone({
     const isExactManagedDestination = appHasOnlyManagedPublicDestination(existingPublic, zone);
 
     if (!appHasOnlyEquivalentPublicDestination(existingPublic, zone)) {
+      let policies;
+      try {
+        policies = await listPolicies({
+          token: credential.token,
+          fetchImpl,
+          accountId: canonicalAccountId,
+          appId: existingPublic.id,
+        });
+      } catch (error) {
+        throw providerPolicyReadFailure(error, credential);
+      }
+
       const error = new Error(
         isNamedManaged
           ? 'The managed FCR public-bypass application destination drifted from the exact public apex scope.'
@@ -339,6 +351,7 @@ export async function reconcileFcrPublicAccessZone({
         ? 'managed-public-bypass-drift'
         : 'existing-public-access-app-requires-review';
       error.matchingApplications = [existingPublic];
+      error.alreadyExempt = policies.some(isEveryoneBypassPolicy);
       throw attachCredentialFailure(error, credential);
     }
 
@@ -364,6 +377,7 @@ export async function reconcileFcrPublicAccessZone({
         ? 'managed-public-bypass-policy-drift'
         : 'existing-public-access-app-requires-review';
       error.matchingApplications = [existingPublic];
+      error.alreadyExempt = false;
       throw attachCredentialFailure(error, credential);
     }
 
@@ -574,6 +588,9 @@ if (invokedDirectly) {
         credentialFailures: Array.isArray(error?.credentialFailures)
           ? error.credentialFailures
           : [],
+        alreadyExempt: typeof error?.alreadyExempt === 'boolean'
+          ? error.alreadyExempt
+          : (rollback ? previous?.alreadyExempt ?? null : null),
         matchingApplications: Array.isArray(error?.matchingApplications)
           ? error.matchingApplications
           : [],

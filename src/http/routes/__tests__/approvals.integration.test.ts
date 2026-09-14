@@ -196,7 +196,12 @@ function executeStack(options: ExecuteOptions = {}) {
                     limit: () => ({
                       maybeSingle: () => Promise.resolve({
                         data: options.proofRecord === undefined
-                          ? { id: 'proof', status: 'pass' }
+                          ? {
+                              id: 'proof',
+                              status: 'pass',
+                              gate_id: missionStatus === 'proposed' ? 'create_branch' : 'merge',
+                              created_at: new Date().toISOString(),
+                            }
                           : options.proofRecord,
                         error: null,
                       }),

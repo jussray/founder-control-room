@@ -6,12 +6,11 @@ const form = document.getElementById('goalfix-form');
 const result = document.getElementById('goalfix-result');
 const message = document.getElementById('goalfix-message');
 const submit = document.getElementById('goalfix-submit');
+const IDLE_SUBMIT_LABEL = 'Confess reality';
+const BUSY_SUBMIT_LABEL = 'Classifying reality…';
 
 function lines(value) {
-  return String(value ?? '')
-    .split('\n')
-    .map((item) => item.trim())
-    .filter(Boolean);
+  return String(value ?? '').split('\n').map((item) => item.trim()).filter(Boolean);
 }
 
 function normalizeSignalName(value) {
@@ -29,11 +28,7 @@ function fingerprint(value) {
 }
 
 function normalizedVerificationNames(values) {
-  return [...new Set(
-    (values ?? [])
-      .map(normalizeSignalName)
-      .filter(Boolean),
-  )].sort();
+  return [...new Set((values ?? []).map(normalizeSignalName).filter(Boolean))].sort();
 }
 
 function attemptScopeId({ desiredOutcome, suspectedFailureArea, firstFilesOrLogs, expectedVerificationNames }) {
@@ -53,24 +48,16 @@ function attemptStorageKey(projectSlug, targetRef, scopeId) {
 
 function sanitizeAttempt(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
-
   const approach = typeof value.approach === 'string' ? value.approach.trim().slice(0, 500) : '';
-  const failureSignature = typeof value.failureSignature === 'string'
-    ? value.failureSignature.trim().slice(0, 500)
-    : undefined;
-  const verificationName = typeof value.verificationName === 'string'
-    ? value.verificationName.trim().slice(0, 200)
-    : undefined;
+  const failureSignature = typeof value.failureSignature === 'string' ? value.failureSignature.trim().slice(0, 500) : undefined;
+  const verificationName = typeof value.verificationName === 'string' ? value.verificationName.trim().slice(0, 200) : undefined;
   const commitSha = typeof value.commitSha === 'string' && /^[a-f0-9]{40}$/i.test(value.commitSha.trim())
     ? value.commitSha.trim().toLowerCase()
     : undefined;
   const resultValue = value.result;
-  const result = (
-    resultValue === 'passed'
-    || resultValue === 'failed'
-    || resultValue === 'blocked'
-    || resultValue === 'incomplete'
-  ) ? resultValue : null;
+  const attemptResult = resultValue === 'passed' || resultValue === 'failed' || resultValue === 'blocked' || resultValue === 'incomplete'
+    ? resultValue
+    : null;
   const filesTouched = Array.isArray(value.filesTouched)
     ? value.filesTouched
       .filter((item) => typeof item === 'string')
@@ -78,29 +65,21 @@ function sanitizeAttempt(value) {
       .filter(Boolean)
       .slice(0, 20)
     : [];
-
-  if (!approach || !result) return null;
-  return {
-    approach,
-    failureSignature,
-    filesTouched,
-    verificationName,
-    commitSha,
-    result,
-  };
+  if (!approach || !attemptResult) return null;
+  return { approach, failureSignature, filesTouched, verificationName, commitSha, result: attemptResult };
 }
 
 function attemptSignature(attempt) {
-  return attempt.failureSignature
-    || `verification:${normalizeSignalName(attempt.verificationName)}`
-    || attempt.approach;
+  if (attempt.failureSignature) return attempt.failureSignature;
+  const verificationName = normalizeSignalName(attempt.verificationName);
+  if (verificationName) return `verification:${verificationName}`;
+  return `approach:${attempt.approach}`;
 }
 
 function boundAttempts(attempts) {
   const sanitized = attempts.map(sanitizeAttempt).filter(Boolean);
   const signatureCounts = new Map();
   const reversed = [];
-
   for (let index = sanitized.length - 1; index >= 0; index -= 1) {
     const attempt = sanitized[index];
     const signature = attemptSignature(attempt);
@@ -109,7 +88,6 @@ function boundAttempts(attempts) {
     signatureCounts.set(signature, count + 1);
     reversed.push(attempt);
   }
-
   return reversed.reverse().slice(-MAX_ATTEMPTS);
 }
 
@@ -125,39 +103,28 @@ function loadAttempts(projectSlug, targetRef, scopeId) {
 }
 
 function saveAttempts(projectSlug, targetRef, scopeId, attempts) {
-  sessionStorage.setItem(
-    attemptStorageKey(projectSlug, targetRef, scopeId),
-    JSON.stringify(boundAttempts(attempts)),
-  );
+  sessionStorage.setItem(attemptStorageKey(projectSlug, targetRef, scopeId), JSON.stringify(boundAttempts(attempts)));
 }
 
 function attemptFromProofLine(value) {
   const line = String(value ?? '').trim();
   const match = line.match(/^(.+): (passed|failed|cancelled|queued|running|skipped|unknown) at ([a-f0-9]{40})$/i);
   if (!match) return null;
-
   const verificationName = match[1].trim().slice(0, 200);
   const status = match[2].toLowerCase();
   const commitSha = match[3].toLowerCase();
-  const normalizedName = normalizeSignalName(verificationName);
-
   return sanitizeAttempt({
     approach: `Inspect ${verificationName} at ${commitSha}`,
-    failureSignature: `verification:${normalizedName}`,
+    failureSignature: `verification:${normalizeSignalName(verificationName)}`,
     filesTouched: [],
     verificationName,
     commitSha,
-    result: status === 'passed'
-      ? 'passed'
-      : status === 'failed' || status === 'cancelled'
-        ? 'failed'
-        : 'incomplete',
+    result: status === 'passed' ? 'passed' : status === 'failed' || status === 'cancelled' ? 'failed' : 'incomplete',
   });
 }
 
 function collapseInspectionAttempts(attempts) {
   const byCheckAndCommit = new Map();
-
   for (const attempt of attempts) {
     const key = `${normalizeSignalName(attempt.verificationName)}:${attempt.commitSha ?? ''}`;
     const current = byCheckAndCommit.get(key);
@@ -165,31 +132,19 @@ function collapseInspectionAttempts(attempts) {
       byCheckAndCommit.set(key, attempt);
     }
   }
-
   return [...byCheckAndCommit.values()];
 }
 
-function recordVerificationAttempts(
-  report,
-  projectSlug,
-  targetRef,
-  scopeId,
-  expectedVerificationNames,
-) {
+function recordVerificationAttempts(report, projectSlug, targetRef, scopeId, expectedVerificationNames) {
   const requiredNames = new Set(expectedVerificationNames.map(normalizeSignalName));
-  const nextAttempts = collapseInspectionAttempts(
-    (report?.proof ?? [])
-      .map(attemptFromProofLine)
-      .filter((attempt) => attempt && requiredNames.has(normalizeSignalName(attempt.verificationName))),
-  );
+  const nextAttempts = collapseInspectionAttempts((report?.proof ?? [])
+    .map(attemptFromProofLine)
+    .filter((attempt) => attempt && requiredNames.has(normalizeSignalName(attempt.verificationName))));
   if (nextAttempts.length === 0) return;
-
-  saveAttempts(
-    projectSlug,
-    targetRef,
-    scopeId,
-    [...loadAttempts(projectSlug, targetRef, scopeId), ...nextAttempts],
-  );
+  saveAttempts(projectSlug, targetRef, scopeId, [
+    ...loadAttempts(projectSlug, targetRef, scopeId),
+    ...nextAttempts,
+  ]);
 }
 
 function node(tag, text, className) {
@@ -213,11 +168,48 @@ function section(title, items) {
   return wrap;
 }
 
+function decisionPlaneLine(label, plane) {
+  const basis = Array.isArray(plane?.basis) && plane.basis.length ? ` · ${plane.basis.join(' ')}` : '';
+  return `${label}: ${plane?.state ?? 'UNKNOWN'}${basis}`;
+}
+
+function renderDecisionKernel(kernel) {
+  if (!kernel) return;
+  result.appendChild(section('STRATEGY / CRUX', [
+    `Diagnosis (${kernel.strategy?.evidenceState ?? 'UNKNOWN'}): ${kernel.strategy?.diagnosis ?? 'Unknown.'}`,
+    `Guiding policy: ${kernel.strategy?.guidingPolicy ?? 'Unknown.'}`,
+    `Coherent action: ${kernel.strategy?.coherentAction ?? 'Unknown.'}`,
+  ]));
+  result.appendChild(section('CUSTOMER TRUTH', [
+    decisionPlaneLine('Behavior', kernel.customerTruth?.behavior),
+    decisionPlaneLine('Commitment / advancement', kernel.customerTruth?.commitment),
+    kernel.customerTruth?.rule ?? 'Customer evidence rule unavailable.',
+  ]));
+  result.appendChild(section('PRODUCT RISK', [
+    decisionPlaneLine('Value', kernel.productRisk?.value),
+    decisionPlaneLine('Usability', kernel.productRisk?.usability),
+    decisionPlaneLine('Feasibility', kernel.productRisk?.feasibility),
+    decisionPlaneLine('Viability', kernel.productRisk?.viability),
+    kernel.productRisk?.rule ?? 'Product evidence rule unavailable.',
+  ]));
+  result.appendChild(section('FINANCIAL TRUTH', [
+    decisionPlaneLine('Revenue', kernel.financialTruth?.revenue),
+    decisionPlaneLine('Profit', kernel.financialTruth?.profit),
+    decisionPlaneLine('Cash', kernel.financialTruth?.cash),
+    kernel.financialTruth?.rule ?? 'Financial evidence rule unavailable.',
+  ]));
+  result.appendChild(section('LEVERAGE', [
+    decisionPlaneLine('Founder effort', kernel.leverage?.founderEffort),
+    decisionPlaneLine('Reusable capability', kernel.leverage?.reusableCapability),
+    kernel.leverage?.rule ?? 'Leverage evidence rule unavailable.',
+  ]));
+  result.appendChild(section('DECISION GAPS', kernel.gaps));
+}
+
 function renderReport(report) {
   result.replaceChildren();
-
   const header = node('div');
-  header.appendChild(node('div', 'Goalfix report', 'goalfix-kicker'));
+  header.appendChild(node('div', 'TruthMode · Fix report', 'goalfix-kicker'));
   header.appendChild(node('h2', report.project?.name ?? report.project?.slug ?? 'Project'));
   const status = node('span', String(report.readiness ?? 'unknown').replaceAll('_', ' '), 'goalfix-status');
   status.dataset.state = report.readiness ?? 'unknown';
@@ -235,6 +227,7 @@ function renderReport(report) {
   authority.append(authorityLevel, routing);
   result.appendChild(authority);
 
+  renderDecisionKernel(report.decisionKernel);
   result.appendChild(section('REALITY', report.reality));
   result.appendChild(section('FIX', report.fix));
   result.appendChild(section('PROOF', report.proof));
@@ -242,7 +235,7 @@ function renderReport(report) {
   result.appendChild(section('ROLLBACK', report.rollback));
 
   const evidence = node('section', undefined, 'goalfix-section');
-  evidence.appendChild(node('h3', 'Evidence classification'));
+  evidence.appendChild(node('h3', 'TruthMode evidence classification'));
   for (const key of ['verified', 'inferred', 'unknown', 'blocked']) {
     evidence.appendChild(node('h4', key.toUpperCase()));
     evidence.appendChild(list(report.evidence?.[key]));
@@ -262,7 +255,6 @@ function renderError(text) {
 form.addEventListener('submit', async (event) => {
   event.preventDefault();
   message.replaceChildren();
-
   const values = Object.fromEntries(new FormData(form).entries());
   const expectedVerificationNames = lines(values.expectedVerificationNames);
   if (expectedVerificationNames.length === 0) {
@@ -300,34 +292,24 @@ form.addEventListener('submit', async (event) => {
   };
 
   submit.disabled = true;
-  submit.textContent = 'Inspecting…';
+  submit.textContent = BUSY_SUBMIT_LABEL;
   try {
     const response = await fetch('/goalfix/inspect', {
       method: 'POST',
       cache: 'no-store',
       credentials: 'same-origin',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
     const body = await response.json().catch(() => null);
-    if (response.status === 401) {
-      sessionStorage.removeItem(attemptStorageKey(projectSlug, targetRef, scopeId));
-    }
+    if (response.status === 401) sessionStorage.removeItem(attemptStorageKey(projectSlug, targetRef, scopeId));
     if (!response.ok) throw new Error(body?.error ?? `Inspection failed (${response.status})`);
-    recordVerificationAttempts(
-      body,
-      projectSlug,
-      targetRef,
-      scopeId,
-      expectedVerificationNames,
-    );
+    recordVerificationAttempts(body, projectSlug, targetRef, scopeId, expectedVerificationNames);
     renderReport(body);
   } catch (error) {
     renderError(error instanceof Error ? error.message : String(error));
   } finally {
     submit.disabled = false;
-    submit.textContent = 'Inspect exact head';
+    submit.textContent = IDLE_SUBMIT_LABEL;
   }
 });

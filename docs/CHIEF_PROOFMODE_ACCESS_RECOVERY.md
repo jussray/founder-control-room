@@ -48,7 +48,8 @@ FCR uses distinct capabilities for distinct truth planes:
 - `CLOUDFLARE_ACCESS_API_TOKEN` is read-only provider authority for `check` mode.
 - `CLOUDFLARE_ACCESS_ADMIN_API_TOKEN` is available only to founder-approved `repair` mode.
 - A read-only `check` may discover the Chief service-token identity only from exactly one existing `non_identity` service-token binding on the provider-resolved effective Chief Access application. It never selects a token merely because that token exists elsewhere in the account, and zero or multiple bound identities fail closed.
-- `repair` still requires at least one protected, non-secret identity selector for the already-existing Chief CI service token: `CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID` or `CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID`.
+- `repair` still requires at least one protected, non-secret identity selector for the already-existing Chief CI service token. `CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID` (or `CLOUDFLARE_ACCESS_CLIENT_ID`) may come from the same protected secret or variable lane already used by the trusted runtime witness; `CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID` (or `CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID`) remains a protected variable alternative.
+- The recovery workflow may reuse the protected client ID as an identity selector, but it never reads the Access client secret. The client secret remains runtime-authentication material only and is never needed to inspect or create the bounded Service Auth policy.
 - The separate trusted runtime-witness workflow requires the protected Access client credential pair in FCR's `production` environment. Source references do not prove those protected values exist, are current, or correspond to the provider-observed service token.
 - GitHub evidence publication uses FCR's repository-scoped GitHub App identity (`APP_ID` + `APP_PRIVATE_KEY`) only after provider installation readback proves `checks: write` and `deployments: write` for `jussray/chief-ai-machine`.
 

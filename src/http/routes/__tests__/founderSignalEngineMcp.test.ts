@@ -18,7 +18,7 @@ const SOURCE_SHA = 'f4573d360a8fea99b301f33a2a21192525725f7b';
 const GRANT_ID = 'founder-approved-auto-distribution-v1';
 const PROOF_URL = 'https://github.com/jussray/Sekret-Bip/actions/runs/123';
 
-type AuditWriter = NonNullable<FounderSignalEngineMcpDependencies['writeAuditEvent']>;
+ type AuditWriter = NonNullable<FounderSignalEngineMcpDependencies['writeAuditEvent']>;
 
 interface StandingPolicyContext {
   grantId: string;
@@ -43,6 +43,15 @@ function automationCandidate(overrides: Record<string, unknown> = {}) {
     why: 'It demonstrates execution and product progress',
     how: 'Follow the build or request the proof package',
     ...overrides,
+  };
+}
+
+function freshContentPolicyResult() {
+  return {
+    version: 'founder-signal-content-v2',
+    intent: 'proof-update',
+    fingerprint: 'verified milestone | evidence-led update | proof vocabulary | proof-update | follow build',
+    freshnessDecision: 'fresh',
   };
 }
 
@@ -245,6 +254,11 @@ describe('Founder Signal Engine remote MCP', () => {
             recipient_id: null,
             recipient_specific_why: null,
           },
+          content_policy_result: {
+            version: 'founder-signal-content-v2',
+            intent: 'proof-update',
+            freshness_decision: 'fresh',
+          },
         });
         return new globalThis.Response(JSON.stringify({ zapier_run_id: 'zap-run-policy' }), {
           status: 200,
@@ -267,6 +281,7 @@ describe('Founder Signal Engine remote MCP', () => {
             steeringGrantId: GRANT_ID,
             founderApprovalId: `standing-policy:${GRANT_ID}:${INVOCATION_ID}`,
             automationCandidate: automationCandidate(),
+            contentPolicyResult: freshContentPolicyResult(),
           }),
         ),
       );
@@ -277,6 +292,9 @@ describe('Founder Signal Engine remote MCP', () => {
       zapierRunId: 'zap-run-policy',
       authorizationMode: 'standing-policy',
       channel: 'linkedin',
+      contentPolicyVersion: 'founder-signal-content-v2',
+      contentIntent: 'proof-update',
+      freshnessDecision: 'fresh',
       endToEndProofComplete: false,
     });
     expect(auditEvents[0]?.metadata).toMatchObject({
@@ -284,6 +302,9 @@ describe('Founder Signal Engine remote MCP', () => {
       channel: 'linkedin',
       audienceSegment: 'build-in-public',
       proofUrl: PROOF_URL,
+      contentPolicyVersion: 'founder-signal-content-v2',
+      contentIntent: 'proof-update',
+      freshnessDecision: 'fresh',
     });
   });
 
