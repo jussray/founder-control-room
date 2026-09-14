@@ -114,6 +114,18 @@ async function proveViewport(label, viewport) {
     throw new Error(`${label}: ULTRATHINK artwork did not decode: ${JSON.stringify(imageState)}`);
   }
 
+  const imageGeometry = await image.evaluate((node) => {
+    const rect = node.getBoundingClientRect();
+    const style = getComputedStyle(node);
+    return { width: rect.width, height: rect.height, objectFit: style.objectFit };
+  });
+  if (Math.abs(imageGeometry.width - imageGeometry.height) > 1) {
+    throw new Error(`${label}: ULTRATHINK artwork must render square: ${JSON.stringify(imageGeometry)}`);
+  }
+  if (imageGeometry.objectFit !== 'contain') {
+    throw new Error(`${label}: ULTRATHINK artwork must preserve the full approved composition: ${JSON.stringify(imageGeometry)}`);
+  }
+
   const artwork = await page.evaluate(async () => {
     const response = await fetch('/assets/plugins/ultrathink.svg');
     return { ok: response.ok, contentType: response.headers.get('content-type'), text: await response.text() };
@@ -162,7 +174,7 @@ async function proveViewport(label, viewport) {
 try {
   await proveViewport('desktop-1440', { width: 1440, height: 1100 });
   await proveViewport('mobile-390', { width: 390, height: 844 });
-  console.log(`PASS: approved ULTRATHINK artwork ${APPROVED_ART_SHA256}, command identity, non-authorizing boundary, responsive layout, browser asset loading, and durable desktop/mobile screenshot receipts are proven.`);
+  console.log(`PASS: approved ULTRATHINK artwork ${APPROVED_ART_SHA256}, command identity, non-authorizing boundary, square composition, responsive layout, browser asset loading, and durable desktop/mobile screenshot receipts are proven.`);
 } finally {
   await browser.close();
   await new Promise((resolve) => server.close(resolve));
