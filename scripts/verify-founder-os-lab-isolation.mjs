@@ -23,12 +23,32 @@ const forbiddenPatterns = [
   { pattern: /\bimport\s*\(/, label: 'dynamic import' },
   { pattern: /\brequire\s*\(/, label: 'CommonJS module loading' },
   { pattern: /\b(setTimeout|setInterval|setImmediate)\s*\(/, label: 'timer scheduling' },
-  // Explicit Date construction from supplied evidence is deterministic and is
-  // allowed for canonical ISO normalization. Ambient clock reads are not.
-  { pattern: /Date\.now\s*\(|new\s+Date\s*\(\s*\)|performance\.now\s*\(/, label: 'ambient wall clock read' },
+  { pattern: /Date\.now\s*\(|performance\.now\s*\(/, label: 'ambient wall clock read' },
   { pattern: /Math\.random\s*\(|\brandomUUID\s*\(|\brandomBytes\s*\(|\brandomFill(?:Sync)?\s*\(|getRandomValues\s*\(/, label: 'randomness' },
   { pattern: /\bWorker\b/, label: 'worker execution' },
 ];
+
+/**
+ * Allow deterministic `new Date(explicitEvidence)` normalization while
+ * rejecting direct clock reads and spread constructions that can collapse to
+ * zero arguments. Calling Date as a function is always an ambient clock read,
+ * regardless of any supplied arguments.
+ */
+function hasAmbientDateConstruction(source) {
+  const dateCall = /\bDate\s*\(/g;
+  let match;
+
+  while ((match = dateCall.exec(source)) !== null) {
+    const before = source.slice(Math.max(0, match.index - 48), match.index);
+    const after = source.slice(match.index + match[0].length);
+    const constructedWithNew = /\bnew\s+$/.test(before);
+
+    if (!constructedWithNew) return true;
+    if (/^\s*(?:\)|\.\.\.)/.test(after)) return true;
+  }
+
+  return false;
+}
 
 async function collectTypeScriptFiles(directory) {
   const entries = await readdir(directory, { withFileTypes: true });
@@ -50,11 +70,33 @@ if (files.length < 5) {
   failures.push(`expected at least five TypeScript lab files, found ${files.length}`);
 }
 
+for (const sample of [
+  'Date()',
+  'Date(explicitEvidence)',
+  'new Date(Date())',
+  'new Date(...([] as []))',
+]) {
+  if (!hasAmbientDateConstruction(sample)) {
+    failures.push(`ambient Date scanner regression for ${JSON.stringify(sample)}`);
+  }
+}
+for (const sample of [
+  'new Date(explicitEvidence)',
+  'new Date(Date.parse(explicitEvidence))',
+]) {
+  if (hasAmbientDateConstruction(sample)) {
+    failures.push(`deterministic Date normalization incorrectly rejected for ${JSON.stringify(sample)}`);
+  }
+}
+
 for (const file of files) {
   const source = await readFile(file, 'utf8');
   const displayPath = relative(ROOT, file);
   for (const rule of forbiddenPatterns) {
     if (rule.pattern.test(source)) failures.push(`${displayPath}: forbidden ${rule.label}`);
+  }
+  if (hasAmbientDateConstruction(source)) {
+    failures.push(`${displayPath}: forbidden ambient wall clock read`);
   }
 }
 
@@ -139,5 +181,5 @@ if (failures.length > 0) {
 }
 
 console.log(`Founder OS lab isolation passed for ${files.length} TypeScript files.`);
-console.log('Deterministic timestamp normalization is allowed; ambient time reads, side effects, and actual randomness remain forbidden.');
+console.log('Deterministic timestamp normalization is allowed; direct Date calls, zero-argument/spread Date construction, ambient time reads, side effects, and actual randomness remain forbidden.');
 console.log('Chief AI owns capability selection; FCR/n8n retain governance/execution boundaries only.');
