@@ -88,11 +88,9 @@ const PROVIDER_AVAILABILITY_FAILURES = new Set([
   'LOCAL_CHIEF_NOT_CONFIGURED',
   'LOCAL_CHIEF_TIMEOUT',
   'LOCAL_CHIEF_REQUEST_FAILED',
-  'LOCAL_CHIEF_HTTP_ERROR',
   'OPENAI_NOT_CONFIGURED',
   'OPENAI_TIMEOUT',
   'OPENAI_REQUEST_FAILED',
-  'OPENAI_HTTP_ERROR',
   'CHIEF_PROVIDER_INELIGIBLE',
 ]);
 
@@ -156,8 +154,16 @@ function providerFailureCode(error: unknown): string {
   return error instanceof QuickScanChiefProviderError ? error.code : 'UNKNOWN_PROVIDER_FAILURE';
 }
 
+function isRecoverableHttpStatus(status: number | null): boolean {
+  return status === 408 || status === 425 || status === 429 || (status !== null && status >= 500);
+}
+
 function isProviderAvailabilityFailure(error: unknown): boolean {
-  return error instanceof QuickScanChiefProviderError && PROVIDER_AVAILABILITY_FAILURES.has(error.code);
+  if (!(error instanceof QuickScanChiefProviderError)) return false;
+  if (error.code === 'LOCAL_CHIEF_HTTP_ERROR' || error.code === 'OPENAI_HTTP_ERROR') {
+    return isRecoverableHttpStatus(error.status);
+  }
+  return PROVIDER_AVAILABILITY_FAILURES.has(error.code);
 }
 
 function responseText(payload: JsonRecord): string | null {
