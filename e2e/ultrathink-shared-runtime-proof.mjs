@@ -84,6 +84,7 @@ try {
 
   const anonymous = await browser.newContext({ viewport: { width: 390, height: 844 } });
   const anonymousPage = await anonymous.newPage();
+  await anonymousPage.goto(`${BASE_URL}/control-room/`, { waitUntil: 'domcontentloaded' });
   const anonymousResult = await anonymousPage.evaluate(async ({ baseUrl, intent }) => {
     const response = await fetch(`${baseUrl}/capabilities/ultrathink-shared-reasoning-v1/runs`, {
       method: 'POST',
