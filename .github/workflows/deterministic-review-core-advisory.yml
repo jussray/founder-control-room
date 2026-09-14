@@ -191,7 +191,7 @@ jobs:
             echo "- Founder-bound exact PR head: \`$TARGET_HEAD_SHA\`"
             echo "- Founder-bound current main: \`$EXPECTED_MAIN_SHA\`"
             echo "- Founder immutable GitHub user ID: \`286642846\`"
-            echo "- Evidence cookie: issue #418 comment \`${{ github.event.comment.id }}\`"
+            echo "- Evidence cookie: issue #418 comment \`$COMMENT_ID\`"
             echo '- Target workflow: `.github/workflows/deterministic-review-core-advisory.yml`'
             echo '- Verdict, Founder Final, merge, deploy, provider, database, secret, and publication authority: none granted by this command'
           } >> "$GITHUB_STEP_SUMMARY"
