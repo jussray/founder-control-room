@@ -136,6 +136,9 @@ async function proveComposer(browser, scenario) {
   assert.equal(await page.locator('#workspace-ready').isHidden(), true);
   assert.equal(await page.locator('#account-secondary').isHidden(), true);
   await page.getByText('What are you working on?', { exact: true }).waitFor();
+  await page.locator('#chief-presence').waitFor({ state: 'visible' });
+  assert.match(await page.locator('#chief-presence').textContent(), /CHIEF/);
+  assert.match(await page.locator('#chief-presence').textContent(), /LEAD · BUILD · EXECUTE/);
   await assertNoHorizontalOverflow(page, `${scenario.name}: project step`);
 
   await page.locator(`label.choice-card:has(input[name="projectType"][value="${scenario.projectType}"])`).click();
@@ -150,6 +153,21 @@ async function proveComposer(browser, scenario) {
   await page.locator('#repo-identifier').fill('jussray/example-project');
   await page.locator(`label.state-chip:has(input[name="currentState"][value="${scenario.currentState}"])`).click();
   await page.locator('[data-next-step="4"]').click();
+
+  const recommendation = page.locator('#chief-recommendation');
+  await recommendation.waitFor({ state: 'visible' });
+  const recommendationTitle = await page.locator('#chief-recommendation-title').textContent();
+  const recommendationDetail = await page.locator('#chief-recommendation-detail').textContent();
+  assert.match(recommendationTitle || '', new RegExp(scenario.projectTypeLabel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  assert.match(recommendationTitle || '', new RegExp(scenario.missionLabel));
+  assert.match(recommendationDetail || '', new RegExp(scenario.projectName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  assert.equal(submittedPayload, null, 'Chief recommendation must not auto-create or authorize the Control Room');
+  await assertNoHorizontalOverflow(page, `${scenario.name}: Chief recommendation`);
+
+  const recommendationScreenshotPath = `${proofDir}/${scenario.name}-chief-recommendation.png`;
+  const durableRecommendationScreenshotPath = `${durableProofDir}/${scenario.name}-chief-recommendation.png`;
+  await page.screenshot({ path: recommendationScreenshotPath, fullPage: true });
+  copyFileSync(recommendationScreenshotPath, durableRecommendationScreenshotPath);
 
   await page.locator('#authority-confirm').check();
   await page.locator('#workspace-button').click();
@@ -214,4 +232,4 @@ try {
   await browser.close();
 }
 
-console.log('Control Room Composer Playwright proof passed: desktop + mobile first-run flow, visible-card interaction, payload binding, overflow checks, ready-room restoration, and durable screenshot receipts.');
+console.log('Control Room Composer Playwright proof passed: desktop + mobile first-run flow, Chief black/gold recommendation without auto-authority, visible-card interaction, payload binding, overflow checks, ready-room restoration, and durable screenshot receipts.');
