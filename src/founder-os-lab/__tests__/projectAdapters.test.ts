@@ -179,4 +179,57 @@ describe('Se’kret Bip Founder OS project adapter', () => {
       'is missing exact-head project contract URLs',
     );
   });
+
+  it('rejects lookalike, wrong-ref, and noncanonical contract URLs', () => {
+    const badUrls = [
+      `https://example.com/jussray/Sekret-Bip/blob/${ADAPTER.auditedSourceHead}/docs/COMPANION_NAME_CANON.md`,
+      `https://github.com/jussray/Sekret-Bip/blob/main/docs/COMPANION_NAME_CANON.md`,
+      `https://github.com/jussray//Sekret-Bip/blob/${ADAPTER.auditedSourceHead}/docs/COMPANION_NAME_CANON.md`,
+    ];
+
+    for (const badUrl of badUrls) {
+      const urls = contractUrls().filter((url) => !url.endsWith('/docs/COMPANION_NAME_CANON.md'));
+      urls.push(badUrl);
+      const plan = planFounderOsLab({
+        goal: 'Inspect project canon.',
+        action: 'inspect',
+        provider: 'github',
+        project: project({ contractUrls: urls }),
+      });
+      expect(plan.readiness).toBe('blocked');
+      expect(plan.route.project?.contractPathsMissing).toContain('docs/COMPANION_NAME_CANON.md');
+    }
+  });
+
+  it('refuses mutating actions and unrelated providers in V1', () => {
+    const deploy = planFounderOsLab({
+      goal: 'Deploy Se’kret Bip from Founder Control Room.',
+      action: 'deploy-code',
+      command: 'goalfix',
+      provider: 'cloudflare',
+      approval: {
+        id: 'founder-approved:project-adapter-test',
+        actions: ['deploy-code'],
+      },
+      project: project({ audience: 'teen' }),
+    });
+    expect(deploy.readiness).toBe('blocked');
+    expect(deploy.truth.blocked.join(' ')).toContain(
+      'adapter supports only inspect and plan previews in V1',
+    );
+    expect(deploy.authority.executionAllowed).toBe(false);
+
+    const crm = planFounderOsLab({
+      goal: 'Route Se’kret Bip canon into CRM.',
+      action: 'plan',
+      command: 'truthmode',
+      provider: 'hubspot',
+      project: project(),
+    });
+    expect(crm.readiness).toBe('blocked');
+    expect(crm.truth.blocked.join(' ')).toContain(
+      'hubspot is not an allowed sekret-bip preview provider',
+    );
+    expect(crm.authority.executionAllowed).toBe(false);
+  });
 });
