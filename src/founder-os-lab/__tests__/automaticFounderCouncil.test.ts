@@ -51,7 +51,8 @@ describe('automatic Founder Council runtime overlay', () => {
     expect(run.status).toBe('simulated');
     expect(run.plan).not.toBeNull();
     expect(run.plan?.route.capabilityPlan.observed).toBe(false);
-    expect(run.plan?.route.capabilityPlan.strategicLenses).toEqual([
+    expect(run.plan?.route.capabilityPlan.strategicLenses).toEqual([]);
+    expect(run.plan?.route.capabilityPlan.effectiveStrategicLenses).toEqual([
       ...FCR_AUTOMATIC_COUNCIL_LENSES,
     ]);
     expect(run.plan?.authority.executionAllowed).toBe(false);
@@ -76,10 +77,11 @@ describe('automatic Founder Council runtime overlay', () => {
     expect(run.plan).not.toBeNull();
     expect(run.plan?.route.capabilityPlan.valid).toBe(true);
     expect(run.plan?.route.capabilityPlan.planHash).toBe(originalHash);
-    expect(run.plan?.route.capabilityPlan.strategicLenses).toEqual(
+    expect(run.plan?.route.capabilityPlan.strategicLenses).toEqual(originalStrategicLenses);
+    expect(run.plan?.route.capabilityPlan.effectiveStrategicLenses).toEqual(
       effectiveFounderCouncilLenses(originalStrategicLenses),
     );
-    expect(run.plan?.route.capabilityPlan.strategicLenses).toContain('custom-task-lens');
+    expect(run.plan?.route.capabilityPlan.effectiveStrategicLenses).toContain('custom-task-lens');
     expect(capabilityPlan.planHash).toBe(originalHash);
     expect(capabilityPlan.strategicLenses).toEqual(originalStrategicLenses);
     expect(run.plan?.authority.executionAllowed).toBe(false);
