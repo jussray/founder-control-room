@@ -31,6 +31,7 @@ export const FOUNDER_CONTROL_ROOM_REQUIRED_NATIVE_APPROVALS = 0;
 const FOUNDER_CONTROL_ROOM_REQUIRED_STATUS_CHECKS = [
   "Required Gate",
   "Verify test-ledger contract",
+  "verify-pair-contract",
 ] as const;
 
 function isFounderControlRoomRepository(repositoryIdentifier: string | undefined): boolean {
