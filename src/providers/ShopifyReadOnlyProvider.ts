@@ -90,8 +90,18 @@ function parsedTimestamp(value: string | null | undefined): number | null {
   return Number.isFinite(timestamp) ? timestamp : null;
 }
 
-function canonicalScopes(scopes: readonly string[]): string[] {
-  return [...new Set(scopes.map((scope) => scope.trim()).filter((scope) => scope.length > 0))].sort();
+function scopeInventoryIsValid(value: unknown): value is readonly string[] {
+  return Array.isArray(value) && value.every((scope) => typeof scope === 'string');
+}
+
+function canonicalScopes(scopes: unknown): string[] {
+  if (!Array.isArray(scopes)) return [];
+  return [...new Set(
+    scopes
+      .filter((scope): scope is string => typeof scope === 'string')
+      .map((scope) => scope.trim())
+      .filter((scope) => scope.length > 0),
+  )].sort();
 }
 
 function normalizeObservation(
@@ -102,7 +112,7 @@ function normalizeObservation(
 ): ProviderChildObservation | null {
   const installationId = normalizedText(app.installationId);
   const appId = normalizedText(app.appId);
-  if (!installationId || !appId || !Array.isArray(app.scopes)) return null;
+  if (!installationId || !appId) return null;
 
   return {
     projectSlug: FOUNDER_CONTROL_ROOM_PROJECT_SLUG,
@@ -129,14 +139,19 @@ export function preflightFounderShopifyInventory(
   ];
   const observedShopifyDomain = normalizedDomain(snapshot.myshopifyDomain);
   const observedPrimaryDomain = normalizedDomain(snapshot.primaryDomain);
-  const nowMs = options.now?.getTime() ?? Date.now();
+  const suppliedNowMs = options.now?.getTime();
+  const nowMs = options.now === undefined ? Date.now() : suppliedNowMs;
+  const evaluationTimeValid = Number.isFinite(nowMs);
   const requestedMaxAgeMs = options.maxSnapshotAgeMs ?? DEFAULT_SHOPIFY_SNAPSHOT_MAX_AGE_MS;
-  const maxSnapshotAgeMs = Number.isFinite(requestedMaxAgeMs) && requestedMaxAgeMs > 0
+  const freshnessWindowValid = Number.isFinite(requestedMaxAgeMs) && requestedMaxAgeMs > 0;
+  const maxSnapshotAgeMs = freshnessWindowValid
     ? requestedMaxAgeMs
     : DEFAULT_SHOPIFY_SNAPSHOT_MAX_AGE_MS;
   const observedAtMs = parsedTimestamp(snapshot.observedAt);
   const observedAt = observedAtMs === null ? null : new Date(observedAtMs).toISOString();
-  const snapshotAgeMs = observedAtMs === null ? null : nowMs - observedAtMs;
+  const snapshotAgeMs = observedAtMs === null || !evaluationTimeValid
+    ? null
+    : Number(nowMs) - observedAtMs;
   const inventoryComplete = snapshot.hasNextPage === false;
   const apps = Array.isArray(snapshot.apps) ? snapshot.apps : [];
   const storeIdentityValid = observedShopifyDomain === FOUNDER_CONTROL_ROOM_SHOPIFY_DOMAIN
@@ -152,6 +167,13 @@ export function preflightFounderShopifyInventory(
     errors.push(
       `Shopify primary domain must be exactly ${FOUNDER_CONTROL_ROOM_PRIMARY_DOMAIN}; observed ${observedPrimaryDomain || 'missing'}.`,
     );
+  }
+
+  if (!evaluationTimeValid) {
+    errors.push('Shopify installed-app evaluation time must be a valid Date.');
+  }
+  if (!freshnessWindowValid) {
+    errors.push('Shopify installed-app maximum snapshot age must be a positive finite number.');
   }
 
   if (observedAtMs === null) {
@@ -186,9 +208,9 @@ export function preflightFounderShopifyInventory(
       appStructureValid = false;
       errors.push(`Shopify app at index ${index} is missing appId.`);
     }
-    if (!Array.isArray(app.scopes)) {
+    if (!scopeInventoryIsValid(app.scopes)) {
       appStructureValid = false;
-      errors.push(`Shopify app at index ${index} is missing its scope inventory.`);
+      errors.push(`Shopify app at index ${index} has an invalid scope inventory; every scope must be a string.`);
     }
 
     if (installationId) {
@@ -271,11 +293,10 @@ export function reconcileFounderShopifyInventory(
   options: ShopifyReadOnlyPreflightOptions = {},
 ): ShopifyInventoryReconciliationResult {
   const preflight = preflightFounderShopifyInventory(snapshot, options);
-  const now = (options.now ?? new Date()).toISOString();
-  const requestedMaxAgeMs = options.maxSnapshotAgeMs ?? DEFAULT_SHOPIFY_SNAPSHOT_MAX_AGE_MS;
-  const maxAgeMs = Number.isFinite(requestedMaxAgeMs) && requestedMaxAgeMs > 0
-    ? requestedMaxAgeMs
-    : DEFAULT_SHOPIFY_SNAPSHOT_MAX_AGE_MS;
+  const suppliedNowMs = options.now?.getTime();
+  const nowMs = options.now === undefined ? Date.now() : suppliedNowMs;
+  const now = Number.isFinite(nowMs) ? new Date(Number(nowMs)).toISOString() : 'INVALID_NOW';
+  const maxAgeMs = options.maxSnapshotAgeMs ?? DEFAULT_SHOPIFY_SNAPSHOT_MAX_AGE_MS;
 
   const apps = preflight.observations.map((observation) => {
     const declaration = parentConnectionDeclared
