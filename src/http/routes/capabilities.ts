@@ -12,6 +12,11 @@ import {
   TinyFishReadOnlyError,
   type TinyFishContinuityInput,
 } from '../../capabilities/tinyFishWebObservation.js';
+import {
+  resolveUltrathinkSharedReasoning,
+  ULTRATHINK_SHARED_REASONING_CAPABILITY,
+  ULTRATHINK_SHARED_REASONING_CAPABILITY_ID,
+} from '../../capabilities/ultrathinkSharedReasoning.js';
 import { capabilities } from '../../capabilities/workbenchRegistry.js';
 import { enqueueReconcile } from '../../events/outbox.js';
 import { supabase } from '../../lib/supabaseClient.js';
@@ -29,6 +34,7 @@ const DYNAMIC_CAPABILITIES = new Map([
 const WORKBENCH_CAPABILITIES = Object.freeze([
   ...capabilities,
   TINYFISH_WEB_OBSERVATION_CAPABILITY,
+  ULTRATHINK_SHARED_REASONING_CAPABILITY,
 ]);
 
 function continuityValue(value: unknown): string | null {
@@ -52,6 +58,49 @@ function boundedIntent(body: Record<string, unknown>, operation: 'search' | 'fet
   return operation === 'search'
     ? 'Observe the requested public-web search through the bounded read-only capability.'
     : 'Observe the requested public URLs through the bounded read-only capability.';
+}
+
+function runUltrathinkReasoning(
+  req: FounderRequest,
+  res: Response,
+  body: Record<string, unknown>,
+) {
+  try {
+    const executionId = `ultrathink-reasoning:${randomUUID()}`;
+    const result = resolveUltrathinkSharedReasoning({
+      executionId,
+      surface: body.surface,
+      intent: typeof body.intent === 'string' ? body.intent : '',
+      founder: req.founder,
+      priorEvidenceFingerprint: continuityValue(body.priorEvidenceFingerprint),
+      priorProofCookie: continuityValue(body.priorProofCookie),
+    });
+
+    return res.status(200).set('Cache-Control', 'no-store').json({
+      run: {
+        id: executionId,
+        capabilityId: ULTRATHINK_SHARED_REASONING_CAPABILITY_ID,
+        state: 'completed',
+        authority: 'reason_only',
+        consequence: 'READ',
+        mutationAllowed: false,
+        providerExecution: false,
+        sharedRuntime: result.receipt,
+        presentation: result.presentation,
+      },
+    });
+  } catch (error) {
+    if (error instanceof SharedCapabilityRuntimeError) {
+      return res.status(sharedRuntimeErrorStatus(error)).set('Cache-Control', 'no-store').json({
+        error: error.message,
+        code: error.code,
+      });
+    }
+    return res.status(500).set('Cache-Control', 'no-store').json({
+      error: 'ULTRATHINK shared-runtime resolution failed.',
+      code: 'shared_runtime_resolution_failure',
+    });
+  }
 }
 
 async function runTinyFishObservation(
@@ -131,6 +180,10 @@ capabilitiesRouter.post('/:capabilityId/runs', async (req: FounderRequest, res) 
   const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body)
     ? req.body as Record<string, unknown>
     : {};
+
+  if (capabilityId === ULTRATHINK_SHARED_REASONING_CAPABILITY_ID) {
+    return runUltrathinkReasoning(req, res, body);
+  }
 
   if (capabilityId === TINYFISH_WEB_OBSERVATION_CAPABILITY_ID) {
     return runTinyFishObservation(req, res, body);
