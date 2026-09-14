@@ -89,30 +89,31 @@ describe('GET /plugin-center', () => {
         };
       }
       if (table === 'plugin_permission_grants') {
+        const grantResult = Promise.resolve({
+          data: [
+            {
+              id: 'grant-1',
+              project_id: PROJECT_ID,
+              connection_id: 'connection-1',
+              grant_type: 'tool_rule',
+              tool_rule: 'Bash(git push origin main)',
+              reason: 'Temporary founder-approved integration window',
+              requested_by: FOUNDER_EMAIL,
+              usage_limit: 'Use only after evidence is preserved.',
+              expires_at: '2099-07-20T18:00:00.000Z',
+              revoked_at: null,
+              created_at: '2026-07-19T18:00:00.000Z',
+              projects: { id: PROJECT_ID, slug: PROJECT_SLUG, name: 'Founder Control Room' },
+            },
+          ],
+          error: null,
+        });
+        const ordered = { limit: () => grantResult };
         return {
           select: () => ({
             is: () => ({
-              order: () => ({
-                limit: () => Promise.resolve({
-                  data: [
-                    {
-                      id: 'grant-1',
-                      project_id: PROJECT_ID,
-                      connection_id: 'connection-1',
-                      grant_type: 'tool_rule',
-                      tool_rule: 'Bash(git push origin main)',
-                      reason: 'Temporary founder-approved integration window',
-                      requested_by: FOUNDER_EMAIL,
-                      usage_limit: 'Use only after evidence is preserved.',
-                      expires_at: '2026-07-20T18:00:00.000Z',
-                      revoked_at: null,
-                      created_at: '2026-07-19T18:00:00.000Z',
-                      projects: { id: PROJECT_ID, slug: PROJECT_SLUG, name: 'Founder Control Room' },
-                    },
-                  ],
-                  error: null,
-                }),
-              }),
+              order: () => ordered,
+              gt: () => ({ order: () => ordered }),
             }),
           }),
         };
