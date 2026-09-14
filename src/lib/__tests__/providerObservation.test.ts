@@ -145,4 +145,30 @@ describe('reconcileProviderObservation', () => {
     expect(result.reasons).toEqual(['DECLARATION_INVALID']);
     expect(result.authorityGranted).toBe(false);
   });
+
+  it('fails closed on malformed observed scope elements without throwing', () => {
+    const malformed = {
+      ...observation,
+      scopes: ['read_orders', null] as unknown as string[],
+    };
+    const result = reconcile(malformed, declaration);
+
+    expect(result.state).toBe('UNKNOWN');
+    expect(result.reasons).toEqual(['OBSERVATION_IDENTITY_INVALID']);
+    expect(result.observedScopes).toEqual(['read_orders']);
+    expect(result.authorityGranted).toBe(false);
+  });
+
+  it('fails closed on malformed declared scope elements without throwing', () => {
+    const malformed = {
+      ...declaration,
+      approvedScopes: ['read_orders', null] as unknown as string[],
+    };
+    const result = reconcile(observation, malformed);
+
+    expect(result.state).toBe('UNKNOWN');
+    expect(result.reasons).toEqual(['DECLARATION_INVALID']);
+    expect(result.approvedScopes).toEqual(['read_orders']);
+    expect(result.authorityGranted).toBe(false);
+  });
 });
