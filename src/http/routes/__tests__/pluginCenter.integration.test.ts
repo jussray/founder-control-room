@@ -58,8 +58,10 @@ describe('Plugin Center auth gate', () => {
 });
 
 describe('GET /plugin-center', () => {
-  it('returns the plugin catalog, connection summary, and active temporary grants', async () => {
+  it('returns only unexpired temporary grants without allowing founder state to be cached', async () => {
     authSuccess();
+    const gt = vi.fn();
+
     supabaseMock.from.mockImplementation((table: string) => {
       if (table === 'founder_users') return founderUsersRow();
       if (table === 'project_connections') {
@@ -109,11 +111,12 @@ describe('GET /plugin-center', () => {
           error: null,
         });
         const ordered = { limit: () => grantResult };
+        gt.mockImplementation(() => ({ order: () => ordered }));
         return {
           select: () => ({
             is: () => ({
               order: () => ordered,
-              gt: () => ({ order: () => ordered }),
+              gt,
             }),
           }),
         };
@@ -125,6 +128,10 @@ describe('GET /plugin-center', () => {
     const res = await request(app).get('/plugin-center').set('Authorization', BEARER);
 
     expect(res.status).toBe(200);
+    expect(res.headers['cache-control']).toBe('no-store');
+    expect(gt).toHaveBeenCalledTimes(1);
+    expect(gt.mock.calls[0]?.[0]).toBe('expires_at');
+    expect(Date.parse(String(gt.mock.calls[0]?.[1]))).toBeGreaterThan(0);
     expect(res.body.contract.id).toBe('founder-control-room-plugin-center');
     expect(res.body.contract.version).toBe('1.1.0');
     expect(res.body.catalog.some((plugin: { type: string }) => plugin.type === 'github')).toBe(true);
@@ -232,5 +239,56 @@ describe('POST /plugin-center/grants', () => {
 
     expect(res.status).toBe(201);
     expect(res.body.grant.id).toBe('grant-1');
+  });
+});
+
+describe('POST /plugin-center/grants/:grantId/revoke', () => {
+  it('keeps revocation truth explicit when the audit write fails after the revoke', async () => {
+    authSuccess();
+    const revokedGrant = {
+      id: 'grant-1',
+      project_id: PROJECT_ID,
+      revoked_at: '2026-09-14T04:00:00.000Z',
+    };
+
+    supabaseMock.from.mockImplementation((table: string) => {
+      if (table === 'founder_users') return founderUsersRow();
+      if (table === 'plugin_permission_grants') {
+        return {
+          select: () => ({
+            eq: () => ({
+              maybeSingle: () => Promise.resolve({
+                data: { id: 'grant-1', project_id: PROJECT_ID, revoked_at: null },
+                error: null,
+              }),
+            }),
+          }),
+          update: () => ({
+            eq: () => ({
+              select: () => ({
+                single: () => Promise.resolve({ data: revokedGrant, error: null }),
+              }),
+            }),
+          }),
+        };
+      }
+      if (table === 'project_events') {
+        return { insert: () => Promise.resolve({ error: { message: 'audit unavailable' } }) };
+      }
+      return {};
+    });
+
+    const app = buildApp();
+    const res = await request(app)
+      .post('/plugin-center/grants/grant-1/revoke')
+      .set('Authorization', BEARER);
+
+    expect(res.status).toBe(500);
+    expect(res.body).toMatchObject({
+      error: 'PLUGIN_REVOKE_AUDIT_INCOMPLETE',
+      detail: 'audit unavailable',
+      revocationSucceeded: true,
+      grant: { id: 'grant-1', project_id: PROJECT_ID },
+    });
   });
 });
