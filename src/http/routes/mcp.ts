@@ -62,8 +62,8 @@ function invocationFromRequest(
   };
 }
 
-// Canonical ChatGPT/Claude/Manus connector lane. Supabase OAuth, token-bound
-// project scope, narrow named tools, and evidence persistence all fail closed.
+// Canonical remote connector lane for MCP-compatible AI clients. Supabase OAuth,
+// token-bound project scope, narrow named tools, and evidence persistence all fail closed.
 // OAuth project claims are intersected with the server-owned portfolio scope.
 mcpRouter.post("/", handlePairedRemoteMcp);
 
