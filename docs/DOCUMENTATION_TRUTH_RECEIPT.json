@@ -1,6 +1,6 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Preserve the current TinyFish Cloudflare and Shopify read-only provider boundaries while documenting the standalone Founder Control Room and Chief AI peer authority contract, including exact candidate peer-head bindings that fail closed on drift without claiming shared runtime, transferred authority, merge, deploy, publication, provider mutation, or runtime activation.",
+  "purpose": "Preserve the current TinyFish Cloudflare and Shopify read-only provider boundaries while documenting the standalone Founder Control Room and Chief AI peer authority contract, including exact candidate peer-head bindings and a load-bearing pair status check that fail closed on drift without claiming shared runtime, transferred authority, merge, deploy, publication, provider mutation, or runtime activation.",
   "domains": [
     "cloudflare-authority",
     "repository-provider",
@@ -51,6 +51,12 @@
       "path": "src/providers/ShopifyReadOnlyProvider.ts",
       "claims": [
         "`src/providers/ShopifyReadOnlyProvider.ts` must bind Shopify observation to the exact Founder Control Room permanent and branded store identities, require complete pagination and app scope inventory, withhold CURRENT on incomplete or mismatched provider evidence, keep reconciliation non-authorizing, and never persist provider inventory or perform Shopify mutation."
+      ]
+    },
+    {
+      "path": "src/providers/providerFactory.ts",
+      "claims": [
+        "`src/providers/providerFactory.ts` must require the exact `verify-pair-contract` check alongside Required Gate and the exact-head test-ledger check for active Founder Control Room main governance, so the standalone Founder Control Room and Chief AI pair contract cannot remain advisory at merge time."
       ]
     },
     {
