@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { createServer } from 'node:http';
 import { copyFileSync, mkdirSync, readFileSync } from 'node:fs';
 import { extname, join, normalize } from 'node:path';
@@ -8,6 +9,7 @@ const REPO_ROOT = fileURLToPath(new URL('../', import.meta.url));
 const PUBLIC_ROOT = join(REPO_ROOT, 'public');
 const RESULTS_ROOT = join(REPO_ROOT, 'test-results');
 const DURABLE_RESULTS_ROOT = join(REPO_ROOT, 'logs', 'plugin-center-ultrathink');
+const APPROVED_ART_SHA256 = '5802a8fb856b813011851600ed7a6fa764f19141b91742823a584c58deb3e218';
 
 const mime = {
   '.html': 'text/html; charset=utf-8',
@@ -119,8 +121,22 @@ async function proveViewport(label, viewport) {
   if (!artwork.ok || !artwork.contentType?.includes('image/svg+xml')) {
     throw new Error(`${label}: ULTRATHINK SVG was not served as an image: ${JSON.stringify({ ok: artwork.ok, contentType: artwork.contentType })}`);
   }
-  if (!artwork.text.includes('data-ultrathink-art="v1"') || !artwork.text.includes('ULTRATHINK') || !artwork.text.includes('DEEP REASONING CORE')) {
-    throw new Error(`${label}: ULTRATHINK artwork identity markers are missing`);
+
+  for (const marker of [
+    'data-ultrathink-art="v2-approved-brain"',
+    `data-source-sha256="${APPROVED_ART_SHA256}"`,
+    'HIGHER INTELLIGENCE',
+    'REAL RESULTS',
+    'FCR PLUGIN',
+  ]) {
+    if (!artwork.text.includes(marker)) throw new Error(`${label}: approved ULTRATHINK identity marker is missing: ${marker}`);
+  }
+
+  const embeddedMatch = artwork.text.match(/href="data:image\/webp;base64,([^"]+)"/);
+  if (!embeddedMatch) throw new Error(`${label}: approved ULTRATHINK WebP payload is missing`);
+  const embeddedSha = createHash('sha256').update(Buffer.from(embeddedMatch[1], 'base64')).digest('hex');
+  if (embeddedSha !== APPROVED_ART_SHA256) {
+    throw new Error(`${label}: ULTRATHINK artwork bytes drifted: expected ${APPROVED_ART_SHA256}, got ${embeddedSha}`);
   }
 
   const overflow = await page.evaluate(() => ({
@@ -146,7 +162,7 @@ async function proveViewport(label, viewport) {
 try {
   await proveViewport('desktop-1440', { width: 1440, height: 1100 });
   await proveViewport('mobile-390', { width: 390, height: 844 });
-  console.log('PASS: ULTRATHINK Plugin Center artwork, SVG identity, command identity, non-authorizing boundary, responsive layout, browser asset loading, and durable screenshot receipts are proven on desktop and mobile.');
+  console.log(`PASS: approved ULTRATHINK artwork ${APPROVED_ART_SHA256}, command identity, non-authorizing boundary, responsive layout, browser asset loading, and durable desktop/mobile screenshot receipts are proven.`);
 } finally {
   await browser.close();
   await new Promise((resolve) => server.close(resolve));
