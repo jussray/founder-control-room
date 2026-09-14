@@ -21,6 +21,16 @@ function pr(overrides = {}) {
   };
 }
 
+function ownerPush(overrides = {}) {
+  return {
+    eventName: 'push',
+    ref: 'refs/heads/main',
+    actor: 'jussray',
+    repositoryOwner: 'jussray',
+    ...overrides,
+  };
+}
+
 function response(body, status = 200) {
   return {
     ok: status >= 200 && status < 300,
@@ -45,7 +55,45 @@ test('accepts exactly one merged PR bound to current main SHA', () => {
   });
 });
 
-test('rejects a direct or otherwise unproven main commit', () => {
+test('accepts an exact current-main push performed by the repository owner', () => {
+  assert.deepEqual(classifyMainReleaseProvenance({
+    targetSha: SHA,
+    currentMainSha: SHA,
+    associatedPulls: [],
+    directMainContext: ownerPush(),
+  }), {
+    ok: true,
+    reason: 'founder_owner_direct_main_provenance',
+    directMainActor: 'jussray',
+    targetSha: SHA,
+  });
+});
+
+test('rejects a direct main push from a non-owner actor', () => {
+  assert.equal(classifyMainReleaseProvenance({
+    targetSha: SHA,
+    currentMainSha: SHA,
+    associatedPulls: [],
+    directMainContext: ownerPush({ actor: 'automation-bot' }),
+  }).reason, 'direct_or_unproven_main_commit');
+});
+
+test('rejects owner identity outside an actual main push', () => {
+  assert.equal(classifyMainReleaseProvenance({
+    targetSha: SHA,
+    currentMainSha: SHA,
+    associatedPulls: [],
+    directMainContext: ownerPush({ eventName: 'workflow_dispatch' }),
+  }).reason, 'direct_or_unproven_main_commit');
+  assert.equal(classifyMainReleaseProvenance({
+    targetSha: SHA,
+    currentMainSha: SHA,
+    associatedPulls: [],
+    directMainContext: ownerPush({ ref: 'refs/heads/feature' }),
+  }).reason, 'direct_or_unproven_main_commit');
+});
+
+test('rejects a direct or otherwise unproven main commit without trusted push context', () => {
   assert.deepEqual(classifyMainReleaseProvenance({
     targetSha: SHA,
     currentMainSha: SHA,
@@ -55,6 +103,15 @@ test('rejects a direct or otherwise unproven main commit', () => {
     reason: 'direct_or_unproven_main_commit',
     targetSha: SHA,
   });
+});
+
+test('rejects stale target even when founder direct-main context is valid', () => {
+  assert.equal(classifyMainReleaseProvenance({
+    targetSha: SHA,
+    currentMainSha: OTHER,
+    associatedPulls: [],
+    directMainContext: ownerPush(),
+  }).reason, 'stale_target');
 });
 
 test('rejects stale target even when a PR association exists', () => {
@@ -81,11 +138,12 @@ test('rejects a PR whose provider merge SHA does not equal the release SHA', () 
   }).reason, 'direct_or_unproven_main_commit');
 });
 
-test('rejects ambiguous release provenance', () => {
+test('rejects ambiguous release provenance even with valid direct-main context', () => {
   const result = classifyMainReleaseProvenance({
     targetSha: SHA,
     currentMainSha: SHA,
     associatedPulls: [pr(), pr({ number: 43 })],
+    directMainContext: ownerPush(),
   });
   assert.equal(result.reason, 'ambiguous_pr_provenance');
   assert.deepEqual(result.matchingPullRequestNumbers, [42, 43]);
@@ -182,4 +240,12 @@ test('main provenance workflow cancels stale push runs without weakening provena
   assert.ok(unenforced > receipt, 'superseded receipt must not claim provenance enforcement');
   assert.ok(verifier > unenforced, 'current candidates must still reach the provenance verifier');
   assert.ok(verifierGuard > verifier, 'the verifier may be skipped only for an explicitly superseded push');
+});
+
+test('main provenance workflow binds founder direct-main authority to trusted GitHub context', () => {
+  const workflow = readFileSync(new URL('../.github/workflows/main-release-provenance.yml', import.meta.url), 'utf8');
+  assert.match(workflow, /MAIN_RELEASE_EVENT_NAME: \$\{\{ github\.event_name \}\}/);
+  assert.match(workflow, /MAIN_RELEASE_REF: \$\{\{ github\.ref \}\}/);
+  assert.match(workflow, /MAIN_RELEASE_ACTOR: \$\{\{ github\.actor \}\}/);
+  assert.match(workflow, /MAIN_RELEASE_REPOSITORY_OWNER: \$\{\{ github\.repository_owner \}\}/);
 });
