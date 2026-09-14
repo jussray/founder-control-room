@@ -105,6 +105,7 @@ export {
   type TrendEvidenceState,
   type TrendFingerprintComparison,
   type TrendRadarCandidate,
+  type TrendRadarEvaluationContext,
   type TrendRadarReason,
   type TrendRadarResult,
   type TrendRadarScores,
