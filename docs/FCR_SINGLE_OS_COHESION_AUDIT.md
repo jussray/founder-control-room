@@ -73,6 +73,30 @@ A material FCR or cross-repository audit must verify all of the following:
    - Owned/creator commerce may use already active low/no-upfront-cost surfaces, but eligibility, storefront existence, traffic, followers, saves, or pending activity are not earnings. Do not claim product use without evidence or automatically buy products, spend on ads, change pricing, create paid subscriptions, enter contracts, or publish new endorsements.
    - Collapse every money review to the smallest evidence-backed next gate most likely to advance a real transaction while preserving authority and truth boundaries.
 
+10. **Founder Signal Engine is a capability, not an OS**
+   - Founder Signal Engine work, including Issue #73, extends FCR's `Grow` and `Prove` capabilities. It must not become a separate founder-facing control plane, mission state, approval system, truth model, or provider router.
+   - Canonical signal path:
+
+```text
+Founder Intent
+→ Project / Mission State
+→ Truth / Evidence Qualification
+→ Grow / Prove Capability
+→ Signal Candidate
+→ Audience / Target Fit
+→ Founder Approval when required
+→ Bounded Provider Execution
+→ Execution Receipt
+→ Measured Outcome
+→ Next Gate
+```
+
+   - GitHub is a proof/evidence surface, not the operating system. HubSpot is a CRM/execution/evidence surface. Buffer, LinkedIn, Facebook, Instagram, Zapier, OpenAI, and future publishing/outreach providers are bounded capabilities underneath FCR governance.
+   - A GitHub event, commit, PR, deploy, screenshot, test, or artifact may become a signal candidate only after its proof class is known. Provider acceptance or repository activity alone must not be promoted into a verified founder-outcome claim.
+   - Public proof must remain traceable to its authoritative project/evidence source. Draft generation does not grant publication authority. Outreach target discovery does not grant contact authority.
+   - Social analytics follow the FCR evidence hierarchy. Native platform evidence wins conflicts; secondary providers and aggregators may corroborate but may not manufacture causal conclusions or override authoritative platform truth.
+   - Existing Issue #73 work should be preserved and progressively reconnected to this shared path rather than rebuilt as a parallel automation stack.
+
 ## Unified capability runtime
 
 Voice, text chat, mobile, desktop, Work/Codex-like surfaces, future devices, and future interaction modes are **modalities**, not separate operating systems and not separate sources of authority. They must all enter the same canonical founder-intent loop and use the same FCR-governed capability runtime.
@@ -319,10 +343,13 @@ PromptOS
 StoryEngine-backed capability
 = story/content creation and provenance capability when invoked through FCR
 
+Founder Signal Engine
+= Grow/Prove capability that converts qualified project evidence into reviewable public proof and targeted outreach signals
+
 L99 / OODA / Lindy / Red Team / goalfix / Proof Mode
 = internal methods and verification disciplines
 
-Providers / plugins / n8n / GitHub / Cloudflare / Supabase / Shopify / other tools
+Providers / plugins / n8n / GitHub / Cloudflare / Supabase / Shopify / HubSpot / Buffer / LinkedIn / other tools
 = bounded execution or evidence surfaces
 ```
 

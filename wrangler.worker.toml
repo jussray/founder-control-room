@@ -80,6 +80,8 @@ N8N_FOUNDER_CONTENT_EXPECTED_RUNTIME_VERSION = "2.32.6"
 # Runtime secrets are provider-held in Cloudflare. Canonical GitHub production
 # deployment preserves them rather than copying their values through Actions.
 # Wrangler validates these required names before a Worker deployment succeeds.
+# TINYFISH_API_KEY activates the bounded read-only TinyFish observation lane;
+# the canonical deploy reads only its binding name and never the secret value.
 [secrets]
 required = [
   "SUPABASE_SERVICE_ROLE_KEY",
@@ -89,6 +91,7 @@ required = [
   "GITHUB_APP_ID",
   "GITHUB_PRIVATE_KEY",
   "FCR_REMOTE_MCP_READ_TOKEN",
+  "TINYFISH_API_KEY",
   "FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON",
   "FOUNDER_SIGNAL_ENGINE_MCP_TOKEN",
   "ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL",

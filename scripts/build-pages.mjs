@@ -19,6 +19,8 @@ const requiredAssets = [
   'control-room/index.html',
   'control-room/app.js',
   'control-room/styles.css',
+  'control-room/founder-shell.html',
+  'control-room/founder-shell.css',
   'control-room/capabilities.html',
   'control-room/capabilities.js',
   'control-room/capabilities.css',
@@ -36,6 +38,7 @@ const requiredAssets = [
   'control-room/evidence-trust.html',
   'portable-founder-console/index.html',
   'juss-rayy/index.html',
+  'mom8/index.html',
 ];
 
 await rm(outputDirectory, { recursive: true, force: true });

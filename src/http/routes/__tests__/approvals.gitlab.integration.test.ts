@@ -209,7 +209,15 @@ describe("GitLab approvals routing", () => {
                   gte: () => ({
                     order: () => ({
                       limit: () => ({
-                        maybeSingle: () => Promise.resolve({ data: { id: "proof", status: "pass" }, error: null }),
+                        maybeSingle: () => Promise.resolve({
+                          data: {
+                            id: "proof",
+                            status: "pass",
+                            gate_id: "create_branch",
+                            created_at: new Date().toISOString(),
+                          },
+                          error: null,
+                        }),
                       }),
                     }),
                   }),
@@ -338,7 +346,15 @@ describe("GitLab approvals routing", () => {
                   gte: () => ({
                     order: () => ({
                       limit: () => ({
-                        maybeSingle: () => Promise.resolve({ data: { id: "proof", status: "pass" }, error: null }),
+                        maybeSingle: () => Promise.resolve({
+                          data: {
+                            id: "proof",
+                            status: "pass",
+                            gate_id: "create_branch",
+                            created_at: new Date().toISOString(),
+                          },
+                          error: null,
+                        }),
                       }),
                     }),
                   }),

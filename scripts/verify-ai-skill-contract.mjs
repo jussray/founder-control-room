@@ -82,7 +82,7 @@ for (const phrase of [
 ]) requireText('ULTRATHINK repair invariant', files.portfolio, phrase);
 
 for (const [label, source, metadata] of [
-  ['sales', files.sales, ['name: sales', 'version: 1.0.0', 'status: active', 'scope: founder-control-room']],
+  ['sales', files.sales, ['name: sales', 'version: 1.1.0', 'status: active', 'scope: founder-control-room']],
   ['devil', files.devil, ['name: devil', 'version: 1.0.0', 'status: active', 'scope: founder-control-room']],
   ['typescript-audit', files.typescriptAudit, ['name: typescript-audit', 'version: 1.0.0', 'status: active', 'scope: founder-control-room']],
   ['typescript-root-cause-debugger', files.typescriptDebugger, ['name: typescript-root-cause-debugger', 'version: 1.0.0', 'status: active', 'scope: founder-control-room']],
