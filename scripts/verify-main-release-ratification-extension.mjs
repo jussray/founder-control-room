@@ -8,8 +8,8 @@ const LEGACY_INCIDENT_TREE = '3e227bc2c51cd75c66a0aa20ecfbb17ed97438a0';
 // Current direct-main incident after reviewed PR #799. Keep this constant name
 // aligned with verify-production-migration-ledger.mjs; the contract test binds
 // Deploy's production boundary to this exact terminal ratified tip.
-const INCIDENT_TIP = '164add06aa903af030bd73ba2a25b6f424aba320';
-const INCIDENT_TREE = 'c9b182b84c2daa3da77ecd6417df1d0331e5a258';
+const INCIDENT_TIP = '035c849b59a89a53f2e07f4de6494068696bf9e7';
+const INCIDENT_TREE = 'a6d92db4105f312c098bc230f948e96e77cde0de';
 const CURRENT_INCIDENT_ANCHOR = '6ab517a381cd3068a1b5f39f386a8b5cd3e5d5f7';
 const CURRENT_INCIDENT_ANCHOR_TREE = '48225f9fd075911c0de4df6fd43de3445a9d201d';
 
@@ -115,13 +115,24 @@ const AFFECTED_FILES = [
 
 const CURRENT_DIRECT_COMMITS = [
   '164add06aa903af030bd73ba2a25b6f424aba320',
+  '4bed35282496f83434a750c9631496163af34f02',
+  '5b5da9af6d23d77b442ee8b5942c65329d6444cd',
+  'd60b5cde57c8777a6d6035dd1227f38929716b5f',
+  '035c849b59a89a53f2e07f4de6494068696bf9e7',
 ];
 
 const CURRENT_AFFECTED_FILES = [
+  '.github/workflows/capability-contract.yml',
   'config/mom8-public-challenge-v1.json',
   'public/mom8/index.html',
   'scripts/build-pages.mjs',
+  'src/capabilities/__tests__/waterTruthShadow.test.ts',
+  'src/capabilities/waterTruthShadow.ts',
+  'src/http/routes/__tests__/waterTruthShadow.integration.test.ts',
+  'src/http/routes/capabilities.ts',
+  'src/lib/__tests__/fcrSkillRouter.test.ts',
   'src/lib/__tests__/mom8PublicChallenge.test.ts',
+  'src/lib/fcrSkillRouter.ts',
 ];
 
 function git(...args) {
@@ -203,7 +214,7 @@ const extensionIncident = {
 };
 
 const currentDirectIncident = {
-  id: 'direct-main-after-pr-799-mom8',
+  id: 'direct-main-after-pr-799-through-watertruth',
   anchorCommit: CURRENT_INCIDENT_ANCHOR,
   anchorTree: CURRENT_INCIDENT_ANCHOR_TREE,
   incidentTip: INCIDENT_TIP,
