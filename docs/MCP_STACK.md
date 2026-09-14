@@ -6,14 +6,17 @@ This file governs which MCP servers an AI agent may use while **developing this 
 
 The Control Room is a private, repository-agnostic governance service. Its standing repository MCP stack supports repository inspection, current implementation documentation, browser proof, design context, its own database schema, and Cloudflare provider/deployment evidence.
 
-## External governed MCP for ChatGPT, Claude, and Manus
+## External governed MCP for MCP-compatible AI clients
 
-The Control Room source defines an external connector boundary:
+Founder Control Room exposes one provider-neutral callable capability surface. ChatGPT, Claude, Codex, Perplexity, Manus, IDE agents, and future clients must connect through the same MCP authority boundary when they support the protocol; no client gets a separate execution engine or a wider authority model merely because it uses a different product UI.
+
+The Control Room source defines that external connector boundary:
 
 - canonical resource: `https://api.foundercontrolroom.org/mcp`;
 - protected-resource metadata: `/.well-known/oauth-protected-resource` and `/.well-known/oauth-protected-resource/mcp`;
 - transport: stateless Streamable HTTP with MCP `2026-07-28`, plus initialization-based `2025-11-25`, `2025-06-18`, and `2025-03-26` compatibility;
 - canonical auth: Supabase OAuth access tokens validated for issuer, audience, expiry/not-before, `client_id`, `mcp:read`, `mcp_projects`, current Supabase user validity, and the server-side `founder_users` allowlist;
+- client portability: `FCR_REMOTE_MCP_OAUTH_CLIENT_IDS` is an allowlist of approved MCP clients, not a vendor lock; adding a client ID never widens project scope or tool authority;
 - temporary compatibility auth: `/mcp/read` with a dedicated static token and the same server-held project scope;
 - evidence: every successful external tool call must persist a redacted `mcp_tool_calls` receipt or the call fails closed.
 
@@ -39,11 +42,11 @@ Source readiness is not production readiness. Before deployment, all of the foll
 
 - reconcile the live Supabase migration ledger so `mcp_servers`, `mcp_project_policies`, and `mcp_tool_calls` actually exist with the checked-in RLS/grant contract;
 - enable/configure Supabase OAuth and a custom access-token hook that emits the exact audience, `mcp:read`, and bounded `mcp_projects` claims;
-- register/allow the exact client IDs for the connected external consoles (CIMD where supported; DCR only for legacy compatibility);
+- register/allow the exact client ID for each external MCP client being connected (CIMD where supported; DCR only for legacy compatibility); a client not yet registered remains unsupported in production even though it speaks MCP;
 - configure `FCR_REMOTE_MCP_*`, `CHIEF_AI_BASE_URL`, and the repository-scoped GitHub App credentials without reusing provider/deploy credentials;
 - prove the GitHub App installation can mint the requested read-only audit permissions without widening to write authority;
 - prove the Chief URL/binding and FCR Worker SHA, then run the Attack Ten auth/scope/replay/header/evidence/client matrix;
-- connect ChatGPT, Claude, or Manus only after provider evidence proves the resource metadata, OAuth flow, tools list, and calls from the deployed exact head.
+- connect an MCP-compatible AI client only after provider evidence proves the resource metadata, OAuth flow, tools list, and calls from the deployed exact head for that client.
 
 The source and provider attack matrix is maintained in `docs/PAIRED_MCP_ATTACK_TEN.md`.
 
