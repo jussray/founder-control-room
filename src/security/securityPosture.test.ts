@@ -14,6 +14,9 @@ describe('strategic security posture', () => {
       totalStageObligations: 74,
       uniqueControlCount: 62,
       frameworkSignalCount: expect.any(Number),
+      cryptographicInventoryEntries: 7,
+      cryptographicReviewRequiredProjects: 3,
+      publicKeyMigrationEntries: 4,
       provenProjects: 0,
     });
     expect(snapshot.projects).toHaveLength(8);
@@ -33,6 +36,39 @@ describe('strategic security posture', () => {
     expect(bySlug.get('sekret-bip')?.requiredProof).toContain('Playwright evidence for UI/runtime claims');
   });
 
+  it('covers every active project with observed crypto evidence or an explicit review-required state', () => {
+    const snapshot = buildSecurityPostureSnapshot();
+
+    expect(snapshot.cryptography.coverage).toEqual({
+      activeProjectCount: 8,
+      representedProjectCount: 8,
+      inventoryEntryCount: 7,
+      reviewRequiredProjectCount: 3,
+      publicKeyMigrationEntryCount: 4,
+      missingProjectSlugs: [],
+      overlappingProjectSlugs: [],
+    });
+
+    const byId = new Map(snapshot.cryptography.inventory.map((entry) => [entry.id, entry]));
+    expect(byId.get('fcr-github-app-rs256')).toMatchObject({
+      algorithm: 'RS256 / RSA-SHA256',
+      quantumMigrationClass: 'PUBLIC_KEY_MIGRATION_REQUIRED',
+    });
+    expect(byId.get('fcr-founder-session-aes256gcm')).toMatchObject({
+      algorithm: 'AES-256-GCM',
+      quantumMigrationClass: 'SYMMETRIC_MONITOR',
+    });
+    expect(byId.get('sekret-firebase-appcheck-rs256')).toMatchObject({
+      provider: 'Firebase / Google',
+      quantumMigrationClass: 'PUBLIC_KEY_MIGRATION_REQUIRED',
+    });
+    expect(snapshot.cryptography.reviewRequired.map((entry) => entry.projectSlug).sort()).toEqual([
+      'chief-ai-machine',
+      'juss-beautiful-hair',
+      'promptos',
+    ]);
+  });
+
   it('publishes defensive Lantern and truth boundaries without adding authority', () => {
     const snapshot = buildSecurityPostureSnapshot();
 
@@ -45,6 +81,7 @@ describe('strategic security posture', () => {
       targetVersionIsNotCurrentMaturity: true,
       frameworkMappingIsNotCertification: true,
       providerClaimsRequireRuntimeEvidence: true,
+      cryptographicInventoryIsObservationNotQuantumSafety: true,
       securityPostureIsReadOnly: true,
       analyticsAreAggregateAndPrivacySafe: true,
       noHumanIdentityClaimFromNetworkSignal: true,

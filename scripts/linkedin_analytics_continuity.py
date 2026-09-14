@@ -183,7 +183,15 @@ def analyze_export(path: str | Path, start: date, end: date, export_limit: int =
         count = counts.get(key, 0)
         cumulative += count
         cadence = "NONE" if count == 0 else "SINGLE" if count == 1 else "DOUBLE" if count == 2 else "BURST"
-        day_activity = activity.get(key, {"impressions": 0, "engagements": 0})
+        day_activity = activity.get(key)
+        if day_activity is None:
+            activity_impressions = None
+            activity_engagements = None
+            activity_evidence_state = "UNKNOWN_NO_EVIDENCE"
+        else:
+            activity_impressions = day_activity["impressions"]
+            activity_engagements = day_activity["engagements"]
+            activity_evidence_state = "VERIFIED"
         days.append({
             "date": key,
             "verified_visible_posts": count,
@@ -191,8 +199,9 @@ def analyze_export(path: str | Path, start: date, end: date, export_limit: int =
             "cumulative_posts": cumulative,
             "cadence": cadence,
             "day_cookie": day_cookie(cursor, fingerprints_by_day.get(key, [])),
-            "activity_impressions": day_activity["impressions"],
-            "activity_engagements": day_activity["engagements"],
+            "activity_impressions": activity_impressions,
+            "activity_engagements": activity_engagements,
+            "activity_evidence_state": activity_evidence_state,
         })
         cursor += timedelta(days=1)
 
