@@ -224,12 +224,16 @@ test('enforces provenance only in the canonical manual Deploy preflight', () => 
   }), false);
 });
 
-test('observes durable owner-direct provenance when no reviewed PR exists', async () => {
-  const fetchImpl = async (url) => {
+test('observes durable owner-direct provenance without widening Deploy actions permission', async () => {
+  let actionsAuthorization = 'not-observed';
+  const fetchImpl = async (url, options = {}) => {
     const href = String(url);
     if (href.endsWith('/branches/main')) return response({ commit: { sha: SHA } });
     if (href.endsWith(`/commits/${SHA}/pulls`)) return response([]);
-    if (href.includes('/actions/runs?')) return response({ workflow_runs: [provenanceRun()] });
+    if (href.includes('/actions/runs?')) {
+      actionsAuthorization = options.headers?.Authorization ?? null;
+      return response({ workflow_runs: [provenanceRun()] });
+    }
     return response({}, 404);
   };
 
@@ -237,12 +241,13 @@ test('observes durable owner-direct provenance when no reviewed PR exists', asyn
     repository: 'jussray/founder-control-room',
     targetSha: SHA,
     fetchImpl,
-    token: '',
+    token: 'scoped-deploy-token',
   });
   assert.equal(result.ok, true);
   assert.equal(result.reason, 'verified_main_release_provenance_workflow');
   assert.equal(result.workflowRunId, 123456);
   assert.equal(result.reviewedProvenanceReason, 'direct_or_unproven_main_commit');
+  assert.equal(actionsAuthorization, null);
 });
 
 test('observes provider state and rejects missing trusted direct-main receipt', async () => {
@@ -292,7 +297,7 @@ test('preflight verifier is load-bearing before the first production mutation', 
   assert.ok(mutationYes > mutationStep, 'Supabase mutation step must remain an acknowledged --yes mutation');
   assert.ok(workerDependency > worker, 'Worker deploy must remain dependent on the Supabase job');
   assert.ok(pagesDependency > pages, 'Pages release must remain dependent on Worker deploy');
-  assert.match(deploy, /permissions:\n\s+contents: read\n\s+pull-requests: read\n\s+actions: read/);
+  assert.doesNotMatch(deploy, /^\s+actions:\s+(?:read|write)\s*$/m);
 });
 
 test('main provenance workflow cancels stale push runs without weakening provenance semantics', () => {
