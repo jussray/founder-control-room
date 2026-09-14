@@ -23,7 +23,7 @@ type Outcome =
 
 type Freshness = 'fresh' | 'stale' | 'unknown';
 
-function normalizedSha(value: string | null): string | null {
+function normalizedSha(value: string | null | undefined): string | null {
   const sha = value?.trim().toLowerCase() ?? '';
   return FULL_SHA.test(sha) ? sha : null;
 }
@@ -150,7 +150,21 @@ export function evaluatePrAuditEvidence(input: EvaluatePrAuditEvidenceInput): Pr
 
   const initialHeadSha = normalizedSha(input.initialPr.headSha);
   const finalHeadSha = normalizedSha(input.finalPr.headSha);
+  const expectedHeadSha = input.expectedHeadSha === undefined
+    ? undefined
+    : normalizedSha(input.expectedHeadSha);
+  const expectedHeadMalformed = input.expectedHeadSha !== undefined && !expectedHeadSha;
+  const expectedHeadMismatch = Boolean(
+    expectedHeadSha
+    && (
+      (initialHeadSha && expectedHeadSha !== initialHeadSha)
+      || (finalHeadSha && expectedHeadSha !== finalHeadSha)
+    ),
+  );
+
   if (!initialHeadSha || !finalHeadSha) findings.push('pr_head_sha_malformed');
+  if (expectedHeadMalformed) findings.push('expected_head_sha_malformed');
+  if (expectedHeadMismatch) findings.push('expected_head_sha_mismatch');
   if (input.initialPr.state !== 'open' || input.finalPr.state !== 'open') findings.push('pr_not_open');
 
   const prIdentityStable = validPrNumber(input.initialPr.number)
@@ -268,7 +282,9 @@ export function evaluatePrAuditEvidence(input: EvaluatePrAuditEvidenceInput): Pr
   }
 
   const normalizedFindings = sortedUnique(findings);
-  const conflicted = normalizedFindings.includes('pr_head_changed_during_collection')
+  const conflicted = expectedHeadMalformed
+    || expectedHeadMismatch
+    || normalizedFindings.includes('pr_head_changed_during_collection')
     || normalizedFindings.includes('pr_identity_changed_during_collection')
     || normalizedFindings.includes('duplicate_current_head_check_conflict');
 
