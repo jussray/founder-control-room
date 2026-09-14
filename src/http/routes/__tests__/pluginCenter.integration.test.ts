@@ -370,6 +370,49 @@ describe('POST /plugin-center/grants', () => {
 });
 
 describe('POST /plugin-center/grants/:grantId/revoke', () => {
+  it('preserves the original revocation receipt on repeated revoke requests', async () => {
+    authSuccess();
+    const originalRevokedAt = '2026-09-14T03:40:00.000Z';
+    const update = vi.fn();
+    const eventInsert = vi.fn();
+
+    supabaseMock.from.mockImplementation((table: string) => {
+      if (table === 'founder_users') return founderUsersRow();
+      if (table === 'plugin_permission_grants') {
+        return {
+          select: () => ({
+            eq: () => ({
+              maybeSingle: () => Promise.resolve({
+                data: { id: 'grant-1', project_id: PROJECT_ID, revoked_at: originalRevokedAt },
+                error: null,
+              }),
+            }),
+          }),
+          update,
+        };
+      }
+      if (table === 'project_events') return { insert: eventInsert };
+      return {};
+    });
+
+    const app = buildApp();
+    const res = await request(app)
+      .post('/plugin-center/grants/grant-1/revoke')
+      .set('Authorization', BEARER);
+
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({
+      alreadyRevoked: true,
+      grant: {
+        id: 'grant-1',
+        project_id: PROJECT_ID,
+        revoked_at: originalRevokedAt,
+      },
+    });
+    expect(update).not.toHaveBeenCalled();
+    expect(eventInsert).not.toHaveBeenCalled();
+  });
+
   it('keeps revocation truth explicit when the audit write fails after the revoke', async () => {
     authSuccess();
     const revokedGrant = {
