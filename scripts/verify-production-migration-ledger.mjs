@@ -189,10 +189,13 @@ export async function observeMainReleaseProvenance({
       status: 'success',
       per_page: '100',
     });
+    // This repository is public. The provenance run itself is public provider
+    // evidence, so observe it without widening the Deploy token to actions:read.
+    // If the repository or provider visibility changes, this request fails closed.
     const runs = await fetchGithubJson(
       fetchImpl,
       `${GITHUB_API_BASE}/repos/${repo}/actions/runs?${query.toString()}`,
-      token,
+      '',
     );
     const directResult = classifyTrustedMainReleaseProvenanceRun({
       repository: repo,
