@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import {
   AUTHORITY_ENVELOPE_CONTRACT,
   authorityEnvelopeHash,
@@ -96,15 +96,11 @@ export function createBranchAuthorityContext(
  * authenticated founder, fresh proof receipt, exact proposed arguments, and
  * observed mission state. The returned context is the execution-time binding
  * that must be re-derived/revalidated immediately before provider mutation.
- *
- * The lab remains deterministic: callers may inject a fresher current time and
- * provider call identity, while pure defaults derive from the already-accepted
- * proof timestamp and idempotent action identity instead of wall clock/randomness.
  */
 export function issueCreateBranchAuthority(input: CreateBranchAuthorityInput): IssuedCreateBranchAuthority {
   validateCreateBranchAuthorityInput(input);
 
-  const now = input.now ?? input.proof.createdAt;
+  const now = input.now ?? new Date().toISOString();
   const issuedAtMs = Date.parse(now);
   if (!Number.isFinite(issuedAtMs)) throw new Error('issuance time must be a valid ISO date');
   const ttlMs = input.ttlMs ?? DEFAULT_AUTHORITY_TTL_MS;
@@ -112,13 +108,7 @@ export function issueCreateBranchAuthority(input: CreateBranchAuthorityInput): I
     throw new Error('authority ttl must be positive and no greater than 15 minutes');
   }
 
-  const toolCallId = input.toolCallId ?? `create-branch:${sha256({
-    missionId: input.missionId,
-    projectId: input.projectId,
-    idempotencyKey: input.idempotencyKey,
-    baseRef: input.baseRef,
-    branchName: input.branchName,
-  })}`;
+  const toolCallId = input.toolCallId ?? randomUUID();
   const context = createBranchAuthorityContext({ ...input, now, toolCallId });
   const capability = capabilityIdentity(context.capabilityId);
 

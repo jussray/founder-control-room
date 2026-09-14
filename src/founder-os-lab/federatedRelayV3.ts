@@ -430,7 +430,7 @@ export function parseFederatedAgentRelayEnvelopeV3(value: unknown): FederatedAge
 export function assertRelayKeyUsableV3(
   key: FederatedRelayPublicKeyV3,
   sourceMember: FederatedRelayMemberV3,
-  now: Date,
+  now = new Date(),
 ): void {
   if (key.member !== sourceMember) throw new FederatedRelayV3Error('relay_source_key_member_mismatch');
   if (key.state === 'revoked' || key.revokedAt) throw new FederatedRelayV3Error('relay_signing_key_revoked');
@@ -443,7 +443,7 @@ export function assertRelayKeyUsableV3(
 
 export function assertRelayFreshnessV3(
   envelope: FederatedAgentRelayEnvelopeV3,
-  now: Date,
+  now = new Date(),
   options: { maxTtlMs?: number; futureSkewMs?: number } = {},
 ): void {
   const maxTtlMs = options.maxTtlMs ?? 600_000;
@@ -474,7 +474,7 @@ export async function verifyRelayEnvelopeV3(input: {
   envelope: FederatedAgentRelayEnvelopeV3;
   key: FederatedRelayPublicKeyV3;
   expectedTarget: FederatedRelayIdentityV3;
-  now: Date;
+  now?: Date;
 }): Promise<{
   envelope: FederatedAgentRelayEnvelopeV3;
   messageFingerprint: string;
@@ -482,7 +482,7 @@ export async function verifyRelayEnvelopeV3(input: {
   successorProofCookie: string;
   receipt: FederatedRelayReceiptV3;
 }> {
-  const now = input.now;
+  const now = input.now ?? new Date();
   const { envelope, key, expectedTarget } = input;
   assertRelayFreshnessV3(envelope, now);
   assertRelayTargetV3(envelope, expectedTarget);

@@ -12,11 +12,6 @@ import {
   type FederatedRelayPublicKeyV3,
   type FederatedRelayReceiptV3,
 } from '../../founder-os-lab/federatedRelayV3.js';
-import {
-  FEDERATED_AGENT_RELAY_V31,
-  FEDERATED_RELAY_KEY_QUERY_V31,
-} from '../../founder-os-lab/federatedRelayV31.js';
-import { handleFederatedRelayV31 } from './federatedRelayV31.js';
 
 const FCR_MEMBER = 'founder-control-room' as const;
 const FCR_REPOSITORY = 'jussray/founder-control-room';
@@ -178,10 +173,6 @@ export const handleFederatedRelayV3: RequestHandler = async function handleFeder
   req: Request,
   res: Response,
 ) {
-  if (isRecord(req.body) && (req.body.contract === FEDERATED_AGENT_RELAY_V31 || req.body.contract === FEDERATED_RELAY_KEY_QUERY_V31)) {
-    return handleFederatedRelayV31(req, res, () => undefined);
-  }
-
   res.set({
     'Cache-Control': 'no-store',
     'Content-Type': 'application/json; charset=utf-8',
@@ -220,7 +211,6 @@ export const handleFederatedRelayV3: RequestHandler = async function handleFeder
         envelope,
         key: sourceKey,
         expectedTarget,
-        now: new Date(),
       });
       durable = await persistVerified(verified);
     }

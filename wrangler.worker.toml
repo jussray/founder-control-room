@@ -64,7 +64,6 @@ FCR_V10_CONVEYOR_CONTRACT = "founder-control-room/n8n-conveyor@v3"
 FCR_V10_MAX_RUNTIME_AUTHORITY = "draft"
 FCR_V10_REGISTRY_RESOLUTION_REQUIRED = "true"
 FCR_V10_RECEIPT_PERSISTENCE_REQUIRED = "true"
-FEDERATED_RELAY_RECEIVER_KEY_ID = "founder-control-room:relay-v3.1:production"
 MCP_EXA_URL = "https://mcp.exa.ai/mcp"
 MCP_RESEND_URL = "https://mcp.resend.com/mcp"
 
@@ -101,7 +100,6 @@ required = [
   "N8N_FOUNDER_CONTENT_BEARER_TOKEN",
   "N8N_FOUNDER_CONTENT_EXPECTED_WORKFLOW_FINGERPRINT",
   "N8N_FOUNDER_CONTENT_IDENTITY_HMAC_SECRET",
-  "FEDERATED_RELAY_RECEIVER_PRIVATE_JWK",
 ]
 
 # With the duplicate API Worker deleted, this Worker is also the sole owner of

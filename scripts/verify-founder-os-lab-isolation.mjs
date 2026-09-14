@@ -23,7 +23,7 @@ const forbiddenPatterns = [
   { pattern: /\bimport\s*\(/, label: 'dynamic import' },
   { pattern: /\brequire\s*\(/, label: 'CommonJS module loading' },
   { pattern: /\b(setTimeout|setInterval|setImmediate)\s*\(/, label: 'timer scheduling' },
-  { pattern: /Date\.now\s*\(|new\s+Date\s*\(\s*\)|performance\.now\s*\(/, label: 'wall clock read' },
+  { pattern: /Date\.now\s*\(|new\s+Date\s*\(|performance\.now\s*\(/, label: 'wall clock read' },
   { pattern: /Math\.random\s*\(|\brandomUUID\s*\(|\brandomBytes\s*\(|\brandomFill(?:Sync)?\s*\(|getRandomValues\s*\(/, label: 'randomness' },
   { pattern: /\bWorker\b/, label: 'worker execution' },
 ];
