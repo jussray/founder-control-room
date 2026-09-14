@@ -54,6 +54,12 @@ The implementation pins the public TinyFish API surfaces used by this capability
 
 Fetch requests use Markdown output and are limited by FCR to 1-10 public HTTP(S) URLs per invocation. FCR rejects localhost, obvious private IPv4 ranges, link-local metadata targets, `.local` names, and non-HTTP(S) schemes before contacting TinyFish. TinyFish's own network protections remain a separate provider boundary; the FCR check is defense in depth, not a claim that application-side hostname screening can replace provider-side SSRF controls.
 
+## Provider-surface evidence isolation
+
+TinyFish Search/Fetch readiness and TinyFish Agent/Browser readiness are separate evidence planes. A wallet, browser-session, Agent-run, or other Agent/Browser receipt must not be used to classify Search/Fetch as ready or unavailable. Likewise, a successful Search/Fetch observation proves nothing about Agent/Browser execution readiness.
+
+Live Search/Fetch readiness requires a direct key-backed Search or Fetch observation from the applicable FCR runtime. Historical or current Agent/Browser billing, wallet, authentication, or execution receipts may remain useful evidence for those provider surfaces, but they are independent receipts and cannot substitute for the Search/Fetch provider receipt.
+
 ## Truth and authority boundary
 
 Every successful observation must retain these fields:
