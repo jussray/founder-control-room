@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import type { FounderOsLabPlan, FounderOsLabRequest } from './contracts.js';
 import { planFounderOsLab } from './engine.js';
+import { FCR_AUTOMATIC_COUNCIL_LENSES } from '../lib/fcrSkillRouter.js';
 import {
   evaluateUntrustedArtifactBoundary,
   type UntrustedArtifactBoundaryResult,
@@ -127,6 +128,45 @@ function fingerprint(value: unknown): string {
   return createHash('sha256').update(stableStringify(value), 'utf8').digest('hex');
 }
 
+function normalizeCouncilLens(value: string): string {
+  return value.trim().replace(/\s+/g, ' ').toLocaleLowerCase('en-US');
+}
+
+export function effectiveFounderCouncilLenses(
+  declared: readonly string[] = [],
+): string[] {
+  const effective: string[] = [];
+  const seen = new Set<string>();
+  for (const raw of [...FCR_AUTOMATIC_COUNCIL_LENSES, ...declared]) {
+    const value = raw.trim();
+    const normalized = normalizeCouncilLens(value);
+    if (!normalized || seen.has(normalized)) continue;
+    seen.add(normalized);
+    effective.push(value);
+  }
+  return effective;
+}
+
+function applyAutomaticFounderCouncil(plan: FounderOsLabPlan): FounderOsLabPlan {
+  plan.route.capabilityPlan.effectiveStrategicLenses = effectiveFounderCouncilLenses(
+    plan.route.capabilityPlan.strategicLenses,
+  );
+
+  const councilReceipt =
+    'Founder Council lenses are FCR code-owned defaults; slash commands are optional foreground aliases and do not create or expand authority.';
+  if (!plan.truth.verified.includes(councilReceipt)) {
+    plan.truth.verified.push(councilReceipt);
+  }
+
+  const councilOrientation =
+    'Apply the automatic Founder Council as advisory reasoning while preserving the original hash-bound Chief capability plan and serialized authority gates.';
+  if (!plan.ooda.orient.includes(councilOrientation)) {
+    plan.ooda.orient.unshift(councilOrientation);
+  }
+
+  return plan;
+}
+
 export function inspectFounderOsSandboxPlan(plan: FounderOsLabPlan): string[] {
   const violations: string[] = [];
   if (plan.authority.level !== 'L0') violations.push('authority_level_escalated');
@@ -212,7 +252,9 @@ export function runFounderOsSandbox(
   const before = stableStringify(plannerRequest);
   let rawPlan: FounderOsLabPlan;
   try {
-    rawPlan = planFounderOsLab(plannerRequest as FounderOsLabRequest);
+    rawPlan = applyAutomaticFounderCouncil(
+      planFounderOsLab(plannerRequest as FounderOsLabRequest),
+    );
   } catch {
     return deepFreeze({
       status: 'blocked',
