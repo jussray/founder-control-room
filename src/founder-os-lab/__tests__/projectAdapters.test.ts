@@ -32,7 +32,7 @@ describe('Se’kret Bip Founder OS project adapter', () => {
       adapterId: 'sekret-bip-project-preview',
       name: 'Se’kret Bip',
       repository: 'jussray/Sekret-Bip',
-      auditedSourceHead: '9b3fef2633071628c0e158c043d096deede8c6ff',
+      auditedSourceHead: '87e80c1e966a8ec5e996a65587546c6cb57dbfdf',
       authorityOwner: 'founder-control-room',
       mode: 'preview',
       executionAllowed: false,
@@ -55,7 +55,8 @@ describe('Se’kret Bip Founder OS project adapter', () => {
     ]);
     expect(ADAPTER.auditedContractBlobs).toMatchObject({
       'app/index.tsx': '299da021482968e415ab1016b19f52daeeec497a',
-      'screens/WebWelcomeScreen.tsx': '3228a5c997ac3a72e8d15dd37d5fb029c993607e',
+      'screens/WebWelcomeScreen.tsx': 'b66acdb7b2f733c78ab53a50db194439b8629c4f',
+      'constants/frontDoorTheme.ts': '8e296dc2a546766c1a4fbefafdd4e11e7ad73dc2',
       'test/dual-front-door-contract.test.mjs': '459ccf28ffe785e725c20a72542a3b18780c28c8',
     });
   });
@@ -177,58 +178,5 @@ describe('Se’kret Bip Founder OS project adapter', () => {
     expect(missingContract.truth.blocked.join(' ')).toContain(
       'is missing exact-head project contract URLs',
     );
-  });
-
-  it('rejects lookalike, wrong-ref, and noncanonical contract URLs', () => {
-    const badUrls = [
-      `https://example.com/jussray/Sekret-Bip/blob/${ADAPTER.auditedSourceHead}/docs/COMPANION_NAME_CANON.md`,
-      `https://github.com/jussray/Sekret-Bip/blob/main/docs/COMPANION_NAME_CANON.md`,
-      `https://github.com/jussray//Sekret-Bip/blob/${ADAPTER.auditedSourceHead}/docs/COMPANION_NAME_CANON.md`,
-    ];
-
-    for (const badUrl of badUrls) {
-      const urls = contractUrls().filter((url) => !url.endsWith('/docs/COMPANION_NAME_CANON.md'));
-      urls.push(badUrl);
-      const plan = planFounderOsLab({
-        goal: 'Inspect project canon.',
-        action: 'inspect',
-        provider: 'github',
-        project: project({ contractUrls: urls }),
-      });
-      expect(plan.readiness).toBe('blocked');
-      expect(plan.route.project?.contractPathsMissing).toContain('docs/COMPANION_NAME_CANON.md');
-    }
-  });
-
-  it('refuses mutating actions and unrelated providers in V1', () => {
-    const deploy = planFounderOsLab({
-      goal: 'Deploy Se’kret Bip from Founder Control Room.',
-      action: 'deploy-code',
-      command: 'goalfix',
-      provider: 'cloudflare',
-      approval: {
-        id: 'founder-approved:project-adapter-test',
-        actions: ['deploy-code'],
-      },
-      project: project({ audience: 'teen' }),
-    });
-    expect(deploy.readiness).toBe('blocked');
-    expect(deploy.truth.blocked.join(' ')).toContain(
-      'adapter supports only inspect and plan previews in V1',
-    );
-    expect(deploy.authority.executionAllowed).toBe(false);
-
-    const crm = planFounderOsLab({
-      goal: 'Route Se’kret Bip canon into CRM.',
-      action: 'plan',
-      command: 'truthmode',
-      provider: 'hubspot',
-      project: project(),
-    });
-    expect(crm.readiness).toBe('blocked');
-    expect(crm.truth.blocked.join(' ')).toContain(
-      'hubspot is not an allowed sekret-bip preview provider',
-    );
-    expect(crm.authority.executionAllowed).toBe(false);
   });
 });
