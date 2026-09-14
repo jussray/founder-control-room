@@ -98,6 +98,29 @@ describe('ULTRATHINK shared reasoning resolution', () => {
     expect(second.receipt.reasoning.mutationAllowed).toBe(false);
   });
 
+  it('requires predecessor fingerprint and proof cookie together before continuity can be confirmed', () => {
+    const first = resolve('text');
+    const fingerprintOnly = resolveUltrathinkSharedReasoning({
+      executionId: 'ultrathink:fingerprint-only',
+      surface: 'voice',
+      intent: INTENT,
+      founder: { userId: 'founder-1', email: 'founder@example.com' },
+      priorEvidenceFingerprint: first.receipt.continuity.evidenceFingerprint,
+    });
+    const cookieOnly = resolveUltrathinkSharedReasoning({
+      executionId: 'ultrathink:cookie-only',
+      surface: 'voice',
+      intent: INTENT,
+      founder: { userId: 'founder-1', email: 'founder@example.com' },
+      priorProofCookie: first.receipt.continuity.proofCookie,
+    });
+
+    expect(fingerprintOnly.receipt.continuity.transition).toBe('changed');
+    expect(cookieOnly.receipt.continuity.transition).toBe('changed');
+    expect(fingerprintOnly.receipt.continuity.authorityEffect).toBe('none');
+    expect(cookieOnly.receipt.continuity.authorityEffect).toBe('none');
+  });
+
   it('rejects intents that do not actually invoke /ultrathink', () => {
     expect(() => resolveUltrathinkSharedReasoning({
       executionId: 'ultrathink:missing-command',

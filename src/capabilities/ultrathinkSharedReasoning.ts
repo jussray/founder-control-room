@@ -118,10 +118,10 @@ export function resolveUltrathinkSharedReasoning(
   const proofCookie = proofCookieFor(evidenceFingerprint);
   const predecessorFingerprint = continuityValue(input.priorEvidenceFingerprint);
   const predecessorProofCookie = continuityValue(input.priorProofCookie);
-  const transition: UltrathinkContinuityTransition = predecessorFingerprint === null
+  const hasPredecessor = predecessorFingerprint !== null || predecessorProofCookie !== null;
+  const transition: UltrathinkContinuityTransition = !hasPredecessor
     ? 'initial'
-    : predecessorFingerprint === evidenceFingerprint
-      && (predecessorProofCookie === null || predecessorProofCookie === proofCookie)
+    : predecessorFingerprint === evidenceFingerprint && predecessorProofCookie === proofCookie
       ? 'confirmed'
       : 'changed';
 
