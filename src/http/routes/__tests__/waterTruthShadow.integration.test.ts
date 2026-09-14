@@ -139,6 +139,8 @@ describe('WaterTruth shadow capability runtime', () => {
   });
 
   it('keeps the WaterTruth runtime behind founder authorization', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: null }, error: null });
+
     const res = await request(buildApp())
       .post('/capabilities/watertruth-evidence-gated-authority-shadow-v1/runs')
       .send({
