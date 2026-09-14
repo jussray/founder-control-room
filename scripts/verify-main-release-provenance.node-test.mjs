@@ -4,6 +4,7 @@ import test from 'node:test';
 
 import { classifyMainReleaseProvenance } from './verify-main-release-provenance.mjs';
 import {
+  classifyTrustedMainReleaseProvenanceRun,
   observeMainReleaseProvenance,
   shouldEnforceMainReleaseProvenance,
 } from './verify-production-migration-ledger.mjs';
@@ -27,6 +28,20 @@ function ownerPush(overrides = {}) {
     ref: 'refs/heads/main',
     actor: 'jussray',
     repositoryOwner: 'jussray',
+    ...overrides,
+  };
+}
+
+function provenanceRun(overrides = {}) {
+  return {
+    id: 123456,
+    path: '.github/workflows/main-release-provenance.yml',
+    head_sha: SHA,
+    head_branch: 'main',
+    event: 'push',
+    status: 'completed',
+    conclusion: 'success',
+    actor: { login: 'jussray' },
     ...overrides,
   };
 }
@@ -149,6 +164,45 @@ test('rejects ambiguous release provenance even with valid direct-main context',
   assert.deepEqual(result.matchingPullRequestNumbers, [42, 43]);
 });
 
+test('accepts durable exact-head provenance run only when GitHub actor is repository owner', () => {
+  assert.deepEqual(classifyTrustedMainReleaseProvenanceRun({
+    repository: 'jussray/founder-control-room',
+    targetSha: SHA,
+    workflowRuns: [provenanceRun()],
+  }), {
+    ok: true,
+    reason: 'verified_main_release_provenance_workflow',
+    targetSha: SHA,
+    workflowRunId: 123456,
+    workflowActor: 'jussray',
+    workflowPath: '.github/workflows/main-release-provenance.yml',
+  });
+});
+
+test('rejects provenance workflow run from non-owner actor', () => {
+  assert.equal(classifyTrustedMainReleaseProvenanceRun({
+    repository: 'jussray/founder-control-room',
+    targetSha: SHA,
+    workflowRuns: [provenanceRun({ actor: { login: 'automation-bot' } })],
+  }).reason, 'missing_trusted_direct_main_provenance_receipt');
+});
+
+test('rejects wrong SHA branch event status conclusion and workflow path receipts', () => {
+  const invalidRuns = [
+    provenanceRun({ head_sha: OTHER }),
+    provenanceRun({ head_branch: 'feature' }),
+    provenanceRun({ event: 'workflow_dispatch' }),
+    provenanceRun({ status: 'in_progress' }),
+    provenanceRun({ conclusion: 'failure' }),
+    provenanceRun({ path: '.github/workflows/ci.yml' }),
+  ];
+  assert.equal(classifyTrustedMainReleaseProvenanceRun({
+    repository: 'jussray/founder-control-room',
+    targetSha: SHA,
+    workflowRuns: invalidRuns,
+  }).reason, 'missing_trusted_direct_main_provenance_receipt');
+});
+
 test('enforces provenance only in the canonical manual Deploy preflight', () => {
   assert.equal(shouldEnforceMainReleaseProvenance({
     phase: 'preflight',
@@ -170,10 +224,33 @@ test('enforces provenance only in the canonical manual Deploy preflight', () => 
   }), false);
 });
 
-test('observes provider state and rejects missing release provenance', async () => {
+test('observes durable owner-direct provenance when no reviewed PR exists', async () => {
   const fetchImpl = async (url) => {
-    if (String(url).endsWith('/branches/main')) return response({ commit: { sha: SHA } });
-    if (String(url).endsWith(`/commits/${SHA}/pulls`)) return response([]);
+    const href = String(url);
+    if (href.endsWith('/branches/main')) return response({ commit: { sha: SHA } });
+    if (href.endsWith(`/commits/${SHA}/pulls`)) return response([]);
+    if (href.includes('/actions/runs?')) return response({ workflow_runs: [provenanceRun()] });
+    return response({}, 404);
+  };
+
+  const result = await observeMainReleaseProvenance({
+    repository: 'jussray/founder-control-room',
+    targetSha: SHA,
+    fetchImpl,
+    token: '',
+  });
+  assert.equal(result.ok, true);
+  assert.equal(result.reason, 'verified_main_release_provenance_workflow');
+  assert.equal(result.workflowRunId, 123456);
+  assert.equal(result.reviewedProvenanceReason, 'direct_or_unproven_main_commit');
+});
+
+test('observes provider state and rejects missing trusted direct-main receipt', async () => {
+  const fetchImpl = async (url) => {
+    const href = String(url);
+    if (href.endsWith('/branches/main')) return response({ commit: { sha: SHA } });
+    if (href.endsWith(`/commits/${SHA}/pulls`)) return response([]);
+    if (href.includes('/actions/runs?')) return response({ workflow_runs: [] });
     return response({}, 404);
   };
 
@@ -184,7 +261,7 @@ test('observes provider state and rejects missing release provenance', async () 
     token: '',
   });
   assert.equal(result.ok, false);
-  assert.equal(result.reason, 'direct_or_unproven_main_commit');
+  assert.equal(result.reason, 'missing_trusted_direct_main_provenance_receipt');
 });
 
 test('provider observation failure blocks instead of manufacturing green', async () => {
@@ -215,6 +292,7 @@ test('preflight verifier is load-bearing before the first production mutation', 
   assert.ok(mutationYes > mutationStep, 'Supabase mutation step must remain an acknowledged --yes mutation');
   assert.ok(workerDependency > worker, 'Worker deploy must remain dependent on the Supabase job');
   assert.ok(pagesDependency > pages, 'Pages release must remain dependent on Worker deploy');
+  assert.match(deploy, /permissions:\n\s+contents: read\n\s+pull-requests: read\n\s+actions: read/);
 });
 
 test('main provenance workflow cancels stale push runs without weakening provenance semantics', () => {
