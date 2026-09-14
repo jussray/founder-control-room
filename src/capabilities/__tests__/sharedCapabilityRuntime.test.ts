@@ -113,8 +113,13 @@ describe('shared read-only capability runtime', () => {
   });
 
   it('rejects any provider evidence that attempts to change authority', () => {
-    const escalated = observation() as unknown as SharedReadOnlyObservation & {
-      continuity: SharedReadOnlyObservation['continuity'] & { authorityEffect: string };
+    const escalated = observation() as unknown as {
+      continuity: {
+        evidenceFingerprint: string;
+        proofCookie: string;
+        transition: string;
+        authorityEffect: string;
+      };
     };
     escalated.continuity.authorityEffect = 'grant_write';
 
