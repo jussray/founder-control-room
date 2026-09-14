@@ -4,6 +4,7 @@ import {
   buildFounderContentIssuedApproval,
   issueFounderContentApproval,
   type FounderContentApprovalRepository,
+  type FounderContentIssuedApproval,
 } from '../founderContentApprovalStore.js';
 
 const require = createRequire(import.meta.url);
@@ -111,6 +112,41 @@ function uniqueApprovalRepository(): FounderContentApprovalRepository {
   };
 }
 
+function retryRecoveringRepository(): FounderContentApprovalRepository {
+  let stored: (FounderContentIssuedApproval & { founderUserId: string }) | undefined;
+  return {
+    issue: vi.fn(async (input) => {
+      if (stored) return false;
+      stored = input;
+      return true;
+    }),
+    readReserved: vi.fn(async (input) => {
+      if (
+        stored
+        && stored.founderUserId === input.founderUserId
+        && stored.approvalId === input.approvalId
+        && stored.proposalHash === input.proposalHash
+        && stored.publicPayloadHash === input.publicPayloadHash
+        && stored.platform === input.platform
+        && stored.expiresAt > input.now
+      ) {
+        const { founderUserId: _founderUserId, ...issued } = stored;
+        return issued;
+      }
+      return {
+        ok: false as const,
+        code: 'APPROVAL_NOT_CURRENT' as const,
+        reason: 'reservation does not exactly match an active approval',
+      };
+    }),
+    claim: vi.fn(async () => ({
+      ok: false as const,
+      code: 'APPROVAL_NOT_FOUND' as const,
+      reason: 'not used in issuance tests',
+    })),
+  };
+}
+
 describe('authoritative founder-content approval issuance', () => {
   it('server-issues an exact founder/proposal/copy/source-bound approval with a bounded TTL', () => {
     const proposalValue = proposal();
@@ -195,6 +231,31 @@ describe('authoritative founder-content approval issuance', () => {
       repository: store,
     })).rejects.toThrow(/could not be persisted/);
     expect(store.issue).toHaveBeenCalledTimes(1);
+  });
+
+  it('recovers the exact active reservation when an issuance response is lost and retried', async () => {
+    const store = retryRecoveringRepository();
+    const proposalValue = proposal();
+
+    const first = await issueFounderContentApproval({
+      proposal: proposalValue,
+      founderUserId: 'founder-user-1',
+      now: '2026-08-19T07:30:00.000Z',
+      repository: store,
+    });
+    const retried = await issueFounderContentApproval({
+      proposal: proposalValue,
+      founderUserId: 'founder-user-1',
+      now: '2026-08-19T07:31:00.000Z',
+      repository: store,
+    });
+
+    expect(store.issue).toHaveBeenCalledTimes(2);
+    expect(store.readReserved).toHaveBeenCalledTimes(1);
+    expect(retried.approvalId).toBe(first.approvalId);
+    expect(retried.authorizationHash).toBe(first.authorizationHash);
+    expect(retried.approvedAt).toBe(first.approvedAt);
+    expect(retried.expiresAt).toBe(first.expiresAt);
   });
 
   it('serializes the same public thesis and hook across evidence rotation within one current-you intent', async () => {
