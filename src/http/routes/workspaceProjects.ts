@@ -117,7 +117,7 @@ function chiefRecommendation(ownerWorkspaceId: string, input: ComposerInput) {
     title: template.title,
     firstGate: template.firstGate,
     reasoning: template.reasoning,
-    authorityBoundary: 'Chief recommends. The founder approves this exact project plan. Creation grants no provider, merge, deployment, spending, communication, or execution authority.',
+    authorityBoundary: 'Chief recommends. The founder approves this exact project plan. Chief creates no provider connection and grants no merge, deployment, spending, communication, or execution authority.',
   };
 }
 
