@@ -255,6 +255,8 @@ When a newer fingerprint contradicts an older present-tense statement, replace o
 
 Documentation Truth proves documentation coverage/materiality. It does not independently prove provider configuration, deployment, browser behavior, security review, publication, or human outcome.
 
+For pull requests, the load-bearing Documentation Truth and default test-discovery baselines must resolve the provider-backed live target branch from `base.ref` at execution time. `pull_request.base.sha` is historical event-snapshot evidence only and must never serve as current proof authority. If the resolved live base is not an exact valid SHA or is not an ancestor of the exact candidate, the gate must fail closed instead of diffing against stale history.
+
 See [`docs/TRUTH_DECAY_AUDIT.md`](docs/TRUTH_DECAY_AUDIT.md).
 
 ## Setup

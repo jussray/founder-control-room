@@ -149,6 +149,8 @@ implementation / authority / provider truth changes
 
 Default test discovery has a distinct proof boundary: an exclusion ledger only says a candidate test is absent from the default suite. It must be base-bound, cannot grow in a candidate PR, and must shrink when the excluded path is repaired or removed; it never proves universal CI non-execution.
 
+For pull-request proof, both Documentation Truth and the default test-discovery ratchet must resolve the provider-backed live target branch from the current `base.ref` at execution time. The event payload's `pull_request.base.sha` is snapshot evidence only and must never be treated as the current proof baseline. If the resolved live base is invalid or is not an ancestor of the exact candidate, the applicable gate must fail closed before merge readiness can be claimed.
+
 Historical evidence stays useful. Mark older contradictory material `HISTORICAL`, `SUPERSEDED`, `REVALIDATION_REQUIRED`, or otherwise point it to the newer authority instead of deleting provenance or letting old present-tense guidance compete silently with current truth.
 
 A docs-only truth-sync merge closes an earlier drift cycle. Its post-merge Documentation Truth receipt closes that transition and does not create an infinite requirement to rewrite the docs again merely because the merge commit SHA changed.

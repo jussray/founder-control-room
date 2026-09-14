@@ -12,8 +12,6 @@ permissions:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-  DOC_TRUTH_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
-  TEST_DISCOVERY_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
 
 jobs:
   typecheck:
@@ -187,8 +185,40 @@ jobs:
         run: |
           set -euo pipefail
           actual="$(git rev-parse HEAD)"
-          printf 'expected=%s\nactual=%s\nbase=%s\n' "$EXPECTED_HEAD_SHA" "$actual" "$DOC_TRUTH_BASE_SHA"
+          printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
           test "$actual" = "$EXPECTED_HEAD_SHA"
+      - name: Resolve exact live base
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.event.pull_request.base.ref || '' }}
+          PUSH_BEFORE_SHA: ${{ github.event.before || '' }}
+        run: |
+          set -euo pipefail
+
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            test -n "$BASE_REF"
+            git check-ref-format "refs/heads/${BASE_REF}"
+            live_base_sha="$(git ls-remote --heads origin "refs/heads/${BASE_REF}" | awk 'NR == 1 {print $1}')"
+          else
+            live_base_sha="$PUSH_BEFORE_SHA"
+          fi
+
+          if ! [[ "$live_base_sha" =~ ^[0-9a-f]{40}$ ]] || [ "$live_base_sha" = "0000000000000000000000000000000000000000" ]; then
+            echo "CI Documentation Truth base resolution failed: expected an exact live base SHA." >&2
+            exit 1
+          fi
+
+          git fetch --no-tags origin "$live_base_sha"
+          if ! git merge-base --is-ancestor "$live_base_sha" "$EXPECTED_HEAD_SHA"; then
+            echo "CI Documentation Truth base resolution failed: live base is not an ancestor of the exact candidate." >&2
+            echo "live_base_sha=$live_base_sha" >&2
+            echo "candidate_sha=$EXPECTED_HEAD_SHA" >&2
+            exit 1
+          fi
+
+          printf 'DOC_TRUTH_BASE_SHA=%s\n' "$live_base_sha" >> "$GITHUB_ENV"
+          printf 'resolved_base_sha=%s\n' "$live_base_sha"
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -244,9 +274,42 @@ jobs:
       - name: Record and verify exact head
         shell: bash
         run: |
+          set -euo pipefail
           actual="$(git rev-parse HEAD)"
           printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
           test "$actual" = "$EXPECTED_HEAD_SHA"
+      - name: Resolve exact live base
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.event.pull_request.base.ref || '' }}
+          PUSH_BEFORE_SHA: ${{ github.event.before || '' }}
+        run: |
+          set -euo pipefail
+
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            test -n "$BASE_REF"
+            git check-ref-format "refs/heads/${BASE_REF}"
+            live_base_sha="$(git ls-remote --heads origin "refs/heads/${BASE_REF}" | awk 'NR == 1 {print $1}')"
+          else
+            live_base_sha="$PUSH_BEFORE_SHA"
+          fi
+
+          if ! [[ "$live_base_sha" =~ ^[0-9a-f]{40}$ ]] || [ "$live_base_sha" = "0000000000000000000000000000000000000000" ]; then
+            echo "Test discovery base resolution failed: expected an exact live base SHA." >&2
+            exit 1
+          fi
+
+          git fetch --no-tags origin "$live_base_sha"
+          if ! git merge-base --is-ancestor "$live_base_sha" "$EXPECTED_HEAD_SHA"; then
+            echo "Test discovery base resolution failed: live base is not an ancestor of the exact candidate." >&2
+            echo "live_base_sha=$live_base_sha" >&2
+            echo "candidate_sha=$EXPECTED_HEAD_SHA" >&2
+            exit 1
+          fi
+
+          printf 'TEST_DISCOVERY_BASE_SHA=%s\n' "$live_base_sha" >> "$GITHUB_ENV"
+          printf 'resolved_base_sha=%s\n' "$live_base_sha"
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
