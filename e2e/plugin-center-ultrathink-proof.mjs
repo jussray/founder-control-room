@@ -13,7 +13,7 @@ const mime = {
   '.html': 'text/html; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
-  '.webp': 'image/webp',
+  '.svg': 'image/svg+xml; charset=utf-8',
 };
 
 const pluginCenterPayload = {
@@ -102,7 +102,7 @@ async function proveViewport(label, viewport) {
     naturalHeight: node.naturalHeight,
   }));
 
-  if (imageState.src !== '/assets/plugins/ultrathink.webp') {
+  if (imageState.src !== '/assets/plugins/ultrathink.svg') {
     throw new Error(`${label}: unexpected ULTRATHINK image path: ${imageState.src}`);
   }
   if (imageState.alt !== 'ULTRATHINK FCR Plugin') {
@@ -110,6 +110,17 @@ async function proveViewport(label, viewport) {
   }
   if (!imageState.complete || imageState.naturalWidth <= 0 || imageState.naturalHeight <= 0) {
     throw new Error(`${label}: ULTRATHINK artwork did not decode: ${JSON.stringify(imageState)}`);
+  }
+
+  const artwork = await page.evaluate(async () => {
+    const response = await fetch('/assets/plugins/ultrathink.svg');
+    return { ok: response.ok, contentType: response.headers.get('content-type'), text: await response.text() };
+  });
+  if (!artwork.ok || !artwork.contentType?.includes('image/svg+xml')) {
+    throw new Error(`${label}: ULTRATHINK SVG was not served as an image: ${JSON.stringify({ ok: artwork.ok, contentType: artwork.contentType })}`);
+  }
+  if (!artwork.text.includes('data-ultrathink-art="v1"') || !artwork.text.includes('ULTRATHINK') || !artwork.text.includes('DEEP REASONING CORE')) {
+    throw new Error(`${label}: ULTRATHINK artwork identity markers are missing`);
   }
 
   const overflow = await page.evaluate(() => ({
@@ -135,7 +146,7 @@ async function proveViewport(label, viewport) {
 try {
   await proveViewport('desktop-1440', { width: 1440, height: 1100 });
   await proveViewport('mobile-390', { width: 390, height: 844 });
-  console.log('PASS: ULTRATHINK Plugin Center artwork, command identity, non-authorizing boundary, responsive layout, browser asset loading, and durable screenshot receipts are proven on desktop and mobile.');
+  console.log('PASS: ULTRATHINK Plugin Center artwork, SVG identity, command identity, non-authorizing boundary, responsive layout, browser asset loading, and durable screenshot receipts are proven on desktop and mobile.');
 } finally {
   await browser.close();
   await new Promise((resolve) => server.close(resolve));

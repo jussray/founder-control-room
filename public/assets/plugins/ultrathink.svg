@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc" data-ultrathink-art="v1">
+  <title id="title">ULTRATHINK FCR Plugin</title>
+  <desc id="desc">A luminous reasoning core with branching circuit paths for Founder Control Room.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#06101f"/>
+      <stop offset="0.48" stop-color="#0c2342"/>
+      <stop offset="1" stop-color="#07101d"/>
+    </linearGradient>
+    <radialGradient id="core" cx="50%" cy="44%" r="55%">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.16" stop-color="#9fe9ff"/>
+      <stop offset="0.42" stop-color="#4c9cff"/>
+      <stop offset="0.72" stop-color="#6e5cff"/>
+      <stop offset="1" stop-color="#111d45"/>
+    </radialGradient>
+    <linearGradient id="stroke" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#9ff5ff"/>
+      <stop offset="0.5" stop-color="#55a8ff"/>
+      <stop offset="1" stop-color="#a77bff"/>
+    </linearGradient>
+    <filter id="glow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="soft" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="22"/>
+    </filter>
+  </defs>
+
+  <rect width="512" height="512" rx="54" fill="url(#bg)"/>
+  <circle cx="256" cy="218" r="166" fill="#2878ff" opacity="0.13" filter="url(#soft)"/>
+  <circle cx="256" cy="218" r="126" fill="none" stroke="#4f88ff" stroke-width="1.5" opacity="0.24"/>
+  <circle cx="256" cy="218" r="154" fill="none" stroke="#79dfff" stroke-width="1" opacity="0.15" stroke-dasharray="5 11"/>
+
+  <g fill="none" stroke="url(#stroke)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" opacity="0.92" filter="url(#glow)">
+    <path d="M255 86v44l-36 27v37"/>
+    <path d="M255 130l42 28v33"/>
+    <path d="M219 157l-53-19-34 22"/>
+    <path d="M297 158l55-19 31 24"/>
+    <path d="M218 194l-48 38-52-2"/>
+    <path d="M298 192l46 40h52"/>
+    <path d="M214 240l-43 45-38 3"/>
+    <path d="M300 238l43 47 39 3"/>
+    <path d="M230 286l-15 39-41 26"/>
+    <path d="M282 286l18 39 40 26"/>
+  </g>
+
+  <g fill="#b7efff" filter="url(#glow)">
+    <circle cx="255" cy="86" r="7"/><circle cx="132" cy="160" r="7"/><circle cx="383" cy="163" r="7"/>
+    <circle cx="118" cy="230" r="7"/><circle cx="396" cy="232" r="7"/><circle cx="133" cy="288" r="7"/>
+    <circle cx="382" cy="288" r="7"/><circle cx="174" cy="351" r="7"/><circle cx="340" cy="351" r="7"/>
+  </g>
+
+  <g filter="url(#glow)">
+    <circle cx="256" cy="224" r="74" fill="url(#core)" opacity="0.34"/>
+    <circle cx="256" cy="224" r="56" fill="#07162d" stroke="#8cecff" stroke-width="3"/>
+    <path d="M237 184h37l-16 30h28l-51 55 17-38h-27z" fill="#ecfbff" stroke="#9bdfff" stroke-width="2" stroke-linejoin="round"/>
+  </g>
+
+  <g font-family="system-ui,-apple-system,Segoe UI,sans-serif">
+    <rect x="32" y="30" width="132" height="30" rx="15" fill="#102e54" stroke="#4d89cf"/>
+    <text x="98" y="50" text-anchor="middle" fill="#bfe5ff" font-size="13" font-weight="700" letter-spacing="2">FCR PLUGIN</text>
+    <text x="256" y="416" text-anchor="middle" fill="#f4f8ff" font-size="41" font-weight="850" letter-spacing="2">ULTRATHINK</text>
+    <text x="256" y="446" text-anchor="middle" fill="#91b8df" font-size="14" font-weight="600" letter-spacing="3">DEEP REASONING CORE</text>
+  </g>
+
+  <rect x="12" y="12" width="488" height="488" rx="44" fill="none" stroke="#4aa0ff" stroke-width="2" opacity="0.52"/>
+</svg>
