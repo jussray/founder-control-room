@@ -16,6 +16,7 @@ function assert(condition, message) {
 const externalTools = read('src/mcp/externalTools.ts');
 
 const fcrTruthTools = [
+  'github_audit_pr',
   'fcr_list_projects',
   'fcr_get_current_truth',
   'fcr_preview_skill_route',
@@ -65,5 +66,6 @@ assert(
 
 console.log('[verify:mcp-role-boundary] PASS');
 console.log('  FCR MCP: scoped truth/governance observations and previews only.');
+console.log('  GitHub PR audit: fixed-repository, bounded, read-only evidence only.');
 console.log('  Chief through FCR MCP: reasoning/audit/capability previews only.');
 console.log('  MCP transport does not mint founder approval, execution authority, or runtime truth.');

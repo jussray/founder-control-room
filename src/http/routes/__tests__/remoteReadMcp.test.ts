@@ -103,6 +103,19 @@ function dependencies(overrides: RemoteReadMcpDependencies = {}): RemoteReadMcpD
       FCR_REMOTE_MCP_READ_TOKEN: TOKEN,
       FCR_REMOTE_MCP_READ_PROJECTS: `${CHIEF},${FCR}`,
     },
+    auditPullRequest: vi.fn(async (input) => ({
+      contract: 'founder-control-room/github-pr-audit@v3',
+      repository: input.repository,
+      verdict: 'evidence_incomplete',
+      summary: { prNumber: input.pullNumber, headSha: input.expectedHeadSha ?? null },
+      boundary: {
+        evidenceAuditOnly: true,
+        mergeApproved: false,
+        mutationPerformed: false,
+        proofCookieGrantsAuthority: false,
+        providerTokenAuthority: 'read_only',
+      },
+    })),
     listProjects: vi.fn(async () => [{ slug: CHIEF }, { slug: FCR }]),
     listCapabilities: vi.fn(async () => ({ project: CHIEF, capabilities: [] })),
     getCurrentTruth: vi.fn(async (projectId) => ({ projectId, exactTarget: null })),
@@ -246,7 +259,7 @@ describe('Founder Control Room paired remote MCP', () => {
     expect(response.headers).not.toHaveProperty('set-cookie');
   });
 
-  it('keeps legacy initialization while advertising only six narrow tools', async () => {
+  it('keeps legacy initialization while advertising only seven narrow tools', async () => {
     const app = buildApp();
     const initialized = await legacyPost(app, rpc('initialize', {
       protocolVersion: '2025-11-25',
@@ -259,6 +272,7 @@ describe('Founder Control Room paired remote MCP', () => {
     expect(initialized.body.result.protocolVersion).toBe('2025-11-25');
     expect(listed.body.result.tools.map((tool: { name: string }) => tool.name)).toEqual([
       'chief_audit_repository',
+      'github_audit_pr',
       'chief_list_capabilities',
       'chief_preview_capability_plan',
       'fcr_list_projects',
@@ -332,6 +346,47 @@ describe('Founder Control Room paired remote MCP', () => {
       cookiesUsed: false,
       fingerprintsUsed: false,
     });
+  });
+
+  it('routes GitHub PR audit only to the fixed FCR repository and persists a non-authorizing receipt', async () => {
+    const auditPullRequest = vi.fn(async (input) => ({
+      contract: 'founder-control-room/github-pr-audit@v3',
+      repository: input.repository,
+      verdict: 'evidence_complete',
+      summary: { prNumber: input.pullNumber, headSha: input.expectedHeadSha },
+      boundary: {
+        evidenceAuditOnly: true,
+        mergeApproved: false,
+        mutationPerformed: false,
+        proofCookieGrantsAuthority: false,
+        providerTokenAuthority: 'read_only',
+      },
+    }));
+    const recordEvidence = vi.fn(async (input) => receipt(input.toolName, input.projectSlug));
+    const head = 'a'.repeat(40);
+    const response = await legacyPost(buildApp({ auditPullRequest, recordEvidence }), rpc('tools/call', {
+      name: 'github_audit_pr',
+      arguments: { projectId: FCR, pullNumber: 702, expectedHeadSha: head },
+    }));
+
+    expect(response.status).toBe(200);
+    expect(auditPullRequest).toHaveBeenCalledWith({
+      projectSlug: FCR,
+      repository: 'jussray/founder-control-room',
+      pullNumber: 702,
+      expectedHeadSha: head,
+    });
+    expect(recordEvidence).toHaveBeenCalledWith(expect.objectContaining({
+      projectSlug: FCR,
+      toolName: 'github_audit_pr',
+      result: expect.objectContaining({
+        boundary: expect.objectContaining({
+          mergeApproved: false,
+          mutationPerformed: false,
+          providerTokenAuthority: 'read_only',
+        }),
+      }),
+    }));
   });
 
   it('intersects OAuth token projects with the server-held project scope', async () => {

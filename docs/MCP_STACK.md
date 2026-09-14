@@ -1,6 +1,6 @@
 # Founder Control Room MCP stack
 
-Last reviewed: 2026-09-13
+Last reviewed: 2026-09-14
 
 This file governs which MCP servers an AI agent may use while **developing this repository**. It is different from the Control Room's own **MCP / Connector Hub** (`project_connections` + `GET /agents` + `GET /authority-levels`), which records connectors and authority for managed projects. Do not conflate the repository agent fleet with the in-app Connector Hub.
 
@@ -20,15 +20,18 @@ The Control Room source defines an external connector boundary:
 The external tool catalog is intentionally small and deterministic:
 
 1. `chief_audit_repository`
-2. `chief_list_capabilities`
-3. `chief_preview_capability_plan`
-4. `fcr_list_projects`
-5. `fcr_get_current_truth`
-6. `fcr_preview_skill_route`
+2. `github_audit_pr`
+3. `chief_list_capabilities`
+4. `chief_preview_capability_plan`
+5. `fcr_list_projects`
+6. `fcr_get_current_truth`
+7. `fcr_preview_skill_route`
+
+`github_audit_pr` is deliberately narrower than a generic GitHub connector. It is fixed to `jussray/founder-control-room`, requires the caller's FCR project grant, accepts only a PR number plus optional full expected head SHA, mints a repository-scoped GitHub App installation token down-scoped to read-only `administration`, `checks`, `contents`, `pull_requests`, and `statuses`, and performs bounded provider reads only. It re-reads the live base and PR identity around collection, discovers required status checks from provider rulesets/branch protection, reads exact-head check runs and commit statuses, reads reviews, compares against the live base, omits patch bodies, and fails closed on truncation, ambiguous provider patterns, access/rate-limit/timeout failures, head disagreement, live-base movement, or missing/failed/pending required evidence. Its semantic proof cookie is an observation marker only and cannot approve, merge, deploy, publish, dispatch, comment, or mutate a provider.
 
 There is no external generic `invoke_read_tool`. Callers cannot choose an arbitrary nested provider, tool name, mission, approval, credential, mutation action, or project outside the intersection of the OAuth token grant and the server-held allowlist. Skill content remains private: capability results expose metadata/evidence only, never raw `SKILL.md` prompt text.
 
-MCP identity uses the validated subject, OAuth client ID, JSON-RPC request ID, exact project, and redacted request/result hashes. It uses no browser session cookie, tracking cookie, device fingerprint, or probabilistic fingerprint. Raw MCP arguments and results are not written to the evidence ledger.
+MCP identity uses the validated subject, OAuth client ID, JSON-RPC request ID, exact project, and redacted request/result hashes. It uses no browser session cookie, tracking cookie, device fingerprint, or probabilistic fingerprint. Raw MCP arguments and results are not written to the evidence ledger. Semantic repository fingerprints/proof cookies returned by a truth tool identify evidence state; they are not browser tracking and never mint authority.
 
 ### Activation gate
 
@@ -37,13 +40,14 @@ Source readiness is not production readiness. Before deployment, all of the foll
 - reconcile the live Supabase migration ledger so `mcp_servers`, `mcp_project_policies`, and `mcp_tool_calls` actually exist with the checked-in RLS/grant contract;
 - enable/configure Supabase OAuth and a custom access-token hook that emits the exact audience, `mcp:read`, and bounded `mcp_projects` claims;
 - register/allow the exact client IDs for the connected external consoles (CIMD where supported; DCR only for legacy compatibility);
-- configure `FCR_REMOTE_MCP_*` and `CHIEF_AI_BASE_URL` without reusing provider/deploy credentials;
+- configure `FCR_REMOTE_MCP_*`, `CHIEF_AI_BASE_URL`, and the repository-scoped GitHub App credentials without reusing provider/deploy credentials;
+- prove the GitHub App installation can mint the requested read-only audit permissions without widening to write authority;
 - prove the Chief URL/binding and FCR Worker SHA, then run the Attack Ten auth/scope/replay/header/evidence/client matrix;
 - connect ChatGPT, Claude, or Manus only after provider evidence proves the resource metadata, OAuth flow, tools list, and calls from the deployed exact head.
 
 The source and provider attack matrix is maintained in `docs/PAIRED_MCP_ATTACK_TEN.md`.
 
-No migration, OAuth dashboard change, Worker secret/binding change, merge, or deployment is authorized merely by this document or by source tests.
+No migration, OAuth dashboard change, GitHub App permission change, Worker secret/binding change, merge, or deployment is authorized merely by this document or by source tests.
 
 ## Connected repository-agent servers
 
@@ -64,13 +68,14 @@ No migration, OAuth dashboard change, Worker secret/binding change, merge, or de
 
 ## Served remote read MCP boundary
 
-Founder Control Room also serves a separate read-only MCP gateway at `POST https://api.foundercontrolroom.org/mcp/read`. This is the remote bridge intended for external MCP clients that need governed repository/provider reads without inheriting Founder Control Room execution authority.
+Founder Control Room also serves a temporary static-auth compatibility entrance at `POST https://api.foundercontrolroom.org/mcp/read`. It instantiates the same `createRemoteReadMcpHandler` and the same seven-tool external catalog as canonical `/mcp`; only the authentication mode differs.
 
 - Authentication uses the dedicated Worker secret `FCR_REMOTE_MCP_READ_TOKEN`. It must not be reused for the write-capable Founder Signal Engine MCP or any provider credential.
 - Production project scope is server-held as `FCR_REMOTE_MCP_READ_PROJECTS=sekret-bip,juss-beautiful-hair,juss-beautiful-hair-private,l99,chief-ai-machine,untold-stories,founder-control-room,promptos`. These are the current active authority-bearing entries in `PORTFOLIO_PROJECTS`; callers cannot add or substitute a project slug in order to widen the grant.
 - External continuity-only projects (`think-tank`, `solcontinuity`, `sleepwealth-agent`, `sweats`) and quarantined repositories remain outside this operator grant unless a later explicit founder authority decision promotes them through the normal portfolio contract.
-- The gateway advertises only `list_read_servers` and `invoke_read_tool`; both remain behind the in-app MCP registry and policy boundary.
-- Provider tools still have to pass the configured server allowlist/denylist. A tool name matching create/update/delete/merge/write authority remains blocked by the underlying FCR MCP policy.
+- The compatibility lane exposes the same seven narrow read/preview tools listed above. It does not expose `list_read_servers`, `invoke_read_tool`, or any other generic nested provider invocation surface.
+- `github_audit_pr` still mints its own server-held repository-scoped GitHub App token with explicit read-only permissions; `FCR_REMOTE_MCP_READ_TOKEN` authenticates the FCR client session and never becomes GitHub provider authority.
+- Provider observations still have to satisfy each named tool's fixed allowlist and fail-closed evidence contract. No tool accepts a caller-selected mutation provider or mutation operation.
 - Mission IDs, approval IDs, bearer tokens, and other authority-bearing fields are not accepted as tool arguments. Nested secret-bearing arguments are rejected before the provider boundary.
 - If either the dedicated token or server-held project scope is absent, the endpoint fails closed rather than falling back to a broader grant.
 - The secret value belongs in the surviving `founder-control-room` Worker secret store only. Do not commit it to `.env`, Wrangler config, MCP client config, issues, screenshots, logs, or proof artifacts.

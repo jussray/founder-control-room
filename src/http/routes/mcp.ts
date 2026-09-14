@@ -68,7 +68,7 @@ function invocationFromRequest(
 mcpRouter.post("/", handlePairedRemoteMcp);
 
 // Temporary compatibility lane for existing server-held static-token clients.
-// It exposes the same six narrow tools as /mcp and no generic nested invocation.
+// It exposes the same seven narrow tools as /mcp and no generic nested invocation.
 mcpRouter.post("/read", handleRemoteReadMcp);
 
 // Connection Vault is part of the MCP/connection authority surface. Its
