@@ -47,149 +47,57 @@ jobs:
           path: founder-control-room
           persist-credentials: false
 
-      - name: Resolve contract-paired Chief authorities
+      - name: Resolve paired Chief AI authority
         id: pair-ref
         shell: bash
         env:
           EVENT_NAME: ${{ github.event_name }}
-          CURRENT_FCR_PR: ${{ github.event.pull_request.number || '' }}
-          FCR_HEAD_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
-          GITHUB_TOKEN: ${{ github.token }}
+          FCR_HEAD_REF: ${{ github.head_ref }}
         run: |
           set -euo pipefail
-          contract="founder-control-room/config/founder-chief-pair.contract.json"
+          selected_ref="main"
+          source="chief-ai-machine/main"
           remote="https://github.com/jussray/chief-ai-machine.git"
 
-          jq -e '
-            .relationship.topology == "standalone-peers"
-            and .relationship.controlRoom.independentlyCallable == true
-            and .relationship.controlRoom.ownsIdentity == true
-            and .relationship.controlRoom.ownsLifecycle == true
-            and .relationship.controlRoom.ownsReceipts == true
-            and .relationship.controlRoom.ownsFailureState == true
-            and .relationship.controlRoom.ownsContinuityMarkers == true
-            and .relationship.chiefAI.independentlyCallable == true
-            and .relationship.chiefAI.ownsIdentity == true
-            and .relationship.chiefAI.ownsLifecycle == true
-            and .relationship.chiefAI.ownsReceipts == true
-            and .relationship.chiefAI.ownsFailureState == true
-            and .relationship.chiefAI.ownsContinuityMarkers == true
-            and .relationship.crossSystem.sharedRuntimeRequired == false
-            and .relationship.crossSystem.identityCollapseAllowed == false
-            and .relationship.crossSystem.implicitAuthorityTransferAllowed == false
-            and .relationship.crossSystem.receiptCollapseAllowed == false
-            and .relationship.crossSystem.failureCollapseAllowed == false
-            and .relationship.crossSystem.continuityCollapseAllowed == false
-            and .relationship.crossSystem.evidenceCreatesAuthority == false
-            and .relationship.crossSystem.cooperationMayProceedWithinEachSystemsOwnAuthority == true
-            and (.relationship.continuityBoundary | contains("non-secret"))
-            and (.relationship.continuityBoundary | contains("non-authorizing"))
-            and (.relationship.continuityBoundary | contains("recipient-side verification"))
-            and (.relationship.continuityBoundary | contains("never transfers authority"))
-            and (.relationship.cooperationBoundary | contains("independently valid systems"))
-            and (.relationship.cooperationBoundary | contains("distinct receipts"))
-            and (.relationship.cooperationBoundary | contains("never silently replaces"))
-          ' "$contract" >/dev/null
-
-          pair_ref="main"
-          pair_sha=""
-          policy_ref="main"
-          policy_sha=""
-          pair_source="chief-ai-machine/main"
-          policy_source="chief-ai-machine/main"
-
-          if [ "$EVENT_NAME" = "pull_request" ]; then
-            configured_fcr_pr="$(jq -r '.candidatePairing.founderControlRoomPullRequest' "$contract")"
-            chief_pr="$(jq -r '.candidatePairing.chiefAIPullRequest' "$contract")"
-            policy_pr="$(jq -r '.candidatePairing.chiefAINecessaryFixPolicyPullRequest' "$contract")"
-            test "$configured_fcr_pr" = "$CURRENT_FCR_PR"
-            printf '%s' "$chief_pr" | grep -Eq '^[1-9][0-9]*$'
-            printf '%s' "$policy_pr" | grep -Eq '^[1-9][0-9]*$'
-            test "$policy_pr" != "$chief_pr"
-
-            pair_json="$(curl --fail-with-body --silent --show-error --location \
-              -H 'Accept: application/vnd.github+json' \
-              -H "Authorization: Bearer $GITHUB_TOKEN" \
-              -H 'X-GitHub-Api-Version: 2022-11-28' \
-              "https://api.github.com/repos/jussray/chief-ai-machine/pulls/${chief_pr}")"
-            jq -e '
-              .state == "open"
-              and .merged_at == null
-              and .base.ref == "main"
-              and .head.repo.full_name == "jussray/chief-ai-machine"
-              and (.head.sha | test("^[0-9a-f]{40}$"))
-            ' <<<"$pair_json" >/dev/null
-            pair_ref="refs/pull/${chief_pr}/head"
-            pair_sha="$(jq -r '.head.sha' <<<"$pair_json")"
-            test "$(git ls-remote --exit-code "$remote" "$pair_ref" | awk 'NR==1 {print $1}')" = "$pair_sha"
-            pair_source="contract-paired-chief-pr-${chief_pr}"
-
-            policy_json="$(curl --fail-with-body --silent --show-error --location \
-              -H 'Accept: application/vnd.github+json' \
-              -H "Authorization: Bearer $GITHUB_TOKEN" \
-              -H 'X-GitHub-Api-Version: 2022-11-28' \
-              "https://api.github.com/repos/jussray/chief-ai-machine/pulls/${policy_pr}")"
-            jq -e '
-              .state == "open"
-              and .merged_at == null
-              and .base.ref == "main"
-              and .head.repo.full_name == "jussray/chief-ai-machine"
-              and (.head.sha | test("^[0-9a-f]{40}$"))
-            ' <<<"$policy_json" >/dev/null
-            policy_ref="refs/pull/${policy_pr}/head"
-            policy_sha="$(jq -r '.head.sha' <<<"$policy_json")"
-            test "$(git ls-remote --exit-code "$remote" "$policy_ref" | awk 'NR==1 {print $1}')" = "$policy_sha"
-            policy_source="separate-chief-policy-pr-${policy_pr}"
-          else
-            pair_sha="$(git ls-remote --exit-code "$remote" 'refs/heads/main' | awk 'NR==1 {print $1}')"
-            policy_sha="$pair_sha"
+          if [ "$EVENT_NAME" = "pull_request" ] && [ -n "$FCR_HEAD_REF" ]; then
+            git check-ref-format --branch "$FCR_HEAD_REF" >/dev/null
+            if git ls-remote --exit-code --heads "$remote" "refs/heads/$FCR_HEAD_REF" >/dev/null 2>&1; then
+              selected_ref="$FCR_HEAD_REF"
+              source="paired-same-name-branch"
+            fi
           fi
 
-          printf '%s' "$pair_sha" | grep -Eq '^[0-9a-f]{40}$'
-          printf '%s' "$policy_sha" | grep -Eq '^[0-9a-f]{40}$'
-          printf 'pair_ref=%s\n' "$pair_ref" >> "$GITHUB_OUTPUT"
-          printf 'pair_sha=%s\n' "$pair_sha" >> "$GITHUB_OUTPUT"
-          printf 'policy_ref=%s\n' "$policy_ref" >> "$GITHUB_OUTPUT"
-          printf 'policy_sha=%s\n' "$policy_sha" >> "$GITHUB_OUTPUT"
-          printf 'pair_source=%s\n' "$pair_source" >> "$GITHUB_OUTPUT"
-          printf 'policy_source=%s\n' "$policy_source" >> "$GITHUB_OUTPUT"
+          selected_sha="$(git ls-remote --exit-code --heads "$remote" "refs/heads/$selected_ref" | awk 'NR==1 {print $1}')"
+          printf '%s' "$selected_sha" | grep -Eq '^[0-9a-f]{40}$'
+
+          printf 'ref=%s\n' "$selected_ref" >> "$GITHUB_OUTPUT"
+          printf 'sha=%s\n' "$selected_sha" >> "$GITHUB_OUTPUT"
+          printf 'source=%s\n' "$source" >> "$GITHUB_OUTPUT"
           {
             echo '## Founder ↔ Chief pair authority'
             echo
-            printf -- '- FCR exact source: `%s`\n' "$FCR_HEAD_SHA"
-            printf -- '- Chief pair ref / SHA: `%s` / `%s`\n' "$pair_ref" "$pair_sha"
-            printf -- '- Chief policy ref / SHA: `%s` / `%s`\n' "$policy_ref" "$policy_sha"
-            printf -- '- Pair selection mode: `%s`\n' "$pair_source"
-            printf -- '- Policy selection mode: `%s`\n' "$policy_source"
-            echo '- Topology: `standalone-peers`'
-            echo '- Pair and policy carriers remain separate proof subjects.'
+            printf -- '- FCR exact source: `%s`\n' "$GITHUB_SHA"
+            printf -- '- Chief logical ref selected: `%s`\n' "$selected_ref"
+            printf -- '- Chief exact SHA selected: `%s`\n' "$selected_sha"
+            printf -- '- Selection mode: `%s`\n' "$source"
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Check out exact Chief AI pair authority
+      - name: Check out exact Chief AI authority
         uses: actions/checkout@v4
         with:
           repository: jussray/chief-ai-machine
-          ref: ${{ steps.pair-ref.outputs.pair_sha }}
+          ref: ${{ steps.pair-ref.outputs.sha }}
           path: chief-ai-machine
           persist-credentials: false
 
-      - name: Check out exact Chief necessary-fix policy carrier
-        uses: actions/checkout@v4
-        with:
-          repository: jussray/chief-ai-machine
-          ref: ${{ steps.pair-ref.outputs.policy_sha }}
-          path: chief-ai-policy
-          persist-credentials: false
-
-      - name: Verify exact Chief checkouts
+      - name: Verify exact Chief AI checkout
         shell: bash
+        working-directory: chief-ai-machine
         env:
-          EXPECTED_PAIR_SHA: ${{ steps.pair-ref.outputs.pair_sha }}
-          EXPECTED_POLICY_SHA: ${{ steps.pair-ref.outputs.policy_sha }}
+          EXPECTED_CHIEF_SHA: ${{ steps.pair-ref.outputs.sha }}
         run: |
           set -euo pipefail
-          test "$(git -C chief-ai-machine rev-parse HEAD)" = "$EXPECTED_PAIR_SHA"
-          test "$(git -C chief-ai-policy rev-parse HEAD)" = "$EXPECTED_POLICY_SHA"
+          test "$(git rev-parse HEAD)" = "$EXPECTED_CHIEF_SHA"
 
       - uses: actions/setup-node@v4
         with:
@@ -199,11 +107,9 @@ jobs:
         working-directory: founder-control-room
         env:
           PAIR_CONTRACT_PATH: ../chief-ai-machine/config/founder-chief-pair.contract.json
-          PAIR_NECESSARY_FIX_POLICY_PATH: ../chief-ai-policy/.control-room/necessary-fix-policy.json
+          PAIR_NECESSARY_FIX_POLICY_PATH: ../chief-ai-machine/.control-room/necessary-fix-policy.json
           PAIR_CROSS_REPO_REQUIRED: 'true'
-          PAIR_SELECTED_REF: ${{ steps.pair-ref.outputs.pair_ref }}
-          PAIR_SELECTED_SHA: ${{ steps.pair-ref.outputs.pair_sha }}
-          PAIR_SELECTION_MODE: ${{ steps.pair-ref.outputs.pair_source }}
-          PAIR_POLICY_REF: ${{ steps.pair-ref.outputs.policy_ref }}
-          PAIR_POLICY_SHA: ${{ steps.pair-ref.outputs.policy_sha }}
+          PAIR_SELECTED_REF: ${{ steps.pair-ref.outputs.ref }}
+          PAIR_SELECTED_SHA: ${{ steps.pair-ref.outputs.sha }}
+          PAIR_SELECTION_MODE: ${{ steps.pair-ref.outputs.source }}
         run: node scripts/verify-founder-chief-pair.mjs

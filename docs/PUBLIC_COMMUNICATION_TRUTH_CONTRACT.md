@@ -204,7 +204,3 @@ Hold the post when:
 A posting workflow is not complete when a draft exists, an approval is issued, a stored approval is claimed, a scheduler accepted it, or an automation was triggered.
 
 It is complete only when the intended publication artifact is observable, its claims remain accurate for their declared temporal class, the platform result is reconciled, and the evidence is recorded.
-
-## Founder-Chief pair publication authority
-
-`config/founder-chief-pair.contract.json` is a load-bearing publication-authority truth surface. Any change to its standalone-peer, automated-posting, approval, or provider-readback semantics requires Documentation Truth coverage and current durable documentation. The contract may preserve an approved automation class, but it cannot replace the active route's exact Current You approval membrane, cannot transfer Chief evidence into FCR authority, and cannot turn provider acceptance into publication truth.

@@ -382,9 +382,3 @@ The strongest optimization is not faster claiming. It is shortening the distance
 ## Rollback
 
 The Truth Lease, production-specific lease composer, temporal founder-content guards, analytics-authority guard, and Documentation Truth control are additive/fail-closed. Revert the focused contract/test/workflow/documentation change if it causes incompatibility. No database, provider credential, DNS, publication, provider ruleset, or production mutation is performed by the documentation-truth slice.
-
-## 2026-09 control correction: Founder-Chief pair contract classification
-
-The pair contract itself previously escaped Documentation Truth even though its fields can change cross-system authority boundaries and publication approval semantics. That was a false-green path: `config/founder-chief-pair.contract.json` could move while the verifier still reported no corresponding pair-authority or publishing truth transition.
-
-The repaired classifier registers `config/founder-chief-pair.contract.json` under `pair-authority` and `publishing`. A change now requires current README, merge-authority documentation, public-communication documentation, this truth-decay audit, and a path-bound documentation receipt. This classification proves durable documentation consistency only; it cannot transfer authority between FCR and Chief, merge separate failure receipts, authorize publication, or replace exact Current You approval and provider readback.

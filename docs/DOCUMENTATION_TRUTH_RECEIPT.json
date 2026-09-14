@@ -1,46 +1,52 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Bind the Founder Control Room and Chief AI standalone-peer authority and publication contract to current durable documentation so pair identity, cross-system evidence, posting approval, and provider-readback semantics cannot change while Documentation Truth reports a false green.",
+  "purpose": "Preserve the current TinyFish Cloudflare activation boundary while binding the recovered read-only Shopify child-provider observation contract to present repository-provider truth without claiming live Shopify inventory, provider mutation, runtime activation, database mutation, merge authority, or deploy authority.",
   "domains": [
-    "pair-authority",
-    "publishing",
-    "truth-governance"
+    "cloudflare-authority",
+    "repository-provider"
   ],
   "changes": [
     {
-      "path": "config/founder-chief-pair.contract.json",
+      "path": "wrangler.worker.toml",
       "claims": [
-        "`config/founder-chief-pair.contract.json` must remain a Documentation Truth input under pair-authority and publishing so standalone-peer and publication-approval changes cannot green without current durable docs and receipt evidence."
-      ]
-    },
-    {
-      "path": "scripts/verify-documentation-truth.mjs",
-      "claims": [
-        "`scripts/verify-documentation-truth.mjs` must classify the Founder-Chief pair contract under pair-authority and publishing and must require the current README, merge-authority documentation, public-communication contract, truth-decay audit, and path-bound receipt."
+        "`wrangler.worker.toml` must list `TINYFISH_API_KEY` under `[secrets].required`, so canonical exact-main Deploy rejects missing provider-held TinyFish activation before Worker mutation while never copying the secret value through GitHub Actions."
       ]
     },
     {
       "path": "README.md",
       "claims": [
-        "`README.md` must describe the Founder-Chief pair contract as a load-bearing control-plane truth surface while keeping separate peer receipts, failures, continuity markers, and authority classes."
+        "`README.md` must keep TinyFish source and CI readiness separate from provider/runtime activation and state that canonical Deploy verifies only provider-held binding-name presence before promotion.",
+        "`README.md` must describe Shopify child-provider observation as source-only, non-authorizing evidence and must never relabel a matching snapshot as live provider authority or mutation permission."
       ]
     },
     {
-      "path": "docs/FOUNDER_MERGE_AUTHORITY.md",
+      "path": "docs/CLOUDFLARE_REASONING.md",
       "claims": [
-        "`docs/FOUNDER_MERGE_AUTHORITY.md` must keep the standalone-peer pair contract non-authorizing for merge, deploy, provider mutation, publication, secrets, and destructive actions."
+        "`docs/CLOUDFLARE_REASONING.md` must treat `TINYFISH_API_KEY` as a provider-held Worker binding and require canonical Deploy to fail closed on a missing binding name without exposing or re-uploading its value."
       ]
     },
     {
-      "path": "docs/PUBLIC_COMMUNICATION_TRUTH_CONTRACT.md",
+      "path": "docs/deployment/CLOUDFLARE_WORKER_TARGETS.md",
       "claims": [
-        "`docs/PUBLIC_COMMUNICATION_TRUTH_CONTRACT.md` must preserve exact Current You approval and provider readback even when the pair contract names an approved automation or posting class."
+        "`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` must name `TINYFISH_API_KEY` as a required canonical Worker secret while preserving live provider observation and real TinyFish Search/Fetch as separate activation proof."
       ]
     },
     {
-      "path": "docs/TRUTH_DECAY_AUDIT.md",
+      "path": "docs/SECRETS.md",
       "claims": [
-        "`docs/TRUTH_DECAY_AUDIT.md` must record the pair-authority and publishing classification repair so a future pair-contract change cannot silently return to a zero-sensitive-file false green."
+        "`docs/SECRETS.md` must keep the TinyFish key in the Cloudflare Worker secret plane and never recast the provider-held value as a GitHub Actions secret or proof artifact."
+      ]
+    },
+    {
+      "path": "src/lib/providerObservation.ts",
+      "claims": [
+        "`src/lib/providerObservation.ts` must classify child-provider evidence as current, undeclared, scope drift, identity drift, stale, or unknown without granting execution authority, and it must fail closed when observation freshness, completeness, declaration identity, or scope equality is not proven."
+      ]
+    },
+    {
+      "path": "src/providers/ShopifyReadOnlyProvider.ts",
+      "claims": [
+        "`src/providers/ShopifyReadOnlyProvider.ts` must bind Shopify observation to the exact Founder Control Room permanent and branded store identities, require complete pagination and app scope inventory, withhold CURRENT on incomplete or mismatched provider evidence, keep reconciliation non-authorizing, and never persist provider inventory or perform Shopify mutation."
       ]
     }
   ]
