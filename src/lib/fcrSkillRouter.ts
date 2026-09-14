@@ -8,11 +8,37 @@ import {
 } from '../design-os/commands.js';
 
 export const FCR_SKILL_ROUTER_CONTRACT = 'juss/fcr-skill-router@v1' as const;
-export const FCR_REQUIRED_PARALLEL_LENSES = [
+
+/**
+ * Founder Council lenses are code-owned defaults, not slash-command activation gates.
+ * Chief AI may add task-specific lenses, but callers do not need to repeat these names
+ * in every goal or capability plan for FCR to apply them.
+ */
+export const FCR_AUTOMATIC_COUNCIL_LENSES = [
+  'human',
+  'futureyou',
+  'truthmode',
+  'confess',
+  'ultrathink',
   'product-design',
   'data-analytics',
   'deep-research',
+  'steal',
+  'redteam',
+  'lindymode',
+  'l99',
+  'ooda',
+  'hormozi',
+  'billgates',
+  'elonmusk',
+  'firstprinciples',
+  'socrates',
+  'antiadvice',
+  'unlearn',
+  'loop',
 ] as const;
+
+export const FCR_REQUIRED_PARALLEL_LENSES = FCR_AUTOMATIC_COUNCIL_LENSES;
 
 export type FcrSkillRouterAction =
   | 'inspect'
@@ -53,6 +79,7 @@ export interface FcrSkillRoutingDecision {
   policyRequiredCapabilityIds: string[];
   missingPolicyCapabilityIds: string[];
   designCommandIds: string[];
+  automaticCouncilLenses: string[];
   requiredParallelLenses: string[];
   missingParallelLenses: string[];
   requiredTools: string[];
@@ -151,6 +178,7 @@ export function routeFcrSkills(input: RouteFcrSkillsInput): FcrSkillRoutingDecis
   const requiredProof: string[] = [];
   const policyRequiredCapabilityIds = explicitSkillsFromGoal(goal);
   const designCommandIds = explicitDesignCommandsFromGoal(goal);
+  const automaticCouncilLenses = [...FCR_AUTOMATIC_COUNCIL_LENSES];
   const requiredParallelLenses = [...FCR_REQUIRED_PARALLEL_LENSES];
   const mutationRequested = MUTATING_ACTIONS.has(input.action);
   const repositoryGoal = isRepositoryGoal(goal) || Boolean(input.repository);
@@ -159,6 +187,9 @@ export function routeFcrSkills(input: RouteFcrSkillsInput): FcrSkillRoutingDecis
   const commercialGoal = isCommercialGoal(goal);
   const mergeReviewGoal = repositoryGoal && (input.action === 'merge' || input.action === 'review');
 
+  pushUnique(requiredProof, 'Founder Council is applied automatically in code; slash commands are optional foreground aliases and never create authority');
+  pushUnique(requiredProof, 'Redteam remains two separate passes: premise before selection and solution after selection; distinct failures keep distinct receipts');
+  pushUnique(requiredProof, 'Steal adapts principles, structures, and durable mechanisms only; protected expression, private implementation, credentials, branding, and proprietary assets stay out of scope');
   pushUnique(requiredProof, 'Product Design disposition recorded for the selected path; UI/runtime claims still require rendered browser evidence');
   pushUnique(requiredProof, 'Data Analytics outcome signals declared before execution and treated as observation-only evidence');
   pushUnique(requiredProof, 'Deep Research uses authoritative primary sources when research can change the decision; research never grants execution authority');
@@ -223,20 +254,23 @@ export function routeFcrSkills(input: RouteFcrSkillsInput): FcrSkillRoutingDecis
     : [];
   const planned = new Set(plannedCapabilityIds);
   const missingPolicyCapabilityIds = policyRequiredCapabilityIds.filter((id) => !planned.has(canonicalCapabilityId(id)));
-  const plannedLenses = new Set((input.capabilityPlan?.strategicLenses ?? []).map(normalize));
-  const missingParallelLenses = requiredParallelLenses.filter((lens) => !plannedLenses.has(lens));
+  const plannedLenses = new Set([
+    ...automaticCouncilLenses.map(normalize),
+    ...(input.capabilityPlan?.strategicLenses ?? []).map(normalize),
+  ]);
+  const missingParallelLenses = requiredParallelLenses.filter((lens) => !plannedLenses.has(normalize(lens)));
 
   for (const missing of missingPolicyCapabilityIds) {
     errors.push(`Chief AI capability plan is missing repository-required capability: ${missing}`);
   }
   for (const missing of missingParallelLenses) {
-    errors.push(`Chief AI capability plan is missing required RayOS parallel lens: ${missing}`);
+    errors.push(`FCR automatic council is missing required RayOS lens: ${missing}`);
   }
 
   const status = errors.length === 0 ? 'ready_for_runtime_discovery' : 'blocked';
   const nextGate = status === 'blocked'
     ? 'Return the policy failures to Chief AI and require a corrected hash-bound capability plan before runtime discovery or mutation.'
-    : 'Discover runtime availability for only the capabilities in the validated Chief AI plan; preserve Product Design, Data Analytics, Deep Research, provider, proof, approval, and execution boundaries.';
+    : 'Discover runtime availability only for capabilities in the validated Chief AI plan; the automatic Founder Council remains advisory and preserves Product Design, Data Analytics, Deep Research, provider, proof, approval, rollback, and execution boundaries.';
 
   return {
     contract: FCR_SKILL_ROUTER_CONTRACT,
@@ -248,6 +282,7 @@ export function routeFcrSkills(input: RouteFcrSkillsInput): FcrSkillRoutingDecis
     policyRequiredCapabilityIds,
     missingPolicyCapabilityIds,
     designCommandIds,
+    automaticCouncilLenses,
     requiredParallelLenses,
     missingParallelLenses,
     requiredTools,
