@@ -4,6 +4,9 @@ import {
   type TrendRadarCandidate,
 } from '../contentTrendRadar.js';
 
+const NOW = '2026-09-14T15:00:00.000Z';
+const CONTEXT = { evaluatedAt: NOW } as const;
+
 function candidate(
   overrides: Partial<TrendRadarCandidate> & Pick<TrendRadarCandidate, 'id' | 'trend'>,
 ): TrendRadarCandidate {
@@ -11,7 +14,11 @@ function candidate(
     id: overrides.id,
     trend: overrides.trend,
     evidenceState: overrides.evidenceState ?? 'EMERGING_SIGNAL',
-    evidenceRefs: overrides.evidenceRefs ?? [{ id: `source:${overrides.id}` }],
+    evidenceRefs: overrides.evidenceRefs ?? [{
+      id: `source:${overrides.id}`,
+      source: 'authoritative-source',
+      observedAt: '2026-09-14T14:00:00.000Z',
+    }],
     saturation: overrides.saturation ?? 'EARLY',
     scores: overrides.scores ?? {
       timeliness: 80,
@@ -59,7 +66,7 @@ describe('evaluateContentTrendRadar', () => {
       },
     });
 
-    const result = evaluateContentTrendRadar([crowded, early]);
+    const result = evaluateContentTrendRadar([crowded, early], CONTEXT);
 
     expect(result.ranked[0]?.id).toBe('early');
     expect(result.firstWave[0]?.id).toBe('early');
@@ -74,7 +81,7 @@ describe('evaluateContentTrendRadar', () => {
       fingerprint: { fingerprintId: 'house-post-control', similarity: 93 },
     });
 
-    const result = evaluateContentTrendRadar([duplicate, fresh]);
+    const result = evaluateContentTrendRadar([duplicate, fresh], CONTEXT);
     const duplicateResult = result.ranked.find((item) => item.id === 'duplicate');
 
     expect(result.ranked[0]?.id).toBe('fresh');
@@ -95,11 +102,53 @@ describe('evaluateContentTrendRadar', () => {
     });
     const sourced = candidate({ id: 'sourced', trend: 'Sourced early signal' });
 
-    const result = evaluateContentTrendRadar([prediction, noEvidence, sourced]);
+    const result = evaluateContentTrendRadar([prediction, noEvidence, sourced], CONTEXT);
 
     expect(result.firstWave.map((item) => item.id)).toEqual(['sourced']);
     expect(result.ranked.find((item) => item.id === 'prediction')?.reasons).toContain('prediction_only');
     expect(result.ranked.find((item) => item.id === 'no-evidence')?.reasons).toContain('missing_evidence');
+  });
+
+  it('requires source and observed-at provenance before first-wave eligibility', () => {
+    const missingProvenance = candidate({
+      id: 'missing-provenance',
+      trend: 'Evidence id without provenance',
+      evidenceRefs: [{ id: 'receipt-only' }],
+    });
+
+    const result = evaluateContentTrendRadar([missingProvenance], CONTEXT);
+
+    expect(result.firstWave).toEqual([]);
+    expect(result.ranked[0]?.reasons).toContain('missing_evidence_provenance');
+  });
+
+  it('rejects stale and future-dated provenance even when the caller labels it verified', () => {
+    const stale = candidate({
+      id: 'stale',
+      trend: 'Old signal',
+      evidenceState: 'VERIFIED',
+      evidenceRefs: [{
+        id: 'stale-evidence',
+        source: 'authoritative-source',
+        observedAt: '2026-08-01T00:00:00.000Z',
+      }],
+    });
+    const future = candidate({
+      id: 'future',
+      trend: 'Future signal',
+      evidenceState: 'VERIFIED',
+      evidenceRefs: [{
+        id: 'future-evidence',
+        source: 'authoritative-source',
+        observedAt: '2026-09-14T16:00:00.000Z',
+      }],
+    });
+
+    const result = evaluateContentTrendRadar([stale, future], CONTEXT);
+
+    expect(result.firstWave).toEqual([]);
+    expect(result.ranked.find((item) => item.id === 'stale')?.reasons).toContain('stale_evidence');
+    expect(result.ranked.find((item) => item.id === 'future')?.reasons).toContain('future_evidence');
   });
 
   it('requires contrarian, practical, and future angles before a candidate enters the first wave', () => {
@@ -109,7 +158,7 @@ describe('evaluateContentTrendRadar', () => {
       angles: [{ kind: 'PRACTICAL', thesis: 'Show the workflow.' }],
     });
 
-    const result = evaluateContentTrendRadar([incomplete]);
+    const result = evaluateContentTrendRadar([incomplete], CONTEXT);
 
     expect(result.firstWave).toEqual([]);
     expect(result.ranked[0]?.reasons).toContain('missing_required_angles');
@@ -121,9 +170,10 @@ describe('evaluateContentTrendRadar', () => {
       candidate({ id: 'a', trend: 'A' }),
       candidate({ id: 'b', trend: 'B' }),
       candidate({ id: 'd', trend: 'D' }),
-    ]);
+    ], CONTEXT);
 
     expect(result.firstWave.map((item) => item.id)).toEqual(['a', 'b', 'c']);
+    expect(result.evaluatedAt).toBe(NOW);
     expect(result.authority).toEqual({
       authorizesPublish: false,
       authorizesSchedule: false,
