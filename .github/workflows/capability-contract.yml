@@ -1,8 +1,9 @@
 name: Capability Contract
 
 on:
-  # Manual dispatch reacquires exact-head proof when main moves through a workflow-authored push
-  # that GitHub intentionally does not fan out into downstream Actions.
+  # Exact-head proof expires whenever main moves, even when the moving commit
+  # does not touch capability code. Manual dispatch remains available for
+  # explicit reproof, while every main push now reacquires the contract.
   workflow_dispatch:
   pull_request:
     paths:
@@ -27,26 +28,6 @@ on:
       - '.github/workflows/capability-contract.yml'
   push:
     branches: [main]
-    paths:
-      - '.control/**'
-      - 'schemas/capability-contract.v1.schema.json'
-      - 'scripts/verify-capability-contract.mjs'
-      - 'scripts/verify-direct-browser-contract.mjs'
-      - 'src/capabilities/**'
-      - 'src/lib/pluginCenter.ts'
-      - 'src/http/routes/capabilities.ts'
-      - 'src/http/routes/pluginCenter.ts'
-      - 'src/http/routes/__tests__/pluginCenter.integration.test.ts'
-      - 'src/http/routes/__tests__/pluginCenterRevocation.integration.test.ts'
-      - 'src/http/routes/__tests__/tinyFishObservation.integration.test.ts'
-      - 'src/http/routes/__tests__/ultrathinkSharedReasoning.integration.test.ts'
-      - 'public/control-room/plugin-center.html'
-      - 'public/assets/plugins/ultrathink.svg'
-      - 'docs/PLUGIN_CENTER.md'
-      - 'e2e/plugin-center-ultrathink-proof.mjs'
-      - 'e2e/ultrathink-shared-runtime-proof.mjs'
-      - 'package.json'
-      - '.github/workflows/capability-contract.yml'
 
 permissions:
   contents: read
