@@ -23,7 +23,9 @@ const forbiddenPatterns = [
   { pattern: /\bimport\s*\(/, label: 'dynamic import' },
   { pattern: /\brequire\s*\(/, label: 'CommonJS module loading' },
   { pattern: /\b(setTimeout|setInterval|setImmediate)\s*\(/, label: 'timer scheduling' },
-  { pattern: /Date\.now\s*\(|new\s+Date\s*\(|performance\.now\s*\(/, label: 'wall clock read' },
+  // Explicit Date construction from supplied evidence is deterministic and is
+  // allowed for canonical ISO normalization. Ambient clock reads are not.
+  { pattern: /Date\.now\s*\(|new\s+Date\s*\(\s*\)|performance\.now\s*\(/, label: 'ambient wall clock read' },
   { pattern: /Math\.random\s*\(|\brandomUUID\s*\(|\brandomBytes\s*\(|\brandomFill(?:Sync)?\s*\(|getRandomValues\s*\(/, label: 'randomness' },
   { pattern: /\bWorker\b/, label: 'worker execution' },
 ];
@@ -137,5 +139,5 @@ if (failures.length > 0) {
 }
 
 console.log(`Founder OS lab isolation passed for ${files.length} TypeScript files.`);
-console.log('Deterministic hashing is allowed; side effects and actual randomness remain forbidden.');
+console.log('Deterministic timestamp normalization is allowed; ambient time reads, side effects, and actual randomness remain forbidden.');
 console.log('Chief AI owns capability selection; FCR/n8n retain governance/execution boundaries only.');
