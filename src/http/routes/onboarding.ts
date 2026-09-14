@@ -5,12 +5,18 @@ import { callbackJs } from './onboardingAssets/callbackJs.js';
 import { controlRoomCss } from './onboardingAssets/controlRoomCss.js';
 import { controlRoomHtml } from './onboardingAssets/controlRoomHtml.js';
 import { controlRoomJs } from './onboardingAssets/controlRoomJs.js';
+import { workspaceProjectsRouter } from './workspaceProjects.js';
 
 export const onboardingRouter = Router();
 
 // Scoped to this router's own routes only. The dashboard SPA has a separate
 // policy, while this identity and onboarding surface stays same-origin.
 onboardingRouter.use(onboardingContentSecurityPolicy);
+
+// Tenant-safe API surface. This is intentionally mounted before the static
+// onboarding routes so future workspace users can use FCR without inheriting
+// any legacy global /projects authority.
+onboardingRouter.use('/workspace/projects', workspaceProjectsRouter);
 
 function sendAsset(res: Response, type: string, body: string) {
   res.setHeader('Content-Type', type);

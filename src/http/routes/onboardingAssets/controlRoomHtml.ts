@@ -42,6 +42,7 @@ export const controlRoomHtml = `<!doctype html>
           <p class="eyebrow">Authenticated founder</p>
           <h2 id="founder-email" class="founder-email">Founder</h2>
           <p>Identity verified. Execution authority remains locked behind separate proof and approval gates.</p>
+          <p id="workspace-boundary-note" class="field-help" hidden></p>
         </div>
         <button id="logout-button" class="secondary" type="button">Sign out</button>
       </div>
@@ -50,18 +51,77 @@ export const controlRoomHtml = `<!doctype html>
         <div class="onboarding-heading">
           <div>
             <p class="eyebrow">Workspace onboarding</p>
-            <h2>Build your first sovereign workspace.</h2>
-            <p>This creates Control Room records and disconnected provider slots. It does not store credentials, connect providers, merge code, or deploy production.</p>
+            <h2 id="workspace-heading">Build your first sovereign workspace.</h2>
+            <p id="workspace-description">This creates Control Room records and disconnected provider slots. It does not store credentials, connect providers, merge code, or deploy production.</p>
           </div>
           <ol class="steps" aria-label="Onboarding steps">
             <li class="active">1. Project</li>
-            <li>2. Tools</li>
+            <li id="tools-step">2. Tools</li>
             <li>3. Authority</li>
           </ol>
         </div>
 
         <form id="workspace-form">
-          <fieldset>
+          <fieldset id="chief-composer-fieldset" class="chief-composer" hidden>
+            <div class="chief-header">
+              <div class="chief-mark" aria-hidden="true">♛</div>
+              <div>
+                <p class="chief-kicker">CHIEF · LEAD · BUILD · EXECUTE</p>
+                <legend>Compose the Control Room around the outcome.</legend>
+                <p>Chief can recommend the first operating gate. It cannot create the project, widen authority, or act on the recommendation until you approve this exact plan.</p>
+              </div>
+            </div>
+
+            <div class="composer-grid">
+              <div>
+                <label for="project-type">What are you building?</label>
+                <select id="project-type" name="projectType">
+                  <option value="software_product">Software / product</option>
+                  <option value="service_business">Service / business</option>
+                  <option value="commerce">Commerce</option>
+                  <option value="content_community">Content / community</option>
+                  <option value="research_decision">Research / decision</option>
+                  <option value="internal_ops">Internal operations</option>
+                </select>
+              </div>
+              <div class="composer-wide">
+                <label for="project-mission">Mission</label>
+                <textarea id="project-mission" name="mission" rows="3" maxlength="500" placeholder="What must become true for this project to matter?"></textarea>
+              </div>
+              <div class="composer-wide">
+                <label for="project-current-state">What is true right now?</label>
+                <textarea id="project-current-state" name="currentState" rows="3" maxlength="700" placeholder="Existing product, blocker, stage, customer signal, or current reality."></textarea>
+              </div>
+              <div class="composer-wide">
+                <label for="project-evidence-notes">Evidence or constraints <span class="optional">optional</span></label>
+                <textarea id="project-evidence-notes" name="evidenceNotes" rows="3" maxlength="1000" placeholder="Links, proof expectations, budget, deadlines, dependencies, or non-negotiables."></textarea>
+              </div>
+            </div>
+
+            <button id="chief-recommend-button" class="chief-button" type="button">Ask Chief for the first gate</button>
+
+            <div id="chief-recommendation" class="chief-recommendation" hidden>
+              <p class="chief-kicker">CHIEF RECOMMENDATION</p>
+              <h3 id="chief-recommendation-title"></h3>
+              <div class="chief-recommendation-grid">
+                <div>
+                  <small>FIRST GATE</small>
+                  <p id="chief-first-gate"></p>
+                </div>
+                <div>
+                  <small>WHY</small>
+                  <p id="chief-reasoning"></p>
+                </div>
+              </div>
+              <p id="chief-authority-boundary" class="chief-boundary"></p>
+              <label id="chief-approval-row" class="chief-approval">
+                <input id="chief-approval" type="checkbox">
+                <span>I approve this exact Chief recommendation as the starting configuration for this Control Room. This approval creates the project only.</span>
+              </label>
+            </div>
+          </fieldset>
+
+          <fieldset id="project-foundation-fieldset">
             <legend>Project foundation</legend>
             <div class="form-grid">
               <div>
@@ -83,7 +143,7 @@ export const controlRoomHtml = `<!doctype html>
             </div>
           </fieldset>
 
-          <fieldset>
+          <fieldset id="provider-slots-fieldset">
             <legend>Declare your tool slots</legend>
             <p class="field-help">Slots begin disconnected. Credentials remain in provider-held OAuth or server-side secret storage.</p>
             <div class="provider-grid">
@@ -121,7 +181,7 @@ export const controlRoomHtml = `<!doctype html>
           <button id="start-onboarding" class="secondary" type="button">Add another project</button>
         </div>
 
-        <div class="module-grid">
+        <div id="platform-modules" class="module-grid">
           <a class="module-card" href="/control-room/github-workspace.html"><small>Repository system</small><strong>GitHub Workspace</strong><span>Read files and commit only to mission branches.</span></a>
           <a class="module-card" href="/control-room/command-bridge.html"><small>Automation system</small><strong>Command Bridge</strong><span>Run allowlisted workflows with exact-head evidence.</span></a>
           <a class="module-card" href="/control-room/plugin-center.html"><small>CRM + providers</small><strong>Plugin Center</strong><span>Declare tool power, boundaries, and temporary grants.</span></a>
@@ -136,7 +196,7 @@ export const controlRoomHtml = `<!doctype html>
         </div>
       </section>
 
-      <section class="panel password">
+      <section id="password-panel" class="panel password">
         <div>
           <p class="eyebrow">Optional credential handoff</p>
           <h2>Set or change your founder password.</h2>
