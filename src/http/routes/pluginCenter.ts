@@ -51,7 +51,7 @@ function stringArray(value: unknown): string[] {
 }
 
 function recordOrNull(value: unknown): DbRecord | null {
-  if (!value || typeof value !== 'object') return null;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   return value as DbRecord;
 }
 
@@ -201,7 +201,7 @@ pluginCenterRouter.get('/', async (_req: FounderRequest, res) => {
 });
 
 pluginCenterRouter.post('/grants', async (req: FounderRequest, res) => {
-  const body = req.body as DbRecord;
+  const body = recordOrNull(req.body) ?? {};
   const projectSlug = stringOrNull(body.projectSlug);
   const toolRule = stringOrNull(body.toolRule);
   const grantType = stringOrNull(body.grantType) ?? 'tool_rule';
@@ -227,9 +227,11 @@ pluginCenterRouter.post('/grants', async (req: FounderRequest, res) => {
     if (!belongs.ok) return res.status(404).json({ error: 'Connection not found for this project' });
   }
 
+  const grantId = randomUUID();
   const { data: grant, error } = await supabase
     .from('plugin_permission_grants')
     .insert({
+      id: grantId,
       project_id: project.id,
       connection_id: connectionId,
       grant_type: grantType,
@@ -244,8 +246,6 @@ pluginCenterRouter.post('/grants', async (req: FounderRequest, res) => {
 
   if (error) return res.status(500).json({ error: error.message });
 
-  const grantRow = recordOrNull(grant);
-  const grantId = stringOrNull(grantRow?.id);
   const { error: auditError } = await supabase.from('project_events').insert({
     project_id: project.id,
     source_event_id: randomUUID(),
@@ -263,13 +263,35 @@ pluginCenterRouter.post('/grants', async (req: FounderRequest, res) => {
   });
 
   if (auditError) {
-    if (grantId) {
-      await supabase
-        .from('plugin_permission_grants')
-        .update({ revoked_at: new Date().toISOString() })
-        .eq('id', grantId);
+    const rollbackAt = new Date().toISOString();
+    const { data: rollbackGrant, error: rollbackError } = await supabase
+      .from('plugin_permission_grants')
+      .update({ revoked_at: rollbackAt })
+      .eq('id', grantId)
+      .select('id, revoked_at')
+      .single();
+    const rollbackRow = recordOrNull(rollbackGrant);
+    const rollbackSucceeded = !rollbackError
+      && stringOrNull(rollbackRow?.id) === grantId
+      && Boolean(stringOrNull(rollbackRow?.revoked_at));
+
+    if (!rollbackSucceeded) {
+      return res.status(500).json({
+        error: 'PLUGIN_GRANT_ROLLBACK_INCOMPLETE',
+        detail: auditError.message,
+        rollbackError: rollbackError?.message ?? 'Grant rollback readback did not confirm revocation.',
+        grantId,
+        grantMayRemainActive: true,
+      });
     }
-    return res.status(500).json({ error: 'PLUGIN_GRANT_AUDIT_INCOMPLETE', detail: auditError.message });
+
+    return res.status(500).json({
+      error: 'PLUGIN_GRANT_AUDIT_INCOMPLETE',
+      detail: auditError.message,
+      grantId,
+      grantRevoked: true,
+      revokedAt: stringOrNull(rollbackRow?.revoked_at),
+    });
   }
 
   return res.status(201).json({ grant });
