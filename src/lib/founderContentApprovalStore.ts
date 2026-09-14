@@ -454,7 +454,7 @@ export async function issueFounderContentApproval({
       platform: issued.platform,
       now,
     });
-    if (!('ok' in recovered && recovered.ok === false)) return recovered;
+    if ('contract' in recovered) return recovered;
   }
 
   throw new Error(
