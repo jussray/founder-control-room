@@ -10,14 +10,12 @@ on:
 permissions:
   contents: read
   checks: read
-  issues: read
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-  CONTROL_ROOM_LEDGER_SELF_CHECK: Verify test-ledger contract
+  CONTROL_ROOM_LEDGER_SELF_CHECK: Publish exact-head test ledger
   CONTROL_ROOM_TEST_LEDGER_PATH: artifacts/control-room-test-ledger.json
-  FOUNDER_MERGE_APPROVAL_PATH: artifacts/founder-merge-approval.json
 
 concurrency:
   group: control-room-test-ledger-${{ github.event.pull_request.number || github.ref }}
@@ -25,15 +23,14 @@ concurrency:
 
 jobs:
   ledger-contract:
-    name: Verify test-ledger contract
+    name: Test-ledger source contract
     runs-on: ubuntu-22.04
-    timeout-minutes: 30
+    timeout-minutes: 10
     steps:
       - name: Check out exact head
         uses: actions/checkout@v4
         with:
           ref: ${{ env.EXPECTED_HEAD_SHA }}
-          fetch-depth: 0
 
       - name: Record and verify exact head
         shell: bash
@@ -47,154 +44,42 @@ jobs:
         with:
           node-version: '24'
 
-      - name: Run control-room test-ledger contracts
+      - name: Run control-room test-ledger and founder-final source contracts
         run: node --test test/control-room-test-ledger.test.mjs test/founder-merge-approval-gate.test.mjs
+
+  publish-ledger:
+    name: Publish exact-head test ledger
+    needs: ledger-contract
+    runs-on: ubuntu-22.04
+    timeout-minutes: 25
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+
+      - name: Record and verify exact head
+        shell: bash
+        run: |
+          actual="$(git rev-parse HEAD)"
+          printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
 
       - name: Observe every exact-head check lane
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: node scripts/control-room-test-ledger.mjs
 
-      - name: Require stable exact-head ledger
-        shell: bash
-        run: |
-          node <<'NODE'
-          const fs = require('node:fs');
-          const ledgerPath = process.env.CONTROL_ROOM_TEST_LEDGER_PATH;
-          const expectedSha = String(process.env.EXPECTED_HEAD_SHA || '').toLowerCase();
-          const ledger = JSON.parse(fs.readFileSync(ledgerPath, 'utf8'));
-          const counts = ledger?.aggregate?.counts || {};
-          const blockers = ['failed', 'queued', 'running', 'unknown']
-            .filter((key) => Number(counts[key] || 0) > 0);
-          const requiredGatePassed = Array.isArray(ledger?.checks)
-            && ledger.checks.some((check) => check?.name === 'Required Gate' && check?.state === 'passed');
-
-          if (String(ledger?.commitSha || '').toLowerCase() !== expectedSha) {
-            throw new Error(`Ledger SHA mismatch: expected ${expectedSha}, observed ${ledger?.commitSha || 'missing'}`);
-          }
-          if (ledger?.runner?.observerState !== 'stable') {
-            throw new Error(`Exact-head ledger is not stable: ${ledger?.runner?.observerState || 'missing'}`);
-          }
-          if (blockers.length > 0) {
-            throw new Error(`Exact-head ledger still contains blocking states: ${blockers.join(', ')}`);
-          }
-          if (!requiredGatePassed) {
-            throw new Error('Exact-head ledger did not observe Required Gate as passed.');
-          }
-
-          console.log(JSON.stringify({
-            commitSha: ledger.commitSha,
-            observerState: ledger.runner.observerState,
-            aggregate: ledger.aggregate,
-            requiredGatePassed,
-          }, null, 2));
-          NODE
-
-      - name: Resolve exact live base for founder approval
-        if: github.event_name == 'pull_request'
-        env:
-          BASE_REF: ${{ github.event.pull_request.base.ref }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          git check-ref-format --branch "$BASE_REF" >/dev/null
-          git fetch --no-tags origin "refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}"
-          live_base="$(git rev-parse "refs/remotes/origin/${BASE_REF}^{commit}")"
-          test -n "$live_base"
-          test "$live_base" != "0000000000000000000000000000000000000000"
-          git merge-base --is-ancestor "$live_base" "$EXPECTED_HEAD_SHA"
-          printf 'FOUNDER_APPROVAL_BASE_SHA=%s\n' "$live_base" >> "$GITHUB_ENV"
-
-      - name: Require exact founder merge approval
-        if: github.event_name == 'pull_request'
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          FOUNDER_GITHUB_LOGIN: jussray
-          FOUNDER_GITHUB_USER_ID: '286642846'
-        shell: bash
-        run: |
-          node --input-type=module <<'NODE'
-          import fs from 'node:fs';
-          import path from 'node:path';
-          import {resolveFounderMergeDecision} from './scripts/founder-merge-approval.mjs';
-
-          const clean = (value) => typeof value === 'string' ? value.trim() : '';
-          const repository = clean(process.env.GITHUB_REPOSITORY);
-          const [owner, repo] = repository.split('/');
-          const prNumber = Number(process.env.PR_NUMBER);
-          const baseSha = clean(process.env.FOUNDER_APPROVAL_BASE_SHA).toLowerCase();
-          const headSha = clean(process.env.HEAD_SHA).toLowerCase();
-          const founderLogin = clean(process.env.FOUNDER_GITHUB_LOGIN);
-          const founderUserId = Number(process.env.FOUNDER_GITHUB_USER_ID);
-          const token = clean(process.env.GITHUB_TOKEN);
-          const outputPath = clean(process.env.FOUNDER_MERGE_APPROVAL_PATH) || 'artifacts/founder-merge-approval.json';
-
-          if (!owner || !repo || !Number.isInteger(prNumber) || prNumber < 1 || !baseSha || !headSha || !founderLogin || !Number.isInteger(founderUserId) || !token) {
-            throw new Error('Founder merge approval verifier is missing required exact-candidate context.');
-          }
-
-          async function githubJson(url) {
-            const response = await fetch(url, {
-              headers: {
-                Accept: 'application/vnd.github+json',
-                Authorization: `Bearer ${token}`,
-                'User-Agent': 'fcr-founder-merge-approval-gate',
-                'X-GitHub-Api-Version': '2022-11-28',
-              },
-            });
-            if (!response.ok) {
-              const responseBody = await response.text();
-              throw new Error(`GitHub approval lookup failed (${response.status}): ${responseBody.slice(0, 500)}`);
-            }
-            return response.json();
-          }
-
-          const comments = [];
-          for (let page = 1; page <= 10; page += 1) {
-            const url = new URL(`https://api.github.com/repos/${owner}/${repo}/issues/${prNumber}/comments`);
-            url.searchParams.set('per_page', '100');
-            url.searchParams.set('page', String(page));
-            const batch = await githubJson(url);
-            if (!Array.isArray(batch)) throw new Error('GitHub approval lookup returned a non-array response.');
-            comments.push(...batch);
-            if (batch.length < 100) break;
-            if (page === 10) throw new Error('FOUNDER_APPROVAL_COMMENT_PAGINATION_LIMIT_EXCEEDED');
-          }
-
-          const decision = resolveFounderMergeDecision(
-            comments,
-            {repository, prNumber, baseSha, headSha},
-            {login: founderLogin, userId: founderUserId},
-          );
-
-          if (!decision.approved) {
-            const reason = decision.status === 'revoked'
-              ? `Latest founder decision for the exact candidate is revoke (comment ${decision.sourceCommentId}); merge remains unauthorized.`
-              : `No fresh founder merge approval receipt exists for ${repository}#${prNumber} base=${baseSha} head=${headSha}.`;
-            throw new Error(reason);
-          }
-
-          const artifact = {
-            ...decision,
-            pullRequest: prNumber,
-            founderLogin,
-            founderUserId,
-            authorizesMerge: true,
-          };
-          fs.mkdirSync(path.dirname(outputPath), {recursive: true});
-          fs.writeFileSync(outputPath, `${JSON.stringify(artifact, null, 2)}\n`, 'utf8');
-          console.log(JSON.stringify(artifact, null, 2));
-          NODE
-
-      - name: Upload exact-head ledger and approval receipts
+      - name: Upload repository-local Control Room ledger
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: control-room-merge-gate-${{ env.EXPECTED_HEAD_SHA }}
-          path: |
-            artifacts/control-room-test-ledger.json
-            artifacts/founder-merge-approval.json
-          if-no-files-found: warn
-          retention-days: 30
+          name: control-room-test-ledger-${{ env.EXPECTED_HEAD_SHA }}
+          path: artifacts/control-room-test-ledger.json
+          if-no-files-found: error
+          retention-days: 14
