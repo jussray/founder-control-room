@@ -54,9 +54,17 @@ export function selectLatestChecks(checkRuns, expectedSha, observerCheckName = '
 
     const key = checkKey(run);
     const current = selected.get(key);
-    const currentTime = timestamp(current?.completed_at ?? current?.started_at);
-    const candidateTime = timestamp(run.completed_at ?? run.started_at);
-    if (!current || candidateTime >= currentTime) selected.set(key, run);
+    const currentStarted = timestamp(current?.started_at);
+    const candidateStarted = timestamp(run.started_at);
+    const currentId = Number(current?.id) || 0;
+    const candidateId = Number(run.id) || 0;
+    if (
+      !current
+      || candidateStarted > currentStarted
+      || (candidateStarted === currentStarted && candidateId >= currentId)
+    ) {
+      selected.set(key, run);
+    }
   }
 
   return [...selected.values()]
