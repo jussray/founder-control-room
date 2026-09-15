@@ -32,9 +32,13 @@ test('recovery workflow is production-gated and keeps read, apply, and rollback 
   assert.match(recoveryWorkflow, /if: inputs\.apply == true/);
   assert.match(recoveryWorkflow, /current_main.*EXPECTED_HEAD_SHA/s);
   assert.match(recoveryWorkflow, /verify-fcr-front-door-playwright\.mjs/);
-  assert.match(recoveryWorkflow, /--rollback/);
-  assert.match(recoveryWorkflow, /steps\.access_apply\.outcome == 'failure'/);
-  assert.doesNotMatch(recoveryWorkflow, /browser.*failure.*--rollback/is);
+  const rollbackStep = workflowSection(
+    '- name: Roll back only an incomplete provider apply',
+    '- name: Install Chromium for stranger front-door proof',
+  );
+  assert.match(rollbackStep, /steps\.access_apply\.outcome == 'failure'/);
+  assert.match(rollbackStep, /--rollback/);
+  assert.doesNotMatch(rollbackStep, /browser|stranger/i);
 });
 
 test('authority gate never publishes a raw approval reference and states the product-auth boundary', () => {
