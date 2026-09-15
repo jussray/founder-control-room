@@ -185,42 +185,98 @@ export function evaluateGovernedExecution(
     addReason(reasons, `authority:${reason}`);
   }
 
-  if (!same(lease.principal.actorId, world.principal.actorId)) addReason(reasons, 'actor_drift');
-  if (!same(lease.principal.workspaceId, world.principal.workspaceId)) addReason(reasons, 'workspace_drift');
-  if (!same(lease.principal.projectId, world.principal.projectId)) addReason(reasons, 'project_drift');
-
-  if (!same(lease.subject.locator, world.subject.locator)) addReason(reasons, 'subject_locator_drift');
-  if (!same(lease.subject.expectedVersion, world.subject.observedVersion)) addReason(reasons, 'subject_version_drift');
-  if (!same(lease.subject.fingerprint, world.subject.fingerprint)) addReason(reasons, 'subject_fingerprint_drift');
-
-  if (!same(lease.runtime.harnessId, world.runtime.harnessId)) addReason(reasons, 'runtime_harness_drift');
-  if (!same(lease.runtime.harnessVersion, world.runtime.harnessVersion)) addReason(reasons, 'runtime_harness_version_drift');
-  if (!same(lease.runtime.runtimeGenerationHash, world.runtime.runtimeGenerationHash)) addReason(reasons, 'runtime_generation_drift');
-  if (!same(lease.runtime.providerId, world.runtime.providerId)) addReason(reasons, 'runtime_provider_drift');
-  if (!same(lease.runtime.modelId, world.runtime.modelId)) addReason(reasons, 'runtime_model_drift');
-  if (!same(lease.runtime.pluginSetHash, world.runtime.pluginSetHash)) addReason(reasons, 'plugin_set_drift');
-
-  if (!same(lease.boundary.missionId, world.boundary.missionId)) addReason(reasons, 'mission_drift');
-  if (!same(lease.boundary.shellId, world.boundary.shellId)) addReason(reasons, 'shell_drift');
-  if (lease.boundary.credentialLane !== world.boundary.credentialLane) addReason(reasons, 'credential_lane_drift');
-  if (!same(lease.boundary.credentialProjectId, world.boundary.credentialProjectId)) addReason(reasons, 'credential_project_drift');
-  if (lease.boundary.credentialLane === 'project') {
-    if (!normalized(lease.boundary.credentialProjectId)) addReason(reasons, 'missing_project_credential_binding');
-    if (!same(lease.boundary.credentialProjectId, lease.principal.projectId)) addReason(reasons, 'lease_credential_project_mismatch');
-    if (!same(world.boundary.credentialProjectId, world.principal.projectId)) addReason(reasons, 'world_credential_project_mismatch');
+  if (!same(lease.principal.actorId, world.principal.actorId)) {
+    addReason(reasons, 'actor_drift');
+  }
+  if (!same(lease.principal.workspaceId, world.principal.workspaceId)) {
+    addReason(reasons, 'workspace_drift');
+  }
+  if (!same(lease.principal.projectId, world.principal.projectId)) {
+    addReason(reasons, 'project_drift');
   }
 
-  const allowedProviders = new Set(lease.boundary.allowedProviderIds.map((provider) => normalized(provider)).filter(Boolean));
-  if (allowedProviders.size === 0) addReason(reasons, 'missing_provider_allowlist');
-  if (!allowedProviders.has(normalized(world.runtime.providerId))) addReason(reasons, `provider_not_leased:${world.runtime.providerId}`);
-  if (lease.boundary.providerFallback !== 'deny') addReason(reasons, 'provider_fallback_not_denied');
+  if (!same(lease.subject.locator, world.subject.locator)) {
+    addReason(reasons, 'subject_locator_drift');
+  }
+  if (!same(lease.subject.expectedVersion, world.subject.observedVersion)) {
+    addReason(reasons, 'subject_version_drift');
+  }
+  if (!same(lease.subject.fingerprint, world.subject.fingerprint)) {
+    addReason(reasons, 'subject_fingerprint_drift');
+  }
 
-  if (lease.boundary.humanFinalAuthorizationRequired !== true) addReason(reasons, 'human_final_authorization_not_required');
-  if (!world.boundary.founderAuthorization.valid) addReason(reasons, 'founder_authorization_invalid');
-  if (!same(lease.boundary.founderAuthorization.decisionReceiptId, world.boundary.founderAuthorization.decisionReceiptId)) {
+  if (!same(lease.runtime.harnessId, world.runtime.harnessId)) {
+    addReason(reasons, 'runtime_harness_drift');
+  }
+  if (!same(lease.runtime.harnessVersion, world.runtime.harnessVersion)) {
+    addReason(reasons, 'runtime_harness_version_drift');
+  }
+  if (!same(lease.runtime.runtimeGenerationHash, world.runtime.runtimeGenerationHash)) {
+    addReason(reasons, 'runtime_generation_drift');
+  }
+  if (!same(lease.runtime.providerId, world.runtime.providerId)) {
+    addReason(reasons, 'runtime_provider_drift');
+  }
+  if (!same(lease.runtime.modelId, world.runtime.modelId)) {
+    addReason(reasons, 'runtime_model_drift');
+  }
+  if (!same(lease.runtime.pluginSetHash, world.runtime.pluginSetHash)) {
+    addReason(reasons, 'plugin_set_drift');
+  }
+
+  if (!same(lease.boundary.missionId, world.boundary.missionId)) {
+    addReason(reasons, 'mission_drift');
+  }
+  if (!same(lease.boundary.shellId, world.boundary.shellId)) {
+    addReason(reasons, 'shell_drift');
+  }
+  if (lease.boundary.credentialLane !== world.boundary.credentialLane) {
+    addReason(reasons, 'credential_lane_drift');
+  }
+  if (!same(lease.boundary.credentialProjectId, world.boundary.credentialProjectId)) {
+    addReason(reasons, 'credential_project_drift');
+  }
+  if (lease.boundary.credentialLane === 'project') {
+    if (!normalized(lease.boundary.credentialProjectId)) {
+      addReason(reasons, 'missing_project_credential_binding');
+    }
+    if (!same(lease.boundary.credentialProjectId, lease.principal.projectId)) {
+      addReason(reasons, 'lease_credential_project_mismatch');
+    }
+    if (!same(world.boundary.credentialProjectId, world.principal.projectId)) {
+      addReason(reasons, 'world_credential_project_mismatch');
+    }
+  }
+
+  const allowedProviders = new Set(
+    lease.boundary.allowedProviderIds.map((provider) => normalized(provider)).filter(Boolean),
+  );
+  if (allowedProviders.size === 0) {
+    addReason(reasons, 'missing_provider_allowlist');
+  }
+  if (!allowedProviders.has(normalized(world.runtime.providerId))) {
+    addReason(reasons, `provider_not_leased:${world.runtime.providerId}`);
+  }
+  if (lease.boundary.providerFallback !== 'deny') {
+    addReason(reasons, 'provider_fallback_not_denied');
+  }
+
+  if (lease.boundary.humanFinalAuthorizationRequired !== true) {
+    addReason(reasons, 'human_final_authorization_not_required');
+  }
+  if (!world.boundary.founderAuthorization.valid) {
+    addReason(reasons, 'founder_authorization_invalid');
+  }
+  if (!same(
+    lease.boundary.founderAuthorization.decisionReceiptId,
+    world.boundary.founderAuthorization.decisionReceiptId,
+  )) {
     addReason(reasons, 'founder_decision_receipt_drift');
   }
-  if (!same(lease.boundary.founderAuthorization.approvedByActorId, world.boundary.founderAuthorization.approvedByActorId)) {
+  if (!same(
+    lease.boundary.founderAuthorization.approvedByActorId,
+    world.boundary.founderAuthorization.approvedByActorId,
+  )) {
     addReason(reasons, 'founder_authorizer_drift');
   }
   if (!same(lease.boundary.founderAuthorization.approvedByActorId, lease.principal.actorId)) {
@@ -231,44 +287,98 @@ export function evaluateGovernedExecution(
     if (triggered) addReason(reasons, `kill_switch:${scope}`);
   }
 
-  const allowedHosts = new Set(lease.boundary.network.allowedHosts.map(normalizedHost).filter(Boolean));
+  const allowedHosts = new Set(
+    lease.boundary.network.allowedHosts.map(normalizedHost).filter(Boolean),
+  );
   const requestedHosts = world.boundary.requestedEgressHosts.map(normalizedHost);
-  if (requestedHosts.some((host) => !host)) addReason(reasons, 'invalid_egress_host');
-  if (lease.boundary.network.blockPrivateNetworks !== true) addReason(reasons, 'private_network_block_not_required');
+  if (requestedHosts.some((host) => !host)) {
+    addReason(reasons, 'invalid_egress_host');
+  }
+  if (lease.boundary.network.blockPrivateNetworks !== true) {
+    addReason(reasons, 'private_network_block_not_required');
+  }
   for (const host of requestedHosts) {
     if (!host) continue;
-    if (isPrivateOrLocalHost(host)) addReason(reasons, `private_network_egress_denied:${host}`);
-    if (lease.boundary.network.mode === 'deny-all') addReason(reasons, `network_egress_denied:${host}`);
-    else if (!allowedHosts.has(host)) addReason(reasons, `egress_host_not_leased:${host}`);
+    if (isPrivateOrLocalHost(host)) {
+      addReason(reasons, `private_network_egress_denied:${host}`);
+    }
+    if (lease.boundary.network.mode === 'deny-all') {
+      addReason(reasons, `network_egress_denied:${host}`);
+    } else if (!allowedHosts.has(host)) {
+      addReason(reasons, `egress_host_not_leased:${host}`);
+    }
   }
 
-  if (!same(lease.authoritySnapshot.capabilityManifestHash, world.authoritySnapshot.capabilityManifestHash)) addReason(reasons, 'capability_manifest_drift');
-  if (!same(lease.authoritySnapshot.resourceManifestHash, world.authoritySnapshot.resourceManifestHash)) addReason(reasons, 'resource_manifest_drift');
-  if (!same(lease.authoritySnapshot.adapterRegistryHash, world.authoritySnapshot.adapterRegistryHash)) addReason(reasons, 'adapter_registry_drift');
+  if (!same(
+    lease.authoritySnapshot.capabilityManifestHash,
+    world.authoritySnapshot.capabilityManifestHash,
+  )) {
+    addReason(reasons, 'capability_manifest_drift');
+  }
+  if (!same(
+    lease.authoritySnapshot.resourceManifestHash,
+    world.authoritySnapshot.resourceManifestHash,
+  )) {
+    addReason(reasons, 'resource_manifest_drift');
+  }
+  if (!same(
+    lease.authoritySnapshot.adapterRegistryHash,
+    world.authoritySnapshot.adapterRegistryHash,
+  )) {
+    addReason(reasons, 'adapter_registry_drift');
+  }
 
-  const effectiveCapabilities = new Set([...world.requestedCapabilities, ...world.adapterCapabilities]);
+  const effectiveCapabilities = new Set([
+    ...world.requestedCapabilities,
+    ...world.adapterCapabilities,
+  ]);
+
   for (const capability of effectiveCapabilities) {
     if (isCovered(capability, lease.forbiddenCapabilities)) {
       addReason(reasons, `forbidden_capability:${capability}`);
       continue;
     }
-    if (!isCovered(capability, lease.capabilities)) addReason(reasons, `capability_not_leased:${capability}`);
+    if (!isCovered(capability, lease.capabilities)) {
+      addReason(reasons, `capability_not_leased:${capability}`);
+    }
   }
 
-  if (!normalized(lease.execution.idempotencyKey)) addReason(reasons, 'invalid_idempotency_key');
-  if (!Number.isInteger(lease.execution.maxAttempts) || lease.execution.maxAttempts < 1) addReason(reasons, 'invalid_max_attempts');
-  if (!Number.isInteger(world.attempt) || world.attempt < 1 || world.attempt > lease.execution.maxAttempts) addReason(reasons, 'attempt_out_of_bounds');
-  if (world.leaseConsumed) addReason(reasons, 'lease_replay');
-  if (world.previousOutcome === 'known_success') addReason(reasons, 'previous_outcome_already_succeeded');
+  if (!normalized(lease.execution.idempotencyKey)) {
+    addReason(reasons, 'invalid_idempotency_key');
+  }
+  if (!Number.isInteger(lease.execution.maxAttempts) || lease.execution.maxAttempts < 1) {
+    addReason(reasons, 'invalid_max_attempts');
+  }
+  if (!Number.isInteger(world.attempt) || world.attempt < 1 || world.attempt > lease.execution.maxAttempts) {
+    addReason(reasons, 'attempt_out_of_bounds');
+  }
+  if (world.leaseConsumed) {
+    addReason(reasons, 'lease_replay');
+  }
+  if (world.previousOutcome === 'known_success') {
+    addReason(reasons, 'previous_outcome_already_succeeded');
+  }
 
-  if (reasons.size > 0) return { disposition: 'DENY', reasons: [...reasons] };
-  if (world.previousOutcome === 'unknown') return { disposition: 'RECONCILE', reasons: ['previous_outcome_unknown'] };
+  if (reasons.size > 0) {
+    return { disposition: 'DENY', reasons: [...reasons] };
+  }
+
+  if (world.previousOutcome === 'unknown') {
+    return { disposition: 'RECONCILE', reasons: ['previous_outcome_unknown'] };
+  }
+
   return { disposition: 'EXECUTE', reasons: [] };
 }
 
 export type GovernedReceiptStatus = 'succeeded' | 'failed' | 'partial' | 'unknown';
 export type WitnessStrength = 'W0' | 'W1' | 'W2' | 'W3' | 'W4';
-export type GovernedOutcomeDisposition = 'VERIFIED' | 'EXECUTED_UNVERIFIED' | 'FAILED' | 'PARTIAL' | 'UNKNOWN' | 'CONTRADICTED';
+export type GovernedOutcomeDisposition =
+  | 'VERIFIED'
+  | 'EXECUTED_UNVERIFIED'
+  | 'FAILED'
+  | 'PARTIAL'
+  | 'UNKNOWN'
+  | 'CONTRADICTED';
 
 export interface GovernedExecutionReceipt {
   leaseId: string;
@@ -296,7 +406,14 @@ export interface GovernedExecutionWitness {
   receiptBinding: GovernedReceiptBinding;
 }
 
-const WITNESS_STRENGTH: Record<WitnessStrength, number> = { W0: 0, W1: 1, W2: 2, W3: 3, W4: 4 };
+const WITNESS_STRENGTH: Record<WitnessStrength, number> = {
+  W0: 0,
+  W1: 1,
+  W2: 2,
+  W3: 3,
+  W4: 4,
+};
+
 const SHA256_FINGERPRINT = /^[0-9a-f]{64}$/i;
 
 function validEvidenceFingerprint(value: string | undefined): boolean {
@@ -309,9 +426,13 @@ function sameRefs(expected: readonly string[], actual: readonly string[]): boole
   return expected.every((value, index) => same(value, actual[index]));
 }
 
-function witnessBindsReceipt(receipt: GovernedExecutionReceipt, witness: GovernedExecutionWitness): boolean {
+function witnessBindsReceipt(
+  receipt: GovernedExecutionReceipt,
+  witness: GovernedExecutionWitness,
+): boolean {
   const receiptTime = Date.parse(receipt.observedAt);
   const witnessTime = Date.parse(witness.observedAt);
+
   return same(receipt.leaseId, witness.receiptBinding.leaseId)
     && same(receipt.idempotencyKey, witness.receiptBinding.idempotencyKey)
     && receipt.status === witness.receiptBinding.status
@@ -332,11 +453,21 @@ export function evaluateGovernedExecutionOutcome(
   witness?: GovernedExecutionWitness,
   minimumWitnessStrength: WitnessStrength = 'W1',
 ): GovernedOutcomeDisposition {
-  const trustedWitness = witness && witnessBindsReceipt(receipt, witness) && validEvidenceFingerprint(witness.evidenceFingerprint)
+  const trustedWitness = witness
+    && witnessBindsReceipt(receipt, witness)
+    && validEvidenceFingerprint(witness.evidenceFingerprint)
     ? witness
     : undefined;
+
   if (trustedWitness?.status === 'contradicted') return 'CONTRADICTED';
-  if (trustedWitness?.status === 'verified' && WITNESS_STRENGTH[trustedWitness.strength] >= WITNESS_STRENGTH[minimumWitnessStrength]) return 'VERIFIED';
+
+  if (
+    trustedWitness?.status === 'verified' &&
+    WITNESS_STRENGTH[trustedWitness.strength] >= WITNESS_STRENGTH[minimumWitnessStrength]
+  ) {
+    return 'VERIFIED';
+  }
+
   if (receipt.status === 'succeeded') return 'EXECUTED_UNVERIFIED';
   if (receipt.status === 'failed') return 'FAILED';
   if (receipt.status === 'partial') return 'PARTIAL';
