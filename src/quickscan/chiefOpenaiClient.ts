@@ -25,7 +25,7 @@ interface JsonRecord {
   [key: string]: unknown;
 }
 
-export type QuickScanChiefProvider = 'local-ollama' | 'openai';
+export type QuickScanChiefProvider = 'deterministic-kernel' | 'local-ollama' | 'openai';
 
 export interface QuickScanChiefProvenance {
   provider: QuickScanChiefProvider;
@@ -84,6 +84,16 @@ const NEXT_ACTIONS = new Set([
 
 const MESSAGE_REQUIRED_ACTIONS = new Set(['approve_outreach', 'send_payment_link', 'prepare_delivery']);
 
+const PROVIDER_AVAILABILITY_FAILURES = new Set([
+  'LOCAL_CHIEF_NOT_CONFIGURED',
+  'LOCAL_CHIEF_TIMEOUT',
+  'LOCAL_CHIEF_REQUEST_FAILED',
+  'OPENAI_NOT_CONFIGURED',
+  'OPENAI_TIMEOUT',
+  'OPENAI_REQUEST_FAILED',
+  'CHIEF_PROVIDER_INELIGIBLE',
+]);
+
 function nextAction(value: unknown): ChiefQuickScanRecommendation['nextAction'] {
   const action = stringValue(value, 'next_action', 40);
   if (!NEXT_ACTIONS.has(action)) {
@@ -117,6 +127,43 @@ function modelOutput(value: unknown): ChiefQuickScanRecommendation {
     messageDraft,
     promptWorkflow: QUICKSCAN_CHIEF_WORKFLOW,
   };
+}
+
+function deterministicKernelResult(
+  decisionTrace: CapabilityDecisionTrace[],
+  fallbackReason: string,
+): QuickScanChiefResult {
+  return {
+    recommendation: {
+      summary: 'Model reasoning is unavailable, so Chief is running in deterministic fallback mode. Founder Control Room remains operational; capture or review evidence before any send-worthy action.',
+      nextAction: 'capture_more_evidence',
+      promptWorkflow: QUICKSCAN_CHIEF_WORKFLOW,
+    },
+    provenance: {
+      provider: 'deterministic-kernel',
+      model: 'quickscan-rules-v1',
+      responseId: null,
+      promptVersion: QUICKSCAN_CHIEF_PROMPT_VERSION,
+      decisionTrace,
+      fallbackReason,
+    },
+  };
+}
+
+function providerFailureCode(error: unknown): string {
+  return error instanceof QuickScanChiefProviderError ? error.code : 'UNKNOWN_PROVIDER_FAILURE';
+}
+
+function isRecoverableHttpStatus(status: number | null): boolean {
+  return status === 408 || status === 425 || status === 429 || (status !== null && status >= 500);
+}
+
+function isProviderAvailabilityFailure(error: unknown): boolean {
+  if (!(error instanceof QuickScanChiefProviderError)) return false;
+  if (error.code === 'LOCAL_CHIEF_HTTP_ERROR' || error.code === 'OPENAI_HTTP_ERROR') {
+    return isRecoverableHttpStatus(error.status);
+  }
+  return PROVIDER_AVAILABILITY_FAILURES.has(error.code);
 }
 
 function responseText(payload: JsonRecord): string | null {
@@ -403,13 +450,10 @@ export function createOpenAiQuickScanChiefRunner(dependencies: OpenAiQuickScanCh
     let selection = selectFreeFirstCapability(candidates, requirements);
 
     if (!selection) {
-      if (!env.OPENAI_API_KEY?.trim() && !localBaseUrl(env)) {
-        throw new QuickScanChiefProviderError('No QuickScan Chief provider is configured', 'OPENAI_NOT_CONFIGURED');
-      }
-      throw new QuickScanChiefProviderError(
-        `No eligible QuickScan Chief provider. ${decisionTrace.map((entry) => `${entry.providerId}:${entry.reasons.join(',') || 'eligible'}`).join('; ')}`,
-        'CHIEF_PROVIDER_INELIGIBLE',
-      );
+      const fallbackReason = !env.OPENAI_API_KEY?.trim() && !localBaseUrl(env)
+        ? 'NO_MODEL_PROVIDER_CONFIGURED'
+        : 'NO_ELIGIBLE_MODEL_PROVIDER';
+      return deterministicKernelResult(decisionTrace, fallbackReason);
     }
 
     let fallbackReason: string | null = null;
@@ -430,28 +474,44 @@ export function createOpenAiQuickScanChiefRunner(dependencies: OpenAiQuickScanCh
           },
         };
       } catch (error) {
-        fallbackReason = error instanceof QuickScanChiefProviderError ? error.code : 'LOCAL_CHIEF_FAILED';
+        fallbackReason = providerFailureCode(error);
         candidates = candidates.map((candidate) => candidate.id === 'local-ollama'
           ? { ...candidate, transportReady: false, transportEvidence: `runtime-failure:${fallbackReason}` }
           : candidate);
         decisionTrace = traceCapabilityDecision(candidates, requirements);
         selection = selectFreeFirstCapability(candidates, requirements);
-        if (!selection) throw error;
+        if (!selection) {
+          if (isProviderAvailabilityFailure(error)) {
+            return deterministicKernelResult(decisionTrace, fallbackReason);
+          }
+          throw error;
+        }
       }
     }
 
-    const paid = await runOpenAi(input, env, fetchFn);
-    return {
-      recommendation: paid.recommendation,
-      provenance: {
-        provider: paid.provider,
-        model: paid.model,
-        responseId: paid.responseId,
-        promptVersion: QUICKSCAN_CHIEF_PROMPT_VERSION,
-        selection,
-        decisionTrace,
-        fallbackReason,
-      },
-    };
+    try {
+      const paid = await runOpenAi(input, env, fetchFn);
+      return {
+        recommendation: paid.recommendation,
+        provenance: {
+          provider: paid.provider,
+          model: paid.model,
+          responseId: paid.responseId,
+          promptVersion: QUICKSCAN_CHIEF_PROMPT_VERSION,
+          selection,
+          decisionTrace,
+          fallbackReason,
+        },
+      };
+    } catch (error) {
+      if (!isProviderAvailabilityFailure(error)) throw error;
+
+      fallbackReason = providerFailureCode(error);
+      candidates = candidates.map((candidate) => candidate.id === 'openai'
+        ? { ...candidate, transportReady: false, transportEvidence: `runtime-failure:${fallbackReason}` }
+        : candidate);
+      decisionTrace = traceCapabilityDecision(candidates, requirements);
+      return deterministicKernelResult(decisionTrace, fallbackReason);
+    }
   };
 }
