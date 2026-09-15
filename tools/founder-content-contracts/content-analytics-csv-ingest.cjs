@@ -29,8 +29,11 @@ function fail(message) {
   throw error;
 }
 
-function text(value, max = 240) {
-  return typeof value === 'string' ? value.trim().slice(0, max) : '';
+function boundedText(value, field, max = 240) {
+  if (typeof value !== 'string') return '';
+  const normalized = value.trim();
+  if (normalized.length > max) fail(`${field} exceeds ${max} characters`);
+  return normalized;
 }
 
 function parseCsv(textValue) {
@@ -108,11 +111,11 @@ function parseFounderContentAnalyticsCsv(csvText, metadata = {}) {
   if (byteLength === 0) fail('CSV input is empty');
   if (byteLength > MAX_BYTES) fail(`CSV input exceeds ${MAX_BYTES} bytes`);
 
-  const platform = text(metadata.platform, 80).toLowerCase();
-  const generatedAt = text(metadata.generated_at, 64);
-  const accountId = text(metadata.account_id, 200);
-  const accountName = text(metadata.account_name, 200);
-  const fileName = text(metadata.file_name, 240);
+  const platform = boundedText(metadata.platform, 'metadata.platform', 80).toLowerCase();
+  const generatedAt = boundedText(metadata.generated_at, 'metadata.generated_at', 64);
+  const accountId = boundedText(metadata.account_id, 'metadata.account_id', 200);
+  const accountName = boundedText(metadata.account_name, 'metadata.account_name', 200);
+  const fileName = boundedText(metadata.file_name, 'metadata.file_name', 240);
   if (!platform) fail('metadata.platform is required');
   if (!generatedAt || Number.isNaN(Date.parse(generatedAt))) fail('metadata.generated_at must be an ISO timestamp');
   if (!accountId) fail('metadata.account_id is required');
@@ -179,7 +182,7 @@ function parseFounderContentAnalyticsCsv(csvText, metadata = {}) {
       if (row.date || row.complete || row.impressions || row.engagements || row.gross_new_followers) {
         fail(`line ${lineNumber} audience rows must not carry daily metric fields`);
       }
-      const segment = text(row.audience_segment, 160);
+      const segment = boundedText(row.audience_segment, `line ${lineNumber} audience_segment`, 160);
       if (!segment) fail(`line ${lineNumber} audience_segment is required`);
       if (group.seenSegments.has(segment)) fail(`snapshot ${row.snapshot_id} contains duplicate audience_segment ${segment}`);
       group.seenSegments.add(segment);
