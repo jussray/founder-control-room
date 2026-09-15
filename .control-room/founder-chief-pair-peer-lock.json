@@ -13,7 +13,7 @@
   "chiefAINecessaryFixPolicy": {
     "repository": "jussray/chief-ai-machine",
     "pullRequest": 151,
-    "expectedHeadSha": "8cccfdf290590049e3bb7a3a8c132e10fb460bc9"
+    "expectedHeadSha": "1a8aab32a75660a414f67d7c2649cfd7b780780c"
   },
   "truthBoundary": "This immutable candidate snapshot binds FCR PR #781 to the exact observed Chief peer heads. It is evidence only: it does not authorize merge, deployment, provider mutation, publication, runtime execution, or transfer authority between peers.",
   "authorizesMerge": false,
