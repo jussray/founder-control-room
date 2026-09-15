@@ -2,7 +2,7 @@
   "schema": "founder-control-room/portfolio-worker-security@v1",
   "suiteVersion": "attack-20-v3",
   "repository": "jussray/founder-control-room",
-  "declaredFromMainSha": "b8e35bab8bcaf5c695ea273ac2823125d6af8fa2",
+  "declaredFromMainSha": "3b6c6731b4a1e76a4864e97aee4ab12f6b189d52",
   "overallState": "UNVERIFIED",
   "aggregation": {
     "passRequiresEveryProductionWorkerPass": true,
