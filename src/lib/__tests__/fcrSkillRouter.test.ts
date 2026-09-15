@@ -7,6 +7,7 @@ import {
   type V10CapabilityPlan,
 } from '../../founder-os-lab/capabilityKernel.js';
 import {
+  FCR_AUTOMATIC_COUNCIL_LENSES,
   FCR_REQUIRED_PARALLEL_LENSES,
   FCR_SKILL_ROUTER_CONTRACT,
   routeFcrSkills,
@@ -60,7 +61,7 @@ function route(goal: string, action: FcrSkillRouterAction, capabilityIds: string
 }
 
 describe('FCR skill router trust gate', () => {
-  it('fails closed until Chief AI supplies a hash-bound capability plan', () => {
+  it('fails closed without a Chief plan while keeping the Founder Council automatic', () => {
     const decision = routeFcrSkills({
       goal: 'Repair the repository.',
       action: 'write',
@@ -73,13 +74,14 @@ describe('FCR skill router trust gate', () => {
     expect(decision.contract).toBe(FCR_SKILL_ROUTER_CONTRACT);
     expect(decision.status).toBe('blocked');
     expect(decision.plannedCapabilityIds).toEqual([]);
+    expect(decision.automaticCouncilLenses).toEqual([...FCR_AUTOMATIC_COUNCIL_LENSES]);
     expect(decision.requiredParallelLenses).toEqual([...FCR_REQUIRED_PARALLEL_LENSES]);
-    expect(decision.missingParallelLenses).toEqual([...FCR_REQUIRED_PARALLEL_LENSES]);
+    expect(decision.missingParallelLenses).toEqual([]);
     expect(decision.errors).toContain('Chief AI capability plan is required before FCR may accept a skill route');
     expect(decision.executionAllowed).toBe(false);
   });
 
-  it('requires Product Design, Data Analytics, and Deep Research on every routed plan', () => {
+  it('applies the Founder Council even when Chief does not repeat the lenses or the user invokes no slash commands', () => {
     const goal = 'Plan the next smallest build.';
     const decision = routeFcrSkills({
       goal,
@@ -87,17 +89,41 @@ describe('FCR skill router trust gate', () => {
       projectSlug: 'founder-control-room',
       expectedHeadSha: HEAD,
       expectedRegistryHash: REGISTRY_HASH,
-      capabilityPlan: plan(goal, ['juss-chief-ai'], { strategicLenses: ['futureyou', 'truthmode', 'redteam'] }),
+      capabilityPlan: plan(goal, ['juss-chief-ai'], { strategicLenses: ['truthmode'] }),
     });
 
-    expect(decision.status).toBe('blocked');
-    expect(decision.requiredParallelLenses).toEqual(['product-design', 'data-analytics', 'deep-research']);
-    expect(decision.missingParallelLenses).toEqual(['product-design', 'data-analytics', 'deep-research']);
-    expect(decision.errors).toEqual(expect.arrayContaining([
-      'Chief AI capability plan is missing required RayOS parallel lens: product-design',
-      'Chief AI capability plan is missing required RayOS parallel lens: data-analytics',
-      'Chief AI capability plan is missing required RayOS parallel lens: deep-research',
+    expect(decision.status).toBe('ready_for_runtime_discovery');
+    expect(decision.automaticCouncilLenses).toEqual([
+      'human',
+      'futureyou',
+      'truthmode',
+      'confess',
+      'ultrathink',
+      'product-design',
+      'data-analytics',
+      'deep-research',
+      'steal',
+      'redteam',
+      'lindymode',
+      'l99',
+      'ooda',
+      'hormozi',
+      'billgates',
+      'elonmusk',
+      'firstprinciples',
+      'socrates',
+      'antiadvice',
+      'unlearn',
+      'loop',
+    ]);
+    expect(decision.requiredParallelLenses).toEqual([...FCR_REQUIRED_PARALLEL_LENSES]);
+    expect(decision.missingParallelLenses).toEqual([]);
+    expect(decision.errors).not.toEqual(expect.arrayContaining([
+      expect.stringMatching(/missing required RayOS lens/),
     ]));
+    expect(decision.requiredProof.join(' ')).toMatch(/Founder Council is applied automatically in code/);
+    expect(decision.requiredProof.join(' ')).toMatch(/two separate passes/);
+    expect(decision.requiredProof.join(' ')).toMatch(/Steal adapts principles/);
   });
 
   it('accepts Chief AI capability selection without reconstructing the stack from prompt keywords', () => {

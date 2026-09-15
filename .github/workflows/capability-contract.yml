@@ -1,27 +1,33 @@
 name: Capability Contract
 
 on:
+  # Exact-head proof expires whenever main moves, even when the moving commit
+  # does not touch capability code. Manual dispatch remains available for
+  # explicit reproof, while every main push now reacquires the contract.
+  workflow_dispatch:
   pull_request:
     paths:
       - '.control/**'
       - 'schemas/capability-contract.v1.schema.json'
       - 'scripts/verify-capability-contract.mjs'
+      - 'scripts/verify-direct-browser-contract.mjs'
       - 'src/capabilities/**'
+      - 'src/lib/pluginCenter.ts'
       - 'src/http/routes/capabilities.ts'
+      - 'src/http/routes/pluginCenter.ts'
+      - 'src/http/routes/__tests__/pluginCenter.integration.test.ts'
+      - 'src/http/routes/__tests__/pluginCenterRevocation.integration.test.ts'
       - 'src/http/routes/__tests__/tinyFishObservation.integration.test.ts'
+      - 'src/http/routes/__tests__/ultrathinkSharedReasoning.integration.test.ts'
+      - 'public/control-room/plugin-center.html'
+      - 'public/assets/plugins/ultrathink.svg'
+      - 'docs/PLUGIN_CENTER.md'
+      - 'e2e/plugin-center-ultrathink-proof.mjs'
+      - 'e2e/ultrathink-shared-runtime-proof.mjs'
       - 'package.json'
       - '.github/workflows/capability-contract.yml'
   push:
     branches: [main]
-    paths:
-      - '.control/**'
-      - 'schemas/capability-contract.v1.schema.json'
-      - 'scripts/verify-capability-contract.mjs'
-      - 'src/capabilities/**'
-      - 'src/http/routes/capabilities.ts'
-      - 'src/http/routes/__tests__/tinyFishObservation.integration.test.ts'
-      - 'package.json'
-      - '.github/workflows/capability-contract.yml'
 
 permissions:
   contents: read
@@ -47,12 +53,21 @@ jobs:
           src/capabilities/__tests__/workbenchRegistry.test.ts
           src/capabilities/__tests__/bubbleLabShadow.test.ts
           src/capabilities/__tests__/tinyFishWebObservation.test.ts
+          src/capabilities/__tests__/sharedCapabilityRuntime.test.ts
+          src/capabilities/__tests__/ultrathinkSharedReasoning.test.ts
+          src/http/routes/__tests__/pluginCenter.integration.test.ts
+          src/http/routes/__tests__/pluginCenterRevocation.integration.test.ts
           src/http/routes/__tests__/tinyFishObservation.integration.test.ts
+          src/http/routes/__tests__/ultrathinkSharedReasoning.integration.test.ts
       - run: npm run typecheck
       - run: npm run build
       - run: npx playwright install --with-deps chromium
       - name: Capability Workbench Playwright
         run: FCR_E2E_SCENARIO=capability-workbench node e2e/direct-browser-run.mjs
+      - name: Plugin Center Playwright
+        run: node e2e/plugin-center-ultrathink-proof.mjs
+      - name: ULTRATHINK Shared Runtime Playwright
+        run: node e2e/ultrathink-shared-runtime-proof.mjs
       - name: Upload capability browser proof
         if: always()
         uses: actions/upload-artifact@v4
@@ -60,3 +75,19 @@ jobs:
           name: capability-workbench-mobile-${{ github.sha }}
           path: test-results/capabilities-workbench-mobile.png
           if-no-files-found: ignore
+      - name: Upload Plugin Center browser proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: plugin-center-${{ github.sha }}
+          path: test-results/plugin-center-ultrathink-*.png
+          if-no-files-found: error
+      - name: Upload ULTRATHINK shared runtime proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ultrathink-shared-runtime-${{ github.sha }}
+          path: |
+            test-results/ultrathink-shared-runtime-receipt.json
+            test-results/ultrathink-shared-runtime-mobile.png
+          if-no-files-found: error
