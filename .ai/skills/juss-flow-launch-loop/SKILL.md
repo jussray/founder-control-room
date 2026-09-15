@@ -257,7 +257,7 @@ Public-safe story may explain what changed, why it matters, what was learned, an
 
 ## Governed repository mutation gate
 
-Operational branch creation is not ambient repository power. For the FCR `create_branch` path, the authenticated founder execute request plus a fresh proof record must produce a server-owned `AuthorityEnvelopeV1` bound to `github.repository.create_branch`, the exact repository scope, branch arguments, current mission-state fingerprint, tool-call identity, expiry, founder identity, and idempotency key.
+Operational branch creation is not ambient repository power. For the FCR `create_branch` path, the authenticated founder execute request plus a fresh proof record must produce a server-owned `AuthorityEnvelopeV1` bound to `github.repository.create_branch`, the exact repository scope, branch arguments, current mission-state fingerprint, tool-call identity, expiry, founder identity, and idempotency key. The envelope's lifetime must begin at the server-observed execute request time rather than the proof receipt timestamp; proof freshness and authority expiry are separate fail-closed windows.
 
 The execution must be reserved before provider mutation. Immediately before `RepositoryProvider.createBranch(...)`, FCR must reacquire mission state, re-derive the execution context, and validate the original envelope through `executeAuthorizedCreateBranch()`. Any state, argument, scope, idempotency, tool-call, capability, expiry, or integrity drift must fail closed. A pending or ambiguous provider outcome requires reconciliation before another mutation attempt. Branch authority never inherits merge, deploy, publication, credential, database, spend, or destructive authority.
 
