@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import test from 'node:test';
 import {
   aggregateTestLedger,
@@ -8,6 +9,7 @@ import {
 } from '../scripts/control-room-test-ledger.mjs';
 
 const SHA = '019f405030af7d79cde420cc504a060fdcaea29b';
+const ledgerSource = fs.readFileSync(new URL('../scripts/control-room-test-ledger.mjs', import.meta.url), 'utf8');
 
 function check(overrides = {}) {
   return {
@@ -124,6 +126,10 @@ test('same-second duplicate check attempts use numeric check-run id as determini
   assert.equal(checks.length, 1);
   assert.equal(checks[0].id, '201');
   assert.equal(checks[0].state, 'passed');
+});
+
+test('check-run evidence pagination fails closed before discovered lanes can be truncated', () => {
+  assert.match(ledgerSource, /if \(page === 10\) throw new Error\('CHECK_RUN_PAGINATION_LIMIT_EXCEEDED'\)/);
 });
 
 test('aggregates failed, pending, warning, unknown, and passed distinctly', () => {
