@@ -1,12 +1,13 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Preserve the current TinyFish Cloudflare and Shopify read-only provider boundaries while documenting the standalone Founder Control Room and Chief AI peer authority contract, including exact candidate peer-head bindings and a load-bearing pair status check that fail closed on drift without claiming shared runtime, transferred authority, merge, deploy, publication, provider mutation, or runtime activation.",
+  "purpose": "Preserve the current TinyFish Cloudflare and Shopify read-only provider boundaries, bind create-branch authority lifetime to the server-observed execute request time, and document the standalone Founder Control Room and Chief AI peer authority contract with exact candidate peer-head bindings and a load-bearing pair status check, without claiming shared runtime, transferred authority, merge, deploy, publication, provider mutation, or runtime activation.",
   "domains": [
     "cloudflare-authority",
     "repository-provider",
     "pair-authority",
     "publishing",
-    "truth-governance"
+    "truth-governance",
+    "merge-authority"
   ],
   "changes": [
     {
@@ -20,7 +21,8 @@
       "claims": [
         "`README.md` must keep TinyFish source and CI readiness separate from provider/runtime activation and state that canonical Deploy verifies only provider-held binding-name presence before promotion.",
         "`README.md` must describe Shopify child-provider observation as source-only, non-authorizing evidence and must never relabel a matching snapshot as live provider authority or mutation permission.",
-        "`README.md` must describe Founder Control Room and Chief AI as independently callable standalone peers with separate identity, lifecycle, receipts, failure state, continuity markers, and authority boundaries; candidate PRs are evidence carriers rather than runtime dependencies."
+        "`README.md` must describe Founder Control Room and Chief AI as independently callable standalone peers with separate identity, lifecycle, receipts, failure state, continuity markers, and authority boundaries; candidate PRs are evidence carriers rather than runtime dependencies.",
+        "`README.md` must state that create-branch authority lifetime begins at the server-observed execute request time rather than the proof receipt timestamp, keeping proof freshness and authority expiry as separate fail-closed windows."
       ]
     },
     {
@@ -87,6 +89,12 @@
       "path": "scripts/verify-documentation-truth.mjs",
       "claims": [
         "`scripts/verify-documentation-truth.mjs` must classify the shared pair contract, FCR candidate peer lock, pair verifier, and pair workflow as pair-authority truth-sensitive surfaces and fail closed when the README, required truth docs, or current path-bound documentation receipt are missing."
+      ]
+    },
+    {
+      "path": "src/http/routes/approvals.ts",
+      "claims": [
+        "`src/http/routes/approvals.ts` must capture the authenticated execute request time at the HTTP boundary and inject it into create-branch authority issuance; execution must still re-read current mission state and use fresh execution time immediately before provider mutation."
       ]
     }
   ]
