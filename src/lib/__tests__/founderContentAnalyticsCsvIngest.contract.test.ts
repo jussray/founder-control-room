@@ -50,12 +50,15 @@ describe('founder content analytics CSV ingestion', () => {
     ]);
     expect(receipt.metric_schema.impressions).toEqual({ unit: 'count', nullable: true });
     expect(receipt.metric_schema.audience_share).toEqual({ unit: 'ratio_0_to_1', nullable: false });
-    expect(receipt.audience_segments).toContainEqual(expect.objectContaining({
+    const founder = receipt.audience_segments.find(
+      (entry: Record<string, unknown>) => entry.audience_segment === 'Founder',
+    );
+    expect(founder).toMatchObject({
       audience_segment: 'Founder',
       baseline_share: 0.2,
       current_share: 0.3,
-      delta_percentage_points: expect.closeTo(10, 10),
-    }));
+    });
+    expect(founder.delta_percentage_points).toBeCloseTo(10, 10);
     expect(receipt.audit.revisions).toContainEqual(expect.objectContaining({
       date: '2026-09-02',
       previous_snapshot_id: 'historical-2026-09-02',
