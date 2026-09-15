@@ -62,13 +62,13 @@ function invocationFromRequest(
   };
 }
 
-// Canonical ChatGPT/Claude/Manus connector lane. Supabase OAuth, token-bound
-// project scope, narrow named tools, and evidence persistence all fail closed.
+// Canonical remote connector lane for MCP-compatible AI clients. Supabase OAuth,
+// token-bound project scope, narrow named tools, and evidence persistence all fail closed.
 // OAuth project claims are intersected with the server-owned portfolio scope.
 mcpRouter.post("/", handlePairedRemoteMcp);
 
 // Temporary compatibility lane for existing server-held static-token clients.
-// It exposes the same six narrow tools as /mcp and no generic nested invocation.
+// It exposes the same seven narrow tools as /mcp and no generic nested invocation.
 mcpRouter.post("/read", handleRemoteReadMcp);
 
 // Connection Vault is part of the MCP/connection authority surface. Its

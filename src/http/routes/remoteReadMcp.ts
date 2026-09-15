@@ -486,7 +486,7 @@ export function createRemoteReadMcpHandler(
         supportedVersions: [...SUPPORTED_PROTOCOL_VERSIONS],
         capabilities: { tools: {} },
         instructions:
-          'Paired Chief AI + Founder Control Room connector. It exposes six read/preview-only tools, fails closed on auth/scope/evidence errors, stores no raw MCP arguments or results, and grants no execution authority.',
+          'Paired Chief AI + Founder Control Room connector. It exposes seven read/preview-only tools, fails closed on auth/scope/evidence errors, stores no raw MCP arguments or results, and grants no execution authority.',
       }, { ttlMs: 300_000, cacheScope: 'private' })));
       return;
     }
@@ -502,7 +502,7 @@ export function createRemoteReadMcpHandler(
         capabilities: { tools: { listChanged: false } },
         serverInfo: { name: SERVER_NAME, version: SERVER_VERSION },
         instructions:
-          'Paired Chief AI + Founder Control Room connector. Six read/preview-only tools; no generic nested invocation, provider mutation, credential input, cookies, fingerprinting, or execution authority.',
+          'Paired Chief AI + Founder Control Room connector. Seven read/preview-only tools; no generic nested invocation, provider mutation, credential input, cookies, fingerprinting, or execution authority.',
       }));
       return;
     }
