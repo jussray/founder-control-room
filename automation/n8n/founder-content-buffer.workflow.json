@@ -1,0 +1,189 @@
+{
+  "id": "fcrFounderContentV1",
+  "name": "FCR Founder Content Buffer v1",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "founder-control-room/founder-content",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "founder-content-webhook",
+      "name": "FCR Founder Content Webhook",
+      "webhookId": "4d8f01d6-9b1a-4f90-8af2-7d79697bc001",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "fcr-founder-content-bearer-auth",
+          "name": "FCR Founder Content Bearer Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\nconst envelope = $input.first().json;\nconst request = envelope.body ?? envelope;\nconst headers = envelope.headers ?? {};\nconst fail = (message) => { throw new Error(`FCR_FOUNDER_CONTENT_REJECTED: ${message}`); };\nconst text = (value) => typeof value === 'string' ? value.trim() : '';\nconst hash = /^[0-9a-f]{64}$/i;\nconst fullSha = /^[0-9a-f]{40}$/i;\nconst uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;\nconst orchestration = /^fcr-n8n-social-v2:[0-9a-f]{64}$/i;\nconst challenge = text(headers['x-fcr-n8n-identity-challenge']).toLowerCase();\nconst identityContract = text(headers['x-fcr-n8n-identity-contract']);\nconst expectedWorkflowId = text($env.N8N_FOUNDER_CONTENT_EXPECTED_WORKFLOW_ID);\nconst expectedFingerprint = text($env.N8N_FOUNDER_CONTENT_EXPECTED_WORKFLOW_FINGERPRINT).toLowerCase();\nconst expectedRuntimeVersion = text($env.N8N_FOUNDER_CONTENT_EXPECTED_RUNTIME_VERSION);\nconst identitySecret = text($env.N8N_FOUNDER_CONTENT_IDENTITY_HMAC_SECRET);\nif (!request || typeof request !== 'object' || Array.isArray(request)) fail('request body must be an object');\nif (request.contract !== 'fcr/n8n-founder-content-orchestration@v1') fail('unsupported contract');\nif (request.event !== 'founder-content.schedule.requested') fail('unsupported event');\nif (!orchestration.test(text(request.orchestrationId))) fail('invalid orchestration id');\nif (!uuid.test(text(request.contentId))) fail('invalid content id');\nif (!['linkedin','facebook'].includes(text(request.platform).toLowerCase())) fail('platform not allowed');\nif (!text(request.text) || text(request.text).length > 5000) fail('bounded public text is required');\nif (!/^jussray\\/[A-Za-z0-9._-]+$/.test(text(request.source?.repo))) fail('source repo must be founder-owned');\nif (!fullSha.test(text(request.source?.commitSha))) fail('source commit must be exact');\nif (request.fcrAuthorization?.mode !== 'exact-current-you') fail('exact Current You authority required');\nfor (const field of ['authorizationHash','proposalHash','publicPayloadHash']) { if (!hash.test(text(request.fcrAuthorization?.[field]))) fail(`${field} must be a SHA-256 hash`); }\nif (!text(request.fcrAuthorization?.currentYouIntentId)) fail('Current You intent id required');\nif (!Number.isInteger(request.fcrAuthorization?.currentYouIntentVersion) || request.fcrAuthorization.currentYouIntentVersion < 1) fail('Current You intent version invalid');\nif (request.providerRequest?.provider !== 'buffer') fail('only Buffer is enabled');\nif (request.providerRequest?.method !== 'schedule') fail('only schedule is enabled');\nif (request.providerRequest?.shareNowAllowed !== false) fail('share-now is forbidden');\nif (!Number.isFinite(Date.parse(text(request.providerRequest?.scheduleAt)))) fail('scheduleAt must be valid ISO time');\nif (request.authority?.orchestrate !== true || request.authority?.requestProviderWrite !== true) fail('orchestration/provider-write authority required');\nfor (const field of ['authorizePublication','changeCopy','markPublished','readPrivateEvidence']) { if (request.authority?.[field] !== false) fail(`forbidden authority opened: ${field}`); }\nif (text(headers['idempotency-key']) !== text(request.orchestrationId)) fail('transport idempotency key mismatch');\nif (text(headers['x-fcr-orchestration-contract']) !== request.contract) fail('transport contract mismatch');\nif (text(headers['x-fcr-social-provider']).toLowerCase() !== 'buffer') fail('transport provider mismatch');\nif (!/^[0-9a-f]{64}$/.test(challenge)) fail('runtime identity challenge required');\nif (identityContract !== 'fcr/n8n-founder-content-runtime-identity@v1') fail('runtime identity contract mismatch');\nif (expectedWorkflowId !== 'fcrFounderContentV1') fail('runtime workflow id is not pinned');\nif (!hash.test(expectedFingerprint)) fail('runtime workflow fingerprint is not pinned');\nif (!/^2\\.32\\.6$/.test(expectedRuntimeVersion)) fail('runtime version must be pinned to 2.32.6');\nif (identitySecret.length < 32) fail('runtime identity HMAC secret is not configured');\nif (text(headers['x-fcr-n8n-expected-workflow-id']) !== expectedWorkflowId) fail('FCR expected workflow id mismatch');\nif (text(headers['x-fcr-n8n-expected-workflow-fingerprint']).toLowerCase() !== expectedFingerprint) fail('FCR expected workflow fingerprint mismatch');\nif (text(headers['x-fcr-n8n-expected-runtime-version']) !== expectedRuntimeVersion) fail('FCR expected runtime version mismatch');\nconst platform = text(request.platform).toLowerCase();\nconst expectedAlias = platform === 'linkedin' ? 'juss_rayy_linkedin' : 'juss_and_co_facebook';\nif (text(request.channel) !== expectedAlias) fail('server-owned Buffer channel alias mismatch');\nconst bufferChannelId = platform === 'linkedin' ? text($env.BUFFER_FOUNDER_LINKEDIN_CHANNEL_ID) : text($env.BUFFER_FOUNDER_FACEBOOK_CHANNEL_ID);\nif (!bufferChannelId) fail(`Buffer channel id is not configured for ${platform}`);\nconst apiUrl = text($env.BUFFER_API_URL) || 'https://api.buffer.com';\nconst proofMode = text($env.N8N_FOUNDER_CONTENT_PROOF_MODE).toLowerCase() === 'true';\nconst urlMatch = apiUrl.match(/^(https?):\\/\\/([^/?#]+)(?:[/?#][^\\s]*)?$/i);\nif (!urlMatch) fail('Buffer API URL is invalid');\nconst protocol = urlMatch[1].toLowerCase();\nconst authority = urlMatch[2];\nif (authority.includes('@') || authority.startsWith('[')) fail('Buffer API URL is invalid');\nconst colonIndex = authority.lastIndexOf(':');\nlet host = authority;\nlet port = '';\nif (colonIndex !== -1) {\n  if (authority.indexOf(':') !== colonIndex) fail('Buffer API URL is invalid');\n  host = authority.slice(0, colonIndex);\n  port = authority.slice(colonIndex + 1);\n}\nconst validPort = (value) => value === '' || (/^\\d{1,5}$/.test(value) && Number(value) >= 1 && Number(value) <= 65535);\nconst validHost = (value) => Boolean(value) && value.length <= 253 && /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)*[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i.test(value);\nif (!validHost(host) || !validPort(port)) fail('Buffer API URL is invalid');\nconst localProof = proofMode && protocol === 'http' && host.toLowerCase() === 'buffer-mock' && port === '18080';\nif (protocol !== 'https' && !localProof) fail('Buffer API URL must use HTTPS outside isolated proof mode');\nconst q = (value) => JSON.stringify(String(value));\nconst graphql = `mutation FcrCreateScheduledPost { createPost(input: { text: ${q(request.text)}, channelId: ${q(bufferChannelId)}, schedulingType: automatic, mode: customScheduled, dueAt: ${q(request.providerRequest.scheduleAt)} }) { ... on PostActionSuccess { post { id dueAt } } ... on MutationError { message } } }`;\nreturn [{ json: { request, apiUrl, graphql, bufferChannelId, identity: { challenge, contract: identityContract, workflowId: expectedWorkflowId, workflowFingerprint: expectedFingerprint, runtimeVersion: expectedRuntimeVersion } } }];"
+      },
+      "id": "validate-and-prepare",
+      "name": "Validate and Prepare Buffer Schedule",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        260,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "url": "={{$json.apiUrl}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{JSON.stringify({query:$json.graphql})}}",
+        "options": {}
+      },
+      "id": "buffer-schedule",
+      "name": "Schedule via Buffer GraphQL",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        520,
+        0
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "fcr-buffer-api-auth",
+          "name": "FCR Buffer API Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\nconst provider = $input.first().json;\nconst prepared = $('Validate and Prepare Buffer Schedule').first().json;\nconst createPost = provider?.data?.createPost;\nconst fail = (message) => { throw new Error(`FCR_BUFFER_SCHEDULE_REJECTED: ${message}`); };\nif (Array.isArray(provider?.errors) && provider.errors.length > 0) fail(provider.errors.map((entry) => String(entry?.message ?? 'GraphQL error')).join('; '));\nif (!createPost || typeof createPost !== 'object') fail('Buffer createPost response missing');\nif (typeof createPost.message === 'string' && createPost.message.trim()) fail(createPost.message.trim());\nconst post = createPost.post;\nif (!post || typeof post.id !== 'string' || !post.id.trim()) fail('Buffer scheduled post id missing');\nif (post.dueAt) { const actual = new Date(post.dueAt).toISOString(); const expected = new Date(prepared.request.providerRequest.scheduleAt).toISOString(); if (actual !== expected) fail('Buffer dueAt does not match exact FCR schedule'); }\nconst identity = prepared.identity;\nconst secret = String($env.N8N_FOUNDER_CONTENT_IDENTITY_HMAC_SECRET ?? '').trim();\nconst message = ['fcr/n8n-founder-content-runtime-identity@v1', identity.challenge, identity.workflowId, identity.workflowFingerprint, identity.runtimeVersion, 'fcr/n8n-founder-content-orchestration@v1'].join('\\n');\nconst signature = crypto.createHmac('sha256', secret).update(message).digest('hex');\nreturn [{ json: { orchestrationId: prepared.request.orchestrationId, provider: 'buffer', state: 'scheduled', providerItemId: post.id.trim(), providerRequestId: null, published: false, identity: { ...identity, signature } } }];"
+      },
+      "id": "build-receipt",
+      "name": "Build Signed Provider Receipt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        780,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ {orchestrationId:$json.orchestrationId,provider:$json.provider,state:$json.state,providerItemId:$json.providerItemId,providerRequestId:$json.providerRequestId,published:$json.published} }}",
+        "options": {
+          "responseCode": 202,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "X-FCR-N8N-Identity-Challenge",
+                "value": "={{$json.identity.challenge}}"
+              },
+              {
+                "name": "X-FCR-N8N-Identity-Contract",
+                "value": "={{$json.identity.contract}}"
+              },
+              {
+                "name": "X-FCR-N8N-Workflow-Id",
+                "value": "={{$json.identity.workflowId}}"
+              },
+              {
+                "name": "X-FCR-N8N-Workflow-Fingerprint",
+                "value": "={{$json.identity.workflowFingerprint}}"
+              },
+              {
+                "name": "X-FCR-N8N-Runtime-Version",
+                "value": "={{$json.identity.runtimeVersion}}"
+              },
+              {
+                "name": "X-FCR-N8N-Identity-Signature",
+                "value": "={{$json.identity.signature}}"
+              }
+            ]
+          }
+        }
+      },
+      "id": "respond",
+      "name": "Return Signed Schedule Receipt",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        1040,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "FCR Founder Content Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate and Prepare Buffer Schedule",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate and Prepare Buffer Schedule": {
+      "main": [
+        [
+          {
+            "node": "Schedule via Buffer GraphQL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule via Buffer GraphQL": {
+      "main": [
+        [
+          {
+            "node": "Build Signed Provider Receipt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Signed Provider Receipt": {
+      "main": [
+        [
+          {
+            "node": "Return Signed Schedule Receipt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": false,
+  "pinData": {},
+  "versionId": "00000000-0000-0000-0000-000000000101"
+}

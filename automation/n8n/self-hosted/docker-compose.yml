@@ -14,6 +14,17 @@ services:
       timeout: 5s
       retries: 10
 
+  buffer-mock:
+    image: node:24-alpine
+    profiles: ["proof"]
+    restart: "no"
+    working_dir: /proof
+    command: ["node", "mock-buffer-graphql.mjs"]
+    environment:
+      BUFFER_MOCK_API_KEY: ${BUFFER_MOCK_API_KEY:-}
+    volumes:
+      - ./mock-buffer-graphql.mjs:/proof/mock-buffer-graphql.mjs:ro
+
   n8n:
     image: docker.n8n.io/n8nio/n8n:2.32.6
     restart: unless-stopped
@@ -39,10 +50,25 @@ services:
       N8N_SECURE_COOKIE: "true"
       N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS: "true"
       N8N_RUNNERS_ENABLED: "true"
+      # Repo-controlled Jira/founder-content workflows intentionally read a
+      # narrow set of runtime bindings in Code/expressions. n8n 2.x otherwise
+      # blocks $env access by default, which would make the imported workflow
+      # appear valid but fail only at execution time.
+      N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"
       NODE_FUNCTION_ALLOW_BUILTIN: crypto
       N8N_DIAGNOSTICS_ENABLED: "false"
       N8N_PERSONALIZATION_ENABLED: "false"
       N8N_VERSION_NOTIFICATIONS_ENABLED: "false"
+      N8N_FOUNDER_CONTENT_EXPECTED_WORKFLOW_ID: ${N8N_FOUNDER_CONTENT_EXPECTED_WORKFLOW_ID:-fcrFounderContentV1}
+      N8N_FOUNDER_CONTENT_EXPECTED_WORKFLOW_FINGERPRINT: ${N8N_FOUNDER_CONTENT_EXPECTED_WORKFLOW_FINGERPRINT:-}
+      N8N_FOUNDER_CONTENT_EXPECTED_RUNTIME_VERSION: ${N8N_FOUNDER_CONTENT_EXPECTED_RUNTIME_VERSION:-2.32.6}
+      N8N_FOUNDER_CONTENT_IDENTITY_HMAC_SECRET: ${N8N_FOUNDER_CONTENT_IDENTITY_HMAC_SECRET:-}
+      # Proof mode is derived only from the ephemeral Buffer-mock key generated
+      # by the dedicated CI lane. Generic/self-hosted runtimes remain false.
+      N8N_FOUNDER_CONTENT_PROOF_MODE: ${BUFFER_MOCK_API_KEY:+true}
+      BUFFER_API_URL: ${BUFFER_API_URL:-https://api.buffer.com}
+      BUFFER_FOUNDER_LINKEDIN_CHANNEL_ID: ${BUFFER_FOUNDER_LINKEDIN_CHANNEL_ID:-}
+      BUFFER_FOUNDER_FACEBOOK_CHANNEL_ID: ${BUFFER_FOUNDER_FACEBOOK_CHANNEL_ID:-}
       GENERIC_TIMEZONE: ${GENERIC_TIMEZONE:-America/New_York}
       TZ: ${GENERIC_TIMEZONE:-America/New_York}
     volumes:

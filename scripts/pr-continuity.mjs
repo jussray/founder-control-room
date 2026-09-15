@@ -20,6 +20,61 @@ export function assertExpectedHead(expected, actual) {
   return true;
 }
 
+export function isStackedUpdateUnsupported(status, message = '') {
+  return status === 403 && /updating a stacked PR's branch via this endpoint is not supported\.?/i.test(message);
+}
+
+export function classifyUpdateBranchFailure(status, message = '') {
+  const providerMessage = String(message || '');
+  if (isStackedUpdateUnsupported(status, providerMessage)) {
+    return {
+      state: 'BLOCKED_STACK_REBASE_REQUIRED',
+      failureReceipts: [{ code: 'STACKED_UPDATE_UNSUPPORTED', providerStatus: status, evidence: providerMessage }],
+    };
+  }
+
+  if ((status === 403 || status === 422) && /repository rule violations found/i.test(providerMessage)) {
+    const failureReceipts = [];
+    if (/changes must be made through a pull request/i.test(providerMessage)) {
+      failureReceipts.push({ code: 'CHANGES_REQUIRE_PULL_REQUEST', providerStatus: status, evidence: 'Changes must be made through a pull request.' });
+    }
+    const requiredCheck = providerMessage.match(/Required status check "([^"]+)" is expected\.?/i);
+    if (requiredCheck) {
+      failureReceipts.push({ code: 'REQUIRED_STATUS_CHECK_EXPECTED', providerStatus: status, checkName: requiredCheck[1], evidence: requiredCheck[0] });
+    }
+    if (/waiting for code scanning results/i.test(providerMessage)) {
+      failureReceipts.push({ code: 'CODE_SCANNING_PENDING_OR_UNCONFIGURED', providerStatus: status, evidence: 'Waiting for Code Scanning results.' });
+    }
+    if (!failureReceipts.length) {
+      failureReceipts.push({ code: 'REPOSITORY_RULE_VIOLATION', providerStatus: status, evidence: providerMessage });
+    }
+    return { state: 'BLOCKED_REPOSITORY_RULES', failureReceipts };
+  }
+
+  if (status === 422 && /merge conflict between base and head/i.test(providerMessage)) {
+    return {
+      state: 'BLOCKED_MERGE_CONFLICT',
+      failureReceipts: [{ code: 'MERGE_CONFLICT', providerStatus: status, evidence: providerMessage }],
+    };
+  }
+
+  if (status === 403) {
+    return {
+      state: 'BLOCKED_PROVIDER_FORBIDDEN',
+      failureReceipts: [{ code: 'PROVIDER_FORBIDDEN', providerStatus: status, evidence: providerMessage || 'GitHub rejected the branch update.' }],
+    };
+  }
+
+  if (status === 422) {
+    return {
+      state: 'BLOCKED_PROVIDER_REJECTED',
+      failureReceipts: [{ code: 'PROVIDER_UPDATE_REJECTED', providerStatus: status, evidence: providerMessage || 'GitHub rejected the branch update.' }],
+    };
+  }
+
+  return null;
+}
+
 export function replaceManagedBlock(body = '', block) {
   const starts = body.split(START_MARKER).length - 1;
   const ends = body.split(END_MARKER).length - 1;
@@ -56,10 +111,14 @@ export function continuityBlock(value) {
     `- proof_subject: \`${value.headSha}\``,
     `- continuity: **${value.continuityState}**`,
     `- proof: **${value.proofState}**`,
-    '- merge_authority: **false**',
+    '- merge_authority: **true**',
+    '- merge_approval: **REQUIRED_EXACT_CANDIDATE**',
+    '- merge_approved: **false**',
+    '- authorizes_merge: **false**',
     '- deploy_authority: **false**',
     '',
-    '> Base/head movement expires predecessor exact-head CI, review, runtime, and browser proof. A successful rollover preserves history but does not donate green proof to the successor head.',
+    '> Merge authority means the merge capability exists; it is not candidate approval. Without fresh explicit founder approval bound to this exact repository, PR, base SHA, and head SHA, the merge must not execute. Base/head movement expires any prior approval.',
+    '> Base/head movement also expires predecessor exact-head CI, review, runtime, and browser proof. A successful rollover preserves history but does not donate green proof to the successor head.',
     END_MARKER,
   ].join('\n');
 }
@@ -88,6 +147,14 @@ export const sameRepositoryPull = (pr, repository) =>
 
 const env = (name, fallback = '') => process.env[name] || fallback;
 const artifactPath = () => env('ARTIFACT_PATH', 'artifacts/pr-continuity.json');
+
+const nonAuthorizingMergeState = Object.freeze({
+  mergeAuthorityAvailable: true,
+  mergeApprovalRequired: true,
+  mergeApproved: false,
+  authorizesMerge: false,
+  authorizesDeploy: false,
+});
 
 function writeReceipt(value) {
   const target = path.resolve(artifactPath());
@@ -191,22 +258,32 @@ async function updateOnePull(repository, number, rootRef) {
   const update = await github(`/repos/${repository}/pulls/${number}/update-branch`, {
     method: 'PUT',
     body: { expected_head_sha: before },
-    allow: [202, 422],
+    allow: [202, 403, 422],
   });
 
-  if (update.status === 422) {
+  if (update.status === 403 || update.status === 422) {
     pr = await getPull(repository, number);
     baseSha = await liveBaseSha(repository, pr);
     status = sameRepositoryPull(pr, repository) ? await compare(repository, baseSha, pr.head.sha) : 'fork';
     if (isCurrentCompareStatus(status)) return updateOnePull(repository, number, rootRef);
-    const metadata = await patchBody(repository, pr, blockFor(repository, pr, rootRef, rootSha, baseSha, 'BLOCKED_CONFLICT_OR_RACE', 'BLOCKED'));
+
+    const failure = classifyUpdateBranchFailure(update.status, update.payload?.message || '');
+    if (!failure) {
+      throw new Error(`GITHUB_API_${update.status}: ${update.payload?.message || 'pull request branch update rejected'}`);
+    }
+    const metadata = await patchBody(repository, pr, blockFor(repository, pr, rootRef, rootSha, baseSha, failure.state, 'BLOCKED'));
     return {
       number,
-      state: 'BLOCKED_CONFLICT_OR_RACE',
+      state: failure.state,
       headRef: pr.head.ref,
       headSha: pr.head.sha,
       metadata,
+      providerStatus: update.status,
       providerMessage: update.payload?.message || null,
+      failureReceipts: failure.failureReceipts.map((receipt) => ({
+        receiptId: `pr-${number}:${receipt.code}`,
+        ...receipt,
+      })),
     };
   }
 
@@ -243,7 +320,7 @@ export async function auditMode() {
   const pr = await getPull(repository, number);
   assertExpectedHead(expected, pr.head.sha);
   if (!sameRepositoryPull(pr, repository)) {
-    writeReceipt({ schema: SCHEMA, mode: 'audit', repository, prNumber: number, state: 'BLOCKED_FORK', authorizesMerge: false, authorizesDeploy: false });
+    writeReceipt({ schema: SCHEMA, mode: 'audit', repository, prNumber: number, state: 'BLOCKED_FORK', ...nonAuthorizingMergeState });
     throw new Error('BLOCKED_FORK');
   }
 
@@ -265,8 +342,7 @@ export async function auditMode() {
     state,
     proofSubjectSha: pr.head.sha,
     predecessorProofExpiresOnHeadMove: true,
-    authorizesMerge: false,
-    authorizesDeploy: false,
+    ...nonAuthorizingMergeState,
   };
   writeReceipt(receipt);
   if (state !== 'CURRENT') throw new Error(`${state}: ${baseSha} is not an ancestor of ${pr.head.sha}`);
@@ -290,7 +366,7 @@ export async function metadataMode() {
     pr,
     blockFor(repository, pr, rootRef, rootSha, baseSha, state, state === 'CURRENT' ? 'EXACT_HEAD_PROOF_SEPARATE' : 'REVERIFY_OR_ROLLOVER_REQUIRED'),
   );
-  const receipt = { schema: SCHEMA, mode: 'metadata', repository, prNumber: number, state, metadata, authorizesMerge: false, authorizesDeploy: false };
+  const receipt = { schema: SCHEMA, mode: 'metadata', repository, prNumber: number, state, metadata, ...nonAuthorizingMergeState };
   writeReceipt(receipt);
   if (metadata.blocked) throw new Error(`METADATA_BLOCKED: ${metadata.reason}`);
   console.log(JSON.stringify(receipt));
@@ -305,6 +381,15 @@ export async function rolloverMode() {
   const results = [];
   for (const number of order) results.push(await updateOnePull(repository, number, rootRef));
   const blocked = results.filter((item) => item.state.startsWith('BLOCKED'));
+  const blockedByState = blocked.reduce((counts, item) => {
+    counts[item.state] = (counts[item.state] || 0) + 1;
+    return counts;
+  }, {});
+  const failureReceipts = blocked.flatMap((item) =>
+    item.failureReceipts?.length
+      ? item.failureReceipts.map((receipt) => ({ pullRequest: item.number, state: item.state, ...receipt }))
+      : [{ pullRequest: item.number, state: item.state, receiptId: `pr-${item.number}:${item.state}`, code: item.state }],
+  );
   const receipt = {
     schema: SCHEMA,
     mode: 'rollover',
@@ -314,9 +399,11 @@ export async function rolloverMode() {
     order,
     results,
     blockedCount: blocked.length,
+    blockedByState,
+    failureReceiptCount: failureReceipts.length,
+    failureReceipts,
     predecessorProofExpiresOnHeadMove: true,
-    authorizesMerge: false,
-    authorizesDeploy: false,
+    ...nonAuthorizingMergeState,
   };
   writeReceipt(receipt);
   console.log(JSON.stringify(receipt));

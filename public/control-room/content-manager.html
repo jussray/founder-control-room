@@ -11,6 +11,7 @@
 @media(max-width:850px){.hero,.authority,.founder-grid{grid-template-columns:1fr}.founder-lane-head,.flow-heading{align-items:flex-start;flex-direction:column}.flow{grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:minmax(78vw,1fr)}.flow-step{min-height:190px}.flow-step:not(:last-child)::after{right:-.72rem}}
 @media(max-width:480px){.shell{padding:14px}.panel{border-radius:18px;padding:19px}.flow{grid-auto-columns:minmax(82vw,1fr)}h1{font-size:2.65rem}}
 </style>
+<link rel="stylesheet" href="/control-room/content-manager-lifecycle.css" />
 </head>
 <body>
 <main class="shell">
@@ -199,6 +200,119 @@
     </li>
   </ol>
 
+  <section class="panel lifecycle-control" data-lifecycle-control-plane data-api-base="/automation/conveyor/founder-content/lifecycle">
+    <div class="lifecycle-head">
+      <div>
+        <p class="eyebrow">Operational control plane</p>
+        <h2>Run the lifecycle without collapsing the truth gates.</h2>
+        <p>Draft, review, schedule intent, provider readback, and publication are separate operations. Live mutations require the authenticated Founder Control Room runtime.</p>
+      </div>
+      <span class="pill lifecycle-runtime" data-lifecycle-runtime data-state="blocked">Checking runtime…</span>
+    </div>
+
+    <div class="lifecycle-toolbar">
+      <button class="control-button primary" type="button" data-refresh-lifecycle data-live-only>Refresh lifecycle</button>
+      <span class="field-note">Reads are automatic. External account connection and publication require explicit buttons below.</span>
+    </div>
+    <div class="adapter-note" data-adapter-note>Provider adapter state is UNKNOWN until runtime readback.</div>
+
+    <div class="lifecycle-analytics" aria-label="Lifecycle analytics">
+      <div class="metric-card"><strong data-metric-total>0</strong><span>Total posts</span></div>
+      <div class="metric-card"><strong data-metric-posted>0</strong><span>Provider-verified posted</span></div>
+      <div class="metric-card"><strong data-metric-scheduled>0</strong><span>Editorial schedule intent</span></div>
+      <div class="metric-card"><strong data-metric-failures>0</strong><span>Failed or ambiguous</span></div>
+    </div>
+
+    <div class="control-grid">
+      <form class="control-card" data-create-draft-form>
+        <h3>Create reviewable draft</h3>
+        <p>This stores public draft state only. It does not approve, schedule at a provider, or publish.</p>
+        <div class="field-grid">
+          <div class="field">
+            <label for="lifecycle-provider">Provider lane</label>
+            <select class="control-select" id="lifecycle-provider" name="provider">
+              <option value="buffer">Buffer</option><option value="linkedin">LinkedIn direct</option><option value="meta">Meta</option><option value="x">X</option><option value="tiktok">TikTok</option><option value="youtube">YouTube</option><option value="pinterest">Pinterest</option><option value="bluesky">Bluesky</option><option value="mastodon">Mastodon</option><option value="google_business">Google Business</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="lifecycle-platform">Platform</label>
+            <select class="control-select" id="lifecycle-platform" name="platform">
+              <option value="linkedin">LinkedIn</option><option value="facebook">Facebook</option><option value="instagram">Instagram</option><option value="threads">Threads</option><option value="x">X</option><option value="tiktok">TikTok</option><option value="youtube">YouTube</option><option value="pinterest">Pinterest</option><option value="bluesky">Bluesky</option><option value="mastodon">Mastodon</option><option value="google_business">Google Business</option>
+            </select>
+          </div>
+          <div class="field full"><label for="lifecycle-account">Destination account ID</label><input class="control-input" id="lifecycle-account" name="account_id" autocomplete="off" placeholder="Provider-owned account identifier" required /></div>
+          <div class="field full"><label for="lifecycle-title">Internal title</label><input class="control-input" id="lifecycle-title" name="title" maxlength="240" placeholder="What this post is about" /></div>
+          <div class="field full"><label for="lifecycle-draft">Public draft text</label><textarea class="control-textarea" id="lifecycle-draft" name="draft_text" placeholder="Exact public-safe copy for review" required></textarea></div>
+        </div>
+        <div class="lifecycle-toolbar"><button class="control-button primary" type="submit" data-live-only>Store draft</button></div>
+        <p class="field-note">Use provider=linkedin only for the current first-party direct publish path. Other provider lanes remain adapter-gated until activated.</p>
+      </form>
+
+      <div class="control-card">
+        <h3>Provider account gate</h3>
+        <p>Account discovery and OAuth connection stay provider-owned. No account connection grants publication authority.</p>
+        <div class="field-grid">
+          <div class="field"><label for="account-provider">Provider</label><select class="control-select" id="account-provider" data-account-provider><option value="buffer">Buffer</option><option value="linkedin">LinkedIn</option><option value="meta">Meta</option><option value="x">X</option><option value="tiktok">TikTok</option><option value="youtube">YouTube</option></select></div>
+          <div class="field"><label for="account-platform">Platform</label><select class="control-select" id="account-platform" data-account-platform><option value="linkedin">LinkedIn</option><option value="facebook">Facebook</option><option value="instagram">Instagram</option><option value="threads">Threads</option><option value="x">X</option><option value="tiktok">TikTok</option><option value="youtube">YouTube</option></select></div>
+          <div class="field full"><label for="account-name">Optional account label</label><input class="control-input" id="account-name" data-account-name placeholder="Account label for provider connection flow" /></div>
+        </div>
+        <div class="lifecycle-toolbar"><button class="control-button" type="button" data-account-list data-live-only>List accounts</button><button class="control-button" type="button" data-account-connect data-live-only>Connect account</button></div>
+      </div>
+    </div>
+
+    <div class="control-card" style="margin-top:1rem">
+      <h3>Bulk schedule intent</h3>
+      <p>Select posts below, then set an editorial schedule sequence. This does not claim provider scheduling succeeded.</p>
+      <div class="field-grid">
+        <div class="field"><label for="bulk-start">Start</label><input class="control-input" id="bulk-start" type="datetime-local" data-bulk-start /></div>
+        <div class="field"><label for="bulk-interval">Minutes between posts</label><input class="control-input" id="bulk-interval" type="number" min="1" max="10080" value="30" data-bulk-interval /></div>
+      </div>
+      <div class="lifecycle-toolbar"><button class="control-button" type="button" data-bulk-schedule data-live-only>Store bulk schedule intent</button></div>
+    </div>
+
+    <div class="posts-head"><div><p class="eyebrow">Durable post ledger</p><h3>Posts</h3></div><span class="field-note">Open one post to review its exact state and authority package.</span></div>
+    <div class="post-list" data-post-list aria-live="polite"></div>
+
+    <section class="control-card selected-console" data-selected-console hidden>
+      <div class="posts-head"><div><p class="eyebrow">Selected post</p><h3 data-selected-title>Selected post</h3></div><span class="mini-pill" data-selected-status>UNKNOWN</span></div>
+      <div class="selected-summary">
+        <div><strong>Provider / platform</strong><span data-selected-provider>UNKNOWN</span></div>
+        <div><strong>Provider write</strong><span data-selected-write-state>UNKNOWN</span></div>
+        <div><strong>Exact public payload hash</strong><span data-selected-hash>UNKNOWN</span></div>
+        <div><strong>Publication truth</strong><span>Provider readback only</span></div>
+      </div>
+
+      <div class="control-grid">
+        <div class="control-card">
+          <h3>Review + reversible state</h3>
+          <div class="field"><label for="review-comment">Review comment</label><textarea class="control-textarea" id="review-comment" data-review-comment placeholder="What should change or what was verified"></textarea></div>
+          <div class="console-actions"><button class="control-button" type="button" data-add-comment data-live-only>Add comment</button><button class="control-button" type="button" data-selected-action="comments" data-live-only>Read comments</button><button class="control-button" type="button" data-selected-action="logs" data-live-only>Read logs</button><button class="control-button" type="button" data-selected-action="status" data-live-only>Read provider status</button><button class="control-button" type="button" data-selected-action="metrics" data-live-only>Sync metrics</button></div>
+          <div class="field" style="margin-top:.8rem"><label for="reschedule-at">New editorial schedule time</label><input class="control-input" id="reschedule-at" type="datetime-local" data-reschedule-at /></div>
+          <div class="console-actions"><button class="control-button" type="button" data-selected-action="reschedule" data-live-only>Reschedule intent</button></div>
+          <div class="field" style="margin-top:.8rem"><label for="reject-reason">Reject reason</label><input class="control-input" id="reject-reason" data-reject-reason placeholder="Why this post should stop" /></div>
+          <div class="console-actions"><button class="control-button danger" type="button" data-selected-action="reject" data-live-only>Reject post</button><button class="control-button" type="button" data-selected-action="retry" data-live-only>Reset failed post for retry</button></div>
+        </div>
+
+        <div class="control-card">
+          <h3>Exact authority package</h3>
+          <p>Paste the exact Chief/FCR proposal. Approval issuance binds this proposal to the authenticated Current You and expires independently of the post ledger.</p>
+          <div class="field"><label for="proposal-json">Proposal JSON</label><textarea class="control-textarea code" id="proposal-json" data-proposal-json placeholder='{"proposal_hash":"…","public_payload":{"draft_text":"…"}}'></textarea></div>
+          <div class="field-grid" style="margin-top:.7rem">
+            <div class="field full"><label for="approval-id">Approval ID</label><input class="control-input" id="approval-id" data-approval-id autocomplete="off" /></div>
+            <div class="field full"><label for="authorization-hash">Authorization hash</label><input class="control-input" id="authorization-hash" data-authorization-hash autocomplete="off" /></div>
+            <div class="field full"><label for="public-payload-hash">Public payload hash</label><input class="control-input" id="public-payload-hash" data-public-payload-hash readonly /></div>
+          </div>
+          <div class="console-actions"><button class="control-button" type="button" data-issue-approval data-live-only>Issue exact-copy approval</button><button class="control-button primary" type="button" data-bind-approval data-live-only>Bind approval to post</button></div>
+          <label class="inline-check"><input type="checkbox" data-publish-confirm data-live-only /><span>I confirm this exact approved copy should publish now. I understand provider publication is irreversible even if lifecycle receipt synchronization later fails.</span></label>
+          <div class="console-actions"><button class="control-button publish" type="button" data-selected-action="publish" data-live-only>Publish exact copy now</button></div>
+          <p class="field-note">Current direct publish is LinkedIn-only and still requires configured server-owned LinkedIn authority, temporal revalidation, one-shot execution reservation, provider write, and provider readback.</p>
+        </div>
+      </div>
+    </section>
+
+    <pre class="console-output" data-console-output data-tone="neutral" aria-live="polite">Lifecycle console ready. No provider mutation has been performed.</pre>
+  </section>
+
   <section class="authority">
     <article class="panel">
       <p class="eyebrow">Founder Control Room owns</p>
@@ -234,5 +348,6 @@
 
   <p class="footer">Every output becomes the next gate. Capability, authorization, dispatch, and publication remain separate truths.</p>
 </main>
+<script src="/control-room/content-manager-lifecycle.js" defer></script>
 </body>
 </html>

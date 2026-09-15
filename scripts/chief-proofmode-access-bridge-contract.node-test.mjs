@@ -4,10 +4,12 @@ import test from 'node:test';
 
 const commandBridge = readFileSync('.github/workflows/chief-proofmode-access-command-bridge.yml', 'utf8');
 const recoveryWorkflow = readFileSync('.github/workflows/chief-proofmode-access-recovery.yml', 'utf8');
+const runtimeWitness = readFileSync('.github/workflows/chief-proofmode-runtime-witness.yml', 'utf8');
 const reconciler = readFileSync('scripts/reconcile-chief-proofmode-access.mjs', 'utf8');
 const recoveryDoc = readFileSync('docs/CHIEF_PROOFMODE_ACCESS_RECOVERY.md', 'utf8');
 
 const ACCOUNT_ID = '9b59861bd1747cf7525571b4c51d2aa0';
+const PROTECTED_CLIENT_ID_SOURCE = /CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID:\s*\$\{\{ secrets\.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID \|\| secrets\.CLOUDFLARE_ACCESS_CLIENT_ID \|\| vars\.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID \|\| vars\.CLOUDFLARE_ACCESS_CLIENT_ID \}\}/;
 
 test('Chief Access command bridge is founder-only, issue-scoped, and exact-FCR-main bound', () => {
   assert.match(commandBridge, /github\.event\.issue\.number == 485/);
@@ -28,17 +30,13 @@ test('recovery keeps repair selector mandatory while check may discover one exis
   assert.match(recoveryWorkflow, new RegExp(ACCOUNT_ID));
   assert.match(recoveryWorkflow, /CLOUDFLARE_ACCESS_API_TOKEN:\s*\$\{\{ secrets\.CLOUDFLARE_ACCESS_API_TOKEN \}\}/);
   assert.match(recoveryWorkflow, /CLOUDFLARE_ACCESS_ADMIN_API_TOKEN:\s*\$\{\{ secrets\.CLOUDFLARE_ACCESS_ADMIN_API_TOKEN \}\}/);
-  assert.match(
-    recoveryWorkflow,
-    /CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID:\s*\$\{\{ vars\.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID \|\| vars\.CLOUDFLARE_ACCESS_CLIENT_ID \}\}/,
-  );
+  assert.match(recoveryWorkflow, PROTECTED_CLIENT_ID_SOURCE);
+  assert.match(runtimeWitness, PROTECTED_CLIENT_ID_SOURCE);
   assert.match(
     recoveryWorkflow,
     /CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID:\s*\$\{\{ vars\.CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID \|\| vars\.CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID \}\}/,
   );
-  assert.doesNotMatch(recoveryWorkflow, /secrets\.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID/);
   assert.doesNotMatch(recoveryWorkflow, /secrets\.CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID/);
-  assert.doesNotMatch(recoveryWorkflow, /secrets\.CLOUDFLARE_ACCESS_CLIENT_ID/);
   assert.doesNotMatch(recoveryWorkflow, /secrets\.CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID/);
 
   const selectorStep = recoveryWorkflow.match(
@@ -47,6 +45,7 @@ test('recovery keeps repair selector mandatory while check may discover one exis
   assert.match(selectorStep, /if: inputs\.mode == 'repair'/);
   assert.match(selectorStep, /-z "\$CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID" && -z "\$CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID"/);
   assert.match(selectorStep, /repair requires CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID/);
+  assert.match(selectorStep, /protected selector in the FCR production environment/);
 
   assert.match(recoveryWorkflow, /- name: Inspect current Chief Service Auth with dedicated read authority\n\s+if: inputs\.mode == 'check'/);
   assert.match(recoveryWorkflow, /- name: Apply exact-host Chief Service Auth with dedicated admin authority\n\s+if: inputs\.mode == 'repair'/);
@@ -120,9 +119,22 @@ test('public receipt explicitly keeps browser/runtime proof separate', () => {
   assert.match(returnStep, /Browser\/runtime proof: `NOT CLAIMED HERE`/);
   assert.match(returnStep, /rerun Chief exact-head Playwright after provider repair/);
   assert.match(returnStep, /Current provider truth: `UNKNOWN`/);
+  assert.match(returnStep, /Current provider truth: `BLOCKED`/);
+  assert.match(returnStep, /\.state == "configured" or \.state == "blocked"/);
+  assert.match(returnStep, /reasonCode/);
   assert.match(returnStep, /single-document|length == 1/);
   assert.doesNotMatch(returnStep, /cat "\$current_receipt"/);
   assert.doesNotMatch(returnStep, /cat "\$mutation_receipt"/);
+  assert.doesNotMatch(returnStep, /error\.message|rawError|errorMessage/);
+});
+
+test('blocked diagnostics are allowlisted and cannot become provider mutation authority', () => {
+  assert.match(reconciler, /BLOCKED_REASON_CODES/);
+  assert.match(reconciler, /state: 'blocked'/);
+  assert.match(reconciler, /mutationPerformed: false/);
+  assert.match(reconciler, /reasonCode/);
+  assert.match(recoveryWorkflow, /allowed_reason/);
+  assert.match(recoveryWorkflow, /\.mutationPerformed == false/);
 });
 
 test('dedicated recovery documentation keeps source, provider, and browser truth separate', () => {

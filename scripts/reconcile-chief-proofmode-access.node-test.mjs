@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { ensureChiefProofModeAccessPolicy } from './reconcile-chief-proofmode-access.mjs';
+import { classifyChiefAccessError, ensureChiefProofModeAccessPolicy } from './reconcile-chief-proofmode-access.mjs';
 
 const ACCOUNT = 'account-1';
 const READ_TOKEN = 'read-token';
@@ -389,4 +389,24 @@ test('check mode cannot create a policy', async () => {
     /No matching Chief Service Auth policy/,
   );
   assert.equal(calls.filter(({ init }) => init.method === 'POST').length, 0);
+});
+
+test('maps fail-closed provider outcomes to bounded diagnostic codes', () => {
+  assert.equal(
+    classifyChiefAccessError(new Error('No existing non-identity service-token binding identifies the Chief CI token; configure an exact protected selector before repair.')),
+    'service-token-binding-missing',
+  );
+  assert.equal(
+    classifyChiefAccessError(new Error('Multiple service-token identities are bound to the effective Chief Access application; found 2; refusing ambiguous discovery.')),
+    'service-token-binding-ambiguous',
+  );
+  assert.equal(
+    classifyChiefAccessError(new Error('No matching Chief Service Auth policy exists on effective scope public_exact_host.')),
+    'service-auth-policy-missing',
+  );
+  assert.equal(
+    classifyChiefAccessError(new Error('Cloudflare API request failed with HTTP 403 (code 9109).')),
+    'provider-read-failed',
+  );
+  assert.equal(classifyChiefAccessError(new Error('secret-shaped internal detail')), 'bounded-check-failed');
 });

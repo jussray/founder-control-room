@@ -133,21 +133,49 @@ test('browser receipt must pass a bounded field schema before derived public boo
   assert.match(returnStep, /\.schemaVersion == 1/);
   assert.match(returnStep, /\.scope == "fcr-access-front-door-browser-proof"/);
   assert.match(returnStep, /\.expectedHeadSha == \$expectedHeadSha/);
+  assert.match(returnStep, /\.audience == "random-stranger"/);
   assert.match(returnStep, /\.requestedOrigin == "https:\/\/foundercontrolroom\.org"/);
+  assert.match(returnStep, /\.publicOrigin == "https:\/\/www\.foundercontrolroom\.org"/);
   assert.match(returnStep, /def origin_or_null:/);
   assert.match(returnStep, /\.finalOrigin \| origin_or_null/);
   assert.match(returnStep, /def status_or_null:/);
   assert.match(returnStep, /\.navigationStatus \| status_or_null/);
+  assert.match(returnStep, /\.controlRoomStatus \| status_or_null/);
+  assert.match(returnStep, /\.founderSignInVisible \| type == "boolean"/);
+  assert.match(returnStep, /\.founderShellVisible \| type == "boolean"/);
+  assert.match(returnStep, /\.authMeStatus \| status_or_null/);
+  assert.match(returnStep, /\.founderAuthorityContained \| type == "boolean"/);
   assert.match(returnStep, /\.apiVersionStatus \| status_or_null/);
   assert.match(returnStep, /\.apiVersionMatchesExpectedSha \| type == "boolean"/);
   assert.match(returnStep, /\.state == "unknown" or \.state == "proven" or \.state == "failed"/);
   assert.match(returnStep, /has\("error"\)/);
   assert.match(returnStep, /\.error \| type == "string" and length <= 2000/);
   assert.doesNotMatch(returnStep, /\| tostring/);
-  assert.match(returnStep, /finalOriginMatchesExpected/);
-  assert.match(returnStep, /unexpectedOriginDetected/);
+  assert.match(returnStep, /finalOriginIsFcr/);
   assert.match(returnStep, /accessInterceptDetected/);
+  assert.match(returnStep, /founderAuthorityContained/);
   assert.match(returnStep, /errorPresent/);
+});
+
+test('destination diagnostics publish counts and coverage booleans without raw provider identifiers', () => {
+  const returnStep = recoveryWorkflow.match(
+    /- name: Return sanitized recovery receipt to founder control issue([\s\S]*?)- name: Upload sanitized recovery evidence/,
+  )?.[1] ?? '';
+
+  assert.match(returnStep, /destinationProfile/);
+  assert.match(returnStep, /total:/);
+  assert.match(returnStep, /public:/);
+  assert.match(returnStep, /allWorkers:/);
+  assert.match(returnStep, /worker:/);
+  assert.match(returnStep, /previewWorker:/);
+  assert.match(returnStep, /other:/);
+  assert.match(returnStep, /hasWholeSitePublic:/);
+  assert.match(returnStep, /hasNarrowPublic:/);
+  assert.match(returnStep, /hasAllWorkers:/);
+  assert.match(returnStep, /foundercontrolroom\.org\/\*/);
+  assert.match(returnStep, /\.matchingApplications/);
+  assert.doesNotMatch(returnStep, /\n\s*matchingApplications\s*[,}]/);
+  assert.doesNotMatch(returnStep, /\n\s*(?:uri|hostname|name|id)\s*[,}]/);
 });
 
 test('recovery returns only bounded sanitized fields to fixed issue and summary', () => {
@@ -162,6 +190,10 @@ test('recovery returns only bounded sanitized fields to fixed issue and summary'
   assert.match(returnStep, /gh issue comment "\$RETURN_ISSUE" --repo "\$GITHUB_REPOSITORY" --body-file "\$public_receipt"/);
   assert.match(returnStep, /cat "\$public_receipt" >> "\$GITHUB_STEP_SUMMARY"/);
   assert.match(returnStep, /matchingApplicationCount/);
+  assert.match(returnStep, /destinationShape/);
+  assert.match(returnStep, /destinationProfile/);
+  assert.match(returnStep, /"single-subpath"/);
+  assert.match(returnStep, /"multi-destination"/);
   assert.match(returnStep, /credentialFailures/);
   assert.match(returnStep, /rollbackPerformed/);
   assert.match(returnStep, /apiVersionMatchesExpectedSha/);
@@ -169,7 +201,8 @@ test('recovery returns only bounded sanitized fields to fixed issue and summary'
   assert.match(returnStep, /Browser proof receipt: `malformed`/);
   assert.match(returnStep, /Provider truth: `UNKNOWN`/);
   assert.match(returnStep, /Browser proof: `UNKNOWN`/);
-  assert.doesNotMatch(returnStep, /matchingApplications/);
+  assert.match(returnStep, /\.matchingApplications/);
+  assert.doesNotMatch(returnStep, /\n\s*matchingApplications\s*[,}]/);
   assert.doesNotMatch(returnStep, /\n\s*managedApplicationId,?\s*\n/);
   assert.doesNotMatch(returnStep, /\n\s*finalOrigin,\s*\n/);
   assert.doesNotMatch(returnStep, /\n\s*error\s*\n/);
@@ -206,7 +239,8 @@ test('provider mutation is limited to exact public Access application create/del
 test('browser proof binds public origin and API runtime to the exact approved SHA', () => {
   assert.match(browserProof, /https:\/\/www\.foundercontrolroom\.org/);
   assert.match(browserProof, /https:\/\/api\.foundercontrolroom\.org\/version/);
-  assert.match(browserProof, /receipt\.finalOrigin !== WEB_ORIGIN/);
+  assert.match(browserProof, /receipt\.finalOrigin !== PUBLIC_ORIGIN/);
+  assert.match(browserProof, /Always probe the canonical public origin independently/);
   assert.match(browserProof, /versionPayload\.includes\(expectedHeadSha\)/);
   assert.match(browserProof, /chromium\.launch/);
 });

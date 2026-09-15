@@ -203,11 +203,19 @@ For GitHub Actions, production promotion is recognized only for the manual `Depl
 
 Canonical Deploy now separates **deployment-plane credentials** from **Worker runtime secrets**. The GitHub `production` authority gate needs only `SUPABASE_DB_URL`, `CLOUDFLARE_API_TOKEN`, and `CLOUDFLARE_ACCOUNT_ID` to prove the release can perform its database and Cloudflare operations. Runtime secret values remain provider-held in the canonical Cloudflare Worker and are not copied through the Deploy workflow. `wrangler.worker.toml [secrets].required` names the required runtime bindings, including `FOUNDER_SESSION_ENCRYPTION_KEY`, so Wrangler is the fail-closed binding-name membrane at deployment time.
 
+For TinyFish, that same membrane now includes `TINYFISH_API_KEY`. The provider-held value must remain only in Cloudflare; canonical Deploy may verify its binding name but cannot read or re-upload the value. Green source, CI, or Playwright therefore does not establish live TinyFish activation until a key-backed Search or Fetch is separately observed on the applicable runtime.
+
 The only runtime secret canonical Deploy actively writes is the checked-in fail-closed `FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON` with `enabled:false`. This preserves the automation kill switch while leaving unrelated runtime secret values untouched. Other trusted workflows that actually need GitHub App execution credentials may still use their separately scoped `APP_ID` / `APP_PRIVATE_KEY` Actions inputs, but canonical Deploy does not re-upload the Worker's `GITHUB_APP_ID` / `GITHUB_PRIVATE_KEY` pair.
 
 `https://api.foundercontrolroom.org` is public release configuration, not secret material. The canonical smoke checks, proof-of-ship runtime readback, and post-Deploy Playwright witness use that explicit API origin. The Playwright witness derives `EXPECTED_RELEASE_SHA` from the successful Deploy run, proves direct Worker and public Pages/proxy identity before the browser journey, reruns both identity reads afterward, and fails if any observation differs from that same SHA.
 
 This source membrane does not prove the current Cloudflare required-secret set, values, Workers Builds dashboard configuration, custom-domain routing, active deployment, or runtime SHA. Those remain separate provider/runtime readback gates.
+
+### Founder Content n8n Worker activation boundary
+
+`wrangler.worker.toml` may express the reviewed Founder Content source intent with `N8N_FOUNDER_CONTENT_ENABLED=true`, Buffer as the only enabled provider for this slice, expected workflow ID `fcrFounderContentV1`, and n8n runtime `2.32.6`. The canonical Worker also declares four provider-held required binding names: `N8N_FOUNDER_CONTENT_WEBHOOK_URL`, `N8N_FOUNDER_CONTENT_BEARER_TOKEN`, `N8N_FOUNDER_CONTENT_EXPECTED_WORKFLOW_FINGERPRINT`, and `N8N_FOUNDER_CONTENT_IDENTITY_HMAC_SECRET`.
+
+Those source declarations and required names are not provider/runtime observations. A Wrangler dry-run, ordinary CI, or an isolated real-n8n proof cannot establish that the production Worker has those bindings, that the exact production workflow is published, that its HMAC identity matches, that the database migrations are applied, or that Buffer accepted a schedule. Canonical exact-main Deploy must fail closed on missing required binding names before Worker mutation, and any later `live`, `used`, `scheduled`, or `published` claim requires exact deployed Worker identity plus production n8n workflow/runtime identity and provider-native Buffer readback.
 
 ## Durable release-proof Workflow boundary
 

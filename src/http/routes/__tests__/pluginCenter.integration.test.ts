@@ -45,6 +45,19 @@ function founderUsersRow() {
   };
 }
 
+function projectRow() {
+  return {
+    select: () => ({
+      eq: () => ({
+        maybeSingle: () => Promise.resolve({
+          data: { id: PROJECT_ID, slug: PROJECT_SLUG, name: 'Founder Control Room' },
+          error: null,
+        }),
+      }),
+    }),
+  };
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
 });
@@ -58,8 +71,10 @@ describe('Plugin Center auth gate', () => {
 });
 
 describe('GET /plugin-center', () => {
-  it('returns the plugin catalog, connection summary, and active temporary grants', async () => {
+  it('returns only unexpired temporary grants without allowing founder state to be cached', async () => {
     authSuccess();
+    const gt = vi.fn();
+
     supabaseMock.from.mockImplementation((table: string) => {
       if (table === 'founder_users') return founderUsersRow();
       if (table === 'project_connections') {
@@ -89,30 +104,32 @@ describe('GET /plugin-center', () => {
         };
       }
       if (table === 'plugin_permission_grants') {
+        const grantResult = Promise.resolve({
+          data: [
+            {
+              id: 'grant-1',
+              project_id: PROJECT_ID,
+              connection_id: 'connection-1',
+              grant_type: 'tool_rule',
+              tool_rule: 'Bash(git push origin main)',
+              reason: 'Temporary founder-approved integration window',
+              requested_by: FOUNDER_EMAIL,
+              usage_limit: 'Use only after evidence is preserved.',
+              expires_at: '2099-07-20T18:00:00.000Z',
+              revoked_at: null,
+              created_at: '2026-07-19T18:00:00.000Z',
+              projects: { id: PROJECT_ID, slug: PROJECT_SLUG, name: 'Founder Control Room' },
+            },
+          ],
+          error: null,
+        });
+        const ordered = { limit: () => grantResult };
+        gt.mockImplementation(() => ({ order: () => ordered }));
         return {
           select: () => ({
             is: () => ({
-              order: () => ({
-                limit: () => Promise.resolve({
-                  data: [
-                    {
-                      id: 'grant-1',
-                      project_id: PROJECT_ID,
-                      connection_id: 'connection-1',
-                      grant_type: 'tool_rule',
-                      tool_rule: 'Bash(git push origin main)',
-                      reason: 'Temporary founder-approved integration window',
-                      requested_by: FOUNDER_EMAIL,
-                      usage_limit: 'Use only after evidence is preserved.',
-                      expires_at: '2026-07-20T18:00:00.000Z',
-                      revoked_at: null,
-                      created_at: '2026-07-19T18:00:00.000Z',
-                      projects: { id: PROJECT_ID, slug: PROJECT_SLUG, name: 'Founder Control Room' },
-                    },
-                  ],
-                  error: null,
-                }),
-              }),
+              order: () => ordered,
+              gt,
             }),
           }),
         };
@@ -124,6 +141,10 @@ describe('GET /plugin-center', () => {
     const res = await request(app).get('/plugin-center').set('Authorization', BEARER);
 
     expect(res.status).toBe(200);
+    expect(res.headers['cache-control']).toBe('no-store');
+    expect(gt).toHaveBeenCalledTimes(1);
+    expect(gt.mock.calls[0]?.[0]).toBe('expires_at');
+    expect(Date.parse(String(gt.mock.calls[0]?.[1]))).toBeGreaterThan(0);
     expect(res.body.contract.id).toBe('founder-control-room-plugin-center');
     expect(res.body.contract.version).toBe('1.1.0');
     expect(res.body.catalog.some((plugin: { type: string }) => plugin.type === 'github')).toBe(true);
@@ -157,6 +178,23 @@ describe('GET /plugin-center', () => {
 });
 
 describe('POST /plugin-center/grants', () => {
+  it('rejects malformed non-object request bodies instead of throwing', async () => {
+    authSuccess();
+    supabaseMock.from.mockImplementation((table: string) => {
+      if (table === 'founder_users') return founderUsersRow();
+      return {};
+    });
+
+    const app = buildApp();
+    const res = await request(app)
+      .post('/plugin-center/grants')
+      .set('Authorization', BEARER)
+      .send([]);
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('projectSlug is required');
+  });
+
   it('rejects grants longer than 24 hours', async () => {
     authSuccess();
     supabaseMock.from.mockImplementation((table: string) => {
@@ -182,25 +220,14 @@ describe('POST /plugin-center/grants', () => {
     authSuccess();
     supabaseMock.from.mockImplementation((table: string) => {
       if (table === 'founder_users') return founderUsersRow();
-      if (table === 'projects') {
-        return {
-          select: () => ({
-            eq: () => ({
-              maybeSingle: () => Promise.resolve({
-                data: { id: PROJECT_ID, slug: PROJECT_SLUG, name: 'Founder Control Room' },
-                error: null,
-              }),
-            }),
-          }),
-        };
-      }
+      if (table === 'projects') return projectRow();
       if (table === 'plugin_permission_grants') {
         return {
-          insert: () => ({
+          insert: (row: Record<string, unknown>) => ({
             select: () => ({
               single: () => Promise.resolve({
                 data: {
-                  id: 'grant-1',
+                  ...row,
                   project_id: PROJECT_ID,
                   grant_type: 'tool_rule',
                   tool_rule: 'Bash(gh issue close:*)',
@@ -230,6 +257,208 @@ describe('POST /plugin-center/grants', () => {
       });
 
     expect(res.status).toBe(201);
-    expect(res.body.grant.id).toBe('grant-1');
+    expect(res.body.grant.id).toMatch(/^[0-9a-f-]{36}$/i);
+  });
+
+  it('revokes a newly created grant when its audit receipt cannot be persisted', async () => {
+    authSuccess();
+    let insertedId = '';
+
+    supabaseMock.from.mockImplementation((table: string) => {
+      if (table === 'founder_users') return founderUsersRow();
+      if (table === 'projects') return projectRow();
+      if (table === 'plugin_permission_grants') {
+        return {
+          insert: (row: Record<string, unknown>) => {
+            insertedId = String(row.id ?? '');
+            return {
+              select: () => ({
+                single: () => Promise.resolve({ data: row, error: null }),
+              }),
+            };
+          },
+          update: (row: Record<string, unknown>) => ({
+            eq: (_field: string, id: string) => ({
+              select: () => ({
+                single: () => Promise.resolve({
+                  data: { id, revoked_at: row.revoked_at },
+                  error: null,
+                }),
+              }),
+            }),
+          }),
+        };
+      }
+      if (table === 'project_events') {
+        return { insert: () => Promise.resolve({ error: { message: 'audit unavailable' } }) };
+      }
+      return {};
+    });
+
+    const app = buildApp();
+    const res = await request(app)
+      .post('/plugin-center/grants')
+      .set('Authorization', BEARER)
+      .send({
+        projectSlug: PROJECT_SLUG,
+        toolRule: 'Bash(gh issue close:*)',
+        durationHours: 1,
+      });
+
+    expect(res.status).toBe(500);
+    expect(insertedId).toMatch(/^[0-9a-f-]{36}$/i);
+    expect(res.body).toMatchObject({
+      error: 'PLUGIN_GRANT_AUDIT_INCOMPLETE',
+      detail: 'audit unavailable',
+      grantId: insertedId,
+      grantRevoked: true,
+    });
+    expect(Date.parse(String(res.body.revokedAt))).toBeGreaterThan(0);
+  });
+
+  it('keeps rollback failure separate when audit failure may leave a grant active', async () => {
+    authSuccess();
+    let insertedId = '';
+
+    supabaseMock.from.mockImplementation((table: string) => {
+      if (table === 'founder_users') return founderUsersRow();
+      if (table === 'projects') return projectRow();
+      if (table === 'plugin_permission_grants') {
+        return {
+          insert: (row: Record<string, unknown>) => {
+            insertedId = String(row.id ?? '');
+            return {
+              select: () => ({
+                single: () => Promise.resolve({ data: row, error: null }),
+              }),
+            };
+          },
+          update: () => ({
+            eq: () => ({
+              select: () => ({
+                single: () => Promise.resolve({ data: null, error: { message: 'rollback unavailable' } }),
+              }),
+            }),
+          }),
+        };
+      }
+      if (table === 'project_events') {
+        return { insert: () => Promise.resolve({ error: { message: 'audit unavailable' } }) };
+      }
+      return {};
+    });
+
+    const app = buildApp();
+    const res = await request(app)
+      .post('/plugin-center/grants')
+      .set('Authorization', BEARER)
+      .send({
+        projectSlug: PROJECT_SLUG,
+        toolRule: 'Bash(gh issue close:*)',
+        durationHours: 1,
+      });
+
+    expect(res.status).toBe(500);
+    expect(res.body).toMatchObject({
+      error: 'PLUGIN_GRANT_ROLLBACK_INCOMPLETE',
+      detail: 'audit unavailable',
+      rollbackError: 'rollback unavailable',
+      grantId: insertedId,
+      grantMayRemainActive: true,
+    });
+  });
+});
+
+describe('POST /plugin-center/grants/:grantId/revoke', () => {
+  it('preserves the original revocation receipt on repeated revoke requests', async () => {
+    authSuccess();
+    const originalRevokedAt = '2026-09-14T03:40:00.000Z';
+    const update = vi.fn();
+    const eventInsert = vi.fn();
+
+    supabaseMock.from.mockImplementation((table: string) => {
+      if (table === 'founder_users') return founderUsersRow();
+      if (table === 'plugin_permission_grants') {
+        return {
+          select: () => ({
+            eq: () => ({
+              maybeSingle: () => Promise.resolve({
+                data: { id: 'grant-1', project_id: PROJECT_ID, revoked_at: originalRevokedAt },
+                error: null,
+              }),
+            }),
+          }),
+          update,
+        };
+      }
+      if (table === 'project_events') return { insert: eventInsert };
+      return {};
+    });
+
+    const app = buildApp();
+    const res = await request(app)
+      .post('/plugin-center/grants/grant-1/revoke')
+      .set('Authorization', BEARER);
+
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({
+      alreadyRevoked: true,
+      grant: {
+        id: 'grant-1',
+        project_id: PROJECT_ID,
+        revoked_at: originalRevokedAt,
+      },
+    });
+    expect(update).not.toHaveBeenCalled();
+    expect(eventInsert).not.toHaveBeenCalled();
+  });
+
+  it('keeps revocation truth explicit when the audit write fails after the revoke', async () => {
+    authSuccess();
+    const revokedGrant = {
+      id: 'grant-1',
+      project_id: PROJECT_ID,
+      revoked_at: '2026-09-14T04:00:00.000Z',
+    };
+
+    supabaseMock.from.mockImplementation((table: string) => {
+      if (table === 'founder_users') return founderUsersRow();
+      if (table === 'plugin_permission_grants') {
+        return {
+          select: () => ({
+            eq: () => ({
+              maybeSingle: () => Promise.resolve({
+                data: { id: 'grant-1', project_id: PROJECT_ID, revoked_at: null },
+                error: null,
+              }),
+            }),
+          }),
+          update: () => ({
+            eq: () => ({
+              select: () => ({
+                single: () => Promise.resolve({ data: revokedGrant, error: null }),
+              }),
+            }),
+          }),
+        };
+      }
+      if (table === 'project_events') {
+        return { insert: () => Promise.resolve({ error: { message: 'audit unavailable' } }) };
+      }
+      return {};
+    });
+
+    const app = buildApp();
+    const res = await request(app)
+      .post('/plugin-center/grants/grant-1/revoke')
+      .set('Authorization', BEARER);
+
+    expect(res.status).toBe(500);
+    expect(res.body).toMatchObject({
+      error: 'PLUGIN_REVOKE_AUDIT_INCOMPLETE',
+      detail: 'audit unavailable',
+      revocationSucceeded: true,
+      grant: { id: 'grant-1', project_id: PROJECT_ID },
+    });
   });
 });
