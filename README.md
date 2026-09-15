@@ -308,3 +308,7 @@ A committed regression test is source evidence only until the exact-head workflo
 FCR now includes a source-only, read-only Shopify child-provider observation contract. `src/providers/ShopifyReadOnlyProvider.ts` is pinned to the Founder Control Room store identity and consumes only an already authenticated, sanitized provider snapshot. It performs no Shopify network mutation, persists no provider inventory as current truth, and grants no execution authority.
 
 A child-app reconciliation may classify evidence as `CURRENT`, `UNDECLARED`, `SCOPE_DRIFT`, `IDENTITY_DRIFT`, `STALE`, or `UNKNOWN`. `CURRENT` means only that fresh, complete evidence matches the supplied declaration identity and exact approved scope set; it still returns `authorityGranted: false`. Live installed-app state, credentials, provider authentication, runtime display, Supabase connection state, production equivalence, or any Shopify write remain separately unproven until independently observed at use time.
+
+## Founder-Chief pair contract truth
+
+Founder Control Room and Chief AI are independently callable, standalone peer systems. Collaboration may occur only across explicit authority boundaries with separate identity, lifecycle, receipts, failure state, and continuity markers. Shared runtime is not required for either system to be valid. Candidate PRs are only evidence carriers; they are not runtime dependencies.

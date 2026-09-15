@@ -80,6 +80,7 @@ function freshnessRuleset(overrides = {}) {
           required_status_checks: [
             { context: 'Required Gate' },
             { context: 'Verify test-ledger contract' },
+            { context: 'verify-pair-contract' },
           ],
         },
       },
@@ -129,7 +130,11 @@ test('canonical FCR governance preserves founder-only review and zero-bypass fre
   assert.deepEqual(freshness.ruleTypes, ['required_status_checks']);
   assert.equal(freshness.requirePullRequest, false);
   assert.equal(freshness.strictRequiredStatusChecks, true);
-  assert.deepEqual(freshness.requiredStatusCheckNames, ['Required Gate', 'Verify test-ledger contract']);
+  assert.deepEqual(freshness.requiredStatusCheckNames, [
+    'Required Gate',
+    'Verify test-ledger contract',
+    'verify-pair-contract',
+  ]);
   assert.deepEqual(freshness.bypassActors, []);
   assert.equal(freshnessFloorSatisfied(freshness), true);
 });
@@ -247,6 +252,7 @@ test('legacy monolithic ruleset is NOT_READY and cannot impersonate canonical tw
         required_status_checks: [
           { context: 'Required Gate' },
           { context: 'Verify test-ledger contract' },
+          { context: 'verify-pair-contract' },
         ],
       },
     },
@@ -292,7 +298,10 @@ test('freshness companion must have zero bypass actors and only exact strict che
   assert.equal(hiddenUnexpectedReport.freshnessFloorSatisfied, false);
 
   const wrongChecks = freshnessRuleset();
-  wrongChecks.rules[0].parameters.required_status_checks = [{ context: 'Required Gate' }];
+  wrongChecks.rules[0].parameters.required_status_checks = [
+    { context: 'Required Gate' },
+    { context: 'Verify test-ledger contract' },
+  ];
   const wrongChecksReport = readyReport({ fullRulesets: [canonicalRuleset(), wrongChecks] });
   assert.equal(wrongChecksReport.status, 'NOT_READY');
   assert.equal(wrongChecksReport.freshnessFloorSatisfied, false);

@@ -434,7 +434,7 @@ jobs:
               targetRefs: ['main'],
               requirePullRequest: true,
               requiredApprovingReviewCount: FOUNDER_CONTROL_ROOM_REQUIRED_NATIVE_APPROVALS,
-              requiredStatusCheckNames: ['Required Gate', 'Verify test-ledger contract'],
+              requiredStatusCheckNames: ['Required Gate', 'Verify test-ledger contract', 'verify-pair-contract'],
               blockForcePushes: true,
               blockDeletion: true,
               bypassActors: [{ kind: 'app', id: appId }],

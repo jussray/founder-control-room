@@ -1,108 +1,47 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Preserve the current TinyFish Cloudflare activation and read-only Shopify child-provider boundaries while documenting the bounded Attack 3000 content observation, advisory Trend Radar, and deterministic founder-content approval retry contracts without converting source, analytics, rankings, retry identity, provider configuration, mergeability, or deployment into publication, provider-mutation, merge, deploy, spend, or external-contact authority.",
+  "purpose": "Document only the current Founder Control Room and Chief AI standalone-peer carrier: exact candidate peer bindings, non-transferring authority, a load-bearing pair status check that is available on every pull request, and Documentation Truth coverage for the pair-enforcement surface. This receipt does not claim runtime activation, deployment, publication, provider mutation, merge approval, or shared-runtime dependence.",
   "domains": [
-    "cloudflare-authority",
     "repository-provider",
-    "content-evidence",
-    "publishing"
+    "pair-authority",
+    "publishing",
+    "truth-governance"
   ],
   "changes": [
     {
-      "path": "wrangler.worker.toml",
+      "path": "src/providers/providerFactory.ts",
       "claims": [
-        "`wrangler.worker.toml` must list `TINYFISH_API_KEY` under `[secrets].required`, so canonical exact-main Deploy rejects missing provider-held TinyFish activation before Worker mutation while never copying the secret value through GitHub Actions."
+        "`src/providers/providerFactory.ts` must require the exact `verify-pair-contract` context alongside Required Gate and the exact-head test-ledger context for Founder Control Room main governance, while the workflow producer must remain available to every pull request so the required check cannot deadlock unrelated work."
       ]
     },
     {
-      "path": "README.md",
+      "path": "config/founder-chief-pair.contract.json",
       "claims": [
-        "`README.md` must keep TinyFish source and CI readiness separate from provider/runtime activation and state that canonical Deploy verifies only provider-held binding-name presence before promotion.",
-        "`README.md` must describe Shopify child-provider observation as source-only, non-authorizing evidence and must never relabel a matching snapshot as live provider authority or mutation permission.",
-        "`README.md` must document Attack 3000 content currentness as independently evaluated from bounded observation time rather than trusted from a CURRENT label, and must keep distribution, external demand, publication, provider mutation, merge, deploy, spend, and external-contact authority separate.",
-        "`README.md` must describe the Content Trend Radar as an advisory existing-lane capability whose first-wave evidence requires current source provenance and whose ranking cannot authorize publication, scheduling, spend, provider mutation, merge, deploy, or external contact.",
-        "`README.md` must describe deterministic founder-content approval reservation and exact active retry recovery without allowing evidence rotation, retry, or a stored reservation to mint new publication authority."
+        "`config/founder-chief-pair.contract.json` must keep Founder Control Room and Chief AI independently callable standalone peers, prohibit identity, receipt, failure, continuity, or implicit authority collapse, and require fresh exact approval for the active publication path where the stricter executable contract demands it."
       ]
     },
     {
-      "path": "docs/CLOUDFLARE_REASONING.md",
+      "path": ".control-room/founder-chief-pair-peer-lock.json",
       "claims": [
-        "`docs/CLOUDFLARE_REASONING.md` must treat `TINYFISH_API_KEY` as a provider-held Worker binding and require canonical Deploy to fail closed on a missing binding name without exposing or re-uploading its value."
+        "`.control-room/founder-chief-pair-peer-lock.json` must bind FCR PR #781 to the exact observed Chief pair and necessary-fix candidate head SHAs while remaining non-authorizing evidence that cannot grant merge, deployment, provider mutation, publication, or runtime truth."
       ]
     },
     {
-      "path": "docs/deployment/CLOUDFLARE_WORKER_TARGETS.md",
+      "path": "scripts/verify-founder-chief-pair.mjs",
       "claims": [
-        "`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` must name `TINYFISH_API_KEY` as a required canonical Worker secret while preserving live provider observation and real TinyFish Search/Fetch as separate activation proof."
+        "`scripts/verify-founder-chief-pair.mjs` must fail closed when standalone-peer identity, lifecycle, receipt, failure, continuity, publication-approval, or necessary-fix authority invariants drift, and it cannot relabel static repository alignment as deployed runtime truth."
       ]
     },
     {
-      "path": "docs/SECRETS.md",
+      "path": ".github/workflows/founder-chief-pair-contract.yml",
       "claims": [
-        "`docs/SECRETS.md` must keep the TinyFish key in the Cloudflare Worker secret plane and never recast the provider-held value as a GitHub Actions secret or proof artifact."
+        "`.github/workflows/founder-chief-pair-contract.yml` must produce the required `verify-pair-contract` context on every pull request; when the pair-enforcement surface changes it must validate both exact live Chief candidate heads against the immutable FCR peer lock, while unrelated FCR changes must not become dependent on Chief candidate state."
       ]
     },
     {
-      "path": "src/lib/providerObservation.ts",
+      "path": "scripts/verify-documentation-truth.mjs",
       "claims": [
-        "`src/lib/providerObservation.ts` must classify child-provider evidence as current, undeclared, scope drift, identity drift, stale, or unknown without granting execution authority, and it must fail closed when observation freshness, completeness, declaration identity, or scope equality is not proven."
-      ]
-    },
-    {
-      "path": "src/providers/ShopifyReadOnlyProvider.ts",
-      "claims": [
-        "`src/providers/ShopifyReadOnlyProvider.ts` must bind Shopify observation to the exact Founder Control Room permanent and branded store identities, require complete pagination and app scope inventory, withhold CURRENT on incomplete or mismatched provider evidence, keep reconciliation non-authorizing, and never persist provider inventory or perform Shopify mutation."
-      ]
-    },
-    {
-      "path": "src/ultrathink-core/attack3000Content.ts",
-      "claims": [
-        "`src/ultrathink-core/attack3000Content.ts` must bind publication and metrics to one content observation, independently evaluate evaluatedAt, window ordering, future skew, observedAt, explicit bounded expiry, measurement completion, and evidence, and must reject stale or future observations even when a caller labels freshness CURRENT.",
-        "`src/ultrathink-core/attack3000Content.ts` must preserve metric-local stop floors and direct external-demand evidence without treating publication, reach, reactions, comments, profile views, or generic analytics references as business demand or execution authority."
-      ]
-    },
-    {
-      "path": "src/ultrathink-core/__tests__/attack3000Content.test.ts",
-      "claims": [
-        "`src/ultrathink-core/__tests__/attack3000Content.test.ts` must prove stale-at-evaluation, future-dated, overlong-lease, mixed-identity, incomplete-window, demand-evidence, metric-local floor, profile-view, and non-authorizing behavior instead of trusting caller freshness labels."
-      ]
-    },
-    {
-      "path": "src/ultrathink-core/contentTrendRadar.ts",
-      "claims": [
-        "`src/ultrathink-core/contentTrendRadar.ts` must require at least one evidence id with source and observedAt that is current against an explicit evaluation time before first-wave eligibility, while keeping prediction-only, stale, future-dated, malformed, unattributed, and incompletely framed candidates out of the first wave.",
-        "`src/ultrathink-core/contentTrendRadar.ts` must keep ranking advisory and must never authorize publication, scheduling, spend, provider mutation, merge, deploy, or external contact."
-      ]
-    },
-    {
-      "path": "src/ultrathink-core/__tests__/contentTrendRadar.test.ts",
-      "claims": [
-        "`src/ultrathink-core/__tests__/contentTrendRadar.test.ts` must adversarially cover missing provenance, stale and future evidence, prediction-only signals, required content angles, saturation, duplicate fingerprints, deterministic first-wave selection, and the non-authorizing ceiling."
-      ]
-    },
-    {
-      "path": "src/ultrathink-core/index.ts",
-      "claims": [
-        "`src/ultrathink-core/index.ts` may export the Attack 3000 content and Trend Radar evidence contracts, including the evaluation context, only as source capabilities and must not imply provider activation, publication, merge, deploy, spend, or execution authority."
-      ]
-    },
-    {
-      "path": "src/lib/founderContentApprovalStore.ts",
-      "claims": [
-        "`src/lib/founderContentApprovalStore.ts` must reserve the same public thesis/opening-hook pattern within one founder, platform, and Current You intent under one deterministic approval id, and a retry may recover only the exact matching active stored proposal/public-payload reservation while rejecting mismatched, consumed, revoked, expired, or non-current state.",
-        "`src/lib/founderContentApprovalStore.ts` must return the original stored authorization hash and timestamps on exact retry recovery and must never use a retry, deterministic identity, or evidence rotation to create or renew publication authority."
-      ]
-    },
-    {
-      "path": "src/lib/__tests__/founderContentApprovalStore.test.ts",
-      "claims": [
-        "`src/lib/__tests__/founderContentApprovalStore.test.ts` must prove exact retry recovery after a lost issuance response while preserving the existing one-reservation behavior across source SHA, evidence reference, evidence digest, and proposal-hash rotation."
-      ]
-    },
-    {
-      "path": "docs/founder-signal-engine/linkedin-analytics-continuity.md",
-      "claims": [
-        "`docs/founder-signal-engine/linkedin-analytics-continuity.md` must document independently evaluated content freshness, direct demand evidence, current trend provenance, fingerprint comparison, deterministic approval retry identity, and observation-only authority without rewriting historical evidence when currentness expires."
+        "`scripts/verify-documentation-truth.mjs` must classify the shared pair contract, FCR candidate peer lock, pair verifier, and pair workflow as pair-authority truth-sensitive surfaces and fail closed when the required current documentation or path-bound receipt is missing."
       ]
     }
   ]

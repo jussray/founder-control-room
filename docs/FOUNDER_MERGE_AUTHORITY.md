@@ -190,3 +190,7 @@ Immediately before merge, re-read current `main`, the exact PR head, required ch
 ## Load-bearing regression execution
 
 A required test contributes to merge readiness only when the exact-head workflow that feeds the applicable gate actually executes it. A committed but uninvoked test is source evidence, not CI proof. For LinkedIn analytics continuity, `.github/workflows/ci.yml` must keep `scripts.test_linkedin_analytics_continuity` inside the load-bearing `python-tests` job, and `Required Gate` must continue to depend on that job. Missing LinkedIn activity rows must remain `UNKNOWN_NO_EVIDENCE` with null metrics, never synthetic zero impressions or engagements.
+
+## Founder-Chief standalone-peer authority contract
+
+`config/founder-chief-pair.contract.json` is a load-bearing standalone-peer authority contract. Any change to FCR/Chief identity separation, cross-system evidence transfer, posting authorization, or paired-carrier semantics must pass Documentation Truth with current durable documentation and a path-bound receipt. The contract coordinates peer evidence only; it cannot merge failure receipts, transfer authority, carry founder approval forward, or authorize merge, deploy, provider mutation, publication, secrets, or destructive actions.
