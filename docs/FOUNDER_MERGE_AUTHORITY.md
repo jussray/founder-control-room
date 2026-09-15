@@ -114,6 +114,10 @@ Trusted witness ignition must execute from code that is already integrated and r
 
 Receipt production, Check Run creation, readback, complete receipt handoff, and route success remain non-authorizing on their own. They never supply founder-final, merge, deploy, secret, provider-policy, database, billing, publication, or destructive-action authority. A candidate that changes the deterministic producer, independent-review gate, merge consumer, trusted witness publication boundary, or trusted ignition surface is a trust-root self-modification and must not certify itself through that same producer. Initial trust-root integration remains blocked until the separately explicit, exact-candidate, auditable constitutional authority path in issue #418 is invoked; ordinary `approved`, `cont`, machine green, mergeability, model review, or bypass capability do not invoke that exception.
 
+### Merge control-plane trust roots
+
+The required merge ledger and PR continuity control plane are deterministic-review trust roots too. Changes to `.github/workflows/control-room-test-ledger.yml`, `.github/workflows/pr-continuity.yml`, `scripts/control-room-test-ledger.mjs`, `scripts/founder-merge-approval.mjs`, `scripts/pr-continuity.mjs`, or `scripts/verify-pr-continuity-rollover-outcome.mjs` must be classified as P1 trust-root self-modification rather than allowed to certify themselves through the normal deterministic reviewer. Such a candidate must still refresh the merge-authority truth surfaces, complete exact-head machine proof, and use the separately explicit exact-candidate constitutional/manual-override path under issue #418 if it is to be integrated. Ordinary `approved`, `cont`, mergeability, green checks, or a stale approval receipt never invoke that exception.
+
 ### Legacy pinned semantic-review missions
 
 Missions already approved under the earlier server-owned semantic-review policy may continue to validate that pinned policy for compatibility. In that historical mode, `FCR_TRUSTED_SEMANTIC_REVIEWER_IDS` remains the server-owned trusted semantic reviewer set and author self-review still cannot satisfy independent semantic review.

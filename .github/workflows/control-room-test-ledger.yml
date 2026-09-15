@@ -23,7 +23,7 @@ concurrency:
 
 jobs:
   ledger-contract:
-    name: Verify test-ledger contract
+    name: Test-ledger source contract
     runs-on: ubuntu-22.04
     timeout-minutes: 10
     steps:
@@ -44,8 +44,8 @@ jobs:
         with:
           node-version: '24'
 
-      - name: Run control-room test-ledger contracts
-        run: node --test test/control-room-test-ledger.test.mjs
+      - name: Run control-room test-ledger and founder-final source contracts
+        run: node --test test/control-room-test-ledger.test.mjs test/founder-merge-approval-gate.test.mjs
 
   publish-ledger:
     name: Publish exact-head test ledger

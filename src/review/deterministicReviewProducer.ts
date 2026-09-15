@@ -17,7 +17,17 @@ const FCR_REPOSITORY = "jussray/founder-control-room";
 const FCR_BASE_REF = "main";
 const FULL_SHA = /^[0-9a-f]{40}$/i;
 
+const MERGE_CONTROL_PLANE_TRUST_ROOT_PATHS = new Set([
+  ".github/workflows/control-room-test-ledger.yml",
+  ".github/workflows/pr-continuity.yml",
+  "scripts/control-room-test-ledger.mjs",
+  "scripts/founder-merge-approval.mjs",
+  "scripts/pr-continuity.mjs",
+  "scripts/verify-pr-continuity-rollover-outcome.mjs",
+]);
+
 const TRUST_ROOT_PATHS = new Set([
+  ...MERGE_CONTROL_PLANE_TRUST_ROOT_PATHS,
   "src/review/deterministicReviewProducer.ts",
   "src/review/deterministicReviewWitnessPublisher.ts",
   ".github/workflows/deterministic-review-core-advisory.yml",
@@ -145,7 +155,8 @@ function changedPathSet(files: DiffFile[]): Set<string> {
 }
 
 function isReviewAuthoritySource(path: string): boolean {
-  return path === "src/http/routes/approvals.ts"
+  return MERGE_CONTROL_PLANE_TRUST_ROOT_PATHS.has(path)
+    || path === "src/http/routes/approvals.ts"
     || (path.startsWith("src/review/") && !path.endsWith(".test.ts"));
 }
 

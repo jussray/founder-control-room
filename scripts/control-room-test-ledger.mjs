@@ -54,9 +54,16 @@ export function selectLatestChecks(checkRuns, expectedSha, observerCheckName = '
 
     const key = checkKey(run);
     const current = selected.get(key);
-    const currentTime = timestamp(current?.completed_at ?? current?.started_at);
-    const candidateTime = timestamp(run.completed_at ?? run.started_at);
-    if (!current || candidateTime >= currentTime) selected.set(key, run);
+    const currentStarted = timestamp(current?.started_at);
+    const candidateStarted = timestamp(run.started_at);
+    const currentId = Number(current?.id) || 0;
+    const candidateId = Number(run.id) || 0;
+    const bothStarted = currentStarted > 0 && candidateStarted > 0;
+    const candidateIsNewer = !current || (bothStarted
+      ? candidateStarted > currentStarted
+        || (candidateStarted === currentStarted && candidateId >= currentId)
+      : candidateId >= currentId);
+    if (candidateIsNewer) selected.set(key, run);
   }
 
   return [...selected.values()]
@@ -161,6 +168,7 @@ async function fetchAllCheckRuns({repository, sha, token}) {
     const pageRuns = Array.isArray(payload?.check_runs) ? payload.check_runs : [];
     runs.push(...pageRuns);
     if (pageRuns.length < 100) break;
+    if (page === 10) throw new Error('CHECK_RUN_PAGINATION_LIMIT_EXCEEDED');
   }
   return runs;
 }

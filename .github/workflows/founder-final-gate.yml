@@ -1,0 +1,91 @@
+name: Founder Final Gate
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  issues: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  EXPECTED_TRUSTED_MAIN_SHA: ${{ github.sha }}
+
+jobs:
+  publish-founder-final-gate:
+    if: >-
+      github.event.issue.pull_request != null &&
+      github.event.comment.user.id == 286642846 &&
+      github.event.comment.user.login == 'jussray' &&
+      contains(github.event.comment.body, 'fcr-founder-merge-approval:v1')
+    name: Publish trusted Founder Final Gate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment: production
+    concurrency:
+      group: founder-final-gate-${{ github.event.issue.number }}
+      cancel-in-progress: false
+    steps:
+      - name: Check out trusted exact current main
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.EXPECTED_TRUSTED_MAIN_SHA }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Fail closed unless workflow implementation is exact current main
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = 'refs/heads/main'
+          actual="$(git rev-parse HEAD)"
+          current_main="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/main" --jq .object.sha)"
+          printf 'trusted_workflow_sha=%s\nactual=%s\ncurrent_main=%s\n' \
+            "$EXPECTED_TRUSTED_MAIN_SHA" "$actual" "$current_main"
+          test "$actual" = "$EXPECTED_TRUSTED_MAIN_SHA"
+          test "$current_main" = "$EXPECTED_TRUSTED_MAIN_SHA"
+
+      - name: Set up Node 24
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Build trusted founder-final implementation
+        run: npm run build
+
+      - name: Verify founder-final source contracts before provider publication
+        run: node --test test/founder-merge-approval-gate.test.mjs
+
+      - name: Publish and read back trusted Founder Final Gate
+        env:
+          FCR_FINAL_PR_NUMBER: ${{ github.event.issue.number }}
+          FOUNDER_APPROVAL_COMMENT_ID: ${{ github.event.comment.id }}
+          GITHUB_APP_ID: ${{ secrets.APP_ID }}
+          GITHUB_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}
+        run: node scripts/publish-founder-final-gate.mjs
+
+      - name: Re-read trusted main after publication
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          current_main="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/main" --jq .object.sha)"
+          printf 'trusted_workflow_sha=%s\ncurrent_main_after=%s\n' "$EXPECTED_TRUSTED_MAIN_SHA" "$current_main"
+          test "$current_main" = "$EXPECTED_TRUSTED_MAIN_SHA"
+
+      - name: Retain sanitized Founder Final Gate receipt
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: founder-final-gate-pr-${{ github.event.issue.number }}-${{ github.run_id }}
+          path: artifacts/founder-final-gate.json
+          if-no-files-found: error
+          retention-days: 30

@@ -1,5 +1,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import {
+  mergeAuthorityStateForDecision,
+  resolveFounderMergeDecision,
+} from './founder-merge-approval.mjs';
 
 export const START_MARKER = '<!-- pr-continuity:start -->';
 export const END_MARKER = '<!-- pr-continuity:end -->';
@@ -96,6 +100,9 @@ export function replaceManagedBlock(body = '', block) {
 }
 
 export function continuityBlock(value) {
+  const approvalId = typeof value.mergeApprovalId === 'string' ? value.mergeApprovalId.trim() : '';
+  const approvalComment = typeof value.mergeApprovalComment === 'string' ? value.mergeApprovalComment.trim() : '';
+  const mergeApproved = value.mergeApproved === true && Boolean(approvalId) && Boolean(approvalComment);
   return [
     START_MARKER,
     '## PR Continuity Receipt',
@@ -113,8 +120,12 @@ export function continuityBlock(value) {
     `- proof: **${value.proofState}**`,
     '- merge_authority: **true**',
     '- merge_approval: **REQUIRED_EXACT_CANDIDATE**',
-    '- merge_approved: **false**',
-    '- authorizes_merge: **false**',
+    `- merge_approved: **${mergeApproved ? 'true' : 'false'}**`,
+    ...(mergeApproved ? [
+      `- merge_approval_id: \`${approvalId}\``,
+      `- merge_approval_comment: \`${approvalComment}\``,
+    ] : []),
+    `- authorizes_merge: **${mergeApproved ? 'true' : 'false'}**`,
     '- deploy_authority: **false**',
     '',
     '> Merge authority means the merge capability exists; it is not candidate approval. Without fresh explicit founder approval bound to this exact repository, PR, base SHA, and head SHA, the merge must not execute. Base/head movement expires any prior approval.',
@@ -154,6 +165,8 @@ const nonAuthorizingMergeState = Object.freeze({
   mergeApproved: false,
   authorizesMerge: false,
   authorizesDeploy: false,
+  mergeApprovalId: null,
+  mergeApprovalComment: null,
 });
 
 function writeReceipt(value) {
@@ -207,6 +220,29 @@ async function listOpenPulls(repository) {
   throw new Error('PULL_PAGINATION_LIMIT_EXCEEDED');
 }
 
+async function listIssueComments(repository, number) {
+  const all = [];
+  for (let page = 1; page <= 10; page += 1) {
+    const rows = (await github(`/repos/${repository}/issues/${number}/comments?per_page=100&page=${page}`)).payload;
+    if (!Array.isArray(rows)) throw new Error('ISSUE_COMMENT_LOOKUP_INVALID');
+    all.push(...rows);
+    if (rows.length < 100) return all;
+  }
+  throw new Error('ISSUE_COMMENT_PAGINATION_LIMIT_EXCEEDED');
+}
+
+async function currentMergeState(repository, pr, baseSha) {
+  const decision = resolveFounderMergeDecision(
+    await listIssueComments(repository, pr.number),
+    {repository, prNumber: pr.number, baseSha, headSha: pr.head.sha},
+    {
+      login: env('FOUNDER_GITHUB_LOGIN', 'jussray'),
+      userId: Number(env('FOUNDER_GITHUB_USER_ID', '286642846')),
+    },
+  );
+  return mergeAuthorityStateForDecision(decision);
+}
+
 async function patchBody(repository, pr, block) {
   let next;
   try {
@@ -219,7 +255,7 @@ async function patchBody(repository, pr, block) {
   return { updated: true, blocked: false };
 }
 
-const blockFor = (repository, pr, rootRef, rootSha, baseSha, state, proof) =>
+const blockFor = (repository, pr, rootRef, rootSha, baseSha, state, proof, mergeState = nonAuthorizingMergeState) =>
   continuityBlock({
     repository,
     prNumber: pr.number,
@@ -231,6 +267,9 @@ const blockFor = (repository, pr, rootRef, rootSha, baseSha, state, proof) =>
     headSha: pr.head.sha,
     continuityState: state,
     proofState: proof,
+    mergeApproved: mergeState.mergeApproved,
+    mergeApprovalId: mergeState.mergeApprovalId,
+    mergeApprovalComment: mergeState.mergeApprovalComment,
   });
 
 async function updateOnePull(repository, number, rootRef) {
@@ -239,18 +278,20 @@ async function updateOnePull(repository, number, rootRef) {
   let baseSha = await liveBaseSha(repository, pr);
   if (!sameRepositoryPull(pr, repository)) {
     const metadata = await patchBody(repository, pr, blockFor(repository, pr, rootRef, rootSha, baseSha, 'BLOCKED_FORK', 'BLOCKED'));
-    return { number, state: 'BLOCKED_FORK', headRef: pr.head.ref, metadata };
+    return { number, state: 'BLOCKED_FORK', headRef: pr.head.ref, metadata, mergeState: nonAuthorizingMergeState };
   }
 
   let status = await compare(repository, baseSha, pr.head.sha);
   if (isCurrentCompareStatus(status)) {
-    const metadata = await patchBody(repository, pr, blockFor(repository, pr, rootRef, rootSha, baseSha, 'CURRENT', 'EXACT_HEAD_PROOF_SEPARATE'));
+    const mergeState = await currentMergeState(repository, pr, baseSha);
+    const metadata = await patchBody(repository, pr, blockFor(repository, pr, rootRef, rootSha, baseSha, 'CURRENT', 'EXACT_HEAD_PROOF_SEPARATE', mergeState));
     return {
       number,
       state: metadata.blocked ? 'BLOCKED_METADATA' : 'CURRENT',
       headRef: pr.head.ref,
       headSha: pr.head.sha,
       metadata,
+      mergeState,
     };
   }
 
@@ -278,6 +319,7 @@ async function updateOnePull(repository, number, rootRef) {
       headRef: pr.head.ref,
       headSha: pr.head.sha,
       metadata,
+      mergeState: nonAuthorizingMergeState,
       providerStatus: update.status,
       providerMessage: update.payload?.message || null,
       failureReceipts: failure.failureReceipts.map((receipt) => ({
@@ -305,9 +347,12 @@ async function updateOnePull(repository, number, rootRef) {
     : state === 'CURRENT_AFTER_RACE'
       ? 'EXACT_HEAD_PROOF_SEPARATE'
       : 'BLOCKED';
-  const metadata = await patchBody(repository, pr, blockFor(repository, pr, rootRef, rootSha, baseSha, state, proof));
+  const mergeState = state === 'CURRENT_AFTER_RACE'
+    ? await currentMergeState(repository, pr, baseSha)
+    : nonAuthorizingMergeState;
+  const metadata = await patchBody(repository, pr, blockFor(repository, pr, rootRef, rootSha, baseSha, state, proof, mergeState));
   if (metadata.blocked) state = 'BLOCKED_METADATA';
-  return { number, state, headRef: pr.head.ref, headBefore: before, headSha: pr.head.sha, metadata };
+  return { number, state, headRef: pr.head.ref, headBefore: before, headSha: pr.head.sha, metadata, mergeState };
 }
 
 export async function auditMode() {
@@ -327,6 +372,9 @@ export async function auditMode() {
   const baseSha = await liveBaseSha(repository, pr);
   const status = await compare(repository, baseSha, pr.head.sha);
   const state = classifyCompareStatus(status);
+  const mergeState = state === 'CURRENT'
+    ? await currentMergeState(repository, pr, baseSha)
+    : nonAuthorizingMergeState;
   const receipt = {
     schema: SCHEMA,
     mode: 'audit',
@@ -342,7 +390,7 @@ export async function auditMode() {
     state,
     proofSubjectSha: pr.head.sha,
     predecessorProofExpiresOnHeadMove: true,
-    ...nonAuthorizingMergeState,
+    ...mergeState,
   };
   writeReceipt(receipt);
   if (state !== 'CURRENT') throw new Error(`${state}: ${baseSha} is not an ancestor of ${pr.head.sha}`);
@@ -361,12 +409,24 @@ export async function metadataMode() {
   const state = sameRepositoryPull(pr, repository)
     ? classifyCompareStatus(await compare(repository, baseSha, pr.head.sha))
     : 'BLOCKED_FORK';
+  const mergeState = state === 'CURRENT'
+    ? await currentMergeState(repository, pr, baseSha)
+    : nonAuthorizingMergeState;
   const metadata = await patchBody(
     repository,
     pr,
-    blockFor(repository, pr, rootRef, rootSha, baseSha, state, state === 'CURRENT' ? 'EXACT_HEAD_PROOF_SEPARATE' : 'REVERIFY_OR_ROLLOVER_REQUIRED'),
+    blockFor(
+      repository,
+      pr,
+      rootRef,
+      rootSha,
+      baseSha,
+      state,
+      state === 'CURRENT' ? 'EXACT_HEAD_PROOF_SEPARATE' : 'REVERIFY_OR_ROLLOVER_REQUIRED',
+      mergeState,
+    ),
   );
-  const receipt = { schema: SCHEMA, mode: 'metadata', repository, prNumber: number, state, metadata, ...nonAuthorizingMergeState };
+  const receipt = { schema: SCHEMA, mode: 'metadata', repository, prNumber: number, state, metadata, ...mergeState };
   writeReceipt(receipt);
   if (metadata.blocked) throw new Error(`METADATA_BLOCKED: ${metadata.reason}`);
   console.log(JSON.stringify(receipt));

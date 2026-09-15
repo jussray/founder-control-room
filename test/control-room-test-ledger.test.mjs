@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import test from 'node:test';
 import {
   aggregateTestLedger,
@@ -8,6 +9,7 @@ import {
 } from '../scripts/control-room-test-ledger.mjs';
 
 const SHA = '019f405030af7d79cde420cc504a060fdcaea29b';
+const ledgerSource = fs.readFileSync(new URL('../scripts/control-room-test-ledger.mjs', import.meta.url), 'utf8');
 
 function check(overrides = {}) {
   return {
@@ -47,6 +49,87 @@ test('keeps every latest exact-head check lane and excludes the observer', () =>
   assert.deepEqual(checks.map((item) => item.name), ['Cloudflare Pages', 'Playwright', 'Quality Gate']);
   assert.equal(checks.find((item) => item.name === 'Quality Gate')?.state, 'failed');
   assert.equal(checks.every((item) => item.headSha === SHA), true);
+});
+
+test('newer started check attempt outranks older attempt even when older completes later', () => {
+  const checks = selectLatestChecks([
+    check({
+      id: 100,
+      name: 'PR Continuity Exact-Head Gate',
+      status: 'completed',
+      conclusion: 'cancelled',
+      started_at: '2026-09-15T01:22:00Z',
+      completed_at: '2026-09-15T01:22:20Z',
+    }),
+    check({
+      id: 101,
+      name: 'PR Continuity Exact-Head Gate',
+      status: 'queued',
+      conclusion: null,
+      started_at: '2026-09-15T01:22:21Z',
+      completed_at: null,
+    }),
+  ], SHA);
+
+  assert.equal(checks.length, 1);
+  assert.equal(checks[0].id, '101');
+  assert.equal(checks[0].state, 'queued');
+  assert.equal(checks[0].completedAt, null);
+});
+
+test('newer queued attempt without started timestamp still outranks older completed attempt', () => {
+  const checks = selectLatestChecks([
+    check({
+      id: 300,
+      name: 'Required Gate',
+      status: 'completed',
+      conclusion: 'success',
+      started_at: '2026-09-15T01:30:00Z',
+      completed_at: '2026-09-15T01:31:00Z',
+    }),
+    check({
+      id: 301,
+      name: 'Required Gate',
+      status: 'queued',
+      conclusion: null,
+      started_at: null,
+      completed_at: null,
+    }),
+  ], SHA);
+
+  assert.equal(checks.length, 1);
+  assert.equal(checks[0].id, '301');
+  assert.equal(checks[0].state, 'queued');
+  assert.equal(checks[0].startedAt, null);
+});
+
+test('same-second duplicate check attempts use numeric check-run id as deterministic tie-breaker', () => {
+  const checks = selectLatestChecks([
+    check({
+      id: 200,
+      name: 'Required Gate',
+      status: 'completed',
+      conclusion: 'failure',
+      started_at: '2026-09-15T01:30:00Z',
+      completed_at: '2026-09-15T01:31:00Z',
+    }),
+    check({
+      id: 201,
+      name: 'Required Gate',
+      status: 'completed',
+      conclusion: 'success',
+      started_at: '2026-09-15T01:30:00Z',
+      completed_at: '2026-09-15T01:30:30Z',
+    }),
+  ], SHA);
+
+  assert.equal(checks.length, 1);
+  assert.equal(checks[0].id, '201');
+  assert.equal(checks[0].state, 'passed');
+});
+
+test('check-run evidence pagination fails closed before discovered lanes can be truncated', () => {
+  assert.match(ledgerSource, /if \(page === 10\) throw new Error\('CHECK_RUN_PAGINATION_LIMIT_EXCEEDED'\)/);
 });
 
 test('aggregates failed, pending, warning, unknown, and passed distinctly', () => {
