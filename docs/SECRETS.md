@@ -98,7 +98,7 @@ The former `founder-control-room2` Worker was deleted and must not be recreated 
 | `FOUNDER_API_URL` | non-secret variable | `https://foundercontrolroom.org` so auth callbacks return through Pages and are proxied to the API Worker. |
 | `TINYFISH_API_KEY` | secret | Required provider-held credential for live `tinyfish-web-observation-v1` Search/Fetch. Canonical production deploy verifies only binding-name presence before mutation; the value remains in Cloudflare and never becomes a GitHub Actions secret or proof receipt. |
 | `FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON` | secret | Scoped, revocable, fail-closed automation grant. |
-| `FOUNDER_SIGNAL_ENGINE_MCP_TOKEN` | secret | Dedicated MCP bearer token. This is not an OpenAI API key. |
+| `FOUNDER_SIGNAL_ENGINE_MCP_TOKEN` | secret | Dedicated MCP bearer token. This is not an OpenAI API key. When review-probe or proof-of-ship downstream receipt workflows are enabled, the same logical credential must also be stored separately as the protected GitHub `production` Actions secret of this name; never expose or log the value. |
 | `ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL` | secret | Private approved Zapier Catch Hook URL. |
 | `FOUNDER_SIGNAL_ENGINE_HOOK_TIMEOUT_MS` | protected variable | Optional bounded provider timeout. |
 | `FOUNDER_REVIEW_EMAIL_INGRESS_SECRET` | secret | Shared only with the review-email Worker when that route is activated. |
@@ -152,7 +152,9 @@ After configuration, capture:
 | `ZAPIER_CATCH_HOOK_URL` | `deploy.yml / proof-of-ship` | Dedicated Catch Hook for verified allowlisted release payloads; do not reuse the Worker bridge hook. |
 | `PROOF_OF_SHIP_STEERING_GRANT_ID` | `deploy.yml / proof-of-ship` | Revocable standing-policy identifier that explicitly activates scheduled publication; suggested value: `proof-of-ship-publish-v1`. |
 
-`FOUNDER_SESSION_ENCRYPTION_KEY`, `FOUNDER_SIGNAL_ENGINE_MCP_TOKEN`, `ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and `SUPABASE_PUBLISHABLE_KEY` are Worker/runtime bindings, not canonical deploy-plane values. The deploy verifies provider-held secret **names** where required and must not copy these values into GitHub merely to make deployment green.
+`FOUNDER_SESSION_ENCRYPTION_KEY`, `ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and `SUPABASE_PUBLISHABLE_KEY` are Worker/runtime bindings, not canonical deploy-plane values. The deploy verifies provider-held secret **names** where required and must not copy these values into GitHub merely to make deployment green.
+
+`FOUNDER_SIGNAL_ENGINE_MCP_TOKEN` is deliberately dual-plane when the review-probe/downstream-receipt workflows are enabled: it remains a provider-held Worker runtime binding for the API routes and is also configured separately as a protected GitHub `production` Actions secret for `founder-signal-engine-review-probe.yml` and `proof-of-ship-downstream-receipt.yml`. The canonical deploy does not transport or print this credential.
 
 The proof-of-ship Catch Hook is intentionally separate from `ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL`. The deployment workflow fails closed when the dedicated hook or `PROOF_OF_SHIP_STEERING_GRANT_ID` is absent, and it sends a payload only after exact-SHA and Supabase proof pass. Configure the downstream Zap according to `docs/founder-signal-engine/proof-of-ship-publish-contract.md`; do not put the hook URL or grant value in repository code or Cloudflare bindings.
 
@@ -199,6 +201,7 @@ Never commit, log, or expose this value through a `NEXT_PUBLIC_*` variable.
 [ ] FCR_CLOUDFLARE_MCP_READ_TOKEN for official Cloudflare API MCP GET-only provider proof
 [ ] CLOUDFLARE_ACCOUNT_ID
 [ ] CLOUDFLARE_DEPLOY_HOOK_URL for exact-SHA Pages release
+[ ] FOUNDER_SIGNAL_ENGINE_MCP_TOKEN for founder-signal-engine-review-probe and proof-of-ship-downstream-receipt; same logical credential as the Worker binding, stored separately in the protected Actions environment
 [ ] CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID when Chief Access recovery or the trusted Chief runtime witness is activated; name presence here does not prove configuration
 [ ] CHIEF_CLOUDFLARE_ACCESS_CLIENT_SECRET when the trusted Chief runtime witness is activated; never expose the value
 [ ] CLOUDFLARE_ACCESS_CLIENT_ID only as the documented backward-compatible client-ID alias for Chief Access recovery or runtime witness when the Chief-specific name is absent
@@ -247,6 +250,7 @@ This table covers GitHub Actions secret names that are referenced outside the ca
 | `NEON_API_KEY` | `neon-pr-branches.yml` | Required for create/delete of PR preview branches when that workflow runs. |
 | `OPENAI_API_KEY` | `playwright.yml` | Injected only into the E2E harness when configured; do not expose it to browser/static assets. |
 | `PERPLEXITY_API_KEY` | `playwright.yml` | Injected only into the E2E harness when configured; do not expose it to browser/static assets. |
+| `FOUNDER_SIGNAL_ENGINE_MCP_TOKEN` | `founder-signal-engine-review-probe.yml`, `proof-of-ship-downstream-receipt.yml` | Required dual-plane bearer/HMAC seed when those production workflows run. The same logical credential is also a Worker runtime binding; configure each plane separately and never log the value. |
 | `N8N_CONVEYOR_WEBHOOK_URL` | `n8n-conveyor-live-probe.yml` | Required private webhook URL for the founder-approved live conveyor probe. |
 | `N8N_CONVEYOR_BEARER_TOKEN` | `n8n-conveyor-live-probe.yml` | Required bearer credential paired with the live conveyor webhook probe. |
 | `CLOUDFLARE_DEPLOY_HOOK_URL` | `pages-production-release.yml` | Required reusable-workflow secret used to trigger the exact-SHA Pages release. |
