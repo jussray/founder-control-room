@@ -94,6 +94,16 @@ describe('founder content analytics CSV ingestion', () => {
       .toThrow(/duplicate daily date 2026-09-03/);
   });
 
+  it('rejects daily rows that fall outside the declared snapshot window', () => {
+    const outsideWindow = safeCsv.replace(
+      'current-2026-09-03,2026-09-03T23:00:00.000Z,2026-09-02,2026-09-03,current_export,daily,2026-09-03,true,130,,2,,',
+      'current-2026-09-03,2026-09-03T23:00:00.000Z,2026-09-02,2026-09-03,current_export,daily,2026-09-04,true,130,,2,,',
+    );
+
+    expect(() => parseFounderContentAnalyticsCsv(outsideWindow, metadata))
+      .toThrow(/daily date 2026-09-04 falls outside snapshot window 2026-09-02\.\.2026-09-03/);
+  });
+
   it('keeps missing metric values null and makes incomplete comparison evidence explicit', () => {
     const receipt = parseFounderContentAnalyticsCsv(safeCsv, {
       ...metadata,
