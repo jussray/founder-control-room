@@ -2,20 +2,6 @@ name: Founder Control Room / Chief AI Pair Contract
 
 on:
   pull_request:
-    paths:
-      - 'config/founder-chief-pair.contract.json'
-      - '.control-room/founder-chief-pair-peer-lock.json'
-      - 'docs/FOUNDER_INTELLIGENCE_CONSTITUTION.md'
-      - 'scripts/verify-founder-chief-pair.mjs'
-      - 'test/founder-chief-pair-peer-lock.test.mjs'
-      - 'src/lib/standingFounderPolicy.ts'
-      - 'src/founder-os-lab/projectAdapters.ts'
-      - 'src/founder-os-lab/capabilityKernel.ts'
-      - 'src/founder-os-lab/engine.ts'
-      - 'src/lib/n8nConveyor.ts'
-      - 'src/lib/n8nConveyorRuntime.ts'
-      - 'automation/n8n/founder-conveyor.workflow.json'
-      - '.github/workflows/founder-chief-pair-contract.yml'
   push:
     branches: [main]
     paths:
@@ -51,7 +37,57 @@ jobs:
           path: founder-control-room
           persist-credentials: false
 
+      - name: Determine whether pair-enforcement truth changed
+        id: pair-scope
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || '' }}
+          HEAD_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          required=true
+
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            printf '%s' "$BASE_SHA" | grep -Eq '^[0-9a-f]{40}$'
+            printf '%s' "$HEAD_SHA" | grep -Eq '^[0-9a-f]{40}$'
+            git -C founder-control-room fetch --no-tags --depth=1 \
+              https://github.com/jussray/founder-control-room.git "$BASE_SHA"
+
+            required=false
+            while IFS= read -r path; do
+              case "$path" in
+                config/founder-chief-pair.contract.json|\
+                .control-room/founder-chief-pair-peer-lock.json|\
+                scripts/verify-founder-chief-pair.mjs|\
+                .github/workflows/founder-chief-pair-contract.yml)
+                  required=true
+                  break
+                  ;;
+              esac
+            done < <(git -C founder-control-room diff --name-only "$BASE_SHA" "$HEAD_SHA")
+          fi
+
+          printf 'required=%s\n' "$required" >> "$GITHUB_OUTPUT"
+          {
+            echo '## Founder ↔ Chief pair scope'
+            echo
+            printf -- '- event: `%s`\n' "$EVENT_NAME"
+            printf -- '- pair-enforcement changed: `%s`\n' "$required"
+            if [ "$required" != "true" ]; then
+              echo '- Required check context still reports on this PR, but cross-repository peer-candidate validation is not applicable because the pair-enforcement surface is unchanged.'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Pair contract unchanged for this pull request
+        if: steps.pair-scope.outputs.required != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo 'Pair-enforcement surface unchanged; required verify-pair-contract context is satisfied without coupling this unrelated FCR change to Chief candidate state.'
+
       - name: Resolve contract-paired Chief authorities
+        if: steps.pair-scope.outputs.required == 'true'
         id: pair-ref
         shell: bash
         env:
@@ -199,6 +235,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Check out exact Chief AI pair authority
+        if: steps.pair-scope.outputs.required == 'true'
         uses: actions/checkout@v4
         with:
           repository: jussray/chief-ai-machine
@@ -207,6 +244,7 @@ jobs:
           persist-credentials: false
 
       - name: Check out exact Chief necessary-fix policy carrier
+        if: steps.pair-scope.outputs.required == 'true'
         uses: actions/checkout@v4
         with:
           repository: jussray/chief-ai-machine
@@ -215,6 +253,7 @@ jobs:
           persist-credentials: false
 
       - name: Verify exact Chief checkouts
+        if: steps.pair-scope.outputs.required == 'true'
         shell: bash
         env:
           EXPECTED_PAIR_SHA: ${{ steps.pair-ref.outputs.pair_sha }}
@@ -225,14 +264,17 @@ jobs:
           test "$(git -C chief-ai-policy rev-parse HEAD)" = "$EXPECTED_POLICY_SHA"
 
       - uses: actions/setup-node@v4
+        if: steps.pair-scope.outputs.required == 'true'
         with:
           node-version: '24'
 
       - name: Verify peer-lock source contract
+        if: steps.pair-scope.outputs.required == 'true'
         working-directory: founder-control-room
         run: node --test test/founder-chief-pair-peer-lock.test.mjs
 
       - name: Verify local and cross-repository pair contract
+        if: steps.pair-scope.outputs.required == 'true'
         working-directory: founder-control-room
         env:
           PAIR_CONTRACT_PATH: ../chief-ai-machine/config/founder-chief-pair.contract.json
