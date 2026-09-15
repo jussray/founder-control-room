@@ -6,6 +6,7 @@ import { authRouter } from './routes/auth.js';
 import { onboardingRouter } from './routes/onboarding.js';
 import { founderOnboardingRouter } from './routes/founderOnboarding.js';
 import { projectsRouter } from './routes/projects.js';
+import { projectShellStateRouter } from './routes/projectShellState.js';
 import { buildEventsRouter } from './routes/buildEvents.js';
 import { handleBuildEventReceiptIngest } from './routes/buildEventReceipts.js';
 import { reasoningRunsRouter } from './routes/reasoningRuns.js';
@@ -41,6 +42,7 @@ import { handleFounderSignalReviewContextIngest } from './routes/founderSignalRe
 import { handleFounderSignalReviewEmailIngest } from './routes/founderSignalReviewEmailIngress.js';
 import { handleJiraWorkAutomationIngress } from './routes/jiraWorkAutomationIngress.js';
 import { handleHairCommerceReceiptIngest } from './routes/hairCommerceReceipts.js';
+import { handleFederatedRelayV3 } from './routes/federatedRelayV3.js';
 import {
   handleProofOfShipCommitLookup,
   handleProofOfShipReceiptIngest,
@@ -239,6 +241,12 @@ export function createServer(options: CreateServerOptions = {}) {
     handleProductBuildReceiptIngest,
   );
   app.post(
+    '/api/federated-relay/v3',
+    rateLimitGeneral,
+    express.json({ type: 'application/json', limit: '64kb' }),
+    handleFederatedRelayV3,
+  );
+  app.post(
     '/mcp/founder-signal-engine',
     rateLimitGeneral,
     express.json({ type: 'application/json', limit: '64kb' }),
@@ -371,6 +379,7 @@ export function createServer(options: CreateServerOptions = {}) {
   app.use('/projects', repositoryVerificationRouter);
   app.use('/projects', buildEventsRouter);
   app.use('/projects', reasoningRunsRouter);
+  app.use('/projects', requireProjectReadAudit, projectShellStateRouter);
   app.use('/projects', requireProjectReadAudit, projectsRouter);
   // Privileged mission execution still uses the existing approvals router, but
   // it must now pass founder authentication + founder master switch + V10
