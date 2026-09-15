@@ -36,6 +36,30 @@ function boundedText(value, field, max = 240) {
   return normalized;
 }
 
+function parseIsoDate(value, field) {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    fail(`${field} must be YYYY-MM-DD`);
+  }
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+  if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== value) {
+    fail(`${field} must be a real calendar date`);
+  }
+  return value;
+}
+
+function validateComparison(comparison) {
+  if (!comparison || typeof comparison !== 'object' || Array.isArray(comparison)) {
+    fail('metadata.comparison is required');
+  }
+  for (const prefix of ['baseline', 'recent']) {
+    const startField = `${prefix}_start`;
+    const endField = `${prefix}_end`;
+    const start = parseIsoDate(comparison[startField], `metadata.comparison.${startField}`);
+    const end = parseIsoDate(comparison[endField], `metadata.comparison.${endField}`);
+    if (start > end) fail(`metadata.comparison.${startField} is after metadata.comparison.${endField}`);
+  }
+}
+
 function parseCsv(textValue) {
   const rows = [];
   let row = [];
@@ -121,6 +145,7 @@ function parseFounderContentAnalyticsCsv(csvText, metadata = {}) {
   if (!accountId) fail('metadata.account_id is required');
   if (!accountName) fail('metadata.account_name is required');
   if (!fileName) fail('metadata.file_name is required');
+  validateComparison(metadata.comparison);
 
   const rows = parseCsv(csvText);
   if (rows.length < 2) fail('CSV must contain a header and at least one data row');
@@ -141,9 +166,8 @@ function parseFounderContentAnalyticsCsv(csvText, metadata = {}) {
     const row = Object.fromEntries(EXPECTED_COLUMNS.map((column, columnIndex) => [column, values[columnIndex].trim()]));
     if (!row.snapshot_id) fail(`line ${lineNumber} snapshot_id is required`);
     if (!row.captured_at || Number.isNaN(Date.parse(row.captured_at))) fail(`line ${lineNumber} captured_at must be an ISO timestamp`);
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(row.window_start) || !/^\d{4}-\d{2}-\d{2}$/.test(row.window_end)) {
-      fail(`line ${lineNumber} window_start/window_end must be YYYY-MM-DD`);
-    }
+    parseIsoDate(row.window_start, `line ${lineNumber} window_start`);
+    parseIsoDate(row.window_end, `line ${lineNumber} window_end`);
     if (row.window_start > row.window_end) fail(`line ${lineNumber} window_start is after window_end`);
     if (!IMPORT_KINDS.has(row.import_kind)) fail(`line ${lineNumber} import_kind must be historical_import or current_export`);
 
@@ -156,7 +180,7 @@ function parseFounderContentAnalyticsCsv(csvText, metadata = {}) {
         window_end: row.window_end,
         import_kind: row.import_kind,
         daily: [],
-        audience: {},
+        audience: Object.create(null),
         seenDates: new Set(),
         seenSegments: new Set(),
       };
@@ -166,7 +190,7 @@ function parseFounderContentAnalyticsCsv(csvText, metadata = {}) {
     }
 
     if (row.row_type === 'daily') {
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(row.date)) fail(`line ${lineNumber} daily date must be YYYY-MM-DD`);
+      parseIsoDate(row.date, `line ${lineNumber} daily date`);
       if (row.date < group.window_start || row.date > group.window_end) {
         fail(`line ${lineNumber} daily date ${row.date} falls outside snapshot window ${group.window_start}..${group.window_end}`);
       }
