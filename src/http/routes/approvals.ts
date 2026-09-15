@@ -577,6 +577,7 @@ approvalsRouter.post(
 approvalsRouter.post(
   '/:missionId/execute',
   async (req: FounderRequest, res: Response) => {
+    const observedRequestTime = new Date().toISOString();
     const { missionId } = req.params as { missionId: string };
     const { actionType, idempotencyKey, payload = {} } = req.body as {
       actionType: string;
@@ -713,6 +714,7 @@ approvalsRouter.post(
             gateId: String(proofRecord.gate_id),
             createdAt: String(proofRecord.created_at),
           },
+          now: observedRequestTime,
         });
       } catch (error) {
         return res.status(409).json({
