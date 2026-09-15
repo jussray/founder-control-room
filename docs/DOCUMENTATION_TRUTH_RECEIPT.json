@@ -1,17 +1,30 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Preserve the current TinyFish Cloudflare activation and read-only Shopify child-provider boundaries while documenting the bounded Attack 3000 content observation, advisory Trend Radar, and deterministic founder-content approval retry contracts without converting source, analytics, rankings, retry identity, provider configuration, mergeability, or deployment into publication, provider-mutation, merge, deploy, spend, or external-contact authority.",
+  "purpose": "Preserve the current TinyFish Cloudflare activation, read-only Shopify child-provider boundaries, FCR browser-auth versus Cloudflare Access boundary, exact founder merge-authority contract, bounded Attack 3000 content observation, advisory Trend Radar, and deterministic founder-content approval retry contracts without converting source, analytics, rankings, retry identity, provider configuration, mergeability, or deployment into publication, provider-mutation, merge, deploy, spend, or external-contact authority.",
   "domains": [
     "cloudflare-authority",
     "repository-provider",
     "content-evidence",
-    "publishing"
+    "publishing",
+    "merge-authority"
   ],
   "changes": [
     {
       "path": "wrangler.worker.toml",
       "claims": [
         "`wrangler.worker.toml` must list `TINYFISH_API_KEY` under `[secrets].required`, so canonical exact-main Deploy rejects missing provider-held TinyFish activation before Worker mutation while never copying the secret value through GitHub Actions."
+      ]
+    },
+    {
+      "path": ".github/workflows/fcr-access-front-door-recovery.yml",
+      "claims": [
+        "`.github/workflows/fcr-access-front-door-recovery.yml` must keep FCR product authentication inside the app, may detach only browser-facing public destinations from one uniquely identified mixed Cloudflare Access application, must preserve every non-browser destination and existing policy, and must fail closed on ambiguous or public-only provider state."
+      ]
+    },
+    {
+      "path": "src/http/routes/approvals.ts",
+      "claims": [
+        "`src/http/routes/approvals.ts` must require exact-head evidence plus provider-backed PR identity, deterministic independent review, and authenticated founder-final confirmation bound to the exact PR, base, and head before FCR integration, then must re-read the mutable branch head immediately before provider integration."
       ]
     },
     {
