@@ -37,6 +37,7 @@ It does not infer revenue, customer intent, causal lift, or publication success 
 10. The CSV ingestion boundary rejects duplicate daily dates and duplicate audience segments inside one snapshot instead of silently choosing a winner.
 11. CSV provenance is bound to the exact file bytes, file name, account identity, import kind, capture timestamps, and snapshot windows.
 12. Re-ingesting the same bytes with the same metadata produces the same `idempotency_key`; a provenance change produces a different ingestion identity.
+13. A daily CSV observation must fall inside its own snapshot's declared `window_start` and `window_end`; out-of-window rows are rejected rather than allowed to contaminate a comparison.
 
 ## Normalized authority input
 
@@ -51,6 +52,19 @@ Call `buildFounderContentAnalyticsAudit` with:
 Each normalized snapshot may contain daily metrics, post-level impression/engagement totals, headline metrics, and audience segment shares.
 
 The core authority contract intentionally does not parse provider-native spreadsheets. Parsing and provenance stay outside that authority primitive so LinkedIn, Buffer, HubSpot, or future providers can normalize into the same evidence shape without changing publication authority.
+
+### Native-provider boundary
+
+LinkedIn already has a load-bearing provider-native path: `scripts/linkedin_analytics_continuity.py` reads LinkedIn aggregate XLSX exports and emits `linkedin-analytics-continuity@v1` / `linkedin-native-post-measurement@v1` evidence. That path remains the canonical LinkedIn-native importer and is exercised by the repository's Python CI contract.
+
+The normalized CSV adapter is additive provider-neutral interchange only. It must not:
+
+- replace or silently fork the LinkedIn-native importer;
+- relabel a provider-native XLSX file as normalized CSV evidence;
+- turn caller-supplied account labels into provider-authenticated account identity;
+- donate a generic CSV hash or fixture result to a separate native-provider receipt.
+
+A provider-specific importer may normalize into the generic authority shape only when its own source provenance and account identity remain explicit and independently verifiable.
 
 ## Normalized CSV ingestion boundary
 
@@ -113,6 +127,6 @@ The CSV adapter returns an outer `fcr/founder-content-analytics-csv-ingest@v1` r
 
 `src/lib/__tests__/founderContentAnalyticsAudit.contract.test.ts` locks the overlapping-export case from the August 20, 2026 LinkedIn audit. It verifies that a later Aug 19 observation replaces the earlier incomplete attribution, Aug 20 stays partial, completed-day comparisons reproduce the audited baseline/recent totals, engagement concentration remains separate from reach concentration, and the analytics artifact cannot authorize publication.
 
-`src/lib/__tests__/founderContentAnalyticsCsvIngest.contract.test.ts` reads the safe CSV fixture at `src/lib/__tests__/fixtures/founder-content-analytics-safe.csv`. It verifies source hashing, account identity, historical/current import provenance, explicit metric units, `audience_segment`, duplicate rejection, null handling, deterministic idempotency, and advisory-only authority.
+`src/lib/__tests__/founderContentAnalyticsCsvIngest.contract.test.ts` reads the safe CSV fixture at `src/lib/__tests__/fixtures/founder-content-analytics-safe.csv`. It verifies source hashing, account identity, historical/current import provenance, explicit metric units, `audience_segment`, duplicate rejection, snapshot-window binding, null handling, deterministic idempotency, and advisory-only authority.
 
 A safe fixture proves the ingestion implementation. It is **not** evidence that any external analytics account is connected or current. A real-data receipt requires an authorized analytics source or a separately supplied export; absence of that source blocks only the real-data receipt, not this contract verification.
