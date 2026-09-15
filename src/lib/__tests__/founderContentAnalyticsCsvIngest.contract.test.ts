@@ -130,15 +130,12 @@ describe('founder content analytics CSV ingestion', () => {
     })).toThrow(/must be a real calendar date/);
   });
 
-  it('preserves prototype-named audience segments as data instead of object behavior', () => {
-    const prototypeSegment = safeCsv.replaceAll('Founder', '__proto__');
-    const receipt = parseFounderContentAnalyticsCsv(prototypeSegment, metadata);
-
-    expect(receipt.audience_segments).toContainEqual(expect.objectContaining({
-      audience_segment: '__proto__',
-      baseline_share: 0.2,
-      current_share: 0.3,
-    }));
+  it('rejects prototype-sensitive audience segment names before they can alias object behavior', () => {
+    for (const reserved of ['__proto__', 'prototype', 'constructor', 'Constructor']) {
+      const reservedSegment = safeCsv.replaceAll('Founder', reserved);
+      expect(() => parseFounderContentAnalyticsCsv(reservedSegment, metadata))
+        .toThrow(new RegExp(`audience_segment ${reserved} is reserved`, 'i'));
+    }
   });
 
   it('keeps missing metric values null and makes incomplete comparison evidence explicit', () => {
