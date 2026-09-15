@@ -43,6 +43,26 @@ test('pair workflow fails closed when either live Chief head leaves the candidat
   assert.doesNotMatch(workflow, /locked_(?:pair|policy)_sha[^\n]*\|\|\s*true/);
 });
 
+test('required pair check reports on every PR without coupling unrelated FCR changes to Chief candidate state', () => {
+  assert.match(workflow, /on:\n  pull_request:\n  push:/);
+  assert.doesNotMatch(workflow, /pull_request:\n    paths:/);
+  assert.match(workflow, /name: Determine whether pair-enforcement truth changed/);
+  assert.match(workflow, /required=false/);
+  assert.match(workflow, /git -C founder-control-room diff --name-only "\$BASE_SHA" "\$HEAD_SHA"/);
+  assert.match(workflow, /name: Pair contract unchanged for this pull request/);
+  assert.match(workflow, /if: steps\.pair-scope\.outputs\.required != 'true'/);
+  assert.match(workflow, /without coupling this unrelated FCR change to Chief candidate state/);
+
+  for (const path of [
+    'config/founder-chief-pair.contract.json',
+    '.control-room/founder-chief-pair-peer-lock.json',
+    'scripts/verify-founder-chief-pair.mjs',
+    '.github/workflows/founder-chief-pair-contract.yml',
+  ]) {
+    assert.ok(workflow.includes(path), `${path} must require full pair validation when changed`);
+  }
+});
+
 test('Documentation Truth classifies the complete pair-enforcement surface', () => {
   for (const path of [
     'config/founder-chief-pair.contract.json',
