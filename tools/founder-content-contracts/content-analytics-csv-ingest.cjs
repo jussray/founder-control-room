@@ -22,6 +22,7 @@ const EXPECTED_COLUMNS = Object.freeze([
   'audience_share',
 ]);
 const IMPORT_KINDS = new Set(['historical_import', 'current_export']);
+const RESERVED_AUDIENCE_SEGMENTS = new Set(['__proto__', 'prototype', 'constructor']);
 
 function fail(message) {
   const error = new Error(`CONTENT_ANALYTICS_CSV_REJECTED: ${message}`);
@@ -211,6 +212,9 @@ function parseFounderContentAnalyticsCsv(csvText, metadata = {}) {
       }
       const segment = boundedText(row.audience_segment, `line ${lineNumber} audience_segment`, 160);
       if (!segment) fail(`line ${lineNumber} audience_segment is required`);
+      if (RESERVED_AUDIENCE_SEGMENTS.has(segment.toLowerCase())) {
+        fail(`line ${lineNumber} audience_segment ${segment} is reserved`);
+      }
       if (group.seenSegments.has(segment)) fail(`snapshot ${row.snapshot_id} contains duplicate audience_segment ${segment}`);
       group.seenSegments.add(segment);
       group.audience[segment] = share(row.audience_share, `line ${lineNumber} audience_share`);
