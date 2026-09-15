@@ -167,6 +167,9 @@ function parseFounderContentAnalyticsCsv(csvText, metadata = {}) {
 
     if (row.row_type === 'daily') {
       if (!/^\d{4}-\d{2}-\d{2}$/.test(row.date)) fail(`line ${lineNumber} daily date must be YYYY-MM-DD`);
+      if (row.date < group.window_start || row.date > group.window_end) {
+        fail(`line ${lineNumber} daily date ${row.date} falls outside snapshot window ${group.window_start}..${group.window_end}`);
+      }
       if (group.seenDates.has(row.date)) fail(`snapshot ${row.snapshot_id} contains duplicate daily date ${row.date}`);
       group.seenDates.add(row.date);
       if (!['true', 'false'].includes(row.complete)) fail(`line ${lineNumber} complete must be true or false`);
