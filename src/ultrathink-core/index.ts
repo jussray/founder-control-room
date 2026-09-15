@@ -78,6 +78,41 @@ export {
 } from './attack3000Release.js';
 
 export {
+  ATTACK_3000_CONTENT_ADAPTER_ID,
+  createContentAttack3000Assessment,
+  deriveContentTerms,
+  evaluateContentAttack3000,
+  type ContentAttack3000Evidence,
+  type ContentAttack3000Input,
+  type ContentAttack3000Result,
+  type ContentCountFloor,
+  type ContentMetricObservation,
+  type ContentObservationContext,
+  type ContentObservationFreshness,
+  type ContentPublicationObservation,
+  type ContentRateFloor,
+  type ContentStopCondition,
+  type ContentTermsDerivation,
+  type ContentTermsInput,
+} from './attack3000Content.js';
+
+export {
+  evaluateContentTrendRadar,
+  type RankedTrendRadarCandidate,
+  type TrendAngleKind,
+  type TrendContentAngle,
+  type TrendEvidenceRef,
+  type TrendEvidenceState,
+  type TrendFingerprintComparison,
+  type TrendRadarCandidate,
+  type TrendRadarEvaluationContext,
+  type TrendRadarReason,
+  type TrendRadarResult,
+  type TrendRadarScores,
+  type TrendSaturation,
+} from './contentTrendRadar.js';
+
+export {
   evaluateAuthorityLease,
   type AuthorityBinding,
   type AuthorityConsequence,
