@@ -11,7 +11,6 @@ permissions:
   contents: read
   checks: read
   issues: read
-  pull-requests: write
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -48,7 +47,7 @@ jobs:
           node-version: '24'
 
       - name: Run control-room test-ledger contracts
-        run: node --test test/control-room-test-ledger.test.mjs
+        run: node --test test/control-room-test-ledger.test.mjs test/founder-merge-approval-gate.test.mjs
 
       - name: Observe every exact-head check lane
         env:
@@ -98,11 +97,13 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           FOUNDER_GITHUB_LOGIN: jussray
+          FOUNDER_GITHUB_USER_ID: '286642846'
         shell: bash
         run: |
-          node <<'NODE'
-          const fs = require('node:fs');
-          const path = require('node:path');
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import path from 'node:path';
+          import {resolveFounderMergeDecision} from './scripts/founder-merge-approval.mjs';
 
           const clean = (value) => typeof value === 'string' ? value.trim() : '';
           const repository = clean(process.env.GITHUB_REPOSITORY);
@@ -111,73 +112,28 @@ jobs:
           const baseSha = clean(process.env.BASE_SHA).toLowerCase();
           const headSha = clean(process.env.HEAD_SHA).toLowerCase();
           const founderLogin = clean(process.env.FOUNDER_GITHUB_LOGIN);
+          const founderUserId = Number(process.env.FOUNDER_GITHUB_USER_ID);
           const token = clean(process.env.GITHUB_TOKEN);
           const outputPath = clean(process.env.FOUNDER_MERGE_APPROVAL_PATH) || 'artifacts/founder-merge-approval.json';
-          const marker = /<!--\s*fcr-founder-merge-approval:v1\s*([\s\S]*?)-->/g;
-          const continuityStart = '<!-- pr-continuity:start -->';
-          const continuityEnd = '<!-- pr-continuity:end -->';
 
-          if (!owner || !repo || !Number.isInteger(prNumber) || prNumber < 1 || !baseSha || !headSha || !founderLogin || !token) {
+          if (!owner || !repo || !Number.isInteger(prNumber) || prNumber < 1 || !baseSha || !headSha || !founderLogin || !Number.isInteger(founderUserId) || !token) {
             throw new Error('Founder merge approval verifier is missing required exact-candidate context.');
           }
 
-          async function githubRequest(url, {method = 'GET', body} = {}) {
+          async function githubJson(url) {
             const response = await fetch(url, {
-              method,
               headers: {
                 Accept: 'application/vnd.github+json',
                 Authorization: `Bearer ${token}`,
                 'User-Agent': 'fcr-founder-merge-approval-gate',
                 'X-GitHub-Api-Version': '2022-11-28',
-                ...(body ? {'Content-Type': 'application/json'} : {}),
               },
-              body: body ? JSON.stringify(body) : undefined,
             });
             if (!response.ok) {
               const responseBody = await response.text();
-              throw new Error(`GitHub approval request failed (${response.status}): ${responseBody.slice(0, 500)}`);
+              throw new Error(`GitHub approval lookup failed (${response.status}): ${responseBody.slice(0, 500)}`);
             }
-            const text = await response.text();
-            return text ? JSON.parse(text) : null;
-          }
-
-          async function setContinuityApproval({approved, approvalId = '', commentId = ''}) {
-            const prUrl = `https://api.github.com/repos/${owner}/${repo}/pulls/${prNumber}`;
-            const pr = await githubRequest(prUrl);
-            const body = String(pr?.body || '');
-            const startIndex = body.indexOf(continuityStart);
-            const endIndex = body.indexOf(continuityEnd);
-            if (startIndex < 0 || endIndex < 0 || startIndex > endIndex) {
-              throw new Error('PR continuity block is missing or malformed; refusing to publish merge authority.');
-            }
-
-            const blockEnd = endIndex + continuityEnd.length;
-            let block = body.slice(startIndex, blockEnd);
-            block = block
-              .replace(/\n- merge_approval_id: `[^`]*`/g, '')
-              .replace(/\n- merge_approval_comment: `[^`]*`/g, '');
-
-            const approvedLine = `- merge_approved: **${approved ? 'true' : 'false'}**`;
-            const authorizesLine = `- authorizes_merge: **${approved ? 'true' : 'false'}**`;
-            if (!/^- merge_approved: \*\*(?:true|false)\*\*$/m.test(block)
-              || !/^- authorizes_merge: \*\*(?:true|false)\*\*$/m.test(block)) {
-              throw new Error('PR continuity approval fields are missing or malformed; refusing to publish merge authority.');
-            }
-            block = block
-              .replace(/^- merge_approved: \*\*(?:true|false)\*\*$/m, approvedLine)
-              .replace(/^- authorizes_merge: \*\*(?:true|false)\*\*$/m, authorizesLine);
-
-            if (approved) {
-              block = block.replace(
-                approvedLine,
-                `${approvedLine}\n- merge_approval_id: \`${approvalId}\`\n- merge_approval_comment: \`${commentId}\``,
-              );
-            }
-
-            const nextBody = `${body.slice(0, startIndex)}${block}${body.slice(blockEnd)}`;
-            if (nextBody !== body) {
-              await githubRequest(prUrl, {method: 'PATCH', body: {body: nextBody}});
-            }
+            return response.json();
           }
 
           const comments = [];
@@ -185,87 +141,30 @@ jobs:
             const url = new URL(`https://api.github.com/repos/${owner}/${repo}/issues/${prNumber}/comments`);
             url.searchParams.set('per_page', '100');
             url.searchParams.set('page', String(page));
-            const batch = await githubRequest(url);
+            const batch = await githubJson(url);
             if (!Array.isArray(batch)) throw new Error('GitHub approval lookup returned a non-array response.');
             comments.push(...batch);
             if (batch.length < 100) break;
           }
 
-          const decisions = [];
-          for (const comment of comments) {
-            if (clean(comment?.user?.login) !== founderLogin) continue;
-            if (!comment?.created_at || comment.created_at !== comment.updated_at) continue;
-            const body = clean(comment?.body);
-            if (!body) continue;
+          const decision = resolveFounderMergeDecision(
+            comments,
+            {repository, prNumber, baseSha, headSha},
+            {login: founderLogin, userId: founderUserId},
+          );
 
-            for (const match of body.matchAll(marker)) {
-              let receipt;
-              try {
-                receipt = JSON.parse(clean(match[1]));
-              } catch {
-                continue;
-              }
-              const matchesCandidate = clean(receipt?.repository) === repository
-                && Number(receipt?.pull_request) === prNumber
-                && clean(receipt?.base_sha).toLowerCase() === baseSha
-                && clean(receipt?.head_sha).toLowerCase() === headSha
-                && ['approve', 'revoke'].includes(clean(receipt?.decision).toLowerCase())
-                && clean(receipt?.approval_id).length >= 8;
-              if (!matchesCandidate) continue;
-
-              decisions.push({
-                commentId: String(comment.id || ''),
-                commentUrl: clean(comment.html_url),
-                createdAt: comment.created_at,
-                actor: founderLogin,
-                receipt: {
-                  repository,
-                  pull_request: prNumber,
-                  base_sha: baseSha,
-                  head_sha: headSha,
-                  decision: clean(receipt.decision).toLowerCase(),
-                  approval_id: clean(receipt.approval_id),
-                },
-              });
-            }
+          if (!decision.approved) {
+            const reason = decision.status === 'revoked'
+              ? `Latest founder decision for the exact candidate is revoke (comment ${decision.sourceCommentId}); merge remains unauthorized.`
+              : `No fresh founder merge approval receipt exists for ${repository}#${prNumber} base=${baseSha} head=${headSha}.`;
+            throw new Error(reason);
           }
-
-          decisions.sort((left, right) => {
-            const byTime = Date.parse(left.createdAt) - Date.parse(right.createdAt);
-            if (byTime !== 0) return byTime;
-            return Number(left.commentId || 0) - Number(right.commentId || 0);
-          });
-
-          const latest = decisions.at(-1);
-          if (!latest) {
-            await setContinuityApproval({approved: false});
-            throw new Error(`No fresh founder merge approval receipt exists for ${repository}#${prNumber} base=${baseSha} head=${headSha}.`);
-          }
-          if (latest.receipt.decision !== 'approve') {
-            await setContinuityApproval({approved: false});
-            throw new Error(`Latest founder decision for the exact candidate is ${latest.receipt.decision}; merge remains unauthorized.`);
-          }
-
-          await setContinuityApproval({
-            approved: true,
-            approvalId: latest.receipt.approval_id,
-            commentId: latest.commentId,
-          });
 
           const artifact = {
-            schema: 'fcr/founder-merge-approval@v1',
-            status: 'approved',
-            repository,
+            ...decision,
             pullRequest: prNumber,
-            baseSha,
-            headSha,
             founderLogin,
-            approvalId: latest.receipt.approval_id,
-            sourceCommentId: latest.commentId,
-            sourceCommentUrl: latest.commentUrl || null,
-            approvedAt: latest.createdAt,
-            exactCandidateBound: true,
-            continuityReceiptUpdated: true,
+            founderUserId,
             authorizesMerge: true,
           };
           fs.mkdirSync(path.dirname(outputPath), {recursive: true});
