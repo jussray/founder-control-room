@@ -75,6 +75,32 @@ test('newer started check attempt outranks older attempt even when older complet
   assert.equal(checks[0].completedAt, null);
 });
 
+test('newer queued attempt without started timestamp still outranks older completed attempt', () => {
+  const checks = selectLatestChecks([
+    check({
+      id: 300,
+      name: 'Required Gate',
+      status: 'completed',
+      conclusion: 'success',
+      started_at: '2026-09-15T01:30:00Z',
+      completed_at: '2026-09-15T01:31:00Z',
+    }),
+    check({
+      id: 301,
+      name: 'Required Gate',
+      status: 'queued',
+      conclusion: null,
+      started_at: null,
+      completed_at: null,
+    }),
+  ], SHA);
+
+  assert.equal(checks.length, 1);
+  assert.equal(checks[0].id, '301');
+  assert.equal(checks[0].state, 'queued');
+  assert.equal(checks[0].startedAt, null);
+});
+
 test('same-second duplicate check attempts use numeric check-run id as deterministic tie-breaker', () => {
   const checks = selectLatestChecks([
     check({

@@ -33,6 +33,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ env.EXPECTED_HEAD_SHA }}
+          fetch-depth: 0
 
       - name: Record and verify exact head
         shell: bash
@@ -89,12 +90,26 @@ jobs:
           }, null, 2));
           NODE
 
+      - name: Resolve exact live base for founder approval
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git check-ref-format --branch "$BASE_REF" >/dev/null
+          git fetch --no-tags origin "refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}"
+          live_base="$(git rev-parse "refs/remotes/origin/${BASE_REF}^{commit}")"
+          test -n "$live_base"
+          test "$live_base" != "0000000000000000000000000000000000000000"
+          git merge-base --is-ancestor "$live_base" "$EXPECTED_HEAD_SHA"
+          printf 'FOUNDER_APPROVAL_BASE_SHA=%s\n' "$live_base" >> "$GITHUB_ENV"
+
       - name: Require exact founder merge approval
         if: github.event_name == 'pull_request'
         env:
           GITHUB_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           FOUNDER_GITHUB_LOGIN: jussray
           FOUNDER_GITHUB_USER_ID: '286642846'
@@ -109,7 +124,7 @@ jobs:
           const repository = clean(process.env.GITHUB_REPOSITORY);
           const [owner, repo] = repository.split('/');
           const prNumber = Number(process.env.PR_NUMBER);
-          const baseSha = clean(process.env.BASE_SHA).toLowerCase();
+          const baseSha = clean(process.env.FOUNDER_APPROVAL_BASE_SHA).toLowerCase();
           const headSha = clean(process.env.HEAD_SHA).toLowerCase();
           const founderLogin = clean(process.env.FOUNDER_GITHUB_LOGIN);
           const founderUserId = Number(process.env.FOUNDER_GITHUB_USER_ID);
@@ -145,6 +160,7 @@ jobs:
             if (!Array.isArray(batch)) throw new Error('GitHub approval lookup returned a non-array response.');
             comments.push(...batch);
             if (batch.length < 100) break;
+            if (page === 10) throw new Error('FOUNDER_APPROVAL_COMMENT_PAGINATION_LIMIT_EXCEEDED');
           }
 
           const decision = resolveFounderMergeDecision(

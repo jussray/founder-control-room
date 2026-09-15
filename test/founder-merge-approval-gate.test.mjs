@@ -70,6 +70,20 @@ test('required ledger gate validates exact founder authority without PR metadata
   assert.match(workflow, /authorizesMerge: true/);
 });
 
+test('founder approval binds to live target branch rather than stale PR base snapshot', () => {
+  assert.match(workflow, /fetch-depth: 0/);
+  assert.match(workflow, /- name: Resolve exact live base for founder approval/);
+  assert.match(workflow, /BASE_REF: \$\{\{ github\.event\.pull_request\.base\.ref \}\}/);
+  assert.match(workflow, /git merge-base --is-ancestor "\$live_base" "\$EXPECTED_HEAD_SHA"/);
+  assert.match(workflow, /FOUNDER_APPROVAL_BASE_SHA=%s/);
+  assert.match(workflow, /process\.env\.FOUNDER_APPROVAL_BASE_SHA/);
+  assert.doesNotMatch(workflow, /BASE_SHA: \$\{\{ github\.event\.pull_request\.base\.sha \}\}/);
+});
+
+test('founder approval comment pagination fails closed before evidence can be truncated', () => {
+  assert.match(workflow, /if \(page === 10\) throw new Error\('FOUNDER_APPROVAL_COMMENT_PAGINATION_LIMIT_EXCEEDED'\)/);
+});
+
 test('exact unedited founder approval authorizes only its bound candidate', () => {
   const decision = resolveFounderMergeDecision(
     [approvalComment({id: 1001})],
