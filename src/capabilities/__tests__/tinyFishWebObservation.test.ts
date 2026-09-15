@@ -107,6 +107,29 @@ describe('TinyFish read-only web observation capability', () => {
     expect(third.mutationAllowed).toBe(false);
   });
 
+  it('requires predecessor fingerprint and proof cookie together before continuity can be confirmed', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ results: [{ title: 'A', snippet: 'one', url: 'https://example.com/a' }] }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const client = new TinyFishReadOnlyClient('test-key');
+    const first = await client.search('paired continuity');
+    const fingerprintOnly = await client.search('paired continuity', {
+      priorEvidenceFingerprint: first.continuity.evidenceFingerprint,
+    });
+    const cookieOnly = await client.search('paired continuity', {
+      priorProofCookie: first.continuity.proofCookie,
+    });
+
+    expect(fingerprintOnly.continuity.transition).toBe('changed');
+    expect(cookieOnly.continuity.transition).toBe('changed');
+    expect(fingerprintOnly.continuity.authorityEffect).toBe('none');
+    expect(cookieOnly.continuity.authorityEffect).toBe('none');
+  });
+
   it('fetches markdown from the official fetch endpoint and preserves only bounded public evidence', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,

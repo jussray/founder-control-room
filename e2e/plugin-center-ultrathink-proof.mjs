@@ -1,5 +1,6 @@
+import { createHash } from 'node:crypto';
 import { createServer } from 'node:http';
-import { mkdirSync, readFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, readFileSync } from 'node:fs';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
@@ -7,12 +8,14 @@ import { chromium } from 'playwright';
 const REPO_ROOT = fileURLToPath(new URL('../', import.meta.url));
 const PUBLIC_ROOT = join(REPO_ROOT, 'public');
 const RESULTS_ROOT = join(REPO_ROOT, 'test-results');
+const DURABLE_RESULTS_ROOT = join(REPO_ROOT, 'logs', 'plugin-center-ultrathink');
+const APPROVED_ART_SHA256 = '5802a8fb856b813011851600ed7a6fa764f19141b91742823a584c58deb3e218';
 
 const mime = {
   '.html': 'text/html; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
-  '.webp': 'image/webp',
+  '.svg': 'image/svg+xml; charset=utf-8',
 };
 
 const pluginCenterPayload = {
@@ -66,6 +69,7 @@ const address = server.address();
 if (!address || typeof address === 'string') throw new Error('Plugin Center proof server did not bind');
 const BASE_URL = `http://127.0.0.1:${address.port}`;
 mkdirSync(RESULTS_ROOT, { recursive: true });
+mkdirSync(DURABLE_RESULTS_ROOT, { recursive: true });
 
 const browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
 
@@ -100,7 +104,7 @@ async function proveViewport(label, viewport) {
     naturalHeight: node.naturalHeight,
   }));
 
-  if (imageState.src !== '/assets/plugins/ultrathink.webp') {
+  if (imageState.src !== '/assets/plugins/ultrathink.svg') {
     throw new Error(`${label}: unexpected ULTRATHINK image path: ${imageState.src}`);
   }
   if (imageState.alt !== 'ULTRATHINK FCR Plugin') {
@@ -108,6 +112,43 @@ async function proveViewport(label, viewport) {
   }
   if (!imageState.complete || imageState.naturalWidth <= 0 || imageState.naturalHeight <= 0) {
     throw new Error(`${label}: ULTRATHINK artwork did not decode: ${JSON.stringify(imageState)}`);
+  }
+
+  const imageGeometry = await image.evaluate((node) => {
+    const rect = node.getBoundingClientRect();
+    const style = getComputedStyle(node);
+    return { width: rect.width, height: rect.height, objectFit: style.objectFit };
+  });
+  if (Math.abs(imageGeometry.width - imageGeometry.height) > 1) {
+    throw new Error(`${label}: ULTRATHINK artwork must render square: ${JSON.stringify(imageGeometry)}`);
+  }
+  if (imageGeometry.objectFit !== 'contain') {
+    throw new Error(`${label}: ULTRATHINK artwork must preserve the full approved composition: ${JSON.stringify(imageGeometry)}`);
+  }
+
+  const artwork = await page.evaluate(async () => {
+    const response = await fetch('/assets/plugins/ultrathink.svg');
+    return { ok: response.ok, contentType: response.headers.get('content-type'), text: await response.text() };
+  });
+  if (!artwork.ok || !artwork.contentType?.includes('image/svg+xml')) {
+    throw new Error(`${label}: ULTRATHINK SVG was not served as an image: ${JSON.stringify({ ok: artwork.ok, contentType: artwork.contentType })}`);
+  }
+
+  for (const marker of [
+    'data-ultrathink-art="v2-approved-brain"',
+    `data-source-sha256="${APPROVED_ART_SHA256}"`,
+    'HIGHER INTELLIGENCE',
+    'REAL RESULTS',
+    'FCR PLUGIN',
+  ]) {
+    if (!artwork.text.includes(marker)) throw new Error(`${label}: approved ULTRATHINK identity marker is missing: ${marker}`);
+  }
+
+  const embeddedMatch = artwork.text.match(/href="data:image\/webp;base64,([^"]+)"/);
+  if (!embeddedMatch) throw new Error(`${label}: approved ULTRATHINK WebP payload is missing`);
+  const embeddedSha = createHash('sha256').update(Buffer.from(embeddedMatch[1], 'base64')).digest('hex');
+  if (embeddedSha !== APPROVED_ART_SHA256) {
+    throw new Error(`${label}: ULTRATHINK artwork bytes drifted: expected ${APPROVED_ART_SHA256}, got ${embeddedSha}`);
   }
 
   const overflow = await page.evaluate(() => ({
@@ -121,10 +162,11 @@ async function proveViewport(label, viewport) {
   if (pageErrors.length > 0) throw new Error(`${label}: browser errors: ${pageErrors.join(' | ')}`);
   if (failedRequests.length > 0) throw new Error(`${label}: failed requests: ${failedRequests.join(' | ')}`);
 
-  await page.screenshot({
-    path: join(RESULTS_ROOT, `plugin-center-ultrathink-${label}.png`),
-    fullPage: true,
-  });
+  const screenshotName = `plugin-center-ultrathink-${label}.png`;
+  const ephemeralPath = join(RESULTS_ROOT, screenshotName);
+  const durablePath = join(DURABLE_RESULTS_ROOT, screenshotName);
+  await page.screenshot({ path: ephemeralPath, fullPage: true });
+  copyFileSync(ephemeralPath, durablePath);
 
   await context.close();
 }
@@ -132,7 +174,7 @@ async function proveViewport(label, viewport) {
 try {
   await proveViewport('desktop-1440', { width: 1440, height: 1100 });
   await proveViewport('mobile-390', { width: 390, height: 844 });
-  console.log('PASS: ULTRATHINK Plugin Center artwork, command identity, non-authorizing boundary, responsive layout, and browser asset loading are proven on desktop and mobile.');
+  console.log(`PASS: approved ULTRATHINK artwork ${APPROVED_ART_SHA256}, command identity, non-authorizing boundary, square composition, responsive layout, browser asset loading, and durable desktop/mobile screenshot receipts are proven.`);
 } finally {
   await browser.close();
   await new Promise((resolve) => server.close(resolve));

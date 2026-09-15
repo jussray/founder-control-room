@@ -96,9 +96,11 @@ function continuityReceipt(
 ): TinyFishContinuityReceipt {
   const predecessorFingerprint = normalizeContinuityValue(continuity.priorEvidenceFingerprint);
   const predecessorProofCookie = normalizeContinuityValue(continuity.priorProofCookie);
-  const transition: TinyFishContinuityTransition = predecessorFingerprint === null
+  const proofCookie = proofCookieFor(evidenceFingerprint);
+  const hasPredecessor = predecessorFingerprint !== null || predecessorProofCookie !== null;
+  const transition: TinyFishContinuityTransition = !hasPredecessor
     ? 'initial'
-    : predecessorFingerprint === evidenceFingerprint
+    : predecessorFingerprint === evidenceFingerprint && predecessorProofCookie === proofCookie
       ? 'confirmed'
       : 'changed';
 
@@ -106,7 +108,7 @@ function continuityReceipt(
     predecessorFingerprint,
     predecessorProofCookie,
     evidenceFingerprint,
-    proofCookie: proofCookieFor(evidenceFingerprint),
+    proofCookie,
     transition,
     authorityEffect: 'none',
   };
