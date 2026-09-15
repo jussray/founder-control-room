@@ -48,10 +48,10 @@ The GitHub App **Client ID is not used** by the current installation-token witne
 | Secret | Required by | Description |
 |---|---|---|
 | `SUPABASE_ACCESS_TOKEN` | Supabase administration workflows | Supabase CLI personal access token where a workflow explicitly requires it. |
-| `SUPABASE_DB_URL` | `deploy.yml / supabase-migrate` | Full Postgres connection string used by `supabase db push`. |
-| `SUPABASE_SERVICE_ROLE_KEY` | `deploy.yml / worker-deploy`, `reconcile` | Service-role JWT. Never expose client-side. |
-| `SUPABASE_PUBLISHABLE_KEY` | `deploy.yml / worker-deploy` | Publishable Supabase key used by server-side auth runtime. |
-| `NEXT_PUBLIC_SUPABASE_URL` | deploy and reconciliation workflows | Public Supabase project URL. This does not replace the Worker binding named `SUPABASE_URL`. |
+| `SUPABASE_DB_URL` | `deploy.yml / supabase-migrate` | Full Postgres connection string used by `supabase db push`. This is a GitHub deployment-plane secret. |
+| `SUPABASE_SERVICE_ROLE_KEY` | surviving API Worker runtime and reconciliation paths that explicitly name it | Service-role JWT. Canonical `deploy.yml` does **not** transport this value; production keeps it provider-held in the Cloudflare Worker secret plane. Never expose client-side. |
+| `SUPABASE_PUBLISHABLE_KEY` | surviving API Worker runtime | Publishable Supabase key used by server-side auth runtime. Canonical `deploy.yml` preserves the provider-held binding instead of copying the value through GitHub Actions. |
+| `NEXT_PUBLIC_SUPABASE_URL` | deploy and reconciliation workflows that explicitly reference it | Public Supabase project URL. This does not replace the Worker binding named `SUPABASE_URL`. |
 
 ---
 
@@ -73,6 +73,8 @@ The authority boundary is **provider + environment + operation class**, not one 
 For the current MCP read witness, create a token scoped to the Founder Control Room account with the minimum account-read permission required for account details. Do not add Access Edit, Workers Scripts Edit/Write, DNS Edit/Write, or other mutation permissions merely to make the probe green. Installing this token into the running Worker is a separate founder-approved runtime activation; the GitHub diagnostic secret does not automatically become a Worker binding.
 
 A documentation name is never allowed to override current executable workflow truth. When a workflow secret name changes, update this registry in the same repair lane or classify the old entry as historical rather than leaving a once-true name presented as current.
+
+The current production deployment path uses scoped Cloudflare credentials for Wrangler/Pages operations. It does not require GitHub Actions `id-token: write`, and it does not require a deploy key or SSH private key. Add OIDC only for a real relying party that accepts GitHub federation; use a read-only deploy key only for a separately approved single-host Git transport case.
 
 ---
 
@@ -116,7 +118,7 @@ Generate `FOUNDER_SESSION_ENCRYPTION_KEY` as exactly 32 random bytes encoded as 
 node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
 ```
 
-Store the generated value in the GitHub `production` environment as `FOUNDER_SESSION_ENCRYPTION_KEY`. The authorized deploy workflow requires that secret name and passes it to Wrangler as the surviving API Worker's secret binding. The value still belongs only in server-side secret planes, never Pages/browser configuration. Source wiring proves the required name and transport, not that the live provider currently has a valid value. After installation, verify only binding-name presence and an opaque-session login flow; never print or copy the secret value into evidence.
+Store the generated value in the surviving `founder-control-room` Worker's Cloudflare secret plane. Canonical `deploy.yml` requires only the deployment-plane secrets it actually consumes, reads back required Worker **names** before mutation, and preserves provider-held runtime secret values rather than copying them through GitHub Actions. Source wiring proves the required binding name, not that the live provider currently has a valid value. After installation, verify only binding-name presence and an opaque-session login flow; never print or copy the secret value into evidence.
 
 The existing provider-held OpenAI key reference remains:
 
@@ -137,16 +139,20 @@ After configuration, capture:
 
 ---
 
-## Deploy
+## Canonical deploy-plane configuration
+
+`DEPLOY_URL` is public configuration and is fixed to `https://api.foundercontrolroom.org` in the release workflows. It is **not** a secret.
 
 | Secret | Required by | Description |
 |---|---|---|
-| `DEPLOY_URL` | `deploy.yml / smoke-test` | Set to `https://api.foundercontrolroom.org` with no trailing slash. |
-| `FOUNDER_SESSION_ENCRYPTION_KEY` | `deploy.yml / authority-gate`, `deploy.yml / worker-deploy` | Required GitHub `production` secret. The gate requires its presence and the Worker runtime enforces the 43-character unpadded base64url / 32-byte key contract. Wrangler installs it as a Worker secret; never log or expose the value. |
-| `FOUNDER_SIGNAL_ENGINE_MCP_TOKEN` | authority gate and Worker deploy | Must match the encrypted value installed in the surviving Worker. |
-| `ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL` | authority gate and Worker deploy | Must match the approved private provider hook installed in the Worker. |
+| `SUPABASE_DB_URL` | `deploy.yml / supabase-migrate` | Migration-only Postgres URL used by the canonical deploy workflow. |
+| `CLOUDFLARE_API_TOKEN` | `deploy.yml / authority-gate`, `worker-deploy`, Pages release | Scoped Cloudflare deployment credential. |
+| `CLOUDFLARE_ACCOUNT_ID` | canonical deploy and Pages release | Cloudflare account identifier used with the scoped deployment credential. |
+| `CLOUDFLARE_DEPLOY_HOOK_URL` | `pages-production-release.yml` | Private Cloudflare Pages deployment hook used by the exact-SHA Pages release. |
 | `ZAPIER_CATCH_HOOK_URL` | `deploy.yml / proof-of-ship` | Dedicated Catch Hook for verified allowlisted release payloads; do not reuse the Worker bridge hook. |
 | `PROOF_OF_SHIP_STEERING_GRANT_ID` | `deploy.yml / proof-of-ship` | Revocable standing-policy identifier that explicitly activates scheduled publication; suggested value: `proof-of-ship-publish-v1`. |
+
+`FOUNDER_SESSION_ENCRYPTION_KEY`, `FOUNDER_SIGNAL_ENGINE_MCP_TOKEN`, `ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and `SUPABASE_PUBLISHABLE_KEY` are Worker/runtime bindings, not canonical deploy-plane values. The deploy verifies provider-held secret **names** where required and must not copy these values into GitHub merely to make deployment green.
 
 The proof-of-ship Catch Hook is intentionally separate from `ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL`. The deployment workflow fails closed when the dedicated hook or `PROOF_OF_SHIP_STEERING_GRANT_ID` is absent, and it sends a payload only after exact-SHA and Supabase proof pass. Configure the downstream Zap according to `docs/founder-signal-engine/proof-of-ship-publish-contract.md`; do not put the hook URL or grant value in repository code or Cloudflare bindings.
 
@@ -184,12 +190,7 @@ Never commit, log, or expose this value through a `NEXT_PUBLIC_*` variable.
 ### GitHub production environment
 
 ```text
-[ ] SUPABASE_DB_URL
-[ ] SUPABASE_SERVICE_ROLE_KEY
-[ ] SUPABASE_PUBLISHABLE_KEY
-[ ] FOUNDER_SESSION_ENCRYPTION_KEY (32 random bytes, unpadded base64url; supplied to Worker deploy)
-[ ] NEXT_PUBLIC_SUPABASE_URL
-[ ] GITHUB_WEBHOOK_SECRET
+[ ] SUPABASE_DB_URL for canonical migration deploy
 [ ] APP_ID (numeric Founder Control Room GitHub App ID)
 [ ] APP_PRIVATE_KEY (matching GitHub App private-key PEM)
 [ ] CLOUDFLARE_API_TOKEN for canonical founder-control-room mutation only
@@ -197,13 +198,11 @@ Never commit, log, or expose this value through a `NEXT_PUBLIC_*` variable.
 [ ] FCR_CLOUDFLARE_BUILDS_USER_TOKEN for read-only FCR Workers Builds inspection
 [ ] FCR_CLOUDFLARE_MCP_READ_TOKEN for official Cloudflare API MCP GET-only provider proof
 [ ] CLOUDFLARE_ACCOUNT_ID
+[ ] CLOUDFLARE_DEPLOY_HOOK_URL for exact-SHA Pages release
 [ ] CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID when Chief Access recovery or the trusted Chief runtime witness is activated; name presence here does not prove configuration
 [ ] CHIEF_CLOUDFLARE_ACCESS_CLIENT_SECRET when the trusted Chief runtime witness is activated; never expose the value
 [ ] CLOUDFLARE_ACCESS_CLIENT_ID only as the documented backward-compatible client-ID alias for Chief Access recovery or runtime witness when the Chief-specific name is absent
 [ ] CLOUDFLARE_ACCESS_CLIENT_SECRET only as the documented backward-compatible runtime-witness alias when the Chief-specific name is absent
-[ ] DEPLOY_URL=https://api.foundercontrolroom.org
-[ ] FOUNDER_SIGNAL_ENGINE_MCP_TOKEN
-[ ] ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL
 [ ] ZAPIER_CATCH_HOOK_URL for scheduled proof-of-ship publication
 [ ] PROOF_OF_SHIP_STEERING_GRANT_ID for scheduled proof-of-ship publication
 [ ] RECONCILE_SHARED_SECRET where enabled
