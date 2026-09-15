@@ -8,6 +8,8 @@ export const GOVERNED_EXECUTION_SCHEMA = 'fcr/governed-execution@v1' as const;
 
 export type GovernedExecutionDisposition = 'EXECUTE' | 'DENY' | 'RECONCILE';
 export type Reversibility = 'reversible' | 'compensatable' | 'irreversible';
+export type CredentialLane = 'control-plane' | 'project';
+export type NetworkMode = 'deny-all' | 'allowlist';
 
 export interface GovernedPrincipal {
   actorId: string;
@@ -36,6 +38,25 @@ export interface GovernedAuthoritySnapshot {
   adapterRegistryHash: string;
 }
 
+export interface GovernedExecutionBoundary {
+  missionId: string;
+  shellId: string;
+  credentialLane: CredentialLane;
+  credentialProjectId?: string;
+  allowedProviderIds: readonly string[];
+  providerFallback: 'deny';
+  network: {
+    mode: NetworkMode;
+    allowedHosts: readonly string[];
+    blockPrivateNetworks: true;
+  };
+  founderAuthorization: {
+    decisionReceiptId: string;
+    approvedByActorId: string;
+  };
+  humanFinalAuthorizationRequired: true;
+}
+
 export interface GovernedExecutionLease {
   schema: typeof GOVERNED_EXECUTION_SCHEMA;
   authority: AuthorityLease;
@@ -44,6 +65,7 @@ export interface GovernedExecutionLease {
   capabilities: readonly string[];
   forbiddenCapabilities: readonly string[];
   runtime: GovernedRuntimeBinding;
+  boundary: GovernedExecutionBoundary;
   authoritySnapshot: GovernedAuthoritySnapshot;
   execution: {
     idempotencyKey: string;
@@ -68,6 +90,24 @@ export interface GovernedExecutionWorld {
    */
   adapterCapabilities: readonly string[];
   runtime: GovernedRuntimeBinding;
+  boundary: {
+    missionId: string;
+    shellId: string;
+    credentialLane: CredentialLane;
+    credentialProjectId?: string;
+    requestedEgressHosts: readonly string[];
+    founderAuthorization: {
+      decisionReceiptId: string;
+      approvedByActorId: string;
+      valid: boolean;
+    };
+    killSwitches: {
+      global: boolean;
+      provider: boolean;
+      project: boolean;
+      capability: boolean;
+    };
+  };
   authoritySnapshot: GovernedAuthoritySnapshot;
   attempt: number;
   leaseConsumed: boolean;
@@ -103,10 +143,34 @@ function addReason(reasons: Set<string>, reason: string): void {
   reasons.add(reason);
 }
 
+function normalizedHost(value: string): string | undefined {
+  const candidate = normalized(value)?.toLowerCase();
+  if (!candidate) return undefined;
+  try {
+    const parsed = candidate.includes('://') ? new URL(candidate) : new URL(`https://${candidate}`);
+    return parsed.hostname.toLowerCase();
+  } catch {
+    return undefined;
+  }
+}
+
+function isPrivateOrLocalHost(host: string): boolean {
+  if (host === 'localhost' || host === '::1' || host.endsWith('.localhost') || host.endsWith('.local')) return true;
+  if (/^127\./.test(host) || /^10\./.test(host) || /^192\.168\./.test(host)) return true;
+  const match = host.match(/^172\.(\d{1,3})\./);
+  if (match) {
+    const second = Number(match[1]);
+    if (second >= 16 && second <= 31) return true;
+  }
+  if (/^169\.254\./.test(host) || /^0\./.test(host)) return true;
+  return false;
+}
+
 /**
  * FCR's execution membrane. The runtime may request work, but only the broker-owned
- * world state can prove that the exact authority, subject, runtime, resources, and
- * adapter capability graph still match the lease at use time.
+ * world state can prove that the exact authority, subject, project shell, provider,
+ * credential lane, network boundary, runtime, resources, and adapter capability graph
+ * still match the lease at use time.
  */
 export function evaluateGovernedExecution(
   lease: GovernedExecutionLease | null | undefined,
@@ -158,6 +222,91 @@ export function evaluateGovernedExecution(
   }
   if (!same(lease.runtime.pluginSetHash, world.runtime.pluginSetHash)) {
     addReason(reasons, 'plugin_set_drift');
+  }
+
+  if (!same(lease.boundary.missionId, world.boundary.missionId)) {
+    addReason(reasons, 'mission_drift');
+  }
+  if (!same(lease.boundary.shellId, world.boundary.shellId)) {
+    addReason(reasons, 'shell_drift');
+  }
+  if (lease.boundary.credentialLane !== world.boundary.credentialLane) {
+    addReason(reasons, 'credential_lane_drift');
+  }
+  if (!same(lease.boundary.credentialProjectId, world.boundary.credentialProjectId)) {
+    addReason(reasons, 'credential_project_drift');
+  }
+  if (lease.boundary.credentialLane === 'project') {
+    if (!normalized(lease.boundary.credentialProjectId)) {
+      addReason(reasons, 'missing_project_credential_binding');
+    }
+    if (!same(lease.boundary.credentialProjectId, lease.principal.projectId)) {
+      addReason(reasons, 'lease_credential_project_mismatch');
+    }
+    if (!same(world.boundary.credentialProjectId, world.principal.projectId)) {
+      addReason(reasons, 'world_credential_project_mismatch');
+    }
+  }
+
+  const allowedProviders = new Set(
+    lease.boundary.allowedProviderIds.map((provider) => normalized(provider)).filter(Boolean),
+  );
+  if (allowedProviders.size === 0) {
+    addReason(reasons, 'missing_provider_allowlist');
+  }
+  if (!allowedProviders.has(normalized(world.runtime.providerId))) {
+    addReason(reasons, `provider_not_leased:${world.runtime.providerId}`);
+  }
+  if (lease.boundary.providerFallback !== 'deny') {
+    addReason(reasons, 'provider_fallback_not_denied');
+  }
+
+  if (lease.boundary.humanFinalAuthorizationRequired !== true) {
+    addReason(reasons, 'human_final_authorization_not_required');
+  }
+  if (!world.boundary.founderAuthorization.valid) {
+    addReason(reasons, 'founder_authorization_invalid');
+  }
+  if (!same(
+    lease.boundary.founderAuthorization.decisionReceiptId,
+    world.boundary.founderAuthorization.decisionReceiptId,
+  )) {
+    addReason(reasons, 'founder_decision_receipt_drift');
+  }
+  if (!same(
+    lease.boundary.founderAuthorization.approvedByActorId,
+    world.boundary.founderAuthorization.approvedByActorId,
+  )) {
+    addReason(reasons, 'founder_authorizer_drift');
+  }
+  if (!same(lease.boundary.founderAuthorization.approvedByActorId, lease.principal.actorId)) {
+    addReason(reasons, 'founder_authorizer_not_principal');
+  }
+
+  for (const [scope, triggered] of Object.entries(world.boundary.killSwitches)) {
+    if (triggered) addReason(reasons, `kill_switch:${scope}`);
+  }
+
+  const allowedHosts = new Set(
+    lease.boundary.network.allowedHosts.map(normalizedHost).filter(Boolean),
+  );
+  const requestedHosts = world.boundary.requestedEgressHosts.map(normalizedHost);
+  if (requestedHosts.some((host) => !host)) {
+    addReason(reasons, 'invalid_egress_host');
+  }
+  if (lease.boundary.network.blockPrivateNetworks !== true) {
+    addReason(reasons, 'private_network_block_not_required');
+  }
+  for (const host of requestedHosts) {
+    if (!host) continue;
+    if (isPrivateOrLocalHost(host)) {
+      addReason(reasons, `private_network_egress_denied:${host}`);
+    }
+    if (lease.boundary.network.mode === 'deny-all') {
+      addReason(reasons, `network_egress_denied:${host}`);
+    } else if (!allowedHosts.has(host)) {
+      addReason(reasons, `egress_host_not_leased:${host}`);
+    }
   }
 
   if (!same(
