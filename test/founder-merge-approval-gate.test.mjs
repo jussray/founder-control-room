@@ -18,6 +18,7 @@ test('required test-ledger context owns terminal exact-head observation', () => 
 
 test('required test-ledger context requires exact founder merge approval', () => {
   assert.match(workflow, /issues: read/);
+  assert.match(workflow, /pull-requests: write/);
   assert.match(workflow, /- name: Require exact founder merge approval/);
   assert.match(workflow, /FOUNDER_GITHUB_LOGIN: jussray/);
   assert.match(workflow, /fcr-founder-merge-approval:v1/);
@@ -30,6 +31,17 @@ test('required test-ledger context requires exact founder merge approval', () =>
   assert.match(workflow, /latest\.receipt\.decision !== 'approve'/);
   assert.match(workflow, /exactCandidateBound: true/);
   assert.match(workflow, /authorizesMerge: true/);
+});
+
+test('continuity approval fields follow the exact founder decision', () => {
+  assert.match(workflow, /async function setContinuityApproval/);
+  assert.match(workflow, /merge_approved: \*\*\$\{approved \? 'true' : 'false'\}\*\*/);
+  assert.match(workflow, /authorizes_merge: \*\*\$\{approved \? 'true' : 'false'\}\*\*/);
+  assert.match(workflow, /merge_approval_id:/);
+  assert.match(workflow, /merge_approval_comment:/);
+  assert.match(workflow, /await setContinuityApproval\(\{approved: false\}\)/);
+  assert.match(workflow, /await setContinuityApproval\(\{\n\s+approved: true,/);
+  assert.match(workflow, /continuityReceiptUpdated: true/);
 });
 
 test('approval evidence is emitted as a separate receipt', () => {
