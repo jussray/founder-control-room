@@ -6,9 +6,9 @@ import {
   resolveFounderMergeDecision,
 } from '../scripts/founder-merge-approval.mjs';
 
-const workflow = fs.readFileSync('.github/workflows/control-room-test-ledger.yml', 'utf8');
-const continuityWorkflow = fs.readFileSync('.github/workflows/pr-continuity.yml', 'utf8');
-const continuitySource = fs.readFileSync('scripts/pr-continuity.mjs', 'utf8');
+const candidateWorkflow = fs.readFileSync('.github/workflows/control-room-test-ledger.yml', 'utf8');
+const trustedWorkflow = fs.readFileSync('.github/workflows/founder-final-gate.yml', 'utf8');
+const publisher = fs.readFileSync('scripts/publish-founder-final-gate.mjs', 'utf8');
 
 const candidate = {
   repository: 'jussray/founder-control-room',
@@ -48,40 +48,78 @@ function approvalComment({
   };
 }
 
-test('required test-ledger context owns terminal exact-head observation', () => {
-  assert.match(workflow, /ledger-contract:\n\s+name: Verify test-ledger contract/);
-  assert.match(workflow, /CONTROL_ROOM_LEDGER_SELF_CHECK: Verify test-ledger contract/);
-  assert.match(workflow, /- name: Observe every exact-head check lane/);
-  assert.match(workflow, /- name: Require stable exact-head ledger/);
-  assert.match(workflow, /observerState !== 'stable'/);
-  assert.match(workflow, /\['failed', 'queued', 'running', 'unknown'\]/);
-  assert.match(workflow, /check\?\.name === 'Required Gate' && check\?\.state === 'passed'/);
-  assert.doesNotMatch(workflow, /\n\s+publish-ledger:/);
+test('candidate-controlled ledger remains evidence-only and cannot emit the required founder-final context', () => {
+  assert.match(candidateWorkflow, /name: Test-ledger source contract/);
+  assert.match(candidateWorkflow, /name: Publish exact-head test ledger/);
+  assert.doesNotMatch(candidateWorkflow, /name: Verify test-ledger contract/);
+  assert.doesNotMatch(candidateWorkflow, /issues: read/);
+  assert.doesNotMatch(candidateWorkflow, /Require exact founder merge approval/);
+  assert.doesNotMatch(candidateWorkflow, /secrets\.APP_PRIVATE_KEY/);
 });
 
-test('required ledger gate validates exact founder authority without PR metadata write', () => {
-  assert.match(workflow, /issues: read/);
-  assert.doesNotMatch(workflow, /pull-requests: write/);
-  assert.match(workflow, /- name: Require exact founder merge approval/);
-  assert.match(workflow, /FOUNDER_GITHUB_LOGIN: jussray/);
-  assert.match(workflow, /FOUNDER_GITHUB_USER_ID: '286642846'/);
-  assert.match(workflow, /resolveFounderMergeDecision/);
-  assert.match(workflow, /if \(!decision\.approved\)/);
-  assert.match(workflow, /authorizesMerge: true/);
+test('trusted founder-final workflow runs only from default-branch issue comments under immutable founder identity', () => {
+  assert.match(trustedWorkflow, /issue_comment:/);
+  assert.match(trustedWorkflow, /github\.event\.issue\.pull_request != null/);
+  assert.match(trustedWorkflow, /github\.event\.comment\.user\.id == 286642846/);
+  assert.match(trustedWorkflow, /github\.event\.comment\.user\.login == 'jussray'/);
+  assert.match(trustedWorkflow, /contains\(github\.event\.comment\.body, 'fcr-founder-merge-approval:v1'\)/);
+  assert.match(trustedWorkflow, /test "\$GITHUB_REF" = 'refs\/heads\/main'/);
+  assert.match(trustedWorkflow, /test "\$current_main" = "\$EXPECTED_TRUSTED_MAIN_SHA"/);
+  assert.doesNotMatch(trustedWorkflow, /pull_request:/);
 });
 
-test('founder approval binds to live target branch rather than stale PR base snapshot', () => {
-  assert.match(workflow, /fetch-depth: 0/);
-  assert.match(workflow, /- name: Resolve exact live base for founder approval/);
-  assert.match(workflow, /BASE_REF: \$\{\{ github\.event\.pull_request\.base\.ref \}\}/);
-  assert.match(workflow, /git merge-base --is-ancestor "\$live_base" "\$EXPECTED_HEAD_SHA"/);
-  assert.match(workflow, /FOUNDER_APPROVAL_BASE_SHA=%s/);
-  assert.match(workflow, /process\.env\.FOUNDER_APPROVAL_BASE_SHA/);
-  assert.doesNotMatch(workflow, /BASE_SHA: \$\{\{ github\.event\.pull_request\.base\.sha \}\}/);
+test('production App secrets are scoped only to the trusted publication step', () => {
+  const marker = '      - name: Publish and read back trusted Founder Final Gate';
+  const next = '      - name: Re-read trusted main after publication';
+  const start = trustedWorkflow.indexOf(marker);
+  const end = trustedWorkflow.indexOf(next, start);
+  assert.ok(start >= 0 && end > start);
+  const before = trustedWorkflow.slice(0, start);
+  const step = trustedWorkflow.slice(start, end);
+  const after = trustedWorkflow.slice(end);
+  for (const mapping of [
+    'GITHUB_APP_ID: ${{ secrets.APP_ID }}',
+    'GITHUB_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}',
+  ]) {
+    assert.doesNotMatch(before, new RegExp(mapping.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+    assert.ok(step.includes(mapping));
+    assert.doesNotMatch(after, new RegExp(mapping.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  }
+  assert.match(trustedWorkflow, /environment: production/);
 });
 
-test('founder approval comment pagination fails closed before evidence can be truncated', () => {
-  assert.match(workflow, /if \(page === 10\) throw new Error\('FOUNDER_APPROVAL_COMMENT_PAGINATION_LIMIT_EXCEEDED'\)/);
+test('trusted publisher preserves deterministic-review then Founder Final ordering', () => {
+  assert.match(publisher, /produceDeterministicReview/);
+  assert.match(publisher, /expectedReviewSignalName\(reviewReceipt\)/);
+  assert.match(publisher, /FOUNDER_FINAL_TRUSTED_DETERMINISTIC_WITNESS_MISSING/);
+  assert.match(publisher, /name: REQUIRED_GATE_NAME/);
+  assert.match(publisher, /appId: '15368'/);
+  assert.match(publisher, /const proofReadyMs = Math\.max/);
+  assert.match(publisher, /if \(approvedAtMs < proofReadyMs\)/);
+  assert.match(publisher, /FOUNDER_FINAL_APPROVAL_PRECEDES_PROOF_READY/);
+  assert.match(publisher, /FOUNDER_FINAL_MAX_AGE_MS = 15 \* 60 \* 1000/);
+});
+
+test('trusted publisher re-reads exact candidate and blocks unresolved review threads', () => {
+  assert.match(publisher, /assertNoUnresolvedReviewThreads/);
+  assert.match(publisher, /FOUNDER_FINAL_UNRESOLVED_REVIEW_THREADS/);
+  assert.match(publisher, /FOUNDER_FINAL_CANDIDATE_MOVED_BEFORE_PUBLICATION/);
+  assert.match(publisher, /FOUNDER_FINAL_CANDIDATE_MOVED_AFTER_PUBLICATION/);
+  assert.match(publisher, /provider\.resolveRef\(PROJECT_ID, 'main'\)/);
+  assert.match(publisher, /provider\.getPullRequestReviewContext/);
+});
+
+test('trusted App publishes the fixed required context with exact provider readback but never merges', () => {
+  assert.match(publisher, /FOUNDER_FINAL_CHECK_NAME = 'Verify test-ledger contract'/);
+  assert.match(publisher, /name: FOUNDER_FINAL_CHECK_NAME/);
+  assert.match(publisher, /conclusion: 'success'/);
+  assert.match(publisher, /external_id: fingerprint/);
+  assert.match(publisher, /String\(run\?\.app\?\.id \?\? ''\) === appId/);
+  assert.match(publisher, /FOUNDER_FINAL_PROVIDER_READBACK_MISSING/);
+  assert.doesNotMatch(publisher, /\.integrate\(/);
+  assert.doesNotMatch(publisher, /merge_pull_request/);
+  assert.match(publisher, /mergeExecutionAttempted: false/);
+  assert.match(publisher, /providerRulesetMutationAttempted: false/);
 });
 
 test('exact unedited founder approval authorizes only its bound candidate', () => {
@@ -120,20 +158,4 @@ test('latest exact founder revoke supersedes earlier approve', () => {
   assert.equal(decision.approved, false);
   assert.equal(decision.sourceCommentId, '1007');
   assert.equal(mergeAuthorityStateForDecision(decision).mergeApproved, false);
-});
-
-test('PR Continuity owns approval metadata and reads the same founder decision source', () => {
-  assert.match(continuityWorkflow, /issues: read/);
-  assert.match(continuitySource, /resolveFounderMergeDecision/);
-  assert.match(continuitySource, /mergeAuthorityStateForDecision/);
-  assert.match(continuitySource, /listIssueComments/);
-  assert.match(continuitySource, /mergeApprovalId/);
-  assert.match(continuitySource, /mergeApprovalComment/);
-});
-
-test('approval evidence is emitted as a separate receipt', () => {
-  assert.match(workflow, /FOUNDER_MERGE_APPROVAL_PATH: artifacts\/founder-merge-approval\.json/);
-  assert.match(workflow, /artifacts\/control-room-test-ledger\.json/);
-  assert.match(workflow, /artifacts\/founder-merge-approval\.json/);
-  assert.match(workflow, /if-no-files-found: warn/);
 });
