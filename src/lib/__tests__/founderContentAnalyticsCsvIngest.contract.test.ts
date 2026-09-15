@@ -109,4 +109,11 @@ describe('founder content analytics CSV ingestion', () => {
     expect(receipt.audit.comparison.recent.engagements).toBeNull();
     expect(receipt.audit.comparison.change.engagement_rate).toBeNull();
   });
+
+  it('rejects overlong account identity instead of truncating distinct provenance into one receipt identity', () => {
+    expect(() => parseFounderContentAnalyticsCsv(safeCsv, {
+      ...metadata,
+      account_id: 'a'.repeat(201),
+    })).toThrow(/metadata\.account_id exceeds 200 characters/);
+  });
 });
