@@ -1,6 +1,9 @@
 name: Goalfix Vertical Slice Proof
 
 on:
+  push:
+    branches:
+      - main
   pull_request:
     paths:
       - 'src/goalfix/**'

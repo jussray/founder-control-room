@@ -50,11 +50,11 @@ interface NormalizedContractUrls {
 
 const EXACT_COMMIT_SHA = /^[0-9a-f]{40}$/i;
 const SEKRET_BIP_REPOSITORY = 'jussray/Sekret-Bip';
-const SEKRET_BIP_AUDITED_HEAD = '9b3fef2633071628c0e158c043d096deede8c6ff';
+const SEKRET_BIP_AUDITED_HEAD = '87e80c1e966a8ec5e996a65587546c6cb57dbfdf';
 const SEKRET_BIP_AUDITED_CONTRACT_BLOBS = {
   'app/index.tsx': '299da021482968e415ab1016b19f52daeeec497a',
-  'screens/WebWelcomeScreen.tsx': '3228a5c997ac3a72e8d15dd37d5fb029c993607e',
-  'constants/frontDoorTheme.ts': '0c331d30058ad21ea3cbb51e0788165008992d2f',
+  'screens/WebWelcomeScreen.tsx': 'b66acdb7b2f733c78ab53a50db194439b8629c4f',
+  'constants/frontDoorTheme.ts': '8e296dc2a546766c1a4fbefafdd4e11e7ad73dc2',
   'docs/COMPANION_NAME_CANON.md': 'fec910ecd3c99b08f1305225cfe3d1b1e82aa171',
   'docs/FRONT_DOOR_VARIANTS.md': '171db3a64822a46d052b290b55ebc890dc7a8d76',
   'implementation-ledger.extensions/human-ai-identity-contract.json': '2266fb7f8bf51506011d976f5907e9656da5a67b',
