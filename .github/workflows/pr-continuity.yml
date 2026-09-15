@@ -33,7 +33,7 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '24'
-      - run: node --test test/pr-continuity.attack20.test.mjs
+      - run: node --test test/pr-continuity.attack20.test.mjs test/pr-continuity-founder-approval.test.mjs
       - env:
           GITHUB_TOKEN: "${{ github.token }}"
           GITHUB_REPOSITORY: "${{ github.repository }}"
@@ -66,7 +66,7 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '24'
-      - run: node --test test/pr-continuity.attack20.test.mjs
+      - run: node --test test/pr-continuity.attack20.test.mjs test/pr-continuity-founder-approval.test.mjs
       - env:
           GITHUB_TOKEN: "${{ github.token }}"
           GITHUB_REPOSITORY: "${{ github.repository }}"
@@ -91,7 +91,7 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '24'
-      - run: node --test test/pr-continuity.attack20.test.mjs
+      - run: node --test test/pr-continuity.attack20.test.mjs test/pr-continuity-founder-approval.test.mjs
       - env:
           GITHUB_TOKEN: "${{ github.token }}"
           GITHUB_REPOSITORY: "${{ github.repository }}"
