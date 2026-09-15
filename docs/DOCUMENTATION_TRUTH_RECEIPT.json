@@ -1,11 +1,12 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Preserve the current TinyFish Cloudflare activation and read-only Shopify child-provider boundaries while documenting the bounded Attack 3000 content observation, advisory Trend Radar, and deterministic founder-content approval retry contracts without converting source, analytics, rankings, retry identity, provider configuration, mergeability, or deployment into publication, provider-mutation, merge, deploy, spend, or external-contact authority.",
+  "purpose": "Preserve the current TinyFish Cloudflare activation and read-only Shopify child-provider boundaries while documenting the bounded Attack 3000 content observation, advisory Trend Radar, deterministic founder-content approval retry contracts, and the merge-control-plane trust-root rule that prevents a candidate from certifying changes to its own required merge ledger or PR continuity gate through the normal deterministic reviewer.",
   "domains": [
     "cloudflare-authority",
     "repository-provider",
     "content-evidence",
-    "publishing"
+    "publishing",
+    "merge-authority"
   ],
   "changes": [
     {
@@ -21,7 +22,8 @@
         "`README.md` must describe Shopify child-provider observation as source-only, non-authorizing evidence and must never relabel a matching snapshot as live provider authority or mutation permission.",
         "`README.md` must document Attack 3000 content currentness as independently evaluated from bounded observation time rather than trusted from a CURRENT label, and must keep distribution, external demand, publication, provider mutation, merge, deploy, spend, and external-contact authority separate.",
         "`README.md` must describe the Content Trend Radar as an advisory existing-lane capability whose first-wave evidence requires current source provenance and whose ranking cannot authorize publication, scheduling, spend, provider mutation, merge, deploy, or external contact.",
-        "`README.md` must describe deterministic founder-content approval reservation and exact active retry recovery without allowing evidence rotation, retry, or a stored reservation to mint new publication authority."
+        "`README.md` must describe deterministic founder-content approval reservation and exact active retry recovery without allowing evidence rotation, retry, or a stored reservation to mint new publication authority.",
+        "`README.md` must identify the required merge-ledger and PR-continuity workflows/scripts as merge trust roots that cannot certify their own modification through the normal deterministic reviewer and require the separately explicit issue #418 constitutional path for integration."
       ]
     },
     {
@@ -103,6 +105,30 @@
       "path": "docs/founder-signal-engine/linkedin-analytics-continuity.md",
       "claims": [
         "`docs/founder-signal-engine/linkedin-analytics-continuity.md` must document independently evaluated content freshness, direct demand evidence, current trend provenance, fingerprint comparison, deterministic approval retry identity, and observation-only authority without rewriting historical evidence when currentness expires."
+      ]
+    },
+    {
+      "path": "src/review/deterministicReviewProducer.ts",
+      "claims": [
+        "`src/review/deterministicReviewProducer.ts` must classify required merge-ledger and PR-continuity control-plane changes as P1 trust-root self-modification, require merge-authority documentation companions, and never allow a candidate to self-certify a modified merge gate through the normal deterministic review path."
+      ]
+    },
+    {
+      "path": "docs/FOUNDER_MERGE_AUTHORITY.md",
+      "claims": [
+        "`docs/FOUNDER_MERGE_AUTHORITY.md` must name the required merge-ledger and PR-continuity workflows/scripts as deterministic-review trust roots and require the separately explicit issue #418 constitutional/manual-override path for any candidate that changes them."
+      ]
+    },
+    {
+      "path": "GLOBAL_AI.md",
+      "claims": [
+        "`GLOBAL_AI.md` must keep merge-control-plane trust-root self-modification fail-closed and must never reinterpret broad founder continuation language as the issue #418 constitutional override."
+      ]
+    },
+    {
+      "path": ".ai/skills/juss-flow-launch-loop/SKILL.md",
+      "claims": [
+        "`.ai/skills/juss-flow-launch-loop/SKILL.md` must require merge-ledger and PR-continuity trust-root changes to P1-block normal deterministic self-certification and preserve the exact-candidate constitutional integration gate."
       ]
     }
   ]
