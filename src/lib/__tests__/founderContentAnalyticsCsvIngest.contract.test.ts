@@ -104,6 +104,43 @@ describe('founder content analytics CSV ingestion', () => {
       .toThrow(/daily date 2026-09-04 falls outside snapshot window 2026-09-02\.\.2026-09-03/);
   });
 
+  it('rejects reversed comparison windows instead of emitting false-complete zero evidence', () => {
+    expect(() => parseFounderContentAnalyticsCsv(safeCsv, {
+      ...metadata,
+      comparison: {
+        baseline_start: '2026-09-02',
+        baseline_end: '2026-09-01',
+        recent_start: '2026-09-02',
+        recent_end: '2026-09-03',
+      },
+    })).toThrow(/baseline_start is after metadata\.comparison\.baseline_end/);
+  });
+
+  it('rejects impossible calendar dates instead of normalizing them into provenance', () => {
+    const impossible = safeCsv.replaceAll('2026-09-01', '2026-02-30');
+
+    expect(() => parseFounderContentAnalyticsCsv(impossible, {
+      ...metadata,
+      comparison: {
+        baseline_start: '2026-02-30',
+        baseline_end: '2026-02-30',
+        recent_start: '2026-09-02',
+        recent_end: '2026-09-02',
+      },
+    })).toThrow(/must be a real calendar date/);
+  });
+
+  it('preserves prototype-named audience segments as data instead of object behavior', () => {
+    const prototypeSegment = safeCsv.replaceAll('Founder', '__proto__');
+    const receipt = parseFounderContentAnalyticsCsv(prototypeSegment, metadata);
+
+    expect(receipt.audience_segments).toContainEqual(expect.objectContaining({
+      audience_segment: '__proto__',
+      baseline_share: 0.2,
+      current_share: 0.3,
+    }));
+  });
+
   it('keeps missing metric values null and makes incomplete comparison evidence explicit', () => {
     const receipt = parseFounderContentAnalyticsCsv(safeCsv, {
       ...metadata,
