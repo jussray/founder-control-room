@@ -91,12 +91,19 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '24'
-      - run: node --test test/pr-continuity.attack20.test.mjs test/pr-continuity-founder-approval.test.mjs
-      - env:
+      - run: node --test test/pr-continuity.attack20.test.mjs test/pr-continuity-founder-approval.test.mjs test/pr-continuity-rollover-outcome.test.mjs
+      - id: rollover-attempt
+        continue-on-error: true
+        env:
           GITHUB_TOKEN: "${{ github.token }}"
           GITHUB_REPOSITORY: "${{ github.repository }}"
           ROOT_BASE_REF: main
         run: node scripts/pr-continuity.mjs rollover
+      - name: Verify rollover control-plane outcome
+        env:
+          ROLLOVER_ATTEMPT_OUTCOME: "${{ steps.rollover-attempt.outcome }}"
+          EXPECTED_ROOT_SHA: "${{ github.sha }}"
+        run: node scripts/verify-pr-continuity-rollover-outcome.mjs
       - if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
