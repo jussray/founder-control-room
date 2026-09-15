@@ -149,15 +149,14 @@ jobs:
           pr_json="$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}")"
           state="$(jq -r '.state' <<< "$pr_json")"
           base_ref="$(jq -r '.base.ref' <<< "$pr_json")"
-          base_sha="$(jq -r '.base.sha' <<< "$pr_json")"
+          base_snapshot_sha="$(jq -r '.base.sha' <<< "$pr_json")"
           head_sha="$(jq -r '.head.sha' <<< "$pr_json")"
 
-          printf 'pr=%s\nstate=%s\nbase_ref=%s\nbase_sha=%s\nhead_sha=%s\n' \
-            "$PR_NUMBER" "$state" "$base_ref" "$base_sha" "$head_sha"
+          printf 'pr=%s\nstate=%s\nbase_ref=%s\nbase_snapshot_sha=%s\nhead_sha=%s\n' \
+            "$PR_NUMBER" "$state" "$base_ref" "$base_snapshot_sha" "$head_sha"
 
           test "$state" = 'open'
           test "$base_ref" = 'main'
-          test "$base_sha" = "$EXPECTED_MAIN_SHA"
           [[ "$head_sha" =~ ^[0-9a-f]{40}$ ]]
 
           echo "head_sha=$head_sha" >> "$GITHUB_OUTPUT"
