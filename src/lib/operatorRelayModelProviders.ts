@@ -1,9 +1,26 @@
-import type { OperatorRelayRequestV1 } from './operatorRelay.js';
+import type { OperatorRelayRequestV1, RelayOperatorId } from './operatorRelay.js';
 import type { OperatorRelayAdapters } from './operatorRelayDispatch.js';
 import { operatorRelayAdapterFromTextProvider } from './operatorRelayProvider.js';
+import {
+  operatorRelayHandoffAdapter,
+  operatorRelayTransportAvailability,
+  resolveOperatorRelayTransport,
+} from './operatorRelayTransport.js';
 
 type FetchLike = typeof fetch;
 type JsonRecord = Record<string, unknown>;
+
+const PROVIDER_TIMEOUT_MS = 60_000;
+const MAX_PROVIDER_RESPONSE_BYTES = 512 * 1024;
+const SAFE_PROVIDER_ID = /^[A-Za-z0-9._:-]{1,200}$/;
+const SAFE_MODEL_ID = /^[A-Za-z0-9._:/-]{1,200}$/;
+const SECRET_VALUE_PATTERNS = [
+  /\bBearer\s+[A-Za-z0-9._~+\/-]{16,}\b/i,
+  /\b(?:api[_-]?key|secret|token|password|passwd)\s*[:=]\s*["']?[^\s"']{8,}/i,
+  /\bsk-(?:proj-)?[A-Za-z0-9_-]{16,}\b/,
+  /\bsk-ant-[A-Za-z0-9_-]{16,}\b/,
+  /\bpplx-[A-Za-z0-9_-]{16,}\b/,
+] as const;
 
 function record(value: unknown): JsonRecord | null {
   return value && typeof value === 'object' && !Array.isArray(value)
@@ -29,22 +46,52 @@ function ensureRelaySensitivity(request: OperatorRelayRequestV1): void {
   }
 }
 
+function ensureNoSecretValues(request: OperatorRelayRequestV1): void {
+  const outbound = `${request.goal}\n${request.context.summary}`;
+  if (SECRET_VALUE_PATTERNS.some((pattern) => pattern.test(outbound))) {
+    throw new Error('relay context appears to contain secret-bearing material');
+  }
+}
+
+async function readBoundedResponseText(response: Response, label: string): Promise<string> {
+  if (!response.body) return '';
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let bytes = 0;
+  let text = '';
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      bytes += value.byteLength;
+      if (bytes > MAX_PROVIDER_RESPONSE_BYTES) {
+        await reader.cancel();
+        throw new Error(`${label} exceeded the bounded response limit`);
+      }
+      text += decoder.decode(value, { stream: true });
+    }
+    text += decoder.decode();
+    return text;
+  } finally {
+    reader.releaseLock();
+  }
+}
+
 async function jsonResponse(response: Response, label: string): Promise<JsonRecord> {
+  const raw = await readBoundedResponseText(response, label);
+  if (!response.ok) {
+    // Provider error bodies are intentionally not surfaced. They can echo prompts,
+    // credentials, or internal provider diagnostics. Status is sufficient evidence.
+    throw new Error(`${label} failed with HTTP ${response.status}`);
+  }
   let body: unknown;
   try {
-    body = await response.json();
+    body = JSON.parse(raw);
   } catch {
     throw new Error(`${label} returned non-JSON output`);
   }
   const parsed = record(body);
   if (!parsed) throw new Error(`${label} returned an invalid response object`);
-  if (!response.ok) {
-    const error = record(parsed.error);
-    const message = typeof error?.message === 'string'
-      ? error.message
-      : `${label} failed with HTTP ${response.status}`;
-    throw new Error(message);
-  }
   return parsed;
 }
 
@@ -60,7 +107,7 @@ function openAiText(body: JsonRecord): string {
       if (typeof block?.text === 'string' && block.text.trim()) parts.push(block.text.trim());
     }
   }
-  if (parts.length === 0) throw new Error('OpenAI relay response contained no text');
+  if (parts.length === 0) throw new Error('OpenAI-compatible relay response contained no text');
   return parts.join('\n');
 }
 
@@ -76,19 +123,33 @@ function anthropicText(body: JsonRecord): string {
   return parts.join('\n');
 }
 
-function perplexityText(body: JsonRecord): string {
-  const choices = Array.isArray(body.choices) ? body.choices : [];
-  const first = record(choices[0]);
-  const message = record(first?.message);
-  if (typeof message?.content !== 'string' || !message.content.trim()) {
-    throw new Error('Perplexity relay response contained no text');
-  }
-  return message.content.trim();
+function safeEvidencePart(value: unknown, fallback: string, pattern: RegExp): string {
+  return typeof value === 'string' && pattern.test(value.trim()) ? value.trim() : fallback;
 }
 
-function evidenceRef(provider: string, body: JsonRecord): string {
-  const id = typeof body.id === 'string' && body.id.trim() ? body.id.trim() : 'unidentified-response';
-  return `provider:${provider}:${id}`;
+function evidenceRef(provider: string, configuredModel: string, body: JsonRecord): string {
+  const id = safeEvidencePart(body.id, 'unidentified-response', SAFE_PROVIDER_ID);
+  const model = safeEvidencePart(configuredModel, 'configured-model', SAFE_MODEL_ID);
+  return `provider:${provider}:model:${model}:response:${id}`;
+}
+
+function prepareProviderRequest(request: OperatorRelayRequestV1): string {
+  ensureRelaySensitivity(request);
+  ensureNoSecretValues(request);
+  return relayPrompt(request);
+}
+
+function handoffIfConfigured(
+  adapters: OperatorRelayAdapters,
+  operator: RelayOperatorId,
+  providerApiAvailable: boolean,
+  env: NodeJS.ProcessEnv,
+): void {
+  if (providerApiAvailable || adapters[operator]) return;
+  const resolution = resolveOperatorRelayTransport(
+    operatorRelayTransportAvailability(operator, false, env),
+  );
+  if (resolution.mode === 'handoff') adapters[operator] = operatorRelayHandoffAdapter(resolution);
 }
 
 export function createServerOperatorRelayAdapters(
@@ -103,10 +164,14 @@ export function createServerOperatorRelayAdapters(
   const perplexityKey = env.PERPLEXITY_API_KEY?.trim();
   const perplexityModel = env.FCR_RELAY_PERPLEXITY_MODEL?.trim();
 
+  const openAiAvailable = Boolean(openAiKey && openAiModel);
+  const anthropicAvailable = Boolean(anthropicKey && anthropicModel);
+  const perplexityAvailable = Boolean(perplexityKey && perplexityModel);
+
   if (openAiKey && openAiModel) {
     adapters.codex = operatorRelayAdapterFromTextProvider({
       invoke: async ({ request }) => {
-        ensureRelaySensitivity(request);
+        const prompt = prepareProviderRequest(request);
         const response = await fetchImpl('https://api.openai.com/v1/responses', {
           method: 'POST',
           headers: {
@@ -115,15 +180,15 @@ export function createServerOperatorRelayAdapters(
           },
           body: JSON.stringify({
             model: openAiModel,
-            input: relayPrompt(request),
+            input: prompt,
             store: false,
             max_output_tokens: 2_000,
           }),
           redirect: 'error',
-          signal: AbortSignal.timeout(60_000),
+          signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
         });
         const body = await jsonResponse(response, 'OpenAI relay');
-        return { text: openAiText(body), evidenceRef: evidenceRef('openai', body) };
+        return { text: openAiText(body), evidenceRef: evidenceRef('openai', openAiModel, body) };
       },
     });
   }
@@ -131,7 +196,7 @@ export function createServerOperatorRelayAdapters(
   if (anthropicKey && anthropicModel) {
     adapters['claude-code'] = operatorRelayAdapterFromTextProvider({
       invoke: async ({ request }) => {
-        ensureRelaySensitivity(request);
+        const prompt = prepareProviderRequest(request);
         const response = await fetchImpl('https://api.anthropic.com/v1/messages', {
           method: 'POST',
           headers: {
@@ -142,13 +207,13 @@ export function createServerOperatorRelayAdapters(
           body: JSON.stringify({
             model: anthropicModel,
             max_tokens: 2_000,
-            messages: [{ role: 'user', content: relayPrompt(request) }],
+            messages: [{ role: 'user', content: prompt }],
           }),
           redirect: 'error',
-          signal: AbortSignal.timeout(60_000),
+          signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
         });
         const body = await jsonResponse(response, 'Anthropic relay');
-        return { text: anthropicText(body), evidenceRef: evidenceRef('anthropic', body) };
+        return { text: anthropicText(body), evidenceRef: evidenceRef('anthropic', anthropicModel, body) };
       },
     });
   }
@@ -156,8 +221,8 @@ export function createServerOperatorRelayAdapters(
   if (perplexityKey && perplexityModel) {
     adapters.perplexity = operatorRelayAdapterFromTextProvider({
       invoke: async ({ request }) => {
-        ensureRelaySensitivity(request);
-        const response = await fetchImpl('https://api.perplexity.ai/v1/sonar', {
+        const prompt = prepareProviderRequest(request);
+        const response = await fetchImpl('https://api.perplexity.ai/v1/responses', {
           method: 'POST',
           headers: {
             Authorization: `Bearer ${perplexityKey}`,
@@ -165,16 +230,23 @@ export function createServerOperatorRelayAdapters(
           },
           body: JSON.stringify({
             model: perplexityModel,
-            messages: [{ role: 'user', content: relayPrompt(request) }],
+            input: prompt,
+            store: false,
+            max_output_tokens: 2_000,
+            tools: [{ type: 'web_search' }],
           }),
           redirect: 'error',
-          signal: AbortSignal.timeout(60_000),
+          signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
         });
         const body = await jsonResponse(response, 'Perplexity relay');
-        return { text: perplexityText(body), evidenceRef: evidenceRef('perplexity', body) };
+        return { text: openAiText(body), evidenceRef: evidenceRef('perplexity', perplexityModel, body) };
       },
     });
   }
+
+  handoffIfConfigured(adapters, 'codex', openAiAvailable, env);
+  handoffIfConfigured(adapters, 'claude-code', anthropicAvailable, env);
+  handoffIfConfigured(adapters, 'perplexity', perplexityAvailable, env);
 
   return adapters;
 }
