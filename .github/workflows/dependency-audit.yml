@@ -1,0 +1,67 @@
+name: Dependency Audit
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  production-dependencies:
+    name: Production dependencies
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          persist-credentials: false
+
+      - name: Verify exact head
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install exact lockfile
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Audit shipped dependency graph
+        id: audit
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          npm audit --omit=dev --audit-level=high --json | tee dependency-audit.json
+
+      - name: Upload dependency audit receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-audit-${{ env.EXPECTED_HEAD_SHA }}
+          path: dependency-audit.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Enforce high-severity production boundary
+        if: steps.audit.outcome != 'success'
+        shell: bash
+        run: |
+          echo 'High-or-critical vulnerability exists in the production dependency graph.' >&2
+          exit 1
