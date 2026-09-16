@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { access, cp, mkdir, rm } from 'node:fs/promises';
+import { access, cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { constants } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
@@ -19,6 +19,7 @@ const requiredAssets = [
   'sitemap.xml',
   'llms.txt',
   'crawlers.json',
+  'work.html',
   '.well-known/sekret-bip-control-room.json',
   'control-room/index.html',
   'control-room/app.js',
@@ -48,6 +49,21 @@ const requiredAssets = [
 await rm(outputDirectory, { recursive: true, force: true });
 await mkdir(outputDirectory, { recursive: true });
 await cp(sourceDirectory, outputDirectory, { recursive: true });
+
+// The FCR public origin is www.foundercontrolroom.org. Normalize the deployed
+// founder identity metadata without rewriting the existing visual/source page.
+const founderProfilePath = resolve(outputDirectory, 'juss-rayy/index.html');
+const founderProfile = await readFile(founderProfilePath, 'utf8');
+const normalizedFounderProfile = founderProfile
+  .replaceAll(
+    'https://foundercontrolroom.org/juss-rayy',
+    'https://www.foundercontrolroom.org/juss-rayy/',
+  )
+  .replace(
+    /<meta itemprop="dateModified" content="\d{4}-\d{2}-\d{2}" \/>/,
+    '<meta itemprop="dateModified" content="2026-09-16" />',
+  );
+await writeFile(founderProfilePath, normalizedFounderProfile, 'utf8');
 
 for (const relativePath of requiredAssets) {
   const absolutePath = resolve(outputDirectory, relativePath);
