@@ -5,14 +5,14 @@ describe('parseRelayIntent', () => {
   it('recognizes the founder shorthand used in conversation', () => {
     expect(parseRelayIntent('Tell Perplexity to attack that version.', 'codex')).toEqual({
       target: 'perplexity',
-      instruction: 'to attack that version.',
+      instruction: 'attack that version.',
     });
   });
 
   it('routes to Claude without confusing the instructor lane', () => {
     expect(parseRelayIntent('Ask Claude to review this implementation.', 'codex')).toEqual({
       target: 'claude-code',
-      instruction: 'to review this implementation.',
+      instruction: 'review this implementation.',
     });
   });
 
