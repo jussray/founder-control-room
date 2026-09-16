@@ -28,6 +28,13 @@ const externalizableControlDocs = [
   '.ai-skills/gpts/capability-mode-router.md',
 ];
 
+const boundedUltrathinkDocs = [
+  '.ai-skills/README.md',
+  '.ai-skills/chatgpt-custom-instructions.md',
+  '.ai-skills/claude-project-instructions.md',
+  '.ai-skills/gpts/capability-mode-router.md',
+];
+
 const forbiddenRawActivationPhrases = [
   /the user may type these commands to switch your behavior/i,
   /i may type these commands to switch your behavior/i,
@@ -120,6 +127,24 @@ describe('founder control decision contract', () => {
         expect(source).not.toMatch(forbidden);
       }
     }
+  });
+
+  it('pins bounded ULTRATHINK v2 across the canonical router and direct host adapters', () => {
+    for (const relativePath of boundedUltrathinkDocs) {
+      const source = readFileSync(relativePath, 'utf8');
+      expect(source).toMatch(/More intelligence never means more authority/i);
+      expect(source).toMatch(/adaptive (?:execution )?budget|adaptive budget/i);
+      expect(source).not.toMatch(/maximum reasoning depth/i);
+      expect(source).not.toMatch(/spend as many tokens as needed/i);
+    }
+
+    const router = readFileSync('.ai-skills/gpts/capability-mode-router.md', 'utf8');
+    expect(router).toMatch(/at most three serious hypotheses\/options/i);
+    expect(router).toMatch(/bound to the exact subject and claim/i);
+    expect(router).toMatch(/Execution proof and outcome proof are separate/i);
+    expect(router).toMatch(/A discovered failure path is \*\*not automatically a veto\*\*/i);
+    expect(router).toMatch(/DeepSeek is an Instructor\/adversary lane/i);
+    expect(router).toMatch(/Never silently substitute a different provider/i);
   });
 
   it.each(['rejected', 'change_requested'] as const)('never authorizes execution for %s', (decisionValue) => {
