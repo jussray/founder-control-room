@@ -5,6 +5,11 @@ import { operatorRelayAdapterFromTextProvider } from './operatorRelayProvider.js
 type FetchLike = typeof fetch;
 type JsonRecord = Record<string, unknown>;
 
+export const OPERATOR_RELAY_PROVIDER_TIMEOUT_MS = 60_000;
+export const OPERATOR_RELAY_MAX_RESPONSE_BYTES = 1_048_576;
+export const OPERATOR_RELAY_MAX_ERROR_BYTES = 32_768;
+const MAX_EXPOSED_PROVIDER_ERROR_CHARS = 1_024;
+
 function record(value: unknown): JsonRecord | null {
   return value && typeof value === 'object' && !Array.isArray(value)
     ? value as JsonRecord
@@ -29,10 +34,59 @@ function ensureRelaySensitivity(request: OperatorRelayRequestV1): void {
   }
 }
 
-async function jsonResponse(response: Response, label: string): Promise<JsonRecord> {
+async function boundedResponseText(response: Response, label: string, maxBytes: number): Promise<string> {
+  if (!response.body) return '';
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let total = 0;
+  let text = '';
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > maxBytes) {
+        await reader.cancel();
+        throw new Error(`${label} response exceeded ${maxBytes} byte limit`);
+      }
+      text += decoder.decode(value, { stream: true });
+    }
+    text += decoder.decode();
+    return text;
+  } finally {
+    reader.releaseLock();
+  }
+}
+
+function redactSecrets(value: string, secrets: readonly (string | undefined)[]): string {
+  let redacted = value;
+  for (const secret of secrets) {
+    const candidate = secret?.trim();
+    if (!candidate) continue;
+    redacted = redacted.split(candidate).join('[REDACTED]');
+  }
+  return redacted;
+}
+
+function boundedProviderError(value: string, secrets: readonly (string | undefined)[]): string {
+  const redacted = redactSecrets(value, secrets).replace(/[\r\n\t]+/g, ' ').trim();
+  if (redacted.length <= MAX_EXPOSED_PROVIDER_ERROR_CHARS) return redacted;
+  return `${redacted.slice(0, MAX_EXPOSED_PROVIDER_ERROR_CHARS)}…`;
+}
+
+async function jsonResponse(
+  response: Response,
+  label: string,
+  secrets: readonly (string | undefined)[] = [],
+): Promise<JsonRecord> {
+  const bodyText = await boundedResponseText(
+    response,
+    label,
+    response.ok ? OPERATOR_RELAY_MAX_RESPONSE_BYTES : OPERATOR_RELAY_MAX_ERROR_BYTES,
+  );
   let body: unknown;
   try {
-    body = await response.json();
+    body = JSON.parse(bodyText);
   } catch {
     throw new Error(`${label} returned non-JSON output`);
   }
@@ -40,9 +94,11 @@ async function jsonResponse(response: Response, label: string): Promise<JsonReco
   if (!parsed) throw new Error(`${label} returned an invalid response object`);
   if (!response.ok) {
     const error = record(parsed.error);
-    const message = typeof error?.message === 'string'
+    const providerMessage = typeof error?.message === 'string'
       ? error.message
       : `${label} failed with HTTP ${response.status}`;
+    const message = boundedProviderError(providerMessage, secrets)
+      || `${label} failed with HTTP ${response.status}`;
     throw new Error(message);
   }
   return parsed;
@@ -120,9 +176,9 @@ export function createServerOperatorRelayAdapters(
             max_output_tokens: 2_000,
           }),
           redirect: 'error',
-          signal: AbortSignal.timeout(60_000),
+          signal: AbortSignal.timeout(OPERATOR_RELAY_PROVIDER_TIMEOUT_MS),
         });
-        const body = await jsonResponse(response, 'OpenAI relay');
+        const body = await jsonResponse(response, 'OpenAI relay', [openAiKey]);
         return { text: openAiText(body), evidenceRef: evidenceRef('openai', body) };
       },
     });
@@ -145,9 +201,9 @@ export function createServerOperatorRelayAdapters(
             messages: [{ role: 'user', content: relayPrompt(request) }],
           }),
           redirect: 'error',
-          signal: AbortSignal.timeout(60_000),
+          signal: AbortSignal.timeout(OPERATOR_RELAY_PROVIDER_TIMEOUT_MS),
         });
-        const body = await jsonResponse(response, 'Anthropic relay');
+        const body = await jsonResponse(response, 'Anthropic relay', [anthropicKey]);
         return { text: anthropicText(body), evidenceRef: evidenceRef('anthropic', body) };
       },
     });
@@ -168,9 +224,9 @@ export function createServerOperatorRelayAdapters(
             messages: [{ role: 'user', content: relayPrompt(request) }],
           }),
           redirect: 'error',
-          signal: AbortSignal.timeout(60_000),
+          signal: AbortSignal.timeout(OPERATOR_RELAY_PROVIDER_TIMEOUT_MS),
         });
-        const body = await jsonResponse(response, 'Perplexity relay');
+        const body = await jsonResponse(response, 'Perplexity relay', [perplexityKey]);
         return { text: perplexityText(body), evidenceRef: evidenceRef('perplexity', body) };
       },
     });
