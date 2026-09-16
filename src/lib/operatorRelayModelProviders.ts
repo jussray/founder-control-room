@@ -5,6 +5,10 @@ import { operatorRelayAdapterFromTextProvider } from './operatorRelayProvider.js
 type FetchLike = typeof fetch;
 type JsonRecord = Record<string, unknown>;
 
+const PROVIDER_TIMEOUT_MS = 60_000;
+const ANTHROPIC_API_VERSION = '2023-06-01';
+const MAX_PROVIDER_RESPONSE_ID_LENGTH = 200;
+
 function record(value: unknown): JsonRecord | null {
   return value && typeof value === 'object' && !Array.isArray(value)
     ? value as JsonRecord
@@ -30,6 +34,18 @@ function ensureRelaySensitivity(request: OperatorRelayRequestV1): void {
 }
 
 async function jsonResponse(response: Response, label: string): Promise<JsonRecord> {
+  if (!response.ok) {
+    // Provider error bodies are intentionally never promoted into FCR errors.
+    // They are untrusted, can be arbitrarily large, and can echo credentials or
+    // submitted context. Status is sufficient for the bounded failure receipt.
+    try {
+      await response.body?.cancel();
+    } catch {
+      // Failure to cancel an already-closed body does not change provider truth.
+    }
+    throw new Error(`${label} failed with HTTP ${response.status}`);
+  }
+
   let body: unknown;
   try {
     body = await response.json();
@@ -38,14 +54,24 @@ async function jsonResponse(response: Response, label: string): Promise<JsonReco
   }
   const parsed = record(body);
   if (!parsed) throw new Error(`${label} returned an invalid response object`);
-  if (!response.ok) {
-    const error = record(parsed.error);
-    const message = typeof error?.message === 'string'
-      ? error.message
-      : `${label} failed with HTTP ${response.status}`;
-    throw new Error(message);
-  }
   return parsed;
+}
+
+async function invokeJsonProvider(
+  fetchImpl: FetchLike,
+  url: string,
+  init: RequestInit,
+  label: string,
+): Promise<JsonRecord> {
+  let response: Response;
+  try {
+    response = await fetchImpl(url, init);
+  } catch {
+    // Do not serialize the provider/fetch exception. A transport exception can
+    // contain request metadata, URLs, proxies, or secret-bearing diagnostics.
+    throw new Error(`${label} request failed`);
+  }
+  return jsonResponse(response, label);
 }
 
 function openAiText(body: JsonRecord): string {
@@ -87,7 +113,12 @@ function perplexityText(body: JsonRecord): string {
 }
 
 function evidenceRef(provider: string, body: JsonRecord): string {
-  const id = typeof body.id === 'string' && body.id.trim() ? body.id.trim() : 'unidentified-response';
+  const rawId = typeof body.id === 'string' ? body.id.trim() : '';
+  const id = rawId
+    && rawId.length <= MAX_PROVIDER_RESPONSE_ID_LENGTH
+    && /^[A-Za-z0-9._:-]+$/.test(rawId)
+    ? rawId
+    : 'unidentified-response';
   return `provider:${provider}:${id}`;
 }
 
@@ -107,7 +138,7 @@ export function createServerOperatorRelayAdapters(
     adapters.codex = operatorRelayAdapterFromTextProvider({
       invoke: async ({ request }) => {
         ensureRelaySensitivity(request);
-        const response = await fetchImpl('https://api.openai.com/v1/responses', {
+        const body = await invokeJsonProvider(fetchImpl, 'https://api.openai.com/v1/responses', {
           method: 'POST',
           headers: {
             Authorization: `Bearer ${openAiKey}`,
@@ -120,9 +151,8 @@ export function createServerOperatorRelayAdapters(
             max_output_tokens: 2_000,
           }),
           redirect: 'error',
-          signal: AbortSignal.timeout(60_000),
-        });
-        const body = await jsonResponse(response, 'OpenAI relay');
+          signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
+        }, 'OpenAI relay');
         return { text: openAiText(body), evidenceRef: evidenceRef('openai', body) };
       },
     });
@@ -132,11 +162,11 @@ export function createServerOperatorRelayAdapters(
     adapters['claude-code'] = operatorRelayAdapterFromTextProvider({
       invoke: async ({ request }) => {
         ensureRelaySensitivity(request);
-        const response = await fetchImpl('https://api.anthropic.com/v1/messages', {
+        const body = await invokeJsonProvider(fetchImpl, 'https://api.anthropic.com/v1/messages', {
           method: 'POST',
           headers: {
             'x-api-key': anthropicKey,
-            'anthropic-version': '2023-06-01',
+            'anthropic-version': ANTHROPIC_API_VERSION,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
@@ -145,9 +175,8 @@ export function createServerOperatorRelayAdapters(
             messages: [{ role: 'user', content: relayPrompt(request) }],
           }),
           redirect: 'error',
-          signal: AbortSignal.timeout(60_000),
-        });
-        const body = await jsonResponse(response, 'Anthropic relay');
+          signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
+        }, 'Anthropic relay');
         return { text: anthropicText(body), evidenceRef: evidenceRef('anthropic', body) };
       },
     });
@@ -157,7 +186,7 @@ export function createServerOperatorRelayAdapters(
     adapters.perplexity = operatorRelayAdapterFromTextProvider({
       invoke: async ({ request }) => {
         ensureRelaySensitivity(request);
-        const response = await fetchImpl('https://api.perplexity.ai/v1/sonar', {
+        const body = await invokeJsonProvider(fetchImpl, 'https://api.perplexity.ai/v1/sonar', {
           method: 'POST',
           headers: {
             Authorization: `Bearer ${perplexityKey}`,
@@ -168,9 +197,8 @@ export function createServerOperatorRelayAdapters(
             messages: [{ role: 'user', content: relayPrompt(request) }],
           }),
           redirect: 'error',
-          signal: AbortSignal.timeout(60_000),
-        });
-        const body = await jsonResponse(response, 'Perplexity relay');
+          signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
+        }, 'Perplexity relay');
         return { text: perplexityText(body), evidenceRef: evidenceRef('perplexity', body) };
       },
     });
