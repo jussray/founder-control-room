@@ -4,7 +4,8 @@ import type { OperatorRelayResponseV1 } from '../operatorRelay.js';
 
 describe('requireProviderEvidence', () => {
   it('rejects completed relay answers with no provider evidence', () => {
-    expect(requireProviderEvidence({ status: 'completed', evidenceRefs: [] } as OperatorRelayResponseV1)).toEqual([
+    const response = { status: 'completed', evidenceRefs: [] } as unknown as OperatorRelayResponseV1;
+    expect(requireProviderEvidence(response)).toEqual([
       'completed relay response requires provider evidence',
     ]);
   });
