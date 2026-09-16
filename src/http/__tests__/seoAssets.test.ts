@@ -9,6 +9,24 @@ function read(path: string) {
   return readFileSync(resolve(repoRoot, path), 'utf8');
 }
 
+function groupFor(robots: string, agent: string) {
+  const escaped = agent.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const match = robots.match(new RegExp(`User-agent: ${escaped}\\n([\\s\\S]*?)(?=\\nUser-agent: |\\nSitemap: |$)`));
+  expect(match, `missing robots group for ${agent}`).toBeTruthy();
+  return match?.[1] ?? '';
+}
+
+const boundedPublicPaths = [
+  '/$',
+  '/juss-rayy/',
+  '/guardrails',
+  '/mom8/',
+  '/robots.txt$',
+  '/sitemap.xml$',
+  '/llms.txt$',
+  '/crawlers.json$',
+];
+
 describe('public founder discovery assets', () => {
   it('keeps Juss Rayy directly indexable and connected to public identity surfaces', () => {
     const profile = read('public/juss-rayy/index.html');
@@ -21,24 +39,27 @@ describe('public founder discovery assets', () => {
     expect(profile).toContain('Juss Rayy');
   });
 
-  it('publishes an explicit crawler map while denying training crawlers', () => {
+  it('publishes an explicit bounded crawler map while denying training crawlers', () => {
     const robots = read('public/robots.txt');
     const sitemap = read('public/sitemap.xml');
 
-    expect(robots).toContain('User-agent: GPTBot\nDisallow: /');
-    expect(robots).toContain('User-agent: ClaudeBot\nDisallow: /');
-    expect(robots).toContain('User-agent: Google-Extended\nDisallow: /');
-    expect(robots).toContain('User-agent: OAI-SearchBot\nAllow: /');
-    expect(robots).toContain('User-agent: ChatGPT-User\nAllow: /');
-    expect(robots).toContain('User-agent: Claude-SearchBot\nAllow: /');
-    expect(robots).toContain('User-agent: Claude-User\nAllow: /');
-    expect(robots).toContain('User-agent: Googlebot\nAllow: /');
-    expect(robots).toContain('User-agent: *\nAllow: /');
-    expect(robots).toContain('Sitemap: https://www.foundercontrolroom.org/sitemap.xml');
+    for (const agent of ['GPTBot', 'ClaudeBot', 'Google-Extended']) {
+      const group = groupFor(robots, agent);
+      expect(group).toMatch(/^Disallow: \/$/m);
+      expect(group).not.toMatch(/^Allow:/m);
+    }
 
+    for (const agent of ['OAI-SearchBot', 'ChatGPT-User', 'Claude-SearchBot', 'Claude-User', 'Googlebot', '*']) {
+      const group = groupFor(robots, agent);
+      expect(group).toMatch(/^Disallow: \/$/m);
+      for (const path of boundedPublicPaths) expect(group).toContain(`Allow: ${path}`);
+    }
+
+    expect(robots).toContain('Sitemap: https://www.foundercontrolroom.org/sitemap.xml');
     expect(sitemap).toContain('<loc>https://www.foundercontrolroom.org/</loc>');
     expect(sitemap).toContain('<loc>https://www.foundercontrolroom.org/juss-rayy/</loc>');
     expect(sitemap).toContain('<loc>https://www.foundercontrolroom.org/guardrails</loc>');
+    expect(sitemap).toContain('<loc>https://www.foundercontrolroom.org/mom8/</loc>');
   });
 
   it('publishes bounded machine-readable AI access and attribution policy', () => {
@@ -56,12 +77,12 @@ describe('public founder discovery assets', () => {
     expect(llms).toContain('A passing test is not automatically production proof');
 
     expect(crawlers.schema).toBe('juss/ai-crawler-contract@v1');
-    expect(crawlers.policy.search_discovery).toBe('allow');
-    expect(crawlers.policy.user_directed_retrieval).toBe('allow');
+    expect(crawlers.policy.search_discovery).toBe('allow_bounded_public_paths');
+    expect(crawlers.policy.user_directed_retrieval).toBe('allow_bounded_public_paths');
     expect(crawlers.policy.model_training).toBe('deny');
     expect(crawlers.policy.write_or_action_authority).toBe('none');
     expect(crawlers.bots.GPTBot).toBe('deny');
-    expect(crawlers.bots['OAI-SearchBot']).toBe('allow');
+    expect(crawlers.bots['OAI-SearchBot']).toBe('allow_bounded_public_paths');
     expect(crawlers.attribution.requested).toBe(true);
     expect(headers).toContain('Content-Signal: ai-train=no, search=yes, ai-input=no');
     expect(headers).toContain('/crawlers.json');
