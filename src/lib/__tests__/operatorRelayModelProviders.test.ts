@@ -4,6 +4,7 @@ import {
   operatorRelayRequestHash,
   relayContextFingerprint,
   type OperatorRelayRequestV1,
+  type RelayOperatorId,
 } from '../operatorRelay.js';
 import {
   createServerOperatorRelayAdapters,
@@ -11,14 +12,17 @@ import {
   OPERATOR_RELAY_PROVIDER_TIMEOUT_MS,
 } from '../operatorRelayModelProviders.js';
 
-function relay(sensitivity: OperatorRelayRequestV1['sensitivity'] = 'internal'): OperatorRelayRequestV1 {
+function relay(
+  sensitivity: OperatorRelayRequestV1['sensitivity'] = 'internal',
+  toOperator: RelayOperatorId = 'perplexity',
+): OperatorRelayRequestV1 {
   const summary = 'Attack the current bridge and return surviving defects.';
   const sourceRef = 'chat:test';
   const base: Omit<OperatorRelayRequestV1, 'requestHash'> = {
     contract: OPERATOR_RELAY_REQUEST_CONTRACT,
     relayId: 'relay-provider-test',
     fromOperator: 'codex',
-    toOperator: 'perplexity',
+    toOperator,
     capability: 'review',
     goal: 'Independent review',
     context: { summary, sourceRef, sourceFingerprint: relayContextFingerprint(summary, sourceRef) },
@@ -85,7 +89,7 @@ describe('createServerOperatorRelayAdapters', () => {
       FCR_RELAY_ANTHROPIC_MODEL: 'claude-current-test',
     }, fetchMock);
 
-    const response = await adapters['claude-code']?.(relay());
+    const response = await adapters['claude-code']?.(relay('internal', 'claude-code'));
     expect(response?.fromOperator).toBe('claude-code');
     expect(response?.answer).toBe('Anthropic review result');
     expect(response?.evidenceRefs).toEqual(['provider:anthropic:anthropic-response-1']);
@@ -109,7 +113,7 @@ describe('createServerOperatorRelayAdapters', () => {
 
     let message = '';
     try {
-      await adapters['claude-code']?.(relay());
+      await adapters['claude-code']?.(relay('internal', 'claude-code'));
     } catch (error) {
       message = error instanceof Error ? error.message : String(error);
     }
@@ -128,7 +132,7 @@ describe('createServerOperatorRelayAdapters', () => {
       FCR_RELAY_ANTHROPIC_MODEL: 'claude-current-test',
     }, fetchMock);
 
-    await expect(adapters['claude-code']?.(relay()))
+    await expect(adapters['claude-code']?.(relay('internal', 'claude-code')))
       .rejects.toThrow(`Anthropic relay response exceeded ${OPERATOR_RELAY_MAX_ERROR_BYTES} byte limit`);
   });
 
