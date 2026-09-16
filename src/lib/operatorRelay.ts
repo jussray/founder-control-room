@@ -145,7 +145,8 @@ export function validateOperatorRelayRequest(value: OperatorRelayRequestV1, nowM
   }
   if (!SHA256.test(value.requestHash ?? '')) errors.push('requestHash must be sha256');
   if (errors.length === 0) {
-    const expected = operatorRelayRequestHash({ ...value, requestHash: undefined as never });
+    const { requestHash: _requestHash, ...identity } = value;
+    const expected = operatorRelayRequestHash(identity);
     if (value.requestHash !== expected) errors.push('requestHash does not match canonical relay request');
   }
   return [...new Set(errors)];
@@ -160,11 +161,13 @@ export function validateOperatorRelayResponse(value: OperatorRelayResponseV1, re
   if (value.toOperator !== request.fromOperator) errors.push('response must return to source operator');
   if (!['accepted', 'completed', 'blocked', 'failed'].includes(value.status)) errors.push('response status is unsupported');
   if (value.answer.length > 20_000) errors.push('response answer exceeds 20000 characters');
+  if (value.status === 'completed' && normalizedList(value.evidenceRefs).length === 0) errors.push('completed response requires provider evidence');
   if (value.authorityRequested !== 'none') errors.push('relay response cannot request authority');
   if (!Number.isFinite(Date.parse(value.completedAt))) errors.push('completedAt must be RFC3339-compatible');
   if (!SHA256.test(value.responseHash ?? '')) errors.push('responseHash must be sha256');
   if (errors.length === 0) {
-    const expected = operatorRelayResponseHash({ ...value, responseHash: undefined as never });
+    const { responseHash: _responseHash, ...identity } = value;
+    const expected = operatorRelayResponseHash(identity);
     if (value.responseHash !== expected) errors.push('responseHash does not match canonical relay response');
   }
   return [...new Set(errors)];
