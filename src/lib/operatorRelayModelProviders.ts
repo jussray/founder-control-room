@@ -105,8 +105,7 @@ export function createServerOperatorRelayAdapters(
 
   if (openAiKey && openAiModel) {
     adapters.codex = operatorRelayAdapterFromTextProvider({
-      invoke: async ({ goal, context }) => {
-        const request = { goal, context: { summary: context }, sensitivity: 'internal', capability: 'review' } as OperatorRelayRequestV1;
+      invoke: async ({ request }) => {
         ensureRelaySensitivity(request);
         const response = await fetchImpl('https://api.openai.com/v1/responses', {
           method: 'POST',
@@ -131,8 +130,7 @@ export function createServerOperatorRelayAdapters(
 
   if (anthropicKey && anthropicModel) {
     adapters['claude-code'] = operatorRelayAdapterFromTextProvider({
-      invoke: async ({ goal, context }) => {
-        const request = { goal, context: { summary: context }, sensitivity: 'internal', capability: 'review' } as OperatorRelayRequestV1;
+      invoke: async ({ request }) => {
         ensureRelaySensitivity(request);
         const response = await fetchImpl('https://api.anthropic.com/v1/messages', {
           method: 'POST',
@@ -157,8 +155,7 @@ export function createServerOperatorRelayAdapters(
 
   if (perplexityKey && perplexityModel) {
     adapters.perplexity = operatorRelayAdapterFromTextProvider({
-      invoke: async ({ goal, context }) => {
-        const request = { goal, context: { summary: context }, sensitivity: 'internal', capability: 'review' } as OperatorRelayRequestV1;
+      invoke: async ({ request }) => {
         ensureRelaySensitivity(request);
         const response = await fetchImpl('https://api.perplexity.ai/v1/sonar', {
           method: 'POST',
