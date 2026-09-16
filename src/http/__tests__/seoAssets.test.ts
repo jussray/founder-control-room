@@ -21,12 +21,19 @@ describe('public founder discovery assets', () => {
     expect(profile).toContain('Juss Rayy');
   });
 
-  it('publishes an explicit crawler map for the founder profile and public work', () => {
+  it('publishes an explicit crawler map while denying training crawlers', () => {
     const robots = read('public/robots.txt');
     const sitemap = read('public/sitemap.xml');
 
-    expect(robots).toContain('User-agent: *');
-    expect(robots).toContain('Allow: /');
+    expect(robots).toContain('User-agent: GPTBot\nDisallow: /');
+    expect(robots).toContain('User-agent: ClaudeBot\nDisallow: /');
+    expect(robots).toContain('User-agent: Google-Extended\nDisallow: /');
+    expect(robots).toContain('User-agent: OAI-SearchBot\nAllow: /');
+    expect(robots).toContain('User-agent: ChatGPT-User\nAllow: /');
+    expect(robots).toContain('User-agent: Claude-SearchBot\nAllow: /');
+    expect(robots).toContain('User-agent: Claude-User\nAllow: /');
+    expect(robots).toContain('User-agent: Googlebot\nAllow: /');
+    expect(robots).toContain('User-agent: *\nAllow: /');
     expect(robots).toContain('Sitemap: https://www.foundercontrolroom.org/sitemap.xml');
 
     expect(sitemap).toContain('<loc>https://www.foundercontrolroom.org/</loc>');
@@ -34,8 +41,10 @@ describe('public founder discovery assets', () => {
     expect(sitemap).toContain('<loc>https://www.foundercontrolroom.org/guardrails</loc>');
   });
 
-  it('publishes a bounded AI-readable map of the same public work', () => {
+  it('publishes bounded machine-readable AI access and attribution policy', () => {
     const llms = read('public/llms.txt');
+    const crawlers = JSON.parse(read('public/crawlers.json'));
+    const headers = read('public/_headers');
 
     expect(llms).toContain('Canonical founder profile: https://www.foundercontrolroom.org/juss-rayy/');
     expect(llms).toContain('Founder Control Room');
@@ -45,5 +54,16 @@ describe('public founder discovery assets', () => {
     expect(llms).toContain('StoryEngine / L99');
     expect(llms).toContain('Goalfix');
     expect(llms).toContain('A passing test is not automatically production proof');
+
+    expect(crawlers.schema).toBe('juss/ai-crawler-contract@v1');
+    expect(crawlers.policy.search_discovery).toBe('allow');
+    expect(crawlers.policy.user_directed_retrieval).toBe('allow');
+    expect(crawlers.policy.model_training).toBe('deny');
+    expect(crawlers.policy.write_or_action_authority).toBe('none');
+    expect(crawlers.bots.GPTBot).toBe('deny');
+    expect(crawlers.bots['OAI-SearchBot']).toBe('allow');
+    expect(crawlers.attribution.requested).toBe(true);
+    expect(headers).toContain('Content-Signal: ai-train=no, search=yes, ai-input=no');
+    expect(headers).toContain('/crawlers.json');
   });
 });
