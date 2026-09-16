@@ -237,7 +237,7 @@ function parseFounderContentAnalyticsCsv(csvText, metadata = {}) {
       }
       const segment = boundedText(row.audience_segment, `line ${lineNumber} audience_segment`, 160);
       if (!segment) fail(`line ${lineNumber} audience_segment is required`);
-      if (RESERVED_AUDIIENCE_SEGMENTS.has(segment.toLowerCase())) {
+      if (RESERVED_AUDIENCE_SEGMENTS.has(segment.toLowerCase())) {
         fail(`line ${lineNumber} audience_segment ${segment} is reserved`);
       }
       if (group.seenSegments.has(segment)) fail(`snapshot ${row.snapshot_id} contains duplicate audience_segment ${segment}`);
