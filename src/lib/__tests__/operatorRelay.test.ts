@@ -80,9 +80,8 @@ describe('operator relay', () => {
   });
 
   it('rejects DeepSeek from the peer operator relay', () => {
-    const value = request() as OperatorRelayRequestV1 & { toOperator: string };
-    value.toOperator = 'deepseek-instructor';
-    expect(validateOperatorRelayRequest(value as OperatorRelayRequestV1, NOW)).toContain('toOperator is unsupported');
+    const value = { ...request(), toOperator: 'deepseek-instructor' } as unknown as OperatorRelayRequestV1;
+    expect(validateOperatorRelayRequest(value, NOW)).toContain('toOperator is unsupported');
   });
 
   it('rejects any mutation authority carried by the relay', () => {
