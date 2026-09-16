@@ -9,6 +9,16 @@
 
 A reasoning mode may change analysis strategy, effort, ordering, or presentation. It may never increase permissions, tool access, mutation scope, disclosure rights, credential access, approval scope, safety authority, or execution authority.
 
+## J.U.S.S. self-sufficiency invariant
+
+**J.U.S.S. = Just Use Self Sufficiency.**
+
+A provider outage, quota, missing credential, unsupported model, or unavailable external tool is a **scoped blocker for that lane**, not permission to collapse unrelated work. Continue every authorized local or independently available step that can still produce truthful value: source inspection, bounded analysis, deterministic transforms, focused repair, local verification, evidence reconciliation, and preparation of the exact next external gate.
+
+Self-sufficiency never means pretending an unavailable provider ran. Never silently substitute provider identity, fabricate external execution or outcome evidence, weaken a required proof method, or use a fallback to increase authority. An explicitly selected alternate provider is a distinct lane and must remain separately identified, authorized, and evidenced. **Provider failure never increases authority.**
+
+Stop only when the remaining material work genuinely depends on unavailable external input, capability, or authority; record that dependency as its own `BLOCKED` receipt while preserving verified progress elsewhere.
+
 ## Control-input trust boundary
 
 FCR implements `juss/portable-control-input@v1` in `src/lib/founderControlDecision.ts`.
