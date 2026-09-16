@@ -1,10 +1,11 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Preserve the current TinyFish Cloudflare activation, read-only Shopify child-provider boundaries, FCR browser-auth versus Cloudflare Access boundary, exact founder merge-authority contract, bounded Attack 3000 content observation, advisory Trend Radar, deterministic founder-content approval retry contracts, and Pages static-versus-API routing truth without converting source, analytics, rankings, retry identity, provider configuration, crawler policy, mergeability, or deployment into publication, provider-mutation, merge, deploy, spend, or external-contact authority.",
+  "purpose": "Preserve the current TinyFish Cloudflare activation, read-only Shopify child-provider boundaries, FCR browser-auth versus Cloudflare Access boundary, exact founder merge-authority contract, bounded Attack 3000 content observation, advisory Trend Radar, deterministic founder-content approval retry contracts, Pages static-versus-API routing truth, and cross-repository StoryEngine federation evidence identity without converting source, analytics, rankings, retry identity, provider configuration, crawler policy, peer pinning, mergeability, or deployment into publication, provider-mutation, merge, deploy, spend, or external-contact authority.",
   "domains": [
     "cloudflare-authority",
     "repository-provider",
     "content-evidence",
+    "evidence-authority",
     "publishing",
     "merge-authority"
   ],
@@ -13,6 +14,12 @@
       "path": "public/_worker.js",
       "claims": [
         "`public/_worker.js` must route public static discovery artifacts, including `crawlers.json`, through the Pages `ASSETS` binding while API-owned callback assets remain on `FCR_API`; this routing classification cannot authorize provider mutation or treat a static crawler policy as authentication."
+      ]
+    },
+    {
+      "path": ".github/workflows/playwright.yml",
+      "claims": [
+        "`.github/workflows/playwright.yml` must bind the FCR-to-StoryEngine browser federation witness to a separately verified exact StoryEngine peer SHA and ref; changing that peer identity expires predecessor federation/browser proof and requires the complete exact-head witness to rerun without granting merge, deploy, production, or provider-mutation authority."
       ]
     },
     {
@@ -47,6 +54,12 @@
       "path": "docs/CLOUDFLARE_REASONING.md",
       "claims": [
         "`docs/CLOUDFLARE_REASONING.md` must treat `TINYFISH_API_KEY` as a provider-held Worker binding and require canonical Deploy to fail closed on a missing binding name without exposing or re-uploading its value."
+      ]
+    },
+    {
+      "path": "docs/TRUTH_DECAY_AUDIT.md",
+      "claims": [
+        "`docs/TRUTH_DECAY_AUDIT.md` must treat a StoryEngine peer SHA/ref in FCR Playwright as evidence identity rather than a durable alias for current StoryEngine, and must require complete federation re-proof whenever the peer identity or either repository head moves."
       ]
     },
     {
