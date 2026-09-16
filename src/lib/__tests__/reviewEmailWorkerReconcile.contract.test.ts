@@ -34,7 +34,7 @@ describe('review-email Worker reconciliation authority contract', () => {
     expect(workflow).toContain('needs: authority-gate');
   });
 
-  it('targets only the dedicated review-email Worker config, route, and canonical Service Binding', () => {
+  it('targets only the dedicated review-email Worker config and canonical Service Binding', () => {
     expect(workflow).toContain('npx --yes wrangler@4.129.0 deploy --config wrangler.email.toml');
     expect(workflow).toContain("'FOUNDER_CONTROL_ROOM_API (founder-control-room)'");
     expect(workflow).not.toContain('wrangler deploy --config wrangler.worker.toml');
@@ -42,11 +42,12 @@ describe('review-email Worker reconciliation authority contract', () => {
 
     expect(emailConfig).toMatch(/^name = "founder-control-room-review-email"$/m);
     expect(emailConfig).toMatch(/^account_id = "[0-9a-f]{32}"$/m);
-    expect(emailConfig).toMatch(/^addresses = \["review@foundercontrolroom.org"\]$/m);
-    expect(emailConfig).not.toMatch(/addresses\s*=\s*\[[^\]]*\*@/m);
+    expect(emailConfig).not.toMatch(/^addresses\s*=/m);
     expect(emailConfig).not.toContain('[[routes]]');
     expect(emailConfig).toMatch(/^binding = "FOUNDER_CONTROL_ROOM_API"$/m);
     expect(emailConfig).toMatch(/^service = "founder-control-room"$/m);
+    expect(emailConfig).toContain('Inbound Email Routing is provider-side state');
+    expect(workflow).toContain('Inbound Email Routing remains provider-side state and must be independently read back.');
   });
 
   it('separates Cloudflare credential authority by operation class', () => {
@@ -91,17 +92,23 @@ describe('review-email Worker reconciliation authority contract', () => {
     expect(workflow).not.toContain("print(token)");
   });
 
-  it('initializes a redacted receipt before provider credential and secret-name checks', () => {
+  it('retains distinct redacted receipts for provider identity, secret-name, deploy, and binding failures', () => {
     expect(workflow).toContain('Initialize redacted reconciliation receipt');
-    expect(workflow).toContain('email_routing_address: $address');
+    expect(workflow).toContain('expected_email_routing_address: $address');
     expect(workflow).toContain('credential_header_safe: false');
+    expect(workflow).toContain('provider_worker_found: null');
     expect(workflow).toContain('required_secret_names_verified: false');
     expect(workflow).toContain('provider_deploy_succeeded: false');
     expect(workflow).toContain('email_trigger_reconciled: false');
     expect(workflow).toContain('blocked_stage: "credential_header_safety"');
-    expect(workflow).toContain('.credential_header_safe = true | .blocked_stage = "secret_names"');
+    expect(workflow).toContain('.credential_header_safe = true | .blocked_stage = "existing_worker_secret_read"');
+    expect(workflow).toContain('.provider_worker_found = false | .blocked_stage = "provider_worker_identity"');
+    expect(workflow).toContain('.provider_worker_found = true');
+    expect(workflow).toContain('.blocked_stage = "required_worker_secret_names"');
     expect(workflow).toContain('.required_secret_names_verified = true | .blocked_stage = "provider_deploy"');
-    expect(workflow).toContain('.provider_deploy_succeeded = true | .email_trigger_reconciled = true | .blocked_stage = null');
+    expect(workflow).toContain('.blocked_stage = "provider_deploy_failed"');
+    expect(workflow).toContain('.blocked_stage = "service_binding_proof"');
+    expect(workflow).toContain('.provider_deploy_succeeded = true | .blocked_stage = null');
     expect(workflow).toContain('if-no-files-found: error');
   });
 
@@ -116,11 +123,12 @@ describe('review-email Worker reconciliation authority contract', () => {
     expect(workflow).toContain('access_policy_mutation: false');
   });
 
-  it('keeps provider deployment proof separate from unproven runtime email invocation', () => {
+  it('keeps provider deployment proof separate from provider-side routing and runtime email invocation', () => {
     expect(workflow).toContain('provider_deploy_succeeded: false');
     expect(workflow).toContain('.provider_deploy_succeeded = true');
     expect(workflow).toContain('email_trigger_reconciled: false');
-    expect(workflow).toContain('.email_trigger_reconciled = true');
+    expect(workflow).not.toContain('.email_trigger_reconciled = true');
+    expect(workflow).toContain('Email rule mutation/readback: absent from this workflow; retained as a separate provider receipt');
     expect(workflow).toContain('required_secret_names_verified: false');
     expect(workflow).toContain('.required_secret_names_verified = true');
     expect(workflow).toContain('runtime_email_invocation_proven: false');

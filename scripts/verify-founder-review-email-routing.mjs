@@ -11,19 +11,15 @@ const failures = [];
 const fail = message => failures.push(message);
 
 if (!/^name\s*=\s*"founder-control-room-review-email"\s*$/m.test(manifest)) {
-  fail('email trigger must target founder-control-room-review-email');
+  fail('email Worker must target founder-control-room-review-email');
 }
 
 if (!/^main\s*=\s*"src\/worker\/founderSignalReviewEmail\.ts"\s*$/m.test(manifest)) {
-  fail('email trigger must use the canonical founder review email entrypoint');
+  fail('email Worker must use the canonical founder review email entrypoint');
 }
 
-if (!/^addresses\s*=\s*\[\s*"review@foundercontrolroom\.org"\s*\]\s*$/m.test(manifest)) {
-  fail('email routing must declare exactly review@foundercontrolroom.org');
-}
-
-if (/addresses\s*=\s*\[[^\]]*\*@/m.test(manifest)) {
-  fail('founder review email routing must not declare a catch-all address');
+if (/^addresses\s*=/m.test(manifest)) {
+  fail('wrangler.email.toml must not claim inbound Email Routing with an unsupported addresses field');
 }
 
 if (/\[\[routes\]\]/.test(manifest)) {
@@ -59,5 +55,5 @@ if (failures.length > 0) {
 }
 
 console.log(
-  'Founder review email routing verified: review@foundercontrolroom.org only, no catch-all, no HTTP route, private FCR service binding preserved, and review+context parsing retained.',
+  'Founder review email Worker source contract verified: canonical identity, no HTTP exposure, private FCR service binding, and review+context parsing retained. Provider-side review@ routing remains external evidence and is not claimed by Wrangler config.',
 );
