@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
     paths:
+      - 'public/index.html'
       - 'public/_worker.js'
       - 'public/_headers'
       - 'public/robots.txt'
@@ -20,6 +21,7 @@ on:
   pull_request:
     branches: [main]
     paths:
+      - 'public/index.html'
       - 'public/_worker.js'
       - 'public/_headers'
       - 'public/robots.txt'
