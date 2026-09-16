@@ -22,6 +22,7 @@
   "public_paths": [
     "/",
     "/juss-rayy/",
+    "/work.html",
     "/guardrails",
     "/mom8/",
     "/robots.txt",
@@ -32,7 +33,8 @@
   "public_truth": {
     "sitemap": "https://www.foundercontrolroom.org/sitemap.xml",
     "llms": "https://www.foundercontrolroom.org/llms.txt",
-    "founder_profile": "https://www.foundercontrolroom.org/juss-rayy/"
+    "founder_profile": "https://www.foundercontrolroom.org/juss-rayy/",
+    "work_directory": "https://www.foundercontrolroom.org/work.html"
   },
   "attribution": {
     "requested": true,
