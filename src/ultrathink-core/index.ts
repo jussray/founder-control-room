@@ -151,3 +151,12 @@ export {
   type Reversibility,
   type WitnessStrength,
 } from './governedExecution.js';
+
+export {
+  GOVERNED_ACTION_AUTHORIZATION_SCHEMA,
+  evaluateGovernedActionAuthorization,
+  type GovernedActionAttempt,
+  type GovernedActionAuthorizationDecision,
+  type GovernedActionClass,
+  type GovernedActionGrant,
+} from './governedActionAuthorization.js';

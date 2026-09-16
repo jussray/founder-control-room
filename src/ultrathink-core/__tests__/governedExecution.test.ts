@@ -46,9 +46,27 @@ const lease: GovernedExecutionLease = {
     harnessId: 'openclaw-derived',
     harnessVersion: 'spike-v1',
     runtimeGenerationHash: 'runtime-generation-a',
-    providerId: 'simulated',
+    providerId: 'github',
     modelId: 'none',
     pluginSetHash: 'plugins-a',
+  },
+  boundary: {
+    missionId: 'mission-read-only-1',
+    shellId: 'shell-openclaw-spike',
+    credentialLane: 'project',
+    credentialProjectId: 'openclaw-spike',
+    allowedProviderIds: ['github'],
+    providerFallback: 'deny',
+    network: {
+      mode: 'allowlist',
+      allowedHosts: ['api.github.com'],
+      blockPrivateNetworks: true,
+    },
+    founderAuthorization: {
+      decisionReceiptId: 'founder-decision-1',
+      approvedByActorId: 'jussray',
+    },
+    humanFinalAuthorizationRequired: true,
   },
   authoritySnapshot: {
     capabilityManifestHash: 'capabilities-a',
@@ -80,6 +98,23 @@ function world(overrides: Partial<GovernedExecutionWorld> = {}): GovernedExecuti
     requestedCapabilities: ['network.read'],
     adapterCapabilities: ['network.read'],
     runtime: { ...lease.runtime },
+    boundary: {
+      missionId: lease.boundary.missionId,
+      shellId: lease.boundary.shellId,
+      credentialLane: lease.boundary.credentialLane,
+      credentialProjectId: lease.boundary.credentialProjectId,
+      requestedEgressHosts: ['api.github.com'],
+      founderAuthorization: {
+        ...lease.boundary.founderAuthorization,
+        valid: true,
+      },
+      killSwitches: {
+        global: false,
+        provider: false,
+        project: false,
+        capability: false,
+      },
+    },
     authoritySnapshot: { ...lease.authoritySnapshot },
     attempt: 1,
     leaseConsumed: false,
@@ -333,5 +368,119 @@ describe('FCR governed execution membrane', () => {
       },
       'W2',
     )).toBe('VERIFIED');
+  });
+
+  it('20 denies project-shell escape even when the capability itself is leased', () => {
+    expect(evaluateGovernedExecution(lease, world({
+      boundary: { ...world().boundary, shellId: 'shell-other-project' },
+    }))).toMatchObject({
+      disposition: 'DENY',
+      reasons: ['shell_drift'],
+    });
+  });
+
+  it('21 denies silent provider fallback', () => {
+    const result = evaluateGovernedExecution(lease, world({
+      runtime: { ...lease.runtime, providerId: 'huggingface' },
+    }));
+    expect(result.disposition).toBe('DENY');
+    expect(result.reasons).toEqual(expect.arrayContaining([
+      'runtime_provider_drift',
+      'provider_not_leased:huggingface',
+    ]));
+  });
+
+  it('22 denies a project credential lane that belongs to another project', () => {
+    const result = evaluateGovernedExecution(lease, world({
+      boundary: { ...world().boundary, credentialProjectId: 'another-project' },
+    }));
+    expect(result.disposition).toBe('DENY');
+    expect(result.reasons).toEqual(expect.arrayContaining([
+      'credential_project_drift',
+      'world_credential_project_mismatch',
+    ]));
+  });
+
+  it('23 denies undeclared egress and private-network access', () => {
+    const publicEscape = evaluateGovernedExecution(lease, world({
+      boundary: { ...world().boundary, requestedEgressHosts: ['api.huggingface.co'] },
+    }));
+    expect(publicEscape).toMatchObject({
+      disposition: 'DENY',
+      reasons: ['egress_host_not_leased:api.huggingface.co'],
+    });
+
+    const privateEscape = evaluateGovernedExecution(lease, world({
+      boundary: { ...world().boundary, requestedEgressHosts: ['127.0.0.1'] },
+    }));
+    expect(privateEscape.reasons).toEqual(expect.arrayContaining([
+      'private_network_egress_denied:127.0.0.1',
+    ]));
+  });
+
+  it('24 denies execution immediately when any kill switch is active', () => {
+    for (const scope of ['global', 'provider', 'project', 'capability'] as const) {
+      const result = evaluateGovernedExecution(lease, world({
+        boundary: {
+          ...world().boundary,
+          killSwitches: { ...world().boundary.killSwitches, [scope]: true },
+        },
+      }));
+      expect(result).toMatchObject({
+        disposition: 'DENY',
+        reasons: [`kill_switch:${scope}`],
+      });
+    }
+  });
+
+  it('25 denies missing or drifted human final authorization', () => {
+    const invalid = evaluateGovernedExecution(lease, world({
+      boundary: {
+        ...world().boundary,
+        founderAuthorization: {
+          ...world().boundary.founderAuthorization,
+          valid: false,
+        },
+      },
+    }));
+    expect(invalid).toMatchObject({
+      disposition: 'DENY',
+      reasons: ['founder_authorization_invalid'],
+    });
+
+    const drifted = evaluateGovernedExecution(lease, world({
+      boundary: {
+        ...world().boundary,
+        founderAuthorization: {
+          ...world().boundary.founderAuthorization,
+          decisionReceiptId: 'founder-decision-other',
+        },
+      },
+    }));
+    expect(drifted).toMatchObject({
+      disposition: 'DENY',
+      reasons: ['founder_decision_receipt_drift'],
+    });
+  });
+
+  it('26 supports a fully offline research shell with deny-all egress', () => {
+    const offline = {
+      ...lease,
+      boundary: {
+        ...lease.boundary,
+        network: {
+          ...lease.boundary.network,
+          mode: 'deny-all' as const,
+          allowedHosts: [],
+        },
+      },
+    };
+    const offlineWorld = world({
+      boundary: { ...world().boundary, requestedEgressHosts: [] },
+    });
+    expect(evaluateGovernedExecution(offline, offlineWorld)).toEqual({
+      disposition: 'EXECUTE',
+      reasons: [],
+    });
   });
 });
