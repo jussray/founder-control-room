@@ -7,7 +7,7 @@ import {
   relayContextFingerprint,
   type OperatorRelayRequestV1,
 } from '../operatorRelay.js';
-import { dispatchOperatorRelay, OperatorRelayDispatchError } from '../operatorRelayDispatch.js';
+import { dispatchOperatorRelay } from '../operatorRelayDispatch.js';
 
 function request(): OperatorRelayRequestV1 {
   const summary = 'Relay a bounded adversarial review to Perplexity.';
@@ -65,7 +65,7 @@ describe('dispatchOperatorRelay', () => {
   it('fails closed instead of silently substituting another operator', async () => {
     await expect(dispatchOperatorRelay(request(), {
       'claude-code': async () => { throw new Error('must not be called'); },
-    }, Date.parse('2026-09-16T06:31:00.000Z'))).rejects.toMatchObject<Partial<OperatorRelayDispatchError>>({
+    }, Date.parse('2026-09-16T06:31:00.000Z'))).rejects.toMatchObject({
       code: 'relay_target_unavailable',
     });
   });
@@ -89,7 +89,7 @@ describe('dispatchOperatorRelay', () => {
         };
         return { ...base, responseHash: operatorRelayResponseHash(base) };
       },
-    }, Date.parse('2026-09-16T06:31:00.000Z'))).rejects.toMatchObject<Partial<OperatorRelayDispatchError>>({
+    }, Date.parse('2026-09-16T06:31:00.000Z'))).rejects.toMatchObject({
       code: 'relay_response_invalid',
     });
   });
