@@ -11,9 +11,11 @@ on:
       - 'public/llms.txt'
       - 'public/crawlers.json'
       - 'public/juss-rayy/**'
+      - 'public/work.html'
       - 'scripts/build-pages.mjs'
       - 'src/http/__tests__/seoAssets.test.ts'
       - 'e2e/pages-api-recovery.spec.ts'
+      - 'e2e/public-work-directory.spec.ts'
       - '.github/workflows/pages-api-recovery-playwright.yml'
   pull_request:
     branches: [main]
@@ -25,12 +27,14 @@ on:
       - 'public/llms.txt'
       - 'public/crawlers.json'
       - 'public/juss-rayy/**'
+      - 'public/work.html'
       - 'scripts/build-pages.mjs'
       - 'src/http/server.ts'
       - 'src/http/__tests__/pagesEdgeProxy.test.ts'
       - 'src/http/__tests__/server.integration.test.ts'
       - 'src/http/__tests__/seoAssets.test.ts'
       - 'e2e/pages-api-recovery.spec.ts'
+      - 'e2e/public-work-directory.spec.ts'
       - '.github/workflows/pages-api-recovery-playwright.yml'
       - '.github/workflows/deploy.yml'
   workflow_dispatch:
@@ -79,6 +83,25 @@ jobs:
       - name: Build Cloudflare Pages bundle
         run: npm run build:pages
 
+      - name: Verify normalized public discovery output
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs';
+          const founder = readFileSync('dist-pages/juss-rayy/index.html', 'utf8');
+          const work = readFileSync('dist-pages/work.html', 'utf8');
+          if (!founder.includes('<link rel="canonical" href="https://www.foundercontrolroom.org/juss-rayy/"')) {
+            throw new Error('deployed founder canonical is not normalized to the public www origin');
+          }
+          if (!founder.includes('<meta itemprop="dateModified" content="2026-09-16" />')) {
+            throw new Error('deployed founder dateModified is stale');
+          }
+          if (!work.includes('<link rel="canonical" href="https://www.foundercontrolroom.org/work.html"')) {
+            throw new Error('public work directory canonical is missing');
+          }
+          NODE
+
       - name: Run focused behavior tests
         run: >-
           npx vitest run
@@ -95,8 +118,11 @@ jobs:
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
-      - name: Run rendered Pages recovery, founder identity, and crawler proof
-        run: npx playwright test -c playwright.config.ts e2e/pages-api-recovery.spec.ts
+      - name: Run rendered Pages recovery, founder identity, crawler, and public-work proof
+        run: >-
+          npx playwright test -c playwright.config.ts
+          e2e/pages-api-recovery.spec.ts
+          e2e/public-work-directory.spec.ts
 
       - name: Upload Playwright report
         if: always()
