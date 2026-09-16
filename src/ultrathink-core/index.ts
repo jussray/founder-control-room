@@ -97,6 +97,17 @@ export {
 } from './attack3000Content.js';
 
 export {
+  CONTENT_METRICS_CSV_CONTRACT,
+  CONTENT_METRIC_NAMES,
+  parseContentMetricsCsv,
+  type ContentMetricCsvEvidenceState,
+  type ContentMetricCsvObservation,
+  type ContentMetricCsvProvenance,
+  type ContentMetricCsvReceipt,
+  type ContentMetricName,
+} from '../lib/contentMetricsCsv.js';
+
+export {
   evaluateContentTrendRadar,
   type RankedTrendRadarCandidate,
   type TrendAngleKind,
