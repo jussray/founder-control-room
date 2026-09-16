@@ -5,7 +5,11 @@ import {
   relayContextFingerprint,
   type OperatorRelayRequestV1,
 } from '../operatorRelay.js';
-import { createServerOperatorRelayAdapters } from '../operatorRelayModelProviders.js';
+import {
+  createServerOperatorRelayAdapters,
+  OPERATOR_RELAY_MAX_ERROR_BYTES,
+  OPERATOR_RELAY_PROVIDER_TIMEOUT_MS,
+} from '../operatorRelayModelProviders.js';
 
 function relay(sensitivity: OperatorRelayRequestV1['sensitivity'] = 'internal'): OperatorRelayRequestV1 {
   const summary = 'Attack the current bridge and return surviving defects.';
@@ -51,6 +55,81 @@ describe('createServerOperatorRelayAdapters', () => {
     expect(response?.fromOperator).toBe('perplexity');
     expect(response?.answer).toBe('Perplexity review result');
     expect(response?.evidenceRefs).toEqual(['provider:perplexity:pplx-response-1']);
+  });
+
+  it('uses the current Anthropic Messages HTTP contract without serializing the API key', async () => {
+    const fetchMock = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      expect(String(url)).toBe('https://api.anthropic.com/v1/messages');
+      expect(init?.method).toBe('POST');
+      expect(init?.headers).toMatchObject({
+        'x-api-key': 'anthropic-test-secret',
+        'anthropic-version': '2023-06-01',
+        'Content-Type': 'application/json',
+      });
+      const serialized = String(init?.body ?? '');
+      expect(serialized).not.toContain('anthropic-test-secret');
+      expect(JSON.parse(serialized)).toMatchObject({
+        model: 'claude-current-test',
+        max_tokens: 2_000,
+        messages: [{ role: 'user' }],
+      });
+      return new Response(JSON.stringify({
+        id: 'anthropic-response-1',
+        provider: 'spoofed-provider-name',
+        content: [{ type: 'text', text: 'Anthropic review result' }],
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    }) as typeof fetch;
+
+    const adapters = createServerOperatorRelayAdapters({
+      ANTHROPIC_API_KEY: 'anthropic-test-secret',
+      FCR_RELAY_ANTHROPIC_MODEL: 'claude-current-test',
+    }, fetchMock);
+
+    const response = await adapters['claude-code']?.(relay());
+    expect(response?.fromOperator).toBe('claude-code');
+    expect(response?.answer).toBe('Anthropic review result');
+    expect(response?.evidenceRefs).toEqual(['provider:anthropic:anthropic-response-1']);
+    expect(OPERATOR_RELAY_PROVIDER_TIMEOUT_MS).toBe(60_000);
+  });
+
+  it('redacts an echoed Anthropic key from bounded provider errors', async () => {
+    const secret = 'anthropic-super-secret';
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+      type: 'error',
+      error: {
+        type: 'authentication_error',
+        message: `bad credential ${secret}`,
+      },
+    }), { status: 401, headers: { 'Content-Type': 'application/json' } })) as typeof fetch;
+
+    const adapters = createServerOperatorRelayAdapters({
+      ANTHROPIC_API_KEY: secret,
+      FCR_RELAY_ANTHROPIC_MODEL: 'claude-current-test',
+    }, fetchMock);
+
+    let message = '';
+    try {
+      await adapters['claude-code']?.(relay());
+    } catch (error) {
+      message = error instanceof Error ? error.message : String(error);
+    }
+    expect(message).toContain('[REDACTED]');
+    expect(message).not.toContain(secret);
+  });
+
+  it('rejects oversized provider error bodies instead of reading them as diagnostic text', async () => {
+    const oversized = JSON.stringify({ error: { message: 'x'.repeat(OPERATOR_RELAY_MAX_ERROR_BYTES + 1) } });
+    const fetchMock = vi.fn(async () => new Response(oversized, {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' },
+    })) as typeof fetch;
+    const adapters = createServerOperatorRelayAdapters({
+      ANTHROPIC_API_KEY: 'bounded-secret',
+      FCR_RELAY_ANTHROPIC_MODEL: 'claude-current-test',
+    }, fetchMock);
+
+    await expect(adapters['claude-code']?.(relay()))
+      .rejects.toThrow(`Anthropic relay response exceeded ${OPERATOR_RELAY_MAX_ERROR_BYTES} byte limit`);
   });
 
   it('fails closed before provider dispatch for restricted context', async () => {
