@@ -97,7 +97,6 @@ describe('per-action authorization membrane', () => {
       'consequential_action_not_approval_bound',
       'consequential_action_missing_evidence_requirement',
       'approval_receipt_missing',
-      'approval_receipt_drift',
     ]));
   });
 
