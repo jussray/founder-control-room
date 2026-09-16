@@ -201,11 +201,11 @@ describe('ChatGPT plugin management repository contract', () => {
     expect(universalCommands).toMatch(/^## Connector bridge recovery$/m);
     expect(universalCommands).toMatch(/connector surface[\s\S]*live session[\s\S]*provider page/i);
     expect(universalCommands).toMatch(/BLOCKED_CONNECTOR_BRIDGE/);
-    expect(universalCommands).toMatch(/re-probe the bridge once/i);
-    expect(universalCommands).toMatch(/do not repeat the same login\/setup instructions/i);
-    expect(universalCommands).toMatch(/equivalent direct provider capability/i);
-    expect(universalCommands).toMatch(/continuity fingerprints and proof cookies remain non-secret state markers/i);
-    expect(universalCommands).toMatch(/For connector\/session failures, separates connector-surface, live-session, and provider-page truth/i);
+    expect(universalCommands).toMatch(/re-probe once when useful/i);
+    expect(universalCommands).toMatch(/not proof that provider setup is wrong/i);
+    expect(universalCommands).toMatch(/equivalent direct capability/i);
+    expect(universalCommands).toMatch(/continuity fingerprints and proof cookies never authorize browser action/i);
+    expect(universalCommands).toMatch(/browser or app connector[\s\S]*bridge\/session failure[\s\S]*three evidence planes separate/i);
   });
 
   it('preserves equivalent evidence when one provider source is unreadable', () => {
