@@ -87,11 +87,12 @@ Implementation rules:
 - Search for existing interfaces, providers, routes, schemas, events, docs, and historical decisions before adding another.
 - Preserve unrelated work and history.
 - Prefer focused, reversible patches over broad rewrites.
-- Re-observe after every meaningful edit, test result, review, merge, provider write, or documentation transition.
+- Re-observe after every meaningful edit, test result, review, merge, deploy, provider write, or documentation transition.
 - Map code paths to explicit guardrails, evidence sources, temporal validity, and approval boundaries.
 - Treat compilation as syntax evidence, tests as behavioral evidence, CI as repository workflow evidence, provider readback as provider evidence, and runtime observation as deployment evidence. None substitutes for all the others.
 - A pull-request Quality Gate must checkout and verify `github.event.pull_request.head.sha` in every job; a successful synthetic PR merge-ref run is merge-simulation evidence, never exact-head candidate proof.
 - FCR CI must keep the secret-free exact-head Cloudflare bridge authority contract load-bearing inside `Required Gate`; that repository check does not substitute for live Cloudflare or GitHub provider readback.
+- Repository branch creation through `src/http/routes/approvals.ts` must use fresh `create_branch` proof plus the authenticated exact execute request to issue a server-owned `AuthorityEnvelopeV1`, with the authority lifetime beginning at the server-observed execute request time rather than the proof receipt timestamp; FCR must reserve the idempotent execution before mutation, re-read mission state immediately before the write, and pass the original envelope through `executeAuthorizedCreateBranch()`; direct provider branch creation from that route is forbidden.
 - Never code around an unknown provider state, schema state, credential state, review state, or failed workflow merely to make a patch appear complete.
 - Delete duplicate authority and dead workflow paths before adding another abstraction, credential, retry, or dashboard.
 - Do not remove behavior merely to make tests pass.
@@ -235,7 +236,7 @@ FCR governance reconciliation must fail closed until the candidate ProofMode con
 
 Require the applicable exact founder/provider authority before:
 
-- creating operational branches or sandboxes when current policy requires it;
+- creating operational branches or sandboxes when current policy requires it; branch creation must remain bound to the exact authenticated execute request, server-issued authority envelope, execution reservation, and fresh mission-state revalidation;
 - force-pushing, production deploying, or rolling back;
 - changing founder identity, auth, authorization, allowlists, sessions, or RLS;
 - adding, rotating, deleting, or exposing credentials;
@@ -270,3 +271,7 @@ For material work report:
 17. Next approval gate
 
 The Control Room exists to preserve founder authority, not automate it out of existence because a workflow diagram got overexcited.
+
+## Load-bearing regression execution
+
+A committed regression test is source evidence only until the exact-head workflow that feeds `Required Gate` actually executes it. For LinkedIn analytics continuity, `.github/workflows/ci.yml` must keep `scripts.test_linkedin_analytics_continuity` inside the load-bearing `python-tests` job, and `Required Gate` must continue to depend on that job. Missing LinkedIn activity rows must remain `UNKNOWN_NO_EVIDENCE` with null metrics, never synthetic zero impressions or engagements.

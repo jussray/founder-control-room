@@ -1,6 +1,6 @@
 # Founder Control Room MCP stack
 
-Last reviewed: 2026-08-29
+Last reviewed: 2026-09-13
 
 This file governs which MCP servers an AI agent may use while **developing this repository**. It is different from the Control Room's own **MCP / Connector Hub** (`project_connections` + `GET /agents` + `GET /authority-levels`), which records connectors and authority for managed projects. Do not conflate the repository agent fleet with the in-app Connector Hub.
 
@@ -55,11 +55,12 @@ No migration, OAuth dashboard change, Worker secret/binding change, merge, or de
 | `figma` | Design context and implementation handoff | Design evidence only; no deploy, migration, spending, or external-action authority |
 | `supabase` | Inspect the Control Room's own schema and Supabase documentation | Project `oojzfmmywbvficgybaxd`, read-only, `database,docs` only |
 | `cloudflare` | Official Cloudflare API MCP at `https://mcp.cloudflare.com/mcp` | Provider-supported OAuth/API-token connection. Read by default; mutations remain separately approved |
-| `cloudflare-stack` | User-supplied supplemental endpoint at `https://stack.mcp.cloudflare.com/mcp` | Experimental repository-client context only. It is not current provider authority because no matching Cloudflare documentation or source-of-truth registration has been verified |
 | `cloudflare-docs` | Current Cloudflare product documentation | Documentation only |
 | `cloudflare-bindings` | Inspect Worker bindings and project wiring | Binding mutations remain separately approved |
 | `cloudflare-builds` | Inspect Control Room Worker build evidence | No deploy or setting changes without separate approval |
 | `cloudflare-observability` | Inspect sanitized runtime logs and analytics | Never query or paste access tokens, service-role keys, founder sessions, or raw project payloads |
+
+`cloudflare-stack` / `https://stack.mcp.cloudflare.com/mcp` is intentionally **not installed** in standing repository-agent configuration because it is not present in Cloudflare's current documented agent-setup fleet. `scripts/verify-mcp-config.mjs` rejects it so stale client configuration cannot silently reintroduce it.
 
 ## Served remote read MCP boundary
 
@@ -87,7 +88,7 @@ The in-app Hub uses `src/mcp/defaultRegistry.ts`, environment/connection-vault a
 - the normal Hub may use the provider's `search` tool for API/schema discovery;
 - generic Code Mode `execute` remains denied in normal Hub policy because its tool name alone cannot prove that the embedded request is read-only;
 - the exact-head `Cloudflare API MCP Read Diagnostic` is the only standing lane allowed to call `execute`, and the repository-owned probe hard-codes a single `GET /accounts/{account_id}` request before recording a redacted receipt;
-- the user-supplied `stack.mcp.cloudflare.com` endpoint is not registered as in-app provider authority;
+- the undocumented `stack.mcp.cloudflare.com` endpoint is not registered as in-app provider authority or standing repository-agent configuration;
 - provider/OAuth availability in an IDE does not prove production runtime authorization.
 
 This keeps Cloudflare provider proof useful without turning a generic code-execution tool into an accidentally privileged Control Room capability.
@@ -97,6 +98,7 @@ This keeps Cloudflare provider proof useful without turning a generic code-execu
 - DBHub and generic database MCP servers. The project-scoped read-only Supabase server covers the current schema-inspection need.
 - Netdata while the service runs on managed infrastructure without claimed persistent hosts.
 - GitHub Insiders and local Docker GitHub MCP as committed defaults.
+- `cloudflare-stack` / `stack.mcp.cloudflare.com` until Cloudflare documents it as a supported agent-setup endpoint and the repository deliberately re-evaluates it.
 - Any cross-project Supabase connection. The Control Room must never point its standing MCP configuration at Bip's database.
 
 ## Data boundary

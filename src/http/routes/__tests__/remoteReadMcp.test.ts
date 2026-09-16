@@ -113,6 +113,15 @@ function dependencies(overrides: RemoteReadMcpDependencies = {}): RemoteReadMcpD
       executionAllowed: false,
       input,
     })),
+    relayOperator: vi.fn(async (input) => ({
+      request: { fromOperator: input.fromOperator, toOperator: input.toOperator },
+      response: {
+        fromOperator: input.toOperator,
+        toOperator: input.fromOperator,
+        answer: 'peer relay complete',
+        evidenceRefs: [`provider:${input.toOperator}:test`],
+      },
+    })),
     invokeReadTool: vi.fn(async (input) => ({
       ...input,
       policy: { decision: 'allow', risk: 'read' },
@@ -246,7 +255,7 @@ describe('Founder Control Room paired remote MCP', () => {
     expect(response.headers).not.toHaveProperty('set-cookie');
   });
 
-  it('keeps legacy initialization while advertising only six narrow tools', async () => {
+  it('keeps legacy initialization while advertising the bounded relay tool', async () => {
     const app = buildApp();
     const initialized = await legacyPost(app, rpc('initialize', {
       protocolVersion: '2025-11-25',
@@ -264,6 +273,7 @@ describe('Founder Control Room paired remote MCP', () => {
       'fcr_list_projects',
       'fcr_get_current_truth',
       'fcr_preview_skill_route',
+      'fcr_relay_operator',
     ]);
     expect(listed.body.result.tools.map((tool: { name: string }) => tool.name)).not.toContain(
       'invoke_read_tool',
@@ -355,6 +365,85 @@ describe('Founder Control Room paired remote MCP', () => {
     expect(response.status).toBe(403);
     expect(response.body.error.message).toBe('Requested project is outside this remote MCP grant');
     expect(getCurrentTruth).not.toHaveBeenCalled();
+  });
+
+  it('relays from the OAuth-bound ChatGPT client to Perplexity without mutation authority', async () => {
+    const relayOperator = vi.fn(async (input) => ({
+      request: { fromOperator: input.fromOperator, toOperator: input.toOperator },
+      response: {
+        fromOperator: input.toOperator,
+        toOperator: input.fromOperator,
+        answer: 'Perplexity attack complete',
+        evidenceRefs: ['provider:perplexity:response-1'],
+      },
+    }));
+    const recordEvidence = vi.fn(async (input) => receipt(input.toolName, input.projectSlug));
+    const app = buildApp({
+      authMode: 'oauth',
+      env: {
+        FCR_REMOTE_MCP_RESOURCE: RESOURCE,
+        FCR_REMOTE_MCP_READ_PROJECTS: `${CHIEF},${FCR}`,
+        FCR_REMOTE_MCP_OPERATOR_CLIENT_MAP: JSON.stringify({ 'chatgpt-client': 'codex' }),
+      },
+      authenticateOauth: vi.fn(async () => ({
+        userId: 'founder-user-1',
+        email: 'founder@example.com',
+        clientId: 'chatgpt-client',
+        projectIds: [FCR],
+        authMode: 'oauth' as const,
+      })),
+      relayOperator,
+      recordEvidence,
+    });
+
+    const body = modernRpc('tools/call', {
+      name: 'fcr_relay_operator',
+      arguments: {
+        targetOperator: 'perplexity',
+        capability: 'review',
+        goal: 'Attack this bridge design.',
+        contextSummary: 'Bounded current design context.',
+      },
+    });
+    const response = await modernPost(app, body, { nameHeader: 'fcr_relay_operator' });
+
+    expect(response.status).toBe(200);
+    expect(relayOperator).toHaveBeenCalledWith(expect.objectContaining({
+      fromOperator: 'codex',
+      toOperator: 'perplexity',
+      capability: 'review',
+    }));
+    expect(response.body.result.structuredContent.data.response).toMatchObject({
+      fromOperator: 'perplexity',
+      toOperator: 'codex',
+      evidenceRefs: ['provider:perplexity:response-1'],
+    });
+    expect(response.body.result.structuredContent.governanceBoundary).toMatchObject({
+      externalProviderCall: true,
+      mutationAuthority: false,
+      executionAllowed: false,
+    });
+    expect(recordEvidence).toHaveBeenCalledWith(expect.objectContaining({
+      toolName: 'fcr_relay_operator',
+      risk: 'external_side_effect',
+    }));
+  });
+
+  it('refuses peer relay through the static compatibility token', async () => {
+    const relayOperator = vi.fn();
+    const response = await legacyPost(buildApp({ relayOperator }), rpc('tools/call', {
+      name: 'fcr_relay_operator',
+      arguments: {
+        targetOperator: 'perplexity',
+        capability: 'review',
+        goal: 'Attack this bridge design.',
+        contextSummary: 'Bounded current design context.',
+      },
+    }));
+
+    expect(response.status).toBe(400);
+    expect(response.body.error.message).toContain('requires OAuth-bound client identity');
+    expect(relayOperator).not.toHaveBeenCalled();
   });
 
   it('rejects nested secret-bearing arguments before any tool executes', async () => {

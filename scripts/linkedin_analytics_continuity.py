@@ -2,7 +2,8 @@
 """Deterministic LinkedIn XLSX analytics continuity for Founder Control Room.
 
 Observation-only: reads a LinkedIn analytics export and emits normalized evidence.
-It never publishes, schedules, approves, or mutates provider state.
+It never publishes, schedules, approves, mutates provider state, or authenticates
+account ownership from caller-supplied identity labels.
 """
 from __future__ import annotations
 
@@ -20,7 +21,9 @@ from xml.etree import ElementTree as ET
 
 NS = {"m": "http://schemas.openxmlformats.org/spreadsheetml/2006/main", "r": "http://schemas.openxmlformats.org/officeDocument/2006/relationships", "p": "http://schemas.openxmlformats.org/package/2006/relationships"}
 CELL_RE = re.compile(r"([A-Z]+)(\d+)")
-POST_ID_RE = re.compile(r"share-(\d+)-")
+POST_URL_ID_RE = re.compile(r"(?:^|[_-])(share|ugcpost)-(\d+)(?:-|$)", re.IGNORECASE)
+POST_URN_RE = re.compile(r"^urn:li:(share|ugcPost):(\d+)$", re.IGNORECASE)
+EMBEDDED_POST_URN_RE = re.compile(r"urn:li:(share|ugcPost):(\d+)", re.IGNORECASE)
 
 
 def _col_index(ref: str) -> int:
@@ -106,6 +109,49 @@ def _normalize_url(url: str) -> str:
     return urlunsplit((parts.scheme.lower(), parts.netloc.lower(), parts.path.rstrip("/"), "", ""))
 
 
+def _canonical_post_kind(value: str) -> str:
+    return "ugcPost" if value.lower() == "ugcpost" else "share"
+
+
+def canonical_post_identity(value: str) -> dict[str, str]:
+    raw = str(value).strip()
+    if not raw:
+        raise ValueError("post identity must not be empty")
+
+    urn_match = POST_URN_RE.fullmatch(raw)
+    if urn_match:
+        kind = _canonical_post_kind(urn_match.group(1))
+        post_id = urn_match.group(2)
+        return {"urn": f"urn:li:{kind}:{post_id}", "id": post_id, "kind": kind}
+
+    parts = urlsplit(raw)
+    if parts.scheme.lower() != "https" or parts.netloc.lower() not in {"linkedin.com", "www.linkedin.com"}:
+        raise ValueError("post identity must be a LinkedIn post URN or https LinkedIn URL")
+    normalized = _normalize_url(raw)
+
+    embedded_urn = EMBEDDED_POST_URN_RE.search(normalized)
+    if embedded_urn:
+        kind = _canonical_post_kind(embedded_urn.group(1))
+        post_id = embedded_urn.group(2)
+        return {"urn": f"urn:li:{kind}:{post_id}", "id": post_id, "kind": kind}
+
+    url_match = POST_URL_ID_RE.search(normalized)
+    if not url_match:
+        raise ValueError("LinkedIn URL does not contain a canonical share or ugcPost identity")
+    kind = _canonical_post_kind(url_match.group(1))
+    post_id = url_match.group(2)
+    return {"urn": f"urn:li:{kind}:{post_id}", "id": post_id, "kind": kind}
+
+
+def _declared_binding(value: str, field: str) -> str:
+    raw = str(value).strip()
+    if not raw:
+        raise ValueError(f"{field} must not be empty")
+    if len(raw) > 256 or any(char in raw for char in "\r\n\t"):
+        raise ValueError(f"{field} is invalid")
+    return raw
+
+
 def post_fingerprint(publish_date: date, url: str) -> str:
     canonical = f"linkedin|{publish_date.isoformat()}|{_normalize_url(url)}"
     return hashlib.sha256(canonical.encode()).hexdigest()[:16]
@@ -135,10 +181,13 @@ def _extract_posts(top_rows: list[list[str]], start: date, end: date) -> tuple[l
         if not start <= publish_day <= end:
             continue
         normalized = _normalize_url(url)
-        match = POST_ID_RE.search(normalized)
+        match = POST_URL_ID_RE.search(normalized)
+        kind = _canonical_post_kind(match.group(1)) if match else None
+        post_id = match.group(2) if match else None
         posts.append({
             "publish_date": publish_day.isoformat(),
-            "linkedin_post_id": match.group(1) if match else None,
+            "linkedin_post_id": post_id,
+            "linkedin_post_urn": f"urn:li:{kind}:{post_id}" if kind and post_id else None,
             "post_url": normalized,
             "impressions": int(float(raw_impressions)) if raw_impressions else None,
             "fingerprint": post_fingerprint(publish_day, normalized),
@@ -183,7 +232,15 @@ def analyze_export(path: str | Path, start: date, end: date, export_limit: int =
         count = counts.get(key, 0)
         cumulative += count
         cadence = "NONE" if count == 0 else "SINGLE" if count == 1 else "DOUBLE" if count == 2 else "BURST"
-        day_activity = activity.get(key, {"impressions": 0, "engagements": 0})
+        day_activity = activity.get(key)
+        if day_activity is None:
+            activity_impressions = None
+            activity_engagements = None
+            activity_evidence_state = "UNKNOWN_NO_EVIDENCE"
+        else:
+            activity_impressions = day_activity["impressions"]
+            activity_engagements = day_activity["engagements"]
+            activity_evidence_state = "VERIFIED"
         days.append({
             "date": key,
             "verified_visible_posts": count,
@@ -191,8 +248,9 @@ def analyze_export(path: str | Path, start: date, end: date, export_limit: int =
             "cumulative_posts": cumulative,
             "cadence": cadence,
             "day_cookie": day_cookie(cursor, fingerprints_by_day.get(key, [])),
-            "activity_impressions": day_activity["impressions"],
-            "activity_engagements": day_activity["engagements"],
+            "activity_impressions": activity_impressions,
+            "activity_engagements": activity_engagements,
+            "activity_evidence_state": activity_evidence_state,
         })
         cursor += timedelta(days=1)
 
@@ -233,6 +291,97 @@ def analyze_export(path: str | Path, start: date, end: date, export_limit: int =
     }
 
 
+def exact_post_measurement(
+    report: dict[str, Any],
+    *,
+    account_id: str,
+    experiment_id: str,
+    post_identity: str,
+) -> dict[str, Any]:
+    """Bind one visible native-export post to declared FCR experiment identity.
+
+    This receipt proves exact post visibility only. Caller-supplied account/experiment
+    labels are declared FCR bindings, not provider authentication, so this receipt
+    alone never makes an experiment eligible for learning or strategy mutation.
+    """
+    account = _declared_binding(account_id, "account_id")
+    experiment = _declared_binding(experiment_id, "experiment_id")
+    target = canonical_post_identity(post_identity)
+    matches = [post for post in report.get("posts", []) if post.get("linkedin_post_urn") == target["urn"]]
+    export_capped = report.get("summary", {}).get("evidence_state") == "VERIFIED_VISIBLE_FLOOR"
+
+    if len(matches) > 1:
+        evidence_state = "BLOCKED_AMBIGUOUS_NATIVE_IDENTITY"
+        post = None
+        gate = "REQUIRES_UNAMBIGUOUS_EXACT_POST_EVIDENCE"
+    elif len(matches) == 1:
+        evidence_state = "VERIFIED_VISIBLE"
+        post = matches[0]
+        gate = "REQUIRES_PROVIDER_AUTHENTICATED_ACCOUNT_BINDING"
+    else:
+        evidence_state = "UNKNOWN_NO_EVIDENCE"
+        post = None
+        gate = "REQUIRES_EXACT_POST_NATIVE_EVIDENCE"
+
+    return {
+        "contract": "linkedin-native-post-measurement@v1",
+        "authority": "observation_only",
+        "measurement_identity": {
+            "platform": "linkedin",
+            "account": account,
+            "post": target["urn"],
+            "experiment": experiment,
+        },
+        "identity_binding": {
+            "post_binding": evidence_state,
+            "account_binding": "DECLARED_FCR_IDENTITY_NOT_PROVIDER_AUTHENTICATED",
+            "experiment_binding": "DECLARED_FCR_EXPERIMENT_ID",
+        },
+        "evidence_state": evidence_state,
+        "source": {
+            "kind": "linkedin_native_export",
+            "filename": report.get("source", {}).get("filename"),
+            "export_capped": export_capped,
+            "window": report.get("window"),
+            "freshness_state": "NOT_ESTABLISHED_BY_THIS_RECEIPT",
+        },
+        "metrics": {
+            "impressions": post.get("impressions") if post else None,
+            "engagements": None,
+        },
+        "metric_provenance": {
+            "impressions": "TOP_POSTS_EXACT_POST" if post else "UNKNOWN_NO_EVIDENCE",
+            "engagements": "UNAVAILABLE_POST_LEVEL_IN_THIS_EXPORT",
+        },
+        "post_observation": {
+            "visible_in_export": len(matches) > 0,
+            "visible_match_count": len(matches),
+            "publish_date": post.get("publish_date") if post else None,
+            "post_url": post.get("post_url") if post else None,
+            "fingerprint": post.get("fingerprint") if post else None,
+        },
+        "absence_semantics": (
+            "TARGET_NOT_VISIBLE_IN_CAPPED_EXPORT_IS_NOT_ZERO_OR_FAILURE"
+            if post is None and not matches and export_capped
+            else "TARGET_NOT_VISIBLE_IN_EXPORT_IS_NOT_ZERO_OR_FAILURE"
+            if post is None and not matches
+            else None
+        ),
+        "learning": {
+            "eligible_from_this_receipt": False,
+            "next_gate": gate,
+            "requires": [
+                "provider_authenticated_account_binding",
+                "current_native_export_freshness",
+                "exact_experiment_binding",
+                "sufficient_exact_post_metrics_for_requested_verdict",
+            ],
+        },
+        "publication_authority": False,
+        "strategy_mutation_authority": False,
+    }
+
+
 def reconcile(previous: dict[str, Any] | None, current: dict[str, Any]) -> dict[str, list[str]]:
     previous_fps = {p["fingerprint"] for p in (previous or {}).get("posts", [])}
     current_fps = {p["fingerprint"] for p in current.get("posts", [])}
@@ -249,14 +398,28 @@ def main() -> int:
     parser.add_argument("--start", required=True)
     parser.add_argument("--end", required=True)
     parser.add_argument("--previous-json")
+    parser.add_argument("--account-id")
+    parser.add_argument("--experiment-id")
+    parser.add_argument("--post")
     parser.add_argument("--output")
     args = parser.parse_args()
+
+    targeted = [args.account_id, args.experiment_id, args.post]
+    if any(targeted) and not all(targeted):
+        parser.error("--account-id, --experiment-id, and --post must be supplied together")
 
     current = analyze_export(args.xlsx, _parse_date(args.start), _parse_date(args.end))
     previous = None
     if args.previous_json:
         previous = json.loads(Path(args.previous_json).read_text())
     current["reconciliation"] = reconcile(previous, current)
+    if all(targeted):
+        current["exact_measurement"] = exact_post_measurement(
+            current,
+            account_id=args.account_id,
+            experiment_id=args.experiment_id,
+            post_identity=args.post,
+        )
     encoded = json.dumps(current, indent=2, sort_keys=True)
     if args.output:
         Path(args.output).write_text(encoded + "\n")
