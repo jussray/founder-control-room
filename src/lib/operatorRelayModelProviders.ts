@@ -5,6 +5,7 @@ import { operatorRelayAdapterFromTextProvider } from './operatorRelayProvider.js
 type FetchLike = typeof fetch;
 type JsonRecord = Record<string, unknown>;
 
+const MAX_PROVIDER_RESPONSE_BYTES = 64 * 1024;
 const PROVIDER_TIMEOUT_MS = 60_000;
 const ANTHROPIC_API_VERSION = '2023-06-01';
 const MAX_PROVIDER_RESPONSE_ID_LENGTH = 200;
@@ -33,6 +34,45 @@ function ensureRelaySensitivity(request: OperatorRelayRequestV1): void {
   }
 }
 
+async function boundedResponseText(response: Response, label: string): Promise<string> {
+  const contentLength = response.headers.get('content-length');
+  if (contentLength) {
+    const declaredBytes = Number(contentLength);
+    if (Number.isFinite(declaredBytes) && declaredBytes > MAX_PROVIDER_RESPONSE_BYTES) {
+      try {
+        await response.body?.cancel();
+      } catch {
+        // The size receipt remains valid even if an already-closed stream cannot be cancelled.
+      }
+      throw new Error(`${label} response exceeded ${MAX_PROVIDER_RESPONSE_BYTES} bytes`);
+    }
+  }
+
+  if (!response.body) return '';
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let bytesRead = 0;
+  let text = '';
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      bytesRead += value.byteLength;
+      if (bytesRead > MAX_PROVIDER_RESPONSE_BYTES) {
+        await reader.cancel();
+        throw new Error(`${label} response exceeded ${MAX_PROVIDER_RESPONSE_BYTES} bytes`);
+      }
+      text += decoder.decode(value, { stream: true });
+    }
+    text += decoder.decode();
+    return text;
+  } finally {
+    reader.releaseLock();
+  }
+}
+
 async function jsonResponse(response: Response, label: string): Promise<JsonRecord> {
   if (!response.ok) {
     // Provider error bodies are intentionally never promoted into FCR errors.
@@ -46,9 +86,10 @@ async function jsonResponse(response: Response, label: string): Promise<JsonReco
     throw new Error(`${label} failed with HTTP ${response.status}`);
   }
 
+  const text = await boundedResponseText(response, label);
   let body: unknown;
   try {
-    body = await response.json();
+    body = JSON.parse(text);
   } catch {
     throw new Error(`${label} returned non-JSON output`);
   }
