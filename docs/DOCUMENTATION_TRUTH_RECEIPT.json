@@ -1,6 +1,6 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Preserve the current TinyFish Cloudflare activation, read-only Shopify child-provider boundaries, FCR browser-auth versus Cloudflare Access boundary, exact founder merge-authority contract, bounded Attack 3000 content observation, advisory Trend Radar, and deterministic founder-content approval retry contracts without converting source, analytics, rankings, retry identity, provider configuration, mergeability, or deployment into publication, provider-mutation, merge, deploy, spend, or external-contact authority.",
+  "purpose": "Preserve the current TinyFish Cloudflare activation, read-only Shopify child-provider boundaries, FCR browser-auth versus Cloudflare Access boundary, exact founder merge-authority contract, bounded Attack 3000 content observation, advisory Trend Radar, deterministic founder-content approval retry contracts, and Pages static-versus-API routing truth without converting source, analytics, rankings, retry identity, provider configuration, crawler policy, mergeability, or deployment into publication, provider-mutation, merge, deploy, spend, or external-contact authority.",
   "domains": [
     "cloudflare-authority",
     "repository-provider",
@@ -9,6 +9,12 @@
     "merge-authority"
   ],
   "changes": [
+    {
+      "path": "public/_worker.js",
+      "claims": [
+        "`public/_worker.js` must route public static discovery artifacts, including `crawlers.json`, through the Pages `ASSETS` binding while API-owned callback assets remain on `FCR_API`; this routing classification cannot authorize provider mutation or treat a static crawler policy as authentication."
+      ]
+    },
     {
       "path": "wrangler.worker.toml",
       "claims": [
