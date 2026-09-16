@@ -68,7 +68,7 @@ describe('founder content metric observations', () => {
       .toThrow(FOUNDER_CONTENT_METRICS_CONTRACT);
     expect(() => normalizeFounderContentMetricsEnvelope({
       contract: FOUNDER_CONTENT_METRICS_CONTRACT,
-      observations: [{ metricName: 'impressions' }],
+      observations: [{ ...observation(), provider: '' }],
     })).toThrow(/provider/i);
   });
 
