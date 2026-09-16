@@ -5,6 +5,10 @@ import { operatorRelayAdapterFromTextProvider } from './operatorRelayProvider.js
 type FetchLike = typeof fetch;
 type JsonRecord = Record<string, unknown>;
 
+const MAX_PROVIDER_RESPONSE_BYTES = 64 * 1024;
+const PROVIDER_TIMEOUT_MS = 60_000;
+const PROVIDER_RESPONSE_ID_PATTERN = /^[A-Za-z0-9._:-]{1,200}$/;
+
 function record(value: unknown): JsonRecord | null {
   return value && typeof value === 'object' && !Array.isArray(value)
     ? value as JsonRecord
@@ -29,22 +33,57 @@ function ensureRelaySensitivity(request: OperatorRelayRequestV1): void {
   }
 }
 
+async function boundedResponseText(response: Response, label: string): Promise<string> {
+  const contentLength = response.headers.get('content-length');
+  if (contentLength) {
+    const declaredBytes = Number(contentLength);
+    if (Number.isFinite(declaredBytes) && declaredBytes > MAX_PROVIDER_RESPONSE_BYTES) {
+      throw new Error(`${label} response exceeded ${MAX_PROVIDER_RESPONSE_BYTES} bytes`);
+    }
+  }
+
+  if (!response.body) return '';
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let bytesRead = 0;
+  let text = '';
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      bytesRead += value.byteLength;
+      if (bytesRead > MAX_PROVIDER_RESPONSE_BYTES) {
+        await reader.cancel();
+        throw new Error(`${label} response exceeded ${MAX_PROVIDER_RESPONSE_BYTES} bytes`);
+      }
+      text += decoder.decode(value, { stream: true });
+    }
+    text += decoder.decode();
+    return text;
+  } finally {
+    reader.releaseLock();
+  }
+}
+
 async function jsonResponse(response: Response, label: string): Promise<JsonRecord> {
+  const text = await boundedResponseText(response, label);
+
+  // Provider error bodies are evidence, not trusted exception text. Never reflect them
+  // into logs/errors because they can contain request fragments or credential-like data.
+  if (!response.ok) {
+    throw new Error(`${label} failed with HTTP ${response.status}`);
+  }
+
   let body: unknown;
   try {
-    body = await response.json();
+    body = JSON.parse(text);
   } catch {
     throw new Error(`${label} returned non-JSON output`);
   }
   const parsed = record(body);
   if (!parsed) throw new Error(`${label} returned an invalid response object`);
-  if (!response.ok) {
-    const error = record(parsed.error);
-    const message = typeof error?.message === 'string'
-      ? error.message
-      : `${label} failed with HTTP ${response.status}`;
-    throw new Error(message);
-  }
   return parsed;
 }
 
@@ -87,7 +126,8 @@ function perplexityText(body: JsonRecord): string {
 }
 
 function evidenceRef(provider: string, body: JsonRecord): string {
-  const id = typeof body.id === 'string' && body.id.trim() ? body.id.trim() : 'unidentified-response';
+  const rawId = typeof body.id === 'string' ? body.id.trim() : '';
+  const id = PROVIDER_RESPONSE_ID_PATTERN.test(rawId) ? rawId : 'unidentified-response';
   return `provider:${provider}:${id}`;
 }
 
@@ -120,7 +160,7 @@ export function createServerOperatorRelayAdapters(
             max_output_tokens: 2_000,
           }),
           redirect: 'error',
-          signal: AbortSignal.timeout(60_000),
+          signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
         });
         const body = await jsonResponse(response, 'OpenAI relay');
         return { text: openAiText(body), evidenceRef: evidenceRef('openai', body) };
@@ -145,7 +185,7 @@ export function createServerOperatorRelayAdapters(
             messages: [{ role: 'user', content: relayPrompt(request) }],
           }),
           redirect: 'error',
-          signal: AbortSignal.timeout(60_000),
+          signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
         });
         const body = await jsonResponse(response, 'Anthropic relay');
         return { text: anthropicText(body), evidenceRef: evidenceRef('anthropic', body) };
@@ -168,7 +208,7 @@ export function createServerOperatorRelayAdapters(
             messages: [{ role: 'user', content: relayPrompt(request) }],
           }),
           redirect: 'error',
-          signal: AbortSignal.timeout(60_000),
+          signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
         });
         const body = await jsonResponse(response, 'Perplexity relay');
         return { text: perplexityText(body), evidenceRef: evidenceRef('perplexity', body) };
