@@ -18,7 +18,7 @@
   "chiefAIFounderContentStrategy": {
     "repository": "jussray/chief-ai-machine",
     "pullRequest": 128,
-    "expectedHeadSha": "ae96643d030da82221b65bc0d45e5f5c51010b6c"
+    "expectedHeadSha": "e7a6b090c29b785647697ae96706e3aef064be96"
   },
   "truthBoundary": "This immutable candidate snapshot binds FCR PR #781 to the exact observed Chief peer, necessary-fix policy, and founder-content-strategy carrier heads. It is evidence only: it does not authorize merge, deployment, provider mutation, publication, runtime execution, or transfer authority between peers.",
   "authorizesMerge": false,
