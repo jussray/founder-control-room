@@ -55,20 +55,29 @@ assert(toolDefsMatch, "externalMcpToolDefinitions is missing");
 const toolDefsBody = toolDefsMatch[0];
 assert(
   /const readAnnotations = \{[\s\S]{0,120}?readOnlyHint:\s*true/.test(toolDefsBody),
-  "the shared tool-annotation object must declare readOnlyHint: true",
+  "the shared read-only tool annotation object must declare readOnlyHint: true",
 );
 assert(
-  !/readOnlyHint:\s*false/.test(toolDefsBody),
-  "no tool in the external MCP catalog may advertise readOnlyHint: false",
+  /const relayAnnotations = \{[\s\S]{0,180}?readOnlyHint:\s*false[\s\S]{0,180}?destructiveHint:\s*false[\s\S]{0,180}?idempotentHint:\s*false[\s\S]{0,180}?openWorldHint:\s*true/.test(toolDefsBody),
+  "the bounded operator relay must remain externally side-effecting, non-destructive, non-idempotent, and open-world",
 );
 const toolCount = (toolDefsBody.match(/^\s{6}name:\s*'/gm) ?? []).length;
 const readAnnotationUses = (
   toolDefsBody.match(/annotations:\s*(?:readAnnotations|\{\s*\.\.\.readAnnotations)/g) ?? []
 ).length;
+const relayAnnotationUses = (toolDefsBody.match(/annotations:\s*relayAnnotations/g) ?? []).length;
 assert(toolCount > 0, "no tools found in externalMcpToolDefinitions");
 assert(
-  readAnnotationUses === toolCount,
-  `every declared external MCP tool (${toolCount}) must derive its annotations from the shared readAnnotations object (found ${readAnnotationUses})`,
+  relayAnnotationUses === 1,
+  `exactly one external MCP tool must use relayAnnotations (found ${relayAnnotationUses})`,
+);
+assert(
+  readAnnotationUses + relayAnnotationUses === toolCount,
+  `every declared external MCP tool (${toolCount}) must use either readAnnotations or the single bounded relayAnnotations object (found ${readAnnotationUses} read + ${relayAnnotationUses} relay)`,
+);
+assert(
+  /name:\s*'fcr_relay_operator'[\s\S]*?annotations:\s*relayAnnotations/.test(toolDefsBody),
+  "only fcr_relay_operator may use the externally side-effecting relay annotations",
 );
 assert(
   externalTools.includes("executionAllowed: false") &&
