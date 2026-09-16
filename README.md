@@ -178,6 +178,8 @@ api.foundercontrolroom.org
   -> canonical Worker: founder-control-room
 ```
 
+Public discovery artifacts such as `/robots.txt`, `/sitemap.xml`, `/llms.txt`, and `/crawlers.json` are static Pages assets and must be served through the `ASSETS` binding; API-owned callback assets remain routed through `FCR_API`. This source routing rule does not make crawler policy authentication and cannot grant provider, deploy, publication, or mutation authority.
+
 Source dependence on that topology is not proof the live provider is configured correctly.
 
 `wrangler.worker.toml [secrets].required` is the canonical production binding-name gate for provider-held Worker secrets. A provider-backed capability such as `tinyfish-web-observation-v1` must name `TINYFISH_API_KEY` there before canonical Worker promotion; Deploy verifies only binding-name presence in Cloudflare and never copies the secret value through GitHub Actions. Source and CI readiness therefore remain distinct from live TinyFish provider/runtime activation.
