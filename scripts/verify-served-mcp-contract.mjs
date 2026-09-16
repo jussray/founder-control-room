@@ -8,7 +8,7 @@
  * `verify-remote-read-mcp-config.mjs` (also under `verify:mcp`) already pins
  * `remoteReadMcp.ts` content, `.env.example`, `wrangler.worker.toml`, and
  * `docs/MCP_STACK.md` for the /mcp and /mcp/read lanes. This script does not
- * repeat that coverage. It pins two things nothing else does:
+ * repeat that coverage. It pins three things nothing else does:
  *
  *   1. The tool catalog and evidence contract in `externalTools.ts` and the
  *      shared secret-argument guard in `safety.ts` — invoked by /mcp and
@@ -18,6 +18,8 @@
  *      still carries its middleware in `mcp.ts` and `server.ts`. A route file
  *      can keep every internal invariant intact while a mount edit silently
  *      drops the auth middleware in front of it; nothing else checks that.
+ *   3. The served discovery/initialize description stays truthful about the
+ *      six read/preview tools plus the one bounded peer relay.
  *
  * Scope is deliberately narrow otherwise: it does not assert OAuth claim
  * handling or protocol-version literals. The external tool catalog is pinned
@@ -41,6 +43,7 @@ function assert(condition, message) {
 
 const externalTools = read("src/mcp/externalTools.ts");
 const safety = read("src/mcp/safety.ts");
+const remoteReadMcp = read("src/http/routes/remoteReadMcp.ts");
 const signalEngineMcp = read("src/http/routes/founderSignalEngineMcp.ts");
 const xEngagementMcp = read("src/http/routes/xEngagementSignalMcp.ts");
 const mcpRouter = read("src/http/routes/mcp.ts");
@@ -93,6 +96,27 @@ assert(
   externalTools.includes("rawArgumentsStored: false") &&
     externalTools.includes("rawResultStored: false"),
   "evidence receipts must not retain raw tool arguments or raw tool results",
+);
+
+/* ---------- remoteReadMcp.ts: served description must match the actual catalog ---------- */
+
+assert(
+  remoteReadMcp.includes('six read/preview tools plus one bounded peer-operator relay tool'),
+  "modern server/discover must describe six read/preview tools plus the bounded peer relay",
+);
+assert(
+  remoteReadMcp.includes('Six read/preview tools plus one bounded peer-operator relay'),
+  "legacy initialize must describe six read/preview tools plus the bounded peer relay",
+);
+assert(
+  !remoteReadMcp.includes('six read/preview-only tools') &&
+    !remoteReadMcp.includes('Six read/preview-only tools'),
+  "served MCP must not regress to the stale read-only-only catalog description",
+);
+assert(
+  remoteReadMcp.includes('research/propose/review') &&
+    remoteReadMcp.includes('carries no mutation authority'),
+  "served MCP must state the peer relay capability and authority ceiling truthfully",
 );
 
 /* ---------- safety.ts: the shared secret-argument guard both MCP lanes call ---------- */
@@ -163,6 +187,6 @@ assert(
 );
 
 console.log(
-  "[verify:served-mcp] Six read/preview MCP tools, one bounded peer relay, secret-argument guard, "
+  "[verify:served-mcp] Six read/preview MCP tools, one bounded peer relay, truthful served discovery, secret-argument guard, "
     + "Founder Signal endpoints, and every served mount point's middleware wiring are pinned.",
 );
