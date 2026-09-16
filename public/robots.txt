@@ -16,6 +16,7 @@ User-agent: OAI-SearchBot
 Disallow: /
 Allow: /$
 Allow: /juss-rayy/
+Allow: /work.html$
 Allow: /guardrails
 Allow: /mom8/
 Allow: /robots.txt$
@@ -27,6 +28,7 @@ User-agent: ChatGPT-User
 Disallow: /
 Allow: /$
 Allow: /juss-rayy/
+Allow: /work.html$
 Allow: /guardrails
 Allow: /mom8/
 Allow: /robots.txt$
@@ -38,6 +40,7 @@ User-agent: Claude-SearchBot
 Disallow: /
 Allow: /$
 Allow: /juss-rayy/
+Allow: /work.html$
 Allow: /guardrails
 Allow: /mom8/
 Allow: /robots.txt$
@@ -49,6 +52,7 @@ User-agent: Claude-User
 Disallow: /
 Allow: /$
 Allow: /juss-rayy/
+Allow: /work.html$
 Allow: /guardrails
 Allow: /mom8/
 Allow: /robots.txt$
@@ -60,6 +64,7 @@ User-agent: Googlebot
 Disallow: /
 Allow: /$
 Allow: /juss-rayy/
+Allow: /work.html$
 Allow: /guardrails
 Allow: /mom8/
 Allow: /robots.txt$
@@ -71,6 +76,7 @@ User-agent: *
 Disallow: /
 Allow: /$
 Allow: /juss-rayy/
+Allow: /work.html$
 Allow: /guardrails
 Allow: /mom8/
 Allow: /robots.txt$
