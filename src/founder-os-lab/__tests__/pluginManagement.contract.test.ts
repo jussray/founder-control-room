@@ -198,7 +198,7 @@ describe('ChatGPT plugin management repository contract', () => {
   });
 
   it('binds ULTRATHINK to connector-bridge recovery instead of stale setup loops', () => {
-    expect(universalCommands).toMatch(/### Connector bridge recovery/);
+    expect(universalCommands).toMatch(/^## Connector bridge recovery$/m);
     expect(universalCommands).toMatch(/connector surface[\s\S]*live session[\s\S]*provider page/i);
     expect(universalCommands).toMatch(/BLOCKED_CONNECTOR_BRIDGE/);
     expect(universalCommands).toMatch(/re-probe the bridge once/i);
