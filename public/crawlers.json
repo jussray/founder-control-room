@@ -1,0 +1,32 @@
+{
+  "schema": "juss/ai-crawler-contract@v1",
+  "project": "founder-control-room",
+  "canonical_origin": "https://www.foundercontrolroom.org",
+  "policy": {
+    "search_discovery": "allow",
+    "user_directed_retrieval": "allow",
+    "model_training": "deny",
+    "bulk_dataset_collection": "deny",
+    "write_or_action_authority": "none"
+  },
+  "bots": {
+    "OAI-SearchBot": "allow",
+    "ChatGPT-User": "allow",
+    "GPTBot": "deny",
+    "Claude-SearchBot": "allow",
+    "Claude-User": "allow",
+    "ClaudeBot": "deny",
+    "Googlebot": "allow",
+    "Google-Extended": "deny"
+  },
+  "public_truth": {
+    "sitemap": "https://www.foundercontrolroom.org/sitemap.xml",
+    "llms": "https://www.foundercontrolroom.org/llms.txt",
+    "founder_profile": "https://www.foundercontrolroom.org/juss-rayy/"
+  },
+  "attribution": {
+    "requested": true,
+    "canonical_link_required_when_supported": true
+  },
+  "security_note": "Crawler policy is not authentication. Private and governed surfaces remain protected independently."
+}
