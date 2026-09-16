@@ -3,22 +3,32 @@
   "project": "founder-control-room",
   "canonical_origin": "https://www.foundercontrolroom.org",
   "policy": {
-    "search_discovery": "allow",
-    "user_directed_retrieval": "allow",
+    "search_discovery": "allow_bounded_public_paths",
+    "user_directed_retrieval": "allow_bounded_public_paths",
     "model_training": "deny",
     "bulk_dataset_collection": "deny",
     "write_or_action_authority": "none"
   },
   "bots": {
-    "OAI-SearchBot": "allow",
-    "ChatGPT-User": "allow",
+    "OAI-SearchBot": "allow_bounded_public_paths",
+    "ChatGPT-User": "allow_bounded_public_paths",
     "GPTBot": "deny",
-    "Claude-SearchBot": "allow",
-    "Claude-User": "allow",
+    "Claude-SearchBot": "allow_bounded_public_paths",
+    "Claude-User": "allow_bounded_public_paths",
     "ClaudeBot": "deny",
-    "Googlebot": "allow",
+    "Googlebot": "allow_bounded_public_paths",
     "Google-Extended": "deny"
   },
+  "public_paths": [
+    "/",
+    "/juss-rayy/",
+    "/guardrails",
+    "/mom8/",
+    "/robots.txt",
+    "/sitemap.xml",
+    "/llms.txt",
+    "/crawlers.json"
+  ],
   "public_truth": {
     "sitemap": "https://www.foundercontrolroom.org/sitemap.xml",
     "llms": "https://www.foundercontrolroom.org/llms.txt",
