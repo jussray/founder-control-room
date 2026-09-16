@@ -137,6 +137,22 @@ describe('createServerOperatorRelayAdapters', () => {
     await expect(call).rejects.not.toThrow(echoedSecret);
   });
 
+  it('bounds oversized successful Anthropic response bodies before parsing', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+      id: 'msg_oversized',
+      content: [{ type: 'text', text: 'x'.repeat(70_000) }],
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } })) as typeof fetch;
+
+    const adapters = createServerOperatorRelayAdapters({
+      ANTHROPIC_API_KEY: 'anthropic-secret',
+      FCR_RELAY_ANTHROPIC_MODEL: 'claude-test-model',
+    }, fetchMock);
+
+    await expect(
+      adapters['claude-code']?.(relay('internal', 'claude-code')),
+    ).rejects.toThrow('Anthropic relay response exceeded 65536 bytes');
+  });
+
   it('redacts transport exception details before they cross the provider boundary', async () => {
     const fetchMock = vi.fn(async () => {
       throw new Error('proxy failed while sending x-api-key: anthropic-secret');
