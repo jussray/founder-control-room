@@ -21,21 +21,65 @@ async function loadHandler(): Promise<PagesHandler> {
   return module.default as PagesHandler;
 }
 
-test('serves the public work directory from Pages and keeps live/source states distinct', async ({ page }) => {
-  const handler = await loadHandler();
-  let apiCalls = 0;
-
-  const assets = {
+function publicAssets(): FetchBinding {
+  return {
     fetch: async (request: Request) => {
       const pathname = new URL(request.url).pathname;
-      if (pathname !== '/work.html') return new Response('not found', { status: 404 });
-      const body = readFileSync(resolve(repoRoot, 'public/work.html'), 'utf8');
-      return new Response(body, {
+      const source = pathname === '/'
+        ? 'public/index.html'
+        : pathname === '/work.html'
+          ? 'public/work.html'
+          : pathname === '/juss-rayy/' || pathname === '/juss-rayy'
+            ? 'public/juss-rayy/index.html'
+            : null;
+      if (!source) return new Response('not found', { status: 404 });
+      return new Response(readFileSync(resolve(repoRoot, source), 'utf8'), {
         status: 200,
         headers: { 'content-type': 'text/html; charset=utf-8' },
       });
     },
   };
+}
+
+test('public front door visibly links people to Juss Rayy and the public work directory', async ({ page }) => {
+  const handler = await loadHandler();
+  let apiCalls = 0;
+  const fcrApi = {
+    fetch: async () => {
+      apiCalls += 1;
+      return new Response('unexpected API route', { status: 500 });
+    },
+  };
+
+  const response = await handler.fetch(
+    new Request('https://foundercontrolroom.org/', { headers: { accept: 'text/html' } }),
+    { ASSETS: publicAssets(), FCR_API: fcrApi },
+  );
+
+  expect(response.status).toBe(200);
+  expect(apiCalls).toBe(0);
+  await page.setContent(await response.text());
+
+  await expect(page.getByRole('link', { name: "Explore Juss Rayy's work" })).toBeVisible();
+  await expect(page.getByRole('link', { name: "Explore Juss Rayy's work" })).toHaveAttribute('href', '/work.html');
+  await expect(page.getByRole('link', { name: 'Meet Juss Rayy' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Meet Juss Rayy' })).toHaveAttribute('href', '/juss-rayy/');
+
+  mkdirSync(outputDir, { recursive: true });
+  await page.screenshot({ path: resolve(outputDir, 'desktop-front-door-founder-work.png'), fullPage: true });
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  const hasHorizontalOverflow = await page.evaluate(
+    () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
+  );
+  expect(hasHorizontalOverflow).toBe(false);
+  await page.screenshot({ path: resolve(outputDir, 'mobile-front-door-founder-work.png'), fullPage: true });
+});
+
+test('serves the public work directory from Pages and keeps live/source states distinct', async ({ page }) => {
+  const handler = await loadHandler();
+  let apiCalls = 0;
+
   const fcrApi = {
     fetch: async () => {
       apiCalls += 1;
@@ -47,7 +91,7 @@ test('serves the public work directory from Pages and keeps live/source states d
     new Request('https://foundercontrolroom.org/work.html', {
       headers: { accept: 'text/html' },
     }),
-    { ASSETS: assets, FCR_API: fcrApi },
+    { ASSETS: publicAssets(), FCR_API: fcrApi },
   );
 
   expect(response.status).toBe(200);
