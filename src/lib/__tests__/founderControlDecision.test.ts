@@ -22,18 +22,16 @@ const proposal: FounderControlProposalBinding = {
 
 const externalizableControlDocs = [
   '.ai-skills/README.md',
+  '.ai-skills/CLAUDE.md',
   '.ai-skills/chatgpt-custom-instructions.md',
   '.ai-skills/claude-project-instructions.md',
   '.ai-skills/custom-gpt-system-prompt.md',
+  '.ai-skills/universal-commands.md',
+  '.ai-skills/skills/capability-mode-router.md',
   '.ai-skills/gpts/capability-mode-router.md',
 ];
 
-const boundedUltrathinkDocs = [
-  '.ai-skills/README.md',
-  '.ai-skills/chatgpt-custom-instructions.md',
-  '.ai-skills/claude-project-instructions.md',
-  '.ai-skills/gpts/capability-mode-router.md',
-];
+const boundedUltrathinkDocs = [...externalizableControlDocs];
 
 const forbiddenRawActivationPhrases = [
   /the user may type these commands to switch your behavior/i,
@@ -115,7 +113,7 @@ describe('founder control decision contract', () => {
     expect(validateFounderControlDecision(decision, productAction)).toEqual([]);
   });
 
-  it('keeps copyable AI instructions aligned with the executable control-input boundary', () => {
+  it('keeps every active copyable AI instruction aligned with the executable control-input boundary', () => {
     for (const relativePath of externalizableControlDocs) {
       const source = readFileSync(relativePath, 'utf8');
       expect(source).toMatch(/juss\/portable-control-input@v1/);
@@ -129,7 +127,7 @@ describe('founder control decision contract', () => {
     }
   });
 
-  it('pins bounded ULTRATHINK v2 across the canonical router and direct host adapters', () => {
+  it('pins bounded ULTRATHINK v2 across the canonical router and every active adapter', () => {
     for (const relativePath of boundedUltrathinkDocs) {
       const source = readFileSync(relativePath, 'utf8');
       expect(source).toMatch(/More intelligence never means more authority/i);
