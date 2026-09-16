@@ -1,13 +1,32 @@
-import { describe, expect, it, vi } from 'vitest';
-import {
-  createExternalMcpToolExecutor,
-  externalMcpToolDefinitions,
-  type ExternalMcpReceipt,
-} from './externalTools.js';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 
-function receipt(toolName: 'fcr_relay_operator'): ExternalMcpReceipt {
+vi.mock('./vaultHub.js', () => ({
+  hubForMcpProject: vi.fn(),
+}));
+vi.mock('../lib/supabaseClient.js', () => ({
+  supabase: {},
+}));
+
+type ExternalToolsModule = typeof import('./externalTools.js');
+type RelayCall = {
+  fromOperator: 'codex' | 'claude-code' | 'perplexity';
+  toOperator: 'codex' | 'claude-code' | 'perplexity';
+  capability: 'research' | 'propose' | 'review' | 'implement';
+  goal: string;
+  contextSummary: string;
+  sourceRef?: string | null;
+  sensitivity: 'public' | 'internal' | 'restricted';
+};
+
+let externalTools: ExternalToolsModule;
+
+beforeAll(async () => {
+  externalTools = await import('./externalTools.js');
+});
+
+function receipt(toolName: 'fcr_relay_operator') {
   return {
-    contract: 'founder-control-room/external-mcp-receipt@v1',
+    contract: 'founder-control-room/external-mcp-receipt@v1' as const,
     id: 'relay-receipt-1',
     projectSlug: 'founder-control-room',
     toolName,
@@ -15,17 +34,18 @@ function receipt(toolName: 'fcr_relay_operator'): ExternalMcpReceipt {
     resultHash: 'b'.repeat(64),
     createdAt: '2026-09-16T18:00:00.000Z',
     privacy: {
-      cookiesUsed: false,
-      fingerprintsUsed: false,
-      rawArgumentsStored: false,
-      rawResultStored: false,
+      cookiesUsed: false as const,
+      fingerprintsUsed: false as const,
+      rawArgumentsStored: false as const,
+      rawResultStored: false as const,
     },
   };
 }
 
 describe('external FCR operator relay authority boundary', () => {
   it('advertises implement as a bounded work class without describing mutation authority', () => {
-    const tool = externalMcpToolDefinitions().find((definition) => definition.name === 'fcr_relay_operator');
+    const tool = externalTools.externalMcpToolDefinitions()
+      .find((definition) => definition.name === 'fcr_relay_operator');
     expect(tool).toBeDefined();
 
     const inputSchema = tool?.inputSchema as {
@@ -41,7 +61,7 @@ describe('external FCR operator relay authority boundary', () => {
   });
 
   it('relays implement work through OAuth identity while execution and mutation authority remain false', async () => {
-    const relayOperator = vi.fn(async (input) => ({
+    const relayOperator = vi.fn(async (input: RelayCall) => ({
       request: input,
       response: {
         fromOperator: input.toOperator,
@@ -50,8 +70,10 @@ describe('external FCR operator relay authority boundary', () => {
         evidenceRefs: ['provider:anthropic:msg_implement'],
       },
     }));
-    const recordEvidence = vi.fn(async (input) => receipt(input.toolName as 'fcr_relay_operator'));
-    const execute = createExternalMcpToolExecutor({
+    const recordEvidence = vi.fn(async (input: { toolName: string }) => (
+      receipt(input.toolName as 'fcr_relay_operator')
+    ));
+    const execute = externalTools.createExternalMcpToolExecutor({
       env: {
         FCR_REMOTE_MCP_OPERATOR_CLIENT_MAP: JSON.stringify({ 'chatgpt-client': 'codex' }),
       },
