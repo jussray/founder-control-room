@@ -62,6 +62,42 @@ function safeProviderErrorMessage(
   return normalized || `${label} failed with HTTP ${status}`;
 }
 
+async function readBoundedResponseText(response: Response, label: string): Promise<string> {
+  const declaredLength = Number.parseInt(response.headers.get('content-length') ?? '', 10);
+  if (Number.isFinite(declaredLength) && declaredLength > OPERATOR_RELAY_MAX_RESPONSE_BYTES) {
+    throw new Error(`${label} response exceeded the bounded response size`);
+  }
+
+  if (!response.body) {
+    const raw = await response.text();
+    if (Buffer.byteLength(raw, 'utf8') > OPERATOR_RELAY_MAX_RESPONSE_BYTES) {
+      throw new Error(`${label} response exceeded the bounded response size`);
+    }
+    return raw;
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  const chunks: string[] = [];
+  let total = 0;
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > OPERATOR_RELAY_MAX_RESPONSE_BYTES) {
+        await reader.cancel().catch(() => undefined);
+        throw new Error(`${label} response exceeded the bounded response size`);
+      }
+      chunks.push(decoder.decode(value, { stream: true }));
+    }
+    chunks.push(decoder.decode());
+    return chunks.join('');
+  } finally {
+    reader.releaseLock();
+  }
+}
+
 async function jsonResponse(
   response: Response,
   label: string,
@@ -69,13 +105,10 @@ async function jsonResponse(
 ): Promise<JsonRecord> {
   let raw: string;
   try {
-    raw = await response.text();
-  } catch {
+    raw = await readBoundedResponseText(response, label);
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('bounded response size')) throw error;
     throw new Error(`${label} response body could not be read`);
-  }
-
-  if (Buffer.byteLength(raw, 'utf8') > OPERATOR_RELAY_MAX_RESPONSE_BYTES) {
-    throw new Error(`${label} response exceeded the bounded response size`);
   }
 
   let body: unknown;
