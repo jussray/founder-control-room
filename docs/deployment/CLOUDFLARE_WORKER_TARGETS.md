@@ -27,6 +27,8 @@ Current merged source uses this contract:
 6. require the upstream response to identify the canonical API service as `founder-control-room`; and
 7. fail closed with a bounded 503 recovery response when the service binding is absent, unreachable, returns Cloudflare upstream failure status, or fails service identity verification.
 
+Public discovery artifacts including `/robots.txt`, `/sitemap.xml`, `/llms.txt`, and `/crawlers.json` are static Pages assets and must remain on `env.ASSETS`; API-owned callback assets remain on `env.FCR_API`. This path classification is not authentication and cannot create crawler write authority, provider mutation authority, deployment authority, or publication authority.
+
 `API_ORIGIN = https://api.foundercontrolroom.org` remains part of request construction/loop protection in source. Dynamic network execution is performed through `FCR_API.fetch(...)`, not a direct public-origin `fetch()` call.
 
 ### Required Pages provider configuration
