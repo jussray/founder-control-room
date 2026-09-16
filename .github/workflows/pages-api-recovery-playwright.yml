@@ -5,19 +5,31 @@ on:
     branches: [main]
     paths:
       - 'public/_worker.js'
+      - 'public/_headers'
+      - 'public/robots.txt'
+      - 'public/sitemap.xml'
+      - 'public/llms.txt'
+      - 'public/crawlers.json'
       - 'public/juss-rayy/**'
       - 'scripts/build-pages.mjs'
+      - 'src/http/__tests__/seoAssets.test.ts'
       - 'e2e/pages-api-recovery.spec.ts'
       - '.github/workflows/pages-api-recovery-playwright.yml'
   pull_request:
     branches: [main]
     paths:
       - 'public/_worker.js'
+      - 'public/_headers'
+      - 'public/robots.txt'
+      - 'public/sitemap.xml'
+      - 'public/llms.txt'
+      - 'public/crawlers.json'
       - 'public/juss-rayy/**'
       - 'scripts/build-pages.mjs'
       - 'src/http/server.ts'
       - 'src/http/__tests__/pagesEdgeProxy.test.ts'
       - 'src/http/__tests__/server.integration.test.ts'
+      - 'src/http/__tests__/seoAssets.test.ts'
       - 'e2e/pages-api-recovery.spec.ts'
       - '.github/workflows/pages-api-recovery-playwright.yml'
       - '.github/workflows/deploy.yml'
@@ -72,6 +84,7 @@ jobs:
           npx vitest run
           src/http/__tests__/pagesEdgeProxy.test.ts
           src/http/__tests__/server.integration.test.ts
+          src/http/__tests__/seoAssets.test.ts
 
       - name: Type check
         run: npm run typecheck
@@ -82,7 +95,7 @@ jobs:
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
-      - name: Run rendered Pages recovery and founder identity proof
+      - name: Run rendered Pages recovery, founder identity, and crawler proof
         run: npx playwright test -c playwright.config.ts e2e/pages-api-recovery.spec.ts
 
       - name: Upload Playwright report
