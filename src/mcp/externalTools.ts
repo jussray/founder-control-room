@@ -6,6 +6,13 @@ import {
   type FcrSkillRouterAction,
 } from '../lib/fcrSkillRouter.js';
 import type { V10CapabilityPlan } from '../founder-os-lab/capabilityKernel.js';
+import { relayBetweenOperators } from '../lib/operatorRelayBridge.js';
+import { createServerOperatorRelayAdapters } from '../lib/operatorRelayModelProviders.js';
+import type {
+  RelayCapability,
+  RelayOperatorId,
+  RelaySensitivity,
+} from '../lib/operatorRelay.js';
 
 export const EXTERNAL_MCP_TOOL_NAMES = [
   'chief_audit_repository',
@@ -14,6 +21,7 @@ export const EXTERNAL_MCP_TOOL_NAMES = [
   'fcr_list_projects',
   'fcr_get_current_truth',
   'fcr_preview_skill_route',
+  'fcr_relay_operator',
 ] as const;
 
 export type ExternalMcpToolName = (typeof EXTERNAL_MCP_TOOL_NAMES)[number];
@@ -49,6 +57,8 @@ export interface RecordExternalMcpEvidenceInput {
   arguments: Record<string, unknown>;
   result: unknown;
   durationMs: number;
+  risk?: 'read' | 'external_side_effect';
+  estimatedCostUsd?: number;
 }
 
 export interface ExternalMcpToolDependencies {
@@ -72,6 +82,15 @@ export interface ExternalMcpToolDependencies {
     capabilityPlan: V10CapabilityPlan;
     provider: string;
   }) => Promise<unknown> | unknown;
+  relayOperator?: (input: {
+    fromOperator: RelayOperatorId;
+    toOperator: RelayOperatorId;
+    capability: RelayCapability;
+    goal: string;
+    contextSummary: string;
+    sourceRef?: string | null;
+    sensitivity: RelaySensitivity;
+  }) => Promise<unknown>;
   recordEvidence?: (input: RecordExternalMcpEvidenceInput) => Promise<ExternalMcpReceipt>;
 }
 
@@ -84,6 +103,9 @@ const READ_ONLY_ROUTE_ACTIONS = new Set<FcrSkillRouterAction>([
   'review',
   'draft',
 ]);
+const RELAY_OPERATORS = new Set<RelayOperatorId>(['codex', 'claude-code', 'perplexity']);
+const RELAY_CAPABILITIES = new Set<RelayCapability>(['research', 'propose', 'review']);
+const RELAY_SENSITIVITIES = new Set<RelaySensitivity>(['public', 'internal']);
 const FULL_SHA = /^[0-9a-f]{40}$/i;
 const HASH = /^[0-9a-f]{64}$/i;
 const PROJECT_SLUG = /^[a-z0-9][a-z0-9-]{0,119}$/;
@@ -125,6 +147,55 @@ function allowedProject(slug: string, allowedProjects: ReadonlySet<string>): str
     throw new Error('Requested project is outside this remote MCP grant');
   }
   return slug;
+}
+
+function relayOperator(value: unknown, field: string): RelayOperatorId {
+  const operator = text(value, field, 40) as RelayOperatorId;
+  if (!RELAY_OPERATORS.has(operator)) throw new Error(`${field} is not a peer relay operator`);
+  return operator;
+}
+
+function relayCapability(value: unknown): RelayCapability {
+  const capability = text(value, 'capability', 40) as RelayCapability;
+  if (!RELAY_CAPABILITIES.has(capability)) {
+    throw new Error('capability must be research, propose, or review');
+  }
+  return capability;
+}
+
+function relaySensitivity(value: unknown): RelaySensitivity {
+  const sensitivity = text(value ?? 'internal', 'sensitivity', 20) as RelaySensitivity;
+  if (!RELAY_SENSITIVITIES.has(sensitivity)) {
+    throw new Error('sensitivity must be public or internal');
+  }
+  return sensitivity;
+}
+
+function configuredOperatorClientMap(env: NodeJS.ProcessEnv): Map<string, RelayOperatorId> {
+  const raw = env.FCR_REMOTE_MCP_OPERATOR_CLIENT_MAP?.trim();
+  if (!raw) return new Map();
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new Error('FCR_REMOTE_MCP_OPERATOR_CLIENT_MAP must be valid JSON');
+  }
+  if (!isRecord(parsed)) throw new Error('FCR_REMOTE_MCP_OPERATOR_CLIENT_MAP must be an object');
+  const entries: Array<[string, RelayOperatorId]> = [];
+  for (const [clientId, value] of Object.entries(parsed)) {
+    if (!clientId.trim()) throw new Error('operator client mapping contains an empty client id');
+    entries.push([clientId.trim(), relayOperator(value, 'mapped operator')]);
+  }
+  return new Map(entries);
+}
+
+function sourceOperatorForIdentity(identity: ExternalMcpIdentity, env: NodeJS.ProcessEnv): RelayOperatorId {
+  if (identity.authMode !== 'oauth') {
+    throw new Error('operator relay requires OAuth-bound client identity');
+  }
+  const operator = configuredOperatorClientMap(env).get(identity.clientId);
+  if (!operator) throw new Error('OAuth client is not mapped to a peer relay operator');
+  return operator;
 }
 
 async function defaultInvokeReadTool(input: {
@@ -368,13 +439,14 @@ async function defaultRecordEvidence(
   const project = await projectRow(input.projectSlug);
   const inputDigest = requestHash(input.arguments);
   const resultDigest = requestHash(input.result);
+  const costEstimateAvailable = input.estimatedCostUsd !== undefined;
   const { data, error } = await supabase
     .from('mcp_tool_calls')
     .insert({
       project_id: project.id,
       server_id: 'founder-control-room-external',
       tool_name: input.toolName,
-      risk: 'read',
+      risk: input.risk ?? 'read',
       policy_decision: 'allow',
       status: 'passed',
       request_hash: inputDigest,
@@ -392,9 +464,10 @@ async function defaultRecordEvidence(
       response_summary: {
         resultHash: resultDigest,
         rawResultStored: false,
+        costEstimateAvailable,
       },
       duration_ms: input.durationMs,
-      estimated_cost_usd: 0,
+      estimated_cost_usd: input.estimatedCostUsd ?? 0,
     })
     .select('id,created_at')
     .single();
@@ -426,6 +499,12 @@ export function externalMcpToolDefinitions(): JsonRecord[] {
     destructiveHint: false,
     idempotentHint: true,
     openWorldHint: false,
+  };
+  const relayAnnotations = {
+    readOnlyHint: false,
+    destructiveHint: false,
+    idempotentHint: false,
+    openWorldHint: true,
   };
   return [
     {
@@ -525,6 +604,26 @@ export function externalMcpToolDefinitions(): JsonRecord[] {
       },
       annotations: readAnnotations,
     },
+    {
+      name: 'fcr_relay_operator',
+      title: 'Relay a bounded task to a peer AI operator',
+      description:
+        'Send a bounded research, proposal, or review task to exactly one named peer operator (ChatGPT/Codex, Claude, or Perplexity) and return its provider-bound response. Requires OAuth client identity, carries zero mutation authority, never targets DeepSeek Instructor, and never substitutes another provider when the requested operator is unavailable.',
+      inputSchema: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['targetOperator', 'capability', 'goal', 'contextSummary'],
+        properties: {
+          targetOperator: { type: 'string', enum: ['codex', 'claude-code', 'perplexity'] },
+          capability: { type: 'string', enum: ['research', 'propose', 'review'] },
+          goal: { type: 'string', minLength: 1, maxLength: 4000 },
+          contextSummary: { type: 'string', minLength: 1, maxLength: 12000 },
+          sourceRef: { type: 'string', minLength: 1, maxLength: 500 },
+          sensitivity: { type: 'string', enum: ['public', 'internal'], default: 'internal' },
+        },
+      },
+      annotations: relayAnnotations,
+    },
   ];
 }
 
@@ -549,12 +648,17 @@ export function createExternalMcpToolExecutor(
   const previewCapabilityPlan = overrides.previewCapabilityPlan
     ?? ((proposal: Record<string, unknown>) => defaultPreviewCapabilityPlan(proposal, env));
   const previewSkillRoute = overrides.previewSkillRoute ?? defaultPreviewSkillRoute;
+  const relayOperatorCall = overrides.relayOperator ?? (async (relayInput) => relayBetweenOperators(
+    relayInput,
+    createServerOperatorRelayAdapters(env),
+  ));
   const recordEvidence = overrides.recordEvidence ?? defaultRecordEvidence;
 
   return async (input) => {
     const startedAt = Date.now();
     let result: unknown;
     let receiptProject = 'founder-control-room';
+    let evidenceRisk: RecordExternalMcpEvidenceInput['risk'] = 'read';
 
     if (input.name === 'chief_audit_repository') {
       allowedProject('chief-ai-machine', input.allowedProjects);
@@ -605,6 +709,26 @@ export function createExternalMcpToolExecutor(
       noUnexpectedKeys(input.arguments, ['projectId'], input.name);
       receiptProject = allowedProject(projectSlug(input.arguments.projectId), input.allowedProjects);
       result = await getCurrentTruth(receiptProject);
+    } else if (input.name === 'fcr_relay_operator') {
+      receiptProject = allowedProject('founder-control-room', input.allowedProjects);
+      noUnexpectedKeys(
+        input.arguments,
+        ['targetOperator', 'capability', 'goal', 'contextSummary', 'sourceRef', 'sensitivity'],
+        input.name,
+      );
+      const fromOperator = sourceOperatorForIdentity(input.identity, env);
+      const toOperator = relayOperator(input.arguments.targetOperator, 'targetOperator');
+      if (fromOperator === toOperator) throw new Error('operator relay requires a distinct target operator');
+      evidenceRisk = 'external_side_effect';
+      result = await relayOperatorCall({
+        fromOperator,
+        toOperator,
+        capability: relayCapability(input.arguments.capability),
+        goal: text(input.arguments.goal, 'goal', 4000),
+        contextSummary: text(input.arguments.contextSummary, 'contextSummary', 12000),
+        sourceRef: optionalText(input.arguments.sourceRef, 'sourceRef', 500) ?? null,
+        sensitivity: relaySensitivity(input.arguments.sensitivity),
+      });
     } else {
       noUnexpectedKeys(
         input.arguments,
@@ -652,13 +776,17 @@ export function createExternalMcpToolExecutor(
       arguments: input.arguments,
       result,
       durationMs: Math.max(0, Date.now() - startedAt),
+      risk: evidenceRisk,
     });
 
+    const relay = input.name === 'fcr_relay_operator';
     return {
       data: result,
       receipt,
       governanceBoundary: {
-        readOrPreviewOnly: true,
+        readOrPreviewOnly: !relay,
+        externalProviderCall: relay,
+        mutationAuthority: false,
         executionAllowed: false,
         founderApprovalGranted: false,
         cookiesUsed: false,
