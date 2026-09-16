@@ -104,7 +104,7 @@ const READ_ONLY_ROUTE_ACTIONS = new Set<FcrSkillRouterAction>([
   'draft',
 ]);
 const RELAY_OPERATORS = new Set<RelayOperatorId>(['codex', 'claude-code', 'perplexity']);
-const RELAY_CAPABILITIES = new Set<RelayCapability>(['research', 'propose', 'review']);
+const RELAY_CAPABILITIES = new Set<RelayCapability>(['research', 'propose', 'review', 'implement']);
 const RELAY_SENSITIVITIES = new Set<RelaySensitivity>(['public', 'internal']);
 const FULL_SHA = /^[0-9a-f]{40}$/i;
 const HASH = /^[0-9a-f]{64}$/i;
@@ -158,7 +158,7 @@ function relayOperator(value: unknown, field: string): RelayOperatorId {
 function relayCapability(value: unknown): RelayCapability {
   const capability = text(value, 'capability', 40) as RelayCapability;
   if (!RELAY_CAPABILITIES.has(capability)) {
-    throw new Error('capability must be research, propose, or review');
+    throw new Error('capability must be research, propose, review, or implement');
   }
   return capability;
 }
@@ -608,14 +608,14 @@ export function externalMcpToolDefinitions(): JsonRecord[] {
       name: 'fcr_relay_operator',
       title: 'Relay a bounded task to a peer AI operator',
       description:
-        'Send a bounded research, proposal, or review task to exactly one named peer operator (ChatGPT/Codex, Claude, or Perplexity) and return its provider-bound response. Requires OAuth client identity, carries zero mutation authority, never targets DeepSeek Instructor, and never substitutes another provider when the requested operator is unavailable.',
+        'Send a bounded research, proposal, review, or implementation-work task to exactly one named peer operator (ChatGPT/Codex, Claude, or Perplexity) and return its provider-bound response. Requires OAuth client identity, carries zero mutation authority, never targets DeepSeek Instructor, and never substitutes another provider when the requested operator is unavailable.',
       inputSchema: {
         type: 'object',
         additionalProperties: false,
         required: ['targetOperator', 'capability', 'goal', 'contextSummary'],
         properties: {
           targetOperator: { type: 'string', enum: ['codex', 'claude-code', 'perplexity'] },
-          capability: { type: 'string', enum: ['research', 'propose', 'review'] },
+          capability: { type: 'string', enum: ['research', 'propose', 'review', 'implement'] },
           goal: { type: 'string', minLength: 1, maxLength: 4000 },
           contextSummary: { type: 'string', minLength: 1, maxLength: 12000 },
           sourceRef: { type: 'string', minLength: 1, maxLength: 500 },
