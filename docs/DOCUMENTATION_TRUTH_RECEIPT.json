@@ -23,7 +23,7 @@
     {
       "path": ".control-room/founder-chief-pair-peer-lock.json",
       "claims": [
-        "`.control-room/founder-chief-pair-peer-lock.json` must bind FCR PR #781 to the exact observed Chief pair and necessary-fix candidate head SHAs while remaining non-authorizing evidence that cannot grant merge, deployment, provider mutation, publication, or runtime truth."
+        "`.control-room/founder-chief-pair-peer-lock.json` must bind FCR PR #781 to the exact observed Chief pair, necessary-fix policy, and founder-content-strategy carrier head SHAs while remaining non-authorizing evidence that cannot grant merge, deployment, provider mutation, publication, or runtime truth."
       ]
     },
     {
@@ -35,7 +35,7 @@
     {
       "path": ".github/workflows/founder-chief-pair-contract.yml",
       "claims": [
-        "`.github/workflows/founder-chief-pair-contract.yml` must produce the required `verify-pair-contract` context on every pull request; when the pair-enforcement surface changes it must validate both exact live Chief candidate heads against the immutable FCR peer lock, while unrelated FCR changes must not become dependent on Chief candidate state."
+        "`.github/workflows/founder-chief-pair-contract.yml` must produce the required `verify-pair-contract` context on every pull request; when the pair-enforcement surface changes it must validate both exact live Chief pair-authority heads against the immutable FCR peer lock, while unrelated FCR changes must not become dependent on Chief candidate state."
       ]
     },
     {

@@ -15,23 +15,28 @@ const [lockText, contractText, workflow, documentationTruth] = await Promise.all
 const lock = JSON.parse(lockText);
 const contract = JSON.parse(contractText);
 
-test('candidate peer lock binds both Chief carriers without granting authority', () => {
+test('candidate peer lock binds all Chief carriers without granting authority', () => {
   assert.equal(lock.schema, 'fcr/founder-chief-pair-peer-lock@v1');
   assert.equal(lock.repository, 'jussray/founder-control-room');
   assert.equal(lock.scope, 'pull-request-candidate-only');
   assert.equal(lock.founderControlRoom.pullRequest, contract.candidatePairing.founderControlRoomPullRequest);
   assert.equal(lock.chiefAIPair.pullRequest, contract.candidatePairing.chiefAIPullRequest);
   assert.equal(lock.chiefAINecessaryFixPolicy.pullRequest, contract.candidatePairing.chiefAINecessaryFixPolicyPullRequest);
+  assert.equal(lock.chiefAIFounderContentStrategy.repository, 'jussray/chief-ai-machine');
+  assert.equal(lock.chiefAIFounderContentStrategy.pullRequest, 128);
   assert.match(lock.chiefAIPair.expectedHeadSha, FULL_SHA);
   assert.match(lock.chiefAINecessaryFixPolicy.expectedHeadSha, FULL_SHA);
+  assert.match(lock.chiefAIFounderContentStrategy.expectedHeadSha, FULL_SHA);
   assert.notEqual(lock.chiefAIPair.expectedHeadSha, lock.chiefAINecessaryFixPolicy.expectedHeadSha);
+  assert.notEqual(lock.chiefAIPair.expectedHeadSha, lock.chiefAIFounderContentStrategy.expectedHeadSha);
+  assert.notEqual(lock.chiefAINecessaryFixPolicy.expectedHeadSha, lock.chiefAIFounderContentStrategy.expectedHeadSha);
   assert.equal(lock.authorizesMerge, false);
   assert.equal(lock.authorizesDeployment, false);
   assert.equal(lock.authorizesProviderMutation, false);
   assert.equal(lock.runtimeTruthProven, false);
 });
 
-test('pair workflow fails closed when either live Chief head leaves the candidate lock', () => {
+test('pair workflow fails closed when either live Chief pair-authority head leaves the candidate lock', () => {
   assert.match(workflow, /peer_lock="founder-control-room\/\.control-room\/founder-chief-pair-peer-lock\.json"/);
   assert.match(workflow, /test "\$locked_pair_pr" = "\$chief_pr"/);
   assert.match(workflow, /test "\$locked_policy_pr" = "\$policy_pr"/);
