@@ -20,10 +20,10 @@
  *      drops the auth middleware in front of it; nothing else checks that.
  *
  * Scope is deliberately narrow otherwise: it does not assert OAuth claim
- * handling, the specific external tool catalog, or protocol-version
- * literals, since the paired OAuth lane is still being built out toward the
- * activation gate in docs/MCP_STACK.md and those are the parts most likely
- * to change first.
+ * handling or protocol-version literals. The external tool catalog is pinned
+ * only where authority semantics matter: six read/preview tools stay read-only,
+ * while the one peer-operator relay is a bounded external side effect with no
+ * repository/provider mutation authority.
  */
 
 import fs from "node:fs";
@@ -54,21 +54,31 @@ const toolDefsMatch = externalTools.match(
 assert(toolDefsMatch, "externalMcpToolDefinitions is missing");
 const toolDefsBody = toolDefsMatch[0];
 assert(
-  /const readAnnotations = \{[\s\S]{0,120}?readOnlyHint:\s*true/.test(toolDefsBody),
-  "the shared tool-annotation object must declare readOnlyHint: true",
+  /const readAnnotations = \{[\s\S]{0,160}?readOnlyHint:\s*true/.test(toolDefsBody),
+  "the shared read-tool annotation object must declare readOnlyHint: true",
 );
 assert(
-  !/readOnlyHint:\s*false/.test(toolDefsBody),
-  "no tool in the external MCP catalog may advertise readOnlyHint: false",
+  /const relayAnnotations = \{[\s\S]{0,200}?readOnlyHint:\s*false[\s\S]{0,160}?destructiveHint:\s*false[\s\S]{0,160}?idempotentHint:\s*false[\s\S]{0,160}?openWorldHint:\s*true/.test(toolDefsBody),
+  "the peer relay annotation must truthfully declare a non-destructive external side effect",
+);
+const falseReadOnlyCount = (toolDefsBody.match(/readOnlyHint:\s*false/g) ?? []).length;
+assert(
+  falseReadOnlyCount === 1,
+  `exactly one external MCP tool annotation may advertise readOnlyHint: false (found ${falseReadOnlyCount})`,
 );
 const toolCount = (toolDefsBody.match(/^\s{6}name:\s*'/gm) ?? []).length;
 const readAnnotationUses = (
   toolDefsBody.match(/annotations:\s*(?:readAnnotations|\{\s*\.\.\.readAnnotations)/g) ?? []
 ).length;
-assert(toolCount > 0, "no tools found in externalMcpToolDefinitions");
+const relayAnnotationUses = (toolDefsBody.match(/annotations:\s*relayAnnotations/g) ?? []).length;
+assert(toolCount === 7, `external MCP catalog must contain the six read/preview tools plus one relay tool (found ${toolCount})`);
 assert(
-  readAnnotationUses === toolCount,
-  `every declared external MCP tool (${toolCount}) must derive its annotations from the shared readAnnotations object (found ${readAnnotationUses})`,
+  readAnnotationUses === 6,
+  `exactly six declared external MCP tools must derive from readAnnotations (found ${readAnnotationUses})`,
+);
+assert(
+  relayAnnotationUses === 1 && /name:\s*'fcr_relay_operator'[\s\S]{0,1600}?annotations:\s*relayAnnotations/.test(toolDefsBody),
+  "fcr_relay_operator must be the only tool using relayAnnotations",
 );
 assert(
   externalTools.includes("executionAllowed: false") &&
@@ -153,6 +163,6 @@ assert(
 );
 
 console.log(
-  "[verify:served-mcp] External MCP tool catalog, secret-argument guard, Founder Signal "
-    + "endpoints, and every served mount point's middleware wiring are pinned.",
+  "[verify:served-mcp] Six read/preview MCP tools, one bounded peer relay, secret-argument guard, "
+    + "Founder Signal endpoints, and every served mount point's middleware wiring are pinned.",
 );
