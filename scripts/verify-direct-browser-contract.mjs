@@ -6,6 +6,10 @@ import { fileURLToPath } from 'node:url';
 const bootstrap = fs.readFileSync(new URL('../e2e/direct-browser-run.mjs', import.meta.url), 'utf8');
 const localPlaywrightProofUrl = new URL('../e2e/local-playwright-browser-proof.mjs', import.meta.url);
 const localPlaywrightProof = fs.readFileSync(localPlaywrightProofUrl, 'utf8');
+const ultrathinkPluginProofUrl = new URL('../e2e/plugin-center-ultrathink-proof.mjs', import.meta.url);
+const ultrathinkPluginProof = fs.readFileSync(ultrathinkPluginProofUrl, 'utf8');
+const composerProofUrl = new URL('../e2e/control-room-composer-proof.mjs', import.meta.url);
+const composerProof = fs.readFileSync(composerProofUrl, 'utf8');
 const pkg = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
 
 assert.match(bootstrap, /--no-proxy-server/);
@@ -17,10 +21,31 @@ assert.match(localPlaywrightProof, /from 'playwright'/);
 assert.match(localPlaywrightProof, /LOCAL_NO_PROVIDER_FEE/);
 assert.match(localPlaywrightProof, /providerWalletRequired: false/);
 assert.doesNotMatch(localPlaywrightProof, /providerWalletRequired:\s*true/);
+assert.match(ultrathinkPluginProof, /from 'playwright'/);
+assert.match(ultrathinkPluginProof, /data-plugin-id="ultrathink"/);
+assert.match(ultrathinkPluginProof, /non-authorizing/);
+assert.match(ultrathinkPluginProof, /plugin-center-ultrathink-/);
+assert.match(composerProof, /from 'playwright'/);
+assert.match(composerProof, /What are you working on\?/);
+assert.match(composerProof, /What do you need FCR to do\?/);
+assert.match(composerProof, /composer-desktop/);
+assert.match(composerProof, /composer-mobile/);
+assert.match(composerProof, /submittedPayload\.controlRoom/);
+assert.match(composerProof, /test-results\/control-room-composer/);
 
 execFileSync(process.execPath, [fileURLToPath(localPlaywrightProofUrl)], {
   stdio: 'inherit',
   env: process.env,
 });
 
-console.log('direct browser contract verified with local Playwright proof');
+execFileSync(process.execPath, [fileURLToPath(ultrathinkPluginProofUrl)], {
+  stdio: 'inherit',
+  env: process.env,
+});
+
+execFileSync(process.execPath, [fileURLToPath(composerProofUrl)], {
+  stdio: 'inherit',
+  env: process.env,
+});
+
+console.log('direct browser contract verified with local, ULTRATHINK Plugin Center, and Control Room Composer Playwright proofs');

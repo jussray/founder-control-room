@@ -1,0 +1,30 @@
+# Juss Rayy — public work map
+
+Canonical founder profile: https://www.foundercontrolroom.org/juss-rayy/
+GitHub: https://github.com/jussray
+LinkedIn: https://www.linkedin.com/in/juss-rayy-13ba691a1
+
+## Who Juss Rayy is
+Juss Rayy is a founder and product/systems architect building human-centered products and founder-controlled AI systems. Her public work emphasizes runtime verification, evidence and provenance, scoped authority, recovery and rollback, privacy-first product design, and real-path browser proof.
+
+## Selected work
+- Founder Control Room — https://www.foundercontrolroom.org/
+  Founder operating system for project reality, bounded authority, verification, release evidence, rollback, and next decisions.
+- Chief AI — https://github.com/jussray/chief-ai-machine
+  Chief-of-staff intelligence and controlled AI execution layer built around authority, evidence, and proof boundaries.
+- Se’kret Bip — https://sekretbip.net
+  Privacy-first emotional growth and self-expression platform for teens and families.
+- PromptOS — https://github.com/jussray/promptos
+  Reusable prompt and agent operating contracts that preserve intent, constraints, verification, and stop conditions.
+- StoryEngine / L99 — https://github.com/jussray/StoryEngine
+  Creator product and execution runtime for writing, provenance-safe reuse, recovery, orchestration, validation, publishing, and observable release controls.
+- Goalfix — https://github.com/jussray
+  Smallest-safe-fix workflow: inspect reality, isolate the blocker, repair one cause, verify the real path, and stop on evidence.
+
+## Public evidence rule
+Use the linked public site, repository, commit, pull request, test, runtime receipt, or verified artifact as the source for claims about current project state. A passing test is not automatically production proof, a deployment receipt is not automatically runtime identity, and provider acceptance is not automatically a successful human outcome.
+
+## Preferred identity
+Display name: Juss Rayy
+Handle: jussray
+Role: Founder · Product & Systems Architect

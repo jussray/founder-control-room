@@ -1,8 +1,12 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Bind the TinyFish production activation boundary to current Cloudflare deployment truth so source and CI readiness cannot be mistaken for a live provider-backed capability when the required Worker secret binding has not been observed.",
+  "purpose": "Preserve the current TinyFish Cloudflare activation, read-only Shopify child-provider boundaries, FCR browser-auth versus Cloudflare Access boundary, exact founder merge-authority contract, bounded Attack 3000 content observation, advisory Trend Radar, and deterministic founder-content approval retry contracts without converting source, analytics, rankings, retry identity, provider configuration, mergeability, or deployment into publication, provider-mutation, merge, deploy, spend, or external-contact authority.",
   "domains": [
-    "cloudflare-authority"
+    "cloudflare-authority",
+    "repository-provider",
+    "content-evidence",
+    "publishing",
+    "merge-authority"
   ],
   "changes": [
     {
@@ -12,9 +16,25 @@
       ]
     },
     {
+      "path": ".github/workflows/fcr-access-front-door-recovery.yml",
+      "claims": [
+        "`.github/workflows/fcr-access-front-door-recovery.yml` must keep FCR product authentication inside the app, may detach only browser-facing public destinations from one uniquely identified mixed Cloudflare Access application, must preserve every non-browser destination and existing policy, and must fail closed on ambiguous or public-only provider state."
+      ]
+    },
+    {
+      "path": "src/http/routes/approvals.ts",
+      "claims": [
+        "`src/http/routes/approvals.ts` must require exact-head evidence plus provider-backed PR identity, deterministic independent review, and authenticated founder-final confirmation bound to the exact PR, base, and head before FCR integration, then must re-read the mutable branch head immediately before provider integration."
+      ]
+    },
+    {
       "path": "README.md",
       "claims": [
-        "`README.md` must keep TinyFish source and CI readiness separate from provider/runtime activation and state that canonical Deploy verifies only provider-held binding-name presence before promotion."
+        "`README.md` must keep TinyFish source and CI readiness separate from provider/runtime activation and state that canonical Deploy verifies only provider-held binding-name presence before promotion.",
+        "`README.md` must describe Shopify child-provider observation as source-only, non-authorizing evidence and must never relabel a matching snapshot as live provider authority or mutation permission.",
+        "`README.md` must document Attack 3000 content currentness as independently evaluated from bounded observation time rather than trusted from a CURRENT label, and must keep distribution, external demand, publication, provider mutation, merge, deploy, spend, and external-contact authority separate.",
+        "`README.md` must describe the Content Trend Radar as an advisory existing-lane capability whose first-wave evidence requires current source provenance and whose ranking cannot authorize publication, scheduling, spend, provider mutation, merge, deploy, or external contact.",
+        "`README.md` must describe deterministic founder-content approval reservation and exact active retry recovery without allowing evidence rotation, retry, or a stored reservation to mint new publication authority."
       ]
     },
     {
@@ -33,6 +53,69 @@
       "path": "docs/SECRETS.md",
       "claims": [
         "`docs/SECRETS.md` must keep the TinyFish key in the Cloudflare Worker secret plane and never recast the provider-held value as a GitHub Actions secret or proof artifact."
+      ]
+    },
+    {
+      "path": "src/lib/providerObservation.ts",
+      "claims": [
+        "`src/lib/providerObservation.ts` must classify child-provider evidence as current, undeclared, scope drift, identity drift, stale, or unknown without granting execution authority, and it must fail closed when observation freshness, completeness, declaration identity, or scope equality is not proven."
+      ]
+    },
+    {
+      "path": "src/providers/ShopifyReadOnlyProvider.ts",
+      "claims": [
+        "`src/providers/ShopifyReadOnlyProvider.ts` must bind Shopify observation to the exact Founder Control Room permanent and branded store identities, require complete pagination and app scope inventory, withhold CURRENT on incomplete or mismatched provider evidence, keep reconciliation non-authorizing, and never persist provider inventory or perform Shopify mutation."
+      ]
+    },
+    {
+      "path": "src/ultrathink-core/attack3000Content.ts",
+      "claims": [
+        "`src/ultrathink-core/attack3000Content.ts` must bind publication and metrics to one content observation, independently evaluate evaluatedAt, window ordering, future skew, observedAt, explicit bounded expiry, measurement completion, and evidence, and must reject stale or future observations even when a caller labels freshness CURRENT.",
+        "`src/ultrathink-core/attack3000Content.ts` must preserve metric-local stop floors and direct external-demand evidence without treating publication, reach, reactions, comments, profile views, or generic analytics references as business demand or execution authority."
+      ]
+    },
+    {
+      "path": "src/ultrathink-core/__tests__/attack3000Content.test.ts",
+      "claims": [
+        "`src/ultrathink-core/__tests__/attack3000Content.test.ts` must prove stale-at-evaluation, future-dated, overlong-lease, mixed-identity, incomplete-window, demand-evidence, metric-local floor, profile-view, and non-authorizing behavior instead of trusting caller freshness labels."
+      ]
+    },
+    {
+      "path": "src/ultrathink-core/contentTrendRadar.ts",
+      "claims": [
+        "`src/ultrathink-core/contentTrendRadar.ts` must require at least one evidence id with source and observedAt that is current against an explicit evaluation time before first-wave eligibility, while keeping prediction-only, stale, future-dated, malformed, unattributed, and incompletely framed candidates out of the first wave.",
+        "`src/ultrathink-core/contentTrendRadar.ts` must keep ranking advisory and must never authorize publication, scheduling, spend, provider mutation, merge, deploy, or external contact."
+      ]
+    },
+    {
+      "path": "src/ultrathink-core/__tests__/contentTrendRadar.test.ts",
+      "claims": [
+        "`src/ultrathink-core/__tests__/contentTrendRadar.test.ts` must adversarially cover missing provenance, stale and future evidence, prediction-only signals, required content angles, saturation, duplicate fingerprints, deterministic first-wave selection, and the non-authorizing ceiling."
+      ]
+    },
+    {
+      "path": "src/ultrathink-core/index.ts",
+      "claims": [
+        "`src/ultrathink-core/index.ts` may export the Attack 3000 content and Trend Radar evidence contracts, including the evaluation context, only as source capabilities and must not imply provider activation, publication, merge, deploy, spend, or execution authority."
+      ]
+    },
+    {
+      "path": "src/lib/founderContentApprovalStore.ts",
+      "claims": [
+        "`src/lib/founderContentApprovalStore.ts` must reserve the same public thesis/opening-hook pattern within one founder, platform, and Current You intent under one deterministic approval id, and a retry may recover only the exact matching active stored proposal/public-payload reservation while rejecting mismatched, consumed, revoked, expired, or non-current state.",
+        "`src/lib/founderContentApprovalStore.ts` must return the original stored authorization hash and timestamps on exact retry recovery and must never use a retry, deterministic identity, or evidence rotation to create or renew publication authority."
+      ]
+    },
+    {
+      "path": "src/lib/__tests__/founderContentApprovalStore.test.ts",
+      "claims": [
+        "`src/lib/__tests__/founderContentApprovalStore.test.ts` must prove exact retry recovery after a lost issuance response while preserving the existing one-reservation behavior across source SHA, evidence reference, evidence digest, and proposal-hash rotation."
+      ]
+    },
+    {
+      "path": "docs/founder-signal-engine/linkedin-analytics-continuity.md",
+      "claims": [
+        "`docs/founder-signal-engine/linkedin-analytics-continuity.md` must document independently evaluated content freshness, direct demand evidence, current trend provenance, fingerprint comparison, deterministic approval retry identity, and observation-only authority without rewriting historical evidence when currentness expires."
       ]
     }
   ]
