@@ -279,6 +279,21 @@ async function withV10PlanAwarePage(page) {
     }
   };
 
+  const originalFill = page.fill.bind(page);
+  page.fill = async (selector, value, options) => {
+    if (typeof selector === 'string' && selector.startsWith('#new-project-form')) {
+      const target = page.locator(selector);
+      if (!(await target.isVisible().catch(() => false))) {
+        // The full founder journey historically assumed Projects was the
+        // landing tab. The product now correctly lands on Home. Reach the form
+        // through the visible founder geography instead of interacting with a
+        // hidden compatibility surface.
+        await driveFiveScreenNavigation(page, LEGACY_TAB_ROUTES.projects);
+      }
+    }
+    return originalFill(selector, value, options);
+  };
+
   const originalClick = page.click.bind(page);
   page.click = async (selector, options) => {
     const fiveScreenRoute = legacyTabRoute(selector);
