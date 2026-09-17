@@ -89,9 +89,25 @@ if (pendingTab && ALLOWED_TABS.has(pendingTab) && !activateTab(pendingTab)) {
     observer.observe(root, { childList: true, subtree: true });
   }
 }
+
 const launchDock = document.querySelector('.launch-dock');
+function syncLaunchDockVisibility() {
+  if (!(launchDock instanceof HTMLDetailsElement)) return;
+  const authenticatedShell = document.querySelector('#root .shell');
+  const authenticated = authenticatedShell instanceof HTMLElement;
+  if (!authenticated && launchDock.open) launchDock.open = false;
+  launchDock.hidden = !authenticated;
+  launchDock.setAttribute('aria-hidden', authenticated ? 'false' : 'true');
+}
+
 if (launchDock instanceof HTMLDetailsElement) {
-  launchDock.addEventListener('toggle', () => { if (launchDock.open) void refreshConveyorReadiness(); });
+  syncLaunchDockVisibility();
+  const root = document.getElementById('root');
+  if (root) {
+    const authVisibilityObserver = new MutationObserver(syncLaunchDockVisibility);
+    authVisibilityObserver.observe(root, { childList: true, subtree: true });
+  }
+  launchDock.addEventListener('toggle', () => { if (launchDock.open && !launchDock.hidden) void refreshConveyorReadiness(); });
 }
 installMissionBoard();
 installProjectShellUi();
