@@ -14,6 +14,12 @@ export type TruthEvidenceRuleInput = {
   status?: unknown;
 };
 
+export type TruthEvidenceIdentity = Array<{
+  id: unknown;
+  status: unknown;
+  relation: unknown;
+}>;
+
 export function classifyTruthEvidence(rows: readonly TruthEvidenceRuleInput[]): TruthClassification {
   if (rows.length === 0) return 'unknown';
   if (rows.some((row) => row.relation === 'contradicts' || row.status === 'fail')) return 'conflicted';
@@ -36,7 +42,7 @@ export function truthContinuityState(
   return 'current';
 }
 
-export function truthEvidenceIdentity(rows: readonly TruthEvidenceRuleInput[]) {
+export function truthEvidenceIdentity(rows: readonly TruthEvidenceRuleInput[]): TruthEvidenceIdentity {
   return rows
     .map((row) => ({ id: row.id, status: row.status, relation: row.relation }))
     .sort((a, b) => String(a.id).localeCompare(String(b.id)));
