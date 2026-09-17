@@ -17,8 +17,9 @@ const safeCsv = readFileSync(
 const metadata = {
   platform: 'linkedin',
   generated_at: '2026-09-04T12:00:00.000Z',
-  account_id: 'linkedin-page-safe-fixture',
+  account_id: 'linkedin-account-safe-fixture',
   account_name: 'Safe Fixture Account',
+  page_id: 'linkedin-page-safe-fixture',
   file_name: 'founder-content-analytics-safe.csv',
   comparison: {
     baseline_start: '2026-09-01',
@@ -29,15 +30,15 @@ const metadata = {
 };
 
 describe('founder content analytics CSV ingestion', () => {
-  it('binds safe CSV data to page/account identity, source hash, history, units, nulls, and audience segments', () => {
+  it('binds a safe CSV import to account, page, source, historical provenance, units, and explicit audience segments', () => {
     const receipt = parseFounderContentAnalyticsCsv(safeCsv, metadata);
 
     expect(receipt.contract).toBe('fcr/founder-content-analytics-csv-ingest@v1');
     expect(receipt.account).toEqual({
-      platform: 'linkedin',
-      id: 'linkedin-page-safe-fixture',
+      id: 'linkedin-account-safe-fixture',
       name: 'Safe Fixture Account',
     });
+    expect(receipt.page).toEqual({ id: 'linkedin-page-safe-fixture' });
     expect(receipt.source).toMatchObject({
       kind: 'normalized_csv',
       file_name: 'founder-content-analytics-safe.csv',
@@ -74,36 +75,31 @@ describe('founder content analytics CSV ingestion', () => {
     });
   });
 
-  it('is idempotent for the same bytes and metadata and changes identity when provenance changes', () => {
+  it('is idempotent for the same logical evidence even when presentation provenance changes', () => {
     const first = parseFounderContentAnalyticsCsv(safeCsv, metadata);
     const second = parseFounderContentAnalyticsCsv(safeCsv, metadata);
-    const renamed = parseFounderContentAnalyticsCsv(safeCsv, {
+    const renamedAndRegenerated = parseFounderContentAnalyticsCsv(safeCsv, {
       ...metadata,
+      generated_at: '2026-09-05T12:00:00.000Z',
       file_name: 'renamed-safe-fixture.csv',
+      account_name: 'Renamed Display Account',
+    });
+    const otherPage = parseFounderContentAnalyticsCsv(safeCsv, {
+      ...metadata,
+      page_id: 'different-linkedin-page',
     });
 
     expect(first.idempotency_key).toBe(second.idempotency_key);
-    expect(first.audit.audit_hash).toBe(second.audit.audit_hash);
-    expect(renamed.idempotency_key).not.toBe(first.idempotency_key);
-    expect(renamed.source.sha256).toBe(first.source.sha256);
-  });
-
-  it('requires UTC Z timestamps for generated_at and captured_at', () => {
-    expect(() => parseFounderContentAnalyticsCsv(safeCsv, {
-      ...metadata,
-      generated_at: '2026-09-04T12:00:00-04:00',
-    })).toThrow(/generated_at must be an ISO UTC timestamp ending in Z/);
-
-    const offsetSnapshot = safeCsv.replaceAll(
-      '2026-09-03T23:00:00.000Z',
-      '2026-09-03T19:00:00-04:00',
-    );
-    expect(() => parseFounderContentAnalyticsCsv(offsetSnapshot, metadata))
-      .toThrow(/captured_at must be an ISO UTC timestamp ending in Z/);
+    expect(first.idempotency_key).toBe(renamedAndRegenerated.idempotency_key);
+    expect(renamedAndRegenerated.source.sha256).toBe(first.source.sha256);
+    expect(renamedAndRegenerated.source.file_name).toBe('renamed-safe-fixture.csv');
+    expect(renamedAndRegenerated.generated_at).toBe('2026-09-05T12:00:00.000Z');
+    expect(otherPage.idempotency_key).not.toBe(first.idempotency_key);
   });
 
   it('rejects duplicate dates inside one snapshot instead of silently overwriting them', () => {
     const duplicate = `${safeCsv.trim()}\ncurrent-2026-09-03,2026-09-03T23:00:00.000Z,2026-09-02,2026-09-03,current_export,daily,2026-09-03,true,131,16,2,,\n`;
+
     expect(() => parseFounderContentAnalyticsCsv(duplicate, metadata))
       .toThrow(/duplicate daily date 2026-09-03/);
   });
@@ -114,16 +110,17 @@ describe('founder content analytics CSV ingestion', () => {
       .toThrow(/duplicate audience_segment Founder/);
   });
 
-  it('rejects daily rows outside the declared historical/current window', () => {
+  it('rejects daily rows that fall outside the declared snapshot window', () => {
     const outsideWindow = safeCsv.replace(
       'current-2026-09-03,2026-09-03T23:00:00.000Z,2026-09-02,2026-09-03,current_export,daily,2026-09-03,true,130,,2,,',
       'current-2026-09-03,2026-09-03T23:00:00.000Z,2026-09-02,2026-09-03,current_export,daily,2026-09-04,true,130,,2,,',
     );
+
     expect(() => parseFounderContentAnalyticsCsv(outsideWindow, metadata))
-      .toThrow(/daily date 2026-09-04 falls outside snapshot window/);
+      .toThrow(/daily date 2026-09-04 falls outside snapshot window 2026-09-02\.\.2026-09-03/);
   });
 
-  it('rejects reversed comparison windows and impossible calendar dates', () => {
+  it('rejects reversed comparison windows instead of emitting false-complete zero evidence', () => {
     expect(() => parseFounderContentAnalyticsCsv(safeCsv, {
       ...metadata,
       comparison: {
@@ -133,8 +130,11 @@ describe('founder content analytics CSV ingestion', () => {
         recent_end: '2026-09-03',
       },
     })).toThrow(/baseline_start is after metadata\.comparison\.baseline_end/);
+  });
 
+  it('rejects impossible calendar dates instead of normalizing them into provenance', () => {
     const impossible = safeCsv.replaceAll('2026-09-01', '2026-02-30');
+
     expect(() => parseFounderContentAnalyticsCsv(impossible, {
       ...metadata,
       comparison: {
@@ -146,7 +146,52 @@ describe('founder content analytics CSV ingestion', () => {
     })).toThrow(/must be a real calendar date/);
   });
 
-  it('rejects prototype-sensitive audience segment names', () => {
+  it('rejects timestamps without an explicit offset instead of guessing provenance time', () => {
+    expect(() => parseFounderContentAnalyticsCsv(safeCsv, {
+      ...metadata,
+      generated_at: '2026-09-04T12:00:00',
+    })).toThrow(/metadata\.generated_at must be an offset-aware ISO timestamp/);
+
+    const offsetlessCapture = safeCsv.replace(
+      '2026-09-03T23:00:00.000Z',
+      '2026-09-03T23:00:00.000',
+    );
+    expect(() => parseFounderContentAnalyticsCsv(offsetlessCapture, metadata))
+      .toThrow(/captured_at must be an offset-aware ISO timestamp/);
+  });
+
+  it('rejects impossible generated and captured timestamps instead of accepting Date.parse normalization', () => {
+    expect(() => parseFounderContentAnalyticsCsv(safeCsv, {
+      ...metadata,
+      generated_at: '2026-02-30T12:00:00.000Z',
+    })).toThrow(/metadata\.generated_at date must be a real calendar date/);
+
+    const impossibleCapture = safeCsv.replace(
+      '2026-09-03T23:00:00.000Z',
+      '2026-02-30T23:00:00.000Z',
+    );
+    expect(() => parseFounderContentAnalyticsCsv(impossibleCapture, metadata))
+      .toThrow(/captured_at date must be a real calendar date/);
+  });
+
+  it('rejects trailing text after a quoted field instead of silently changing the metric value', () => {
+    const malformedQuotedMetric = safeCsv.replace(
+      'historical_import,daily,2026-09-01,true,100,10,2,,',
+      'historical_import,daily,2026-09-01,true,"10"5,10,2,,',
+    );
+
+    expect(() => parseFounderContentAnalyticsCsv(malformedQuotedMetric, metadata))
+      .toThrow(/quoted CSV field must be followed by a comma, newline, or end-of-input/);
+  });
+
+  it('rejects snapshot IDs longer than the downstream audit identity bound', () => {
+    const overlongSnapshotId = safeCsv.replaceAll('current-2026-09-03', 's'.repeat(121));
+
+    expect(() => parseFounderContentAnalyticsCsv(overlongSnapshotId, metadata))
+      .toThrow(/snapshot_id exceeds 120 characters/);
+  });
+
+  it('rejects prototype-sensitive audience segment names before they can alias object behavior', () => {
     for (const reserved of ['__proto__', 'prototype', 'constructor', 'Constructor']) {
       const reservedSegment = safeCsv.replaceAll('Founder', reserved);
       expect(() => parseFounderContentAnalyticsCsv(reservedSegment, metadata))
@@ -154,7 +199,7 @@ describe('founder content analytics CSV ingestion', () => {
     }
   });
 
-  it('keeps missing metrics null and marks comparisons incomplete instead of inventing zeros', () => {
+  it('keeps missing metric values null and makes incomplete comparison evidence explicit', () => {
     const receipt = parseFounderContentAnalyticsCsv(safeCsv, {
       ...metadata,
       comparison: {
@@ -164,15 +209,26 @@ describe('founder content analytics CSV ingestion', () => {
         recent_end: '2026-09-03',
       },
     });
+
     expect(receipt.audit.comparison.recent.state).toBe('INCOMPLETE');
     expect(receipt.audit.comparison.recent.engagements).toBeNull();
     expect(receipt.audit.comparison.change.engagement_rate).toBeNull();
   });
 
-  it('rejects overlong account identity rather than truncating provenance into a collision', () => {
+  it('rejects missing or overlong account/page identity instead of weakening provenance', () => {
     expect(() => parseFounderContentAnalyticsCsv(safeCsv, {
       ...metadata,
       account_id: 'a'.repeat(201),
     })).toThrow(/metadata\.account_id exceeds 200 characters/);
+
+    expect(() => parseFounderContentAnalyticsCsv(safeCsv, {
+      ...metadata,
+      page_id: '',
+    })).toThrow(/metadata\.page_id is required/);
+
+    expect(() => parseFounderContentAnalyticsCsv(safeCsv, {
+      ...metadata,
+      page_id: 'p'.repeat(201),
+    })).toThrow(/metadata\.page_id exceeds 200 characters/);
   });
 });
