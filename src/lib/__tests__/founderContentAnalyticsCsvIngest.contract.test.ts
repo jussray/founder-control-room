@@ -17,8 +17,9 @@ const safeCsv = readFileSync(
 const metadata = {
   platform: 'linkedin',
   generated_at: '2026-09-04T12:00:00.000Z',
-  account_id: 'linkedin-page-safe-fixture',
+  account_id: 'linkedin-account-safe-fixture',
   account_name: 'Safe Fixture Account',
+  page_id: 'linkedin-page-safe-fixture',
   file_name: 'founder-content-analytics-safe.csv',
   comparison: {
     baseline_start: '2026-09-01',
@@ -29,14 +30,15 @@ const metadata = {
 };
 
 describe('founder content analytics CSV ingestion', () => {
-  it('binds a safe CSV import to account, source, historical provenance, units, and explicit audience segments', () => {
+  it('binds a safe CSV import to account, page, source, historical provenance, units, and explicit audience segments', () => {
     const receipt = parseFounderContentAnalyticsCsv(safeCsv, metadata);
 
     expect(receipt.contract).toBe('fcr/founder-content-analytics-csv-ingest@v1');
     expect(receipt.account).toEqual({
-      id: 'linkedin-page-safe-fixture',
+      id: 'linkedin-account-safe-fixture',
       name: 'Safe Fixture Account',
     });
+    expect(receipt.page).toEqual({ id: 'linkedin-page-safe-fixture' });
     expect(receipt.source).toMatchObject({
       kind: 'normalized_csv',
       file_name: 'founder-content-analytics-safe.csv',
@@ -73,18 +75,26 @@ describe('founder content analytics CSV ingestion', () => {
     });
   });
 
-  it('is idempotent for the same bytes and metadata and changes identity when provenance changes', () => {
+  it('is idempotent for the same logical evidence even when presentation provenance changes', () => {
     const first = parseFounderContentAnalyticsCsv(safeCsv, metadata);
     const second = parseFounderContentAnalyticsCsv(safeCsv, metadata);
-    const renamed = parseFounderContentAnalyticsCsv(safeCsv, {
+    const renamedAndRegenerated = parseFounderContentAnalyticsCsv(safeCsv, {
       ...metadata,
+      generated_at: '2026-09-05T12:00:00.000Z',
       file_name: 'renamed-safe-fixture.csv',
+      account_name: 'Renamed Display Account',
+    });
+    const otherPage = parseFounderContentAnalyticsCsv(safeCsv, {
+      ...metadata,
+      page_id: 'different-linkedin-page',
     });
 
     expect(first.idempotency_key).toBe(second.idempotency_key);
-    expect(first.audit.audit_hash).toBe(second.audit.audit_hash);
-    expect(renamed.idempotency_key).not.toBe(first.idempotency_key);
-    expect(renamed.source.sha256).toBe(first.source.sha256);
+    expect(first.idempotency_key).toBe(renamedAndRegenerated.idempotency_key);
+    expect(renamedAndRegenerated.source.sha256).toBe(first.source.sha256);
+    expect(renamedAndRegenerated.source.file_name).toBe('renamed-safe-fixture.csv');
+    expect(renamedAndRegenerated.generated_at).toBe('2026-09-05T12:00:00.000Z');
+    expect(otherPage.idempotency_key).not.toBe(first.idempotency_key);
   });
 
   it('rejects duplicate dates inside one snapshot instead of silently overwriting them', () => {
@@ -130,6 +140,20 @@ describe('founder content analytics CSV ingestion', () => {
     })).toThrow(/must be a real calendar date/);
   });
 
+  it('rejects timestamps without an explicit offset instead of guessing provenance time', () => {
+    expect(() => parseFounderContentAnalyticsCsv(safeCsv, {
+      ...metadata,
+      generated_at: '2026-09-04T12:00:00',
+    })).toThrow(/metadata\.generated_at must be an offset-aware ISO timestamp/);
+
+    const offsetlessCapture = safeCsv.replace(
+      '2026-09-03T23:00:00.000Z',
+      '2026-09-03T23:00:00.000',
+    );
+    expect(() => parseFounderContentAnalyticsCsv(offsetlessCapture, metadata))
+      .toThrow(/captured_at must be an offset-aware ISO timestamp/);
+  });
+
   it('rejects prototype-sensitive audience segment names before they can alias object behavior', () => {
     for (const reserved of ['__proto__', 'prototype', 'constructor', 'Constructor']) {
       const reservedSegment = safeCsv.replaceAll('Founder', reserved);
@@ -154,10 +178,20 @@ describe('founder content analytics CSV ingestion', () => {
     expect(receipt.audit.comparison.change.engagement_rate).toBeNull();
   });
 
-  it('rejects overlong account identity instead of truncating distinct provenance into one receipt identity', () => {
+  it('rejects missing or overlong account/page identity instead of weakening provenance', () => {
     expect(() => parseFounderContentAnalyticsCsv(safeCsv, {
       ...metadata,
       account_id: 'a'.repeat(201),
     })).toThrow(/metadata\.account_id exceeds 200 characters/);
+
+    expect(() => parseFounderContentAnalyticsCsv(safeCsv, {
+      ...metadata,
+      page_id: '',
+    })).toThrow(/metadata\.page_id is required/);
+
+    expect(() => parseFounderContentAnalyticsCsv(safeCsv, {
+      ...metadata,
+      page_id: 'p'.repeat(201),
+    })).toThrow(/metadata\.page_id exceeds 200 characters/);
   });
 });
