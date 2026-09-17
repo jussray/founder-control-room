@@ -32,6 +32,11 @@ function fail(message) {
   throw error;
 }
 
+function compareOrdinal(left, right) {
+  if (left === right) return 0;
+  return left < right ? -1 : 1;
+}
+
 function boundedText(value, field, max = 240) {
   if (typeof value !== 'string') return '';
   const normalized = value.trim();
@@ -193,9 +198,9 @@ function canonicalSnapshotEvidence(group) {
     window_start: group.window_start,
     window_end: group.window_end,
     import_kind: group.import_kind,
-    daily: [...group.daily].sort((left, right) => left.date.localeCompare(right.date)),
+    daily: [...group.daily].sort((left, right) => compareOrdinal(left.date, right.date)),
     audience: Object.fromEntries(
-      Object.entries(group.audience).sort(([left], [right]) => left.localeCompare(right)),
+      Object.entries(group.audience).sort(([left], [right]) => compareOrdinal(left, right)),
     ),
   };
 }
@@ -376,8 +381,8 @@ function parseFounderContentAnalyticsCsv(csvText, metadata = {}) {
   });
   const normalizedEvidence = [...groups.values()]
     .map(canonicalSnapshotEvidence)
-    .sort((left, right) => left.captured_at.localeCompare(right.captured_at)
-      || left.snapshot_id.localeCompare(right.snapshot_id));
+    .sort((left, right) => compareOrdinal(left.captured_at, right.captured_at)
+      || compareOrdinal(left.snapshot_id, right.snapshot_id));
   const idempotencyIdentity = {
     contract: CONTRACT,
     platform,
