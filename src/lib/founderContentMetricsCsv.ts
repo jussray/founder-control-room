@@ -6,6 +6,10 @@ import {
   type FounderContentMetricUnit,
 } from './founderContentMetrics.js';
 
+// Persistence intake for the broader founder-content metric ledger. This is
+// intentionally distinct from contentMetricsCsv.ts, whose narrower
+// content-metrics-csv@v1 contract is the public-safe content-evidence import
+// boundary used by the existing analytics/Attack-3000 lane.
 const MAX_CSV_BYTES = 1_000_000;
 const MAX_CSV_ROWS = 10_000;
 const MAX_COLUMNS = 20;
@@ -16,6 +20,7 @@ const REQUIRED_HEADERS = [
   'platform',
   'source',
   'account_id',
+  'page_id',
   'metric_name',
   'metric_unit',
   'metric_value',
@@ -54,7 +59,7 @@ function parseRows(csv: string): string[][] {
       if (cell.length > MAX_CELL_CHARS) reject(`cell exceeds ${MAX_CELL_CHARS} characters`);
       row.push(cell);
       cell = '';
-      if (row.some((value) => value.trim().length > 0)) rows.push(row);
+      if (row.some((candidate) => candidate.trim().length > 0)) rows.push(row);
       row = [];
       if (rows.length > MAX_CSV_ROWS + 1) reject(`CSV exceeds ${MAX_CSV_ROWS} data rows`);
     } else {
@@ -65,7 +70,7 @@ function parseRows(csv: string): string[][] {
   if (cell.length > MAX_CELL_CHARS) reject(`cell exceeds ${MAX_CELL_CHARS} characters`);
   if (cell.length > 0 || row.length > 0) {
     row.push(cell);
-    if (row.some((value) => value.trim().length > 0)) rows.push(row);
+    if (row.some((candidate) => candidate.trim().length > 0)) rows.push(row);
   }
   return rows;
 }
@@ -121,7 +126,7 @@ export function parseFounderContentMetricsCsv(csv: string): readonly FounderCont
       source,
       sourceMetricId: nullable(row, indexes, 'source_metric_id'),
       accountId: value(row, indexes, 'account_id'),
-      pageId: nullable(row, indexes, 'page_id'),
+      pageId: value(row, indexes, 'page_id'),
       externalPostId: nullable(row, indexes, 'external_post_id'),
       audienceSegment: nullable(row, indexes, 'audience_segment'),
       metricName: value(row, indexes, 'metric_name'),
