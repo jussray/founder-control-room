@@ -66,6 +66,18 @@ The corrected canon separates the planes. `merge_authority: true` means only tha
 
 This is an authority-freshness correction, not a relaxation of review or proof. Exact-head evidence still constrains what can be claimed and integrated, while founder approval controls whether the exact candidate may cross the merge boundary. Deployment, publication, billing, secrets, database mutation, deletion, and other consequential classes remain separately gated.
 
+## 2026-09 control correction: Chief Access repair authority and ambiguous writes
+
+The Chief ProofMode recovery lane exposed a provider-mutation version of truth decay. A direct workflow-dispatch surface could bypass the founder command bridge, a generic service-token alias could silently outrank a conflicting Chief-specific selector, and a transport failure after a provider POST could be misread as “nothing happened.” Any of those states can turn truthful source intent into unsafe retry authority.
+
+The corrected authority path is deliberately singular. Founder issue #485 is the only supported mutation entry point; it revalidates the founder identity, exact current FCR main, immutable Chief preview origin, and auditable approval reference before invoking the local reusable recovery workflow. The recovery workflow has no independent `workflow_dispatch` mutation surface. Read-only provider inspection and repair authority remain separate, and a check cannot claim browser/runtime success.
+
+Service-token resolution is specificity-first and conflict-detecting. Chief-specific protected configuration may use the documented generic alias only when those sources agree or the specific source is absent. The chosen non-secret selector is fingerprinted for continuity, but selector presence does not prove credential validity or runtime authentication.
+
+The provider write path now binds the exact target application plus service-token identity into a provider-subject fingerprint before mutation. `REPAIR_IN_PROGRESS` is persisted before the POST. If transport or verification leaves the write outcome ambiguous, the subject becomes `RECONCILE_REQUIRED`; the same subject must be read back before retry authority can return, and evidence for a different application/token subject cannot clear the latch. This prevents a failed response from being converted into an unbounded duplicate Service Auth policy creation.
+
+A green recovery check, a successful policy creation, and a green exact-head source suite are still different facts. Chief production runtime remains UNKNOWN/BLOCKED until the exact current Chief release is independently observed through production Playwright/runtime identity after Access recovery.
+
 ## Root causes
 
 ### 1. Evidence lifetime was implicit
@@ -381,6 +393,7 @@ The strongest optimization is not faster claiming. It is shortening the distance
 32. A capital decision card, recommendation, score, or HOLD state is evidence interpretation, not financing or execution authority; stale or missing capital evidence must remove derived certainty instead of preserving an earlier recommendation.
 33. `merge_authority: true` cannot be reused as candidate approval; every merge requires a fresh explicit founder decision for the exact live repository/PR/base/head, and candidate movement expires that approval.
 34. Rebinding a cross-repository Playwright peer to a newly verified exact ref/SHA expires predecessor federation/browser proof and requires a complete exact-head rerun; the pin is evidence identity, not production or merge authority.
+35. An ambiguous provider-write response cannot be reused as permission to retry; Chief Access repair must reconcile the same provider-subject fingerprint before another mutation can be authorized.
 
 ## Rollback
 
