@@ -8,6 +8,8 @@ on:
       - 'config/founder-chief-pair.contract.json'
       - '.control-room/founder-chief-pair-peer-lock.json'
       - 'docs/FOUNDER_INTELLIGENCE_CONSTITUTION.md'
+      - 'docs/PUBLIC_COMMUNICATION_TRUTH_CONTRACT.md'
+      - 'package.json'
       - 'scripts/verify-founder-chief-pair.mjs'
       - 'test/founder-chief-pair-peer-lock.test.mjs'
       - 'src/lib/standingFounderPolicy.ts'
@@ -59,7 +61,17 @@ jobs:
               case "$path" in
                 config/founder-chief-pair.contract.json|\
                 .control-room/founder-chief-pair-peer-lock.json|\
+                docs/FOUNDER_INTELLIGENCE_CONSTITUTION.md|\
+                docs/PUBLIC_COMMUNICATION_TRUTH_CONTRACT.md|\
+                package.json|\
                 scripts/verify-founder-chief-pair.mjs|\
+                src/lib/standingFounderPolicy.ts|\
+                src/founder-os-lab/projectAdapters.ts|\
+                src/founder-os-lab/capabilityKernel.ts|\
+                src/founder-os-lab/engine.ts|\
+                src/lib/n8nConveyor.ts|\
+                src/lib/n8nConveyorRuntime.ts|\
+                automation/n8n/founder-conveyor.workflow.json|\
                 .github/workflows/founder-chief-pair-contract.yml)
                   required=true
                   break
