@@ -6,7 +6,7 @@ const { buildFounderContentAnalyticsAudit } = require('./content-analytics-audit
 const CONTRACT = 'fcr/founder-content-analytics-csv-ingest@v1';
 const MAX_BYTES = 1_000_000;
 const MAX_ROWS = 5_000;
-const ISO_UTC_TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/;
+const DEFAULT_TOP_POST_COUNT = 2;
 const EXPECTED_COLUMNS = Object.freeze([
   'snapshot_id',
   'captured_at',
@@ -24,6 +24,7 @@ const EXPECTED_COLUMNS = Object.freeze([
 ]);
 const IMPORT_KINDS = new Set(['historical_import', 'current_export']);
 const RESERVED_AUDIENCE_SEGMENTS = new Set(['__proto__', 'prototype', 'constructor']);
+const OFFSET_AWARE_ISO_TIMESTAMP = /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d{1,9})?(Z|[+-]\d{2}:\d{2})$/;
 
 function fail(message) {
   const error = new Error(`CONTENT_ANALYTICS_CSV_REJECTED: ${message}`);
@@ -38,18 +39,6 @@ function boundedText(value, field, max = 240) {
   return normalized;
 }
 
-function parseIsoTimestamp(value, field) {
-  if (typeof value !== 'string' || !ISO_UTC_TIMESTAMP.test(value)) {
-    fail(`${field} must be an ISO UTC timestamp ending in Z`);
-  }
-  const parsed = new Date(value);
-  const expected = value.length === 20 ? value.replace(/Z$/, '.000Z') : value;
-  if (Number.isNaN(parsed.getTime()) || parsed.toISOString() !== expected) {
-    fail(`${field} must be a real ISO UTC timestamp`);
-  }
-  return value;
-}
-
 function parseIsoDate(value, field) {
   if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
     fail(`${field} must be YYYY-MM-DD`);
@@ -61,16 +50,57 @@ function parseIsoDate(value, field) {
   return value;
 }
 
+function parseIsoTimestamp(value, field) {
+  if (typeof value !== 'string') fail(`${field} must be an offset-aware ISO timestamp`);
+  const match = OFFSET_AWARE_ISO_TIMESTAMP.exec(value);
+  if (!match) fail(`${field} must be an offset-aware ISO timestamp`);
+
+  parseIsoDate(match[1], `${field} date`);
+  const hour = Number(match[2]);
+  const minute = Number(match[3]);
+  const second = Number(match[4]);
+  if (hour > 23 || minute > 59 || second > 59) fail(`${field} must be a real ISO timestamp`);
+
+  const offset = match[5];
+  if (offset !== 'Z') {
+    const offsetHour = Number(offset.slice(1, 3));
+    const offsetMinute = Number(offset.slice(4, 6));
+    if (offsetHour > 14 || offsetMinute > 59 || (offsetHour === 14 && offsetMinute !== 0)) {
+      fail(`${field} has an invalid UTC offset`);
+    }
+  }
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) fail(`${field} must be a real ISO timestamp`);
+  return parsed.toISOString();
+}
+
+function normalizeTopPostCount(value) {
+  if (value === undefined || value === null) return DEFAULT_TOP_POST_COUNT;
+  if (!Number.isSafeInteger(value) || value <= 0) {
+    fail('metadata.top_post_count must be a positive safe integer when provided');
+  }
+  return value;
+}
+
 function validateComparison(comparison) {
   if (!comparison || typeof comparison !== 'object' || Array.isArray(comparison)) {
     fail('metadata.comparison is required');
   }
+
+  const values = {};
   for (const prefix of ['baseline', 'recent']) {
     const startField = `${prefix}_start`;
     const endField = `${prefix}_end`;
     const start = parseIsoDate(comparison[startField], `metadata.comparison.${startField}`);
     const end = parseIsoDate(comparison[endField], `metadata.comparison.${endField}`);
     if (start > end) fail(`metadata.comparison.${startField} is after metadata.comparison.${endField}`);
+    values[startField] = start;
+    values[endField] = end;
+  }
+
+  if (values.recent_start <= values.baseline_end) {
+    fail('metadata.comparison.recent_start must be after metadata.comparison.baseline_end');
   }
 }
 
@@ -79,6 +109,7 @@ function parseCsv(textValue) {
   let row = [];
   let field = '';
   let quoted = false;
+  let justClosedQuote = false;
 
   for (let index = 0; index < textValue.length; index += 1) {
     const char = textValue[index];
@@ -89,9 +120,29 @@ function parseCsv(textValue) {
           index += 1;
         } else {
           quoted = false;
+          justClosedQuote = true;
         }
       } else {
         field += char;
+      }
+      continue;
+    }
+
+    if (justClosedQuote) {
+      if (char === ',') {
+        row.push(field);
+        field = '';
+        justClosedQuote = false;
+      } else if (char === '\n') {
+        row.push(field);
+        rows.push(row);
+        row = [];
+        field = '';
+        justClosedQuote = false;
+      } else if (char === '\r' && textValue[index + 1] === '\n') {
+        // Keep waiting for the LF delimiter without accepting trailing field text.
+      } else {
+        fail('quoted CSV field must be followed by a comma, newline, or end-of-input');
       }
       continue;
     }
@@ -113,7 +164,7 @@ function parseCsv(textValue) {
   }
 
   if (quoted) fail('unterminated quoted CSV field');
-  if (field.length > 0 || row.length > 0) {
+  if (field.length > 0 || row.length > 0 || justClosedQuote) {
     row.push(field.replace(/\r$/, ''));
     rows.push(row);
   }
@@ -143,6 +194,17 @@ function assertSnapshotMetadata(group, row, lineNumber) {
   }
 }
 
+function windowsOverlap(left, right) {
+  return left.window_start <= right.window_end && right.window_start <= left.window_end;
+}
+
+function deepFreeze(value, seen = new WeakSet()) {
+  if (!value || typeof value !== 'object' || seen.has(value)) return value;
+  seen.add(value);
+  for (const nested of Object.values(value)) deepFreeze(nested, seen);
+  return Object.freeze(value);
+}
+
 function parseFounderContentAnalyticsCsv(csvText, metadata = {}) {
   if (typeof csvText !== 'string') fail('CSV input must be UTF-8 text');
   const byteLength = Buffer.byteLength(csvText, 'utf8');
@@ -150,16 +212,19 @@ function parseFounderContentAnalyticsCsv(csvText, metadata = {}) {
   if (byteLength > MAX_BYTES) fail(`CSV input exceeds ${MAX_BYTES} bytes`);
 
   const platform = boundedText(metadata.platform, 'metadata.platform', 80).toLowerCase();
-  const generatedAt = boundedText(metadata.generated_at, 'metadata.generated_at', 64);
+  const generatedAtInput = boundedText(metadata.generated_at, 'metadata.generated_at', 64);
   const accountId = boundedText(metadata.account_id, 'metadata.account_id', 200);
   const accountName = boundedText(metadata.account_name, 'metadata.account_name', 200);
+  const pageId = boundedText(metadata.page_id, 'metadata.page_id', 200);
   const fileName = boundedText(metadata.file_name, 'metadata.file_name', 240);
   if (!platform) fail('metadata.platform is required');
-  parseIsoTimestamp(generatedAt, 'metadata.generated_at');
+  const generatedAt = parseIsoTimestamp(generatedAtInput, 'metadata.generated_at');
   if (!accountId) fail('metadata.account_id is required');
   if (!accountName) fail('metadata.account_name is required');
+  if (!pageId) fail('metadata.page_id is required');
   if (!fileName) fail('metadata.file_name is required');
   validateComparison(metadata.comparison);
+  const topPostCount = normalizeTopPostCount(metadata.top_post_count);
 
   const rows = parseCsv(csvText);
   if (rows.length < 2) fail('CSV must contain a header and at least one data row');
@@ -177,9 +242,11 @@ function parseFounderContentAnalyticsCsv(csvText, metadata = {}) {
     if (values.length !== EXPECTED_COLUMNS.length) {
       fail(`line ${lineNumber} has ${values.length} columns; expected ${EXPECTED_COLUMNS.length}`);
     }
+
     const row = Object.fromEntries(EXPECTED_COLUMNS.map((column, columnIndex) => [column, values[columnIndex].trim()]));
+    row.snapshot_id = boundedText(row.snapshot_id, `line ${lineNumber} snapshot_id`, 120);
     if (!row.snapshot_id) fail(`line ${lineNumber} snapshot_id is required`);
-    parseIsoTimestamp(row.captured_at, `line ${lineNumber} captured_at`);
+    row.captured_at = parseIsoTimestamp(row.captured_at, `line ${lineNumber} captured_at`);
     parseIsoDate(row.window_start, `line ${lineNumber} window_start`);
     parseIsoDate(row.window_end, `line ${lineNumber} window_end`);
     if (row.window_start > row.window_end) fail(`line ${lineNumber} window_start is after window_end`);
@@ -237,7 +304,24 @@ function parseFounderContentAnalyticsCsv(csvText, metadata = {}) {
   }
 
   if (groups.size < 2) fail('CSV must contain at least two snapshots for comparison');
-  const snapshots = [...groups.values()].map((group) => ({
+  const groupList = [...groups.values()];
+  const generatedAtMs = Date.parse(generatedAt);
+  for (const group of groupList) {
+    if (Date.parse(group.captured_at) > generatedAtMs) {
+      fail(`snapshot ${group.id} captured_at must not be after metadata.generated_at`);
+    }
+  }
+  for (let leftIndex = 0; leftIndex < groupList.length; leftIndex += 1) {
+    for (let rightIndex = leftIndex + 1; rightIndex < groupList.length; rightIndex += 1) {
+      const left = groupList[leftIndex];
+      const right = groupList[rightIndex];
+      if (left.captured_at === right.captured_at && windowsOverlap(left, right)) {
+        fail(`overlapping snapshots ${left.id} and ${right.id} must not share captured_at`);
+      }
+    }
+  }
+
+  const snapshots = groupList.map((group) => ({
     id: group.id,
     captured_at: group.captured_at,
     window_start: group.window_start,
@@ -246,16 +330,17 @@ function parseFounderContentAnalyticsCsv(csvText, metadata = {}) {
     audience: group.audience,
   }));
 
-  const audit = buildFounderContentAnalyticsAudit({
+  const audit = deepFreeze(buildFounderContentAnalyticsAudit({
     platform,
     generated_at: generatedAt,
     snapshots,
     comparison: metadata.comparison,
-    top_post_count: metadata.top_post_count,
-  });
+    top_post_count: topPostCount,
+  }));
 
   const sourceSha256 = createHash('sha256').update(csvText).digest('hex');
-  const account = Object.freeze({ platform, id: accountId, name: accountName });
+  const account = Object.freeze({ id: accountId, name: accountName });
+  const page = Object.freeze({ id: pageId });
   const source = Object.freeze({
     kind: 'normalized_csv',
     file_name: fileName,
@@ -263,7 +348,7 @@ function parseFounderContentAnalyticsCsv(csvText, metadata = {}) {
     bytes: byteLength,
     row_count: rows.length - 1,
   });
-  const snapshotSources = Object.freeze([...groups.values()].map((group) => Object.freeze({
+  const snapshotSources = Object.freeze(groupList.map((group) => Object.freeze({
     snapshot_id: group.id,
     captured_at: group.captured_at,
     window_start: group.window_start,
@@ -276,6 +361,17 @@ function parseFounderContentAnalyticsCsv(csvText, metadata = {}) {
     gross_new_followers: Object.freeze({ unit: 'count', nullable: true }),
     audience_share: Object.freeze({ unit: 'ratio_0_to_1', nullable: false }),
     audience_delta: Object.freeze({ unit: 'percentage_points', nullable: true }),
+    post_concentration: Object.freeze({
+      availability: 'unavailable',
+      reason: 'post_level_metrics_not_present_in_csv_schema',
+    }),
+  });
+  const metricAvailability = Object.freeze({
+    post_concentration: Object.freeze({
+      state: 'UNAVAILABLE',
+      reason: 'post_level_metrics_not_present_in_csv_schema',
+      observed_empty: false,
+    }),
   });
   const audienceSegments = Object.freeze(audit.audience_shift.map((entry) => Object.freeze({
     audience_segment: entry.segment,
@@ -288,12 +384,29 @@ function parseFounderContentAnalyticsCsv(csvText, metadata = {}) {
     platform,
     generated_at: generatedAt,
     account,
+    page,
     source,
     snapshot_sources: snapshotSources,
     metric_schema: metricSchema,
+    metric_availability: metricAvailability,
     audit_hash: audit.audit_hash,
   };
-  const idempotencyKey = createHash('sha256').update(JSON.stringify(receiptIdentity)).digest('hex');
+  const comparisonIdentity = Object.freeze({
+    baseline_start: metadata.comparison.baseline_start,
+    baseline_end: metadata.comparison.baseline_end,
+    recent_start: metadata.comparison.recent_start,
+    recent_end: metadata.comparison.recent_end,
+  });
+  const idempotencyIdentity = {
+    contract: CONTRACT,
+    platform,
+    account_id: accountId,
+    page_id: pageId,
+    source_sha256: sourceSha256,
+    comparison: comparisonIdentity,
+    top_post_count: topPostCount,
+  };
+  const idempotencyKey = createHash('sha256').update(JSON.stringify(idempotencyIdentity)).digest('hex');
 
   return Object.freeze({
     ...receiptIdentity,
