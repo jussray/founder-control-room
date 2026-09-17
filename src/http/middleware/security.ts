@@ -180,12 +180,29 @@ interface RateBucket {
   resetsAt: number;
 }
 
+interface RateLimiterOptions {
+  testMaxEnv?: string;
+}
+
+function resolveRateLimitMax(max: number, options: RateLimiterOptions): number {
+  if (process.env['NODE_ENV'] !== 'test' || !options.testMaxEnv) return max;
+  const raw = process.env[options.testMaxEnv];
+  if (!raw) return max;
+  const parsed = Number(raw);
+  if (!Number.isSafeInteger(parsed) || parsed < max) {
+    throw new Error(`${options.testMaxEnv} must be an integer greater than or equal to ${max}.`);
+  }
+  return parsed;
+}
+
 function createRateLimiter(
   windowMs: number,
   max: number,
   message: { error: string },
+  options: RateLimiterOptions = {},
 ): RequestHandler {
   const buckets = new Map<string, RateBucket>();
+  const effectiveMax = resolveRateLimitMax(max, options);
 
   return (req, res, next): void => {
     const now = Date.now();
@@ -198,11 +215,11 @@ function createRateLimiter(
     bucket.count += 1;
     buckets.set(key, bucket);
 
-    res.setHeader('RateLimit-Limit', String(max));
-    res.setHeader('RateLimit-Remaining', String(Math.max(0, max - bucket.count)));
+    res.setHeader('RateLimit-Limit', String(effectiveMax));
+    res.setHeader('RateLimit-Remaining', String(Math.max(0, effectiveMax - bucket.count)));
     res.setHeader('RateLimit-Reset', String(Math.ceil(bucket.resetsAt / 1_000)));
 
-    if (bucket.count > max) {
+    if (bucket.count > effectiveMax) {
       res.setHeader('Retry-After', String(Math.max(1, Math.ceil((bucket.resetsAt - now) / 1_000))));
       res.status(429).json(message);
       return;
@@ -224,6 +241,7 @@ export const rateLimitGeneral = createRateLimiter(
   60 * 1_000,
   60,
   { error: 'Rate limit exceeded.' },
+  { testMaxEnv: 'FCR_E2E_GENERAL_RATE_LIMIT_MAX' },
 );
 
 /**
