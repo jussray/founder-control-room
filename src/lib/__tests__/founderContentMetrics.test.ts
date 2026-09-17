@@ -94,6 +94,21 @@ describe('founder content metric observations', () => {
     })).toThrow(/offset-aware ISO timestamp/);
   });
 
+  it('rejects impossible timestamps and invalid UTC offsets instead of Date.parse normalization', () => {
+    expect(() => normalizeFounderContentMetricObservation({
+      ...observation(),
+      observedAt: '2026-02-30T12:00:00.000Z',
+    })).toThrow(/real calendar date/);
+    expect(() => normalizeFounderContentMetricObservation({
+      ...observation(),
+      periodEnd: '2026-02-30T23:59:59.000Z',
+    })).toThrow(/real calendar date/);
+    expect(() => normalizeFounderContentMetricObservation({
+      ...observation(),
+      observedAt: '2026-09-15T12:00:00+15:00',
+    })).toThrow(/invalid UTC offset/);
+  });
+
   it('parses a safe historical CSV while preserving source field identity and audience segment', () => {
     const csv = [
       'provider,platform,source,source_metric_id,account_id,page_id,external_post_id,audience_segment,metric_name,metric_unit,metric_value,observed_at,period_start,period_end,provenance_json',
@@ -128,6 +143,15 @@ describe('founder content metric observations', () => {
       'linkedin,linkedin,native_platform_export,acct-1,page-1,impressions,count,1,2026-09-15T12:00:00',
     ].join('\n');
     expect(() => parseFounderContentMetricsCsv(offsetless)).toThrow(/offset-aware ISO timestamp/);
+  });
+
+  it('rejects trailing data after a quoted CSV field instead of silently changing the field', () => {
+    const malformed = [
+      'provider,platform,source,account_id,page_id,metric_name,metric_unit,metric_value,observed_at',
+      'linkedin,linkedin,native_platform_export,acct-1,page-1,impressions,count,"12"3,2026-09-15T12:00:00Z',
+    ].join('\n');
+    expect(() => parseFounderContentMetricsCsv(malformed))
+      .toThrow(/quoted CSV field must be followed by a comma, newline, or end-of-input/);
   });
 
   it('rejects conflicting duplicate CSV observations rather than hiding the second value', () => {

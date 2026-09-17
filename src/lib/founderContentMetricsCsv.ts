@@ -37,6 +37,22 @@ function parseRows(csv: string): string[][] {
   let row: string[] = [];
   let cell = '';
   let quoted = false;
+  let justClosedQuote = false;
+
+  function pushCell(): void {
+    if (cell.length > MAX_CELL_CHARS) reject(`cell exceeds ${MAX_CELL_CHARS} characters`);
+    row.push(cell);
+    cell = '';
+    justClosedQuote = false;
+  }
+
+  function pushRow(): void {
+    pushCell();
+    if (row.some((candidate) => candidate.trim().length > 0)) rows.push(row);
+    row = [];
+    if (rows.length > MAX_CSV_ROWS + 1) reject(`CSV exceeds ${MAX_CSV_ROWS} data rows`);
+  }
+
   for (let index = 0; index < csv.length; index += 1) {
     const char = csv[index];
     if (quoted) {
@@ -45,33 +61,43 @@ function parseRows(csv: string): string[][] {
         index += 1;
       } else if (char === '"') {
         quoted = false;
+        justClosedQuote = true;
       } else {
         cell += char;
       }
-    } else if (char === '"' && cell.length === 0) {
+      continue;
+    }
+
+    if (justClosedQuote) {
+      if (char === ',') {
+        pushCell();
+      } else if (char === '\n') {
+        pushRow();
+      } else if (char === '\r' && csv[index + 1] === '\n') {
+        index += 1;
+        pushRow();
+      } else {
+        reject('quoted CSV field must be followed by a comma, newline, or end-of-input');
+      }
+      continue;
+    }
+
+    if (char === '"') {
+      if (cell.length !== 0) reject('quote must begin at the start of a CSV field');
       quoted = true;
     } else if (char === ',') {
-      if (cell.length > MAX_CELL_CHARS) reject(`cell exceeds ${MAX_CELL_CHARS} characters`);
-      row.push(cell);
-      cell = '';
-    } else if (char === '\n' || char === '\r') {
-      if (char === '\r' && csv[index + 1] === '\n') index += 1;
-      if (cell.length > MAX_CELL_CHARS) reject(`cell exceeds ${MAX_CELL_CHARS} characters`);
-      row.push(cell);
-      cell = '';
-      if (row.some((candidate) => candidate.trim().length > 0)) rows.push(row);
-      row = [];
-      if (rows.length > MAX_CSV_ROWS + 1) reject(`CSV exceeds ${MAX_CSV_ROWS} data rows`);
+      pushCell();
+    } else if (char === '\n') {
+      pushRow();
+    } else if (char === '\r') {
+      if (csv[index + 1] === '\n') index += 1;
+      pushRow();
     } else {
       cell += char;
     }
   }
   if (quoted) reject('unterminated quoted field');
-  if (cell.length > MAX_CELL_CHARS) reject(`cell exceeds ${MAX_CELL_CHARS} characters`);
-  if (cell.length > 0 || row.length > 0) {
-    row.push(cell);
-    if (row.some((candidate) => candidate.trim().length > 0)) rows.push(row);
-  }
+  if (cell.length > 0 || row.length > 0 || justClosedQuote) pushRow();
   return rows;
 }
 

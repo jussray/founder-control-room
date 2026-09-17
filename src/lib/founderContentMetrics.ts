@@ -65,7 +65,7 @@ export interface FounderContentMetricsEnvelope {
 const MAX_OBSERVATIONS = 5_000;
 const MAX_TEXT = 240;
 const SAFE_PROVENANCE_KEYS = 40;
-const OFFSET_AWARE_ISO_TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})$/;
+const OFFSET_AWARE_ISO_TIMESTAMP = /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d{1,9})?(Z|[+-]\d{2}:\d{2})$/;
 
 function reject(message: string): never {
   throw new Error(`FOUNDER_CONTENT_METRICS_REJECTED: ${message}`);
@@ -87,13 +87,37 @@ function nullableText(value: unknown, field: string): string | null {
   return normalized || null;
 }
 
+function assertRealIsoDate(value: string, field: string): void {
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+  if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== value) {
+    reject(`${field} must contain a real calendar date`);
+  }
+}
+
 function iso(value: unknown, field: string, required = true): string | null {
   const normalized = text(value, field, required);
   if (!normalized) return null;
-  if (!OFFSET_AWARE_ISO_TIMESTAMP.test(normalized) || !Number.isFinite(Date.parse(normalized))) {
-    reject(`${field} must be an offset-aware ISO timestamp`);
+  const match = OFFSET_AWARE_ISO_TIMESTAMP.exec(normalized);
+  if (!match) reject(`${field} must be an offset-aware ISO timestamp`);
+
+  assertRealIsoDate(match[1], field);
+  const hour = Number(match[2]);
+  const minute = Number(match[3]);
+  const second = Number(match[4]);
+  if (hour > 23 || minute > 59 || second > 59) reject(`${field} must be a real ISO timestamp`);
+
+  const offset = match[5];
+  if (offset !== 'Z') {
+    const offsetHour = Number(offset.slice(1, 3));
+    const offsetMinute = Number(offset.slice(4, 6));
+    if (offsetHour > 14 || offsetMinute > 59 || (offsetHour === 14 && offsetMinute !== 0)) {
+      reject(`${field} has an invalid UTC offset`);
+    }
   }
-  return new Date(normalized).toISOString();
+
+  const parsed = new Date(normalized);
+  if (!Number.isFinite(parsed.getTime())) reject(`${field} must be a real ISO timestamp`);
+  return parsed.toISOString();
 }
 
 function finiteMetric(value: unknown): number | null {
