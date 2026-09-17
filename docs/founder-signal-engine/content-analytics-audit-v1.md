@@ -38,7 +38,7 @@ It does not infer revenue, customer intent, causal lift, or publication success 
 9. The complete audit identity is SHA-256 hashed for deterministic evidence comparison.
 10. The CSV ingestion boundary rejects duplicate daily dates and duplicate audience segments inside one snapshot instead of silently choosing a winner.
 11. CSV provenance preserves exact file bytes, file name, account and page identity, import kind, normalized UTC capture timestamps, snapshot windows, and receipt generation time.
-12. Logical import idempotency is bound to stable evidence identity: contract, platform, account ID, page ID, exact source SHA-256, comparison window, and normalized top-post scope. Renaming the same bytes, changing an account display name, or regenerating the receipt does not mint a second logical import identity.
+12. Logical import idempotency is bound to stable normalized evidence identity: contract, platform, account ID, page ID, canonical snapshot evidence, comparison window, and normalized top-post scope. Exact source-file SHA-256, file name, account display name, and receipt-generation time remain provenance and do not mint a second logical import when normalized evidence is unchanged. Reordering otherwise identical CSV rows does not change logical identity; changing a metric, snapshot identity/metadata, or comparison scope does.
 13. A daily CSV observation must fall inside its own snapshot's declared `window_start` and `window_end`; out-of-window rows are rejected rather than allowed to contaminate a comparison.
 14. `generated_at` and every snapshot `captured_at` must be offset-aware ISO timestamps. Accepted explicit offsets are normalized to UTC before delegation to the core audit, while local-time guesses and impossible calendar instants are rejected at the evidence boundary.
 15. Quoted CSV fields must terminate at a comma, newline, or end-of-input; trailing text after a closing quote is malformed evidence and is rejected.
@@ -97,7 +97,7 @@ snapshot_id,captured_at,window_start,window_end,import_kind,row_type,date,comple
 The ingestion receipt records:
 
 - account identity and separate page identity;
-- exact source-file SHA-256 and byte/row counts;
+- exact source-file SHA-256 and byte/row counts as immutable provenance;
 - source file name as provenance rather than logical idempotency authority;
 - receipt-generation time as provenance rather than logical idempotency authority;
 - normalized capture timestamps and windows per snapshot;
@@ -105,7 +105,7 @@ The ingestion receipt records:
 - metric names and units;
 - explicit `audience_segment` rows;
 - explicit metric availability, including `post_concentration: UNAVAILABLE` for this CSV schema;
-- deterministic logical `idempotency_key`;
+- deterministic logical `idempotency_key` over canonical normalized evidence and stable comparison identity;
 - the nested advisory analytics audit.
 
 Units are explicit:
@@ -136,7 +136,7 @@ The CSV adapter returns an outer `fcr/founder-content-analytics-csv-ingest@v1` r
 
 `src/lib/__tests__/founderContentAnalyticsAudit.contract.test.ts` locks the overlapping-export case from the August 20, 2026 LinkedIn audit. It verifies that a later Aug 19 observation replaces the earlier incomplete attribution, Aug 20 stays partial, completed-day comparisons reproduce the audited baseline/recent totals, engagement concentration remains separate from reach concentration, and the analytics artifact cannot authorize publication.
 
-`src/lib/__tests__/founderContentAnalyticsCsvIngest.contract.test.ts` reads the safe CSV fixture at `src/lib/__tests__/fixtures/founder-content-analytics-safe.csv`. It verifies source hashing, account/page identity, historical/current import provenance, explicit metric units, `audience_segment`, duplicate rejection, snapshot-window binding, null handling, offset-aware timestamps, logical idempotency across file/display metadata changes, and advisory-only authority.
+`src/lib/__tests__/founderContentAnalyticsCsvIngest.contract.test.ts` reads the safe CSV fixture at `src/lib/__tests__/fixtures/founder-content-analytics-safe.csv`. It verifies source hashing, account/page identity, historical/current import provenance, explicit metric units, `audience_segment`, duplicate rejection, snapshot-window binding, null handling, offset-aware timestamps, logical idempotency across file/display metadata and row-order changes, changed-evidence separation, and advisory-only authority.
 
 `src/lib/__tests__/founderContentAnalyticsCsvIngest.reviewRegressions.test.ts` locks review-found edge cases: UTC normalization for explicit offsets, canonical top-post scope, unavailable post-concentration evidence, malformed quoted fields, and bounded snapshot identities.
 
