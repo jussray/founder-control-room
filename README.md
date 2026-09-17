@@ -208,6 +208,18 @@ Current source includes receipt/evaluator foundations that can classify whether 
 
 Even a valid current receipt cannot by itself authorize merge, deploy, production promotion, issue closure, secret mutation, policy mutation, billing, publication, or deletion.
 
+### Founder Truth Console
+
+The signed-in Founder Truth Console is a founder-authenticated evidence surface inside the existing Control Room shell, not a second operating system and not an authority source. Its seven source surfaces are Dashboard, Claims, Evidence Inbox, Reconciliation, Attack Center, World Radar, and Continuity. They reuse the existing `evidence`, `reconciliation_runs`, `truth_snapshots`, and `continuity_records` proof spine while `truth_claims`, claim-evidence links, and truth attacks provide founder-facing organization around that evidence.
+
+A new claim begins `unknown`. Attaching evidence is a proof mutation, so the durable database path must atomically create the normalized evidence/link, invalidate the matching current continuity marker, increment the claim revision, clear the current snapshot pointer, and leave the claim stale until it is reconciled again. Reconciliation requires the exact current claim revision and atomically produces the new truth snapshot, reconciliation receipt, continuity record, proof cookie, and claim update. An attack may be resolved only with evidence already linked to the challenged claim; resolution increments the claim revision and invalidates the prior continuity marker before any fresh reconciliation.
+
+Continuity state is current confidence about reuse, not a rewrite of historical fact. An invalidated marker is `stale`; a time-bounded marker past `valid_until` is `expired`; earlier verification remains historical evidence rather than being erased. A proof cookie, truth snapshot, reconciliation receipt, attack resolution, green classification, canonical repository binding, or browser success has `authority effect: none` and cannot grant merge, deploy, production, publication, provider mutation, billing, database-migration, credential, or external-contact authority.
+
+The UX must make those boundaries inspectable: canonical repository scope, claim revision, classification, evidence relationship, operation receipt, cookie state, invalidation cause, loading/error/empty states, keyboard focus, and responsive mobile behavior are founder-visible. The dedicated `e2e/truth-console-proof.mjs` journey is wired into exact-head Playwright to exercise the signed-in seven-screen path and mobile overflow behavior. Source wiring or the existence of that test file is not browser proof; the exact candidate must complete that Playwright step successfully before the current UI/UX journey may be called verified. Production database migration, deployed runtime identity, and provider state remain separate proof planes.
+
+World Radar is read-only on this surface. When no persisted economic intelligence or portfolio-signal observations exist, the truthful UI state is empty; fixtures or synthetic opportunities must not be substituted merely to make the screen look populated.
+
 ### Founder Capital Decision
 
 The Founder Capital Decision surface is an evidence-evaluation capability, not a financing actuator. It can turn founder-supplied and verified fundraising context into a decision card, surface dilution and option tradeoffs, and return `HOLD` when required evidence is stale, missing, or insufficient.
