@@ -20,6 +20,12 @@ assert.match(bootstrap, /--no-proxy-server/);
 assert.match(bootstrap, /delete process\.env\[key\]/);
 assert.match(bootstrap, /process\.env\.NO_PROXY = '\*'/);
 assert.match(bootstrap, /process\.env\.no_proxy = '\*'/);
+assert.match(bootstrap, /const LEGACY_TAB_ROUTES = \{/);
+assert.match(bootstrap, /missions: \{ screen: 'Control', view: 'Work' \}/);
+assert.match(bootstrap, /terminal: \{ screen: 'Control', view: 'Execution' \}/);
+assert.match(bootstrap, /async function driveFiveScreenNavigation/);
+assert.match(bootstrap, /\.founder-screen-nav button/);
+assert.match(bootstrap, /\.founder-subnav button/);
 assert.equal(pkg.scripts['test:e2e'], 'npm run build && npm run verify:direct-browser && node e2e/pages-auth-callback-proof.mjs && node e2e/direct-browser-run.mjs');
 assert.match(localPlaywrightProof, /from 'playwright'/);
 assert.match(localPlaywrightProof, /LOCAL_NO_PROVIDER_FEE/);
@@ -72,4 +78,4 @@ execFileSync(process.execPath, [fileURLToPath(fiveScreenProofUrl)], {
   env: process.env,
 });
 
-console.log('direct browser contract verified with local, ULTRATHINK Plugin Center, Control Room Composer, and five-screen cockpit Playwright proofs');
+console.log('direct browser contract verified with local, ULTRATHINK Plugin Center, Control Room Composer, five-screen cockpit, and legacy-journey navigation proofs');
