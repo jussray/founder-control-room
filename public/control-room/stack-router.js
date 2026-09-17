@@ -26,6 +26,9 @@ function safeSessionGet(key) {
 function safeSessionSet(key, value) {
   try { sessionStorage.setItem(key, value); } catch { /* links still work */ }
 }
+function safeSessionRemove(key) {
+  try { sessionStorage.removeItem(key); } catch { /* no-op */ }
+}
 function setConveyorReadiness(state, label) {
   const status = document.querySelector('[data-conveyor-readiness]');
   const text = document.querySelector('[data-conveyor-readiness-label]');
@@ -59,21 +62,15 @@ function requestedTabFromUrl() {
   const tab = new URL(window.location.href).searchParams.get('tab');
   return tab && ALLOWED_TABS.has(tab) ? tab : null;
 }
-function removeTabQueryParameter() {
-  const url = new URL(window.location.href);
-  if (!url.searchParams.has('tab')) return;
-  url.searchParams.delete('tab');
-  history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
-}
 function activateTab(tab) {
   const button = document.querySelector(`.tabs button[data-tab="${tab}"]`);
   if (!(button instanceof HTMLButtonElement)) return false;
   button.click();
-  // Preserve fcr_pending_tab until the five-screen adapter consumes it. The
-  // legacy router can render the historical target first, but it must not erase
-  // the user's navigation intent before the authoritative five-screen shell can
-  // translate that intent into screen/view state.
-  removeTabQueryParameter();
+  safeSessionRemove(PENDING_TAB_KEY);
+  // Leave ?tab= in place. The five-screen shell is now the authoritative
+  // navigation layer and consumes the legacy URL into screen/view state. If
+  // this router erased the query first, a fast render could destroy the user's
+  // deep-link intent before the five-screen adapter observes it.
   return true;
 }
 const requestedTab = requestedTabFromUrl();
