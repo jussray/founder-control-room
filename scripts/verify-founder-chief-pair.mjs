@@ -192,9 +192,12 @@ if (counterpartNecessaryFixPolicyPath) {
       'pair drift: Chief AI standing communication authorization sources changed',
     );
     requireValue(
-      counterpartPolicy.mergeCanon?.mergeApprovalRequired === true
-        && counterpartPolicy.mergeCanon?.approvalScope === 'exact-repository-pr-base-head'
-        && counterpartPolicy.mergeCanon?.approvalCarryForward === false,
+      counterpartPolicy.mergeCanon?.mergeAuthorityAvailable === true
+        && counterpartPolicy.mergeCanon?.actingOperatorMayMergeWhenSafetyConditionsPass === true
+        && counterpartPolicy.mergeCanon?.requiresExactRepositoryPrBaseHead === true
+        && counterpartPolicy.mergeCanon?.reviewOrGreenChecksAloneDoNotAuthorizeMerge === true
+        && counterpartPolicy.mergeCanon?.baseOrHeadMovementExpiresEvidence === true
+        && counterpartPolicy.mergeCanon?.separatelyGatedActionsRemainSeparatelyGated === true,
       'pair drift: Chief AI necessary-fix merge canon changed',
     );
     requireValue(
@@ -206,7 +209,8 @@ if (counterpartNecessaryFixPolicyPath) {
     );
     requireValue(
       counterpartPolicy.continuity?.bidirectionalFingerprintsAndCookies === true
-        && counterpartPolicy.continuity?.incomingEvidenceMayInvalidateStaleState === true
+        && counterpartPolicy.continuity?.incomingEvidenceMayInvalidateStaleStateAfterRecipientVerification === true
+        && counterpartPolicy.continuity?.unverifiedIncomingEvidenceMayInvalidateState === false
         && counterpartPolicy.continuity?.outgoingApprovedActionsEmitUpdatedMarkersAndReceipts === true,
       'pair drift: Chief AI necessary-fix continuity boundary changed',
     );
