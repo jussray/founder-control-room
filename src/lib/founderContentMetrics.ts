@@ -32,7 +32,7 @@ export interface FounderContentMetricObservationInput {
   source: FounderContentMetricSource;
   sourceMetricId?: string | null;
   accountId: string;
-  pageId?: string | null;
+  pageId: string;
   externalPostId?: string | null;
   audienceSegment?: string | null;
   metricName: string;
@@ -48,7 +48,6 @@ export interface FounderContentMetricObservationInput {
 export interface FounderContentMetricObservation extends FounderContentMetricObservationInput {
   contract: typeof FOUNDER_CONTENT_METRICS_CONTRACT;
   sourceMetricId: string | null;
-  pageId: string | null;
   externalPostId: string | null;
   audienceSegment: string | null;
   periodStart: string | null;
@@ -66,6 +65,7 @@ export interface FounderContentMetricsEnvelope {
 const MAX_OBSERVATIONS = 5_000;
 const MAX_TEXT = 240;
 const SAFE_PROVENANCE_KEYS = 40;
+const OFFSET_AWARE_ISO_TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})$/;
 
 function reject(message: string): never {
   throw new Error(`FOUNDER_CONTENT_METRICS_REJECTED: ${message}`);
@@ -90,7 +90,9 @@ function nullableText(value: unknown, field: string): string | null {
 function iso(value: unknown, field: string, required = true): string | null {
   const normalized = text(value, field, required);
   if (!normalized) return null;
-  if (!Number.isFinite(Date.parse(normalized))) reject(`${field} must be an ISO timestamp`);
+  if (!OFFSET_AWARE_ISO_TIMESTAMP.test(normalized) || !Number.isFinite(Date.parse(normalized))) {
+    reject(`${field} must be an offset-aware ISO timestamp`);
+  }
   return new Date(normalized).toISOString();
 }
 
@@ -105,8 +107,8 @@ function finiteMetric(value: unknown): number | null {
 function canonical(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
   if (value && typeof value === 'object') {
-    const record = value as Record<string, unknown>;
-    return `{${Object.keys(record).sort().map((key) => `${JSON.stringify(key)}:${canonical(record[key])}`).join(',')}}`;
+    const candidate = value as Record<string, unknown>;
+    return `{${Object.keys(candidate).sort().map((key) => `${JSON.stringify(key)}:${canonical(candidate[key])}`).join(',')}}`;
   }
   return JSON.stringify(value);
 }
@@ -155,13 +157,13 @@ export function normalizeFounderContentMetricObservation(
     reject('historical_csv imports must retain historical_csv or native_platform_export source');
   }
 
-  const identity = {
+  const normalized = {
     provider: text(input.provider, 'provider').toLowerCase(),
     platform: text(input.platform, 'platform').toLowerCase(),
     source,
     sourceMetricId: nullableText(input.sourceMetricId, 'sourceMetricId'),
     accountId: text(input.accountId, 'accountId'),
-    pageId: nullableText(input.pageId, 'pageId'),
+    pageId: text(input.pageId, 'pageId'),
     externalPostId: nullableText(input.externalPostId, 'externalPostId'),
     audienceSegment: nullableText(input.audienceSegment, 'audienceSegment'),
     metricName: text(input.metricName, 'metricName').toLowerCase(),
@@ -173,29 +175,31 @@ export function normalizeFounderContentMetricObservation(
     importKind: input.importKind,
     provenance: provenance(input.provenance),
   } as const;
-  const sourceRowHash = digest(identity);
-  const idempotencyIdentity = {
-    provider: identity.provider,
-    platform: identity.platform,
-    source: identity.source,
-    sourceMetricId: identity.sourceMetricId,
-    accountId: identity.accountId,
-    pageId: identity.pageId,
-    externalPostId: identity.externalPostId,
-    audienceSegment: identity.audienceSegment,
-    metricName: identity.metricName,
-    metricUnit: identity.metricUnit,
-    observedAt: identity.observedAt,
-    periodStart: identity.periodStart,
-    periodEnd: identity.periodEnd,
-    importKind: identity.importKind,
-    sourceRowHash,
+
+  const logicalIdentity = {
+    provider: normalized.provider,
+    platform: normalized.platform,
+    source: normalized.source,
+    sourceMetricId: normalized.sourceMetricId,
+    accountId: normalized.accountId,
+    pageId: normalized.pageId,
+    externalPostId: normalized.externalPostId,
+    audienceSegment: normalized.audienceSegment,
+    metricName: normalized.metricName,
+    metricUnit: normalized.metricUnit,
+    observedAt: normalized.observedAt,
+    periodStart: normalized.periodStart,
+    periodEnd: normalized.periodEnd,
+    importKind: normalized.importKind,
   };
+  const sourceRowHash = digest(normalized);
+  const idempotencyKey = digest(logicalIdentity);
+
   return Object.freeze({
     contract: FOUNDER_CONTENT_METRICS_CONTRACT,
-    ...identity,
+    ...normalized,
     sourceRowHash,
-    idempotencyKey: digest(idempotencyIdentity),
+    idempotencyKey,
   });
 }
 
@@ -205,19 +209,26 @@ export function normalizeFounderContentMetricsEnvelope(value: unknown): readonly
   if (candidate.contract !== FOUNDER_CONTENT_METRICS_CONTRACT) reject(`provider data contract must equal ${FOUNDER_CONTENT_METRICS_CONTRACT}`);
   if (!Array.isArray(candidate.observations)) reject('provider data observations must be an array');
   if (candidate.observations.length > MAX_OBSERVATIONS) reject(`observations exceed ${MAX_OBSERVATIONS}`);
-  return Object.freeze(candidate.observations.map((observation) => {
+  const observations = candidate.observations.map((observation) => {
     if (!observation || typeof observation !== 'object' || Array.isArray(observation)) reject('each observation must be an object');
     return normalizeFounderContentMetricObservation(observation as unknown as FounderContentMetricObservationInput);
-  }));
+  });
+  return dedupeFounderContentMetrics(observations);
 }
 
 export function dedupeFounderContentMetrics(
   observations: readonly FounderContentMetricObservation[],
 ): readonly FounderContentMetricObservation[] {
-  const seen = new Set<string>();
-  return Object.freeze(observations.filter((observation) => {
-    if (seen.has(observation.idempotencyKey)) return false;
-    seen.add(observation.idempotencyKey);
-    return true;
-  }));
+  const accepted = new Map<string, FounderContentMetricObservation>();
+  for (const observation of observations) {
+    const previous = accepted.get(observation.idempotencyKey);
+    if (!previous) {
+      accepted.set(observation.idempotencyKey, observation);
+      continue;
+    }
+    if (previous.sourceRowHash !== observation.sourceRowHash) {
+      reject(`conflicting duplicate metric identity ${observation.idempotencyKey}`);
+    }
+  }
+  return Object.freeze([...accepted.values()]);
 }
