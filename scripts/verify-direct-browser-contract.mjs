@@ -10,6 +10,10 @@ const ultrathinkPluginProofUrl = new URL('../e2e/plugin-center-ultrathink-proof.
 const ultrathinkPluginProof = fs.readFileSync(ultrathinkPluginProofUrl, 'utf8');
 const composerProofUrl = new URL('../e2e/control-room-composer-proof.mjs', import.meta.url);
 const composerProof = fs.readFileSync(composerProofUrl, 'utf8');
+const fiveScreenProofUrl = new URL('../e2e/five-screen-shell-proof.mjs', import.meta.url);
+const fiveScreenProof = fs.readFileSync(fiveScreenProofUrl, 'utf8');
+const fiveScreenShell = fs.readFileSync(new URL('../public/control-room/five-screen-shell.js', import.meta.url), 'utf8');
+const opaqueBootstrap = fs.readFileSync(new URL('../public/control-room/opaque-session-bootstrap.js', import.meta.url), 'utf8');
 const pkg = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
 
 assert.match(bootstrap, /--no-proxy-server/);
@@ -32,6 +36,21 @@ assert.match(composerProof, /composer-desktop/);
 assert.match(composerProof, /composer-mobile/);
 assert.match(composerProof, /submittedPayload\.controlRoom/);
 assert.match(composerProof, /test-results\/control-room-composer/);
+assert.match(fiveScreenProof, /from 'playwright'/);
+assert.match(fiveScreenProof, /\['Home', 'Control', 'Chief', 'PromptOS', 'Proof'\]/);
+assert.match(fiveScreenProof, /fcr_founder_context/);
+assert.match(fiveScreenProof, /\?tab=activity/);
+assert.match(fiveScreenProof, /desktop-context-restored/);
+assert.match(fiveScreenProof, /mobile-proof/);
+assert.match(fiveScreenShell, /const SCREENS = \[/);
+assert.match(fiveScreenShell, /\['home', 'Home'\]/);
+assert.match(fiveScreenShell, /\['control', 'Control'\]/);
+assert.match(fiveScreenShell, /\['chief', 'Chief'\]/);
+assert.match(fiveScreenShell, /\['promptos', 'PromptOS'\]/);
+assert.match(fiveScreenShell, /\['proof', 'Proof'\]/);
+assert.match(fiveScreenShell, /LEGACY_ROUTE_MAP/);
+assert.match(fiveScreenShell, /CONTEXT_KEY/);
+assert.match(opaqueBootstrap, /five-screen-shell\.js/);
 
 execFileSync(process.execPath, [fileURLToPath(localPlaywrightProofUrl)], {
   stdio: 'inherit',
@@ -48,4 +67,9 @@ execFileSync(process.execPath, [fileURLToPath(composerProofUrl)], {
   env: process.env,
 });
 
-console.log('direct browser contract verified with local, ULTRATHINK Plugin Center, and Control Room Composer Playwright proofs');
+execFileSync(process.execPath, [fileURLToPath(fiveScreenProofUrl)], {
+  stdio: 'inherit',
+  env: process.env,
+});
+
+console.log('direct browser contract verified with local, ULTRATHINK Plugin Center, Control Room Composer, and five-screen cockpit Playwright proofs');
