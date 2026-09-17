@@ -78,7 +78,18 @@ async function installRoutes(page) {
         readiness: { state: 'not-configured' },
       });
     }
-    if (url.pathname === '/projects') return json(route, { projects: [project] });
+    if (url.pathname === '/projects' && request.method() === 'GET') return json(route, { projects: [project] });
+    if (url.pathname === '/projects/sekret-bip' && request.method() === 'GET') {
+      return json(route, { project, live: { defaultBranch: 'main' } });
+    }
+    if (url.pathname === '/projects/sekret-bip/files') {
+      return json(route, { ref: 'main', path: '', entries: [] });
+    }
+    if (url.pathname === '/projects/sekret-bip/releases') return json(route, { releases: [] });
+    if (url.pathname === '/projects/sekret-bip/connections') return json(route, { connections: [] });
+    if (url.pathname === '/projects/sekret-bip/missions' && request.method() === 'POST') {
+      return json(route, { mission: { id: 'created-mission' } }, 201);
+    }
     if (url.pathname === '/dashboard/tasks') return json(route, { tasks: [mission] });
     if (url.pathname === '/dashboard/activity') return json(route, { activity });
     if (url.pathname === '/dashboard/costs') return json(route, { totalUsd: 1.25, byAgent: [] });
@@ -141,6 +152,13 @@ async function proveDesktop(browser) {
     await page.locator('.founder-subnav button').allTextContents(),
     ['Overview', 'Work', 'Costs', 'Execution'],
   );
+
+  await page.locator('#project-list .card[data-slug="sekret-bip"]').click();
+  await page.locator('#new-mission-form').waitFor();
+  await page.locator('#new-mission-form input[name="title"]').fill('Prove founder geography copy');
+  await page.locator('#new-mission-form button[type="submit"]').click();
+  await page.getByText('Mission created. Open Control → Work.', { exact: true }).waitFor();
+  assert.equal(await page.getByText('Mission created. See the Missions tab.', { exact: true }).count(), 0);
 
   await page.locator('.founder-subnav button', { hasText: 'Work' }).click();
   const missionCard = page.locator('#mission-lanes .card[data-id="mission-1"]');
@@ -206,4 +224,4 @@ try {
   await browser.close();
 }
 
-console.log('Five-screen shell Playwright proof passed through the real control-room index: five permanent screens, hidden legacy compatibility tabs, real Home data, Control subviews, cross-screen project/mission context, reload restoration, stack-router legacy route migration, mobile overflow, and screenshot receipts.');
+console.log('Five-screen shell Playwright proof passed through the real control-room index: five permanent screens, hidden legacy compatibility tabs, real Home data, founder-facing Control/Work copy, Control subviews, cross-screen project/mission context, reload restoration, stack-router legacy route migration, mobile overflow, and screenshot receipts.');
