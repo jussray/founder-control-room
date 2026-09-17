@@ -1116,6 +1116,7 @@ jobs:
   reconcile:
     name: Post-Deploy Reconciliation
     runs-on: ubuntu-latest
+    environment: production
     needs: smoke-test
     steps:
       - uses: actions/checkout@v4
