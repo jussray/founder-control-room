@@ -24,6 +24,8 @@ const requiredAssets = [
   'control-room/index.html',
   'control-room/app.js',
   'control-room/styles.css',
+  'control-room/opaque-session-bootstrap.js',
+  'control-room/five-screen-shell.js',
   'control-room/founder-shell.html',
   'control-room/founder-shell.css',
   'control-room/capabilities.html',
