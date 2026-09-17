@@ -190,7 +190,10 @@ async function proveDesktop(browser) {
 
   await page.locator('.founder-screen-nav button', { hasText: 'PromptOS' }).click();
   await page.getByText('New template', { exact: true }).waitFor();
-  assert.match(await page.locator('.founder-context').textContent(), /sekret-bip/i);
+  assert.ok(
+    (await page.locator('.founder-context').textContent())?.includes(project.name),
+    'cross-screen context should render the founder-visible project name',
+  );
   assert.match(await page.locator('.founder-context').textContent(), /Verify launch runtime identity/);
 
   await page.locator('.founder-screen-nav button', { hasText: 'Control' }).click();
