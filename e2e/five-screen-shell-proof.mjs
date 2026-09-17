@@ -2,26 +2,7 @@ import assert from 'node:assert/strict';
 import { copyFileSync, mkdirSync, readFileSync } from 'node:fs';
 import { chromium } from 'playwright';
 
-const html = `<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Founder Control Room five-screen proof</title>
-  <link rel="stylesheet" href="/control-room/styles.css" />
-</head>
-<body>
-  <div id="root"><p class="boot-fallback">Loading Founder Control Room…</p></div>
-  <script src="/control-room/opaque-session-bootstrap.js"></script>
-</body>
-</html>`;
-
-const assets = new Map([
-  ['/control-room/styles.css', readFileSync(new URL('../public/control-room/styles.css', import.meta.url), 'utf8')],
-  ['/control-room/opaque-session-bootstrap.js', readFileSync(new URL('../public/control-room/opaque-session-bootstrap.js', import.meta.url), 'utf8')],
-  ['/control-room/app.js', readFileSync(new URL('../public/control-room/app.js', import.meta.url), 'utf8')],
-  ['/control-room/five-screen-shell.js', readFileSync(new URL('../public/control-room/five-screen-shell.js', import.meta.url), 'utf8')],
-]);
+const html = readFileSync(new URL('../public/control-room/index.html', import.meta.url), 'utf8');
 
 const proofDir = 'test-results/five-screen-shell';
 const durableProofDir = 'logs/five-screen-shell';
@@ -59,6 +40,22 @@ function json(route, body, status = 200) {
   return route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
 }
 
+function staticControlRoomAsset(pathname) {
+  if (!pathname.startsWith('/control-room/') || pathname.includes('..')) return null;
+  if (!/^[A-Za-z0-9._/-]+$/.test(pathname)) return null;
+  try {
+    const body = readFileSync(new URL(`../public${pathname}`, import.meta.url), 'utf8');
+    const contentType = pathname.endsWith('.css')
+      ? 'text/css'
+      : pathname.endsWith('.html')
+        ? 'text/html'
+        : 'text/javascript';
+    return { body, contentType };
+  } catch {
+    return null;
+  }
+}
+
 async function installRoutes(page) {
   await page.route('https://fcr.test/**', async (route) => {
     const request = route.request();
@@ -67,13 +64,19 @@ async function installRoutes(page) {
     if (url.pathname === '/control-room/' || url.pathname === '/control-room') {
       return route.fulfill({ status: 200, contentType: 'text/html', body: html });
     }
-    if (assets.has(url.pathname)) {
-      const contentType = url.pathname.endsWith('.css') ? 'text/css' : 'text/javascript';
-      return route.fulfill({ status: 200, contentType, body: assets.get(url.pathname) });
+    const staticAsset = staticControlRoomAsset(url.pathname);
+    if (staticAsset) {
+      return route.fulfill({ status: 200, contentType: staticAsset.contentType, body: staticAsset.body });
     }
     if (url.pathname === '/favicon.ico') return route.fulfill({ status: 204, body: '' });
     if (url.pathname === '/auth/me') {
       return json(route, { success: true, data: { founder: { email: 'founder@example.com' } } });
+    }
+    if (url.pathname === '/automation/conveyor/') {
+      return json(route, {
+        contract: 'founder-control-room/n8n-conveyor@v3',
+        readiness: { state: 'not-configured' },
+      });
     }
     if (url.pathname === '/projects') return json(route, { projects: [project] });
     if (url.pathname === '/dashboard/tasks') return json(route, { tasks: [mission] });
@@ -101,7 +104,10 @@ async function assertNoHorizontalOverflow(page, label) {
     scrollWidth: document.documentElement.scrollWidth,
     clientWidth: document.documentElement.clientWidth,
   }));
-  assert.ok(dimensions.scrollWidth <= dimensions.clientWidth, `${label}: horizontal overflow ${dimensions.scrollWidth}px > ${dimensions.clientWidth}px`);
+  assert.ok(
+    dimensions.scrollWidth <= dimensions.clientWidth,
+    `${label}: horizontal overflow ${dimensions.scrollWidth}px > ${dimensions.clientWidth}px`,
+  );
 }
 
 async function proveDesktop(browser) {
@@ -117,15 +123,24 @@ async function proveDesktop(browser) {
     await page.locator('.founder-screen-nav button').allTextContents(),
     ['Home', 'Control', 'Chief', 'PromptOS', 'Proof'],
   );
-  assert.equal(await page.locator('.tabs[data-legacy-tabs="true"]').evaluate((node) => getComputedStyle(node).display), 'none');
+  assert.equal(
+    await page.locator('.tabs[data-legacy-tabs="true"]').evaluate((node) => getComputedStyle(node).display),
+    'none',
+  );
   await page.getByText('What needs you now?', { exact: true }).waitFor();
   assert.match(await page.locator('.founder-home').textContent(), /Verify launch runtime identity/);
-  assert.match(await page.locator('.founder-home').textContent(), /Resolve review findings and bind fresh proof to the exact head/);
+  assert.match(
+    await page.locator('.founder-home').textContent(),
+    /Resolve review findings and bind fresh proof to the exact head/,
+  );
   assert.match(await page.locator('.founder-home').textContent(), /bbbbbbbbbbbb/);
 
   await page.locator('.founder-screen-nav button', { hasText: 'Control' }).click();
   await page.getByText('Register a project', { exact: true }).waitFor();
-  assert.deepEqual(await page.locator('.founder-subnav button').allTextContents(), ['Overview', 'Work', 'Costs', 'Execution']);
+  assert.deepEqual(
+    await page.locator('.founder-subnav button').allTextContents(),
+    ['Overview', 'Work', 'Costs', 'Execution'],
+  );
 
   await page.locator('.founder-subnav button', { hasText: 'Work' }).click();
   const missionCard = page.locator('#mission-lanes .card[data-id="mission-1"]');
@@ -191,4 +206,4 @@ try {
   await browser.close();
 }
 
-console.log('Five-screen shell Playwright proof passed: five permanent screens, hidden legacy compatibility tabs, real Home data, Control subviews, cross-screen project/mission context, reload restoration, legacy route migration, mobile overflow, and screenshot receipts.');
+console.log('Five-screen shell Playwright proof passed through the real control-room index: five permanent screens, hidden legacy compatibility tabs, real Home data, Control subviews, cross-screen project/mission context, reload restoration, stack-router legacy route migration, mobile overflow, and screenshot receipts.');
