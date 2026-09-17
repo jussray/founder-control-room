@@ -14,9 +14,9 @@
   ],
   "blocked": [
     {
-      "receipt": "lovable-build-credits",
+      "receipt": "external-surface-runtime-integration",
       "status": "BLOCKED",
-      "reason": "Lovable build turns are unavailable because the workspace is out of credits; source/UI integration and browser proof cannot be completed from the Lovable side yet."
+      "reason": "The external builder runtime cannot currently accept the required source/UI mutation, so live surface integration and browser proof remain separate from this repository-side binding."
     }
   ],
   "authorityGranted": false,
