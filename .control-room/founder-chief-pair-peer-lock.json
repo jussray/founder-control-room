@@ -13,7 +13,7 @@
   "chiefAINecessaryFixPolicy": {
     "repository": "jussray/chief-ai-machine",
     "pullRequest": 151,
-    "expectedHeadSha": "e7136dc8d8a4055d42abc444f0c849285e70cf22"
+    "expectedHeadSha": "e0e5801312f4a74d70c96d39fc61683875712b99"
   },
   "chiefAIFounderContentStrategy": {
     "repository": "jussray/chief-ai-machine",
