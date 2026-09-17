@@ -154,6 +154,37 @@ describe('founder content analytics CSV ingestion', () => {
       .toThrow(/captured_at must be an offset-aware ISO timestamp/);
   });
 
+  it('rejects impossible generated and captured timestamps instead of accepting Date.parse normalization', () => {
+    expect(() => parseFounderContentAnalyticsCsv(safeCsv, {
+      ...metadata,
+      generated_at: '2026-02-30T12:00:00.000Z',
+    })).toThrow(/metadata\.generated_at date must be a real calendar date/);
+
+    const impossibleCapture = safeCsv.replace(
+      '2026-09-03T23:00:00.000Z',
+      '2026-02-30T23:00:00.000Z',
+    );
+    expect(() => parseFounderContentAnalyticsCsv(impossibleCapture, metadata))
+      .toThrow(/captured_at date must be a real calendar date/);
+  });
+
+  it('rejects trailing text after a quoted field instead of silently changing the metric value', () => {
+    const malformedQuotedMetric = safeCsv.replace(
+      'historical_import,daily,2026-09-01,true,100,10,2,,',
+      'historical_import,daily,2026-09-01,true,"10"5,10,2,,',
+    );
+
+    expect(() => parseFounderContentAnalyticsCsv(malformedQuotedMetric, metadata))
+      .toThrow(/quoted CSV field must be followed by a comma, newline, or end-of-input/);
+  });
+
+  it('rejects snapshot IDs longer than the downstream audit identity bound', () => {
+    const overlongSnapshotId = safeCsv.replaceAll('current-2026-09-03', 's'.repeat(121));
+
+    expect(() => parseFounderContentAnalyticsCsv(overlongSnapshotId, metadata))
+      .toThrow(/snapshot_id exceeds 120 characters/);
+  });
+
   it('rejects prototype-sensitive audience segment names before they can alias object behavior', () => {
     for (const reserved of ['__proto__', 'prototype', 'constructor', 'Constructor']) {
       const reservedSegment = safeCsv.replaceAll('Founder', reserved);
