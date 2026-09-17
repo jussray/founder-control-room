@@ -1,6 +1,6 @@
-import { createHash } from 'node:crypto';
 import { Router } from 'express';
 import { supabase } from '../../lib/supabaseClient.js';
+import { truthContinuityState } from '../../lib/truthConsoleRules.js';
 import { requireFounder, type FounderRequest } from '../middleware/requireFounder.js';
 
 export const truthConsoleRouter = Router();
@@ -13,13 +13,10 @@ const CONTINUITY_LIMIT = 300;
 const ATTACK_LIMIT = 200;
 const TEXT_LIMIT = 4_000;
 
-const CLASSIFICATIONS = new Set(['verified', 'inferred', 'unknown', 'blocked', 'conflicted', 'stale']);
 const EVIDENCE_STATUS = new Set(['pass', 'fail', 'warn', 'pending']);
 const EVIDENCE_RELATION = new Set(['supports', 'contradicts', 'context']);
 const ATTACK_TYPES = new Set(['version', 'premise', 'evidence', 'authority', 'runtime']);
 const ATTACK_SEVERITY = new Set(['low', 'medium', 'high', 'critical']);
-
-type RecordValue = Record<string, unknown>;
 
 type TruthClaim = {
   id: string;
@@ -33,9 +30,7 @@ type TruthClaim = {
   updated_at: string;
 };
 
-function sha256(value: string): string {
-  return createHash('sha256').update(value).digest('hex');
-}
+type RpcFailure = { status: number; message: string };
 
 function stringField(value: unknown, name: string, max = TEXT_LIMIT): string {
   if (typeof value !== 'string') throw new Error(`${name} is required`);
@@ -44,6 +39,13 @@ function stringField(value: unknown, name: string, max = TEXT_LIMIT): string {
     throw new Error(`${name} must be 1-${max} characters`);
   }
   return normalized;
+}
+
+function positiveIntegerField(value: unknown, name: string): number {
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 1) {
+    throw new Error(`${name} is invalid`);
+  }
+  return value;
 }
 
 function optionalEnum(value: unknown, allowed: Set<string>, fallback: string, name: string): string {
@@ -56,10 +58,26 @@ function statusCodeForInputError(error: unknown): number {
   return error instanceof Error && /required|invalid|characters/.test(error.message) ? 400 : 500;
 }
 
+function rpcFailure(error: unknown, fallback: string): RpcFailure {
+  const message = typeof error === 'object' && error && 'message' in error
+    ? String((error as { message?: unknown }).message ?? '')
+    : '';
+  if (message.includes('truth_claim_not_found')) return { status: 404, message: 'Claim not found' };
+  if (message.includes('truth_attack_not_found')) return { status: 404, message: 'Attack not found' };
+  if (message.includes('truth_claim_revision_mismatch')) {
+    return { status: 409, message: 'Claim changed since this screen loaded. Refresh before reconciling.' };
+  }
+  if (message.includes('truth_attack_already_resolved')) return { status: 409, message: 'Attack already resolved' };
+  if (message.includes('truth_attack_evidence_not_linked')) {
+    return { status: 400, message: 'evidenceId must already be attached to this claim' };
+  }
+  return { status: 500, message: fallback };
+}
+
 async function requireProject(projectId: string) {
   const { data, error } = await supabase
     .from('projects')
-    .select('id, slug, name')
+    .select('id, slug, name, repo_provider, repo_identifier, status, risk_level')
     .eq('id', projectId)
     .maybeSingle();
   if (error) throw new Error('project lookup failed');
@@ -76,71 +94,6 @@ async function readClaim(claimId: string): Promise<TruthClaim | null> {
   return data as TruthClaim | null;
 }
 
-async function linkedEvidence(claimId: string) {
-  const { data: links, error: linkError } = await supabase
-    .from('truth_claim_evidence')
-    .select('claim_id, evidence_id, relation, created_at')
-    .eq('claim_id', claimId)
-    .order('created_at', { ascending: true });
-  if (linkError) throw new Error('claim evidence lookup failed');
-  const evidenceIds = (links ?? []).map((link) => link.evidence_id as string);
-  if (evidenceIds.length === 0) return [];
-  const { data: evidence, error: evidenceError } = await supabase
-    .from('evidence')
-    .select('id, project_id, mission_id, subject, kind, status, provider, commit_sha, environment, details_ref, reusable_until, created_at')
-    .in('id', evidenceIds);
-  if (evidenceError) throw new Error('evidence lookup failed');
-  const relationById = new Map((links ?? []).map((link) => [link.evidence_id, link.relation]));
-  return (evidence ?? []).map((row) => ({ ...row, relation: relationById.get(row.id) ?? 'context' }));
-}
-
-function classifyEvidence(rows: Array<RecordValue>): string {
-  if (rows.length === 0) return 'unknown';
-  if (rows.some((row) => row.relation === 'contradicts' || row.status === 'fail')) return 'conflicted';
-  const supporting = rows.filter((row) => row.relation === 'supports');
-  if (supporting.length > 0 && supporting.every((row) => row.status === 'pass')) return 'verified';
-  if (rows.some((row) => row.status === 'pending')) return 'unknown';
-  return 'inferred';
-}
-
-function continuityState(row: RecordValue, now = Date.now()): 'current' | 'stale' | 'expired' {
-  if (row.invalidated_at) return 'stale';
-  if (typeof row.valid_until === 'string' && Date.parse(row.valid_until) <= now) return 'expired';
-  return 'current';
-}
-
-async function invalidateCurrentContinuity(claim: TruthClaim, reason: string) {
-  if (!claim.current_subject_fingerprint) return [];
-  const invalidatedAt = new Date().toISOString();
-  const { data, error } = await supabase
-    .from('continuity_records')
-    .update({ invalidated_at: invalidatedAt, invalidation_reason: reason })
-    .eq('project_id', claim.project_id)
-    .eq('subject_fingerprint', claim.current_subject_fingerprint)
-    .is('invalidated_at', null)
-    .select('id, proof_cookie, subject_fingerprint, invalidated_at, invalidation_reason');
-  if (error) throw new Error('continuity invalidation failed');
-  return (data ?? []).map((row) => ({ ...row, state: 'stale' }));
-}
-
-async function markClaimStale(claim: TruthClaim, reason: string) {
-  const invalidated = await invalidateCurrentContinuity(claim, reason);
-  const nextRevision = Number(claim.revision) + 1;
-  const { data, error } = await supabase
-    .from('truth_claims')
-    .update({
-      classification: 'stale',
-      revision: nextRevision,
-      current_truth_snapshot_id: null,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', claim.id)
-    .select()
-    .single();
-  if (error) throw new Error('claim stale transition failed');
-  return { claim: data, invalidated };
-}
-
 truthConsoleRouter.get('/overview', async (_req: FounderRequest, res) => {
   const [claimsResult, evidenceResult, runsResult, attacksResult, continuityResult] = await Promise.all([
     supabase.from('truth_claims').select('id, classification, updated_at').order('updated_at', { ascending: false }).limit(CLAIM_LIMIT),
@@ -153,7 +106,7 @@ truthConsoleRouter.get('/overview', async (_req: FounderRequest, res) => {
   if (error) return res.status(500).json({ error: 'Truth console overview unavailable' });
 
   const claims = claimsResult.data ?? [];
-  const continuity = (continuityResult.data ?? []).map((row) => ({ ...row, state: continuityState(row as RecordValue) }));
+  const continuity = (continuityResult.data ?? []).map((row) => ({ ...row, state: truthContinuityState(row) }));
   return res.json({
     counts: {
       claims: claims.length,
@@ -171,7 +124,7 @@ truthConsoleRouter.get('/overview', async (_req: FounderRequest, res) => {
 truthConsoleRouter.get('/projects', async (_req: FounderRequest, res) => {
   const { data, error } = await supabase
     .from('projects')
-    .select('id, slug, name, status')
+    .select('id, slug, name, repo_provider, repo_identifier, status, risk_level')
     .order('created_at', { ascending: false });
   if (error) return res.status(500).json({ error: 'Project registry unavailable' });
   return res.json({ projects: data ?? [] });
@@ -204,54 +157,50 @@ truthConsoleRouter.post('/claims', async (req: FounderRequest, res) => {
       .select()
       .single();
     if (error) return res.status(500).json({ error: 'Claim creation failed' });
-    return res.status(201).json({ claim: data });
+    return res.status(201).json({ claim: data, project, authorityEffect: 'none' });
   } catch (error) {
     return res.status(statusCodeForInputError(error)).json({ error: error instanceof Error ? error.message : 'Claim creation failed' });
   }
 });
 
 truthConsoleRouter.get('/evidence', async (_req: FounderRequest, res) => {
-  const { data, error } = await supabase
-    .from('evidence')
-    .select('id, project_id, mission_id, subject, kind, status, provider, commit_sha, environment, details_ref, reusable_until, created_at')
-    .order('created_at', { ascending: false })
-    .limit(EVIDENCE_LIMIT);
+  const [evidenceResult, linkResult] = await Promise.all([
+    supabase
+      .from('evidence')
+      .select('id, project_id, mission_id, subject, kind, status, provider, commit_sha, environment, details_ref, reusable_until, created_at')
+      .order('created_at', { ascending: false })
+      .limit(EVIDENCE_LIMIT),
+    supabase
+      .from('truth_claim_evidence')
+      .select('claim_id, evidence_id, relation, created_at')
+      .order('created_at', { ascending: false }),
+  ]);
+  const error = evidenceResult.error ?? linkResult.error;
   if (error) return res.status(500).json({ error: 'Evidence unavailable' });
-  return res.json({ evidence: data ?? [] });
+  return res.json({ evidence: evidenceResult.data ?? [], claimLinks: linkResult.data ?? [] });
 });
 
 truthConsoleRouter.post('/claims/:claimId/evidence', async (req: FounderRequest, res) => {
   try {
-    const claim = await readClaim(req.params.claimId);
-    if (!claim) return res.status(404).json({ error: 'Claim not found' });
     const kind = stringField(req.body?.kind ?? 'founder_observation', 'kind', 120);
     const status = optionalEnum(req.body?.status, EVIDENCE_STATUS, 'pass', 'status');
     const relation = optionalEnum(req.body?.relation, EVIDENCE_RELATION, 'supports', 'relation');
     const provider = stringField(req.body?.provider ?? 'founder', 'provider', 120);
     const detailsRef = stringField(req.body?.detailsRef, 'detailsRef', 2_000);
 
-    const { data: evidence, error: evidenceError } = await supabase
-      .from('evidence')
-      .insert({
-        project_id: claim.project_id,
-        subject: claim.statement,
-        kind,
-        status,
-        provider,
-        environment: 'truth-console',
-        details_ref: detailsRef,
-      })
-      .select()
-      .single();
-    if (evidenceError) return res.status(500).json({ error: 'Evidence creation failed' });
-
-    const { error: linkError } = await supabase
-      .from('truth_claim_evidence')
-      .insert({ claim_id: claim.id, evidence_id: evidence.id, relation });
-    if (linkError) return res.status(500).json({ error: 'Evidence link failed' });
-
-    const stale = await markClaimStale(claim, 'claim_evidence_changed');
-    return res.status(201).json({ evidence: { ...evidence, relation }, claim: stale.claim, invalidatedContinuity: stale.invalidated });
+    const { data, error } = await supabase.rpc('truth_console_attach_evidence', {
+      p_claim_id: req.params.claimId,
+      p_kind: kind,
+      p_status: status,
+      p_relation: relation,
+      p_provider: provider,
+      p_details_ref: detailsRef,
+    });
+    if (error) {
+      const failure = rpcFailure(error, 'Evidence creation failed');
+      return res.status(failure.status).json({ error: failure.message });
+    }
+    return res.status(201).json(data);
   } catch (error) {
     return res.status(statusCodeForInputError(error)).json({ error: error instanceof Error ? error.message : 'Evidence creation failed' });
   }
@@ -270,102 +219,18 @@ truthConsoleRouter.get('/reconciliations', async (_req: FounderRequest, res) => 
 
 truthConsoleRouter.post('/claims/:claimId/reconcile', async (req: FounderRequest, res) => {
   try {
-    const claim = await readClaim(req.params.claimId);
-    if (!claim) return res.status(404).json({ error: 'Claim not found' });
-    const rows = await linkedEvidence(claim.id) as Array<RecordValue>;
-    const classification = classifyEvidence(rows);
-    const evidenceFingerprint = sha256(JSON.stringify(rows
-      .map((row) => ({ id: row.id, status: row.status, relation: row.relation }))
-      .sort((a, b) => String(a.id).localeCompare(String(b.id)))));
-    const subjectFingerprint = sha256(JSON.stringify({
-      contract: 'fcr/truth-claim-subject@v1',
-      claimId: claim.id,
-      projectId: claim.project_id,
-      statement: claim.statement,
-      revision: claim.revision,
-    }));
-    const now = new Date();
-    const completedAt = now.toISOString();
-    const validUntil = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
-
-    const { data: snapshot, error: snapshotError } = await supabase
-      .from('truth_snapshots')
-      .insert({
-        project_id: claim.project_id,
-        source_truth: {
-          contract: 'fcr/truth-claim@v1',
-          claimId: claim.id,
-          statement: claim.statement,
-          revision: claim.revision,
-          evidenceIds: rows.map((row) => row.id),
-        },
-        outcome_truth: { classification },
-        classification,
-        observed_at: completedAt,
-        expires_at: validUntil,
-      })
-      .select()
-      .single();
-    if (snapshotError) return res.status(500).json({ error: 'Truth snapshot creation failed' });
-
-    await invalidateCurrentContinuity(claim, 'superseded_by_reconciliation');
-    const proofCookie = `fcr-proof-v1:${sha256(`${subjectFingerprint}:${evidenceFingerprint}:${snapshot.id}`).slice(0, 40)}`;
-    const { data: continuity, error: continuityError } = await supabase
-      .from('continuity_records')
-      .insert({
-        project_id: claim.project_id,
-        subject_fingerprint: subjectFingerprint,
-        proof_cookie: proofCookie,
-        truth_snapshot_id: snapshot.id,
-        evidence_fingerprint: evidenceFingerprint,
-        valid_until: validUntil,
-      })
-      .select()
-      .single();
-    if (continuityError) return res.status(500).json({ error: 'Continuity record creation failed' });
-
-    const status = classification === 'verified' ? 'converged' : 'drifted';
-    const { data: receipt, error: receiptError } = await supabase
-      .from('reconciliation_runs')
-      .insert({
-        project_id: claim.project_id,
-        controller: 'TruthConsole',
-        resource_id: claim.id,
-        reason: 'founder_truth_reconciliation',
-        status,
-        observed_changes: [{ classification, revision: claim.revision }],
-        proposed_actions: classification === 'verified' ? [] : [{ action: 'review_evidence', authority: 'none' }],
-        evidence_ids: rows.map((row) => row.id),
-        requires_approval: false,
-        message: `Truth claim reconciled as ${classification}`,
-        completed_at: completedAt,
-      })
-      .select()
-      .single();
-    if (receiptError) return res.status(500).json({ error: 'Reconciliation receipt creation failed' });
-
-    const { data: updatedClaim, error: claimError } = await supabase
-      .from('truth_claims')
-      .update({
-        classification,
-        current_truth_snapshot_id: snapshot.id,
-        current_subject_fingerprint: subjectFingerprint,
-        updated_at: completedAt,
-      })
-      .eq('id', claim.id)
-      .select()
-      .single();
-    if (claimError) return res.status(500).json({ error: 'Claim reconciliation update failed' });
-
-    return res.json({
-      claim: updatedClaim,
-      snapshot,
-      receipt,
-      continuity: { ...continuity, state: continuityState(continuity as RecordValue) },
-      authorityEffect: 'none',
+    const expectedRevision = positiveIntegerField(req.body?.expectedRevision, 'expectedRevision');
+    const { data, error } = await supabase.rpc('truth_console_reconcile_claim', {
+      p_claim_id: req.params.claimId,
+      p_expected_revision: expectedRevision,
     });
-  } catch {
-    return res.status(500).json({ error: 'Claim reconciliation failed' });
+    if (error) {
+      const failure = rpcFailure(error, 'Claim reconciliation failed');
+      return res.status(failure.status).json({ error: failure.message });
+    }
+    return res.json(data);
+  } catch (error) {
+    return res.status(statusCodeForInputError(error)).json({ error: error instanceof Error ? error.message : 'Claim reconciliation failed' });
   }
 });
 
@@ -401,7 +266,7 @@ truthConsoleRouter.post('/attacks', async (req: FounderRequest, res) => {
       .select()
       .single();
     if (error) return res.status(500).json({ error: 'Attack creation failed' });
-    return res.status(201).json({ attack: data });
+    return res.status(201).json({ attack: data, authorityEffect: 'none' });
   } catch (error) {
     return res.status(statusCodeForInputError(error)).json({ error: error instanceof Error ? error.message : 'Attack creation failed' });
   }
@@ -411,43 +276,16 @@ truthConsoleRouter.post('/attacks/:attackId/resolve', async (req: FounderRequest
   try {
     const answer = stringField(req.body?.answer, 'answer');
     const evidenceId = stringField(req.body?.evidenceId, 'evidenceId', 200);
-    const { data: attack, error: attackError } = await supabase
-      .from('truth_attacks')
-      .select('id, claim_id, project_id, status')
-      .eq('id', req.params.attackId)
-      .maybeSingle();
-    if (attackError) return res.status(500).json({ error: 'Attack lookup failed' });
-    if (!attack) return res.status(404).json({ error: 'Attack not found' });
-    if (attack.status === 'resolved') return res.status(409).json({ error: 'Attack already resolved' });
-
-    const { data: link, error: linkError } = await supabase
-      .from('truth_claim_evidence')
-      .select('claim_id, evidence_id')
-      .eq('claim_id', attack.claim_id)
-      .eq('evidence_id', evidenceId)
-      .maybeSingle();
-    if (linkError) return res.status(500).json({ error: 'Attack evidence lookup failed' });
-    if (!link) return res.status(400).json({ error: 'evidenceId must already be attached to this claim' });
-
-    const claim = await readClaim(attack.claim_id as string);
-    if (!claim) return res.status(404).json({ error: 'Claim not found' });
-    const stale = await markClaimStale(claim, 'attack_resolution_changed_truth');
-    const resolvedAt = new Date().toISOString();
-    const { data: updatedAttack, error: updateError } = await supabase
-      .from('truth_attacks')
-      .update({
-        status: 'resolved',
-        resolution_answer: answer,
-        resolution_evidence_id: evidenceId,
-        resolved_at: resolvedAt,
-        updated_at: resolvedAt,
-      })
-      .eq('id', attack.id)
-      .select()
-      .single();
-    if (updateError) return res.status(500).json({ error: 'Attack resolution failed' });
-
-    return res.json({ attack: updatedAttack, claim: stale.claim, invalidatedContinuity: stale.invalidated, cookieState: 'stale', authorityEffect: 'none' });
+    const { data, error } = await supabase.rpc('truth_console_resolve_attack', {
+      p_attack_id: req.params.attackId,
+      p_answer: answer,
+      p_evidence_id: evidenceId,
+    });
+    if (error) {
+      const failure = rpcFailure(error, 'Attack resolution failed');
+      return res.status(failure.status).json({ error: failure.message });
+    }
+    return res.json(data);
   } catch (error) {
     return res.status(statusCodeForInputError(error)).json({ error: error instanceof Error ? error.message : 'Attack resolution failed' });
   }
@@ -460,7 +298,7 @@ truthConsoleRouter.get('/continuity', async (_req: FounderRequest, res) => {
     .order('created_at', { ascending: false })
     .limit(CONTINUITY_LIMIT);
   if (error) return res.status(500).json({ error: 'Continuity unavailable' });
-  return res.json({ continuity: (data ?? []).map((row) => ({ ...row, state: continuityState(row as RecordValue) })) });
+  return res.json({ continuity: (data ?? []).map((row) => ({ ...row, state: truthContinuityState(row) })) });
 });
 
 truthConsoleRouter.get('/world-radar', async (_req: FounderRequest, res) => {
