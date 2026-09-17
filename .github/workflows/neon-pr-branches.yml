@@ -24,17 +24,24 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
+      - name: Check out exact PR head for Neon scope classification
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
       - name: Classify Neon preview scope
         id: neon_scope
         shell: bash
         env:
-          GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
-          mapfile -t CHANGED_FILES < <(
-            gh api --paginate "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/files?per_page=100" --jq '.[].filename'
-          )
+          test "$(git rev-parse HEAD)" = "$HEAD_SHA"
+          git fetch --no-tags --prune origin "refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}"
+          mapfile -t CHANGED_FILES < <(git diff --name-only "origin/${BASE_REF}...${HEAD_SHA}")
 
           NEEDS_NEON=false
           for path in "${CHANGED_FILES[@]}"; do
@@ -48,9 +55,9 @@ jobs:
 
           echo "needs_neon=${NEEDS_NEON}" >> "$GITHUB_OUTPUT"
           if [ "$NEEDS_NEON" = "true" ]; then
-            echo 'Supabase change detected; Neon preview branch is required.'
+            echo 'Supabase change detected in the effective current-base diff; Neon preview branch is required.'
           else
-            echo 'No supabase/ change detected; Neon preview branch is not required.'
+            echo 'No supabase/ change detected in the effective current-base diff; Neon preview branch is not required.'
           fi
 
       - name: Record non-database no-op
@@ -102,17 +109,24 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
+      - name: Check out exact PR head for Neon scope classification
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
       - name: Classify Neon preview scope
         id: neon_scope
         shell: bash
         env:
-          GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
-          mapfile -t CHANGED_FILES < <(
-            gh api --paginate "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/files?per_page=100" --jq '.[].filename'
-          )
+          test "$(git rev-parse HEAD)" = "$HEAD_SHA"
+          git fetch --no-tags --prune origin "refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}"
+          mapfile -t CHANGED_FILES < <(git diff --name-only "origin/${BASE_REF}...${HEAD_SHA}")
 
           NEEDS_NEON=false
           for path in "${CHANGED_FILES[@]}"; do
@@ -126,9 +140,9 @@ jobs:
 
           echo "needs_neon=${NEEDS_NEON}" >> "$GITHUB_OUTPUT"
           if [ "$NEEDS_NEON" = "true" ]; then
-            echo 'Supabase change detected; Neon preview cleanup is required.'
+            echo 'Supabase change detected in the effective current-base diff; Neon preview cleanup is required.'
           else
-            echo 'No supabase/ change detected; no Neon preview is expected for this PR.'
+            echo 'No supabase/ change detected in the effective current-base diff; no Neon preview is expected for this PR.'
           fi
 
       - name: Record non-database cleanup no-op
