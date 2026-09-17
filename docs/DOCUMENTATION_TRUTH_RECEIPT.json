@@ -107,7 +107,7 @@
       "path": "tools/founder-content-contracts/content-analytics-csv-ingest.cjs",
       "claims": [
         "`tools/founder-content-contracts/content-analytics-csv-ingest.cjs` must require explicit account and page identity, offset-aware receipt/snapshot timestamps, bounded normalized CSV input, null-preserving metrics, duplicate rejection within snapshots, deterministic overlap reconciliation through the canonical analytics audit, and observation-only authority.",
-        "Its logical `idempotency_key` must bind stable source SHA-256 plus platform/account/page/comparison scope and must not change solely because identical bytes are renamed, an account display label changes, or receipt-generation time changes; those fields remain provenance only."
+        "Its logical `idempotency_key` must bind canonical normalized snapshot evidence plus platform/account/page/comparison scope and normalized top-post scope; exact source SHA-256, filename, account display label, and receipt-generation time remain provenance only and must not change logical identity when normalized evidence is unchanged. Reordering otherwise identical CSV rows must not mint a second import, while changed metric evidence must change the key."
       ]
     },
     {
