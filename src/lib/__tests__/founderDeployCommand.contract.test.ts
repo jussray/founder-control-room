@@ -108,6 +108,7 @@ describe('Founder deploy command authority contract', () => {
     const proofOfShip = deployJobBlock('proof-of-ship', 'reconcile');
     const postDeployReconcile = deployJobBlock('reconcile');
 
+    expect(postDeployReconcile).toContain('environment: production');
     expect(postDeployReconcile).toContain('needs: smoke-test');
     expect(postDeployReconcile).not.toContain('continue-on-error: true');
     expect(postDeployReconcile).toContain('npx tsx src/reconciliation/scripts/self-reconcile.ts');
