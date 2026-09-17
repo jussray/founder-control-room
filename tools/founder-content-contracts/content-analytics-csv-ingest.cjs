@@ -23,7 +23,7 @@ const EXPECTED_COLUMNS = Object.freeze([
 ]);
 const IMPORT_KINDS = new Set(['historical_import', 'current_export']);
 const RESERVED_AUDIENCE_SEGMENTS = new Set(['__proto__', 'prototype', 'constructor']);
-const OFFSET_AWARE_ISO_TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})$/;
+const OFFSET_AWARE_ISO_TIMESTAMP = /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d{1,9})?(Z|[+-]\d{2}:\d{2})$/;
 
 function fail(message) {
   const error = new Error(`CONTENT_ANALYTICS_CSV_REJECTED: ${message}`);
@@ -38,13 +38,6 @@ function boundedText(value, field, max = 240) {
   return normalized;
 }
 
-function parseIsoTimestamp(value, field) {
-  if (typeof value !== 'string' || !OFFSET_AWARE_ISO_TIMESTAMP.test(value) || Number.isNaN(Date.parse(value))) {
-    fail(`${field} must be an offset-aware ISO timestamp`);
-  }
-  return value;
-}
-
 function parseIsoDate(value, field) {
   if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
     fail(`${field} must be YYYY-MM-DD`);
@@ -53,6 +46,30 @@ function parseIsoDate(value, field) {
   if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== value) {
     fail(`${field} must be a real calendar date`);
   }
+  return value;
+}
+
+function parseIsoTimestamp(value, field) {
+  if (typeof value !== 'string') fail(`${field} must be an offset-aware ISO timestamp`);
+  const match = OFFSET_AWARE_ISO_TIMESTAMP.exec(value);
+  if (!match) fail(`${field} must be an offset-aware ISO timestamp`);
+
+  parseIsoDate(match[1], `${field} date`);
+  const hour = Number(match[2]);
+  const minute = Number(match[3]);
+  const second = Number(match[4]);
+  if (hour > 23 || minute > 59 || second > 59) fail(`${field} must be a real ISO timestamp`);
+
+  const offset = match[5];
+  if (offset !== 'Z') {
+    const offsetHour = Number(offset.slice(1, 3));
+    const offsetMinute = Number(offset.slice(4, 6));
+    if (offsetHour > 14 || offsetMinute > 59 || (offsetHour === 14 && offsetMinute !== 0)) {
+      fail(`${field} has an invalid UTC offset`);
+    }
+  }
+
+  if (Number.isNaN(Date.parse(value))) fail(`${field} must be a real ISO timestamp`);
   return value;
 }
 
@@ -74,6 +91,7 @@ function parseCsv(textValue) {
   let row = [];
   let field = '';
   let quoted = false;
+  let justClosedQuote = false;
 
   for (let index = 0; index < textValue.length; index += 1) {
     const char = textValue[index];
@@ -84,9 +102,29 @@ function parseCsv(textValue) {
           index += 1;
         } else {
           quoted = false;
+          justClosedQuote = true;
         }
       } else {
         field += char;
+      }
+      continue;
+    }
+
+    if (justClosedQuote) {
+      if (char === ',') {
+        row.push(field);
+        field = '';
+        justClosedQuote = false;
+      } else if (char === '\n') {
+        row.push(field);
+        rows.push(row);
+        row = [];
+        field = '';
+        justClosedQuote = false;
+      } else if (char === '\r' && textValue[index + 1] === '\n') {
+        // Keep waiting for the LF delimiter without accepting trailing field text.
+      } else {
+        fail('quoted CSV field must be followed by a comma, newline, or end-of-input');
       }
       continue;
     }
@@ -108,7 +146,7 @@ function parseCsv(textValue) {
   }
 
   if (quoted) fail('unterminated quoted CSV field');
-  if (field.length > 0 || row.length > 0) {
+  if (field.length > 0 || row.length > 0 || justClosedQuote) {
     row.push(field.replace(/\r$/, ''));
     rows.push(row);
   }
@@ -175,6 +213,7 @@ function parseFounderContentAnalyticsCsv(csvText, metadata = {}) {
       fail(`line ${lineNumber} has ${values.length} columns; expected ${EXPECTED_COLUMNS.length}`);
     }
     const row = Object.fromEntries(EXPECTED_COLUMNS.map((column, columnIndex) => [column, values[columnIndex].trim()]));
+    row.snapshot_id = boundedText(row.snapshot_id, `line ${lineNumber} snapshot_id`, 120);
     if (!row.snapshot_id) fail(`line ${lineNumber} snapshot_id is required`);
     parseIsoTimestamp(row.captured_at, `line ${lineNumber} captured_at`);
     parseIsoDate(row.window_start, `line ${lineNumber} window_start`);
