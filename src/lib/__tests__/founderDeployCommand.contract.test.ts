@@ -35,6 +35,14 @@ function commandJobBlock(name: string, nextName: string) {
   return block![1];
 }
 
+function deployJobBlock(name: string, nextName?: string) {
+  const suffix = nextName ? `(?=\\n  ${nextName}:\\n)` : '$';
+  const pattern = new RegExp(`\\n  ${name}:\\n([\\s\\S]*?)${suffix}`);
+  const block = deployWorkflow.match(pattern);
+  expect(block).not.toBeNull();
+  return block![1];
+}
+
 describe('Founder deploy command authority contract', () => {
   it('accepts only the founder Worker command on canonical issue 182', () => {
     expect(commandWorkflow).toContain('issue_comment:');
@@ -94,6 +102,17 @@ describe('Founder deploy command authority contract', () => {
     expect(deployWorkflow).toContain('--dry-run');
     expect(deployWorkflow).toContain('--include-all');
     expect(deployWorkflow).toContain('Verify post-push migration ledger');
+  });
+
+  it('fails closed on post-deploy drift before proof-of-ship can schedule publication', () => {
+    const proofOfShip = deployJobBlock('proof-of-ship', 'reconcile');
+    const postDeployReconcile = deployJobBlock('reconcile');
+
+    expect(postDeployReconcile).toContain('needs: smoke-test');
+    expect(postDeployReconcile).not.toContain('continue-on-error: true');
+    expect(postDeployReconcile).toContain('npx tsx src/reconciliation/scripts/self-reconcile.ts');
+    expect(proofOfShip).toContain('needs: reconcile');
+    expect(proofOfShip).toContain("if: needs.reconcile.result == 'success'");
   });
 
   it('accepts a separate founder-only review-email command only on issue 395', () => {
