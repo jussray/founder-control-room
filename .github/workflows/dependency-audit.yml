@@ -50,6 +50,27 @@ jobs:
           set -o pipefail
           npm audit --omit=dev --audit-level=high --json | tee dependency-audit.json
 
+      - name: Generate reviewable lock repair candidate
+        id: repair
+        if: steps.audit.outcome != 'success'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp package-lock.json package-lock.before-audit-fix.json
+          npm audit fix --package-lock-only --omit=dev --ignore-scripts --no-audit --no-fund
+          test -s package-lock.json
+          if cmp -s package-lock.before-audit-fix.json package-lock.json; then
+            echo 'npm audit fix produced no lockfile change.' >&2
+            exit 1
+          fi
+          npm ci --ignore-scripts --no-audit --no-fund
+          set +e
+          npm audit --omit=dev --audit-level=high --json > dependency-audit-candidate.json
+          candidate_status=$?
+          set -e
+          echo "candidate_audit_exit=${candidate_status}"
+
       - name: Upload dependency audit receipt
         if: always()
         uses: actions/upload-artifact@v4
@@ -59,9 +80,21 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+      - name: Upload lock repair candidate
+        if: steps.audit.outcome != 'success' && steps.repair.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-lock-repair-${{ env.EXPECTED_HEAD_SHA }}
+          path: |
+            package-lock.json
+            dependency-audit-candidate.json
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Enforce high-severity production boundary
         if: steps.audit.outcome != 'success'
         shell: bash
         run: |
-          echo 'High-or-critical vulnerability exists in the production dependency graph.' >&2
+          echo 'High-or-critical vulnerability exists in the committed production dependency graph.' >&2
+          echo 'A generated lock repair candidate, when available, is evidence for review only; it does not make this head green.' >&2
           exit 1
