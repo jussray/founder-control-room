@@ -213,6 +213,33 @@ globalThis.fetch = async (input, init = {}) => {
   return originalFetch(input, init);
 };
 
+const LEGACY_TAB_ROUTES = {
+  projects: { screen: 'Control', view: 'Overview' },
+  missions: { screen: 'Control', view: 'Work' },
+  analytics: { screen: 'Control', view: 'Costs' },
+  terminal: { screen: 'Control', view: 'Execution' },
+  l99: { screen: 'Chief', view: null },
+  promptos: { screen: 'PromptOS', view: null },
+  activity: { screen: 'Proof', view: null },
+};
+
+function legacyTabRoute(selector) {
+  if (typeof selector !== 'string') return null;
+  const match = selector.match(/^\.tabs button\[data-tab=(?:"|')?([a-z0-9-]+)(?:"|')?\]$/i);
+  return match ? LEGACY_TAB_ROUTES[match[1]] ?? null : null;
+}
+
+async function driveFiveScreenNavigation(page, route) {
+  const primary = page.locator('.founder-screen-nav button', { hasText: route.screen });
+  await primary.waitFor({ state: 'visible' });
+  await primary.click();
+  if (route.view) {
+    const secondary = page.locator('.founder-subnav button', { hasText: route.view });
+    await secondary.waitFor({ state: 'visible' });
+    await secondary.click();
+  }
+}
+
 async function withV10PlanAwarePage(page) {
   activeBrowserPage = page;
   page.on('response', (response) => {
@@ -254,14 +281,23 @@ async function withV10PlanAwarePage(page) {
 
   const originalClick = page.click.bind(page);
   page.click = async (selector, options) => {
+    const fiveScreenRoute = legacyTabRoute(selector);
+
     if (selector === '.tabs button[data-tab=terminal]' && await page.locator(selector).count() === 0) {
-      // The opaque-session callback lands on the newer root shell. The guarded
-      // terminal remains in the canonical legacy cockpit at /control-room/.
-      // Enter that real surface with the same HttpOnly founder session before
-      // continuing the historical terminal journey. Do not synthesize DOM or
-      // bypass the normal tab click.
+      // The opaque-session callback can land on the root onboarding shell.
+      // Enter the canonical authenticated cockpit with the same HttpOnly
+      // founder session, then use the visible five-screen navigation below.
       await page.goto(new URL('/control-room/', page.url()).href, { waitUntil: 'domcontentloaded' });
-      await page.waitForSelector(selector);
+    }
+
+    if (fiveScreenRoute) {
+      // The historical long-form journey still names the old seven tabs.
+      // Exercise the new user-visible five-screen geography instead of making
+      // hidden compatibility buttons clickable merely to keep an old test green.
+      const primaryNav = page.locator('.founder-screen-nav');
+      await primaryNav.waitFor({ state: 'visible' });
+      await driveFiveScreenNavigation(page, fiveScreenRoute);
+      return;
     }
 
     if (selector === '#create-branch-form button[type=submit]') {
