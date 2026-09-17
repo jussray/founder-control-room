@@ -137,10 +137,18 @@ describe('parseContentMetricsCsv', () => {
     });
   });
 
-  it('rejects ambiguous timestamps, missing account/page/audience identity, bad units, and unsupported metrics', () => {
+  it('rejects ambiguous, impossible, and out-of-range timestamps plus identity/schema drift', () => {
     expect(() => parseContentMetricsCsv(csv(
       impressions.replace('2026-09-16T08:30:00Z', '2026-09-16T08:30:00'),
     ))).toThrow('observed_at must be an offset-aware ISO timestamp');
+
+    expect(() => parseContentMetricsCsv(csv(
+      impressions.replace('2026-09-16T08:30:00Z', '2026-02-30T08:30:00Z'),
+    ))).toThrow('observed_at must be a real offset-aware ISO timestamp');
+
+    expect(() => parseContentMetricsCsv(csv(
+      impressions.replace('2026-09-16T08:30:00Z', '2026-09-16T08:30:00+15:00'),
+    ))).toThrow('observed_at must be a real offset-aware ISO timestamp');
 
     expect(() => parseContentMetricsCsv(csv(
       impressions.replace(',acct-fcr,page-founder,', ',,page-founder,'),
@@ -161,6 +169,12 @@ describe('parseContentMetricsCsv', () => {
     expect(() => parseContentMetricsCsv(csv(
       impressions.replace(',impressions,542,', ',mystery_metric,542,'),
     ))).toThrow('unsupported metric_name mystery_metric');
+  });
+
+  it('rejects malformed quoted fields instead of accepting ambiguous CSV', () => {
+    expect(() => parseContentMetricsCsv(csv(
+      impressions.replace('"founders,operators"', '"founders,operators"x'),
+    ))).toThrow('quoted field must be followed by a comma, newline, or end-of-input');
   });
 
   it('rejects reversed windows, pre-window observations, negative values, and schema drift', () => {
