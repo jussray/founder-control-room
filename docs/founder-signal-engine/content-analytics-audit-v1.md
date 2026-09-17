@@ -19,7 +19,9 @@ Raw post text, DMs, comments, provider payloads, customer data, and private note
 
 ## Business question
 
-The artifact answers a bounded question: **what changed in distribution, engagement, follower movement, post concentration, and audience composition between comparable observed windows for one identified account/page?**
+The core artifact answers a bounded question: **what changed in distribution, engagement, follower movement, post concentration when post-level evidence is actually present, and audience composition between comparable observed windows for one identified account/page?**
+
+The normalized CSV interchange answers only the dimensions its schema carries: daily distribution/engagement/follower metrics and audience composition. Because that CSV schema has no post-level rows, its receipt explicitly marks post concentration `UNAVAILABLE`; an empty top-post list is never treated as evidence that the account had no posts or no concentration.
 
 It does not infer revenue, customer intent, causal lift, or publication success unless a separate evidence source proves those claims.
 
@@ -31,14 +33,16 @@ It does not infer revenue, customer intent, causal lift, or publication success 
 4. Partial or otherwise incomplete days remain visible in data-quality metadata and are excluded from comparisons that claim complete evidence.
 5. Missing comparison evidence returns `INCOMPLETE` and null derived metrics instead of fabricated zeroes.
 6. Historical and recent windows are compared using per-day rates so different window lengths do not distort the conclusion.
-7. Engagement concentration is calculated separately from impression concentration so broad distribution is not confused with resonance.
+7. Engagement concentration is calculated separately from impression concentration only when post-level evidence exists; ingestion paths that cannot represent posts must mark concentration unavailable.
 8. Audience composition changes are expressed as percentage-point deltas.
 9. The complete audit identity is SHA-256 hashed for deterministic evidence comparison.
 10. The CSV ingestion boundary rejects duplicate daily dates and duplicate audience segments inside one snapshot instead of silently choosing a winner.
-11. CSV provenance preserves exact file bytes, file name, account and page identity, import kind, offset-aware capture timestamps, snapshot windows, and receipt generation time.
-12. Logical import idempotency is bound to stable evidence identity: contract, platform, account ID, page ID, exact source SHA-256, comparison window, and optional top-post scope. Renaming the same bytes, changing an account display name, or regenerating the receipt does not mint a second logical import identity.
+11. CSV provenance preserves exact file bytes, file name, account and page identity, import kind, normalized UTC capture timestamps, snapshot windows, and receipt generation time.
+12. Logical import idempotency is bound to stable evidence identity: contract, platform, account ID, page ID, exact source SHA-256, comparison window, and normalized top-post scope. Renaming the same bytes, changing an account display name, or regenerating the receipt does not mint a second logical import identity.
 13. A daily CSV observation must fall inside its own snapshot's declared `window_start` and `window_end`; out-of-window rows are rejected rather than allowed to contaminate a comparison.
-14. `generated_at` and every snapshot `captured_at` must be offset-aware ISO timestamps; local-time guesses are rejected at the evidence boundary.
+14. `generated_at` and every snapshot `captured_at` must be offset-aware ISO timestamps. Accepted explicit offsets are normalized to UTC before delegation to the core audit, while local-time guesses and impossible calendar instants are rejected at the evidence boundary.
+15. Quoted CSV fields must terminate at a comma, newline, or end-of-input; trailing text after a closing quote is malformed evidence and is rejected.
+16. Snapshot IDs and other provenance identifiers are bounded at ingress so downstream normalization cannot silently truncate identity.
 
 ## Normalized authority input
 
@@ -80,7 +84,7 @@ Required metadata:
 - `page_id`;
 - `file_name`;
 - `comparison`;
-- optional `top_post_count`.
+- optional `top_post_count`, which defaults canonically to `2` when omitted and must be a positive safe integer when supplied.
 
 Exact CSV columns:
 
@@ -88,7 +92,7 @@ Exact CSV columns:
 snapshot_id,captured_at,window_start,window_end,import_kind,row_type,date,complete,impressions,engagements,gross_new_followers,audience_segment,audience_share
 ```
 
-`import_kind` is either `historical_import` or `current_export`. `row_type` is either `daily` or `audience`. Every `captured_at` must include `Z` or an explicit UTC offset.
+`import_kind` is either `historical_import` or `current_export`. `row_type` is either `daily` or `audience`. Every `captured_at` must include `Z` or an explicit UTC offset; accepted offsets are normalized to UTC in the receipt and delegated audit.
 
 The ingestion receipt records:
 
@@ -96,10 +100,11 @@ The ingestion receipt records:
 - exact source-file SHA-256 and byte/row counts;
 - source file name as provenance rather than logical idempotency authority;
 - receipt-generation time as provenance rather than logical idempotency authority;
-- capture timestamps and windows per snapshot;
+- normalized capture timestamps and windows per snapshot;
 - historical/current import provenance;
 - metric names and units;
 - explicit `audience_segment` rows;
+- explicit metric availability, including `post_concentration: UNAVAILABLE` for this CSV schema;
 - deterministic logical `idempotency_key`;
 - the nested advisory analytics audit.
 
@@ -119,18 +124,20 @@ The returned `fcr/founder-content-analytics-audit` contains:
 - revision history for overlapping exports;
 - complete/incomplete baseline and recent comparisons;
 - per-day distribution and engagement-rate changes;
-- current post engagement/impression concentration;
+- current post engagement/impression concentration when post-level evidence exists;
 - audience-share deltas;
 - partial-day and revision data-quality metadata;
 - immutable advisory-only authority and privacy declarations;
 - `audit_hash` for deterministic evidence identity.
 
-The CSV adapter returns an outer `fcr/founder-content-analytics-csv-ingest@v1` receipt that adds account/page identity, source provenance, units, historical-import provenance, explicit audience-segment naming, and a logical idempotency key without increasing authority.
+The CSV adapter returns an outer `fcr/founder-content-analytics-csv-ingest@v1` receipt that adds account/page identity, source provenance, units, historical-import provenance, explicit audience-segment naming, metric availability, and a logical idempotency key without increasing authority. For this schema, `metric_availability.post_concentration.state` is `UNAVAILABLE`, so consumers must not interpret the nested audit's empty post collection as an observed no-post result.
 
 ## Verification fixtures
 
 `src/lib/__tests__/founderContentAnalyticsAudit.contract.test.ts` locks the overlapping-export case from the August 20, 2026 LinkedIn audit. It verifies that a later Aug 19 observation replaces the earlier incomplete attribution, Aug 20 stays partial, completed-day comparisons reproduce the audited baseline/recent totals, engagement concentration remains separate from reach concentration, and the analytics artifact cannot authorize publication.
 
 `src/lib/__tests__/founderContentAnalyticsCsvIngest.contract.test.ts` reads the safe CSV fixture at `src/lib/__tests__/fixtures/founder-content-analytics-safe.csv`. It verifies source hashing, account/page identity, historical/current import provenance, explicit metric units, `audience_segment`, duplicate rejection, snapshot-window binding, null handling, offset-aware timestamps, logical idempotency across file/display metadata changes, and advisory-only authority.
+
+`src/lib/__tests__/founderContentAnalyticsCsvIngest.reviewRegressions.test.ts` locks review-found edge cases: UTC normalization for explicit offsets, canonical top-post scope, unavailable post-concentration evidence, malformed quoted fields, and bounded snapshot identities.
 
 A safe fixture proves the ingestion implementation. It is **not** evidence that any external analytics account/page is connected or current. A real-data receipt requires an authorized analytics source or a separately supplied export; absence of that source blocks only the real-data receipt, not this contract verification.
