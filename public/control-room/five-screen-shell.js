@@ -37,6 +37,7 @@ const SCREEN_TO_LEGACY = {
 const root = document.getElementById('root');
 let applying = false;
 let homeLoadToken = 0;
+let shellObserver = null;
 const restoreAttempts = new Set();
 
 function safeSessionGet(key) {
@@ -346,11 +347,20 @@ function showHome(shell, content) {
     content.insertAdjacentElement('beforebegin', home);
   }
   home.hidden = false;
-  void renderHome(home);
+  if (home.dataset.loadState === 'loading' || home.dataset.loadState === 'loaded') return;
+  home.dataset.loadState = 'loading';
+  void renderHome(home).finally(() => {
+    if (locationState.screen === 'home') home.dataset.loadState = 'loaded';
+  });
 }
 
 function showLegacyContent(shell, content) {
-  shell.querySelector('.founder-home')?.setAttribute('hidden', '');
+  const home = shell.querySelector('.founder-home');
+  if (home instanceof HTMLElement) {
+    if (!home.hidden) homeLoadToken += 1;
+    home.hidden = true;
+    delete home.dataset.loadState;
+  }
   content.hidden = false;
   installContextRibbon(content);
   installIntro(content);
@@ -415,6 +425,7 @@ function applyShell() {
   if (!(shell instanceof HTMLElement) || !(legacyTabs instanceof HTMLElement) || !(content instanceof HTMLElement)) return;
 
   applying = true;
+  shellObserver?.disconnect();
   try {
     installStyles();
     ensurePrimaryNav(shell, legacyTabs);
@@ -433,6 +444,7 @@ function applyShell() {
     maybeRestoreContext();
   } finally {
     applying = false;
+    if (root && shellObserver) shellObserver.observe(root, { childList: true, subtree: true });
   }
 }
 
@@ -440,8 +452,8 @@ syncUrl();
 document.addEventListener('click', captureContext, true);
 
 if (root) {
-  const observer = new MutationObserver(() => queueMicrotask(applyShell));
-  observer.observe(root, { childList: true, subtree: true });
+  shellObserver = new MutationObserver(() => queueMicrotask(applyShell));
+  shellObserver.observe(root, { childList: true, subtree: true });
 }
 
 applyShell();
