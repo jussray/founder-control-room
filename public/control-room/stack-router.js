@@ -26,9 +26,6 @@ function safeSessionGet(key) {
 function safeSessionSet(key, value) {
   try { sessionStorage.setItem(key, value); } catch { /* links still work */ }
 }
-function safeSessionRemove(key) {
-  try { sessionStorage.removeItem(key); } catch { /* no-op */ }
-}
 function setConveyorReadiness(state, label) {
   const status = document.querySelector('[data-conveyor-readiness]');
   const text = document.querySelector('[data-conveyor-readiness-label]');
@@ -72,7 +69,10 @@ function activateTab(tab) {
   const button = document.querySelector(`.tabs button[data-tab="${tab}"]`);
   if (!(button instanceof HTMLButtonElement)) return false;
   button.click();
-  safeSessionRemove(PENDING_TAB_KEY);
+  // Preserve fcr_pending_tab until the five-screen adapter consumes it. The
+  // legacy router can render the historical target first, but it must not erase
+  // the user's navigation intent before the authoritative five-screen shell can
+  // translate that intent into screen/view state.
   removeTabQueryParameter();
   return true;
 }
