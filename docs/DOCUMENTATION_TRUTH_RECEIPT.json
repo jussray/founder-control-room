@@ -20,7 +20,7 @@
     {
       "path": ".github/workflows/playwright.yml",
       "claims": [
-        "`.github/workflows/playwright.yml` must bind the FCR-to-StoryEngine browser federation witness to a separately verified exact StoryEngine peer SHA and ref; changing that peer identity expires predecessor federation/browser proof and requires the complete exact-head witness to rerun without granting merge, deploy, production, or provider-mutation authority."
+        "`.github/workflows/playwright.yml` must bind the FCR-to-StoryEngine browser federation witness to a separately verified exact StoryEngine peer SHA and ref; a security-hardening peer rollover is still a new evidence identity, so changing that peer expires predecessor federation/browser proof and requires the complete exact-head FCR-to-StoryEngine witness to rerun without granting merge, deploy, production, database, or provider-mutation authority."
       ]
     },
     {
@@ -54,7 +54,8 @@
         "`README.md` must describe Shopify child-provider observation as source-only, non-authorizing evidence and must never relabel a matching snapshot as live provider authority or mutation permission.",
         "`README.md` must document Attack 3000 content currentness as independently evaluated from bounded observation time rather than trusted from a CURRENT label, and must keep distribution, external demand, publication, provider mutation, merge, deploy, spend, and external-contact authority separate.",
         "`README.md` must describe the Content Trend Radar as an advisory existing-lane capability whose first-wave evidence requires current source provenance and whose ranking cannot authorize publication, scheduling, spend, provider mutation, merge, deploy, or external contact.",
-        "`README.md` must describe deterministic founder-content approval reservation and exact active retry recovery without allowing evidence rotation, retry, or a stored reservation to mint new publication authority."
+        "`README.md` must describe deterministic founder-content approval reservation and exact active retry recovery without allowing evidence rotation, retry, or a stored reservation to mint new publication authority.",
+        "`README.md` must state that even a security-only StoryEngine peer rollover changes federation evidence identity, invalidates predecessor FCR browser proof, and requires the complete exact-head federation witness to rerun."
       ]
     },
     {
@@ -66,7 +67,7 @@
     {
       "path": "docs/TRUTH_DECAY_AUDIT.md",
       "claims": [
-        "`docs/TRUTH_DECAY_AUDIT.md` must treat a StoryEngine peer SHA/ref in FCR Playwright as evidence identity rather than a durable alias for current StoryEngine, and must require complete federation re-proof whenever the peer identity or either repository head moves."
+        "`docs/TRUTH_DECAY_AUDIT.md` must treat a StoryEngine peer SHA/ref in FCR Playwright as evidence identity rather than a durable alias for current StoryEngine, must record security-hardening peer movement as proof-invalidating, and must require complete federation re-proof whenever the peer identity or either repository head moves."
       ]
     },
     {
