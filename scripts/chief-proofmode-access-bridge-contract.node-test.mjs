@@ -79,7 +79,8 @@ test('provider subject and ambiguous mutation outcome are durable and fail close
   assert.match(reconciler, /mutationOutcomeForError/);
   assert.match(reconciler, /provider-write-outcome-unknown/);
   assert.match(reconciler, /provider-write-verification-failed/);
-  assert.match(reconciler, /mutationOutcome:\s*'unknown'/);
+  assert.match(reconciler, /markMutationOutcome\(error,\s*'unknown'\)/);
+  assert.match(reconciler, /chiefAccessMutationOutcome/);
   assert.match(recoveryWorkflow, /allowed_mutation_outcome/);
   assert.match(recoveryWorkflow, /\.mutationPerformed == null/);
   assert.match(recoveryWorkflow, /subjectFingerprint/);
