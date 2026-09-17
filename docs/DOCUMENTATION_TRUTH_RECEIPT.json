@@ -1,6 +1,6 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Preserve current workflow, Cloudflare, Shopify, founder-merge, content-evidence, public-discovery, cross-repository StoryEngine federation, and FCR-to-Chief standalone-peer truth boundaries without converting source, analytics, crawler policy, peer pinning, peer locks, provider configuration, mergeability, or candidate/browser proof into publication, production, provider-mutation, merge, deploy, spend, or external-contact authority.",
+  "purpose": "Preserve current workflow, Cloudflare, Shopify, founder-merge, content-evidence, public-discovery, cross-repository StoryEngine federation, and FCR-to-Chief standalone-peer truth boundaries, including the load-bearing pair status check, without converting source, analytics, crawler policy, peer pinning, peer locks, provider configuration, mergeability, or candidate/browser proof into publication, production, provider-mutation, merge, deploy, spend, or external-contact authority.",
   "domains": [
     "cloudflare-authority",
     "repository-provider",
@@ -94,6 +94,12 @@
       "path": "src/providers/ShopifyReadOnlyProvider.ts",
       "claims": [
         "`src/providers/ShopifyReadOnlyProvider.ts` must bind Shopify observation to the exact Founder Control Room permanent and branded store identities, require complete pagination and app scope inventory, withhold CURRENT on incomplete or mismatched provider evidence, keep reconciliation non-authorizing, and never persist provider inventory or perform Shopify mutation."
+      ]
+    },
+    {
+      "path": "src/providers/providerFactory.ts",
+      "claims": [
+        "`src/providers/providerFactory.ts` must require the exact `verify-pair-contract` status check alongside `Required Gate` and `Verify test-ledger contract` for active Founder Control Room main governance, so the FCR-to-Chief standalone-peer contract cannot remain advisory at merge time."
       ]
     },
     {
