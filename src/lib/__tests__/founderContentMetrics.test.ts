@@ -31,16 +31,18 @@ function observation() {
 }
 
 describe('founder content metric observations', () => {
-  it('binds source/account/post/metric/unit/time/provenance into deterministic hashes', () => {
+  it('binds stable provider/account/page/metric/time identity separately from exact row provenance', () => {
     const first = observation();
     const second = observation();
     expect(first.contract).toBe(FOUNDER_CONTENT_METRICS_CONTRACT);
+    expect(first.pageId).toBe('page-1');
     expect(first.sourceRowHash).toMatch(/^[0-9a-f]{64}$/);
     expect(first.idempotencyKey).toMatch(/^[0-9a-f]{64}$/);
     expect(first.idempotencyKey).toBe(second.idempotencyKey);
+    expect(first.sourceRowHash).toBe(second.sourceRowHash);
   });
 
-  it('keeps null metric values distinct from zero', () => {
+  it('keeps null distinct from zero without permitting two values for one logical observation', () => {
     const zero = normalizeFounderContentMetricObservation({
       ...observation(),
       metricValue: 0,
@@ -51,16 +53,21 @@ describe('founder content metric observations', () => {
     });
     expect(zero.metricValue).toBe(0);
     expect(unknown.metricValue).toBeNull();
-    expect(zero.idempotencyKey).not.toBe(unknown.idempotencyKey);
+    expect(zero.idempotencyKey).toBe(unknown.idempotencyKey);
+    expect(zero.sourceRowHash).not.toBe(unknown.sourceRowHash);
+    expect(() => dedupeFounderContentMetrics([zero, unknown]))
+      .toThrow(/conflicting duplicate metric identity/);
   });
 
-  it('deduplicates exact observations by idempotency key only', () => {
+  it('collapses exact repeats and rejects conflicting duplicates instead of last-row-wins', () => {
     const first = observation();
     const changed = normalizeFounderContentMetricObservation({
       ...first,
       metricValue: 43,
     });
-    expect(dedupeFounderContentMetrics([first, first, changed])).toHaveLength(2);
+    expect(dedupeFounderContentMetrics([first, first])).toHaveLength(1);
+    expect(() => dedupeFounderContentMetrics([first, changed]))
+      .toThrow(/conflicting duplicate metric identity/);
   });
 
   it('rejects malformed provider envelopes instead of accepting opaque metrics payloads', () => {
@@ -70,6 +77,21 @@ describe('founder content metric observations', () => {
       contract: FOUNDER_CONTENT_METRICS_CONTRACT,
       observations: [{ ...observation(), provider: '' }],
     })).toThrow(/provider/i);
+  });
+
+  it('requires explicit page identity and offset-aware timestamps', () => {
+    expect(() => normalizeFounderContentMetricObservation({
+      ...observation(),
+      pageId: '',
+    })).toThrow(/pageId is required/);
+    expect(() => normalizeFounderContentMetricObservation({
+      ...observation(),
+      observedAt: '2026-09-15T12:00:00',
+    })).toThrow(/offset-aware ISO timestamp/);
+    expect(() => normalizeFounderContentMetricObservation({
+      ...observation(),
+      periodStart: '2026-09-15T00:00:00',
+    })).toThrow(/offset-aware ISO timestamp/);
   });
 
   it('parses a safe historical CSV while preserving source field identity and audience segment', () => {
@@ -94,10 +116,33 @@ describe('founder content metric observations', () => {
     expect(rows[1].metricValue).toBeNull();
   });
 
+  it('rejects historical CSV without page identity or with an offset-less timestamp', () => {
+    const missingPage = [
+      'provider,platform,source,account_id,metric_name,metric_unit,metric_value,observed_at',
+      'linkedin,linkedin,native_platform_export,acct-1,impressions,count,1,2026-09-15T12:00:00Z',
+    ].join('\n');
+    expect(() => parseFounderContentMetricsCsv(missingPage)).toThrow(/missing required header page_id/);
+
+    const offsetless = [
+      'provider,platform,source,account_id,page_id,metric_name,metric_unit,metric_value,observed_at',
+      'linkedin,linkedin,native_platform_export,acct-1,page-1,impressions,count,1,2026-09-15T12:00:00',
+    ].join('\n');
+    expect(() => parseFounderContentMetricsCsv(offsetless)).toThrow(/offset-aware ISO timestamp/);
+  });
+
+  it('rejects conflicting duplicate CSV observations rather than hiding the second value', () => {
+    const csv = [
+      'provider,platform,source,source_metric_id,account_id,page_id,metric_name,metric_unit,metric_value,observed_at,period_start,period_end',
+      'linkedin,linkedin,native_platform_export,IMPRESSIONS,acct-1,page-1,impressions,count,123,2026-09-15T12:00:00Z,2026-09-15T00:00:00Z,2026-09-15T23:59:59Z',
+      'linkedin,linkedin,native_platform_export,IMPRESSIONS,acct-1,page-1,impressions,count,124,2026-09-15T12:00:00Z,2026-09-15T00:00:00Z,2026-09-15T23:59:59Z',
+    ].join('\n');
+    expect(() => parseFounderContentMetricsCsv(csv)).toThrow(/conflicting duplicate metric identity/);
+  });
+
   it('rejects historical CSV that launders an aggregator row as a native export', () => {
     const csv = [
-      'provider,platform,source,account_id,metric_name,metric_unit,metric_value,observed_at',
-      'metricool,facebook,aggregator,acct-1,impressions,count,1,2026-09-15T12:00:00Z',
+      'provider,platform,source,account_id,page_id,metric_name,metric_unit,metric_value,observed_at',
+      'metricool,facebook,aggregator,acct-1,page-1,impressions,count,1,2026-09-15T12:00:00Z',
     ].join('\n');
     expect(() => parseFounderContentMetricsCsv(csv)).toThrow(/historical_csv or native_platform_export/);
   });
