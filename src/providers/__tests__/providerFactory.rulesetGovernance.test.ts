@@ -17,7 +17,12 @@ const baseConfig: RulesetConfig = {
   targetRefs: ["main"],
   requirePullRequest: true,
   requiredApprovingReviewCount: FOUNDER_CONTROL_ROOM_REQUIRED_NATIVE_APPROVALS,
-  requiredStatusCheckNames: ["Playwright E2E", "Required Gate", "Verify test-ledger contract"],
+  requiredStatusCheckNames: [
+    "Playwright E2E",
+    "Required Gate",
+    "Verify test-ledger contract",
+    "verify-pair-contract",
+  ],
   blockForcePushes: true,
   blockDeletion: true,
 };
@@ -88,15 +93,22 @@ describe("Founder Control Room ruleset governance", () => {
   it("fails closed when FCR main drops the Required Gate status check", () => {
     expect(() => assertRulesetGovernancePolicy("founder-control-room", {
       ...baseConfig,
-      requiredStatusCheckNames: ["Verify test-ledger contract"],
+      requiredStatusCheckNames: ["Verify test-ledger contract", "verify-pair-contract"],
     })).toThrow(/Required Gate/);
   });
 
   it("fails closed when FCR main drops the exact-head ledger status check", () => {
     expect(() => assertRulesetGovernancePolicy("founder-control-room", {
       ...baseConfig,
-      requiredStatusCheckNames: ["Required Gate"],
+      requiredStatusCheckNames: ["Required Gate", "verify-pair-contract"],
     })).toThrow(/Verify test-ledger contract/);
+  });
+
+  it("fails closed when FCR main drops the Founder/Chief pair status check", () => {
+    expect(() => assertRulesetGovernancePolicy("founder-control-room", {
+      ...baseConfig,
+      requiredStatusCheckNames: ["Required Gate", "Verify test-ledger contract"],
+    })).toThrow(/verify-pair-contract/);
   });
 
   it("fails closed when FCR main permits force pushes", () => {
