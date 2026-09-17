@@ -417,21 +417,28 @@ function captureContext(event) {
   }
 }
 
+function shellParts() {
+  const shell = root?.querySelector('.shell');
+  const legacyTabs = shell?.querySelector('.tabs');
+  const content = shell?.querySelector('.content');
+  return shell instanceof HTMLElement && legacyTabs instanceof HTMLElement && content instanceof HTMLElement
+    ? { shell, legacyTabs, content }
+    : null;
+}
+
 function applyShell() {
   if (applying || !root) return;
-  const shell = root.querySelector('.shell');
-  const legacyTabs = shell?.querySelector('.tabs');
-  const initialContent = shell?.querySelector('.content');
-  if (!(shell instanceof HTMLElement) || !(legacyTabs instanceof HTMLElement) || !(initialContent instanceof HTMLElement)) return;
+  const initial = shellParts();
+  if (!initial) return;
 
   applying = true;
   shellObserver?.disconnect();
   try {
     installStyles();
-    ensurePrimaryNav(shell, legacyTabs);
 
     if (locationState.screen === 'home') {
-      showHome(shell, initialContent);
+      ensurePrimaryNav(initial.shell, initial.legacyTabs);
+      showHome(initial.shell, initial.content);
       return;
     }
 
@@ -440,9 +447,13 @@ function applyShell() {
       activateLegacy(target);
     }
 
-    const finalContent = shell.querySelector('.content');
-    if (!(finalContent instanceof HTMLElement)) return;
-    showLegacyContent(shell, finalContent);
+    // Legacy tab activation calls app.js render(), which rebuilds the entire
+    // .shell under #root. Always reacquire live DOM references after that
+    // compatibility render before installing five-screen chrome or context.
+    const final = shellParts();
+    if (!final) return;
+    ensurePrimaryNav(final.shell, final.legacyTabs);
+    showLegacyContent(final.shell, final.content);
     maybeRestoreContext();
   } finally {
     applying = false;
