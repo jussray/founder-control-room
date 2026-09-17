@@ -5,14 +5,18 @@ import { readFile } from 'node:fs/promises';
 const read = (path) => readFile(new URL(`../${path}`, import.meta.url), 'utf8');
 const FULL_SHA = /^[0-9a-f]{40}$/;
 
-const [lockText, contractText, workflow] = await Promise.all([
+const [lockText, contractText, workflow, documentationTruth, mergeAuthority, documentationReceiptText] = await Promise.all([
   read('.control-room/founder-chief-pair-peer-lock.json'),
   read('config/founder-chief-pair.contract.json'),
   read('.github/workflows/founder-chief-pair-contract.yml'),
+  read('scripts/verify-documentation-truth.mjs'),
+  read('docs/FOUNDER_MERGE_AUTHORITY.md'),
+  read('docs/DOCUMENTATION_TRUTH_RECEIPT.json'),
 ]);
 
 const lock = JSON.parse(lockText);
 const contract = JSON.parse(contractText);
+const documentationReceipt = JSON.parse(documentationReceiptText);
 
 const pairRevalidationPaths = [
   'config/founder-chief-pair.contract.json',
@@ -70,5 +74,31 @@ test('required pair check reruns for every load-bearing verifier input and stays
   for (const path of pairRevalidationPaths) {
     assert.ok(pairScopeBlock.includes(path), `${path} must require full pair validation when changed on a PR`);
     assert.ok(pushScopeBlock.includes(path), `${path} must trigger pair validation when changed on main`);
+  }
+});
+
+test('documentation truth keeps pair authority load-bearing instead of allowing stale green', () => {
+  for (const path of [
+    'config\\/founder-chief-pair\\.contract\\.json',
+    '\\.control-room\\/founder-chief-pair-peer-lock\\.json',
+    'scripts\\/verify-founder-chief-pair\\.mjs',
+    '\\.github\\/workflows\\/founder-chief-pair-contract\\.yml',
+  ]) {
+    assert.ok(documentationTruth.includes("domain: 'pair-authority'"), 'documentation truth must retain the pair-authority domain');
+    assert.ok(documentationTruth.includes(path), `${path} must remain a pair-authority truth-sensitive surface`);
+  }
+  assert.match(documentationTruth, /domains\.has\('pair-authority'\).*FOUNDER_MERGE_AUTHORITY/);
+  assert.match(mergeAuthority, /verify-pair-contract/);
+  assert.match(mergeAuthority, /Standalone-peer pair-check freshness/);
+  assert.ok(documentationReceipt.domains.includes('pair-authority'));
+
+  const receiptPaths = new Set(documentationReceipt.changes.map((change) => change.path));
+  for (const path of [
+    '.control-room/founder-chief-pair-peer-lock.json',
+    '.github/workflows/founder-chief-pair-contract.yml',
+    'scripts/verify-founder-chief-pair.mjs',
+    'scripts/verify-documentation-truth.mjs',
+  ]) {
+    assert.ok(receiptPaths.has(path), `${path} must retain a current documentation-truth receipt claim`);
   }
 });
