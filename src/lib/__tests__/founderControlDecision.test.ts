@@ -145,6 +145,20 @@ describe('founder control decision contract', () => {
     expect(router).toMatch(/Never silently substitute a different provider/i);
   });
 
+  it('pins J.U.S.S. self-sufficiency without counterfeiting provider truth or authority', () => {
+    for (const relativePath of [
+      '.ai-skills/gpts/capability-mode-router.md',
+      '.ai-skills/skills/capability-mode-router.md',
+    ]) {
+      const source = readFileSync(relativePath, 'utf8');
+      expect(source).toMatch(/J\.U\.S\.S\.\s*=\s*Just Use Self Sufficiency/i);
+      expect(source).toMatch(/scoped blocker for that lane/i);
+      expect(source).toMatch(/Provider failure never increases authority/i);
+      expect(source).toMatch(/Never silently substitute provider identity/i);
+      expect(source).toMatch(/BLOCKED.*receipt|record.*blocked dependency.*BLOCKED/i);
+    }
+  });
+
   it.each(['rejected', 'change_requested'] as const)('never authorizes execution for %s', (decisionValue) => {
     const decision = createFounderControlDecision({
       proposal,
