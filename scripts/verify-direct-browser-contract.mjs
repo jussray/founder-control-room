@@ -10,6 +10,10 @@ const ultrathinkPluginProofUrl = new URL('../e2e/plugin-center-ultrathink-proof.
 const ultrathinkPluginProof = fs.readFileSync(ultrathinkPluginProofUrl, 'utf8');
 const composerProofUrl = new URL('../e2e/control-room-composer-proof.mjs', import.meta.url);
 const composerProof = fs.readFileSync(composerProofUrl, 'utf8');
+const missionLiveProofUrl = new URL('../e2e/mission-live-ux-proof.mjs', import.meta.url);
+const missionLiveProof = fs.readFileSync(missionLiveProofUrl, 'utf8');
+const missionLiveUx = fs.readFileSync(new URL('../public/control-room/mission-live-ux.js', import.meta.url), 'utf8');
+const stackRouter = fs.readFileSync(new URL('../public/control-room/stack-router.js', import.meta.url), 'utf8');
 const pkg = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
 
 assert.match(bootstrap, /--no-proxy-server/);
@@ -32,6 +36,15 @@ assert.match(composerProof, /composer-desktop/);
 assert.match(composerProof, /composer-mobile/);
 assert.match(composerProof, /submittedPayload\.controlRoom/);
 assert.match(composerProof, /test-results\/control-room-composer/);
+assert.match(missionLiveProof, /from 'playwright'/);
+assert.match(missionLiveProof, /window\.refreshClicks > 0/);
+assert.match(missionLiveProof, /proof-gate input survives shell re-render/);
+assert.match(missionLiveProof, /mobile-live-status\.png/);
+assert.match(missionLiveUx, /founderIsEditingMissionForm/);
+assert.match(missionLiveUx, /boardSignatureFromTasks/);
+assert.match(missionLiveUx, /Live status · paused while editing/);
+assert.match(stackRouter, /import \{ installMissionLiveUx \} from '\.\/mission-live-ux\.js'/);
+assert.match(stackRouter, /installMissionLiveUx\(\)/);
 
 execFileSync(process.execPath, [fileURLToPath(localPlaywrightProofUrl)], {
   stdio: 'inherit',
@@ -48,4 +61,9 @@ execFileSync(process.execPath, [fileURLToPath(composerProofUrl)], {
   env: process.env,
 });
 
-console.log('direct browser contract verified with local, ULTRATHINK Plugin Center, and Control Room Composer Playwright proofs');
+execFileSync(process.execPath, [fileURLToPath(missionLiveProofUrl)], {
+  stdio: 'inherit',
+  env: process.env,
+});
+
+console.log('direct browser contract verified with local, ULTRATHINK Plugin Center, Control Room Composer, and live mission UX Playwright proofs');
