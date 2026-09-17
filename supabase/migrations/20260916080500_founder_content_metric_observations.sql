@@ -151,9 +151,9 @@ begin
     if v_source_row_hash !~ '^[0-9a-f]{64}$' then raise exception 'metric source row hash is invalid'; end if;
     if nullif(btrim(coalesce(v_observation->>'metricName', '')), '') is null then raise exception 'metric name is required'; end if;
     if nullif(v_observation->>'observedAt', '') is null then raise exception 'metric observedAt is required'; end if;
-    if (v_observation->>'observedAt') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}([.][0-9]{1,9})?(Z|[+-][0-9]{2}:[0-9]{2})$' then raise exception 'metric observedAt must be offset-aware'; end if;
-    if nullif(v_observation->>'periodStart', '') is not null and (v_observation->>'periodStart') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}([.][0-9]{1,9})?(Z|[+-][0-9]{2}:[0-9]{2})$' then raise exception 'metric periodStart must be offset-aware'; end if;
-    if nullif(v_observation->>'periodEnd', '') is not null and (v_observation->>'periodEnd') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}([.][0-9]{1,9})?(Z|[+-][0-9]{2}:[0-9]{2})$' then raise exception 'metric periodEnd must be offset-aware'; end if;
+    if (v_observation->>'observedAt') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}([.][0-9]{1,9})?(Z|[+-](0[0-9]|1[0-3]):[0-5][0-9]|[+-]14:00)$' then raise exception 'metric observedAt must be offset-aware with a valid UTC offset'; end if;
+    if nullif(v_observation->>'periodStart', '') is not null and (v_observation->>'periodStart') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}([.][0-9]{1,9})?(Z|[+-](0[0-9]|1[0-3]):[0-5][0-9]|[+-]14:00)$' then raise exception 'metric periodStart must be offset-aware with a valid UTC offset'; end if;
+    if nullif(v_observation->>'periodEnd', '') is not null and (v_observation->>'periodEnd') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}([.][0-9]{1,9})?(Z|[+-](0[0-9]|1[0-3]):[0-5][0-9]|[+-]14:00)$' then raise exception 'metric periodEnd must be offset-aware with a valid UTC offset'; end if;
     if v_observation ? 'metricValue' and jsonb_typeof(v_observation->'metricValue') not in ('number', 'null') then raise exception 'metric value must be a number or null'; end if;
     if v_observation ? 'provenance' and jsonb_typeof(v_observation->'provenance') <> 'object' then raise exception 'metric provenance must be an object'; end if;
     if v_observation->>'importKind' = 'historical_csv' and v_observation->>'source' not in ('historical_csv','native_platform_export') then raise exception 'historical metric source is invalid'; end if;
