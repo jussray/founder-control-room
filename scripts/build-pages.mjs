@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { access, cp, mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
+import { access, cp, mkdir, open, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { constants } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { relative, resolve } from 'node:path';
@@ -10,7 +10,8 @@ await import('./verify-sekret-bip-control-room-bridge.mjs');
 const repositoryRoot = fileURLToPath(new URL('../', import.meta.url));
 const sourceDirectory = resolve(repositoryRoot, 'public');
 const outputDirectory = resolve(repositoryRoot, 'dist-pages');
-const MAX_SECRET_SCAN_BYTES = 2 * 1024 * 1024;
+const SECRET_SCAN_CHUNK_BYTES = 256 * 1024;
+const SECRET_SCAN_OVERLAP_CHARS = 256;
 
 const requiredAssets = [
   'index.html',
@@ -78,6 +79,32 @@ function artifactPath(absolutePath) {
   return relative(outputDirectory, absolutePath).split('\\').join('/');
 }
 
+async function assertFileContainsNoLiteralSecret(absolutePath, packagedPath) {
+  const handle = await open(absolutePath, 'r');
+  const buffer = Buffer.allocUnsafe(SECRET_SCAN_CHUNK_BYTES);
+  let overlap = '';
+
+  try {
+    while (true) {
+      const { bytesRead } = await handle.read(buffer, 0, buffer.length, null);
+      if (bytesRead === 0) break;
+
+      // Secret signatures are ASCII. Latin-1 gives a byte-preserving one-byte
+      // mapping for every artifact, including binaries, so large or binary
+      // assets cannot escape scanning merely because of size or encoding.
+      const window = overlap + buffer.subarray(0, bytesRead).toString('latin1');
+      for (const rule of forbiddenLiteralSecrets) {
+        if (rule.pattern.test(window)) {
+          throw new Error(`Cloudflare Pages output contains ${rule.label}: ${packagedPath}`);
+        }
+      }
+      overlap = window.slice(-SECRET_SCAN_OVERLAP_CHARS);
+    }
+  } finally {
+    await handle.close();
+  }
+}
+
 async function assertArtifactSafe() {
   for (const absolutePath of await collectFiles(outputDirectory)) {
     const packagedPath = artifactPath(absolutePath);
@@ -87,16 +114,7 @@ async function assertArtifactSafe() {
       }
     }
 
-    const info = await stat(absolutePath);
-    if (info.size > MAX_SECRET_SCAN_BYTES) continue;
-    const bytes = await readFile(absolutePath);
-    if (bytes.includes(0)) continue;
-    const text = bytes.toString('utf8');
-    for (const rule of forbiddenLiteralSecrets) {
-      if (rule.pattern.test(text)) {
-        throw new Error(`Cloudflare Pages output contains ${rule.label}: ${packagedPath}`);
-      }
-    }
+    await assertFileContainsNoLiteralSecret(absolutePath, packagedPath);
   }
 }
 
