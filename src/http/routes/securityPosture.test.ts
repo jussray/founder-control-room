@@ -50,17 +50,17 @@ describe('Strategic Security Posture API', () => {
 
     expect(response.status).toBe(200);
     expect(response.body.summary.providerPqcEvidenceEntries).toBe(10);
-    expect(response.body.summary.providerPqcCurrentEntries).toBe(2);
+    expect(response.body.summary.providerPqcCurrentEntries).toBe(0);
     expect(response.body.summary.providerPqcPlannedEntries).toBe(2);
     expect(response.body.summary.providerPqcUnsupportedEntries).toBe(4);
-    expect(response.body.summary.providerPqcUnknownEntries).toBe(2);
+    expect(response.body.summary.providerPqcUnknownEntries).toBe(4);
     expect(response.body.cryptography.providerPqcEvidence.entries).toHaveLength(10);
     expect(response.body.cryptography.providerPqcEvidence.summary).toEqual({
       entryCount: 10,
-      currentCount: 2,
+      currentCount: 0,
       plannedCount: 2,
       unsupportedCount: 4,
-      unknownCount: 2,
+      unknownCount: 4,
     });
     expect(response.body.truthBoundaries.providerClaimsRequireRuntimeEvidence).toBe(true);
     expect(response.body.truthBoundaries.providerRoadmapIsNotRuntimeProof).toBe(true);

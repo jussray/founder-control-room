@@ -10,6 +10,16 @@ Only an **authorized internal controller** may select a mode within authority it
 
 **More intelligence never means more authority.** Model capability, reasoning effort, context length, subscription tier, confidence, fingerprints, continuity markers, or tool availability never create permissions.
 
+## J.U.S.S. self-sufficiency invariant
+
+**J.U.S.S. = Just Use Self Sufficiency.**
+
+A provider outage, quota, missing credential, unsupported model, or unavailable external tool is a **scoped blocker for that lane**, not a reason to collapse unrelated authorized work. Continue truthful source inspection, bounded analysis, deterministic transforms, focused repair, local verification, evidence reconciliation, and preparation of the exact next external gate whenever those paths remain available.
+
+Never pretend an unavailable provider ran. Never silently substitute provider identity, fabricate external execution or outcome evidence, weaken a required proof method, or use a fallback to increase authority. An explicitly selected alternate provider is a separate lane with separate identity, authorization, and evidence. **Provider failure never increases authority.**
+
+Stop only when the remaining material work genuinely depends on unavailable external input, capability, or authority; preserve completed proof and record the blocked dependency as its own `BLOCKED` receipt.
+
 ## Mode planes
 
 - **Authority:** platform/system/developer/user authorization/tool permissions. Bounds every other plane.

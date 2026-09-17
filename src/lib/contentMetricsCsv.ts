@@ -183,13 +183,17 @@ function canonicalRowWithoutFingerprint(row: Omit<ContentMetricCsvObservation, '
 }
 
 function duplicateIdentity(row: ContentMetricCsvObservation): string {
-  return [
+  return JSON.stringify([
     row.observationId,
+    row.contentFingerprint,
+    row.provider,
     row.accountId,
     row.pageId,
     row.audienceSegment,
     row.metricName,
-  ].join('|');
+    row.windowStart,
+    row.windowEnd,
+  ]);
 }
 
 function canonicalNormalizedRow(row: ContentMetricCsvObservation): string {

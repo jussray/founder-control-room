@@ -1,4 +1,87 @@
+# Founder Control Room crawler contract
+# Discovery and user-directed retrieval are welcome on canonical public truth.
+# Model-training and bulk training collection are denied by default.
+# robots.txt is crawler policy, not authentication or authorization.
+
+User-agent: GPTBot
+Disallow: /
+
+User-agent: ClaudeBot
+Disallow: /
+
+User-agent: Google-Extended
+Disallow: /
+
+User-agent: OAI-SearchBot
+Disallow: /
+Allow: /$
+Allow: /juss-rayy/
+Allow: /work.html$
+Allow: /guardrails
+Allow: /mom8/
+Allow: /robots.txt$
+Allow: /sitemap.xml$
+Allow: /llms.txt$
+Allow: /crawlers.json$
+
+User-agent: ChatGPT-User
+Disallow: /
+Allow: /$
+Allow: /juss-rayy/
+Allow: /work.html$
+Allow: /guardrails
+Allow: /mom8/
+Allow: /robots.txt$
+Allow: /sitemap.xml$
+Allow: /llms.txt$
+Allow: /crawlers.json$
+
+User-agent: Claude-SearchBot
+Disallow: /
+Allow: /$
+Allow: /juss-rayy/
+Allow: /work.html$
+Allow: /guardrails
+Allow: /mom8/
+Allow: /robots.txt$
+Allow: /sitemap.xml$
+Allow: /llms.txt$
+Allow: /crawlers.json$
+
+User-agent: Claude-User
+Disallow: /
+Allow: /$
+Allow: /juss-rayy/
+Allow: /work.html$
+Allow: /guardrails
+Allow: /mom8/
+Allow: /robots.txt$
+Allow: /sitemap.xml$
+Allow: /llms.txt$
+Allow: /crawlers.json$
+
+User-agent: Googlebot
+Disallow: /
+Allow: /$
+Allow: /juss-rayy/
+Allow: /work.html$
+Allow: /guardrails
+Allow: /mom8/
+Allow: /robots.txt$
+Allow: /sitemap.xml$
+Allow: /llms.txt$
+Allow: /crawlers.json$
+
 User-agent: *
-Allow: /
+Disallow: /
+Allow: /$
+Allow: /juss-rayy/
+Allow: /work.html$
+Allow: /guardrails
+Allow: /mom8/
+Allow: /robots.txt$
+Allow: /sitemap.xml$
+Allow: /llms.txt$
+Allow: /crawlers.json$
 
 Sitemap: https://www.foundercontrolroom.org/sitemap.xml
