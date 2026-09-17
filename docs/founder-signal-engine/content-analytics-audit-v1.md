@@ -19,7 +19,7 @@ Raw post text, DMs, comments, provider payloads, customer data, and private note
 
 ## Business question
 
-The artifact answers a bounded question: **what changed in distribution, engagement, follower movement, post concentration, and audience composition between comparable observed windows for one identified account?**
+The artifact answers a bounded question: **what changed in distribution, engagement, follower movement, post concentration, and audience composition between comparable observed windows for one identified account/page?**
 
 It does not infer revenue, customer intent, causal lift, or publication success unless a separate evidence source proves those claims.
 
@@ -35,9 +35,10 @@ It does not infer revenue, customer intent, causal lift, or publication success 
 8. Audience composition changes are expressed as percentage-point deltas.
 9. The complete audit identity is SHA-256 hashed for deterministic evidence comparison.
 10. The CSV ingestion boundary rejects duplicate daily dates and duplicate audience segments inside one snapshot instead of silently choosing a winner.
-11. CSV provenance is bound to the exact file bytes, file name, account identity, import kind, capture timestamps, and snapshot windows.
-12. Re-ingesting the same bytes with the same metadata produces the same `idempotency_key`; a provenance change produces a different ingestion identity.
+11. CSV provenance preserves exact file bytes, file name, account and page identity, import kind, offset-aware capture timestamps, snapshot windows, and receipt generation time.
+12. Logical import idempotency is bound to stable evidence identity: contract, platform, account ID, page ID, exact source SHA-256, comparison window, and optional top-post scope. Renaming the same bytes, changing an account display name, or regenerating the receipt does not mint a second logical import identity.
 13. A daily CSV observation must fall inside its own snapshot's declared `window_start` and `window_end`; out-of-window rows are rejected rather than allowed to contaminate a comparison.
+14. `generated_at` and every snapshot `captured_at` must be offset-aware ISO timestamps; local-time guesses are rejected at the evidence boundary.
 
 ## Normalized authority input
 
@@ -61,10 +62,10 @@ The normalized CSV adapter is additive provider-neutral interchange only. It mus
 
 - replace or silently fork the LinkedIn-native importer;
 - relabel a provider-native XLSX file as normalized CSV evidence;
-- turn caller-supplied account labels into provider-authenticated account identity;
+- turn caller-supplied account/page labels into provider-authenticated identity;
 - donate a generic CSV hash or fixture result to a separate native-provider receipt.
 
-A provider-specific importer may normalize into the generic authority shape only when its own source provenance and account identity remain explicit and independently verifiable.
+A provider-specific importer may normalize into the generic authority shape only when its own source provenance and account/page identity remain explicit and independently verifiable.
 
 ## Normalized CSV ingestion boundary
 
@@ -73,9 +74,10 @@ A provider-specific importer may normalize into the generic authority shape only
 Required metadata:
 
 - `platform`;
-- `generated_at`;
+- `generated_at` as an offset-aware ISO timestamp;
 - `account_id`;
 - `account_name`;
+- `page_id`;
 - `file_name`;
 - `comparison`;
 - optional `top_post_count`.
@@ -86,17 +88,19 @@ Exact CSV columns:
 snapshot_id,captured_at,window_start,window_end,import_kind,row_type,date,complete,impressions,engagements,gross_new_followers,audience_segment,audience_share
 ```
 
-`import_kind` is either `historical_import` or `current_export`. `row_type` is either `daily` or `audience`.
+`import_kind` is either `historical_import` or `current_export`. `row_type` is either `daily` or `audience`. Every `captured_at` must include `Z` or an explicit UTC offset.
 
 The ingestion receipt records:
 
-- account/page identity;
+- account identity and separate page identity;
 - exact source-file SHA-256 and byte/row counts;
+- source file name as provenance rather than logical idempotency authority;
+- receipt-generation time as provenance rather than logical idempotency authority;
 - capture timestamps and windows per snapshot;
 - historical/current import provenance;
 - metric names and units;
 - explicit `audience_segment` rows;
-- deterministic `idempotency_key`;
+- deterministic logical `idempotency_key`;
 - the nested advisory analytics audit.
 
 Units are explicit:
@@ -121,12 +125,12 @@ The returned `fcr/founder-content-analytics-audit` contains:
 - immutable advisory-only authority and privacy declarations;
 - `audit_hash` for deterministic evidence identity.
 
-The CSV adapter returns an outer `fcr/founder-content-analytics-csv-ingest@v1` receipt that adds account, source, units, historical-import provenance, explicit audience-segment naming, and an idempotency key without increasing authority.
+The CSV adapter returns an outer `fcr/founder-content-analytics-csv-ingest@v1` receipt that adds account/page identity, source provenance, units, historical-import provenance, explicit audience-segment naming, and a logical idempotency key without increasing authority.
 
 ## Verification fixtures
 
 `src/lib/__tests__/founderContentAnalyticsAudit.contract.test.ts` locks the overlapping-export case from the August 20, 2026 LinkedIn audit. It verifies that a later Aug 19 observation replaces the earlier incomplete attribution, Aug 20 stays partial, completed-day comparisons reproduce the audited baseline/recent totals, engagement concentration remains separate from reach concentration, and the analytics artifact cannot authorize publication.
 
-`src/lib/__tests__/founderContentAnalyticsCsvIngest.contract.test.ts` reads the safe CSV fixture at `src/lib/__tests__/fixtures/founder-content-analytics-safe.csv`. It verifies source hashing, account identity, historical/current import provenance, explicit metric units, `audience_segment`, duplicate rejection, snapshot-window binding, null handling, deterministic idempotency, and advisory-only authority.
+`src/lib/__tests__/founderContentAnalyticsCsvIngest.contract.test.ts` reads the safe CSV fixture at `src/lib/__tests__/fixtures/founder-content-analytics-safe.csv`. It verifies source hashing, account/page identity, historical/current import provenance, explicit metric units, `audience_segment`, duplicate rejection, snapshot-window binding, null handling, offset-aware timestamps, logical idempotency across file/display metadata changes, and advisory-only authority.
 
-A safe fixture proves the ingestion implementation. It is **not** evidence that any external analytics account is connected or current. A real-data receipt requires an authorized analytics source or a separately supplied export; absence of that source blocks only the real-data receipt, not this contract verification.
+A safe fixture proves the ingestion implementation. It is **not** evidence that any external analytics account/page is connected or current. A real-data receipt requires an authorized analytics source or a separately supplied export; absence of that source blocks only the real-data receipt, not this contract verification.
