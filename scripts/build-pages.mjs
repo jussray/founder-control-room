@@ -11,7 +11,7 @@ const repositoryRoot = fileURLToPath(new URL('../', import.meta.url));
 const sourceDirectory = resolve(repositoryRoot, 'public');
 const outputDirectory = resolve(repositoryRoot, 'dist-pages');
 const SECRET_SCAN_CHUNK_BYTES = 256 * 1024;
-const SECRET_SCAN_OVERLAP_CHARS = 256;
+const SECRET_SCAN_OVERLAP_CHARS = 512;
 
 const requiredAssets = [
   'index.html',
@@ -63,6 +63,10 @@ const forbiddenLiteralSecrets = [
   { label: 'OpenAI/Anthropic-style API key', pattern: /\bsk-(?:ant-)?[A-Za-z0-9_-]{20,}\b/ },
   { label: 'GitHub token', pattern: /\b(?:ghp|github_pat)_[A-Za-z0-9_]{16,}\b/ },
   { label: 'Slack token', pattern: /\bxox[baprs]-[A-Za-z0-9-]{10,}\b/ },
+  {
+    label: 'sensitive credential assignment',
+    pattern: /\b(?:ANTHROPIC_API_KEY|OPENAI_API_KEY|CLOUDFLARE_API_TOKEN|CLOUDFLARE_ACCESS_API_TOKEN|CF_API_TOKEN|SUPABASE_SERVICE_ROLE_KEY|DATABASE_URL|GITHUB_TOKEN|N8N_API_KEY)\b\s*(?:=|:)\s*["']?(?!\$\{|\$[A-Z_]|process\.env\b|env\b|secret\b|redacted\b|placeholder\b|example\b)[^\s"'`,;}{]{8,}/i,
+  },
 ];
 
 async function collectFiles(directory) {
