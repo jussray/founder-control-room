@@ -1,0 +1,26 @@
+{
+  "schema": "juss/external-surface-binding-receipt@v1",
+  "base": "c14192f81a43da5c2d54d831ca1d2026d04281da",
+  "surfaces": [
+    "lovable:0fa1fd0f-9ec2-4bf3-9415-79bbfd4b3917",
+    "lovable:e1436754-7a41-40bb-927c-c9a0e081e70b",
+    "lovable:8ef43cd3-8d93-4494-a685-59ce0f795614"
+  ],
+  "verified": [
+    "Each external surface is bound to one canonical GitHub repository and main branch.",
+    "Surface identity is explicitly non-authoritative and grants no execution or external mutation authority.",
+    "Exact Match Engine is explicitly classified as browser-local demo state until its runtime storage is replaced or quarantined.",
+    "Repository HEAD is resolved at use time rather than frozen into the binding manifest."
+  ],
+  "blocked": [
+    {
+      "receipt": "lovable-build-credits",
+      "status": "BLOCKED",
+      "reason": "Lovable build turns are unavailable because the workspace is out of credits; source/UI integration and browser proof cannot be completed from the Lovable side yet."
+    }
+  ],
+  "authorityGranted": false,
+  "authorizesMerge": false,
+  "authorizesDeploy": false,
+  "authorizesPublication": false
+}
