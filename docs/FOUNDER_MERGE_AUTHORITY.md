@@ -192,3 +192,9 @@ Immediately before merge, re-read current `main`, the exact PR head, required ch
 A required test contributes to merge readiness only when the exact-head workflow that feeds the applicable gate actually executes it. A committed but uninvoked test is source evidence, not CI proof. For LinkedIn analytics continuity, `.github/workflows/ci.yml` must keep `scripts.test_linkedin_analytics_continuity` inside the load-bearing `python-tests` job, and `Required Gate` must continue to depend on that job. Missing LinkedIn activity rows must remain `UNKNOWN_NO_EVIDENCE` with null metrics, never synthetic zero impressions or engagements.
 
 For public crawler and work-directory behavior, `.github/workflows/ci.yml` must keep `e2e/pages-api-recovery.spec.ts` and `e2e/public-work-directory.spec.ts` inside the load-bearing `Playwright e2e` job that feeds `Required Gate`; a green specialized Pages workflow alone cannot satisfy merge-required browser proof or authorize integration.
+
+## Standalone-peer pair-check freshness
+
+The FCR ↔ Chief AI standalone-peer contract is a load-bearing merge subject, not an advisory badge. The required `verify-pair-contract` context must execute full cross-repository validation whenever the pair contract, candidate peer lock, pair verifier, pair workflow, or another declared load-bearing pair-verifier input changes. The cheap no-op success path is permitted only when that dependency surface is genuinely unchanged. Any FCR base/head move or locked Chief peer-head move expires predecessor pair proof and requires a fresh exact-candidate receipt.
+
+Source enforcement still does not prove live GitHub provider enforcement. The intended strict-freshness ruleset must require `Required Gate`, `Verify test-ledger contract`, and `verify-pair-contract` with zero bypass, and provider reconciliation remains a separate current-main mutation/readback gate.
