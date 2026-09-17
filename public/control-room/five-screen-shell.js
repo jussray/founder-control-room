@@ -421,8 +421,8 @@ function applyShell() {
   if (applying || !root) return;
   const shell = root.querySelector('.shell');
   const legacyTabs = shell?.querySelector('.tabs');
-  const content = shell?.querySelector('.content');
-  if (!(shell instanceof HTMLElement) || !(legacyTabs instanceof HTMLElement) || !(content instanceof HTMLElement)) return;
+  const initialContent = shell?.querySelector('.content');
+  if (!(shell instanceof HTMLElement) || !(legacyTabs instanceof HTMLElement) || !(initialContent instanceof HTMLElement)) return;
 
   applying = true;
   shellObserver?.disconnect();
@@ -431,16 +431,18 @@ function applyShell() {
     ensurePrimaryNav(shell, legacyTabs);
 
     if (locationState.screen === 'home') {
-      showHome(shell, content);
+      showHome(shell, initialContent);
       return;
     }
 
-    showLegacyContent(shell, content);
     const target = desiredLegacyTab();
     if (target && activeLegacyTab() !== target) {
       activateLegacy(target);
-      return;
     }
+
+    const finalContent = shell.querySelector('.content');
+    if (!(finalContent instanceof HTMLElement)) return;
+    showLegacyContent(shell, finalContent);
     maybeRestoreContext();
   } finally {
     applying = false;
