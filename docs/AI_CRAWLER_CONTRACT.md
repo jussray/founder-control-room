@@ -43,7 +43,9 @@ When the deployment supports them, publish:
 - `/llms.txt` — compact public product/source map where useful.
 - `/crawlers.json` — project-local machine-readable statement of crawler intent.
 
-These files are discovery/policy surfaces, not authentication or authorization controls.
+For intentionally public Pages content, the current Content Signals intent is `search=yes, ai-input=yes, ai-train=no`: search indexing and real-time AI grounding/retrieval are allowed, while model training is not. Private/control-room Pages paths must override that public default with `search=no, ai-input=no, ai-train=no`.
+
+These files and headers are discovery/policy surfaces, not authentication or authorization controls.
 
 ## Cloudflare economic layer
 
