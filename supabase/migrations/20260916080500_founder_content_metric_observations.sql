@@ -15,7 +15,7 @@ create table if not exists public.founder_content_metric_observations (
   )),
   source_metric_id text,
   account_id text not null check (length(btrim(account_id)) between 1 and 240),
-  page_id text,
+  page_id text not null check (length(btrim(page_id)) between 1 and 240),
   external_post_id text,
   audience_segment text,
   metric_name text not null check (length(btrim(metric_name)) between 1 and 240),
@@ -51,8 +51,7 @@ create index if not exists founder_content_metric_account_name_observed_idx
   on public.founder_content_metric_observations (founder_user_id, platform, account_id, metric_name, observed_at desc);
 
 create index if not exists founder_content_metric_page_segment_idx
-  on public.founder_content_metric_observations (founder_user_id, page_id, audience_segment, observed_at desc)
-  where page_id is not null or audience_segment is not null;
+  on public.founder_content_metric_observations (founder_user_id, page_id, audience_segment, observed_at desc);
 
 alter table public.founder_content_metric_observations enable row level security;
 drop policy if exists founder_content_metric_observations_service_role_only on public.founder_content_metric_observations;
@@ -84,7 +83,12 @@ declare
   v_provider text;
   v_platform text;
   v_account_id text;
+  v_page_id text;
   v_external_post_id text;
+  v_idempotency_key text;
+  v_source_row_hash text;
+  v_existing_source_row_hash text;
+  v_inserted integer;
   v_count integer := 0;
 begin
   if nullif(btrim(p_founder_user_id), '') is null then
@@ -118,7 +122,10 @@ begin
     v_provider := lower(btrim(coalesce(v_observation->>'provider', '')));
     v_platform := lower(btrim(coalesce(v_observation->>'platform', '')));
     v_account_id := btrim(coalesce(v_observation->>'accountId', ''));
+    v_page_id := btrim(coalesce(v_observation->>'pageId', ''));
     v_external_post_id := nullif(btrim(coalesce(v_observation->>'externalPostId', '')), '');
+    v_idempotency_key := coalesce(v_observation->>'idempotencyKey', '');
+    v_source_row_hash := coalesce(v_observation->>'sourceRowHash', '');
 
     if p_post_id is not null then
       if v_provider <> v_post.provider or v_platform <> v_post.platform or v_account_id <> v_post.account_id then
@@ -136,13 +143,18 @@ begin
     if v_provider !~ '^[a-z0-9][a-z0-9._:-]{0,159}$' then raise exception 'metric provider is invalid'; end if;
     if v_platform !~ '^[a-z0-9][a-z0-9._-]{0,79}$' then raise exception 'metric platform is invalid'; end if;
     if length(v_account_id) not between 1 and 240 then raise exception 'metric account identity is invalid'; end if;
+    if length(v_page_id) not between 1 and 240 then raise exception 'metric page identity is invalid'; end if;
     if coalesce(v_observation->>'source', '') not in ('native_platform','native_platform_export','official_api_partner','aggregator','historical_csv') then raise exception 'metric source is invalid'; end if;
     if coalesce(v_observation->>'metricUnit', '') not in ('count','ratio','percent','milliseconds','seconds','currency','currency_minor','score','unknown') then raise exception 'metric unit is invalid'; end if;
     if coalesce(v_observation->>'importKind', '') not in ('provider_live','historical_csv') then raise exception 'metric import kind is invalid'; end if;
-    if coalesce(v_observation->>'idempotencyKey', '') !~ '^[0-9a-f]{64}$' then raise exception 'metric idempotency key is invalid'; end if;
-    if coalesce(v_observation->>'sourceRowHash', '') !~ '^[0-9a-f]{64}$' then raise exception 'metric source row hash is invalid'; end if;
+    if v_idempotency_key !~ '^[0-9a-f]{64}$' then raise exception 'metric idempotency key is invalid'; end if;
+    if v_source_row_hash !~ '^[0-9a-f]{64}$' then raise exception 'metric source row hash is invalid'; end if;
     if nullif(btrim(coalesce(v_observation->>'metricName', '')), '') is null then raise exception 'metric name is required'; end if;
     if nullif(v_observation->>'observedAt', '') is null then raise exception 'metric observedAt is required'; end if;
+    if (v_observation->>'observedAt') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}([.][0-9]{1,9})?(Z|[+-][0-9]{2}:[0-9]{2})$' then raise exception 'metric observedAt must be offset-aware'; end if;
+    if nullif(v_observation->>'periodStart', '') is not null and (v_observation->>'periodStart') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}([.][0-9]{1,9})?(Z|[+-][0-9]{2}:[0-9]{2})$' then raise exception 'metric periodStart must be offset-aware'; end if;
+    if nullif(v_observation->>'periodEnd', '') is not null and (v_observation->>'periodEnd') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}([.][0-9]{1,9})?(Z|[+-][0-9]{2}:[0-9]{2})$' then raise exception 'metric periodEnd must be offset-aware'; end if;
+    if v_observation ? 'metricValue' and jsonb_typeof(v_observation->'metricValue') not in ('number', 'null') then raise exception 'metric value must be a number or null'; end if;
     if v_observation ? 'provenance' and jsonb_typeof(v_observation->'provenance') <> 'object' then raise exception 'metric provenance must be an object'; end if;
     if v_observation->>'importKind' = 'historical_csv' and v_observation->>'source' not in ('historical_csv','native_platform_export') then raise exception 'historical metric source is invalid'; end if;
 
@@ -159,7 +171,7 @@ begin
       v_observation->>'source',
       nullif(btrim(coalesce(v_observation->>'sourceMetricId', '')), ''),
       v_account_id,
-      nullif(btrim(coalesce(v_observation->>'pageId', '')), ''),
+      v_page_id,
       v_external_post_id,
       nullif(btrim(coalesce(v_observation->>'audienceSegment', '')), ''),
       lower(btrim(v_observation->>'metricName')),
@@ -171,13 +183,27 @@ begin
       nullif(v_observation->>'periodEnd', '')::timestamptz,
       v_observation->>'importKind',
       coalesce(v_observation->'provenance', '{}'::jsonb),
-      v_observation->>'sourceRowHash',
-      v_observation->>'idempotencyKey',
+      v_source_row_hash,
+      v_idempotency_key,
       p_ingested_at
     )
     on conflict (founder_user_id, idempotency_key) do nothing;
 
-    if found then v_count := v_count + 1; end if;
+    get diagnostics v_inserted = row_count;
+    if v_inserted = 1 then
+      v_count := v_count + 1;
+    else
+      select source_row_hash into v_existing_source_row_hash
+      from public.founder_content_metric_observations
+      where founder_user_id = p_founder_user_id
+        and idempotency_key = v_idempotency_key;
+      if not found then
+        raise exception 'metric idempotency conflict could not be reconciled';
+      end if;
+      if v_existing_source_row_hash <> v_source_row_hash then
+        raise exception 'conflicting duplicate metric identity %', v_idempotency_key;
+      end if;
+    end if;
   end loop;
 
   return v_count;
