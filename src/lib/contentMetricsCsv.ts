@@ -183,7 +183,7 @@ function canonicalRowWithoutFingerprint(row: Omit<ContentMetricCsvObservation, '
 }
 
 function duplicateIdentity(row: ContentMetricCsvObservation): string {
-  return [
+  return JSON.stringify([
     row.observationId,
     row.contentFingerprint,
     row.provider,
@@ -193,7 +193,7 @@ function duplicateIdentity(row: ContentMetricCsvObservation): string {
     row.metricName,
     row.windowStart,
     row.windowEnd,
-  ].join('|');
+  ]);
 }
 
 function canonicalNormalizedRow(row: ContentMetricCsvObservation): string {
