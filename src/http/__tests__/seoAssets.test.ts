@@ -109,7 +109,10 @@ describe('public founder discovery assets', () => {
     expect(crawlers.public_paths).toContain('/work.html');
     expect(crawlers.public_truth.work_directory).toBe('https://www.foundercontrolroom.org/work.html');
     expect(crawlers.attribution.requested).toBe(true);
-    expect(headers).toContain('Content-Signal: ai-train=no, search=yes, ai-input=no');
+    expect(headers).toContain('Content-Signal: ai-train=no, search=yes, ai-input=yes');
+    expect(headers).toContain('/control-room/*\n  Cache-Control: no-store\n  Content-Signal: ai-train=no, search=no, ai-input=no');
+    expect(headers).toContain('/demo/*\n  Cache-Control: no-store\n  Content-Signal: ai-train=no, search=no, ai-input=no');
+    expect(headers).toContain('/.well-known/sekret-bip-control-room.json');
     expect(headers).toContain('/crawlers.json');
   });
 });
