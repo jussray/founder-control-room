@@ -182,10 +182,11 @@ function timestamp(value: string | undefined, field: string, rowNumber: number):
     invalidOffset = offsetHour > 14 || offsetMinute > 59 || (offsetHour === 14 && offsetMinute !== 0);
   }
 
-  if (invalidDate || invalidTime || invalidOffset || !Number.isFinite(Date.parse(normalized))) {
+  const parsed = new Date(normalized);
+  if (invalidDate || invalidTime || invalidOffset || !Number.isFinite(parsed.getTime())) {
     throw new Error(`content metrics CSV row ${rowNumber}: ${field} must be a real offset-aware ISO timestamp`);
   }
-  return normalized;
+  return parsed.toISOString();
 }
 
 function metricValue(value: string | undefined, rowNumber: number): number | null {
