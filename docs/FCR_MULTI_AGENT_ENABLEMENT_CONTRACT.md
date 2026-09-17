@@ -2,12 +2,24 @@
 
 **Status:** founder-approved additive operator contract  
 **Authority host:** `jussray/founder-control-room`  
-**Applies to:** Codex / ChatGPT, Claude / Claude Code, Perplexity, DeepSeek Instructor  
+**Applies to:** Cursor, Codex / ChatGPT, Claude / Claude Code, Perplexity, DeepSeek Instructor  
 **Canonical product rules:** FCR master specification plus the v1.4 ULTRATHINK Self-Attack addendum
 
 ## Boundary
 
-Founder Control Room is the sole implementation host for the current first slice. Claude and Perplexity are enabled as governed operator lanes alongside Codex/ChatGPT. DeepSeek is enabled as a bounded instructor lane for research, proposal, review, adversarial challenge, and cross-project pattern extraction.
+Founder Control Room is the sole implementation and authority host for the current first slice. Cursor is the preferred local repository implementation cockpit for repo-heavy work when it is actually connected and available. Claude and Perplexity are enabled as governed operator lanes alongside Codex/ChatGPT. DeepSeek is enabled as a bounded instructor lane for research, proposal, review, adversarial challenge, and cross-project pattern extraction.
+
+The intended repo-heavy implementation chain is:
+
+```text
+FCR / founder intent + truth
+-> Cursor implementation cockpit when available
+-> GitHub durable code/history/CI receipts
+-> Playwright/provider/runtime proof
+-> FCR truth reclassification and next gate
+```
+
+Cursor is not another OS, authority plane, source of truth, or substitute for GitHub/runtime evidence. If Cursor is unavailable, another currently authorized builder may perform the work, but the handoff must record that substitution rather than pretending the Cursor step occurred.
 
 Enabling an operator means FCR may assign it only the capabilities registered for that operator when the current session and repository policy authorize the work.
 
@@ -19,8 +31,9 @@ DeepSeek specifically does not receive the `implement` capability. Its instructi
 
 These are different capability classes:
 
-- `claude-code`, `codex`, `perplexity`, and `deepseek-instructor` are bounded operator identities.
+- `cursor`, `claude-code`, `codex`, `perplexity`, and `deepseek-instructor` are bounded operator/workspace identities.
 - `anthropic-platform`, `openai-platform`, and `deepseek-platform` are replaceable server-side model-provider identities.
+- Cursor workspace availability is not model-provider availability, repository authority, or proof that any edit/test actually ran.
 - Operator enablement does not automatically enable the corresponding model provider.
 - Model-provider availability does not grant operator or mutation authority.
 
@@ -37,11 +50,11 @@ Founder auth
 -> usefulness feedback
 ```
 
-For that slice, Claude, ChatGPT/Codex, Perplexity, and DeepSeek may help inspect, design, test, review, and verify the repository within their registered capabilities, but the live product path must not call OpenAI, Anthropic, Perplexity, DeepSeek, or another external model.
+For that slice, Cursor, Claude, ChatGPT/Codex, Perplexity, and DeepSeek may help inspect, design, test, review, and verify the repository within their registered capabilities, but the live product path must not call OpenAI, Anthropic, Perplexity, DeepSeek, or another external model.
 
 ## Enabled operator capabilities
 
-Claude, Codex/ChatGPT, and Perplexity may be assigned:
+Cursor, Claude, Codex/ChatGPT, and Perplexity may be assigned:
 
 - `research`
 - `propose`
@@ -86,8 +99,15 @@ All enabled operators must preserve:
 10. Green founder-facing truth requires compatible, fresh evidence.
 11. A cross-project lesson is only a hypothesis until the target project is independently inspected against its current exact head.
 12. Model output may propose a plan or instruction packet, but cannot itself become a repository/provider/tool execution command.
+13. Cursor-local edits and local test output remain workspace evidence until they are bound to the exact repository/branch/head and carried into durable GitHub/CI/runtime receipts.
 
 ## Tool-specific overlays
+
+Cursor must also obey:
+
+- `.cursor/rules`
+- `AGENTS.md`
+- `GLOBAL_AI.md`
 
 Claude must also obey:
 
@@ -109,6 +129,6 @@ When tool-specific instructions conflict with the canonical FCR product/authorit
 
 ## Proof rule
 
-Agent participation is bookkeeping/provenance until the exact work is independently evidenced. A model or operator statement that something passed is not test, CI, provider, browser, deployment, or outcome proof.
+Agent participation is bookkeeping/provenance until the exact work is independently evidenced. A model, IDE, or operator statement that something passed is not test, CI, provider, browser, deployment, or outcome proof.
 
 The first-slice completion gate remains real desktop/mobile Playwright plus the seven acceptance gates. No operator may self-declare those gates green without the corresponding evidence.
