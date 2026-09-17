@@ -98,7 +98,7 @@ function ensureLiveStatus(text = 'Live status · synced') {
     status.setAttribute('aria-live', 'polite');
     toolbar.appendChild(status);
   }
-  status.textContent = text;
+  if (status.textContent !== text) status.textContent = text;
 }
 
 async function pollMissionStatus() {
