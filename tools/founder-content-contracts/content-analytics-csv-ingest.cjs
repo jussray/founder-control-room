@@ -92,12 +92,20 @@ function validateComparison(comparison) {
   if (!comparison || typeof comparison !== 'object' || Array.isArray(comparison)) {
     fail('metadata.comparison is required');
   }
+
+  const values = {};
   for (const prefix of ['baseline', 'recent']) {
     const startField = `${prefix}_start`;
     const endField = `${prefix}_end`;
     const start = parseIsoDate(comparison[startField], `metadata.comparison.${startField}`);
     const end = parseIsoDate(comparison[endField], `metadata.comparison.${endField}`);
     if (start > end) fail(`metadata.comparison.${startField} is after metadata.comparison.${endField}`);
+    values[startField] = start;
+    values[endField] = end;
+  }
+
+  if (values.recent_start <= values.baseline_end) {
+    fail('metadata.comparison.recent_start must be after metadata.comparison.baseline_end');
   }
 }
 
@@ -189,6 +197,17 @@ function assertSnapshotMetadata(group, row, lineNumber) {
       fail(`line ${lineNumber} changes ${field} inside snapshot ${group.id}`);
     }
   }
+}
+
+function windowsOverlap(left, right) {
+  return left.window_start <= right.window_end && right.window_start <= left.window_end;
+}
+
+function deepFreeze(value, seen = new WeakSet()) {
+  if (!value || typeof value !== 'object' || seen.has(value)) return value;
+  seen.add(value);
+  for (const nested of Object.values(value)) deepFreeze(nested, seen);
+  return Object.freeze(value);
 }
 
 function canonicalSnapshotEvidence(group) {
@@ -303,7 +322,24 @@ function parseFounderContentAnalyticsCsv(csvText, metadata = {}) {
   }
 
   if (groups.size < 2) fail('CSV must contain at least two snapshots for comparison');
-  const snapshots = [...groups.values()].map((group) => ({
+  const groupList = [...groups.values()];
+  const generatedAtMs = Date.parse(generatedAt);
+  for (const group of groupList) {
+    if (Date.parse(group.captured_at) > generatedAtMs) {
+      fail(`snapshot ${group.id} captured_at must not be after metadata.generated_at`);
+    }
+  }
+  for (let leftIndex = 0; leftIndex < groupList.length; leftIndex += 1) {
+    for (let rightIndex = leftIndex + 1; rightIndex < groupList.length; rightIndex += 1) {
+      const left = groupList[leftIndex];
+      const right = groupList[rightIndex];
+      if (left.captured_at === right.captured_at && windowsOverlap(left, right)) {
+        fail(`overlapping snapshots ${left.id} and ${right.id} must not share captured_at`);
+      }
+    }
+  }
+
+  const snapshots = groupList.map((group) => ({
     id: group.id,
     captured_at: group.captured_at,
     window_start: group.window_start,
@@ -312,13 +348,13 @@ function parseFounderContentAnalyticsCsv(csvText, metadata = {}) {
     audience: group.audience,
   }));
 
-  const audit = buildFounderContentAnalyticsAudit({
+  const audit = deepFreeze(buildFounderContentAnalyticsAudit({
     platform,
     generated_at: generatedAt,
     snapshots,
     comparison: metadata.comparison,
     top_post_count: topPostCount,
-  });
+  }));
 
   const sourceSha256 = createHash('sha256').update(csvText).digest('hex');
   const account = Object.freeze({ id: accountId, name: accountName });
@@ -330,7 +366,7 @@ function parseFounderContentAnalyticsCsv(csvText, metadata = {}) {
     bytes: byteLength,
     row_count: rows.length - 1,
   });
-  const snapshotSources = Object.freeze([...groups.values()].map((group) => Object.freeze({
+  const snapshotSources = Object.freeze(groupList.map((group) => Object.freeze({
     snapshot_id: group.id,
     captured_at: group.captured_at,
     window_start: group.window_start,
@@ -379,7 +415,7 @@ function parseFounderContentAnalyticsCsv(csvText, metadata = {}) {
     recent_start: metadata.comparison.recent_start,
     recent_end: metadata.comparison.recent_end,
   });
-  const normalizedEvidence = [...groups.values()]
+  const normalizedEvidence = groupList
     .map(canonicalSnapshotEvidence)
     .sort((left, right) => compareOrdinal(left.captured_at, right.captured_at)
       || compareOrdinal(left.snapshot_id, right.snapshot_id));

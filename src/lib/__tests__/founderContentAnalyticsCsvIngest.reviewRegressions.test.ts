@@ -48,6 +48,34 @@ describe('founder content analytics CSV review regressions', () => {
     expect(receipt.audit.current_snapshot.captured_at).toBe('2026-09-03T23:00:00.000Z');
   });
 
+  it('rejects a recent comparison window that does not follow the baseline', () => {
+    expect(() => parseFounderContentAnalyticsCsv(safeCsv, {
+      ...metadata,
+      comparison: {
+        baseline_start: '2026-09-02',
+        baseline_end: '2026-09-02',
+        recent_start: '2026-09-01',
+        recent_end: '2026-09-01',
+      },
+    })).toThrow(/recent_start must be after metadata\.comparison\.baseline_end/);
+  });
+
+  it('rejects snapshot captures later than receipt generation time', () => {
+    expect(() => parseFounderContentAnalyticsCsv(safeCsv, {
+      ...metadata,
+      generated_at: '2026-09-03T12:00:00.000Z',
+    })).toThrow(/captured_at must not be after metadata\.generated_at/);
+  });
+
+  it('rejects ambiguous equal capture timestamps for overlapping snapshots', () => {
+    const ambiguous = safeCsv.replaceAll(
+      '2026-09-03T23:00:00.000Z',
+      '2026-09-02T23:00:00.000Z',
+    );
+    expect(() => parseFounderContentAnalyticsCsv(ambiguous, metadata))
+      .toThrow(/must not share captured_at/);
+  });
+
   it('rejects invalid explicit top-post scopes and canonicalizes omitted versus explicit default scope', () => {
     for (const invalid of [0, -1, 1.5, '2']) {
       expect(() => parseFounderContentAnalyticsCsv(safeCsv, {
@@ -85,5 +113,16 @@ describe('founder content analytics CSV review regressions', () => {
     const overlongSnapshot = safeCsv.replaceAll('historical-2026-09-02', longId);
     expect(() => parseFounderContentAnalyticsCsv(overlongSnapshot, metadata))
       .toThrow(/snapshot_id exceeds 120 characters/);
+  });
+
+  it('deep-freezes the hashed audit payload so callers cannot mutate evidence under a stable hash', () => {
+    const receipt = parseFounderContentAnalyticsCsv(safeCsv, metadata);
+    expect(Object.isFrozen(receipt.audit)).toBe(true);
+    expect(Object.isFrozen(receipt.audit.comparison)).toBe(true);
+    expect(Object.isFrozen(receipt.audit.comparison.baseline)).toBe(true);
+    expect(() => {
+      receipt.audit.comparison.baseline.impressions = 999;
+    }).toThrow();
+    expect(receipt.audit.comparison.baseline.impressions).not.toBe(999);
   });
 });
