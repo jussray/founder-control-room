@@ -7,6 +7,10 @@ const missionUxSource = readFileSync(new URL('../public/control-room/mission-liv
 const screenshotDir = new URL('../test-results/mission-live-ux/', import.meta.url).pathname;
 mkdirSync(screenshotDir, { recursive: true });
 
+const SESSION_COOKIE_NAME = '__Host-fcr_session';
+const SESSION_COOKIE_VALUE = `v1.${'a'.repeat(43)}`;
+let bearerAuthorizationObserved = false;
+let opaqueCookieObserved = false;
 let taskStatus = 'sandboxed';
 let taskBranch = 'mission/ux-proof';
 
@@ -37,7 +41,6 @@ body{font:16px system-ui,sans-serif;margin:0;background:#0b1020;color:#e8eef8}.s
 const initialTask=${JSON.stringify(task())};
 let currentTask=initialTask;
 window.refreshClicks=0;
-sessionStorage.setItem('fcr_session', JSON.stringify({access_token:'ux-proof-token',email:'founder@example.com'}));
 function proofFormHtml(){return currentTask.status==='sandboxed'||currentTask.status==='in_review'?\`
 <form id="proof-gate-form">
 <label>Gate ID<select name="gateId"><option value="create_branch">create_branch</option><option value="merge">merge</option></select></label>
@@ -61,7 +64,7 @@ function render(){
   </div>\`;
   document.querySelector('#refresh-missions').addEventListener('click', async()=>{
     window.refreshClicks+=1;
-    const response=await fetch('/dashboard/tasks',{headers:{Authorization:'Bearer ux-proof-token'}});
+    const response=await fetch('/dashboard/tasks',{credentials:'same-origin',headers:{Accept:'application/json'}});
     const body=await response.json();
     currentTask=body.tasks[0];
     render();
@@ -84,16 +87,25 @@ const server = http.createServer((req, res) => {
     return;
   }
   if (req.url === '/dashboard/tasks') {
-    if (req.headers.authorization !== 'Bearer ux-proof-token') {
+    if (typeof req.headers.authorization === 'string' && req.headers.authorization.length > 0) {
+      bearerAuthorizationObserved = true;
+    }
+    const cookie = req.headers.cookie ?? '';
+    opaqueCookieObserved ||= cookie.includes(`${SESSION_COOKIE_NAME}=${SESSION_COOKIE_VALUE}`);
+    if (!cookie.includes(`${SESSION_COOKIE_NAME}=${SESSION_COOKIE_VALUE}`)) {
       res.writeHead(401, { 'content-type': 'application/json' });
-      res.end(JSON.stringify({ error: 'unauthorized' }));
+      res.end(JSON.stringify({ error: 'opaque founder session required' }));
       return;
     }
     res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
     res.end(JSON.stringify({ tasks: [task()] }));
     return;
   }
-  res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
+  res.writeHead(200, {
+    'content-type': 'text/html; charset=utf-8',
+    'cache-control': 'no-store',
+    'set-cookie': `${SESSION_COOKIE_NAME}=${SESSION_COOKIE_VALUE}; Path=/; Secure; HttpOnly; SameSite=Strict`,
+  });
   res.end(pageHtml);
 });
 
@@ -143,9 +155,12 @@ try {
   assert.equal(overflow, false, 'mission UX proof must not create document-level mobile overflow');
   await page.screenshot({ path: `${screenshotDir}/mobile-live-status.png`, fullPage: true });
 
+  assert.equal(opaqueCookieObserved, true, 'mission UX proof must authenticate through the opaque founder cookie');
+  assert.equal(bearerAuthorizationObserved, false, 'mission UX browser flow must not send bearer authorization');
+  assert.equal(await page.evaluate(() => sessionStorage.getItem('fcr_session')), null, 'proof must not manufacture a legacy browser bearer session');
   assert.deepEqual(pageErrors, []);
   assert.deepEqual(consoleErrors, []);
-  console.log('Mission live UX Playwright proof passed: proof-gate input survives shell re-render, external mission status appears without a founder Refresh click, live state is announced, and mobile has no document overflow.');
+  console.log('Mission live UX Playwright proof passed: proof-gate input survives shell re-render, mission polling uses only the opaque founder cookie, external status appears without a founder Refresh click, live state is announced, and mobile has no document overflow.');
 } finally {
   await context.close();
   await browser.close();
