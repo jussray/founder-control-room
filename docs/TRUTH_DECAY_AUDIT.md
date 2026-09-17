@@ -381,6 +381,15 @@ The strongest optimization is not faster claiming. It is shortening the distance
 32. A capital decision card, recommendation, score, or HOLD state is evidence interpretation, not financing or execution authority; stale or missing capital evidence must remove derived certainty instead of preserving an earlier recommendation.
 33. `merge_authority: true` cannot be reused as candidate approval; every merge requires a fresh explicit founder decision for the exact live repository/PR/base/head, and candidate movement expires that approval.
 34. Rebinding a cross-repository Playwright peer to a newly verified exact ref/SHA expires predecessor federation/browser proof and requires a complete exact-head rerun; the pin is evidence identity, not production or merge authority.
+35. A checked-in FCR ↔ Chief peer lock can prove exact repository identity only when its referenced PRs and heads are freshly re-read; it cannot create merge, deploy, provider, publication, or runtime authority, and any peer/head movement invalidates predecessor proof.
+
+## FCR ↔ Chief peer-lock rollover
+
+The FCR ↔ Chief standalone-peer contract is an evidence-authority boundary. Its checked-in peer lock binds exact repository and candidate identities so the verifier can reject stale or substituted counterpart state, but that lock is not runtime truth and carries no execution authority.
+
+When FCR main, the FCR candidate head, either Chief carrier head, or a load-bearing browser peer pin moves, all predecessor exact-head evidence is historical for the successor. Recovery requires a fresh repository/provider read of the referenced peer PRs and heads plus the applicable exact-head CI and browser witness. A byte-identical lock or successful merge-base repair does not donate earlier green proof to the new candidate.
+
+This correction also keeps failure receipts independent: a GitHub-managed review outage cannot stand in for pair-verifier failure, and a missing production/browser witness cannot stand in for source correctness. Merge, deploy, provider mutation, publication, and production-runtime authority remain separately gated.
 
 ## Rollback
 
