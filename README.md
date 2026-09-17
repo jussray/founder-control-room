@@ -48,6 +48,12 @@ FCR models projects, proposals, missions, exact refs, verification runs, evidenc
 
 Branch creation through `src/http/routes/approvals.ts` is now an exact-action governed repository mutation. A fresh `create_branch` proof and authenticated founder execute request cause FCR to issue a server-derived `AuthorityEnvelopeV1` bound to `github.repository.create_branch`, repository scope, exact branch arguments, current mission-state fingerprint, tool-call identity, expiry, founder identity, and idempotency key. The authority lifetime starts from the server-observed execute request time, not the proof receipt timestamp, so proof freshness and authority expiry remain separate fail-closed windows. FCR reserves the execution before the external write, re-reads mission state immediately before mutation, and `executeAuthorizedCreateBranch()` must reject drift before `RepositoryProvider.createBranch(...)` can be reached. A pending or ambiguous execution remains reconcile-before-retry; source and CI proof of this membrane do not by themselves prove that a live GitHub branch was created.
 
+### Founder shell and signed-out boundary
+
+The `/control-room/` source keeps founder-only stack controls out of the signed-out surface without introducing a second authentication model. `public/control-room/stack-router.js` consumes the app-rendered state inside `#root`: when no authenticated `.shell` is present, the founder-stack launch dock is closed, hidden, and marked `aria-hidden="true"`; when the authenticated shell appears, the same existing dock becomes available; if that shell disappears again, the dock closes and hides again.
+
+This is a presentation boundary, not a new credential or session authority. It does not prove the live domain is deployed with the same behavior. The focused mobile browser witness in `e2e/conveyor-readiness-proof.mjs` must exercise the real state transition signed-out hidden → authenticated visible/readiness behavior → signed-out hidden again, preserve the opaque HttpOnly-cookie boundary, and check mobile overflow on the exact candidate before this source behavior is treated as browser proof.
+
 ### PR continuity
 
 The repository has machine-enforced PR continuity. Eligible same-repository branches may roll forward when their live base moves, but every head movement creates a new proof subject.
