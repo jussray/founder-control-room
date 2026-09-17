@@ -49,9 +49,9 @@ The GitHub App **Client ID is not used** by the current installation-token witne
 |---|---|---|
 | `SUPABASE_ACCESS_TOKEN` | Supabase administration workflows | Supabase CLI personal access token where a workflow explicitly requires it. |
 | `SUPABASE_DB_URL` | `deploy.yml / supabase-migrate` | Full Postgres connection string used by `supabase db push`. This is a GitHub deployment-plane secret. |
-| `SUPABASE_SERVICE_ROLE_KEY` | surviving API Worker runtime and reconciliation paths that explicitly name it | Service-role JWT. Canonical `deploy.yml` does **not** transport this value; production keeps it provider-held in the Cloudflare Worker secret plane. Never expose client-side. |
-| `SUPABASE_PUBLISHABLE_KEY` | surviving API Worker runtime | Publishable Supabase key used by server-side auth runtime. Canonical `deploy.yml` preserves the provider-held binding instead of copying the value through GitHub Actions. |
-| `NEXT_PUBLIC_SUPABASE_URL` | deploy and reconciliation workflows that explicitly reference it | Public Supabase project URL. This does not replace the Worker binding named `SUPABASE_URL`. |
+| `SUPABASE_SERVICE_ROLE_KEY` | surviving API Worker runtime and `deploy.yml / reconcile` | Service-role JWT. The Worker keeps its provider-held runtime copy in Cloudflare; `deploy.yml / reconcile` separately reads the protected GitHub Actions secret for post-deploy database inspection. `worker-deploy` does **not** transport or rewrite this value. Never expose client-side. |
+| `SUPABASE_PUBLISHABLE_KEY` | surviving API Worker runtime | Publishable Supabase key used by server-side auth runtime. Canonical `worker-deploy` preserves the provider-held binding instead of copying the value through GitHub Actions. |
+| `NEXT_PUBLIC_SUPABASE_URL` | `deploy.yml / reconcile` and other workflows that explicitly reference it | Public Supabase project URL. The reconcile job reads it from the GitHub Actions secret plane and maps it to `SUPABASE_URL`; this does not replace the Worker binding named `SUPABASE_URL`. |
 
 ---
 
@@ -118,7 +118,7 @@ Generate `FOUNDER_SESSION_ENCRYPTION_KEY` as exactly 32 random bytes encoded as 
 node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
 ```
 
-Store the generated value in the surviving `founder-control-room` Worker's Cloudflare secret plane. Canonical `deploy.yml` requires only the deployment-plane secrets it actually consumes, reads back required Worker **names** before mutation, and preserves provider-held runtime secret values rather than copying them through GitHub Actions. Source wiring proves the required binding name, not that the live provider currently has a valid value. After installation, verify only binding-name presence and an opaque-session login flow; never print or copy the secret value into evidence.
+Store the generated value in the surviving `founder-control-room` Worker's Cloudflare secret plane. Canonical `deploy.yml` requires the deployment-plane secrets it actually consumes, reads back required Worker **names** before mutation, and preserves provider-held runtime secret values rather than copying them through the Worker deploy. The post-deploy `reconcile` job is a separate read/inspection consumer and therefore reads its own protected Actions copy of `SUPABASE_SERVICE_ROLE_KEY` plus `NEXT_PUBLIC_SUPABASE_URL`. Source wiring proves a required binding/secret name, not that the live provider currently has a valid value. After installation, verify only binding-name presence and an opaque-session login flow; never print or copy the secret value into evidence.
 
 The existing provider-held OpenAI key reference remains:
 
@@ -146,13 +146,15 @@ After configuration, capture:
 | Secret | Required by | Description |
 |---|---|---|
 | `SUPABASE_DB_URL` | `deploy.yml / supabase-migrate` | Migration-only Postgres URL used by the canonical deploy workflow. |
+| `NEXT_PUBLIC_SUPABASE_URL` | `deploy.yml / reconcile` | Public Supabase URL passed only to the post-deploy reconciliation inspection as `SUPABASE_URL`. |
+| `SUPABASE_SERVICE_ROLE_KEY` | `deploy.yml / reconcile` | Protected Actions copy used only by post-deploy database reconciliation. This is separate from the provider-held Worker secret and is not transported by `worker-deploy`. |
 | `CLOUDFLARE_API_TOKEN` | `deploy.yml / authority-gate`, `worker-deploy`, Pages release | Scoped Cloudflare deployment credential. |
 | `CLOUDFLARE_ACCOUNT_ID` | canonical deploy and Pages release | Cloudflare account identifier used with the scoped deployment credential. |
 | `CLOUDFLARE_DEPLOY_HOOK_URL` | `pages-production-release.yml` | Private Cloudflare Pages deployment hook used by the exact-SHA Pages release. |
 | `ZAPIER_CATCH_HOOK_URL` | `deploy.yml / proof-of-ship` | Dedicated Catch Hook for verified allowlisted release payloads; do not reuse the Worker bridge hook. |
 | `PROOF_OF_SHIP_STEERING_GRANT_ID` | `deploy.yml / proof-of-ship` | Revocable standing-policy identifier that explicitly activates scheduled publication; suggested value: `proof-of-ship-publish-v1`. |
 
-`FOUNDER_SESSION_ENCRYPTION_KEY`, `ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and `SUPABASE_PUBLISHABLE_KEY` are Worker/runtime bindings, not canonical deploy-plane values. The deploy verifies provider-held secret **names** where required and must not copy these values into GitHub merely to make deployment green.
+`FOUNDER_SESSION_ENCRYPTION_KEY`, `ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL`, and `SUPABASE_PUBLISHABLE_KEY` are Worker/runtime bindings, not canonical deploy-plane values. `SUPABASE_SERVICE_ROLE_KEY` is dual-plane only because `deploy.yml / reconcile` explicitly consumes a separately configured protected Actions copy; the Worker deploy itself preserves the provider-held binding instead of copying or rewriting the value.
 
 `FOUNDER_SIGNAL_ENGINE_MCP_TOKEN` is deliberately dual-plane when the review-probe/downstream-receipt workflows are enabled: it remains a provider-held Worker runtime binding for the API routes and is also configured separately as a protected GitHub `production` Actions secret for `founder-signal-engine-review-probe.yml` and `proof-of-ship-downstream-receipt.yml`. The canonical deploy does not transport or print this credential.
 
@@ -193,6 +195,8 @@ Never commit, log, or expose this value through a `NEXT_PUBLIC_*` variable.
 
 ```text
 [ ] SUPABASE_DB_URL for canonical migration deploy
+[ ] NEXT_PUBLIC_SUPABASE_URL for deploy.yml post-deploy reconciliation inspection
+[ ] SUPABASE_SERVICE_ROLE_KEY for deploy.yml post-deploy reconciliation inspection; separate Actions copy from the Worker runtime binding
 [ ] APP_ID (numeric Founder Control Room GitHub App ID)
 [ ] APP_PRIVATE_KEY (matching GitHub App private-key PEM)
 [ ] CLOUDFLARE_API_TOKEN for canonical founder-control-room mutation only
