@@ -102,6 +102,21 @@ describe('parseContentMetricsCsv', () => {
     expect(receipt.observations.map((row) => row.metricValue)).toEqual(expect.arrayContaining([542, 311, 410, 625]));
   });
 
+  it('does not let delimiter characters create duplicate-identity collisions', () => {
+    const left = impressions
+      .replace('obs-20260916,fp-post-1', 'obs|x,fp')
+      .replace(',542,count,', ',101,count,');
+    const right = impressions
+      .replace('obs-20260916,fp-post-1', 'obs,x|fp')
+      .replace(',542,count,', ',202,count,');
+
+    const receipt = parseContentMetricsCsv(csv(left, right));
+
+    expect(receipt.normalizedRowCount).toBe(2);
+    expect(receipt.duplicateRowsCollapsed).toBe(0);
+    expect(receipt.observations.map((row) => row.metricValue)).toEqual(expect.arrayContaining([101, 202]));
+  });
+
   it('fails closed on conflicting duplicates instead of choosing a convenient value', () => {
     const conflict = impressions.replace(',542,count,', ',543,count,');
     expect(() => parseContentMetricsCsv(csv(impressions, conflict))).toThrow(
