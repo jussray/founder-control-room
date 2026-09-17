@@ -80,6 +80,11 @@ function sha256(value: string): string {
   return createHash('sha256').update(value).digest('hex');
 }
 
+function compareOrdinal(left: string, right: string): number {
+  if (left === right) return 0;
+  return left < right ? -1 : 1;
+}
+
 function parseCsvRows(csv: string): string[][] {
   const rows: string[][] = [];
   let row: string[] = [];
@@ -334,7 +339,7 @@ export function parseContentMetricsCsv(csv: string): ContentMetricCsvReceipt {
   });
 
   const observations = [...accepted.values()].sort((left, right) =>
-    duplicateIdentity(left).localeCompare(duplicateIdentity(right))
+    compareOrdinal(duplicateIdentity(left), duplicateIdentity(right))
   );
   const importFingerprint = sha256(observations.map(canonicalNormalizedRow).join('\n'));
 
