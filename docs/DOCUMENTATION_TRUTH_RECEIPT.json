@@ -55,7 +55,8 @@
         "`README.md` must document Attack 3000 content currentness as independently evaluated from bounded observation time rather than trusted from a CURRENT label, and must keep distribution, external demand, publication, provider mutation, merge, deploy, spend, and external-contact authority separate.",
         "`README.md` must describe the Content Trend Radar as an advisory existing-lane capability whose first-wave evidence requires current source provenance and whose ranking cannot authorize publication, scheduling, spend, provider mutation, merge, deploy, or external contact.",
         "`README.md` must describe deterministic founder-content approval reservation and exact active retry recovery without allowing evidence rotation, retry, or a stored reservation to mint new publication authority.",
-        "`README.md` must describe `content-metrics-csv@v1` as an observation-only import contract that binds account/page identity, audience segment, metric name and unit, measurement windows, null semantics, duplicate handling, and provenance while keeping real provider readback separate from fixture proof."
+        "`README.md` must describe `content-metrics-csv@v1` as an observation-only import contract that binds account/page identity, audience segment, metric name and unit, measurement windows, null semantics, duplicate handling, and provenance while keeping real provider readback separate from fixture proof.",
+        "`README.md` must describe the normalized founder-content analytics interchange as requiring separate account/page identity and offset-aware timestamps, and must keep filename/display-name/receipt-generation provenance separate from stable logical idempotency and provider truth."
       ]
     },
     {
@@ -68,7 +69,8 @@
       "path": "docs/TRUTH_DECAY_AUDIT.md",
       "claims": [
         "`docs/TRUTH_DECAY_AUDIT.md` must treat a StoryEngine peer SHA/ref in FCR Playwright as evidence identity rather than a durable alias for current StoryEngine, and must require complete federation re-proof whenever the peer identity or either repository head moves.",
-        "`docs/TRUTH_DECAY_AUDIT.md` must keep imported content metrics observation-only, preserve UNKNOWN for missing values, reject conflicting duplicate identities, and require real provider evidence before imported fixture data can support a current external analytics claim."
+        "`docs/TRUTH_DECAY_AUDIT.md` must keep imported content metrics observation-only, preserve UNKNOWN for missing values, reject conflicting duplicate identities, and require real provider evidence before imported fixture data can support a current external analytics claim.",
+        "`docs/TRUTH_DECAY_AUDIT.md` must distinguish stable logical analytics-import identity from provenance-only filename, display-name, and receipt-generation metadata so presentation changes cannot manufacture a second logical import."
       ]
     },
     {
@@ -99,6 +101,13 @@
       "path": "src/lib/contentMetricsCsv.ts",
       "claims": [
         "`src/lib/contentMetricsCsv.ts` must parse only the bounded `content-metrics-csv@v1` schema, bind each observation to provider/account/page/audience/content/window/source provenance, preserve blank metric values as UNKNOWN_NO_EVIDENCE, collapse only identical duplicate identities, reject conflicting duplicates, and remain observation-only without freshness, publication, strategy-mutation, or provider authority."
+      ]
+    },
+    {
+      "path": "tools/founder-content-contracts/content-analytics-csv-ingest.cjs",
+      "claims": [
+        "`tools/founder-content-contracts/content-analytics-csv-ingest.cjs` must require explicit account and page identity, offset-aware receipt/snapshot timestamps, bounded normalized CSV input, null-preserving metrics, duplicate rejection within snapshots, deterministic overlap reconciliation through the canonical analytics audit, and observation-only authority.",
+        "Its logical `idempotency_key` must bind stable source SHA-256 plus platform/account/page/comparison scope and must not change solely because identical bytes are renamed, an account display label changes, or receipt-generation time changes; those fields remain provenance only."
       ]
     },
     {
