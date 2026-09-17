@@ -26,6 +26,7 @@ process.env.NO_PROXY = '*';
 process.env.no_proxy = '*';
 
 process.env.FOUNDER_SESSION_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString('base64url');
+process.env.FCR_E2E_GENERAL_RATE_LIMIT_MAX = '240';
 
 if (!process.env.FCR_E2E_SCENARIO) {
   const runnerPath = new URL('./direct-browser-run.mjs', import.meta.url).pathname;
