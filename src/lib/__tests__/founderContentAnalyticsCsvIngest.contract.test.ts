@@ -75,7 +75,7 @@ describe('founder content analytics CSV ingestion', () => {
     });
   });
 
-  it('is idempotent for the same logical evidence even when presentation provenance changes', () => {
+  it('is idempotent for the same logical evidence even when presentation provenance or row order changes', () => {
     const first = parseFounderContentAnalyticsCsv(safeCsv, metadata);
     const second = parseFounderContentAnalyticsCsv(safeCsv, metadata);
     const renamedAndRegenerated = parseFounderContentAnalyticsCsv(safeCsv, {
@@ -84,6 +84,13 @@ describe('founder content analytics CSV ingestion', () => {
       file_name: 'renamed-safe-fixture.csv',
       account_name: 'Renamed Display Account',
     });
+    const [header, ...dataRows] = safeCsv.trimEnd().split('\n');
+    const reorderedCsv = `${[header, ...dataRows.reverse()].join('\n')}\n`;
+    const reordered = parseFounderContentAnalyticsCsv(reorderedCsv, metadata);
+    const changedMetric = parseFounderContentAnalyticsCsv(
+      safeCsv.replace(',100,10,2,,', ',101,10,2,,'),
+      metadata,
+    );
     const otherPage = parseFounderContentAnalyticsCsv(safeCsv, {
       ...metadata,
       page_id: 'different-linkedin-page',
@@ -91,6 +98,9 @@ describe('founder content analytics CSV ingestion', () => {
 
     expect(first.idempotency_key).toBe(second.idempotency_key);
     expect(first.idempotency_key).toBe(renamedAndRegenerated.idempotency_key);
+    expect(reordered.idempotency_key).toBe(first.idempotency_key);
+    expect(reordered.source.sha256).not.toBe(first.source.sha256);
+    expect(changedMetric.idempotency_key).not.toBe(first.idempotency_key);
     expect(renamedAndRegenerated.source.sha256).toBe(first.source.sha256);
     expect(renamedAndRegenerated.source.file_name).toBe('renamed-safe-fixture.csv');
     expect(renamedAndRegenerated.generated_at).toBe('2026-09-05T12:00:00.000Z');
