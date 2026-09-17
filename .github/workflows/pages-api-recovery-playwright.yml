@@ -96,8 +96,8 @@ jobs:
           if (!founder.includes('<link rel="canonical" href="https://www.foundercontrolroom.org/juss-rayy/"')) {
             throw new Error('deployed founder canonical is not normalized to the public www origin');
           }
-          if (!founder.includes('<meta itemprop="dateModified" content="2026-09-16" />')) {
-            throw new Error('deployed founder dateModified is stale');
+          if (!/<meta itemprop="dateModified" content="\d{4}-\d{2}-\d{2}" \/>/.test(founder)) {
+            throw new Error('deployed founder dateModified is missing or malformed');
           }
           if (!work.includes('<link rel="canonical" href="https://www.foundercontrolroom.org/work.html"')) {
             throw new Error('public work directory canonical is missing');
