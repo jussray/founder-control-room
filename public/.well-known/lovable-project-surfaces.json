@@ -1,0 +1,58 @@
+{
+  "schema": "juss/external-project-surfaces@v1",
+  "provider": "lovable",
+  "authorityRepository": "jussray/founder-control-room",
+  "bindings": [
+    {
+      "surfaceId": "lovable:0fa1fd0f-9ec2-4bf3-9415-79bbfd4b3917",
+      "name": "Truth Compass",
+      "role": "founder-control-surface",
+      "canonicalRepository": "jussray/founder-control-room",
+      "canonicalBranch": "main",
+      "surfaceCommit": "3c6f382bd39775cc927b05e20562a446fa1ce935",
+      "surfaceState": "durable-backend-ui-incomplete",
+      "truthAuthority": false,
+      "executionAllowed": false,
+      "externalMutationAllowed": false,
+      "rules": [
+        "Resolve the current canonical repository head before making current-state claims.",
+        "Founder Control Room remains authoritative for project truth, evidence, approvals, receipts, continuity, and consequential execution boundaries.",
+        "If the canonical read path is unavailable, fail closed as UNKNOWN or BLOCKED rather than substituting demo, seed, browser-local, generated, or model-produced state."
+      ]
+    },
+    {
+      "surfaceId": "lovable:e1436754-7a41-40bb-927c-c9a0e081e70b",
+      "name": "Exact Match Engine",
+      "role": "reconciliation-prototype",
+      "canonicalRepository": "jussray/founder-control-room",
+      "canonicalBranch": "main",
+      "surfaceCommit": "dd9fdc48281ed3fb1fe907bb7dc01afa5c40fc56",
+      "surfaceState": "browser-local-demo",
+      "truthAuthority": false,
+      "executionAllowed": false,
+      "externalMutationAllowed": false,
+      "rules": [
+        "Browser-local and seeded state is demo evidence only and may never be promoted to portfolio truth.",
+        "Real reconciliation observations must bind repository, ref, exact SHA, and evidence source.",
+        "If Founder Control Room evidence is unavailable, return UNKNOWN or BLOCKED rather than falling back to seeded state."
+      ]
+    },
+    {
+      "surfaceId": "lovable:8ef43cd3-8d93-4494-a685-59ce0f795614",
+      "name": "Truth Weaver",
+      "role": "reasoning-proposal-surface",
+      "canonicalRepository": "jussray/chief-ai-machine",
+      "canonicalBranch": "main",
+      "surfaceCommit": "a2d5310fc5e3e4301173cb85112719c2542b3440",
+      "surfaceState": "ui-incomplete",
+      "truthAuthority": false,
+      "executionAllowed": false,
+      "externalMutationAllowed": false,
+      "rules": [
+        "Chief AI owns reasoning, synthesis, capability composition, and recommendations; Founder Control Room remains the portfolio authority repository.",
+        "A stronger model, strategic lens, or higher confidence never increases authority.",
+        "If Chief or Founder Control Room truth cannot be resolved, fail closed as UNKNOWN or BLOCKED."
+      ]
+    }
+  ]
+}
