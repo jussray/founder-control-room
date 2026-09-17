@@ -49,10 +49,11 @@ test.describe('Repository Settings ruleset safety', () => {
     await expect(page.locator('select[name="enforcement"]')).toHaveValue('active');
     await expect(page.locator('input[name="targetRefs"]')).toHaveValue('main');
     await expect(page.locator('input[name="requirePullRequest"]')).toBeChecked();
-    await expect(page.locator('input[name="requiredApprovingReviewCount"]')).toHaveValue('1');
+    await expect(page.locator('input[name="requiredApprovingReviewCount"]')).toHaveValue('0');
     await expect(page.locator('input[name="requiredStatusCheckNames"]')).toHaveValue(
       'Required Gate, Verify test-ledger contract',
     );
+    await expect(page.getByText('strict-freshness ruleset with no bypass actors')).toBeVisible();
   });
 
   test('blocks an accidental second active FCR main ruleset before any provider request', async ({ page }) => {
