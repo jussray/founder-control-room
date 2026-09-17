@@ -53,9 +53,9 @@ describe('parseContentMetricsCsv', () => {
       metricValue: 542,
       unit: 'count',
       evidenceState: 'OBSERVED',
-      windowStart: '2026-09-10T00:00:00Z',
-      windowEnd: '2026-09-16T00:00:00Z',
-      observedAt: '2026-09-16T08:30:00Z',
+      windowStart: '2026-09-10T00:00:00.000Z',
+      windowEnd: '2026-09-16T00:00:00.000Z',
+      observedAt: '2026-09-16T08:30:00.000Z',
       provenance: {
         source: 'linkedin_native_export',
         sourceRef: 'export:20260916',
@@ -79,6 +79,28 @@ describe('parseContentMetricsCsv', () => {
     expect(duplicated.inputRowCount).toBe(4);
     expect(duplicated.normalizedRowCount).toBe(3);
     expect(duplicated.duplicateRowsCollapsed).toBe(1);
+  });
+
+  it('canonicalizes equivalent timestamp offsets before duplicate identity and fingerprinting', () => {
+    const equivalentOffset = impressions
+      .replace('2026-09-10T00:00:00Z', '2026-09-10T01:00:00+01:00')
+      .replace('2026-09-16T00:00:00Z', '2026-09-16T01:00:00+01:00')
+      .replace('2026-09-16T08:30:00Z', '2026-09-16T09:30:00+01:00');
+
+    const canonical = parseContentMetricsCsv(csv(impressions));
+    const offset = parseContentMetricsCsv(csv(equivalentOffset));
+    const combined = parseContentMetricsCsv(csv(impressions, equivalentOffset));
+
+    expect(offset.importFingerprint).toBe(canonical.importFingerprint);
+    expect(offset.observations[0]?.provenance.rowFingerprint)
+      .toBe(canonical.observations[0]?.provenance.rowFingerprint);
+    expect(offset.observations[0]).toMatchObject({
+      windowStart: '2026-09-10T00:00:00.000Z',
+      windowEnd: '2026-09-16T00:00:00.000Z',
+      observedAt: '2026-09-16T08:30:00.000Z',
+    });
+    expect(combined.normalizedRowCount).toBe(1);
+    expect(combined.duplicateRowsCollapsed).toBe(1);
   });
 
   it('keeps distinct content, providers, and metric windows as separate business observations', () => {
@@ -130,9 +152,9 @@ describe('parseContentMetricsCsv', () => {
 
     expect(receipt.freshnessAuthority).toBe(false);
     expect(receipt.observations[0]).toMatchObject({
-      windowStart: '2025-01-01T00:00:00Z',
-      windowEnd: '2025-01-07T00:00:00Z',
-      observedAt: '2025-01-08T00:00:00Z',
+      windowStart: '2025-01-01T00:00:00.000Z',
+      windowEnd: '2025-01-07T00:00:00.000Z',
+      observedAt: '2025-01-08T00:00:00.000Z',
       provenance: { sourceRef: 'archive:2025-01' },
     });
   });
