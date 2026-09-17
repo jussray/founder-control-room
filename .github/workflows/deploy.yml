@@ -514,8 +514,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     environment: production
-    needs: smoke-test
-    if: needs.smoke-test.result == 'success'
+    needs: reconcile
+    if: needs.reconcile.result == 'success'
     env:
       EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha }}
       DEPLOY_URL: https://api.foundercontrolroom.org
