@@ -118,7 +118,7 @@ test('provider subject and ambiguous mutation outcome are durable and fail close
   assert.match(reconciler, /mutationOutcomeForError/);
   assert.match(reconciler, /provider-write-outcome-unknown/);
   assert.match(reconciler, /provider-write-verification-failed/);
-  assert.match(reconciler, /markMutationOutcome\(error,\s*'unknown'\)/);
+  assert.match(reconciler, /markMutationOutcome\(markAccessSubject\(error,\s*subjectFingerprint\),\s*'unknown'\)/s);
   assert.match(reconciler, /chiefAccessMutationOutcome/);
   assert.match(recoveryWorkflow, /allowed_mutation_outcome/);
   assert.match(recoveryWorkflow, /\.mutationPerformed == null/);
@@ -179,10 +179,12 @@ test('public receipt explicitly keeps browser/runtime proof separate', () => {
 test('blocked diagnostics are allowlisted and cannot become provider mutation authority', () => {
   assert.match(reconciler, /BLOCKED_REASON_CODES/);
   assert.match(reconciler, /state: 'blocked'/);
-  assert.match(reconciler, /mutationPerformed: false/);
+  assert.match(reconciler, /const mutationPerformed = mutationOutcome === 'performed'[\s\S]*?\? true[\s\S]*?: mutationOutcome === 'unknown'[\s\S]*?\? null[\s\S]*?: false;/);
   assert.match(reconciler, /reasonCode/);
   assert.match(recoveryWorkflow, /allowed_reason/);
-  assert.match(recoveryWorkflow, /\.mutationPerformed == false/);
+  assert.match(recoveryWorkflow, /if \.mutationOutcome == "none" then \.mutationPerformed == false/);
+  assert.match(recoveryWorkflow, /elif \.mutationOutcome == "performed" then \.mutationPerformed == true/);
+  assert.match(recoveryWorkflow, /else \.mutationPerformed == null/);
 });
 
 test('runtime witness remains check-only and cannot inherit repair authority', () => {
