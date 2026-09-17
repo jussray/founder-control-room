@@ -186,6 +186,20 @@ function assertSnapshotMetadata(group, row, lineNumber) {
   }
 }
 
+function canonicalSnapshotEvidence(group) {
+  return {
+    snapshot_id: group.id,
+    captured_at: group.captured_at,
+    window_start: group.window_start,
+    window_end: group.window_end,
+    import_kind: group.import_kind,
+    daily: [...group.daily].sort((left, right) => left.date.localeCompare(right.date)),
+    audience: Object.fromEntries(
+      Object.entries(group.audience).sort(([left], [right]) => left.localeCompare(right)),
+    ),
+  };
+}
+
 function parseFounderContentAnalyticsCsv(csvText, metadata = {}) {
   if (typeof csvText !== 'string') fail('CSV input must be UTF-8 text');
   const byteLength = Buffer.byteLength(csvText, 'utf8');
@@ -360,12 +374,16 @@ function parseFounderContentAnalyticsCsv(csvText, metadata = {}) {
     recent_start: metadata.comparison.recent_start,
     recent_end: metadata.comparison.recent_end,
   });
+  const normalizedEvidence = [...groups.values()]
+    .map(canonicalSnapshotEvidence)
+    .sort((left, right) => left.captured_at.localeCompare(right.captured_at)
+      || left.snapshot_id.localeCompare(right.snapshot_id));
   const idempotencyIdentity = {
     contract: CONTRACT,
     platform,
     account_id: accountId,
     page_id: pageId,
-    source_sha256: sourceSha256,
+    normalized_evidence: normalizedEvidence,
     comparison: comparisonIdentity,
     top_post_count: topPostCount,
   };
