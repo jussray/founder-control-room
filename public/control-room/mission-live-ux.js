@@ -1,4 +1,3 @@
-const SESSION_KEY = 'fcr_session';
 const POLL_MS = 2000;
 const PROOF_FORM_SELECTOR = '#proof-gate-form';
 const MISSION_TAB_SELECTOR = '.tabs button[data-tab="missions"]';
@@ -10,17 +9,6 @@ let pollInFlight = false;
 
 function activeMissionTab() {
   return document.querySelector(`${MISSION_TAB_SELECTOR}.active`) instanceof HTMLButtonElement;
-}
-
-function readSessionToken() {
-  try {
-    const raw = sessionStorage.getItem(SESSION_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    return typeof parsed?.access_token === 'string' && parsed.access_token ? parsed.access_token : null;
-  } catch {
-    return null;
-  }
 }
 
 function proofForm() {
@@ -109,8 +97,6 @@ async function pollMissionStatus() {
     ensureLiveStatus('Live status · paused while editing');
     return;
   }
-  const token = readSessionToken();
-  if (!token) return;
 
   pollInFlight = true;
   try {
@@ -118,11 +104,12 @@ async function pollMissionStatus() {
       method: 'GET',
       cache: 'no-store',
       credentials: 'same-origin',
-      headers: {
-        Accept: 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
+      headers: { Accept: 'application/json' },
     });
+    if (response.status === 401) {
+      ensureLiveStatus('Live status · sign in required');
+      return;
+    }
     if (!response.ok) {
       ensureLiveStatus(`Live status · unavailable (${response.status})`);
       return;
