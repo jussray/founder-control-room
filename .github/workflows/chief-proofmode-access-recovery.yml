@@ -1,7 +1,7 @@
 name: Chief ProofMode Access Recovery
 
 on:
-  workflow_dispatch:
+  workflow_call:
     inputs:
       expected_head_sha:
         description: 'Exact current FCR main SHA approved to control the Chief Access repair'
@@ -10,11 +10,7 @@ on:
       mode:
         description: 'Inspect or repair only the exact immutable Chief preview Service Auth policy'
         required: true
-        default: check
-        type: choice
-        options:
-          - check
-          - repair
+        type: string
       target_url:
         description: 'Exact immutable Chief workers.dev preview origin'
         required: true
@@ -42,6 +38,11 @@ env:
 
 jobs:
   recover:
+    if: >-
+      github.repository == 'jussray/founder-control-room' &&
+      github.event_name == 'issue_comment' &&
+      github.event.issue.number == 485 &&
+      github.event.comment.user.login == 'jussray'
     name: Verify or repair exact Chief ProofMode Service Auth
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -117,11 +118,26 @@ jobs:
             echo "- Mode: \`$CHIEF_ACCESS_MODE\`"
             echo "- Target: \`$target_origin\`"
             echo "- Approval reference receipt: \`$approval_reference_receipt\`"
+            echo '- Invocation authority: founder issue #485 command bridge only'
             echo '- Allowed mutation: create one specific non_identity Service Auth policy on one exact immutable Chief preview host'
             echo '- Wildcard/public multi-destination/worker/preview_worker mutation: blocked'
             echo '- Existing conflicting named policy overwrite: blocked'
             echo '- DNS, Worker route, deployment, database, secret, and application mutation: none'
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Refuse unresolved prior Chief Access repair
+        id: reconcile_gate
+        if: inputs.mode == 'repair'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! gh api --paginate --slurp "repos/${GITHUB_REPOSITORY}/issues/485/comments?per_page=100" \
+            | node scripts/chief-proofmode-access-reconciliation-state.mjs "$CHIEF_ACCESS_TARGET_URL" >/dev/null; then
+            echo '::error title=Chief Access reconciliation required::trusted subject-bound reconciliation remains unresolved for this exact target; a matching provider subject must clear the latch before another repair can execute.'
+            exit 1
+          fi
 
       - name: Set up Node 24
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
@@ -135,50 +151,79 @@ jobs:
       - name: Prove Chief Access bounded-repair contracts
         run: |
           node --check scripts/reconcile-chief-proofmode-access.mjs
+          node --check scripts/resolve-chief-proofmode-access-selector.mjs
+          node --check scripts/chief-proofmode-access-reconciliation-state.mjs
           node --test scripts/reconcile-chief-proofmode-access.node-test.mjs
+          node --test scripts/reconcile-chief-proofmode-access-subject.node-test.mjs
+          node --test scripts/resolve-chief-proofmode-access-selector.node-test.mjs
+          node --test scripts/chief-proofmode-access-reconciliation-state.node-test.mjs
           node --test scripts/chief-proofmode-access-bridge-contract.node-test.mjs
           node --test scripts/fcr-cloudflare-bridge-contract.node-test.mjs
 
-      - name: Require configured Chief service-token identity before repair
-        if: inputs.mode == 'repair'
+      - name: Resolve canonical Chief service-token identity
+        id: selector
         env:
-          CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID: ${{ secrets.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID || secrets.CLOUDFLARE_ACCESS_CLIENT_ID || vars.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID || vars.CLOUDFLARE_ACCESS_CLIENT_ID }}
-          CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID: ${{ vars.CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID || vars.CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID }}
+          CHIEF_ACCESS_CLIENT_ID_SECRET: ${{ secrets.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID }}
+          CHIEF_ACCESS_CLIENT_ID_VARIABLE: ${{ vars.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID }}
+          GENERIC_ACCESS_CLIENT_ID_SECRET: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_ID }}
+          GENERIC_ACCESS_CLIENT_ID_VARIABLE: ${{ vars.CLOUDFLARE_ACCESS_CLIENT_ID }}
+          CHIEF_ACCESS_SERVICE_TOKEN_ID_VARIABLE: ${{ vars.CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID }}
+          GENERIC_ACCESS_SERVICE_TOKEN_ID_VARIABLE: ${{ vars.CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID }}
+          CHIEF_SELECTOR_REQUIRE_IDENTITY: ${{ inputs.mode == 'repair' && 'true' || 'false' }}
+        run: node scripts/resolve-chief-proofmode-access-selector.mjs
+
+      - name: Persist repair-in-progress reconciliation latch
+        if: inputs.mode == 'repair' && steps.selector.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RETURN_ISSUE: '485'
         shell: bash
         run: |
           set -euo pipefail
-          if [[ -z "$CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID" && -z "$CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID" ]]; then
-            echo '::error title=Missing Chief service-token identity::repair requires CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID (or canonical alias CLOUDFLARE_ACCESS_CLIENT_ID) or CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID (or alias CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID) as a protected selector in the FCR production environment.'
-            exit 1
-          fi
+          latch='test-results/chief-proofmode-access-reconciliation-latch.md'
+          mkdir -p test-results
+          {
+            echo "<!-- chief-proofmode-access-reconciliation:v2 target=$CHIEF_ACCESS_TARGET_URL disposition=REPAIR_IN_PROGRESS subject=pending head=$EXPECTED_HEAD_SHA run=$GITHUB_RUN_ID -->"
+            echo
+            echo '## Chief ProofMode Access reconciliation latch'
+            echo
+            echo '- Disposition: `REPAIR_IN_PROGRESS`'
+            echo '- Provider subject: `pending provider readback`'
+            echo "- Exact FCR authority head: \`$EXPECTED_HEAD_SHA\`"
+            echo "- Chief target: \`$CHIEF_ACCESS_TARGET_URL\`"
+            echo "- Workflow run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            echo '- A later repair is blocked until this same run terminates safely or exact provider-subject evidence clears every unresolved subject.'
+          } > "$latch"
+          gh issue comment "$RETURN_ISSUE" --repo "$GITHUB_REPOSITORY" --body-file "$latch"
 
       - name: Inspect current Chief Service Auth with dedicated read authority
         if: inputs.mode == 'check'
         env:
           CLOUDFLARE_ACCESS_API_TOKEN: ${{ secrets.CLOUDFLARE_ACCESS_API_TOKEN }}
-          CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID: ${{ secrets.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID || secrets.CLOUDFLARE_ACCESS_CLIENT_ID || vars.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID || vars.CLOUDFLARE_ACCESS_CLIENT_ID }}
-          CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID: ${{ vars.CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID || vars.CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID }}
         run: node scripts/reconcile-chief-proofmode-access.mjs >/dev/null 2>&1
 
       - name: Apply exact-host Chief Service Auth with dedicated admin authority
+        id: apply
         if: inputs.mode == 'repair'
         env:
           CLOUDFLARE_ACCESS_ADMIN_API_TOKEN: ${{ secrets.CLOUDFLARE_ACCESS_ADMIN_API_TOKEN }}
-          CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID: ${{ secrets.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID || secrets.CLOUDFLARE_ACCESS_CLIENT_ID || vars.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID || vars.CLOUDFLARE_ACCESS_CLIENT_ID }}
-          CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID: ${{ vars.CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID || vars.CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID }}
         shell: bash
         run: |
-          set -euo pipefail
+          set +e
           node scripts/reconcile-chief-proofmode-access.mjs >/dev/null 2>&1
-          cp test-results/chief-proofmode-access-recovery.json test-results/chief-proofmode-access-mutation.json
+          status=$?
+          set -e
+          if [[ -f test-results/chief-proofmode-access-recovery.json ]]; then
+            cp test-results/chief-proofmode-access-recovery.json test-results/chief-proofmode-access-mutation.json
+          fi
+          exit "$status"
 
       - name: Re-read repaired policy with provider authority
-        if: inputs.mode == 'repair'
+        id: reread
+        if: ${{ always() && inputs.mode == 'repair' && steps.selector.outcome == 'success' }}
         env:
           CHIEF_ACCESS_MODE: check
           CLOUDFLARE_ACCESS_API_TOKEN: ${{ secrets.CLOUDFLARE_ACCESS_ADMIN_API_TOKEN }}
-          CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID: ${{ secrets.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID || secrets.CLOUDFLARE_ACCESS_CLIENT_ID || vars.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID || vars.CLOUDFLARE_ACCESS_CLIENT_ID }}
-          CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID: ${{ vars.CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID || vars.CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID }}
         run: node scripts/reconcile-chief-proofmode-access.mjs >/dev/null 2>&1
 
       - name: Return sanitized Chief Access receipt to founder control issue
@@ -188,6 +233,12 @@ jobs:
           RETURN_ISSUE: '485'
           JOB_STATUS: ${{ job.status }}
           WORKFLOW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          RECONCILIATION_GATE_OUTCOME: ${{ steps.reconcile_gate.outcome }}
+          SELECTOR_OUTCOME: ${{ steps.selector.outcome }}
+          SELECTOR_CLIENT_SOURCE: ${{ steps.selector.outputs.client_id_source }}
+          SELECTOR_TOKEN_SOURCE: ${{ steps.selector.outputs.service_token_id_source }}
+          APPLY_OUTCOME: ${{ steps.apply.outcome }}
+          REREAD_OUTCOME: ${{ steps.reread.outcome }}
         shell: bash
         run: |
           set -euo pipefail
@@ -221,26 +272,38 @@ jobs:
                 or . == "access-scope-not-repair-eligible"
                 or . == "provider-read-credential-missing"
                 or . == "provider-read-failed"
+                or . == "provider-write-outcome-unknown"
+                or . == "provider-write-verification-failed"
                 or . == "bounded-check-failed";
+              def allowed_mutation_outcome: . == "none" or . == "performed" or . == "unknown";
+              def allowed_subject: . == null or (type == "string" and test("^sha256:[0-9a-f]{64}$"));
               length == 1 and (.[0]
                 | type == "object"
-                and .schemaVersion == 1
+                and .schemaVersion == 2
                 and .scope == "chief-proofmode-access-recovery"
                 and (.observedAt | iso8601)
                 and (.mode == "check" or .mode == "repair")
                 and (.state == "configured" or .state == "blocked")
-                and (.mutationPerformed | type == "boolean")
+                and (.mutationOutcome | allowed_mutation_outcome)
+                and (
+                  if .mutationOutcome == "none" then .mutationPerformed == false
+                  elif .mutationOutcome == "performed" then .mutationPerformed == true
+                  else .mutationPerformed == null
+                  end
+                )
                 and .targetOrigin == $target
+                and (.subjectFingerprint | allowed_subject)
                 and (
                   if .state == "configured" then
-                    (.accessScope | allowed_scope)
+                    .mutationOutcome != "unknown"
+                    and (.accessScope | allowed_scope)
                     and (.applicationId | type == "string" and length > 0 and length <= 200)
                     and (.policyId == null or (.policyId | type == "string" and length <= 200))
                     and (.serviceTokenId | type == "string" and length > 0 and length <= 200)
+                    and (.subjectFingerprint | type == "string" and test("^sha256:[0-9a-f]{64}$"))
                     and (.reasonCode == null)
                   else
-                    .mutationPerformed == false
-                    and (.reasonCode | allowed_reason)
+                    (.reasonCode | allowed_reason)
                     and (.accessScope == null)
                     and (.applicationId == null)
                     and (.policyId == null)
@@ -251,7 +314,57 @@ jobs:
             ' "$path" >/dev/null 2>&1
           }
 
+          current_receipt_valid=false
+          current_state=''
+          current_subject=''
+          if [[ "$safe_target" != 'UNKNOWN' && -f "$current_receipt" ]] && validate_receipt "$current_receipt"; then
+            current_receipt_valid=true
+            current_state="$(jq -r '.state' "$current_receipt")"
+            current_subject="$(jq -r '.subjectFingerprint // ""' "$current_receipt")"
+          fi
+
+          mutation_receipt_valid=false
+          mutation_outcome=''
+          mutation_subject=''
+          if [[ "$safe_target" != 'UNKNOWN' && -f "$mutation_receipt" ]] && validate_receipt "$mutation_receipt"; then
+            mutation_receipt_valid=true
+            mutation_outcome="$(jq -r '.mutationOutcome' "$mutation_receipt")"
+            mutation_subject="$(jq -r '.subjectFingerprint // ""' "$mutation_receipt")"
+          fi
+
+          reconciliation_disposition=''
+          reconciliation_subject=''
+          if [[ "$safe_target" != 'UNKNOWN' && "$safe_head" != 'UNKNOWN' ]]; then
+            if [[ "$CHIEF_ACCESS_MODE" == 'repair' ]]; then
+              if [[ "$RECONCILIATION_GATE_OUTCOME" == 'success' ]]; then
+                if [[ "$REREAD_OUTCOME" == 'success' && "$current_receipt_valid" == 'true' && "$current_state" == 'configured' && "$current_subject" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+                  reconciliation_disposition='CLEAR'
+                  reconciliation_subject="$current_subject"
+                elif [[ "$mutation_receipt_valid" == 'true' && "$mutation_outcome" == 'none' ]]; then
+                  reconciliation_disposition='CLEAR'
+                  reconciliation_subject='pending'
+                else
+                  reconciliation_disposition='RECONCILE_REQUIRED'
+                  if [[ "$mutation_subject" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+                    reconciliation_subject="$mutation_subject"
+                  elif [[ "$current_subject" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+                    reconciliation_subject="$current_subject"
+                  else
+                    reconciliation_subject='pending'
+                  fi
+                fi
+              fi
+            elif [[ "$current_receipt_valid" == 'true' && "$current_state" == 'configured' && "$current_subject" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+              reconciliation_disposition='CLEAR'
+              reconciliation_subject="$current_subject"
+            fi
+          fi
+
           {
+            if [[ -n "$reconciliation_disposition" && -n "$reconciliation_subject" ]]; then
+              echo "<!-- chief-proofmode-access-reconciliation:v2 target=$safe_target disposition=$reconciliation_disposition subject=$reconciliation_subject head=$safe_head run=$GITHUB_RUN_ID -->"
+              echo
+            fi
             echo '## Chief ProofMode Cloudflare Access receipt'
             echo
             echo "- Exact FCR authority head: \`$safe_head\`"
@@ -260,36 +373,44 @@ jobs:
             echo "- Founder approval receipt: \`$safe_approval\`"
             echo "- Workflow run: $WORKFLOW_RUN_URL"
             echo "- Job status: \`$JOB_STATUS\`"
+            echo "- Client selector source class: \`${SELECTOR_CLIENT_SOURCE:-unresolved}\`"
+            echo "- Service-token selector source class: \`${SELECTOR_TOKEN_SOURCE:-unresolved}\`"
+            if [[ -n "$reconciliation_disposition" ]]; then
+              echo "- Reconciliation disposition: \`$reconciliation_disposition\`"
+              echo "- Reconciliation subject: \`$reconciliation_subject\`"
+            fi
 
-            if [[ "$safe_target" == 'UNKNOWN' || ! -f "$current_receipt" ]] || ! validate_receipt "$current_receipt"; then
+            if [[ "$current_receipt_valid" != 'true' ]]; then
               echo '- Current provider receipt: `missing-or-malformed`'
               echo '- Current provider truth: `UNKNOWN`'
             else
               echo '- Current provider receipt: `present`'
-              receipt_state="$(jq -r '.state' "$current_receipt")"
-              if [[ "$receipt_state" == 'blocked' ]]; then
+              if [[ "$current_state" == 'blocked' ]]; then
                 echo '- Current provider truth: `BLOCKED`'
               else
                 echo '- Current provider truth: `CONFIGURED`'
               fi
               echo
               echo '```json'
-              jq -s '.[0] | if .state == "blocked" then {schemaVersion, scope, observedAt, mode, state, mutationPerformed, targetOrigin, reasonCode} else {schemaVersion, scope, observedAt, mode, state, mutationPerformed, targetOrigin, accessScope, applicationId, policyId, serviceTokenId} end' "$current_receipt"
+              jq -s '.[0] | if .state == "blocked" then {schemaVersion, scope, observedAt, mode, state, mutationOutcome, mutationPerformed, targetOrigin, reasonCode, subjectFingerprint} else {schemaVersion, scope, observedAt, mode, state, mutationOutcome, mutationPerformed, targetOrigin, accessScope, policyId, subjectFingerprint} end' "$current_receipt"
               echo '```'
             fi
 
             if [[ "$CHIEF_ACCESS_MODE" == 'repair' ]]; then
-              if [[ "$safe_target" == 'UNKNOWN' || ! -f "$mutation_receipt" ]] || ! validate_receipt "$mutation_receipt"; then
+              if [[ "$mutation_receipt_valid" != 'true' ]]; then
                 echo '- Mutation receipt: `missing-or-malformed`'
               else
                 echo '- Mutation receipt: `present`'
                 echo
                 echo '```json'
-                jq -s '.[0] | if .state == "blocked" then {schemaVersion, scope, observedAt, mode, state, mutationPerformed, targetOrigin, reasonCode} else {schemaVersion, scope, observedAt, mode, state, mutationPerformed, targetOrigin, accessScope, applicationId, policyId, serviceTokenId} end' "$mutation_receipt"
+                jq -s '.[0] | if .state == "blocked" then {schemaVersion, scope, observedAt, mode, state, mutationOutcome, mutationPerformed, targetOrigin, reasonCode, subjectFingerprint} else {schemaVersion, scope, observedAt, mode, state, mutationOutcome, mutationPerformed, targetOrigin, accessScope, policyId, subjectFingerprint} end' "$mutation_receipt"
                 echo '```'
               fi
             fi
 
+            if [[ "$reconciliation_disposition" == 'RECONCILE_REQUIRED' ]]; then
+              echo '- Retry authority: `BLOCKED`; read-only provider evidence must clear the same unresolved provider subject. A configured result for another app/token identity cannot clear this latch.'
+            fi
             echo '- Browser/runtime proof: `NOT CLAIMED HERE`; rerun Chief exact-head Playwright after provider repair.'
           } > "$public_receipt"
 
