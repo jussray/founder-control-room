@@ -200,6 +200,16 @@ A production-specific Truth Lease composes already-authoritative observations. I
 
 The privileged post-Deploy Playwright witness is an **independent verifier**, not an executor for the Deploy-run checkout. It must run only for a successful `workflow_dispatch` Deploy run from `main`, execute trusted witness source, and treat the Deploy run SHA only as release evidence to compare with the deployed Worker and public browser/runtime identity. A `workflow_run` SHA must never become executable authority merely because the upstream workflow succeeded.
 
+### Chief ProofMode Access recovery
+
+Chief Access recovery is a bounded Cloudflare authority lane, not a second control plane. The only supported mutation entry point is the founder-authored command on FCR issue #485; that bridge revalidates exact FCR `main`, the immutable Chief preview origin, the founder identity, and an auditable repair approval reference before invoking the repository-local reusable recovery workflow. The recovery workflow has no standalone `workflow_dispatch` mutation surface.
+
+Read and repair authority remain separate. A read-only `check` may inspect the exact Access application/policy/token binding and emit a sanitized receipt, but it performs no provider mutation and cannot claim browser/runtime success. `repair` requires separate admin authority and remains limited to one exact-host Service Auth policy creation for one resolved service-token identity; DNS, Worker routes, deployment, database, ruleset, and secret mutation remain out of scope.
+
+Service-token selection is specificity-first and conflict-detecting. Chief-specific protected configuration may fall back to the documented generic alias only when the two sources do not conflict. The selected non-secret identity is fingerprinted for continuity; selector presence is configuration evidence only and never proves the credential is valid or the runtime can authenticate.
+
+A provider write is not assumed absent merely because the request failed. Before mutation, FCR binds the exact target application and service-token identity into a provider-subject fingerprint and records `REPAIR_IN_PROGRESS`. A failed or ambiguous write becomes `RECONCILE_REQUIRED`; later evidence for another subject cannot clear that latch, and blind retry is blocked until the same provider subject is read back. A successful policy repair still does not prove Chief runtime health. Exact-current production Playwright and runtime identity remain separate required evidence.
+
 ### Evidence Trust Plane
 
 The Evidence Trust Plane keeps observation, provider readback, evidence validity, freshness, and action ceilings separate.
