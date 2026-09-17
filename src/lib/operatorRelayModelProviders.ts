@@ -21,6 +21,12 @@ const SECRET_VALUE_PATTERNS = [
   /\bsk-(?:proj-)?[A-Za-z0-9_-]{16,}\b/,
   /\bsk-ant-[A-Za-z0-9_-]{16,}\b/,
   /\bpplx-[A-Za-z0-9_-]{16,}\b/,
+  /\bgh[pousr]_[A-Za-z0-9]{20,}\b/,
+  /\bglpat-[A-Za-z0-9_-]{20,}\b/,
+  /\b(?:AKIA|ASIA)[A-Z0-9]{16}\b/,
+  /\bxox[baprs]-[A-Za-z0-9-]{20,}\b/,
+  /\bAIza[0-9A-Za-z_-]{30,}\b/,
+  /-----BEGIN (?:RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----/,
 ] as const;
 
 function record(value: unknown): JsonRecord | null {
@@ -152,6 +158,9 @@ function openAiText(body: JsonRecord): string {
 }
 
 function anthropicText(body: JsonRecord): string {
+  if (body.type !== 'message' || body.role !== 'assistant') {
+    throw new Error('Anthropic relay returned an invalid Messages response envelope');
+  }
   const content = Array.isArray(body.content) ? body.content : [];
   const parts = content.flatMap((entry) => {
     const block = record(entry);
