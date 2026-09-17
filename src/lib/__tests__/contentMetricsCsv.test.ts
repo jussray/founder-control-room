@@ -81,6 +81,27 @@ describe('parseContentMetricsCsv', () => {
     expect(duplicated.duplicateRowsCollapsed).toBe(1);
   });
 
+  it('keeps distinct content, providers, and metric windows as separate business observations', () => {
+    const secondContent = impressions
+      .replace('fp-post-1', 'fp-post-2')
+      .replace(',542,count,', ',311,count,');
+    const secondProvider = impressions
+      .replace(',linkedin,', ',facebook,')
+      .replace(',542,count,', ',410,count,');
+    const nextWindow = impressions
+      .replace('2026-09-10T00:00:00Z', '2026-09-17T00:00:00Z')
+      .replace('2026-09-16T00:00:00Z', '2026-09-23T00:00:00Z')
+      .replace('2026-09-16T08:30:00Z', '2026-09-23T08:30:00Z')
+      .replace(',542,count,', ',625,count,');
+
+    const receipt = parseContentMetricsCsv(csv(impressions, secondContent, secondProvider, nextWindow));
+
+    expect(receipt.inputRowCount).toBe(4);
+    expect(receipt.normalizedRowCount).toBe(4);
+    expect(receipt.duplicateRowsCollapsed).toBe(0);
+    expect(receipt.observations.map((row) => row.metricValue)).toEqual(expect.arrayContaining([542, 311, 410, 625]));
+  });
+
   it('fails closed on conflicting duplicates instead of choosing a convenient value', () => {
     const conflict = impressions.replace(',542,count,', ',543,count,');
     expect(() => parseContentMetricsCsv(csv(impressions, conflict))).toThrow(
