@@ -96,7 +96,10 @@ test('accepts only the configured service token on an existing exact-host Servic
   });
 
   const result = await ensureChiefProofModeAccessPolicy({ ...baseArgs, fetchImpl });
-  assert.deepEqual(result, {
+  assert.match(result.subjectFingerprint, /^sha256:[0-9a-f]{64}$/);
+  const { subjectFingerprint, ...stable } = result;
+  assert.ok(subjectFingerprint);
+  assert.deepEqual(stable, {
     state: 'configured',
     changed: false,
     appId: exactPublicApp.id,
