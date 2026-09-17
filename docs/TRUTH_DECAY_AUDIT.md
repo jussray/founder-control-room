@@ -66,6 +66,14 @@ The corrected canon separates the planes. `merge_authority: true` means only tha
 
 This is an authority-freshness correction, not a relaxation of review or proof. Exact-head evidence still constrains what can be claimed and integrated, while founder approval controls whether the exact candidate may cross the merge boundary. Deployment, publication, billing, secrets, database mutation, deletion, and other consequential classes remain separately gated.
 
+## 2026-09 control correction: content-metrics import provenance versus provider truth
+
+The portfolio metrics lane exposed a separate false-green risk: a correctly parsed CSV can prove the shape and provenance of imported observations without proving that the observations came from a currently authorized analytics provider. Treating a fixture, export, or repeated import as live platform truth would collapse import integrity into provider authority.
+
+The `content-metrics-csv@v1` contract therefore keeps imports observation-only. Each row must bind content fingerprint, provider, account and page identity, audience segment, metric name, count unit, bounded measurement window, observation time, source reference, and deterministic row provenance. A blank metric remains `UNKNOWN_NO_EVIDENCE`, not zero. Identical duplicate identities may collapse idempotently, while conflicting duplicate identities fail closed rather than last-row-wins.
+
+A safe sample CSV and green ingestion tests prove parser behavior, null handling, duplicate handling, timestamp rules, idempotency, and provenance only. A present-tense claim about impressions, reactions, profile views, attributed visits, conversations, contacts, or deals still requires real authorized provider evidence with current account/page identity and freshness. Imported analytics cannot grant publication, strategy mutation, provider mutation, merge, deploy, spend, or freshness authority.
+
 ## Root causes
 
 ### 1. Evidence lifetime was implicit
@@ -381,6 +389,7 @@ The strongest optimization is not faster claiming. It is shortening the distance
 32. A capital decision card, recommendation, score, or HOLD state is evidence interpretation, not financing or execution authority; stale or missing capital evidence must remove derived certainty instead of preserving an earlier recommendation.
 33. `merge_authority: true` cannot be reused as candidate approval; every merge requires a fresh explicit founder decision for the exact live repository/PR/base/head, and candidate movement expires that approval.
 34. Rebinding a cross-repository Playwright peer to a newly verified exact ref/SHA expires predecessor federation/browser proof and requires a complete exact-head rerun; the pin is evidence identity, not production or merge authority.
+35. A valid content-metrics CSV import proves bounded observation parsing and provenance only; missing metrics stay unknown, conflicting duplicates fail closed, and real provider authority plus freshness is still required for a current external analytics claim.
 
 ## Rollback
 
