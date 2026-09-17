@@ -23,6 +23,7 @@ const EXPECTED_COLUMNS = Object.freeze([
 ]);
 const IMPORT_KINDS = new Set(['historical_import', 'current_export']);
 const RESERVED_AUDIENCE_SEGMENTS = new Set(['__proto__', 'prototype', 'constructor']);
+const OFFSET_AWARE_ISO_TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})$/;
 
 function fail(message) {
   const error = new Error(`CONTENT_ANALYTICS_CSV_REJECTED: ${message}`);
@@ -35,6 +36,13 @@ function boundedText(value, field, max = 240) {
   const normalized = value.trim();
   if (normalized.length > max) fail(`${field} exceeds ${max} characters`);
   return normalized;
+}
+
+function parseIsoTimestamp(value, field) {
+  if (typeof value !== 'string' || !OFFSET_AWARE_ISO_TIMESTAMP.test(value) || Number.isNaN(Date.parse(value))) {
+    fail(`${field} must be an offset-aware ISO timestamp`);
+  }
+  return value;
 }
 
 function parseIsoDate(value, field) {
@@ -140,11 +148,13 @@ function parseFounderContentAnalyticsCsv(csvText, metadata = {}) {
   const generatedAt = boundedText(metadata.generated_at, 'metadata.generated_at', 64);
   const accountId = boundedText(metadata.account_id, 'metadata.account_id', 200);
   const accountName = boundedText(metadata.account_name, 'metadata.account_name', 200);
+  const pageId = boundedText(metadata.page_id, 'metadata.page_id', 200);
   const fileName = boundedText(metadata.file_name, 'metadata.file_name', 240);
   if (!platform) fail('metadata.platform is required');
-  if (!generatedAt || Number.isNaN(Date.parse(generatedAt))) fail('metadata.generated_at must be an ISO timestamp');
+  parseIsoTimestamp(generatedAt, 'metadata.generated_at');
   if (!accountId) fail('metadata.account_id is required');
   if (!accountName) fail('metadata.account_name is required');
+  if (!pageId) fail('metadata.page_id is required');
   if (!fileName) fail('metadata.file_name is required');
   validateComparison(metadata.comparison);
 
@@ -166,7 +176,7 @@ function parseFounderContentAnalyticsCsv(csvText, metadata = {}) {
     }
     const row = Object.fromEntries(EXPECTED_COLUMNS.map((column, columnIndex) => [column, values[columnIndex].trim()]));
     if (!row.snapshot_id) fail(`line ${lineNumber} snapshot_id is required`);
-    if (!row.captured_at || Number.isNaN(Date.parse(row.captured_at))) fail(`line ${lineNumber} captured_at must be an ISO timestamp`);
+    parseIsoTimestamp(row.captured_at, `line ${lineNumber} captured_at`);
     parseIsoDate(row.window_start, `line ${lineNumber} window_start`);
     parseIsoDate(row.window_end, `line ${lineNumber} window_end`);
     if (row.window_start > row.window_end) fail(`line ${lineNumber} window_start is after window_end`);
@@ -243,6 +253,7 @@ function parseFounderContentAnalyticsCsv(csvText, metadata = {}) {
 
   const sourceSha256 = createHash('sha256').update(csvText).digest('hex');
   const account = Object.freeze({ id: accountId, name: accountName });
+  const page = Object.freeze({ id: pageId });
   const source = Object.freeze({
     kind: 'normalized_csv',
     file_name: fileName,
@@ -275,12 +286,28 @@ function parseFounderContentAnalyticsCsv(csvText, metadata = {}) {
     platform,
     generated_at: generatedAt,
     account,
+    page,
     source,
     snapshot_sources: snapshotSources,
     metric_schema: metricSchema,
     audit_hash: audit.audit_hash,
   };
-  const idempotencyKey = createHash('sha256').update(JSON.stringify(receiptIdentity)).digest('hex');
+  const comparisonIdentity = Object.freeze({
+    baseline_start: metadata.comparison.baseline_start,
+    baseline_end: metadata.comparison.baseline_end,
+    recent_start: metadata.comparison.recent_start,
+    recent_end: metadata.comparison.recent_end,
+  });
+  const idempotencyIdentity = {
+    contract: CONTRACT,
+    platform,
+    account_id: accountId,
+    page_id: pageId,
+    source_sha256: sourceSha256,
+    comparison: comparisonIdentity,
+    top_post_count: metadata.top_post_count ?? null,
+  };
+  const idempotencyKey = createHash('sha256').update(JSON.stringify(idempotencyIdentity)).digest('hex');
 
   return Object.freeze({
     ...receiptIdentity,
