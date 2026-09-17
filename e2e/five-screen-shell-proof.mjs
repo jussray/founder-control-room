@@ -9,6 +9,8 @@ const durableProofDir = 'logs/five-screen-shell';
 mkdirSync(proofDir, { recursive: true });
 mkdirSync(durableProofDir, { recursive: true });
 
+const HOME_READ_PATHS = new Set(['/projects', '/dashboard/tasks', '/dashboard/activity', '/version']);
+
 const project = {
   slug: 'sekret-bip',
   name: "Se'kret Bip",
@@ -56,10 +58,16 @@ function staticControlRoomAsset(pathname) {
   }
 }
 
-async function installRoutes(page) {
+function recordRead(readCounts, pathname, method) {
+  if (!(readCounts instanceof Map) || method !== 'GET' || !HOME_READ_PATHS.has(pathname)) return;
+  readCounts.set(pathname, (readCounts.get(pathname) ?? 0) + 1);
+}
+
+async function installRoutes(page, readCounts = null) {
   await page.route('https://fcr.test/**', async (route) => {
     const request = route.request();
     const url = new URL(request.url());
+    recordRead(readCounts, url.pathname, request.method());
 
     if (url.pathname === '/control-room/' || url.pathname === '/control-room') {
       return route.fulfill({ status: 200, contentType: 'text/html', body: html });
@@ -124,8 +132,9 @@ async function assertNoHorizontalOverflow(page, label) {
 async function proveDesktop(browser) {
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
   const pageErrors = [];
+  const homeReadCounts = new Map();
   page.on('pageerror', (error) => pageErrors.push(error.message));
-  await installRoutes(page);
+  await installRoutes(page, homeReadCounts);
 
   await page.goto('https://fcr.test/control-room/', { waitUntil: 'networkidle' });
   await page.locator('.founder-screen-nav').waitFor();
@@ -145,6 +154,14 @@ async function proveDesktop(browser) {
     /Resolve review findings and bind fresh proof to the exact head/,
   );
   assert.match(await page.locator('.founder-home').textContent(), /bbbbbbbbbbbb/);
+
+  const settledHomeReads = Object.fromEntries(homeReadCounts);
+  await page.waitForTimeout(350);
+  assert.deepEqual(
+    Object.fromEntries(homeReadCounts),
+    settledHomeReads,
+    'Home reads must remain stable after render; shell-owned DOM mutations must not trigger refetch loops',
+  );
 
   await page.locator('.founder-screen-nav button', { hasText: 'Control' }).click();
   await page.getByText('Register a project', { exact: true }).waitFor();
@@ -224,4 +241,4 @@ try {
   await browser.close();
 }
 
-console.log('Five-screen shell Playwright proof passed through the real control-room index: five permanent screens, hidden legacy compatibility tabs, real Home data, founder-facing Control/Work copy, Control subviews, cross-screen project/mission context, reload restoration, stack-router legacy route migration, mobile overflow, and screenshot receipts.');
+console.log('Five-screen shell Playwright proof passed through the real control-room index: five permanent screens, bounded Home reads, hidden legacy compatibility tabs, real Home data, founder-facing Control/Work copy, Control subviews, cross-screen project/mission context, reload restoration, stack-router legacy route migration, mobile overflow, and screenshot receipts.');
