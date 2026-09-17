@@ -174,7 +174,16 @@ try {
   await page.waitForSelector('.truth-resolve-attack');
   assert((await page.locator('.truth-resolve-attack select[name="evidenceId"] option').count()) === 1, 'attack resolution offers only evidence actually linked to the challenged claim');
   await page.fill('.truth-resolve-attack textarea[name="answer"]', 'The linked signed-in browser receipt answers this version challenge, but it invalidates the previous continuity cookie before any fresh reconciliation.');
-  await page.click('.truth-resolve-attack button[type="submit"]');
+  const resolveButton = page.locator('.truth-resolve-attack button[type="submit"]');
+  const launchDock = page.locator('.launch-dock');
+  const [buttonBox, dockBox] = await Promise.all([resolveButton.boundingBox(), launchDock.boundingBox()]);
+  const dockOverlapsResolve = Boolean(buttonBox && dockBox
+    && buttonBox.x < dockBox.x + dockBox.width
+    && buttonBox.x + buttonBox.width > dockBox.x
+    && buttonBox.y < dockBox.y + dockBox.height
+    && buttonBox.y + buttonBox.height > dockBox.y);
+  assert(!dockOverlapsResolve, 'collapsed founder stack dock does not cover the attack-resolution action');
+  await resolveButton.click();
   const attackReceipt = await waitForReceipt(page, 'Attack resolved');
   assert(attackReceipt.toLowerCase().includes('stale'), 'attack resolution leaves the prior cookie visibly stale');
   assert(attackReceipt.includes('authority effect') && attackReceipt.includes('none'), 'attack resolution cannot create authority');
