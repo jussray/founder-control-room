@@ -50,19 +50,15 @@ await rm(outputDirectory, { recursive: true, force: true });
 await mkdir(outputDirectory, { recursive: true });
 await cp(sourceDirectory, outputDirectory, { recursive: true });
 
-// The FCR public origin is www.foundercontrolroom.org. Normalize the deployed
-// founder identity metadata without rewriting the existing visual/source page.
+// The FCR public origin is www.foundercontrolroom.org. Normalize only the
+// deployed canonical origin; source-owned provenance such as dateModified
+// must remain unchanged by packaging.
 const founderProfilePath = resolve(outputDirectory, 'juss-rayy/index.html');
 const founderProfile = await readFile(founderProfilePath, 'utf8');
-const normalizedFounderProfile = founderProfile
-  .replaceAll(
-    'https://foundercontrolroom.org/juss-rayy',
-    'https://www.foundercontrolroom.org/juss-rayy/',
-  )
-  .replace(
-    /<meta itemprop="dateModified" content="\d{4}-\d{2}-\d{2}" \/>/,
-    '<meta itemprop="dateModified" content="2026-09-16" />',
-  );
+const normalizedFounderProfile = founderProfile.replaceAll(
+  'https://foundercontrolroom.org/juss-rayy',
+  'https://www.foundercontrolroom.org/juss-rayy/',
+);
 await writeFile(founderProfilePath, normalizedFounderProfile, 'utf8');
 
 for (const relativePath of requiredAssets) {
