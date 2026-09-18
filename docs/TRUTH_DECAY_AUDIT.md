@@ -42,6 +42,14 @@ A September peer-rollover incident made the freshness rule concrete. FCR `af87c6
 
 The workflow's `STORYENGINE_PEER_SHA` and `STORYENGINE_PEER_REF` are evidence identities, not durable aliases for “current StoryEngine.” A peer-pin update is valid only after the referenced peer is independently observed to resolve to the intended exact StoryEngine SHA. Changing either pin immediately expires predecessor FCR federation/browser evidence and requires the complete exact-head Playwright loop to rerun against the new peer. A correct pin does not prove StoryEngine production deployment, FCR production deployment, merge authority, deploy authority, or provider mutation.
 
+## 2026-09 control correction: PR base snapshot versus live-main witness authority
+
+The trusted deterministic-review command exposed a repository-identity TOCTOU bug. GitHub may retain a pull request's `.base.sha` as historical snapshot provenance after `main` advances. Requiring that snapshot to equal current live `main` can therefore block a lawful witness even when the pull request is open, targets `main`, and already contains the current base.
+
+Simply removing the snapshot equality would create the opposite false green: a genuinely behind pull request could reach trusted-witness dispatch. The corrected rule keeps `.base.sha` diagnostic only, re-reads live `main`, requires the pull request to remain open and target `main`, compares live `main` to the exact pull-request head, requires `behind_by=0`, and requires the provider-reported merge base to equal live `main` before dispatch.
+
+This makes freshness depend on current graph identity instead of a stale snapshot while remaining fail-closed for a truly behind candidate. The dispatch remains evidence-only. It grants no merge, Founder Final, deployment, provider-policy, database, secret, publication, billing, deletion, or other execution authority.
+
 ## 2026-09 control correction: privileged production witness isolation
 
 A post-Deploy `workflow_run` witness is privileged even when its purpose is read-only verification. Treating the triggering workflow's `head_sha` as both the release identity to observe and the code to execute collapses evidence identity into executable authority. A successful upstream workflow must not make its checkout trusted merely by becoming a completed run.
@@ -381,6 +389,7 @@ The strongest optimization is not faster claiming. It is shortening the distance
 32. A capital decision card, recommendation, score, or HOLD state is evidence interpretation, not financing or execution authority; stale or missing capital evidence must remove derived certainty instead of preserving an earlier recommendation.
 33. `merge_authority: true` cannot be reused as candidate approval; every merge requires a fresh explicit founder decision for the exact live repository/PR/base/head, and candidate movement expires that approval.
 34. Rebinding a cross-repository Playwright peer to a newly verified exact ref/SHA expires predecessor federation/browser proof and requires a complete exact-head rerun; the pin is evidence identity, not production or merge authority.
+35. A pull request's `.base.sha` snapshot is provenance, not current-base authority; trusted witness dispatch must prove the exact head contains live `main` with `behind_by=0` and live `main` as the merge base.
 
 ## Rollback
 
