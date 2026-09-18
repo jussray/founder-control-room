@@ -133,6 +133,7 @@ function ensureLiveStatus(text = 'Live status · synced') {
 }
 
 function clearExpiredFounderSession() {
+  missionDrafts = new Map();
   const signOut = document.querySelector('#sign-out');
   if (signOut instanceof HTMLButtonElement) {
     signOut.click();
@@ -192,7 +193,7 @@ function onDraftInput(event) {
 function onNavigationClick(event) {
   const target = event.target;
   if (!(target instanceof Element)) return;
-  if (target.closest('.lane .card[data-id]') || target.closest('.tabs button')) {
+  if (target.closest('#sign-out') || target.closest('.lane .card[data-id]') || target.closest('.tabs button')) {
     missionDrafts = new Map();
   }
 }
