@@ -10,6 +10,10 @@ const selfReconcileSource = readFileSync(
   new URL('../../reconciliation/scripts/self-reconcile.ts', import.meta.url),
   'utf8',
 );
+const workerConfigSource = readFileSync(
+  new URL('../../../wrangler.worker.toml', import.meta.url),
+  'utf8',
+);
 
 describe('validateControlRoomSupabaseUrl', () => {
   it('accepts the exact Founder Control Room Supabase project', () => {
@@ -148,13 +152,23 @@ describe('validateControlRoomSupabaseUrl', () => {
     );
   });
 
-  it('keeps post-deploy reconciliation bound to the same code-owned project identity', () => {
+  it('keeps Worker config and post-deploy reconciliation bound to the same code-owned project identity', () => {
     const validationIndex = selfReconcileSource.indexOf('validateControlRoomSupabaseUrl(SUPABASE_URL');
+    const runtimeReadbackIndex = selfReconcileSource.indexOf('assertDeployedRuntimeSupabaseIdentity()');
     const clientIndex = selfReconcileSource.indexOf('createClient(SUPABASE_URL');
 
+    expect(workerConfigSource).toContain(
+      `SUPABASE_URL = "https://${CONTROL_ROOM_SUPABASE_PROJECT_REF}.supabase.co"`,
+    );
+    expect(workerConfigSource).toContain(
+      `SUPABASE_PROJECT_REF = "${CONTROL_ROOM_SUPABASE_PROJECT_REF}"`,
+    );
     expect(selfReconcileSource).toContain("from '../../lib/supabaseProjectIdentity.js'");
     expect(selfReconcileSource).toContain("{ nodeEnv: 'production' }");
+    expect(selfReconcileSource).toContain("/version");
+    expect(selfReconcileSource).toContain('body.v10?.supabaseProjectRef !== CONTROL_ROOM_SUPABASE_PROJECT_REF');
     expect(validationIndex).toBeGreaterThan(-1);
-    expect(clientIndex).toBeGreaterThan(validationIndex);
+    expect(runtimeReadbackIndex).toBeGreaterThan(validationIndex);
+    expect(clientIndex).toBeGreaterThan(runtimeReadbackIndex);
   });
 });
