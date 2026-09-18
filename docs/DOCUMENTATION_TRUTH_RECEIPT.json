@@ -30,6 +30,12 @@
       ]
     },
     {
+      "path": ".github/workflows/deploy.yml",
+      "claims": [
+        "`.github/workflows/deploy.yml` must treat Post-Deploy Reconciliation as a load-bearing production gate after smoke proof: reconciliation cannot be `continue-on-error`, and `post-deploy-evidence` may run only after reconciliation succeeds; this sequencing cannot convert workflow source into live deployment, provider, or runtime proof."
+      ]
+    },
+    {
       "path": "wrangler.worker.toml",
       "claims": [
         "`wrangler.worker.toml` must list `TINYFISH_API_KEY` under `[secrets].required`, so canonical exact-main Deploy rejects missing provider-held TinyFish activation before Worker mutation while never copying the secret value through GitHub Actions."
@@ -62,7 +68,8 @@
     {
       "path": "docs/CLOUDFLARE_REASONING.md",
       "claims": [
-        "`docs/CLOUDFLARE_REASONING.md` must treat `TINYFISH_API_KEY` as a provider-held Worker binding and require canonical Deploy to fail closed on a missing binding name without exposing or re-uploading its value."
+        "`docs/CLOUDFLARE_REASONING.md` must treat `TINYFISH_API_KEY` as a provider-held Worker binding and require canonical Deploy to fail closed on a missing binding name without exposing or re-uploading its value.",
+        "`docs/CLOUDFLARE_REASONING.md` must document Post-Deploy Reconciliation as a load-bearing production gate whose failure blocks downstream post-deploy evidence, while keeping workflow source separate from live reconciliation or runtime proof."
       ]
     },
     {
@@ -76,7 +83,8 @@
     {
       "path": "docs/deployment/CLOUDFLARE_WORKER_TARGETS.md",
       "claims": [
-        "`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` must name `TINYFISH_API_KEY` as a required canonical Worker secret while preserving live provider observation and real TinyFish Search/Fetch as separate activation proof."
+        "`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` must name `TINYFISH_API_KEY` as a required canonical Worker secret while preserving live provider observation and real TinyFish Search/Fetch as separate activation proof.",
+        "`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` must document that Post-Deploy Reconciliation runs as a load-bearing production gate after smoke proof and must succeed before post-deploy evidence can advance, without treating checked workflow source as live reconciliation proof."
       ]
     },
     {
