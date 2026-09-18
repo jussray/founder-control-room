@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   CONTROL_ROOM_SUPABASE_PROJECT_REF,
@@ -5,6 +6,10 @@ import {
 } from '../supabaseProjectIdentity.js';
 
 const CONTROL_ROOM_URL = `https://${CONTROL_ROOM_SUPABASE_PROJECT_REF}.supabase.co`;
+const selfReconcileSource = readFileSync(
+  new URL('../../reconciliation/scripts/self-reconcile.ts', import.meta.url),
+  'utf8',
+);
 
 describe('validateControlRoomSupabaseUrl', () => {
   it('accepts the exact Founder Control Room Supabase project', () => {
@@ -141,5 +146,15 @@ describe('validateControlRoomSupabaseUrl', () => {
     ).toThrow(
       'requires SUPABASE_ALLOW_LOCAL=true with NODE_ENV=development or test',
     );
+  });
+
+  it('keeps post-deploy reconciliation bound to the same code-owned project identity', () => {
+    const validationIndex = selfReconcileSource.indexOf('validateControlRoomSupabaseUrl(SUPABASE_URL');
+    const clientIndex = selfReconcileSource.indexOf('createClient(SUPABASE_URL');
+
+    expect(selfReconcileSource).toContain("from '../../lib/supabaseProjectIdentity.js'");
+    expect(selfReconcileSource).toContain("{ nodeEnv: 'production' }");
+    expect(validationIndex).toBeGreaterThan(-1);
+    expect(clientIndex).toBeGreaterThan(validationIndex);
   });
 });
