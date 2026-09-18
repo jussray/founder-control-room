@@ -109,6 +109,35 @@ describe('founder content metric observations', () => {
     })).toThrow(/invalid UTC offset/);
   });
 
+  it('rejects timestamp precision that JavaScript Date would silently truncate', () => {
+    expect(() => normalizeFounderContentMetricObservation({
+      ...observation(),
+      observedAt: '2026-09-15T12:00:00.1234Z',
+    })).toThrow(/millisecond precision or less/);
+  });
+
+  it('enforces provider and platform identifiers at the same boundary as storage', () => {
+    expect(() => normalizeFounderContentMetricObservation({
+      ...observation(),
+      provider: 'google-ads',
+    })).toThrow(/provider is invalid/);
+    expect(() => normalizeFounderContentMetricObservation({
+      ...observation(),
+      platform: `p${'x'.repeat(80)}`,
+    })).toThrow(/platform is invalid/);
+  });
+
+  it('retains reserved provenance keys as own data properties without prototype mutation', () => {
+    const reserved = JSON.parse('{"__proto__":"source-row"}') as Record<string, string>;
+    const normalized = normalizeFounderContentMetricObservation({
+      ...observation(),
+      provenance: reserved,
+    });
+    expect(Object.getPrototypeOf(normalized.provenance)).toBeNull();
+    expect(Object.prototype.hasOwnProperty.call(normalized.provenance, '__proto__')).toBe(true);
+    expect(normalized.provenance.__proto__).toBe('source-row');
+  });
+
   it('parses a safe historical CSV while preserving source field identity and audience segment', () => {
     const csv = [
       'provider,platform,source,source_metric_id,account_id,page_id,external_post_id,audience_segment,metric_name,metric_unit,metric_value,observed_at,period_start,period_end,provenance_json',
