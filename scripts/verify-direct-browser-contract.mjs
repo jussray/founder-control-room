@@ -12,7 +12,10 @@ const composerProofUrl = new URL('../e2e/control-room-composer-proof.mjs', impor
 const composerProof = fs.readFileSync(composerProofUrl, 'utf8');
 const fiveScreenProofUrl = new URL('../e2e/five-screen-shell-proof.mjs', import.meta.url);
 const fiveScreenProof = fs.readFileSync(fiveScreenProofUrl, 'utf8');
+const osTopologyProofUrl = new URL('../e2e/founder-os-topology-proof.mjs', import.meta.url);
+const osTopologyProof = fs.readFileSync(osTopologyProofUrl, 'utf8');
 const fiveScreenShell = fs.readFileSync(new URL('../public/control-room/five-screen-shell.js', import.meta.url), 'utf8');
+const osTopology = fs.readFileSync(new URL('../public/control-room/os-topology.js', import.meta.url), 'utf8');
 const opaqueBootstrap = fs.readFileSync(new URL('../public/control-room/opaque-session-bootstrap.js', import.meta.url), 'utf8');
 const pkg = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
 
@@ -56,7 +59,26 @@ assert.match(fiveScreenShell, /\['promptos', 'PromptOS'\]/);
 assert.match(fiveScreenShell, /\['proof', 'Proof'\]/);
 assert.match(fiveScreenShell, /LEGACY_ROUTE_MAP/);
 assert.match(fiveScreenShell, /CONTEXT_KEY/);
+
+assert.match(osTopologyProof, /from 'playwright'/);
+assert.match(osTopologyProof, /fcr\/os-topology@v1/);
+assert.match(osTopologyProof, /EXPECTED_SYSTEMS/);
+assert.match(osTopologyProof, /authority-transfer/);
+assert.match(osTopologyProof, /only rendered authority owner/);
+assert.match(osTopologyProof, /L99 stays a Chief operating method/);
+assert.match(osTopology, /FCR_OS_TOPOLOGY_CONTRACT = 'fcr\/os-topology@v1'/);
+assert.match(osTopology, /id: 'ultrathink'/);
+assert.match(osTopology, /id: 'promptos'/);
+assert.match(osTopology, /id: 'chief-ai-machine'/);
+assert.match(osTopology, /id: 'founder-control-room'/);
+assert.match(osTopology, /id: 'project-runtime'/);
+assert.match(osTopology, /id: 'evidence-trust'/);
+assert.match(osTopology, /id: 'solcontinuity'/);
+assert.doesNotMatch(osTopology, /authorityTransfer:\s*true/);
+assert.match(osTopology, /recipientVerificationRequired:\s*true/);
+assert.match(osTopology, /L99 stays a Chief operating method, not a rival control plane/);
 assert.match(opaqueBootstrap, /five-screen-shell\.js/);
+assert.match(opaqueBootstrap, /os-topology\.js/);
 
 execFileSync(process.execPath, [fileURLToPath(localPlaywrightProofUrl)], {
   stdio: 'inherit',
@@ -78,4 +100,9 @@ execFileSync(process.execPath, [fileURLToPath(fiveScreenProofUrl)], {
   env: process.env,
 });
 
-console.log('direct browser contract verified with local, ULTRATHINK Plugin Center, Control Room Composer, five-screen cockpit, and legacy-journey navigation proofs');
+execFileSync(process.execPath, [fileURLToPath(osTopologyProofUrl)], {
+  stdio: 'inherit',
+  env: process.env,
+});
+
+console.log('direct browser contract verified with local, ULTRATHINK Plugin Center, Control Room Composer, five-screen cockpit, Founder OS topology, and legacy-journey navigation proofs');
