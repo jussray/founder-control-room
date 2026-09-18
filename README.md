@@ -222,7 +222,11 @@ A terminal result is verification evidence only for the command and exact checko
 
 ### MCP and provider bridges
 
-FCR can declare and govern bounded MCP/provider capabilities, including the source contract for a read-only FCR MCP bridge. Repository declarations prove wiring only. Live secret presence, provider authentication, endpoint health, deployed runtime identity, and mutation authority require separate current evidence.
+FCR can declare and govern bounded MCP/provider capabilities, including a source-level read-only GitHub PR truth audit exposed as `github_audit_pr`. That tool is fixed to `jussray/founder-control-room`, accepts only a PR number plus optional full expected head SHA inside the caller's existing project grant, and returns bounded PR/base/head/check/review/file evidence. It is observation only: no result, receipt, continuity cookie, or evidence fingerprint grants approval, merge, deploy, provider mutation, publication, or execution authority.
+
+The source also preserves the bounded OAuth-only `fcr_relay_operator` path. That relay is an external provider call, not a repository mutation path, and remains separately labeled from the seven read/preview tools.
+
+Repository declarations and tests prove wiring only. Live GitHub App permissions, OAuth/client configuration, endpoint health, deployed runtime identity, complete provider reads, and real client calls require separate current evidence before this lane is called active or proven.
 
 ## Data boundary
 

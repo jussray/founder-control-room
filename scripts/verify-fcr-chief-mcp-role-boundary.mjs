@@ -16,6 +16,7 @@ function assert(condition, message) {
 const externalTools = read('src/mcp/externalTools.ts');
 
 const fcrTruthTools = [
+  'github_audit_pr',
   'fcr_list_projects',
   'fcr_get_current_truth',
   'fcr_preview_skill_route',

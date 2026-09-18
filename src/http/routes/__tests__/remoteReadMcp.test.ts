@@ -268,6 +268,7 @@ describe('Founder Control Room paired remote MCP', () => {
     expect(initialized.body.result.protocolVersion).toBe('2025-11-25');
     expect(listed.body.result.tools.map((tool: { name: string }) => tool.name)).toEqual([
       'chief_audit_repository',
+      'github_audit_pr',
       'chief_list_capabilities',
       'chief_preview_capability_plan',
       'fcr_list_projects',
@@ -341,6 +342,35 @@ describe('Founder Control Room paired remote MCP', () => {
       executionAllowed: false,
       cookiesUsed: false,
       fingerprintsUsed: false,
+    });
+  });
+
+  it('routes github_audit_pr only to the fixed Founder Control Room repository', async () => {
+    const auditPullRequest = vi.fn(async (input) => ({
+      repository: input.repository,
+      pullNumber: input.pullNumber,
+      expectedHeadSha: input.expectedHeadSha,
+      continuityCookie: { authorizes: [] },
+    }));
+    const expectedHeadSha = 'c'.repeat(40);
+    const response = await legacyPost(buildApp({ auditPullRequest }), rpc('tools/call', {
+      name: 'github_audit_pr',
+      arguments: { projectId: FCR, pullNumber: 702, expectedHeadSha },
+    }));
+
+    expect(response.status).toBe(200);
+    expect(auditPullRequest).toHaveBeenCalledWith({
+      projectSlug: FCR,
+      repository: 'jussray/founder-control-room',
+      pullNumber: 702,
+      expectedHeadSha,
+    });
+    expect(response.body.result.structuredContent.governanceBoundary).toMatchObject({
+      readOrPreviewOnly: true,
+      externalProviderCall: false,
+      mutationAuthority: false,
+      executionAllowed: false,
+      founderApprovalGranted: false,
     });
   });
 
