@@ -1,6 +1,6 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Preserve current workflow, Cloudflare, Shopify, founder-merge, content-evidence, public-discovery, and cross-repository StoryEngine federation truth boundaries without converting source, analytics, crawler policy, peer pinning, provider configuration, mergeability, or candidate/browser proof into publication, production, provider-mutation, merge, deploy, spend, or external-contact authority.",
+  "purpose": "Preserve current workflow, Cloudflare, Chief Access recovery, Shopify, founder-merge, content-evidence, public-discovery, and cross-repository StoryEngine federation truth boundaries without converting source, analytics, crawler policy, peer pinning, provider configuration, selector identity, mergeability, or candidate/browser proof into publication, production, provider-mutation, merge, deploy, spend, or external-contact authority.",
   "domains": [
     "cloudflare-authority",
     "repository-provider",
@@ -20,7 +20,38 @@
     {
       "path": ".github/workflows/playwright.yml",
       "claims": [
-        "`.github/workflows/playwright.yml` must bind the FCR-to-StoryEngine browser federation witness to a separately verified exact StoryEngine peer SHA and ref; changing that peer identity expires predecessor federation/browser proof and requires the complete exact-head witness to rerun without granting merge, deploy, production, or provider-mutation authority."
+        "`.github/workflows/playwright.yml` must bind the FCR-to-StoryEngine browser federation witness to a separately verified exact StoryEngine peer SHA and ref; changing that peer identity expires predecessor federation/browser proof and requires the complete exact-head witness to rerun without granting merge, deploy, production, or provider-mutation authority.",
+        "`.github/workflows/playwright.yml` must not advance the StoryEngine peer pin from repository source identity alone; the selected peer requires separately verified exact runtime identity, and the successor FCR candidate must rerun the full federation browser witness before that pin can support a current integration claim."
+      ]
+    },
+    {
+      "path": ".github/workflows/chief-proofmode-access-command-bridge.yml",
+      "claims": [
+        "`.github/workflows/chief-proofmode-access-command-bridge.yml` must keep Chief Access provider mutation reachable only from founder-authored issue #485 commands bound to exact current FCR main and the immutable Chief preview target; it cannot create a second direct provider-mutation authority surface."
+      ]
+    },
+    {
+      "path": ".github/workflows/chief-proofmode-access-recovery.yml",
+      "claims": [
+        "`.github/workflows/chief-proofmode-access-recovery.yml` must remain a repository-local reusable workflow with no standalone repair dispatch, keep read and repair authority separate, require an auditable repair approval reference, and fail closed on unresolved subject-bound reconciliation state before any provider POST."
+      ]
+    },
+    {
+      "path": "scripts/resolve-chief-proofmode-access-selector.mjs",
+      "claims": [
+        "`scripts/resolve-chief-proofmode-access-selector.mjs` must resolve Chief-specific protected identity before the documented generic fallback, reject conflicting specific/generic selectors, and expose only non-secret source/fingerprint metadata without treating selector presence as runtime proof."
+      ]
+    },
+    {
+      "path": "scripts/reconcile-chief-proofmode-access.mjs",
+      "claims": [
+        "`scripts/reconcile-chief-proofmode-access.mjs` must bind repair to one exact-host provider subject, mark ambiguous provider writes as unknown, and never permit a failed response to imply that no mutation occurred or authorize an unbounded retry."
+      ]
+    },
+    {
+      "path": "scripts/chief-proofmode-access-reconciliation-state.mjs",
+      "claims": [
+        "`scripts/chief-proofmode-access-reconciliation-state.mjs` must persist REPAIR_IN_PROGRESS and RECONCILE_REQUIRED by provider-subject fingerprint so evidence for a different application/token subject cannot clear retry blocking."
       ]
     },
     {
@@ -54,7 +85,8 @@
         "`README.md` must describe Shopify child-provider observation as source-only, non-authorizing evidence and must never relabel a matching snapshot as live provider authority or mutation permission.",
         "`README.md` must document Attack 3000 content currentness as independently evaluated from bounded observation time rather than trusted from a CURRENT label, and must keep distribution, external demand, publication, provider mutation, merge, deploy, spend, and external-contact authority separate.",
         "`README.md` must describe the Content Trend Radar as an advisory existing-lane capability whose first-wave evidence requires current source provenance and whose ranking cannot authorize publication, scheduling, spend, provider mutation, merge, deploy, or external contact.",
-        "`README.md` must describe deterministic founder-content approval reservation and exact active retry recovery without allowing evidence rotation, retry, or a stored reservation to mint new publication authority."
+        "`README.md` must describe deterministic founder-content approval reservation and exact active retry recovery without allowing evidence rotation, retry, or a stored reservation to mint new publication authority.",
+        "`README.md` must describe Chief ProofMode Access recovery as founder-bridge-bound, specificity-first, subject-reconciled provider authority and must keep successful Access repair separate from production runtime/Playwright proof."
       ]
     },
     {
@@ -66,7 +98,8 @@
     {
       "path": "docs/TRUTH_DECAY_AUDIT.md",
       "claims": [
-        "`docs/TRUTH_DECAY_AUDIT.md` must treat a StoryEngine peer SHA/ref in FCR Playwright as evidence identity rather than a durable alias for current StoryEngine, and must require complete federation re-proof whenever the peer identity or either repository head moves."
+        "`docs/TRUTH_DECAY_AUDIT.md` must treat a StoryEngine peer SHA/ref in FCR Playwright as evidence identity rather than a durable alias for current StoryEngine, and must require complete federation re-proof whenever the peer identity or either repository head moves.",
+        "`docs/TRUTH_DECAY_AUDIT.md` must treat an ambiguous Chief Access provider-write result as reconciliation-required state bound to the same provider-subject fingerprint and must never allow transport failure to become blind retry authority."
       ]
     },
     {
