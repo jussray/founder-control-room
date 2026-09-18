@@ -314,3 +314,9 @@ A child-app reconciliation may classify evidence as `CURRENT`, `UNDECLARED`, `SC
 ## Required crawler/public-work browser proof
 
 For public crawler and work-directory behavior, `.github/workflows/ci.yml` must keep `e2e/pages-api-recovery.spec.ts` and `e2e/public-work-directory.spec.ts` inside the load-bearing `Playwright e2e` job that feeds `Required Gate`. The specialized Pages workflow is supplementary evidence only; it cannot replace this required exact-head browser proof or authorize merge.
+
+## Five-screen founder cockpit proof boundary
+
+The cockpit source has five permanent founder destinations: `Home`, `Control`, `Chief`, `PromptOS`, and `Proof`. `Control` owns `Overview`, `Work`, `Costs`, and `Execution`; legacy Projects/Missions/Analytics/Terminal/L99/PromptOS/Activity routes remain compatibility targets rather than a second navigation authority. The shell may preserve selected project and mission context across screen changes and reloads without creating execution authority.
+
+`e2e/five-screen-shell-proof.mjs` is fixture-backed source/UI evidence. Its intercepted `fcr.test` project, work, activity, and version responses cannot prove `foundercontrolroom.org`, the live FCR APIs, or a deployed candidate. Exact-candidate Playwright against the real application path and the separately privileged production-origin exact-SHA witness remain distinct receipts. Production is not `PROVEN` until deployed runtime identity and real browser evidence agree for the same release.
