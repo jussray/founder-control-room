@@ -8,6 +8,8 @@
 // request authenticate through the browser's same-origin cookie.
 
 const LEGACY_SESSION_KEY = 'fcr_session';
+const LEGACY_MISSION_NOTICE = 'Mission created. See the Missions tab.';
+const FOUNDER_MISSION_NOTICE = 'Mission created. Open Control → Work.';
 
 function unwrapApiData(value) {
   return value && value.success === true && value.data ? value.data : value;
@@ -35,6 +37,22 @@ async function founderIdentityFromOpaqueSession() {
     ? payload.founder.email.trim().toLowerCase()
     : '';
   return email ? { email, transport: 'opaque-http-only-cookie' } : null;
+}
+
+function installFounderCopyCompatibility() {
+  // Keep legacy app.js internal tab identifiers as compatibility plumbing, but
+  // never teach the founder the retired seven-tab geography. This observer is
+  // intentionally exact-match only so unrelated notices remain untouched.
+  const normalize = () => {
+    document.querySelectorAll('.notice').forEach((notice) => {
+      if (notice.textContent?.trim() === LEGACY_MISSION_NOTICE) {
+        notice.textContent = FOUNDER_MISSION_NOTICE;
+      }
+    });
+  };
+  const observer = new MutationObserver(normalize);
+  observer.observe(document.documentElement, { childList: true, subtree: true });
+  normalize();
 }
 
 function installCookieBackedSignOut() {
@@ -74,6 +92,14 @@ function installCookieBackedSignOut() {
 
 async function bootLegacyCockpit() {
   scrubLegacyBrowserCredentials();
+
+  // Safe reads may legitimately cross the founder API's real per-IP budget
+  // during a dense cockpit session. Install the bounded same-origin GET/HEAD
+  // retry before the first authenticated read. Mutation requests are never
+  // automatically retried by this layer.
+  await import('/control-room/safe-rate-limit-fetch.js');
+
+  installFounderCopyCompatibility();
   installCookieBackedSignOut();
 
   try {
@@ -89,6 +115,8 @@ async function bootLegacyCockpit() {
   }
 
   await import('/control-room/app.js');
+  await import('/control-room/five-screen-shell.js');
+  await import('/control-room/os-topology.js');
 }
 
 void bootLegacyCockpit();

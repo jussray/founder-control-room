@@ -62,18 +62,15 @@ function requestedTabFromUrl() {
   const tab = new URL(window.location.href).searchParams.get('tab');
   return tab && ALLOWED_TABS.has(tab) ? tab : null;
 }
-function removeTabQueryParameter() {
-  const url = new URL(window.location.href);
-  if (!url.searchParams.has('tab')) return;
-  url.searchParams.delete('tab');
-  history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
-}
 function activateTab(tab) {
   const button = document.querySelector(`.tabs button[data-tab="${tab}"]`);
   if (!(button instanceof HTMLButtonElement)) return false;
   button.click();
   safeSessionRemove(PENDING_TAB_KEY);
-  removeTabQueryParameter();
+  // Leave ?tab= in place. The five-screen shell is now the authoritative
+  // navigation layer and consumes the legacy URL into screen/view state. If
+  // this router erased the query first, a fast render could destroy the user's
+  // deep-link intent before the five-screen adapter observes it.
   return true;
 }
 const requestedTab = requestedTabFromUrl();
