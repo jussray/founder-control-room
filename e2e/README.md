@@ -135,12 +135,17 @@ harness.
    rendering the result from state, the same way every other panel in this
    app already has to.
 
-Also surfaced, and worth knowing even though it isn't a bug: **the frontend
-has no live refresh.** A mission that transitions status asynchronously
-(via the background reconciler reacting to a webhook) will never appear
-updated in the browser until something re-fetches — there's no polling or
-websocket. The harness's `waitForMissionStatusByPolling()` works around
-this the way a founder would have to: click Refresh, reopen the mission.
+The original harness also surfaced a former product gap: mission status did
+not refresh without a founder clicking **Refresh**. The current product now
+installs bounded mission-status polling through `mission-live-ux.js`. It
+polls no faster than every five seconds, pauses while a founder is actively
+editing, preserves unsaved mission-detail drafts across automatic shell
+rerenders, and clears the authenticated cockpit when polling receives 401.
+`mission-live-ux-proof.mjs` is the dedicated real-Chromium proof for those
+behaviors. `waitForMissionStatusByPolling()` in this older full-journey
+harness still clicks Refresh deliberately so the long scenario controls its
+own request cadence; that helper no longer describes the product's only
+refresh mechanism.
 
 ## What this does NOT prove
 
