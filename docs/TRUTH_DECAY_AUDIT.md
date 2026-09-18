@@ -389,6 +389,10 @@ The five-screen cockpit is a source/UI navigation contract, not a production-sta
 
 The exact-candidate browser journey must exercise the real application path for the candidate head. After an authorized merge and deployment, production truth requires a separately current production-origin browser witness whose observed `/version` identity matches the deployed release. Movement of the candidate head, production deployment identity, or other load-bearing runtime dependency expires predecessor browser proof instead of preserving a false green.
 
+## 2026-09 StoryEngine peer witness renewal
+
+A StoryEngine `main` advance is not permission to retarget FCR automatically. Before `.github/workflows/playwright.yml` may bind a successor peer, that exact StoryEngine candidate must have separately green CI, promotion gates, test-ledger, and browser/guardrail proof, and the resulting StoryEngine `main` identity must be re-observed. The FCR pin update itself expires predecessor FCR federation proof and requires the complete exact-head StoryEngine checkout, runtime-identity, directive/receipt, and Playwright loop to run again. A successful peer renewal remains evidence only and cannot authorize FCR merge, deployment, production promotion, or provider mutation.
+
 ## Rollback
 
 The Truth Lease, production-specific lease composer, temporal founder-content guards, analytics-authority guard, and Documentation Truth control are additive/fail-closed. Revert the focused contract/test/workflow/documentation change if it causes incompatibility. No database, provider credential, DNS, publication, provider ruleset, or production mutation is performed by the documentation-truth slice.
