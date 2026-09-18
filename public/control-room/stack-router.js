@@ -1,5 +1,6 @@
 import { installMissionBoard } from './mission-board.js';
 import { installProjectShellUi } from './project-shell-ui.js';
+import { installMissionLiveUx } from './mission-live-ux.js';
 
 const PENDING_TAB_KEY = 'fcr_pending_tab';
 const CONVEYOR_CONTRACT = 'founder-control-room/n8n-conveyor@v3';
@@ -95,4 +96,5 @@ if (launchDock instanceof HTMLDetailsElement) {
 }
 installMissionBoard();
 installProjectShellUi();
+installMissionLiveUx();
 void refreshConveyorReadiness();

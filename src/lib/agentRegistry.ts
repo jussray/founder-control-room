@@ -30,6 +30,18 @@ const DEEPSEEK_INSTRUCTOR = 'docs/DEEPSEEK_INSTRUCTOR_CONTRACT.md';
 
 export const AGENT_REGISTRY: readonly AgentDescriptor[] = [
   {
+    id: 'cursor',
+    label: 'Cursor',
+    role: 'Preferred local repository implementation cockpit for repo-heavy work when connected; bounded code edits and local proof, never an independent authority plane.',
+    operator: {
+      enabled: true,
+      capabilities: ['research', 'propose', 'review', 'implement'],
+      firstSliceRuntimeModel: false,
+      externalWritesRequireBoundAuthority: true,
+      instructionContracts: ['.cursor/rules', 'AGENTS.md', 'GLOBAL_AI.md', FCR_V14, MULTI_AGENT],
+    },
+  },
+  {
     id: 'claude-code',
     label: 'Claude / Claude Code',
     role: 'Long-context repository analysis, structured implementation, careful refactors, and documentation.',

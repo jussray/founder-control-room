@@ -6,8 +6,9 @@
  * Checks that all required Supabase tables are reachable and non-empty,
  * then POSTs its own DriftReport to /api/reconcile.
  *
- * Exit 0 = clean (deploy continues)
- * Exit 1 = drift detected (logged, but deploy NOT blocked — continue-on-error: true)
+ * Exit 0 = clean.
+ * Exit 1 = drift detected; the deployment workflow fails closed so the
+ * deployed state must be rolled back or repaired with a verified safe-forward fix.
  */
 import { createClient } from '@supabase/supabase-js';
 
