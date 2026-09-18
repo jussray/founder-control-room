@@ -1,8 +1,26 @@
 # Cursor Rules — founder-control-room
 
-Before nontrivial work, also read `AGENTS.md`, `GLOBAL_AI.md`, `docs/FOUNDER_CONTROL_ROOM_AND_CHIEF_AI_MASTER_BUILD_SPEC.md`, and `docs/FOUNDER_MERGE_AUTHORITY.md`.
+Before nontrivial work, also read `AGENTS.md`, `GLOBAL_AI.md`, `docs/FOUNDER_CONTROL_ROOM_AND_CHIEF_AI_MASTER_BUILD_SPEC.md`, `docs/FCR_MULTI_AGENT_ENABLEMENT_CONTRACT.md`, and `docs/FOUNDER_MERGE_AUTHORITY.md`.
 
 Repository and runtime evidence outrank stale prose. When an older instruction conflicts with inspected current code, record the drift and repair the contract rather than reverting reality to the obsolete description.
+
+## Implementation cockpit role
+
+For repo-heavy Founder Control Room work, Cursor is the preferred local implementation cockpit when it is actually connected and available.
+
+The intended chain is:
+
+```text
+FCR / founder intent + truth
+-> Cursor exact-repo implementation
+-> GitHub durable code/history/CI receipts
+-> Playwright/provider/runtime proof
+-> FCR truth reclassification + next gate
+```
+
+Cursor is the implementation arm inside Founder Control Room, not another OS, authority plane, source of truth, or substitute for GitHub/provider/runtime evidence. Before editing, bind work to the authoritative repository, branch, and exact HEAD. Make the smallest safe patch, run the narrowest valid local proof, and leave durable repository receipts. If Cursor is unavailable, record that fact and use another currently authorized builder rather than claiming Cursor executed work it did not perform.
+
+Local Cursor output can support implementation truth. It cannot by itself prove CI, provider configuration, deployment identity, runtime behavior, merge approval, or user outcome.
 
 ## 5W1H Operating Contract
 

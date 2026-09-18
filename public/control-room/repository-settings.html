@@ -77,15 +77,16 @@
           <label class="checkbox"><input type="checkbox" name="blockDeletion" checked /> Block branch deletion</label>
         </div>
         <div>
-          <label>Required approving review count (only used if PR is required)</label>
-          <input name="requiredApprovingReviewCount" type="number" min="0" value="1" />
+          <label>Required approving review count (current founder-only phase: 0)</label>
+          <input name="requiredApprovingReviewCount" type="number" min="0" value="0" />
           <label>Required status check names (comma-separated, optional)</label>
           <input name="requiredStatusCheckNames" value="Required Gate, Verify test-ledger contract" />
+          <p class="muted">For active Founder Control Room main protection, these checks are installed by the provider as a separate strict-freshness ruleset with no bypass actors.</p>
         </div>
       </div>
 
       <h3>Bypass actor</h3>
-      <p class="muted">This app's own GitHub App numeric ID (from the GitHub App's settings page), so its automated merges aren't blocked by the rules above. Leave blank only if this ruleset has no PR requirement and this app never needs to bypass it.</p>
+      <p class="muted">This app's own GitHub App numeric ID (from the GitHub App's settings page), so its automated merges aren't blocked by the review rules above. Active Founder Control Room main protection keeps the strict-freshness ruleset bypass-free.</p>
       <div class="grid">
         <div>
           <label>GitHub App ID</label>

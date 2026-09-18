@@ -268,13 +268,24 @@ jobs:
     name: Migration lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          persist-credentials: false
+      - name: Record and verify exact head
+        shell: bash
+        run: |
+          actual="$(git rev-parse HEAD)"
+          printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
       - uses: supabase/setup-cli@v1
         with:
           version: 2.101.0
+      - name: Start local Supabase database
+        run: supabase db start
       - name: Lint migrations
         run: supabase db lint --local
-        continue-on-error: true
 
   required-gate:
     name: Required Gate
@@ -289,6 +300,7 @@ jobs:
       - test-discovery
       - documentation-truth
       - cloudflare-bridge-authority
+      - migration-lint
     runs-on: ubuntu-latest
     steps:
       - name: Enforce load-bearing CI results
@@ -303,9 +315,10 @@ jobs:
           DISCOVERY_RESULT: ${{ needs.test-discovery.result }}
           DOCUMENTATION_TRUTH_RESULT: ${{ needs.documentation-truth.result }}
           CLOUDFLARE_AUTHORITY_RESULT: ${{ needs.cloudflare-bridge-authority.result }}
+          MIGRATION_LINT_RESULT: ${{ needs.migration-lint.result }}
         run: |
           set -euo pipefail
-          printf 'typecheck=%s\nlint=%s\ntest=%s\ne2e=%s\npython=%s\nrls=%s\ndiscovery=%s\ndocumentation_truth=%s\ncloudflare_authority=%s\n' \
+          printf 'typecheck=%s\nlint=%s\ntest=%s\ne2e=%s\npython=%s\nrls=%s\ndiscovery=%s\ndocumentation_truth=%s\ncloudflare_authority=%s\nmigration_lint=%s\n' \
             "$TYPECHECK_RESULT" \
             "$LINT_RESULT" \
             "$TEST_RESULT" \
@@ -314,7 +327,8 @@ jobs:
             "$RLS_RESULT" \
             "$DISCOVERY_RESULT" \
             "$DOCUMENTATION_TRUTH_RESULT" \
-            "$CLOUDFLARE_AUTHORITY_RESULT"
+            "$CLOUDFLARE_AUTHORITY_RESULT" \
+            "$MIGRATION_LINT_RESULT"
 
           for result in \
             "$TYPECHECK_RESULT" \
@@ -325,7 +339,8 @@ jobs:
             "$RLS_RESULT" \
             "$DISCOVERY_RESULT" \
             "$DOCUMENTATION_TRUTH_RESULT" \
-            "$CLOUDFLARE_AUTHORITY_RESULT"; do
+            "$CLOUDFLARE_AUTHORITY_RESULT" \
+            "$MIGRATION_LINT_RESULT"; do
             if [ "$result" != "success" ]; then
               echo "Required Gate blocked: at least one load-bearing CI job is not successful."
               exit 1

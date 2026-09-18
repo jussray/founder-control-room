@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   CONTROL_ROOM_SUPABASE_PROJECT_REF,
@@ -5,6 +6,14 @@ import {
 } from '../supabaseProjectIdentity.js';
 
 const CONTROL_ROOM_URL = `https://${CONTROL_ROOM_SUPABASE_PROJECT_REF}.supabase.co`;
+const selfReconcileSource = readFileSync(
+  new URL('../../reconciliation/scripts/self-reconcile.ts', import.meta.url),
+  'utf8',
+);
+const workerConfigSource = readFileSync(
+  new URL('../../../wrangler.worker.toml', import.meta.url),
+  'utf8',
+);
 
 describe('validateControlRoomSupabaseUrl', () => {
   it('accepts the exact Founder Control Room Supabase project', () => {
@@ -141,5 +150,25 @@ describe('validateControlRoomSupabaseUrl', () => {
     ).toThrow(
       'requires SUPABASE_ALLOW_LOCAL=true with NODE_ENV=development or test',
     );
+  });
+
+  it('keeps Worker config and post-deploy reconciliation bound to the same code-owned project identity', () => {
+    const validationIndex = selfReconcileSource.indexOf('validateControlRoomSupabaseUrl(SUPABASE_URL');
+    const runtimeReadbackIndex = selfReconcileSource.indexOf('await assertDeployedRuntimeSupabaseIdentity();');
+    const clientIndex = selfReconcileSource.indexOf('createClient(SUPABASE_URL');
+
+    expect(workerConfigSource).toContain(
+      `SUPABASE_URL = "https://${CONTROL_ROOM_SUPABASE_PROJECT_REF}.supabase.co"`,
+    );
+    expect(workerConfigSource).toContain(
+      `SUPABASE_PROJECT_REF = "${CONTROL_ROOM_SUPABASE_PROJECT_REF}"`,
+    );
+    expect(selfReconcileSource).toContain("from '../../lib/supabaseProjectIdentity.js'");
+    expect(selfReconcileSource).toContain("{ nodeEnv: 'production' }");
+    expect(selfReconcileSource).toContain("/version");
+    expect(selfReconcileSource).toContain('body.v10?.supabaseProjectRef !== CONTROL_ROOM_SUPABASE_PROJECT_REF');
+    expect(validationIndex).toBeGreaterThan(-1);
+    expect(runtimeReadbackIndex).toBeGreaterThan(validationIndex);
+    expect(clientIndex).toBeGreaterThan(runtimeReadbackIndex);
   });
 });
