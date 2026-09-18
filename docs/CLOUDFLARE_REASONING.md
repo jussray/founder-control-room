@@ -108,6 +108,12 @@ The reasoner may not automatically:
 
 Those remain separate founder approval gates. Approval never carries forward.
 
+## Pages public discovery routing
+
+`public/_worker.js` must treat public discovery files such as `/robots.txt`, `/sitemap.xml`, `/llms.txt`, and `/crawlers.json` as static Pages assets and serve them through `env.ASSETS`. API-owned callback assets stay on `env.FCR_API`; the presence of crawler policy metadata never becomes authentication, write authority, provider-mutation authority, deployment authority, or publication authority.
+
+That routing distinction is source truth only. A repository diff or green unit test cannot prove the deployed Pages artifact currently serves the exact file, so the applicable Pages deployment and browser/runtime witness remain separate evidence gates.
+
 ## HTTP surfaces
 
 ### Public-safe contract
@@ -197,7 +203,7 @@ Repository configuration can prove the desired binding name and sender restricti
 
 `wrangler.worker.toml` runs `scripts/verify-worker-build-authority.mjs` as its custom Worker build hook. The hook is a repository-side fail-closed membrane, not a provider mutation authority.
 
-For native Cloudflare Workers Builds, the membrane requires the provider-reported commit SHA to equal the checked-out Git source, requires branch/build UUID evidence, and permits only the non-promoting `wrangler versions upload --config wrangler.worker.toml` command. A native `wrangler deploy` is rejected before promotion with `NATIVE_WORKER_GIT_PROMOTION_BLOCKED`.
+For native Cloudflare Workers Builds, the membrane requires the provider-reported commit SHA to equal the checked-out Git source, requires branch/build UUID evidence, and permits only the non-promoting `wrangler versions upload --config wrangler.worker.toml` lane. A native `wrangler deploy` is rejected before promotion with `NATIVE_WORKER_GIT_PROMOTION_BLOCKED`.
 
 For GitHub Actions, production promotion is recognized only for the manual `Deploy` or `FCR Worker Reconcile` workflow-dispatch lanes when the checked-out SHA equals the exact GitHub workflow SHA. Ordinary CI remains verification-only. The emitted `fcr/worker-build-authority-receipt@v1` is redacted build evidence and explicitly cannot authorize provider mutation.
 
@@ -233,29 +239,17 @@ Its final receipt deliberately keeps `mergeAuthorized`, `deploymentAuthorized`, 
 
 ## Bounded FCR Access front-door recovery
 
-The manual `FCR Access Front Door Recovery` workflow is a narrowly scoped provider-recovery lane, not general Cloudflare administration authority. Its requested `expected_head_sha` must be a lowercase 40-character SHA, the workflow checks out that exact SHA, and provider inspection or mutation proceeds only when the same SHA still equals current `main`.
+The manual `FCR Access Front Door Recovery` workflow remains the one trusted provider-recovery carrier, but its desired product state is now explicit: **Cloudflare Access must not own the Founder Control Room browser doorway.** The public Pages experience may reach FCR without a Cloudflare Access login or challenge screen, and founder authentication begins inside the FCR `/control-room/` sign-in surface.
 
-Read and mutation authority are intentionally split. `apply=false` uses only `CLOUDFLARE_ACCESS_API_TOKEN` for Access application inspection and rejects an unnecessary approval reference. `apply=true` requires a fresh auditable `approval_reference`, records only its SHA-256 receipt, and uses only `CLOUDFLARE_ACCESS_ADMIN_API_TOKEN` for the provider write path. Neither credential is a fallback for the other.
+Read and mutation authority remain split. `apply=false` uses only `CLOUDFLARE_ACCESS_API_TOKEN` for Access application inspection and rejects an unnecessary approval reference. `apply=true` requires a fresh auditable `approval_reference`, records only its SHA-256 receipt, and uses only `CLOUDFLARE_ACCESS_ADMIN_API_TOKEN` for the provider write path. Neither credential is a fallback for the other.
 
-The mutation surface is exact:
+The mutation surface is narrower than general Access administration: exactly one uniquely identified mixed Access application may have only its browser-facing public `foundercontrolroom.org` or `www.foundercontrolroom.org` destinations detached. Every non-browser/private destination and every existing policy must remain unchanged. Multiple matching applications, a missing stable provider identity, or a public-only application fail closed instead of guessing ownership or deleting provider state.
 
-```text
-Cloudflare account: canonical FCR account only
-Access destination: foundercontrolroom.org/*
-managed application: foundercontrolroom.org - public apex bypass
-application type: self_hosted
-policy: Bypass / Everyone
-DNS mutation: none
-Worker route mutation: none
-database mutation: none
-unrelated Access application mutation: none
-```
+Anonymous Playwright is a separate outcome witness. It must show that the apex/public FCR pages are not intercepted by Cloudflare Access, that a random stranger reaches the FCR-owned founder sign-in surface rather than the authenticated shell, and that the API runtime identity matches the exact approved SHA. A later `/version`, deployment, or browser-runtime failure does **not** automatically reintroduce a Cloudflare Access product-login screen after provider readback already proved successful detachment.
 
-If the exact managed public-destination application already exists, its destination and Everyone-bypass policy must match before it can be treated as clear. Multiple managed matches, destination/policy drift, or any non-managed Access application already owning the exact public destination fails closed for manual review. The recovery code does not rewrite the account-level `deny_unmatched_requests_exempted_zone_names` setting and does not alter existing all-workers protection.
+Rollback is reserved for an incomplete or ambiguous provider apply and is bound to the exact pre/post destination receipt plus unchanged application and policy fingerprints. It is not a generic response to an unrelated runtime failure. Only the bounded sanitized public receipt is returned to the fixed founder control issue and retained artifact; raw Access/browser receipts, raw approval references, provider IDs, raw errors, and blockers are not promoted into public proof.
 
-A successful create is not production proof. It enters `mutated-needs-browser-proof`, then the workflow runs anonymous Playwright against the public front door and exact runtime SHA. If that post-apply proof fails, rollback may delete only the run-created managed application after reacquiring exactly one application with the same receipt-bound account, zone, application ID, managed name, and destination. Missing identity, ambiguity, or drift blocks rollback instead of widening deletion authority.
-
-Only the bounded sanitized public receipt is returned to the fixed founder control issue and retained artifact. Raw Access/browser receipts, raw approval references, managed application IDs, final origins, raw errors, and blockers are not promoted into public proof. Source code for this workflow proves the recovery contract only; current Access state, credential validity, provider mutation success, and public runtime identity still require fresh provider/browser evidence.
+Source code proves only this bounded recovery contract. Current Access state, credential validity, provider mutation success, routed runtime identity, and the absence of a Cloudflare Access screen require fresh provider/browser evidence.
 
 ## Verification
 

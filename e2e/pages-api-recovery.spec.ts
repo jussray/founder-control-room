@@ -208,3 +208,63 @@ test('serves the owned Juss Rayy identity from Pages with machine-readable ident
     fullPage: true,
   });
 });
+
+test('serves the bounded AI crawler contract as Pages assets without touching the API binding', async () => {
+  const handler = await loadHandler();
+  let apiCalls = 0;
+
+  const crawlerAssets = {
+    fetch: async (request: Request) => {
+      const pathname = new URL(request.url).pathname;
+      const fileName = pathname === '/' ? 'index.html' : pathname.slice(1);
+      const body = readFileSync(resolve(repoRoot, 'public', fileName), 'utf8');
+      const contentType = pathname.endsWith('.json')
+        ? 'application/json; charset=utf-8'
+        : pathname.endsWith('.xml')
+          ? 'application/xml; charset=utf-8'
+          : 'text/plain; charset=utf-8';
+      return new Response(body, { status: 200, headers: { 'content-type': contentType } });
+    },
+  };
+  const fcrApi = {
+    fetch: async (_request: Request) => {
+      apiCalls += 1;
+      return new Response('unexpected API route', { status: 500 });
+    },
+  };
+
+  const robots = await handler.fetch(
+    new Request('https://foundercontrolroom.org/robots.txt'),
+    { ASSETS: crawlerAssets, FCR_API: fcrApi },
+  );
+  expect(robots.status).toBe(200);
+  const robotsBody = await robots.text();
+  expect(robotsBody).toContain('User-agent: OAI-SearchBot');
+  expect(robotsBody).toContain('User-agent: GPTBot');
+  expect(robotsBody).toContain('Allow: /crawlers.json$');
+
+  const crawlers = await handler.fetch(
+    new Request('https://foundercontrolroom.org/crawlers.json'),
+    { ASSETS: crawlerAssets, FCR_API: fcrApi },
+  );
+  expect(crawlers.status).toBe(200);
+  const policy = await crawlers.json() as {
+    schema?: string;
+    policy?: Record<string, string>;
+    bots?: Record<string, string>;
+  };
+  expect(policy.schema).toBe('juss/ai-crawler-contract@v1');
+  expect(policy.policy?.search_discovery).toBe('allow_bounded_public_paths');
+  expect(policy.policy?.model_training).toBe('deny');
+  expect(policy.policy?.write_or_action_authority).toBe('none');
+  expect(policy.bots?.['OAI-SearchBot']).toBe('allow_bounded_public_paths');
+  expect(policy.bots?.GPTBot).toBe('deny');
+
+  const llms = await handler.fetch(
+    new Request('https://foundercontrolroom.org/llms.txt'),
+    { ASSETS: crawlerAssets, FCR_API: fcrApi },
+  );
+  expect(llms.status).toBe(200);
+  expect(await llms.text()).toContain('Canonical founder profile: https://www.foundercontrolroom.org/juss-rayy/');
+  expect(apiCalls).toBe(0);
+});
