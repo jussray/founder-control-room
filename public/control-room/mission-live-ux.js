@@ -1,8 +1,8 @@
 const POLL_MS = 5000;
-const PROOF_FORM_SELECTOR = '#proof-gate-form';
+const MISSION_DETAIL_SELECTOR = '#mission-detail';
 const MISSION_TAB_SELECTOR = '.tabs button[data-tab="missions"]';
 
-let proofGateDraft = null;
+let missionDrafts = new Map();
 let pollTimer = null;
 let observer = null;
 let pollInFlight = false;
@@ -11,42 +11,85 @@ function activeMissionTab() {
   return document.querySelector(`${MISSION_TAB_SELECTOR}.active`) instanceof HTMLButtonElement;
 }
 
-function proofForm() {
-  const form = document.querySelector(PROOF_FORM_SELECTOR);
-  return form instanceof HTMLFormElement ? form : null;
+function missionDetail() {
+  const detail = document.querySelector(MISSION_DETAIL_SELECTOR);
+  return detail instanceof HTMLElement ? detail : null;
+}
+
+function isDraftField(field) {
+  return (
+    field instanceof HTMLInputElement ||
+    field instanceof HTMLTextAreaElement ||
+    field instanceof HTMLSelectElement
+  ) && field.name && !(field instanceof HTMLInputElement && field.type === 'file');
+}
+
+function fieldDraftKey(field) {
+  const detail = missionDetail();
+  const form = field.closest('form');
+  if (!detail || !(form instanceof HTMLFormElement)) return null;
+  const forms = [...detail.querySelectorAll('form')];
+  const formKey = form.id || `form-${forms.indexOf(form)}`;
+  const matching = [...form.querySelectorAll('[name]')].filter((candidate) => (
+    isDraftField(candidate) && candidate.name === field.name
+  ));
+  return `${formKey}:${field.name}:${matching.indexOf(field)}`;
 }
 
 function founderIsEditingMissionForm() {
   const active = document.activeElement;
   if (!(active instanceof HTMLElement)) return false;
-  if (!active.closest('#mission-detail')) return false;
+  if (!active.closest(MISSION_DETAIL_SELECTOR)) return false;
   return active.matches('input, textarea, select');
 }
 
-function captureProofGateDraft() {
-  const form = proofForm();
-  if (!form) return;
-  const values = {};
-  form.querySelectorAll('[name]').forEach((field) => {
-    if (field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement || field instanceof HTMLSelectElement) {
-      values[field.name] = field.value;
+function captureMissionDrafts() {
+  const detail = missionDetail();
+  if (!detail) return;
+  const next = new Map(missionDrafts);
+  detail.querySelectorAll('[name]').forEach((candidate) => {
+    if (!isDraftField(candidate)) return;
+    const key = fieldDraftKey(candidate);
+    if (!key) return;
+    if (candidate instanceof HTMLInputElement && (candidate.type === 'checkbox' || candidate.type === 'radio')) {
+      next.set(key, { kind: 'checked', checked: candidate.checked });
+      return;
     }
+    if (candidate instanceof HTMLSelectElement && candidate.multiple) {
+      next.set(key, {
+        kind: 'multiple',
+        values: [...candidate.selectedOptions].map((option) => option.value),
+      });
+      return;
+    }
+    next.set(key, { kind: 'value', value: candidate.value });
   });
-  proofGateDraft = values;
+  missionDrafts = next;
 }
 
-function restoreProofGateDraft() {
-  const form = proofForm();
-  if (!form) {
-    if (activeMissionTab()) proofGateDraft = null;
+function restoreMissionDrafts() {
+  const detail = missionDetail();
+  if (!detail) {
+    if (activeMissionTab()) missionDrafts = new Map();
     return;
   }
-  if (!proofGateDraft) return;
-  Object.entries(proofGateDraft).forEach(([name, value]) => {
-    const field = form.elements.namedItem(name);
-    if (field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement || field instanceof HTMLSelectElement) {
-      if (field.value !== value) field.value = value;
+  if (missionDrafts.size === 0) return;
+  detail.querySelectorAll('[name]').forEach((candidate) => {
+    if (!isDraftField(candidate)) return;
+    const key = fieldDraftKey(candidate);
+    if (!key) return;
+    const draft = missionDrafts.get(key);
+    if (!draft) return;
+    if (draft.kind === 'checked' && candidate instanceof HTMLInputElement) {
+      candidate.checked = draft.checked;
+      return;
     }
+    if (draft.kind === 'multiple' && candidate instanceof HTMLSelectElement) {
+      const wanted = new Set(draft.values);
+      [...candidate.options].forEach((option) => { option.selected = wanted.has(option.value); });
+      return;
+    }
+    if (draft.kind === 'value' && candidate.value !== draft.value) candidate.value = draft.value;
   });
 }
 
@@ -89,6 +132,15 @@ function ensureLiveStatus(text = 'Live status · synced') {
   if (status.textContent !== text) status.textContent = text;
 }
 
+function clearExpiredFounderSession() {
+  const signOut = document.querySelector('#sign-out');
+  if (signOut instanceof HTMLButtonElement) {
+    signOut.click();
+    return;
+  }
+  window.location.assign('/control-room/');
+}
+
 async function pollMissionStatus() {
   if (pollInFlight || document.hidden || !activeMissionTab()) return;
   const refreshButton = document.querySelector('#refresh-missions');
@@ -108,6 +160,7 @@ async function pollMissionStatus() {
     });
     if (response.status === 401) {
       ensureLiveStatus('Live status · sign in required');
+      clearExpiredFounderSession();
       return;
     }
     if (!response.ok) {
@@ -132,15 +185,15 @@ async function pollMissionStatus() {
 
 function onDraftInput(event) {
   const target = event.target;
-  if (!(target instanceof Element) || !target.closest(PROOF_FORM_SELECTOR)) return;
-  captureProofGateDraft();
+  if (!(target instanceof Element) || !target.closest(MISSION_DETAIL_SELECTOR)) return;
+  captureMissionDrafts();
 }
 
 function onNavigationClick(event) {
   const target = event.target;
   if (!(target instanceof Element)) return;
   if (target.closest('.lane .card[data-id]') || target.closest('.tabs button')) {
-    proofGateDraft = null;
+    missionDrafts = new Map();
   }
 }
 
@@ -154,13 +207,13 @@ export function installMissionLiveUx() {
   const root = document.getElementById('root');
   if (root) {
     observer = new MutationObserver(() => {
-      restoreProofGateDraft();
+      restoreMissionDrafts();
       if (activeMissionTab()) ensureLiveStatus();
     });
     observer.observe(root, { childList: true, subtree: true });
   }
 
-  restoreProofGateDraft();
+  restoreMissionDrafts();
   if (activeMissionTab()) ensureLiveStatus();
   void pollMissionStatus();
   pollTimer = window.setInterval(() => { void pollMissionStatus(); }, POLL_MS);
