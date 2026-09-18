@@ -1,6 +1,6 @@
 # Founder Control Room MCP stack
 
-Last reviewed: 2026-09-13
+Last reviewed: 2026-09-17
 
 This file governs which MCP servers an AI agent may use while **developing this repository**. It is different from the Control Room's own **MCP / Connector Hub** (`project_connections` + `GET /agents` + `GET /authority-levels`), which records connectors and authority for managed projects. Do not conflate the repository agent fleet with the in-app Connector Hub.
 
@@ -25,6 +25,9 @@ The external tool catalog is intentionally small and deterministic:
 4. `fcr_list_projects`
 5. `fcr_get_current_truth`
 6. `fcr_preview_skill_route`
+7. `fcr_relay_operator`
+
+`fcr_relay_operator` is the bounded peer-AI relay surface. It may produce an external provider side effect when a configured provider is actually called, but its FCR result keeps `mutationAuthority:false`, `executionAllowed:false`, and `founderApprovalGranted:false`; model output cannot upgrade that authority ceiling.
 
 There is no external generic `invoke_read_tool`. Callers cannot choose an arbitrary nested provider, tool name, mission, approval, credential, mutation action, or project outside the intersection of the OAuth token grant and the server-held allowlist. Skill content remains private: capability results expose metadata/evidence only, never raw `SKILL.md` prompt text.
 
