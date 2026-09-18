@@ -67,13 +67,69 @@ describe('founder content analytics CSV review regressions', () => {
     })).toThrow(/captured_at must not be after metadata\.generated_at/);
   });
 
-  it('rejects ambiguous equal capture timestamps for overlapping snapshots', () => {
-    const ambiguous = safeCsv.replaceAll(
-      '2026-09-03T23:00:00.000Z',
+  it('rejects a snapshot captured before its declared observation window ends', () => {
+    const futureObservation = safeCsv.replaceAll(
       '2026-09-02T23:00:00.000Z',
+      '2026-09-01T23:00:00.000Z',
     );
-    expect(() => parseFounderContentAnalyticsCsv(ambiguous, metadata))
-      .toThrow(/must not share captured_at/);
+    expect(() => parseFounderContentAnalyticsCsv(futureObservation, metadata))
+      .toThrow(/captured_at must not be before its window_end/);
+  });
+
+  it('rejects equal capture timestamps even when snapshot windows are disjoint', () => {
+    const lines = safeCsv.trimEnd().split('\n');
+    const disjoint = lines
+      .filter((line) => !line.startsWith('current-2026-09-03,') || !line.includes(',daily,2026-09-02,'))
+      .map((line) => {
+        if (line.startsWith('historical-2026-09-02,')) {
+          return line.replace('2026-09-02T23:00:00.000Z', '2026-09-03T12:00:00.000Z');
+        }
+        if (line.startsWith('current-2026-09-03,')) {
+          return line
+            .replace('2026-09-03T23:00:00.000Z', '2026-09-03T12:00:00.000Z')
+            .replace(',2026-09-02,2026-09-03,current_export,', ',2026-09-03,2026-09-03,current_export,');
+        }
+        return line;
+      })
+      .join('\n');
+
+    expect(() => parseFounderContentAnalyticsCsv(disjoint, {
+      ...metadata,
+      comparison: {
+        baseline_start: '2026-09-01',
+        baseline_end: '2026-09-01',
+        recent_start: '2026-09-03',
+        recent_end: '2026-09-03',
+      },
+    })).toThrow(/must not share captured_at/);
+  });
+
+  it('rejects extra archival snapshots that would decouple audience shift from the declared comparison windows', () => {
+    const [header, ...rows] = safeCsv.trimEnd().split('\n');
+    const archivalRows = [
+      'archival-2026-08-31,2026-08-31T23:00:00.000Z,2026-08-31,2026-08-31,historical_import,daily,2026-08-31,true,50,5,1,,',
+      'archival-2026-08-31,2026-08-31T23:00:00.000Z,2026-08-31,2026-08-31,historical_import,audience,,,,,,Founder,0.10',
+    ];
+    const ambiguousAudience = [header, ...archivalRows, ...rows].join('\n');
+
+    expect(() => parseFounderContentAnalyticsCsv(ambiguousAudience, metadata))
+      .toThrow(/extra snapshots make audience comparison ambiguous/);
+  });
+
+  it('rejects reconciled comparison totals that exceed the JavaScript safe-integer range', () => {
+    const unsafeAggregate = safeCsv
+      .replace(',2026-09-02,true,125,15,1,,', ',2026-09-02,true,9007199254740991,15,1,,')
+      .replace(',2026-09-03,true,130,,2,,', ',2026-09-03,true,1,,2,,');
+
+    expect(() => parseFounderContentAnalyticsCsv(unsafeAggregate, {
+      ...metadata,
+      comparison: {
+        baseline_start: '2026-09-01',
+        baseline_end: '2026-09-01',
+        recent_start: '2026-09-02',
+        recent_end: '2026-09-03',
+      },
+    })).toThrow(/recent impressions aggregate exceeds the safe integer range/);
   });
 
   it('rejects invalid explicit top-post scopes and canonicalizes omitted versus explicit default scope', () => {
