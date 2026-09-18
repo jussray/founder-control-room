@@ -65,9 +65,25 @@ const forbiddenLiteralSecrets = [
   { label: 'Slack token', pattern: /\bxox[baprs]-[A-Za-z0-9-]{10,}\b/ },
   {
     label: 'sensitive credential assignment',
-    pattern: /\b(?:ANTHROPIC_API_KEY|OPENAI_API_KEY|CLOUDFLARE_API_TOKEN|CLOUDFLARE_ACCESS_API_TOKEN|CF_API_TOKEN|SUPABASE_SERVICE_ROLE_KEY|DATABASE_URL|GITHUB_TOKEN|N8N_API_KEY)\b\s*(?:=|:)\s*["']?(?!\$\{|\$[A-Z_]|process\.env\b|env\b|secret\b|redacted\b|placeholder\b|example\b)[^\s"'`,;}{]{8,}/i,
+    pattern: /(?:"|')?(?:[A-Z][A-Z0-9_]*(?:API_KEY|API_TOKEN|ACCESS_TOKEN|BEARER_TOKEN|PRIVATE_KEY|SERVICE_ROLE_KEY|ENCRYPTION_KEY|WEBHOOK_SECRET|HMAC_SECRET|INGRESS_SECRET|INGEST_SECRET|SHARED_SECRET|MCP_TOKEN|HOOK_URL|PASSWORD|FINGERPRINT)|DATABASE_URL|SUPABASE_DB_URL|GITHUB_TOKEN)(?:"|')?\s*(?:=|:)\s*["']?(?!\$\{|\$[A-Z_]|process\.env\b|env\b|redacted(?:\b|_)|placeholder(?:\b|_)|example(?:\b|_))[^\s"'`,;}{]{8,}/i,
   },
 ];
+
+const leakageScannerRegressionSamples = [
+  '{"SUPABASE_SERVICE_ROLE_KEY":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}',
+  '{"FOUNDER_SESSION_ENCRYPTION_KEY":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}',
+  '{"FOUNDER_SIGNAL_ENGINE_MCP_TOKEN":"cccccccccccccccccccccccccccccccc"}',
+  '{"RECONCILE_SHARED_SECRET":"dddddddddddddddddddddddddddddddd"}',
+  '{"N8N_FOUNDER_CONTENT_IDENTITY_HMAC_SECRET":"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"}',
+  'ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL=https://hooks.invalid/opaque-secret-value',
+];
+
+for (const sample of leakageScannerRegressionSamples) {
+  const detected = forbiddenLiteralSecrets.some((rule) => rule.pattern.test(sample));
+  if (!detected) {
+    throw new Error(`Cloudflare Pages leakage scanner regression: failed to detect synthetic sensitive assignment ${sample.split(/[=:]/, 1)[0]}`);
+  }
+}
 
 async function collectFiles(directory) {
   const files = [];
