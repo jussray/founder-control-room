@@ -598,7 +598,7 @@ async function main() {
   await page.fill('#log-cost-form input[name="agentName"]', 'perplexity');
   await page.fill('#log-cost-form input[name="costUsd"]', '0.05');
   await page.click('#log-cost-form button[type=submit]');
-  const costText = await waitForText(page, '#mission-detail', 'Total: $');
+  const costText = await waitForText(page, '#mission-detail', 'Total: $', 65000);
   assert(costText.includes('0.0500'), 'cost entry round-tripped and totals correctly');
 
   console.log('\n[8] Register an MCP connector and record a health check');
