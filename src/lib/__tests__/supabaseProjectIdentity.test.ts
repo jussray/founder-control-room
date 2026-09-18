@@ -154,7 +154,7 @@ describe('validateControlRoomSupabaseUrl', () => {
 
   it('keeps Worker config and post-deploy reconciliation bound to the same code-owned project identity', () => {
     const validationIndex = selfReconcileSource.indexOf('validateControlRoomSupabaseUrl(SUPABASE_URL');
-    const runtimeReadbackIndex = selfReconcileSource.indexOf('assertDeployedRuntimeSupabaseIdentity()');
+    const runtimeReadbackIndex = selfReconcileSource.indexOf('await assertDeployedRuntimeSupabaseIdentity();');
     const clientIndex = selfReconcileSource.indexOf('createClient(SUPABASE_URL');
 
     expect(workerConfigSource).toContain(
