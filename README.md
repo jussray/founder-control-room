@@ -314,3 +314,9 @@ A child-app reconciliation may classify evidence as `CURRENT`, `UNDECLARED`, `SC
 ## Required crawler/public-work browser proof
 
 For public crawler and work-directory behavior, `.github/workflows/ci.yml` must keep `e2e/pages-api-recovery.spec.ts` and `e2e/public-work-directory.spec.ts` inside the load-bearing `Playwright e2e` job that feeds `Required Gate`. The specialized Pages workflow is supplementary evidence only; it cannot replace this required exact-head browser proof or authorize merge.
+
+## FCR ↔ Chief standalone peer proof
+
+The FCR ↔ Chief contract is a standalone-peer evidence boundary, not a shared authority plane. The checked-in peer lock may bind exact Chief pair-policy carrier identities, and repository verification may prove those identities are still current, but neither the lock nor green source checks can authorize merge, deploy, provider mutation, publication, or production execution.
+
+Any FCR head movement, Chief peer-head movement, or Playwright peer-pin movement creates a new proof subject. Predecessor CI, review, runtime, and browser evidence becomes historical until the successor exact head is re-verified. A correct peer lock proves repository identity only; current runtime behavior still requires the applicable exact-head real-path witness.

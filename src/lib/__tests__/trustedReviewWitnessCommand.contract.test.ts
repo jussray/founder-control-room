@@ -156,7 +156,9 @@ describe('trusted review witness command contract', () => {
       'requiredApprovingReviewCount: FOUNDER_CONTROL_ROOM_REQUIRED_NATIVE_APPROVALS',
     );
     expect(governanceJob).not.toContain('requiredApprovingReviewCount: 1');
-    expect(governanceJob).toContain("requiredStatusCheckNames: ['Required Gate', 'Verify test-ledger contract']");
+    expect(governanceJob).toContain(
+      "requiredStatusCheckNames: ['Required Gate', 'Verify test-ledger contract', 'verify-pair-contract']",
+    );
     expect(governanceJob).toContain('blockForcePushes: true');
     expect(governanceJob).toContain('blockDeletion: true');
     expect(governanceJob).toContain("bypassActors: [{ kind: 'app', id: appId }]");

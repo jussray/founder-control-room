@@ -1,0 +1,28 @@
+{
+  "schema": "fcr/founder-chief-pair-peer-lock@v1",
+  "repository": "jussray/founder-control-room",
+  "scope": "pull-request-candidate-only",
+  "founderControlRoom": {
+    "pullRequest": 781
+  },
+  "chiefAIPair": {
+    "repository": "jussray/chief-ai-machine",
+    "pullRequest": 142,
+    "expectedHeadSha": "1f34f3d957fac340c6a9680656418648cc501a00"
+  },
+  "chiefAINecessaryFixPolicy": {
+    "repository": "jussray/chief-ai-machine",
+    "pullRequest": 151,
+    "expectedHeadSha": "e0e5801312f4a74d70c96d39fc61683875712b99"
+  },
+  "chiefAIFounderContentStrategy": {
+    "repository": "jussray/chief-ai-machine",
+    "pullRequest": 128,
+    "expectedHeadSha": "ca1db788a8c489cc1eb3fe0cc2ec500648f631c7"
+  },
+  "truthBoundary": "This immutable candidate snapshot binds FCR PR #781 to exact observed Chief peer and necessary-fix-policy heads. The merged founder-content carrier remains provenance only. The lock is evidence, not authority: it does not authorize merge, deployment, provider mutation, publication, runtime execution, or transfer authority between peers.",
+  "authorizesMerge": false,
+  "authorizesDeployment": false,
+  "authorizesProviderMutation": false,
+  "runtimeTruthProven": false
+}
