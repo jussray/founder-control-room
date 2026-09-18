@@ -40,6 +40,14 @@ describe('Founder Control Room Cloudflare topology', () => {
     expect(buildScript).toContain('await assertFileContainsNoLiteralSecret(absolutePath, packagedPath)');
   });
 
+  it('budgets mission live polling below the shared API rate limit', () => {
+    const missionLive = read('public/control-room/mission-live-ux.js');
+    const match = missionLive.match(/const POLL_MS = (\d+);/);
+
+    expect(match).not.toBeNull();
+    expect(Number(match?.[1])).toBeGreaterThanOrEqual(5000);
+  });
+
   it('provides a five-screen public front door into the founder-authenticated app', () => {
     const landing = read('public/index.html');
     const app = read('public/control-room/index.html');

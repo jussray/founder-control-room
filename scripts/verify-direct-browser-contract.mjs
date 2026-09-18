@@ -20,7 +20,7 @@ assert.match(bootstrap, /--no-proxy-server/);
 assert.match(bootstrap, /delete process\.env\[key\]/);
 assert.match(bootstrap, /process\.env\.NO_PROXY = '\*'/);
 assert.match(bootstrap, /process\.env\.no_proxy = '\*'/);
-assert.equal(pkg.scripts['test:e2e'], 'npm run build && npm run verify:direct-browser && node e2e/pages-auth-callback-proof.mjs && node e2e/direct-browser-run.mjs');
+assert.equal(pkg.scripts['test:e2e'], 'npm run build && npm run verify:direct-browser && node e2e/pages-auth-callback-proof.mjs && node e2e/direct-browser-run.mjs && node e2e/mission-live-ux-proof.mjs');
 assert.match(localPlaywrightProof, /from 'playwright'/);
 assert.match(localPlaywrightProof, /LOCAL_NO_PROVIDER_FEE/);
 assert.match(localPlaywrightProof, /providerWalletRequired: false/);
@@ -43,6 +43,9 @@ assert.match(missionLiveProof, /mobile-live-status\.png/);
 assert.match(missionLiveUx, /founderIsEditingMissionForm/);
 assert.match(missionLiveUx, /boardSignatureFromTasks/);
 assert.match(missionLiveUx, /Live status · paused while editing/);
+const missionPollMatch = missionLiveUx.match(/const POLL_MS = (\d+);/);
+assert.ok(missionPollMatch, 'Mission live UX must declare POLL_MS.');
+assert.ok(Number(missionPollMatch[1]) >= 5000, 'Mission live polling must preserve the shared API request budget.');
 assert.match(stackRouter, /import \{ installMissionLiveUx \} from '\.\/mission-live-ux\.js'/);
 assert.match(stackRouter, /installMissionLiveUx\(\)/);
 
