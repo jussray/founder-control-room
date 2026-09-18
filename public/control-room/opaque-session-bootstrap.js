@@ -109,6 +109,7 @@ async function bootLegacyCockpit() {
 
   await import('/control-room/app.js');
   await import('/control-room/five-screen-shell.js');
+  await import('/control-room/os-topology.js');
 }
 
 void bootLegacyCockpit();
