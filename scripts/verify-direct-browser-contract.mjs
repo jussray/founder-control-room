@@ -14,8 +14,11 @@ const fiveScreenProofUrl = new URL('../e2e/five-screen-shell-proof.mjs', import.
 const fiveScreenProof = fs.readFileSync(fiveScreenProofUrl, 'utf8');
 const osTopologyProofUrl = new URL('../e2e/founder-os-topology-proof.mjs', import.meta.url);
 const osTopologyProof = fs.readFileSync(osTopologyProofUrl, 'utf8');
+const rateLimitProofUrl = new URL('../e2e/safe-rate-limit-fetch-proof.mjs', import.meta.url);
+const rateLimitProof = fs.readFileSync(rateLimitProofUrl, 'utf8');
 const fiveScreenShell = fs.readFileSync(new URL('../public/control-room/five-screen-shell.js', import.meta.url), 'utf8');
 const osTopology = fs.readFileSync(new URL('../public/control-room/os-topology.js', import.meta.url), 'utf8');
+const safeRateLimitFetch = fs.readFileSync(new URL('../public/control-room/safe-rate-limit-fetch.js', import.meta.url), 'utf8');
 const opaqueBootstrap = fs.readFileSync(new URL('../public/control-room/opaque-session-bootstrap.js', import.meta.url), 'utf8');
 const pkg = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
 
@@ -77,8 +80,23 @@ assert.match(osTopology, /id: 'solcontinuity'/);
 assert.doesNotMatch(osTopology, /authorityTransfer:\s*true/);
 assert.match(osTopology, /recipientVerificationRequired:\s*true/);
 assert.match(osTopology, /L99 stays a Chief operating method, not a rival control plane/);
+
+assert.match(rateLimitProof, /safe same-origin GET retries exactly once/);
+assert.match(rateLimitProof, /consequential POST is never retried automatically/);
+assert.match(rateLimitProof, /cross-origin response is never retried/);
+assert.match(rateLimitProof, /unbounded Retry-After remains a visible 429/);
+assert.match(safeRateLimitFetch, /SAFE_METHODS = new Set\(\['GET', 'HEAD'\]\)/);
+assert.match(safeRateLimitFetch, /MAX_RETRY_AFTER_SECONDS = 61/);
+assert.match(safeRateLimitFetch, /first\.status !== 429/);
+assert.doesNotMatch(safeRateLimitFetch, /SAFE_METHODS = .*POST/);
+assert.match(opaqueBootstrap, /safe-rate-limit-fetch\.js/);
 assert.match(opaqueBootstrap, /five-screen-shell\.js/);
 assert.match(opaqueBootstrap, /os-topology\.js/);
+
+execFileSync(process.execPath, [fileURLToPath(rateLimitProofUrl)], {
+  stdio: 'inherit',
+  env: process.env,
+});
 
 execFileSync(process.execPath, [fileURLToPath(localPlaywrightProofUrl)], {
   stdio: 'inherit',
@@ -105,4 +123,4 @@ execFileSync(process.execPath, [fileURLToPath(osTopologyProofUrl)], {
   env: process.env,
 });
 
-console.log('direct browser contract verified with local, ULTRATHINK Plugin Center, Control Room Composer, five-screen cockpit, Founder OS topology, and legacy-journey navigation proofs');
+console.log('direct browser contract verified with bounded safe-read rate-limit recovery, local proof, ULTRATHINK Plugin Center, Control Room Composer, five-screen cockpit, Founder OS topology, and legacy-journey navigation proofs');
