@@ -282,6 +282,8 @@ jobs:
       - uses: supabase/setup-cli@v1
         with:
           version: 2.101.0
+      - name: Start local Supabase database
+        run: supabase db start
       - name: Lint migrations
         run: supabase db lint --local
 
