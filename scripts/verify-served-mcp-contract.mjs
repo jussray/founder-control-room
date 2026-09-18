@@ -19,11 +19,11 @@
  *      can keep every internal invariant intact while a mount edit silently
  *      drops the auth middleware in front of it; nothing else checks that.
  *   3. The served discovery/initialize description stays truthful about the
- *      six read/preview tools plus the one bounded peer relay.
+ *      seven read/preview tools plus the one bounded peer relay.
  *
  * Scope is deliberately narrow otherwise: it does not assert OAuth claim
  * handling or protocol-version literals. The external tool catalog is pinned
- * only where authority semantics matter: six read/preview tools stay read-only,
+ * only where authority semantics matter: seven read/preview tools stay read-only,
  * while the one peer-operator relay is a bounded external side effect with no
  * repository/provider mutation authority.
  */
@@ -74,14 +74,18 @@ const readAnnotationUses = (
   toolDefsBody.match(/annotations:\s*(?:readAnnotations|\{\s*\.\.\.readAnnotations)/g) ?? []
 ).length;
 const relayAnnotationUses = (toolDefsBody.match(/annotations:\s*relayAnnotations/g) ?? []).length;
-assert(toolCount === 7, `external MCP catalog must contain the six read/preview tools plus one relay tool (found ${toolCount})`);
+assert(toolCount === 8, `external MCP catalog must contain the seven read/preview tools plus one relay tool (found ${toolCount})`);
 assert(
-  readAnnotationUses === 6,
-  `exactly six declared external MCP tools must derive from readAnnotations (found ${readAnnotationUses})`,
+  readAnnotationUses === 7,
+  `exactly seven declared external MCP tools must derive from readAnnotations (found ${readAnnotationUses})`,
 );
 assert(
   relayAnnotationUses === 1 && /name:\s*'fcr_relay_operator'[\s\S]{0,1600}?annotations:\s*relayAnnotations/.test(toolDefsBody),
   "fcr_relay_operator must be the only tool using relayAnnotations",
+);
+assert(
+  /name:\s*'github_audit_pr'[\s\S]{0,1600}?annotations:\s*\{\s*\.\.\.readAnnotations/.test(toolDefsBody),
+  "github_audit_pr must stay on the read-only annotation path",
 );
 assert(
   externalTools.includes("executionAllowed: false") &&
@@ -101,17 +105,17 @@ assert(
 /* ---------- remoteReadMcp.ts: served description must match the actual catalog ---------- */
 
 assert(
-  remoteReadMcp.includes('six read/preview tools plus one bounded peer-operator relay tool'),
-  "modern server/discover must describe six read/preview tools plus the bounded peer relay",
+  remoteReadMcp.includes('seven read/preview tools plus one bounded peer-operator relay tool'),
+  "modern server/discover must describe seven read/preview tools plus the bounded peer relay",
 );
 assert(
-  remoteReadMcp.includes('Six read/preview tools plus one bounded peer-operator relay'),
-  "legacy initialize must describe six read/preview tools plus the bounded peer relay",
+  remoteReadMcp.includes('Seven read/preview tools plus one bounded peer-operator relay'),
+  "legacy initialize must describe seven read/preview tools plus the bounded peer relay",
 );
 assert(
-  !remoteReadMcp.includes('six read/preview-only tools') &&
-    !remoteReadMcp.includes('Six read/preview-only tools'),
-  "served MCP must not regress to the stale read-only-only catalog description",
+  !remoteReadMcp.includes('six read/preview tools plus one bounded peer-operator relay tool') &&
+    !remoteReadMcp.includes('Six read/preview tools plus one bounded peer-operator relay'),
+  "served MCP must not regress to the stale six-read-tool catalog description",
 );
 assert(
   remoteReadMcp.includes('research/propose/review') &&
@@ -187,6 +191,6 @@ assert(
 );
 
 console.log(
-  "[verify:served-mcp] Six read/preview MCP tools, one bounded peer relay, truthful served discovery, secret-argument guard, "
+  "[verify:served-mcp] Seven read/preview MCP tools, one bounded peer relay, truthful served discovery, secret-argument guard, "
     + "Founder Signal endpoints, and every served mount point's middleware wiring are pinned.",
 );

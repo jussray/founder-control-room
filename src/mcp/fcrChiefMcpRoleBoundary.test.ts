@@ -8,6 +8,7 @@ const externalTools = fs.readFileSync(
 );
 
 const fcrTruthTools = [
+  'github_audit_pr',
   'fcr_list_projects',
   'fcr_get_current_truth',
   'fcr_preview_skill_route',
