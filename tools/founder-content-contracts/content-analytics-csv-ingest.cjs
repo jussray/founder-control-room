@@ -7,6 +7,7 @@ const CONTRACT = 'fcr/founder-content-analytics-csv-ingest@v1';
 const MAX_BYTES = 1_000_000;
 const MAX_ROWS = 5_000;
 const DEFAULT_TOP_POST_COUNT = 2;
+const MAX_SAFE_INTEGER_BIGINT = BigInt(Number.MAX_SAFE_INTEGER);
 const EXPECTED_COLUMNS = Object.freeze([
   'snapshot_id',
   'captured_at',
@@ -199,10 +200,6 @@ function assertSnapshotMetadata(group, row, lineNumber) {
   }
 }
 
-function windowsOverlap(left, right) {
-  return left.window_start <= right.window_end && right.window_start <= left.window_end;
-}
-
 function deepFreeze(value, seen = new WeakSet()) {
   if (!value || typeof value !== 'object' || seen.has(value)) return value;
   seen.add(value);
@@ -222,6 +219,67 @@ function canonicalSnapshotEvidence(group) {
       Object.entries(group.audience).sort(([left], [right]) => compareOrdinal(left, right)),
     ),
   };
+}
+
+function snapshotCoversRange(group, start, end) {
+  return group.window_start <= start && group.window_end >= end;
+}
+
+function latestSnapshotCoveringRange(groupList, start, end, label) {
+  const candidates = groupList
+    .filter((group) => snapshotCoversRange(group, start, end))
+    .sort((left, right) => compareOrdinal(left.captured_at, right.captured_at)
+      || compareOrdinal(left.id, right.id));
+  if (candidates.length === 0) {
+    fail(`no snapshot covers metadata.comparison.${label}_start..${label}_end`);
+  }
+  return candidates[candidates.length - 1];
+}
+
+function assertAudienceComparisonBinding(groupList, comparison) {
+  const ordered = [...groupList].sort((left, right) => compareOrdinal(left.captured_at, right.captured_at));
+  const baseline = latestSnapshotCoveringRange(
+    groupList,
+    comparison.baseline_start,
+    comparison.baseline_end,
+    'baseline',
+  );
+  const recent = latestSnapshotCoveringRange(
+    groupList,
+    comparison.recent_start,
+    comparison.recent_end,
+    'recent',
+  );
+
+  if (baseline.id === recent.id) {
+    fail('baseline and recent comparison windows must resolve to distinct audience snapshots');
+  }
+  if (ordered[0].id !== baseline.id || ordered[ordered.length - 1].id !== recent.id) {
+    fail('extra snapshots make audience comparison ambiguous; oldest/latest audience evidence must match the declared baseline/recent windows');
+  }
+}
+
+function assertSafeRangeAggregates(groupList, comparison) {
+  const latestByDate = new Map();
+  const ordered = [...groupList].sort((left, right) => compareOrdinal(left.captured_at, right.captured_at));
+  for (const group of ordered) {
+    for (const row of group.daily) latestByDate.set(row.date, row);
+  }
+
+  for (const label of ['baseline', 'recent']) {
+    const start = comparison[`${label}_start`];
+    const end = comparison[`${label}_end`];
+    for (const metric of ['impressions', 'engagements']) {
+      let total = 0n;
+      for (const [date, row] of latestByDate.entries()) {
+        if (date < start || date > end || row[metric] === null) continue;
+        total += BigInt(row[metric]);
+        if (total > MAX_SAFE_INTEGER_BIGINT) {
+          fail(`${label} ${metric} aggregate exceeds the safe integer range`);
+        }
+      }
+    }
+  }
 }
 
 function parseFounderContentAnalyticsCsv(csvText, metadata = {}) {
@@ -325,19 +383,27 @@ function parseFounderContentAnalyticsCsv(csvText, metadata = {}) {
   const groupList = [...groups.values()];
   const generatedAtMs = Date.parse(generatedAt);
   for (const group of groupList) {
-    if (Date.parse(group.captured_at) > generatedAtMs) {
+    const capturedAtMs = Date.parse(group.captured_at);
+    if (capturedAtMs > generatedAtMs) {
       fail(`snapshot ${group.id} captured_at must not be after metadata.generated_at`);
+    }
+    const windowEndMs = Date.parse(`${group.window_end}T00:00:00.000Z`);
+    if (capturedAtMs < windowEndMs) {
+      fail(`snapshot ${group.id} captured_at must not be before its window_end`);
     }
   }
   for (let leftIndex = 0; leftIndex < groupList.length; leftIndex += 1) {
     for (let rightIndex = leftIndex + 1; rightIndex < groupList.length; rightIndex += 1) {
       const left = groupList[leftIndex];
       const right = groupList[rightIndex];
-      if (left.captured_at === right.captured_at && windowsOverlap(left, right)) {
-        fail(`overlapping snapshots ${left.id} and ${right.id} must not share captured_at`);
+      if (left.captured_at === right.captured_at) {
+        fail(`snapshots ${left.id} and ${right.id} must not share captured_at`);
       }
     }
   }
+
+  assertAudienceComparisonBinding(groupList, metadata.comparison);
+  assertSafeRangeAggregates(groupList, metadata.comparison);
 
   const snapshots = groupList.map((group) => ({
     id: group.id,
