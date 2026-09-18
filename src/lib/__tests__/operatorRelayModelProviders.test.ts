@@ -231,6 +231,27 @@ describe('createServerOperatorRelayAdapters', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ['GitHub token', `ghp_${'a'.repeat(36)}`],
+    ['GitLab token', `glpat-${'b'.repeat(24)}`],
+    ['AWS access key', `AKIA${'C'.repeat(16)}`],
+    ['PEM private key', '-----BEGIN PRIVATE KEY-----'],
+  ])('fails closed before provider dispatch for a bare %s', async (_label, secret) => {
+    const fetchMock = vi.fn() as unknown as typeof fetch;
+    const adapters = createServerOperatorRelayAdapters({
+      ANTHROPIC_API_KEY: 'anthropic-secret',
+      FCR_RELAY_ANTHROPIC_MODEL: 'claude-test-model',
+    }, fetchMock);
+
+    await expect(adapters['claude-code']?.(relay(
+      'internal',
+      'claude-code',
+      'review',
+      `Review this context: ${secret}`,
+    ))).rejects.toThrow('secret-bearing material');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it('never surfaces a Perplexity provider error body that could echo secrets', async () => {
     const fetchMock = vi.fn(async () => new Response(JSON.stringify({
       error: { message: 'provider rejected the request' },
