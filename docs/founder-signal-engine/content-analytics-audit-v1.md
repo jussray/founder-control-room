@@ -43,6 +43,10 @@ It does not infer revenue, customer intent, causal lift, or publication success 
 14. `generated_at` and every snapshot `captured_at` must be offset-aware ISO timestamps. Accepted explicit offsets are normalized to UTC before delegation to the core audit, while local-time guesses and impossible calendar instants are rejected at the evidence boundary.
 15. Quoted CSV fields must terminate at a comma, newline, or end-of-input; trailing text after a closing quote is malformed evidence and is rejected.
 16. Snapshot IDs and other provenance identifiers are bounded at ingress so downstream normalization cannot silently truncate identity.
+17. Distinct snapshots must have distinct normalized `captured_at` instants. Equal-time snapshots are rejected rather than letting CSV row order choose audience or revision truth.
+18. A snapshot cannot claim observations from the future relative to its own capture. Its normalized `captured_at` must be on or after its declared `window_end` and no later than receipt `generated_at`.
+19. Audience-shift evidence is bound to the declared baseline/recent comparison windows. The ingestion path resolves those windows to distinct covering snapshots and rejects extra oldest/latest snapshots that would make the audience comparison scope ambiguous.
+20. Reconciled baseline/recent impression and engagement totals must remain within JavaScript's exact safe-integer range. Individually valid cells whose range sum would exceed `Number.MAX_SAFE_INTEGER` are rejected before the core audit can hash rounded totals.
 
 ## Normalized authority input
 
@@ -92,7 +96,7 @@ Exact CSV columns:
 snapshot_id,captured_at,window_start,window_end,import_kind,row_type,date,complete,impressions,engagements,gross_new_followers,audience_segment,audience_share
 ```
 
-`import_kind` is either `historical_import` or `current_export`. `row_type` is either `daily` or `audience`. Every `captured_at` must include `Z` or an explicit UTC offset; accepted offsets are normalized to UTC in the receipt and delegated audit.
+`import_kind` is either `historical_import` or `current_export`. `row_type` is either `daily` or `audience`. Every `captured_at` must include `Z` or an explicit UTC offset; accepted offsets are normalized to UTC in the receipt and delegated audit. Distinct snapshots must not normalize to the same capture instant, and a snapshot capture cannot precede its own `window_end`.
 
 The ingestion receipt records:
 
@@ -114,7 +118,7 @@ Units are explicit:
 - `audience_share`: ratio from 0 to 1;
 - `audience_delta`: percentage points.
 
-An empty count cell becomes `null`, never zero. A comparison requiring that null value becomes `INCOMPLETE`.
+An empty count cell becomes `null`, never zero. A comparison requiring that null value becomes `INCOMPLETE`. Comparison-range impression and engagement totals must also remain exactly representable as JavaScript safe integers; otherwise ingestion fails closed rather than emitting rounded analytics.
 
 ## Output
 
@@ -138,6 +142,6 @@ The CSV adapter returns an outer `fcr/founder-content-analytics-csv-ingest@v1` r
 
 `src/lib/__tests__/founderContentAnalyticsCsvIngest.contract.test.ts` reads the safe CSV fixture at `src/lib/__tests__/fixtures/founder-content-analytics-safe.csv`. It verifies source hashing, account/page identity, historical/current import provenance, explicit metric units, `audience_segment`, duplicate rejection, snapshot-window binding, null handling, offset-aware timestamps, logical idempotency across file/display metadata and row-order changes, changed-evidence separation, and advisory-only authority.
 
-`src/lib/__tests__/founderContentAnalyticsCsvIngest.reviewRegressions.test.ts` locks review-found edge cases: UTC normalization for explicit offsets, canonical top-post scope, unavailable post-concentration evidence, malformed quoted fields, and bounded snapshot identities.
+`src/lib/__tests__/founderContentAnalyticsCsvIngest.reviewRegressions.test.ts` locks review-found edge cases: UTC normalization for explicit offsets, canonical top-post scope, unavailable post-concentration evidence, malformed quoted fields, bounded snapshot identities, capture/window chronology, equal-capture rejection, comparison-bound audience snapshots, and safe-integer aggregate bounds.
 
 A safe fixture proves the ingestion implementation. It is **not** evidence that any external analytics account/page is connected or current. A real-data receipt requires an authorized analytics source or a separately supplied export; absence of that source blocks only the real-data receipt, not this contract verification.
