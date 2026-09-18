@@ -92,6 +92,13 @@ function installCookieBackedSignOut() {
 
 async function bootLegacyCockpit() {
   scrubLegacyBrowserCredentials();
+
+  // Safe reads may legitimately cross the founder API's real per-IP budget
+  // during a dense cockpit session. Install the bounded same-origin GET/HEAD
+  // retry before the first authenticated read. Mutation requests are never
+  // automatically retried by this layer.
+  await import('/control-room/safe-rate-limit-fetch.js');
+
   installFounderCopyCompatibility();
   installCookieBackedSignOut();
 
