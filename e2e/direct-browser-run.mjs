@@ -258,10 +258,13 @@ async function withV10PlanAwarePage(page) {
   const originalWaitForSelector = page.waitForSelector.bind(page);
   page.waitForSelector = async (selector, options) => {
     if (selector === '#new-project-form') {
+      // app.js performs an authenticated boot load after the document load event
+      // and re-renders the shell when those reads settle. Wait for that real
+      // startup traffic before driving Control so the proof cannot race a
+      // legitimate boot render back to Home.
+      await page.waitForLoadState('networkidle');
       const target = page.locator(selector);
       if (!(await target.isVisible().catch(() => false))) {
-        // The full journey now lands on Home. Reach the project form through
-        // the same visible founder geography a real user follows.
         await driveFiveScreenNavigation(page, LEGACY_TAB_ROUTES.projects);
       }
     }
