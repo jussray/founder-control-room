@@ -4,20 +4,27 @@
 
 begin;
 
+-- The composite key lets the evidence ledger enforce that a lifecycle post and
+-- founder identity always belong together, even if a future service-role caller
+-- bypasses the application-layer subject check.
+alter table public.founder_content_posts
+  add constraint founder_content_posts_post_founder_unique
+  unique (post_id, founder_user_id);
+
 create table if not exists public.founder_content_metric_observations (
   observation_id uuid primary key default gen_random_uuid(),
-  post_id uuid references public.founder_content_posts(post_id) on delete cascade,
+  post_id uuid,
   founder_user_id text not null,
   provider text not null check (provider ~ '^[a-z0-9][a-z0-9._:-]{0,159}$'),
   platform text not null check (platform ~ '^[a-z0-9][a-z0-9._-]{0,79}$'),
   source text not null check (source in (
     'native_platform', 'native_platform_export', 'official_api_partner', 'aggregator', 'historical_csv'
   )),
-  source_metric_id text,
+  source_metric_id text check (source_metric_id is null or length(source_metric_id) between 1 and 240),
   account_id text not null check (length(btrim(account_id)) between 1 and 240),
   page_id text not null check (length(btrim(page_id)) between 1 and 240),
-  external_post_id text,
-  audience_segment text,
+  external_post_id text check (external_post_id is null or length(external_post_id) between 1 and 240),
+  audience_segment text check (audience_segment is null or length(audience_segment) between 1 and 240),
   metric_name text not null check (length(btrim(metric_name)) between 1 and 240),
   metric_unit text not null check (metric_unit in (
     'count', 'ratio', 'percent', 'milliseconds', 'seconds', 'currency', 'currency_minor', 'score', 'unknown'
@@ -31,6 +38,10 @@ create table if not exists public.founder_content_metric_observations (
   source_row_hash text not null check (source_row_hash ~ '^[0-9a-f]{64}$'),
   idempotency_key text not null check (idempotency_key ~ '^[0-9a-f]{64}$'),
   created_at timestamptz not null default now(),
+  constraint founder_content_metric_post_founder_fk
+    foreign key (post_id, founder_user_id)
+    references public.founder_content_posts(post_id, founder_user_id)
+    on delete cascade,
   constraint founder_content_metric_period_pair_check check (
     (period_start is null and period_end is null)
     or (period_start is not null and period_end is not null and period_start <= period_end)
@@ -56,15 +67,16 @@ create index if not exists founder_content_metric_page_segment_idx
 alter table public.founder_content_metric_observations enable row level security;
 drop policy if exists founder_content_metric_observations_service_role_only on public.founder_content_metric_observations;
 create policy founder_content_metric_observations_service_role_only on public.founder_content_metric_observations
-  for all
-  using (auth.role() = 'service_role')
-  with check (auth.role() = 'service_role');
+  for select
+  using (auth.role() = 'service_role');
 
-revoke all on table public.founder_content_metric_observations from public, anon, authenticated;
-grant select, insert, update, delete on table public.founder_content_metric_observations to service_role;
+-- Evidence rows are append-only through the validated SECURITY DEFINER intake.
+-- Even service-role callers do not receive direct UPDATE or DELETE privileges.
+revoke all on table public.founder_content_metric_observations from public, anon, authenticated, service_role;
+grant select on table public.founder_content_metric_observations to service_role;
 
 comment on table public.founder_content_metric_observations is
-  'Service-role-only normalized observational analytics ledger. Evidence only; never publication, execution, or model authority.';
+  'Append-only service-role observational analytics ledger. Evidence only; never publication, execution, or model authority.';
 
 create or replace function public.ingest_founder_content_metric_observations(
   p_founder_user_id text,
@@ -82,9 +94,20 @@ declare
   v_observation jsonb;
   v_provider text;
   v_platform text;
+  v_source text;
+  v_source_metric_id text;
   v_account_id text;
   v_page_id text;
   v_external_post_id text;
+  v_audience_segment text;
+  v_metric_name text;
+  v_metric_unit text;
+  v_metric_value numeric;
+  v_observed_at timestamptz;
+  v_period_start timestamptz;
+  v_period_end timestamptz;
+  v_import_kind text;
+  v_provenance jsonb;
   v_idempotency_key text;
   v_source_row_hash text;
   v_existing_source_row_hash text;
@@ -94,13 +117,13 @@ begin
   if nullif(btrim(p_founder_user_id), '') is null then
     raise exception 'founder user id is required';
   end if;
-  if p_envelope is null or jsonb_typeof(p_envelope) <> 'object' then
+  if p_envelope is null or jsonb_typeof(p_envelope) is distinct from 'object' then
     raise exception 'metrics envelope must be an object';
   end if;
-  if p_envelope->>'contract' <> 'fcr/founder-content-metrics@v1' then
+  if p_envelope->>'contract' is distinct from 'fcr/founder-content-metrics@v1' then
     raise exception 'metrics envelope contract is invalid';
   end if;
-  if jsonb_typeof(p_envelope->'observations') <> 'array' then
+  if jsonb_typeof(p_envelope->'observations') is distinct from 'array' then
     raise exception 'metrics observations must be an array';
   end if;
   if jsonb_array_length(p_envelope->'observations') > 5000 then
@@ -117,15 +140,22 @@ begin
 
   for v_observation in select value from jsonb_array_elements(p_envelope->'observations')
   loop
-    if jsonb_typeof(v_observation) <> 'object' then raise exception 'metric observation must be an object'; end if;
+    if jsonb_typeof(v_observation) is distinct from 'object' then
+      raise exception 'metric observation must be an object';
+    end if;
 
     v_provider := lower(btrim(coalesce(v_observation->>'provider', '')));
     v_platform := lower(btrim(coalesce(v_observation->>'platform', '')));
+    v_source := coalesce(v_observation->>'source', '');
+    v_source_metric_id := nullif(btrim(coalesce(v_observation->>'sourceMetricId', '')), '');
     v_account_id := btrim(coalesce(v_observation->>'accountId', ''));
     v_page_id := btrim(coalesce(v_observation->>'pageId', ''));
     v_external_post_id := nullif(btrim(coalesce(v_observation->>'externalPostId', '')), '');
-    v_idempotency_key := coalesce(v_observation->>'idempotencyKey', '');
-    v_source_row_hash := coalesce(v_observation->>'sourceRowHash', '');
+    v_audience_segment := nullif(btrim(coalesce(v_observation->>'audienceSegment', '')), '');
+    v_metric_name := lower(btrim(coalesce(v_observation->>'metricName', '')));
+    v_metric_unit := coalesce(v_observation->>'metricUnit', '');
+    v_import_kind := coalesce(v_observation->>'importKind', '');
+    v_provenance := coalesce(v_observation->'provenance', '{}'::jsonb);
 
     if p_post_id is not null then
       if v_provider <> v_post.provider or v_platform <> v_post.platform or v_account_id <> v_post.account_id then
@@ -142,21 +172,89 @@ begin
 
     if v_provider !~ '^[a-z0-9][a-z0-9._:-]{0,159}$' then raise exception 'metric provider is invalid'; end if;
     if v_platform !~ '^[a-z0-9][a-z0-9._-]{0,79}$' then raise exception 'metric platform is invalid'; end if;
+    if v_source not in ('native_platform','native_platform_export','official_api_partner','aggregator','historical_csv') then raise exception 'metric source is invalid'; end if;
+    if v_source_metric_id is not null and length(v_source_metric_id) > 240 then raise exception 'metric source identity is invalid'; end if;
     if length(v_account_id) not between 1 and 240 then raise exception 'metric account identity is invalid'; end if;
     if length(v_page_id) not between 1 and 240 then raise exception 'metric page identity is invalid'; end if;
-    if coalesce(v_observation->>'source', '') not in ('native_platform','native_platform_export','official_api_partner','aggregator','historical_csv') then raise exception 'metric source is invalid'; end if;
-    if coalesce(v_observation->>'metricUnit', '') not in ('count','ratio','percent','milliseconds','seconds','currency','currency_minor','score','unknown') then raise exception 'metric unit is invalid'; end if;
-    if coalesce(v_observation->>'importKind', '') not in ('provider_live','historical_csv') then raise exception 'metric import kind is invalid'; end if;
-    if v_idempotency_key !~ '^[0-9a-f]{64}$' then raise exception 'metric idempotency key is invalid'; end if;
-    if v_source_row_hash !~ '^[0-9a-f]{64}$' then raise exception 'metric source row hash is invalid'; end if;
-    if nullif(btrim(coalesce(v_observation->>'metricName', '')), '') is null then raise exception 'metric name is required'; end if;
+    if v_external_post_id is not null and length(v_external_post_id) > 240 then raise exception 'metric external post identity is invalid'; end if;
+    if v_audience_segment is not null and length(v_audience_segment) > 240 then raise exception 'metric audience segment is invalid'; end if;
+    if length(v_metric_name) not between 1 and 240 then raise exception 'metric name is invalid'; end if;
+    if v_metric_unit not in ('count','ratio','percent','milliseconds','seconds','currency','currency_minor','score','unknown') then raise exception 'metric unit is invalid'; end if;
+    if v_import_kind not in ('provider_live','historical_csv') then raise exception 'metric import kind is invalid'; end if;
+    if not (v_observation ? 'metricValue') or jsonb_typeof(v_observation->'metricValue') not in ('number', 'null') then raise exception 'metric value must be a number or null'; end if;
+    if jsonb_typeof(v_provenance) is distinct from 'object' then raise exception 'metric provenance must be an object'; end if;
+    if v_import_kind = 'historical_csv' and v_source not in ('historical_csv','native_platform_export') then raise exception 'historical metric source is invalid'; end if;
+
     if nullif(v_observation->>'observedAt', '') is null then raise exception 'metric observedAt is required'; end if;
-    if (v_observation->>'observedAt') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}([.][0-9]{1,9})?(Z|[+-](0[0-9]|1[0-3]):[0-5][0-9]|[+-]14:00)$' then raise exception 'metric observedAt must be offset-aware with a valid UTC offset'; end if;
-    if nullif(v_observation->>'periodStart', '') is not null and (v_observation->>'periodStart') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}([.][0-9]{1,9})?(Z|[+-](0[0-9]|1[0-3]):[0-5][0-9]|[+-]14:00)$' then raise exception 'metric periodStart must be offset-aware with a valid UTC offset'; end if;
-    if nullif(v_observation->>'periodEnd', '') is not null and (v_observation->>'periodEnd') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}([.][0-9]{1,9})?(Z|[+-](0[0-9]|1[0-3]):[0-5][0-9]|[+-]14:00)$' then raise exception 'metric periodEnd must be offset-aware with a valid UTC offset'; end if;
-    if v_observation ? 'metricValue' and jsonb_typeof(v_observation->'metricValue') not in ('number', 'null') then raise exception 'metric value must be a number or null'; end if;
-    if v_observation ? 'provenance' and jsonb_typeof(v_observation->'provenance') <> 'object' then raise exception 'metric provenance must be an object'; end if;
-    if v_observation->>'importKind' = 'historical_csv' and v_observation->>'source' not in ('historical_csv','native_platform_export') then raise exception 'historical metric source is invalid'; end if;
+    if (v_observation->>'observedAt') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}([.][0-9]{1,3})?(Z|[+-](0[0-9]|1[0-3]):[0-5][0-9]|[+-]14:00)$' then raise exception 'metric observedAt must be offset-aware with millisecond precision or less'; end if;
+    if nullif(v_observation->>'periodStart', '') is not null and (v_observation->>'periodStart') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}([.][0-9]{1,3})?(Z|[+-](0[0-9]|1[0-3]):[0-5][0-9]|[+-]14:00)$' then raise exception 'metric periodStart must be offset-aware with millisecond precision or less'; end if;
+    if nullif(v_observation->>'periodEnd', '') is not null and (v_observation->>'periodEnd') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}([.][0-9]{1,3})?(Z|[+-](0[0-9]|1[0-3]):[0-5][0-9]|[+-]14:00)$' then raise exception 'metric periodEnd must be offset-aware with millisecond precision or less'; end if;
+
+    begin
+      v_observed_at := (v_observation->>'observedAt')::timestamptz;
+      v_period_start := nullif(v_observation->>'periodStart', '')::timestamptz;
+      v_period_end := nullif(v_observation->>'periodEnd', '')::timestamptz;
+    exception when others then
+      raise exception 'metric timestamp is not a real calendar timestamp';
+    end;
+
+    if (v_period_start is null) <> (v_period_end is null) then
+      raise exception 'metric periodStart and periodEnd must be supplied together';
+    end if;
+    if v_period_start is not null and v_period_start > v_period_end then
+      raise exception 'metric periodStart must not be after periodEnd';
+    end if;
+
+    if jsonb_typeof(v_observation->'metricValue') = 'null' then
+      v_metric_value := null;
+    else
+      begin
+        v_metric_value := (v_observation->>'metricValue')::numeric;
+      exception when others then
+        raise exception 'metric value must be a finite number or null';
+      end;
+    end if;
+
+    -- Incoming hash fields are never authority. Recompute storage fingerprints
+    -- from normalized values before uniqueness or conflict handling. The post
+    -- identity is part of the database idempotency subject, so two lifecycle
+    -- posts can never silently suppress each other's otherwise identical row.
+    v_source_row_hash := encode(digest(jsonb_build_object(
+      'provider', v_provider,
+      'platform', v_platform,
+      'source', v_source,
+      'sourceMetricId', v_source_metric_id,
+      'accountId', v_account_id,
+      'pageId', v_page_id,
+      'externalPostId', v_external_post_id,
+      'audienceSegment', v_audience_segment,
+      'metricName', v_metric_name,
+      'metricUnit', v_metric_unit,
+      'metricValue', case when v_metric_value is null then null else trim_scale(v_metric_value) end,
+      'observedAt', to_char(v_observed_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'),
+      'periodStart', case when v_period_start is null then null else to_char(v_period_start at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') end,
+      'periodEnd', case when v_period_end is null then null else to_char(v_period_end at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') end,
+      'importKind', v_import_kind,
+      'provenance', v_provenance
+    )::text, 'sha256'), 'hex');
+
+    v_idempotency_key := encode(digest(jsonb_build_object(
+      'postId', p_post_id,
+      'provider', v_provider,
+      'platform', v_platform,
+      'source', v_source,
+      'sourceMetricId', v_source_metric_id,
+      'accountId', v_account_id,
+      'pageId', v_page_id,
+      'externalPostId', v_external_post_id,
+      'audienceSegment', v_audience_segment,
+      'metricName', v_metric_name,
+      'metricUnit', v_metric_unit,
+      'observedAt', to_char(v_observed_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'),
+      'periodStart', case when v_period_start is null then null else to_char(v_period_start at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') end,
+      'periodEnd', case when v_period_end is null then null else to_char(v_period_end at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') end,
+      'importKind', v_import_kind
+    )::text, 'sha256'), 'hex');
 
     insert into public.founder_content_metric_observations (
       post_id, founder_user_id, provider, platform, source, source_metric_id,
@@ -168,21 +266,20 @@ begin
       p_founder_user_id,
       v_provider,
       v_platform,
-      v_observation->>'source',
-      nullif(btrim(coalesce(v_observation->>'sourceMetricId', '')), ''),
+      v_source,
+      v_source_metric_id,
       v_account_id,
       v_page_id,
       v_external_post_id,
-      nullif(btrim(coalesce(v_observation->>'audienceSegment', '')), ''),
-      lower(btrim(v_observation->>'metricName')),
-      v_observation->>'metricUnit',
-      case when v_observation->'metricValue' is null or jsonb_typeof(v_observation->'metricValue') = 'null'
-        then null else (v_observation->>'metricValue')::numeric end,
-      (v_observation->>'observedAt')::timestamptz,
-      nullif(v_observation->>'periodStart', '')::timestamptz,
-      nullif(v_observation->>'periodEnd', '')::timestamptz,
-      v_observation->>'importKind',
-      coalesce(v_observation->'provenance', '{}'::jsonb),
+      v_audience_segment,
+      v_metric_name,
+      v_metric_unit,
+      v_metric_value,
+      v_observed_at,
+      v_period_start,
+      v_period_end,
+      v_import_kind,
+      v_provenance,
       v_source_row_hash,
       v_idempotency_key,
       p_ingested_at
@@ -232,8 +329,7 @@ begin
 end;
 $$;
 
-revoke all on function public.ingest_founder_content_metrics_from_lifecycle_event() from public, anon, authenticated;
-grant execute on function public.ingest_founder_content_metrics_from_lifecycle_event() to service_role;
+revoke all on function public.ingest_founder_content_metrics_from_lifecycle_event() from public, anon, authenticated, service_role;
 
 drop trigger if exists founder_content_metrics_from_lifecycle_event on public.founder_content_post_events;
 create trigger founder_content_metrics_from_lifecycle_event
