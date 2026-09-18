@@ -219,7 +219,7 @@ begin
     -- from normalized values before uniqueness or conflict handling. The post
     -- identity is part of the database idempotency subject, so two lifecycle
     -- posts can never silently suppress each other's otherwise identical row.
-    v_source_row_hash := encode(digest(jsonb_build_object(
+    v_source_row_hash := encode(extensions.digest(jsonb_build_object(
       'provider', v_provider,
       'platform', v_platform,
       'source', v_source,
@@ -238,7 +238,7 @@ begin
       'provenance', v_provenance
     )::text, 'sha256'), 'hex');
 
-    v_idempotency_key := encode(digest(jsonb_build_object(
+    v_idempotency_key := encode(extensions.digest(jsonb_build_object(
       'postId', p_post_id,
       'provider', v_provider,
       'platform', v_platform,
