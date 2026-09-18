@@ -1,0 +1,96 @@
+# Proof-of-Ship Webhook Payload Schema
+#
+# Emitted by proof-of-ship.yml when a meaningful commit (feat|fix|perf) is verified
+# live OR merged. All fields required. Webhook consumer validates against this before
+# any AI processing.
+
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Proof-of-Ship Webhook Payload",
+  "description": "Verified build-in-public proof that a commit has shipped to production or merged to main.",
+  "type": "object",
+  "required": [
+    "repo",
+    "commit_sha",
+    "commit_title",
+    "commit_url",
+    "live_state",
+    "publish_allowed",
+    "idempotency_key"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "repo": {
+      "type": "string",
+      "description": "GitHub repository in format owner/repo (e.g., jussray/founder-control-room)",
+      "pattern": "^[a-z0-9-]+/[a-z0-9-]+$"
+    },
+    "commit_sha": {
+      "type": "string",
+      "description": "Full git commit SHA (40 hex characters)",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "commit_title": {
+      "type": "string",
+      "description": "Commit subject line (first 72 chars of commit message)",
+      "maxLength": 100
+    },
+    "commit_url": {
+      "type": "string",
+      "description": "Full GitHub commit URL (must be https://github.com/...)",
+      "pattern": "^https://github\\.com/[a-z0-9-]+/[a-z0-9-]+/commit/[a-f0-9]{40}$"
+    },
+    "live_state": {
+      "type": "string",
+      "enum": ["verified", "merged"],
+      "description": "'verified' if live endpoint confirmed serving this SHA; 'merged' if commit-only proof (no live backend)"
+    },
+    "publish_allowed": {
+      "type": "boolean",
+      "enum": [false],
+      "description": "MUST be false. Email is terminal action. No automatic social publish."
+    },
+    "idempotency_key": {
+      "type": "string",
+      "description": "repo:commit_sha for deduplication",
+      "pattern": "^[a-z0-9-]+/[a-z0-9-]+:[a-f0-9]{40}$"
+    },
+    "supabase_migration_version": {
+      "type": "string",
+      "description": "[OPTIONAL] If live_state=verified and repo has Supabase: migration version applied on remote",
+      "pattern": "^[0-9]{14}$"
+    },
+    "cloudflare_live_sha": {
+      "type": "string",
+      "description": "[OPTIONAL] If live_state=verified and repo has Cloudflare: SHA returned by /version endpoint",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "oxygen_live_sha": {
+      "type": "string",
+      "description": "[OPTIONAL] If live_state=verified and repo has Hydrogen/Oxygen: SHA returned by /version endpoint",
+      "pattern": "^[a-f0-9]{40}$"
+    }
+  },
+  "examples": [
+    {
+      "repo": "jussray/founder-control-room",
+      "commit_sha": "abc123def456abc123def456abc123def456abc1",
+      "commit_title": "feat(checkout): add express pay",
+      "commit_url": "https://github.com/jussray/founder-control-room/commit/abc123def456abc123def456abc123def456abc1",
+      "live_state": "verified",
+      "publish_allowed": false,
+      "idempotency_key": "jussray/founder-control-room:abc123def456abc123def456abc123def456abc1",
+      "supabase_migration_version": "20260918054300",
+      "cloudflare_live_sha": "abc123def456abc123def456abc123def456abc1"
+    },
+    {
+      "repo": "jussray/chief-ai-machine",
+      "commit_sha": "def456abc123def456abc123def456abc123def45",
+      "commit_title": "fix(prompt): improve reasoning chain",
+      "commit_url": "https://github.com/jussray/chief-ai-machine/commit/def456abc123def456abc123def456abc123def45",
+      "live_state": "merged",
+      "publish_allowed": false,
+      "idempotency_key": "jussray/chief-ai-machine:def456abc123def456abc123def456abc123def45"
+    }
+  ]
+}
