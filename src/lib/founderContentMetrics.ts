@@ -65,7 +65,9 @@ export interface FounderContentMetricsEnvelope {
 const MAX_OBSERVATIONS = 5_000;
 const MAX_TEXT = 240;
 const SAFE_PROVENANCE_KEYS = 40;
-const OFFSET_AWARE_ISO_TIMESTAMP = /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d{1,9})?(Z|[+-]\d{2}:\d{2})$/;
+const OFFSET_AWARE_ISO_TIMESTAMP = /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d{1,3})?(Z|[+-]\d{2}:\d{2})$/;
+const PROVIDER_ID = /^[a-z0-9][a-z0-9._:-]{0,159}$/;
+const PLATFORM_ID = /^[a-z0-9][a-z0-9._-]{0,79}$/;
 
 function reject(message: string): never {
   throw new Error(`FOUNDER_CONTENT_METRICS_REJECTED: ${message}`);
@@ -87,6 +89,12 @@ function nullableText(value: unknown, field: string): string | null {
   return normalized || null;
 }
 
+function storageIdentifier(value: unknown, field: 'provider' | 'platform', pattern: RegExp): string {
+  const normalized = text(value, field).toLowerCase();
+  if (!pattern.test(normalized)) reject(`${field} is invalid`);
+  return normalized;
+}
+
 function assertRealIsoDate(value: string, field: string): void {
   const parsed = new Date(`${value}T00:00:00.000Z`);
   if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== value) {
@@ -98,7 +106,7 @@ function iso(value: unknown, field: string, required = true): string | null {
   const normalized = text(value, field, required);
   if (!normalized) return null;
   const match = OFFSET_AWARE_ISO_TIMESTAMP.exec(normalized);
-  if (!match) reject(`${field} must be an offset-aware ISO timestamp`);
+  if (!match) reject(`${field} must be an offset-aware ISO timestamp with millisecond precision or less`);
 
   assertRealIsoDate(match[1], field);
   const hour = Number(match[2]);
@@ -146,7 +154,7 @@ function provenance(value: unknown): Readonly<Record<string, string | number | b
   if (!value || typeof value !== 'object' || Array.isArray(value)) reject('provenance must be a flat object');
   const entries = Object.entries(value as Record<string, unknown>);
   if (entries.length > SAFE_PROVENANCE_KEYS) reject(`provenance exceeds ${SAFE_PROVENANCE_KEYS} keys`);
-  const out: Record<string, string | number | boolean | null> = {};
+  const out = Object.create(null) as Record<string, string | number | boolean | null>;
   for (const [rawKey, rawValue] of entries) {
     const key = text(rawKey, 'provenance key');
     if (!/^[a-zA-Z0-9_.:-]+$/.test(key)) reject(`invalid provenance key ${key}`);
@@ -182,8 +190,8 @@ export function normalizeFounderContentMetricObservation(
   }
 
   const normalized = {
-    provider: text(input.provider, 'provider').toLowerCase(),
-    platform: text(input.platform, 'platform').toLowerCase(),
+    provider: storageIdentifier(input.provider, 'provider', PROVIDER_ID),
+    platform: storageIdentifier(input.platform, 'platform', PLATFORM_ID),
     source,
     sourceMetricId: nullableText(input.sourceMetricId, 'sourceMetricId'),
     accountId: text(input.accountId, 'accountId'),
