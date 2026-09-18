@@ -117,9 +117,14 @@ describe('founder content metric observations', () => {
   });
 
   it('enforces provider and platform identifiers at the same boundary as storage', () => {
-    expect(() => normalizeFounderContentMetricObservation({
+    const hyphenated = normalizeFounderContentMetricObservation({
       ...observation(),
       provider: 'google-ads',
+    });
+    expect(hyphenated.provider).toBe('google-ads');
+    expect(() => normalizeFounderContentMetricObservation({
+      ...observation(),
+      provider: 'google/ads',
     })).toThrow(/provider is invalid/);
     expect(() => normalizeFounderContentMetricObservation({
       ...observation(),
