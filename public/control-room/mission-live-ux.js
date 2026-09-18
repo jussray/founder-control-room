@@ -193,7 +193,12 @@ function onDraftInput(event) {
 function onNavigationClick(event) {
   const target = event.target;
   if (!(target instanceof Element)) return;
-  if (target.closest('#sign-out') || target.closest('.lane .card[data-id]') || target.closest('.tabs button')) {
+  if (target.closest('#sign-out') || target.closest('.lane .card[data-id]')) {
+    missionDrafts = new Map();
+    return;
+  }
+  const tab = target.closest('.tabs button');
+  if (tab instanceof HTMLButtonElement && tab.dataset.tab !== 'missions') {
     missionDrafts = new Map();
   }
 }
