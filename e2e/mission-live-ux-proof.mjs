@@ -156,6 +156,13 @@ try {
   assert.equal(await page.locator('#mission-working-draft-form textarea[name=reviewNotes]').inputValue(), 'Do not lose this note during polling.');
   assert.equal(await page.locator('#mission-working-draft-form input[name=runAfterReview]').isChecked(), true);
 
+  await page.click('.tabs button[data-tab="missions"]');
+  await page.evaluate(() => window.forceFounderShellRerender());
+  assert.equal(await page.locator('#proof-gate-form input[name=filesChanged]').inputValue(), 'src/index.ts');
+  assert.equal(await page.locator('#mission-working-draft-form input[name=commitMessage]').inputValue(), 'fix: keep founder working draft');
+  assert.equal(await page.locator('#mission-working-draft-form textarea[name=reviewNotes]').inputValue(), 'Do not lose this note during polling.');
+  assert.equal(await page.locator('#mission-working-draft-form input[name=runAfterReview]').isChecked(), true);
+
   await page.screenshot({ path: `${screenshotDir}/desktop-draft-survives.png`, fullPage: true });
 
   await page.locator('h2').click();
@@ -185,7 +192,7 @@ try {
 
   assert.deepEqual(pageErrors, []);
   assert.deepEqual(consoleErrors, []);
-  console.log('Mission live UX Playwright proof passed: all named mission drafts survive shell and polling re-renders, polling uses only the opaque founder cookie, a polling 401 clears the cached cockpit through sign-out, external status appears without a founder Refresh click, live state is announced, and mobile has no document overflow.');
+  console.log('Mission live UX Playwright proof passed: all named mission drafts survive shell, no-op tab, and polling re-renders; polling uses only the opaque founder cookie; a polling 401 clears the cached cockpit through sign-out; external status appears without a founder Refresh click; live state is announced; and mobile has no document overflow.');
 } finally {
   await context.close();
   await browser.close();
