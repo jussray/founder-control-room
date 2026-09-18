@@ -32,7 +32,7 @@ const pageHtml = `<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Mission live UX proof</title>
 <style>
-body{font:16px system-ui,sans-serif;margin:0;background:#0b1020;color:#e8eef8}.shell{max-width:960px;margin:auto;padding:24px}.tabs,.toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.tabs button,.toolbar button{padding:9px 12px}.panel{margin-top:16px;padding:16px;border:1px solid #334155;border-radius:14px;background:#111827}.lane{padding:12px;border:1px solid #475569;border-radius:12px}.card{padding:10px;background:#1e293b;border-radius:10px}.muted{color:#a5b4c7}form{display:grid;gap:8px;margin-top:16px}input,select{width:100%;box-sizing:border-box;padding:9px}label{display:grid;gap:4px}.grid-lanes{display:grid;gap:10px}
+body{font:16px system-ui,sans-serif;margin:0;background:#0b1020;color:#e8eef8}.shell{max-width:960px;margin:auto;padding:24px}.tabs,.toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.tabs button,.toolbar button{padding:9px 12px}.panel{margin-top:16px;padding:16px;border:1px solid #334155;border-radius:14px;background:#111827}.lane{padding:12px;border:1px solid #475569;border-radius:12px}.card{padding:10px;background:#1e293b;border-radius:10px}.muted{color:#a5b4c7}form{display:grid;gap:8px;margin-top:16px}input,select,textarea{width:100%;box-sizing:border-box;padding:9px}label{display:grid;gap:4px}.grid-lanes{display:grid;gap:10px}
 </style>
 </head>
 <body>
@@ -41,6 +41,7 @@ body{font:16px system-ui,sans-serif;margin:0;background:#0b1020;color:#e8eef8}.s
 const initialTask=${JSON.stringify(task())};
 let currentTask=initialTask;
 window.refreshClicks=0;
+window.signedOut=false;
 function proofFormHtml(){return currentTask.status==='sandboxed'||currentTask.status==='in_review'?\`
 <form id="proof-gate-form">
 <label>Gate ID<select name="gateId"><option value="create_branch">create_branch</option><option value="merge">merge</option></select></label>
@@ -52,16 +53,25 @@ function proofFormHtml(){return currentTask.status==='sandboxed'||currentTask.st
 <label>Rollback path<input name="rollbackPath" /></label>
 <button type="submit">Run proof gate</button>
 </form>\`:''}
+function workingDraftHtml(){return currentTask.status==='sandboxed'||currentTask.status==='in_review'?\`
+<form id="mission-working-draft-form">
+<label>Commit message<input name="commitMessage" /></label>
+<label>Reviewer notes<textarea name="reviewNotes"></textarea></label>
+<label>Run after review<input type="checkbox" name="runAfterReview" /></label>
+</form>\`:''}
 function render(){
+  if(window.signedOut){document.querySelector('#root').innerHTML='<main id="signed-out"><h1>Sign in required</h1></main>';return;}
   document.querySelector('#root').innerHTML=\`
   <div class="shell">
+    <div class="topbar"><button id="sign-out" type="button">Sign out</button></div>
     <div class="tabs"><button data-tab="missions" class="active">Missions</button><button data-tab="projects">Projects</button></div>
     <div class="panel">
       <div class="toolbar"><button id="refresh-missions">Refresh</button></div>
       <div class="grid-lanes" id="mission-lanes"><div class="lane"><h4>\${currentTask.status} (1)</h4><div class="card" data-id="\${currentTask.id}">\${currentTask.title}</div></div></div>
     </div>
-    <div class="panel" id="mission-detail"><h2>\${currentTask.title}</h2><p class="muted">status: <strong>\${currentTask.status}</strong></p>\${proofFormHtml()}</div>
+    <div class="panel" id="mission-detail"><h2>\${currentTask.title}</h2><p class="muted">status: <strong>\${currentTask.status}</strong></p>\${proofFormHtml()}\${workingDraftHtml()}</div>
   </div>\`;
+  document.querySelector('#sign-out').addEventListener('click',()=>{window.signedOut=true;render();});
   document.querySelector('#refresh-missions').addEventListener('click', async()=>{
     window.refreshClicks+=1;
     const response=await fetch('/dashboard/tasks',{credentials:'same-origin',headers:{Accept:'application/json'}});
@@ -132,6 +142,9 @@ try {
   await page.fill('#proof-gate-form input[name=checksRun]', 'unit_test, playwright');
   await page.fill('#proof-gate-form input[name=behaviorChanged]', 'Mission status is visible without manual refresh.');
   await page.fill('#proof-gate-form input[name=rollbackPath]', 'Revert the focused UX commits.');
+  await page.fill('#mission-working-draft-form input[name=commitMessage]', 'fix: keep founder working draft');
+  await page.fill('#mission-working-draft-form textarea[name=reviewNotes]', 'Do not lose this note during polling.');
+  await page.check('#mission-working-draft-form input[name=runAfterReview]');
 
   await page.evaluate(() => window.forceFounderShellRerender());
   await page.waitForFunction(() => document.querySelector('#proof-gate-form select[name=gateId]')?.value === 'merge');
@@ -139,6 +152,9 @@ try {
   assert.equal(await page.locator('#proof-gate-form input[name=checksRun]').inputValue(), 'unit_test, playwright');
   assert.equal(await page.locator('#proof-gate-form input[name=behaviorChanged]').inputValue(), 'Mission status is visible without manual refresh.');
   assert.equal(await page.locator('#proof-gate-form input[name=rollbackPath]').inputValue(), 'Revert the focused UX commits.');
+  assert.equal(await page.locator('#mission-working-draft-form input[name=commitMessage]').inputValue(), 'fix: keep founder working draft');
+  assert.equal(await page.locator('#mission-working-draft-form textarea[name=reviewNotes]').inputValue(), 'Do not lose this note during polling.');
+  assert.equal(await page.locator('#mission-working-draft-form input[name=runAfterReview]').isChecked(), true);
 
   await page.screenshot({ path: `${screenshotDir}/desktop-draft-survives.png`, fullPage: true });
 
@@ -148,6 +164,9 @@ try {
   assert.ok(await page.evaluate(() => window.refreshClicks > 0), 'live status module must cause the refresh; the proof does not click Refresh');
   assert.equal(await page.locator('#proof-gate-form select[name=gateId]').inputValue(), 'merge');
   assert.equal(await page.locator('#proof-gate-form input[name=filesChanged]').inputValue(), 'src/index.ts');
+  assert.equal(await page.locator('#mission-working-draft-form input[name=commitMessage]').inputValue(), 'fix: keep founder working draft');
+  assert.equal(await page.locator('#mission-working-draft-form textarea[name=reviewNotes]').inputValue(), 'Do not lose this note during polling.');
+  assert.equal(await page.locator('#mission-working-draft-form input[name=runAfterReview]').isChecked(), true);
   assert.match(await page.locator('[data-mission-live-status]').innerText(), /Live status/);
 
   await page.setViewportSize({ width: 390, height: 844 });
@@ -158,9 +177,15 @@ try {
   assert.equal(opaqueCookieObserved, true, 'mission UX proof must authenticate through the opaque founder cookie');
   assert.equal(bearerAuthorizationObserved, false, 'mission UX browser flow must not send bearer authorization');
   assert.equal(await page.evaluate(() => sessionStorage.getItem('fcr_session')), null, 'proof must not manufacture a legacy browser bearer session');
+
+  await context.clearCookies();
+  await page.waitForSelector('#signed-out', { timeout: 8000 });
+  assert.equal(await page.locator('#mission-detail').count(), 0, 'expired opaque session must remove the cached mission cockpit');
+  assert.equal(await page.evaluate(() => window.signedOut), true, 'polling 401 must use the founder sign-out path');
+
   assert.deepEqual(pageErrors, []);
   assert.deepEqual(consoleErrors, []);
-  console.log('Mission live UX Playwright proof passed: proof-gate input survives shell re-render, mission polling uses only the opaque founder cookie, external status appears without a founder Refresh click, live state is announced, and mobile has no document overflow.');
+  console.log('Mission live UX Playwright proof passed: all named mission drafts survive shell and polling re-renders, polling uses only the opaque founder cookie, a polling 401 clears the cached cockpit through sign-out, external status appears without a founder Refresh click, live state is announced, and mobile has no document overflow.');
 } finally {
   await context.close();
   await browser.close();
