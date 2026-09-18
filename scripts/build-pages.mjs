@@ -25,6 +25,7 @@ const requiredAssets = [
   'control-room/app.js',
   'control-room/styles.css',
   'control-room/opaque-session-bootstrap.js',
+  'control-room/safe-rate-limit-fetch.js',
   'control-room/five-screen-shell.js',
   'control-room/os-topology.js',
   'control-room/founder-shell.html',
