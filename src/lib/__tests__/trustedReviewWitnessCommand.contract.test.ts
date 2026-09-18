@@ -22,7 +22,7 @@ describe('trusted review witness command contract', () => {
     expect(reviewWorkflow).toContain("re.fullmatch(r'[0-9a-f]{40}', main_sha)");
   });
 
-  it('fails closed on live current main while treating the PR base SHA as diagnostic snapshot only', () => {
+  it('fails closed on live current main and exact ancestry while treating the PR base SHA as diagnostic snapshot only', () => {
     expect(reviewWorkflow).toContain('/git/ref/heads/main');
     expect(reviewWorkflow).toContain('test "$current_main" = "$EXPECTED_MAIN_SHA"');
     expect(reviewWorkflow).toContain('pulls/${PR_NUMBER}');
@@ -30,6 +30,11 @@ describe('trusted review witness command contract', () => {
     expect(reviewWorkflow).toContain("test \"$base_ref\" = 'main'");
     expect(reviewWorkflow).toContain("base_snapshot_sha=\"$(jq -r '.base.sha' <<< \"$pr_json\")\"");
     expect(reviewWorkflow).toContain('base_snapshot_sha=%s');
+    expect(reviewWorkflow).toContain('compare/${EXPECTED_MAIN_SHA}...${head_sha}');
+    expect(reviewWorkflow).toContain("behind_by=\"$(jq -r '.behind_by' <<< \"$compare_json\")\"");
+    expect(reviewWorkflow).toContain("merge_base_sha=\"$(jq -r '.merge_base_commit.sha' <<< \"$compare_json\")\"");
+    expect(reviewWorkflow).toContain("test \"$behind_by\" = '0'");
+    expect(reviewWorkflow).toContain('test "$merge_base_sha" = "$EXPECTED_MAIN_SHA"');
     expect(reviewWorkflow).not.toContain('test "$base_snapshot_sha" = "$EXPECTED_MAIN_SHA"');
     expect(reviewWorkflow).not.toContain('test "$base_sha" = "$EXPECTED_MAIN_SHA"');
   });
