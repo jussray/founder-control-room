@@ -11,6 +11,7 @@
  * deployed state must be rolled back or repaired with a verified safe-forward fix.
  */
 import { createClient } from '@supabase/supabase-js';
+import { validateControlRoomSupabaseUrl } from '../../lib/supabaseProjectIdentity.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL!;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -30,6 +31,11 @@ const REQUIRED_TABLES = [
 type DriftItem = { type: string; detail: string };
 
 async function run() {
+  // The deploy-plane Actions URL must identify the same code-owned FCR project
+  // that the runtime client accepts. A different but schema-compatible Supabase
+  // project must never satisfy post-deploy reconciliation or unlock publication.
+  validateControlRoomSupabaseUrl(SUPABASE_URL, { nodeEnv: 'production' });
+
   const db = createClient(SUPABASE_URL, SERVICE_KEY, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
