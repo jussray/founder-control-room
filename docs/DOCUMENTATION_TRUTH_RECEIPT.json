@@ -1,6 +1,6 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Preserve current workflow, Cloudflare, Shopify, founder-merge, content-evidence, public-discovery, and cross-repository StoryEngine federation truth boundaries without converting source, analytics, crawler policy, peer pinning, provider configuration, mergeability, or candidate/browser proof into publication, production, provider-mutation, merge, deploy, spend, or external-contact authority.",
+  "purpose": "Preserve current workflow, founder UI/auth presentation, Cloudflare, Shopify, founder-merge, content-evidence, public-discovery, and cross-repository StoryEngine federation truth boundaries without converting source, analytics, browser presentation state, crawler policy, peer pinning, provider configuration, mergeability, or candidate/browser proof into publication, production, provider-mutation, merge, deploy, spend, or external-contact authority.",
   "domains": [
     "cloudflare-authority",
     "repository-provider",
@@ -8,7 +8,8 @@
     "evidence-authority",
     "publishing",
     "merge-authority",
-    "workflow-authority"
+    "workflow-authority",
+    "founder-ui-auth-boundary"
   ],
   "changes": [
     {
@@ -27,6 +28,18 @@
       "path": ".github/workflows/ci.yml",
       "claims": [
         "`.github/workflows/ci.yml` must keep the existing crawler and public-work Playwright specs inside the load-bearing `Playwright e2e` job that feeds `Required Gate`; a separate advisory Pages workflow cannot substitute for required exact-head browser execution or grant merge authority."
+      ]
+    },
+    {
+      "path": "public/control-room/stack-router.js",
+      "claims": [
+        "`public/control-room/stack-router.js` must derive founder-stack launch-dock visibility only from the existing rendered authenticated `.shell` inside `#root`, close/hide/aria-hide the dock whenever that shell is absent, reveal the same dock when the shell is present, and avoid creating a parallel browser authentication authority."
+      ]
+    },
+    {
+      "path": "e2e/conveyor-readiness-proof.mjs",
+      "claims": [
+        "`e2e/conveyor-readiness-proof.mjs` must exercise signed-out hidden → authenticated visible/readiness behavior → signed-out hidden again in the focused mobile Control Room flow, preserve opaque HttpOnly-cookie authority, and fail on signed-out mobile horizontal overflow instead of treating source attributes alone as browser proof."
       ]
     },
     {
@@ -54,7 +67,8 @@
         "`README.md` must describe Shopify child-provider observation as source-only, non-authorizing evidence and must never relabel a matching snapshot as live provider authority or mutation permission.",
         "`README.md` must document Attack 3000 content currentness as independently evaluated from bounded observation time rather than trusted from a CURRENT label, and must keep distribution, external demand, publication, provider mutation, merge, deploy, spend, and external-contact authority separate.",
         "`README.md` must describe the Content Trend Radar as an advisory existing-lane capability whose first-wave evidence requires current source provenance and whose ranking cannot authorize publication, scheduling, spend, provider mutation, merge, deploy, or external contact.",
-        "`README.md` must describe deterministic founder-content approval reservation and exact active retry recovery without allowing evidence rotation, retry, or a stored reservation to mint new publication authority."
+        "`README.md` must describe deterministic founder-content approval reservation and exact active retry recovery without allowing evidence rotation, retry, or a stored reservation to mint new publication authority.",
+        "`README.md` must describe the founder-stack launch dock as an authenticated-shell presentation boundary: signed-out/session-expired source state keeps it closed, hidden, and aria-hidden; authenticated shell state reveals the existing dock; browser/runtime proof remains separate from source implementation."
       ]
     },
     {
