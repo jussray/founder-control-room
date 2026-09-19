@@ -15,7 +15,7 @@ export const SPLIT_ROLLBACK_RECEIPT_PATH = 'test-results/fcr-access-public-worke
 export const SPLIT_ROLLBACK_ERROR_PATH = 'test-results/fcr-access-public-worker-split-rollback-error.json';
 export const FRONT_DOOR_COMPAT_RECEIPT_PATH = 'test-results/fcr-access-front-door-recovery.json';
 const FCR_ZONE = FCR_PUBLIC_ZONE;
-const IDEMPOTENCY_PREFIX = 'fcr-access-split-v1:';
+const IDEMPOTENCY_PREFIX = 'fcr-access-split-v2:';
 
 function clean(value) {
   return typeof value === 'string' ? value.trim() : '';
@@ -34,7 +34,7 @@ function exactHead(env) {
 function mutationIdempotencyKey(command, expectedHeadSha) {
   const digest = createHash('sha256')
     .update([
-      'fcr-access-public-worker-split/v1',
+      'fcr-access-public-worker-split/v2',
       command,
       FCR_ZONE,
       expectedHeadSha,
@@ -44,34 +44,42 @@ function mutationIdempotencyKey(command, expectedHeadSha) {
 }
 
 function workflowMetadata(env, expectedHeadSha, command) {
-  const workflowRunId = clean(env.GITHUB_RUN_ID) || null;
-  const workflowRunAttempt = clean(env.GITHUB_RUN_ATTEMPT) || null;
   return {
     observedAt: new Date().toISOString(),
     expectedHeadSha,
-    workflowRunId,
-    workflowRunAttempt,
+    workflowRunId: clean(env.GITHUB_RUN_ID) || null,
+    workflowRunAttempt: clean(env.GITHUB_RUN_ATTEMPT) || null,
     idempotencyKey: mutationIdempotencyKey(command, expectedHeadSha),
   };
 }
 
-function boundedError(error, metadata) {
+async function writeJson(path, payload) {
+  await mkdir('test-results', { recursive: true });
+  await writeFile(path, `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
+}
+
+async function readJson(path) {
+  return JSON.parse(await readFile(path, 'utf8'));
+}
+
+function boundedError(error, metadata, prior = {}) {
   const mutationOutcome = ['none', 'performed', 'unknown'].includes(error?.mutationOutcome)
     ? error.mutationOutcome
-    : 'unknown';
+    : (['none', 'performed', 'unknown'].includes(prior?.mutationOutcome) ? prior.mutationOutcome : 'unknown');
   return {
-    schemaVersion: 1,
+    ...prior,
+    schemaVersion: 2,
     scope: 'fcr-access-public-worker-split',
     ...metadata,
     zone: FCR_ZONE,
-    state: mutationOutcome === 'unknown' ? 'reconcile-required' : 'failed',
+    state: mutationOutcome === 'none' ? 'failed' : 'reconcile-required',
     mutationOutcome,
-    mutationPerformed: mutationOutcome === 'performed',
-    rollbackPerformed: error?.rollbackPerformed === true,
+    mutationPerformed: mutationOutcome === 'performed' || prior?.mutationPerformed === true,
+    rollbackPerformed: prior?.rollbackPerformed === true || error?.rollbackPerformed === true,
     currentTruthState: 'unknown',
-    classification: clean(error?.classification) || 'split-execution-failed',
-    sourceApplicationId: clean(error?.sourceApplicationId) || null,
-    managedApplicationId: clean(error?.managedApplicationId) || null,
+    classification: clean(error?.classification) || clean(prior?.classification) || 'split-execution-failed',
+    sourceApplicationId: clean(error?.sourceApplicationId) || clean(prior?.sourceApplicationId) || null,
+    managedApplicationId: clean(error?.managedApplicationId) || clean(prior?.managedApplicationId) || null,
   };
 }
 
@@ -98,8 +106,8 @@ export function projectSplitCompatibilityReceipt(receipt, metadata, { rollback =
     throw new Error('Split compatibility projection requires an FCR split receipt.');
   }
 
-  const failed = receipt.state === 'failed' || receipt.state === 'reconcile-required';
-  if (failed) {
+  const terminalFailure = receipt.state === 'failed' || receipt.state === 'reconcile-required';
+  if (terminalFailure) {
     const boundedClassification = receipt.classification === 'dedicated-admin-credential-required'
       ? 'dedicated-admin-credential-required'
       : receipt.classification === 'provider-credential-invalid'
@@ -110,7 +118,7 @@ export function projectSplitCompatibilityReceipt(receipt, metadata, { rollback =
     return {
       ...compatibilityBase(metadata),
       state: 'blocked',
-      mutationPerformed: receipt.mutationOutcome === 'performed' || receipt.mutationOutcome === 'unknown',
+      mutationPerformed: receipt.mutationOutcome === 'performed',
       rollbackPerformed: receipt.rollbackPerformed === true,
       alreadyExempt: null,
       action: 'none',
@@ -149,9 +157,25 @@ export function projectSplitCompatibilityReceipt(receipt, metadata, { rollback =
   };
 }
 
-async function writeJson(path, payload) {
-  await mkdir('test-results', { recursive: true });
-  await writeFile(path, `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
+function attachApplyMetadata(receipt, metadata) {
+  return {
+    ...receipt,
+    ...metadata,
+    currentTruthState: 'unknown',
+  };
+}
+
+function attachRollbackMetadata(receipt, metadata, original) {
+  return {
+    ...receipt,
+    observedAt: metadata.observedAt,
+    expectedHeadSha: original.expectedHeadSha,
+    workflowRunId: metadata.workflowRunId,
+    workflowRunAttempt: metadata.workflowRunAttempt,
+    idempotencyKey: original.idempotencyKey,
+    rollbackIdempotencyKey: metadata.idempotencyKey,
+    currentTruthState: receipt.rollbackPerformed === true ? 'fresh' : 'unknown',
+  };
 }
 
 export async function runFcrAccessSplitCli({
@@ -168,13 +192,16 @@ export async function runFcrAccessSplitCli({
 
   if (command === 'apply') {
     const metadata = workflowMetadata(env, expectedHeadSha, 'apply');
+    let latest = null;
+    const persistReceipt = async (checkpoint) => {
+      latest = attachApplyMetadata(checkpoint, metadata);
+      await writeJson(receiptPath, latest);
+    };
+
     try {
-      const receipt = await execute({ env });
-      const durable = {
-        ...receipt,
-        ...metadata,
-        currentTruthState: 'unknown',
-      };
+      const receipt = await execute({ env, persistReceipt });
+      const durable = attachApplyMetadata(receipt, metadata);
+      latest = durable;
       await writeJson(receiptPath, durable);
       await writeJson(
         compatibilityReceiptPath,
@@ -182,7 +209,14 @@ export async function runFcrAccessSplitCli({
       );
       return durable;
     } catch (error) {
-      const failure = boundedError(error, metadata);
+      if (!latest) {
+        try {
+          latest = await readJson(receiptPath);
+        } catch {
+          latest = null;
+        }
+      }
+      const failure = boundedError(error, metadata, latest ?? {});
       await writeJson(receiptPath, failure);
       await writeJson(
         compatibilityReceiptPath,
@@ -194,17 +228,16 @@ export async function runFcrAccessSplitCli({
 
   if (command === 'rollback') {
     const metadata = workflowMetadata(env, expectedHeadSha, 'rollback');
-    const original = JSON.parse(await readFile(receiptPath, 'utf8'));
+    const original = await readJson(receiptPath);
     const expectedApplyIdempotencyKey = mutationIdempotencyKey('apply', expectedHeadSha);
     if (original?.scope !== 'fcr-access-public-worker-split'
       || original?.expectedHeadSha !== expectedHeadSha
       || original?.idempotencyKey !== expectedApplyIdempotencyKey
-      || original?.mutationOutcome !== 'performed'
-      || original?.splitApplied !== true) {
-      const error = new Error('Rollback requires the exact performed split receipt for the current approved head and mutation identity.');
+      || !['performed', 'unknown'].includes(original?.mutationOutcome)) {
+      const error = new Error('Rollback requires the exact durable split receipt for the current approved head and mutation identity.');
       error.classification = 'split-rollback-receipt-head-mismatch';
       error.mutationOutcome = 'unknown';
-      const failure = boundedError(error, metadata);
+      const failure = boundedError(error, metadata, original ?? {});
       await writeJson(rollbackErrorPath, failure);
       await writeJson(
         compatibilityReceiptPath,
@@ -213,14 +246,17 @@ export async function runFcrAccessSplitCli({
       throw error;
     }
 
+    let latest = original;
+    const persistReceipt = async (checkpoint) => {
+      latest = attachRollbackMetadata(checkpoint, metadata, original);
+      await writeJson(receiptPath, latest);
+    };
+
     try {
-      const receipt = await rollback({ receipt: original, env });
-      const durable = {
-        ...receipt,
-        ...metadata,
-        appliedIdempotencyKey: original.idempotencyKey,
-        currentTruthState: 'fresh',
-      };
+      const receipt = await rollback({ receipt: original, env, persistReceipt });
+      const durable = attachRollbackMetadata(receipt, metadata, original);
+      latest = durable;
+      await writeJson(receiptPath, durable);
       await writeJson(rollbackReceiptPath, durable);
       await writeJson(
         compatibilityReceiptPath,
@@ -229,9 +265,12 @@ export async function runFcrAccessSplitCli({
       return durable;
     } catch (error) {
       const failure = {
-        ...boundedError(error, metadata),
-        appliedIdempotencyKey: original.idempotencyKey,
+        ...boundedError(error, metadata, latest ?? original),
+        expectedHeadSha: original.expectedHeadSha,
+        idempotencyKey: original.idempotencyKey,
+        rollbackIdempotencyKey: metadata.idempotencyKey,
       };
+      await writeJson(receiptPath, failure);
       await writeJson(rollbackErrorPath, failure);
       await writeJson(
         compatibilityReceiptPath,
