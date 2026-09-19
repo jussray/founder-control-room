@@ -7,6 +7,7 @@ import {
 import {
   bindGeminiMediaCommandFromRelay,
   evaluateGeminiMediaProductionCommand,
+  geminiMediaPlanFingerprint,
   type BoundGeminiMediaCommand,
   type GeminiMediaCommandAuthorityBinding,
   type GeminiMediaProductionCommandDraft,
@@ -41,7 +42,7 @@ function mediaState(
     intentFingerprint: digest('gemini-front-door'),
     subjectFingerprint: digest('fcr-founder-video'),
     scriptFingerprint: digest('script-v2'),
-    promptFingerprint: digest('gemini-command-v1'),
+    promptFingerprint: digest('unbound-plan'),
     sourceAssetFingerprints: evidenceState === 'script_verified' ? [] : [digest('shot-source')],
     intelligenceFingerprint: digest({ layer: 'gemini-command' }),
     renderStackFingerprint: digest({ renderers: ['gemini-veo', 'invideo', 'runtime-capture'] }),
@@ -83,12 +84,12 @@ function commandDraft(
   };
 }
 
-function relayRequest(): OperatorRelayRequestV1 {
+function relayRequest(relayId = 'relay-gemini-media-command-001'): OperatorRelayRequestV1 {
   const summary = 'Create a bounded Gemini media production command under the current FCR evidence and canon envelope.';
   const sourceRef = 'test:media-production-authority';
   const base: Omit<OperatorRelayRequestV1, 'requestHash'> = {
     contract: OPERATOR_RELAY_REQUEST_CONTRACT,
-    relayId: 'relay-gemini-media-command-001',
+    relayId,
     fromOperator: 'codex',
     toOperator: 'gemini',
     capability: 'implement',
@@ -112,13 +113,15 @@ function relayRequest(): OperatorRelayRequestV1 {
   return { ...base, requestHash: operatorRelayRequestHash(base) };
 }
 
+let bindingCounter = 0;
 function boundCommand(
   overrides: Partial<GeminiMediaProductionCommandDraft> = {},
 ): BoundGeminiMediaCommand {
-  const request = relayRequest();
+  bindingCounter += 1;
+  const request = relayRequest(`relay-gemini-media-command-${bindingCounter}`);
   const response = buildOperatorRelayResponse(request, {
     answer: JSON.stringify(commandDraft(overrides)),
-    evidenceRefs: ['provider:gemini:gemini-media-test-001'],
+    evidenceRefs: [`provider:gemini:gemini-media-test-${bindingCounter}`],
     completedAt: '2026-09-18T21:55:00.000Z',
   });
   return bindGeminiMediaCommandFromRelay(request, response);
@@ -137,11 +140,22 @@ function claim(overrides: Partial<LeevizeMediaClaimSnapshot> = {}): LeevizeMedia
   };
 }
 
+function boundMediaState(
+  bound: BoundGeminiMediaCommand,
+  evidenceState: MediaContinuityInput['evidenceState'] = 'script_verified',
+  overrides: Partial<MediaContinuityInput> = {},
+): MediaContinuityInput {
+  return mediaState(evidenceState, {
+    promptFingerprint: geminiMediaPlanFingerprint(bound.command),
+    ...overrides,
+  });
+}
+
 function input(
   overrides: Partial<LeevizeMediaPolicyInput> = {},
   bound: BoundGeminiMediaCommand = boundCommand(),
 ): LeevizeMediaPolicyInput {
-  const current = mediaState();
+  const current = boundMediaState(bound);
   const cookie = createMediaProofCookie(current);
   return {
     command: bound.command,
@@ -164,7 +178,7 @@ function input(
 }
 
 describe('Gemini command + /LEEVIZE policy boundary', () => {
-  it('lets a provider-bound Gemini command authorize a bounded production plan without granting truth or publish authority', () => {
+  it('lets a provider-bound Gemini command authorize its exact production plan without granting truth or publish authority', () => {
     const result = evaluateGeminiMediaProductionCommand(input());
 
     expect(result).toMatchObject({
@@ -237,10 +251,10 @@ describe('Gemini command + /LEEVIZE policy boundary', () => {
   });
 
   it('blocks stale continuity, stale claim heads, canon drift, and budget overrun as separate receipts', () => {
-    const original = mediaState();
-    const cookie = createMediaProofCookie(original);
-    const changed = mediaState('script_verified', { scriptFingerprint: digest('changed-script') });
     const bound = boundCommand();
+    const original = boundMediaState(bound);
+    const cookie = createMediaProofCookie(original);
+    const changed = boundMediaState(bound, 'script_verified', { scriptFingerprint: digest('changed-script') });
     const result = evaluateGeminiMediaProductionCommand(input({
       continuity: {
         projectId: PROJECT_ID,
@@ -273,25 +287,26 @@ describe('Gemini command + /LEEVIZE policy boundary', () => {
     expect(result.reasons).toEqual(expect.arrayContaining([
       'command_hash_invalid',
       'command_authority_hash_mismatch',
+      'command_continuity_mismatch',
     ]));
   });
 
-  it('accepts Gemini RELEASE only on export-verified continuity and clean deterministic verification', () => {
-    const script = mediaState();
+  it('accepts Gemini RELEASE only for the exact export-verified production plan with clean verification', () => {
+    const bound = boundCommand({ decision: 'RELEASE' });
+    const script = boundMediaState(bound);
     const scriptCookie = createMediaProofCookie(script);
-    const shots = mediaState('shot_generated', {
+    const shots = boundMediaState(bound, 'shot_generated', {
       predecessorFingerprint: scriptCookie.cookieId,
     });
     const shotsCookie = createMediaProofCookie(shots);
-    const edit = mediaState('edit_verified', {
+    const edit = boundMediaState(bound, 'edit_verified', {
       predecessorFingerprint: shotsCookie.cookieId,
     });
     const editCookie = createMediaProofCookie(edit);
-    const exported = mediaState('export_verified', {
+    const exported = boundMediaState(bound, 'export_verified', {
       predecessorFingerprint: editCookie.cookieId,
     });
     const exportCookie = createMediaProofCookie(exported);
-    const bound = boundCommand({ decision: 'RELEASE' });
 
     const clean = evaluateGeminiMediaProductionCommand(input({
       continuity: {
@@ -326,8 +341,42 @@ describe('Gemini command + /LEEVIZE policy boundary', () => {
     expect(failed.reasons).toContain('verification_failed:ui_legibility');
   });
 
-  it('executes HOLD safely without letting stale production evidence force work to continue', () => {
-    const bound = boundCommand({ decision: 'HOLD', maxCredits: 0, shots: [] });
+  it('blocks a valid RELEASE command from borrowing continuity and export proof from another production plan', () => {
+    const release = boundCommand({ decision: 'RELEASE' });
+    const otherPlan = boundCommand({
+      viewerTakeaway: 'A different story with a different viewer belief.',
+    });
+    const edit = boundMediaState(otherPlan, 'edit_verified');
+    const editCookie = createMediaProofCookie(edit);
+    const exported = boundMediaState(otherPlan, 'export_verified', {
+      predecessorFingerprint: editCookie.cookieId,
+    });
+    const exportCookie = createMediaProofCookie(exported);
+
+    const result = evaluateGeminiMediaProductionCommand(input({
+      continuity: {
+        projectId: PROJECT_ID,
+        missionId: MISSION_ID,
+        expectedHeadSha: HEAD,
+        cookie: exportCookie,
+        current: exported,
+        predecessorCookie: editCookie,
+        now: NOW,
+      },
+    }, release));
+
+    expect(result.disposition).toBe('BLOCK');
+    expect(result.reasons).toContain('command_continuity_mismatch');
+    expect(result.releaseDispositionAccepted).toBe(false);
+  });
+
+  it('blocks action dispositions with no executable shots while HOLD remains safe', () => {
+    const empty = boundCommand({ maxCredits: 0, shots: [] });
+    const blocked = evaluateGeminiMediaProductionCommand(input({}, empty));
+    expect(blocked.disposition).toBe('BLOCK');
+    expect(blocked.reasons).toContain('command_has_no_executable_shots');
+
+    const hold = boundCommand({ decision: 'HOLD', maxCredits: 0, shots: [] });
     const original = mediaState();
     const cookie = createMediaProofCookie(original);
     const changed = mediaState('script_verified', { scriptFingerprint: digest('stale-after-hold') });
@@ -340,7 +389,7 @@ describe('Gemini command + /LEEVIZE policy boundary', () => {
         current: changed,
         now: NOW,
       },
-    }, bound));
+    }, hold));
 
     expect(result.disposition).toBe('EXECUTE');
     expect(result.decision).toBe('HOLD');
