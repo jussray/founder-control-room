@@ -402,13 +402,20 @@ jobs:
                   and .publicOrigin == "https://www.foundercontrolroom.org"
                   and (.finalOrigin | origin_or_null)
                   and (.navigationStatus | status_or_null)
+                  and (.publicCanonicalHref == null or .publicCanonicalHref == "https://www.foundercontrolroom.org/")
                   and (.controlRoomStatus | status_or_null)
                   and (.founderSignInVisible | type == "boolean")
                   and (.founderShellVisible | type == "boolean")
                   and (.authMeStatus | status_or_null)
                   and (.founderAuthorityContained | type == "boolean")
+                  and (.publicHealthStatus | status_or_null)
+                  and (.publicHealthServiceIdentity == null or .publicHealthServiceIdentity == "founder-control-room")
+                  and (.publicHealthReachesCanonicalWorker | type == "boolean")
                   and (.apiVersionStatus | status_or_null)
                   and (.apiVersionMatchesExpectedSha | type == "boolean")
+                  and (.protectedApiHealthStatus | status_or_null)
+                  and (.protectedApiHealthRedirectIsAccess | type == "boolean")
+                  and (.protectedApiHealthDeniedToStranger | type == "boolean")
                   and (.state == "unknown" or .state == "proven" or .state == "failed")
                   and ((has("error") | not) or .error == null or (.error | type == "string" and length <= 2000))
                 )
@@ -432,13 +439,20 @@ jobs:
                 finalOriginIsFcr: (.finalOrigin != null and (.finalOrigin == .requestedOrigin or .finalOrigin == .publicOrigin)),
                 accessInterceptDetected: (((.finalOrigin // "") | test("cloudflareaccess\\.com"; "i")) or ((.error // "") | test("Cloudflare Access"; "i"))),
                 navigationStatus,
+                publicCanonicalHrefMatchesExpected: (.publicCanonicalHref == "https://www.foundercontrolroom.org/"),
                 controlRoomStatus,
                 founderSignInVisible,
                 founderShellVisible,
                 authMeStatus,
                 founderAuthorityContained,
+                publicHealthStatus,
+                publicHealthServiceIdentity,
+                publicHealthReachesCanonicalWorker,
                 apiVersionStatus,
                 apiVersionMatchesExpectedSha,
+                protectedApiHealthStatus,
+                protectedApiHealthRedirectIsAccess,
+                protectedApiHealthDeniedToStranger,
                 state,
                 errorPresent: (((.error // "") | length) > 0)
               }' "$browser_receipt"

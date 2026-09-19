@@ -21,6 +21,7 @@ on:
       - 'scripts/publish-chief-runtime-witness.mjs'
       - 'scripts/publish-chief-runtime-witness.node-test.mjs'
       - 'scripts/chief-proofmode-runtime-witness-contract.node-test.mjs'
+      - 'scripts/fcr-access-runtime-boundary.node-test.mjs'
       - 'scripts/fcr-cloudflare-bridge-contract.node-test.mjs'
       - 'scripts/verify-fcr-front-door-playwright.mjs'
       - 'docs/CHIEF_PROOFMODE_ACCESS_RECOVERY.md'
@@ -44,6 +45,7 @@ on:
       - 'scripts/publish-chief-runtime-witness.mjs'
       - 'scripts/publish-chief-runtime-witness.node-test.mjs'
       - 'scripts/chief-proofmode-runtime-witness-contract.node-test.mjs'
+      - 'scripts/fcr-access-runtime-boundary.node-test.mjs'
       - 'scripts/fcr-cloudflare-bridge-contract.node-test.mjs'
       - 'scripts/verify-fcr-front-door-playwright.mjs'
       - 'docs/CHIEF_PROOFMODE_ACCESS_RECOVERY.md'
@@ -94,4 +96,5 @@ jobs:
           node --test scripts/chief-proofmode-access-bridge-contract.node-test.mjs
           node --test scripts/publish-chief-runtime-witness.node-test.mjs
           node --test scripts/chief-proofmode-runtime-witness-contract.node-test.mjs
+          node --test scripts/fcr-access-runtime-boundary.node-test.mjs
           node --test scripts/fcr-cloudflare-bridge-contract.node-test.mjs
