@@ -47,7 +47,30 @@
     "publishAuthorityMustBeCheckedAtExecutionTime": true,
     "providerAcceptanceMustProduceReceipt": true,
     "publishedOutcomeRequiresYouTubeEvidence": true,
-    "workflow": ["series-idea","episode-concept","script-or-storyboard","generate-or-edit-video","review-final-asset","approve-publish-payload","publish-or-schedule","capture-provider-receipt","verify-youtube-outcome","measure-and-learn"]
+    "workflow": ["series-idea","episode-concept","script-or-storyboard","generate-or-edit-video","review-final-asset","approve-publish-payload","publish-or-schedule","capture-provider-receipt","verify-youtube-outcome","measure-and-learn"],
+    "leevize": {
+      "workflow": "LEEVIZE",
+      "shotContract": "shot-dna@v1",
+      "productionWorkflow": ["intent-and-proof","director-brief","model-neutral-shot-spec","renderer-adapter","generate-or-capture","deterministic-post","final-audio","caption-from-final-audio","media-probe","playwright-product-proof-if-applicable","attack6000","review-final-asset"],
+      "openSourceFirst": true,
+      "deterministicPostTools": ["ffmpeg","ffprobe"],
+      "optionalOpenSourceCandidates": ["remotion","comfyui","whisper-compatible"],
+      "candidateAvailabilityIsRuntimeFact": true,
+      "openSourceLabelDoesNotProveLicenseOrCommercialUse": true,
+      "unknownLicenseClassifyAs": "BLOCKED_LICENSE_REVIEW",
+      "rendererAdaptersReplaceable": true,
+      "generatedUiMayProveProductBehavior": false,
+      "realProductCaptureRequiresPlaywright": true,
+      "finalAudioPrecedesCaptionTiming": true,
+      "attack6000": {
+        "reasoningPressureBudget": 6000,
+        "externalTestCountClaimed": false,
+        "deduplicateFailureClasses": true,
+        "families": ["story","open","generic-ai-look","continuity","camera","physics","product-truth","evidence","pacing","audio","voice","lip-sync","captions","brand","accessibility","platform","model-fit","cost","provenance","release"]
+      },
+      "releaseGate": ["story","continuity","product-truth","audio","captions","brand","platform","provenance","evidence"],
+      "authorityRule": "Open-source-first is a routing preference, never production authority. Runtime availability, license/commercial-use status, privacy, cost/resource preflight, product evidence, and release authority remain separately verified."
+    }
   },
   "connectorBridgeTruth": {
     "evidencePlanes": ["connector-surface","live-session","provider-page"],
