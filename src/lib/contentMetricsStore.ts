@@ -34,7 +34,7 @@ interface FounderContentMetricObservationRepository {
     observations: readonly ContentMetricCsvObservation[];
     importFingerprint: string;
     importedAt: string;
-  }): Promise<FounderContentMetricImportResult>;
+  }): Promise<unknown>;
 }
 
 function text(value: unknown): string {
@@ -122,7 +122,7 @@ function supabaseRepository(client: SupabaseClient): FounderContentMetricObserva
       if (error || !data) {
         throw new Error(error?.message || 'founder-content metric import returned no receipt');
       }
-      return normalizeResult(data);
+      return data;
     },
   };
 }
@@ -160,13 +160,13 @@ export async function importFounderContentMetricObservations(
   }
 
   const store = repository ?? await defaultRepository();
-  const result = await store.importObservations({
+  const result = normalizeResult(await store.importObservations({
     founderUserId,
     postId,
     observations: input.receipt.observations,
     importFingerprint,
     importedAt,
-  });
+  }));
 
   if (result.importFingerprint !== importFingerprint) {
     throw new Error('founder-content metric import receipt fingerprint mismatch');
