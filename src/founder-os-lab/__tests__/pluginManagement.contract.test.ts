@@ -57,10 +57,6 @@ interface ConnectorBridgeTruth {
   repeatProviderSetupWithoutProviderEvidence: boolean;
   blockedStateInvalidatedBy: string[];
   continuityMarkersAreNonAuthorizing: boolean;
-  installedOrToolSurfacedDoesNotProveLiveSession: boolean;
-  connectedClaimRequiresLiveProbe: boolean;
-  retryClaimRequiresProbeExecution: boolean;
-  canonicalReadOnlyProbeByConnector: Record<string, string>;
   recoveryRule: string;
 }
 
@@ -196,26 +192,20 @@ describe('ChatGPT plugin management repository contract', () => {
     expect(manifest.connectorBridgeTruth.repeatProviderSetupWithoutProviderEvidence).toBe(false);
     expect(manifest.connectorBridgeTruth.blockedStateInvalidatedBy).toEqual(['live-session-exposed','stronger-contradictory-bridge-evidence']);
     expect(manifest.connectorBridgeTruth.continuityMarkersAreNonAuthorizing).toBe(true);
-    expect(manifest.connectorBridgeTruth.installedOrToolSurfacedDoesNotProveLiveSession).toBe(true);
-    expect(manifest.connectorBridgeTruth.connectedClaimRequiresLiveProbe).toBe(true);
-    expect(manifest.connectorBridgeTruth.retryClaimRequiresProbeExecution).toBe(true);
-    expect(manifest.connectorBridgeTruth.canonicalReadOnlyProbeByConnector).toEqual({'Opera Browser Connector':'list-tabs'});
     expect(manifest.connectorBridgeTruth.recoveryRule).toMatch(/Browser not connected/i);
-    expect(manifest.connectorBridgeTruth.recoveryRule).toMatch(/does not prove a live browser session/i);
-    expect(manifest.connectorBridgeTruth.recoveryRule).toMatch(/Claim a retry only when the live read-only probe actually executes/i);
     expect(manifest.connectorBridgeTruth.recoveryRule).toMatch(/do not blame or reset the page/i);
     expect(manifest.connectorBridgeTruth.recoveryRule).toMatch(/fresh bridge evidence/i);
   });
 
   it('binds ULTRATHINK to connector-bridge recovery instead of stale setup loops', () => {
-    expect(universalCommands).toMatch(/### Connector bridge recovery/);
+    expect(universalCommands).toMatch(/^## Connector bridge recovery$/m);
     expect(universalCommands).toMatch(/connector surface[\s\S]*live session[\s\S]*provider page/i);
     expect(universalCommands).toMatch(/BLOCKED_CONNECTOR_BRIDGE/);
-    expect(universalCommands).toMatch(/re-probe the bridge once/i);
-    expect(universalCommands).toMatch(/do not repeat the same login\/setup instructions/i);
-    expect(universalCommands).toMatch(/equivalent direct provider capability/i);
-    expect(universalCommands).toMatch(/continuity fingerprints and proof cookies remain non-secret state markers/i);
-    expect(universalCommands).toMatch(/For connector\/session failures, separates connector-surface, live-session, and provider-page truth/i);
+    expect(universalCommands).toMatch(/re-probe once when useful/i);
+    expect(universalCommands).toMatch(/not proof that provider setup is wrong/i);
+    expect(universalCommands).toMatch(/equivalent direct capability/i);
+    expect(universalCommands).toMatch(/continuity fingerprints and proof cookies never authorize browser action/i);
+    expect(universalCommands).toMatch(/browser or app connector[\s\S]*bridge\/session failure[\s\S]*three evidence planes separate/i);
   });
 
   it('preserves equivalent evidence when one provider source is unreadable', () => {

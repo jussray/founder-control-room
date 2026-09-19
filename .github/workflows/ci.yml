@@ -122,6 +122,15 @@ jobs:
           NODE_ENV: test
           PLAYWRIGHT_BROWSERS_PATH: /opt/pw-browsers
 
+      - name: Run crawler and public-work browser proof
+        run: >-
+          npx playwright test -c playwright.config.ts
+          e2e/pages-api-recovery.spec.ts
+          e2e/public-work-directory.spec.ts
+        env:
+          NODE_ENV: test
+          PLAYWRIGHT_BROWSERS_PATH: /opt/pw-browsers
+
   python-tests:
     name: Python tests
     runs-on: ubuntu-latest
