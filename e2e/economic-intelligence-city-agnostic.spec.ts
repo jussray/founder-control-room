@@ -8,6 +8,7 @@ test('truthmode contract declares jurisdiction portability and fail-closed invar
 
   const contract = await response.json();
   expect(contract.cityAgnostic).toBe(true);
+  expect(contract.version).toBe('1.1.0');
   expect(contract.primitives).toEqual(expect.arrayContaining([
     'jurisdiction',
     'organization',
@@ -16,10 +17,16 @@ test('truthmode contract declares jurisdiction portability and fail-closed invar
     'opportunity',
     'signal',
     'outcome',
+    'initiative',
+    'gate',
+    'evidence_receipt',
+    'blocker',
   ]));
   expect(contract.invariants).toEqual(expect.arrayContaining([
     expect.stringContaining('Identical signals produce identical scores'),
     expect.stringContaining('fail closed'),
+    expect.stringContaining('never create authority'),
+    expect.stringContaining('must not be promoted'),
   ]));
 });
 
@@ -32,7 +39,7 @@ test('redteam: two jurisdictions render through the same response contract witho
 
   for (const payload of payloads) {
     expect(payload).toEqual(expect.objectContaining({
-      contractVersion: '1.0.0',
+      contractVersion: '1.1.0',
       jurisdiction: expect.any(Object),
       opportunities: expect.any(Array),
       dataClassification: expect.any(String),
@@ -99,4 +106,88 @@ test('redteam: malformed scoring input is rejected', async ({ request }) => {
     },
   });
   expect(response.status()).toBe(400);
+});
+
+test('goalfix: Johnstown AI Center exposes the current City Hall execution gate, not the old portability goal', async ({ request }) => {
+  const response = await request.get('/economic-intelligence/initiative/johnstown-ai-center');
+  expect(response.ok()).toBeTruthy();
+
+  const snapshot = await response.json();
+  expect(snapshot.initiativeName).toBe('Johnstown AI Center');
+  expect(snapshot.goal).toContain('90-day proof-first pilot');
+  expect(snapshot.nextGateId).toBe('city_hall_working_meeting');
+
+  const meetingGate = snapshot.gates.find((gate: { id: string }) => gate.id === 'city_hall_working_meeting');
+  expect(meetingGate).toEqual(expect.objectContaining({
+    status: 'OPEN',
+    proofToClear: expect.stringContaining('date/time'),
+  }));
+
+  const pilotGate = snapshot.gates.find((gate: { id: string }) => gate.id === 'meeting_ready_pilot');
+  expect(pilotGate).toEqual(expect.objectContaining({
+    status: 'VERIFIED',
+    blockers: [],
+    receiptIds: expect.arrayContaining(['repo:city-hall-meeting-packet:2026-09-19']),
+  }));
+});
+
+test('redteam twin: review, guidance, and financing fit never become approval or authority', async ({ request }) => {
+  const response = await request.get('/economic-intelligence/initiative/johnstown-ai-center');
+  const snapshot = await response.json();
+
+  expect(snapshot.authority).toEqual(expect.objectContaining({
+    kind: 'descriptive_only',
+    canAuthorize: false,
+  }));
+  expect(snapshot.receipts.every(
+    (receipt: { authorityEffect: string }) => receipt.authorityEffect === 'none',
+  )).toBe(true);
+
+  const serialized = JSON.stringify(snapshot).toLowerCase();
+  expect(serialized).not.toContain('city endorsement');
+  expect(serialized).not.toContain('loan approved');
+  expect(serialized).not.toContain('partnership approved');
+});
+
+test('l99: funding and facility blockers stay separate and cannot collapse into a false green', async ({ request }) => {
+  const response = await request.get('/economic-intelligence/initiative/johnstown-ai-center');
+  const snapshot = await response.json();
+  const fundingGate = snapshot.gates.find((gate: { id: string }) => gate.id === 'funding_facility_path');
+
+  expect(fundingGate.status).toBe('BLOCKED');
+  expect(fundingGate.blockers).toEqual(expect.arrayContaining([
+    expect.stringContaining('Site control'),
+    expect.stringContaining('job-creation'),
+    expect.stringContaining('financing-share cap'),
+    expect.stringContaining('Owner equity'),
+    expect.stringContaining('quotes'),
+    expect.stringContaining('not loan approval'),
+  ]));
+  expect(fundingGate.blockers).toHaveLength(6);
+});
+
+test('continuity fingerprint is deterministic, public-safe, and explicitly non-authorizing', async ({ request }) => {
+  const first = await request.get('/economic-intelligence/initiative/johnstown-ai-center');
+  const second = await request.get('/economic-intelligence/initiative/johnstown-ai-center');
+  const firstSnapshot = await first.json();
+  const secondSnapshot = await second.json();
+
+  expect(firstSnapshot.continuityFingerprint).toMatch(/^initiative-state-v1:sha256:[0-9a-f]{64}$/);
+  expect(firstSnapshot.continuityFingerprint).toBe(secondSnapshot.continuityFingerprint);
+  expect(firstSnapshot.authority.canAuthorize).toBe(false);
+
+  const serialized = JSON.stringify(firstSnapshot);
+  expect(serialized).not.toContain('@');
+  expect(serialized.toLowerCase()).not.toContain('service_role');
+  expect(serialized.toLowerCase()).not.toContain('password');
+  expect(serialized.toLowerCase()).not.toContain('token=');
+});
+
+test('redteam: unknown initiative fails closed instead of borrowing Johnstown state', async ({ request }) => {
+  const response = await request.get('/economic-intelligence/initiative/not-a-real-initiative');
+  expect(response.status()).toBe(404);
+  const payload = await response.json();
+  expect(payload.error).toBe('Unknown initiative');
+  expect(payload).not.toHaveProperty('gates');
+  expect(payload).not.toHaveProperty('receipts');
 });
