@@ -76,6 +76,13 @@ export interface MediaProductionExecutionOptions {
 const SHA256 = /^[0-9a-f]{64}$/i;
 const SAFE_FAILURE_CODE = /^[a-z0-9._:-]{1,120}$/;
 const MAX_EVIDENCE_REF_LENGTH = 512;
+const RENDERER_EVIDENCE_PREFIXES: Readonly<Record<MediaRendererId, readonly string[]>> = {
+  'gemini-veo': ['provider:gemini-veo:', 'provider:veo:'],
+  invideo: ['provider:invideo:'],
+  runway: ['provider:runway:'],
+  'runtime-capture': ['runtime:', 'browser:'],
+  'editor-compositor': ['artifact:', 'editor:'],
+};
 
 function text(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
@@ -92,6 +99,11 @@ function fingerprint(value: unknown): string {
 function safeFailureCode(value: unknown, fallback: string): string {
   const normalized = text(value).toLocaleLowerCase('en-US');
   return SAFE_FAILURE_CODE.test(normalized) ? normalized : fallback;
+}
+
+function rendererEvidenceRefIsValid(renderer: MediaRendererId, ref: string): boolean {
+  if (!ref || ref.length > MAX_EVIDENCE_REF_LENGTH) return false;
+  return RENDERER_EVIDENCE_PREFIXES[renderer].some((prefix) => ref.startsWith(prefix));
 }
 
 function policyAtExecutionTime(
@@ -163,8 +175,21 @@ function normalizeRendererResult(
     ? result.attempts
     : -1;
   const credits = result.creditsConsumed;
-  const evidenceRefs = unique(result.providerEvidenceRefs).filter((ref) => ref.length <= MAX_EVIDENCE_REF_LENGTH);
+  const rawEvidenceRefs = unique(result.providerEvidenceRefs);
+  const evidenceRefs = rawEvidenceRefs.filter((ref) => rendererEvidenceRefIsValid(base.renderer, ref));
   const outputFingerprint = text(result.outputFingerprint).toLowerCase() || null;
+
+  if (!['SUCCEEDED', 'FAILED', 'UNKNOWN'].includes(result.status)) {
+    return {
+      ...base,
+      outcome: 'UNKNOWN',
+      failureCode: 'renderer_status_invalid',
+      attempts: Math.max(attempts, 0),
+      creditsConsumed: null,
+      outputFingerprint: null,
+      providerEvidenceRefs: evidenceRefs,
+    };
+  }
 
   if (attempts < 0 || attempts > shot.maxAttempts) {
     return {
@@ -225,11 +250,11 @@ function normalizeRendererResult(
         providerEvidenceRefs: evidenceRefs,
       };
     }
-    if (evidenceRefs.length === 0 || evidenceRefs.length !== unique(result.providerEvidenceRefs).length) {
+    if (evidenceRefs.length === 0 || evidenceRefs.length !== rawEvidenceRefs.length) {
       return {
         ...base,
         outcome: 'UNKNOWN',
-        failureCode: 'renderer_evidence_receipt_missing',
+        failureCode: 'renderer_evidence_receipt_invalid',
         attempts,
         creditsConsumed: credits,
         outputFingerprint,
