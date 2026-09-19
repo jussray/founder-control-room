@@ -77,6 +77,8 @@ describe('createServerOperatorRelayAdapters', () => {
       });
       return new Response(JSON.stringify({
         id: 'msg_01safe',
+        type: 'message',
+        role: 'assistant',
         content: [{ type: 'text', text: 'Claude review result' }],
       }), { status: 200, headers: { 'Content-Type': 'application/json' } });
     }) as typeof fetch;
@@ -96,9 +98,29 @@ describe('createServerOperatorRelayAdapters', () => {
     });
   });
 
+  it('rejects content-like JSON that is not an Anthropic message envelope', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+      id: 'msg_01wrong',
+      type: 'error',
+      role: 'assistant',
+      content: [{ type: 'text', text: 'This must not be accepted as provider success.' }],
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } })) as typeof fetch;
+
+    const adapters = createServerOperatorRelayAdapters({
+      ANTHROPIC_API_KEY: 'anthropic-secret',
+      FCR_RELAY_ANTHROPIC_MODEL: 'claude-test-model',
+    }, fetchMock);
+
+    await expect(
+      adapters['claude-code']?.(relay('internal', 'claude-code')),
+    ).rejects.toThrow('Anthropic relay returned invalid message envelope');
+  });
+
   it('does not let model output overwrite operator identity, authority, or provenance', async () => {
     const fetchMock = vi.fn(async () => new Response(JSON.stringify({
       id: 'msg_02identity',
+      type: 'message',
+      role: 'assistant',
       content: [{
         type: 'text',
         text: JSON.stringify({
@@ -140,6 +162,8 @@ describe('createServerOperatorRelayAdapters', () => {
   it('bounds oversized successful Anthropic response bodies before parsing', async () => {
     const fetchMock = vi.fn(async () => new Response(JSON.stringify({
       id: 'msg_oversized',
+      type: 'message',
+      role: 'assistant',
       content: [{ type: 'text', text: 'x'.repeat(70_000) }],
     }), { status: 200, headers: { 'Content-Type': 'application/json' } })) as typeof fetch;
 

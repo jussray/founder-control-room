@@ -132,6 +132,18 @@ function openAiText(body: JsonRecord): string {
 }
 
 function anthropicText(body: JsonRecord): string {
+  const rawId = typeof body.id === 'string' ? body.id.trim() : '';
+  if (
+    !rawId
+    || rawId.length > MAX_PROVIDER_RESPONSE_ID_LENGTH
+    || !/^[A-Za-z0-9._:-]+$/.test(rawId)
+  ) {
+    throw new Error('Anthropic relay returned invalid response identity');
+  }
+  if (body.type !== 'message' || body.role !== 'assistant') {
+    throw new Error('Anthropic relay returned invalid message envelope');
+  }
+
   const content = Array.isArray(body.content) ? body.content : [];
   const parts = content.flatMap((entry) => {
     const block = record(entry);
