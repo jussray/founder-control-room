@@ -283,7 +283,27 @@ describe('executeGeminiMediaProductionPlan', () => {
     expect(result.status).toBe('BLOCKED');
     expect(result.receipts[0]).toMatchObject({
       outcome: 'UNKNOWN',
-      failureCode: 'renderer_evidence_receipt_missing',
+      failureCode: 'renderer_evidence_receipt_invalid',
+    });
+    expect(invideo).not.toHaveBeenCalled();
+  });
+
+  it('rejects a renderer receipt that tries to borrow another renderer provenance namespace', async () => {
+    const forgedVeo = vi.fn(async () => success('veo-output', 'provider:invideo:not-veo', 1));
+    const invideo = vi.fn(async () => success('unused', 'provider:invideo:unused'));
+
+    const result = await executeGeminiMediaProductionPlan(
+      policyInput(),
+      { 'gemini-veo': forgedVeo, invideo },
+      { now: () => NOW },
+    );
+
+    expect(result.status).toBe('BLOCKED');
+    expect(result.receipts[0]).toMatchObject({
+      shotId: 'FCR-01',
+      outcome: 'UNKNOWN',
+      failureCode: 'renderer_evidence_receipt_invalid',
+      providerEvidenceRefs: [],
     });
     expect(invideo).not.toHaveBeenCalled();
   });
