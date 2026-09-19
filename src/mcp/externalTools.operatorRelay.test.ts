@@ -9,8 +9,8 @@ vi.mock('../lib/supabaseClient.js', () => ({
 
 type ExternalToolsModule = typeof import('./externalTools.js');
 type RelayCall = {
-  fromOperator: 'codex' | 'claude-code' | 'perplexity';
-  toOperator: 'codex' | 'claude-code' | 'perplexity';
+  fromOperator: 'gemini' | 'codex' | 'claude-code' | 'perplexity';
+  toOperator: 'gemini' | 'codex' | 'claude-code' | 'perplexity';
   capability: 'research' | 'propose' | 'review' | 'implement';
   goal: string;
   contextSummary: string;
