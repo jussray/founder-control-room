@@ -20,9 +20,12 @@ describe('Cloudflare Pages package leakage membrane', () => {
     expect(buildScript).toContain("toString('latin1')");
     expect(buildScript).toContain('SECRET_SCAN_OVERLAP_CHARS');
     expect(buildScript).toContain("label: 'sensitive credential assignment'");
-    expect(buildScript).toContain('ANTHROPIC_API_KEY');
-    expect(buildScript).toContain('CLOUDFLARE_ACCESS_API_TOKEN');
+    expect(buildScript).toContain("label: 'OpenAI/Anthropic-style API key'");
+    expect(buildScript).toContain('API_KEY|API_TOKEN');
     expect(buildScript).toContain('SUPABASE_SERVICE_ROLE_KEY');
+    expect(buildScript).toContain('FOUNDER_SESSION_ENCRYPTION_KEY');
+    expect(buildScript).toContain('FOUNDER_SIGNAL_ENGINE_MCP_TOKEN');
+    expect(buildScript).toContain('RECONCILE_SHARED_SECRET');
     expect(buildScript).toContain('await assertFileContainsNoLiteralSecret(absolutePath, packagedPath)');
   });
 });
