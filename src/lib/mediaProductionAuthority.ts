@@ -4,8 +4,15 @@ import {
   evaluateMediaMissionContinuity,
   type MediaMissionContinuityGateInput,
 } from './mediaMissionContinuity.js';
+import {
+  validateOperatorRelayRequest,
+  validateOperatorRelayResponse,
+  type OperatorRelayRequestV1,
+  type OperatorRelayResponseV1,
+} from './operatorRelay.js';
 
 export const GEMINI_MEDIA_COMMAND_CONTRACT = 'founder-control-room/gemini-media-production-command@v1' as const;
+export const GEMINI_MEDIA_COMMAND_AUTHORITY_RECEIPT_CONTRACT = 'founder-control-room/gemini-media-command-authority-receipt@v1' as const;
 export const LEEVIZE_MEDIA_POLICY_CONTRACT = 'founder-control-room/leevize-media-policy@v1' as const;
 
 export type GeminiMediaDecision = 'AUTHORIZE_PRODUCTION' | 'HOLD' | 'REPAIR' | 'RELEASE' | 'CANCEL';
@@ -46,6 +53,49 @@ export interface GeminiMediaProductionCommand {
   commandHash: string;
 }
 
+export type GeminiMediaProductionCommandDraft = Pick<
+  GeminiMediaProductionCommand,
+  'commandId' | 'projectId' | 'missionId' | 'decision' | 'viewerTakeaway' | 'maxCredits' | 'shots'
+>;
+
+/**
+ * Serializable audit receipt. This receipt is deliberately not an authority
+ * token: it records the provider-bound relay provenance used to create the
+ * in-process command binding, but cannot itself authorize truth, spend,
+ * rendering, publication, or another external action.
+ */
+export interface GeminiMediaCommandAuthorityReceipt {
+  contract: typeof GEMINI_MEDIA_COMMAND_AUTHORITY_RECEIPT_CONTRACT;
+  commandHash: string;
+  relayId: string;
+  requestHash: string;
+  responseHash: string;
+  providerEvidenceRef: string;
+  boundAt: string;
+  authorityScope: 'media-command-only';
+  truthAuthority: false;
+  externalActionAuthority: false;
+  publishAuthority: false;
+}
+
+const GEMINI_MEDIA_AUTHORITY_BINDING = Symbol('gemini-media-command-authority-binding');
+
+/**
+ * Opaque process-local binding produced only after a validated Gemini relay
+ * response is tied to the exact command bytes. A JSON receipt/fingerprint is
+ * never accepted in its place.
+ */
+export interface GeminiMediaCommandAuthorityBinding {
+  readonly receipt: GeminiMediaCommandAuthorityReceipt;
+  readonly [GEMINI_MEDIA_AUTHORITY_BINDING]: true;
+}
+
+export interface BoundGeminiMediaCommand {
+  command: GeminiMediaProductionCommand;
+  authority: GeminiMediaCommandAuthorityBinding;
+  receipt: GeminiMediaCommandAuthorityReceipt;
+}
+
 export interface LeevizeMediaClaimSnapshot {
   claimId: string;
   state: ClaimState;
@@ -58,6 +108,7 @@ export interface LeevizeMediaClaimSnapshot {
 
 export interface LeevizeMediaPolicyInput {
   command: GeminiMediaProductionCommand;
+  commandAuthority: GeminiMediaCommandAuthorityBinding;
   continuity: MediaMissionContinuityGateInput;
   claims: readonly LeevizeMediaClaimSnapshot[];
   currentEvidenceRefs: readonly string[];
@@ -71,7 +122,7 @@ export interface LeevizeMediaPolicyResult {
   disposition: 'EXECUTE' | 'BLOCK';
   decision: GeminiMediaDecision;
   reasons: readonly string[];
-  commandAuthority: 'gemini-command';
+  commandAuthority: 'gemini-command-bound';
   policyAuthority: 'leevize';
   truthReclassificationAllowed: false;
   continuityVerified: boolean;
@@ -84,6 +135,11 @@ const SHA256 = /^[0-9a-f]{64}$/i;
 const FULL_SHA = /^[0-9a-f]{40}$/i;
 const MAX_ATTEMPTS = 10;
 const FUTURE_SKEW_MS = 2 * 60 * 1000;
+const DECISIONS = new Set<GeminiMediaDecision>(['AUTHORIZE_PRODUCTION', 'HOLD', 'REPAIR', 'RELEASE', 'CANCEL']);
+const DIRECTIVES = new Set<MediaRenderDirective>(['GENERATE', 'CAPTURE_REAL_RUNTIME', 'COMPOSITE', 'EDIT', 'STOP']);
+const RENDERERS = new Set<MediaRendererId>(['gemini-veo', 'invideo', 'runway', 'runtime-capture', 'editor-compositor']);
+const CLAIM_CHANNELS = new Set<MediaClaimChannel>(['spoken', 'text', 'visual', 'implied']);
+const CLAIM_PRESENTATIONS = new Set<MediaClaimPresentation>(['FACT', 'QUALIFIED']);
 
 function text(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
@@ -91,6 +147,93 @@ function text(value: unknown): string {
 
 function unique(values: readonly string[]): string[] {
   return [...new Set(values.map(text).filter(Boolean))].sort();
+}
+
+function object(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+}
+
+function exactKeys(value: Record<string, unknown>, allowed: readonly string[], label: string): void {
+  const extras = Object.keys(value).filter((key) => !allowed.includes(key));
+  if (extras.length > 0) throw new Error(`${label} contains unsupported fields: ${extras.sort().join(',')}`);
+}
+
+function stringArray(value: unknown, label: string): string[] {
+  if (!Array.isArray(value) || value.some((item) => typeof item !== 'string')) {
+    throw new Error(`${label} must be an array of strings`);
+  }
+  return value.map((item) => item.trim());
+}
+
+function parseGeminiCommandDraft(raw: unknown): GeminiMediaProductionCommandDraft {
+  const root = object(raw);
+  if (!root) throw new Error('Gemini media command output must be a JSON object');
+  exactKeys(root, ['commandId', 'projectId', 'missionId', 'decision', 'viewerTakeaway', 'maxCredits', 'shots'], 'Gemini media command');
+
+  const decision = root.decision;
+  if (typeof decision !== 'string' || !DECISIONS.has(decision as GeminiMediaDecision)) {
+    throw new Error('Gemini media command decision is unsupported');
+  }
+  if (!Array.isArray(root.shots)) throw new Error('Gemini media command shots must be an array');
+
+  const shots: GeminiMediaShotCommand[] = root.shots.map((value, index) => {
+    const shot = object(value);
+    if (!shot) throw new Error(`Gemini media command shot ${index + 1} must be an object`);
+    exactKeys(
+      shot,
+      ['shotId', 'directive', 'renderer', 'purpose', 'maxAttempts', 'creditCeiling', 'claimBindings', 'requiredEvidenceRefs', 'strictCanonFingerprints'],
+      `Gemini media command shot ${index + 1}`,
+    );
+    if (typeof shot.directive !== 'string' || !DIRECTIVES.has(shot.directive as MediaRenderDirective)) {
+      throw new Error(`Gemini media command shot ${index + 1} directive is unsupported`);
+    }
+    if (shot.renderer !== null && (typeof shot.renderer !== 'string' || !RENDERERS.has(shot.renderer as MediaRendererId))) {
+      throw new Error(`Gemini media command shot ${index + 1} renderer is unsupported`);
+    }
+    if (!Array.isArray(shot.claimBindings)) {
+      throw new Error(`Gemini media command shot ${index + 1} claimBindings must be an array`);
+    }
+    const claimBindings: GeminiMediaClaimBinding[] = shot.claimBindings.map((value, bindingIndex) => {
+      const binding = object(value);
+      if (!binding) throw new Error(`Gemini media command shot ${index + 1} claim binding ${bindingIndex + 1} must be an object`);
+      exactKeys(binding, ['claimId', 'channel', 'presentation'], `Gemini media command shot ${index + 1} claim binding ${bindingIndex + 1}`);
+      if (typeof binding.channel !== 'string' || !CLAIM_CHANNELS.has(binding.channel as MediaClaimChannel)) {
+        throw new Error(`Gemini media command shot ${index + 1} claim binding ${bindingIndex + 1} channel is unsupported`);
+      }
+      if (typeof binding.presentation !== 'string' || !CLAIM_PRESENTATIONS.has(binding.presentation as MediaClaimPresentation)) {
+        throw new Error(`Gemini media command shot ${index + 1} claim binding ${bindingIndex + 1} presentation is unsupported`);
+      }
+      return {
+        claimId: text(binding.claimId),
+        channel: binding.channel as MediaClaimChannel,
+        presentation: binding.presentation as MediaClaimPresentation,
+      };
+    });
+
+    return {
+      shotId: text(shot.shotId),
+      directive: shot.directive as MediaRenderDirective,
+      renderer: shot.renderer as MediaRendererId | null,
+      purpose: text(shot.purpose),
+      maxAttempts: typeof shot.maxAttempts === 'number' ? shot.maxAttempts : Number.NaN,
+      creditCeiling: typeof shot.creditCeiling === 'number' ? shot.creditCeiling : Number.NaN,
+      claimBindings,
+      requiredEvidenceRefs: stringArray(shot.requiredEvidenceRefs, `Gemini media command shot ${index + 1} requiredEvidenceRefs`),
+      strictCanonFingerprints: stringArray(shot.strictCanonFingerprints, `Gemini media command shot ${index + 1} strictCanonFingerprints`),
+    };
+  });
+
+  return {
+    commandId: text(root.commandId),
+    projectId: text(root.projectId),
+    missionId: text(root.missionId),
+    decision: decision as GeminiMediaDecision,
+    viewerTakeaway: text(root.viewerTakeaway),
+    maxCredits: typeof root.maxCredits === 'number' ? root.maxCredits : Number.NaN,
+    shots,
+  };
 }
 
 function stableShot(shot: GeminiMediaShotCommand): unknown {
@@ -129,6 +272,75 @@ export function geminiMediaCommandHash(
     issuedAt: command.issuedAt,
   };
   return createHash('sha256').update(JSON.stringify(canonical)).digest('hex');
+}
+
+/**
+ * Converts a completed, validated Gemini relay response into the only command
+ * authority binding accepted by /LEEVIZE. The model does not choose its issuer,
+ * issuedAt, hash, provider evidence, or authority fields; those are bound by the
+ * server-side relay path. Provider evidence is provenance, not external-action
+ * authority.
+ */
+export function bindGeminiMediaCommandFromRelay(
+  request: OperatorRelayRequestV1,
+  response: OperatorRelayResponseV1,
+): BoundGeminiMediaCommand {
+  const completedAtMs = Date.parse(response.completedAt);
+  if (!Number.isFinite(completedAtMs)) throw new Error('Gemini media relay completion time is invalid');
+  const requestErrors = validateOperatorRelayRequest(request, completedAtMs);
+  if (requestErrors.length > 0) throw new Error(`Gemini media relay request invalid: ${requestErrors.join('; ')}`);
+  const responseErrors = validateOperatorRelayResponse(response, request);
+  if (responseErrors.length > 0) throw new Error(`Gemini media relay response invalid: ${responseErrors.join('; ')}`);
+  if (request.toOperator !== 'gemini') throw new Error('Gemini media command must originate from the Gemini relay target');
+  if (request.capability !== 'implement') throw new Error('Gemini media command requires the bounded implement capability');
+  if (response.status !== 'completed') throw new Error('Gemini media command requires a completed relay response');
+
+  const providerRefs = unique(response.evidenceRefs).filter((ref) => /^provider:gemini:[A-Za-z0-9._:-]{1,200}$/.test(ref));
+  if (providerRefs.length !== 1 || unique(response.evidenceRefs).length !== 1) {
+    throw new Error('Gemini media command requires exactly one server-bound Gemini provider evidence reference');
+  }
+
+  let raw: unknown;
+  try {
+    raw = JSON.parse(response.answer);
+  } catch {
+    throw new Error('Gemini media command response must be strict JSON');
+  }
+  const draft = parseGeminiCommandDraft(raw);
+  const identity: Omit<GeminiMediaProductionCommand, 'commandHash'> = {
+    contract: GEMINI_MEDIA_COMMAND_CONTRACT,
+    issuer: 'gemini-command',
+    commandId: draft.commandId,
+    projectId: draft.projectId,
+    missionId: draft.missionId,
+    decision: draft.decision,
+    viewerTakeaway: draft.viewerTakeaway,
+    maxCredits: draft.maxCredits,
+    shots: draft.shots,
+    issuedAt: response.completedAt,
+  };
+  const command: GeminiMediaProductionCommand = {
+    ...identity,
+    commandHash: geminiMediaCommandHash(identity),
+  };
+  const receipt: GeminiMediaCommandAuthorityReceipt = {
+    contract: GEMINI_MEDIA_COMMAND_AUTHORITY_RECEIPT_CONTRACT,
+    commandHash: command.commandHash,
+    relayId: request.relayId,
+    requestHash: request.requestHash,
+    responseHash: response.responseHash,
+    providerEvidenceRef: providerRefs[0]!,
+    boundAt: response.completedAt,
+    authorityScope: 'media-command-only',
+    truthAuthority: false,
+    externalActionAuthority: false,
+    publishAuthority: false,
+  };
+  const authority: GeminiMediaCommandAuthorityBinding = {
+    receipt,
+    [GEMINI_MEDIA_AUTHORITY_BINDING]: true,
+  };
+  return { command, authority, receipt };
 }
 
 function commandErrors(command: GeminiMediaProductionCommand, now: string): string[] {
@@ -170,11 +382,33 @@ function commandErrors(command: GeminiMediaProductionCommand, now: string): stri
     if (shot.directive === 'CAPTURE_REAL_RUNTIME' && shot.renderer !== 'runtime-capture') {
       reasons.push(`runtime_capture_renderer_invalid:${shotId}`);
     }
-    if (shot.directive === 'GENERATE' && shot.renderer === 'runtime-capture') {
-      reasons.push(`generated_runtime_capture_invalid:${shotId}`);
+    if (shot.directive === 'GENERATE' && !['gemini-veo', 'invideo', 'runway'].includes(shot.renderer ?? '')) {
+      reasons.push(`generate_renderer_invalid:${shotId}`);
+    }
+    if ((shot.directive === 'COMPOSITE' || shot.directive === 'EDIT') && shot.renderer !== 'editor-compositor') {
+      reasons.push(`editor_renderer_invalid:${shotId}`);
     }
   }
   if (allocatedCredits > command.maxCredits) reasons.push('shot_budget_exceeds_command_budget');
+  return unique(reasons);
+}
+
+function authorityErrors(input: LeevizeMediaPolicyInput): string[] {
+  const reasons: string[] = [];
+  const authority = input.commandAuthority;
+  if (!authority || authority[GEMINI_MEDIA_AUTHORITY_BINDING] !== true) {
+    return ['command_authority_unbound'];
+  }
+  const receipt = authority.receipt;
+  if (receipt.contract !== GEMINI_MEDIA_COMMAND_AUTHORITY_RECEIPT_CONTRACT) reasons.push('command_authority_contract_invalid');
+  if (receipt.commandHash !== input.command.commandHash) reasons.push('command_authority_hash_mismatch');
+  if (!SHA256.test(receipt.requestHash) || !SHA256.test(receipt.responseHash)) reasons.push('command_authority_relay_hash_invalid');
+  if (!/^provider:gemini:[A-Za-z0-9._:-]{1,200}$/.test(receipt.providerEvidenceRef)) reasons.push('command_authority_provider_invalid');
+  if (receipt.boundAt !== input.command.issuedAt) reasons.push('command_authority_time_mismatch');
+  if (receipt.authorityScope !== 'media-command-only') reasons.push('command_authority_scope_invalid');
+  if (receipt.truthAuthority !== false || receipt.externalActionAuthority !== false || receipt.publishAuthority !== false) {
+    reasons.push('command_authority_overclaimed');
+  }
   return unique(reasons);
 }
 
@@ -188,6 +422,7 @@ function policyErrors(input: LeevizeMediaPolicyInput): string[] {
   const currentEvidence = new Set(unique(input.currentEvidenceRefs));
   const currentCanon = new Set(unique(input.currentCanonFingerprints).map((value) => value.toLowerCase()));
 
+  reasons.push(...authorityErrors(input));
   reasons.push(...commandErrors(command, input.continuity.now));
   if (command.projectId !== input.continuity.projectId) reasons.push('command_project_mismatch');
   if (command.missionId !== input.continuity.missionId) reasons.push('command_mission_mismatch');
@@ -259,10 +494,10 @@ function policyErrors(input: LeevizeMediaPolicyInput): string[] {
 
 /**
  * Gemini decides the production action. /LEEVIZE only enforces the non-bypassable
- * evidence, canon, budget, freshness, and continuity envelope. The command may
- * reference a claim, but it cannot carry or overwrite the claim's truth state.
- * A passing RELEASE accepts Gemini's release disposition; it never turns a media
- * proof cookie into external publish authority.
+ * evidence, canon, budget, freshness, continuity, and authority envelope. The
+ * command may reference a claim, but it cannot carry or overwrite the claim's
+ * truth state. A passing RELEASE accepts Gemini's release disposition; it never
+ * turns a media proof cookie or command provenance receipt into publish authority.
  */
 export function evaluateGeminiMediaProductionCommand(
   input: LeevizeMediaPolicyInput,
@@ -275,7 +510,7 @@ export function evaluateGeminiMediaProductionCommand(
     disposition,
     decision: input.command.decision,
     reasons,
-    commandAuthority: 'gemini-command',
+    commandAuthority: 'gemini-command-bound',
     policyAuthority: 'leevize',
     truthReclassificationAllowed: false,
     continuityVerified: continuity.status === 'pass' && continuity.continuityState === 'current',
