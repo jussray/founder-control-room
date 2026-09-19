@@ -129,7 +129,11 @@ const context = await browser.newContext({ viewport: { width: 1280, height: 800 
 const page = await context.newPage();
 const pageErrors = [];
 const consoleErrors = [];
+let expectedUnauthorizedObserved = false;
 page.on('pageerror', (error) => pageErrors.push(String(error)));
+page.on('response', (response) => {
+  if (response.status() === 401 && response.url().endsWith('/dashboard/tasks')) expectedUnauthorizedObserved = true;
+});
 page.on('console', (message) => { if (message.type() === 'error') consoleErrors.push(message.text()); });
 
 try {
@@ -190,8 +194,13 @@ try {
   assert.equal(await page.locator('#mission-detail').count(), 0, 'expired opaque session must remove the cached mission cockpit');
   assert.equal(await page.evaluate(() => window.signedOut), true, 'polling 401 must use the founder sign-out path');
 
+  assert.equal(expectedUnauthorizedObserved, true, 'expired-session proof must observe the intentional dashboard 401');
+  const unexpectedConsoleErrors = consoleErrors.filter((entry) => !(
+    expectedUnauthorizedObserved
+    && entry === 'Failed to load resource: the server responded with a status of 401 (Unauthorized)'
+  ));
   assert.deepEqual(pageErrors, []);
-  assert.deepEqual(consoleErrors, []);
+  assert.deepEqual(unexpectedConsoleErrors, []);
   console.log('Mission live UX Playwright proof passed: all named mission drafts survive shell, no-op tab, and polling re-renders; polling uses only the opaque founder cookie; a polling 401 clears the cached cockpit through sign-out; external status appears without a founder Refresh click; live state is announced; and mobile has no document overflow.');
 } finally {
   await context.close();
