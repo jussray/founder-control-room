@@ -158,9 +158,10 @@ async function proveViewport(name, viewport) {
   });
 
   await page.goto(`${baseUrl}/control-room/goalfix.html`, { waitUntil: 'networkidle' });
+  await page.fill('[name="project"]', "Se'kret Bip");
   await page.fill('[name="desiredOutcome"]', 'Recheck the same commit after Playwright is repaired.');
-  await page.check('[name="intentConfirmed"]');
   await page.fill('[name="firstFilesOrLogs"]', 'Playwright artifact');
+  await page.locator('.goalfix-advanced > summary').click();
   await page.fill('[name="expectedVerificationNames"]', 'Playwright');
   await page.fill('[name="stopCondition"]', STOP_CONDITION);
 
