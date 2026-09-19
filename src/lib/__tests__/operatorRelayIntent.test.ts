@@ -2,6 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { parseRelayIntent } from '../operatorRelayIntent.js';
 
 describe('parseRelayIntent', () => {
+  it('routes Gemini as the front command operator', () => {
+    expect(parseRelayIntent('Ask Gemini to plan the media route.', 'codex')).toEqual({
+      target: 'gemini',
+      instruction: 'plan the media route.',
+    });
+  });
+
   it('recognizes the founder shorthand used in conversation', () => {
     expect(parseRelayIntent('Tell Perplexity to attack that version.', 'codex')).toEqual({
       target: 'perplexity',

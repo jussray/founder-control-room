@@ -9,6 +9,7 @@ const MAX_PROVIDER_RESPONSE_BYTES = 64 * 1024;
 const PROVIDER_TIMEOUT_MS = 60_000;
 const ANTHROPIC_API_VERSION = '2023-06-01';
 const MAX_PROVIDER_RESPONSE_ID_LENGTH = 200;
+const SAFE_GEMINI_MODEL = /^[A-Za-z0-9._-]{1,160}$/;
 
 function record(value: unknown): JsonRecord | null {
   return value && typeof value === 'object' && !Array.isArray(value)
@@ -155,6 +156,44 @@ function anthropicText(body: JsonRecord): string {
   return parts.join('\n');
 }
 
+function geminiResponseId(body: JsonRecord): string {
+  const rawId = typeof body.responseId === 'string' ? body.responseId.trim() : '';
+  if (
+    !rawId
+    || rawId.length > MAX_PROVIDER_RESPONSE_ID_LENGTH
+    || !/^[A-Za-z0-9._:-]+$/.test(rawId)
+  ) {
+    throw new Error('Gemini relay returned invalid response identity');
+  }
+  return rawId;
+}
+
+function geminiText(body: JsonRecord): string {
+  geminiResponseId(body);
+  const promptFeedback = record(body.promptFeedback);
+  if (
+    typeof promptFeedback?.blockReason === 'string'
+    && promptFeedback.blockReason
+    && promptFeedback.blockReason !== 'BLOCK_REASON_UNSPECIFIED'
+  ) {
+    throw new Error('Gemini relay response was blocked');
+  }
+
+  const candidates = Array.isArray(body.candidates) ? body.candidates : [];
+  const first = record(candidates[0]);
+  const content = record(first?.content);
+  if (!content || (content.role !== undefined && content.role !== 'model')) {
+    throw new Error('Gemini relay returned invalid content envelope');
+  }
+  const parts = Array.isArray(content.parts) ? content.parts : [];
+  const textParts = parts.flatMap((entry) => {
+    const block = record(entry);
+    return typeof block?.text === 'string' && block.text.trim() ? [block.text.trim()] : [];
+  });
+  if (textParts.length === 0) throw new Error('Gemini relay response contained no text');
+  return textParts.join('\n');
+}
+
 function perplexityText(body: JsonRecord): string {
   const choices = Array.isArray(body.choices) ? body.choices : [];
   const first = record(choices[0]);
@@ -165,14 +204,22 @@ function perplexityText(body: JsonRecord): string {
   return message.content.trim();
 }
 
-function evidenceRef(provider: string, body: JsonRecord): string {
-  const rawId = typeof body.id === 'string' ? body.id.trim() : '';
-  const id = rawId
+function responseIdentity(body: JsonRecord, field: 'id' | 'responseId' = 'id'): string {
+  const rawId = typeof body[field] === 'string' ? body[field].trim() : '';
+  return rawId
     && rawId.length <= MAX_PROVIDER_RESPONSE_ID_LENGTH
     && /^[A-Za-z0-9._:-]+$/.test(rawId)
     ? rawId
     : 'unidentified-response';
-  return `provider:${provider}:${id}`;
+}
+
+function evidenceRef(provider: string, body: JsonRecord, field: 'id' | 'responseId' = 'id'): string {
+  return `provider:${provider}:${responseIdentity(body, field)}`;
+}
+
+function geminiModelId(value: string): string | null {
+  const normalized = value.trim().replace(/^models\//, '');
+  return SAFE_GEMINI_MODEL.test(normalized) ? normalized : null;
 }
 
 export function createServerOperatorRelayAdapters(
@@ -180,12 +227,44 @@ export function createServerOperatorRelayAdapters(
   fetchImpl: FetchLike = fetch,
 ): OperatorRelayAdapters {
   const adapters: OperatorRelayAdapters = {};
+  const geminiKey = env.GEMINI_API_KEY?.trim() || env.GOOGLE_API_KEY?.trim();
+  const geminiModel = env.FCR_RELAY_GEMINI_MODEL?.trim();
   const openAiKey = env.OPENAI_API_KEY?.trim();
   const openAiModel = env.FCR_RELAY_OPENAI_MODEL?.trim();
   const anthropicKey = env.ANTHROPIC_API_KEY?.trim();
   const anthropicModel = env.FCR_RELAY_ANTHROPIC_MODEL?.trim();
   const perplexityKey = env.PERPLEXITY_API_KEY?.trim();
   const perplexityModel = env.FCR_RELAY_PERPLEXITY_MODEL?.trim();
+
+  if (geminiKey && geminiModel) {
+    const modelId = geminiModelId(geminiModel);
+    if (modelId) {
+      adapters.gemini = operatorRelayAdapterFromTextProvider({
+        invoke: async ({ request }) => {
+          ensureRelaySensitivity(request);
+          const body = await invokeJsonProvider(
+            fetchImpl,
+            `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(modelId)}:generateContent`,
+            {
+              method: 'POST',
+              headers: {
+                'x-goog-api-key': geminiKey,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                contents: [{ role: 'user', parts: [{ text: relayPrompt(request) }] }],
+                generationConfig: { maxOutputTokens: 2_000 },
+              }),
+              redirect: 'error',
+              signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
+            },
+            'Gemini relay',
+          );
+          return { text: geminiText(body), evidenceRef: evidenceRef('gemini', body, 'responseId') };
+        },
+      });
+    }
+  }
 
   if (openAiKey && openAiModel) {
     adapters.codex = operatorRelayAdapterFromTextProvider({
