@@ -46,7 +46,7 @@ Exact SHAs belong in receipts, PRs, artifacts, incidents, and provenance. The RE
 
 FCR models projects, proposals, missions, exact refs, verification runs, evidence, approval state, and bounded repository operations behind provider-neutral interfaces.
 
-Branch creation through `src/http/routes/approvals.ts` is now an exact-action governed repository mutation. A fresh `create_branch` proof and authenticated founder execute request cause FCR to issue a server-derived `AuthorityEnvelopeV1` bound to `github.repository.create_branch`, repository scope, exact branch arguments, current mission-state fingerprint, tool-call identity, expiry, founder identity, and idempotency key. FCR reserves the execution before the external write, re-reads mission state immediately before mutation, and `executeAuthorizedCreateBranch()` must reject drift before `RepositoryProvider.createBranch(...)` can be reached. A pending or ambiguous execution remains reconcile-before-retry; source and CI proof of this membrane do not by themselves prove that a live GitHub branch was created.
+Branch creation through `src/http/routes/approvals.ts` is now an exact-action governed repository mutation. A fresh `create_branch` proof and authenticated founder execute request cause FCR to issue a server-derived `AuthorityEnvelopeV1` bound to `github.repository.create_branch`, repository scope, exact branch arguments, current mission-state fingerprint, tool-call identity, expiry, founder identity, and idempotency key. The authority lifetime starts from the server-observed execute request time, not the proof receipt timestamp, so proof freshness and authority expiry remain separate fail-closed windows. FCR reserves the execution before the external write, re-reads mission state immediately before mutation, and `executeAuthorizedCreateBranch()` must reject drift before `RepositoryProvider.createBranch(...)` can be reached. A pending or ambiguous execution remains reconcile-before-retry; source and CI proof of this membrane do not by themselves prove that a live GitHub branch was created.
 
 ### PR continuity
 
@@ -61,6 +61,8 @@ main/base moves
 ```
 
 Continuity never rolls founder approval, merge authority, deploy authority, publication authority, provider-mutation authority, spend, deletion, or destructive authority forward automatically. **Proof rollover is allowed only by re-verification. Authority rollover is not.**
+
+Under the current merge canon, `merge_authority: true` means only that the governed merge capability/authority class is available. It never means the current candidate is approved. Every merge requires fresh explicit founder approval bound to the exact repository, pull request number, current base SHA, and current head SHA. If that exact approval is absent, ambiguous, or stale, the agent or operator must ask and stop. Any base/head movement expires both predecessor proof and predecessor merge approval.
 
 See [`docs/PR_CONTINUITY.md`](docs/PR_CONTINUITY.md).
 
@@ -103,7 +105,7 @@ The repository contains FCR's founder-final merge policy, deterministic independ
 
 Source policy is not live GitHub provider truth. Current rulesets, bypass actors, required checks, native review settings, and provider enforcement require fresh GitHub provider readback before a merge decision.
 
-Founder self-approval is not relabeled as independent review. The canonical path keeps deterministic independent review and authenticated exact-candidate founder-final approval separate.
+Founder self-approval is not relabeled as independent review. The canonical path keeps deterministic independent review and authenticated exact-candidate founder-final approval separate. Merge capability and merge approval are also separate: green evidence, mergeability, review requests, `merge review`, broad `approved`/`cont` language, or `merge_authority: true` cannot silently authorize integration. Before every merge, the founder must explicitly approve the exact current repository, pull request number, current base SHA, and current head SHA; if the candidate moves, approval expires and must be requested again.
 
 For Chief governance, FCR contains a **read-only trusted observation and verification boundary** pinned to `jussray/chief-ai-machine` and Chief ruleset IDs `20818149` and `21261587`. It uses the repository-scoped FCR GitHub App installation-token path rather than caller-supplied PAT/token authority, preserves required-check `integration_id` producer identity, requires complete bypass and deployment readback, and fingerprints the provider observation. Under the current founder decision, ruleset `20818149` is accepted exactly as observed when it preserves zero bypass actors, its approved source checks, `Cloudflare Production`, `proofmode-access-admin`, and the unbound reserved candidate runtime context. A compliant observation returns `NO_CHANGE_REQUIRED` with `mutation:null`; drift blocks verification rather than producing a desired-state rewrite. This boundary never grants provider mutation, merge, deploy, or execution authority.
 
@@ -150,6 +152,18 @@ The governed Founder Content n8n production-source lane is source-enabled only w
 
 Investor email is a separate authority class and must not auto-send without the applicable policy, recipient-specific qualification, and send authority.
 
+### Content evidence and Trend Radar
+
+FCR's `content-outcome-learning@v1` Attack 3000 adapter and `evaluateContentTrendRadar` are source-level observation and recommendation capabilities inside the existing ULTRATHINK content lane. They do not create a separate publishing system and do not make analytics or trends authoritative merely because a caller labels them `CURRENT`, `VERIFIED`, or `EMERGING_SIGNAL`.
+
+Attack 3000 content evidence must bind publication and metrics to one observation identity, content fingerprint, provider, comparable window, completed measurement state, and explicit evaluation time. The adapter independently checks observation/window timestamps, bounded future skew, and an explicit freshness expiry; `CURRENT` alone is insufficient. Distribution evidence such as publication, impressions, reactions, comments, and profile views is not business demand by itself. Supporting external-demand evidence must retain its own evidence references plus a downstream attributed signal. Metric stop floors are evaluated only from their relevant current observation and cannot fire before verified publication and a completed measurement window.
+
+The Trend Radar ranks sourced signals using timeliness, audience interest, content potential, founder fit, closest-legitimate-dollar relevance, competition opportunity, saturation, and content-fingerprint similarity. First-wave eligibility requires evidence id + source + `observedAt` that is current against the explicit evaluation time; the default evidence window is seven days with a two-minute future-skew tolerance. Evidence-less, unattributed, malformed, stale, future-dated, prediction-only, or incompletely framed candidates cannot enter the first wave. Rankings remain advisory and authorize **no publish, scheduling, spend, provider, merge, deploy, or external-contact action**.
+
+Founder-content approval reservations are deterministic for the same founder, platform, normalized public thesis/opening hook, and Current You intent. A retry after a lost issuance response may recover only the exact still-active stored reservation with matching approval id, founder, proposal hash, public payload hash, and platform. Mismatched, consumed, revoked, expired, or otherwise non-current reservations do not recover and do not create fresh authority.
+
+See [`docs/founder-signal-engine/linkedin-analytics-continuity.md`](docs/founder-signal-engine/linkedin-analytics-continuity.md) for the bounded analytics, Trend Radar, and approval-retry evidence contract.
+
 ### Cloudflare and production release
 
 Canonical source topology is:
@@ -164,7 +178,11 @@ api.foundercontrolroom.org
   -> canonical Worker: founder-control-room
 ```
 
+Public discovery artifacts such as `/robots.txt`, `/sitemap.xml`, `/llms.txt`, and `/crawlers.json` are static Pages assets and must be served through the `ASSETS` binding; API-owned callback assets remain routed through `FCR_API`. This source routing rule does not make crawler policy authentication and cannot grant provider, deploy, publication, or mutation authority.
+
 Source dependence on that topology is not proof the live provider is configured correctly.
+
+`wrangler.worker.toml [secrets].required` is the canonical production binding-name gate for provider-held Worker secrets. A provider-backed capability such as `tinyfish-web-observation-v1` must name `TINYFISH_API_KEY` there before canonical Worker promotion; Deploy verifies only binding-name presence in Cloudflare and never copies the secret value through GitHub Actions. Source and CI readiness therefore remain distinct from live TinyFish provider/runtime activation.
 
 Production does not deploy merely because `main` moved or a Cloudflare build succeeded. A production claim remains incomplete until the authorized lane proves, for one exact candidate:
 
@@ -219,8 +237,8 @@ Repository manifests, operational packets, analytics, receipts, and public conte
 | Read project/evidence | Founder-authenticated or explicitly public-safe read |
 | Run bounded verification | Applicable founder/repository authority |
 | Create branch | Fresh `create_branch` proof + authenticated exact execute request + server-issued `AuthorityEnvelopeV1` + execution reservation + fresh mission-state revalidation + repository write authority |
-| Merge through FCR | Exact-head machine proof + deterministic independent review + authenticated exact-candidate founder-final approval + repository authority |
-| Merge through live GitHub | Separate live GitHub ruleset/provider authority and fresh readback |
+| Merge through FCR | Exact-head machine proof + deterministic independent review + fresh explicit founder approval bound to exact repo/PR/base/head + authenticated exact-candidate founder-final receipt + repository authority |
+| Merge through live GitHub | Same fresh explicit exact-candidate founder approval + separate live GitHub ruleset/provider authority and fresh readback |
 | Deploy / mutate production | Separate exact production authority |
 | Database migration | Separate migration/database authority |
 | Credentials / secrets | Separate credential authority |
@@ -229,7 +247,7 @@ Repository manifests, operational packets, analytics, receipts, and public conte
 | Billing / destructive action | Separate exact authority |
 | Rollback | Separate rollback authority |
 
-No approval silently carries into another authority class.
+No approval silently carries into another authority class, and merge approval does not carry into a different repo/PR/base/head candidate.
 
 ## Documentation truth gate
 
@@ -282,3 +300,21 @@ Public-safe configuration may live in `.env.example`. Secret values do not belon
 - [`docs/GOALFIX_EXECUTION_WORKFLOW_V2.md`](docs/GOALFIX_EXECUTION_WORKFLOW_V2.md) — canonical repair/verification workflow
 
 Provider overlays may become stricter. They do not become competing constitutions or expand their own authority.
+
+## Load-bearing regression execution
+
+A committed regression test is source evidence only until the exact-head workflow that feeds `Required Gate` actually executes it. For LinkedIn analytics continuity, `.github/workflows/ci.yml` must keep `scripts.test_linkedin_analytics_continuity` inside the load-bearing `python-tests` job, and `Required Gate` must continue to depend on that job. Missing LinkedIn activity rows must remain `UNKNOWN_NO_EVIDENCE` with null metrics, never synthetic zero impressions or engagements.
+
+## Shopify child-provider observation
+
+FCR now includes a source-only, read-only Shopify child-provider observation contract. `src/providers/ShopifyReadOnlyProvider.ts` is pinned to the Founder Control Room store identity and consumes only an already authenticated, sanitized provider snapshot. It performs no Shopify network mutation, persists no provider inventory as current truth, and grants no execution authority.
+
+A child-app reconciliation may classify evidence as `CURRENT`, `UNDECLARED`, `SCOPE_DRIFT`, `IDENTITY_DRIFT`, `STALE`, or `UNKNOWN`. `CURRENT` means only that fresh, complete evidence matches the supplied declaration identity and exact approved scope set; it still returns `authorityGranted: false`. Live installed-app state, credentials, provider authentication, runtime display, Supabase connection state, production equivalence, or any Shopify write remain separately unproven until independently observed at use time.
+
+## Required crawler/public-work browser proof
+
+For public crawler and work-directory behavior, `.github/workflows/ci.yml` must keep `e2e/pages-api-recovery.spec.ts` and `e2e/public-work-directory.spec.ts` inside the load-bearing `Playwright e2e` job that feeds `Required Gate`. The specialized Pages workflow is supplementary evidence only; it cannot replace this required exact-head browser proof or authorize merge.
+
+## Cross-repository browser witness freshness
+
+The exact StoryEngine peer configured in `.github/workflows/playwright.yml` is an evidence subject, not a durable alias for current StoryEngine. A peer refresh must be backed by an independent ref/SHA observation and must reset predecessor federation/browser proof until the complete FCR → StoryEngine → receipt → FCR Playwright witness passes on the exact FCR head. Pin alignment alone grants no merge, deploy, production, or provider-mutation authority.

@@ -100,7 +100,7 @@
       border-bottom: 1px solid rgba(255,255,255,0.07);
     }
 
-    .hero { grid-template-columns: minmax(0, 1.2fr) minmax(290px, 0.8fr); align-items: center; column-gap: clamp(2rem, 6vw, 5.5rem); }
+    .hero { grid-template-columns: minmax(0, 1fr) minmax(320px, 0.95fr); align-items: center; column-gap: clamp(2rem, 6vw, 5.5rem); }
     .eyebrow {
       display: inline-flex;
       width: fit-content;
@@ -137,6 +137,61 @@
       background: rgba(255,255,255,0.04);
     }
     .button-primary { color: #0b0814; border-color: transparent; background: linear-gradient(100deg, #f6d3ff, #cbbcff 46%, #74e6f7); box-shadow: 0 18px 52px rgba(132, 89, 240, 0.22); }
+
+    .entry-panel {
+      display: grid;
+      gap: 0.9rem;
+      padding: clamp(1rem, 3vw, 1.35rem);
+      border: 1px solid rgba(205, 193, 255, 0.28);
+      border-radius: 1.6rem;
+      background:
+        radial-gradient(circle at 20% 0%, rgba(116,230,247,.16), transparent 19rem),
+        linear-gradient(150deg, rgba(32,31,69,.94), rgba(10,12,28,.92));
+      box-shadow: 0 30px 90px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.08);
+    }
+    .entry-panel h2 { font-size: clamp(1.75rem, 4vw, 2.7rem); letter-spacing: -.04em; line-height: 1.05; }
+    .entry-panel > p { margin: 0; color: #cac6da; line-height: 1.55; }
+    .entry-card {
+      display: grid;
+      gap: .5rem;
+      padding: 1.05rem;
+      border: 1px solid rgba(255,255,255,.1);
+      border-radius: 1.1rem;
+      text-decoration: none;
+      background: rgba(255,255,255,.045);
+      transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
+    }
+    .entry-card:hover, .entry-card:focus-visible { transform: translateY(-2px); border-color: rgba(184,166,255,.58); background: rgba(182,156,255,.1); outline: none; }
+    .entry-card[data-entry-choice="user"] { box-shadow: inset 3px 0 0 rgba(116,230,247,.8); }
+    .entry-card[data-entry-choice="founder"] { box-shadow: inset 3px 0 0 rgba(182,156,255,.86); }
+    .entry-kicker { color: #dfd5ff; font-size: .72rem; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; }
+    .entry-card strong { font-size: 1.18rem; }
+    .entry-card span:last-child { color: var(--muted); line-height: 1.45; }
+    .entry-arrow { justify-self: end; color: #fff; font-weight: 900; }
+    .entry-truth { margin: .1rem 0 0; color: #9e99b2; font-size: .78rem; line-height: 1.5; }
+
+    .onboarding-grid { display: grid; grid-template-columns: minmax(0,.85fr) minmax(0,1.15fr); gap: clamp(1.5rem,5vw,4rem); align-items: start; }
+    .start-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: .85rem; }
+    .start-card {
+      display: grid;
+      gap: .45rem;
+      min-height: 10rem;
+      padding: 1.15rem;
+      border: 1px solid rgba(255,255,255,.09);
+      border-radius: 1.15rem;
+      background: linear-gradient(155deg, rgba(26,29,56,.82), rgba(10,12,27,.88));
+      text-decoration: none;
+    }
+    .start-card:hover, .start-card:focus-visible { border-color: rgba(144,214,255,.5); outline: 2px solid rgba(116,230,247,.35); outline-offset: 2px; }
+    .start-card strong { font-size: 1.08rem; }
+    .start-card p { margin: 0; color: var(--muted); line-height: 1.5; }
+    .onboarding-note { margin: 1rem 0 0; color: #aaa5bb; font-size: .84rem; line-height: 1.6; }
+    .steps { display: grid; gap: .8rem; counter-reset: founder-step; }
+    .step { position: relative; display: grid; grid-template-columns: auto 1fr; gap: .8rem; align-items: start; padding: 1rem; border: 1px solid rgba(255,255,255,.08); border-radius: 1rem; background: rgba(255,255,255,.04); }
+    .step::before { counter-increment: founder-step; content: counter(founder-step); display: grid; place-items: center; width: 2rem; height: 2rem; border-radius: .7rem; background: rgba(182,156,255,.16); color: #e9e1ff; font-weight: 900; }
+    .step strong { display: block; margin-bottom: .2rem; }
+    .step span { color: var(--muted); line-height: 1.45; }
+    .boundary-note { margin-top: 1rem; padding: .9rem 1rem; border-left: 3px solid rgba(182,156,255,.75); border-radius: .65rem; background: rgba(182,156,255,.07); color: #c8c3d7; line-height: 1.55; font-size: .86rem; }
 
     .truth-card {
       border: 1px solid var(--line);
@@ -204,9 +259,9 @@
     footer { padding: 2rem 0 0.5rem; color: #8f8aa3; font-size: 0.82rem; text-align: center; }
 
     @media (max-width: 860px) {
-      .hero, .screen-grid { grid-template-columns: 1fr; }
+      .hero, .screen-grid, .onboarding-grid { grid-template-columns: 1fr; }
       .hero { align-content: start; }
-      .truth-card { max-width: 650px; }
+      .truth-card, .entry-panel { max-width: 650px; }
       .screen { min-height: auto; }
     }
     @media (max-width: 580px) {
@@ -215,7 +270,7 @@
       .status span:last-child { display: none; }
       h1 { font-size: clamp(3rem, 16vw, 4.8rem); }
       h2 { font-size: clamp(2.6rem, 13vw, 4rem); }
-      .truth-grid { grid-template-columns: 1fr; }
+      .truth-grid, .start-grid { grid-template-columns: 1fr; }
       .metric-wide { grid-column: auto; }
       .actions { display: grid; }
       .button { width: 100%; }
@@ -239,27 +294,90 @@
 
     <section class="screen hero" id="home" data-public-screen="home" aria-labelledby="home-title">
       <div>
-        <div class="eyebrow">Public front door</div>
-        <h1 id="home-title">Run the work.<br /><span class="gradient">Keep the truth.</span></h1>
+        <div class="eyebrow">Welcome to FCR</div>
+        <h1 id="home-title">People. Ideas.<br /><span class="gradient">Progress.</span></h1>
         <p class="lede">
-          Founder Control Room is a founder operating system for turning intent into controlled execution without losing authority, evidence, or rollback. This public face explains the system. Private projects, approvals, credentials, and operating evidence stay behind founder authentication.
+          Discover founders and useful work, or step into a founder workspace built around reality, evidence, and the next thing that matters. The public doorway stays public. Private projects, approvals, credentials, and operating evidence stay behind product authentication.
         </p>
         <div class="actions">
-          <a class="button button-primary" href="https://www.foundercontrolroom.org/#control-room">See the Control Room</a>
-          <a class="button" href="https://www.foundercontrolroom.org/#chief">Meet Chief</a>
+          <a class="button" href="/work.html">Explore public work</a>
+          <a class="button" href="/juss-rayy/">Meet Juss Rayy</a>
         </div>
       </div>
 
-      <aside class="truth-card" aria-label="Founder operating loop">
-        <div class="truth-card-head"><span>FOUNDER OPERATING LOOP</span><span>REALITY FIRST</span></div>
-        <div class="truth-grid">
-          <div class="metric"><small>Intent</small><strong>What outcome matters?</strong></div>
-          <div class="metric"><small>Authority</small><strong>Who may act?</strong></div>
-          <div class="metric"><small>Evidence</small><strong>What actually happened?</strong></div>
-          <div class="metric"><small>Recovery</small><strong>How do we reverse safely?</strong></div>
-          <div class="metric metric-wide"><small>Founder decision</small><strong>One exact next gate, not ten vague next steps.</strong></div>
-        </div>
+      <aside class="entry-panel" aria-labelledby="entry-title" data-fcr-entry>
+        <div class="eyebrow">Choose your path</div>
+        <h2 id="entry-title">What brings you to FCR?</h2>
+        <p>Same mission. Different experience and authority.</p>
+        <a class="entry-card" data-entry-choice="user" href="#discover">
+          <span class="entry-kicker">User view</span>
+          <strong>Explore &amp; Support</strong>
+          <span>Discover founders, learn, follow public progress, and support work you believe in.</span>
+          <span class="entry-arrow" aria-hidden="true">→</span>
+        </a>
+        <a class="entry-card" data-entry-choice="founder" href="#founder-start">
+          <span class="entry-kicker">Founder view</span>
+          <strong>Build &amp; Grow</strong>
+          <span>Bring your company or project into a workspace for goals, evidence, decisions, and progress.</span>
+          <span class="entry-arrow" aria-hidden="true">→</span>
+        </a>
+        <p class="entry-truth">Choosing a view does not grant private authority. Founder access still passes through FCR authentication.</p>
       </aside>
+    </section>
+
+    <section class="screen" id="discover" data-public-onboarding="user" aria-labelledby="discover-title">
+      <div class="onboarding-grid">
+        <div>
+          <div class="eyebrow">User onboarding</div>
+          <h2 id="discover-title">Start with what matters to you.</h2>
+          <p class="lede">No account is required to explore the public FCR world. Pick a real starting lane now. Account-based interests and a personalized member feed are not claimed until member authentication exists.</p>
+          <p class="onboarding-note">Public browsing never exposes founder-only projects, approvals, credentials, private evidence, or owner controls.</p>
+        </div>
+        <div class="start-grid" aria-label="Public FCR starting lanes">
+          <a class="start-card" href="/work.html" data-user-start="founders">
+            <span class="entry-kicker">Discover</span>
+            <strong>Founder work</strong>
+            <p>See public products, projects, proof, and useful work that is actually ready to be seen.</p>
+          </a>
+          <a class="start-card" href="/juss-rayy/" data-user-start="story">
+            <span class="entry-kicker">People</span>
+            <strong>Founder story</strong>
+            <p>Meet the person behind the work and understand what is being built and why.</p>
+          </a>
+          <a class="start-card" href="#chief" data-user-start="learn">
+            <span class="entry-kicker">Learn</span>
+            <strong>How FCR works</strong>
+            <p>Understand Chief, PromptOS, authority, and how FCR turns intent into controlled execution.</p>
+          </a>
+          <a class="start-card" href="#proof" data-user-start="proof">
+            <span class="entry-kicker">Trust</span>
+            <strong>See the proof boundary</strong>
+            <p>See what FCR can say publicly, what remains private, and why unknown stays unknown.</p>
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <section class="screen" id="founder-start" data-public-onboarding="founder" aria-labelledby="founder-start-title">
+      <div class="onboarding-grid">
+        <div>
+          <div class="eyebrow">Founder onboarding</div>
+          <h2 id="founder-start-title">Turn what you are building into a working control room.</h2>
+          <p class="lede">The founder path begins with product authentication, then uses the existing FCR onboarding flow to establish the project, mission, current reality, and evidence connections before private workspace state is shown.</p>
+          <div class="actions">
+            <a class="button button-primary" href="/control-room/" data-founder-start="authenticated">Continue as a Founder</a>
+            <a class="button" href="/control-room/founder-shell.html">Preview the experience</a>
+          </div>
+          <p class="boundary-note"><strong>Authority boundary:</strong> the existing FCR owner session remains founder-gated. General member authentication and multi-tenant founder workspaces remain a separate implementation gate and are not silently simulated by this public screen.</p>
+        </div>
+        <div class="steps" aria-label="Founder onboarding steps">
+          <div class="step"><div><strong>You</strong><span>Authenticate through FCR so private workspace state is never exposed at the public doorway.</span></div></div>
+          <div class="step"><div><strong>What are you building?</strong><span>Set the project type, mission, current reality, repository or stack, and the work that matters now.</span></div></div>
+          <div class="step"><div><strong>What needs to move?</strong><span>Choose the current outcome and keep the next gate bounded instead of turning onboarding into a giant setup checklist.</span></div></div>
+          <div class="step"><div><strong>Connect evidence</strong><span>Add the providers and proof surfaces that can verify what really happened. Connection never creates authority by itself.</span></div></div>
+          <div class="step"><div><strong>Enter the Control Room</strong><span>See project reality, proof, decisions, and controlled actions only after the authority boundary is satisfied.</span></div></div>
+        </div>
+      </div>
     </section>
 
     <section class="screen" id="control-room" data-public-screen="control-room" aria-labelledby="control-room-title">
