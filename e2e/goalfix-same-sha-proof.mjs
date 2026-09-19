@@ -76,6 +76,7 @@ const server = createServer((req, res) => {
           intent: {
             raw: payload.desiredOutcome,
             resolved: payload.resolvedIntent,
+            confirmed: payload.resolvedIntent === undefined,
           },
           attempts: refreshedAttempts,
           scope: {
