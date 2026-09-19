@@ -243,7 +243,7 @@ describe('executeGeminiMediaProductionPlan', () => {
     expect(invideo).not.toHaveBeenCalled();
   });
 
-  it('redacts adapter exception details and refuses to claim success without provider evidence', async () => {
+  it('redacts adapter exception details and preserves post-dispatch uncertainty without claiming a clean block', async () => {
     const secret = 'provider-key-that-must-not-escape';
     const veo = vi.fn(async () => {
       throw new Error(`transport failed with ${secret}`);
@@ -256,7 +256,7 @@ describe('executeGeminiMediaProductionPlan', () => {
       { now: () => NOW },
     );
 
-    expect(result.status).toBe('BLOCKED');
+    expect(result.status).toBe('PARTIAL');
     expect(result.receipts[0]).toMatchObject({
       shotId: 'FCR-01',
       outcome: 'UNKNOWN',
