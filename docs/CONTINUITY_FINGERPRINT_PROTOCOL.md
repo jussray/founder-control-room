@@ -51,6 +51,52 @@ prior decision
 → current authority
 ```
 
+## Capability continuity without historical erasure
+
+Connector and external-capability continuity has two independent time planes:
+
+1. **historical evidence**: what a receipt proved at the time it was observed; and
+2. **current observation**: what the authoritative runtime/provider exposes now.
+
+A fresh current observation may supersede a present-tense capability claim. It may not rewrite history. Verified predecessor evidence remains append-only provenance unless the receipt itself is proven forged, misbound, or otherwise invalid.
+
+When evidence exists, keep these capability dimensions separate rather than collapsing them into one `available` boolean:
+
+- catalog visibility;
+- installation or enablement;
+- authentication/session identity;
+- callability from the current execution surface;
+- read capability;
+- write capability/authority;
+- provider acceptance; and
+- verified successful outcome.
+
+Each observation must be time-bound and source-bound. `Not exposed in this session at T2` is a valid current observation. It is not evidence that the connector never existed at T1.
+
+Resolution examples:
+
+| Historical receipt | Current observation | Correct classification |
+| --- | --- | --- |
+| successful connector use | connector absent now | `HISTORICALLY_VERIFIED` + `CURRENTLY_UNAVAILABLE` |
+| successful connector use | no current probe | `HISTORICALLY_VERIFIED` + `UNKNOWN` |
+| none found | connector absent now | current absence only; historical existence remains `UNKNOWN` |
+| one current surface says installed, another cannot invoke | contradictory current evidence | `CONNECTOR_STATE_CONFLICT` |
+
+Never infer an uninstall actor or root cause from disappearance alone. `Founder removed it`, `agent removed it`, `provider delisted it`, `OAuth expired`, and `eligibility changed` each require their own evidence receipt.
+
+Hard invariants:
+
+```text
+CURRENTLY_UNAVAILABLE != NEVER_EXISTED
+UNKNOWN != NO
+STALE != FALSE
+INSTALLED != AUTHORIZED
+AUTHORIZED != SUCCESSFUL
+SUCCESSFUL_ONCE != VERIFIED_NOW
+```
+
+Continuity fingerprints and proof cookies may link predecessor and successor observations, including the capability dimensions and evidence references above. They remain non-secret state markers only. They cannot install a connector, authenticate a session, create provider authority, replay approval, or convert historical success into current capability.
+
 ## Reuse rule
 
 Every correction should leave a reusable fingerprint so the same discovery cost is not paid twice. Prefer exact issue, PR, SHA, route, function, provider, evidence receipt, or prior decision before broad scans.
