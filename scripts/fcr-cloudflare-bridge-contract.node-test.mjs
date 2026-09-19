@@ -257,7 +257,8 @@ test('provider mutation is limited to the exact public/Worker split kernel', () 
   assert.doesNotMatch(splitCli, /APPROVAL_REFERENCE/);
 
   // The predecessor remains the read-only topology observer in the trusted lane.
-  assert.match(reconciliation, /existing-public-access-app-requires-review/);
+  assert.match(reconciliation, /would-detach-browser-access/);
+  assert.match(reconciliation, /preservedNonBrowserDestinationCount/);
 });
 
 test('browser proof binds public origin, private Worker containment, and runtime to the exact approved SHA', () => {
