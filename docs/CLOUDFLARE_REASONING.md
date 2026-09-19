@@ -239,17 +239,27 @@ Its final receipt deliberately keeps `mergeAuthorized`, `deploymentAuthorized`, 
 
 ## Bounded FCR Access front-door recovery
 
-The manual `FCR Access Front Door Recovery` workflow remains the one trusted provider-recovery carrier, but its desired product state is now explicit: **Cloudflare Access must not own the Founder Control Room browser doorway.** The public Pages experience may reach FCR without a Cloudflare Access login or challenge screen, and founder authentication begins inside the FCR `/control-room/` sign-in surface.
+The manual `FCR Access Front Door Recovery` workflow remains the one trusted provider-recovery carrier. Its desired topology is a **bounded split**, not global Access removal: the FCR browser doorway is public, while the canonical API Worker remains protected except for the exact `/version` release witness.
 
-Read and mutation authority remain split. `apply=false` uses only `CLOUDFLARE_ACCESS_API_TOKEN` for Access application inspection and rejects an unnecessary approval reference. `apply=true` requires a fresh auditable `approval_reference`, records only its SHA-256 receipt, and uses only `CLOUDFLARE_ACCESS_ADMIN_API_TOKEN` for the provider write path. Neither credential is a fallback for the other.
+The source-level intended public destinations are exactly:
 
-The mutation surface is narrower than general Access administration: exactly one uniquely identified mixed Access application may have only its browser-facing public `foundercontrolroom.org` or `www.foundercontrolroom.org` destinations detached. Every non-browser/private destination and every existing policy must remain unchanged. Multiple matching applications, a missing stable provider identity, or a public-only application fail closed instead of guessing ownership or deleting provider state.
+```text
+foundercontrolroom.org/*
+www.foundercontrolroom.org/*
+api.foundercontrolroom.org/version
+```
 
-Anonymous Playwright is a separate outcome witness. It must show that the apex/public FCR pages are not intercepted by Cloudflare Access, that a random stranger reaches the FCR-owned founder sign-in surface rather than the authenticated shell, and that the API runtime identity matches the exact approved SHA. A later `/version`, deployment, or browser-runtime failure does **not** automatically reintroduce a Cloudflare Access product-login screen after provider readback already proved successful detachment.
+The split kernel preserves the existing protected Worker Access application and its policies, narrows that protected application to its Worker/private destinations, and creates or reconciles one separately named managed public Access application for only the destinations above. Only that managed public application receives an `Everyone` Bypass policy. Every other `api.foundercontrolroom.org/*` path remains behind the protected Worker Access membrane. The public browser experience still reaches the canonical Worker privately through the Pages `FCR_API` Service Binding, so making the browser doorway usable does not require making the Worker API generally public.
 
-Rollback is reserved for an incomplete or ambiguous provider apply and is bound to the exact pre/post destination receipt plus unchanged application and policy fingerprints. It is not a generic response to an unrelated runtime failure. Only the bounded sanitized public receipt is returned to the fixed founder control issue and retained artifact; raw Access/browser receipts, raw approval references, provider IDs, raw errors, and blockers are not promoted into public proof.
+Read and mutation authority remain split. `apply=false` uses only `CLOUDFLARE_ACCESS_API_TOKEN` for Access inspection and rejects an unnecessary approval reference. `apply=true` requires a fresh auditable `approval_reference`, records only its SHA-256 receipt, and uses only `CLOUDFLARE_ACCESS_ADMIN_API_TOKEN` for the provider write path. Neither credential is a fallback for the other, and source/test success cannot manufacture either authority.
 
-Source code proves only this bounded recovery contract. Current Access state, credential validity, provider mutation success, routed runtime identity, and the absence of a Cloudflare Access screen require fresh provider/browser evidence.
+The mutation fails closed when provider state is ambiguous, when the expected protected application cannot be identified safely, when managed-public ownership cannot be proven, or when the split would widen public API scope beyond the exact allowlist. It does not delete or rewrite unrelated Access applications or policies.
+
+Anonymous Playwright is a separate outcome witness. It must show that a random stranger reaches the FCR-owned public/sign-in experience without a Cloudflare Access product-login interception, that the authenticated founder shell is not granted to that stranger, that `api.foundercontrolroom.org/version` is reachable only as the exact public witness, that protected direct API paths remain protected, and that runtime identity matches the exact approved release SHA where the runtime contract applies.
+
+Rollback is receipt-bound to an actually performed split. It first removes only the run-created managed public application, proves that removal, and then restores the protected application's original destination set only when the protected application identity and policy fingerprints still match the pre-mutation receipt. It is not a generic response to unrelated runtime failure and must not guess through provider drift.
+
+Source code, CI, the bridge contract, or a controlled Playwright fixture prove only the intended split and browser contract. They do **not** prove that Cloudflare has applied the split, that the dedicated admin credential exists, that the public doorway is currently healthy, or that production serves the candidate SHA. Those claims remain `UNKNOWN` or `BLOCKED` until a separately authorized exact-main provider apply is followed by provider readback, anonymous browser proof, Pages-through-`FCR_API` health, exact `/version` identity, and protected direct-API health.
 
 ## Verification
 

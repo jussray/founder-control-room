@@ -132,17 +132,31 @@ This checked-in binding and sender allowlist prove repository intent only. They 
 
 Repository source contains a founder-gated Cloudflare Access inspection/recovery lane. Its existence does **not** prove current Access application state, token permissions, browser reachability, or production front-door availability.
 
-The desired product state is explicit: `foundercontrolroom.org` and `www.foundercontrolroom.org` must reach the FCR Pages/browser experience without a Cloudflare Access product-login screen. Founder authentication begins inside FCR at `/control-room/`. Access may remain on separately scoped private/internal Worker destinations.
+The desired topology is a bounded public/protected split, not global Access removal:
 
-The `FCR Access Front Door Recovery` workflow requires an exact requested SHA that still equals current `main`. Read-only inspection uses only `CLOUDFLARE_ACCESS_API_TOKEN`. Any apply or receipt-bound rollback uses only `CLOUDFLARE_ACCESS_ADMIN_API_TOKEN`, and `apply=true` additionally requires a fresh auditable founder approval reference whose raw value is never published.
+```text
+PUBLIC Access app
+  foundercontrolroom.org/*
+  www.foundercontrolroom.org/*
+  api.foundercontrolroom.org/version
+  policy: Everyone Bypass
 
-The only automatic provider write allowed by this lane is to update one uniquely identified mixed self-hosted Access application by detaching only browser-facing public destinations for the FCR apex or `www` host. All non-browser/private destinations and all existing policies must remain unchanged. Multiple matching applications, a missing stable provider identity, or a public-only application fail closed rather than guessing ownership or deleting provider state.
+PROTECTED Worker Access app
+  all remaining reviewed Worker/private destinations
+  policies: preserved
+```
 
-A successful provider write is execution evidence, not browser outcome proof. Anonymous Playwright must independently verify no Cloudflare Access interception, that a random stranger reaches the FCR-owned founder sign-in surface without reaching the authenticated shell, and that `api.foundercontrolroom.org/version` matches the exact approved SHA.
+The browser frontend remains Cloudflare Pages. Dynamic browser/API execution should traverse the private Pages `FCR_API` Service Binding to the canonical `founder-control-room` Worker. Direct public access to the canonical API Worker is therefore not required for normal browser operation, and every `api.foundercontrolroom.org/*` path except exact `/version` remains protected by the Worker Access boundary.
 
-Rollback is limited to an incomplete or ambiguous provider apply and must restore only the exact receipt-bound original destination set after reacquiring unchanged application and policy identity. A later browser, runtime, deployment, or `/version` failure alone must not automatically reintroduce a Cloudflare Access product-login screen.
+The `FCR Access Front Door Recovery` workflow requires an exact requested SHA that still equals current `main`. Read-only inspection uses only `CLOUDFLARE_ACCESS_API_TOKEN`. Any apply or receipt-bound rollback uses only `CLOUDFLARE_ACCESS_ADMIN_API_TOKEN`, and `apply=true` additionally requires a fresh auditable founder approval reference whose raw value is never published. Neither credential substitutes for the other.
 
-Only a bounded sanitized recovery receipt may be returned to the fixed founder-control issue or retained as an artifact. Raw provider/browser receipts, raw approval references, provider identifiers, raw errors, and blockers remain outside public proof.
+The bounded provider write preserves the existing protected Worker application and policies, removes only the reviewed public destinations from that protected application, and creates or reconciles one separately named managed public Access application containing only the exact public allowlist above. Only the managed public application may receive the `Everyone` Bypass policy. The repair fails closed on ambiguous application identity, unprovable managed-public ownership, destination widening, unexpected policy drift, or any state that would require guessing which provider object is authoritative.
+
+A successful source check or provider write is not browser outcome proof. Anonymous Playwright must independently verify that a random stranger reaches the FCR-owned public/sign-in experience without Cloudflare Access interception, never receives the authenticated founder shell, can use exact `api.foundercontrolroom.org/version` only as the public release witness, and remains blocked from protected direct API paths. Deployed `/version` identity must match the exact approved release SHA where that runtime contract applies.
+
+Rollback is limited to the exact split created by the run. It deletes only the run-created managed public application first, verifies that deletion, and restores the protected application's original destination set only after re-acquiring unchanged protected-application identity and policy fingerprints. It must not delete unrelated applications, rewrite unrelated policies, or use a later runtime/browser failure as permission to widen or recreate Access state blindly.
+
+Only bounded sanitized recovery receipts may be retained. Raw provider/browser receipts, raw approval references, provider identifiers, secret material, and unrestricted provider errors remain outside public proof.
 
 Keep these truths separate:
 
@@ -151,10 +165,13 @@ source capability
 -> credential/configuration availability
 -> provider inspection/readback
 -> separately authorized bounded mutation when needed
--> deployed browser/runtime proof
+-> anonymous browser + protected-route proof
+-> exact deployed runtime identity
 ```
 
-Do not infer live provider configuration from a workflow file, secret name, token display label, or successful unrelated Cloudflare build.
+Current source truth therefore does **not** claim that the live Cloudflare Access split has been applied or that the public front door is repaired. Those remain `UNKNOWN` or `BLOCKED` until the exact-main provider lane runs with the dedicated admin authority and the resulting provider/browser/runtime receipts agree.
+
+Do not infer live provider configuration from a workflow file, secret name, token display label, green contract test, or successful unrelated Cloudflare build.
 
 ## Read-only hostname inventory boundary
 
@@ -210,14 +227,14 @@ At minimum verify:
 3. the canonical Worker deployment/version intended for production succeeds;
 4. deployment-plane credentials pass the pre-mutation authority gate and provider-held Worker required-secret names pass the Wrangler binding membrane;
 5. the Pages `FCR_API` Service Binding is provider-proven to target the canonical `founder-control-room` Worker;
-6. `https://api.foundercontrolroom.org/health` returns the expected service identity/health payload;
+6. `https://api.foundercontrolroom.org/health` returns the expected service identity/health payload on the authorized/protected path;
 7. `https://foundercontrolroom.org/health` reaches the same canonical API service through the Pages binding;
-8. `/version` or equivalent runtime identity matches the approved exact SHA where that contract applies;
+8. exact public `https://api.foundercontrolroom.org/version` matches the approved SHA while other direct API paths remain protected;
 9. authentication returns to `/control-room/` on the Pages origin;
-10. required Playwright/browser proof runs against the deployed path; and
+10. anonymous and authenticated Playwright/browser proof runs against the deployed path; and
 11. founder-content/provider claims use their own exact authorization and provider-readback gates.
 
-Provider build/deploy comments, preview URLs, and successful uploads are useful evidence for the artifact they name. They do not substitute for runtime binding identity, auth, browser, publication, or fleet-wide proof.
+Provider build/deploy comments, preview URLs, and successful uploads are useful evidence for the artifact they name. They do not substitute for Access topology readback, protected-route proof, runtime binding identity, auth, browser, publication, or fleet-wide proof.
 
 ## Documentation truth
 
@@ -231,6 +248,6 @@ Current executable source and authoritative provider readback outrank an older v
 - API Worker: redeploy the prior exact Worker SHA through the authorized Worker release path.
 - Proxy: revert the focused `public/_worker.js` change and matching deployment contract together; do not silently point the browser at an unverified origin.
 - Service binding: revert only the affected Pages binding through separately authorized provider mutation; preserve unrelated bindings/configuration.
-- Access: roll back only an incomplete or ambiguous browser-destination detachment using the receipt-bound original destination set and unchanged application/policy identity; a later runtime/browser failure alone must not automatically reintroduce a Cloudflare Access product-login screen.
+- Access: for a receipt-bound split, remove only the run-created managed public Access application first, verify deletion, then restore only the protected application's exact original destinations after unchanged application/policy identity is re-proven; do not touch unrelated Access objects.
 - Credentials: remove/revoke only the affected credential; do not rotate unrelated keys to repair binding drift.
 - Preserve build logs, deployment IDs, provider readback, browser traces, and runtime receipts.
