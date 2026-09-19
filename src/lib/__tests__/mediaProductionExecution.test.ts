@@ -6,6 +6,7 @@ import {
 } from '../mediaContinuity.js';
 import {
   bindGeminiMediaCommandFromRelay,
+  geminiMediaPlanFingerprint,
   type BoundGeminiMediaCommand,
   type GeminiMediaProductionCommandDraft,
   type LeevizeMediaClaimSnapshot,
@@ -40,7 +41,7 @@ function mediaState(overrides: Partial<MediaContinuityInput> = {}): MediaContinu
     intentFingerprint: digest('gemini-front-door'),
     subjectFingerprint: digest('fcr-founder-video'),
     scriptFingerprint: digest('script-v2'),
-    promptFingerprint: digest('gemini-command-v1'),
+    promptFingerprint: digest('unbound-plan'),
     sourceAssetFingerprints: [],
     intelligenceFingerprint: digest({ layer: 'gemini-command' }),
     renderStackFingerprint: digest({ renderers: ['gemini-veo', 'invideo', 'runtime-capture'] }),
@@ -153,7 +154,9 @@ function policyInput(
   bound: BoundGeminiMediaCommand = boundCommand(),
   overrides: Partial<LeevizeMediaPolicyInput> = {},
 ): LeevizeMediaPolicyInput {
-  const current = mediaState();
+  const current = mediaState({
+    promptFingerprint: geminiMediaPlanFingerprint(bound.command),
+  });
   return {
     command: bound.command,
     commandAuthority: bound.authority,
@@ -358,7 +361,7 @@ describe('executeGeminiMediaProductionPlan', () => {
     expect(veo).not.toHaveBeenCalled();
   });
 
-  it('never invokes a renderer for HOLD, CANCEL, or RELEASE dispositions', async () => {
+  it('never invokes a renderer for HOLD or CANCEL dispositions', async () => {
     const renderer = vi.fn(async () => success('unused', 'provider:veo:unused'));
 
     for (const decision of ['HOLD', 'CANCEL'] as const) {
