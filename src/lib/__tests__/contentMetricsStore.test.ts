@@ -2,7 +2,10 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
 import { parseContentMetricsCsv } from '../contentMetricsCsv.js';
-import { importFounderContentMetricObservations } from '../contentMetricsStore.js';
+import {
+  importFounderContentMetricObservations,
+  type FounderContentMetricImportResult,
+} from '../contentMetricsStore.js';
 
 const CONTENT_HASH = 'f'.repeat(64);
 const header = [
@@ -28,18 +31,18 @@ const row = [
 ].join(',');
 const receipt = parseContentMetricsCsv(`${header}\n${row}`);
 
-function result(overrides: Record<string, unknown> = {}) {
+function result(overrides: Partial<FounderContentMetricImportResult> = {}): FounderContentMetricImportResult {
   return {
-    contract: 'fcr/founder-content-metric-observation-store@v1' as const,
-    authority: 'observation_only' as const,
+    contract: 'fcr/founder-content-metric-observation-store@v1',
+    authority: 'observation_only',
     importFingerprint: receipt.importFingerprint,
     normalizedRowCount: 1,
     insertedRowCount: 1,
     existingRowCount: 0,
     latestObservedAt: '2026-09-16T08:30:00.000Z',
-    publicationAuthority: false as const,
-    freshnessAuthority: false as const,
-    strategyMutationAuthority: false as const,
+    publicationAuthority: false,
+    freshnessAuthority: false,
+    strategyMutationAuthority: false,
     ...overrides,
   };
 }
@@ -98,7 +101,7 @@ describe('founder content metric observation store', () => {
       postId: '11111111-1111-4111-8111-111111111111',
       receipt,
     }, {
-      importObservations: async () => result({ publicationAuthority: true as never }),
+      importObservations: async () => ({ ...result(), publicationAuthority: true } as never),
     })).rejects.toThrow('exceeded observation-only authority');
   });
 
