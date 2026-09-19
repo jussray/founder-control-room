@@ -58,7 +58,9 @@
       "Do not claim Founder Control Room is fully launched.",
       "Do not claim a render, publication, customer outcome, or external action before outcome evidence exists.",
       "Do not turn continuity evidence into action or publish authority.",
-      "Keep future usefulness framed as design intent or future capability, not present outcome."
+      "Keep future usefulness framed as design intent or future capability, not present outcome.",
+      "Gemini may direct production but cannot manufacture, promote, or overwrite claim truth.",
+      "Gemini/Veo output receives the same evidence and canon gate as every delegated renderer."
     ],
     "publicClaims": [
       {
@@ -68,6 +70,14 @@
           "github:src/lib/mediaContinuity.ts",
           "github:src/lib/mediaMissionContinuity.ts",
           "github:Founder Cookie Contract Mirror"
+        ]
+      },
+      {
+        "claim": "Founder Control Room has a Gemini-command /LEEVIZE-policy boundary that keeps production decisions separate from claim truth and publish authority.",
+        "classification": "VERIFIED",
+        "evidenceRefs": [
+          "github:src/lib/mediaProductionAuthority.ts",
+          "github:src/lib/__tests__/mediaProductionAuthority.test.ts"
         ]
       },
       {
@@ -94,11 +104,47 @@
     ]
   },
   "intelligence": {
-    "layer": "chatgpt",
-    "role": "reasoning-director-and-truth-review"
+    "layer": "gemini-command",
+    "role": "foremost-operational-media-authority",
+    "responsibilities": [
+      "intake",
+      "interpretation",
+      "narrative-planning",
+      "shot-routing",
+      "budget-allocation",
+      "approve-or-block",
+      "targeted-repair",
+      "release-disposition"
+    ],
+    "cannot": [
+      "reclassify-truth",
+      "mint-evidence-authority",
+      "turn-continuity-into-publish-authority"
+    ]
+  },
+  "policyKernel": {
+    "layer": "leevize",
+    "role": "truth-policy-audit-kernel",
+    "nonBypassable": true,
+    "enforces": [
+      "claim-eligibility",
+      "evidence-freshness",
+      "strict-canon",
+      "budget-ceilings",
+      "continuity-lineage",
+      "verification-failures"
+    ]
   },
   "renderStack": {
-    "state": "not-selected",
+    "state": "router-defined",
+    "commandAuthority": "gemini-command",
+    "renderers": [
+      "gemini-veo",
+      "invideo",
+      "runway",
+      "runtime-capture",
+      "editor-compositor"
+    ],
     "renderAuthorized": false
   },
   "runtime": {
@@ -115,6 +161,7 @@
   "evidenceRefs": [
     "github:media-script-manifest",
     "github:media-continuity-contract",
-    "github:media-mission-continuity-contract"
+    "github:media-mission-continuity-contract",
+    "github:media-production-authority-contract"
   ]
 }
