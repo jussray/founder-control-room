@@ -160,6 +160,8 @@ Attack 3000 content evidence must bind publication and metrics to one observatio
 
 The Trend Radar ranks sourced signals using timeliness, audience interest, content potential, founder fit, closest-legitimate-dollar relevance, competition opportunity, saturation, and content-fingerprint similarity. First-wave eligibility requires evidence id + source + `observedAt` that is current against the explicit evaluation time; the default evidence window is seven days with a two-minute future-skew tolerance. Evidence-less, unattributed, malformed, stale, future-dated, prediction-only, or incompletely framed candidates cannot enter the first wave. Rankings remain advisory and authorize **no publish, scheduling, spend, provider, merge, deploy, or external-contact action**.
 
+The authenticated founder-content conveyor now exposes `fcr/youtube-growth-evaluation@v1` at `/automation/conveyor/founder-content/youtube-growth/evaluate`. This route makes the existing evidence-gated `TEST_AND_VALIDATE -> DOUBLE_DOWN -> SCALE` evaluator reachable without turning it into an execution lane. It rejects malformed experiments, measurements, continuity fingerprints, thresholds, targets, unknown fields, and duplicate repeatability receipts before they can produce a stronger recommendation. A returned `ADVANCE` is advisory strategy evidence only: it authorizes no publication, scheduling, spend, provider mutation, scale execution, merge, or deploy. YouTube publication state, YPP eligibility, revenue, and other provider outcomes remain UNKNOWN until separately proven by authoritative provider/outcome evidence.
+
 Founder-content approval reservations are deterministic for the same founder, platform, normalized public thesis/opening hook, and Current You intent. A retry after a lost issuance response may recover only the exact still-active stored reservation with matching approval id, founder, proposal hash, public payload hash, and platform. Mismatched, consumed, revoked, expired, or otherwise non-current reservations do not recover and do not create fresh authority.
 
 See [`docs/founder-signal-engine/linkedin-analytics-continuity.md`](docs/founder-signal-engine/linkedin-analytics-continuity.md) for the bounded analytics, Trend Radar, and approval-retry evidence contract.
@@ -177,7 +179,6 @@ foundercontrolroom.org
 api.foundercontrolroom.org
   -> canonical Worker: founder-control-room
 ```
-
 Public discovery artifacts such as `/robots.txt`, `/sitemap.xml`, `/llms.txt`, and `/crawlers.json` are static Pages assets and must be served through the `ASSETS` binding; API-owned callback assets remain routed through `FCR_API`. This source routing rule does not make crawler policy authentication and cannot grant provider, deploy, publication, or mutation authority.
 
 Source dependence on that topology is not proof the live provider is configured correctly.
