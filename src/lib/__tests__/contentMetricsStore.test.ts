@@ -31,6 +31,14 @@ const row = [
 ].join(',');
 const receipt = parseContentMetricsCsv(`${header}\n${row}`);
 
+type DurableImportInput = {
+  founderUserId: string;
+  postId: string;
+  observations: readonly unknown[];
+  importFingerprint: string;
+  importedAt: string;
+};
+
 function result(overrides: Partial<FounderContentMetricImportResult> = {}): FounderContentMetricImportResult {
   return {
     contract: 'fcr/founder-content-metric-observation-store@v1',
@@ -49,8 +57,12 @@ function result(overrides: Partial<FounderContentMetricImportResult> = {}): Foun
 
 describe('founder content metric observation store', () => {
   it('sends only normalized observations to the durable boundary and preserves observation-only authority', async () => {
+    let durableInput: DurableImportInput | null = null;
     const repository = {
-      importObservations: vi.fn(async () => result()),
+      importObservations: vi.fn(async (input: DurableImportInput) => {
+        durableInput = input;
+        return result();
+      }),
     };
 
     const imported = await importFounderContentMetricObservations({
@@ -69,7 +81,6 @@ describe('founder content metric observation store', () => {
       strategyMutationAuthority: false,
     });
     expect(repository.importObservations).toHaveBeenCalledTimes(1);
-    const durableInput = repository.importObservations.mock.calls[0]?.[0];
     expect(durableInput).toMatchObject({
       founderUserId: 'founder-1',
       importFingerprint: receipt.importFingerprint,
@@ -101,7 +112,7 @@ describe('founder content metric observation store', () => {
       postId: '11111111-1111-4111-8111-111111111111',
       receipt,
     }, {
-      importObservations: async () => ({ ...result(), publicationAuthority: true } as never),
+      importObservations: async () => ({ ...result(), publicationAuthority: true }),
     })).rejects.toThrow('exceeded observation-only authority');
   });
 
