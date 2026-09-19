@@ -431,7 +431,7 @@ export async function executeGeminiMediaProductionPlan(
     }
 
     if (receipt.outcome !== 'SUCCEEDED') {
-      return finalize(currentInput, policy, 'PARTIAL', receipts);
+      return finalize(currentInput, policy, receipts.length === 1 ? 'BLOCKED' : 'PARTIAL', receipts);
     }
   }
 
