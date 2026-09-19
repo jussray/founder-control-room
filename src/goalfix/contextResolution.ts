@@ -138,6 +138,28 @@ function uniqueNames(values: string[]): string[] {
   return result;
 }
 
+function verificationCatalogs(tests: Record<string, unknown>): unknown[] {
+  const catalogs = [tests.workflowCatalog, tests.catalog]
+    .filter((catalog): catalog is unknown[] => Array.isArray(catalog));
+
+  if (catalogs.length === 0) {
+    throw new GoalfixContextResolutionError(
+      'GOALFIX_VERIFICATION_CONTRACT_INVALID',
+      'Repository verification manifest must contain tests.workflowCatalog or tests.catalog.',
+    );
+  }
+
+  const entries = catalogs.flat();
+  if (entries.length === 0 || entries.length > VERIFICATION_NAME_MAX_COUNT) {
+    throw new GoalfixContextResolutionError(
+      'GOALFIX_VERIFICATION_CONTRACT_INVALID',
+      'Repository verification manifest must contain a bounded verification catalog.',
+    );
+  }
+
+  return entries;
+}
+
 export function parseGoalfixVerificationManifest(
   text: string,
   expectedRepository: string,
@@ -185,20 +207,13 @@ export function parseGoalfixVerificationManifest(
     );
   }
 
-  const workflowCatalog = (tests as Record<string, unknown>).workflowCatalog;
-  if (!Array.isArray(workflowCatalog) || workflowCatalog.length === 0 || workflowCatalog.length > VERIFICATION_NAME_MAX_COUNT) {
-    throw new GoalfixContextResolutionError(
-      'GOALFIX_VERIFICATION_CONTRACT_INVALID',
-      'Repository verification manifest must contain a bounded workflow catalog.',
-    );
-  }
-
+  const verificationEntries = verificationCatalogs(tests as Record<string, unknown>);
   const requiredNames: string[] = [];
-  for (const entry of workflowCatalog) {
+  for (const entry of verificationEntries) {
     if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
       throw new GoalfixContextResolutionError(
         'GOALFIX_VERIFICATION_CONTRACT_INVALID',
-        'Repository verification workflow entries must be objects.',
+        'Repository verification catalog entries must be objects.',
       );
     }
     const row = entry as Record<string, unknown>;
@@ -207,7 +222,7 @@ export function parseGoalfixVerificationManifest(
     if (!status || !ALLOWED_WORKFLOW_STATUSES.has(status)) {
       throw new GoalfixContextResolutionError(
         'GOALFIX_VERIFICATION_CONTRACT_INVALID',
-        'Repository verification workflow status is unsupported.',
+        'Repository verification catalog status is unsupported.',
       );
     }
     if (row.required !== true || status === 'retired') continue;
@@ -215,7 +230,7 @@ export function parseGoalfixVerificationManifest(
     if (!name || name.length > VERIFICATION_NAME_MAX_LENGTH) {
       throw new GoalfixContextResolutionError(
         'GOALFIX_VERIFICATION_CONTRACT_INVALID',
-        'Repository verification workflow has an invalid required name.',
+        'Repository verification catalog has an invalid required name.',
       );
     }
     requiredNames.push(name);
