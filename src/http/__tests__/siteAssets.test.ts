@@ -32,7 +32,7 @@ describe('Founder Control Room Cloudflare topology', () => {
     expect(landing).toContain('<link rel="canonical" href="https://www.foundercontrolroom.org/" />');
     expect(landing).toContain('href="https://www.foundercontrolroom.org/control-room/"');
     expect(landing).toContain('href="https://www.foundercontrolroom.org/guardrails"');
-    expect(landing).not.toContain('href="/control-room/"');
+    expect(landing).toContain('href="/control-room/" data-founder-start="authenticated"');
     expect(landing).toContain('data-bottom-nav="five-screen"');
     for (const screen of ['home', 'control-room', 'chief', 'promptos', 'proof']) {
       expect(landing).toContain(`data-public-screen="${screen}"`);
