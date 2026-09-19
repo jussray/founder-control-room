@@ -58,6 +58,12 @@ Founder-content orchestration must not reuse the generic conveyor activation rec
 
 The governed Founder Content rescue may set `N8N_FOUNDER_CONTENT_ENABLED=true` in candidate source, restrict the enabled provider to Buffer, and pin the expected workflow/runtime identity. That is **source intent only**. It does not prove the canonical Worker carrying those bindings was deployed, that the production n8n workflow was published, that the Supabase migrations were applied, that Buffer accepted a schedule, or that a public artifact exists. A successful isolated n8n runtime proof or webhook `202` remains execution-plane evidence; present-tense `live`, `used`, `scheduled`, or `published` language requires the corresponding exact deployed runtime and provider-native readback.
 
+### Imported founder-content metric observations
+
+The authenticated founder-content CSV-import route is an observation intake boundary, not a metric-truth mint. Every normalized row must retain explicit content fingerprint, provider, account, page, audience segment, metric name, unit, measurement window, observation time, source, source reference, and row provenance. Blank metric values remain unknown evidence rather than synthetic zeroes. Exact duplicate rows may be idempotent; conflicting duplicate identities must fail closed instead of selecting a convenient value.
+
+Imported rows must be bound to the stored founder-content post identity before persistence. Raw CSV is not durable evidence. A database receipt is treated as untrusted input at the application boundary and must preserve `observation_only` authority with publication, freshness, and strategy-mutation authority all false. A parsed CSV, accepted database write, historical import, or stored observation proves only what it directly observed; a current numerical claim still requires fresh authoritative metric evidence at the use boundary.
+
 ## /confess
 
 Before release, state internally and, when material to the audience, publicly:
@@ -192,6 +198,7 @@ Hold the post when:
 - configuration/readiness evidence is being used as proof that n8n, Buffer, or another provider actually executed or published;
 - a generic n8n stage-conveyor receipt is being used as proof that a founder-content provider write or publication occurred;
 - a founder-content `verified` proof label is missing Buffer provider binding, receipt identity, observation time, or exact deployed-SHA binding;
+- an imported metric observation or historical CSV receipt is being reused as a current metric claim without a fresh authoritative read;
 - the post falls outside the approved automated publishing class or a stricter exact Current You gate is unsatisfied;
 - the active first-party route cannot read and atomically claim an exact matching FCR-owned approval;
 - the post depends on a workflow that failed before executing steps;
