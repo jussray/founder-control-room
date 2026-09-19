@@ -13,6 +13,7 @@ import {
 
 export const GEMINI_MEDIA_COMMAND_CONTRACT = 'founder-control-room/gemini-media-production-command@v1' as const;
 export const GEMINI_MEDIA_COMMAND_AUTHORITY_RECEIPT_CONTRACT = 'founder-control-room/gemini-media-command-authority-receipt@v1' as const;
+export const GEMINI_MEDIA_PLAN_CONTRACT = 'founder-control-room/gemini-media-plan@v1' as const;
 export const LEEVIZE_MEDIA_POLICY_CONTRACT = 'founder-control-room/leevize-media-policy@v1' as const;
 
 export type GeminiMediaDecision = 'AUTHORIZE_PRODUCTION' | 'HOLD' | 'REPAIR' | 'RELEASE' | 'CANCEL';
@@ -275,6 +276,27 @@ export function geminiMediaCommandHash(
 }
 
 /**
+ * Stable production-plan identity. Decision, command id, issuance time and
+ * command hash are intentionally excluded so a later RELEASE command can prove
+ * it is reviewing the exact same plan that produced the export. A different
+ * story, budget, renderer route, claim binding, canon requirement or evidence
+ * requirement produces a different plan fingerprint.
+ */
+export function geminiMediaPlanFingerprint(
+  command: Pick<GeminiMediaProductionCommand, 'projectId' | 'missionId' | 'viewerTakeaway' | 'maxCredits' | 'shots'>,
+): string {
+  const canonical = {
+    contract: GEMINI_MEDIA_PLAN_CONTRACT,
+    projectId: text(command.projectId),
+    missionId: text(command.missionId),
+    viewerTakeaway: text(command.viewerTakeaway),
+    maxCredits: command.maxCredits,
+    shots: command.shots.map(stableShot),
+  };
+  return createHash('sha256').update(JSON.stringify(canonical)).digest('hex');
+}
+
+/**
  * Converts a completed, validated Gemini relay response into the only command
  * authority binding accepted by /LEEVIZE. The model does not choose its issuer,
  * issuedAt, hash, provider evidence, or authority fields; those are bound by the
@@ -430,6 +452,15 @@ function policyErrors(input: LeevizeMediaPolicyInput): string[] {
   else if (command.maxCredits > input.projectCreditCeiling) reasons.push('command_budget_exceeds_project_ceiling');
 
   if (command.decision === 'HOLD' || command.decision === 'CANCEL') return unique(reasons);
+
+  const executableShots = command.shots.filter((shot) => shot.directive !== 'STOP');
+  if (executableShots.length === 0) reasons.push('command_has_no_executable_shots');
+
+  const expectedPlanFingerprint = geminiMediaPlanFingerprint(command);
+  const observedPlanFingerprint = text(input.continuity.current.promptFingerprint).toLowerCase();
+  if (observedPlanFingerprint !== expectedPlanFingerprint) {
+    reasons.push('command_continuity_mismatch');
+  }
 
   if (continuity.status !== 'pass' || continuity.continuityState !== 'current') {
     reasons.push('media_continuity_not_current');
