@@ -39,7 +39,7 @@ const PROJECTS: GoalfixProjectCandidate[] = [
   },
 ];
 
-function manifest(repository = 'jussray/Sekret-Bip') {
+function workflowManifest(repository = 'jussray/Sekret-Bip') {
   return JSON.stringify({
     repository,
     tests: {
@@ -50,6 +50,19 @@ function manifest(repository = 'jussray/Sekret-Bip') {
         { id: 'founder', name: 'Control Room Manifest', required: true, status: 'founder-gated' },
         { id: 'old', name: 'Retired Proof', required: true, status: 'retired' },
         { id: 'advisory', name: 'Advisory', required: false, status: 'active' },
+      ],
+    },
+  });
+}
+
+function catalogManifest(repository = 'jussray/chief-ai-machine') {
+  return JSON.stringify({
+    repository,
+    tests: {
+      catalog: [
+        { id: 'typecheck', name: 'Chief AI TypeScript', required: true, status: 'active' },
+        { id: 'unit-tests', name: 'Chief AI unit tests', required: true, status: 'active' },
+        { id: 'playwright', name: 'Freestyle save and persistence Chromium proof', required: true, status: 'active' },
       ],
     },
   });
@@ -95,8 +108,8 @@ describe('resolveGoalfixProjectHint', () => {
 });
 
 describe('parseGoalfixVerificationManifest', () => {
-  it('derives the required proof set from the repository-owned manifest on the default branch', () => {
-    expect(parseGoalfixVerificationManifest(manifest(), 'jussray/Sekret-Bip', 'main', 'main')).toEqual({
+  it('derives the required proof set from tests.workflowCatalog on the default branch', () => {
+    expect(parseGoalfixVerificationManifest(workflowManifest(), 'jussray/Sekret-Bip', 'main', 'main')).toEqual({
       manifestRepository: 'jussray/Sekret-Bip',
       requiredVerificationNames: [
         'Repository Truth Gate',
@@ -107,19 +120,64 @@ describe('parseGoalfixVerificationManifest', () => {
     });
   });
 
+  it('accepts the established portfolio tests.catalog dialect without forcing manifest rewrites', () => {
+    expect(parseGoalfixVerificationManifest(
+      catalogManifest(),
+      'jussray/chief-ai-machine',
+      'main',
+      'main',
+    )).toEqual({
+      manifestRepository: 'jussray/chief-ai-machine',
+      requiredVerificationNames: [
+        'Chief AI TypeScript',
+        'Chief AI unit tests',
+        'Freestyle save and persistence Chromium proof',
+      ],
+    });
+  });
+
+  it('unions both authoritative catalog dialects when a repository exposes both', () => {
+    const combined = JSON.stringify({
+      repository: 'jussray/founder-control-room',
+      tests: {
+        workflowCatalog: [
+          { id: 'ci', name: 'CI', required: true, status: 'active' },
+          { id: 'shared', name: 'Shared Proof', required: true, status: 'active' },
+        ],
+        catalog: [
+          { id: 'playwright', name: 'Playwright E2E', required: true, status: 'active' },
+          { id: 'shared-duplicate', name: 'Shared Proof', required: true, status: 'active' },
+        ],
+      },
+    });
+
+    expect(parseGoalfixVerificationManifest(
+      combined,
+      'jussray/founder-control-room',
+      'main',
+      'main',
+    ).requiredVerificationNames).toEqual(['CI', 'Shared Proof', 'Playwright E2E']);
+  });
+
   it('does not require a main-only lane on a non-default ref', () => {
-    expect(parseGoalfixVerificationManifest(manifest(), 'jussray/Sekret-Bip', 'feature/test', 'main').requiredVerificationNames)
+    expect(parseGoalfixVerificationManifest(workflowManifest(), 'jussray/Sekret-Bip', 'feature/test', 'main').requiredVerificationNames)
       .toEqual(['Repository Truth Gate', 'Product Design Playwright Proof', 'Control Room Manifest']);
   });
 
   it('fails closed when manifest identity does not match the registered repository', () => {
-    expect(() => parseGoalfixVerificationManifest(manifest('jussray/wrong-repo'), 'jussray/Sekret-Bip', 'main', 'main'))
+    expect(() => parseGoalfixVerificationManifest(workflowManifest('jussray/wrong-repo'), 'jussray/Sekret-Bip', 'main', 'main'))
       .toThrowError(GoalfixContextResolutionError);
     try {
-      parseGoalfixVerificationManifest(manifest('jussray/wrong-repo'), 'jussray/Sekret-Bip', 'main', 'main');
+      parseGoalfixVerificationManifest(workflowManifest('jussray/wrong-repo'), 'jussray/Sekret-Bip', 'main', 'main');
     } catch (error) {
       expect((error as GoalfixContextResolutionError).code).toBe('GOALFIX_REPOSITORY_IDENTITY_MISMATCH');
     }
+  });
+
+  it('fails closed when neither authoritative catalog dialect is present', () => {
+    const noCatalog = JSON.stringify({ repository: 'jussray/Sekret-Bip', tests: {} });
+    expect(() => parseGoalfixVerificationManifest(noCatalog, 'jussray/Sekret-Bip', 'main', 'main'))
+      .toThrowError(GoalfixContextResolutionError);
   });
 
   it('normalizes equivalent GitHub repository identities without treating them as authority', () => {
