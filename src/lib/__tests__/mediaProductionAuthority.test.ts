@@ -167,7 +167,7 @@ describe('Gemini command + /LEEVIZE policy boundary', () => {
   it('blocks stale continuity, stale claim heads, canon drift, and budget overrun as separate receipts', () => {
     const original = mediaState();
     const cookie = createMediaProofCookie(original);
-    const changed = mediaState({ scriptFingerprint: digest('changed-script') });
+    const changed = mediaState('script_verified', { scriptFingerprint: digest('changed-script') });
     const result = evaluateGeminiMediaProductionCommand(input({
       continuity: {
         projectId: PROJECT_ID,
@@ -255,7 +255,7 @@ describe('Gemini command + /LEEVIZE policy boundary', () => {
     const base = command({ decision: 'HOLD', maxCredits: 0, shots: [] });
     const original = mediaState();
     const cookie = createMediaProofCookie(original);
-    const changed = mediaState({ scriptFingerprint: digest('stale-after-hold') });
+    const changed = mediaState('script_verified', { scriptFingerprint: digest('stale-after-hold') });
     const result = evaluateGeminiMediaProductionCommand(input({
       command: base,
       continuity: {
