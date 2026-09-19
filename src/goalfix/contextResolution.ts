@@ -138,26 +138,131 @@ function uniqueNames(values: string[]): string[] {
   return result;
 }
 
-function verificationCatalogs(tests: Record<string, unknown>): unknown[] {
-  const catalogs = [tests.workflowCatalog, tests.catalog]
-    .filter((catalog): catalog is unknown[] => Array.isArray(catalog));
-
-  if (catalogs.length === 0) {
+function parseBoundedJsonObject(text: string, description: string): Record<string, unknown> {
+  if (Buffer.byteLength(text, 'utf8') > MANIFEST_MAX_BYTES) {
     throw new GoalfixContextResolutionError(
       'GOALFIX_VERIFICATION_CONTRACT_INVALID',
-      'Repository verification manifest must contain tests.workflowCatalog or tests.catalog.',
+      `${description} exceeds the bounded GoalFix size limit.`,
     );
   }
 
-  const entries = catalogs.flat();
-  if (entries.length === 0 || entries.length > VERIFICATION_NAME_MAX_COUNT) {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
     throw new GoalfixContextResolutionError(
       'GOALFIX_VERIFICATION_CONTRACT_INVALID',
-      'Repository verification manifest must contain a bounded verification catalog.',
+      `${description} is not valid JSON.`,
     );
   }
 
-  return entries;
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new GoalfixContextResolutionError(
+      'GOALFIX_VERIFICATION_CONTRACT_INVALID',
+      `${description} must be an object.`,
+    );
+  }
+
+  return parsed as Record<string, unknown>;
+}
+
+function assertRepositoryIdentity(
+  root: Record<string, unknown>,
+  expectedRepository: string,
+  description: string,
+): string {
+  const repository = typeof root.repository === 'string' ? root.repository.trim() : '';
+  if (!repository || !repositoryIdentityMatches(expectedRepository, repository)) {
+    throw new GoalfixContextResolutionError(
+      'GOALFIX_REPOSITORY_IDENTITY_MISMATCH',
+      `${description} identity does not match the registered project repository.`,
+    );
+  }
+  return repository;
+}
+
+function requiredWorkflowNames(
+  workflowCatalog: unknown[],
+  targetRef: string,
+  defaultBranch: string,
+): string[] {
+  if (workflowCatalog.length === 0 || workflowCatalog.length > VERIFICATION_NAME_MAX_COUNT) {
+    throw new GoalfixContextResolutionError(
+      'GOALFIX_VERIFICATION_CONTRACT_INVALID',
+      'Repository workflow catalog must be bounded and non-empty.',
+    );
+  }
+
+  const requiredNames: string[] = [];
+  for (const entry of workflowCatalog) {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+      throw new GoalfixContextResolutionError(
+        'GOALFIX_VERIFICATION_CONTRACT_INVALID',
+        'Repository workflow catalog entries must be objects.',
+      );
+    }
+    const row = entry as Record<string, unknown>;
+    const name = typeof row.name === 'string' ? row.name.trim() : '';
+    const status = typeof row.status === 'string' ? row.status.trim() : '';
+    if (!status || !ALLOWED_WORKFLOW_STATUSES.has(status)) {
+      throw new GoalfixContextResolutionError(
+        'GOALFIX_VERIFICATION_CONTRACT_INVALID',
+        'Repository workflow catalog status is unsupported.',
+      );
+    }
+    if (row.required !== true || status === 'retired') continue;
+    if (status === 'main-only' && targetRef !== defaultBranch) continue;
+    if (!name || name.length > VERIFICATION_NAME_MAX_LENGTH) {
+      throw new GoalfixContextResolutionError(
+        'GOALFIX_VERIFICATION_CONTRACT_INVALID',
+        'Repository workflow catalog has an invalid required name.',
+      );
+    }
+    requiredNames.push(name);
+  }
+
+  return uniqueNames(requiredNames);
+}
+
+function requiredLedgerNames(policyText: string, expectedRepository: string): string[] {
+  const ledger = parseBoundedJsonObject(policyText, 'Repository test-ledger policy');
+  assertRepositoryIdentity(ledger, expectedRepository, 'Repository test-ledger policy');
+
+  const policy = ledger.policy;
+  if (!policy || typeof policy !== 'object' || Array.isArray(policy)) {
+    throw new GoalfixContextResolutionError(
+      'GOALFIX_PROVIDER_CHECK_POLICY_UNAVAILABLE',
+      'Repository test-ledger policy does not expose provider check authority.',
+    );
+  }
+
+  const requiredChecks = (policy as Record<string, unknown>).requiredChecks;
+  if (!Array.isArray(requiredChecks) || requiredChecks.length === 0 || requiredChecks.length > VERIFICATION_NAME_MAX_COUNT) {
+    throw new GoalfixContextResolutionError(
+      'GOALFIX_PROVIDER_CHECK_POLICY_UNAVAILABLE',
+      'Repository test-ledger policy does not expose an explicit bounded requiredChecks set.',
+    );
+  }
+
+  const names: string[] = [];
+  for (const value of requiredChecks) {
+    if (typeof value !== 'string') {
+      throw new GoalfixContextResolutionError(
+        'GOALFIX_VERIFICATION_CONTRACT_INVALID',
+        'Repository test-ledger requiredChecks entries must be strings.',
+      );
+    }
+    const name = value.trim();
+    if (!name || name.length > VERIFICATION_NAME_MAX_LENGTH) {
+      throw new GoalfixContextResolutionError(
+        'GOALFIX_VERIFICATION_CONTRACT_INVALID',
+        'Repository test-ledger contains an invalid required check name.',
+      );
+    }
+    names.push(name);
+  }
+
+  return uniqueNames(names);
 }
 
 export function parseGoalfixVerificationManifest(
@@ -165,39 +270,14 @@ export function parseGoalfixVerificationManifest(
   expectedRepository: string,
   targetRef: string,
   defaultBranch: string,
+  providerPolicyText?: string,
 ): GoalfixVerificationContract {
-  if (Buffer.byteLength(text, 'utf8') > MANIFEST_MAX_BYTES) {
-    throw new GoalfixContextResolutionError(
-      'GOALFIX_VERIFICATION_CONTRACT_INVALID',
-      'Repository verification manifest exceeds the bounded GoalFix size limit.',
-    );
-  }
-
-  let manifest: unknown;
-  try {
-    manifest = JSON.parse(text);
-  } catch {
-    throw new GoalfixContextResolutionError(
-      'GOALFIX_VERIFICATION_CONTRACT_INVALID',
-      'Repository verification manifest is not valid JSON.',
-    );
-  }
-
-  if (!manifest || typeof manifest !== 'object' || Array.isArray(manifest)) {
-    throw new GoalfixContextResolutionError(
-      'GOALFIX_VERIFICATION_CONTRACT_INVALID',
-      'Repository verification manifest must be an object.',
-    );
-  }
-
-  const root = manifest as Record<string, unknown>;
-  const manifestRepository = typeof root.repository === 'string' ? root.repository.trim() : '';
-  if (!manifestRepository || !repositoryIdentityMatches(expectedRepository, manifestRepository)) {
-    throw new GoalfixContextResolutionError(
-      'GOALFIX_REPOSITORY_IDENTITY_MISMATCH',
-      'Repository verification manifest identity does not match the registered project repository.',
-    );
-  }
+  const root = parseBoundedJsonObject(text, 'Repository verification manifest');
+  const manifestRepository = assertRepositoryIdentity(
+    root,
+    expectedRepository,
+    'Repository verification manifest',
+  );
 
   const tests = root.tests;
   if (!tests || typeof tests !== 'object' || Array.isArray(tests)) {
@@ -207,45 +287,45 @@ export function parseGoalfixVerificationManifest(
     );
   }
 
-  const verificationEntries = verificationCatalogs(tests as Record<string, unknown>);
-  const requiredNames: string[] = [];
-  for (const entry of verificationEntries) {
-    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+  const testContract = tests as Record<string, unknown>;
+  const workflowCatalog = testContract.workflowCatalog;
+  if (Array.isArray(workflowCatalog)) {
+    const requiredVerificationNames = requiredWorkflowNames(
+      workflowCatalog,
+      targetRef,
+      defaultBranch,
+    );
+    if (requiredVerificationNames.length === 0) {
       throw new GoalfixContextResolutionError(
-        'GOALFIX_VERIFICATION_CONTRACT_INVALID',
-        'Repository verification catalog entries must be objects.',
+        'GOALFIX_VERIFICATION_CONTRACT_UNAVAILABLE',
+        'Repository workflow catalog does not expose an applicable required proof set.',
       );
     }
-    const row = entry as Record<string, unknown>;
-    const name = typeof row.name === 'string' ? row.name.trim() : '';
-    const status = typeof row.status === 'string' ? row.status.trim() : '';
-    if (!status || !ALLOWED_WORKFLOW_STATUSES.has(status)) {
-      throw new GoalfixContextResolutionError(
-        'GOALFIX_VERIFICATION_CONTRACT_INVALID',
-        'Repository verification catalog status is unsupported.',
-      );
-    }
-    if (row.required !== true || status === 'retired') continue;
-    if (status === 'main-only' && targetRef !== defaultBranch) continue;
-    if (!name || name.length > VERIFICATION_NAME_MAX_LENGTH) {
-      throw new GoalfixContextResolutionError(
-        'GOALFIX_VERIFICATION_CONTRACT_INVALID',
-        'Repository verification catalog has an invalid required name.',
-      );
-    }
-    requiredNames.push(name);
+    return { manifestRepository, requiredVerificationNames };
   }
 
-  const uniqueRequiredNames = uniqueNames(requiredNames);
-  if (uniqueRequiredNames.length === 0) {
+  const catalog = testContract.catalog;
+  if (!Array.isArray(catalog) || catalog.length === 0 || catalog.length > VERIFICATION_NAME_MAX_COUNT) {
     throw new GoalfixContextResolutionError(
-      'GOALFIX_VERIFICATION_CONTRACT_UNAVAILABLE',
-      'Repository verification manifest does not expose an applicable required proof set.',
+      'GOALFIX_VERIFICATION_CONTRACT_INVALID',
+      'Repository verification manifest must contain tests.workflowCatalog or a bounded tests.catalog.',
     );
   }
 
-  return {
-    manifestRepository,
-    requiredVerificationNames: uniqueRequiredNames,
-  };
+  if (!providerPolicyText) {
+    throw new GoalfixContextResolutionError(
+      'GOALFIX_PROVIDER_CHECK_POLICY_UNAVAILABLE',
+      'Repository tests.catalog is inventory only; exact provider required-check policy is required before GoalFix can classify provider proof.',
+    );
+  }
+
+  const requiredVerificationNames = requiredLedgerNames(providerPolicyText, expectedRepository);
+  if (requiredVerificationNames.length === 0) {
+    throw new GoalfixContextResolutionError(
+      'GOALFIX_PROVIDER_CHECK_POLICY_UNAVAILABLE',
+      'Repository provider policy does not expose an applicable required proof set.',
+    );
+  }
+
+  return { manifestRepository, requiredVerificationNames };
 }
