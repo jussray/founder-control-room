@@ -60,8 +60,8 @@ test('public front door visibly links people to Juss Rayy and the public work di
   expect(apiCalls).toBe(0);
   await page.setContent(await response.text());
 
-  await expect(page.getByRole('link', { name: "Explore Juss Rayy's work" })).toBeVisible();
-  await expect(page.getByRole('link', { name: "Explore Juss Rayy's work" })).toHaveAttribute('href', '/work.html');
+  await expect(page.getByRole('link', { name: 'Explore public work' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Explore public work' })).toHaveAttribute('href', '/work.html');
   await expect(page.getByRole('link', { name: 'Meet Juss Rayy' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Meet Juss Rayy' })).toHaveAttribute('href', '/juss-rayy/');
 
