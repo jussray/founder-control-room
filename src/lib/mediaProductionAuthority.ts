@@ -59,12 +59,6 @@ export type GeminiMediaProductionCommandDraft = Pick<
   'commandId' | 'projectId' | 'missionId' | 'decision' | 'viewerTakeaway' | 'maxCredits' | 'shots'
 >;
 
-/**
- * Serializable audit receipt. This receipt is deliberately not an authority
- * token: it records the provider-bound relay provenance used to create the
- * in-process command binding, but cannot itself authorize truth, spend,
- * rendering, publication, or another external action.
- */
 export interface GeminiMediaCommandAuthorityReceipt {
   contract: typeof GEMINI_MEDIA_COMMAND_AUTHORITY_RECEIPT_CONTRACT;
   commandHash: string;
@@ -81,11 +75,6 @@ export interface GeminiMediaCommandAuthorityReceipt {
 
 const GEMINI_MEDIA_AUTHORITY_BINDING = Symbol('gemini-media-command-authority-binding');
 
-/**
- * Opaque process-local binding produced only after a validated Gemini relay
- * response is tied to the exact command bytes. A JSON receipt/fingerprint is
- * never accepted in its place.
- */
 export interface GeminiMediaCommandAuthorityBinding {
   readonly receipt: GeminiMediaCommandAuthorityReceipt;
   readonly [GEMINI_MEDIA_AUTHORITY_BINDING]: true;
@@ -275,13 +264,6 @@ export function geminiMediaCommandHash(
   return createHash('sha256').update(JSON.stringify(canonical)).digest('hex');
 }
 
-/**
- * Stable production-plan identity. Decision, command id, issuance time and
- * command hash are intentionally excluded so a later RELEASE command can prove
- * it is reviewing the exact same plan that produced the export. A different
- * story, budget, renderer route, claim binding, canon requirement or evidence
- * requirement produces a different plan fingerprint.
- */
 export function geminiMediaPlanFingerprint(
   command: Pick<GeminiMediaProductionCommand, 'projectId' | 'missionId' | 'viewerTakeaway' | 'maxCredits' | 'shots'>,
 ): string {
@@ -296,13 +278,6 @@ export function geminiMediaPlanFingerprint(
   return createHash('sha256').update(JSON.stringify(canonical)).digest('hex');
 }
 
-/**
- * Converts a completed, validated Gemini relay response into the only command
- * authority binding accepted by /LEEVIZE. The model does not choose its issuer,
- * issuedAt, hash, provider evidence, or authority fields; those are bound by the
- * server-side relay path. Provider evidence is provenance, not external-action
- * authority.
- */
 export function bindGeminiMediaCommandFromRelay(
   request: OperatorRelayRequestV1,
   response: OperatorRelayResponseV1,
@@ -422,8 +397,9 @@ function authorityErrors(input: LeevizeMediaPolicyInput): string[] {
     return ['command_authority_unbound'];
   }
   const receipt = authority.receipt;
+  const actualCommandHash = geminiMediaCommandHash(input.command);
   if (receipt.contract !== GEMINI_MEDIA_COMMAND_AUTHORITY_RECEIPT_CONTRACT) reasons.push('command_authority_contract_invalid');
-  if (receipt.commandHash !== input.command.commandHash) reasons.push('command_authority_hash_mismatch');
+  if (receipt.commandHash !== input.command.commandHash || receipt.commandHash !== actualCommandHash) reasons.push('command_authority_hash_mismatch');
   if (!SHA256.test(receipt.requestHash) || !SHA256.test(receipt.responseHash)) reasons.push('command_authority_relay_hash_invalid');
   if (!/^provider:gemini:[A-Za-z0-9._:-]{1,200}$/.test(receipt.providerEvidenceRef)) reasons.push('command_authority_provider_invalid');
   if (receipt.boundAt !== input.command.issuedAt) reasons.push('command_authority_time_mismatch');
@@ -523,13 +499,6 @@ function policyErrors(input: LeevizeMediaPolicyInput): string[] {
   return unique(reasons);
 }
 
-/**
- * Gemini decides the production action. /LEEVIZE only enforces the non-bypassable
- * evidence, canon, budget, freshness, continuity, and authority envelope. The
- * command may reference a claim, but it cannot carry or overwrite the claim's
- * truth state. A passing RELEASE accepts Gemini's release disposition; it never
- * turns a media proof cookie or command provenance receipt into publish authority.
- */
 export function evaluateGeminiMediaProductionCommand(
   input: LeevizeMediaPolicyInput,
 ): LeevizeMediaPolicyResult {
