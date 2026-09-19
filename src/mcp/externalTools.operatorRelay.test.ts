@@ -43,20 +43,30 @@ function receipt(toolName: 'fcr_relay_operator') {
 }
 
 describe('external FCR operator relay authority boundary', () => {
-  it('advertises implement as a bounded work class without describing mutation authority', () => {
+  it('advertises Gemini plus the bounded work classes without describing mutation authority', () => {
     const tool = externalTools.externalMcpToolDefinitions()
       .find((definition) => definition.name === 'fcr_relay_operator');
     expect(tool).toBeDefined();
 
     const inputSchema = tool?.inputSchema as {
-      properties?: { capability?: { enum?: string[] } };
+      properties?: {
+        targetOperator?: { enum?: string[] };
+        capability?: { enum?: string[] };
+      };
     };
+    expect(inputSchema.properties?.targetOperator?.enum).toEqual([
+      'gemini',
+      'codex',
+      'claude-code',
+      'perplexity',
+    ]);
     expect(inputSchema.properties?.capability?.enum).toEqual([
       'research',
       'propose',
       'review',
       'implement',
     ]);
+    expect(String(tool?.description)).toContain('Gemini');
     expect(String(tool?.description)).toContain('zero mutation authority');
   });
 
@@ -103,6 +113,63 @@ describe('external FCR operator relay authority boundary', () => {
     expect(relayOperator).toHaveBeenCalledWith(expect.objectContaining({
       fromOperator: 'codex',
       toOperator: 'claude-code',
+      capability: 'implement',
+    }));
+    expect(result.governanceBoundary).toEqual(expect.objectContaining({
+      externalProviderCall: true,
+      mutationAuthority: false,
+      executionAllowed: false,
+      founderApprovalGranted: false,
+    }));
+    expect(recordEvidence).toHaveBeenCalledWith(expect.objectContaining({
+      risk: 'external_side_effect',
+      toolName: 'fcr_relay_operator',
+    }));
+  });
+
+  it('routes the public Gemini target through the same bounded relay without granting execution authority', async () => {
+    const relayOperator = vi.fn(async (input: RelayCall) => ({
+      request: input,
+      response: {
+        fromOperator: input.toOperator,
+        toOperator: input.fromOperator,
+        answer: 'Gemini media command proposal',
+        evidenceRefs: ['provider:gemini:gemini-media-command-1'],
+      },
+    }));
+    const recordEvidence = vi.fn(async (input: { toolName: string }) => (
+      receipt(input.toolName as 'fcr_relay_operator')
+    ));
+    const execute = externalTools.createExternalMcpToolExecutor({
+      env: {
+        FCR_REMOTE_MCP_OPERATOR_CLIENT_MAP: JSON.stringify({ 'chatgpt-client': 'codex' }),
+      },
+      relayOperator,
+      recordEvidence,
+    });
+
+    const result = await execute({
+      name: 'fcr_relay_operator',
+      arguments: {
+        targetOperator: 'gemini',
+        capability: 'implement',
+        goal: 'Plan the governed media route.',
+        contextSummary: 'Gemini is operational command authority only. /LEEVIZE remains the non-bypassable truth and policy kernel.',
+        sensitivity: 'internal',
+      },
+      allowedProjects: new Set(['founder-control-room']),
+      identity: {
+        userId: 'founder-user-1',
+        email: 'founder@example.com',
+        clientId: 'chatgpt-client',
+        authMode: 'oauth',
+      },
+      requestId: 'relay-request-gemini-1',
+    });
+
+    expect(relayOperator).toHaveBeenCalledWith(expect.objectContaining({
+      fromOperator: 'codex',
+      toOperator: 'gemini',
       capability: 'implement',
     }));
     expect(result.governanceBoundary).toEqual(expect.objectContaining({
