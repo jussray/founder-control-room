@@ -14,8 +14,6 @@ on:
         required: true
       CLOUDFLARE_DEPLOY_HOOK_URL:
         required: true
-      DEPLOY_URL:
-        required: true
 
 permissions:
   contents: read
@@ -36,7 +34,7 @@ jobs:
       CLOUDFLARE_DEPLOY_HOOK_URL: ${{ secrets.CLOUDFLARE_DEPLOY_HOOK_URL }}
       CLOUDFLARE_PAGES_PROJECT: founder-control-room
       CLOUDFLARE_PAGES_BRANCH: main
-      DEPLOY_URL: ${{ secrets.DEPLOY_URL }}
+      DEPLOY_URL: https://api.foundercontrolroom.org
       LIVE_ORIGIN: https://foundercontrolroom.org
 
     steps:

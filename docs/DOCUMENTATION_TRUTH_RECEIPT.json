@@ -1,6 +1,6 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Preserve current workflow, Cloudflare, Shopify, founder-merge, content-evidence, public-discovery, and cross-repository StoryEngine federation truth boundaries without converting source, analytics, crawler policy, peer pinning, provider configuration, mergeability, or candidate/browser proof into publication, production, provider-mutation, merge, deploy, spend, or external-contact authority.",
+  "purpose": "Preserve current workflow, Cloudflare, Shopify, founder-merge, content-metrics provenance, public-discovery, and cross-repository StoryEngine federation truth boundaries without converting source, analytics, CSV imports, crawler policy, peer pinning, provider configuration, mergeability, or candidate/browser proof into publication, production, provider-mutation, merge, deploy, spend, or external-contact authority.",
   "domains": [
     "cloudflare-authority",
     "repository-provider",
@@ -20,14 +20,19 @@
     {
       "path": ".github/workflows/playwright.yml",
       "claims": [
-        "`.github/workflows/playwright.yml` must bind the FCR-to-StoryEngine browser federation witness to a separately verified exact StoryEngine peer SHA and ref; changing that peer identity expires predecessor federation/browser proof and requires the complete exact-head witness to rerun without granting merge, deploy, production, or provider-mutation authority.",
-        "A fresh peer ref/SHA observation may select the successor StoryEngine evidence subject, but the successor FCR federation state remains UNKNOWN until the complete exact-head runtime identity, directive, receipt, and Playwright browser witness succeeds against that peer."
+        "`.github/workflows/playwright.yml` must bind the FCR-to-StoryEngine browser federation witness to the separately verified exact StoryEngine main peer SHA observed for the candidate and must re-read that peer ref before execution; changing either repository head or peer identity expires predecessor federation/browser proof and requires the complete exact-head witness to rerun without granting merge, deploy, production, or provider-mutation authority."
       ]
     },
     {
       "path": ".github/workflows/ci.yml",
       "claims": [
         "`.github/workflows/ci.yml` must keep the existing crawler and public-work Playwright specs inside the load-bearing `Playwright e2e` job that feeds `Required Gate`; a separate advisory Pages workflow cannot substitute for required exact-head browser execution or grant merge authority."
+      ]
+    },
+    {
+      "path": ".github/workflows/deploy.yml",
+      "claims": [
+        "`.github/workflows/deploy.yml` must treat Post-Deploy Reconciliation as a load-bearing production gate after smoke proof: reconciliation cannot be `continue-on-error`, and `post-deploy-evidence` may run only after reconciliation succeeds; this sequencing cannot convert workflow source into live deployment, provider, or runtime proof."
       ]
     },
     {
@@ -56,26 +61,30 @@
         "`README.md` must document Attack 3000 content currentness as independently evaluated from bounded observation time rather than trusted from a CURRENT label, and must keep distribution, external demand, publication, provider mutation, merge, deploy, spend, and external-contact authority separate.",
         "`README.md` must describe the Content Trend Radar as an advisory existing-lane capability whose first-wave evidence requires current source provenance and whose ranking cannot authorize publication, scheduling, spend, provider mutation, merge, deploy, or external contact.",
         "`README.md` must describe deterministic founder-content approval reservation and exact active retry recovery without allowing evidence rotation, retry, or a stored reservation to mint new publication authority.",
-        "`README.md` must state that rebinding the StoryEngine Playwright peer resets predecessor browser-federation proof and that a ref/SHA match alone cannot grant merge, deploy, production, or provider-mutation authority."
+        "`README.md` must describe `content-metrics-csv@v1` as an observation-only import contract that binds account/page identity, audience segment, metric name and unit, measurement windows, null semantics, duplicate handling, and provenance while keeping real provider readback separate from fixture proof.",
+        "`README.md` must describe the normalized founder-content analytics interchange as requiring separate account/page identity and offset-aware timestamps, and must keep filename/display-name/receipt-generation provenance separate from stable logical idempotency and provider truth."
       ]
     },
     {
       "path": "docs/CLOUDFLARE_REASONING.md",
       "claims": [
-        "`docs/CLOUDFLARE_REASONING.md` must treat `TINYFISH_API_KEY` as a provider-held Worker binding and require canonical Deploy to fail closed on a missing binding name without exposing or re-uploading its value."
+        "`docs/CLOUDFLARE_REASONING.md` must treat `TINYFISH_API_KEY` as a provider-held Worker binding and require canonical Deploy to fail closed on a missing binding name without exposing or re-uploading its value.",
+        "`docs/CLOUDFLARE_REASONING.md` must document Post-Deploy Reconciliation as a load-bearing production gate whose failure blocks downstream post-deploy evidence, while keeping workflow source separate from live reconciliation or runtime proof."
       ]
     },
     {
       "path": "docs/TRUTH_DECAY_AUDIT.md",
       "claims": [
         "`docs/TRUTH_DECAY_AUDIT.md` must treat a StoryEngine peer SHA/ref in FCR Playwright as evidence identity rather than a durable alias for current StoryEngine, and must require complete federation re-proof whenever the peer identity or either repository head moves.",
-        "`docs/TRUTH_DECAY_AUDIT.md` must keep a newly matched StoryEngine ref/SHA in UNKNOWN browser-federation state until the exact successor FCR head completes the runtime, directive, receipt, and browser witness."
+        "`docs/TRUTH_DECAY_AUDIT.md` must keep imported content metrics observation-only, preserve UNKNOWN for missing values, reject conflicting duplicate identities, and require real provider evidence before imported fixture data can support a current external analytics claim.",
+        "`docs/TRUTH_DECAY_AUDIT.md` must distinguish stable logical analytics-import identity from provenance-only filename, display-name, and receipt-generation metadata so presentation changes cannot manufacture a second logical import."
       ]
     },
     {
       "path": "docs/deployment/CLOUDFLARE_WORKER_TARGETS.md",
       "claims": [
-        "`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` must name `TINYFISH_API_KEY` as a required canonical Worker secret while preserving live provider observation and real TinyFish Search/Fetch as separate activation proof."
+        "`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` must name `TINYFISH_API_KEY` as a required canonical Worker secret while preserving live provider observation and real TinyFish Search/Fetch as separate activation proof.",
+        "`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` must document that Post-Deploy Reconciliation runs as a load-bearing production gate after smoke proof and must succeed before post-deploy evidence can advance, without treating checked workflow source as live reconciliation proof."
       ]
     },
     {
@@ -94,6 +103,19 @@
       "path": "src/providers/ShopifyReadOnlyProvider.ts",
       "claims": [
         "`src/providers/ShopifyReadOnlyProvider.ts` must bind Shopify observation to the exact Founder Control Room permanent and branded store identities, require complete pagination and app scope inventory, withhold CURRENT on incomplete or mismatched provider evidence, keep reconciliation non-authorizing, and never persist provider inventory or perform Shopify mutation."
+      ]
+    },
+    {
+      "path": "src/lib/contentMetricsCsv.ts",
+      "claims": [
+        "`src/lib/contentMetricsCsv.ts` must parse only the bounded `content-metrics-csv@v1` schema, bind each observation to provider/account/page/audience/content/window/source provenance, preserve blank metric values as UNKNOWN_NO_EVIDENCE, collapse only identical duplicate identities, reject conflicting duplicates, and remain observation-only without freshness, publication, strategy-mutation, or provider authority."
+      ]
+    },
+    {
+      "path": "tools/founder-content-contracts/content-analytics-csv-ingest.cjs",
+      "claims": [
+        "`tools/founder-content-contracts/content-analytics-csv-ingest.cjs` must require explicit account and page identity, offset-aware receipt/snapshot timestamps, bounded normalized CSV input, null-preserving metrics, duplicate rejection within snapshots, deterministic overlap reconciliation through the canonical analytics audit, and observation-only authority.",
+        "Its logical `idempotency_key` must bind canonical normalized snapshot evidence plus platform/account/page/comparison scope and normalized top-post scope; exact source SHA-256, filename, account display label, and receipt-generation time remain provenance only and must not change logical identity when normalized evidence is unchanged. Reordering otherwise identical CSV rows must not mint a second import, while changed metric evidence must change the key."
       ]
     },
     {

@@ -66,6 +66,16 @@ The corrected canon separates the planes. `merge_authority: true` means only tha
 
 This is an authority-freshness correction, not a relaxation of review or proof. Exact-head evidence still constrains what can be claimed and integrated, while founder approval controls whether the exact candidate may cross the merge boundary. Deployment, publication, billing, secrets, database mutation, deletion, and other consequential classes remain separately gated.
 
+## 2026-09 control correction: content-metrics import provenance versus provider truth
+
+The portfolio metrics lane exposed a separate false-green risk: a correctly parsed CSV can prove the shape and provenance of imported observations without proving that the observations came from a currently authorized analytics provider. Treating a fixture, export, or repeated import as live platform truth would collapse import integrity into provider authority.
+
+The `content-metrics-csv@v1` contract therefore keeps imports observation-only. Each row must bind content fingerprint, provider, account and page identity, audience segment, metric name, count unit, bounded measurement window, observation time, source reference, and deterministic row provenance. A blank metric remains `UNKNOWN_NO_EVIDENCE`, not zero. Identical duplicate identities may collapse idempotently, while conflicting duplicate identities fail closed rather than last-row-wins.
+
+A safe sample CSV and green ingestion tests prove parser behavior, null handling, duplicate handling, timestamp rules, idempotency, and provenance only. A present-tense claim about impressions, reactions, profile views, attributed visits, conversations, contacts, or deals still requires real authorized provider evidence with current account/page identity and freshness. Imported analytics cannot grant publication, strategy mutation, provider mutation, merge, deploy, spend, or freshness authority.
+
+The provider-neutral founder-content analytics interchange applies the same boundary at the snapshot level. Its receipt requires separate account and page identity and offset-aware generation/capture timestamps. Filename, account display name, and receipt-generation time remain useful provenance, but they are not stable logical evidence identity and therefore must not mint a second import when the same source bytes are renamed or the receipt is regenerated. Logical idempotency stays bound to the stable source SHA-256 plus platform, account ID, page ID, comparison scope, and optional top-post scope. Changing account/page scope changes identity; changing presentation metadata does not. This idempotency rule still grants no provider authenticity or freshness.
+
 ## Root causes
 
 ### 1. Evidence lifetime was implicit
@@ -381,11 +391,8 @@ The strongest optimization is not faster claiming. It is shortening the distance
 32. A capital decision card, recommendation, score, or HOLD state is evidence interpretation, not financing or execution authority; stale or missing capital evidence must remove derived certainty instead of preserving an earlier recommendation.
 33. `merge_authority: true` cannot be reused as candidate approval; every merge requires a fresh explicit founder decision for the exact live repository/PR/base/head, and candidate movement expires that approval.
 34. Rebinding a cross-repository Playwright peer to a newly verified exact ref/SHA expires predecessor federation/browser proof and requires a complete exact-head rerun; the pin is evidence identity, not production or merge authority.
-35. A live peer ref/SHA match may select the next browser-federation evidence subject, but it cannot carry predecessor green forward; the successor stays `UNKNOWN` until the complete exact-head runtime, directive, receipt, and browser witness passes.
-
-## 2026-09 control correction: peer ref refresh resets proof
-
-A later StoryEngine `main` observation can justify rebinding the exact Playwright peer, but that observation only selects the new evidence subject. The FCR browser/federation witness remains `UNKNOWN` for that successor until the exact FCR head reruns the complete runtime identity, directive, receipt, and browser path against that peer. A valid ref/SHA match cannot carry predecessor green forward or mint merge, deploy, production, or provider-mutation authority.
+35. A valid content-metrics CSV import proves bounded observation parsing and provenance only; missing metrics stay unknown, conflicting duplicates fail closed, and real provider authority plus freshness is still required for a current external analytics claim.
+36. Renaming identical analytics bytes, changing an account display name, or regenerating a receipt must not manufacture a second logical import; stable idempotency binds the source hash and explicit platform/account/page/comparison scope, while provenance-only presentation metadata remains recorded but non-authorizing.
 
 ## Rollback
 

@@ -31,18 +31,18 @@ function normalizedVerificationNames(values) {
   return [...new Set((values ?? []).map(normalizeSignalName).filter(Boolean))].sort();
 }
 
-function attemptScopeId({ desiredOutcome, suspectedFailureArea, firstFilesOrLogs, expectedVerificationNames }) {
+function attemptScopeId({ desiredOutcome, suspectedFailureArea, firstFilesOrLogs, additionalVerificationNames }) {
   return fingerprint([
     String(desiredOutcome ?? '').trim(),
     String(suspectedFailureArea ?? '').trim(),
     ...(firstFilesOrLogs ?? []),
-    ...normalizedVerificationNames(expectedVerificationNames),
+    ...normalizedVerificationNames(additionalVerificationNames),
   ].join('\u241f'));
 }
 
-function attemptStorageKey(projectSlug, targetRef, scopeId) {
-  const project = String(projectSlug ?? '').trim().toLowerCase();
-  const target = String(targetRef ?? '').trim() || 'main';
+function attemptStorageKey(projectKey, targetKey, scopeId) {
+  const project = String(projectKey ?? '').trim().toLowerCase();
+  const target = String(targetKey ?? '').trim() || '(auto)';
   return `${ATTEMPTS_KEY_PREFIX}:${project}:${target}:${scopeId}`;
 }
 
@@ -91,9 +91,9 @@ function boundAttempts(attempts) {
   return reversed.reverse().slice(-MAX_ATTEMPTS);
 }
 
-function loadAttempts(projectSlug, targetRef, scopeId) {
+function loadAttempts(projectKey, targetKey, scopeId) {
   try {
-    const raw = sessionStorage.getItem(attemptStorageKey(projectSlug, targetRef, scopeId));
+    const raw = sessionStorage.getItem(attemptStorageKey(projectKey, targetKey, scopeId));
     const parsed = raw ? JSON.parse(raw) : [];
     if (!Array.isArray(parsed)) return [];
     return boundAttempts(parsed);
@@ -102,8 +102,8 @@ function loadAttempts(projectSlug, targetRef, scopeId) {
   }
 }
 
-function saveAttempts(projectSlug, targetRef, scopeId, attempts) {
-  sessionStorage.setItem(attemptStorageKey(projectSlug, targetRef, scopeId), JSON.stringify(boundAttempts(attempts)));
+function saveAttempts(projectKey, targetKey, scopeId, attempts) {
+  sessionStorage.setItem(attemptStorageKey(projectKey, targetKey, scopeId), JSON.stringify(boundAttempts(attempts)));
 }
 
 function attemptFromProofLine(value) {
@@ -135,14 +135,14 @@ function collapseInspectionAttempts(attempts) {
   return [...byCheckAndCommit.values()];
 }
 
-function recordVerificationAttempts(report, projectSlug, targetRef, scopeId, expectedVerificationNames) {
+function recordVerificationAttempts(report, projectKey, targetKey, scopeId, expectedVerificationNames) {
   const requiredNames = new Set(expectedVerificationNames.map(normalizeSignalName));
   const nextAttempts = collapseInspectionAttempts((report?.proof ?? [])
     .map(attemptFromProofLine)
     .filter((attempt) => attempt && requiredNames.has(normalizeSignalName(attempt.verificationName))));
   if (nextAttempts.length === 0) return;
-  saveAttempts(projectSlug, targetRef, scopeId, [
-    ...loadAttempts(projectSlug, targetRef, scopeId),
+  saveAttempts(projectKey, targetKey, scopeId, [
+    ...loadAttempts(projectKey, targetKey, scopeId),
     ...nextAttempts,
   ]);
 }
@@ -206,6 +206,17 @@ function renderDecisionKernel(kernel) {
   result.appendChild(section('DECISION GAPS', kernel.gaps));
 }
 
+function renderContext(contextResolution) {
+  if (!contextResolution || contextResolution.mode !== 'automatic') return;
+  result.appendChild(section('RESOLVED CONTEXT', [
+    `Project: ${contextResolution.resolvedProjectSlug ?? 'unknown'}`,
+    `Repository: ${contextResolution.repository ?? 'unknown'}`,
+    `Default branch: ${contextResolution.defaultBranch ?? 'unknown'}`,
+    `Resolved ref: ${contextResolution.resolvedRef ?? 'unknown'}`,
+    `Verification contract: ${contextResolution.verificationContract ?? 'unknown'}`,
+  ]));
+}
+
 function renderReport(report) {
   result.replaceChildren();
   const header = node('div');
@@ -227,6 +238,7 @@ function renderReport(report) {
   authority.append(authorityLevel, routing);
   result.appendChild(authority);
 
+  renderContext(report.contextResolution);
   renderDecisionKernel(report.decisionKernel);
   result.appendChild(section('REALITY', report.reality));
   result.appendChild(section('FIX', report.fix));
@@ -256,39 +268,30 @@ form.addEventListener('submit', async (event) => {
   event.preventDefault();
   message.replaceChildren();
   const values = Object.fromEntries(new FormData(form).entries());
-  const expectedVerificationNames = lines(values.expectedVerificationNames);
-  if (expectedVerificationNames.length === 0) {
-    renderError('Name at least one required exact-head check before inspecting.');
-    return;
-  }
-  if (values.intentConfirmed !== 'on') {
-    renderError('Confirm the exact founder outcome before inspecting.');
-    return;
-  }
-
-  const projectSlug = String(values.projectSlug ?? '').trim();
+  const project = String(values.project ?? '').trim();
   const targetRef = String(values.targetRef ?? '').trim();
+  const targetKey = targetRef || '(auto)';
   const desiredOutcome = String(values.desiredOutcome ?? '').trim();
   const suspectedFailureArea = String(values.suspectedFailureArea ?? '').trim();
   const firstFilesOrLogs = lines(values.firstFilesOrLogs);
+  const additionalVerificationNames = lines(values.expectedVerificationNames);
   const scopeId = attemptScopeId({
     desiredOutcome,
     suspectedFailureArea,
     firstFilesOrLogs,
-    expectedVerificationNames,
+    additionalVerificationNames,
   });
   const payload = {
-    projectSlug,
-    targetRef,
+    project,
+    targetRef: targetRef || undefined,
     desiredOutcome,
-    resolvedIntent: desiredOutcome,
     reason: String(values.reason ?? '').trim() || undefined,
     suspectedFailureArea: suspectedFailureArea || undefined,
     constraints: lines(values.constraints),
     firstFilesOrLogs,
-    expectedVerificationNames,
+    expectedVerificationNames: additionalVerificationNames,
     stopCondition: String(values.stopCondition ?? '').trim() || undefined,
-    attempts: loadAttempts(projectSlug, targetRef, scopeId),
+    attempts: loadAttempts(project, targetKey, scopeId),
   };
 
   submit.disabled = true;
@@ -302,9 +305,19 @@ form.addEventListener('submit', async (event) => {
       body: JSON.stringify(payload),
     });
     const body = await response.json().catch(() => null);
-    if (response.status === 401) sessionStorage.removeItem(attemptStorageKey(projectSlug, targetRef, scopeId));
-    if (!response.ok) throw new Error(body?.error ?? `Inspection failed (${response.status})`);
-    recordVerificationAttempts(body, projectSlug, targetRef, scopeId, expectedVerificationNames);
+    if (response.status === 401) sessionStorage.removeItem(attemptStorageKey(project, targetKey, scopeId));
+    if (!response.ok) {
+      const candidates = Array.isArray(body?.candidates) && body.candidates.length
+        ? ` Candidates: ${body.candidates.map((candidate) => candidate.name ?? candidate.slug).join(', ')}.`
+        : '';
+      throw new Error(`${body?.error ?? `Inspection failed (${response.status})`}${candidates}`);
+    }
+    const requiredNames = Array.isArray(body?.goal?.expectedVerificationNames)
+      ? body.goal.expectedVerificationNames
+      : Array.isArray(body?.contextResolution?.requiredVerificationNames)
+        ? body.contextResolution.requiredVerificationNames
+        : additionalVerificationNames;
+    recordVerificationAttempts(body, project, targetKey, scopeId, requiredNames);
     renderReport(body);
   } catch (error) {
     renderError(error instanceof Error ? error.message : String(error));

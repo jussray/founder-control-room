@@ -24,6 +24,30 @@ describe('Founder Control Room Cloudflare topology', () => {
     expect(buildScript).toContain("'portable-founder-console/index.html'");
   });
 
+  it('scans every packaged artifact for credential signatures without a file-size bypass', () => {
+    const buildScript = read('scripts/build-pages.mjs');
+
+    expect(buildScript).not.toContain('if (info.size > MAX_SECRET_SCAN_BYTES) continue');
+    expect(buildScript).not.toContain('MAX_SECRET_SCAN_BYTES');
+    expect(buildScript).toContain('SECRET_SCAN_CHUNK_BYTES');
+    expect(buildScript).toContain("open(absolutePath, 'r')");
+    expect(buildScript).toContain("toString('latin1')");
+    expect(buildScript).toContain('SECRET_SCAN_OVERLAP_CHARS');
+    expect(buildScript).toContain("label: 'sensitive credential assignment'");
+    expect(buildScript).toContain('ANTHROPIC_API_KEY');
+    expect(buildScript).toContain('CLOUDFLARE_ACCESS_API_TOKEN');
+    expect(buildScript).toContain('SUPABASE_SERVICE_ROLE_KEY');
+    expect(buildScript).toContain('await assertFileContainsNoLiteralSecret(absolutePath, packagedPath)');
+  });
+
+  it('budgets mission live polling below the shared API rate limit', () => {
+    const missionLive = read('public/control-room/mission-live-ux.js');
+    const match = missionLive.match(/const POLL_MS = (\d+);/);
+
+    expect(match).not.toBeNull();
+    expect(Number(match?.[1])).toBeGreaterThanOrEqual(5000);
+  });
+
   it('provides a five-screen public front door into the founder-authenticated app', () => {
     const landing = read('public/index.html');
     const app = read('public/control-room/index.html');
@@ -32,7 +56,7 @@ describe('Founder Control Room Cloudflare topology', () => {
     expect(landing).toContain('<link rel="canonical" href="https://www.foundercontrolroom.org/" />');
     expect(landing).toContain('href="https://www.foundercontrolroom.org/control-room/"');
     expect(landing).toContain('href="https://www.foundercontrolroom.org/guardrails"');
-    expect(landing).toContain('href="/control-room/" data-founder-start="authenticated"');
+    expect(landing).not.toContain('href="/control-room/"');
     expect(landing).toContain('data-bottom-nav="five-screen"');
     for (const screen of ['home', 'control-room', 'chief', 'promptos', 'proof']) {
       expect(landing).toContain(`data-public-screen="${screen}"`);
@@ -40,7 +64,7 @@ describe('Founder Control Room Cloudflare topology', () => {
     }
     expect(landing).toContain('Chief turns founder intent into governed execution.');
     expect(landing).toContain('PromptOS is an intention compiler.');
-    expect(landing).toContain('Private projects, approvals, credentials, and operating evidence stay behind product authentication.');
+    expect(landing).toContain('Private projects, approvals, credentials, and operating evidence stay behind founder authentication.');
     expect(app).toContain('src="/control-room/opaque-session-bootstrap.js"');
     expect(app).not.toContain('src="/control-room/app.js"');
     expect(bootstrap).toContain("await import('/control-room/app.js')");

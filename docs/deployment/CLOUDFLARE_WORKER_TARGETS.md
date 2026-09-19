@@ -122,6 +122,10 @@ That hook makes the repository's production-authority boundary executable before
 
 The hook emits a redacted `fcr/worker-build-authority-receipt@v1`. That receipt proves only the source/build authority decision it records. It cannot mutate Cloudflare, prove provider dashboard configuration, prove the active deployment, or replace `/health`, `/version`, Pages binding, and Playwright runtime evidence.
 
+### Post-deploy reconciliation gate
+
+Canonical `.github/workflows/deploy.yml` requires **Post-Deploy Reconciliation** to succeed after smoke proof before `post-deploy-evidence` can run. Reconciliation executes in the `production` environment and is not advisory or `continue-on-error`. A failed reconciliation therefore blocks the downstream durable evidence lane rather than allowing a release to appear complete. This checked workflow sequencing proves only the intended release authority contract; it does not prove that production reconciliation ran, provider state converged, or the runtime outcome is healthy.
+
 ### Outbound email boundary
 
 The canonical Worker owns the FCR outbound Cloudflare Email Service capability through the project-scoped binding `FCR_EMAIL`. Repository source pins the only allowed FCR sender identity to `welcome@api.foundercontrolroom.org` in both `src/worker/projectEmail.ts` and `wrangler.worker.toml`; application callers may provide recipients/content but not a different `from` identity. A generic `EMAIL` binding or another project's sender must not be substituted into this Worker without a separate reviewed authority change.

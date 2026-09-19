@@ -11,7 +11,7 @@ const ARTIFACT_DIR = join(ROOT, 'artifacts', 'goalfix');
 const OLD_SHA = 'abc123abc123abc123abc123abc123abc123abcd';
 const NEW_SHA = 'fedcba9876543210fedcba9876543210fedcba98';
 const REQUIRED_CHECKS = ['Typecheck', 'Product Design Playwright Proof'];
-const STOP_CONDITION = 'Stop after the complete named exact-head proof set is classified.';
+const STOP_CONDITION = 'Stop before mutation when required exact-head proof is incomplete, project identity is ambiguous, or founder approval is required.';
 const SESSION_COOKIE_NAME = '__Host-fcr_session';
 const SESSION_COOKIE_VALUE = `v1.${'b'.repeat(43)}`;
 const requestAttemptCounts = [];
@@ -19,10 +19,6 @@ let currentSha = OLD_SHA;
 
 function normalizeSignalName(value) {
   return String(value ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
-}
-
-function normalizedRequiredNames(values) {
-  return [...new Set((Array.isArray(values) ? values : []).map(normalizeSignalName).filter(Boolean))].sort();
 }
 
 function buildProofReport(commitSha) {
@@ -100,25 +96,28 @@ const server = createServer((req, res) => {
       try {
         const payload = JSON.parse(raw);
         if (
-          payload.projectSlug !== 'sekret-bip'
+          payload.project !== "Se'kret Bip"
+          || payload.projectSlug !== undefined
           || !payload.desiredOutcome
-          || payload.resolvedIntent !== payload.desiredOutcome
-          || payload.stopCondition !== STOP_CONDITION
-          || JSON.stringify(normalizedRequiredNames(payload.expectedVerificationNames)) !== JSON.stringify(normalizedRequiredNames(REQUIRED_CHECKS))
+          || payload.resolvedIntent !== undefined
+          || payload.targetRef !== undefined
+          || payload.stopCondition !== undefined
+          || !Array.isArray(payload.expectedVerificationNames)
+          || payload.expectedVerificationNames.length !== 0
         ) {
-          throw new Error('Proof request did not preserve the confirmed founder goal, stop condition, and required check set.');
+          throw new Error('Proof request did not preserve the intent-first automatic context contract.');
         }
 
         const attempts = Array.isArray(payload.attempts) ? payload.attempts : [];
         requestAttemptCounts.push(attempts.length);
         const runtimeInput = {
-          intent: { raw: payload.desiredOutcome, resolved: payload.resolvedIntent },
+          intent: { raw: payload.desiredOutcome, confirmed: true },
           scope: {
             firstFilesOrLogs: Array.isArray(payload.firstFilesOrLogs) ? payload.firstFilesOrLogs : [],
             maxInitialReads: Number.isInteger(payload.maxInitialReads)
               ? payload.maxInitialReads
               : Math.max(1, Math.min(payload.firstFilesOrLogs?.length || 1, 5)),
-            stopCondition: payload.stopCondition,
+            stopCondition: STOP_CONDITION,
           },
         };
         const preflightDecision = buildGoalfixSkillRuntimeDecision({ ...runtimeInput, attempts: [] });
@@ -146,7 +145,21 @@ const server = createServer((req, res) => {
 
         const report = buildProofReport(currentSha);
         res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
-        res.end(JSON.stringify({ ...report, skillRuntime: runtimeDecision }));
+        res.end(JSON.stringify({
+          ...report,
+          skillRuntime: runtimeDecision,
+          contextResolution: {
+            mode: 'automatic',
+            requestedProject: "Se'kret Bip",
+            resolvedProjectSlug: 'sekret-bip',
+            repository: 'jussray/Sekret-Bip',
+            defaultBranch: 'main',
+            requestedRef: null,
+            resolvedRef: 'main',
+            verificationContract: `control-room.manifest.json@${currentSha}`,
+            requiredVerificationNames: REQUIRED_CHECKS,
+          },
+        }));
       } catch (error) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: error instanceof Error ? error.message : String(error) }));
@@ -213,20 +226,20 @@ async function proveViewport(name, viewport) {
   });
 
   await page.goto(`${baseUrl}/control-room/goalfix.html`, { waitUntil: 'networkidle' });
+  assert(await page.inputValue('[name="project"]') === "Se'kret Bip", `${name}: founder sees human project identity instead of a slug requirement`);
   await page.fill('[name="desiredOutcome"]', 'Keep the public welcome available before login.');
-  await page.check('[name="intentConfirmed"]');
   await page.fill('[name="reason"]', 'Preserve the front door without weakening protected routes.');
   await page.fill('[name="constraints"]', 'Read-only inspection\nNo deployment');
   await page.fill('[name="firstFilesOrLogs"]', 'app/_layout.tsx\nProduct Design Playwright Proof');
-  await page.fill('[name="expectedVerificationNames"]', REQUIRED_CHECKS.join('\n'));
-  await page.fill('[name="stopCondition"]', STOP_CONDITION);
 
   const firstResponse = await submitInspection(page);
-  assert(firstResponse.status() === 200, `${name}: confirmed first inspection executes through opaque founder cookie`);
+  assert(firstResponse.status() === 200, `${name}: intent-first inspection executes through opaque founder cookie`);
   await page.locator('[data-state="blocked"]').waitFor({ state: 'visible' });
 
   const text = await page.locator('#goalfix-result').innerText();
   assert(text.includes("Se'kret Bip"), `${name}: project identity renders`);
+  assert(text.includes('RESOLVED CONTEXT'), `${name}: resolved registry/provider/manifest context renders`);
+  assert(text.includes('Repository: jussray/Sekret-Bip'), `${name}: bound repository identity renders`);
   assert(text.includes(OLD_SHA), `${name}: immutable exact head renders`);
   assert(text.includes('L1 · read-only'), `${name}: authority boundary renders`);
   assert(text.includes('Required exact-head checks: Typecheck, Product Design Playwright Proof.'), `${name}: complete named proof set renders`);
@@ -246,7 +259,6 @@ async function proveViewport(name, viewport) {
   assert(secondResponse.status() === 200, `${name}: second inspection receives accumulated exact-head history`);
   assert(JSON.stringify(await storedAttemptCounts(page)) === JSON.stringify([4]), `${name}: second inspection adds one observation per required check`);
 
-  await page.fill('[name="expectedVerificationNames"]', [...REQUIRED_CHECKS].reverse().join('\n'));
   const thirdResponse = await submitInspection(page);
   assert(thirdResponse.status() === 409, `${name}: third repeated same-head inspection is blocked`);
   const errorText = await page.locator('#goalfix-message').innerText();
@@ -289,5 +301,5 @@ if (failures > 0) {
   console.error(`Goalfix browser proof failed with ${failures} assertion(s).`);
   process.exitCode = 1;
 } else {
-  console.log('Goalfix browser proof passed for desktop and mobile with opaque-cookie auth, continuity fingerprints, evidence-only proof cookies, duplicate-suite collapse, exact-head recovery, and bounded required-check history.');
+  console.log('Goalfix browser proof passed for desktop and mobile with automatic trusted context, opaque-cookie auth, continuity fingerprints, evidence-only proof cookies, exact-head recovery, and bounded required-check history.');
 }

@@ -5,7 +5,7 @@ export const CONTENT_METRICS_CSV_CONTRACT = 'content-metrics-csv@v1' as const;
 const MAX_CSV_BYTES = 1024 * 1024;
 const MAX_DATA_ROWS = 10_000;
 const MAX_FIELD_LENGTH = 2_000;
-const ISO_TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/;
+const ISO_TIMESTAMP = /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,3}))?(Z|[+-]\d{2}:\d{2})$/;
 
 export const CONTENT_METRIC_NAMES = [
   'impressions',
@@ -80,11 +80,17 @@ function sha256(value: string): string {
   return createHash('sha256').update(value).digest('hex');
 }
 
+function compareOrdinal(left: string, right: string): number {
+  if (left === right) return 0;
+  return left < right ? -1 : 1;
+}
+
 function parseCsvRows(csv: string): string[][] {
   const rows: string[][] = [];
   let row: string[] = [];
   let field = '';
   let quoted = false;
+  let justClosedQuote = false;
 
   for (let index = 0; index < csv.length; index += 1) {
     const char = csv[index];
@@ -95,6 +101,7 @@ function parseCsvRows(csv: string): string[][] {
           index += 1;
         } else {
           quoted = false;
+          justClosedQuote = true;
         }
       } else {
         field += char;
@@ -102,7 +109,27 @@ function parseCsvRows(csv: string): string[][] {
       continue;
     }
 
-    if (char === '"' && field.length === 0) {
+    if (justClosedQuote) {
+      if (char === ',') {
+        row.push(field);
+        field = '';
+        justClosedQuote = false;
+      } else if (char === '\n') {
+        row.push(field);
+        rows.push(row);
+        row = [];
+        field = '';
+        justClosedQuote = false;
+      } else if (char === '\r' && csv[index + 1] === '\n') {
+        // Wait for LF so quoted CRLF rows remain unambiguous.
+      } else {
+        throw new Error('content metrics CSV quoted field must be followed by a comma, newline, or end-of-input');
+      }
+      continue;
+    }
+
+    if (char === '"') {
+      if (field.length !== 0) throw new Error('content metrics CSV quote must begin at the start of a field');
       quoted = true;
     } else if (char === ',') {
       row.push(field);
@@ -118,7 +145,7 @@ function parseCsvRows(csv: string): string[][] {
   }
 
   if (quoted) throw new Error('content metrics CSV contains an unterminated quoted field');
-  if (field.length > 0 || row.length > 0) {
+  if (field.length > 0 || row.length > 0 || justClosedQuote) {
     row.push(field.replace(/\r$/, ''));
     rows.push(row);
   }
@@ -136,10 +163,30 @@ function requiredString(value: string | undefined, field: string, rowNumber: num
 
 function timestamp(value: string | undefined, field: string, rowNumber: number): string {
   const normalized = requiredString(value, field, rowNumber);
-  if (!ISO_TIMESTAMP.test(normalized) || !Number.isFinite(Date.parse(normalized))) {
+  const match = ISO_TIMESTAMP.exec(normalized);
+  if (!match) {
     throw new Error(`content metrics CSV row ${rowNumber}: ${field} must be an offset-aware ISO timestamp`);
   }
-  return normalized;
+
+  const date = new Date(`${match[1]}T00:00:00.000Z`);
+  const hour = Number(match[2]);
+  const minute = Number(match[3]);
+  const second = Number(match[4]);
+  const offset = match[6];
+  const invalidDate = Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== match[1];
+  const invalidTime = hour > 23 || minute > 59 || second > 59;
+  let invalidOffset = false;
+  if (offset !== 'Z') {
+    const offsetHour = Number(offset.slice(1, 3));
+    const offsetMinute = Number(offset.slice(4, 6));
+    invalidOffset = offsetHour > 14 || offsetMinute > 59 || (offsetHour === 14 && offsetMinute !== 0);
+  }
+
+  const parsed = new Date(normalized);
+  if (invalidDate || invalidTime || invalidOffset || !Number.isFinite(parsed.getTime())) {
+    throw new Error(`content metrics CSV row ${rowNumber}: ${field} must be a real offset-aware ISO timestamp`);
+  }
+  return parsed.toISOString();
 }
 
 function metricValue(value: string | undefined, rowNumber: number): number | null {
@@ -293,7 +340,7 @@ export function parseContentMetricsCsv(csv: string): ContentMetricCsvReceipt {
   });
 
   const observations = [...accepted.values()].sort((left, right) =>
-    duplicateIdentity(left).localeCompare(duplicateIdentity(right))
+    compareOrdinal(duplicateIdentity(left), duplicateIdentity(right))
   );
   const importFingerprint = sha256(observations.map(canonicalNormalizedRow).join('\n'));
 
