@@ -34,7 +34,7 @@ export interface YouTubeMeasurement {
 
 export interface YouTubeGrowthExperiment {
   id: string;
-  confirmedRuns: number;
+  confirmedRunEvidenceRefs: readonly string[];
   criteria: readonly YouTubeSuccessCriterion[];
   measurement?: YouTubeMeasurement;
 }
@@ -80,13 +80,20 @@ export type YouTubeGrowthLoopReason =
   | 'measurement_future_dated'
   | 'measurement_stale'
   | 'criterion_missing_metric'
-  | 'criterion_not_met';
+  | 'criterion_invalid_threshold'
+  | 'criterion_invalid_range'
+  | 'criterion_not_met'
+  | 'repeatability_missing_evidence';
 
 export interface YouTubeGrowthLoopResult {
   phase: YouTubeGrowthPhase;
   requestedPhase: YouTubeGrowthPhase;
   transition: 'HOLD' | 'ADVANCE';
   reasons: readonly YouTubeGrowthLoopReason[];
+  experimentFailures: readonly {
+    experimentId: string;
+    reasons: readonly YouTubeGrowthLoopReason[];
+  }[];
   winningExperimentIds: readonly string[];
   repeatableWinningExperimentIds: readonly string[];
   diagnoses: readonly {
@@ -94,6 +101,22 @@ export interface YouTubeGrowthLoopResult {
     action: string;
   }[];
   targets: Partial<Record<YouTubeMetricKey, number>>;
+  workflow: readonly [
+    'trend-radar',
+    'weekly-content-bet',
+    'title-thumbnail',
+    'script',
+    'LEEVIZE',
+    'publish-with-separate-approval',
+    'measure',
+    'diagnose',
+    'double-down-repair-or-kill',
+  ];
+  monetizationTruth: {
+    yppEligibilityRequiresProviderEvidence: true;
+    affiliateOrSponsorIntentIsNotRevenue: true;
+    revenueRequiresOutcomeEvidence: true;
+  };
   continuity: {
     currentFingerprint: string | null;
     predecessorInvalidated: boolean;
@@ -111,6 +134,17 @@ export interface YouTubeGrowthLoopResult {
 
 const DEFAULT_MAX_MEASUREMENT_AGE_MS = 14 * 24 * 60 * 60 * 1000;
 const PHASES: readonly YouTubeGrowthPhase[] = ['TEST_AND_VALIDATE', 'DOUBLE_DOWN', 'SCALE'];
+const WORKFLOW = [
+  'trend-radar',
+  'weekly-content-bet',
+  'title-thumbnail',
+  'script',
+  'LEEVIZE',
+  'publish-with-separate-approval',
+  'measure',
+  'diagnose',
+  'double-down-repair-or-kill',
+] as const;
 
 function text(value: string | undefined): string {
   return value?.trim() ?? '';
@@ -124,13 +158,17 @@ function positiveFinite(value: number | undefined, fallback: number): number {
   return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : fallback;
 }
 
+function cleanEvidenceRefs(values: readonly string[]): string[] {
+  return [...new Set(values.map((value) => text(value)).filter(Boolean))];
+}
+
 function validateMeasurement(
   measurement: YouTubeMeasurement | undefined,
   evaluatedAt: number,
   maxMeasurementAgeMs: number,
 ): YouTubeGrowthLoopReason[] {
   if (!measurement) return ['measurement_missing'];
-  if (!text(measurement.source) || !measurement.evidenceRefs.some((ref) => text(ref))) {
+  if (!text(measurement.source) || cleanEvidenceRefs(measurement.evidenceRefs).length === 0) {
     return ['measurement_missing_provenance'];
   }
 
@@ -151,16 +189,37 @@ function criterionReasons(
   if (experiment.criteria.length === 0) return ['criterion_not_met'];
 
   for (const criterion of experiment.criteria) {
+    const minimum = criterion.minimum;
+    const maximum = criterion.maximum;
+    if (minimum !== undefined && !Number.isFinite(minimum)) {
+      reasons.push('criterion_invalid_threshold');
+      continue;
+    }
+    if (maximum !== undefined && !Number.isFinite(maximum)) {
+      reasons.push('criterion_invalid_threshold');
+      continue;
+    }
+    if (minimum !== undefined && maximum !== undefined && minimum > maximum) {
+      reasons.push('criterion_invalid_range');
+      continue;
+    }
+
     const value = finite(experiment.measurement?.metrics[criterion.metric]);
     if (value === undefined) reasons.push('criterion_missing_metric');
-    if (value !== undefined && criterion.minimum !== undefined && value < criterion.minimum) {
+    if (value !== undefined && minimum !== undefined && value < minimum) {
       reasons.push('criterion_not_met');
     }
-    if (value !== undefined && criterion.maximum !== undefined && value > criterion.maximum) {
+    if (value !== undefined && maximum !== undefined && value > maximum) {
       reasons.push('criterion_not_met');
     }
   }
   return [...new Set(reasons)];
+}
+
+function repeatabilityReasons(experiment: YouTubeGrowthExperiment): YouTubeGrowthLoopReason[] {
+  return cleanEvidenceRefs(experiment.confirmedRunEvidenceRefs).length >= 2
+    ? []
+    : ['repeatability_missing_evidence'];
 }
 
 function diagnostics(
@@ -181,23 +240,22 @@ function diagnostics(
   const watchTimeMinutes = finite(metrics.watchTimeMinutes);
   const shortsViews = finite(metrics.shortsViews);
   const shortsToLongFormViews = finite(metrics.shortsToLongFormViews);
+  const ctrFloor = finite(thresholds.ctrPercentFloor);
+  const retentionFloor = finite(thresholds.retentionPercentFloor);
+  const impressionsFloor = finite(thresholds.minimumImpressionsForCtrDiagnosis);
+  const viewsFloor = finite(thresholds.minimumViewsForWatchTimeDiagnosis);
+  const watchTimePerViewFloor = finite(thresholds.watchTimeMinutesPerViewFloor);
+  const shortsViewsFloor = finite(thresholds.minimumShortsViewsForConversionDiagnosis);
+  const shortsConversionFloor = finite(thresholds.shortsToLongFormConversionPercentFloor);
 
-  if (
-    ctr !== undefined
-    && thresholds.ctrPercentFloor !== undefined
-    && ctr < thresholds.ctrPercentFloor
-  ) {
+  if (ctr !== undefined && ctrFloor !== undefined && ctr < ctrFloor) {
     output.push({
       kind: 'WEAK_CTR',
       action: 'Inspect title-thumbnail promise, search/viewer intent match, and traffic-source impressions; change packaging before changing the whole topic.',
     });
   }
 
-  if (
-    retention !== undefined
-    && thresholds.retentionPercentFloor !== undefined
-    && retention < thresholds.retentionPercentFloor
-  ) {
+  if (retention !== undefined && retentionFloor !== undefined && retention < retentionFloor) {
     output.push({
       kind: 'WEAK_RETENTION',
       action: 'Inspect the opening drop-off and major exit points; tighten the first promise, remove setup that delays payoff, and repair only the failing retention beats.',
@@ -206,10 +264,11 @@ function diagnostics(
 
   if (
     impressions !== undefined
-    && impressions >= (thresholds.minimumImpressionsForCtrDiagnosis ?? Number.POSITIVE_INFINITY)
+    && impressionsFloor !== undefined
+    && impressions >= impressionsFloor
     && ctr !== undefined
-    && thresholds.ctrPercentFloor !== undefined
-    && ctr < thresholds.ctrPercentFloor
+    && ctrFloor !== undefined
+    && ctr < ctrFloor
   ) {
     output.push({
       kind: 'IMPRESSIONS_WITH_FEW_VIEWS',
@@ -219,10 +278,11 @@ function diagnostics(
 
   if (
     views !== undefined
-    && views >= (thresholds.minimumViewsForWatchTimeDiagnosis ?? Number.POSITIVE_INFINITY)
+    && viewsFloor !== undefined
+    && views >= viewsFloor
     && watchTimeMinutes !== undefined
-    && thresholds.watchTimeMinutesPerViewFloor !== undefined
-    && watchTimeMinutes / Math.max(views, 1) < thresholds.watchTimeMinutesPerViewFloor
+    && watchTimePerViewFloor !== undefined
+    && watchTimeMinutes / Math.max(views, 1) < watchTimePerViewFloor
   ) {
     output.push({
       kind: 'VIEWS_WITH_POOR_WATCH_TIME',
@@ -232,10 +292,11 @@ function diagnostics(
 
   if (
     shortsViews !== undefined
-    && shortsViews >= (thresholds.minimumShortsViewsForConversionDiagnosis ?? Number.POSITIVE_INFINITY)
+    && shortsViewsFloor !== undefined
+    && shortsViews >= shortsViewsFloor
     && shortsToLongFormViews !== undefined
-    && thresholds.shortsToLongFormConversionPercentFloor !== undefined
-    && ((shortsToLongFormViews / Math.max(shortsViews, 1)) * 100) < thresholds.shortsToLongFormConversionPercentFloor
+    && shortsConversionFloor !== undefined
+    && ((shortsToLongFormViews / Math.max(shortsViews, 1)) * 100) < shortsConversionFloor
   ) {
     output.push({
       kind: 'SHORTS_NOT_CONVERTING',
@@ -252,8 +313,9 @@ function diagnostics(
  * Calendar time chooses when a phase may be considered, never whether it has
  * been proven. Targets remain aspirations. Only fresh, sourced measurements
  * evaluated against caller-declared success criteria can produce a winner.
- * The result is advisory and cannot authorize publishing, spend, scheduling,
- * or scaling execution.
+ * Repeatability is proven with at least two distinct evidence references, not
+ * a caller-supplied run count. The result is advisory and cannot authorize
+ * publishing, spend, scheduling, or scaling execution.
  */
 export function evaluateYouTubeGrowthLoop(input: YouTubeGrowthLoopInput): YouTubeGrowthLoopResult {
   const reasons = new Set<YouTubeGrowthLoopReason>();
@@ -280,14 +342,23 @@ export function evaluateYouTubeGrowthLoop(input: YouTubeGrowthLoopInput): YouTub
 
   const winners: string[] = [];
   const repeatableWinners: string[] = [];
+  const experimentFailures: Array<{
+    experimentId: string;
+    reasons: YouTubeGrowthLoopReason[];
+  }> = [];
   if (Number.isFinite(evaluatedAt)) {
     for (const experiment of input.experiments) {
       const experimentReasons = criterionReasons(experiment, evaluatedAt, maxMeasurementAgeMs);
       if (experimentReasons.length === 0) {
         winners.push(experiment.id);
-        if (Number.isInteger(experiment.confirmedRuns) && experiment.confirmedRuns >= 2) {
+        const repeatReasons = repeatabilityReasons(experiment);
+        if (repeatReasons.length === 0) {
           repeatableWinners.push(experiment.id);
+        } else {
+          experimentFailures.push({ experimentId: experiment.id, reasons: repeatReasons });
         }
+      } else {
+        experimentFailures.push({ experimentId: experiment.id, reasons: experimentReasons });
       }
     }
   }
@@ -311,12 +382,19 @@ export function evaluateYouTubeGrowthLoop(input: YouTubeGrowthLoopInput): YouTub
     requestedPhase: input.requestedPhase,
     transition: advance ? 'ADVANCE' : 'HOLD',
     reasons: [...reasons],
+    experimentFailures,
     winningExperimentIds: winners,
     repeatableWinningExperimentIds: repeatableWinners,
     diagnoses: Number.isFinite(evaluatedAt)
       ? diagnostics(input.diagnosticSnapshot, input.diagnosticThresholds, evaluatedAt, maxMeasurementAgeMs)
       : [],
     targets: { ...(input.targets ?? {}) },
+    workflow: WORKFLOW,
+    monetizationTruth: {
+      yppEligibilityRequiresProviderEvidence: true,
+      affiliateOrSponsorIntentIsNotRevenue: true,
+      revenueRequiresOutcomeEvidence: true,
+    },
     continuity: {
       currentFingerprint: text(input.continuity?.currentFingerprint) || null,
       predecessorInvalidated,
