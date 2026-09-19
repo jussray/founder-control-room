@@ -1,0 +1,101 @@
+name: Dependency Audit
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  production-dependencies:
+    name: Production dependencies
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          persist-credentials: false
+
+      - name: Verify exact head
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install exact lockfile
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Audit shipped dependency graph
+        id: audit
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          npm audit --omit=dev --audit-level=high --json | tee dependency-audit.json
+
+      - name: Generate reviewable lock repair candidate
+        id: repair
+        if: steps.audit.outcome != 'success'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp package-lock.json package-lock.before-audit-fix.json
+          npm audit fix --package-lock-only --omit=dev --ignore-scripts --no-audit --no-fund
+          test -s package-lock.json
+          if cmp -s package-lock.before-audit-fix.json package-lock.json; then
+            echo 'npm audit fix produced no lockfile change.' >&2
+            exit 1
+          fi
+          npm ci --ignore-scripts --no-audit --no-fund
+          set +e
+          npm audit --omit=dev --audit-level=high --json > dependency-audit-candidate.json
+          candidate_status=$?
+          set -e
+          echo "candidate_audit_exit=${candidate_status}"
+          test "$candidate_status" -eq 0
+
+      - name: Upload dependency audit receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-audit-${{ env.EXPECTED_HEAD_SHA }}
+          path: dependency-audit.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload lock repair candidate
+        if: steps.audit.outcome != 'success' && steps.repair.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-lock-repair-${{ env.EXPECTED_HEAD_SHA }}
+          path: |
+            package-lock.json
+            dependency-audit-candidate.json
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Enforce high-severity production boundary
+        if: steps.audit.outcome != 'success'
+        shell: bash
+        run: |
+          echo 'High-or-critical vulnerability exists in the committed production dependency graph.' >&2
+          echo 'A generated lock repair candidate, when available, is evidence for review only; it does not make this head green.' >&2
+          exit 1
