@@ -126,6 +126,38 @@ describe('authenticated YouTube growth evaluation route', () => {
     }));
   });
 
+  it('rejects malformed continuity and unknown target fields instead of crashing or leaking them', async () => {
+    const malformedContinuity = await request(buildApp())
+      .post('/automation/conveyor/founder-content/youtube-growth/evaluate')
+      .set('Authorization', BEARER)
+      .send({
+        day: 31,
+        evaluatedAt: NOW,
+        currentPhase: 'TEST_AND_VALIDATE',
+        requestedPhase: 'DOUBLE_DOWN',
+        experiments: [winner()],
+        continuity: { currentFingerprint: 123 },
+      });
+
+    expect(malformedContinuity.status).toBe(400);
+    expect(malformedContinuity.body.code).toBe('INVALID_YOUTUBE_GROWTH_EVALUATION_PAYLOAD');
+
+    const unknownTarget = await request(buildApp())
+      .post('/automation/conveyor/founder-content/youtube-growth/evaluate')
+      .set('Authorization', BEARER)
+      .send({
+        day: 31,
+        evaluatedAt: NOW,
+        currentPhase: 'TEST_AND_VALIDATE',
+        requestedPhase: 'DOUBLE_DOWN',
+        experiments: [winner()],
+        targets: { views: 1_000, publishAuthority: 1 },
+      });
+
+    expect(unknownTarget.status).toBe(400);
+    expect(unknownTarget.body.code).toBe('INVALID_YOUTUBE_GROWTH_EVALUATION_PAYLOAD');
+  });
+
   it('makes a fresh sourced Day-31 winner reachable without granting execution authority', async () => {
     const res = await request(buildApp())
       .post('/automation/conveyor/founder-content/youtube-growth/evaluate')
