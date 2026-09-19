@@ -4,6 +4,7 @@ import { validateOperatorRelayRequest, validateOperatorRelayResponse } from './o
 export type OperatorRelayAdapter = (request: OperatorRelayRequestV1) => Promise<OperatorRelayResponseV1>;
 
 export interface OperatorRelayAdapters {
+  gemini?: OperatorRelayAdapter;
   codex?: OperatorRelayAdapter;
   'claude-code'?: OperatorRelayAdapter;
   perplexity?: OperatorRelayAdapter;
