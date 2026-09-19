@@ -103,7 +103,7 @@ const READ_ONLY_ROUTE_ACTIONS = new Set<FcrSkillRouterAction>([
   'review',
   'draft',
 ]);
-const RELAY_OPERATORS = new Set<RelayOperatorId>(['codex', 'claude-code', 'perplexity']);
+const RELAY_OPERATORS = new Set<RelayOperatorId>(['gemini', 'codex', 'claude-code', 'perplexity']);
 const RELAY_CAPABILITIES = new Set<RelayCapability>(['research', 'propose', 'review', 'implement']);
 const RELAY_SENSITIVITIES = new Set<RelaySensitivity>(['public', 'internal']);
 const FULL_SHA = /^[0-9a-f]{40}$/i;
@@ -608,13 +608,13 @@ export function externalMcpToolDefinitions(): JsonRecord[] {
       name: 'fcr_relay_operator',
       title: 'Relay a bounded task to a peer AI operator',
       description:
-        'Send a bounded research, proposal, review, or implementation-work task to exactly one named peer operator (ChatGPT/Codex, Claude, or Perplexity) and return its provider-bound response. Requires OAuth client identity, carries zero mutation authority, never targets DeepSeek Instructor, and never substitutes another provider when the requested operator is unavailable.',
+        'Send a bounded research, proposal, review, or implementation-work task to exactly one named peer operator (Gemini, ChatGPT/Codex, Claude, or Perplexity) and return its provider-bound response. Requires OAuth client identity, carries zero mutation authority, never targets DeepSeek Instructor, and never substitutes another provider when the requested operator is unavailable.',
       inputSchema: {
         type: 'object',
         additionalProperties: false,
         required: ['targetOperator', 'capability', 'goal', 'contextSummary'],
         properties: {
-          targetOperator: { type: 'string', enum: ['codex', 'claude-code', 'perplexity'] },
+          targetOperator: { type: 'string', enum: ['gemini', 'codex', 'claude-code', 'perplexity'] },
           capability: { type: 'string', enum: ['research', 'propose', 'review', 'implement'] },
           goal: { type: 'string', minLength: 1, maxLength: 4000 },
           contextSummary: { type: 'string', minLength: 1, maxLength: 12000 },
