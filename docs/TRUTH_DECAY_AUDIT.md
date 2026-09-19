@@ -382,10 +382,13 @@ The strongest optimization is not faster claiming. It is shortening the distance
 33. `merge_authority: true` cannot be reused as candidate approval; every merge requires a fresh explicit founder decision for the exact live repository/PR/base/head, and candidate movement expires that approval.
 34. Rebinding a cross-repository Playwright peer to a newly verified exact ref/SHA expires predecessor federation/browser proof and requires a complete exact-head rerun; the pin is evidence identity, not production or merge authority.
 35. A live peer ref/SHA match may select the next browser-federation evidence subject, but it cannot carry predecessor green forward; the successor stays `UNKNOWN` until the complete exact-head runtime, directive, receipt, and browser witness passes.
+36. Merge-tree equality can prove that a live peer merge contains the exact separately-green candidate tree, but it cannot transplant FCR federation/browser proof or any execution authority onto the new peer identity.
 
 ## 2026-09 control correction: peer ref refresh resets proof
 
 A later StoryEngine `main` observation can justify rebinding the exact Playwright peer, but that observation only selects the new evidence subject. The FCR browser/federation witness remains `UNKNOWN` for that successor until the exact FCR head reruns the complete runtime identity, directive, receipt, and browser path against that peer. A valid ref/SHA match cannot carry predecessor green forward or mint merge, deploy, production, or provider-mutation authority.
+
+A StoryEngine merge commit may be selected as the successor peer when the live `main` ref is current and its tree is independently proven identical to a separately exact-head-green candidate. That tree identity proves content equivalence only. It does not preserve the former FCR witness, so rebinding still resets the FCR federation state to `UNKNOWN` until the full successor runtime, directive, receipt, and browser witness succeeds.
 
 ## Rollback
 
