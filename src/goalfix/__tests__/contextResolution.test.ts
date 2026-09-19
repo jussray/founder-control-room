@@ -68,6 +68,27 @@ function catalogManifest(repository = 'jussray/chief-ai-machine') {
   });
 }
 
+function providerPolicy(
+  repository = 'jussray/chief-ai-machine',
+  requiredChecks = [
+    'Typecheck',
+    'Lint',
+    'Unit Tests',
+    'Verify Chief AI control room contracts',
+    'Verify operational authority',
+    'Verify test-ledger contract',
+  ],
+) {
+  return JSON.stringify({
+    repository,
+    source: { provider: 'github-check-runs', exactRef: 'commit-sha' },
+    policy: {
+      requiredCheckAuthority: 'repository-policy',
+      requiredChecks,
+    },
+  });
+}
+
 describe('resolveGoalfixProjectHint', () => {
   it('resolves founder shorthand without collapsing the two JBH repositories', () => {
     expect(resolveGoalfixProjectHint(PROJECTS, 'JBH')).toEqual({
@@ -108,7 +129,7 @@ describe('resolveGoalfixProjectHint', () => {
 });
 
 describe('parseGoalfixVerificationManifest', () => {
-  it('derives the required proof set from tests.workflowCatalog on the default branch', () => {
+  it('derives the required provider proof set from tests.workflowCatalog on the default branch', () => {
     expect(parseGoalfixVerificationManifest(workflowManifest(), 'jussray/Sekret-Bip', 'main', 'main')).toEqual({
       manifestRepository: 'jussray/Sekret-Bip',
       requiredVerificationNames: [
@@ -120,33 +141,51 @@ describe('parseGoalfixVerificationManifest', () => {
     });
   });
 
-  it('accepts the established portfolio tests.catalog dialect without forcing manifest rewrites', () => {
+  it('treats tests.catalog as inventory and requires exact provider check policy', () => {
+    expect(() => parseGoalfixVerificationManifest(
+      catalogManifest(),
+      'jussray/chief-ai-machine',
+      'main',
+      'main',
+    )).toThrowError(GoalfixContextResolutionError);
+
+    try {
+      parseGoalfixVerificationManifest(catalogManifest(), 'jussray/chief-ai-machine', 'main', 'main');
+    } catch (error) {
+      expect((error as GoalfixContextResolutionError).code).toBe('GOALFIX_PROVIDER_CHECK_POLICY_UNAVAILABLE');
+    }
+  });
+
+  it('uses exact provider requiredChecks rather than human tests.catalog labels', () => {
     expect(parseGoalfixVerificationManifest(
       catalogManifest(),
       'jussray/chief-ai-machine',
       'main',
       'main',
+      providerPolicy(),
     )).toEqual({
       manifestRepository: 'jussray/chief-ai-machine',
       requiredVerificationNames: [
-        'Chief AI TypeScript',
-        'Chief AI unit tests',
-        'Freestyle save and persistence Chromium proof',
+        'Typecheck',
+        'Lint',
+        'Unit Tests',
+        'Verify Chief AI control room contracts',
+        'Verify operational authority',
+        'Verify test-ledger contract',
       ],
     });
   });
 
-  it('unions both authoritative catalog dialects when a repository exposes both', () => {
+  it('prefers explicit workflow check authority when a repository exposes both dialects', () => {
     const combined = JSON.stringify({
       repository: 'jussray/founder-control-room',
       tests: {
         workflowCatalog: [
           { id: 'ci', name: 'CI', required: true, status: 'active' },
-          { id: 'shared', name: 'Shared Proof', required: true, status: 'active' },
+          { id: 'playwright', name: 'Playwright E2E', required: true, status: 'active' },
         ],
         catalog: [
-          { id: 'playwright', name: 'Playwright E2E', required: true, status: 'active' },
-          { id: 'shared-duplicate', name: 'Shared Proof', required: true, status: 'active' },
+          { id: 'human-label', name: 'Human Inventory Label', required: true, status: 'active' },
         ],
       },
     });
@@ -156,7 +195,8 @@ describe('parseGoalfixVerificationManifest', () => {
       'jussray/founder-control-room',
       'main',
       'main',
-    ).requiredVerificationNames).toEqual(['CI', 'Shared Proof', 'Playwright E2E']);
+      providerPolicy('jussray/founder-control-room', ['Wrong fallback']),
+    ).requiredVerificationNames).toEqual(['CI', 'Playwright E2E']);
   });
 
   it('does not require a main-only lane on a non-default ref', () => {
@@ -172,6 +212,29 @@ describe('parseGoalfixVerificationManifest', () => {
     } catch (error) {
       expect((error as GoalfixContextResolutionError).code).toBe('GOALFIX_REPOSITORY_IDENTITY_MISMATCH');
     }
+  });
+
+  it('fails closed when the provider-policy repository identity does not match', () => {
+    expect(() => parseGoalfixVerificationManifest(
+      catalogManifest(),
+      'jussray/chief-ai-machine',
+      'main',
+      'main',
+      providerPolicy('jussray/wrong-repo'),
+    )).toThrowError(GoalfixContextResolutionError);
+  });
+
+  it('fails closed when provider policy omits explicit requiredChecks', () => {
+    expect(() => parseGoalfixVerificationManifest(
+      catalogManifest(),
+      'jussray/chief-ai-machine',
+      'main',
+      'main',
+      JSON.stringify({
+        repository: 'jussray/chief-ai-machine',
+        policy: { requiredCheckAuthority: 'repository-native-ruleset' },
+      }),
+    )).toThrowError(GoalfixContextResolutionError);
   });
 
   it('fails closed when neither authoritative catalog dialect is present', () => {
