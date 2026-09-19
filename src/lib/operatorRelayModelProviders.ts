@@ -157,9 +157,13 @@ function openAiText(body: JsonRecord): string {
   return parts.join('\n');
 }
 
-function anthropicText(body: JsonRecord): string {
+function anthropicText(body: JsonRecord): { text: string; providerResponseId: string } {
   if (body.type !== 'message' || body.role !== 'assistant') {
     throw new Error('Anthropic relay returned an invalid Messages response envelope');
+  }
+  const providerResponseId = typeof body.id === 'string' ? body.id.trim() : '';
+  if (!SAFE_PROVIDER_ID.test(providerResponseId)) {
+    throw new Error('Anthropic relay returned invalid response identity');
   }
   const content = Array.isArray(body.content) ? body.content : [];
   const parts = content.flatMap((entry) => {
@@ -169,17 +173,21 @@ function anthropicText(body: JsonRecord): string {
       : [];
   });
   if (parts.length === 0) throw new Error('Anthropic relay response contained no text');
-  return parts.join('\n');
+  return { text: parts.join('\n'), providerResponseId };
 }
 
 function safeEvidencePart(value: unknown, fallback: string, pattern: RegExp): string {
   return typeof value === 'string' && pattern.test(value.trim()) ? value.trim() : fallback;
 }
 
+function evidenceRefFromId(provider: string, configuredModel: string, providerResponseId: string): string {
+  const model = safeEvidencePart(configuredModel, 'configured-model', SAFE_MODEL_ID);
+  return `provider:${provider}:model:${model}:response:${providerResponseId}`;
+}
+
 function evidenceRef(provider: string, configuredModel: string, body: JsonRecord): string {
   const id = safeEvidencePart(body.id, 'unidentified-response', SAFE_PROVIDER_ID);
-  const model = safeEvidencePart(configuredModel, 'configured-model', SAFE_MODEL_ID);
-  return `provider:${provider}:model:${model}:response:${id}`;
+  return evidenceRefFromId(provider, configuredModel, id);
 }
 
 function prepareProviderRequest(request: OperatorRelayRequestV1): string {
@@ -260,7 +268,11 @@ export function createServerOperatorRelayAdapters(
           redirect: 'error',
           signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
         }, 'Anthropic relay');
-        return { text: anthropicText(body), evidenceRef: evidenceRef('anthropic', anthropicModel, body) };
+        const message = anthropicText(body);
+        return {
+          text: message.text,
+          evidenceRef: evidenceRefFromId('anthropic', anthropicModel, message.providerResponseId),
+        };
       },
     });
   }

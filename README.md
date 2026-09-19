@@ -83,8 +83,6 @@ Source wiring and unit tests do **not** prove the current peer runtime is reacha
 
 The StoryEngine peer pin is an evidence identity, not a durable alias for “current StoryEngine.” If the separately versioned StoryEngine carrier moves, earlier FCR Playwright green remains historical for its pinned peer. FCR must bind a separately exact-head-proven StoryEngine successor and rerun the complete FCR → StoryEngine → receipt → FCR browser/runtime witness before making a current federation claim.
 
-A security-only StoryEngine peer rollover still changes the evidence identity. FCR may repin only after independently observing the intended StoryEngine ref/SHA, and the repinned FCR head must reacquire the complete federation browser/runtime witness. The repin itself cannot inherit predecessor green proof or grant merge, deploy, production, provider-mutation, or database authority.
-
 See [`docs/REPOSITORY_FEDERATION.md`](docs/REPOSITORY_FEDERATION.md).
 
 ### Jira work automation
@@ -316,3 +314,7 @@ A child-app reconciliation may classify evidence as `CURRENT`, `UNDECLARED`, `SC
 ## Required crawler/public-work browser proof
 
 For public crawler and work-directory behavior, `.github/workflows/ci.yml` must keep `e2e/pages-api-recovery.spec.ts` and `e2e/public-work-directory.spec.ts` inside the load-bearing `Playwright e2e` job that feeds `Required Gate`. The specialized Pages workflow is supplementary evidence only; it cannot replace this required exact-head browser proof or authorize merge.
+
+## Cross-repository browser witness freshness
+
+The exact StoryEngine peer configured in `.github/workflows/playwright.yml` is an evidence subject, not a durable alias for current StoryEngine. A peer refresh must be backed by an independent ref/SHA observation and must reset predecessor federation/browser proof until the complete FCR → StoryEngine → receipt → FCR Playwright witness passes on the exact FCR head. Pin alignment alone grants no merge, deploy, production, or provider-mutation authority.
