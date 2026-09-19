@@ -6,6 +6,7 @@ on:
       - 'config/founder-chief-pair.contract.json'
       - 'docs/FOUNDER_INTELLIGENCE_CONSTITUTION.md'
       - 'scripts/verify-founder-chief-pair.mjs'
+      - 'src/lib/standingFounderPolicy.ts'
       - 'src/founder-os-lab/projectAdapters.ts'
       - 'src/founder-os-lab/capabilityKernel.ts'
       - 'src/founder-os-lab/engine.ts'
@@ -19,6 +20,7 @@ on:
       - 'config/founder-chief-pair.contract.json'
       - 'docs/FOUNDER_INTELLIGENCE_CONSTITUTION.md'
       - 'scripts/verify-founder-chief-pair.mjs'
+      - 'src/lib/standingFounderPolicy.ts'
       - 'src/founder-os-lab/projectAdapters.ts'
       - 'src/founder-os-lab/capabilityKernel.ts'
       - 'src/founder-os-lab/engine.ts'
@@ -105,6 +107,7 @@ jobs:
         working-directory: founder-control-room
         env:
           PAIR_CONTRACT_PATH: ../chief-ai-machine/config/founder-chief-pair.contract.json
+          PAIR_NECESSARY_FIX_POLICY_PATH: ../chief-ai-machine/.control-room/necessary-fix-policy.json
           PAIR_CROSS_REPO_REQUIRED: 'true'
           PAIR_SELECTED_REF: ${{ steps.pair-ref.outputs.ref }}
           PAIR_SELECTED_SHA: ${{ steps.pair-ref.outputs.sha }}

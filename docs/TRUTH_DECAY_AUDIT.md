@@ -40,6 +40,8 @@ This is why the exact-head Playwright workflow is registered as `evidence-author
 
 A September peer-rollover incident made the freshness rule concrete. FCR `af87c67e05584203b04610eb25e6f89ad8c1e7a0` completed a real federation lap against its pinned StoryEngine peer `abd4aab9f33e6c67d7863bd1a03c917901a00668`, but StoryEngine PR #89 had already advanced to separately exact-head-proven `f78492230e88c66b04d4d8c9d6210c6380ba0db1`. The earlier FCR green therefore remains historical for the old peer rather than current integration authority. Refreshing the peer pin is only the start of recovery: the successor FCR head must rerun the entire browser/runtime/receipt witness against the newly bound StoryEngine SHA, and movement on either side expires that successor proof again.
 
+The workflow's `STORYENGINE_PEER_SHA` and `STORYENGINE_PEER_REF` are evidence identities, not durable aliases for “current StoryEngine.” A peer-pin update is valid only after the referenced peer is independently observed to resolve to the intended exact StoryEngine SHA. Changing either pin immediately expires predecessor FCR federation/browser evidence and requires the complete exact-head Playwright loop to rerun against the new peer. A correct pin does not prove StoryEngine production deployment, FCR production deployment, merge authority, deploy authority, or provider mutation.
+
 ## 2026-09 control correction: privileged production witness isolation
 
 A post-Deploy `workflow_run` witness is privileged even when its purpose is read-only verification. Treating the triggering workflow's `head_sha` as both the release identity to observe and the code to execute collapses evidence identity into executable authority. A successful upstream workflow must not make its checkout trusted merely by becoming a completed run.
@@ -55,6 +57,14 @@ The Founder Capital Decision feature introduced a founder-facing evidence-evalua
 The correction is documentation-only with respect to the Capital Decision behavior: `README.md`, this audit, and `docs/DOCUMENTATION_TRUTH_RECEIPT.json` now state that a decision card, score, option set, or browser rendering is evidence interpretation rather than authority. Stale or missing evidence must remove derived certainty instead of silently carrying an earlier recommendation forward. Financing, spend, investor-contact, fundraise, merge, deploy, publication, and execution authority remain separate and require their own explicit gates.
 
 This documentation repair does not retroactively prove the earlier feature branch, external financing activity, investor contact, or any provider/runtime outcome. It closes the durable truth-surface gap so future operators do not mistake a source-level capital recommendation for executable authority.
+
+## 2026-09 control correction: merge authority availability versus exact approval
+
+A merge-governance ambiguity treated the existence of merge capability and the founder's approval of one exact candidate as if they were the same state. That ambiguity can cause a truthful capability statement such as `merge_authority: true` to decay into an unsafe execution assumption after a review request, green CI, a broad “approved,” or a later base/head movement.
+
+The corrected canon separates the planes. `merge_authority: true` means only that the governed merge capability/authority class exists. Every merge still requires fresh explicit founder approval bound to the exact repository, pull request number, current base SHA, and current head SHA. If that exact approval is absent, ambiguous, or stale, the agent or operator must ask and stop. Review requests, `merge review`, `approved`, `cont`, `continue`, `implement`, mergeability, continuity metadata, or green proof cannot manufacture candidate approval. Any base/head movement invalidates the prior merge approval and requires a new founder decision.
+
+This is an authority-freshness correction, not a relaxation of review or proof. Exact-head evidence still constrains what can be claimed and integrated, while founder approval controls whether the exact candidate may cross the merge boundary. Deployment, publication, billing, secrets, database mutation, deletion, and other consequential classes remain separately gated.
 
 ## Root causes
 
@@ -201,6 +211,8 @@ It also checks cross-document invariants that are easy to regress during fast-mo
 - the founder-content story keeps first-party LinkedIn, provider-neutral n8n, exact Current You authority, provider readback, and Sauce Guard distinct;
 - `.control/capability.json` remains the canonical capability authority while YAML remains a compatibility pointer; and
 - post-merge truth/documentation re-observation exists in the shared AI workflow.
+
+The merge-approval split is also a documentation-truth invariant. A future agent may read `merge_authority: true` only as capability availability; it must never infer current candidate approval. Exact founder approval must be bound to the live repository, PR, base SHA, and head SHA, and any candidate movement makes the prior approval historical rather than reusable authority.
 
 The verifier emits a sanitized `fcr/documentation-truth@v1` receipt with counts, domains, documentation coverage, and failure reasons. It does not store credentials, private proof, raw diffs, private prompts, customer data, private metrics, or provider payloads.
 
@@ -367,6 +379,13 @@ The strongest optimization is not faster claiming. It is shortening the distance
 30. A predecessor Playwright success cannot prove a cross-repository federation successor after either repository head, peer proof contract, peer runtime identity, or serialized wire shape moves.
 31. A privileged `workflow_run` witness may consume an upstream release SHA as evidence, but it cannot execute that upstream checkout or treat upstream success as executable trust.
 32. A capital decision card, recommendation, score, or HOLD state is evidence interpretation, not financing or execution authority; stale or missing capital evidence must remove derived certainty instead of preserving an earlier recommendation.
+33. `merge_authority: true` cannot be reused as candidate approval; every merge requires a fresh explicit founder decision for the exact live repository/PR/base/head, and candidate movement expires that approval.
+34. Rebinding a cross-repository Playwright peer to a newly verified exact ref/SHA expires predecessor federation/browser proof and requires a complete exact-head rerun; the pin is evidence identity, not production or merge authority.
+35. A live peer ref/SHA match may select the next browser-federation evidence subject, but it cannot carry predecessor green forward; the successor stays `UNKNOWN` until the complete exact-head runtime, directive, receipt, and browser witness passes.
+
+## 2026-09 control correction: peer ref refresh resets proof
+
+A later StoryEngine `main` observation can justify rebinding the exact Playwright peer, but that observation only selects the new evidence subject. The FCR browser/federation witness remains `UNKNOWN` for that successor until the exact FCR head reruns the complete runtime identity, directive, receipt, and browser path against that peer. A valid ref/SHA match cannot carry predecessor green forward or mint merge, deploy, production, or provider-mutation authority.
 
 ## Rollback
 

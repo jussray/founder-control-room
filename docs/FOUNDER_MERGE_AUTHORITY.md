@@ -2,9 +2,11 @@
 
 ## Current founder decision
 
-Juss authorizes repository changes to be merged when the acting AI or operator determines that the merge is appropriate and the evidence supports that conclusion.
+Juss grants Founder Control Room and its governed operators the merge capability/authority class, but **does not grant standing approval to execute any specific merge**.
 
-This standing authority replaces blanket `do not merge` language in active operating instructions. It does not require another merge-only confirmation when every applicable merge condition below is satisfied.
+Every repository merge requires a fresh, explicit founder approval bound to the exact repository, pull request number, current base SHA, and current head SHA. If that exact approval is absent, ambiguous, or stale, the acting AI or operator must ask and stop. `review`, `merge review`, `approved`, `cont`, `continue`, `implement`, successful CI, mergeability, or `merge_authority: true` do not by themselves authorize the merge unless the founder explicitly approves that exact candidate for merge. Any base/head movement expires the approval and requires a new one.
+
+`merge_authority: true` therefore means the merge capability is available. It does **not** mean `merge_approved: true`, and it must never be treated as an execution token.
 
 For Founder Control Room itself, the canonical human authority model is now **founder-final review**:
 
@@ -18,11 +20,25 @@ deterministic independent review
 
 Founder final approval is a separate authority class. It must never be mislabeled as independent semantic review.
 
+## Canonical merge-approval rule
+
+For every governed repository:
+
+```text
+merge capability available
++ exact-head evidence sufficient
++ explicit founder approval for exact repo/PR/base/head
+= merge may execute
+```
+
+If the last term is missing, the system asks. It does not infer approval from prior conversation, a review request, a previous candidate, another repository, successful checks, or a continuity marker. Approval is single-candidate and non-transferable.
+
 ## Merge conditions
 
 A merge is appropriate only when:
 
 - the repository, pull request, target branch, and exact head SHA are verified;
+- fresh explicit founder approval is bound to that exact repository, PR number, current base SHA, and current head SHA;
 - the intended scope is understood and no unrelated work is being smuggled into the change;
 - code, configuration, docs, schemas, generated artifacts, and release-impacting changes have been reviewed;
 - required checks have genuinely executed and passed, or a documented infrastructure failure has been classified and distinguished from code-test evidence;
@@ -38,6 +54,16 @@ A merge is appropriate only when:
 - privacy, security, brand, IP, credential, sauce, and user-data boundaries remain intact;
 - rollback or safe forward-fix is understood;
 - the merge itself does not silently execute a separately gated action.
+
+## Governed branch-creation authority
+
+Repository branch creation is a separate reversible mutation class and does not inherit merge authority. In `src/http/routes/approvals.ts`, an authenticated founder execute request may reach `RepositoryProvider.createBranch(...)` only after a fresh `create_branch` proof is present, FCR issues an `AuthorityEnvelopeV1` for capability `github.repository.create_branch`, and the execution is durably reserved under the same idempotency key before provider mutation.
+
+The authority issuance/expiry window begins at the server-observed execute request time injected by the HTTP edge, never at the proof receipt creation timestamp. Proof freshness remains a separate precondition, so a still-valid near-TTL proof cannot mint an authority envelope that is effectively expired at issuance while execution-time expiry remains fail-closed.
+
+The envelope binds the exact mission intent, authenticated actor/approver, repository scope, proposal hash, branch arguments, mission-state fingerprint, consequence class, tool-call identity, issuance/expiry window, and idempotency key. Immediately before the provider write, FCR must re-read current mission state, re-derive the execution context, and pass the original envelope through `executeAuthorizedCreateBranch()`. Changed state, arguments, repository scope, tool call, expiry, idempotency, capability, or envelope integrity must fail closed before GitHub can be mutated. A pending or ambiguous execution must reconcile before retry rather than minting a replacement write from uncertainty.
+
+This source/runtime membrane proves only that the branch-creation path is governed when that code executes. CI or unit green does not prove a live GitHub branch was created, and successful branch creation does not grant merge, deploy, publication, secret, database, billing, or destructive authority.
 
 ## Independent review + founder-final authority for Founder Control Room merges
 
@@ -135,7 +161,7 @@ A GitHub Actions infrastructure outage can gate merge and release truth without 
 
 When jobs have no executed steps or no logs, agents must not blame the diff. They must record the exact PR, head SHA, workflow, run, job evidence, classification, impact, Cloudflare/runtime evidence if available, and the next gate in Founder Control Room.
 
-If remaining evidence is sufficient for a docs-only, policy-only, or otherwise low-risk focused change, a merge may still be appropriate only when every other applicable authority gate is satisfied. If the change requires executed CI, deterministic review, Playwright, deployment proof, auth proof, migration proof, runtime proof, or Documentation Truth proof that is unavailable, leave the PR open and state the exact blocker.
+If remaining evidence is sufficient for a docs-only, policy-only, or otherwise low-risk focused change, a merge may still be appropriate only when every other applicable authority gate is satisfied, including fresh explicit founder approval for that exact candidate. If the change requires executed CI, deterministic review, Playwright, deployment proof, auth proof, migration proof, runtime proof, Documentation Truth proof, or explicit merge approval that is unavailable, leave the PR open and state the exact blocker.
 
 ## Canonical project routing
 
@@ -143,7 +169,7 @@ Only `jussray/Sekret-Bip` is the active Se’kret Bip working repository. Other 
 
 ## Separate gates remain separate
 
-This standing merge authority does not automatically authorize:
+Merge authority and exact-candidate merge approval do not automatically authorize:
 
 - production deployment or public release;
 - database migration or destructive data writes;
@@ -157,6 +183,12 @@ Those actions still require their own exact approval unless a later founder dire
 
 ## Operating rule
 
-Do not merge merely because a PR exists or because a badge looks green. Merge when it is the correct, evidence-backed integration step and the current authority membrane is satisfied.
+Do not merge merely because a PR exists, because a badge looks green, because `merge_authority` is true, or because the founder asked for review/implementation. **Before every merge, ask for and obtain explicit founder approval for the exact current repository, PR, base SHA, and head SHA unless that exact approval is already present and still current.**
 
-Immediately before merge, re-read current `main`, the exact PR head, required checks, review state, founder-final receipt state, and applicable provider state. After merge, re-read the resulting `main`, Documentation Truth, and the next release/runtime gate. Old-head green remains historical evidence only.
+Immediately before merge, re-read current `main`, the exact PR head, required checks, review state, founder-final receipt state, exact-candidate founder approval, and applicable provider state. If base or head moved after approval, stop and ask again. After merge, re-read the resulting `main`, Documentation Truth, and the next release/runtime gate. Old-head green and old approval remain historical evidence only.
+
+## Load-bearing regression execution
+
+A required test contributes to merge readiness only when the exact-head workflow that feeds the applicable gate actually executes it. A committed but uninvoked test is source evidence, not CI proof. For LinkedIn analytics continuity, `.github/workflows/ci.yml` must keep `scripts.test_linkedin_analytics_continuity` inside the load-bearing `python-tests` job, and `Required Gate` must continue to depend on that job. Missing LinkedIn activity rows must remain `UNKNOWN_NO_EVIDENCE` with null metrics, never synthetic zero impressions or engagements.
+
+For public crawler and work-directory behavior, `.github/workflows/ci.yml` must keep `e2e/pages-api-recovery.spec.ts` and `e2e/public-work-directory.spec.ts` inside the load-bearing `Playwright e2e` job that feeds `Required Gate`; a green specialized Pages workflow alone cannot satisfy merge-required browser proof or authorize integration.

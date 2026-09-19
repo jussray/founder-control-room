@@ -22,8 +22,8 @@ env:
   PLAYWRIGHT_BROWSERS_PATH: /opt/pw-browsers
   EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
   PR_BASE_SHA: ${{ github.event.pull_request.base.sha || '' }}
-  STORYENGINE_PEER_SHA: 9a3a1e1db4d29923138b0a6c0da3d23650f2e6bd
-  STORYENGINE_PEER_REF: refs/heads/feat/intent-aware-inbound-routing-20260825
+  STORYENGINE_PEER_SHA: aa768075f4bd4fcd8b65f7ee0753596cc488d53a
+  STORYENGINE_PEER_REF: refs/heads/main
   STORYENGINE_PEER_URL: http://127.0.0.1:3901
   STORYENGINE_PEER_API_KEY: fcr-ci-product-build
 
@@ -230,6 +230,12 @@ jobs:
         run: |
           set -euo pipefail
           node e2e/security-posture-proof.mjs 2>&1 | tee logs/security-posture-proof.log
+
+      - name: Prove FCR account experience shell
+        shell: bash
+        run: |
+          set -euo pipefail
+          node e2e/founder-experience-shell-proof.mjs 2>&1 | tee logs/founder-experience-shell-proof.log
 
       - name: Upload Playwright HTML report
         if: always()

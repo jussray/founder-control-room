@@ -59,6 +59,7 @@ export type EvidenceKind =
   | 'security_scan'
   | 'integration_test'
   | 'artifact_provenance'
+  | 'media_continuity'
   | 'deployment_result'
   | 'manual_attestation';
 
