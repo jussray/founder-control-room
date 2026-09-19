@@ -382,10 +382,13 @@ The strongest optimization is not faster claiming. It is shortening the distance
 33. `merge_authority: true` cannot be reused as candidate approval; every merge requires a fresh explicit founder decision for the exact live repository/PR/base/head, and candidate movement expires that approval.
 34. Rebinding a cross-repository Playwright peer to a newly verified exact ref/SHA expires predecessor federation/browser proof and requires a complete exact-head rerun; the pin is evidence identity, not production or merge authority.
 35. A live peer ref/SHA match may select the next browser-federation evidence subject, but it cannot carry predecessor green forward; the successor stays `UNKNOWN` until the complete exact-head runtime, directive, receipt, and browser witness passes.
+36. A peer-only witness refresh is still truth-sensitive: moving the exact peer identity without a substantive same-range README, truth-decay audit, and documentation receipt refresh must keep Documentation Truth red rather than preserve predecessor green.
 
 ## 2026-09 control correction: peer ref refresh resets proof
 
 A later StoryEngine `main` observation can justify rebinding the exact Playwright peer, but that observation only selects the new evidence subject. The FCR browser/federation witness remains `UNKNOWN` for that successor until the exact FCR head reruns the complete runtime identity, directive, receipt, and browser path against that peer. A valid ref/SHA match cannot carry predecessor green forward or mint merge, deploy, production, or provider-mutation authority.
+
+The September 19 peer-only refresh exposed the documentation side of the same boundary: a one-line evidence-identity change can leave durable prose semantically correct yet still outside the reviewed range that changed operational truth. The repair therefore refreshes README, this audit, and the structured documentation receipt together. That documentation update proves review coverage only; the successor federation claim remains `UNKNOWN` until the exact candidate completes the full StoryEngine runtime, directive, receipt, and Playwright witness.
 
 ## Rollback
 
