@@ -16,15 +16,42 @@ import {
   validateControlRoomSupabaseUrl,
 } from '../../lib/supabaseProjectIdentity.js';
 
+const CONTROL_ROOM_DEPLOY_URL = 'https://api.foundercontrolroom.org';
 const SUPABASE_URL = process.env.SUPABASE_URL!;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-const DEPLOY_URL = process.env.DEPLOY_URL!;
+const DEPLOY_URL_INPUT = process.env.DEPLOY_URL?.trim();
 const SECRET = process.env.RECONCILE_SHARED_SECRET!;
 
 if (!SUPABASE_URL || !SERVICE_KEY) {
   console.error(JSON.stringify({ error: 'Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY' }));
   process.exit(1);
 }
+
+function normalizeOrigin(value: string): string {
+  try {
+    const url = new URL(value);
+    if (url.username || url.password || url.search || url.hash) {
+      throw new Error('credentials, query, and fragments are not allowed');
+    }
+    if (url.pathname !== '/' && url.pathname !== '') {
+      throw new Error('nested paths are not allowed');
+    }
+    return url.origin;
+  } catch {
+    throw new Error('DEPLOY_URL must be the canonical Founder Control Room HTTPS origin');
+  }
+}
+
+function deployedRuntimeOrigin(): string {
+  if (!DEPLOY_URL_INPUT) return CONTROL_ROOM_DEPLOY_URL;
+  const observed = normalizeOrigin(DEPLOY_URL_INPUT);
+  if (observed !== CONTROL_ROOM_DEPLOY_URL) {
+    throw new Error('DEPLOY_URL does not match the canonical Founder Control Room Worker origin');
+  }
+  return observed;
+}
+
+const DEPLOY_URL = deployedRuntimeOrigin();
 
 const REQUIRED_TABLES = [
   'profiles',
@@ -41,9 +68,7 @@ type VersionReceipt = {
 };
 
 async function assertDeployedRuntimeSupabaseIdentity(): Promise<void> {
-  if (!DEPLOY_URL) throw new Error('Missing DEPLOY_URL for deployed runtime identity proof');
-
-  const response = await fetch(`${DEPLOY_URL.replace(/\/$/, '')}/version`, {
+  const response = await fetch(`${DEPLOY_URL}/version`, {
     method: 'GET',
     redirect: 'error',
     headers: { Accept: 'application/json' },
@@ -101,8 +126,10 @@ async function run() {
   console.log('\nReconciliation report:');
   console.log(JSON.stringify(report, null, 2));
 
-  // POST back to own /api/reconcile so it lands in the dashboard
-  if (DEPLOY_URL && SECRET) {
+  // POST back to own /api/reconcile so it lands in the dashboard when the
+  // separately provisioned reconciliation secret is available. The runtime
+  // identity check above is mandatory regardless of whether this write occurs.
+  if (SECRET) {
     try {
       const res = await fetch(`${DEPLOY_URL}/api/reconcile`, {
         method: 'POST',
