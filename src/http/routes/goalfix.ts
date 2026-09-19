@@ -29,6 +29,7 @@ const SAFE_REF_PATTERN = /^[A-Za-z0-9._/-]{1,200}$/;
 const COMMIT_SHA_PATTERN = /^[a-f0-9]{40}$/i;
 const SHA256_PATTERN = /^[a-f0-9]{64}$/i;
 const VERIFICATION_MANIFEST_PATH = 'control-room.manifest.json';
+const VERIFICATION_LEDGER_PATH = '.control-room/test-ledger.manifest.json';
 
 interface ProjectRow extends GoalfixProjectCandidate {}
 
@@ -281,8 +282,8 @@ async function loadAutomaticProject(projectHint: string): Promise<{
 /**
  * POST /goalfix/inspect
  *
- * Executes the first Goalfix vertical slice: founder goal intake, one bounded
- * repository read, exact-head evidence classification, and a founder-ready
+ * Executes the first Goalfix vertical slice: founder goal intake, bounded
+ * repository reads, exact-head evidence classification, and a founder-ready
  * report. It never creates a branch, changes a file, merges, deploys, writes to
  * CRM, or mutates provider state. A sanitized internal access-audit event is
  * required for both completed and failed provider-read attempts.
@@ -521,12 +522,46 @@ goalfixRouter.post('/inspect', async (req: FounderRequest, res) => {
     }
 
     try {
-      const contract = parseGoalfixVerificationManifest(
-        manifestText,
-        project.repo_identifier,
-        target.name,
-        providerProject.defaultBranch,
-      );
+      let contract;
+      try {
+        contract = parseGoalfixVerificationManifest(
+          manifestText,
+          project.repo_identifier,
+          target.name,
+          providerProject.defaultBranch,
+        );
+      } catch (contextError) {
+        if (
+          !(contextError instanceof GoalfixContextResolutionError)
+          || contextError.code !== 'GOALFIX_PROVIDER_CHECK_POLICY_UNAVAILABLE'
+        ) throw contextError;
+
+        let providerPolicyText: string;
+        try {
+          providerPolicyText = await provider.readFile(
+            project.slug,
+            target.commitSha,
+            VERIFICATION_LEDGER_PATH,
+          );
+        } catch (providerError) {
+          return failedContext(
+            'resolve_verification_contract',
+            'GOALFIX_PROVIDER_CHECK_POLICY_UNAVAILABLE',
+            'Repository catalog is inventory only and its exact provider required-check policy could not be read at the target head.',
+            target,
+            providerError,
+          );
+        }
+
+        contract = parseGoalfixVerificationManifest(
+          manifestText,
+          project.repo_identifier,
+          target.name,
+          providerProject.defaultBranch,
+          providerPolicyText,
+        );
+      }
+
       expectedVerificationNames = uniqueVerificationNames([
         ...contract.requiredVerificationNames,
         ...suppliedVerificationNames,
