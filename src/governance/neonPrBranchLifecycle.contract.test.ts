@@ -26,16 +26,22 @@ describe('Neon pull-request branch lifecycle contract', () => {
     expect(workflow).toContain('Neon cleanup skipped because this PR does not change supabase/.');
   });
 
-  it('keeps Neon credentials behind the database-scope gate and never exports database URLs', () => {
+  it('keeps Neon credentials and the private preview URL behind the database-scope gate without exporting it', () => {
     expect(workflow).not.toContain('create_neon_branch_encode');
-    expect(workflow).not.toContain('db_url');
     expect(workflow).not.toContain('db_url_pooled');
     expect(workflow).not.toContain('db_url_with_pooler');
     expect(workflow).toContain("echo 'NEON_API_KEY is not configured' >&2");
+    expect(workflow).toContain('NEON_DB_URL: ${{ steps.create_neon_branch.outputs.db_url }}');
+    expect(workflow).toContain("echo 'Neon branch identity and private database URL output are present. URL value was not printed.'");
+    expect(workflow).not.toMatch(/echo .*\$NEON_DB_URL/);
+    expect(workflow).not.toMatch(/NEON_DB_URL=.*>>\s*["']?\$GITHUB_ENV/);
+    expect(workflow).not.toMatch(/NEON_DB_URL=.*>>\s*["']?\$GITHUB_OUTPUT/);
 
     const firstClassifier = workflow.indexOf('- name: Classify Neon preview scope');
     const firstCredentialRead = workflow.indexOf('NEON_API_KEY: ${{ secrets.NEON_API_KEY }}');
+    const firstDatabaseUrlRead = workflow.indexOf('NEON_DB_URL: ${{ steps.create_neon_branch.outputs.db_url }}');
     expect(firstClassifier).toBeGreaterThan(-1);
     expect(firstCredentialRead).toBeGreaterThan(firstClassifier);
+    expect(firstDatabaseUrlRead).toBeGreaterThan(firstClassifier);
   });
 });

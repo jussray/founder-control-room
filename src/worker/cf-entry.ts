@@ -12,8 +12,10 @@
 
 import { httpServerHandler } from 'cloudflare:node';
 import { env } from 'cloudflare:workers';
+import express from 'express';
 import { createServer as createNodeHttpServer } from 'node:http';
 import type { ExportedHandler } from '@cloudflare/workers-types';
+import { mountFcrCommerceIngress } from '../http/fcrCommerceIngress.js';
 import {
   composeWorkerHandler,
   validateWorkerEnv,
@@ -25,7 +27,9 @@ export { ReleaseProofWorkflowV0 } from '../workflows/releaseProofWorkflow.js';
 validateWorkerEnv(env);
 
 const { createServer: createExpressApp } = await import('../http/server.js');
-const app = createExpressApp();
+const app = express();
+mountFcrCommerceIngress(app);
+app.use(createExpressApp());
 const nodeServer = createNodeHttpServer(app);
 const httpHandler = httpServerHandler(nodeServer) as ExportedHandler<ControlRoomWorkerEnv>;
 
