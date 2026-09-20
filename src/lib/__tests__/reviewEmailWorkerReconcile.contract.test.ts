@@ -112,6 +112,7 @@ describe('review-email Worker reconciliation authority contract', () => {
     expect(workflow).toContain('provider_cli_exit_status: null');
     expect(workflow).toContain('required_secret_names_verified: false');
     expect(workflow).toContain('provider_deploy_succeeded: false');
+    expect(workflow).toContain('service_binding_verified: false');
     expect(workflow).toContain('email_trigger_reconciled: false');
     expect(workflow).toContain('blocked_stage: "credential_header_safety"');
     expect(workflow).toContain('.credential_header_safe = true | .blocked_stage = "existing_worker_secret_read"');
@@ -128,8 +129,9 @@ describe('review-email Worker reconciliation authority contract', () => {
     expect(workflow).toContain('.blocked_stage = "required_worker_secret_names"');
     expect(workflow).toContain('.required_secret_names_verified = true | .blocked_stage = "provider_deploy"');
     expect(workflow).toContain('.blocked_stage = "provider_deploy_failed"');
-    expect(workflow).toContain('.blocked_stage = "service_binding_proof"');
-    expect(workflow).toContain('.provider_deploy_succeeded = true | .blocked_stage = null');
+    expect(workflow).toContain('.provider_deploy_succeeded = true | .blocked_stage = "service_binding_proof"');
+    expect(workflow).toContain('.service_binding_verified = true | .blocked_stage = null');
+    expect(workflow).not.toContain('.provider_deploy_succeeded = true | .blocked_stage = null');
     expect(workflow).toContain('Raw provider stderr was classified then deleted without emission.');
     expect(workflow).not.toContain('cat "$secret_error"');
     expect(workflow).toContain('if-no-files-found: error');
@@ -146,9 +148,12 @@ describe('review-email Worker reconciliation authority contract', () => {
     expect(workflow).toContain('access_policy_mutation: false');
   });
 
-  it('keeps provider deployment proof separate from provider-side routing and runtime email invocation', () => {
+  it('records provider deploy success before binding proof and keeps routing/runtime proof separate', () => {
     expect(workflow).toContain('provider_deploy_succeeded: false');
-    expect(workflow).toContain('.provider_deploy_succeeded = true');
+    expect(workflow).toContain('service_binding_verified: false');
+    expect(workflow).toContain('.provider_deploy_succeeded = true | .blocked_stage = "service_binding_proof"');
+    expect(workflow).toContain('Worker deploy succeeded, but Wrangler output did not prove FOUNDER_CONTROL_ROOM_API -> founder-control-room. Provider deployment remains recorded as successful; binding proof remains false.');
+    expect(workflow).toContain('.service_binding_verified = true | .blocked_stage = null');
     expect(workflow).toContain('email_trigger_reconciled: false');
     expect(workflow).not.toContain('.email_trigger_reconciled = true');
     expect(workflow).toContain('Email rule mutation/readback: absent from this workflow; retained as a separate provider receipt');

@@ -167,6 +167,7 @@ jobs:
               provider_cli_exit_status: null,
               required_secret_names_verified: false,
               provider_deploy_succeeded: false,
+              service_binding_verified: false,
               email_trigger_reconciled: false,
               blocked_stage: "credential_header_safety",
               supabase_db_mutation: false,
@@ -307,16 +308,17 @@ jobs:
             exit "$deploy_status"
           fi
 
+          tmp="${receipt}.tmp"
+          jq '.provider_deploy_succeeded = true | .blocked_stage = "service_binding_proof"' "$receipt" > "$tmp"
+          mv "$tmp" "$receipt"
+
           grep -F 'FOUNDER_CONTROL_ROOM_API (founder-control-room)' "$deploy_log" >/dev/null || {
-            tmp="${receipt}.tmp"
-            jq '.blocked_stage = "service_binding_proof"' "$receipt" > "$tmp"
-            mv "$tmp" "$receipt"
-            echo '::error title=Service Binding proof missing::Wrangler deployment output did not prove FOUNDER_CONTROL_ROOM_API -> founder-control-room.'
+            echo '::error title=Service Binding proof missing::Worker deploy succeeded, but Wrangler output did not prove FOUNDER_CONTROL_ROOM_API -> founder-control-room. Provider deployment remains recorded as successful; binding proof remains false.'
             exit 1
           }
 
           tmp="${receipt}.tmp"
-          jq '.provider_deploy_succeeded = true | .blocked_stage = null' "$receipt" > "$tmp"
+          jq '.service_binding_verified = true | .blocked_stage = null' "$receipt" > "$tmp"
           mv "$tmp" "$receipt"
           cat "$receipt" >> "$GITHUB_STEP_SUMMARY"
 
