@@ -179,6 +179,8 @@ The canonical Worker runtime secret values belong in the Cloudflare Worker secre
 
 `TINYFISH_API_KEY` is one of those required canonical Worker binding names. Its value must remain only in the Cloudflare Worker secret plane; canonical Deploy may verify the provider-held name but never read, log, or re-upload the value. That binding-name receipt still does not prove TinyFish accepted a request, so live activation requires a separately observed key-backed Search or Fetch receipt.
 
+`JBH_RECEIPT_INGEST_TOKEN` is also a required canonical Worker binding name because `/ingest/hair-commerce-receipts` rejects requests when its receiver credential is absent. Canonical Deploy may verify only that the provider reports the binding name; the value remains provider-held. That check does not prove the paired `jbh-private` `CONTROL_ROOM_RECEIPT_TOKEN`, the sender runtime, migration state, dispatch, or ledger outcome. Live JBH receipt activation requires one current sanitized sender-to-ledger receipt bound to the exact sender and FCR runtime identities.
+
 For the governed Founder Content n8n production-source lane, the same canonical Worker additionally requires the provider-held binding names `N8N_FOUNDER_CONTENT_WEBHOOK_URL`, `N8N_FOUNDER_CONTENT_BEARER_TOKEN`, `N8N_FOUNDER_CONTENT_EXPECTED_WORKFLOW_FINGERPRINT`, and `N8N_FOUNDER_CONTENT_IDENTITY_HMAC_SECRET`. Public-safe source may declare `N8N_FOUNDER_CONTENT_ENABLED=true`, Buffer-only provider selection, workflow ID `fcrFounderContentV1`, and runtime `2.32.6`, but those declarations do not prove any of the four secret values exist or that production n8n is active. Canonical exact-main Deploy must verify required binding-name presence before Worker mutation, and production truth still requires exact deployed Worker identity, production n8n workflow/fingerprint/runtime readback, and provider-native Buffer outcome evidence.
 
 The canonical Deploy authority gate has a smaller GitHub production credential surface. It requires only the credentials needed to perform the release itself:
@@ -189,7 +191,7 @@ CLOUDFLARE_API_TOKEN
 CLOUDFLARE_ACCOUNT_ID
 ```
 
-Those deployment-plane values do not become Worker runtime bindings. Conversely, Worker runtime values such as `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_PUBLISHABLE_KEY`, `FOUNDER_SESSION_ENCRYPTION_KEY`, `GITHUB_WEBHOOK_SECRET`, `GITHUB_APP_ID`, `GITHUB_PRIVATE_KEY`, MCP tokens, provider hook URLs, and review-email ingress secrets are not duplicated into the canonical Deploy authority gate.
+Those deployment-plane values do not become Worker runtime bindings. Conversely, Worker runtime values such as `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_PUBLISHABLE_KEY`, `FOUNDER_SESSION_ENCRYPTION_KEY`, `GITHUB_WEBHOOK_SECRET`, `GITHUB_APP_ID`, `GITHUB_PRIVATE_KEY`, MCP tokens, provider hook URLs, review-email ingress secrets, and the JBH receipt-ingest secret are not duplicated into the canonical Deploy authority gate.
 
 The only runtime secret canonical Deploy deliberately writes is `FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON`, and the checked-in value is fail-closed with `enabled:false`. This lets the release actively preserve the broad automation kill switch while leaving unrelated provider-held runtime secrets untouched.
 
