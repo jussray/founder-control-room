@@ -224,3 +224,23 @@ At minimum verify:
 9. authentication returns to `/control-room/` on the Pages origin;
 10. required Playwright/browser proof runs against the deployed path; and
 11. founder-content/provider claims use their own exact authorization and provider-readback gates.
+
+For the FCR Shopify money path specifically, production proof additionally requires the exact production database migration, a deployed Worker whose runtime identity matches the authorized release, provider readback that Shopify's `orders/paid` subscription targets the deployed callback, and a genuine provider-confirmed paid-order receipt before `payment_collected` can be presented as a live outcome. No test charge is implied by source or CI proof.
+
+Provider build/deploy comments, preview URLs, and successful uploads are useful evidence for the artifact they name. They do not substitute for runtime binding identity, auth, browser, publication, or fleet-wide proof.
+
+## Documentation truth
+
+When Pages proxy behavior, Worker identity, deployment authority, Cloudflare Access behavior, service bindings, secret interfaces, remote MCP scope, hostname-inventory/Request Trace behavior, Worker build-authority behavior, Cloudflare Workflow bindings/orchestration authority, or runtime proof requirements change, update this document in the same bounded repository change.
+
+Current executable source and authoritative provider readback outrank an older version of this runbook. Preserve older deployment evidence as historical provenance rather than deleting it.
+
+## Rollback
+
+- Pages: roll back to the prior verified Pages deployment.
+- API Worker: redeploy the prior exact Worker SHA through the authorized Worker release path.
+- Proxy: revert the focused `public/_worker.js` change and matching deployment contract together; do not silently point the browser at an unverified origin.
+- Service binding: revert only the affected Pages binding through separately authorized provider mutation; preserve unrelated bindings/configuration.
+- Access: roll back only an incomplete or ambiguous browser-destination detachment using the receipt-bound original destination set and unchanged application/policy identity; a later runtime/browser failure alone must not automatically reintroduce a Cloudflare Access product-login screen.
+- Credentials: remove/revoke only the affected credential; do not rotate unrelated keys to repair binding drift.
+- Preserve build logs, deployment IDs, provider readback, browser traces, and runtime receipts.

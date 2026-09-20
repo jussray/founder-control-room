@@ -266,3 +266,8 @@ Source code proves only this bounded recovery contract. Current Access state, cr
 ```bash
 npm test
 npm run typecheck
+npm run lint
+npx playwright test e2e/cloudflare-reasoning.spec.ts
+```
+
+The browser/API suite verifies the public-safe contract, founder protection, absence of credential leakage, presence of the implementation stack, and absence of an accidental deployment endpoint. Unit tests verify exact-commit reasoning, stale evidence, duplicate authority, authentication failures, runtime failure, rollback preparation, first-principles deletion/simplification output, and approval boundaries.

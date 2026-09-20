@@ -319,3 +319,7 @@ A child-app reconciliation may classify evidence as `CURRENT`, `UNDECLARED`, `SC
 ## Required crawler/public-work browser proof
 
 For public crawler and work-directory behavior, `.github/workflows/ci.yml` must keep `e2e/pages-api-recovery.spec.ts` and `e2e/public-work-directory.spec.ts` inside the load-bearing `Playwright e2e` job that feeds `Required Gate`. The specialized Pages workflow is supplementary evidence only; it cannot replace this required exact-head browser proof or authorize merge.
+
+## Cross-repository browser witness freshness
+
+The exact StoryEngine peer configured in `.github/workflows/playwright.yml` is an evidence subject, not a durable alias for current StoryEngine. A peer refresh must be backed by an independent ref/SHA observation and must reset predecessor federation/browser proof until the complete FCR → StoryEngine → receipt → FCR Playwright witness passes on the exact FCR head. Pin alignment alone grants no merge, deploy, production, or provider-mutation authority.
