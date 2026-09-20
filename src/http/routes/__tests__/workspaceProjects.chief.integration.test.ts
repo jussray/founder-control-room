@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const { mockGetUser, mockChiefRecommendation, supabaseMock } = vi.hoisted(() => ({
   mockGetUser: vi.fn(),
   mockChiefRecommendation: vi.fn(),
-  supabaseMock: { from: vi.fn() },
+  supabaseMock: { from: vi.fn(), rpc: vi.fn() },
 }));
 
 vi.mock('../../../lib/supabaseAuthClient.js', () => ({
@@ -58,6 +58,16 @@ function founderUsersRow() {
   };
 }
 
+function emptyProjectLookup() {
+  return {
+    select: () => ({
+      eq: () => ({
+        maybeSingle: () => Promise.resolve({ data: null, error: null }),
+      }),
+    }),
+  };
+}
+
 function chiefRecommendation(recommendationHash = CHIEF_HASH) {
   return {
     contract: 'chief-ai/control-room-recommendation@v1',
@@ -106,6 +116,7 @@ beforeEach(() => {
     error: null,
   });
   mockChiefRecommendation.mockResolvedValue(chiefRecommendation());
+  supabaseMock.rpc.mockResolvedValue({ data: null, error: null });
   supabaseMock.from.mockImplementation((table: string) => {
     if (table === 'founder_users') return founderUsersRow();
     return {};
@@ -145,42 +156,31 @@ describe('workspace Chief onboarding', () => {
     });
   });
 
-  it('revalidates the exact Chief recommendation after explicit founder approval before project creation', async () => {
+  it('revalidates Chief, then atomically creates project plus privacy-safe onboarding evidence', async () => {
     const recommendationResponse = await request(app())
       .post('/workspace/projects/recommendation')
       .set('Authorization', BEARER)
       .send({ project, controlRoom });
     const recommendationId = recommendationResponse.body.recommendation.id;
 
-    let eventRow: Record<string, unknown> | null = null;
     supabaseMock.from.mockImplementation((table: string) => {
       if (table === 'founder_users') return founderUsersRow();
-      if (table === 'projects') {
-        return {
-          select: () => ({
-            eq: () => ({
-              maybeSingle: () => Promise.resolve({ data: null, error: null }),
-            }),
-          }),
-          insert: (row: Record<string, unknown>) => ({
-            select: () => ({
-              single: () => Promise.resolve({
-                data: { id: 'project-1', ...row },
-                error: null,
-              }),
-            }),
-          }),
-        };
-      }
-      if (table === 'project_events') {
-        return {
-          insert: (row: Record<string, unknown>) => {
-            eventRow = row;
-            return Promise.resolve({ error: null });
-          },
-        };
-      }
+      if (table === 'projects') return emptyProjectLookup();
       return {};
+    });
+    supabaseMock.rpc.mockResolvedValue({
+      data: {
+        id: 'project-1',
+        workspace_id: 'workspace-1',
+        slug: 'launch-project',
+        name: 'Launch Project',
+        repo_provider: 'github',
+        repo_identifier: 'jussray/launch-project',
+        stack: 'Cloudflare + Supabase',
+        status: 'active',
+        risk_level: 'medium',
+      },
+      error: null,
     });
 
     const response = await request(app())
@@ -204,15 +204,59 @@ describe('workspace Chief onboarding', () => {
       deploymentApproved: false,
       executionApproved: false,
     });
-    expect(eventRow).toMatchObject({
-      project_id: 'project-1',
-      event_type: 'founder_onboarding_bootstrapped',
-      metadata: {
+
+    expect(supabaseMock.rpc).toHaveBeenCalledTimes(1);
+    const [rpcName, rpcArgs] = supabaseMock.rpc.mock.calls[0];
+    expect(rpcName).toBe('create_workspace_project_with_onboarding_event');
+    expect(rpcArgs).toMatchObject({
+      p_workspace_id: 'workspace-1',
+      p_slug: 'launch-project',
+      p_name: 'Launch Project',
+      p_repo_provider: 'github',
+      p_repo_identifier: 'jussray/launch-project',
+      p_stack: 'Cloudflare + Supabase',
+      p_event_metadata: {
         workspaceId: 'workspace-1',
         chiefRecommendationApproved: true,
         authorityGranted: false,
         credentialsStored: false,
       },
     });
+    expect(rpcArgs.p_event_metadata).not.toHaveProperty('founder');
+    expect(rpcArgs.p_event_metadata).not.toHaveProperty('email');
+    expect(rpcArgs.p_event_metadata).not.toHaveProperty('founderEmail');
+  });
+
+  it('fails closed when the atomic database bootstrap fails', async () => {
+    const recommendationResponse = await request(app())
+      .post('/workspace/projects/recommendation')
+      .set('Authorization', BEARER)
+      .send({ project, controlRoom });
+    const recommendationId = recommendationResponse.body.recommendation.id;
+
+    supabaseMock.from.mockImplementation((table: string) => {
+      if (table === 'founder_users') return founderUsersRow();
+      if (table === 'projects') return emptyProjectLookup();
+      return {};
+    });
+    supabaseMock.rpc.mockResolvedValue({
+      data: null,
+      error: { code: 'P0001', message: 'event insert rejected' },
+    });
+
+    const response = await request(app())
+      .post('/workspace/projects')
+      .set('Authorization', BEARER)
+      .send({
+        project,
+        controlRoom,
+        providers: [],
+        chiefRecommendationId: recommendationId,
+        chiefApproval: true,
+      });
+
+    expect(response.status).toBe(500);
+    expect(response.body.error).toBe('Project and onboarding evidence could not be created atomically');
+    expect(supabaseMock.rpc).toHaveBeenCalledTimes(1);
   });
 });
