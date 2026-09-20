@@ -44,6 +44,7 @@ describe('Cloudflare Worker binding observation', () => {
     expect(receipt.providerValuesRetained).toBe(false);
     expect(receipt.undeclaredBindingNamesRetained).toBe(false);
     expect(receipt.canAuthorizeProviderMutation).toBe(false);
+    expect(receipt).not.toHaveProperty('providerBindingCount');
     expect(JSON.stringify(receipt)).not.toContain('UNDECLARED_PRIVATE_NAME');
     expect(
       (receipt.requiredBindings as Array<{ present: boolean }>).every((entry) => entry.present),
