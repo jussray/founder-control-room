@@ -161,9 +161,10 @@ jobs:
             test -f "$migration" || { echo "Missing migration file: $migration" >&2; exit 1; }
 
             CHECKSUM="$(sha256sum "$migration" | awk '{print $1}')"
+            # The migration path is interpolated only after the strict filename
+            # allowlist above; it therefore cannot contain a quote or SQL token.
             EXISTING="$(psql "$NEON_DB_URL" -X -Atq \
-              -v filename="$migration" \
-              -c "SELECT sha256 FROM ci_preview.migration_receipts WHERE filename = :'filename';")"
+              -c "SELECT sha256 FROM ci_preview.migration_receipts WHERE filename = '$migration';")"
 
             if [ -n "$EXISTING" ]; then
               if [ "$EXISTING" = "$CHECKSUM" ]; then
@@ -177,9 +178,7 @@ jobs:
             echo "Applying preview migration atomically: $migration"
             psql "$NEON_DB_URL" -X -1 -v ON_ERROR_STOP=1 -f "$migration"
             psql "$NEON_DB_URL" -X -v ON_ERROR_STOP=1 \
-              -v filename="$migration" \
-              -v checksum="$CHECKSUM" \
-              -c "INSERT INTO ci_preview.migration_receipts(filename, sha256) VALUES (:'filename', :'checksum');"
+              -c "INSERT INTO ci_preview.migration_receipts(filename, sha256) VALUES ('$migration', '$CHECKSUM');"
           done
 
       - name: Verify FCR commerce preview schema when present
