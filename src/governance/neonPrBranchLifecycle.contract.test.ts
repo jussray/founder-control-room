@@ -19,8 +19,12 @@ describe('Neon pull-request branch lifecycle contract', () => {
     expect(workflow).toContain('pull-requests: read');
     expect(workflow.match(/- name: Classify Neon preview scope/g)).toHaveLength(2);
     expect(workflow).toContain('ref: ${{ github.event.pull_request.head.sha }}');
+    expect(workflow.match(/fetch-depth: 0/g)).toHaveLength(2);
+    expect(workflow).not.toContain('fetch-depth: 1');
     expect(workflow).toContain('BASE_REF: ${{ github.event.pull_request.base.ref }}');
     expect(workflow).toContain('git ls-remote origin "refs/heads/${BASE_REF}"');
+    expect(workflow).toContain('git fetch --no-tags origin "$LIVE_BASE_SHA"');
+    expect(workflow).toContain('git merge-base --is-ancestor "$LIVE_BASE_SHA" "$EXPECTED_HEAD_SHA"');
     expect(workflow).toContain('git diff --name-only "$LIVE_BASE_SHA...$EXPECTED_HEAD_SHA"');
     expect(workflow).not.toContain('pulls/${PR_NUMBER}/files?per_page=100');
     expect(workflow).toContain('supabase/*)');
