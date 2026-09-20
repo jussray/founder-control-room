@@ -6,6 +6,10 @@ const workflow = readFileSync(
   'utf8',
 );
 const wrangler = readFileSync(new URL('../../../wrangler.worker.toml', import.meta.url), 'utf8');
+const receiptRoute = readFileSync(
+  new URL('../../http/routes/hairCommerceReceipts.ts', import.meta.url),
+  'utf8',
+);
 
 describe('production Worker secret preflight contract', () => {
   it('reads provider-held secret names before any production mutation can start', () => {
@@ -56,5 +60,10 @@ describe('production Worker secret preflight contract', () => {
     expect(wrangler).toContain('"FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON",');
     expect(wrangler).toContain('"SUPABASE_SERVICE_ROLE_KEY",');
     expect(wrangler).toContain('"FOUNDER_SESSION_ENCRYPTION_KEY",');
+  });
+
+  it('keeps the JBH receipt receiver binding inside canonical deploy preflight', () => {
+    expect(receiptRoute).toContain('process.env.JBH_RECEIPT_INGEST_TOKEN?.trim()');
+    expect(wrangler).toContain('"JBH_RECEIPT_INGEST_TOKEN",');
   });
 });
