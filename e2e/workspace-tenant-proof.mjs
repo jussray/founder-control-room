@@ -195,6 +195,19 @@ try {
   assert(await page.locator('#onboarding-flow').isHidden(), 'existing workspace project bypasses first-run Composer');
   assert((await page.locator('#project-count').innerText()) === '1', 'reload preserves scoped project count');
   assert(await page.locator('.module-grid').isHidden(), 'reload does not widen capability visibility');
+
+  // The real server scheduler polls the reconciliation outbox every two seconds.
+  // Give it one cycle and prove workspace isolation also contains background
+  // provider authority, not only API visibility.
+  await sleep(2_500);
+  assert(
+    !serverLog.includes('/repos/other-founder/private-project'),
+    'foreign-workspace repositories never borrow platform GitHub provider authority',
+  );
+  assert(
+    !serverLog.includes('/repos/tenant-founder/demo'),
+    'tenant-created repository references never borrow platform GitHub provider authority',
+  );
   assert(jsErrors.length === 0, `no uncaught tenant-browser JavaScript errors (saw ${JSON.stringify(jsErrors)})`);
 
   await page.screenshot({ path: join(REPO_ROOT, 'logs', 'workspace-tenant-ready-desktop.png'), fullPage: true });
