@@ -172,7 +172,7 @@ beforeEach(() => {
   mocks.select.mockReturnValue(allowlistChain);
   mocks.eq.mockReturnValue(allowlistChain);
   mocks.maybeSingle.mockResolvedValue({
-    data: { email: 'founder@example.com' },
+    data: { email: 'founder@example.com', user_id: 'founder-user-1' },
     error: null,
   });
 
@@ -230,6 +230,34 @@ describe('requireFounder', () => {
     expect(mocks.eq).toHaveBeenCalledWith('email', 'founder@example.com');
     expect(mocks.createAuthClient).not.toHaveBeenCalled();
     expect(response.headers['set-cookie']).toBeUndefined();
+  });
+
+  it('fails closed for a legacy email-only allowlist row during role migration', async () => {
+    mocks.maybeSingle.mockResolvedValue({
+      data: { email: 'founder@example.com' },
+      error: null,
+    });
+
+    const response = await request(createProbeApp())
+      .get('/protected')
+      .set('Authorization', 'Bearer founder-access-token');
+
+    expect(response.status).toBe(403);
+    expect(response.body).toEqual({ error: 'Not on the founder allowlist' });
+  });
+
+  it('fails closed when a legacy allowlist row is bound to a different immutable user id', async () => {
+    mocks.maybeSingle.mockResolvedValue({
+      data: { email: 'founder@example.com', user_id: 'different-founder-user' },
+      error: null,
+    });
+
+    const response = await request(createProbeApp())
+      .get('/protected')
+      .set('Authorization', 'Bearer founder-access-token');
+
+    expect(response.status).toBe(403);
+    expect(response.body).toEqual({ error: 'Not on the founder allowlist' });
   });
 
   it('does not refresh an invalid explicit bearer session through a cookie', async () => {
