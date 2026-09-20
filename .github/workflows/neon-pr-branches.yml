@@ -189,18 +189,19 @@ jobs:
             # a previous baseline. Reconstruct historical order without rewriting
             # either migration: temporarily provide exactly the platform workspace
             # default that the later workspace migration would have backfilled,
-            # run the real historical migration, then remove the default even on
-            # failure. Fresh previews never take this compatibility path.
+            # run the real historical migration, then remove the default. Fresh
+            # previews never take this compatibility path.
             PROJECT_WORKSPACE_COLUMN="$(psql "$NEON_DB_URL" -X -Atqc "select count(*) from information_schema.columns where table_schema='public' and table_name='projects' and column_name='workspace_id' and data_type='uuid')"
             if [ "$PROJECT_WORKSPACE_COLUMN" = "1" ]; then
               PLATFORM_WORKSPACE_ID="$(psql "$NEON_DB_URL" -X -Atqc "select id from public.workspaces where slug='juss-founder-workspace' limit 1")"
               test -n "$PLATFORM_WORKSPACE_ID" || { echo 'Platform workspace missing while healing reused Neon baseline.' >&2; exit 1; }
               psql "$NEON_DB_URL" -X -v ON_ERROR_STOP=1 -c "ALTER TABLE public.projects ALTER COLUMN workspace_id SET DEFAULT '$PLATFORM_WORKSPACE_ID'::uuid;"
-              if ! psql "$NEON_DB_URL" -X -1 -v ON_ERROR_STOP=1 -f "$TERMINAL_MIGRATION"; then
-                psql "$NEON_DB_URL" -X -v ON_ERROR_STOP=1 -c 'ALTER TABLE public.projects ALTER COLUMN workspace_id DROP DEFAULT;' || true
-                exit 1
-              fi
+              set +e
+              psql "$NEON_DB_URL" -X -1 -v ON_ERROR_STOP=1 -f "$TERMINAL_MIGRATION"
+              TERMINAL_MIGRATION_STATUS=$?
+              set -e
               psql "$NEON_DB_URL" -X -v ON_ERROR_STOP=1 -c 'ALTER TABLE public.projects ALTER COLUMN workspace_id DROP DEFAULT;'
+              test "$TERMINAL_MIGRATION_STATUS" -eq 0
             else
               echo "Applying authoritative FCR baseline migration: $TERMINAL_MIGRATION"
               psql "$NEON_DB_URL" -X -1 -v ON_ERROR_STOP=1 -f "$TERMINAL_MIGRATION"
