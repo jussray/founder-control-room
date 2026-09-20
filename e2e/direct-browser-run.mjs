@@ -232,6 +232,30 @@ async function withV10PlanAwarePage(page) {
       });
   });
 
+  const originalLocator = page.locator.bind(page);
+  page.locator = (selector, ...args) => {
+    if (selector === '#signed-out h1') {
+      // run.mjs predates the current onboarding hierarchy. The canonical page
+      // title moved into the masthead while the signed-out panel now owns an h2.
+      // The harness already waits for #login-form; redirect only this stale
+      // heading lookup to the real masthead instead of mutating production DOM.
+      return originalLocator('.masthead h1', ...args);
+    }
+    return originalLocator(selector, ...args);
+  };
+
+  const originalWaitForSelector = page.waitForSelector.bind(page);
+  page.waitForSelector = async (selector, options) => {
+    const result = await originalWaitForSelector(selector, options);
+    if (selector === '#login-form') {
+      const signInHeading = await originalLocator('#signed-out h2').innerText();
+      if (signInHeading !== 'Enter your private control plane.') {
+        throw new Error(`E2E_SIGNED_OUT_HEADING_DRIFT: ${JSON.stringify(signInHeading)}`);
+      }
+    }
+    return result;
+  };
+
   const originalEvaluate = page.evaluate.bind(page);
   page.evaluate = async (...args) => {
     const [pageFunction] = args;
