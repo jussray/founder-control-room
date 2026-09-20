@@ -11,6 +11,7 @@ const MANAGED_ENV = [
   'FCR_GMAIL_CLIENT_ID',
   'FCR_GMAIL_CLIENT_SECRET',
   'FCR_GMAIL_EXPECTED_EMAIL',
+  'FCR_GMAIL_FROM_EMAIL',
   'FCR_WHATSAPP_ACCESS_TOKEN',
   'FCR_WHATSAPP_PHONE_NUMBER_ID',
   'FCR_WHATSAPP_WABA_ID',
@@ -44,12 +45,23 @@ describe('growthInboxReplyStatus', () => {
     expect(status.channels.email.configured).toBe(false);
     expect(status.channels.whatsapp.configured).toBe(false);
   });
+
+  it('requires a pinned Gmail sender identity separately from the authenticated account', () => {
+    process.env.FCR_GMAIL_ACCESS_TOKEN = 'test-token';
+    process.env.FCR_GMAIL_EXPECTED_EMAIL = 'founder@example.com';
+    delete process.env.FCR_GMAIL_FROM_EMAIL;
+
+    const status = growthInboxReplyStatus();
+    expect(status.channels.email.configured).toBe(false);
+    expect(status.channels.email.missing).toContain('FCR_GMAIL_FROM_EMAIL');
+  });
 });
 
 describe('sendGmailReply', () => {
-  it('verifies the mailbox fingerprint and derives the recipient from the referenced message', async () => {
+  it('verifies mailbox and sender fingerprints and derives the recipient from the referenced message', async () => {
     process.env.FCR_GMAIL_ACCESS_TOKEN = 'test-token';
     process.env.FCR_GMAIL_EXPECTED_EMAIL = 'founder@example.com';
+    process.env.FCR_GMAIL_FROM_EMAIL = 'support@example.com';
 
     const fetchMock = vi.fn<typeof fetch>()
       .mockResolvedValueOnce(jsonResponse({ emailAddress: 'founder@example.com' }))
@@ -65,7 +77,12 @@ describe('sendGmailReply', () => {
           ],
         },
       }))
-      .mockResolvedValueOnce(jsonResponse({ id: 'sent-2', threadId: 'thread-7' }));
+      .mockResolvedValueOnce(jsonResponse({ id: 'sent-2', threadId: 'thread-7' }))
+      .mockResolvedValueOnce(jsonResponse({
+        id: 'sent-2',
+        threadId: 'thread-7',
+        payload: { headers: [{ name: 'From', value: 'support@example.com' }] },
+      }));
 
     const result = await sendGmailReply({
       messageId: 'gmail-message-1',
@@ -78,13 +95,15 @@ describe('sendGmailReply', () => {
       threadId: 'thread-7',
       recipient: 'replies@example.net',
       account: 'founder@example.com',
+      sender: 'support@example.com',
     });
 
-    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(fetchMock).toHaveBeenCalledTimes(4);
     const sendInit = fetchMock.mock.calls[2]?.[1] as RequestInit;
     const sendBody = JSON.parse(String(sendInit.body)) as { raw: string; threadId: string };
     const decoded = Buffer.from(sendBody.raw, 'base64url').toString('utf8');
     expect(sendBody.threadId).toBe('thread-7');
+    expect(decoded).toContain('From: support@example.com');
     expect(decoded).toContain('To: replies@example.net');
     expect(decoded).toContain('Subject: Re: Question about the launch');
     expect(decoded).toContain('In-Reply-To: <provider-123@example.net>');
@@ -94,6 +113,7 @@ describe('sendGmailReply', () => {
   it('blocks a mismatched Gmail account fingerprint before reading or sending the message', async () => {
     process.env.FCR_GMAIL_ACCESS_TOKEN = 'test-token';
     process.env.FCR_GMAIL_EXPECTED_EMAIL = 'founder@example.com';
+    process.env.FCR_GMAIL_FROM_EMAIL = 'support@example.com';
     const fetchMock = vi.fn<typeof fetch>()
       .mockResolvedValueOnce(jsonResponse({ emailAddress: 'wrong@example.com' }));
 
@@ -102,6 +122,36 @@ describe('sendGmailReply', () => {
       body: 'Reply',
     }, fetchMock)).rejects.toThrow('GMAIL_ACCOUNT_FINGERPRINT_MISMATCH');
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('blocks success when Gmail rewrites or rejects the pinned sender identity', async () => {
+    process.env.FCR_GMAIL_ACCESS_TOKEN = 'test-token';
+    process.env.FCR_GMAIL_EXPECTED_EMAIL = 'founder@example.com';
+    process.env.FCR_GMAIL_FROM_EMAIL = 'support@example.com';
+
+    const fetchMock = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(jsonResponse({ emailAddress: 'founder@example.com' }))
+      .mockResolvedValueOnce(jsonResponse({
+        id: 'gmail-message-1',
+        threadId: 'thread-7',
+        payload: {
+          headers: [
+            { name: 'From', value: 'Customer <customer@example.net>' },
+            { name: 'Subject', value: 'Question' },
+          ],
+        },
+      }))
+      .mockResolvedValueOnce(jsonResponse({ id: 'sent-2', threadId: 'thread-7' }))
+      .mockResolvedValueOnce(jsonResponse({
+        id: 'sent-2',
+        threadId: 'thread-7',
+        payload: { headers: [{ name: 'From', value: 'founder@example.com' }] },
+      }));
+
+    await expect(sendGmailReply({
+      messageId: 'gmail-message-1',
+      body: 'Reply',
+    }, fetchMock)).rejects.toThrow('GMAIL_SENDER_FINGERPRINT_MISMATCH');
   });
 });
 
