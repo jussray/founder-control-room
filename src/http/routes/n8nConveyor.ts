@@ -27,11 +27,13 @@ import {
 import { FOUNDER_CONVEYOR_CONTRACT } from '../../lib/founderConveyorReceipt.js';
 import { requireFounder, type FounderRequest } from '../middleware/requireFounder.js';
 import { founderContentLifecycleRouter } from './founderContentLifecycle.js';
+import { founderContentMetricsCsvRouter } from './founderContentMetricsCsv.js';
 import { youtubeGrowthRouter } from './youtubeGrowth.js';
 
 export const n8nConveyorRouter = Router();
 n8nConveyorRouter.use(requireFounder);
 n8nConveyorRouter.use('/founder-content/lifecycle', founderContentLifecycleRouter);
+n8nConveyorRouter.use('/founder-content/lifecycle', founderContentMetricsCsvRouter);
 n8nConveyorRouter.use('/founder-content/youtube-growth', youtubeGrowthRouter);
 
 type JsonRecord = Record<string, unknown>;
