@@ -2,9 +2,10 @@ import { createHash, randomUUID } from 'node:crypto';
 import { Router } from 'express';
 import { supabase } from '../../lib/supabaseClient.js';
 import { requireWorkspaceUser, type FounderRequest } from '../middleware/requireFounder.js';
+import { rateLimitFounderPermissions } from '../middleware/security.js';
 
 export const workspaceProjectsRouter = Router();
-workspaceProjectsRouter.use(requireWorkspaceUser);
+workspaceProjectsRouter.use(rateLimitFounderPermissions, requireWorkspaceUser);
 
 type DbRecord = Record<string, unknown>;
 type ControlRoomProfile = {
