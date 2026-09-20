@@ -18,11 +18,15 @@ const cancelOnboarding = id('cancel-onboarding');
 const accountSecondary = id('account-secondary');
 const projectName = id('project-name');
 const projectSlug = id('project-slug');
+const repoIdentifier = id('repo-identifier');
+const projectStack = id('project-stack');
 const authorityConfirm = id('authority-confirm');
 let founder = null;
 let state = null;
 let slugTouched = false;
 let serverRecommendationId = null;
+let platformChiefRecommendation = null;
+let recommendationSequence = 0;
 
 const projectTypeLabels = {
   'product-app': 'Product / App',
@@ -65,13 +69,13 @@ const isWorkspaceOwner = () => founder && founder.role === 'workspace_owner';
 
 function composerPayload() {
   const formData = new FormData(workspaceForm);
-  const repoIdentifier = String(formData.get('repoIdentifier') || '').trim();
+  const repoValue = String(formData.get('repoIdentifier') || '').trim();
   return {
     project: {
       name: String(formData.get('projectName') || '').trim(),
       slug: String(formData.get('projectSlug') || '').trim(),
-      repoProvider: repoIdentifier ? 'github' : 'none',
-      repoIdentifier,
+      repoProvider: repoValue ? 'github' : 'none',
+      repoIdentifier: repoValue,
       stack: String(formData.get('stack') || '').trim(),
       riskLevel: 'medium',
     },
@@ -90,7 +94,7 @@ function ensureChiefUi() {
     presence.id = 'chief-presence';
     presence.className = 'chief-presence';
     presence.setAttribute('aria-label', 'Chief recommendation guide');
-    presence.innerHTML = '<div class="chief-emblem" aria-hidden="true"><span class="chief-crown">♛</span><span class="chief-lion">🦁</span></div><div class="chief-copy"><span class="chief-name">CHIEF</span><span class="chief-motto">LEAD · BUILD · EXECUTE</span><p>I will recommend the right Control Room. You decide whether to create it.</p></div>';
+    presence.innerHTML = '<div class="chief-emblem" aria-hidden="true"><span class="chief-crown">♛</span><span class="chief-lion">🦁</span></div><div class="chief-copy"><span class="chief-name">CHIEF</span><span class="chief-motto">LEAD · BUILD · EXECUTE</span><p>Chief recommends the Control Room. FCR keeps the evidence and authority boundary. You decide whether to create it.</p></div>';
     hero.appendChild(presence);
   }
 
@@ -101,30 +105,28 @@ function ensureChiefUi() {
     card.id = 'chief-recommendation';
     card.className = 'chief-recommendation';
     card.setAttribute('aria-live', 'polite');
-    card.innerHTML = '<div class="chief-emblem" aria-hidden="true"><span class="chief-crown">♛</span><span class="chief-lion">🦁</span></div><div class="chief-recommendation-copy"><span class="chief-label">Chief recommendation</span><strong id="chief-recommendation-title">Complete the project, mission, and reality steps.</strong><p id="chief-recommendation-detail">Chief will recommend a room after you provide the context.</p><p class="chief-authority">Recommendation only. Chief does not create, change, connect, merge, deploy, or authorize this room until you explicitly choose Create my Control Room.</p></div>';
+    card.innerHTML = '<div class="chief-emblem" aria-hidden="true"><span class="chief-crown">♛</span><span class="chief-lion">🦁</span></div><div class="chief-recommendation-copy"><span class="chief-label">Chief recommendation</span><strong id="chief-recommendation-title">Complete the project, mission, and reality steps.</strong><p id="chief-recommendation-detail">FCR will request a proposal-only recommendation after you provide the context.</p><p class="chief-authority">Recommendation only. Chief cannot create, change, connect, merge, deploy, spend, publish, or authorize this room.</p></div>';
     evidenceStep.insertBefore(card, authority);
   }
 }
 
-function updateChiefRecommendation() {
+function invalidateChiefRecommendation() {
+  recommendationSequence += 1;
   serverRecommendationId = null;
-  const projectType = selectedValue('projectType');
-  const mission = selectedValue('mission');
-  const currentState = selectedValue('currentState');
-  const name = projectName.value.trim() || 'this project';
+  platformChiefRecommendation = null;
+  if (authorityConfirm) {
+    authorityConfirm.checked = false;
+    authorityConfirm.disabled = true;
+  }
+  workspaceButton.disabled = true;
+}
+
+function setRecommendationPlaceholder() {
   const title = id('chief-recommendation-title');
   const detail = id('chief-recommendation-detail');
   if (!title || !detail) return;
-  if (!projectType || !mission || !currentState) {
-    title.textContent = 'Complete the project, mission, and reality steps.';
-    detail.textContent = 'Chief will recommend a room after you provide the context.';
-    return;
-  }
-  const typeLabel = projectTypeLabels[projectType] || 'Project';
-  const missionLabel = missionLabels[mission] || 'Mission';
-  const stateLabel = stateLabels[currentState] || 'Unknown';
-  title.textContent = 'Chief recommends a ' + typeLabel + ' Control Room focused on ' + missionLabel + '.';
-  detail.textContent = 'For ' + name + ', begin from the founder-declared ' + stateLabel + ' state. FCR will keep that declaration separate from independently verified reality and use ' + missionLabel + ' as the primary operating lens.';
+  title.textContent = 'Complete the project, mission, and reality steps.';
+  detail.textContent = 'FCR will request a proposal-only recommendation after you provide the context.';
 }
 
 async function api(path, options = {}) {
@@ -158,8 +160,7 @@ async function requestWorkspaceRecommendation() {
   if (!isWorkspaceOwner()) return;
   const title = id('chief-recommendation-title');
   const detail = id('chief-recommendation-detail');
-  serverRecommendationId = null;
-  workspaceButton.disabled = true;
+  const sequence = recommendationSequence;
   title.textContent = 'Chief is binding this recommendation to your workspace…';
   detail.textContent = 'The exact project, mission, reality, and workspace are being fingerprinted before you can approve creation.';
   try {
@@ -167,17 +168,58 @@ async function requestWorkspaceRecommendation() {
       method: 'POST',
       body: JSON.stringify(composerPayload()),
     });
+    if (sequence !== recommendationSequence) return;
     const recommendation = result.recommendation;
     serverRecommendationId = recommendation.id;
     title.textContent = recommendation.title;
     detail.textContent = recommendation.detail + ' First gate: ' + recommendation.firstGate;
+    authorityConfirm.disabled = false;
+    workspaceButton.disabled = false;
     say('Chief recommendation is bound to this exact workspace and project. Review it before creating the room.');
   } catch (error) {
+    if (sequence !== recommendationSequence) return;
     title.textContent = 'Chief could not bind this recommendation.';
     detail.textContent = error instanceof Error ? error.message : 'Request a fresh recommendation.';
     say(detail.textContent, true);
-  } finally {
+  }
+}
+
+async function requestPlatformChiefRecommendation() {
+  if (isWorkspaceOwner()) return;
+  const title = id('chief-recommendation-title');
+  const detail = id('chief-recommendation-detail');
+  const sequence = recommendationSequence;
+  title.textContent = 'Asking Chief for the current recommendation…';
+  detail.textContent = 'FCR is keeping this request proposal-only and will bind your approval to the exact recommendation.';
+  try {
+    const result = await api('/onboarding/chief-recommendation', {
+      method: 'POST',
+      body: JSON.stringify(composerPayload()),
+    });
+    if (sequence !== recommendationSequence) return;
+    const recommendation = result && result.recommendation;
+    const acceptance = result && result.acceptance;
+    if (!recommendation || !acceptance || typeof recommendation.recommendationHash !== 'string' || typeof acceptance.fingerprint !== 'string') {
+      throw new Error('Chief returned an incomplete recommendation');
+    }
+    platformChiefRecommendation = {
+      recommendationHash: recommendation.recommendationHash,
+      acceptanceFingerprint: acceptance.fingerprint,
+    };
+    title.textContent = recommendation.title;
+    detail.textContent = [
+      recommendation.focus,
+      recommendation.stateGuidance,
+      'Next gate: ' + recommendation.nextGate,
+    ].filter(Boolean).join(' ');
+    authorityConfirm.disabled = false;
     workspaceButton.disabled = false;
+    say('Chief recommendation verified. Your approval will be bound to this exact project subject and recommendation.');
+  } catch (error) {
+    if (sequence !== recommendationSequence) return;
+    title.textContent = 'Chief recommendation unavailable.';
+    detail.textContent = 'FCR will not create this Control Room until the recommendation can be verified and explicitly accepted.';
+    say(error instanceof Error ? error.message : 'Unable to load Chief recommendation', true);
   }
 }
 
@@ -191,8 +233,9 @@ function showStep(step) {
     indicator.classList.toggle('complete', value < step);
   });
   if (step === 4) {
-    updateChiefRecommendation();
+    invalidateChiefRecommendation();
     if (isWorkspaceOwner()) void requestWorkspaceRecommendation();
+    else void requestPlatformChiefRecommendation();
   }
   flow.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
@@ -211,8 +254,8 @@ function validateStep(step) {
 function resetComposer() {
   workspaceForm.reset();
   slugTouched = false;
-  serverRecommendationId = null;
-  updateChiefRecommendation();
+  invalidateChiefRecommendation();
+  setRecommendationPlaceholder();
   showStep(1);
   say('');
 }
@@ -237,8 +280,10 @@ function applyAccountMode() {
 
   if (authorityConfirm) {
     const copy = authorityConfirm.closest('label')?.querySelector('span');
-    if (copy && tenant) {
-      copy.textContent = 'I approve this exact Chief recommendation to create this workspace-scoped Control Room. This does not approve provider access, merge, deployment, migration, spending, communication, deletion, or execution.';
+    if (copy) {
+      copy.textContent = tenant
+        ? 'I approve this exact Chief recommendation to create this workspace-scoped Control Room. This does not approve provider access, merge, deployment, migration, spending, communication, deletion, or execution.'
+        : 'I reviewed the current Chief recommendation above and explicitly accept it for this Control Room. This does not approve provider access, merge, deployment, migration, spending, communication, deletion, or execution.';
     }
   }
 }
@@ -319,7 +364,8 @@ async function session() {
 }
 
 ensureChiefUi();
-document.querySelectorAll('input[name="projectType"],input[name="mission"],input[name="currentState"]').forEach((input) => input.addEventListener('change', updateChiefRecommendation));
+invalidateChiefRecommendation();
+document.querySelectorAll('input[name="projectType"],input[name="mission"],input[name="currentState"]').forEach((input) => input.addEventListener('change', invalidateChiefRecommendation));
 document.querySelectorAll('.next-step').forEach((button) => button.addEventListener('click', () => {
   const current = Number(button.closest('.composer-step')?.dataset.step || 1);
   if (validateStep(current)) showStep(Number(button.dataset.nextStep));
@@ -327,15 +373,15 @@ document.querySelectorAll('.next-step').forEach((button) => button.addEventListe
 document.querySelectorAll('.previous-step').forEach((button) => button.addEventListener('click', () => showStep(Number(button.dataset.previousStep))));
 projectName.addEventListener('input', () => {
   if (!slugTouched) projectSlug.value = slugify(projectName.value);
-  updateChiefRecommendation();
+  invalidateChiefRecommendation();
 });
 projectSlug.addEventListener('input', () => {
   slugTouched = true;
   projectSlug.value = slugify(projectSlug.value);
-  serverRecommendationId = null;
+  invalidateChiefRecommendation();
 });
-id('repo-identifier').addEventListener('input', () => { serverRecommendationId = null; });
-id('project-stack').addEventListener('input', () => { serverRecommendationId = null; });
+repoIdentifier.addEventListener('input', invalidateChiefRecommendation);
+projectStack.addEventListener('input', invalidateChiefRecommendation);
 
 loginForm.addEventListener('submit', async (event) => {
   event.preventDefault();
@@ -361,9 +407,13 @@ workspaceForm.addEventListener('submit', async (event) => {
     say('Chief recommendation is stale or unavailable. Return to Reality, then continue to Evidence for a fresh recommendation.', true);
     return;
   }
+  if (!tenant && !platformChiefRecommendation) {
+    say('A current Chief recommendation must be loaded and accepted before creating this Control Room.', true);
+    return;
+  }
 
   workspaceButton.disabled = true;
-  say(tenant ? 'Creating the approved workspace-scoped Control Room…' : 'Composing the Control Room and declaring evidence boundaries…');
+  say(tenant ? 'Creating the approved workspace-scoped Control Room…' : 'Revalidating the accepted Chief recommendation and composing the Control Room…');
   try {
     const formData = new FormData(workspaceForm);
     const payload = composerPayload();
@@ -385,16 +435,31 @@ workspaceForm.addEventListener('submit', async (event) => {
     } else {
       const result = await api('/onboarding/bootstrap', {
         method: 'POST',
-        body: JSON.stringify({ ...payload, providers }),
+        body: JSON.stringify({
+          ...payload,
+          providers,
+          chiefRecommendation: {
+            recommendationHash: platformChiefRecommendation.recommendationHash,
+            acceptanceFingerprint: platformChiefRecommendation.acceptanceFingerprint,
+            accepted: true,
+          },
+        }),
       });
       const created = Array.isArray(result.connectionsCreated) ? result.connectionsCreated.length : 0;
-      say('Control Room ready. ' + created + ' evidence slot' + (created === 1 ? ' was' : 's were') + ' declared. No credentials or execution authority were granted.');
+      say('Control Room ready. ' + created + ' evidence slot' + (created === 1 ? ' was' : 's were') + ' declared. Chief granted no execution authority, and no credentials or provider authority were granted.');
+      platformChiefRecommendation = null;
     }
     await loadState();
   } catch (error) {
-    say(error instanceof Error ? error.message : 'Unable to create Control Room', true);
+    const message = error instanceof Error ? error.message : 'Unable to create Control Room';
+    say(message, true);
+    if (/recommendation changed|revalidat|current Chief recommendation/i.test(message)) {
+      invalidateChiefRecommendation();
+      if (tenant) void requestWorkspaceRecommendation();
+      else void requestPlatformChiefRecommendation();
+    }
   } finally {
-    workspaceButton.disabled = false;
+    if (tenant ? serverRecommendationId : platformChiefRecommendation) workspaceButton.disabled = false;
   }
 });
 
