@@ -468,11 +468,18 @@ function renderProjectDetail(mount) {
   panel.querySelectorAll('.connection-check-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
       guarded(async () => {
-        await api(`/projects/${encodeURIComponent(p.project.slug)}/connections/${btn.dataset.connectionId}/check`, {
+        const expectedConnectionId = btn.dataset.connectionId;
+        const checkResult = await api(`/projects/${encodeURIComponent(p.project.slug)}/connections/${expectedConnectionId}/check`, {
           method: 'POST',
           body: JSON.stringify({ status: 'active' }),
         });
-        await loadProjectConnections(p.project.slug);
+        const updatedConnection = checkResult?.connection;
+        if (!updatedConnection || updatedConnection.id !== expectedConnectionId) {
+          throw new Error('Connection check returned mismatched connection identity.');
+        }
+        state.projectConnections = state.projectConnections.map((connection) => (
+          connection.id === expectedConnectionId ? updatedConnection : connection
+        ));
         setBanner('notice', 'Connection check recorded.');
       });
     });
