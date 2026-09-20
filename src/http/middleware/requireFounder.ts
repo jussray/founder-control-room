@@ -51,14 +51,15 @@ function authenticatedIdentity(user: unknown): AuthenticatedIdentity | null {
 }
 
 async function founderAccess(identity: AuthenticatedIdentity): Promise<FounderAccessState> {
-  // `select('*')` is deliberate during the migration rollout. Before the new
-  // workspace columns exist, only the already-bound immutable founder user_id
-  // may retain platform-owner authority. A legacy email-only allowlist row must
-  // fail closed rather than temporarily inheriting global FCR authority.
+  // Immutable Auth ID is the database predicate, not merely a field checked
+  // after an email lookup. `user_id` has been part of founder_users since the
+  // immutable-authority migration, so a legacy email-only row cannot match
+  // this query and therefore fails closed. Selecting `*` keeps the rollout
+  // compatible while account_role/workspace_id are introduced.
   const { data: allowRow, error: allowError } = await supabase
     .from('founder_users')
     .select('*')
-    .eq('email', identity.email)
+    .eq('user_id', identity.userId)
     .maybeSingle();
 
   if (allowError) return { state: 'error' };
@@ -67,14 +68,20 @@ async function founderAccess(identity: AuthenticatedIdentity): Promise<FounderAc
   }
 
   const record = allowRow as Record<string, unknown>;
+  const rowEmail = typeof record.email === 'string'
+    ? record.email.trim().toLowerCase()
+    : '';
   const boundUserId = typeof record.user_id === 'string' ? record.user_id.trim() : '';
   const rawRole = record.account_role;
   const hasExplicitRole = rawRole !== undefined && rawRole !== null;
   const hasExplicitWorkspaceColumn = Object.prototype.hasOwnProperty.call(record, 'workspace_id');
 
-  // Email is discovery metadata only. No legacy or explicit role can grant
-  // authority unless the allowlist row is bound to the exact immutable Auth ID.
-  if (!boundUserId || boundUserId !== identity.userId) {
+  // Real provider truth is established by the exact user_id predicate above.
+  // Validate any echoed identity fields as an additional consistency check.
+  if (!rowEmail || rowEmail !== identity.email) {
+    return { state: 'denied' };
+  }
+  if (boundUserId && boundUserId !== identity.userId) {
     return { state: 'denied' };
   }
 
