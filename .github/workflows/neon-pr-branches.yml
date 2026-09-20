@@ -28,7 +28,7 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: ${{ github.event.pull_request.head.sha }}
-          fetch-depth: 1
+          fetch-depth: 0
           persist-credentials: false
 
       - name: Classify Neon preview scope
@@ -57,7 +57,7 @@ jobs:
             echo "::error title=Live base resolution failed::Could not resolve refs/heads/${BASE_REF}"
             exit 1
           }
-          git fetch --no-tags --depth=1 origin "$LIVE_BASE_SHA"
+          git fetch --no-tags origin "$LIVE_BASE_SHA"
           git merge-base --is-ancestor "$LIVE_BASE_SHA" "$EXPECTED_HEAD_SHA" || {
             echo "::error title=Stale pull request base::Exact head does not contain live ${BASE_REF}@${LIVE_BASE_SHA}; continuity must roll forward before database preview."
             exit 1
@@ -233,7 +233,7 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: ${{ github.event.pull_request.head.sha }}
-          fetch-depth: 1
+          fetch-depth: 0
           persist-credentials: false
 
       - name: Classify Neon preview scope
@@ -262,7 +262,7 @@ jobs:
             echo "::error title=Live base resolution failed::Could not resolve refs/heads/${BASE_REF}"
             exit 1
           }
-          git fetch --no-tags --depth=1 origin "$LIVE_BASE_SHA"
+          git fetch --no-tags origin "$LIVE_BASE_SHA"
 
           mapfile -t CHANGED_FILES < <(git diff --name-only "$LIVE_BASE_SHA...$EXPECTED_HEAD_SHA")
 
