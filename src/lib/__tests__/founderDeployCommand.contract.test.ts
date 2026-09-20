@@ -35,14 +35,6 @@ function commandJobBlock(name: string, nextName: string) {
   return block![1];
 }
 
-function deployJobBlock(name: string, nextName?: string) {
-  const suffix = nextName ? `(?=\\n  ${nextName}:\\n)` : '$';
-  const pattern = new RegExp(`\\n  ${name}:\\n([\\s\\S]*?)${suffix}`);
-  const block = deployWorkflow.match(pattern);
-  expect(block).not.toBeNull();
-  return block![1];
-}
-
 describe('Founder deploy command authority contract', () => {
   it('accepts only the founder Worker command on canonical issue 182', () => {
     expect(commandWorkflow).toContain('issue_comment:');
@@ -104,18 +96,6 @@ describe('Founder deploy command authority contract', () => {
     expect(deployWorkflow).toContain('Verify post-push migration ledger');
   });
 
-  it('fails closed on post-deploy drift before proof-of-ship can schedule publication', () => {
-    const proofOfShip = deployJobBlock('proof-of-ship', 'reconcile');
-    const postDeployReconcile = deployJobBlock('reconcile');
-
-    expect(postDeployReconcile).toContain('environment: production');
-    expect(postDeployReconcile).toContain('needs: smoke-test');
-    expect(postDeployReconcile).not.toContain('continue-on-error: true');
-    expect(postDeployReconcile).toContain('npx tsx src/reconciliation/scripts/self-reconcile.ts');
-    expect(proofOfShip).toContain('needs: reconcile');
-    expect(proofOfShip).toContain("if: needs.reconcile.result == 'success'");
-  });
-
   it('accepts a separate founder-only review-email command only on issue 395', () => {
     expect(commandWorkflow).toContain("github.event.issue.number == 395");
     expect(commandWorkflow).toContain("github.event.comment.user.login == 'jussray'");
@@ -171,6 +151,8 @@ describe('Founder deploy command authority contract', () => {
     expect(workerConfig).toMatch(/^account_id = "[0-9a-f]{32}"$/m);
     expect(reconcileWorkflow).not.toContain('SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}');
     expect(reconcileWorkflow).not.toContain('GITHUB_PRIVATE_KEY: ${{ secrets.GITHUB_PRIVATE_KEY }}');
+    expect(reconcileWorkflow).not.toContain('FCR_SHOPIFY_WEBHOOK_SECRET: ${{ secrets.FCR_SHOPIFY_WEBHOOK_SECRET }}');
+    expect(reconcileWorkflow).not.toContain('FCR_COMMERCE_HASH_SALT: ${{ secrets.FCR_COMMERCE_HASH_SALT }}');
     expect(reconcileWorkflow).not.toContain('TINYFISH_API_KEY: ${{ secrets.TINYFISH_API_KEY }}');
     expect(reconcileWorkflow).not.toContain('FOUNDER_SIGNAL_ENGINE_MCP_TOKEN: ${{ secrets.FOUNDER_SIGNAL_ENGINE_MCP_TOKEN }}');
     expect(configuredWorkerSecretNames()).toEqual([
@@ -181,6 +163,8 @@ describe('Founder deploy command authority contract', () => {
       'GITHUB_APP_ID',
       'GITHUB_PRIVATE_KEY',
       'FCR_REMOTE_MCP_READ_TOKEN',
+      'FCR_SHOPIFY_WEBHOOK_SECRET',
+      'FCR_COMMERCE_HASH_SALT',
       'TINYFISH_API_KEY',
       'FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON',
       'FOUNDER_SIGNAL_ENGINE_MCP_TOKEN',

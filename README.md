@@ -156,13 +156,11 @@ Investor email is a separate authority class and must not auto-send without the 
 
 FCR's `content-outcome-learning@v1` Attack 3000 adapter and `evaluateContentTrendRadar` are source-level observation and recommendation capabilities inside the existing ULTRATHINK content lane. They do not create a separate publishing system and do not make analytics or trends authoritative merely because a caller labels them `CURRENT`, `VERIFIED`, or `EMERGING_SIGNAL`.
 
-The `content-metrics-csv@v1` importer is also observation-only. It binds each metric row to content fingerprint, provider, account, page, audience segment, metric name and count unit, measurement window, observation time, source reference, and deterministic provenance. Blank metric values remain `UNKNOWN_NO_EVIDENCE`; exact duplicate observations may collapse, but conflicting duplicate identities fail closed. Safe fixture ingestion proves parsing, normalization, duplicate handling, null semantics, provenance, and idempotency only. A current external analytics claim still requires authorized real provider data and freshness evidence, and CSV ingestion never grants publication, provider mutation, strategy mutation, merge, deploy, or freshness authority.
-
-The normalized founder-content analytics CSV ingest is a separate provider-neutral interchange boundary. Its receipt requires distinct account and page identity, exact source SHA-256, historical/current snapshot provenance, comparison scope, and offset-aware `generated_at`/`captured_at` timestamps. Filename, account display name, and receipt-generation time remain provenance but do not mint a second logical import for identical evidence; logical idempotency is bound to stable source/account/page/comparison identity. Safe fixture proof remains source proof only and cannot substitute for live provider analytics evidence.
-
 Attack 3000 content evidence must bind publication and metrics to one observation identity, content fingerprint, provider, comparable window, completed measurement state, and explicit evaluation time. The adapter independently checks observation/window timestamps, bounded future skew, and an explicit freshness expiry; `CURRENT` alone is insufficient. Distribution evidence such as publication, impressions, reactions, comments, and profile views is not business demand by itself. Supporting external-demand evidence must retain its own evidence references plus a downstream attributed signal. Metric stop floors are evaluated only from their relevant current observation and cannot fire before verified publication and a completed measurement window.
 
 The Trend Radar ranks sourced signals using timeliness, audience interest, content potential, founder fit, closest-legitimate-dollar relevance, competition opportunity, saturation, and content-fingerprint similarity. First-wave eligibility requires evidence id + source + `observedAt` that is current against the explicit evaluation time; the default evidence window is seven days with a two-minute future-skew tolerance. Evidence-less, unattributed, malformed, stale, future-dated, prediction-only, or incompletely framed candidates cannot enter the first wave. Rankings remain advisory and authorize **no publish, scheduling, spend, provider, merge, deploy, or external-contact action**.
+
+The authenticated founder-content conveyor now exposes `fcr/youtube-growth-evaluation@v1` at `/automation/conveyor/founder-content/youtube-growth/evaluate`. This route makes the existing evidence-gated `TEST_AND_VALIDATE -> DOUBLE_DOWN -> SCALE` evaluator reachable without turning it into an execution lane. It rejects malformed experiments, measurements, continuity fingerprints, thresholds, targets, unknown fields, and duplicate repeatability receipts before they can produce a stronger recommendation. A returned `ADVANCE` is advisory strategy evidence only: it authorizes no publication, scheduling, spend, provider mutation, scale execution, merge, or deploy. YouTube publication state, YPP eligibility, revenue, and other provider outcomes remain UNKNOWN until separately proven by authoritative provider/outcome evidence.
 
 Founder-content approval reservations are deterministic for the same founder, platform, normalized public thesis/opening hook, and Current You intent. A retry after a lost issuance response may recover only the exact still-active stored reservation with matching approval id, founder, proposal hash, public payload hash, and platform. Mismatched, consumed, revoked, expired, or otherwise non-current reservations do not recover and do not create fresh authority.
 
@@ -181,12 +179,13 @@ foundercontrolroom.org
 api.foundercontrolroom.org
   -> canonical Worker: founder-control-room
 ```
-
 Public discovery artifacts such as `/robots.txt`, `/sitemap.xml`, `/llms.txt`, and `/crawlers.json` are static Pages assets and must be served through the `ASSETS` binding; API-owned callback assets remain routed through `FCR_API`. This source routing rule does not make crawler policy authentication and cannot grant provider, deploy, publication, or mutation authority.
 
 Source dependence on that topology is not proof the live provider is configured correctly.
 
 `wrangler.worker.toml [secrets].required` is the canonical production binding-name gate for provider-held Worker secrets. A provider-backed capability such as `tinyfish-web-observation-v1` must name `TINYFISH_API_KEY` there before canonical Worker promotion; Deploy verifies only binding-name presence in Cloudflare and never copies the secret value through GitHub Actions. Source and CI readiness therefore remain distinct from live TinyFish provider/runtime activation.
+
+The first-party FCR Shopify paid-order ingress follows the same boundary. `FCR_SHOPIFY_WEBHOOK_SECRET` and `FCR_COMMERCE_HASH_SALT` must remain provider-held required Worker secrets before promotion, while source merely declares their names. Their presence cannot prove that Shopify registered the `orders/paid` callback, that the deployed Worker serves the exact commerce head, that the production Supabase migration exists, or that any payment was collected; those claims require separate provider, deployment, database, runtime, and revenue receipts.
 
 Production does not deploy merely because `main` moved or a Cloudflare build succeeded. A production claim remains incomplete until the authorized lane proves, for one exact candidate:
 
@@ -318,3 +317,7 @@ A child-app reconciliation may classify evidence as `CURRENT`, `UNDECLARED`, `SC
 ## Required crawler/public-work browser proof
 
 For public crawler and work-directory behavior, `.github/workflows/ci.yml` must keep `e2e/pages-api-recovery.spec.ts` and `e2e/public-work-directory.spec.ts` inside the load-bearing `Playwright e2e` job that feeds `Required Gate`. The specialized Pages workflow is supplementary evidence only; it cannot replace this required exact-head browser proof or authorize merge.
+
+## Cross-repository browser witness freshness
+
+The exact StoryEngine peer configured in `.github/workflows/playwright.yml` is an evidence subject, not a durable alias for current StoryEngine. A peer refresh must be backed by an independent ref/SHA observation and must reset predecessor federation/browser proof until the complete FCR → StoryEngine → receipt → FCR Playwright witness passes on the exact FCR head. Pin alignment alone grants no merge, deploy, production, or provider-mutation authority.

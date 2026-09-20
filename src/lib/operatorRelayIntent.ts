@@ -1,6 +1,7 @@
 import type { RelayOperatorId } from './operatorRelay.js';
 
 const TARGETS: ReadonlyArray<{ id: RelayOperatorId; patterns: RegExp[] }> = [
+  { id: 'gemini', patterns: [/\bgemini\b/i] },
   { id: 'perplexity', patterns: [/\bperplexity\b/i] },
   { id: 'claude-code', patterns: [/\bclaude(?:\s+code)?\b/i] },
   { id: 'codex', patterns: [/\b(?:chatgpt|codex)\b/i] },
@@ -9,6 +10,15 @@ const TARGETS: ReadonlyArray<{ id: RelayOperatorId; patterns: RegExp[] }> = [
 export interface RelayIntent {
   target: RelayOperatorId;
   instruction: string;
+}
+
+function targetPattern(target: RelayOperatorId): RegExp {
+  switch (target) {
+    case 'gemini': return /\bgemini\b/i;
+    case 'claude-code': return /\bclaude(?:\s+code)?\b/i;
+    case 'codex': return /\b(?:chatgpt|codex)\b/i;
+    case 'perplexity': return /\bperplexity\b/i;
+  }
 }
 
 export function parseRelayIntent(input: string, activeOperator: RelayOperatorId): RelayIntent | null {
@@ -23,7 +33,7 @@ export function parseRelayIntent(input: string, activeOperator: RelayOperatorId)
 
   const instruction = text
     .replace(/^(?:tell|ask|send|relay(?:\s+this)?\s+to|have)\s+/i, '')
-    .replace(target === 'claude-code' ? /\bclaude(?:\s+code)?\b/i : target === 'codex' ? /\b(?:chatgpt|codex)\b/i : /\bperplexity\b/i, '')
+    .replace(targetPattern(target), '')
     .replace(/^\s*(?:to\s+)?/i, '')
     .trim();
 

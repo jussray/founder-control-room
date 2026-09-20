@@ -9,6 +9,10 @@ const API_OWNED_ASSET_PATHS = new Set([
   '/assets/auth-callback.js',
   '/assets/control-room.css',
 ]);
+const STATIC_EXACT_PATHS = new Set([
+  '/products/business-leak-quickscan',
+  '/products/business-leak-quickscan/',
+]);
 const STATIC_FILE_PATTERN = /\.(?:avif|css|gif|html|ico|jpe?g|js|json|map|png|svg|txt|webmanifest|webp|woff2?|xml)$/i;
 const STATIC_DIRECTORY_PREFIXES = [
   '/control-room',
@@ -26,6 +30,7 @@ function shouldServeFromPages(request) {
   // one-time Supabase session before FCR can mint its opaque browser session.
   if (API_OWNED_ASSET_PATHS.has(pathname)) return false;
   return pathname === '/'
+    || STATIC_EXACT_PATHS.has(pathname)
     || STATIC_DIRECTORY_PREFIXES.some(
       (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
     )

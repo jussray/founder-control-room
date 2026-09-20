@@ -79,7 +79,26 @@
     "repeatProviderSetupWithoutProviderEvidence": false,
     "blockedStateInvalidatedBy": ["live-session-exposed","stronger-contradictory-bridge-evidence"],
     "continuityMarkersAreNonAuthorizing": true,
-    "recoveryRule": "When the connector surface exists but the runtime reports Browser not connected and exposes no tabs, classify the connector bridge as blocked. Preserve separately observed or founder-reported provider-page state; do not blame or reset the page and do not repeat login/setup instructions without provider-level evidence. Re-probe the connector bridge and clear the blocked state only when fresh bridge evidence exposes a live session or stronger contradictory bridge evidence supersedes it."
+    "currentObservationSource": "chatgpt-runtime",
+    "historicalReceiptSource": "evidence-receipts",
+    "historicalEvidenceIsAppendOnly": true,
+    "currentAbsenceDoesNotEraseHistoricalPresence": true,
+    "currentAndHistoricalMayCoexist": true,
+    "unknownDoesNotMeanNo": true,
+    "staleDoesNotMeanFalse": true,
+    "contradictoryCurrentSignalsClassifyAs": "CONNECTOR_STATE_CONFLICT",
+    "currentUnavailableClassifyAs": "CURRENTLY_UNAVAILABLE",
+    "historicallyVerifiedClassifyAs": "HISTORICALLY_VERIFIED",
+    "observationRequiresTimestamp": true,
+    "capabilityDimensions": ["catalog-visible","installed","authenticated","callable","readable","writable","execution-success"],
+    "installedOrToolSurfacedDoesNotProveLiveSession": true,
+    "connectedClaimRequiresLiveProbe": true,
+    "retryClaimRequiresProbeExecution": true,
+    "canonicalReadOnlyProbeByConnector": {
+      "Opera Browser Connector": "list-tabs"
+    },
+    "resolutionRule": "A current runtime observation may update current capability state but must never rewrite or delete a verified historical receipt. Current absence may classify the present state as CURRENTLY_UNAVAILABLE while historical successful use remains HISTORICALLY_VERIFIED. Contradictory current signals remain CONNECTOR_STATE_CONFLICT until reconciled. UNKNOWN stays UNKNOWN. Continuity fingerprints and proof cookies may correlate predecessor and successor evidence but never create installation, authentication, authority, capability, or successful execution.",
+    "recoveryRule": "When the connector surface exists but the runtime reports Browser not connected and exposes no tabs, classify the connector bridge as blocked. Installed, enabled, or tool-surfaced state alone does not prove a live browser session. Claim a retry only when the live read-only probe actually executes. Preserve separately observed or founder-reported provider-page state; do not blame or reset the page and do not repeat login/setup instructions without provider-level evidence. Re-probe the connector bridge and clear the blocked state only when fresh bridge evidence exposes a live session or stronger contradictory bridge evidence supersedes it."
   },
   "evidenceSourceTruth": {
     "providerReadFailureClassifyAs": "BLOCKED_SOURCE_ACCESS",

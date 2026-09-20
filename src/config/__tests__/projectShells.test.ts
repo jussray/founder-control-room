@@ -41,4 +41,19 @@ describe('project-specific FCR shells', () => {
       projectSpecificViews: expect.arrayContaining(['safety', 'mobile-runtime', 'playwright-proof']),
     });
   });
+
+  it('treats Founder Control Room as its own first-party commerce business', () => {
+    expect(getProjectShell('founder-control-room')).toMatchObject({
+      identity: expect.stringContaining('first-party commerce business'),
+      primaryOutcome: expect.stringContaining('first-party revenue'),
+      projectSpecificViews: expect.arrayContaining([
+        'catalog',
+        'storefront-runtime',
+        'shopify',
+        'checkout',
+        'revenue-proof',
+        'playwright-proof',
+      ]),
+    });
+  });
 });
