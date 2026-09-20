@@ -7,7 +7,9 @@ on:
       - "src/http/routes/hairCommerceReceipts.ts"
       - "src/http/routes/__tests__/hairCommerceReceipts.integration.test.ts"
       - "src/http/server.ts"
+      - "src/lib/__tests__/productionDeployWorkerSecretPreflight.contract.test.ts"
       - "supabase/migrations/20260802193000_hair_commerce_receipts.sql"
+      - "wrangler.worker.toml"
       - ".github/workflows/jbh-commerce-receipts-exact-head.yml"
   workflow_dispatch:
 
@@ -55,8 +57,11 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      - name: Run focused receipt integration proof
-        run: npx vitest run src/http/routes/__tests__/hairCommerceReceipts.integration.test.ts
+      - name: Run focused receipt and deploy-contract proof
+        run: >-
+          npx vitest run
+          src/http/routes/__tests__/hairCommerceReceipts.integration.test.ts
+          src/lib/__tests__/productionDeployWorkerSecretPreflight.contract.test.ts
 
       - name: Build
         run: npm run build
