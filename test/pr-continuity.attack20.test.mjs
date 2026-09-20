@@ -130,4 +130,10 @@ test('AT30 rollover aggregate preserves per-state and per-failure receipt fields
   assert.match(continuitySource, /failureReceipts/);
   assert.match(continuitySource, /receiptId: `pr-\$\{number\}:\$\{receipt\.code\}`/);
 });
+test('AT31 classified PR blockers remain non-authorizing receipts without turning successful graph classification into a main failure', () => {
+  assert.match(continuitySource, /rolloverCompleted: true/);
+  assert.match(continuitySource, /blockedPullsRemainNonAuthorizing: true/);
+  assert.match(continuitySource, /ROLLOVER_CLASSIFIED_WITH_BLOCKERS/);
+  assert.doesNotMatch(continuitySource, /throw new Error\(`ROLLOVER_BLOCKED/);
+});
 test('schema remains stable', () => assert.equal(SCHEMA, 'juss/pr-continuity@v1'));
