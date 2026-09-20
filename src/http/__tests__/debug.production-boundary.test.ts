@@ -15,6 +15,7 @@ vi.mock('../../lib/supabaseClient.js', () => ({
 import express from 'express';
 import request from 'supertest';
 import { debugRouter } from '../routes/debug.js';
+import { setCloudflareWorkerRuntime } from '../runtimeBoundary.js';
 
 function app() {
   const instance = express();
@@ -24,9 +25,11 @@ function app() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  setCloudflareWorkerRuntime(false);
 });
 
 afterEach(() => {
+  setCloudflareWorkerRuntime(false);
   vi.unstubAllEnvs();
 });
 
@@ -62,6 +65,18 @@ describe('debug provider production boundary', () => {
     expect(response.body).not.toHaveProperty('provider');
     expect(response.body).not.toHaveProperty('openaiKeyPresent');
     expect(response.body).not.toHaveProperty('perplexityKeyPresent');
+  });
+
+  it('fails closed on a Cloudflare Worker even if process env mirroring is unavailable', async () => {
+    vi.stubEnv('NODE_ENV', 'test');
+    vi.stubEnv('ENVIRONMENT', 'test');
+    setCloudflareWorkerRuntime(true);
+
+    const response = await request(app()).get('/_debug/provider');
+
+    expect(response.status).toBe(401);
+    expect(response.body).not.toHaveProperty('provider');
+    expect(response.body).not.toHaveProperty('openaiKeyPresent');
   });
 
   it('also fails closed for a Node production deployment', async () => {
