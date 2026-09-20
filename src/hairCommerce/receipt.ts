@@ -1,7 +1,10 @@
+import type { RevenueState } from '../types/growthInbox.js';
+
 const RECEIPT_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const SHA256 = /^[0-9a-f]{64}$/i;
 const COMMIT_SHA = /^[0-9a-f]{40}$/i;
 const SOURCE_REPO = 'jussray/jbh-private' as const;
+const CURRENCY = 'USD' as const;
 
 export const HAIR_COMMERCE_EVENTS = [
   'paid_order_recorded',
@@ -26,6 +29,8 @@ export type HairCommerceReceipt = {
   unresolvedCount: number;
   occurredAt: string;
   exactCommitSha: string;
+  collectedValueCents?: number;
+  currency?: typeof CURRENCY;
   evidenceUrl?: string;
 };
 
@@ -40,8 +45,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
-function boundedInteger(value: unknown, field: string): number {
-  if (!Number.isSafeInteger(value) || (value as number) < 0 || (value as number) > 1000) {
+function boundedInteger(value: unknown, field: string, min = 0, max = 1000): number {
+  if (!Number.isSafeInteger(value) || (value as number) < min || (value as number) > max) {
     throw new HairCommerceReceiptError(`invalid_${field}`);
   }
   return value as number;
@@ -78,6 +83,12 @@ function githubEvidenceUrl(value: unknown, exactCommitSha: string): string | und
   return `https://github.com${expectedPath}`;
 }
 
+export function hairCommerceRevenueState(
+  receipt: Pick<HairCommerceReceipt, 'event'>,
+): RevenueState | null {
+  return receipt.event === 'paid_order_recorded' ? 'payment_collected' : null;
+}
+
 export function validateHairCommerceReceipt(input: unknown): HairCommerceReceipt {
   if (!isRecord(input)) throw new HairCommerceReceiptError('invalid_body');
 
@@ -90,6 +101,8 @@ export function validateHairCommerceReceipt(input: unknown): HairCommerceReceipt
     'unresolvedCount',
     'occurredAt',
     'exactCommitSha',
+    'collectedValueCents',
+    'currency',
     'evidenceUrl',
   ]);
   for (const key of Object.keys(input)) {
@@ -127,17 +140,37 @@ export function validateHairCommerceReceipt(input: unknown): HairCommerceReceipt
     throw new HairCommerceReceiptError('invalid_occurred_at');
   }
 
+  const event = input.event as HairCommerceEvent;
+  let collectedValueCents: number | undefined;
+  let currency: typeof CURRENCY | undefined;
+  if (event === 'paid_order_recorded') {
+    collectedValueCents = boundedInteger(
+      input.collectedValueCents,
+      'collected_value_cents',
+      1,
+      100_000_000,
+    );
+    if (input.currency !== CURRENCY) {
+      throw new HairCommerceReceiptError('invalid_currency');
+    }
+    currency = CURRENCY;
+  } else if (input.collectedValueCents !== undefined || input.currency !== undefined) {
+    throw new HairCommerceReceiptError('money_fields_not_allowed_for_event');
+  }
+
   const exactCommitSha = input.exactCommitSha.toLowerCase();
 
   return {
     receiptId: input.receiptId.toLowerCase(),
     sourceRepo: SOURCE_REPO,
     orderRefHash: input.orderRefHash.toLowerCase(),
-    event: input.event as HairCommerceEvent,
+    event,
     groupCount: boundedInteger(input.groupCount, 'group_count'),
     unresolvedCount: boundedInteger(input.unresolvedCount, 'unresolved_count'),
     occurredAt: occurredAt.toISOString(),
     exactCommitSha,
+    collectedValueCents,
+    currency,
     evidenceUrl: githubEvidenceUrl(input.evidenceUrl, exactCommitSha),
   };
 }
