@@ -367,7 +367,7 @@ async function main() {
   await page.goto(`${BASE_URL}/control-room/`, { waitUntil: 'networkidle' });
   await page.waitForURL((url) => url.pathname === '/founder-onboarding/' || url.pathname === '/founder-onboarding', { timeout: 5000 });
   await page.waitForSelector('#login-form');
-  assert(await page.locator('#signed-out h1').innerText() === 'Founder Control Room', 'canonical onboarding sign-in surface is shown');
+  assert(await page.locator('#signed-out h2').innerText() === 'Enter your private control plane.', 'canonical onboarding sign-in surface is shown');
 
   console.log('\n[2] Request a magic link through the real UI and real API');
   await page.fill('input[name="email"]', FOUNDER_EMAIL);
