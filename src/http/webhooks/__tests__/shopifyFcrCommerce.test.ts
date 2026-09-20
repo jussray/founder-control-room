@@ -8,6 +8,7 @@ import {
   FCR_SHOPIFY_STORE_FINGERPRINT,
   FCR_SHOPIFY_STORE_IDENTITY,
 } from '../../../fcrCommerce/shopifyMoneyPath.js';
+import { rateLimitFcrShopifyWebhook } from '../../fcrCommerceIngress.js';
 import {
   createShopifyFcrCommerceWebhookHandler,
   type FcrCommerceReceiptStore,
@@ -22,6 +23,7 @@ function app(store: FcrCommerceReceiptStore) {
   const instance = express();
   instance.post(
     '/webhooks/shopify/fcr/orders-paid',
+    rateLimitFcrShopifyWebhook,
     express.raw({ type: 'application/json', limit: '64kb' }),
     createShopifyFcrCommerceWebhookHandler(store),
   );
