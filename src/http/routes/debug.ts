@@ -7,6 +7,7 @@
  *
  * Safety:
  * - Requires the normal platform-founder authority boundary
+ * - Rate-limits authorization-bearing inspection requests
  * - Never exposes key values, only boolean presence
  * - Does not perform any AI call
  * - Does not mutate any state
@@ -14,9 +15,10 @@
  */
 import { Router } from 'express';
 import { requireFounder, type FounderRequest } from '../middleware/requireFounder.js';
+import { rateLimitFounderPermissions } from '../middleware/security.js';
 
 export const debugRouter = Router();
-debugRouter.use(requireFounder);
+debugRouter.use(rateLimitFounderPermissions, requireFounder);
 
 debugRouter.get('/provider', (_req: FounderRequest, res) => {
   res.setHeader('Cache-Control', 'private, no-store');
