@@ -363,15 +363,16 @@ async function main() {
     else jsExceptions.push(msg.text());
   });
 
-  console.log('\n[1] Sign-in screen renders for real, unauthenticated');
-  await page.goto(`${BASE_URL}/control-room/`);
-  await page.waitForSelector('#magic-link-form');
-  assert(await page.locator('.sign-in-card h2').innerText() === 'Founder Control Room', 'sign-in card is shown');
+  console.log('\n[1] Canonical founder onboarding renders for real, unauthenticated');
+  await page.goto(`${BASE_URL}/control-room/`, { waitUntil: 'networkidle' });
+  await page.waitForURL((url) => url.pathname === '/founder-onboarding/' || url.pathname === '/founder-onboarding', { timeout: 5000 });
+  await page.waitForSelector('#login-form');
+  assert(await page.locator('#signed-out h2').innerText() === 'Enter your private control plane.', 'canonical onboarding sign-in surface is shown');
 
   console.log('\n[2] Request a magic link through the real UI and real API');
   await page.fill('input[name="email"]', FOUNDER_EMAIL);
-  await page.click('#magic-link-form button[type=submit]');
-  await page.waitForSelector('.notice');
+  await page.click('#login-form button[type=submit]');
+  await page.waitForSelector('#notice');
 
   let bridge;
   for (let i = 0; i < 30 && !bridge; i += 1) {
