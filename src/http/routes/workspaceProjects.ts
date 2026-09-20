@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from 'node:crypto';
+import { createHash } from 'node:crypto';
 import { Router } from 'express';
 import { supabase } from '../../lib/supabaseClient.js';
 import {
@@ -285,50 +285,45 @@ workspaceProjectsRouter.post('/projects', async (req: FounderRequest, res) => {
     return res.status(409).json({ error: `Project slug "${parsed.input.slug}" is already registered.` });
   }
 
-  const { data: project, error } = await supabase
-    .from('projects')
-    .insert({
-      workspace_id: ownerWorkspaceId,
-      slug: parsed.input.slug,
-      name: parsed.input.name,
-      repo_provider: parsed.input.repoIdentifier ? 'github' : 'none',
-      repo_identifier: parsed.input.repoIdentifier,
-      stack: parsed.input.stack,
-      status: 'active',
-      risk_level: 'medium',
-    })
-    .select('id, workspace_id, slug, name, repo_provider, repo_identifier, stack, status, risk_level')
-    .single();
-  if (error || !project) {
-    return res.status(500).json({ error: error?.message ?? 'Project creation returned no record' });
+  const eventMetadata = {
+    route: 'POST /workspace/projects',
+    workspaceId: ownerWorkspaceId,
+    projectCreated: true,
+    requestedProviders: [],
+    createdProviders: [],
+    controlRoomProfile: parsed.input.controlRoom,
+    controlRoomProfileAuthority: 'founder-declared',
+    chiefRecommendation: expected,
+    chiefRecommendationApproved: true,
+    authorityGranted: false,
+    credentialsStored: false,
+  };
+
+  const { data: createdProject, error } = await supabase.rpc(
+    'create_workspace_project_with_onboarding_event',
+    {
+      p_workspace_id: ownerWorkspaceId,
+      p_slug: parsed.input.slug,
+      p_name: parsed.input.name,
+      p_repo_provider: parsed.input.repoIdentifier ? 'github' : 'none',
+      p_repo_identifier: parsed.input.repoIdentifier,
+      p_stack: parsed.input.stack,
+      p_event_metadata: eventMetadata,
+    },
+  );
+  if (error) {
+    if (error.code === '23505') {
+      return res.status(409).json({ error: `Project slug "${parsed.input.slug}" is already registered.` });
+    }
+    return res.status(500).json({
+      error: 'Project and onboarding evidence could not be created atomically',
+      detail: error.message,
+    });
   }
 
-  const { error: eventError } = await supabase.from('project_events').insert({
-    project_id: project.id,
-    source_event_id: randomUUID(),
-    event_type: 'founder_onboarding_bootstrapped',
-    severity: 'info',
-    screen: 'chief-workspace-onboarding',
-    metadata: {
-      route: 'POST /workspace/projects',
-      founder: req.founder?.email,
-      workspaceId: ownerWorkspaceId,
-      projectCreated: true,
-      requestedProviders: [],
-      createdProviders: [],
-      controlRoomProfile: parsed.input.controlRoom,
-      controlRoomProfileAuthority: 'founder-declared',
-      chiefRecommendation: expected,
-      chiefRecommendationApproved: true,
-      authorityGranted: false,
-      credentialsStored: false,
-    },
-  });
-  if (eventError) {
-    return res.status(500).json({
-      error: 'Project was created, but its onboarding audit event could not be recorded',
-      detail: eventError.message,
-    });
+  const project = record(createdProject);
+  if (!project || !text(project.id)) {
+    return res.status(500).json({ error: 'Atomic project creation returned no project record' });
   }
 
   return res.status(201).json({
