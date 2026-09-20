@@ -77,6 +77,7 @@ export interface FcrShopifyPaidReceipt {
   storeFingerprint: typeof FCR_SHOPIFY_STORE_FINGERPRINT;
   shopDomain: typeof FOUNDER_CONTROL_ROOM_SHOPIFY_DOMAIN;
   webhookId: string;
+  eventId: string;
   orderRefHash: string;
   event: 'payment_collected';
   revenueState: Extract<RevenueState, 'payment_collected'>;
@@ -111,6 +112,30 @@ function decimalDigitsOnly(value: string): boolean {
     if (code < 48 || code > 57) return false;
   }
   return true;
+}
+
+function hexOnly(value: string): boolean {
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index);
+    const digit = code >= 48 && code <= 57;
+    const lower = code >= 97 && code <= 102;
+    const upper = code >= 65 && code <= 70;
+    if (!digit && !lower && !upper) return false;
+  }
+  return true;
+}
+
+function canonicalUuid(value: unknown): string | null {
+  const text = stringValue(value)?.toLowerCase();
+  if (!text || text.length !== 36) return null;
+  const parts = text.split('-');
+  if (parts.length !== 5) return null;
+  const expectedLengths = [8, 4, 4, 4, 12] as const;
+  for (let index = 0; index < parts.length; index += 1) {
+    const part = parts[index];
+    if (part.length !== expectedLengths[index] || !hexOnly(part)) return null;
+  }
+  return text;
 }
 
 function integerId(value: unknown): string | null {
@@ -198,6 +223,7 @@ export function createFcrOrderRefHash(orderId: string, salt: string): string {
 export function buildFcrShopifyPaidReceipt(input: {
   rawPayload: unknown;
   webhookId: string;
+  eventId: string;
   shopDomain: string;
   occurredAt: string;
   hashSalt: string;
@@ -205,8 +231,13 @@ export function buildFcrShopifyPaidReceipt(input: {
   if (normalizeShopifyDomain(input.shopDomain) !== FOUNDER_CONTROL_ROOM_SHOPIFY_DOMAIN) {
     throw new FcrShopifyMoneyPathError('wrong_shop');
   }
-  if (!/^[0-9a-f-]{20,100}$/i.test(input.webhookId)) {
+  const webhookId = canonicalUuid(input.webhookId);
+  if (!webhookId) {
     throw new FcrShopifyMoneyPathError('invalid_webhook_id');
+  }
+  const eventId = canonicalUuid(input.eventId);
+  if (!eventId) {
+    throw new FcrShopifyMoneyPathError('invalid_event_id');
   }
   const occurredAtMs = Date.parse(input.occurredAt);
   if (!Number.isFinite(occurredAtMs)) {
@@ -259,7 +290,8 @@ export function buildFcrShopifyPaidReceipt(input: {
     provider: 'shopify',
     storeFingerprint: FCR_SHOPIFY_STORE_FINGERPRINT,
     shopDomain: FOUNDER_CONTROL_ROOM_SHOPIFY_DOMAIN,
-    webhookId: input.webhookId.toLowerCase(),
+    webhookId,
+    eventId,
     orderRefHash: createFcrOrderRefHash(orderId, input.hashSalt),
     event: 'payment_collected',
     revenueState: 'payment_collected',
