@@ -16,15 +16,15 @@ const EXPIRES_AT = '2026-09-16T06:40:00.000Z';
 const NOW = Date.parse('2026-09-16T06:31:00.000Z');
 
 function request(overrides: Partial<OperatorRelayRequestV1> = {}): OperatorRelayRequestV1 {
-  const summary = 'Attack the current ULTRATHINK bridge design and return only surviving defects.';
+  const summary = 'Implement the focused ULTRATHINK bridge fix and return provider evidence.';
   const sourceRef = 'chat:ultrathink-bridge';
   const base: Omit<OperatorRelayRequestV1, 'requestHash'> = {
     contract: OPERATOR_RELAY_REQUEST_CONTRACT,
     relayId: 'relay-001',
     fromOperator: 'codex',
     toOperator: 'perplexity',
-    capability: 'review',
-    goal: 'Get an independent adversarial review without founder copy/paste.',
+    capability: 'implement',
+    goal: 'Use one governed provider for focused work without transferring mutation authority.',
     context: {
       summary,
       sourceRef,
@@ -56,8 +56,8 @@ function response(req: OperatorRelayRequestV1, overrides: Partial<OperatorRelayR
     fromOperator: req.toOperator,
     toOperator: req.fromOperator,
     status: 'completed',
-    answer: 'Subject-bound evidence is the strongest surviving requirement.',
-    evidenceRefs: ['source:perplexity-review'],
+    answer: 'Focused provider work completed with bounded evidence.',
+    evidenceRefs: ['provider:bounded-work'],
     unresolved: [],
     authorityRequested: 'none',
     completedAt: '2026-09-16T06:32:00.000Z',
@@ -70,13 +70,22 @@ function response(req: OperatorRelayRequestV1, overrides: Partial<OperatorRelayR
 }
 
 describe('operator relay', () => {
-  it('accepts a bounded ChatGPT to Perplexity review relay', () => {
+  it('accepts bounded keyed implementation work', () => {
     expect(validateOperatorRelayRequest(request(), NOW)).toEqual([]);
   });
 
-  it('accepts Claude and ChatGPT as peer operator targets', () => {
+  it('accepts Claude and Codex as peer operator targets for focused work', () => {
     expect(validateOperatorRelayRequest(request({ toOperator: 'claude-code' }), NOW)).toEqual([]);
     expect(validateOperatorRelayRequest(request({ fromOperator: 'perplexity', toOperator: 'codex' }), NOW)).toEqual([]);
+  });
+
+  it('rejects semantic peer review while cost-control mode is active', () => {
+    expect(validateOperatorRelayRequest(request({ capability: 'review' }), NOW)).toContain(
+      'target operator is not enabled for requested capability',
+    );
+    expect(validateOperatorRelayRequest(request({ toOperator: 'claude-code', capability: 'review' }), NOW)).toContain(
+      'target operator is not enabled for requested capability',
+    );
   });
 
   it('rejects DeepSeek from the peer operator relay', () => {
