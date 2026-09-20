@@ -19,6 +19,15 @@ const validReceipt = {
   evidenceUrl: 'https://github.com/jussray/jbh-private/commit/' + 'b'.repeat(40),
 } as const;
 
+const paidReceipt = {
+  ...validReceipt,
+  receiptId: '6a0a94b5-1590-4ca3-b4d6-b0a7a5f96b13',
+  event: 'paid_order_recorded',
+  groupCount: 0,
+  collectedValueCents: 25_00,
+  currency: 'USD',
+} as const;
+
 function createTestApp(store: HairCommerceReceiptStore) {
   const app = express();
   app.use(express.json({ limit: '32kb' }));
@@ -71,37 +80,52 @@ describe('hair commerce receipt ingest', () => {
     expect(store).not.toHaveBeenCalled();
   });
 
-  it('rejects evidence URLs from another repository', async () => {
+  it('requires collected value and currency for paid-order evidence', async () => {
+    const store = vi.fn<HairCommerceReceiptStore>();
+    for (const incomplete of [
+      { ...paidReceipt, collectedValueCents: undefined },
+      { ...paidReceipt, currency: undefined },
+      { ...paidReceipt, collectedValueCents: 0 },
+      { ...paidReceipt, currency: 'EUR' },
+    ]) {
+      const response = await request(createTestApp(store))
+        .post('/ingest/hair-commerce-receipts')
+        .set('x-jbh-receipt-token', 'test-secret-token')
+        .send(incomplete);
+      expect(response.status).toBe(400);
+    }
+    expect(store).not.toHaveBeenCalled();
+  });
+
+  it('rejects money fields on non-payment lifecycle receipts', async () => {
     const store = vi.fn<HairCommerceReceiptStore>();
     const response = await request(createTestApp(store))
       .post('/ingest/hair-commerce-receipts')
       .set('x-jbh-receipt-token', 'test-secret-token')
-      .send({
-        ...validReceipt,
-        evidenceUrl: 'https://github.com/other/private/commit/' + 'b'.repeat(40),
-      });
+      .send({ ...validReceipt, collectedValueCents: 2500, currency: 'USD' });
 
     expect(response.status).toBe(400);
-    expect(response.body).toEqual({ error: 'invalid_evidence_url' });
+    expect(response.body).toEqual({ error: 'money_fields_not_allowed_for_event' });
     expect(store).not.toHaveBeenCalled();
   });
 
-  it('rejects evidence URLs for a different commit', async () => {
+  it('rejects evidence URLs from another repository or commit', async () => {
     const store = vi.fn<HairCommerceReceiptStore>();
-    const response = await request(createTestApp(store))
-      .post('/ingest/hair-commerce-receipts')
-      .set('x-jbh-receipt-token', 'test-secret-token')
-      .send({
-        ...validReceipt,
-        evidenceUrl: 'https://github.com/jussray/jbh-private/commit/' + 'c'.repeat(40),
-      });
-
-    expect(response.status).toBe(400);
-    expect(response.body).toEqual({ error: 'invalid_evidence_url' });
+    for (const evidenceUrl of [
+      'https://github.com/other/private/commit/' + 'b'.repeat(40),
+      'https://github.com/jussray/jbh-private/commit/' + 'c'.repeat(40),
+    ]) {
+      const response = await request(createTestApp(store))
+        .post('/ingest/hair-commerce-receipts')
+        .set('x-jbh-receipt-token', 'test-secret-token')
+        .send({ ...validReceipt, evidenceUrl });
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({ error: 'invalid_evidence_url' });
+    }
     expect(store).not.toHaveBeenCalled();
   });
 
-  it('stores only the sanitized exact-head receipt', async () => {
+  it('stores only the sanitized exact-head lifecycle receipt', async () => {
     const store = vi.fn<HairCommerceReceiptStore>().mockResolvedValue('stored');
     const response = await request(createTestApp(store))
       .post('/ingest/hair-commerce-receipts')
@@ -114,12 +138,31 @@ describe('hair commerce receipt ingest', () => {
       duplicate: false,
       receiptId: validReceipt.receiptId,
       event: validReceipt.event,
+      revenueState: null,
     });
     expect(store).toHaveBeenCalledOnce();
     expect(store).toHaveBeenCalledWith(validReceipt);
   });
 
-  it('returns an idempotent duplicate receipt without storing private data', async () => {
+  it('maps a paid receipt to payment_collected without trusting sender revenue state', async () => {
+    const store = vi.fn<HairCommerceReceiptStore>().mockResolvedValue('stored');
+    const response = await request(createTestApp(store))
+      .post('/ingest/hair-commerce-receipts')
+      .set('x-jbh-receipt-token', 'test-secret-token')
+      .send(paidReceipt);
+
+    expect(response.status).toBe(201);
+    expect(response.body).toEqual({
+      accepted: true,
+      duplicate: false,
+      receiptId: paidReceipt.receiptId,
+      event: paidReceipt.event,
+      revenueState: 'payment_collected',
+    });
+    expect(store).toHaveBeenCalledWith(paidReceipt);
+  });
+
+  it('returns an idempotent duplicate receipt', async () => {
     const store = vi.fn<HairCommerceReceiptStore>().mockResolvedValue('duplicate');
     const response = await request(createTestApp(store))
       .post('/ingest/hair-commerce-receipts')
@@ -132,6 +175,7 @@ describe('hair commerce receipt ingest', () => {
       duplicate: true,
       receiptId: validReceipt.receiptId,
       event: validReceipt.event,
+      revenueState: null,
     });
   });
 
@@ -148,36 +192,37 @@ describe('hair commerce receipt ingest', () => {
       error: 'receipt_id_conflict',
       receiptId: validReceipt.receiptId,
     });
-    expect(response.body).not.toHaveProperty('event');
   });
 
   it('compares every immutable receipt field before classifying a duplicate', () => {
     const stored = {
-      receipt_id: validReceipt.receiptId,
-      source_repo: validReceipt.sourceRepo,
-      order_ref_hash: validReceipt.orderRefHash,
-      event_type: validReceipt.event,
-      group_count: validReceipt.groupCount,
-      unresolved_count: validReceipt.unresolvedCount,
-      occurred_at: validReceipt.occurredAt,
-      exact_commit_sha: validReceipt.exactCommitSha,
-      evidence_url: validReceipt.evidenceUrl,
+      receipt_id: paidReceipt.receiptId,
+      source_repo: paidReceipt.sourceRepo,
+      order_ref_hash: paidReceipt.orderRefHash,
+      event_type: paidReceipt.event,
+      group_count: paidReceipt.groupCount,
+      unresolved_count: paidReceipt.unresolvedCount,
+      occurred_at: paidReceipt.occurredAt,
+      exact_commit_sha: paidReceipt.exactCommitSha,
+      collected_value_cents: paidReceipt.collectedValueCents,
+      currency: paidReceipt.currency,
+      revenue_state: 'payment_collected',
+      evidence_url: paidReceipt.evidenceUrl,
     };
 
-    expect(storedHairCommerceReceiptMatches(stored, validReceipt)).toBe(true);
+    expect(storedHairCommerceReceiptMatches(stored, paidReceipt)).toBe(true);
 
     const conflictingRows = [
       { ...stored, order_ref_hash: 'c'.repeat(64) },
-      { ...stored, event_type: 'owner_approved' },
-      { ...stored, group_count: 3 },
-      { ...stored, unresolved_count: 1 },
-      { ...stored, occurred_at: '2026-08-02T19:31:00.000Z' },
+      { ...stored, collected_value_cents: 2600 },
+      { ...stored, currency: null },
+      { ...stored, revenue_state: null },
       { ...stored, exact_commit_sha: 'c'.repeat(40) },
       { ...stored, evidence_url: null },
     ];
 
     for (const conflicting of conflictingRows) {
-      expect(storedHairCommerceReceiptMatches(conflicting, validReceipt)).toBe(false);
+      expect(storedHairCommerceReceiptMatches(conflicting, paidReceipt)).toBe(false);
     }
   });
 
