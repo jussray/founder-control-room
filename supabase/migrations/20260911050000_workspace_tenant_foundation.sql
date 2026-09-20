@@ -108,10 +108,12 @@ create index if not exists projects_workspace_id_idx
 comment on column public.projects.workspace_id is
   'Owning FCR workspace. Workspace-aware service-role queries must filter by this column.';
 
--- Historical founder_full_access policies call is_founder(). Narrow that
--- helper to the platform owner. Supabase provides auth.jwt(); generic preview
--- PostgreSQL does not. In a non-Supabase environment install a deny-all helper
--- instead of widening access or fabricating auth state.
+-- Historical founder_full_access policies call is_founder(). Preserve the
+-- immutable Supabase Auth user_id binding introduced by the founder authority
+-- hardening and narrow it further to platform_owner. Email is descriptive data,
+-- never an authority key. Generic preview PostgreSQL does not provide auth.uid,
+-- auth.jwt, and auth.role; in that environment install a deny-all helper rather
+-- than widening access or fabricating auth state.
 do $$
 begin
   if exists (
@@ -119,7 +121,21 @@ begin
     from pg_proc p
     join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'auth'
+      and p.proname = 'uid'
+      and p.pronargs = 0
+  ) and exists (
+    select 1
+    from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'auth'
       and p.proname = 'jwt'
+      and p.pronargs = 0
+  ) and exists (
+    select 1
+    from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'auth'
+      and p.proname = 'role'
       and p.pronargs = 0
   ) then
     execute $function$
@@ -127,17 +143,18 @@ begin
       language sql
       stable
       security definer
-      set search_path = public
+      set search_path = public, auth
       as $body$
-        select coalesce(
-          exists (
+        select
+          coalesce(((select auth.jwt()) ->> 'is_anonymous')::boolean, false) = false
+          and coalesce((select auth.role()) = 'authenticated', false)
+          and exists (
             select 1
             from public.founder_users fu
-            where lower(fu.email) = lower((select auth.jwt()) ->> 'email')
+            where fu.user_id is not null
+              and fu.user_id = (select auth.uid())
               and fu.account_role = 'platform_owner'
-          ),
-          false
-        );
+          );
       $body$;
     $function$;
   else
