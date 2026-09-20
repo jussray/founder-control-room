@@ -3,6 +3,7 @@ import { mkdir, readFile } from 'node:fs/promises';
 import { extname, resolve, sep } from 'node:path';
 import { chromium } from 'playwright';
 
+// This proof intentionally runs again whenever the Video Creation OS carrier is refreshed onto a newer main.
 const publicRoot = resolve('public');
 const proofRoot = resolve('artifacts/video-creation-os');
 const mime = new Map([
