@@ -16,7 +16,7 @@ describe('containsRawCredentialMaterial', () => {
     [{ nested: { private_key: 'raw-value' } }, 'nested private_key'],
     [{ auth: { clientSecret: 'raw-value' } }, 'clientSecret'],
     [{ options: [{ password: 'raw-value' }] }, 'array password'],
-  ])('rejects credential-bearing key %s (%s)', (value) => {
+  ])('rejects credential-bearing key %s (%s)', (value, _label) => {
     expect(containsRawCredentialMaterial(value)).toBe(true);
   });
 
