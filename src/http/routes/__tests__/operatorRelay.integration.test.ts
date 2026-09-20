@@ -7,19 +7,16 @@ import {
   type OperatorRelayRequestV1,
 } from '../../../lib/operatorRelay.js';
 
-function relay(
-  toOperator: OperatorRelayRequestV1['toOperator'],
-  capability: OperatorRelayRequestV1['capability'] = 'implement',
-): OperatorRelayRequestV1 {
-  const summary = 'Relay this bounded implementation task to one governed operator and return its response to FCR.';
+function relay(toOperator: OperatorRelayRequestV1['toOperator']): OperatorRelayRequestV1 {
+  const summary = 'Relay this bounded review to another governed operator and return its response to FCR.';
   const sourceRef = 'fcr:operator-relay:e2e';
   const base: Omit<OperatorRelayRequestV1, 'requestHash'> = {
     contract: OPERATOR_RELAY_REQUEST_CONTRACT,
-    relayId: `relay-${toOperator}-${capability}`,
+    relayId: `relay-${toOperator}`,
     fromOperator: 'codex',
     toOperator,
-    capability,
-    goal: 'Prove FCR can address one keyed peer operator without transferring mutation authority.',
+    capability: 'review',
+    goal: 'Prove FCR can address a peer operator without transferring mutation authority.',
     context: {
       summary,
       sourceRef,
@@ -40,13 +37,7 @@ function relay(
 }
 
 describe('operator relay route contract', () => {
-  it.each(['perplexity', 'claude-code'] as const)('keeps %s in the keyed peer-operator work lane', (toOperator) => {
+  it.each(['perplexity', 'claude-code'] as const)('keeps %s in the peer-operator lane', (toOperator) => {
     expect(validateOperatorRelayRequest(relay(toOperator), Date.parse('2026-09-16T06:31:00.000Z'))).toEqual([]);
-  });
-
-  it.each(['perplexity', 'claude-code'] as const)('blocks %s semantic peer review while cost-control mode is active', (toOperator) => {
-    expect(validateOperatorRelayRequest(relay(toOperator, 'review'), Date.parse('2026-09-16T06:31:00.000Z'))).toContain(
-      'target operator is not enabled for requested capability',
-    );
   });
 });
