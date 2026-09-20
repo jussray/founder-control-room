@@ -7,10 +7,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   FCR_SHOPIFY_STORE_FINGERPRINT,
   FCR_SHOPIFY_STORE_IDENTITY,
+  buildFcrShopifyPaidReceipt,
 } from '../../../fcrCommerce/shopifyMoneyPath.js';
 import { rateLimitFcrShopifyWebhook } from '../../fcrCommerceIngress.js';
 import {
   createShopifyFcrCommerceWebhookHandler,
+  storedFcrCommerceOrderReceiptMatches,
+  storedFcrCommerceReceiptMatches,
   type FcrCommerceReceiptStore,
 } from '../shopifyFcrCommerce.js';
 
@@ -152,10 +155,12 @@ describe('FCR Shopify commerce webhook', () => {
     expect(store).not.toHaveBeenCalled();
   });
 
-  it('does not recognize unpaid or wrong-currency payloads as revenue', async () => {
+  it('does not recognize missing, unpaid, refunded, wrong-currency, or zero-value payloads as revenue', async () => {
     const store = vi.fn<FcrCommerceReceiptStore>();
     for (const payload of [
+      paidOrder({ financial_status: undefined }),
       paidOrder({ financial_status: 'pending' }),
+      paidOrder({ financial_status: 'partially_refunded' }),
       paidOrder({ currency: 'EUR' }),
       paidOrder({ current_total_price: '0.00' }),
     ]) {
@@ -169,7 +174,39 @@ describe('FCR Shopify commerce webhook', () => {
     expect(store).not.toHaveBeenCalled();
   });
 
-  it('preserves idempotency and conflicts as separate outcomes', async () => {
+  it('treats a second webhook id for the same exact paid order as a semantic duplicate', () => {
+    const receipt = buildFcrShopifyPaidReceipt({
+      rawPayload: paidOrder(),
+      webhookId: WEBHOOK_ID,
+      shopDomain: FCR_SHOPIFY_STORE_IDENTITY.shopifyDomain,
+      occurredAt: TRIGGERED_AT,
+      hashSalt: HASH_SALT,
+    });
+    const stored = {
+      webhook_id: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+      contract_id: receipt.contract,
+      provider: receipt.provider,
+      store_fingerprint: receipt.storeFingerprint,
+      shop_domain: receipt.shopDomain,
+      order_ref_hash: receipt.orderRefHash,
+      event_type: receipt.event,
+      revenue_state: receipt.revenueState,
+      collected_value_cents: receipt.collectedValueCents,
+      currency: receipt.currency,
+      offer_keys: receipt.offerKeys,
+      unknown_offer_count: receipt.unknownOfferCount,
+      occurred_at: '2026-09-20T02:56:00.000Z',
+    };
+
+    expect(storedFcrCommerceReceiptMatches(stored, receipt)).toBe(false);
+    expect(storedFcrCommerceOrderReceiptMatches(stored, receipt)).toBe(true);
+    expect(storedFcrCommerceOrderReceiptMatches({
+      ...stored,
+      collected_value_cents: 1,
+    }, receipt)).toBe(false);
+  });
+
+  it('preserves duplicates and conflicts as separate outcomes', async () => {
     const duplicateStore = vi.fn<FcrCommerceReceiptStore>().mockResolvedValue('duplicate');
     const conflictStore = vi.fn<FcrCommerceReceiptStore>().mockResolvedValue('conflict');
     const raw = JSON.stringify(paidOrder());
@@ -186,7 +223,7 @@ describe('FCR Shopify commerce webhook', () => {
       .set(headers(raw))
       .send(raw);
     expect(conflict.status).toBe(409);
-    expect(conflict.body.error).toBe('webhook_id_conflict');
+    expect(conflict.body.error).toBe('commerce_receipt_conflict');
   });
 
   it('fails closed when webhook bindings are absent', async () => {
