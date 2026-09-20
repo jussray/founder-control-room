@@ -8,6 +8,7 @@ on:
       - "src/http/routes/__tests__/hairCommerceReceipts.integration.test.ts"
       - "src/http/server.ts"
       - "supabase/migrations/20260802193000_hair_commerce_receipts.sql"
+      - "supabase/migrations/20260920001500_hair_commerce_revenue_fields.sql"
       - ".github/workflows/jbh-commerce-receipts-exact-head.yml"
   workflow_dispatch:
 
