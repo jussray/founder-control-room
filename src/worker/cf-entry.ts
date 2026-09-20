@@ -14,6 +14,7 @@ import { httpServerHandler } from 'cloudflare:node';
 import { env } from 'cloudflare:workers';
 import { createServer as createNodeHttpServer } from 'node:http';
 import type { ExportedHandler } from '@cloudflare/workers-types';
+import { setCloudflareWorkerRuntime } from '../http/runtimeBoundary.js';
 import {
   composeWorkerHandler,
   validateWorkerEnv,
@@ -23,6 +24,11 @@ import {
 export { ReleaseProofWorkflowV0 } from '../workflows/releaseProofWorkflow.js';
 
 validateWorkerEnv(env);
+
+// Runtime identity is an execution fact, not authority. Mark it before the
+// Express module is imported so production/provider-sensitive routes can fail
+// closed without relying on process.env mirroring behavior inside Workers.
+setCloudflareWorkerRuntime(true);
 
 const { createServer: createExpressApp } = await import('../http/server.js');
 const app = createExpressApp();
