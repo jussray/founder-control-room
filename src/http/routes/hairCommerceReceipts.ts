@@ -2,6 +2,7 @@ import { timingSafeEqual } from 'node:crypto';
 import type { Request, RequestHandler, Response } from 'express';
 import {
   HairCommerceReceiptError,
+  hairCommerceRevenueState,
   type HairCommerceReceipt,
   validateHairCommerceReceipt,
 } from '../../hairCommerce/receipt.js';
@@ -21,6 +22,9 @@ const RECEIPT_COLUMNS = [
   'unresolved_count',
   'occurred_at',
   'exact_commit_sha',
+  'collected_value_cents',
+  'currency',
+  'revenue_state',
   'evidence_url',
 ].join(',');
 
@@ -55,6 +59,9 @@ export function storedHairCommerceReceiptMatches(
     stored.unresolved_count === receipt.unresolvedCount &&
     stored.occurred_at === receipt.occurredAt &&
     stored.exact_commit_sha === receipt.exactCommitSha &&
+    (stored.collected_value_cents ?? null) === (receipt.collectedValueCents ?? null) &&
+    (stored.currency ?? null) === (receipt.currency ?? null) &&
+    (stored.revenue_state ?? null) === hairCommerceRevenueState(receipt) &&
     (stored.evidence_url ?? null) === (receipt.evidenceUrl ?? null)
   );
 }
@@ -91,6 +98,9 @@ export const persistHairCommerceReceipt: HairCommerceReceiptStore = async (recei
     unresolved_count: receipt.unresolvedCount,
     occurred_at: receipt.occurredAt,
     exact_commit_sha: receipt.exactCommitSha,
+    collected_value_cents: receipt.collectedValueCents ?? null,
+    currency: receipt.currency ?? null,
+    revenue_state: hairCommerceRevenueState(receipt),
     evidence_url: receipt.evidenceUrl ?? null,
   });
 
@@ -154,6 +164,7 @@ export function createHairCommerceReceiptIngestHandler(
         duplicate: disposition === 'duplicate',
         receiptId: receipt.receiptId,
         event: receipt.event,
+        revenueState: hairCommerceRevenueState(receipt),
       });
     } catch {
       return res.status(503).json({ error: 'Receipt store unavailable' });
