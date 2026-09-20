@@ -30,6 +30,17 @@ CREATE TABLE IF NOT EXISTS public.fcr_commerce_receipts (
   received_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- One provider-confirmed payment_collected event may contribute revenue only
+-- once per FCR order identity, even if duplicate webhook subscriptions produce
+-- different Shopify webhook IDs for the same underlying order.
+CREATE UNIQUE INDEX IF NOT EXISTS fcr_commerce_receipts_order_event_uidx
+  ON public.fcr_commerce_receipts (
+    provider,
+    shop_domain,
+    order_ref_hash,
+    event_type
+  );
+
 CREATE INDEX IF NOT EXISTS fcr_commerce_receipts_order_time_idx
   ON public.fcr_commerce_receipts (order_ref_hash, occurred_at DESC);
 
