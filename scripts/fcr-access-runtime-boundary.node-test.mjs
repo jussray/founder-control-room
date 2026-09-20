@@ -60,5 +60,5 @@ test('sanitized retained receipt preserves each launch-critical browser boundary
   assert.match(returnStep, /protectedApiHealthDeniedToStranger,/);
 
   assert.doesNotMatch(returnStep, /\n\s*finalOrigin,\s*\n/);
-  assert.doesNotMatch(returnStep, /\n\s*error\s*[,}]?/);
+  assert.doesNotMatch(returnStep, /\n\s*error\s*(?:[:,}])/);
 });
