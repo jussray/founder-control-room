@@ -98,8 +98,6 @@ jobs:
           exit "${status}"
         env:
           NODE_ENV: test
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          PERPLEXITY_API_KEY: ${{ secrets.PERPLEXITY_API_KEY }}
 
       - name: Verify live StoryEngine peer ref still pinned
         shell: bash
