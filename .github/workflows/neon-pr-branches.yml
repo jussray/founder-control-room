@@ -191,7 +191,7 @@ jobs:
             # default that the later workspace migration would have backfilled,
             # run the real historical migration, then remove the default. Fresh
             # previews never take this compatibility path.
-            PROJECT_WORKSPACE_COLUMN="$(psql "$NEON_DB_URL" -X -Atqc "select count(*) from information_schema.columns where table_schema='public' and table_name='projects' and column_name='workspace_id' and data_type='uuid')"
+            PROJECT_WORKSPACE_COLUMN="$(psql "$NEON_DB_URL" -X -Atqc "select count(*) from information_schema.columns where table_schema='public' and table_name='projects' and column_name='workspace_id' and data_type='uuid'")"
             if [ "$PROJECT_WORKSPACE_COLUMN" = "1" ]; then
               PLATFORM_WORKSPACE_ID="$(psql "$NEON_DB_URL" -X -Atqc "select id from public.workspaces where slug='juss-founder-workspace' limit 1")"
               test -n "$PLATFORM_WORKSPACE_ID" || { echo 'Platform workspace missing while healing reused Neon baseline.' >&2; exit 1; }
@@ -224,8 +224,8 @@ jobs:
           HAS_FOUNDER_USERS="$(psql "$NEON_DB_URL" -X -Atqc "select to_regclass('public.founder_users') is not null")"
           HAS_TERMINAL_RUNS="$(psql "$NEON_DB_URL" -X -Atqc "select to_regclass('public.terminal_runs') is not null")"
           HAS_COMMAND_BRIDGE="$(psql "$NEON_DB_URL" -X -Atqc "select to_regclass('public.command_bridge_requests') is not null")"
-          HAS_USER_ID="$(psql "$NEON_DB_URL" -X -Atqc "select count(*) from information_schema.columns where table_schema='public' and table_name='founder_users' and column_name='user_id' and data_type='uuid')"
-          WORKSPACE_DEFAULT="$(psql "$NEON_DB_URL" -X -Atqc "select coalesce(column_default, '') from information_schema.columns where table_schema='public' and table_name='projects' and column_name='workspace_id')"
+          HAS_USER_ID="$(psql "$NEON_DB_URL" -X -Atqc "select count(*) from information_schema.columns where table_schema='public' and table_name='founder_users' and column_name='user_id' and data_type='uuid'")"
+          WORKSPACE_DEFAULT="$(psql "$NEON_DB_URL" -X -Atqc "select coalesce(column_default, '') from information_schema.columns where table_schema='public' and table_name='projects' and column_name='workspace_id'")"
           test "$HAS_PROJECTS" = "t"
           test "$HAS_FOUNDER_USERS" = "t"
           test "$HAS_TERMINAL_RUNS" = "t"
@@ -318,9 +318,9 @@ jobs:
             exit 0
           fi
 
-          FOUNDER_WORKSPACE="$(psql "$NEON_DB_URL" -X -Atqc "select count(*) from information_schema.columns where table_schema='public' and table_name='founder_users' and column_name='workspace_id' and data_type='uuid' and is_nullable='NO')"
-          FOUNDER_ROLE="$(psql "$NEON_DB_URL" -X -Atqc "select count(*) from information_schema.columns where table_schema='public' and table_name='founder_users' and column_name='account_role' and is_nullable='NO')"
-          PROJECT_WORKSPACE="$(psql "$NEON_DB_URL" -X -Atqc "select count(*) from information_schema.columns where table_schema='public' and table_name='projects' and column_name='workspace_id' and data_type='uuid' and is_nullable='NO')"
+          FOUNDER_WORKSPACE="$(psql "$NEON_DB_URL" -X -Atqc "select count(*) from information_schema.columns where table_schema='public' and table_name='founder_users' and column_name='workspace_id' and data_type='uuid' and is_nullable='NO'")"
+          FOUNDER_ROLE="$(psql "$NEON_DB_URL" -X -Atqc "select count(*) from information_schema.columns where table_schema='public' and table_name='founder_users' and column_name='account_role' and is_nullable='NO'")"
+          PROJECT_WORKSPACE="$(psql "$NEON_DB_URL" -X -Atqc "select count(*) from information_schema.columns where table_schema='public' and table_name='projects' and column_name='workspace_id' and data_type='uuid' and is_nullable='NO'")"
           WORKSPACE_RLS="$(psql "$NEON_DB_URL" -X -Atqc "select relrowsecurity from pg_class where oid='public.workspaces'::regclass")"
           test "$FOUNDER_WORKSPACE" = "1"
           test "$FOUNDER_ROLE" = "1"
@@ -341,9 +341,9 @@ jobs:
             exit 0
           fi
 
-          EVENT_COLUMN="$(psql "$NEON_DB_URL" -X -Atqc "select count(*) from information_schema.columns where table_schema='public' and table_name='fcr_commerce_receipts' and column_name='event_id' and data_type='uuid' and is_nullable='NO')"
-          EVENT_INDEX="$(psql "$NEON_DB_URL" -X -Atqc "select count(*) from pg_indexes where schemaname='public' and tablename='fcr_commerce_receipts' and indexname='fcr_commerce_receipts_provider_event_uidx')"
-          RLS_ENABLED="$(psql "$NEON_DB_URL" -X -Atqc "select relrowsecurity from pg_class where oid='public.fcr_commerce_receipts'::regclass')"
+          EVENT_COLUMN="$(psql "$NEON_DB_URL" -X -Atqc "select count(*) from information_schema.columns where table_schema='public' and table_name='fcr_commerce_receipts' and column_name='event_id' and data_type='uuid' and is_nullable='NO'")"
+          EVENT_INDEX="$(psql "$NEON_DB_URL" -X -Atqc "select count(*) from pg_indexes where schemaname='public' and tablename='fcr_commerce_receipts' and indexname='fcr_commerce_receipts_provider_event_uidx'")"
+          RLS_ENABLED="$(psql "$NEON_DB_URL" -X -Atqc "select relrowsecurity from pg_class where oid='public.fcr_commerce_receipts'::regclass")"
           ROW_COUNT="$(psql "$NEON_DB_URL" -X -Atqc "select count(*) from public.fcr_commerce_receipts")"
 
           test "$EVENT_COLUMN" = "1"
