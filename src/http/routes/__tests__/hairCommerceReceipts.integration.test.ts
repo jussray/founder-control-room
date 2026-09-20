@@ -28,6 +28,13 @@ const paidReceipt = {
   currency: 'USD',
 } as const;
 
+const legacyPaidReceipt = {
+  ...validReceipt,
+  receiptId: 'bb24454d-893e-41f1-a0be-a1aa4763e906',
+  event: 'paid_order_recorded',
+  groupCount: 0,
+} as const;
+
 function createTestApp(store: HairCommerceReceiptStore) {
   const app = express();
   app.use(express.json({ limit: '32kb' }));
@@ -80,7 +87,7 @@ describe('hair commerce receipt ingest', () => {
     expect(store).not.toHaveBeenCalled();
   });
 
-  it('requires collected value and currency for paid-order evidence', async () => {
+  it('requires collected value and currency to arrive as one complete paid-order tuple', async () => {
     const store = vi.fn<HairCommerceReceiptStore>();
     for (const incomplete of [
       { ...paidReceipt, collectedValueCents: undefined },
@@ -95,6 +102,24 @@ describe('hair commerce receipt ingest', () => {
       expect(response.status).toBe(400);
     }
     expect(store).not.toHaveBeenCalled();
+  });
+
+  it('accepts a legacy paid receipt without fabricating recognized revenue', async () => {
+    const store = vi.fn<HairCommerceReceiptStore>().mockResolvedValue('stored');
+    const response = await request(createTestApp(store))
+      .post('/ingest/hair-commerce-receipts')
+      .set('x-jbh-receipt-token', 'test-secret-token')
+      .send(legacyPaidReceipt);
+
+    expect(response.status).toBe(201);
+    expect(response.body).toEqual({
+      accepted: true,
+      duplicate: false,
+      receiptId: legacyPaidReceipt.receiptId,
+      event: legacyPaidReceipt.event,
+      revenueState: null,
+    });
+    expect(store).toHaveBeenCalledWith(legacyPaidReceipt);
   });
 
   it('rejects money fields on non-payment lifecycle receipts', async () => {
