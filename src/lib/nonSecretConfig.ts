@@ -1,3 +1,5 @@
+import { Buffer } from 'node:buffer';
+
 const RAW_CREDENTIAL_KEYS = new Set([
   'secret',
   'secretvalue',
@@ -19,6 +21,7 @@ const RAW_CREDENTIAL_KEYS = new Set([
 const PRIVATE_KEY_PEM = /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/i;
 const BEARER_VALUE = /^Bearer\s+\S{8,}$/i;
 const COMMON_PROVIDER_KEY = /^(?:gh[pousr]_[A-Za-z0-9_]{20,}|sk-[A-Za-z0-9_-]{16,}|pplx-[A-Za-z0-9_-]{16,})$/;
+const BASE64_VALUE = /^[A-Za-z0-9+/_-]+={0,2}$/;
 
 function normalizedKey(key: string): string {
   return key.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -31,9 +34,25 @@ function nonEmptyCredentialValue(value: unknown): boolean {
   return true;
 }
 
+function decodesToPrivateKey(value: string): boolean {
+  const compact = value.trim();
+  if (compact.length < 64 || !BASE64_VALUE.test(compact)) return false;
+
+  try {
+    // Node accepts both ordinary base64 and URL-safe alphabet variants here.
+    const decoded = Buffer.from(compact, 'base64').toString('utf8');
+    return PRIVATE_KEY_PEM.test(decoded);
+  } catch {
+    return false;
+  }
+}
+
 function stringLooksSecret(value: string): boolean {
   const trimmed = value.trim();
-  return PRIVATE_KEY_PEM.test(trimmed) || BEARER_VALUE.test(trimmed) || COMMON_PROVIDER_KEY.test(trimmed);
+  return PRIVATE_KEY_PEM.test(trimmed)
+    || BEARER_VALUE.test(trimmed)
+    || COMMON_PROVIDER_KEY.test(trimmed)
+    || decodesToPrivateKey(trimmed);
 }
 
 export function containsRawCredentialMaterial(value: unknown, seen = new Set<object>()): boolean {
