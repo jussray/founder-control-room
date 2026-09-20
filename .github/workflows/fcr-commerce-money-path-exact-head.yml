@@ -13,6 +13,7 @@ on:
       - 'src/index.ts'
       - 'src/worker/cf-entry.ts'
       - 'supabase/migrations/20260920030000_fcr_commerce_receipts.sql'
+      - 'supabase/migrations/20260920031500_fcr_commerce_event_identity.sql'
       - 'wrangler.worker.toml'
       - '.github/workflows/fcr-commerce-money-path-exact-head.yml'
   workflow_dispatch:
@@ -69,9 +70,11 @@ jobs:
           grep -F '"FCR_COMMERCE_HASH_SALT",' wrangler.worker.toml
           node scripts/verify-production-deploy-authority.mjs
 
-      - name: Prove privacy-safe additive and order-idempotent ledger
+      - name: Prove privacy-safe additive and provider-event-idempotent ledger
         run: |
           grep -F "CREATE TABLE IF NOT EXISTS public.fcr_commerce_receipts" supabase/migrations/20260920030000_fcr_commerce_receipts.sql
           grep -F "CREATE UNIQUE INDEX IF NOT EXISTS fcr_commerce_receipts_order_event_uidx" supabase/migrations/20260920030000_fcr_commerce_receipts.sql
+          grep -F "ADD COLUMN IF NOT EXISTS event_id UUID" supabase/migrations/20260920031500_fcr_commerce_event_identity.sql
+          grep -F "CREATE UNIQUE INDEX IF NOT EXISTS fcr_commerce_receipts_provider_event_uidx" supabase/migrations/20260920031500_fcr_commerce_event_identity.sql
           grep -F "ALTER TABLE public.fcr_commerce_receipts ENABLE ROW LEVEL SECURITY" supabase/migrations/20260920030000_fcr_commerce_receipts.sql
-          ! grep -Eiq 'customer_(name|email|phone)|shipping_address|payment_instrument|raw_order' supabase/migrations/20260920030000_fcr_commerce_receipts.sql
+          ! grep -Eiq 'customer_(name|email|phone)|shipping_address|payment_instrument|raw_order' supabase/migrations/20260920030000_fcr_commerce_receipts.sql supabase/migrations/20260920031500_fcr_commerce_event_identity.sql
