@@ -13,6 +13,12 @@ Founder Control Room uses Cloudflare Pages for the browser frontend and one cano
 
 The former `founder-control-room2` Worker was retired. Its identity and `wrangler.api.toml` must not be recreated or targeted without a new explicit authority decision.
 
+### Review-email Worker and Email Routing
+
+`wrangler.email.toml` defines the `founder-control-room-review-email` Worker source identity, entrypoint, account, public-route posture, and private `FOUNDER_CONTROL_ROOM_API -> founder-control-room` Service Binding. It intentionally does not declare an `addresses` field.
+
+The address mapping `review@foundercontrolroom.org -> founder-control-room-review-email` is Cloudflare provider-side Email Routing state and must be observed or reconciled separately. `wrangler deploy --config wrangler.email.toml`, required-secret-name readback, and Service Binding deployment output prove only their respective layers. They must not be recorded as `email_trigger_reconciled:true` or as runtime email invocation proof. Calling the inbound lane active requires separate provider routing evidence plus a real inbound-email execution receipt.
+
 ## Pages behavior
 
 The Pages project publishes `dist-pages`, a deterministic copy of `public/` containing the landing page, authenticated Control Room application, security headers, and `public/_worker.js`.
