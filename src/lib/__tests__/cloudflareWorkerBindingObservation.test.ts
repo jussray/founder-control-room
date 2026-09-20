@@ -19,6 +19,7 @@ const relayBindings = [
   'FCR_REMOTE_MCP_OPERATOR_CLIENT_MAP',
 ];
 const coreRequiredBinding = 'FOUNDER_SESSION_ENCRYPTION_KEY';
+const readOnlyCredentialFixture = 'TEST_ONLY_NON_CREDENTIAL_VALUE';
 
 describe('Cloudflare Worker binding observation', () => {
   it('keeps relay bindings capability-specific instead of global deploy requirements', () => {
@@ -96,7 +97,7 @@ describe('Cloudflare Worker binding observation', () => {
     const receipt = await observeCloudflareWorkerBindings({
       accountId: '1234567890abcdef',
       workerName: 'founder-control-room',
-      apiToken: 'cfut_example_read_only_token',
+      apiToken: readOnlyCredentialFixture,
       requiredNames: [coreRequiredBinding],
       fetchImpl: fetchMock as typeof fetch,
     });
@@ -118,7 +119,7 @@ describe('Cloudflare Worker binding observation', () => {
     const receipt = await observeCloudflareWorkerBindings({
       accountId: '1234567890abcdef',
       workerName: 'founder-control-room',
-      apiToken: 'cfut_example_read_only_token',
+      apiToken: readOnlyCredentialFixture,
       requiredNames: [coreRequiredBinding],
       fetchImpl: fetchMock as typeof fetch,
     });
