@@ -1,4 +1,5 @@
 import { resolveGoalfixIntent, type GoalfixIntent, type ResolveGoalfixIntentInput } from './intent.js';
+import { GOALFIX_AUTO_STOP_CONDITION } from './contextResolution.js';
 import {
   detectGoalfixStagnation,
   type GoalfixAttempt,
@@ -47,12 +48,34 @@ function normalizeScope(scope: GoalfixScopeBudget): GoalfixScopeBudget {
   };
 }
 
+function normalizeIntentText(value: string | undefined): string {
+  return String(value ?? '').trim().replace(/\s+/g, ' ').toLocaleLowerCase('en-US');
+}
+
 export function buildGoalfixSkillRuntimeDecision(
   input: BuildGoalfixSkillRuntimeInput,
 ): GoalfixSkillRuntimeDecision {
-  const intent = resolveGoalfixIntent(input.intent);
-  const stagnation = detectGoalfixStagnation(input.attempts ?? []);
   const scope = normalizeScope(input.scope);
+  let intent = resolveGoalfixIntent(input.intent);
+
+  // Automatic context may confirm only an unchanged founder outcome. The
+  // canonical automatic stop condition is how this runtime distinguishes that
+  // lane from manual/explicit intent resolution without trusting caller-added
+  // provider or repository metadata. A semantic rewrite remains unconfirmed
+  // even if the automatic route supplied confirmed=true.
+  if (
+    scope.stopCondition === GOALFIX_AUTO_STOP_CONDITION
+    && input.intent.resolved !== undefined
+    && normalizeIntentText(input.intent.raw) !== normalizeIntentText(input.intent.resolved)
+  ) {
+    intent = {
+      ...intent,
+      confidence: 'low',
+      confirmed: false,
+    };
+  }
+
+  const stagnation = detectGoalfixStagnation(input.attempts ?? []);
 
   let mayProceed = true;
   let nextAction = 'Inspect only the scoped first files or logs, then re-observe.';

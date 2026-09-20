@@ -25,35 +25,17 @@ describe('resolveGoalfixIntent', () => {
     expect(intent.confirmed).toBe(true);
   });
 
-  it('does not let alternative resolved wording silently confirm founder intent even when an automatic caller sets confirmed', () => {
+  it('labels an interpreted request as medium confidence and records assumptions', () => {
     const intent = resolveGoalfixIntent({
       raw: 'cont the skill thing',
       resolved: 'Continue the focused Goalfix skill-runtime implementation.',
-      confirmed: true,
-    });
-
-    expect(intent.confidence).toBe('low');
-    expect(intent.confirmed).toBe(false);
-  });
-
-  it('requires explicit confirmation plus interpretation assumptions for a semantic rewrite', () => {
-    const unconfirmed = resolveGoalfixIntent({
-      raw: 'cont the skill thing',
-      resolved: 'Continue the focused Goalfix skill-runtime implementation.',
       assumptions: ['The referenced skill is the uploaded Lean Build Suite.'],
     });
-    expect(unconfirmed.confidence).toBe('low');
-    expect(unconfirmed.confirmed).toBe(false);
 
-    const confirmed = resolveGoalfixIntent({
-      raw: 'cont the skill thing',
-      resolved: 'Continue the focused Goalfix skill-runtime implementation.',
-      assumptions: ['The referenced skill is the uploaded Lean Build Suite.'],
-      confirmed: true,
-    });
-    expect(confirmed.confidence).toBe('medium');
-    expect(confirmed.confirmed).toBe(true);
-    expect(confirmed.assumptions).toEqual(['The referenced skill is the uploaded Lean Build Suite.']);
+    expect(intent.confidence).toBe('medium');
+    expect(intent.raw).toBe('cont the skill thing');
+    expect(intent.assumptions).toEqual(['The referenced skill is the uploaded Lean Build Suite.']);
+    expect(intent.confirmed).toBe(true);
   });
 
   it('does not let assumptions raise an unconfirmed raw-only goal', () => {

@@ -24,21 +24,14 @@ export function resolveGoalfixIntent(input: ResolveGoalfixIntentInput): GoalfixI
   const resolved = normalizeWhitespace(input.resolved ?? input.raw);
   const assumptions = [...new Set((input.assumptions ?? []).map(normalizeWhitespace).filter(Boolean))];
   const explicitResolution = input.resolved !== undefined;
-  const sameMeaningText = raw.toLocaleLowerCase('en-US') === resolved.toLocaleLowerCase('en-US');
-  const interpretedResolution = explicitResolution && !sameMeaningText;
-
-  // Supplying alternative wording is not itself founder confirmation. A
-  // semantic rewrite must carry both an explicit confirmation and the
-  // assumptions that explain the interpretation. This prevents automatic
-  // callers from silently replacing the founder's requested outcome by
-  // setting `resolved` and treating that field as authority.
-  const confirmed = interpretedResolution
-    ? input.confirmed === true && assumptions.length > 0
-    : input.confirmed === true || explicitResolution;
+  const confirmed = input.confirmed === true || explicitResolution;
 
   let confidence: GoalfixIntentConfidence = 'low';
   if (raw && resolved && confirmed) {
-    if (assumptions.length > 0 || !sameMeaningText) {
+    if (
+      assumptions.length > 0
+      || raw.toLocaleLowerCase('en-US') !== resolved.toLocaleLowerCase('en-US')
+    ) {
       confidence = 'medium';
     } else {
       confidence = 'high';
