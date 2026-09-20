@@ -1,10 +1,14 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
+  L99_GIT_CONNECTION_LABEL,
+  L99_GIT_CONNECTION_TYPE,
   L99_PROJECT_SLUG,
   L99_REPOSITORY_IDENTIFIER,
   L99_REPOSITORY_PROVIDER,
+  buildL99GitConnectionConfig,
   buildL99RepositoryFields,
+  needsL99GitConnectionReconciliation,
   needsL99RepositoryReconciliation,
 } from "./l99Repository.js";
 
@@ -15,12 +19,21 @@ const ACTIVE_ROUTING_FILES = [
   "../../docs/FIGMA_PORTFOLIO_CONTRACT.md",
   "../../docs/REPOSITORY_PRIVACY_PROGRAM.md",
 ] as const;
+const CONNECTION_RECONCILIATION_MIGRATION = readFileSync(
+  new URL(
+    "../../supabase/migrations/20260920215300_reconcile_storyengine_git_connection_identity.sql",
+    import.meta.url,
+  ),
+  "utf8",
+);
 
 describe("L99 repository identity", () => {
   it("keeps the stable project slug separate from the repository locator", () => {
     expect(L99_PROJECT_SLUG).toBe("l99");
     expect(L99_REPOSITORY_PROVIDER).toBe("github");
     expect(L99_REPOSITORY_IDENTIFIER).toBe("jussray/StoryEngine");
+    expect(L99_GIT_CONNECTION_TYPE).toBe("git");
+    expect(L99_GIT_CONNECTION_LABEL).toBe("primary");
   });
 
   it("accepts only the authoritative StoryEngine repository", () => {
@@ -62,11 +75,49 @@ describe("L99 repository identity", () => {
     ).toBe(true);
   });
 
-  it("builds the exact idempotent database patch", () => {
+  it("builds the exact idempotent project-row patch", () => {
     expect(buildL99RepositoryFields("2026-08-04T05:30:00.000Z")).toEqual({
       repo_provider: "github",
       repo_identifier: "jussray/StoryEngine",
       updated_at: "2026-08-04T05:30:00.000Z",
     });
+  });
+
+  it("detects stale primary Git connection config", () => {
+    expect(
+      needsL99GitConnectionReconciliation({ repository: L99_REPOSITORY_IDENTIFIER }),
+    ).toBe(false);
+    expect(
+      needsL99GitConnectionReconciliation({ repository: STALE_REPOSITORY_IDENTIFIER }),
+    ).toBe(true);
+    expect(needsL99GitConnectionReconciliation({})).toBe(true);
+    expect(needsL99GitConnectionReconciliation(null)).toBe(true);
+  });
+
+  it("repairs only the repository key and preserves existing connection config", () => {
+    expect(
+      buildL99GitConnectionConfig({
+        repository: STALE_REPOSITORY_IDENTIFIER,
+        manifest_path: "control-room.manifest.json",
+        default_branch: "main",
+        observation_mode: "sanitized_read_only",
+      }),
+    ).toEqual({
+      repository: L99_REPOSITORY_IDENTIFIER,
+      manifest_path: "control-room.manifest.json",
+      default_branch: "main",
+      observation_mode: "sanitized_read_only",
+    });
+  });
+
+  it("ships an idempotent database repair for the existing primary Git connection", () => {
+    expect(CONNECTION_RECONCILIATION_MIGRATION).toContain("public.project_connections");
+    expect(CONNECTION_RECONCILIATION_MIGRATION).toContain("p.slug = 'l99'");
+    expect(CONNECTION_RECONCILIATION_MIGRATION).toContain("pc.connection_type = 'git'");
+    expect(CONNECTION_RECONCILIATION_MIGRATION).toContain("pc.label = 'primary'");
+    expect(CONNECTION_RECONCILIATION_MIGRATION).toContain("pc.status = 'active'");
+    expect(CONNECTION_RECONCILIATION_MIGRATION).toContain("jsonb_set");
+    expect(CONNECTION_RECONCILIATION_MIGRATION).toContain("jussray/StoryEngine");
+    expect(CONNECTION_RECONCILIATION_MIGRATION).not.toContain("4e7e9fca-90e6-46d4-a5cc-cb0759909008");
   });
 });
