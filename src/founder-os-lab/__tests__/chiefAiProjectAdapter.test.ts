@@ -25,12 +25,12 @@ function project(overrides: Record<string, unknown> = {}) {
 }
 
 describe('Chief AI Founder OS project adapter', () => {
-  it('pins the live Chief contract spine without copying execution authority', () => {
+  it('pins the reviewed Chief contract spine without copying execution authority', () => {
     expect(ADAPTER).toMatchObject({
       id: 'chief-ai-machine',
       adapterId: 'chief-ai-machine-project-preview',
       repository: 'jussray/chief-ai-machine',
-      auditedSourceHead: '2fd4fda0cab12e52ab5096e723884d98bcfe7d10',
+      auditedSourceHead: '19a8bb1013dbb8a9663377afeec562086fa55f35',
       authorityOwner: 'founder-control-room',
       mode: 'preview',
       executionAllowed: false,
