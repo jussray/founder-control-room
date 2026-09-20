@@ -192,6 +192,49 @@ async function fakeRpc(name, args) {
     return { data: null, error: null };
   }
 
+  if (name === 'create_workspace_project_with_onboarding_event') {
+    const projects = table('projects');
+    const events = table('project_events');
+    const metadata = args?.p_event_metadata;
+    if (!args?.p_workspace_id || !String(args?.p_slug ?? '').trim() || !String(args?.p_name ?? '').trim()) {
+      return { data: null, error: { code: '22023', message: 'invalid workspace onboarding subject' } };
+    }
+    if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) {
+      return { data: null, error: { code: '22023', message: 'invalid onboarding event metadata' } };
+    }
+    if ('founder' in metadata || 'email' in metadata || 'founderEmail' in metadata) {
+      return { data: null, error: { code: '22023', message: 'founder identity is forbidden in onboarding event metadata' } };
+    }
+    if (projects.some((row) => row.slug === args.p_slug)) {
+      return { data: null, error: { code: '23505', message: 'duplicate project slug' } };
+    }
+
+    const project = withDefaults({
+      workspace_id: args.p_workspace_id,
+      slug: args.p_slug,
+      name: args.p_name,
+      repo_provider: args.p_repo_provider,
+      repo_identifier: args.p_repo_identifier,
+      stack: args.p_stack,
+      status: 'active',
+      risk_level: 'medium',
+    }, 'projects');
+    const event = withDefaults({
+      project_id: project.id,
+      source_event_id: `e2e-onboarding-${project.id}`,
+      event_type: 'founder_onboarding_bootstrapped',
+      severity: 'info',
+      screen: 'chief-workspace-onboarding',
+      metadata,
+    }, 'project_events');
+
+    // Commit both rows only after every validation above has succeeded. This
+    // mirrors the all-or-nothing PostgreSQL function used in production.
+    projects.push(project);
+    events.push(event);
+    return { data: project, error: null };
+  }
+
   if (name === 'is_v10_registry_approved') {
     const candidateHash = String(args?.candidate_hash ?? '').trim().toLowerCase();
     const approved = table('capability_registry_snapshots').some((row) => (
