@@ -146,13 +146,12 @@ this the way a founder would have to: click Refresh, reopen the mission.
 
 Anything requiring a real Supabase or Cloudflare account (production auth,
 deployment, migrations), and the guarded terminal's *write*-risk and
-*verify*-risk command paths (only a read-risk command — `git.head` — is
-exercised here; write-risk additionally requires `confirmWrite: true` and a
-stricter `sandboxed`-only status window, and verify-risk commands like
-`npm test` would need real dependencies installed, which this harness
-doesn't attempt). Real founder credentials and a real production
-environment need the founder's own account access — those cannot be faked
-without pretending to have authority nobody granted.
+*verify*-risk command paths. Only a read-risk command — `git.head` — is
+exercised here. Verify/write commands require the separate exact L99
+ApprovalReceipt-aware execution path; `confirmWrite` is not execution
+authority. Real founder credentials and a real production environment need
+the founder's own account access — those cannot be faked without pretending
+to have authority nobody granted.
 
 ## Running it
 
