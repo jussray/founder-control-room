@@ -59,28 +59,23 @@ function founderIsEditingMissionForm() {
   return active.matches('input, textarea, select');
 }
 
-function captureMissionDrafts() {
-  const detail = missionDetail();
-  if (!detail) return;
-  const next = new Map(missionDrafts);
-  detail.querySelectorAll('input, textarea, select').forEach((candidate) => {
-    if (!isDraftField(candidate)) return;
-    const key = fieldDraftKey(candidate);
-    if (!key) return;
-    if (candidate instanceof HTMLInputElement && (candidate.type === 'checkbox' || candidate.type === 'radio')) {
-      next.set(key, { kind: 'checked', checked: candidate.checked });
-      return;
-    }
-    if (candidate instanceof HTMLSelectElement && candidate.multiple) {
-      next.set(key, {
-        kind: 'multiple',
-        values: [...candidate.selectedOptions].map((option) => option.value),
-      });
-      return;
-    }
-    next.set(key, { kind: 'value', value: candidate.value });
-  });
-  missionDrafts = next;
+function captureMissionDraft(field) {
+  if (!isDraftField(field)) return;
+  const key = fieldDraftKey(field);
+  if (!key) return;
+
+  if (field instanceof HTMLInputElement && (field.type === 'checkbox' || field.type === 'radio')) {
+    missionDrafts.set(key, { kind: 'checked', checked: field.checked });
+    return;
+  }
+  if (field instanceof HTMLSelectElement && field.multiple) {
+    missionDrafts.set(key, {
+      kind: 'multiple',
+      values: [...field.selectedOptions].map((option) => option.value),
+    });
+    return;
+  }
+  missionDrafts.set(key, { kind: 'value', value: field.value });
 }
 
 function restoreMissionDrafts() {
@@ -219,7 +214,7 @@ async function pollMissionStatus() {
 function onDraftInput(event) {
   const target = event.target;
   if (!(target instanceof Element) || !target.closest(MISSION_DETAIL_SELECTOR)) return;
-  captureMissionDrafts();
+  captureMissionDraft(target);
 }
 
 function onMissionDraftCommitted(event) {
