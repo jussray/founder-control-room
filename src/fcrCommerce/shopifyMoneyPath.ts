@@ -104,14 +104,37 @@ function stringValue(value: unknown): string | null {
   return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
 
+function decimalDigitsOnly(value: string): boolean {
+  if (value.length < 1 || value.length > 32) return false;
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index);
+    if (code < 48 || code > 57) return false;
+  }
+  return true;
+}
+
 function integerId(value: unknown): string | null {
   if (typeof value === 'number' && Number.isSafeInteger(value) && value > 0) {
     return String(value);
   }
+
   const text = stringValue(value);
-  if (!text) return null;
-  const match = text.match(/(?:gid:\/\/shopify\/(?:Product|ProductVariant)\/)?(\d+)$/);
-  return match?.[1] ?? null;
+  if (!text || text.length > 96) return null;
+
+  const prefixes = [
+    'gid://shopify/Product/',
+    'gid://shopify/ProductVariant/',
+  ] as const;
+
+  let candidate = text;
+  for (const prefix of prefixes) {
+    if (text.startsWith(prefix)) {
+      candidate = text.slice(prefix.length);
+      break;
+    }
+  }
+
+  return decimalDigitsOnly(candidate) ? candidate : null;
 }
 
 function moneyToCents(value: unknown): number | null {
