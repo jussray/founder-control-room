@@ -5,12 +5,18 @@ import { callbackJs } from './onboardingAssets/callbackJs.js';
 import { controlRoomCss } from './onboardingAssets/controlRoomCss.js';
 import { controlRoomHtml } from './onboardingAssets/controlRoomHtml.js';
 import { controlRoomJs } from './onboardingAssets/controlRoomJs.js';
+import { workspaceProjectsRouter } from './workspaceProjects.js';
 
 export const onboardingRouter = Router();
 
 // Scoped to this router's own routes only. The dashboard SPA has a separate
 // policy, while this identity and onboarding surface stays same-origin.
 onboardingRouter.use(onboardingContentSecurityPolicy);
+
+// Workspace-scoped founder onboarding is deliberately separate from legacy
+// global FCR routes. The route owns its tenant filter and cannot borrow global
+// project authority merely because a founder is allowlisted.
+onboardingRouter.use('/workspace', workspaceProjectsRouter);
 
 function sendAsset(res: Response, type: string, body: string) {
   res.setHeader('Content-Type', type);
@@ -19,6 +25,8 @@ function sendAsset(res: Response, type: string, body: string) {
 }
 
 onboardingRouter.get('/', (_req, res) =>
+  sendAsset(res, 'text/html; charset=utf-8', controlRoomHtml));
+onboardingRouter.get(['/founder-onboarding', '/founder-onboarding/'], (_req, res) =>
   sendAsset(res, 'text/html; charset=utf-8', controlRoomHtml));
 onboardingRouter.get('/assets/control-room.css', (_req, res) =>
   sendAsset(res, 'text/css; charset=utf-8', controlRoomCss));
