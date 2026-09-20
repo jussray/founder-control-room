@@ -317,7 +317,6 @@ workspaceProjectsRouter.post('/projects', async (req: FounderRequest, res) => {
     }
     return res.status(500).json({
       error: 'Project and onboarding evidence could not be created atomically',
-      detail: error.message,
     });
   }
 
