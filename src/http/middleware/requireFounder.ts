@@ -51,9 +51,10 @@ function authenticatedIdentity(user: unknown): AuthenticatedIdentity | null {
 }
 
 async function founderAccess(identity: AuthenticatedIdentity): Promise<FounderAccessState> {
-  // `select('*')` is deliberate during the migration rollout: before the
-  // workspace columns exist the platform owner must remain able to sign in;
-  // after migration the returned role/workspace become load-bearing.
+  // `select('*')` is deliberate during the migration rollout. Before the new
+  // workspace columns exist, only the already-bound immutable founder user_id
+  // may retain platform-owner authority. A legacy email-only allowlist row must
+  // fail closed rather than temporarily inheriting global FCR authority.
   const { data: allowRow, error: allowError } = await supabase
     .from('founder_users')
     .select('*')
@@ -70,13 +71,23 @@ async function founderAccess(identity: AuthenticatedIdentity): Promise<FounderAc
   const hasExplicitRole = rawRole !== undefined && rawRole !== null;
   const hasExplicitWorkspaceColumn = Object.prototype.hasOwnProperty.call(record, 'workspace_id');
 
-  const role: FounderAccountRole = !hasExplicitRole
-    ? 'platform_owner'
-    : rawRole === 'platform_owner' || rawRole === 'workspace_owner'
-      ? rawRole
-      : 'platform_owner';
+  if (!hasExplicitRole) {
+    const boundUserId = typeof record.user_id === 'string' ? record.user_id.trim() : '';
+    if (!boundUserId || boundUserId !== identity.userId) {
+      return { state: 'denied' };
+    }
 
-  if (hasExplicitRole && rawRole !== 'platform_owner' && rawRole !== 'workspace_owner') {
+    return {
+      state: 'allowed',
+      access: {
+        role: 'platform_owner',
+        workspaceId: null,
+        exposesWorkspaceIdentity: false,
+      },
+    };
+  }
+
+  if (rawRole !== 'platform_owner' && rawRole !== 'workspace_owner') {
     return { state: 'error' };
   }
 
@@ -87,7 +98,7 @@ async function founderAccess(identity: AuthenticatedIdentity): Promise<FounderAc
   return {
     state: 'allowed',
     access: {
-      role,
+      role: rawRole,
       workspaceId,
       exposesWorkspaceIdentity: hasExplicitRole || hasExplicitWorkspaceColumn,
     },
