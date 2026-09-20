@@ -17,11 +17,17 @@ import { requireFounder, type FounderRequest } from '../middleware/requireFounde
 
 export const debugRouter = Router();
 
+function isProductionRuntime(): boolean {
+  return process.env.ENVIRONMENT === 'production' || process.env.NODE_ENV === 'production';
+}
+
 // Keep the CI/dev diagnostic usable without inventing a second test-only
-// endpoint, while closing the production reconnaissance surface. This check
-// runs per request so tests and local harnesses can change NODE_ENV safely.
+// endpoint, while closing the production reconnaissance surface. Cloudflare's
+// canonical Worker declares ENVIRONMENT=production in wrangler.worker.toml;
+// Node deployments may use NODE_ENV=production. Either production marker must
+// fail closed behind the existing founder authentication boundary.
 debugRouter.use((req, res, next) => {
-  if (process.env.NODE_ENV !== 'production') return next();
+  if (!isProductionRuntime()) return next();
   return requireFounder(req as FounderRequest, res, next);
 });
 
@@ -59,5 +65,6 @@ debugRouter.get('/provider', (_req, res) => {
     openaiKeyPresent,
     perplexityKeyPresent,
     nodeEnv: process.env.NODE_ENV ?? 'unknown',
+    environment: process.env.ENVIRONMENT ?? 'unknown',
   });
 });
