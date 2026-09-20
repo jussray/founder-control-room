@@ -183,6 +183,8 @@ Public discovery artifacts such as `/robots.txt`, `/sitemap.xml`, `/llms.txt`, a
 
 Source dependence on that topology is not proof the live provider is configured correctly.
 
+The dedicated review-email Worker uses the same truth separation. `wrangler.email.toml` may declare the `founder-control-room-review-email` Worker identity, source entrypoint, Cloudflare account, and private `FOUNDER_CONTROL_ROOM_API -> founder-control-room` Service Binding, but it must not use an `addresses` field to claim inbound routing. The mapping `review@foundercontrolroom.org -> founder-control-room-review-email` is Cloudflare provider-side Email Routing state. Source verification, required-secret-name readback, or a successful Worker deploy cannot prove that provider rule exists, cannot set `email_trigger_reconciled=true`, and cannot prove that an inbound email actually invoked the Worker; provider routing readback and runtime email evidence remain separate receipts.
+
 `wrangler.worker.toml [secrets].required` is the canonical production binding-name gate for provider-held Worker secrets. A provider-backed capability such as `tinyfish-web-observation-v1` must name `TINYFISH_API_KEY` there before canonical Worker promotion; Deploy verifies only binding-name presence in Cloudflare and never copies the secret value through GitHub Actions. Source and CI readiness therefore remain distinct from live TinyFish provider/runtime activation.
 
 The first-party FCR Shopify paid-order ingress follows the same boundary. `FCR_SHOPIFY_WEBHOOK_SECRET` and `FCR_COMMERCE_HASH_SALT` must remain provider-held required Worker secrets before promotion, while source merely declares their names. Their presence cannot prove that Shopify registered the `orders/paid` callback, that the deployed Worker serves the exact commerce head, that the production Supabase migration exists, or that any payment was collected; those claims require separate provider, deployment, database, runtime, and revenue receipts.
@@ -317,7 +319,3 @@ A child-app reconciliation may classify evidence as `CURRENT`, `UNDECLARED`, `SC
 ## Required crawler/public-work browser proof
 
 For public crawler and work-directory behavior, `.github/workflows/ci.yml` must keep `e2e/pages-api-recovery.spec.ts` and `e2e/public-work-directory.spec.ts` inside the load-bearing `Playwright e2e` job that feeds `Required Gate`. The specialized Pages workflow is supplementary evidence only; it cannot replace this required exact-head browser proof or authorize merge.
-
-## Cross-repository browser witness freshness
-
-The exact StoryEngine peer configured in `.github/workflows/playwright.yml` is an evidence subject, not a durable alias for current StoryEngine. A peer refresh must be backed by an independent ref/SHA observation and must reset predecessor federation/browser proof until the complete FCR → StoryEngine → receipt → FCR Playwright witness passes on the exact FCR head. Pin alignment alone grants no merge, deploy, production, or provider-mutation authority.

@@ -199,6 +199,14 @@ Cloudflare outbound email is a capability boundary, not a global portfolio trans
 
 Repository configuration can prove the desired binding name and sender restriction. It cannot prove Cloudflare has onboarded the sender domain, the deployed Worker currently exposes that binding, or a message was accepted/delivered. Those claims require fresh provider/runtime evidence and must remain separate from source truth.
 
+## Review-email inbound routing boundary
+
+`wrangler.email.toml` is source truth for the `founder-control-room-review-email` Worker identity, source entrypoint, Cloudflare account, public-route posture, and the private `FOUNDER_CONTROL_ROOM_API -> founder-control-room` Service Binding. It must not encode inbound Email Routing through an `addresses` field.
+
+The intended mapping `review@foundercontrolroom.org -> founder-control-room-review-email` is Cloudflare provider-side Email Routing state. A repository verifier, secret-name readback, or successful `wrangler deploy --config wrangler.email.toml` can prove only the layer it actually observed. Provider routing mutation/readback and an actual inbound-email invocation remain separate evidence planes.
+
+The reconciliation receipt therefore keeps `provider_deploy_succeeded`, `email_trigger_reconciled`, and `runtime_email_invocation_proven` independent. Worker deployment must never promote either provider-side routing or runtime invocation to green without their own evidence.
+
 ## Worker build authority membrane
 
 `wrangler.worker.toml` runs `scripts/verify-worker-build-authority.mjs` as its custom Worker build hook. The hook is a repository-side fail-closed membrane, not a provider mutation authority.
@@ -258,8 +266,3 @@ Source code proves only this bounded recovery contract. Current Access state, cr
 ```bash
 npm test
 npm run typecheck
-npm run lint
-npx playwright test e2e/cloudflare-reasoning.spec.ts
-```
-
-The browser/API suite verifies the public-safe contract, founder protection, absence of credential leakage, presence of the implementation stack, and absence of an accidental deployment endpoint. Unit tests verify exact-commit reasoning, stale evidence, duplicate authority, authentication failures, runtime failure, rollback preparation, first-principles deletion/simplification output, and approval boundaries.
