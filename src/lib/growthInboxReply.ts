@@ -10,6 +10,7 @@ export interface GrowthInboxReplyStatus {
     email: {
       configured: boolean;
       expectedAccount: string | null;
+      fromAddress: string | null;
       fingerprint: string | null;
       missing: string[];
     };
@@ -35,6 +36,7 @@ export interface GmailReplyResult {
   threadId: string;
   recipient: string;
   account: string;
+  sender: string;
 }
 
 export interface WhatsAppReplyInput {
@@ -104,6 +106,9 @@ function replySubject(subject: string | null): string {
 function configuredGmailMissing(): string[] {
   const missing: string[] = [];
   if (!env('FCR_GMAIL_EXPECTED_EMAIL')) missing.push('FCR_GMAIL_EXPECTED_EMAIL');
+  const fromAddress = env('FCR_GMAIL_FROM_EMAIL');
+  if (!fromAddress) missing.push('FCR_GMAIL_FROM_EMAIL');
+  else if (!emailFromHeader(fromAddress)) missing.push('FCR_GMAIL_FROM_EMAIL must be a valid email address');
   const directToken = env('FCR_GMAIL_ACCESS_TOKEN');
   const refreshReady = Boolean(
     env('FCR_GMAIL_REFRESH_TOKEN')
@@ -130,6 +135,7 @@ export function growthInboxReplyStatus(): GrowthInboxReplyStatus {
   const gmailMissing = configuredGmailMissing();
   const whatsappMissing = configuredWhatsAppMissing();
   const expectedAccount = env('FCR_GMAIL_EXPECTED_EMAIL')?.toLowerCase() ?? null;
+  const fromAddress = emailFromHeader(env('FCR_GMAIL_FROM_EMAIL') ?? '');
   const phoneNumberId = env('FCR_WHATSAPP_PHONE_NUMBER_ID');
   const wabaId = env('FCR_WHATSAPP_WABA_ID');
   const graphVersion = env('FCR_WHATSAPP_GRAPH_VERSION');
@@ -142,7 +148,10 @@ export function growthInboxReplyStatus(): GrowthInboxReplyStatus {
       email: {
         configured: gmailMissing.length === 0,
         expectedAccount,
-        fingerprint: expectedAccount ? `gmail:${expectedAccount}` : null,
+        fromAddress,
+        fingerprint: expectedAccount && fromAddress
+          ? `gmail:account=${expectedAccount}:from=${fromAddress}`
+          : null,
         missing: gmailMissing,
       },
       whatsapp: {
@@ -228,7 +237,7 @@ export async function sendGmailReply(
   if (!body || body.length > MAX_REPLY_LENGTH) throw new Error('REPLY_BODY_INVALID');
 
   const status = growthInboxReplyStatus();
-  if (!status.channels.email.configured || !status.channels.email.expectedAccount) {
+  if (!status.channels.email.configured || !status.channels.email.expectedAccount || !status.channels.email.fromAddress) {
     throw new Error('GMAIL_NOT_CONFIGURED');
   }
 
@@ -239,6 +248,7 @@ export async function sendGmailReply(
     throw new Error('GMAIL_ACCOUNT_FINGERPRINT_MISMATCH');
   }
 
+  const sender = status.channels.email.fromAddress;
   const params = new URLSearchParams({ format: 'metadata' });
   for (const name of ['From', 'Reply-To', 'Subject', 'Message-ID']) params.append('metadataHeaders', name);
   const original = await gmailJson(
@@ -253,11 +263,12 @@ export async function sendGmailReply(
 
   const headers = original.payload?.headers;
   const recipient = emailFromHeader(header(headers, 'Reply-To') ?? header(headers, 'From') ?? '');
-  if (!recipient || recipient === account) throw new Error('GMAIL_REPLY_RECIPIENT_INVALID');
+  if (!recipient || recipient === account || recipient === sender) throw new Error('GMAIL_REPLY_RECIPIENT_INVALID');
   const providerMessageId = oneLine(header(headers, 'Message-ID') ?? '');
   const subject = replySubject(header(headers, 'Subject'));
 
   const rawHeaders = [
+    `From: ${sender}`,
     `To: ${recipient}`,
     `Subject: ${subject}`,
     ...(providerMessageId ? [`In-Reply-To: ${providerMessageId}`, `References: ${providerMessageId}`] : []),
@@ -275,12 +286,27 @@ export async function sendGmailReply(
   const sentThreadId = typeof sent.threadId === 'string' ? sent.threadId : '';
   if (!sentId || sentThreadId !== threadId) throw new Error('GMAIL_SEND_RECEIPT_INVALID');
 
+  const receiptParams = new URLSearchParams({ format: 'metadata' });
+  receiptParams.append('metadataHeaders', 'From');
+  const receipt = await gmailJson(
+    fetchImpl,
+    token,
+    `${GMAIL_API}/messages/${encodeURIComponent(sentId)}?${receiptParams.toString()}`,
+  ) as GmailMessage;
+  const receiptId = typeof receipt.id === 'string' ? receipt.id : '';
+  const receiptThreadId = typeof receipt.threadId === 'string' ? receipt.threadId : '';
+  const receiptSender = emailFromHeader(header(receipt.payload?.headers, 'From') ?? '');
+  if (receiptId !== sentId || receiptThreadId !== threadId || receiptSender !== sender) {
+    throw new Error('GMAIL_SENDER_FINGERPRINT_MISMATCH');
+  }
+
   return {
     channel: 'email',
     providerMessageId: sentId,
     threadId,
     recipient,
     account,
+    sender,
   };
 }
 
