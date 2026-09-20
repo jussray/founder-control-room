@@ -26,6 +26,7 @@ const CONNECTION_RECONCILIATION_MIGRATION = readFileSync(
   ),
   "utf8",
 );
+const L99_ROUTE = readFileSync(new URL("../http/routes/l99.ts", import.meta.url), "utf8");
 
 describe("L99 repository identity", () => {
   it("keeps the stable project slug separate from the repository locator", () => {
@@ -119,5 +120,18 @@ describe("L99 repository identity", () => {
     expect(CONNECTION_RECONCILIATION_MIGRATION).toContain("jsonb_set");
     expect(CONNECTION_RECONCILIATION_MIGRATION).toContain("jussray/StoryEngine");
     expect(CONNECTION_RECONCILIATION_MIGRATION).not.toContain("4e7e9fca-90e6-46d4-a5cc-cb0759909008");
+  });
+
+  it("keeps the seed route from claiming parity while its Git connection is stale or missing", () => {
+    for (const required of [
+      "getL99GitConnection",
+      "needsL99GitConnectionReconciliation",
+      "buildL99GitConnectionConfig",
+      "L99_GIT_CONNECTION_MISSING",
+      "git_connection_reconciled",
+    ]) {
+      expect(L99_ROUTE).toContain(required);
+    }
+    expect(L99_ROUTE).toContain(".from('project_connections')");
   });
 });
