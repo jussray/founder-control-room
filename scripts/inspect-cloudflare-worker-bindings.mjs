@@ -34,7 +34,6 @@ function baseReceipt({ accountId, workerName, requiredNames }) {
     method: 'GET',
     endpointClass: 'workers-script-secret-name-list',
     requiredBindingCount: requiredNames.length,
-    providerBindingCount: null,
     requiredBindings: requiredNames.map((name) => ({ name, present: false })),
     missingRequiredBindings: [...requiredNames],
     relayBindings: RELAY_REQUIRED_BINDINGS.map((name) => ({ name, present: false })),
@@ -53,7 +52,6 @@ export function classifyBindingObservation({ providerNames, requiredNames, accou
     providerNames.filter((name) => typeof name === 'string' && SAFE_BINDING_NAME.test(name)),
   );
 
-  receipt.providerBindingCount = safeProviderNames.size;
   receipt.requiredBindings = requiredNames.map((name) => ({
     name,
     present: safeProviderNames.has(name),
