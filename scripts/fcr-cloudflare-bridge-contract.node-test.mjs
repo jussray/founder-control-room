@@ -11,11 +11,14 @@ const browserProof = readFileSync('scripts/verify-fcr-front-door-playwright.mjs'
 
 const ACCOUNT_ID = '9b59861bd1747cf7525571b4c51d2aa0';
 
-test('command bridge is founder-only, issue-scoped, and exact-main bound', () => {
+test('command bridge is founder-only, issue-scoped, exact-main bound, and split-explicit', () => {
   assert.match(commandBridge, /github\.event\.issue\.number == 485/);
   assert.match(commandBridge, /github\.event\.comment\.user\.login == 'jussray'/);
   assert.match(commandBridge, /actions:\s*write/);
   assert.match(commandBridge, /\/cloudflare-fcr-access/);
+  assert.match(commandBridge, /action must be inspect or split/);
+  assert.match(commandBridge, /split requires an auditable/);
+  assert.doesNotMatch(commandBridge, /action must be inspect or apply/);
   assert.match(commandBridge, /commits\/main/);
   assert.match(commandBridge, /test "\$current_main" = "\$EXPECTED_HEAD_SHA"/);
   assert.match(commandBridge, /fcr-access-front-door-recovery\.yml\/dispatches/);
@@ -256,8 +259,10 @@ test('provider mutation is limited to the exact public/Worker split kernel', () 
   assert.match(splitCli, /FRONT_DOOR_COMPAT_RECEIPT_PATH/);
   assert.doesNotMatch(splitCli, /APPROVAL_REFERENCE/);
 
-  // The predecessor remains the read-only topology observer in the trusted lane.
-  assert.match(reconciliation, /would-detach-browser-access/);
+  // The read-only inspector recognizes both the pre-split mixed topology and the exact managed split.
+  assert.match(reconciliation, /would-create-public-bypass/);
+  assert.match(reconciliation, /already-public-bypass/);
+  assert.match(reconciliation, /managed-public-bypass-policy-drift/);
   assert.match(reconciliation, /preservedNonBrowserDestinationCount/);
 });
 
