@@ -103,9 +103,9 @@ try {
   });
 
   await page.goto(`${BASE_URL}/control-room/`);
-  await page.waitForSelector('#magic-link-form');
-  await page.fill('#magic-link-form input[name="email"]', FOUNDER_EMAIL);
-  await page.click('#magic-link-form button[type="submit"]');
+  await page.waitForSelector('#login-form');
+  await page.fill('#login-form input[name="email"]', FOUNDER_EMAIL);
+  await page.click('#login-form button[type="submit"]');
   const bridge = await waitForBridge();
   assert(Boolean(bridge?.tokenHash), 'server generated the founder magic-link token hash');
 
