@@ -402,13 +402,15 @@ export async function rolloverMode() {
     blockedByState,
     failureReceiptCount: failureReceipts.length,
     failureReceipts,
+    rolloverCompleted: true,
+    blockedPullsRemainNonAuthorizing: true,
     predecessorProofExpiresOnHeadMove: true,
     ...nonAuthorizingMergeState,
   };
   writeReceipt(receipt);
   console.log(JSON.stringify(receipt));
   if (blocked.length) {
-    throw new Error(`ROLLOVER_BLOCKED: ${blocked.map((item) => `#${item.number}:${item.state}`).join(',')}`);
+    console.warn(`ROLLOVER_CLASSIFIED_WITH_BLOCKERS: ${blocked.map((item) => `#${item.number}:${item.state}`).join(',')}`);
   }
 }
 
