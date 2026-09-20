@@ -18,7 +18,7 @@ class ProjectReadAuditError extends Error {
   }
 }
 
-const CREDENTIAL_KEY_PATTERN = /(?:^|[_-])(api[_-]?key|access[_-]?token|refresh[_-]?token|bearer[_-]?token|client[_-]?secret|private[_-]?key|password|passwd|secret|authorization|credential)(?:$|[_-])/i;
+const CREDENTIAL_KEY_PATTERN = /(?:^|_)(api_?key|access_?token|refresh_?token|bearer_?token|client_?secret|private_?key|password|passwd|secret|authorization|credential)(?:$|_)/i;
 const CREDENTIAL_VALUE_PATTERNS = [
   /^Bearer\s+\S+/i,
   /^-----BEGIN [A-Z ]*PRIVATE KEY-----/,
@@ -36,11 +36,19 @@ function credentialLikeValue(value: unknown): boolean {
     && CREDENTIAL_VALUE_PATTERNS.some(pattern => pattern.test(value.trim()));
 }
 
+function credentialLikeKey(key: string): boolean {
+  const normalized = key
+    .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+    .replace(/[^a-z0-9]+/gi, '_')
+    .toLowerCase();
+  return CREDENTIAL_KEY_PATTERN.test(normalized);
+}
+
 /**
  * Returns the first credential-shaped path found inside connection config.
  * `secretRef` is intentionally outside `config` and remains the supported
  * reference-only metadata path. The detector is recursive so nesting cannot
- * bypass the boundary.
+ * bypass the boundary, including camelCase key spellings.
  */
 export function connectionConfigSecretViolation(
   value: unknown,
@@ -61,7 +69,7 @@ export function connectionConfigSecretViolation(
 
   for (const [key, nested] of Object.entries(record)) {
     const nextPath = `${path}.${key}`;
-    if (CREDENTIAL_KEY_PATTERN.test(key)) return nextPath;
+    if (credentialLikeKey(key)) return nextPath;
     const violation = connectionConfigSecretViolation(nested, nextPath);
     if (violation) return violation;
   }
