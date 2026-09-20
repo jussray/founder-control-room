@@ -251,7 +251,7 @@ test('provider mutation is limited to the exact public/Worker split kernel', () 
   assert.doesNotMatch(splitKernel, /deny_unmatched_requests_exempted_zone_names/);
   assert.doesNotMatch(splitKernel, /\/dns_records|\/routes|wrangler|supabase/i);
 
-  assert.match(splitCli, /fcr-access-split-v1:/);
+  assert.match(splitCli, /fcr-access-split-v2:/);
   assert.match(splitCli, /split-rollback-receipt-head-mismatch/);
   assert.match(splitCli, /FRONT_DOOR_COMPAT_RECEIPT_PATH/);
   assert.doesNotMatch(splitCli, /APPROVAL_REFERENCE/);
