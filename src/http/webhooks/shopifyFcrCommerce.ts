@@ -17,6 +17,7 @@ export type FcrCommerceReceiptStore = (
 
 const RECEIPT_COLUMNS = [
   'webhook_id',
+  'event_id',
   'contract_id',
   'provider',
   'store_fingerprint',
@@ -47,7 +48,8 @@ export function storedFcrCommerceOrderReceiptMatches(
 ): boolean {
   if (!isRecord(stored)) return false;
   return (
-    stored.contract_id === receipt.contract
+    stored.event_id === receipt.eventId
+    && stored.contract_id === receipt.contract
     && stored.provider === receipt.provider
     && stored.store_fingerprint === receipt.storeFingerprint
     && stored.shop_domain === receipt.shopDomain
@@ -89,6 +91,18 @@ export const persistFcrCommerceReceipt: FcrCommerceReceiptStore = async (receipt
     return isRecord(data) ? data : null;
   };
 
+  const readExistingByEventId = async (): Promise<Record<string, unknown> | null> => {
+    const { data, error } = await admin
+      .from('fcr_commerce_receipts')
+      .select(RECEIPT_COLUMNS)
+      .eq('provider', receipt.provider)
+      .eq('shop_domain', receipt.shopDomain)
+      .eq('event_id', receipt.eventId)
+      .maybeSingle();
+    if (error) throw new Error('fcr_commerce_receipt_lookup_failed');
+    return isRecord(data) ? data : null;
+  };
+
   const readExistingByOrder = async (): Promise<Record<string, unknown> | null> => {
     const { data, error } = await admin
       .from('fcr_commerce_receipts')
@@ -109,8 +123,21 @@ export const persistFcrCommerceReceipt: FcrCommerceReceiptStore = async (receipt
       : 'conflict';
   }
 
+  // Shopify's event id is shared across all deliveries produced by the same
+  // merchant action. It is the provider-native semantic dedupe identity;
+  // webhook_id remains only the individual delivery identity.
+  const existingByEventId = await readExistingByEventId();
+  if (existingByEventId) {
+    return storedFcrCommerceOrderReceiptMatches(existingByEventId, receipt)
+      ? 'duplicate'
+      : 'conflict';
+  }
+
   const existingByOrder = await readExistingByOrder();
   if (existingByOrder) {
+    // The pre-activation v1 ledger also has an order/event uniqueness guard.
+    // A different provider event for the same order is therefore surfaced as
+    // an explicit conflict rather than silently collapsed into fake revenue.
     return storedFcrCommerceOrderReceiptMatches(existingByOrder, receipt)
       ? 'duplicate'
       : 'conflict';
@@ -118,6 +145,7 @@ export const persistFcrCommerceReceipt: FcrCommerceReceiptStore = async (receipt
 
   const { error: insertError } = await admin.from('fcr_commerce_receipts').insert({
     webhook_id: receipt.webhookId,
+    event_id: receipt.eventId,
     contract_id: receipt.contract,
     provider: receipt.provider,
     store_fingerprint: receipt.storeFingerprint,
@@ -137,12 +165,19 @@ export const persistFcrCommerceReceipt: FcrCommerceReceiptStore = async (receipt
     throw new Error('fcr_commerce_receipt_store_failed');
   }
 
-  // A concurrent retry may collide on either the provider webhook id or the
-  // order-level revenue uniqueness key. Re-read both identities and classify
-  // the result instead of retrying a durable duplicate forever.
+  // A concurrent retry may collide on the provider webhook id, provider event
+  // id, or the conservative pre-activation order guard. Re-read each identity
+  // and classify it instead of retrying a durable duplicate forever.
   const racedByWebhookId = await readExistingByWebhookId();
   if (racedByWebhookId) {
     return storedFcrCommerceReceiptMatches(racedByWebhookId, receipt)
+      ? 'duplicate'
+      : 'conflict';
+  }
+
+  const racedByEventId = await readExistingByEventId();
+  if (racedByEventId) {
+    return storedFcrCommerceOrderReceiptMatches(racedByEventId, receipt)
       ? 'duplicate'
       : 'conflict';
   }
@@ -209,6 +244,7 @@ export function createShopifyFcrCommerceWebhookHandler(
       receipt = buildFcrShopifyPaidReceipt({
         rawPayload: payload,
         webhookId: req.get('x-shopify-webhook-id') ?? '',
+        eventId: req.get('x-shopify-event-id') ?? '',
         shopDomain,
         occurredAt: req.get('x-shopify-triggered-at') ?? '',
         hashSalt,
