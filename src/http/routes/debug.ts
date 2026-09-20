@@ -9,11 +9,21 @@
  * - Never exposes key values, only boolean presence
  * - Does not perform any AI call
  * - Does not mutate any state
- * - Safe to call from Playwright in CI with real secrets wired
+ * - Development/CI may read it without founder auth
+ * - Production requires the existing founder authentication boundary
  */
 import { Router } from 'express';
+import { requireFounder, type FounderRequest } from '../middleware/requireFounder.js';
 
 export const debugRouter = Router();
+
+// Keep the CI/dev diagnostic usable without inventing a second test-only
+// endpoint, while closing the production reconnaissance surface. This check
+// runs per request so tests and local harnesses can change NODE_ENV safely.
+debugRouter.use((req, res, next) => {
+  if (process.env.NODE_ENV !== 'production') return next();
+  return requireFounder(req as FounderRequest, res, next);
+});
 
 debugRouter.get('/provider', (_req, res) => {
   const openaiKeyPresent = typeof process.env.OPENAI_API_KEY === 'string' &&
