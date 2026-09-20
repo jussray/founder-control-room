@@ -28,6 +28,17 @@ const FCR_V14 = 'docs/FOUNDER_CONTROL_ROOM_AND_CHIEF_AI_MASTER_BUILD_SPEC_V1_4_A
 const MULTI_AGENT = 'docs/FCR_MULTI_AGENT_ENABLEMENT_CONTRACT.md';
 const DEEPSEEK_INSTRUCTOR = 'docs/DEEPSEEK_INSTRUCTOR_CONTRACT.md';
 
+/**
+ * Founder cost-control mode: paid semantic peer review is temporarily paused.
+ * Deterministic review, CI, security checks, exact-head proof, and founder-final
+ * authority remain separate and must not be weakened by this switch.
+ *
+ * Operators stay enabled for focused work through configured server/repository
+ * provider credentials. Re-enable `review` only after an explicit founder
+ * decision to resume semantic peer-review spend.
+ */
+export const SEMANTIC_PEER_REVIEW_MODE = 'paused' as const;
+
 export const AGENT_REGISTRY: readonly AgentDescriptor[] = [
   {
     id: 'gemini',
@@ -35,7 +46,7 @@ export const AGENT_REGISTRY: readonly AgentDescriptor[] = [
     role: 'Foremost operational media authority for intake, interpretation, planning, routing, production review, and release disposition under the non-bypassable /LEEVIZE truth and policy kernel.',
     operator: {
       enabled: true,
-      capabilities: ['research', 'propose', 'review', 'implement'],
+      capabilities: ['research', 'propose', 'implement'],
       firstSliceRuntimeModel: false,
       externalWritesRequireBoundAuthority: true,
       instructionContracts: [FCR_V14, MULTI_AGENT],
@@ -47,7 +58,7 @@ export const AGENT_REGISTRY: readonly AgentDescriptor[] = [
     role: 'Long-context repository analysis, structured implementation, careful refactors, and documentation.',
     operator: {
       enabled: true,
-      capabilities: ['research', 'propose', 'review', 'implement'],
+      capabilities: ['research', 'propose', 'implement'],
       firstSliceRuntimeModel: false,
       externalWritesRequireBoundAuthority: true,
       instructionContracts: ['CLAUDE.md', 'docs/CLAUDE_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC.md', FCR_V14, MULTI_AGENT],
@@ -59,7 +70,7 @@ export const AGENT_REGISTRY: readonly AgentDescriptor[] = [
     role: 'Debugging, code review, data analysis, repository operations, and founder-readable synthesis.',
     operator: {
       enabled: true,
-      capabilities: ['research', 'propose', 'review', 'implement'],
+      capabilities: ['research', 'propose', 'implement'],
       firstSliceRuntimeModel: false,
       externalWritesRequireBoundAuthority: true,
       instructionContracts: ['AGENTS.md', 'GLOBAL_AI.md', FCR_V14, MULTI_AGENT],
@@ -71,7 +82,7 @@ export const AGENT_REGISTRY: readonly AgentDescriptor[] = [
     role: 'Cross-project instruction, adversarial challenge, solution synthesis, and portable pattern extraction without direct implementation authority.',
     operator: {
       enabled: true,
-      capabilities: ['research', 'propose', 'review', 'instruct'],
+      capabilities: ['research', 'propose', 'instruct'],
       firstSliceRuntimeModel: false,
       externalWritesRequireBoundAuthority: true,
       instructionContracts: [DEEPSEEK_INSTRUCTOR, FCR_V14, MULTI_AGENT],
@@ -103,7 +114,7 @@ export const AGENT_REGISTRY: readonly AgentDescriptor[] = [
     role: 'Current public research, source validation, adversarial verification, and bounded implementation when separately authorized.',
     operator: {
       enabled: true,
-      capabilities: ['research', 'propose', 'review', 'implement'],
+      capabilities: ['research', 'propose', 'implement'],
       firstSliceRuntimeModel: false,
       externalWritesRequireBoundAuthority: true,
       instructionContracts: ['PERPLEXITY.md', 'docs/PERPLEXITY_MCP_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC.md', FCR_V14, MULTI_AGENT],
