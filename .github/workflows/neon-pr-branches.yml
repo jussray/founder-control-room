@@ -121,19 +121,16 @@ jobs:
           HAS_PROJECTS="$(psql "$NEON_DB_URL" -X -Atqc "select to_regclass('public.projects') is not null")"
           HAS_FOUNDER_USERS="$(psql "$NEON_DB_URL" -X -Atqc "select to_regclass('public.founder_users') is not null")"
 
-          if [ "$HAS_PROJECTS" = "t" ] && [ "$HAS_FOUNDER_USERS" = "t" ]; then
-            echo 'Core FCR preview baseline already exists.'
-            exit 0
-          fi
           if [ "$HAS_PROJECTS" != "$HAS_FOUNDER_USERS" ]; then
             echo '::error title=Inconsistent Neon FCR baseline::projects and founder_users must both exist or both be absent before PR migrations run.'
             exit 1
           fi
 
           # Neon is generic PostgreSQL, while the authoritative FCR migrations
-          # target Supabase PostgreSQL. Provide only the auth object signatures
-          # needed to replay the real baseline migrations. They return no
-          # identity and therefore cannot grant founder authority in preview.
+          # target Supabase PostgreSQL. Provide only fail-closed auth signatures
+          # and non-login role names required to replay the real migrations.
+          # These compatibility objects carry no user identity and grant no
+          # founder authority in preview.
           psql "$NEON_DB_URL" -X -1 -v ON_ERROR_STOP=1 <<'SQL'
           CREATE SCHEMA IF NOT EXISTS auth;
           CREATE TABLE IF NOT EXISTS auth.users (
@@ -146,26 +143,95 @@ jobs:
           LANGUAGE sql STABLE AS $$ SELECT NULL::text $$;
           CREATE OR REPLACE FUNCTION auth.uid() RETURNS uuid
           LANGUAGE sql STABLE AS $$ SELECT NULL::uuid $$;
+          DO $$
+          BEGIN
+            IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
+              CREATE ROLE anon NOLOGIN;
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
+              CREATE ROLE authenticated NOLOGIN;
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'service_role') THEN
+              CREATE ROLE service_role NOLOGIN;
+            END IF;
+          END
+          $$;
           SQL
 
-          BASELINE_MIGRATIONS=(
-            supabase/migrations/20260711030127_init_control_room_schema.sql
-            supabase/migrations/20260711030936_enable_rls_and_founder_policy.sql
-            supabase/migrations/20260831153313_bind_founder_authority_to_immutable_user_id.sql
-          )
-          for migration in "${BASELINE_MIGRATIONS[@]}"; do
-            test -f "$migration" || { echo "Missing authoritative FCR baseline migration: $migration" >&2; exit 1; }
-            echo "Applying authoritative FCR baseline migration: $migration"
-            psql "$NEON_DB_URL" -X -1 -v ON_ERROR_STOP=1 -f "$migration"
-          done
+          if [ "$HAS_PROJECTS" != "t" ]; then
+            CORE_BASELINE_MIGRATIONS=(
+              supabase/migrations/20260711030127_init_control_room_schema.sql
+              supabase/migrations/20260711030936_enable_rls_and_founder_policy.sql
+              supabase/migrations/20260831153313_bind_founder_authority_to_immutable_user_id.sql
+            )
+            for migration in "${CORE_BASELINE_MIGRATIONS[@]}"; do
+              test -f "$migration" || { echo "Missing authoritative FCR baseline migration: $migration" >&2; exit 1; }
+              echo "Applying authoritative FCR baseline migration: $migration"
+              psql "$NEON_DB_URL" -X -1 -v ON_ERROR_STOP=1 -f "$migration"
+            done
+          else
+            echo 'Core FCR preview baseline already exists; checking later historical prerequisites independently.'
+          fi
+
+          HAS_TERMINAL_RUNS="$(psql "$NEON_DB_URL" -X -Atqc "select to_regclass('public.terminal_runs') is not null")"
+          HAS_COMMAND_BRIDGE="$(psql "$NEON_DB_URL" -X -Atqc "select to_regclass('public.command_bridge_requests') is not null")"
+          if [ "$HAS_COMMAND_BRIDGE" = "t" ] && [ "$HAS_TERMINAL_RUNS" != "t" ]; then
+            echo '::error title=Inconsistent Neon command baseline::command_bridge_requests exists without terminal_runs.'
+            exit 1
+          fi
+
+          if [ "$HAS_TERMINAL_RUNS" != "t" ]; then
+            TERMINAL_MIGRATION='supabase/migrations/20260718032552_guarded_terminal_and_schema_reconciliation.sql'
+            test -f "$TERMINAL_MIGRATION" || { echo "Missing authoritative FCR baseline migration: $TERMINAL_MIGRATION" >&2; exit 1; }
+
+            # A reused PR preview may already have the newer workspace_id NOT NULL
+            # invariant even though this older historical migration was omitted by
+            # a previous baseline. Reconstruct historical order without rewriting
+            # either migration: temporarily provide exactly the platform workspace
+            # default that the later workspace migration would have backfilled,
+            # run the real historical migration, then remove the default even on
+            # failure. Fresh previews never take this compatibility path.
+            PROJECT_WORKSPACE_COLUMN="$(psql "$NEON_DB_URL" -X -Atqc "select count(*) from information_schema.columns where table_schema='public' and table_name='projects' and column_name='workspace_id' and data_type='uuid')"
+            if [ "$PROJECT_WORKSPACE_COLUMN" = "1" ]; then
+              PLATFORM_WORKSPACE_ID="$(psql "$NEON_DB_URL" -X -Atqc "select id from public.workspaces where slug='juss-founder-workspace' limit 1")"
+              test -n "$PLATFORM_WORKSPACE_ID" || { echo 'Platform workspace missing while healing reused Neon baseline.' >&2; exit 1; }
+              psql "$NEON_DB_URL" -X -v ON_ERROR_STOP=1 -c "ALTER TABLE public.projects ALTER COLUMN workspace_id SET DEFAULT '$PLATFORM_WORKSPACE_ID'::uuid;"
+              if ! psql "$NEON_DB_URL" -X -1 -v ON_ERROR_STOP=1 -f "$TERMINAL_MIGRATION"; then
+                psql "$NEON_DB_URL" -X -v ON_ERROR_STOP=1 -c 'ALTER TABLE public.projects ALTER COLUMN workspace_id DROP DEFAULT;' || true
+                exit 1
+              fi
+              psql "$NEON_DB_URL" -X -v ON_ERROR_STOP=1 -c 'ALTER TABLE public.projects ALTER COLUMN workspace_id DROP DEFAULT;'
+            else
+              echo "Applying authoritative FCR baseline migration: $TERMINAL_MIGRATION"
+              psql "$NEON_DB_URL" -X -1 -v ON_ERROR_STOP=1 -f "$TERMINAL_MIGRATION"
+            fi
+          else
+            echo 'Guarded-terminal historical baseline already exists.'
+          fi
+
+          HAS_COMMAND_BRIDGE="$(psql "$NEON_DB_URL" -X -Atqc "select to_regclass('public.command_bridge_requests') is not null")"
+          if [ "$HAS_COMMAND_BRIDGE" != "t" ]; then
+            COMMAND_BRIDGE_MIGRATION='supabase/migrations/20260719193000_founder_command_bridge.sql'
+            test -f "$COMMAND_BRIDGE_MIGRATION" || { echo "Missing authoritative FCR baseline migration: $COMMAND_BRIDGE_MIGRATION" >&2; exit 1; }
+            echo "Applying authoritative FCR baseline migration: $COMMAND_BRIDGE_MIGRATION"
+            psql "$NEON_DB_URL" -X -1 -v ON_ERROR_STOP=1 -f "$COMMAND_BRIDGE_MIGRATION"
+          else
+            echo 'Founder Command Bridge historical baseline already exists.'
+          fi
 
           HAS_PROJECTS="$(psql "$NEON_DB_URL" -X -Atqc "select to_regclass('public.projects') is not null")"
           HAS_FOUNDER_USERS="$(psql "$NEON_DB_URL" -X -Atqc "select to_regclass('public.founder_users') is not null")"
+          HAS_TERMINAL_RUNS="$(psql "$NEON_DB_URL" -X -Atqc "select to_regclass('public.terminal_runs') is not null")"
+          HAS_COMMAND_BRIDGE="$(psql "$NEON_DB_URL" -X -Atqc "select to_regclass('public.command_bridge_requests') is not null")"
           HAS_USER_ID="$(psql "$NEON_DB_URL" -X -Atqc "select count(*) from information_schema.columns where table_schema='public' and table_name='founder_users' and column_name='user_id' and data_type='uuid')"
+          WORKSPACE_DEFAULT="$(psql "$NEON_DB_URL" -X -Atqc "select coalesce(column_default, '') from information_schema.columns where table_schema='public' and table_name='projects' and column_name='workspace_id')"
           test "$HAS_PROJECTS" = "t"
           test "$HAS_FOUNDER_USERS" = "t"
+          test "$HAS_TERMINAL_RUNS" = "t"
+          test "$HAS_COMMAND_BRIDGE" = "t"
           test "$HAS_USER_ID" = "1"
-          echo 'Authoritative FCR core baseline established on Neon with deny/no-user auth compatibility signatures.'
+          test -z "$WORKSPACE_DEFAULT"
+          echo 'Authoritative FCR preview baseline verified: core, guarded terminal, Command Bridge, immutable founder identity, and no compatibility default remain.'
 
       - name: Execute added migrations on Neon preview
         if: steps.neon_scope.outputs.needs_neon == 'true'
@@ -275,8 +341,8 @@ jobs:
           fi
 
           EVENT_COLUMN="$(psql "$NEON_DB_URL" -X -Atqc "select count(*) from information_schema.columns where table_schema='public' and table_name='fcr_commerce_receipts' and column_name='event_id' and data_type='uuid' and is_nullable='NO')"
-          EVENT_INDEX="$(psql "$NEON_DB_URL" -X -Atqc "select count(*) from pg_indexes where schemaname='public' and tablename='fcr_commerce_receipts' and indexname='fcr_commerce_receipts_provider_event_uidx'")"
-          RLS_ENABLED="$(psql "$NEON_DB_URL" -X -Atqc "select relrowsecurity from pg_class where oid='public.fcr_commerce_receipts'::regclass")"
+          EVENT_INDEX="$(psql "$NEON_DB_URL" -X -Atqc "select count(*) from pg_indexes where schemaname='public' and tablename='fcr_commerce_receipts' and indexname='fcr_commerce_receipts_provider_event_uidx')"
+          RLS_ENABLED="$(psql "$NEON_DB_URL" -X -Atqc "select relrowsecurity from pg_class where oid='public.fcr_commerce_receipts'::regclass')"
           ROW_COUNT="$(psql "$NEON_DB_URL" -X -Atqc "select count(*) from public.fcr_commerce_receipts")"
 
           test "$EVENT_COLUMN" = "1"
