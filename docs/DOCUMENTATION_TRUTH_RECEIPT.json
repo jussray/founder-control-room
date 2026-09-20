@@ -33,7 +33,7 @@
     {
       "path": "wrangler.worker.toml",
       "claims": [
-        "`wrangler.worker.toml` must list `TINYFISH_API_KEY` under `[secrets].required`, so canonical exact-main Deploy rejects missing provider-held TinyFish activation before Worker mutation while never copying the secret value through GitHub Actions."
+        "`wrangler.worker.toml` must list `FCR_SHOPIFY_WEBHOOK_SECRET` and `FCR_COMMERCE_HASH_SALT` under `[secrets].required`, so canonical exact-main Deploy rejects a missing FCR Shopify runtime binding before Worker mutation while never reading, logging, or re-uploading either provider-held value; this source boundary cannot prove webhook registration, production migration, runtime delivery, or collected revenue."
       ]
     },
     {
@@ -70,6 +70,7 @@
       "path": "README.md",
       "claims": [
         "`README.md` must keep TinyFish source and CI readiness separate from provider/runtime activation and state that canonical Deploy verifies only provider-held binding-name presence before promotion.",
+        "`README.md` must keep FCR Shopify runtime-secret name verification separate from webhook registration, deployed callback identity, production database migration, and collected-revenue outcome proof.",
         "`README.md` must describe Shopify child-provider observation as source-only, non-authorizing evidence and must never relabel a matching snapshot as live provider authority or mutation permission.",
         "`README.md` must document Attack 3000 content currentness as independently evaluated from bounded observation time rather than trusted from a CURRENT label, and must keep distribution, external demand, publication, provider mutation, merge, deploy, spend, and external-contact authority separate.",
         "`README.md` must describe the Content Trend Radar as an advisory existing-lane capability whose first-wave evidence requires current source provenance and whose ranking cannot authorize publication, scheduling, spend, provider mutation, merge, deploy, or external contact.",
@@ -87,7 +88,7 @@
     {
       "path": "docs/CLOUDFLARE_REASONING.md",
       "claims": [
-        "`docs/CLOUDFLARE_REASONING.md` must treat `TINYFISH_API_KEY` as a provider-held Worker binding and require canonical Deploy to fail closed on a missing binding name without exposing or re-uploading its value."
+        "`docs/CLOUDFLARE_REASONING.md` must require both FCR Shopify provider-held Worker binding names to pass the canonical Deploy membrane without treating source, binding-name presence, CI, or Playwright as proof of Shopify callback registration, production migration, or revenue outcome."
       ]
     },
     {
@@ -100,13 +101,13 @@
     {
       "path": "docs/deployment/CLOUDFLARE_WORKER_TARGETS.md",
       "claims": [
-        "`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` must name `TINYFISH_API_KEY` as a required canonical Worker secret while preserving live provider observation and real TinyFish Search/Fetch as separate activation proof."
+        "`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` must name `FCR_SHOPIFY_WEBHOOK_SECRET` and `FCR_COMMERCE_HASH_SALT` as required canonical Worker secrets while keeping provider subscription, runtime delivery, production database state, and paid-order outcome as separate activation proof."
       ]
     },
     {
       "path": "docs/SECRETS.md",
       "claims": [
-        "`docs/SECRETS.md` must keep the TinyFish key in the Cloudflare Worker secret plane and never recast the provider-held value as a GitHub Actions secret or proof artifact."
+        "`docs/SECRETS.md` must keep the FCR Shopify signing secret and commerce hash salt in the Cloudflare Worker secret plane and never recast either provider-held value as a public proof artifact."
       ]
     },
     {
