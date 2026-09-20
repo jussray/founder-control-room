@@ -1,6 +1,10 @@
 -- Extend sanitized Juss Beautiful Hair commerce receipts with authoritative
 -- collected-value evidence. No customer, address, vendor, cost, margin, or
 -- payment-instrument data is introduced.
+--
+-- Rollout is backward compatible: an older paid_order_recorded receipt may be
+-- stored without value evidence, but it is not recognized as revenue until the
+-- full collected-value tuple is present.
 
 ALTER TABLE public.hair_commerce_receipts
   ADD COLUMN IF NOT EXISTS collected_value_cents INTEGER,
@@ -14,9 +18,19 @@ ALTER TABLE public.hair_commerce_receipts
   ADD CONSTRAINT hair_commerce_receipts_revenue_evidence_check CHECK (
     (
       event_type = 'paid_order_recorded'
-      AND collected_value_cents BETWEEN 1 AND 100000000
-      AND currency = 'USD'
-      AND revenue_state = 'payment_collected'
+      AND (
+        (
+          collected_value_cents IS NULL
+          AND currency IS NULL
+          AND revenue_state IS NULL
+        )
+        OR
+        (
+          collected_value_cents BETWEEN 1 AND 100000000
+          AND currency = 'USD'
+          AND revenue_state = 'payment_collected'
+        )
+      )
     )
     OR
     (
