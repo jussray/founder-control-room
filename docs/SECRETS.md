@@ -100,6 +100,7 @@ The former `founder-control-room2` Worker was deleted and must not be recreated 
 | `ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL` | secret | Private approved Zapier Catch Hook URL. |
 | `FOUNDER_SIGNAL_ENGINE_HOOK_TIMEOUT_MS` | protected variable | Optional bounded provider timeout. |
 | `FOUNDER_REVIEW_EMAIL_INGRESS_SECRET` | secret | Shared only with the review-email Worker when that route is activated. |
+| `JBH_RECEIPT_INGEST_TOKEN` | secret | Required receiver-side bearer boundary for sanitized `jbh-private` commerce receipts at `/ingest/hair-commerce-receipts`. Canonical Deploy verifies binding-name presence only; the value remains provider-held and corresponds to the sender-side `CONTROL_ROOM_RECEIPT_TOKEN`. |
 | `N8N_FOUNDER_CONTENT_WEBHOOK_URL` | secret | Required private production webhook URL for the governed Founder Content n8n workflow. Source presence does not prove a live n8n deployment. |
 | `N8N_FOUNDER_CONTENT_BEARER_TOKEN` | secret | Bearer credential paired only with the governed Founder Content production webhook. |
 | `N8N_FOUNDER_CONTENT_EXPECTED_WORKFLOW_FINGERPRINT` | secret | Exact SHA-256 workflow fingerprint that binds FCR to the published n8n workflow identity. |
@@ -108,7 +109,7 @@ The former `founder-control-room2` Worker was deleted and must not be recreated 
 
 The Founder Content n8n source lane is Buffer-only and schedule-only. `N8N_FOUNDER_CONTENT_ENABLED=true` is source intent, not runtime proof. A production claim requires exact-main deployment, provider-held secret-name readback, exact `fcrFounderContentV1` workflow fingerprint and n8n `2.32.6` identity, plus provider-native Buffer readback. n8n acceptance never establishes final publication truth.
 
-The Worker intentionally fails closed when required bindings are absent, empty, malformed, or when the GitHub App pair is incomplete. Do not weaken `validateWorkerEnv` to bypass provider configuration. TinyFish remains route-level fail-closed if its provider-held key is later removed.
+The Worker intentionally fails closed when required bindings are absent, empty, malformed, or when the GitHub App pair is incomplete. Do not weaken `validateWorkerEnv` to bypass provider configuration. TinyFish remains route-level fail-closed if its provider-held key is later removed. The JBH receipt route likewise remains fail-closed until its receiver binding is installed; source declaration does not prove live sender-to-ledger activation.
 
 Generate `FOUNDER_SESSION_ENCRYPTION_KEY` as exactly 32 random bytes encoded as unpadded base64url, for example:
 
@@ -227,6 +228,7 @@ The client-ID names above are shared recovery/runtime-witness selectors; the cli
 [ ] FOUNDER_SIGNAL_ENGINE_MCP_TOKEN
 [ ] ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL
 [ ] FOUNDER_REVIEW_EMAIL_INGRESS_SECRET when email intake is active
+[ ] JBH_RECEIPT_INGEST_TOKEN (provider-held; required before live JBH receipt activation)
 [ ] N8N_FOUNDER_CONTENT_WEBHOOK_URL
 [ ] N8N_FOUNDER_CONTENT_BEARER_TOKEN
 [ ] N8N_FOUNDER_CONTENT_EXPECTED_WORKFLOW_FINGERPRINT
