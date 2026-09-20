@@ -22,11 +22,16 @@ const proposal: FounderControlProposalBinding = {
 
 const externalizableControlDocs = [
   '.ai-skills/README.md',
+  '.ai-skills/CLAUDE.md',
   '.ai-skills/chatgpt-custom-instructions.md',
   '.ai-skills/claude-project-instructions.md',
   '.ai-skills/custom-gpt-system-prompt.md',
+  '.ai-skills/universal-commands.md',
+  '.ai-skills/skills/capability-mode-router.md',
   '.ai-skills/gpts/capability-mode-router.md',
 ];
+
+const boundedUltrathinkDocs = [...externalizableControlDocs];
 
 const forbiddenRawActivationPhrases = [
   /the user may type these commands to switch your behavior/i,
@@ -108,7 +113,7 @@ describe('founder control decision contract', () => {
     expect(validateFounderControlDecision(decision, productAction)).toEqual([]);
   });
 
-  it('keeps copyable AI instructions aligned with the executable control-input boundary', () => {
+  it('keeps every active copyable AI instruction aligned with the executable control-input boundary', () => {
     for (const relativePath of externalizableControlDocs) {
       const source = readFileSync(relativePath, 'utf8');
       expect(source).toMatch(/juss\/portable-control-input@v1/);
@@ -119,6 +124,38 @@ describe('founder control decision contract', () => {
       for (const forbidden of forbiddenRawActivationPhrases) {
         expect(source).not.toMatch(forbidden);
       }
+    }
+  });
+
+  it('pins bounded ULTRATHINK v2 across the canonical router and every active adapter', () => {
+    for (const relativePath of boundedUltrathinkDocs) {
+      const source = readFileSync(relativePath, 'utf8');
+      expect(source).toMatch(/More intelligence never means more authority/i);
+      expect(source).toMatch(/adaptive (?:execution )?budget|adaptive budget/i);
+      expect(source).not.toMatch(/maximum reasoning depth/i);
+      expect(source).not.toMatch(/spend as many tokens as needed/i);
+    }
+
+    const router = readFileSync('.ai-skills/gpts/capability-mode-router.md', 'utf8');
+    expect(router).toMatch(/at most three serious hypotheses\/options/i);
+    expect(router).toMatch(/bound to the exact subject and claim/i);
+    expect(router).toMatch(/Execution proof and outcome proof are separate/i);
+    expect(router).toMatch(/A discovered failure path is \*\*not automatically a veto\*\*/i);
+    expect(router).toMatch(/DeepSeek is an Instructor\/adversary lane/i);
+    expect(router).toMatch(/Never silently substitute a different provider/i);
+  });
+
+  it('pins J.U.S.S. self-sufficiency without counterfeiting provider truth or authority', () => {
+    for (const relativePath of [
+      '.ai-skills/gpts/capability-mode-router.md',
+      '.ai-skills/skills/capability-mode-router.md',
+    ]) {
+      const source = readFileSync(relativePath, 'utf8');
+      expect(source).toMatch(/J\.U\.S\.S\.\s*=\s*Just Use Self Sufficiency/i);
+      expect(source).toMatch(/scoped blocker for that lane/i);
+      expect(source).toMatch(/Provider failure never increases authority/i);
+      expect(source).toMatch(/Never silently substitute provider identity/i);
+      expect(source).toMatch(/BLOCKED.*receipt|record.*blocked dependency.*BLOCKED/i);
     }
   });
 

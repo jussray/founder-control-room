@@ -36,10 +36,10 @@ The GitHub App **Client ID is not used** by the current installation-token witne
 
 | Secret | Required by | Description |
 |---|---|---|
-| `APP_ID` | `deterministic-review-core-advisory.yml` trusted witness publication and FCR governance reconciliation | Numeric GitHub App ID for the repository-scoped Founder Control Room App. Mapped at job runtime to `GITHUB_APP_ID`. |
-| `APP_PRIVATE_KEY` | `deterministic-review-core-advisory.yml` trusted witness publication and FCR governance reconciliation | Complete PEM private key for the same GitHub App. Mapped at job runtime to `GITHUB_PRIVATE_KEY`. Never log or expose the value. |
+| `APP_ID` | `deterministic-review-core-advisory.yml` trusted witness publication, `github-app-secret-shape-diagnostic.yml` read-only production shape diagnostic, and FCR governance reconciliation | Numeric GitHub App ID for the repository-scoped Founder Control Room App. Mapped at job runtime to `GITHUB_APP_ID`. |
+| `APP_PRIVATE_KEY` | `deterministic-review-core-advisory.yml` trusted witness publication, `github-app-secret-shape-diagnostic.yml` read-only production shape diagnostic, and FCR governance reconciliation | Complete PEM private key for the same GitHub App. Mapped at job runtime to `GITHUB_PRIVATE_KEY`. Never log or expose the value. |
 
-`APP_ID` and `APP_PRIVATE_KEY` must identify the same installed App. A successful job must prove that both mapped runtime values were usable and that provider readback reports the expected App issuer; secret-name presence alone is not provider proof.
+`APP_ID` and `APP_PRIVATE_KEY` must identify the same installed App. The read-only `github-app-secret-shape-diagnostic.yml` proves only local credential transport/PEM/RSA shape and explicitly performs no provider authentication or issuer readback. For workflows that claim provider proof, success must separately establish that both mapped runtime values were usable and that provider readback reports the expected App issuer; secret-name presence or a green shape diagnostic alone is not provider proof.
 
 ---
 
@@ -94,6 +94,8 @@ The former `founder-control-room2` Worker was deleted and must not be recreated 
 | `GITHUB_TOKEN` | secret | Local/development fallback only when the GitHub App pair is absent. |
 | `FOUNDER_ALLOWED_ORIGINS` | non-secret variable | `https://foundercontrolroom.org`. |
 | `FOUNDER_API_URL` | non-secret variable | `https://foundercontrolroom.org` so auth callbacks return through Pages and are proxied to the API Worker. |
+| `FCR_SHOPIFY_WEBHOOK_SECRET` | secret | Required Shopify `orders/paid` HMAC signing secret for the FCR first-party commerce ingress. Provider-held; never log or copy its value into proof. |
+| `FCR_COMMERCE_HASH_SALT` | secret | Required independent server-only salt for privacy-safe FCR Shopify order-reference HMACs. This marker creates no Shopify authority. |
 | `TINYFISH_API_KEY` | secret | Required provider-held credential for live `tinyfish-web-observation-v1` Search/Fetch. Canonical production deploy verifies only binding-name presence before mutation; the value remains in Cloudflare and never becomes a GitHub Actions secret or proof receipt. |
 | `FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON` | secret | Scoped, revocable, fail-closed automation grant. |
 | `FOUNDER_SIGNAL_ENGINE_MCP_TOKEN` | secret | Dedicated MCP bearer token. This is not an OpenAI API key. |
@@ -222,6 +224,8 @@ The client-ID names above are shared recovery/runtime-witness selectors; the cli
 [ ] GITHUB_APP_ID + GITHUB_PRIVATE_KEY
 [ ] FOUNDER_ALLOWED_ORIGINS=https://foundercontrolroom.org
 [ ] FOUNDER_API_URL=https://foundercontrolroom.org
+[ ] FCR_SHOPIFY_WEBHOOK_SECRET (provider-held Shopify HMAC secret)
+[ ] FCR_COMMERCE_HASH_SALT (independent server-only order-reference HMAC salt)
 [ ] TINYFISH_API_KEY (provider-held; required before live TinyFish activation)
 [ ] FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON
 [ ] FOUNDER_SIGNAL_ENGINE_MCP_TOKEN
