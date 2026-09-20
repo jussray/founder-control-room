@@ -10,24 +10,20 @@
  * - Does not perform any AI call
  * - Does not mutate any state
  * - Development/CI may read it without founder auth
- * - Production requires the existing founder authentication boundary
+ * - Cloudflare and production runtimes require the existing founder auth boundary
  */
 import { Router } from 'express';
+import { requiresFounderForDebugSurface } from '../runtimeBoundary.js';
 import { requireFounder, type FounderRequest } from '../middleware/requireFounder.js';
 
 export const debugRouter = Router();
 
-function isProductionRuntime(): boolean {
-  return process.env.ENVIRONMENT === 'production' || process.env.NODE_ENV === 'production';
-}
-
-// Keep the CI/dev diagnostic usable without inventing a second test-only
-// endpoint, while closing the production reconnaissance surface. Cloudflare's
-// canonical Worker declares ENVIRONMENT=production in wrangler.worker.toml;
-// Node deployments may use NODE_ENV=production. Either production marker must
-// fail closed behind the existing founder authentication boundary.
+// The Cloudflare Worker entry point marks itself explicitly before importing
+// the Express server. Node deployments additionally fail closed on either
+// canonical production environment marker. This avoids depending on whether a
+// provider binding is mirrored into process.env at runtime.
 debugRouter.use((req, res, next) => {
-  if (!isProductionRuntime()) return next();
+  if (!requiresFounderForDebugSurface()) return next();
   return requireFounder(req as FounderRequest, res, next);
 });
 
