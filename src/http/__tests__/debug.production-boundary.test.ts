@@ -33,6 +33,7 @@ afterEach(() => {
 describe('debug provider production boundary', () => {
   it('keeps the provider diagnostic available to development/CI without exposing values', async () => {
     vi.stubEnv('NODE_ENV', 'test');
+    vi.stubEnv('ENVIRONMENT', 'test');
     vi.stubEnv('AI_PROVIDER', 'openai');
     vi.stubEnv('OPENAI_API_KEY', 'test-key-present-but-never-returned');
 
@@ -45,13 +46,15 @@ describe('debug provider production boundary', () => {
       fallback: false,
       openaiKeyPresent: true,
       nodeEnv: 'test',
+      environment: 'test',
     });
     expect(JSON.stringify(response.body)).not.toContain('test-key-present-but-never-returned');
     expect(mockGetUser).not.toHaveBeenCalled();
   });
 
-  it('requires the existing founder authentication boundary in production', async () => {
-    vi.stubEnv('NODE_ENV', 'production');
+  it('requires founder auth when the canonical Cloudflare runtime marker says production', async () => {
+    vi.stubEnv('NODE_ENV', 'test');
+    vi.stubEnv('ENVIRONMENT', 'production');
 
     const response = await request(app()).get('/_debug/provider');
 
@@ -59,5 +62,15 @@ describe('debug provider production boundary', () => {
     expect(response.body).not.toHaveProperty('provider');
     expect(response.body).not.toHaveProperty('openaiKeyPresent');
     expect(response.body).not.toHaveProperty('perplexityKeyPresent');
+  });
+
+  it('also fails closed for a Node production deployment', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('ENVIRONMENT', 'test');
+
+    const response = await request(app()).get('/_debug/provider');
+
+    expect(response.status).toBe(401);
+    expect(response.body).not.toHaveProperty('provider');
   });
 });
