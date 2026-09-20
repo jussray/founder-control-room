@@ -2,13 +2,13 @@ import type { Request, RequestHandler, Response } from 'express';
 
 import {
   FCR_SHOPIFY_PAID_TOPIC,
-  FOUNDER_CONTROL_ROOM_SHOPIFY_DOMAIN,
   FcrShopifyMoneyPathError,
   buildFcrShopifyPaidReceipt,
   normalizeShopifyDomain,
   verifyFcrShopifyWebhookHmac,
   type FcrShopifyPaidReceipt,
 } from '../../fcrCommerce/shopifyMoneyPath.js';
+import { FOUNDER_CONTROL_ROOM_SHOPIFY_DOMAIN } from '../../providers/ShopifyReadOnlyProvider.js';
 
 export type FcrCommerceReceiptStoreDisposition = 'stored' | 'duplicate' | 'conflict';
 export type FcrCommerceReceiptStore = (
