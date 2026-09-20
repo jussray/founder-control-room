@@ -162,6 +162,9 @@ jobs:
               service_binding: {binding: $binding, service: $service},
               credential_header_safe: false,
               provider_worker_found: null,
+              provider_error_class: null,
+              provider_error_code: null,
+              provider_cli_exit_status: null,
               required_secret_names_verified: false,
               provider_deploy_succeeded: false,
               email_trigger_reconciled: false,
@@ -224,15 +227,42 @@ jobs:
           tmp="${receipt}.tmp"
 
           if (( secret_status != 0 )); then
+            provider_error_code="$(grep -Eo '\[code: [0-9]+\]' "$secret_error" | head -n 1 | grep -Eo '[0-9]+' || true)"
+            provider_error_class='provider_read_failed'
+            provider_worker_found='null'
+            blocked_stage='existing_worker_secret_read'
+
             if grep -F 'Worker "founder-control-room-review-email" not found.' "$secret_error" >/dev/null; then
-              jq '.provider_worker_found = false | .blocked_stage = "provider_worker_identity"' "$receipt" > "$tmp"
-              mv "$tmp" "$receipt"
-              echo '::error title=Review-email Worker identity missing::Cloudflare did not find founder-control-room-review-email in the declared account. Reconcile provider Worker identity before any deploy or secret migration.'
-            else
-              jq '.blocked_stage = "existing_worker_secret_read"' "$receipt" > "$tmp"
-              mv "$tmp" "$receipt"
-              echo '::error title=Review-email Worker provider read failed::Cloudflare secret-name readback failed before deployment. Inspect the provider-side credential/account receipt without exposing secret values.'
+              provider_error_class='worker_not_found'
+              provider_worker_found='false'
+              blocked_stage='provider_worker_identity'
+            elif grep -Eiq 'authentication|invalid api token|api token[^[:alnum:]]+invalid' "$secret_error"; then
+              provider_error_class='authentication'
+            elif grep -Eiq 'unauthorized|forbidden|not authorized|permission denied|insufficient permission' "$secret_error"; then
+              provider_error_class='authorization'
+            elif grep -Eiq 'rate limit|too many requests|\b429\b' "$secret_error"; then
+              provider_error_class='rate_limit'
+            elif grep -Eiq 'internal server|service unavailable|bad gateway|gateway timeout|\b5[0-9][0-9]\b' "$secret_error"; then
+              provider_error_class='provider_service'
+            elif grep -Eiq 'account' "$secret_error"; then
+              provider_error_class='account_or_scope'
             fi
+
+            jq \
+              --arg provider_error_class "$provider_error_class" \
+              --arg provider_error_code "$provider_error_code" \
+              --arg blocked_stage "$blocked_stage" \
+              --argjson provider_cli_exit_status "$secret_status" \
+              --argjson provider_worker_found "$provider_worker_found" \
+              '.provider_error_class = $provider_error_class
+               | .provider_error_code = (if $provider_error_code == "" then null else $provider_error_code end)
+               | .provider_cli_exit_status = $provider_cli_exit_status
+               | .provider_worker_found = $provider_worker_found
+               | .blocked_stage = $blocked_stage' \
+              "$receipt" > "$tmp"
+            mv "$tmp" "$receipt"
+
+            echo "::error title=Review-email Worker provider read failed::Cloudflare secret-name readback failed safely classified as ${provider_error_class}; code=${provider_error_code:-unknown}; exit=${secret_status}. Raw provider stderr was not emitted or retained."
             exit "$secret_status"
           fi
 

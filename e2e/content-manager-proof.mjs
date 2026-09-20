@@ -9,6 +9,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const publicRoot = resolve(here, '../public');
 const outputDir = resolve(here, '../test-results');
 const lifecycleBase = '/automation/conveyor/founder-content/lifecycle';
+const youtubeGrowthEvaluate = '/automation/conveyor/founder-content/youtube-growth/evaluate';
 
 await mkdir(outputDir, { recursive: true });
 
@@ -40,6 +41,7 @@ const approvedPost = {
 };
 
 const mutationRequests = [];
+const growthEvaluationRequests = [];
 
 function json(res, status, body) {
   res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
@@ -48,6 +50,13 @@ function json(res, status, body) {
 
 function mime(pathname) {
   return ({ '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8' })[extname(pathname)] || 'application/octet-stream';
+}
+
+async function readJsonBody(req) {
+  const chunks = [];
+  for await (const chunk of req) chunks.push(chunk);
+  const raw = Buffer.concat(chunks).toString('utf8');
+  return raw ? JSON.parse(raw) : {};
 }
 
 const server = createServer(async (req, res) => {
@@ -74,6 +83,44 @@ const server = createServer(async (req, res) => {
       retryQueue: [],
       ambiguous: [],
       metrics: [],
+    });
+  }
+  if (url.pathname === youtubeGrowthEvaluate && req.method === 'POST') {
+    const body = await readJsonBody(req);
+    growthEvaluationRequests.push(body);
+    return json(res, 200, {
+      ok: true,
+      contract: 'fcr/youtube-growth-evaluation@v1',
+      result: {
+        phase: 'DOUBLE_DOWN',
+        requestedPhase: 'DOUBLE_DOWN',
+        transition: 'ADVANCE',
+        reasons: [],
+        winningExperimentIds: ['experiment-a'],
+        repeatableWinningExperimentIds: [],
+        diagnoses: [],
+        experimentFailures: [],
+        targets: {},
+        continuity: { currentFingerprint: null, predecessorInvalidated: false },
+        workflow: ['LEEVIZE', 'measure', 'diagnose', 'double-down-or-repair-or-kill'],
+        monetization: {
+          yppEligibilityRequiresProviderEvidence: true,
+          revenueRequiresOutcomeEvidence: true,
+          yppEligibilityProven: false,
+          revenueProven: false,
+        },
+        authority: {
+          advisoryOnly: true,
+          authorizesPublish: false,
+          authorizesSchedule: false,
+          authorizesSpend: false,
+          authorizesScaleExecution: false,
+          targetsAreOutcomeEvidence: false,
+          continuityMarkersAuthorize: false,
+        },
+      },
+      published: false,
+      providerMutationAttempted: false,
     });
   }
   if (url.pathname.startsWith(lifecycleBase) || url.pathname === '/automation/conveyor/founder-content/approvals') {
@@ -173,6 +220,49 @@ try {
   assert.match(learningText, /private snapshot may still guide which public-safe story shape/i);
   assert.doesNotMatch(learningText, /\b42\b|\b52\b|\b3,?740\b/, 'private workbook totals must not be baked into the public Content Manager');
 
+  const growth = learningLoop.locator('[data-youtube-growth-control]');
+  await growth.waitFor({ state: 'visible' });
+  assert.equal(await growth.getAttribute('data-youtube-growth-authority'), 'advisory-only');
+  assert.match(await growth.innerText(), /YouTube growth evidence/i);
+  assert.match(await growth.innerText(), /never publishes, schedules, spends, scales, or proves a provider outcome/i);
+  assert.match(await growth.locator('[data-youtube-growth-authority-label]').innerText(), /Advisory only · no publish authority/i);
+  assert.equal(await growth.locator('button').count(), 1, 'growth card exposes evaluation only');
+
+  const growthPacket = {
+    day: 31,
+    evaluatedAt: '2026-09-19T20:00:00.000Z',
+    currentPhase: 'TEST_AND_VALIDATE',
+    requestedPhase: 'DOUBLE_DOWN',
+    experiments: [{
+      id: 'experiment-a',
+      confirmedRunEvidenceRefs: ['youtube:run:1'],
+      criteria: [
+        { metric: 'ctrPercent', minimum: 5 },
+        { metric: 'retentionPercent', minimum: 40 },
+      ],
+      measurement: {
+        observedAt: '2026-09-19T19:00:00.000Z',
+        source: 'youtube-native',
+        evidenceRefs: ['youtube:video:abc123'],
+        metrics: { impressions: 10000, views: 900, ctrPercent: 7, retentionPercent: 52, watchTimeMinutes: 4200 },
+      },
+    }],
+  };
+  await growth.locator('[data-youtube-growth-input]').fill(JSON.stringify(growthPacket, null, 2));
+  await growth.locator('[data-youtube-growth-evaluate]').click();
+  await growth.locator('[data-youtube-growth-output]').waitFor({ state: 'visible' });
+  await page.waitForFunction(() => document.querySelector('[data-youtube-growth-output]')?.textContent?.includes('ADVANCE'));
+  const growthOutput = await growth.locator('[data-youtube-growth-output]').innerText();
+  assert.match(growthOutput, /"transition": "ADVANCE"/);
+  assert.match(growthOutput, /"phase": "DOUBLE_DOWN"/);
+  assert.match(growthOutput, /"authorizesPublish": false/);
+  assert.match(growthOutput, /"authorizesScaleExecution": false/);
+  assert.match(growthOutput, /"published": false/);
+  assert.match(growthOutput, /"providerMutationAttempted": false/);
+  assert.equal(growthEvaluationRequests.length, 1, 'browser should issue exactly one advisory growth evaluation');
+  assert.deepEqual(growthEvaluationRequests[0], growthPacket);
+  assert.equal(mutationRequests.length, 0, 'growth evaluation must not enter lifecycle mutation paths');
+
   const status = page.locator('[aria-label="Content authority status"]');
   assert.equal(await status.locator('[data-founder-engine-state]').getAttribute('data-founder-engine-state'), 'contract-ready');
   assert.equal(await status.locator('[data-first-party-linkedin-capability]').getAttribute('data-first-party-linkedin-capability'), 'implemented');
@@ -245,6 +335,7 @@ try {
     flowScrollWidth: document.querySelector('.flow')?.scrollWidth ?? 0,
     founderLaneWidth: document.querySelector('[data-founder-progress-lane]')?.clientWidth ?? 0,
     learningLoopWidth: document.querySelector('[data-content-learning-loop]')?.clientWidth ?? 0,
+    growthControlWidth: document.querySelector('[data-youtube-growth-control]')?.clientWidth ?? 0,
     controlPlaneWidth: document.querySelector('[data-lifecycle-control-plane]')?.clientWidth ?? 0,
   }));
 
@@ -252,6 +343,7 @@ try {
   assert(dimensions.flowScrollWidth > dimensions.flowWidth, 'workflow must remain horizontally explorable on mobile');
   assert(dimensions.founderLaneWidth > 0 && dimensions.founderLaneWidth <= dimensions.viewportWidth, 'founder progress lane must fit the mobile viewport');
   assert(dimensions.learningLoopWidth > 0 && dimensions.learningLoopWidth <= dimensions.viewportWidth, 'content learning loop must fit the mobile viewport');
+  assert(dimensions.growthControlWidth > 0 && dimensions.growthControlWidth <= dimensions.viewportWidth, 'YouTube growth control must fit the mobile viewport');
   assert(dimensions.controlPlaneWidth > 0 && dimensions.controlPlaneWidth <= dimensions.viewportWidth, 'lifecycle control plane must fit the mobile viewport');
 
   await page.screenshot({
@@ -279,6 +371,13 @@ try {
       metricClaimState: 'fresh-verifier-required',
       axes: learningAxes,
       storyArchetypes,
+      youtubeGrowth: {
+        authority: 'advisory-only',
+        evaluations: growthEvaluationRequests.length,
+        transition: 'ADVANCE',
+        providerMutationAttempted: false,
+        publicationAttempted: false,
+      },
     },
     screenshot: 'test-results/content-manager-mobile.png',
     overflow: dimensions,

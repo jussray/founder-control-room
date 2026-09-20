@@ -5,6 +5,10 @@ const workflow = readFileSync(
   new URL('../../../.github/workflows/review-email-worker-reconcile.yml', import.meta.url),
   'utf8',
 );
+const ingressWorkflow = readFileSync(
+  new URL('../../../.github/workflows/founder-review-email-ingress.yml', import.meta.url),
+  'utf8',
+);
 const canonicalDeployWorkflow = readFileSync(
   new URL('../../../.github/workflows/deploy.yml', import.meta.url),
   'utf8',
@@ -50,6 +54,12 @@ describe('review-email Worker reconciliation authority contract', () => {
     expect(workflow).toContain('Inbound Email Routing remains provider-side state and must be independently read back.');
   });
 
+  it('does not label a source-only check as live routing proof', () => {
+    expect(ingressWorkflow).toContain('- name: Verify review-email Worker source contract');
+    expect(ingressWorkflow).not.toContain('- name: Verify email routing trigger contract');
+    expect(ingressWorkflow).toContain('node scripts/verify-founder-review-email-routing.mjs');
+  });
+
   it('separates Cloudflare credential authority by operation class', () => {
     const canonicalSecret = '${{ secrets.CLOUDFLARE_API_TOKEN }}';
     const reviewEmailSecret = '${{ secrets.CLOUDFLARE_REVIEW_EMAIL_DEPLOY_TOKEN }}';
@@ -92,23 +102,34 @@ describe('review-email Worker reconciliation authority contract', () => {
     expect(workflow).not.toContain("print(token)");
   });
 
-  it('retains distinct redacted receipts for provider identity, secret-name, deploy, and binding failures', () => {
+  it('retains distinct redacted receipts for provider identity, provider error class, secret-name, deploy, and binding failures', () => {
     expect(workflow).toContain('Initialize redacted reconciliation receipt');
     expect(workflow).toContain('expected_email_routing_address: $address');
     expect(workflow).toContain('credential_header_safe: false');
     expect(workflow).toContain('provider_worker_found: null');
+    expect(workflow).toContain('provider_error_class: null');
+    expect(workflow).toContain('provider_error_code: null');
+    expect(workflow).toContain('provider_cli_exit_status: null');
     expect(workflow).toContain('required_secret_names_verified: false');
     expect(workflow).toContain('provider_deploy_succeeded: false');
     expect(workflow).toContain('email_trigger_reconciled: false');
     expect(workflow).toContain('blocked_stage: "credential_header_safety"');
     expect(workflow).toContain('.credential_header_safe = true | .blocked_stage = "existing_worker_secret_read"');
-    expect(workflow).toContain('.provider_worker_found = false | .blocked_stage = "provider_worker_identity"');
+    expect(workflow).toContain("provider_error_class='worker_not_found'");
+    expect(workflow).toContain("provider_error_class='authentication'");
+    expect(workflow).toContain("provider_error_class='authorization'");
+    expect(workflow).toContain("provider_error_class='rate_limit'");
+    expect(workflow).toContain("provider_error_class='provider_service'");
+    expect(workflow).toContain("provider_error_class='account_or_scope'");
+    expect(workflow).toContain('.provider_cli_exit_status = $provider_cli_exit_status');
     expect(workflow).toContain('.provider_worker_found = true');
     expect(workflow).toContain('.blocked_stage = "required_worker_secret_names"');
     expect(workflow).toContain('.required_secret_names_verified = true | .blocked_stage = "provider_deploy"');
     expect(workflow).toContain('.blocked_stage = "provider_deploy_failed"');
     expect(workflow).toContain('.blocked_stage = "service_binding_proof"');
     expect(workflow).toContain('.provider_deploy_succeeded = true | .blocked_stage = null');
+    expect(workflow).toContain('Raw provider stderr was not emitted or retained.');
+    expect(workflow).not.toContain('cat "$secret_error"');
     expect(workflow).toContain('if-no-files-found: error');
   });
 

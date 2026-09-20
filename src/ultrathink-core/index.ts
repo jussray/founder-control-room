@@ -78,6 +78,24 @@ export {
 } from './attack3000Release.js';
 
 export {
+  ATTACK_3000_VENDOR_ADAPTER_ID,
+  createVendorAttack3000Assessment,
+  deriveVendorPartnershipTerms,
+  evaluateVendorAttack3000,
+  type VendorAttack3000Evidence,
+  type VendorAttack3000Input,
+  type VendorAttack3000Result,
+  type VendorBooleanObservation,
+  type VendorBooleanRequirement,
+  type VendorBoundary,
+  type VendorCountObservation,
+  type VendorNumberObservation,
+  type VendorPartnershipTermsDerivation,
+  type VendorPartnershipTermsInput,
+  type VendorStopCondition,
+} from './attack3000Vendor.js';
+
+export {
   ATTACK_3000_CONTENT_ADAPTER_ID,
   createContentAttack3000Assessment,
   deriveContentTerms,
@@ -97,6 +115,17 @@ export {
 } from './attack3000Content.js';
 
 export {
+  CONTENT_METRICS_CSV_CONTRACT,
+  CONTENT_METRIC_NAMES,
+  parseContentMetricsCsv,
+  type ContentMetricCsvEvidenceState,
+  type ContentMetricCsvObservation,
+  type ContentMetricCsvProvenance,
+  type ContentMetricCsvReceipt,
+  type ContentMetricName,
+} from '../lib/contentMetricsCsv.js';
+
+export {
   evaluateContentTrendRadar,
   type RankedTrendRadarCandidate,
   type TrendAngleKind,
@@ -111,6 +140,20 @@ export {
   type TrendRadarScores,
   type TrendSaturation,
 } from './contentTrendRadar.js';
+
+export {
+  evaluateYouTubeGrowthLoop,
+  type YouTubeDiagnosticThresholds,
+  type YouTubeGrowthDiagnosis,
+  type YouTubeGrowthExperiment,
+  type YouTubeGrowthLoopInput,
+  type YouTubeGrowthLoopReason,
+  type YouTubeGrowthLoopResult,
+  type YouTubeGrowthPhase,
+  type YouTubeMeasurement,
+  type YouTubeMetricKey,
+  type YouTubeSuccessCriterion,
+} from './youtubeGrowthLoop.js';
 
 export {
   evaluateAuthorityLease,
