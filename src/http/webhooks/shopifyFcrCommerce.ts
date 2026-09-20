@@ -41,14 +41,13 @@ function sameStringArray(left: unknown, right: readonly string[]): boolean {
     && left.every((value, index) => value === right[index]);
 }
 
-export function storedFcrCommerceReceiptMatches(
+export function storedFcrCommerceOrderReceiptMatches(
   stored: unknown,
   receipt: FcrShopifyPaidReceipt,
 ): boolean {
   if (!isRecord(stored)) return false;
   return (
-    stored.webhook_id === receipt.webhookId
-    && stored.contract_id === receipt.contract
+    stored.contract_id === receipt.contract
     && stored.provider === receipt.provider
     && stored.store_fingerprint === receipt.storeFingerprint
     && stored.shop_domain === receipt.shopDomain
@@ -59,15 +58,28 @@ export function storedFcrCommerceReceiptMatches(
     && stored.currency === receipt.currency
     && sameStringArray(stored.offer_keys, receipt.offerKeys)
     && stored.unknown_offer_count === receipt.unknownOfferCount
+  );
+}
+
+export function storedFcrCommerceReceiptMatches(
+  stored: unknown,
+  receipt: FcrShopifyPaidReceipt,
+): boolean {
+  if (!isRecord(stored)) return false;
+  return (
+    stored.webhook_id === receipt.webhookId
     && stored.occurred_at === receipt.occurredAt
+    && storedFcrCommerceOrderReceiptMatches(stored, receipt)
   );
 }
 
 export const persistFcrCommerceReceipt: FcrCommerceReceiptStore = async (receipt) => {
-  const { supabaseAdmin } = await import('../../lib/supabase.js');
-  const admin = supabaseAdmin();
+  // Use the canonical FCR Supabase client so privileged writes are bound to
+  // SUPABASE_URL and the checked-in Founder Control Room project identity.
+  // Do not use the legacy NEXT_PUBLIC_* client for this server authority path.
+  const { supabase: admin } = await import('../../lib/supabaseClient.js');
 
-  const readExisting = async (): Promise<Record<string, unknown> | null> => {
+  const readExistingByWebhookId = async (): Promise<Record<string, unknown> | null> => {
     const { data, error } = await admin
       .from('fcr_commerce_receipts')
       .select(RECEIPT_COLUMNS)
@@ -77,9 +89,31 @@ export const persistFcrCommerceReceipt: FcrCommerceReceiptStore = async (receipt
     return isRecord(data) ? data : null;
   };
 
-  const existing = await readExisting();
-  if (existing) {
-    return storedFcrCommerceReceiptMatches(existing, receipt) ? 'duplicate' : 'conflict';
+  const readExistingByOrder = async (): Promise<Record<string, unknown> | null> => {
+    const { data, error } = await admin
+      .from('fcr_commerce_receipts')
+      .select(RECEIPT_COLUMNS)
+      .eq('provider', receipt.provider)
+      .eq('shop_domain', receipt.shopDomain)
+      .eq('order_ref_hash', receipt.orderRefHash)
+      .eq('event_type', receipt.event)
+      .maybeSingle();
+    if (error) throw new Error('fcr_commerce_receipt_lookup_failed');
+    return isRecord(data) ? data : null;
+  };
+
+  const existingByWebhookId = await readExistingByWebhookId();
+  if (existingByWebhookId) {
+    return storedFcrCommerceReceiptMatches(existingByWebhookId, receipt)
+      ? 'duplicate'
+      : 'conflict';
+  }
+
+  const existingByOrder = await readExistingByOrder();
+  if (existingByOrder) {
+    return storedFcrCommerceOrderReceiptMatches(existingByOrder, receipt)
+      ? 'duplicate'
+      : 'conflict';
   }
 
   const { error: insertError } = await admin.from('fcr_commerce_receipts').insert({
@@ -103,9 +137,24 @@ export const persistFcrCommerceReceipt: FcrCommerceReceiptStore = async (receipt
     throw new Error('fcr_commerce_receipt_store_failed');
   }
 
-  const racedExisting = await readExisting();
-  if (!racedExisting) throw new Error('fcr_commerce_receipt_store_failed');
-  return storedFcrCommerceReceiptMatches(racedExisting, receipt) ? 'duplicate' : 'conflict';
+  // A concurrent retry may collide on either the provider webhook id or the
+  // order-level revenue uniqueness key. Re-read both identities and classify
+  // the result instead of retrying a durable duplicate forever.
+  const racedByWebhookId = await readExistingByWebhookId();
+  if (racedByWebhookId) {
+    return storedFcrCommerceReceiptMatches(racedByWebhookId, receipt)
+      ? 'duplicate'
+      : 'conflict';
+  }
+
+  const racedByOrder = await readExistingByOrder();
+  if (racedByOrder) {
+    return storedFcrCommerceOrderReceiptMatches(racedByOrder, receipt)
+      ? 'duplicate'
+      : 'conflict';
+  }
+
+  throw new Error('fcr_commerce_receipt_store_failed');
 };
 
 export function createShopifyFcrCommerceWebhookHandler(
@@ -176,7 +225,7 @@ export function createShopifyFcrCommerceWebhookHandler(
       if (disposition === 'conflict') {
         return res.status(409).json({
           accepted: false,
-          error: 'webhook_id_conflict',
+          error: 'commerce_receipt_conflict',
           webhookId: receipt.webhookId,
         });
       }
