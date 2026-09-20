@@ -60,6 +60,20 @@ async function provePublicFrontDoor(label, viewport) {
   await page.goto(`${BASE_URL}/`, { waitUntil: 'networkidle' });
   await page.locator('[data-fcr-entry]').waitFor({ state: 'visible' });
 
+  const publicViews = page.locator('.public-dual > .view-card');
+  if (await publicViews.count() !== 2) {
+    throw new Error(`${label}: live public domain must render exactly two primary FCR views`);
+  }
+  if (await page.locator('.public-dual > .user-view').count() !== 1
+      || await page.locator('.public-dual > .founder-view').count() !== 1) {
+    throw new Error(`${label}: public domain must render one User View and one Founder View`);
+  }
+  const founderPreviewCopy = await page.locator('.public-dual > .founder-view').innerText();
+  if (!founderPreviewCopy.includes('Existing product paths')
+      || !founderPreviewCopy.includes('/control-room/')) {
+    throw new Error(`${label}: Founder View must explain the real authenticated backend path`);
+  }
+
   const entryChoices = page.locator('[data-entry-choice]');
   if (await entryChoices.count() !== 2) {
     throw new Error(`${label}: public front door must expose exactly two role choices`);
@@ -206,7 +220,7 @@ try {
   await provePublicFrontDoor('mobile-390', { width: 390, height: 844 });
   await proveViewport('desktop-1440', { width: 1440, height: 1100 });
   await proveViewport('mobile-390', { width: 390, height: 844 });
-  console.log('PASS: public FCR user/founder entry, honest onboarding boundaries, FCR visual signature, user/founder/owner views, owner-only crown authority, Bip platform identity, responsive layout, and keyboard focus are preserved.');
+  console.log('PASS: live public FCR User/Founder dual view, honest onboarding boundaries, FCR visual signature, user/founder/owner views, owner-only crown authority, Bip platform identity, responsive layout, and keyboard focus are preserved.');
 } finally {
   await browser.close();
   await new Promise((resolve) => server.close(resolve));
