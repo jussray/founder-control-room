@@ -227,7 +227,7 @@ describe('workspace Chief onboarding', () => {
     expect(rpcArgs.p_event_metadata).not.toHaveProperty('founderEmail');
   });
 
-  it('fails closed when the atomic database bootstrap fails', async () => {
+  it('fails closed without reflecting database details when atomic bootstrap fails', async () => {
     const recommendationResponse = await request(app())
       .post('/workspace/projects/recommendation')
       .set('Authorization', BEARER)
@@ -241,7 +241,7 @@ describe('workspace Chief onboarding', () => {
     });
     supabaseMock.rpc.mockResolvedValue({
       data: null,
-      error: { code: 'P0001', message: 'event insert rejected' },
+      error: { code: 'P0001', message: 'event insert rejected: internal schema detail' },
     });
 
     const response = await request(app())
@@ -256,7 +256,10 @@ describe('workspace Chief onboarding', () => {
       });
 
     expect(response.status).toBe(500);
-    expect(response.body.error).toBe('Project and onboarding evidence could not be created atomically');
+    expect(response.body).toEqual({
+      error: 'Project and onboarding evidence could not be created atomically',
+    });
+    expect(JSON.stringify(response.body)).not.toContain('internal schema detail');
     expect(supabaseMock.rpc).toHaveBeenCalledTimes(1);
   });
 });
