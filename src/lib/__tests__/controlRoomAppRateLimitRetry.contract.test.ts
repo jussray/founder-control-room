@@ -19,4 +19,18 @@ describe('Control Room safe read rate-limit retry contract', () => {
     expect(appSource).not.toMatch(/method === 'PATCH'[^\n]*safeReadRetryAttempt/);
     expect(appSource).not.toMatch(/method === 'DELETE'[^\n]*safeReadRetryAttempt/);
   });
+
+  it('uses the authoritative connection-check response instead of spending an immediate duplicate GET', () => {
+    const handlerStart = appSource.indexOf("panel.querySelectorAll('.connection-check-btn')");
+    const handlerEnd = appSource.indexOf("panel.querySelector('#file-up')", handlerStart);
+    expect(handlerStart).toBeGreaterThanOrEqual(0);
+    expect(handlerEnd).toBeGreaterThan(handlerStart);
+
+    const handler = appSource.slice(handlerStart, handlerEnd);
+    expect(handler).toContain('const checkResult = await api(');
+    expect(handler).toContain('checkResult?.connection');
+    expect(handler).toContain('updatedConnection.id !== expectedConnectionId');
+    expect(handler).toContain('state.projectConnections = state.projectConnections.map');
+    expect(handler).not.toContain('await loadProjectConnections(');
+  });
 });
