@@ -185,6 +185,8 @@ Source dependence on that topology is not proof the live provider is configured 
 
 `wrangler.worker.toml [secrets].required` is the canonical production binding-name gate for provider-held Worker secrets. A provider-backed capability such as `tinyfish-web-observation-v1` must name `TINYFISH_API_KEY` there before canonical Worker promotion; Deploy verifies only binding-name presence in Cloudflare and never copies the secret value through GitHub Actions. Source and CI readiness therefore remain distinct from live TinyFish provider/runtime activation.
 
+The same rule now covers the JBH commerce-receipt receiver: `JBH_RECEIPT_INGEST_TOKEN` must be declared in the canonical Worker required-secret set because `/ingest/hair-commerce-receipts` fails closed without it. That declaration proves only the source/configuration contract. Live Cloudflare binding presence, the deployed FCR Worker identity, the `jbh-private` sender runtime, and one matching sanitized sender-to-ledger receipt remain separate evidence gates; a green deploy preflight alone must not be relabeled as end-to-end commerce activation.
+
 Production does not deploy merely because `main` moved or a Cloudflare build succeeded. A production claim remains incomplete until the authorized lane proves, for one exact candidate:
 
 - current deployment authority;
