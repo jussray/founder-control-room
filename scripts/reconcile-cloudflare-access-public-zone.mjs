@@ -13,6 +13,7 @@ export const FCR_CLOUDFLARE_ACCOUNT_ID = '9b59861bd1747cf7525571b4c51d2aa0';
 export const FCR_PUBLIC_ZONE = 'foundercontrolroom.org';
 export const FCR_PUBLIC_URL = 'https://foundercontrolroom.org/';
 export const FCR_PUBLIC_ACCESS_APP_NAME = 'foundercontrolroom.org - public apex bypass';
+export const FCR_SPLIT_PUBLIC_ACCESS_APP_NAME = 'foundercontrolroom.org - public front door and version witness';
 
 function clean(value) {
   return typeof value === 'string' ? value.trim() : '';
@@ -40,6 +41,15 @@ function publicHost(value) {
 function browserHosts(zone = FCR_PUBLIC_ZONE) {
   const target = clean(zone).toLowerCase();
   return new Set([target, `www.${target}`]);
+}
+
+function splitPublicUris(zone = FCR_PUBLIC_ZONE) {
+  const target = clean(zone).toLowerCase();
+  return [
+    `${target}/*`,
+    `www.${target}/*`,
+    `api.${target}/version`,
+  ];
 }
 
 export function isBrowserFacingFcrPublicDestination(destination, zone = FCR_PUBLIC_ZONE) {
@@ -80,6 +90,23 @@ export function isEveryoneBypassPolicy(policy) {
   return include.some(
     (rule) => rule && typeof rule === 'object' && rule.everyone && typeof rule.everyone === 'object',
   );
+}
+
+export function isExactFcrSplitPublicApplication(application, zone = FCR_PUBLIC_ZONE) {
+  const target = clean(zone).toLowerCase();
+  if (!target) return false;
+  if (clean(application?.name) !== FCR_SPLIT_PUBLIC_ACCESS_APP_NAME) return false;
+  if (clean(application?.type).toLowerCase() !== 'self_hosted') return false;
+  if (normalizePublicUri(application?.domain) !== `www.${target}`) return false;
+  const destinations = Array.isArray(application?.destinations) ? application.destinations : [];
+  if (destinations.length !== 3 || destinations.some((destination) => destinationType(destination) !== 'public')) {
+    return false;
+  }
+  const actual = destinations
+    .map((destination) => normalizePublicUri(destination?.uri || destination?.hostname))
+    .sort();
+  const expected = splitPublicUris(target).sort();
+  return actual.every((uri, index) => uri === expected[index]);
 }
 
 function stableValue(value) {
@@ -293,7 +320,7 @@ async function selectCredential({ env, accountId, fetchImpl, apply }) {
 
 function receiptBase({ apply, accountId, zone }) {
   return {
-    schemaVersion: 3,
+    schemaVersion: 2,
     scope: 'fcr-access-front-door-recovery',
     desiredState: 'fcr-product-auth-without-cloudflare-access-screen',
     observedAt: new Date().toISOString(),
@@ -308,6 +335,8 @@ function receiptBase({ apply, accountId, zone }) {
     zone,
     credentialSource: null,
     credentialFailures: [],
+    denyUnmatchedRequests: null,
+    alreadyExempt: null,
     matchingApplicationCount: null,
     browserAccessDestinationCount: null,
     preservedNonBrowserDestinationCount: null,
@@ -372,14 +401,15 @@ export async function reconcileFcrPublicAccessZone({
     return {
       ...receipt,
       state: 'clear',
-      action: 'browser-access-already-detached',
+      action: 'none',
+      alreadyExempt: true,
       nextAction: 'verify the FCR-owned sign-in surface and runtime identity with stranger-path Playwright',
     };
   }
 
   if (matching.length > 1) {
-    const error = new Error('More than one Access application owns an FCR browser-facing destination; refusing to guess provider ownership.');
-    error.classification = 'multiple-browser-access-apps-require-review';
+    const error = new Error('More than one Access application targets the FCR public apex; refusing to infer ownership or mutate automatically.');
+    error.classification = 'existing-public-access-app-requires-review';
     error.matchingApplications = matching;
     throw attachCredentialFailure(error, credential);
   }
@@ -387,9 +417,40 @@ export async function reconcileFcrPublicAccessZone({
   const source = matching[0];
   const sourceId = clean(source?.id);
   if (!sourceId) {
-    const error = new Error('The browser-facing Access application has no stable provider ID.');
-    error.classification = 'browser-access-source-id-missing';
+    const error = new Error('An existing browser-facing Access application has no stable provider ID; manual review is required before mutation.');
+    error.classification = 'existing-public-access-app-requires-review';
+    error.matchingApplications = [source];
     throw attachCredentialFailure(error, credential);
+  }
+
+  if (isExactFcrSplitPublicApplication(source, zone)) {
+    let policies;
+    try {
+      policies = await listPolicies({
+        token: credential.token,
+        fetchImpl,
+        accountId: canonicalAccountId,
+        appId: sourceId,
+      });
+    } catch (error) {
+      error.classification = 'provider-read-failed';
+      throw attachCredentialFailure(error, credential);
+    }
+
+    if (policies.length !== 1 || !isEveryoneBypassPolicy(policies[0])) {
+      const error = new Error('The managed FCR public bypass application exists but its exact Everyone Bypass policy has drifted.');
+      error.classification = 'managed-public-bypass-policy-drift';
+      error.matchingApplications = [source];
+      throw attachCredentialFailure(error, credential);
+    }
+
+    return {
+      ...receipt,
+      state: 'clear',
+      action: 'already-public-bypass',
+      alreadyExempt: true,
+      nextAction: 'verify the public front door, Pages-to-Worker service binding, exact /version witness, and protected direct API boundary with stranger-path Playwright',
+    };
   }
 
   const remainingDestinations = withoutBrowserDestinations(source, zone);
@@ -398,9 +459,9 @@ export async function reconcileFcrPublicAccessZone({
 
   if (remainingDestinations.length === 0) {
     const error = new Error(
-      'The only matching Access application is public-only. Automatic deletion is intentionally blocked; remove it through a separately reviewed exact provider action.',
+      'An existing non-managed Access application targets the FCR apex with broader or different destination scope; manual review is required before mutation.',
     );
-    error.classification = 'public-only-access-app-requires-reviewed-deletion';
+    error.classification = 'existing-public-access-app-requires-review';
     error.matchingApplications = [source];
     throw attachCredentialFailure(error, credential);
   }
@@ -409,10 +470,11 @@ export async function reconcileFcrPublicAccessZone({
     return {
       ...receipt,
       state: 'attention',
-      action: 'would-detach-browser-access',
+      action: 'would-create-public-bypass',
+      alreadyExempt: false,
       preservedNonBrowserDestinationCount: remainingDestinations.length,
-      blocker: 'Cloudflare Access currently owns one or more FCR browser-facing destinations.',
-      nextAction: 'founder-approved apply may remove only the browser-facing public destinations while preserving every non-browser destination and policy',
+      blocker: 'Cloudflare Access currently combines the FCR browser front door with a protected non-browser destination.',
+      nextAction: 'an exact founder-approved split may preserve the protected non-browser destination while creating only the bounded public bypass application',
     };
   }
 
