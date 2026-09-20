@@ -244,9 +244,11 @@ jobs:
               provider_error_class='rate_limit'
             elif grep -Eiq 'internal server|service unavailable|bad gateway|gateway timeout|\b5[0-9][0-9]\b' "$secret_error"; then
               provider_error_class='provider_service'
-            elif grep -Eiq 'account' "$secret_error"; then
+            elif grep -Eiq 'invalid account|account[^[:alnum:]]+(not found|permission|scope)' "$secret_error"; then
               provider_error_class='account_or_scope'
             fi
+
+            rm -f "$secret_error"
 
             jq \
               --arg provider_error_class "$provider_error_class" \
@@ -262,10 +264,11 @@ jobs:
               "$receipt" > "$tmp"
             mv "$tmp" "$receipt"
 
-            echo "::error title=Review-email Worker provider read failed::Cloudflare secret-name readback failed safely classified as ${provider_error_class}; code=${provider_error_code:-unknown}; exit=${secret_status}. Raw provider stderr was not emitted or retained."
+            echo "::error title=Review-email Worker provider read failed::Cloudflare secret-name readback failed safely classified as ${provider_error_class}; code=${provider_error_code:-unknown}; exit=${secret_status}. Raw provider stderr was classified then deleted without emission."
             exit "$secret_status"
           fi
 
+          rm -f "$secret_error"
           jq '.provider_worker_found = true' "$receipt" > "$tmp"
           mv "$tmp" "$receipt"
 

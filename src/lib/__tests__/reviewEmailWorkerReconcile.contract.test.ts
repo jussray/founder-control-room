@@ -102,7 +102,7 @@ describe('review-email Worker reconciliation authority contract', () => {
     expect(workflow).not.toContain("print(token)");
   });
 
-  it('retains distinct redacted receipts for provider identity, provider error class, secret-name, deploy, and binding failures', () => {
+  it('retains distinct secret-safe receipts for provider identity, error class, secret-name, deploy, and binding failures', () => {
     expect(workflow).toContain('Initialize redacted reconciliation receipt');
     expect(workflow).toContain('expected_email_routing_address: $address');
     expect(workflow).toContain('credential_header_safe: false');
@@ -121,14 +121,16 @@ describe('review-email Worker reconciliation authority contract', () => {
     expect(workflow).toContain("provider_error_class='rate_limit'");
     expect(workflow).toContain("provider_error_class='provider_service'");
     expect(workflow).toContain("provider_error_class='account_or_scope'");
+    expect(workflow).toContain("invalid account|account[^[:alnum:]]+(not found|permission|scope)");
     expect(workflow).toContain('.provider_cli_exit_status = $provider_cli_exit_status');
+    expect(workflow).toContain('rm -f "$secret_error"');
     expect(workflow).toContain('.provider_worker_found = true');
     expect(workflow).toContain('.blocked_stage = "required_worker_secret_names"');
     expect(workflow).toContain('.required_secret_names_verified = true | .blocked_stage = "provider_deploy"');
     expect(workflow).toContain('.blocked_stage = "provider_deploy_failed"');
     expect(workflow).toContain('.blocked_stage = "service_binding_proof"');
     expect(workflow).toContain('.provider_deploy_succeeded = true | .blocked_stage = null');
-    expect(workflow).toContain('Raw provider stderr was not emitted or retained.');
+    expect(workflow).toContain('Raw provider stderr was classified then deleted without emission.');
     expect(workflow).not.toContain('cat "$secret_error"');
     expect(workflow).toContain('if-no-files-found: error');
   });
