@@ -30,6 +30,18 @@ const DEEPSEEK_INSTRUCTOR = 'docs/DEEPSEEK_INSTRUCTOR_CONTRACT.md';
 
 export const AGENT_REGISTRY: readonly AgentDescriptor[] = [
   {
+    id: 'gemini',
+    label: 'Gemini Command',
+    role: 'Foremost operational media authority for intake, interpretation, planning, routing, production review, and release disposition under the non-bypassable /LEEVIZE truth and policy kernel.',
+    operator: {
+      enabled: true,
+      capabilities: ['research', 'propose', 'review', 'implement'],
+      firstSliceRuntimeModel: false,
+      externalWritesRequireBoundAuthority: true,
+      instructionContracts: [FCR_V14, MULTI_AGENT],
+    },
+  },
+  {
     id: 'claude-code',
     label: 'Claude / Claude Code',
     role: 'Long-context repository analysis, structured implementation, careful refactors, and documentation.',
@@ -74,6 +86,11 @@ export const AGENT_REGISTRY: readonly AgentDescriptor[] = [
     id: 'anthropic-platform',
     label: 'Anthropic Platform',
     role: 'Replaceable server-side model capability behind adapters; model context is not durable memory.',
+  },
+  {
+    id: 'google-ai-platform',
+    label: 'Google AI / Gemini Platform',
+    role: 'Replaceable server-side Gemini model capability behind adapters; provider availability never grants truth, mutation, spend, render, or publish authority.',
   },
   {
     id: 'deepseek-platform',

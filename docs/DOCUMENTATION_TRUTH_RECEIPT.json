@@ -1,14 +1,176 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Bind the founder-approved Chief governance reconciliation plan to current provider documentation without claiming live ruleset mutation, merge authority, deployment authority, or production proof.",
+  "purpose": "Preserve current workflow, Cloudflare, Shopify, founder-merge, content-evidence, public-discovery, and cross-repository StoryEngine federation truth boundaries without converting source, analytics, crawler policy, peer pinning, provider configuration, mergeability, candidate/browser proof, or growth recommendations into publication, production, provider-mutation, merge, deploy, spend, or external-contact authority.",
   "domains": [
-    "repository-provider"
+    "cloudflare-authority",
+    "repository-provider",
+    "content-evidence",
+    "evidence-authority",
+    "publishing",
+    "merge-authority",
+    "workflow-authority"
   ],
   "changes": [
     {
-      "path": "src/providers/githubGovernanceReconciliation.ts",
+      "path": "public/_worker.js",
       "claims": [
-        "src/providers/githubGovernanceReconciliation.ts must keep Chief candidate proof pre-merge, keep production proof post-merge, require zero desired bypass actors and strict freshness, preserve unmanaged security, and withhold provider mutation and merge authority until fresh provider readback."
+        "`public/_worker.js` must route public static discovery artifacts, including `crawlers.json`, through the Pages `ASSETS` binding while API-owned callback assets remain on `FCR_API`; this routing classification cannot authorize provider mutation or treat a static crawler policy as authentication."
+      ]
+    },
+    {
+      "path": ".github/workflows/playwright.yml",
+      "claims": [
+        "`.github/workflows/playwright.yml` must bind the FCR-to-StoryEngine browser federation witness to a separately verified exact StoryEngine peer SHA and ref; changing that peer identity expires predecessor federation/browser proof and requires the complete exact-head witness to rerun without granting merge, deploy, production, or provider-mutation authority.",
+        "A fresh peer ref/SHA observation may select the successor StoryEngine evidence subject, but the successor FCR federation state remains UNKNOWN until the complete exact-head runtime identity, directive, receipt, and Playwright browser witness succeeds against that peer."
+      ]
+    },
+    {
+      "path": ".github/workflows/ci.yml",
+      "claims": [
+        "`.github/workflows/ci.yml` must keep the existing crawler and public-work Playwright specs inside the load-bearing `Playwright e2e` job that feeds `Required Gate`; a separate advisory Pages workflow cannot substitute for required exact-head browser execution or grant merge authority."
+      ]
+    },
+    {
+      "path": "wrangler.worker.toml",
+      "claims": [
+        "`wrangler.worker.toml` must list `FCR_SHOPIFY_WEBHOOK_SECRET` and `FCR_COMMERCE_HASH_SALT` under `[secrets].required`, so canonical exact-main Deploy rejects a missing FCR Shopify runtime binding before Worker mutation while never reading, logging, or re-uploading either provider-held value; this source boundary cannot prove webhook registration, production migration, runtime delivery, or collected revenue."
+      ]
+    },
+    {
+      "path": ".github/workflows/fcr-access-front-door-recovery.yml",
+      "claims": [
+        "`.github/workflows/fcr-access-front-door-recovery.yml` must keep FCR product authentication inside the app, may detach only browser-facing public destinations from one uniquely identified mixed Cloudflare Access application, must preserve every non-browser destination and existing policy, and must fail closed on ambiguous or public-only provider state."
+      ]
+    },
+    {
+      "path": "src/http/routes/approvals.ts",
+      "claims": [
+        "`src/http/routes/approvals.ts` must require exact-head evidence plus provider-backed PR identity, deterministic independent review, and authenticated founder-final confirmation bound to the exact PR, base, and head before FCR integration, then must re-read the mutable branch head immediately before provider integration."
+      ]
+    },
+    {
+      "path": "src/http/routes/n8nConveyor.ts",
+      "claims": [
+        "`src/http/routes/n8nConveyor.ts` may mount the authenticated YouTube growth evaluator under the existing founder-content conveyor only as a read/evaluation capability; mounting that route must not grant publish, schedule, spend, provider-mutation, scale-execution, merge, or deploy authority and must not weaken the existing founder-content publication membrane."
+      ]
+    },
+    {
+      "path": "src/http/routes/youtubeGrowth.ts",
+      "claims": [
+        "`src/http/routes/youtubeGrowth.ts` must require founder authentication, reject malformed or unknown experiment, measurement, continuity, threshold, target, and repeatability input before core evaluation, and return only the non-authorizing `fcr/youtube-growth-evaluation@v1` result with publication/provider mutation explicitly false."
+      ]
+    },
+    {
+      "path": "src/http/routes/__tests__/n8nConveyor.youtubeGrowth.integration.test.ts",
+      "claims": [
+        "`src/http/routes/__tests__/n8nConveyor.youtubeGrowth.integration.test.ts` must prove unauthenticated access is rejected, malformed state fails closed, duplicate receipts cannot fake repeatability, and a valid Day-31 recommendation remains advisory with no provider mutation or publication claim."
+      ]
+    },
+    {
+      "path": "README.md",
+      "claims": [
+        "`README.md` must keep TinyFish source and CI readiness separate from provider/runtime activation and state that canonical Deploy verifies only provider-held binding-name presence before promotion.",
+        "`README.md` must keep FCR Shopify runtime-secret name verification separate from webhook registration, deployed callback identity, production database migration, and collected-revenue outcome proof.",
+        "`README.md` must describe Shopify child-provider observation as source-only, non-authorizing evidence and must never relabel a matching snapshot as live provider authority or mutation permission.",
+        "`README.md` must document Attack 3000 content currentness as independently evaluated from bounded observation time rather than trusted from a CURRENT label, and must keep distribution, external demand, publication, provider mutation, merge, deploy, spend, and external-contact authority separate.",
+        "`README.md` must describe the Content Trend Radar as an advisory existing-lane capability whose first-wave evidence requires current source provenance and whose ranking cannot authorize publication, scheduling, spend, provider mutation, merge, deploy, or external contact.",
+        "`README.md` must describe the authenticated YouTube growth route as an advisory evidence evaluator whose HOLD/ADVANCE result cannot prove publication, YPP eligibility, revenue, provider mutation, or scale execution and whose malformed inputs fail closed.",
+        "`README.md` must describe deterministic founder-content approval reservation and exact active retry recovery without allowing evidence rotation, retry, or a stored reservation to mint new publication authority.",
+        "`README.md` must state that rebinding the StoryEngine Playwright peer resets predecessor browser-federation proof and that a ref/SHA match alone cannot grant merge, deploy, production, or provider-mutation authority."
+      ]
+    },
+    {
+      "path": "docs/PUBLIC_COMMUNICATION_TRUTH_CONTRACT.md",
+      "claims": [
+        "`docs/PUBLIC_COMMUNICATION_TRUTH_CONTRACT.md` must keep YouTube growth HOLD/ADVANCE and diagnostic recommendations inside observation/recommendation authority and require separate provider/outcome evidence before public claims of publication, YPP eligibility, revenue, conversion, or provider-side state."
+      ]
+    },
+    {
+      "path": "docs/CLOUDFLARE_REASONING.md",
+      "claims": [
+        "`docs/CLOUDFLARE_REASONING.md` must require both FCR Shopify provider-held Worker binding names to pass the canonical Deploy membrane without treating source, binding-name presence, CI, or Playwright as proof of Shopify callback registration, production migration, or revenue outcome."
+      ]
+    },
+    {
+      "path": "docs/TRUTH_DECAY_AUDIT.md",
+      "claims": [
+        "`docs/TRUTH_DECAY_AUDIT.md` must treat a StoryEngine peer SHA/ref in FCR Playwright as evidence identity rather than a durable alias for current StoryEngine, and must require complete federation re-proof whenever the peer identity or either repository head moves.",
+        "`docs/TRUTH_DECAY_AUDIT.md` must keep a newly matched StoryEngine ref/SHA in UNKNOWN browser-federation state until the exact successor FCR head completes the runtime, directive, receipt, and browser witness."
+      ]
+    },
+    {
+      "path": "docs/deployment/CLOUDFLARE_WORKER_TARGETS.md",
+      "claims": [
+        "`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` must name `FCR_SHOPIFY_WEBHOOK_SECRET` and `FCR_COMMERCE_HASH_SALT` as required canonical Worker secrets while keeping provider subscription, runtime delivery, production database state, and paid-order outcome as separate activation proof."
+      ]
+    },
+    {
+      "path": "docs/SECRETS.md",
+      "claims": [
+        "`docs/SECRETS.md` must keep the FCR Shopify signing secret and commerce hash salt in the Cloudflare Worker secret plane and never recast either provider-held value as a public proof artifact."
+      ]
+    },
+    {
+      "path": "src/lib/providerObservation.ts",
+      "claims": [
+        "`src/lib/providerObservation.ts` must classify child-provider evidence as current, undeclared, scope drift, identity drift, stale, or unknown without granting execution authority, and it must fail closed when observation freshness, completeness, declaration identity, or scope equality is not proven."
+      ]
+    },
+    {
+      "path": "src/providers/ShopifyReadOnlyProvider.ts",
+      "claims": [
+        "`src/providers/ShopifyReadOnlyProvider.ts` must bind Shopify observation to the exact Founder Control Room permanent and branded store identities, require complete pagination and app scope inventory, withhold CURRENT on incomplete or mismatched provider evidence, keep reconciliation non-authorizing, and never persist provider inventory or perform Shopify mutation."
+      ]
+    },
+    {
+      "path": "src/ultrathink-core/attack3000Content.ts",
+      "claims": [
+        "`src/ultrathink-core/attack3000Content.ts` must bind publication and metrics to one content observation, independently evaluate evaluatedAt, window ordering, future skew, observedAt, explicit bounded expiry, measurement completion, and evidence, and must reject stale or future observations even when a caller labels freshness CURRENT.",
+        "`src/ultrathink-core/attack3000Content.ts` must preserve metric-local stop floors and direct external-demand evidence without treating publication, reach, reactions, comments, profile views, or generic analytics references as business demand or execution authority."
+      ]
+    },
+    {
+      "path": "src/ultrathink-core/__tests__/attack3000Content.test.ts",
+      "claims": [
+        "`src/ultrathink-core/__tests__/attack3000Content.test.ts` must prove stale-at-evaluation, future-dated, overlong-lease, mixed-identity, incomplete-window, demand-evidence, metric-local floor, profile-view, and non-authorizing behavior instead of trusting caller freshness labels."
+      ]
+    },
+    {
+      "path": "src/ultrathink-core/contentTrendRadar.ts",
+      "claims": [
+        "`src/ultrathink-core/contentTrendRadar.ts` must require at least one evidence id with source and observedAt that is current against an explicit evaluation time before first-wave eligibility, while keeping prediction-only, stale, future-dated, malformed, unattributed, and incompletely framed candidates out of the first wave.",
+        "`src/ultrathink-core/contentTrendRadar.ts` must keep ranking advisory and must never authorize publication, scheduling, spend, provider mutation, merge, deploy, or external contact."
+      ]
+    },
+    {
+      "path": "src/ultrathink-core/__tests__/contentTrendRadar.test.ts",
+      "claims": [
+        "`src/ultrathink-core/__tests__/contentTrendRadar.test.ts` must adversarially cover missing provenance, stale and future evidence, prediction-only signals, required content angles, saturation, duplicate fingerprints, deterministic first-wave selection, and the non-authorizing ceiling."
+      ]
+    },
+    {
+      "path": "src/ultrathink-core/index.ts",
+      "claims": [
+        "`src/ultrathink-core/index.ts` may export the Attack 3000 content, Trend Radar, and YouTube growth evidence contracts only as source capabilities and must not imply provider activation, publication, merge, deploy, spend, or execution authority."
+      ]
+    },
+    {
+      "path": "src/lib/founderContentApprovalStore.ts",
+      "claims": [
+        "`src/lib/founderContentApprovalStore.ts` must reserve the same public thesis/opening-hook pattern within one founder, platform, and Current You intent under one deterministic approval id, and a retry may recover only the exact matching active stored proposal/public-payload reservation while rejecting mismatched, consumed, revoked, expired, or non-current state.",
+        "`src/lib/founderContentApprovalStore.ts` must return the original stored authorization hash and timestamps on exact retry recovery and must never use a retry, deterministic identity, or evidence rotation to create or renew publication authority."
+      ]
+    },
+    {
+      "path": "src/lib/__tests__/founderContentApprovalStore.test.ts",
+      "claims": [
+        "`src/lib/__tests__/founderContentApprovalStore.test.ts` must prove exact retry recovery after a lost issuance response while preserving the existing one-reservation behavior across source SHA, evidence reference, evidence digest, and proposal-hash rotation."
+      ]
+    },
+    {
+      "path": "docs/founder-signal-engine/linkedin-analytics-continuity.md",
+      "claims": [
+        "`docs/founder-signal-engine/linkedin-analytics-continuity.md` must document independently evaluated content freshness, direct demand evidence, current trend provenance, fingerprint comparison, deterministic approval retry identity, and observation-only authority without rewriting historical evidence when currentness expires."
       ]
     }
   ]

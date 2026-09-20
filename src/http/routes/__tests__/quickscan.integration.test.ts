@@ -219,6 +219,37 @@ describe('QuickScan founder-gated API', () => {
     expect(response.body.prospect.audit.some((entry: { type: string; message: string }) => entry.type === 'chief.recommendation.provenance' && entry.message.includes('resp_1') && entry.message.includes('gpt-5-mini'))).toBe(true);
   });
 
+  it('audits why a local provider was skipped and that the run fell back to a paid one', async () => {
+    founderSession();
+    const created = await request(buildApp()).post('/quickscan/prospects').set('Authorization', BEARER).send({ businessName: 'Glow Studio', ownerName: 'Maya', segment: 'salon_studio_team_owner' });
+    const id = created.body.prospect.id;
+    await request(buildApp()).post(`/quickscan/prospects/${id}/evidence`).set('Authorization', BEARER).send({ category: 'visible_friction', note: 'Customers ask about availability in comments.' });
+
+    const runChief = vi.fn(async (_input: QuickScanChiefPromptInput) => ({
+      recommendation: chiefRecommendation(),
+      provenance: {
+        provider: 'openai' as const,
+        model: 'gpt-5-mini',
+        responseId: 'resp_fallback',
+        promptVersion: 'quickscan-chief-v1-test',
+        selection: { providerId: 'openai', costClass: 'PAID' as const, eligibilityRevision: 'quickscan-openai-v1', licenseEvidence: 'provider-api-terms', quotaEvidence: 'api-key-configured' },
+        decisionTrace: [
+          { providerId: 'local-ollama', eligible: false, reasons: ['transport' as const], eligibilityRevision: 'quickscan-local-v1' },
+          { providerId: 'openai', eligible: true, reasons: [], eligibilityRevision: 'quickscan-openai-v1' },
+        ],
+        fallbackReason: 'LOCAL_CHIEF_REQUEST_FAILED',
+      },
+    }));
+    const response = await request(buildAppWithChief({ runChief })).post(`/quickscan/prospects/${id}/chief-recommendation`).set('Authorization', BEARER).send({ acknowledgeDataSharing: true });
+
+    expect(response.status).toBe(200);
+    const provenanceEntry = response.body.prospect.audit.find((entry: { type: string }) => entry.type === 'chief.recommendation.provenance');
+    expect(provenanceEntry).toBeDefined();
+    expect(provenanceEntry.message).toContain('costClass=PAID');
+    expect(provenanceEntry.message).toContain('fallbackReason=LOCAL_CHIEF_REQUEST_FAILED');
+    expect(provenanceEntry.message).toContain('rejected=local-ollama:transport');
+  });
+
   it('refuses to run Chief without an explicit data-sharing acknowledgement', async () => {
     founderSession();
     const created = await request(buildApp()).post('/quickscan/prospects').set('Authorization', BEARER).send({ businessName: 'No Ack Studio', segment: 'salon_studio_team_owner' });
