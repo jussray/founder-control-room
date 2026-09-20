@@ -10,9 +10,10 @@ describe('JBH commerce receipt receiver boundary', () => {
     expect(receiver).toContain("return res.status(503).json({ error: 'Receipt ingest is not configured' });");
   });
 
-  it('keeps the bearer server-side and compares presented authorization before receipt handling', () => {
-    expect(receiver).toContain("req.get('authorization')");
-    expect(receiver).toContain('safeEqual');
+  it('keeps the bearer server-side and compares the dedicated receipt header before receipt handling', () => {
+    expect(receiver).toContain("req.get('x-jbh-receipt-token')");
+    expect(receiver).toContain('tokenMatches(provided, expectedToken)');
+    expect(receiver).toContain('timingSafeEqual');
     expect(receiver).not.toContain('NEXT_PUBLIC_JBH_RECEIPT_INGEST_TOKEN');
   });
 });
