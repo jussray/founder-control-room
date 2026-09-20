@@ -1,0 +1,202 @@
+import { createHmac } from 'node:crypto';
+
+import express from 'express';
+import request from 'supertest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import {
+  FCR_SHOPIFY_STORE_FINGERPRINT,
+  FCR_SHOPIFY_STORE_IDENTITY,
+} from '../../../fcrCommerce/shopifyMoneyPath.js';
+import {
+  createShopifyFcrCommerceWebhookHandler,
+  type FcrCommerceReceiptStore,
+} from '../shopifyFcrCommerce.js';
+
+const SECRET = 'fcr-shopify-test-secret';
+const HASH_SALT = 'fcr-commerce-test-hash-salt';
+const WEBHOOK_ID = '11111111-2222-4333-8444-555555555555';
+const TRIGGERED_AT = '2026-09-20T02:55:00.000Z';
+
+function app(store: FcrCommerceReceiptStore) {
+  const instance = express();
+  instance.post(
+    '/webhooks/shopify/fcr/orders-paid',
+    express.raw({ type: 'application/json', limit: '64kb' }),
+    createShopifyFcrCommerceWebhookHandler(store),
+  );
+  return instance;
+}
+
+function paidOrder(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 999001,
+    admin_graphql_api_id: 'gid://shopify/Order/999001',
+    financial_status: 'paid',
+    currency: 'USD',
+    current_total_price: '249.00',
+    line_items: [
+      {
+        product_id: 10820354834737,
+        variant_id: 56213760442673,
+        sku: 'FCR-QUICKSCAN-249',
+        quantity: 1,
+      },
+    ],
+    ...overrides,
+  };
+}
+
+function headers(raw: string, overrides: Record<string, string> = {}) {
+  return {
+    'Content-Type': 'application/json',
+    'X-Shopify-Topic': 'orders/paid',
+    'X-Shopify-Shop-Domain': FCR_SHOPIFY_STORE_IDENTITY.shopifyDomain,
+    'X-Shopify-Webhook-Id': WEBHOOK_ID,
+    'X-Shopify-Triggered-At': TRIGGERED_AT,
+    'X-Shopify-Hmac-SHA256': createHmac('sha256', SECRET).update(raw).digest('base64'),
+    ...overrides,
+  };
+}
+
+describe('FCR Shopify commerce webhook', () => {
+  const originalSecret = process.env.FCR_SHOPIFY_WEBHOOK_SECRET;
+  const originalSalt = process.env.FCR_COMMERCE_HASH_SALT;
+
+  beforeEach(() => {
+    process.env.FCR_SHOPIFY_WEBHOOK_SECRET = SECRET;
+    process.env.FCR_COMMERCE_HASH_SALT = HASH_SALT;
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    if (originalSecret === undefined) delete process.env.FCR_SHOPIFY_WEBHOOK_SECRET;
+    else process.env.FCR_SHOPIFY_WEBHOOK_SECRET = originalSecret;
+    if (originalSalt === undefined) delete process.env.FCR_COMMERCE_HASH_SALT;
+    else process.env.FCR_COMMERCE_HASH_SALT = originalSalt;
+  });
+
+  it('recognizes a verified FCR Shopify paid order as collected revenue', async () => {
+    const store = vi.fn<FcrCommerceReceiptStore>().mockResolvedValue('stored');
+    const raw = JSON.stringify(paidOrder());
+    const response = await request(app(store))
+      .post('/webhooks/shopify/fcr/orders-paid')
+      .set(headers(raw))
+      .send(raw);
+
+    expect(response.status).toBe(201);
+    expect(response.body).toMatchObject({
+      accepted: true,
+      duplicate: false,
+      event: 'payment_collected',
+      revenueState: 'payment_collected',
+      collectedValueCents: 24900,
+      currency: 'USD',
+    });
+    expect(store).toHaveBeenCalledOnce();
+    expect(store.mock.calls[0]?.[0]).toMatchObject({
+      contract: 'founder-control-room/shopify-money-path@v1',
+      provider: 'shopify',
+      storeFingerprint: FCR_SHOPIFY_STORE_FINGERPRINT,
+      shopDomain: FCR_SHOPIFY_STORE_IDENTITY.shopifyDomain,
+      offerKeys: ['business_leak_quickscan'],
+      unknownOfferCount: 0,
+    });
+    const serialized = JSON.stringify(store.mock.calls[0]?.[0]);
+    expect(serialized).not.toMatch(/customer|email|phone|address|payment_method/i);
+  });
+
+  it('keeps an unknown future FCR offer as its own receipt without losing real paid-store revenue', async () => {
+    const store = vi.fn<FcrCommerceReceiptStore>().mockResolvedValue('stored');
+    const raw = JSON.stringify(paidOrder({
+      current_total_price: '12.00',
+      line_items: [{ product_id: 1, variant_id: 2, sku: 'FUTURE-FCR', quantity: 1 }],
+    }));
+    const response = await request(app(store))
+      .post('/webhooks/shopify/fcr/orders-paid')
+      .set(headers(raw))
+      .send(raw);
+
+    expect(response.status).toBe(201);
+    expect(store.mock.calls[0]?.[0]).toMatchObject({
+      collectedValueCents: 1200,
+      offerKeys: [],
+      unknownOfferCount: 1,
+      revenueState: 'payment_collected',
+    });
+  });
+
+  it('fails closed for another Shopify store even with a valid signature', async () => {
+    const store = vi.fn<FcrCommerceReceiptStore>();
+    const raw = JSON.stringify(paidOrder());
+    const response = await request(app(store))
+      .post('/webhooks/shopify/fcr/orders-paid')
+      .set(headers(raw, { 'X-Shopify-Shop-Domain': 'another-shop.myshopify.com' }))
+      .send(raw);
+
+    expect(response.status).toBe(403);
+    expect(store).not.toHaveBeenCalled();
+  });
+
+  it('rejects an invalid HMAC before parsing or persisting order data', async () => {
+    const store = vi.fn<FcrCommerceReceiptStore>();
+    const raw = JSON.stringify(paidOrder());
+    const response = await request(app(store))
+      .post('/webhooks/shopify/fcr/orders-paid')
+      .set(headers(raw, { 'X-Shopify-Hmac-SHA256': 'not-valid' }))
+      .send(raw);
+
+    expect(response.status).toBe(401);
+    expect(store).not.toHaveBeenCalled();
+  });
+
+  it('does not recognize unpaid or wrong-currency payloads as revenue', async () => {
+    const store = vi.fn<FcrCommerceReceiptStore>();
+    for (const payload of [
+      paidOrder({ financial_status: 'pending' }),
+      paidOrder({ currency: 'EUR' }),
+      paidOrder({ current_total_price: '0.00' }),
+    ]) {
+      const raw = JSON.stringify(payload);
+      const response = await request(app(store))
+        .post('/webhooks/shopify/fcr/orders-paid')
+        .set(headers(raw))
+        .send(raw);
+      expect(response.status).toBe(400);
+    }
+    expect(store).not.toHaveBeenCalled();
+  });
+
+  it('preserves idempotency and conflicts as separate outcomes', async () => {
+    const duplicateStore = vi.fn<FcrCommerceReceiptStore>().mockResolvedValue('duplicate');
+    const conflictStore = vi.fn<FcrCommerceReceiptStore>().mockResolvedValue('conflict');
+    const raw = JSON.stringify(paidOrder());
+
+    const duplicate = await request(app(duplicateStore))
+      .post('/webhooks/shopify/fcr/orders-paid')
+      .set(headers(raw))
+      .send(raw);
+    expect(duplicate.status).toBe(200);
+    expect(duplicate.body.duplicate).toBe(true);
+
+    const conflict = await request(app(conflictStore))
+      .post('/webhooks/shopify/fcr/orders-paid')
+      .set(headers(raw))
+      .send(raw);
+    expect(conflict.status).toBe(409);
+    expect(conflict.body.error).toBe('webhook_id_conflict');
+  });
+
+  it('fails closed when webhook bindings are absent', async () => {
+    delete process.env.FCR_SHOPIFY_WEBHOOK_SECRET;
+    const store = vi.fn<FcrCommerceReceiptStore>();
+    const raw = JSON.stringify(paidOrder());
+    const response = await request(app(store))
+      .post('/webhooks/shopify/fcr/orders-paid')
+      .set(headers(raw))
+      .send(raw);
+
+    expect(response.status).toBe(503);
+    expect(store).not.toHaveBeenCalled();
+  });
+});
