@@ -144,14 +144,14 @@ try {
 
   console.log('\n[tenant-3] Chief binds recommendation to exact project before explicit creation');
   await page.waitForSelector('#onboarding-flow:not([hidden])');
-  await page.check('input[name="projectType"][value="product-app"]');
+  await page.locator('label.choice-card:has(input[name="projectType"][value="product-app"])').click();
   await page.click('[data-next-step="2"]');
-  await page.check('input[name="mission"][value="launch"]');
+  await page.locator('label.choice-card:has(input[name="mission"][value="launch"])').click();
   await page.click('[data-next-step="3"]');
   await page.fill('#project-name', 'Tenant Demo');
   await page.fill('#repo-identifier', 'tenant-founder/demo');
   await page.fill('#project-stack', 'TypeScript + Supabase');
-  await page.check('input[name="currentState"][value="building"]');
+  await page.locator('label.state-chip:has(input[name="currentState"][value="building"])').click();
   await page.click('[data-next-step="4"]');
 
   await page.waitForFunction(() => {
@@ -171,7 +171,7 @@ try {
   await page.screenshot({ path: join(REPO_ROOT, 'logs', 'workspace-chief-composer-mobile.png'), fullPage: true });
   await page.setViewportSize({ width: 1280, height: 900 });
 
-  await page.check('#authority-confirm');
+  await page.locator('label.confirm-row:has(#authority-confirm)').click();
   await page.click('#workspace-button');
   await page.waitForSelector('#workspace-ready:not([hidden])');
   assert((await page.locator('#project-count').innerText()) === '1', 'tenant sees exactly one newly created project');
