@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 
-const relayOperators = ['codex', 'claude-code', 'perplexity'];
+const relayOperators = ['gemini', 'codex', 'claude-code', 'perplexity'];
 const instructorOnly = 'deepseek-instructor';
 
 function relayEnvelope(fromOperator, toOperator) {
@@ -20,6 +20,10 @@ function relayEnvelope(fromOperator, toOperator) {
   };
 }
 
+const gemini = relayEnvelope('codex', 'gemini');
+assert.equal(gemini.toOperator, 'gemini');
+assert.deepEqual(Object.values(gemini.authority), [false, false, false, false, false]);
+
 const perplexity = relayEnvelope('codex', 'perplexity');
 assert.equal(perplexity.toOperator, 'perplexity');
 assert.deepEqual(Object.values(perplexity.authority), [false, false, false, false, false]);
@@ -33,7 +37,9 @@ console.log(JSON.stringify({
   contract: 'fcr/operator-relay-playwright-preflight@v1',
   peerOperators: relayOperators,
   instructorLane: instructorOnly,
+  canonicalPath: '/mcp',
+  standaloneHttpRoute: 'UNMOUNTED_TEST_SCAFFOLD',
   authorityEscalation: false,
-  status: 'CONTRACT_ONLY',
-  nextGate: 'authenticated endpoint + real provider dispatch + browser round-trip',
+  status: 'SOURCE_WIRED_LIVE_UNPROVEN',
+  nextGate: 'same-head deployed runtime + OAuth-bound operator client + real provider evidence + founder-visible Playwright round-trip',
 }, null, 2));
