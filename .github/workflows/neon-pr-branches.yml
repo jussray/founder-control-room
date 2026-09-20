@@ -22,7 +22,7 @@ jobs:
        github.event.action == 'reopened' ||
        github.event.action == 'synchronize')
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 8
     steps:
       - name: Classify Neon preview scope
         id: neon_scope
@@ -89,9 +89,121 @@ jobs:
         shell: bash
         env:
           NEON_BRANCH_ID: ${{ steps.create_neon_branch.outputs.branch_id }}
+          NEON_DB_URL: ${{ steps.create_neon_branch.outputs.db_url }}
         run: |
           set -euo pipefail
           test -n "$NEON_BRANCH_ID" || { echo 'Neon create action returned no branch_id' >&2; exit 1; }
+          test -n "$NEON_DB_URL" || { echo 'Neon create action returned no database URL' >&2; exit 1; }
+          echo 'Neon branch identity and private database URL output are present. URL value was not printed.'
+
+      - name: Check out exact PR head for migration proof
+        if: steps.neon_scope.outputs.needs_neon == 'true'
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+
+      - name: Verify exact PR head
+        if: steps.neon_scope.outputs.needs_neon == 'true'
+        shell: bash
+        env:
+          EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
+
+      - name: Execute added migrations on Neon preview
+        if: steps.neon_scope.outputs.needs_neon == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          NEON_DB_URL: ${{ steps.create_neon_branch.outputs.db_url }}
+        run: |
+          set -euo pipefail
+
+          mapfile -t REWRITTEN_MIGRATIONS < <(
+            gh api --paginate "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/files?per_page=100" \
+              --jq '.[] | select((.filename | startswith("supabase/migrations/")) and (.filename | endswith(".sql")) and .status != "added") | "\(.status) \(.filename)"'
+          )
+          if (( ${#REWRITTEN_MIGRATIONS[@]} > 0 )); then
+            printf '::error title=Migration history rewrite is not preview-safe::%s\n' "${REWRITTEN_MIGRATIONS[*]}"
+            exit 1
+          fi
+
+          mapfile -t MIGRATIONS < <(
+            gh api --paginate "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/files?per_page=100" \
+              --jq '.[] | select((.filename | startswith("supabase/migrations/")) and (.filename | endswith(".sql")) and .status == "added") | .filename' \
+              | sort
+          )
+
+          if (( ${#MIGRATIONS[@]} == 0 )); then
+            echo 'Supabase scope changed but no added SQL migration was found.'
+            exit 0
+          fi
+
+          # The preview branch is reused across synchronize events. Keep an
+          # isolated CI-only checksum ledger so the exact same migration is
+          # skipped on rerun, while changing an already-applied migration fails
+          # closed and requires a new append-only migration instead.
+          psql "$NEON_DB_URL" -X -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE SCHEMA IF NOT EXISTS ci_preview;
+          CREATE TABLE IF NOT EXISTS ci_preview.migration_receipts (
+            filename TEXT PRIMARY KEY,
+            sha256 TEXT NOT NULL CHECK (sha256 ~ '^[0-9a-f]{64}$'),
+            applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+          );
+          SQL
+
+          for migration in "${MIGRATIONS[@]}"; do
+            if [[ ! "$migration" =~ ^supabase/migrations/[0-9]{14}_[A-Za-z0-9_]+\.sql$ ]]; then
+              echo "::error title=Invalid migration path::$migration is not a canonical append-only migration filename."
+              exit 1
+            fi
+            test -f "$migration" || { echo "Missing migration file: $migration" >&2; exit 1; }
+
+            CHECKSUM="$(sha256sum "$migration" | awk '{print $1}')"
+            # The migration path is interpolated only after the strict filename
+            # allowlist above; it therefore cannot contain a quote or SQL token.
+            EXISTING="$(psql "$NEON_DB_URL" -X -Atq \
+              -c "SELECT sha256 FROM ci_preview.migration_receipts WHERE filename = '$migration';")"
+
+            if [ -n "$EXISTING" ]; then
+              if [ "$EXISTING" = "$CHECKSUM" ]; then
+                echo "Preview migration already applied with matching checksum: $migration"
+                continue
+              fi
+              echo "::error title=Applied migration changed::$migration was already executed on this preview with a different checksum. Add a new migration instead of rewriting history."
+              exit 1
+            fi
+
+            echo "Applying preview migration atomically: $migration"
+            psql "$NEON_DB_URL" -X -1 -v ON_ERROR_STOP=1 -f "$migration"
+            psql "$NEON_DB_URL" -X -v ON_ERROR_STOP=1 \
+              -c "INSERT INTO ci_preview.migration_receipts(filename, sha256) VALUES ('$migration', '$CHECKSUM');"
+          done
+
+      - name: Verify FCR commerce preview schema when present
+        if: steps.neon_scope.outputs.needs_neon == 'true'
+        shell: bash
+        env:
+          NEON_DB_URL: ${{ steps.create_neon_branch.outputs.db_url }}
+        run: |
+          set -euo pipefail
+          HAS_FCR_COMMERCE="$(psql "$NEON_DB_URL" -X -Atqc "select to_regclass('public.fcr_commerce_receipts') is not null")"
+          if [ "$HAS_FCR_COMMERCE" != "t" ]; then
+            echo 'FCR commerce table is not part of this preview; generic migration execution completed.'
+            exit 0
+          fi
+
+          EVENT_COLUMN="$(psql "$NEON_DB_URL" -X -Atqc "select count(*) from information_schema.columns where table_schema='public' and table_name='fcr_commerce_receipts' and column_name='event_id' and data_type='uuid' and is_nullable='NO'")"
+          EVENT_INDEX="$(psql "$NEON_DB_URL" -X -Atqc "select count(*) from pg_indexes where schemaname='public' and tablename='fcr_commerce_receipts' and indexname='fcr_commerce_receipts_provider_event_uidx'")"
+          RLS_ENABLED="$(psql "$NEON_DB_URL" -X -Atqc "select relrowsecurity from pg_class where oid='public.fcr_commerce_receipts'::regclass")"
+          ROW_COUNT="$(psql "$NEON_DB_URL" -X -Atqc "select count(*) from public.fcr_commerce_receipts")"
+
+          test "$EVENT_COLUMN" = "1"
+          test "$EVENT_INDEX" = "1"
+          test "$RLS_ENABLED" = "t"
+          test "$ROW_COUNT" = "0"
+          echo 'FCR commerce Neon preview schema verified: event identity present, RLS enabled, zero synthetic revenue rows.'
 
   delete_neon_branch:
     name: Delete Neon Branch
