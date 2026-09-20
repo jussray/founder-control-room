@@ -24,17 +24,46 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 8
     steps:
+      - name: Check out exact PR head for scope classification
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
       - name: Classify Neon preview scope
         id: neon_scope
         shell: bash
         env:
-          GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
+          EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
         run: |
           set -euo pipefail
-          mapfile -t CHANGED_FILES < <(
-            gh api --paginate "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/files?per_page=100" --jq '.[].filename'
-          )
+          ACTUAL_HEAD_SHA="$(git rev-parse HEAD)"
+          test "$ACTUAL_HEAD_SHA" = "$EXPECTED_HEAD_SHA" || {
+            echo "::error title=Head moved::expected $EXPECTED_HEAD_SHA but checked out $ACTUAL_HEAD_SHA"
+            exit 1
+          }
+
+          case "$BASE_REF" in
+            ''|*[!A-Za-z0-9._/-]*)
+              echo "::error title=Invalid live base ref::$BASE_REF"
+              exit 1
+              ;;
+          esac
+
+          LIVE_BASE_SHA="$(git ls-remote origin "refs/heads/${BASE_REF}" | awk 'NR == 1 { print $1 }')"
+          [[ "$LIVE_BASE_SHA" =~ ^[0-9a-f]{40}$ ]] || {
+            echo "::error title=Live base resolution failed::Could not resolve refs/heads/${BASE_REF}"
+            exit 1
+          }
+          git fetch --no-tags --depth=1 origin "$LIVE_BASE_SHA"
+          git merge-base --is-ancestor "$LIVE_BASE_SHA" "$EXPECTED_HEAD_SHA" || {
+            echo "::error title=Stale pull request base::Exact head does not contain live ${BASE_REF}@${LIVE_BASE_SHA}; continuity must roll forward before database preview."
+            exit 1
+          }
+
+          mapfile -t CHANGED_FILES < <(git diff --name-only "$LIVE_BASE_SHA...$EXPECTED_HEAD_SHA")
 
           NEEDS_NEON=false
           for path in "${CHANGED_FILES[@]}"; do
@@ -46,17 +75,18 @@ jobs:
             esac
           done
 
+          echo "live_base_sha=${LIVE_BASE_SHA}" >> "$GITHUB_OUTPUT"
           echo "needs_neon=${NEEDS_NEON}" >> "$GITHUB_OUTPUT"
           if [ "$NEEDS_NEON" = "true" ]; then
-            echo 'Supabase change detected; Neon preview branch is required.'
+            echo 'Supabase change detected against live base; Neon preview branch is required.'
           else
-            echo 'No supabase/ change detected; Neon preview branch is not required.'
+            echo 'No supabase/ change detected against live base; Neon preview branch is not required.'
           fi
 
       - name: Record non-database no-op
         if: steps.neon_scope.outputs.needs_neon == 'false'
         shell: bash
-        run: echo 'Neon preview skipped because this PR does not change supabase/.'
+        run: echo 'Neon preview skipped because this exact PR head does not change supabase/ against the live base.'
 
       - name: Validate Neon configuration
         if: steps.neon_scope.outputs.needs_neon == 'true'
@@ -96,13 +126,6 @@ jobs:
           test -n "$NEON_DB_URL" || { echo 'Neon create action returned no database URL' >&2; exit 1; }
           echo 'Neon branch identity and private database URL output are present. URL value was not printed.'
 
-      - name: Check out exact PR head for migration proof
-        if: steps.neon_scope.outputs.needs_neon == 'true'
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-          persist-credentials: false
-
       - name: Verify exact PR head
         if: steps.neon_scope.outputs.needs_neon == 'true'
         shell: bash
@@ -114,15 +137,15 @@ jobs:
         if: steps.neon_scope.outputs.needs_neon == 'true'
         shell: bash
         env:
-          GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
+          LIVE_BASE_SHA: ${{ steps.neon_scope.outputs.live_base_sha }}
+          EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           NEON_DB_URL: ${{ steps.create_neon_branch.outputs.db_url }}
         run: |
           set -euo pipefail
 
           mapfile -t REWRITTEN_MIGRATIONS < <(
-            gh api --paginate "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/files?per_page=100" \
-              --jq '.[] | select((.filename | startswith("supabase/migrations/")) and (.filename | endswith(".sql")) and .status != "added") | "\(.status) \(.filename)"'
+            git diff --name-status "$LIVE_BASE_SHA...$EXPECTED_HEAD_SHA" -- 'supabase/migrations/*.sql' \
+              | awk '$1 != "A" { print }'
           )
           if (( ${#REWRITTEN_MIGRATIONS[@]} > 0 )); then
             printf '::error title=Migration history rewrite is not preview-safe::%s\n' "${REWRITTEN_MIGRATIONS[*]}"
@@ -130,9 +153,7 @@ jobs:
           fi
 
           mapfile -t MIGRATIONS < <(
-            gh api --paginate "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/files?per_page=100" \
-              --jq '.[] | select((.filename | startswith("supabase/migrations/")) and (.filename | endswith(".sql")) and .status == "added") | .filename' \
-              | sort
+            git diff --name-only --diff-filter=A "$LIVE_BASE_SHA...$EXPECTED_HEAD_SHA" -- 'supabase/migrations/*.sql' | sort
           )
 
           if (( ${#MIGRATIONS[@]} == 0 )); then
@@ -140,10 +161,6 @@ jobs:
             exit 0
           fi
 
-          # The preview branch is reused across synchronize events. Keep an
-          # isolated CI-only checksum ledger so the exact same migration is
-          # skipped on rerun, while changing an already-applied migration fails
-          # closed and requires a new append-only migration instead.
           psql "$NEON_DB_URL" -X -v ON_ERROR_STOP=1 <<'SQL'
           CREATE SCHEMA IF NOT EXISTS ci_preview;
           CREATE TABLE IF NOT EXISTS ci_preview.migration_receipts (
@@ -161,8 +178,6 @@ jobs:
             test -f "$migration" || { echo "Missing migration file: $migration" >&2; exit 1; }
 
             CHECKSUM="$(sha256sum "$migration" | awk '{print $1}')"
-            # The migration path is interpolated only after the strict filename
-            # allowlist above; it therefore cannot contain a quote or SQL token.
             EXISTING="$(psql "$NEON_DB_URL" -X -Atq \
               -c "SELECT sha256 FROM ci_preview.migration_receipts WHERE filename = '$migration';")"
 
@@ -214,17 +229,42 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
+      - name: Check out exact PR head for cleanup classification
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
       - name: Classify Neon preview scope
         id: neon_scope
         shell: bash
         env:
-          GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
+          EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
         run: |
           set -euo pipefail
-          mapfile -t CHANGED_FILES < <(
-            gh api --paginate "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/files?per_page=100" --jq '.[].filename'
-          )
+          ACTUAL_HEAD_SHA="$(git rev-parse HEAD)"
+          test "$ACTUAL_HEAD_SHA" = "$EXPECTED_HEAD_SHA" || {
+            echo "::error title=Head moved::expected $EXPECTED_HEAD_SHA but checked out $ACTUAL_HEAD_SHA"
+            exit 1
+          }
+
+          case "$BASE_REF" in
+            ''|*[!A-Za-z0-9._/-]*)
+              echo "::error title=Invalid live base ref::$BASE_REF"
+              exit 1
+              ;;
+          esac
+
+          LIVE_BASE_SHA="$(git ls-remote origin "refs/heads/${BASE_REF}" | awk 'NR == 1 { print $1 }')"
+          [[ "$LIVE_BASE_SHA" =~ ^[0-9a-f]{40}$ ]] || {
+            echo "::error title=Live base resolution failed::Could not resolve refs/heads/${BASE_REF}"
+            exit 1
+          }
+          git fetch --no-tags --depth=1 origin "$LIVE_BASE_SHA"
+
+          mapfile -t CHANGED_FILES < <(git diff --name-only "$LIVE_BASE_SHA...$EXPECTED_HEAD_SHA")
 
           NEEDS_NEON=false
           for path in "${CHANGED_FILES[@]}"; do
@@ -238,15 +278,15 @@ jobs:
 
           echo "needs_neon=${NEEDS_NEON}" >> "$GITHUB_OUTPUT"
           if [ "$NEEDS_NEON" = "true" ]; then
-            echo 'Supabase change detected; Neon preview cleanup is required.'
+            echo 'Supabase change detected against live base; Neon preview cleanup is required.'
           else
-            echo 'No supabase/ change detected; no Neon preview is expected for this PR.'
+            echo 'No supabase/ change detected against live base; no Neon preview is expected for this PR.'
           fi
 
       - name: Record non-database cleanup no-op
         if: steps.neon_scope.outputs.needs_neon == 'false'
         shell: bash
-        run: echo 'Neon cleanup skipped because this PR does not change supabase/.'
+        run: echo 'Neon cleanup skipped because this exact PR head does not change supabase/ against the live base.'
 
       - name: Validate Neon configuration
         if: steps.neon_scope.outputs.needs_neon == 'true'
