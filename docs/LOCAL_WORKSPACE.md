@@ -79,13 +79,13 @@ Run only fixed allowlisted command IDs through the authenticated terminal API:
 
 1. `git.head`
 2. `git.status`
-3. `deps.install` with `confirmWrite: true`
-4. `deps.playwright-package` with `confirmWrite: true`
-5. `deps.playwright-browser` with `confirmWrite: true`
-6. `verify.ai-skills`
-7. project-specific security, type, lint, unit, build, and browser commands
+3. `deps.install` only after a fresh L99 ApprovalReceipt authorizes that exact setup action
+4. `deps.playwright-package` only after its own fresh L99 ApprovalReceipt
+5. `deps.playwright-browser` only after its own fresh L99 ApprovalReceipt
+6. `verify.ai-skills` under the applicable verify-risk authority
+7. project-specific security, type, lint, unit, build, and browser commands under their applicable exact-action authority
 
-Every terminal run must bind `expectedCommitSha` to the mission SHA. `output_truncated=true` is warning evidence and cannot satisfy the proof gate.
+Every terminal run must bind `expectedCommitSha` to the mission SHA. `output_truncated=true` is warning evidence and cannot satisfy the proof gate. The legacy `confirmWrite` browser boolean is not execution authority and must not be used as a substitute for an L99 ApprovalReceipt.
 
 ## Completion rules
 
