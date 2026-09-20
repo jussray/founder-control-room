@@ -5,14 +5,17 @@ import {
   relayContextFingerprint,
   type OperatorRelayRequestV1,
 } from '../operatorRelay.js';
-import { createServerOperatorRelayAdapters } from '../operatorRelayModelProviders.js';
+import {
+  SEMANTIC_PEER_REVIEW_SPEND_MODE,
+  createServerOperatorRelayAdapters,
+} from '../operatorRelayModelProviders.js';
 
 function relay(
   sensitivity: OperatorRelayRequestV1['sensitivity'] = 'internal',
   toOperator: OperatorRelayRequestV1['toOperator'] = 'perplexity',
-  capability: OperatorRelayRequestV1['capability'] = 'review',
+  capability: OperatorRelayRequestV1['capability'] = 'implement',
 ): OperatorRelayRequestV1 {
-  const summary = 'Attack the current bridge and return surviving defects.';
+  const summary = 'Perform the current bounded provider task and return evidence.';
   const sourceRef = 'chat:test';
   const base: Omit<OperatorRelayRequestV1, 'requestHash'> = {
     contract: OPERATOR_RELAY_REQUEST_CONTRACT,
@@ -20,7 +23,7 @@ function relay(
     fromOperator: 'codex',
     toOperator,
     capability,
-    goal: 'Independent review',
+    goal: 'Focused provider work',
     context: { summary, sourceRef, sourceFingerprint: relayContextFingerprint(summary, sourceRef) },
     authority: { externalWrite: false, merge: false, deploy: false, publish: false, providerMutation: false },
     sensitivity,
@@ -38,6 +41,27 @@ describe('createServerOperatorRelayAdapters', () => {
     }, vi.fn() as typeof fetch);
     expect(adapters.perplexity).toBeUndefined();
     expect(adapters.gemini).toBeUndefined();
+  });
+
+  it('blocks semantic peer-review spend before any configured provider call', async () => {
+    expect(SEMANTIC_PEER_REVIEW_SPEND_MODE).toBe('paused');
+    const fetchMock = vi.fn() as unknown as typeof fetch;
+    const adapters = createServerOperatorRelayAdapters({
+      GEMINI_API_KEY: 'gemini-secret',
+      FCR_RELAY_GEMINI_MODEL: 'gemini-3.8-flash',
+      OPENAI_API_KEY: 'openai-secret',
+      FCR_RELAY_OPENAI_MODEL: 'gpt-test-model',
+      ANTHROPIC_API_KEY: 'anthropic-secret',
+      FCR_RELAY_ANTHROPIC_MODEL: 'claude-test-model',
+      PERPLEXITY_API_KEY: 'pplx-secret',
+      FCR_RELAY_PERPLEXITY_MODEL: 'sonar',
+    }, fetchMock);
+
+    await expect(adapters.gemini?.(relay('internal', 'gemini', 'review'))).rejects.toThrow('semantic peer review is paused');
+    await expect(adapters.codex?.(relay('internal', 'codex', 'review'))).rejects.toThrow('semantic peer review is paused');
+    await expect(adapters['claude-code']?.(relay('internal', 'claude-code', 'review'))).rejects.toThrow('semantic peer review is paused');
+    await expect(adapters.perplexity?.(relay('internal', 'perplexity', 'review'))).rejects.toThrow('semantic peer review is paused');
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('calls the Gemini generateContent provider without putting the key in the URL or body', async () => {
@@ -124,7 +148,7 @@ describe('createServerOperatorRelayAdapters', () => {
       expect(init?.headers).toMatchObject({ Authorization: 'Bearer pplx-secret' });
       return new Response(JSON.stringify({
         id: 'pplx-response-1',
-        choices: [{ message: { content: 'Perplexity review result' } }],
+        choices: [{ message: { content: 'Perplexity work result' } }],
       }), { status: 200, headers: { 'Content-Type': 'application/json' } });
     }) as typeof fetch;
 
@@ -135,7 +159,7 @@ describe('createServerOperatorRelayAdapters', () => {
 
     const response = await adapters.perplexity?.(relay());
     expect(response?.fromOperator).toBe('perplexity');
-    expect(response?.answer).toBe('Perplexity review result');
+    expect(response?.answer).toBe('Perplexity work result');
     expect(response?.evidenceRefs).toEqual(['provider:perplexity:pplx-response-1']);
   });
 
@@ -161,7 +185,7 @@ describe('createServerOperatorRelayAdapters', () => {
         id: 'msg_01safe',
         type: 'message',
         role: 'assistant',
-        content: [{ type: 'text', text: 'Claude review result' }],
+        content: [{ type: 'text', text: 'Claude work result' }],
       }), { status: 200, headers: { 'Content-Type': 'application/json' } });
     }) as typeof fetch;
 
@@ -174,7 +198,7 @@ describe('createServerOperatorRelayAdapters', () => {
     expect(response).toMatchObject({
       fromOperator: 'claude-code',
       toOperator: 'codex',
-      answer: 'Claude review result',
+      answer: 'Claude work result',
       evidenceRefs: ['provider:anthropic:msg_01safe'],
       authorityRequested: 'none',
     });
