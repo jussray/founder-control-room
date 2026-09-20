@@ -163,25 +163,41 @@ describe("trusted Chief governance GitHub App observer", () => {
     expect(result.authority.candidateCheckPublicationAuthority).toBe(false);
   });
 
-  it("verifies the founder-approved ruleset as-is while the external candidate producer remains unbound", async () => {
+  it("returns the founder-approved non-authorizing reconciliation plan for the observed stale topology", async () => {
     const result = await planChiefGovernanceWithGitHubApp({
       appId: TEST_FCR_APP_ID,
       privateKey: "test-private-key",
       now: new Date("2026-09-05T21:20:00.000Z"),
     });
 
-    expect(result.disposition).toBe("NO_CHANGE_REQUIRED");
-    expect(result.changesRequired).toBe(false);
-    expect(result.mutationRequired).toBe(false);
-    expect(result.mutation).toBeNull();
+    expect(result.disposition).toBe("MUTATION_REQUIRED");
+    expect(result.changesRequired).toBe(true);
+    expect(result.mutationRequired).toBe(true);
+    expect(result.mutation?.executionAuthorized).toBe(false);
+    expect(result.mutation?.requiresFreshProviderReadback).toBe(true);
     expect(result.candidateProducer).toMatchObject({
-      integrationId: null,
-      requiredByRuleset: false,
+      integrationId: "15368",
+      requiredByRuleset: true,
+      carrierRulesetId: "20818149",
     });
     expect(result.observedRequiredDeploymentEnvironments.exactHeadGate).toEqual([
       "Cloudflare Production",
       "proofmode-access-admin",
     ]);
+    expect(result.mutation?.exactHeadGate.desiredRequiredDeploymentEnvironments).toEqual([]);
+    expect(result.postMergeProductionProof).toEqual({
+      requiredDeploymentEnvironments: ["Cloudflare Production", "proofmode-access-admin"],
+      preMergeRequired: false,
+      truthPlane: "post-merge-current-main",
+    });
+    expect(result.mutation?.governanceBoundary.changes.bypassActors.removed).toContainEqual({
+      actorType: "Integration",
+      actorId: "85455",
+      bypassMode: "pull_request",
+    });
+    expect(result.authority.providerMutationAuthority).toBe(false);
+    expect(result.authority.mergeAuthority).toBe(false);
+    expect(result.authority.deployAuthority).toBe(false);
   });
 
   it("fails closed before token minting when App identity is malformed", async () => {
