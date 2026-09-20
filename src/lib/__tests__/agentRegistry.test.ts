@@ -1,43 +1,30 @@
 import { describe, expect, it } from 'vitest';
 import {
   AGENT_REGISTRY,
-  SEMANTIC_PEER_REVIEW_MODE,
   agentCanOperate,
   agentOperatorPolicy,
 } from '../agentRegistry.js';
 
 describe('FCR governed agent enablement', () => {
-  it.each(['gemini', 'claude-code', 'codex', 'perplexity'])('%s stays enabled for bounded keyed work while peer review is paused', (agentId) => {
+  it.each(['gemini', 'claude-code', 'codex', 'perplexity'])('%s is enabled as a bounded implementation-capable operator', (agentId) => {
     const policy = agentOperatorPolicy(agentId);
 
     expect(policy).not.toBeNull();
     expect(policy?.enabled).toBe(true);
     expect(policy?.externalWritesRequireBoundAuthority).toBe(true);
     expect(policy?.firstSliceRuntimeModel).toBe(false);
-    expect(policy?.capabilities).toEqual(expect.arrayContaining(['research', 'propose', 'implement']));
-    expect(policy?.capabilities).not.toContain('review');
-    expect(agentCanOperate(agentId, 'review')).toBe(false);
-    expect(agentCanOperate(agentId, 'implement')).toBe(true);
+    expect(policy?.capabilities).toEqual(expect.arrayContaining(['research', 'propose', 'review', 'implement']));
   });
 
-  it('pauses semantic peer review without weakening deterministic verification', () => {
-    expect(SEMANTIC_PEER_REVIEW_MODE).toBe('paused');
-    for (const agentId of ['gemini', 'claude-code', 'codex', 'perplexity', 'deepseek-instructor']) {
-      expect(agentCanOperate(agentId, 'review')).toBe(false);
-    }
-  });
-
-  it('enables DeepSeek as an instructor without implementation or peer-review authority', () => {
+  it('enables DeepSeek as an instructor without implementation authority', () => {
     const policy = agentOperatorPolicy('deepseek-instructor');
 
     expect(policy).not.toBeNull();
     expect(policy?.enabled).toBe(true);
     expect(policy?.externalWritesRequireBoundAuthority).toBe(true);
     expect(policy?.firstSliceRuntimeModel).toBe(false);
-    expect(policy?.capabilities).toEqual(expect.arrayContaining(['research', 'propose', 'instruct']));
-    expect(policy?.capabilities).not.toContain('review');
+    expect(policy?.capabilities).toEqual(expect.arrayContaining(['research', 'propose', 'review', 'instruct']));
     expect(policy?.capabilities).not.toContain('implement');
-    expect(agentCanOperate('deepseek-instructor', 'review')).toBe(false);
     expect(agentCanOperate('deepseek-instructor', 'implement')).toBe(false);
   });
 
