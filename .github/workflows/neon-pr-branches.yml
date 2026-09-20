@@ -140,10 +140,46 @@ jobs:
             exit 0
           fi
 
+          # The preview branch is reused across synchronize events. Keep an
+          # isolated CI-only checksum ledger so the exact same migration is
+          # skipped on rerun, while changing an already-applied migration fails
+          # closed and requires a new append-only migration instead.
+          psql "$NEON_DB_URL" -X -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE SCHEMA IF NOT EXISTS ci_preview;
+          CREATE TABLE IF NOT EXISTS ci_preview.migration_receipts (
+            filename TEXT PRIMARY KEY,
+            sha256 TEXT NOT NULL CHECK (sha256 ~ '^[0-9a-f]{64}$'),
+            applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+          );
+          SQL
+
           for migration in "${MIGRATIONS[@]}"; do
+            if [[ ! "$migration" =~ ^supabase/migrations/[0-9]{14}_[A-Za-z0-9_]+\.sql$ ]]; then
+              echo "::error title=Invalid migration path::$migration is not a canonical append-only migration filename."
+              exit 1
+            fi
             test -f "$migration" || { echo "Missing migration file: $migration" >&2; exit 1; }
-            echo "Applying preview migration: $migration"
-            psql "$NEON_DB_URL" -X -v ON_ERROR_STOP=1 -f "$migration"
+
+            CHECKSUM="$(sha256sum "$migration" | awk '{print $1}')"
+            EXISTING="$(psql "$NEON_DB_URL" -X -Atq \
+              -v filename="$migration" \
+              -c "SELECT sha256 FROM ci_preview.migration_receipts WHERE filename = :'filename';")"
+
+            if [ -n "$EXISTING" ]; then
+              if [ "$EXISTING" = "$CHECKSUM" ]; then
+                echo "Preview migration already applied with matching checksum: $migration"
+                continue
+              fi
+              echo "::error title=Applied migration changed::$migration was already executed on this preview with a different checksum. Add a new migration instead of rewriting history."
+              exit 1
+            fi
+
+            echo "Applying preview migration atomically: $migration"
+            psql "$NEON_DB_URL" -X -1 -v ON_ERROR_STOP=1 -f "$migration"
+            psql "$NEON_DB_URL" -X -v ON_ERROR_STOP=1 \
+              -v filename="$migration" \
+              -v checksum="$CHECKSUM" \
+              -c "INSERT INTO ci_preview.migration_receipts(filename, sha256) VALUES (:'filename', :'checksum');"
           done
 
       - name: Verify FCR commerce preview schema when present
