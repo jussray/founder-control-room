@@ -88,7 +88,6 @@ class QueryBuilder {
       return { data: null, error: null };
     }
 
-    // select
     let result = sortRows(matched, this.orderCol, this.orderAsc);
     if (this.limitN != null) result = result.slice(0, this.limitN);
     return this._shapeResult(result, wantSingle, allowZero);
@@ -214,18 +213,33 @@ export function makeSupabaseClient() {
   return supabase;
 }
 
-// Seed the founder allowlist synchronously at process start, mirroring what
-// migration 0002 does for real (`insert into founder_users ...`) — this
-// module is the first thing the loader redirects to, so this runs before
-// the HTTP server accepts any request.
+// Seed the founder allowlist synchronously at process start. Optional workspace
+// fields are test-only state used by the focused tenancy browser proof.
 if (process.env.E2E_SEED_FOUNDER_EMAIL) {
-  table('founder_users').push({ email: process.env.E2E_SEED_FOUNDER_EMAIL, created_at: new Date().toISOString() });
+  const founderRow = {
+    email: process.env.E2E_SEED_FOUNDER_EMAIL,
+    created_at: new Date().toISOString(),
+  };
+  if (process.env.E2E_SEED_FOUNDER_ROLE) founderRow.account_role = process.env.E2E_SEED_FOUNDER_ROLE;
+  if (process.env.E2E_SEED_WORKSPACE_ID) founderRow.workspace_id = process.env.E2E_SEED_WORKSPACE_ID;
+  table('founder_users').push(founderRow);
 }
 
-// E2E-only mirror of the V10 founder approval boundary. The harness must
-// explicitly provide one exact registry hash and its canonical entries;
-// unlike an "always true" fake, every other registry remains unapproved and
-// the real middleware still verifies the entry hash and capability identity.
+if (process.env.E2E_SEED_PROJECTS_JSON) {
+  let seedProjects;
+  try {
+    seedProjects = JSON.parse(process.env.E2E_SEED_PROJECTS_JSON);
+  } catch {
+    throw new Error('E2E_SEED_PROJECTS_JSON must be valid JSON');
+  }
+  if (!Array.isArray(seedProjects)) {
+    throw new Error('E2E_SEED_PROJECTS_JSON must be a JSON array');
+  }
+  for (const project of seedProjects) {
+    table('projects').push(withDefaults(project, 'projects'));
+  }
+}
+
 const approvedV10RegistryHash = String(process.env.E2E_APPROVED_V10_REGISTRY_HASH ?? '').trim().toLowerCase();
 if (/^[0-9a-f]{64}$/.test(approvedV10RegistryHash)) {
   let entries = [];
