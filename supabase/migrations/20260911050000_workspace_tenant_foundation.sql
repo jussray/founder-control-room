@@ -17,7 +17,21 @@ comment on table public.workspaces is
   'Tenant boundary for Founder Control Room. A workspace owns founder access and projects.';
 
 alter table public.workspaces enable row level security;
-revoke all on table public.workspaces from public, anon, authenticated;
+revoke all on table public.workspaces from public;
+
+-- Supabase defines anon/authenticated roles, while the generic Neon preview
+-- used by CI does not. Preserve the Supabase privilege revocation exactly when
+-- those roles exist and remain fail-closed on generic PostgreSQL previews.
+do $$
+begin
+  if exists (select 1 from pg_roles where rolname = 'anon') then
+    execute 'revoke all on table public.workspaces from anon';
+  end if;
+  if exists (select 1 from pg_roles where rolname = 'authenticated') then
+    execute 'revoke all on table public.workspaces from authenticated';
+  end if;
+end
+$$;
 
 insert into public.workspaces (id, slug, name)
 values ('00000000-0000-0000-0000-000000000001', 'juss-founder-workspace', 'Juss Founder Workspace')
@@ -95,21 +109,48 @@ comment on column public.projects.workspace_id is
   'Owning FCR workspace. Workspace-aware service-role queries must filter by this column.';
 
 -- Historical founder_full_access policies call is_founder(). Narrow that
--- helper to the platform owner. Workspace owners intentionally receive zero
--- direct authenticated-table access and must use workspace-aware FCR routes.
-create or replace function public.is_founder() returns boolean
-language sql
-stable
-security definer
-set search_path = public
-as $$
-  select coalesce(
-    exists (
-      select 1
-      from public.founder_users fu
-      where lower(fu.email) = lower((select auth.jwt()) ->> 'email')
-        and fu.account_role = 'platform_owner'
-    ),
-    false
-  );
+-- helper to the platform owner. Supabase provides auth.jwt(); generic preview
+-- PostgreSQL does not. In a non-Supabase environment install a deny-all helper
+-- instead of widening access or fabricating auth state.
+do $$
+begin
+  if exists (
+    select 1
+    from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'auth'
+      and p.proname = 'jwt'
+      and p.pronargs = 0
+  ) then
+    execute $function$
+      create or replace function public.is_founder() returns boolean
+      language sql
+      stable
+      security definer
+      set search_path = public
+      as $body$
+        select coalesce(
+          exists (
+            select 1
+            from public.founder_users fu
+            where lower(fu.email) = lower((select auth.jwt()) ->> 'email')
+              and fu.account_role = 'platform_owner'
+          ),
+          false
+        );
+      $body$;
+    $function$;
+  else
+    execute $function$
+      create or replace function public.is_founder() returns boolean
+      language sql
+      stable
+      security definer
+      set search_path = public
+      as $body$
+        select false;
+      $body$;
+    $function$;
+  end if;
+end
 $$;
