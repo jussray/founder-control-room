@@ -124,6 +124,7 @@ function integerId(value: unknown): string | null {
   const prefixes = [
     'gid://shopify/Product/',
     'gid://shopify/ProductVariant/',
+    'gid://shopify/Order/',
   ] as const;
 
   let candidate = text;
@@ -215,8 +216,11 @@ export function buildFcrShopifyPaidReceipt(input: {
   const payload = record(input.rawPayload);
   if (!payload) throw new FcrShopifyMoneyPathError('invalid_payload');
 
+  // orders/paid is revenue authority only when the payload independently says
+  // the order is paid. Missing, pending, authorized, refunded, or partially
+  // refunded states fail closed instead of inheriting authority from the topic.
   const financialStatus = stringValue(payload.financial_status)?.toLowerCase();
-  if (financialStatus && !['paid', 'partially_refunded'].includes(financialStatus)) {
+  if (financialStatus !== 'paid') {
     throw new FcrShopifyMoneyPathError('order_not_paid');
   }
 
@@ -232,9 +236,8 @@ export function buildFcrShopifyPaidReceipt(input: {
     throw new FcrShopifyMoneyPathError('invalid_collected_value');
   }
 
-  const orderId = stringValue(payload.admin_graphql_api_id)
-    ?? stringValue(payload.id)
-    ?? (typeof payload.id === 'number' ? String(payload.id) : null);
+  const orderId = integerId(payload.admin_graphql_api_id)
+    ?? integerId(payload.id);
   if (!orderId) throw new FcrShopifyMoneyPathError('missing_order_id');
 
   const lineItems = Array.isArray(payload.line_items) ? payload.line_items : [];
