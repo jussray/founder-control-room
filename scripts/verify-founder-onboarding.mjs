@@ -11,6 +11,10 @@ const files = {
     await readFile(new URL('../src/http/routes/onboardingAssets/callbackJs.ts', import.meta.url), 'utf8'),
   ].join('\n'),
   workspace: await readFile(new URL('../src/http/routes/founderOnboarding.ts', import.meta.url), 'utf8'),
+  chiefRecommendationClient: await readFile(
+    new URL('../src/lib/chiefControlRoomRecommendation.ts', import.meta.url),
+    'utf8',
+  ),
   session: await readFile(new URL('../src/auth/founderSession.ts', import.meta.url), 'utf8'),
   middleware: await readFile(new URL('../src/http/middleware/requireFounder.ts', import.meta.url), 'utf8'),
   server: await readFile(new URL('../src/http/server.ts', import.meta.url), 'utf8'),
@@ -67,9 +71,13 @@ requireText('ui', 'Command Bridge handoff', '/control-room/command-bridge.html')
 requireText('ui', 'Plugin Center handoff', '/control-room/plugin-center.html');
 requireText('ui', 'HubSpot onboarding slot', 'value="hubspot"');
 requireText('ui', 'Playwright onboarding slot', 'value="playwright"');
+requireText('ui', 'real Chief recommendation endpoint', "api('/onboarding/chief-recommendation'");
 requireText('ui', 'workspace bootstrap endpoint', "api('/onboarding/bootstrap'");
 requireText('ui', 'workspace state endpoint', "api('/onboarding/state')");
-requireText('ui', 'composer payload', 'controlRoom:{projectType:');
+requireText('ui', 'composer payload', 'controlRoom: {');
+requireText('ui', 'Chief acceptance fingerprint payload', 'acceptanceFingerprint: platformChiefRecommendation.acceptanceFingerprint');
+requireText('ui', 'Chief explicit approval copy', 'explicitly accept it for this Control Room');
+requireText('ui', 'Chief stale acceptance reset', 'invalidateChiefRecommendation');
 requireText('ui', 'password form', 'id="password-form"');
 requireText('ui', 'password confirmation', 'name="confirmPassword"');
 requireText('ui', 'password endpoint fetch', "api('/auth/password'");
@@ -77,21 +85,38 @@ requireText('ui', 'scoped onboarding CSP', 'onboardingRouter.use(onboardingConte
 
 requireText('workspace', 'founder auth gate', 'founderOnboardingRouter.use(requireFounder)');
 requireText('workspace', 'resumable state route', "founderOnboardingRouter.get('/state'");
+requireText('workspace', 'Chief recommendation route', "founderOnboardingRouter.post('/chief-recommendation'");
 requireText('workspace', 'idempotent bootstrap route', "founderOnboardingRouter.post('/bootstrap'");
 requireText('workspace', 'composer project-type allowlist', 'const PROJECT_TYPES = [');
 requireText('workspace', 'composer mission allowlist', 'const MISSIONS = [');
 requireText('workspace', 'composer state allowlist', 'const PROJECT_STATES = [');
 requireText('workspace', 'composer profile normalization', 'normalizeControlRoomProfile');
+requireText('workspace', 'Chief recommendation approval normalization', 'normalizeChiefRecommendationApproval');
+requireText('workspace', 'Chief recommendation server readback', 'currentChiefRecommendation');
+requireText('workspace', 'Chief acceptance fingerprint', 'recommendationAcceptanceFingerprint');
+requireText('workspace', 'Chief hash freshness check', 'approval.recommendationHash !== current.recommendation.recommendationHash');
+requireText('workspace', 'Chief fingerprint freshness check', 'approval.acceptanceFingerprint !== current.acceptanceFingerprint');
 requireText('workspace', 'composer profile audit receipt', 'controlRoomProfile: suppliedProfile');
+requireText('workspace', 'Chief audit receipt', 'chiefRecommendation: chiefReceipt');
 requireText('workspace', 'composer profile state restoration', 'controlRoomProfile: profileByProject.get(projectId) ?? null');
 requireText('workspace', 'composer option discovery', 'composerOptions: {');
 requireText('workspace', 'HubSpot provider declaration', "'hubspot'");
 requireText('workspace', 'disconnected-by-default providers', "status: 'disconnected'");
 requireText('workspace', 'no secret persistence', 'secret_ref: null');
 requireText('workspace', 'no execution authority truth', 'authorityGranted: false');
+requireText('workspace', 'Chief no execution authority truth', 'chiefExecutionAuthorized: false');
 requireText('workspace', 'no provider connection claim', 'providersConnected: false');
 requireText('workspace', 'no merge approval claim', 'mergeApproved: false');
 requireText('workspace', 'no deployment approval claim', 'deploymentApproved: false');
+
+requireText('chiefRecommendationClient', 'Chief server-held base URL', 'CHIEF_AI_BASE_URL');
+requireText('chiefRecommendationClient', 'Chief recommendation API path', '/api/chief/control-room-recommendation');
+requireText('chiefRecommendationClient', 'Chief HTTPS-only boundary', "url.protocol !== 'https:'");
+requireText('chiefRecommendationClient', 'Chief proposal-only boundary', "requireExact(boundary.proposalOnly, true");
+requireText('chiefRecommendationClient', 'Chief execution refusal', "requireExact(boundary.executionAuthorized, false");
+requireText('chiefRecommendationClient', 'Chief creation refusal', "requireExact(boundary.createControlRoomAuthorized, false");
+requireText('chiefRecommendationClient', 'Chief credential refusal', "requireExact(boundary.credentialAuthority, 'none'");
+requireText('chiefRecommendationClient', 'Chief stale acceptance contract', 'recommendationMutationInvalidatesAcceptance');
 
 requireText('session', 'HttpOnly cookie', 'HttpOnly');
 requireText('session', 'strict same-site cookie', 'SameSite=Strict');
@@ -154,6 +179,9 @@ if (/secret_ref:\s*null[\s\S]{0,240}status:\s*'active'/.test(files.workspace)) {
 if (files.workspace.includes('controlRoomProfile: suppliedProfile') && files.workspace.includes('authorityGranted: true')) {
   errors.push('composer authority: project/mission/state selection must never grant execution authority');
 }
+if (files.chiefRecommendationClient.includes('Authorization')) {
+  errors.push('Chief onboarding boundary: FCR must not send a credential or bearer header to the proposal-only endpoint');
+}
 if (files.worker.includes('Object.assign(request')) {
   errors.push('Worker bridge: hand-built Request duck typing must not return');
 }
@@ -171,6 +199,7 @@ console.log('Founder onboarding contract verified.');
 console.log('Google OAuth: Supabase redirect + private founder allowlist');
 console.log('First authenticated experience: Control Room Composer');
 console.log('Composer state: project type + mission + current reality restored from audit evidence');
+console.log('Chief recommendation: server-mediated, proposal-only, exact-hash + founder-acceptance fingerprint bound');
 console.log('Workspace bootstrap: project registry + disconnected provider slots');
 console.log('Opaque browser cookie: HttpOnly + Strict + server-side revocation');
 console.log('Founder callback handoff: opaque cookie only; no Supabase credential fragment');
