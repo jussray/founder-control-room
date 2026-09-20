@@ -19,7 +19,9 @@ function governanceBoundaryReadback(overrides: Record<string, unknown> = {}) {
     bypass_actors: [
       { actor_type: "DeployKey", actor_id: null, bypass_mode: "always" },
       { actor_type: "RepositoryRole", actor_id: 5, bypass_mode: "always" },
+      { actor_type: "Integration", actor_id: 9426, bypass_mode: "always" },
       { actor_type: "Integration", actor_id: 1144995, bypass_mode: "always" },
+      { actor_type: "Integration", actor_id: 1236702, bypass_mode: "always" },
     ],
     conditions: { ref_name: { include: ["~DEFAULT_BRANCH", "refs/heads/governance boundary"], exclude: [] } },
     rules: [
@@ -54,6 +56,12 @@ function governanceBoundaryReadback(overrides: Record<string, unknown> = {}) {
         },
       },
       { type: "code_scanning", parameters: { code_scanning_tools: [{ tool: "CodeQL" }] } },
+      {
+        type: "required_deployments",
+        parameters: {
+          required_deployment_environments: ["Cloudflare Production", "github-pages", "proofmode-access-admin"],
+        },
+      },
     ],
     ...overrides,
   };
@@ -65,7 +73,13 @@ function exactHeadReadback(overrides: Record<string, unknown> = {}) {
     name: "Chief AI main exact-head gate",
     target: "branch",
     enforcement: "active",
-    bypass_actors: [],
+    bypass_actors: [
+      { actor_type: "DeployKey", actor_id: null, bypass_mode: "always" },
+      { actor_type: "RepositoryRole", actor_id: 5, bypass_mode: "always" },
+      { actor_type: "Integration", actor_id: 85455, bypass_mode: "always" },
+      { actor_type: "Integration", actor_id: 1144995, bypass_mode: "always" },
+      { actor_type: "Integration", actor_id: 4047066, bypass_mode: "always" },
+    ],
     conditions: { ref_name: { include: ["~DEFAULT_BRANCH"], exclude: [] } },
     rules: [
       { type: "deletion" },
@@ -102,7 +116,7 @@ function observe(readback: Record<string, unknown>, observerAppId = SYNTHETIC_OB
     rulesetId: String(readback.id),
     readback,
     observerAppId,
-    observedAt: "2026-09-13T16:00:00.000Z",
+    observedAt: "2026-09-20T20:20:00.000Z",
   });
 }
 
@@ -207,10 +221,16 @@ describe("Chief GitHub governance reconciliation", () => {
   it("removes pre-merge deployment requirements without erasing the post-merge production truth obligation", () => {
     const plan = planChiefProofModeRulesetMigration(currentPair());
 
+    expect(plan.observedRequiredDeploymentEnvironments.governanceBoundary).toEqual([
+      "Cloudflare Production",
+      "github-pages",
+      "proofmode-access-admin",
+    ]);
     expect(plan.observedRequiredDeploymentEnvironments.exactHeadGate).toEqual([
       "Cloudflare Production",
       "proofmode-access-admin",
     ]);
+    expect(plan.mutation?.governanceBoundary.desiredRequiredDeploymentEnvironments).toEqual([]);
     expect(plan.mutation?.exactHeadGate.desiredRequiredDeploymentEnvironments).toEqual([]);
     expect(plan.mutation?.exactHeadGate.changes.requiredDeploymentEnvironments.removed).toEqual([
       "Cloudflare Production",
@@ -243,9 +263,14 @@ describe("Chief GitHub governance reconciliation", () => {
     ]);
   });
 
-  it("plans removal of every observed bypass actor, including GitHub DeployKey actors with null actor ids", () => {
+  it("plans removal of every observed bypass actor from both rulesets, including null-id DeployKey actors", () => {
     const input = currentPair();
     expect(input.governanceBoundary.bypassActors[0]).toEqual({
+      actorType: "DeployKey",
+      actorId: null,
+      bypassMode: "always",
+    });
+    expect(input.exactHeadGate.bypassActors[0]).toEqual({
       actorType: "DeployKey",
       actorId: null,
       bypassMode: "always",
@@ -253,8 +278,12 @@ describe("Chief GitHub governance reconciliation", () => {
 
     const plan = planChiefProofModeRulesetMigration(input);
     expect(plan.mutation?.governanceBoundary.desiredBypassActors).toEqual([]);
+    expect(plan.mutation?.exactHeadGate.desiredBypassActors).toEqual([]);
     expect(plan.mutation?.governanceBoundary.changes.bypassActors.removed).toEqual(
       input.governanceBoundary.bypassActors,
+    );
+    expect(plan.mutation?.exactHeadGate.changes.bypassActors.removed).toEqual(
+      input.exactHeadGate.bypassActors,
     );
   });
 
@@ -278,6 +307,7 @@ describe("Chief GitHub governance reconciliation", () => {
   it("replaces a wrong candidate producer binding instead of accepting check-name equality as authority", () => {
     const input = currentPair();
     input.exactHeadGate = observe(exactHeadReadback({
+      bypass_actors: [],
       rules: [
         {
           type: "required_status_checks",
@@ -343,7 +373,7 @@ describe("Chief GitHub governance reconciliation", () => {
       rulesetId: 21261587,
       readback: governanceBoundaryReadback(),
       observerAppId: SYNTHETIC_OBSERVER_APP_ID,
-      observedAt: "2026-09-13T16:00:00.000Z",
+      observedAt: "2026-09-20T20:20:00.000Z",
     })).toThrow(/pinned to jussray\/chief-ai-machine/);
 
     expect(() => createTrustedGithubRulesetObservation({
@@ -351,7 +381,7 @@ describe("Chief GitHub governance reconciliation", () => {
       rulesetId: 20818149,
       readback: governanceBoundaryReadback(),
       observerAppId: SYNTHETIC_OBSERVER_APP_ID,
-      observedAt: "2026-09-13T16:00:00.000Z",
+      observedAt: "2026-09-20T20:20:00.000Z",
     })).toThrow(/provider ruleset id mismatch/);
   });
 });
