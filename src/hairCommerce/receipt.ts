@@ -84,9 +84,13 @@ function githubEvidenceUrl(value: unknown, exactCommitSha: string): string | und
 }
 
 export function hairCommerceRevenueState(
-  receipt: Pick<HairCommerceReceipt, 'event'>,
+  receipt: Pick<HairCommerceReceipt, 'event' | 'collectedValueCents' | 'currency'>,
 ): RevenueState | null {
-  return receipt.event === 'paid_order_recorded' ? 'payment_collected' : null;
+  return receipt.event === 'paid_order_recorded' &&
+    typeof receipt.collectedValueCents === 'number' &&
+    receipt.currency === CURRENCY
+    ? 'payment_collected'
+    : null;
 }
 
 export function validateHairCommerceReceipt(input: unknown): HairCommerceReceipt {
@@ -144,16 +148,23 @@ export function validateHairCommerceReceipt(input: unknown): HairCommerceReceipt
   let collectedValueCents: number | undefined;
   let currency: typeof CURRENCY | undefined;
   if (event === 'paid_order_recorded') {
-    collectedValueCents = boundedInteger(
-      input.collectedValueCents,
-      'collected_value_cents',
-      1,
-      100_000_000,
-    );
-    if (input.currency !== CURRENCY) {
-      throw new HairCommerceReceiptError('invalid_currency');
+    const hasValue = input.collectedValueCents !== undefined;
+    const hasCurrency = input.currency !== undefined;
+    if (hasValue !== hasCurrency) {
+      throw new HairCommerceReceiptError('incomplete_money_evidence');
     }
-    currency = CURRENCY;
+    if (hasValue && hasCurrency) {
+      collectedValueCents = boundedInteger(
+        input.collectedValueCents,
+        'collected_value_cents',
+        1,
+        100_000_000,
+      );
+      if (input.currency !== CURRENCY) {
+        throw new HairCommerceReceiptError('invalid_currency');
+      }
+      currency = CURRENCY;
+    }
   } else if (input.collectedValueCents !== undefined || input.currency !== undefined) {
     throw new HairCommerceReceiptError('money_fields_not_allowed_for_event');
   }
