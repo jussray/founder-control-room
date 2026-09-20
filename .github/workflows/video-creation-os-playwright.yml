@@ -1,0 +1,59 @@
+name: Video Creation OS Playwright
+
+on:
+  push:
+    branches:
+      - project/founder-short-form-content-engine
+    paths:
+      - 'public/control-room/video-creation-os.html'
+      - 'public/control-room/video-creation-os.js'
+      - 'e2e/video-creation-os-proof.mjs'
+      - '.github/workflows/video-creation-os-playwright.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'public/control-room/video-creation-os.html'
+      - 'public/control-room/video-creation-os.js'
+      - 'e2e/video-creation-os-proof.mjs'
+      - '.github/workflows/video-creation-os-playwright.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  video-creation-os-proof:
+    name: Video Creation OS Playwright
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify immutable exact head
+        shell: bash
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+      - name: Install repository dependencies
+        run: npm install
+      - name: Install Chromium
+        run: npx playwright install chromium --with-deps
+      - name: Prove standalone FCR Video Creation OS
+        run: node e2e/video-creation-os-proof.mjs
+      - name: Upload browser proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: video-creation-os-playwright-${{ env.EXPECTED_HEAD_SHA }}
+          path: artifacts/video-creation-os/
+          if-no-files-found: ignore
