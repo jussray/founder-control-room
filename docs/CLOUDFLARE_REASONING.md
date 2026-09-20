@@ -219,6 +219,12 @@ The only runtime secret canonical Deploy actively writes is the checked-in fail-
 
 This source membrane does not prove the current Cloudflare required-secret set, values, Workers Builds dashboard configuration, custom-domain routing, active deployment, or runtime SHA. Those remain separate provider/runtime readback gates.
 
+### Post-Deploy Reconciliation release gate
+
+Canonical Deploy treats Post-Deploy Reconciliation as load-bearing production verification. The `reconcile` job runs only after smoke-test, uses the `production` environment, executes `src/reconciliation/scripts/self-reconcile.ts`, and is not allowed to continue on error. Proof-of-ship depends on successful reconciliation rather than bypassing it.
+
+The reconciler must bind `https://api.foundercontrolroom.org/version` to service `founder-control-room` and the code-owned Supabase project reference before constructing the database client and reading release state. That sequence prevents a green reconciliation receipt from being borrowed from the wrong deployed service or database project. Source code and CI prove only the checked contract; live Worker identity, deployed Supabase identity, and database state remain separate production evidence.
+
 ### Founder Content n8n Worker activation boundary
 
 `wrangler.worker.toml` may express the reviewed Founder Content source intent with `N8N_FOUNDER_CONTENT_ENABLED=true`, Buffer as the only enabled provider for this slice, expected workflow ID `fcrFounderContentV1`, and n8n runtime `2.32.6`. The canonical Worker also declares four provider-held required binding names: `N8N_FOUNDER_CONTENT_WEBHOOK_URL`, `N8N_FOUNDER_CONTENT_BEARER_TOKEN`, `N8N_FOUNDER_CONTENT_EXPECTED_WORKFLOW_FINGERPRINT`, and `N8N_FOUNDER_CONTENT_IDENTITY_HMAC_SECRET`.

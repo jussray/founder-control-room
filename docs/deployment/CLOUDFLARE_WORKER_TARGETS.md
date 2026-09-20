@@ -201,6 +201,12 @@ Trusted deterministic-review or other bounded workflows that actually need GitHu
 
 Never copy secret values into repository files, logs, screenshots, issue comments, PR bodies, documentation, or public content. A source declaration or required-name check proves only the intended boundary. Live provider secret presence, validity, permissions, deployment success, and runtime identity still require provider/runtime evidence.
 
+## Post-Deploy Reconciliation gate
+
+Canonical `.github/workflows/deploy.yml` runs Post-Deploy Reconciliation after smoke-test and before proof-of-ship. The reconciliation job is bound to the `production` environment, must fail closed rather than use `continue-on-error`, and executes `src/reconciliation/scripts/self-reconcile.ts`. Proof-of-ship is eligible only when reconciliation succeeds.
+
+The reconciler must first read the deployed canonical Worker's `/version`, require service identity `founder-control-room`, and require the runtime-reported Supabase project reference to equal the code-owned canonical project reference before constructing the database client. This source contract prevents a release from accepting reconciliation evidence from the wrong runtime/database pairing. It still does not prove the current deployed Worker, database migration state, or browser outcome until exact release/runtime/database receipts are observed.
+
 ## Verification gate
 
 A merge or provider build does not prove activation. Production is verified only after the applicable authorized lane captures evidence against one exact current-main SHA.

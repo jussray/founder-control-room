@@ -203,6 +203,8 @@ A production-specific Truth Lease composes already-authoritative observations. I
 
 The privileged post-Deploy Playwright witness is an **independent verifier**, not an executor for the Deploy-run checkout. It must run only for a successful `workflow_dispatch` Deploy run from `main`, execute trusted witness source, and treat the Deploy run SHA only as release evidence to compare with the deployed Worker and public browser/runtime identity. A `workflow_run` SHA must never become executable authority merely because the upstream workflow succeeded.
 
+Post-Deploy Reconciliation is also a **load-bearing production gate**, not a best-effort observer. After smoke-test, the Deploy workflow must run reconciliation in the production environment and require it to succeed before proof-of-ship can continue. The reconciler must first bind the deployed `/version` identity to the canonical Founder Control Room service and Supabase project reference before reading database state. Checked-in reconciliation source, a green unit test, or a successful upload is not live deployment/database proof; exact deployed runtime identity and reconciliation receipts remain separate evidence.
+
 ### Evidence Trust Plane
 
 The Evidence Trust Plane keeps observation, provider readback, evidence validity, freshness, and action ceilings separate.
@@ -321,3 +323,7 @@ For public crawler and work-directory behavior, `.github/workflows/ci.yml` must 
 ## Cross-repository browser witness freshness
 
 The exact StoryEngine peer configured in `.github/workflows/playwright.yml` is an evidence subject, not a durable alias for current StoryEngine. A peer refresh must be backed by an independent ref/SHA observation and must reset predecessor federation/browser proof until the complete FCR → StoryEngine → receipt → FCR Playwright witness passes on the exact FCR head. Pin alignment alone grants no merge, deploy, production, or provider-mutation authority.
+
+## Founder-content analytics CSV evidence
+
+Normalized founder-content analytics CSV input is observation evidence, not action authority. It must retain source/account/page identity, source hashes, snapshot/window chronology, comparison bindings, and idempotency semantics. Successful ingestion or derived metrics cannot by itself authorize publication, scheduling, provider mutation, merge, deploy, spend, or external contact.
