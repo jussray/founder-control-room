@@ -72,9 +72,57 @@ function installCookieBackedSignOut() {
   }, true);
 }
 
+function installLegacyTerminalAuthorityBoundary() {
+  // The legacy SPA still renders/sends `confirmWrite`, but the authoritative
+  // terminal contract no longer treats that boolean as execution authority.
+  // Keep the compatibility shell honest until app.js is retired: remove the
+  // fake authority affordance and strip the legacy field from terminal-run
+  // requests. This never creates authority; L99 approval receipts remain the
+  // only execution-authority path for write/verify commands.
+  const nativeFetch = window.fetch.bind(window);
+  window.fetch = (input, init = {}) => {
+    const path = typeof input === 'string' ? input : '';
+    if (/^\/terminal\/[^/]+\/run$/.test(path) && typeof init.body === 'string') {
+      try {
+        const payload = JSON.parse(init.body);
+        if (payload && typeof payload === 'object' && !Array.isArray(payload)) {
+          delete payload.confirmWrite;
+          init = { ...init, body: JSON.stringify(payload) };
+        }
+      } catch {
+        // Preserve the original request. The server owns JSON/error handling.
+      }
+    }
+    return nativeFetch(input, init);
+  };
+
+  const reconcileTerminalForm = () => {
+    document.querySelectorAll('#terminal-run-form input[name="confirmWrite"]').forEach((input) => {
+      const label = input.closest('label');
+      if (label) label.remove();
+      else input.remove();
+    });
+
+    const form = document.querySelector('#terminal-run-form');
+    if (!form || form.querySelector('[data-l99-authority-copy]')) return;
+
+    const copy = document.createElement('p');
+    copy.className = 'muted';
+    copy.dataset.l99AuthorityCopy = 'true';
+    copy.textContent = 'Write and verify commands require a fresh L99 approval receipt. This form never grants execution authority.';
+    const submitRow = form.querySelector('button[type="submit"]')?.parentElement ?? null;
+    form.insertBefore(copy, submitRow);
+  };
+
+  const observer = new MutationObserver(reconcileTerminalForm);
+  observer.observe(document.documentElement, { childList: true, subtree: true });
+  reconcileTerminalForm();
+}
+
 async function bootLegacyCockpit() {
   scrubLegacyBrowserCredentials();
   installCookieBackedSignOut();
+  installLegacyTerminalAuthorityBoundary();
 
   try {
     const founder = await founderIdentityFromOpaqueSession();
