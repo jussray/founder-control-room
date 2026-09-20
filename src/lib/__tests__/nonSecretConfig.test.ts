@@ -1,3 +1,4 @@
+import { Buffer } from 'node:buffer';
 import { describe, expect, it } from 'vitest';
 import { containsRawCredentialMaterial } from '../nonSecretConfig.js';
 
@@ -23,6 +24,15 @@ describe('containsRawCredentialMaterial', () => {
     expect(containsRawCredentialMaterial({ note: 'Bearer abcdefghijklmnop' })).toBe(true);
     expect(containsRawCredentialMaterial({ note: '-----BEGIN PRIVATE KEY-----\nredacted' })).toBe(true);
     expect(containsRawCredentialMaterial({ note: `sk-${'a'.repeat(24)}` })).toBe(true);
+  });
+
+  it('rejects base64-wrapped private-key material under an innocuous key', () => {
+    const wrappedPem = Buffer.from(
+      `-----BEGIN PRIVATE KEY-----\n${'a'.repeat(96)}\n-----END PRIVATE KEY-----`,
+      'utf8',
+    ).toString('base64');
+
+    expect(containsRawCredentialMaterial({ note: wrappedPem })).toBe(true);
   });
 
   it('does not reject empty credential-shaped metadata fields', () => {
