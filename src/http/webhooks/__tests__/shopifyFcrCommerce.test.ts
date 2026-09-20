@@ -20,6 +20,7 @@ import {
 const SECRET = 'fcr-shopify-test-secret';
 const HASH_SALT = 'fcr-commerce-test-hash-salt';
 const WEBHOOK_ID = '11111111-2222-4333-8444-555555555555';
+const EVENT_ID = '66666666-7777-4888-8999-aaaaaaaaaaaa';
 const TRIGGERED_AT = '2026-09-20T02:55:00.000Z';
 
 function app(store: FcrCommerceReceiptStore) {
@@ -58,6 +59,7 @@ function headers(raw: string, overrides: Record<string, string> = {}) {
     'X-Shopify-Topic': 'orders/paid',
     'X-Shopify-Shop-Domain': FCR_SHOPIFY_STORE_IDENTITY.shopifyDomain,
     'X-Shopify-Webhook-Id': WEBHOOK_ID,
+    'X-Shopify-Event-Id': EVENT_ID,
     'X-Shopify-Triggered-At': TRIGGERED_AT,
     'X-Shopify-Hmac-SHA256': createHmac('sha256', SECRET).update(raw).digest('base64'),
     ...overrides,
@@ -104,6 +106,8 @@ describe('FCR Shopify commerce webhook', () => {
       provider: 'shopify',
       storeFingerprint: FCR_SHOPIFY_STORE_FINGERPRINT,
       shopDomain: FCR_SHOPIFY_STORE_IDENTITY.shopifyDomain,
+      webhookId: WEBHOOK_ID,
+      eventId: EVENT_ID,
       offerKeys: ['business_leak_quickscan'],
       unknownOfferCount: 0,
     });
@@ -155,6 +159,27 @@ describe('FCR Shopify commerce webhook', () => {
     expect(store).not.toHaveBeenCalled();
   });
 
+  it('requires provider delivery and merchant-event identities before persistence', async () => {
+    const store = vi.fn<FcrCommerceReceiptStore>();
+    const raw = JSON.stringify(paidOrder());
+
+    const missingEvent = await request(app(store))
+      .post('/webhooks/shopify/fcr/orders-paid')
+      .set(headers(raw, { 'X-Shopify-Event-Id': '' }))
+      .send(raw);
+    expect(missingEvent.status).toBe(400);
+    expect(missingEvent.body.error).toBe('invalid_event_id');
+
+    const invalidWebhook = await request(app(store))
+      .post('/webhooks/shopify/fcr/orders-paid')
+      .set(headers(raw, { 'X-Shopify-Webhook-Id': 'not-a-uuid' }))
+      .send(raw);
+    expect(invalidWebhook.status).toBe(400);
+    expect(invalidWebhook.body.error).toBe('invalid_webhook_id');
+
+    expect(store).not.toHaveBeenCalled();
+  });
+
   it('does not recognize missing, unpaid, refunded, wrong-currency, or zero-value payloads as revenue', async () => {
     const store = vi.fn<FcrCommerceReceiptStore>();
     for (const payload of [
@@ -174,16 +199,18 @@ describe('FCR Shopify commerce webhook', () => {
     expect(store).not.toHaveBeenCalled();
   });
 
-  it('treats a second webhook id for the same exact paid order as a semantic duplicate', () => {
+  it('treats another delivery id for the same Shopify merchant event as a semantic duplicate', () => {
     const receipt = buildFcrShopifyPaidReceipt({
       rawPayload: paidOrder(),
       webhookId: WEBHOOK_ID,
+      eventId: EVENT_ID,
       shopDomain: FCR_SHOPIFY_STORE_IDENTITY.shopifyDomain,
       occurredAt: TRIGGERED_AT,
       hashSalt: HASH_SALT,
     });
     const stored = {
       webhook_id: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+      event_id: receipt.eventId,
       contract_id: receipt.contract,
       provider: receipt.provider,
       store_fingerprint: receipt.storeFingerprint,
@@ -200,6 +227,10 @@ describe('FCR Shopify commerce webhook', () => {
 
     expect(storedFcrCommerceReceiptMatches(stored, receipt)).toBe(false);
     expect(storedFcrCommerceOrderReceiptMatches(stored, receipt)).toBe(true);
+    expect(storedFcrCommerceOrderReceiptMatches({
+      ...stored,
+      event_id: 'bbbbbbbb-cccc-4ddd-8eee-ffffffffffff',
+    }, receipt)).toBe(false);
     expect(storedFcrCommerceOrderReceiptMatches({
       ...stored,
       collected_value_cents: 1,
