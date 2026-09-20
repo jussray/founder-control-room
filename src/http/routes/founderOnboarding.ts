@@ -1,6 +1,12 @@
+import { createHash, randomUUID } from 'node:crypto';
 import { Router } from 'express';
-import { randomUUID } from 'node:crypto';
 import { supabase } from '../../lib/supabaseClient.js';
+import {
+  CHIEF_CONTROL_ROOM_RECOMMENDATION_CONTRACT,
+  requestChiefControlRoomRecommendation,
+  type ChiefControlRoomRecommendation,
+  type ChiefControlRoomRecommendationInput,
+} from '../../lib/chiefControlRoomRecommendation.js';
 import {
   PLUGIN_CATALOG,
   pluginDescriptorFor,
@@ -17,8 +23,14 @@ type ControlRoomProfile = {
   mission: string;
   currentState: string;
 };
+type ChiefRecommendationApproval = {
+  recommendationHash: string;
+  acceptanceFingerprint: string;
+  accepted: true;
+};
 
 const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const SHA256_PATTERN = /^[0-9a-f]{64}$/;
 const PROJECT_TYPES = [
   'product-app',
   'website',
@@ -85,6 +97,93 @@ function normalizeControlRoomProfile(value: unknown): ControlRoomProfile | null 
   if (!PROJECT_STATE_SET.has(currentState)) return null;
 
   return { projectType, mission, currentState };
+}
+
+function normalizeChiefRecommendationApproval(value: unknown): ChiefRecommendationApproval | null {
+  const record = recordValue(value);
+  if (!record || record.accepted !== true) return null;
+  const recommendationHash = stringValue(record.recommendationHash).toLowerCase();
+  const acceptanceFingerprint = stringValue(record.acceptanceFingerprint).toLowerCase();
+  if (!SHA256_PATTERN.test(recommendationHash) || !SHA256_PATTERN.test(acceptanceFingerprint)) {
+    return null;
+  }
+  return { recommendationHash, acceptanceFingerprint, accepted: true };
+}
+
+function recommendationInput(
+  projectInput: DbRecord,
+  profile: ControlRoomProfile,
+): ChiefControlRoomRecommendationInput {
+  return {
+    projectName: stringValue(projectInput.name),
+    projectType: profile.projectType,
+    mission: profile.mission,
+    currentState: profile.currentState,
+    repoIdentifier: optionalString(projectInput.repoIdentifier),
+    stack: optionalString(projectInput.stack),
+  };
+}
+
+function recommendationAcceptanceFingerprint(
+  projectInput: DbRecord,
+  profile: ControlRoomProfile,
+  recommendationHash: string,
+): string {
+  const subject = [
+    'founder-control-room/chief-onboarding-acceptance@v1',
+    stringValue(projectInput.slug),
+    stringValue(projectInput.name),
+    profile.projectType,
+    profile.mission,
+    profile.currentState,
+    optionalString(projectInput.repoIdentifier),
+    optionalString(projectInput.stack),
+    recommendationHash,
+  ];
+  return createHash('sha256').update(JSON.stringify(subject)).digest('hex');
+}
+
+function recommendationReceipt(
+  recommendation: ChiefControlRoomRecommendation,
+  acceptanceFingerprint: string,
+) {
+  return {
+    contract: recommendation.contract,
+    selectedBy: recommendation.selectedBy,
+    recommendationHash: recommendation.recommendationHash,
+    acceptanceFingerprint,
+    accepted: true,
+    authorityGranted: false,
+  };
+}
+
+function validateRecommendationProjectInput(projectInput: DbRecord): string | null {
+  const slug = stringValue(projectInput.slug);
+  const name = stringValue(projectInput.name);
+  if (!slug || !name) return 'project.slug and project.name are required';
+  if (!SLUG_PATTERN.test(slug)) {
+    return 'project.slug must be lowercase alphanumeric segments separated by hyphens';
+  }
+  if (name.length > 120) return 'project.name must be at most 120 characters';
+  if ((optionalString(projectInput.stack)?.length ?? 0) > 240) {
+    return 'project.stack must be at most 240 characters';
+  }
+  return null;
+}
+
+async function currentChiefRecommendation(
+  projectInput: DbRecord,
+  profile: ControlRoomProfile,
+): Promise<{ recommendation: ChiefControlRoomRecommendation; acceptanceFingerprint: string }> {
+  const recommendation = await requestChiefControlRoomRecommendation(recommendationInput(projectInput, profile));
+  return {
+    recommendation,
+    acceptanceFingerprint: recommendationAcceptanceFingerprint(
+      projectInput,
+      profile,
+      recommendation.recommendationHash,
+    ),
+  };
 }
 
 function recommendedCatalog() {
@@ -216,6 +315,43 @@ founderOnboardingRouter.get('/state', async (_req: FounderRequest, res) => {
   });
 });
 
+founderOnboardingRouter.post('/chief-recommendation', async (req: FounderRequest, res) => {
+  res.setHeader('Cache-Control', 'private, no-store');
+
+  const body = req.body as DbRecord;
+  const projectInput = recordValue(body.project) ?? {};
+  const profile = normalizeControlRoomProfile(body.controlRoom);
+  if (!profile) {
+    return res.status(400).json({
+      error: 'controlRoom must include a supported projectType, mission, and currentState',
+    });
+  }
+  const projectError = validateRecommendationProjectInput(projectInput);
+  if (projectError) return res.status(400).json({ error: projectError });
+
+  try {
+    const current = await currentChiefRecommendation(projectInput, profile);
+    return res.json({
+      recommendation: current.recommendation,
+      acceptance: {
+        fingerprint: current.acceptanceFingerprint,
+        requiresExplicitFounderDecision: true,
+        accepted: false,
+      },
+      truth: {
+        chiefCreatesControlRoom: false,
+        chiefGrantsExecution: false,
+        stateAuthority: 'founder-control-room',
+        evidenceAuthority: 'founder-control-room',
+      },
+    });
+  } catch {
+    return res.status(503).json({
+      error: 'Chief recommendation is unavailable. Control Room creation remains fail-closed.',
+    });
+  }
+});
+
 founderOnboardingRouter.post('/bootstrap', async (req: FounderRequest, res) => {
   res.setHeader('Cache-Control', 'private, no-store');
 
@@ -247,6 +383,8 @@ founderOnboardingRouter.post('/bootstrap', async (req: FounderRequest, res) => {
       error: 'project.slug must be lowercase alphanumeric segments separated by hyphens',
     });
   }
+  if (name.length > 120) return res.status(400).json({ error: 'project.name must be at most 120 characters' });
+  if ((stack?.length ?? 0) > 240) return res.status(400).json({ error: 'project.stack must be at most 240 characters' });
   if (!['low', 'medium', 'high'].includes(riskLevel)) {
     return res.status(400).json({ error: 'project.riskLevel must be low, medium, or high' });
   }
@@ -254,6 +392,36 @@ founderOnboardingRouter.post('/bootstrap', async (req: FounderRequest, res) => {
     return res.status(400).json({
       error: `providers must be drawn from: ${RECOMMENDED_PROVIDER_TYPES.join(', ')}`,
     });
+  }
+
+  let acceptedChiefRecommendation: {
+    recommendation: ChiefControlRoomRecommendation;
+    acceptanceFingerprint: string;
+  } | null = null;
+  if (suppliedProfile) {
+    const approval = normalizeChiefRecommendationApproval(body.chiefRecommendation);
+    if (!approval) {
+      return res.status(400).json({
+        error: 'An explicit founder acceptance of the current Chief recommendation is required',
+      });
+    }
+
+    try {
+      const current = await currentChiefRecommendation(projectInput, suppliedProfile);
+      if (
+        approval.recommendationHash !== current.recommendation.recommendationHash
+        || approval.acceptanceFingerprint !== current.acceptanceFingerprint
+      ) {
+        return res.status(409).json({
+          error: 'Chief recommendation changed. Review and accept the current recommendation before creating the Control Room.',
+        });
+      }
+      acceptedChiefRecommendation = current;
+    } catch {
+      return res.status(503).json({
+        error: 'Chief recommendation could not be revalidated. Control Room creation remains fail-closed.',
+      });
+    }
   }
 
   const { data: existingProject, error: existingProjectError } = await supabase
@@ -351,6 +519,13 @@ founderOnboardingRouter.post('/bootstrap', async (req: FounderRequest, res) => {
     createdConnections = (data ?? []) as DbRecord[];
   }
 
+  const chiefReceipt = acceptedChiefRecommendation
+    ? recommendationReceipt(
+      acceptedChiefRecommendation.recommendation,
+      acceptedChiefRecommendation.acceptanceFingerprint,
+    )
+    : null;
+
   const { error: eventError } = await supabase.from('project_events').insert({
     project_id: projectId,
     source_event_id: randomUUID(),
@@ -365,6 +540,7 @@ founderOnboardingRouter.post('/bootstrap', async (req: FounderRequest, res) => {
       createdProviders: createdConnections.map((connection) => connection.connection_type),
       controlRoomProfile: suppliedProfile,
       controlRoomProfileAuthority: 'founder-declared',
+      chiefRecommendation: chiefReceipt,
       authorityGranted: false,
       credentialsStored: false,
     },
@@ -382,6 +558,7 @@ founderOnboardingRouter.post('/bootstrap', async (req: FounderRequest, res) => {
     project,
     controlRoomProfile: suppliedProfile,
     controlRoomProfileAuthority: suppliedProfile ? 'founder-declared' : null,
+    chiefRecommendation: chiefReceipt,
     projectCreated,
     connectionsCreated: createdConnections,
     connectionsAlreadyPresent: requestedProviders.filter((provider) => existingTypes.has(provider)),
@@ -394,6 +571,7 @@ founderOnboardingRouter.post('/bootstrap', async (req: FounderRequest, res) => {
     truth: {
       credentialsStored: false,
       providersConnected: false,
+      chiefExecutionAuthorized: false,
       mergeApproved: false,
       deploymentApproved: false,
     },
@@ -402,3 +580,4 @@ founderOnboardingRouter.post('/bootstrap', async (req: FounderRequest, res) => {
 
 // Keep the catalog imported and type-checked as the single provider source.
 void PLUGIN_CATALOG;
+void CHIEF_CONTROL_ROOM_RECOMMENDATION_CONTRACT;
