@@ -67,16 +67,18 @@ async function founderAccess(identity: AuthenticatedIdentity): Promise<FounderAc
   }
 
   const record = allowRow as Record<string, unknown>;
+  const boundUserId = typeof record.user_id === 'string' ? record.user_id.trim() : '';
   const rawRole = record.account_role;
   const hasExplicitRole = rawRole !== undefined && rawRole !== null;
   const hasExplicitWorkspaceColumn = Object.prototype.hasOwnProperty.call(record, 'workspace_id');
 
-  if (!hasExplicitRole) {
-    const boundUserId = typeof record.user_id === 'string' ? record.user_id.trim() : '';
-    if (!boundUserId || boundUserId !== identity.userId) {
-      return { state: 'denied' };
-    }
+  // Email is discovery metadata only. No legacy or explicit role can grant
+  // authority unless the allowlist row is bound to the exact immutable Auth ID.
+  if (!boundUserId || boundUserId !== identity.userId) {
+    return { state: 'denied' };
+  }
 
+  if (!hasExplicitRole) {
     return {
       state: 'allowed',
       access: {
