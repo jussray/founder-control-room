@@ -203,6 +203,8 @@ A production-specific Truth Lease composes already-authoritative observations. I
 
 The privileged post-Deploy Playwright witness is an **independent verifier**, not an executor for the Deploy-run checkout. It must run only for a successful `workflow_dispatch` Deploy run from `main`, execute trusted witness source, and treat the Deploy run SHA only as release evidence to compare with the deployed Worker and public browser/runtime identity. A `workflow_run` SHA must never become executable authority merely because the upstream workflow succeeded.
 
+Routine Playwright verification is intentionally lower privilege than provider execution. `.github/workflows/playwright.yml` does not receive `OPENAI_API_KEY` or `PERPLEXITY_API_KEY` for the normal browser lane. Model-provider credentials belong only in separately authorized provider-specific or live-runtime lanes. Their absence from routine Playwright narrows secret exposure; it does not prove a provider is configured, unavailable, healthy, or live.
+
 ### Evidence Trust Plane
 
 The Evidence Trust Plane keeps observation, provider readback, evidence validity, freshness, and action ceilings separate.
