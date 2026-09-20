@@ -1,6 +1,6 @@
 # Multi-Witness Repair Authority
 
-Status: portfolio governance contract. This file narrows and operationalizes the existing Founder Control Room authority model; it does not turn evidence, fingerprints, proof cookies, trackers, or model output into authority.
+Status: portfolio governance contract. This file narrows and operationalizes the existing Founder Control Room authority model; it does not turn evidence, fingerprints, proof cookies, trackers, attack results, or model output into authority.
 
 ## Purpose
 
@@ -25,6 +25,25 @@ Every repair must bind, when applicable:
 Changing a load-bearing identity expires predecessor repair authority and proof.
 
 Fingerprints and proof cookies are non-secret correlation markers only. They never grant authentication, founder approval, merge permission, deployment permission, credential access, or mutation authority by themselves.
+
+## Portfolio Repair OS
+
+Every consequential witness-triggered repair runs one fused operating loop. The loop may narrow or stop authority; it may never widen it.
+
+1. **Lindy** — prefer the existing authoritative carrier, stable interface, simple platform primitive, reversible repair, and minimum new dependency surface.
+2. **Red Team I** — attack the premise before mutation: establish that the defect is real, the requested change should exist, the proposed scope serves the product goal, and inaction is not the safer truthful outcome.
+3. **ATTACK TEN** — pressure the proposed repair for wrong-subject targeting, stale proof, authority inversion, hidden coupling, failure masking, unsafe fallback, rollback weakness, user-outcome mismatch, temporal races, and missing verification.
+4. **OODA Observe** — reacquire current fingerprints/proof cookies and all relevant witnesses. Record VERIFIED / INFERRED / UNKNOWN / BLOCKED plus STALE / SUPERSEDED / CONTRADICTED when needed.
+5. **OODA Orient** — identify the owning truth plane, authoritative source, current consequence class, and distinct incidents. Do not collapse unrelated reds.
+6. **OODA Decide** — select one smallest reversible action, acceptance condition, and stop condition.
+7. **L99 Authority** — before Act, verify exact subject identity, provenance, state, authority ceiling, evidence requirement, rollback, continuity, drift/expiry, and whether the owning execution principal actually has the required provider permission.
+8. **Act** — execute only through the authority that owns the failed plane. Evidence or reasoning output cannot impersonate that authority.
+9. **Red Team II** — attack the actual implementation for regression, privacy/security breakage, stale assumptions, authority drift, provider mismatch, fake-green behavior, and recovery failure.
+10. **Attack workflow verification** — consequential repairs use PromptOS recursive hardening where available: 10 OODA cycles covering `authority-inversion`, `evidence-falsification`, `human-outcome`, and `temporal-race`. Attack findings may revise or block the repair; they never authorize it.
+11. **Verify** — prove the repaired claim at the highest relevant truth plane. Browser/user-path repairs require Playwright. Provider repairs require post-write provider readback. Source repairs require exact-head source/test evidence.
+12. **Loop or stop** — loop only if the intended outcome remains unproven and current authority remains valid. Stop when acceptance is proved or a real evidence/authority edge is reached.
+
+The machine-readable reusable workflow lives in PromptOS (`REPAIR_OS_SEQUENCE`, `ATTACK_WORKFLOWS`, and the existing `juss-v10/recursive-hardening@v1` contract). FCR owns consequential execution authority and cross-plane receipts; PromptOS owns workflow semantics; each product repository retains its stricter local invariants.
 
 ## Repair classes
 
