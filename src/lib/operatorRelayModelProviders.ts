@@ -11,6 +11,8 @@ const ANTHROPIC_API_VERSION = '2023-06-01';
 const MAX_PROVIDER_RESPONSE_ID_LENGTH = 200;
 const SAFE_GEMINI_MODEL = /^[A-Za-z0-9._-]{1,160}$/;
 
+export const SEMANTIC_PEER_REVIEW_SPEND_MODE = 'paused' as const;
+
 function record(value: unknown): JsonRecord | null {
   return value && typeof value === 'object' && !Array.isArray(value)
     ? value as JsonRecord
@@ -32,6 +34,12 @@ function relayPrompt(request: OperatorRelayRequestV1): string {
 function ensureRelaySensitivity(request: OperatorRelayRequestV1): void {
   if (request.sensitivity === 'restricted') {
     throw new Error('restricted relay context requires a separately approved provider data policy');
+  }
+}
+
+function ensureRelaySpendPolicy(request: OperatorRelayRequestV1): void {
+  if (request.capability === 'review') {
+    throw new Error('semantic peer review is paused by founder cost-control policy');
   }
 }
 
@@ -242,6 +250,7 @@ export function createServerOperatorRelayAdapters(
       adapters.gemini = operatorRelayAdapterFromTextProvider({
         invoke: async ({ request }) => {
           ensureRelaySensitivity(request);
+          ensureRelaySpendPolicy(request);
           const body = await invokeJsonProvider(
             fetchImpl,
             `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(modelId)}:generateContent`,
@@ -270,6 +279,7 @@ export function createServerOperatorRelayAdapters(
     adapters.codex = operatorRelayAdapterFromTextProvider({
       invoke: async ({ request }) => {
         ensureRelaySensitivity(request);
+        ensureRelaySpendPolicy(request);
         const body = await invokeJsonProvider(fetchImpl, 'https://api.openai.com/v1/responses', {
           method: 'POST',
           headers: {
@@ -294,6 +304,7 @@ export function createServerOperatorRelayAdapters(
     adapters['claude-code'] = operatorRelayAdapterFromTextProvider({
       invoke: async ({ request }) => {
         ensureRelaySensitivity(request);
+        ensureRelaySpendPolicy(request);
         const body = await invokeJsonProvider(fetchImpl, 'https://api.anthropic.com/v1/messages', {
           method: 'POST',
           headers: {
@@ -318,6 +329,7 @@ export function createServerOperatorRelayAdapters(
     adapters.perplexity = operatorRelayAdapterFromTextProvider({
       invoke: async ({ request }) => {
         ensureRelaySensitivity(request);
+        ensureRelaySpendPolicy(request);
         const body = await invokeJsonProvider(fetchImpl, 'https://api.perplexity.ai/v1/sonar', {
           method: 'POST',
           headers: {
