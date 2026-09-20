@@ -18,14 +18,65 @@ class ProjectReadAuditError extends Error {
   }
 }
 
+const CREDENTIAL_KEY_PATTERN = /(?:^|[_-])(api[_-]?key|access[_-]?token|refresh[_-]?token|bearer[_-]?token|client[_-]?secret|private[_-]?key|password|passwd|secret|authorization|credential)(?:$|[_-])/i;
+const CREDENTIAL_VALUE_PATTERNS = [
+  /^Bearer\s+\S+/i,
+  /^-----BEGIN [A-Z ]*PRIVATE KEY-----/,
+  /^(?:sk-|sk_live_|rk_live_|ghp_|gho_|github_pat_|xox[baprs]-)\S+$/i,
+];
+
 function asRecord(value: unknown): JsonRecord | undefined {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
     ? value as JsonRecord
     : undefined;
 }
 
+function credentialLikeValue(value: unknown): boolean {
+  return typeof value === 'string'
+    && CREDENTIAL_VALUE_PATTERNS.some(pattern => pattern.test(value.trim()));
+}
+
+/**
+ * Returns the first credential-shaped path found inside connection config.
+ * `secretRef` is intentionally outside `config` and remains the supported
+ * reference-only metadata path. The detector is recursive so nesting cannot
+ * bypass the boundary.
+ */
+export function connectionConfigSecretViolation(
+  value: unknown,
+  path = 'config',
+): string | null {
+  if (credentialLikeValue(value)) return path;
+
+  if (Array.isArray(value)) {
+    for (let index = 0; index < value.length; index += 1) {
+      const violation = connectionConfigSecretViolation(value[index], `${path}[${index}]`);
+      if (violation) return violation;
+    }
+    return null;
+  }
+
+  const record = asRecord(value);
+  if (!record) return null;
+
+  for (const [key, nested] of Object.entries(record)) {
+    const nextPath = `${path}.${key}`;
+    if (CREDENTIAL_KEY_PATTERN.test(key)) return nextPath;
+    const violation = connectionConfigSecretViolation(nested, nextPath);
+    if (violation) return violation;
+  }
+
+  return null;
+}
+
 function pathSegments(pathname: string): string[] {
   return pathname.split('/').filter(Boolean);
+}
+
+function isConnectionCreate(req: FounderRequest): boolean {
+  if (req.method !== 'POST') return false;
+  const segments = pathSegments(req.path);
+  return segments.length === 2 && segments[1] === 'connections';
 }
 
 function readSurface(pathname: string): ReadSurface | null {
@@ -137,9 +188,6 @@ async function persistReadAudit(
 ): Promise<void> {
   const projectIds = await projectIdsForRead(surface, body);
 
-  // An empty registry reveals no project rows and the schema has no global audit
-  // parent. Every non-empty registry row and every project-specific read is
-  // fail-closed below.
   if (projectIds.length === 0) return;
 
   const rows = projectIds.map(projectId => ({
@@ -163,16 +211,31 @@ async function persistReadAudit(
 }
 
 /**
- * Delays successful JSON responses from project read surfaces until a sanitized
- * access event has persisted. Error responses and non-GET methods are not
- * rewritten. Every recognized project-specific read fails closed when its
- * audit receipt cannot be written.
+ * This project-router boundary has two fail-closed jobs:
+ *
+ * 1. Reject credential-shaped `config` before POST /:slug/connections reaches
+ *    persistence. `secretRef` remains the explicit reference-only channel.
+ * 2. Delay successful project read responses until their sanitized audit event
+ *    has persisted.
  */
 export function requireProjectReadAudit(
   req: FounderRequest,
   res: Response,
   next: NextFunction,
 ): void {
+  if (isConnectionCreate(req)) {
+    const body = asRecord(req.body);
+    const violation = connectionConfigSecretViolation(body?.config);
+    if (violation) {
+      res.status(400).json({
+        error: 'Connection config must not contain credentials; store only non-secret metadata and use secretRef for the credential reference.',
+        code: 'CONNECTION_CONFIG_SECRET_REJECTED',
+        field: violation,
+      });
+      return;
+    }
+  }
+
   if (req.method !== 'GET') {
     next();
     return;
