@@ -1,6 +1,10 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { Router } from 'express';
 import { supabase } from '../../lib/supabaseClient.js';
+import {
+  requestChiefControlRoomRecommendation,
+  type ChiefControlRoomRecommendation,
+} from '../../lib/chiefControlRoomRecommendation.js';
 import { requireWorkspaceUser, type FounderRequest } from '../middleware/requireFounder.js';
 import { rateLimitFounderPermissions } from '../middleware/security.js';
 
@@ -23,7 +27,6 @@ type ComposerInput = {
 };
 
 const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-const CHIEF_RECOMMENDATION_VERSION = 'chief-workspace-composer-v2';
 const PROJECT_TYPES = new Set([
   'product-app', 'website', 'ai-agent', 'business-company', 'client-project',
   'content-brand', 'store-commerce', 'research-decision', 'other',
@@ -32,15 +35,6 @@ const MISSIONS = new Set(['build', 'fix', 'launch', 'grow', 'operate', 'decide',
 const PROJECT_STATES = new Set([
   'idea', 'planning', 'building', 'live', 'broken', 'needs-improvement', 'unsure',
 ]);
-const MISSION_GATES: Record<string, string> = {
-  build: 'Define the smallest end-to-end build slice and the proof that makes it real.',
-  fix: 'Bind the failing path to current evidence, repair one cause, then re-run the real path.',
-  launch: 'Prove one real user path against the exact release before widening traffic.',
-  grow: 'Choose the nearest measurable growth signal and one bounded experiment.',
-  operate: 'Establish current health, failure signals, and a reversible recovery path.',
-  decide: 'Name the decision, the evidence that could change it, and the stop condition.',
-  prove: 'Name the claim and collect evidence from the real runtime or provider that can verify it.',
-};
 
 function text(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
@@ -88,27 +82,53 @@ function parseComposer(body: DbRecord): { input?: ComposerInput; error?: string 
   };
 }
 
-function recommendation(ownerWorkspaceId: string, input: ComposerInput) {
-  const canonical = JSON.stringify({
-    version: CHIEF_RECOMMENDATION_VERSION,
-    workspaceId: ownerWorkspaceId,
-    name: input.name,
-    slug: input.slug,
+function chiefInput(input: ComposerInput) {
+  return {
+    projectName: input.name,
+    projectType: input.controlRoom.projectType,
+    mission: input.controlRoom.mission,
+    currentState: input.controlRoom.currentState,
     repoIdentifier: input.repoIdentifier,
     stack: input.stack,
-    controlRoom: input.controlRoom,
+  };
+}
+
+function workspaceRecommendationEnvelope(
+  ownerWorkspaceId: string,
+  input: ComposerInput,
+  chief: ChiefControlRoomRecommendation,
+) {
+  const canonical = JSON.stringify({
+    contract: 'founder-control-room/workspace-chief-acceptance@v1',
+    workspaceId: ownerWorkspaceId,
+    project: {
+      name: input.name,
+      slug: input.slug,
+      repoIdentifier: input.repoIdentifier,
+      stack: input.stack,
+      controlRoom: input.controlRoom,
+    },
+    chiefRecommendationHash: chief.recommendationHash,
   });
   const fingerprint = createHash('sha256').update(canonical).digest('hex');
-  const gate = MISSION_GATES[input.controlRoom.mission] ?? MISSION_GATES.prove;
 
   return {
-    id: `${CHIEF_RECOMMENDATION_VERSION}:${fingerprint}`,
-    version: CHIEF_RECOMMENDATION_VERSION,
-    title: `Chief recommends a ${input.controlRoom.projectType} Control Room focused on ${input.controlRoom.mission}.`,
-    detail: `Begin from the founder-declared ${input.controlRoom.currentState} state. Keep declarations separate from independently verified reality.`,
-    firstGate: gate,
+    id: `workspace-chief-acceptance-v1:${fingerprint}`,
+    version: chief.contract,
+    selectedBy: chief.selectedBy,
+    recommendationHash: chief.recommendationHash,
+    title: chief.title,
+    detail: [chief.focus, chief.stateGuidance].filter(Boolean).join(' '),
+    firstGate: chief.nextGate,
+    capabilityIntents: chief.capabilityIntents,
+    evidencePriorities: chief.evidencePriorities,
     authorityBoundary: 'Recommendation only. Creating this room grants no provider, credential, merge, deploy, spending, communication, deletion, or execution authority.',
   };
+}
+
+async function currentWorkspaceRecommendation(ownerWorkspaceId: string, input: ComposerInput) {
+  const chief = await requestChiefControlRoomRecommendation(chiefInput(input));
+  return workspaceRecommendationEnvelope(ownerWorkspaceId, input, chief);
 }
 
 async function profileMap(projectIds: string[]) {
@@ -205,7 +225,23 @@ workspaceProjectsRouter.post('/projects/recommendation', async (req: FounderRequ
   }
   const parsed = parseComposer(req.body as DbRecord);
   if (!parsed.input) return res.status(400).json({ error: parsed.error });
-  return res.json({ recommendation: recommendation(ownerWorkspaceId, parsed.input) });
+
+  try {
+    const recommendation = await currentWorkspaceRecommendation(ownerWorkspaceId, parsed.input);
+    return res.json({
+      recommendation,
+      truth: {
+        chiefCreatesControlRoom: false,
+        chiefGrantsExecution: false,
+        stateAuthority: 'founder-control-room',
+        evidenceAuthority: 'founder-control-room',
+      },
+    });
+  } catch {
+    return res.status(503).json({
+      error: 'Chief recommendation is unavailable. Control Room creation remains fail-closed.',
+    });
+  }
 });
 
 workspaceProjectsRouter.post('/projects', async (req: FounderRequest, res) => {
@@ -218,11 +254,20 @@ workspaceProjectsRouter.post('/projects', async (req: FounderRequest, res) => {
   const body = req.body as DbRecord;
   const parsed = parseComposer(body);
   if (!parsed.input) return res.status(400).json({ error: parsed.error });
-  const expected = recommendation(ownerWorkspaceId, parsed.input);
 
   if (body.chiefApproval !== true) {
     return res.status(400).json({ error: 'Founder approval of the current Chief recommendation is required' });
   }
+
+  let expected;
+  try {
+    expected = await currentWorkspaceRecommendation(ownerWorkspaceId, parsed.input);
+  } catch {
+    return res.status(503).json({
+      error: 'Chief recommendation could not be revalidated. Control Room creation remains fail-closed.',
+    });
+  }
+
   if (text(body.chiefRecommendationId) !== expected.id) {
     return res.status(409).json({ error: 'Chief recommendation is stale. Request and approve a fresh recommendation.' });
   }
