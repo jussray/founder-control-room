@@ -159,6 +159,7 @@ export function validateHairCommerceReceipt(input: unknown): HairCommerceReceipt
   }
 
   const exactCommitSha = input.exactCommitSha.toLowerCase();
+  const evidenceUrl = githubEvidenceUrl(input.evidenceUrl, exactCommitSha);
 
   return {
     receiptId: input.receiptId.toLowerCase(),
@@ -169,8 +170,9 @@ export function validateHairCommerceReceipt(input: unknown): HairCommerceReceipt
     unresolvedCount: boundedInteger(input.unresolvedCount, 'unresolved_count'),
     occurredAt: occurredAt.toISOString(),
     exactCommitSha,
-    collectedValueCents,
-    currency,
-    evidenceUrl: githubEvidenceUrl(input.evidenceUrl, exactCommitSha),
+    ...(collectedValueCents !== undefined && currency
+      ? { collectedValueCents, currency }
+      : {}),
+    ...(evidenceUrl ? { evidenceUrl } : {}),
   };
 }
