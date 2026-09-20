@@ -153,7 +153,6 @@ describe('Founder deploy command authority contract', () => {
     expect(reconcileWorkflow).not.toContain('GITHUB_PRIVATE_KEY: ${{ secrets.GITHUB_PRIVATE_KEY }}');
     expect(reconcileWorkflow).not.toContain('FCR_SHOPIFY_WEBHOOK_SECRET: ${{ secrets.FCR_SHOPIFY_WEBHOOK_SECRET }}');
     expect(reconcileWorkflow).not.toContain('FCR_COMMERCE_HASH_SALT: ${{ secrets.FCR_COMMERCE_HASH_SALT }}');
-    expect(reconcileWorkflow).not.toContain('JBH_RECEIPT_INGEST_TOKEN: ${{ secrets.JBH_RECEIPT_INGEST_TOKEN }}');
     expect(reconcileWorkflow).not.toContain('TINYFISH_API_KEY: ${{ secrets.TINYFISH_API_KEY }}');
     expect(reconcileWorkflow).not.toContain('FOUNDER_SIGNAL_ENGINE_MCP_TOKEN: ${{ secrets.FOUNDER_SIGNAL_ENGINE_MCP_TOKEN }}');
     expect(configuredWorkerSecretNames()).toEqual([
@@ -166,7 +165,6 @@ describe('Founder deploy command authority contract', () => {
       'FCR_REMOTE_MCP_READ_TOKEN',
       'FCR_SHOPIFY_WEBHOOK_SECRET',
       'FCR_COMMERCE_HASH_SALT',
-      'JBH_RECEIPT_INGEST_TOKEN',
       'TINYFISH_API_KEY',
       'FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON',
       'FOUNDER_SIGNAL_ENGINE_MCP_TOKEN',
