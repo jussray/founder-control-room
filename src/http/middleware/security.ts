@@ -180,6 +180,10 @@ interface RateBucket {
   resetsAt: number;
 }
 
+function requestRateClass(req: Request): 'read' | 'write' {
+  return req.method === 'GET' || req.method === 'HEAD' ? 'read' : 'write';
+}
+
 function createRateLimiter(
   windowMs: number,
   max: number,
@@ -189,7 +193,8 @@ function createRateLimiter(
 
   return (req, res, next): void => {
     const now = Date.now();
-    const key = req.ip || req.socket.remoteAddress || 'unknown';
+    const address = req.ip || req.socket.remoteAddress || 'unknown';
+    const key = `${address}:${requestRateClass(req)}`;
     const existing = buckets.get(key);
     const bucket = !existing || existing.resetsAt <= now
       ? { count: 0, resetsAt: now + windowMs }
@@ -219,7 +224,7 @@ export const rateLimitMagicLink = createRateLimiter(
   { error: 'Too many magic-link requests, please try again later.' },
 );
 
-/** 60 requests per minute per process/IP for general API routes. */
+/** 60 read and 60 write requests per minute per process/IP for general API routes. */
 export const rateLimitGeneral = createRateLimiter(
   60 * 1_000,
   60,
