@@ -148,6 +148,8 @@ verified evidence
 
 A draft, provider acceptance, or n8n execution is not publication truth. **Provider readback** is the terminal external-state evidence for the route that actually ran.
 
+The current Postiz source integration is deliberately narrower than publication. `src/lib/postizMcpLifecycleAdapter.ts` may use the server-held `POSTIZ_API_KEY` only for bounded MCP account discovery and post-status readback (`integrationList` and `postsListTool`). It does not expose Postiz `schedulePostTool`, `publish_now`, or any other provider-write path through the generic MCP/readback boundary. A Postiz-reported `PUBLISHED` state without a destination-native permalink or equivalent independently verified terminal artifact remains provider-reported state, not FCR publication truth. Live Postiz authentication, endpoint health, connected-account state, and provider outcomes remain separately unproven until current runtime/provider evidence observes them.
+
 The governed Founder Content n8n production-source lane is source-enabled only when its reviewed configuration sets `N8N_FOUNDER_CONTENT_ENABLED=true`, restricts the enabled provider to Buffer, pins workflow identity `fcrFounderContentV1`, and pins n8n runtime `2.32.6`. That source state does not prove the canonical Worker was deployed with the four required provider-held n8n secret bindings, the production workflow was published at the exact expected fingerprint, the database migrations were applied, or Buffer accepted a schedule. CI may prove the checked workflow on an isolated real n8n runtime without proving production use. Present-tense `live`, `used`, `scheduled`, or `published` claims require exact deployed runtime identity plus provider-native readback.
 
 Investor email is a separate authority class and must not auto-send without the applicable policy, recipient-specific qualification, and send authority.
@@ -203,8 +205,6 @@ A production-specific Truth Lease composes already-authoritative observations. I
 
 The privileged post-Deploy Playwright witness is an **independent verifier**, not an executor for the Deploy-run checkout. It must run only for a successful `workflow_dispatch` Deploy run from `main`, execute trusted witness source, and treat the Deploy run SHA only as release evidence to compare with the deployed Worker and public browser/runtime identity. A `workflow_run` SHA must never become executable authority merely because the upstream workflow succeeded.
 
-Routine Playwright verification is intentionally lower privilege than provider execution. `.github/workflows/playwright.yml` does not receive `OPENAI_API_KEY` or `PERPLEXITY_API_KEY` for the normal browser lane. Model-provider credentials belong only in separately authorized provider-specific or live-runtime lanes. Their absence from routine Playwright narrows secret exposure; it does not prove a provider is configured, unavailable, healthy, or live.
-
 ### Evidence Trust Plane
 
 The Evidence Trust Plane keeps observation, provider readback, evidence validity, freshness, and action ceilings separate.
@@ -228,6 +228,8 @@ A terminal result is verification evidence only for the command and exact checko
 ### MCP and provider bridges
 
 FCR can declare and govern bounded MCP/provider capabilities, including the source contract for a read-only FCR MCP bridge. Repository declarations prove wiring only. Live secret presence, provider authentication, endpoint health, deployed runtime identity, and mutation authority require separate current evidence.
+
+Componecat is one such bounded source capability: its registry entry is read-only portfolio architecture/catalog context for active projects. Catalog discovery does not grant project ownership, repository mutation, merge, deploy, provider-write, or publication authority, and continuity-only/external project identities do not inherit access merely because they exist in the broader portfolio graph.
 
 ## Data boundary
 

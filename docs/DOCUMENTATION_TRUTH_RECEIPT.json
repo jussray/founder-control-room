@@ -1,6 +1,6 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Preserve current workflow, Cloudflare, Shopify, founder-merge, content-evidence, public-discovery, and cross-repository StoryEngine federation truth boundaries without converting source, analytics, crawler policy, peer pinning, provider configuration, mergeability, candidate/browser proof, or growth recommendations into publication, production, provider-mutation, merge, deploy, spend, or external-contact authority.",
+  "purpose": "Preserve current workflow, Cloudflare, Shopify, founder-merge, content-evidence, public-discovery, bounded Postiz readback, Componecat catalog context, and cross-repository StoryEngine federation truth boundaries without converting source, analytics, crawler policy, peer pinning, provider configuration, readback state, mergeability, candidate/browser proof, or growth recommendations into publication, production, provider-mutation, merge, deploy, spend, or external-contact authority.",
   "domains": [
     "cloudflare-authority",
     "repository-provider",
@@ -21,8 +21,7 @@
       "path": ".github/workflows/playwright.yml",
       "claims": [
         "`.github/workflows/playwright.yml` must bind the FCR-to-StoryEngine browser federation witness to a separately verified exact StoryEngine peer SHA and ref; changing that peer identity expires predecessor federation/browser proof and requires the complete exact-head witness to rerun without granting merge, deploy, production, or provider-mutation authority.",
-        "A fresh peer ref/SHA observation may select the successor StoryEngine evidence subject, but the successor FCR federation state remains UNKNOWN until the complete exact-head runtime identity, directive, receipt, and Playwright browser witness succeeds against that peer.",
-        "`.github/workflows/playwright.yml` must keep routine browser verification free of `OPENAI_API_KEY` and `PERPLEXITY_API_KEY`; live model-provider credentials may enter only separately authorized provider-specific lanes, and their absence from routine Playwright cannot be interpreted as provider unavailability or production proof."
+        "A fresh peer ref/SHA observation may select the successor StoryEngine evidence subject, but the successor FCR federation state remains UNKNOWN until the complete exact-head runtime identity, directive, receipt, and Playwright browser witness succeeds against that peer."
       ]
     },
     {
@@ -56,6 +55,12 @@
       ]
     },
     {
+      "path": "src/http/routes/founderContentLifecycleRuntime.ts",
+      "claims": [
+        "`src/http/routes/founderContentLifecycleRuntime.ts` may inject a configured Postiz lifecycle adapter only as the bounded account/status readback dependency declared by that adapter; runtime composition must not add publication authority or bypass the existing founder-content approval and execution membrane."
+      ]
+    },
+    {
       "path": "src/http/routes/youtubeGrowth.ts",
       "claims": [
         "`src/http/routes/youtubeGrowth.ts` must require founder authentication, reject malformed or unknown experiment, measurement, continuity, threshold, target, and repeatability input before core evaluation, and return only the non-authorizing `fcr/youtube-growth-evaluation@v1` result with publication/provider mutation explicitly false."
@@ -65,6 +70,19 @@
       "path": "src/http/routes/__tests__/n8nConveyor.youtubeGrowth.integration.test.ts",
       "claims": [
         "`src/http/routes/__tests__/n8nConveyor.youtubeGrowth.integration.test.ts` must prove unauthenticated access is rejected, malformed state fails closed, duplicate receipts cannot fake repeatability, and a valid Day-31 recommendation remains advisory with no provider mutation or publication claim."
+      ]
+    },
+    {
+      "path": "src/lib/postizMcpLifecycleAdapter.ts",
+      "claims": [
+        "`src/lib/postizMcpLifecycleAdapter.ts` may expose only bounded Postiz account listing and post-status readback and must deny `publish_now`, `schedulePostTool`, and other provider-write operations through this lifecycle adapter.",
+        "A Postiz-reported PUBLISHED state without a destination-native permalink or equivalent independently verified terminal artifact must remain provider-reported, non-terminal evidence and cannot become FCR publication truth."
+      ]
+    },
+    {
+      "path": "src/mcp/defaultRegistry.ts",
+      "claims": [
+        "`src/mcp/defaultRegistry.ts` may register Componecat only as read-only active-portfolio architecture/catalog context; discovery must not grant repository mutation, merge, deploy, provider-write, publication authority, or access to continuity-only external project identities."
       ]
     },
     {
@@ -78,13 +96,28 @@
         "`README.md` must describe the authenticated YouTube growth route as an advisory evidence evaluator whose HOLD/ADVANCE result cannot prove publication, YPP eligibility, revenue, provider mutation, or scale execution and whose malformed inputs fail closed.",
         "`README.md` must describe deterministic founder-content approval reservation and exact active retry recovery without allowing evidence rotation, retry, or a stored reservation to mint new publication authority.",
         "`README.md` must state that rebinding the StoryEngine Playwright peer resets predecessor browser-federation proof and that a ref/SHA match alone cannot grant merge, deploy, production, or provider-mutation authority.",
-        "`README.md` must state that routine Playwright runs do not receive model-provider API keys and that secret absence there is a least-privilege boundary, not evidence that a live provider is configured, unavailable, or proven."
+        "`README.md` must describe Postiz as bounded server-authenticated account/status readback only, keep Postiz scheduling/publication writes outside that adapter, and refuse to translate provider-reported PUBLISHED state without terminal artifact evidence into publication truth.",
+        "`README.md` must describe Componecat as read-only architecture/catalog context whose discovery grants no project ownership, repository mutation, merge, deploy, provider-write, or publication authority."
       ]
     },
     {
       "path": "docs/PUBLIC_COMMUNICATION_TRUTH_CONTRACT.md",
       "claims": [
-        "`docs/PUBLIC_COMMUNICATION_TRUTH_CONTRACT.md` must keep YouTube growth HOLD/ADVANCE and diagnostic recommendations inside observation/recommendation authority and require separate provider/outcome evidence before public claims of publication, YPP eligibility, revenue, conversion, or provider-side state."
+        "`docs/PUBLIC_COMMUNICATION_TRUTH_CONTRACT.md` must keep YouTube growth HOLD/ADVANCE and diagnostic recommendations inside observation/recommendation authority and require separate provider/outcome evidence before public claims of publication, YPP eligibility, revenue, conversion, or provider-side state.",
+        "`docs/PUBLIC_COMMUNICATION_TRUTH_CONTRACT.md` must keep Postiz MCP account/status readback separate from provider-write authority and must hold any publication claim when Postiz reports PUBLISHED without a destination-native permalink or equivalent independently verified terminal artifact.",
+        "Componecat catalog/context evidence must remain non-authorizing and cannot be used as public proof of project execution, deployment, or publication."
+      ]
+    },
+    {
+      "path": "public/control-room/content-manager.html",
+      "claims": [
+        "`public/control-room/content-manager.html` may expose Postiz to the founder only as a clearly labeled readback-only provider choice; the UI must continue to state that direct publish is LinkedIn-only and must not present Postiz readback as publication authority."
+      ]
+    },
+    {
+      "path": "e2e/content-manager-proof.mjs",
+      "claims": [
+        "`e2e/content-manager-proof.mjs` must prove the Postiz readback option is founder-visible while remaining non-authorizing, and must preserve the no-provider-mutation-before-explicit-confirmation browser invariant."
       ]
     },
     {
@@ -97,8 +130,7 @@
       "path": "docs/TRUTH_DECAY_AUDIT.md",
       "claims": [
         "`docs/TRUTH_DECAY_AUDIT.md` must treat a StoryEngine peer SHA/ref in FCR Playwright as evidence identity rather than a durable alias for current StoryEngine, and must require complete federation re-proof whenever the peer identity or either repository head moves.",
-        "`docs/TRUTH_DECAY_AUDIT.md` must keep a newly matched StoryEngine ref/SHA in UNKNOWN browser-federation state until the exact successor FCR head completes the runtime, directive, receipt, and browser witness.",
-        "`docs/TRUTH_DECAY_AUDIT.md` must treat model-provider credentials as separate authority from routine browser proof; removing provider keys from routine Playwright narrows secret exposure and cannot prove provider availability, configuration, or live execution."
+        "`docs/TRUTH_DECAY_AUDIT.md` must keep a newly matched StoryEngine ref/SHA in UNKNOWN browser-federation state until the exact successor FCR head completes the runtime, directive, receipt, and browser witness."
       ]
     },
     {

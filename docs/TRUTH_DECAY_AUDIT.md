@@ -42,6 +42,8 @@ A September peer-rollover incident made the freshness rule concrete. FCR `af87c6
 
 The workflow's `STORYENGINE_PEER_SHA` and `STORYENGINE_PEER_REF` are evidence identities, not durable aliases for “current StoryEngine.” A peer-pin update is valid only after the referenced peer is independently observed to resolve to the intended exact StoryEngine SHA. Changing either pin immediately expires predecessor FCR federation/browser evidence and requires the complete exact-head Playwright loop to rerun against the new peer. A correct pin does not prove StoryEngine production deployment, FCR production deployment, merge authority, deploy authority, or provider mutation.
 
+On September 20, that freshness gate caught the same class again when StoryEngine `main` advanced from `aa768075f4bd4fcd8b65f7ee0753596cc488d53a` to merge head `39bed061b034793c69c262527d85c3c4b5617cce` after PR #115. The failing FCR witness remains useful historical evidence that its local browser harness passed, but it cannot prove federation against the successor peer. Recovery requires pinning the independently proven StoryEngine merge head and rerunning the complete FCR exact-head federation/browser witness; neither predecessor green nor a founder merge approval for the predecessor FCR head carries across that movement.
+
 ## 2026-09 control correction: privileged production witness isolation
 
 A post-Deploy `workflow_run` witness is privileged even when its purpose is read-only verification. Treating the triggering workflow's `head_sha` as both the release identity to observe and the code to execute collapses evidence identity into executable authority. A successful upstream workflow must not make its checkout trusted merely by becoming a completed run.
@@ -49,14 +51,6 @@ A post-Deploy `workflow_run` witness is privileged even when its purpose is read
 The corrected rule keeps those roles separate: `.github/workflows/playwright.yml` restricts the production witness to successful `workflow_dispatch` Deploy runs from `main`, executes only the trusted witness source associated with the privileged workflow context, and carries `workflow_run.head_sha` only as the expected release identity to compare against production. The witness can prove that deployed Worker and browser/runtime identity match the Deploy run SHA, but it cannot execute the Deploy-run checkout or use upstream success as authority to widen what code runs in the privileged phase.
 
 This remains a proof contract, not production proof by itself. The witness must actually run for the relevant release and return terminal exact-SHA evidence before a production-runtime claim becomes current.
-
-## 2026-09 control correction: routine Playwright secret minimization
-
-Routine browser verification previously inherited model-provider credentials even though the normal Playwright lane does not need live OpenAI or Perplexity execution to prove UI behavior. That made an evidence lane more privileged than its job required and blurred two different truths: browser behavior and provider availability.
-
-The corrected boundary removes `OPENAI_API_KEY` and `PERPLEXITY_API_KEY` from the routine `.github/workflows/playwright.yml` environment. Routine Playwright may prove the browser and application path it actually exercises, but the absence of provider keys cannot prove that a model provider is unavailable, misconfigured, healthy, or live. Any live-provider witness must run in a separately authorized provider-specific lane with its own credential boundary and provider/runtime readback.
-
-This is a least-privilege correction, not provider deactivation. The source change narrows secret exposure while preserving the rule that provider configuration, live model execution, and production outcome require their own current evidence.
 
 ## 2026-09 control correction: Capital Decision documentation drift
 
@@ -236,8 +230,6 @@ For cross-repository product-build proof, `.github/workflows/playwright.yml` is 
 
 The same workflow also contains a privileged post-Deploy production witness. That witness must not execute `workflow_run.head_sha`; it must execute trusted witness source and carry the successful main-bound Deploy run SHA only as release evidence. Separating witness code from observed release identity is part of the evidence-authority contract, because upstream workflow success cannot itself grant executable trust to an arbitrary checkout.
 
-Routine browser verification is a separate authority class from live provider execution. The routine `.github/workflows/playwright.yml` path must stay free of model-provider API keys unless a separately authorized live-provider witness explicitly requires them. Removing provider secrets from routine browser proof is a least-privilege change; it cannot be reused as evidence that provider configuration or live model execution succeeded or failed.
-
 That registration does not mean durable evidence persistence exists. The current Evidence Trust Plane slice defines receipt, validity, and action-ceiling contracts only; `ledgerState` is supplied state until a separately reviewed persistence writer/store exists. Current receipt use must also re-evaluate expiration and bind merge-review preparation to GitHub API evidence for an exact repository, full SHA, workflow, and run identity. Rejected or non-GitHub evidence cannot be relabeled as merge-review-ready merely because readback completed.
 
 ### Release-coverage at-use gate
@@ -392,7 +384,6 @@ The strongest optimization is not faster claiming. It is shortening the distance
 33. `merge_authority: true` cannot be reused as candidate approval; every merge requires a fresh explicit founder decision for the exact live repository/PR/base/head, and candidate movement expires that approval.
 34. Rebinding a cross-repository Playwright peer to a newly verified exact ref/SHA expires predecessor federation/browser proof and requires a complete exact-head rerun; the pin is evidence identity, not production or merge authority.
 35. A live peer ref/SHA match may select the next browser-federation evidence subject, but it cannot carry predecessor green forward; the successor stays `UNKNOWN` until the complete exact-head runtime, directive, receipt, and browser witness passes.
-36. Removing model-provider credentials from routine Playwright is a least-privilege boundary, not proof that the provider is unavailable or inactive; provider configuration and live execution require separate authorized evidence.
 
 ## 2026-09 control correction: peer ref refresh resets proof
 
