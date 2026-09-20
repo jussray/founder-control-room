@@ -71,26 +71,31 @@ function projectListRow() {
   };
 }
 
-function catalogManifest() {
+function catalogManifest({ explicitProviderPolicy = false } = {}) {
   return JSON.stringify({
     repository: PROJECT.repo_identifier,
     tests: {
+      ...(explicitProviderPolicy ? { providerCheckPolicy: '.control-room/test-ledger.manifest.json' } : {}),
       catalog: [
         { id: 'typecheck', name: 'Chief AI TypeScript', required: true, status: 'active' },
         { id: 'unit-tests', name: 'Chief AI unit tests', required: true, status: 'active' },
         { id: 'playwright', name: 'Freestyle save and persistence Chromium proof', required: true, status: 'active' },
       ],
+      workflowCatalog: explicitProviderPolicy ? [
+        { id: 'ci', name: 'CI', required: true, status: 'active' },
+        { id: 'quality', name: 'Quality Gate', required: true, status: 'active' },
+      ] : undefined,
     },
   });
 }
 
-function providerPolicy() {
+function providerPolicy(requiredChecks = REQUIRED_CHECKS) {
   return JSON.stringify({
     repository: PROJECT.repo_identifier,
     source: { provider: 'github-check-runs', exactRef: 'commit-sha' },
     policy: {
       requiredCheckAuthority: 'repository-policy',
-      requiredChecks: REQUIRED_CHECKS,
+      requiredChecks,
     },
   });
 }
@@ -148,21 +153,46 @@ describe('POST /goalfix/inspect provider policy resolution', () => {
       });
 
     expect(response.status).toBe(200);
-    expect(providerMock.readFile).toHaveBeenNthCalledWith(
-      1,
-      PROJECT.slug,
-      SHA,
-      'control-room.manifest.json',
-    );
-    expect(providerMock.readFile).toHaveBeenNthCalledWith(
-      2,
-      PROJECT.slug,
-      SHA,
-      '.control-room/test-ledger.manifest.json',
-    );
+    expect(providerMock.readFile).toHaveBeenNthCalledWith(1, PROJECT.slug, SHA, 'control-room.manifest.json');
+    expect(providerMock.readFile).toHaveBeenNthCalledWith(2, PROJECT.slug, SHA, '.control-room/test-ledger.manifest.json');
     expect(response.body.goal.expectedVerificationNames).toEqual(REQUIRED_CHECKS);
     expect(response.body.goal.expectedVerificationNames).not.toContain('Chief AI TypeScript');
     expect(response.body.contextResolution.requiredVerificationNames).toEqual(REQUIRED_CHECKS);
     expect(response.body.readiness).not.toBe('blocked');
+  });
+
+  it('prefers an explicitly declared provider-check policy over workflow display names', async () => {
+    const providerContexts = ['Required Gate', 'Verify test-ledger contract'];
+    providerMock.readFile.mockImplementation(async (_projectId: string, ref: string, path: string) => {
+      expect(ref).toBe(SHA);
+      if (path === 'control-room.manifest.json') return catalogManifest({ explicitProviderPolicy: true });
+      if (path === '.control-room/test-ledger.manifest.json') return providerPolicy(providerContexts);
+      throw new Error(`Unexpected file read: ${path}`);
+    });
+    providerMock.listVerificationSignals.mockResolvedValue(
+      providerContexts.map((name, index) => ({
+        id: `provider-${index}`,
+        name,
+        status: 'passed',
+        commitSha: SHA,
+        provider: 'github',
+      })),
+    );
+
+    const response = await request(buildApp())
+      .post('/goalfix/inspect')
+      .set('Authorization', BEARER)
+      .send({
+        project: 'Chief AI Machine',
+        desiredOutcome: 'Use the exact provider status contexts, not workflow display names.',
+        constraints: ['Read-only inspection'],
+        firstFilesOrLogs: ['control-room.manifest.json'],
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body.goal.expectedVerificationNames).toEqual(providerContexts);
+    expect(response.body.goal.expectedVerificationNames).not.toContain('CI');
+    expect(response.body.goal.expectedVerificationNames).not.toContain('Quality Gate');
+    expect(response.body.contextResolution.requiredVerificationNames).toEqual(providerContexts);
   });
 });

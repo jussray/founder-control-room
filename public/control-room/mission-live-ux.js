@@ -1,6 +1,7 @@
 const POLL_MS = 5000;
 const MISSION_DETAIL_SELECTOR = '#mission-detail';
 const MISSION_TAB_SELECTOR = '.tabs button[data-tab="missions"]';
+const MISSION_DRAFT_COMMITTED_EVENT = 'fcr:mission-draft-committed';
 
 let missionDrafts = new Map();
 let pollTimer = null;
@@ -16,24 +17,39 @@ function missionDetail() {
   return detail instanceof HTMLElement ? detail : null;
 }
 
+function draftFieldIdentity(field) {
+  if (field.name) return `name:${field.name}`;
+  if (field.id) return `id:${field.id}`;
+  return null;
+}
+
 function isDraftField(field) {
   return (
     field instanceof HTMLInputElement ||
     field instanceof HTMLTextAreaElement ||
     field instanceof HTMLSelectElement
-  ) && field.name && !(field instanceof HTMLInputElement && field.type === 'file');
+  ) && draftFieldIdentity(field) !== null
+    && !(field instanceof HTMLInputElement && field.type === 'file');
 }
 
 function fieldDraftKey(field) {
   const detail = missionDetail();
+  if (!detail) return null;
+  const identity = draftFieldIdentity(field);
+  if (!identity) return null;
+
   const form = field.closest('form');
-  if (!detail || !(form instanceof HTMLFormElement)) return null;
-  const forms = [...detail.querySelectorAll('form')];
-  const formKey = form.id || `form-${forms.indexOf(form)}`;
-  const matching = [...form.querySelectorAll('[name]')].filter((candidate) => (
-    isDraftField(candidate) && candidate.name === field.name
-  ));
-  return `${formKey}:${field.name}:${matching.indexOf(field)}`;
+  if (form instanceof HTMLFormElement) {
+    const forms = [...detail.querySelectorAll('form')];
+    const formKey = form.id || `form-${forms.indexOf(form)}`;
+    const matching = [...form.querySelectorAll('input, textarea, select')].filter((candidate) => (
+      isDraftField(candidate) && draftFieldIdentity(candidate) === identity
+    ));
+    return `form:${formKey}:${identity}:${matching.indexOf(field)}`;
+  }
+
+  if (field.id) return `detail:id:${field.id}`;
+  return null;
 }
 
 function founderIsEditingMissionForm() {
@@ -47,7 +63,7 @@ function captureMissionDrafts() {
   const detail = missionDetail();
   if (!detail) return;
   const next = new Map(missionDrafts);
-  detail.querySelectorAll('[name]').forEach((candidate) => {
+  detail.querySelectorAll('input, textarea, select').forEach((candidate) => {
     if (!isDraftField(candidate)) return;
     const key = fieldDraftKey(candidate);
     if (!key) return;
@@ -74,7 +90,7 @@ function restoreMissionDrafts() {
     return;
   }
   if (missionDrafts.size === 0) return;
-  detail.querySelectorAll('[name]').forEach((candidate) => {
+  detail.querySelectorAll('input, textarea, select').forEach((candidate) => {
     if (!isDraftField(candidate)) return;
     const key = fieldDraftKey(candidate);
     if (!key) return;
@@ -91,6 +107,22 @@ function restoreMissionDrafts() {
     }
     if (draft.kind === 'value' && candidate.value !== draft.value) candidate.value = draft.value;
   });
+}
+
+function clearCommittedDrafts(detail) {
+  if (!detail || typeof detail !== 'object') return;
+  const formId = typeof detail.formId === 'string' ? detail.formId.trim() : '';
+  const fieldIds = Array.isArray(detail.fieldIds)
+    ? detail.fieldIds.filter((value) => typeof value === 'string' && value.trim()).map((value) => value.trim())
+    : [];
+
+  if (formId) {
+    const prefix = `form:${formId}:`;
+    for (const key of missionDrafts.keys()) {
+      if (key.startsWith(prefix)) missionDrafts.delete(key);
+    }
+  }
+  for (const fieldId of fieldIds) missionDrafts.delete(`detail:id:${fieldId}`);
 }
 
 function laneName(lane) {
@@ -190,6 +222,11 @@ function onDraftInput(event) {
   captureMissionDrafts();
 }
 
+function onMissionDraftCommitted(event) {
+  if (!(event instanceof CustomEvent)) return;
+  clearCommittedDrafts(event.detail);
+}
+
 function onNavigationClick(event) {
   const target = event.target;
   if (!(target instanceof Element)) return;
@@ -209,6 +246,7 @@ export function installMissionLiveUx() {
   document.addEventListener('input', onDraftInput, true);
   document.addEventListener('change', onDraftInput, true);
   document.addEventListener('click', onNavigationClick, true);
+  document.addEventListener(MISSION_DRAFT_COMMITTED_EVENT, onMissionDraftCommitted, true);
 
   const root = document.getElementById('root');
   if (root) {
@@ -232,5 +270,6 @@ export function installMissionLiveUx() {
     document.removeEventListener('input', onDraftInput, true);
     document.removeEventListener('change', onDraftInput, true);
     document.removeEventListener('click', onNavigationClick, true);
+    document.removeEventListener(MISSION_DRAFT_COMMITTED_EVENT, onMissionDraftCommitted, true);
   };
 }

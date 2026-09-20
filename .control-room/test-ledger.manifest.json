@@ -27,6 +27,10 @@
     "observerConclusion": "collection-and-schema-only",
     "aggregateDoesNotDuplicateNativeCheckConclusion": true,
     "requiredCheckAuthority": "repository-native-ruleset",
+    "requiredChecks": [
+      "Required Gate",
+      "Verify test-ledger contract"
+    ],
     "productionMutation": false,
     "secretMaterialAllowed": false
   }

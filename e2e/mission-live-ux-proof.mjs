@@ -58,7 +58,10 @@ function workingDraftHtml(){return currentTask.status==='sandboxed'||currentTask
 <label>Commit message<input name="commitMessage" /></label>
 <label>Reviewer notes<textarea name="reviewNotes"></textarea></label>
 <label>Run after review<input type="checkbox" name="runAfterReview" /></label>
-</form>\`:''}
+</form>
+<label>File path<input id="mission-file-path" /></label>
+<label>File editor<textarea id="mission-file-editor"></textarea></label>
+<label>Commit message<input id="mission-commit-message" /></label>\`:''}
 function render(){
   if(window.signedOut){document.querySelector('#root').innerHTML='<main id="signed-out"><h1>Sign in required</h1></main>';return;}
   document.querySelector('#root').innerHTML=\`
@@ -149,6 +152,9 @@ try {
   await page.fill('#mission-working-draft-form input[name=commitMessage]', 'fix: keep founder working draft');
   await page.fill('#mission-working-draft-form textarea[name=reviewNotes]', 'Do not lose this note during polling.');
   await page.check('#mission-working-draft-form input[name=runAfterReview]');
+  await page.fill('#mission-file-path', 'src/index.ts');
+  await page.fill('#mission-file-editor', 'export const draft = true;');
+  await page.fill('#mission-commit-message', 'fix: preserve id-only draft');
 
   await page.evaluate(() => window.forceFounderShellRerender());
   await page.waitForFunction(() => document.querySelector('#proof-gate-form select[name=gateId]')?.value === 'merge');
@@ -159,6 +165,9 @@ try {
   assert.equal(await page.locator('#mission-working-draft-form input[name=commitMessage]').inputValue(), 'fix: keep founder working draft');
   assert.equal(await page.locator('#mission-working-draft-form textarea[name=reviewNotes]').inputValue(), 'Do not lose this note during polling.');
   assert.equal(await page.locator('#mission-working-draft-form input[name=runAfterReview]').isChecked(), true);
+  assert.equal(await page.locator('#mission-file-path').inputValue(), 'src/index.ts');
+  assert.equal(await page.locator('#mission-file-editor').inputValue(), 'export const draft = true;');
+  assert.equal(await page.locator('#mission-commit-message').inputValue(), 'fix: preserve id-only draft');
 
   await page.click('.tabs button[data-tab="missions"]');
   await page.evaluate(() => window.forceFounderShellRerender());
@@ -166,8 +175,26 @@ try {
   assert.equal(await page.locator('#mission-working-draft-form input[name=commitMessage]').inputValue(), 'fix: keep founder working draft');
   assert.equal(await page.locator('#mission-working-draft-form textarea[name=reviewNotes]').inputValue(), 'Do not lose this note during polling.');
   assert.equal(await page.locator('#mission-working-draft-form input[name=runAfterReview]').isChecked(), true);
+  assert.equal(await page.locator('#mission-file-editor').inputValue(), 'export const draft = true;');
 
   await page.screenshot({ path: `${screenshotDir}/desktop-draft-survives.png`, fullPage: true });
+
+  await page.evaluate(() => {
+    document.dispatchEvent(new CustomEvent('fcr:mission-draft-committed', {
+      detail: { formId: 'mission-working-draft-form' },
+    }));
+    document.dispatchEvent(new CustomEvent('fcr:mission-draft-committed', {
+      detail: { fieldIds: ['mission-file-path', 'mission-file-editor', 'mission-commit-message'] },
+    }));
+    window.forceFounderShellRerender();
+  });
+  assert.equal(await page.locator('#mission-working-draft-form input[name=commitMessage]').inputValue(), '');
+  assert.equal(await page.locator('#mission-working-draft-form textarea[name=reviewNotes]').inputValue(), '');
+  assert.equal(await page.locator('#mission-working-draft-form input[name=runAfterReview]').isChecked(), false);
+  assert.equal(await page.locator('#mission-file-path').inputValue(), '');
+  assert.equal(await page.locator('#mission-file-editor').inputValue(), '');
+  assert.equal(await page.locator('#mission-commit-message').inputValue(), '');
+  assert.equal(await page.locator('#proof-gate-form input[name=filesChanged]').inputValue(), 'src/index.ts', 'clearing one successful form must not erase a different unsent form');
 
   await page.locator('h2').click();
   taskStatus = 'in_review';
@@ -175,9 +202,6 @@ try {
   assert.ok(await page.evaluate(() => window.refreshClicks > 0), 'live status module must cause the refresh; the proof does not click Refresh');
   assert.equal(await page.locator('#proof-gate-form select[name=gateId]').inputValue(), 'merge');
   assert.equal(await page.locator('#proof-gate-form input[name=filesChanged]').inputValue(), 'src/index.ts');
-  assert.equal(await page.locator('#mission-working-draft-form input[name=commitMessage]').inputValue(), 'fix: keep founder working draft');
-  assert.equal(await page.locator('#mission-working-draft-form textarea[name=reviewNotes]').inputValue(), 'Do not lose this note during polling.');
-  assert.equal(await page.locator('#mission-working-draft-form input[name=runAfterReview]').isChecked(), true);
   assert.match(await page.locator('[data-mission-live-status]').innerText(), /Live status/);
 
   await page.setViewportSize({ width: 390, height: 844 });
@@ -201,7 +225,7 @@ try {
   ));
   assert.deepEqual(pageErrors, []);
   assert.deepEqual(unexpectedConsoleErrors, []);
-  console.log('Mission live UX Playwright proof passed: all named mission drafts survive shell, no-op tab, and polling re-renders; polling uses only the opaque founder cookie; a polling 401 clears the cached cockpit through sign-out; external status appears without a founder Refresh click; live state is announced; and mobile has no document overflow.');
+  console.log('Mission live UX Playwright proof passed: named and ID-only mission drafts survive shell, no-op tab, and polling re-renders; successful scopes clear only their committed drafts; polling uses only the opaque founder cookie; a polling 401 clears the cached cockpit through sign-out; external status appears without a founder Refresh click; live state is announced; and mobile has no document overflow.');
 } finally {
   await context.close();
   await browser.close();

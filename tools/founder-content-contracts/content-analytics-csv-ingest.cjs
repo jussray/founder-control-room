@@ -257,6 +257,7 @@ function assertAudienceComparisonBinding(groupList, comparison) {
   if (ordered[0].id !== baseline.id || ordered[ordered.length - 1].id !== recent.id) {
     fail('extra snapshots make audience comparison ambiguous; oldest/latest audience evidence must match the declared baseline/recent windows');
   }
+  return { baseline, recent };
 }
 
 function assertSafeRangeAggregates(groupList, comparison) {
@@ -402,7 +403,7 @@ function parseFounderContentAnalyticsCsv(csvText, metadata = {}) {
     }
   }
 
-  assertAudienceComparisonBinding(groupList, metadata.comparison);
+  const audienceBinding = assertAudienceComparisonBinding(groupList, metadata.comparison);
   assertSafeRangeAggregates(groupList, metadata.comparison);
 
   const snapshots = groupList.map((group) => ({
@@ -439,6 +440,25 @@ function parseFounderContentAnalyticsCsv(csvText, metadata = {}) {
     window_end: group.window_end,
     import_kind: group.import_kind,
   })));
+  const baselineAudienceCount = Object.keys(audienceBinding.baseline.audience).length;
+  const recentAudienceCount = Object.keys(audienceBinding.recent.audience).length;
+  const audienceAvailability = baselineAudienceCount === 0 && recentAudienceCount === 0
+    ? Object.freeze({
+      state: 'UNAVAILABLE',
+      reason: 'audience_rows_not_present_for_comparison_snapshots',
+      observed_empty: false,
+    })
+    : baselineAudienceCount === 0 || recentAudienceCount === 0
+      ? Object.freeze({
+        state: 'PARTIAL',
+        reason: 'audience_rows_missing_from_one_comparison_snapshot',
+        observed_empty: false,
+      })
+      : Object.freeze({
+        state: 'AVAILABLE',
+        reason: null,
+        observed_empty: false,
+      });
   const metricSchema = Object.freeze({
     impressions: Object.freeze({ unit: 'count', nullable: true }),
     engagements: Object.freeze({ unit: 'count', nullable: true }),
@@ -451,6 +471,7 @@ function parseFounderContentAnalyticsCsv(csvText, metadata = {}) {
     }),
   });
   const metricAvailability = Object.freeze({
+    audience_segments: audienceAvailability,
     post_concentration: Object.freeze({
       state: 'UNAVAILABLE',
       reason: 'post_level_metrics_not_present_in_csv_schema',

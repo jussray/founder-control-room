@@ -61,7 +61,7 @@ const forbiddenArtifactPaths = [
 const forbiddenLiteralSecrets = [
   { label: 'private key material', pattern: /-----BEGIN (?:RSA |EC |OPENSSH |PGP )?PRIVATE KEY-----/ },
   { label: 'OpenAI/Anthropic-style API key', pattern: /\bsk-(?:ant-)?[A-Za-z0-9_-]{20,}\b/ },
-  { label: 'GitHub token', pattern: /\b(?:ghp|github_pat)_[A-Za-z0-9_]{16,}\b/ },
+  { label: 'GitHub token', pattern: /\b(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9_]{16,}\b|\bgithub_pat_[A-Za-z0-9_]{16,}\b/ },
   { label: 'Slack token', pattern: /\bxox[baprs]-[A-Za-z0-9-]{10,}\b/ },
   {
     label: 'sensitive credential assignment',
@@ -76,6 +76,12 @@ const leakageScannerRegressionSamples = [
   '{"RECONCILE_SHARED_SECRET":"dddddddddddddddddddddddddddddddd"}',
   '{"N8N_FOUNDER_CONTENT_IDENTITY_HMAC_SECRET":"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"}',
   'ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL=https://hooks.invalid/opaque-secret-value',
+  'ghp_0123456789abcdef0123456789abcdef',
+  'gho_0123456789abcdef0123456789abcdef',
+  'ghu_0123456789abcdef0123456789abcdef',
+  'ghs_0123456789abcdef0123456789abcdef',
+  'ghr_0123456789abcdef0123456789abcdef',
+  'github_pat_0123456789abcdef0123456789abcdef',
 ];
 
 for (const sample of leakageScannerRegressionSamples) {

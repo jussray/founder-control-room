@@ -25,6 +25,7 @@
     "authority": "repo-native-dynamic-discovery",
     "aggregation": "self-owned-exact-head-plus-sanitized-repository-packets",
     "rawLogsAllowed": false,
+    "providerCheckPolicy": ".control-room/test-ledger.manifest.json",
     "discovery": {
       "source": "package.json#scripts",
       "includedPrefixes": [

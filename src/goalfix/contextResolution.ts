@@ -22,6 +22,7 @@ export const GOALFIX_AUTO_STOP_CONDITION =
 const MANIFEST_MAX_BYTES = 256_000;
 const VERIFICATION_NAME_MAX_LENGTH = 200;
 const VERIFICATION_NAME_MAX_COUNT = 50;
+const COMMIT_SHA_PATTERN = /^[a-f0-9]{40}$/i;
 const ALLOWED_WORKFLOW_STATUSES = new Set([
   'active',
   'main-only',
@@ -193,6 +194,7 @@ function requiredWorkflowNames(
     );
   }
 
+  const branchAmbiguousExactSha = COMMIT_SHA_PATTERN.test(targetRef);
   const requiredNames: string[] = [];
   for (const entry of workflowCatalog) {
     if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
@@ -211,7 +213,7 @@ function requiredWorkflowNames(
       );
     }
     if (row.required !== true || status === 'retired') continue;
-    if (status === 'main-only' && targetRef !== defaultBranch) continue;
+    if (status === 'main-only' && targetRef !== defaultBranch && !branchAmbiguousExactSha) continue;
     if (!name || name.length > VERIFICATION_NAME_MAX_LENGTH) {
       throw new GoalfixContextResolutionError(
         'GOALFIX_VERIFICATION_CONTRACT_INVALID',
@@ -288,6 +290,32 @@ export function parseGoalfixVerificationManifest(
   }
 
   const testContract = tests as Record<string, unknown>;
+  const providerCheckPolicy = typeof testContract.providerCheckPolicy === 'string'
+    ? testContract.providerCheckPolicy.trim()
+    : '';
+  if (providerCheckPolicy) {
+    if (providerCheckPolicy.length > 300) {
+      throw new GoalfixContextResolutionError(
+        'GOALFIX_VERIFICATION_CONTRACT_INVALID',
+        'Repository provider-check policy path is too long.',
+      );
+    }
+    if (!providerPolicyText) {
+      throw new GoalfixContextResolutionError(
+        'GOALFIX_PROVIDER_CHECK_POLICY_UNAVAILABLE',
+        'Repository declares an explicit provider-check policy; the exact policy must be read before GoalFix can classify provider proof.',
+      );
+    }
+    const requiredVerificationNames = requiredLedgerNames(providerPolicyText, expectedRepository);
+    if (requiredVerificationNames.length === 0) {
+      throw new GoalfixContextResolutionError(
+        'GOALFIX_PROVIDER_CHECK_POLICY_UNAVAILABLE',
+        'Repository provider policy does not expose an applicable required proof set.',
+      );
+    }
+    return { manifestRepository, requiredVerificationNames };
+  }
+
   const workflowCatalog = testContract.workflowCatalog;
   if (Array.isArray(workflowCatalog)) {
     const requiredVerificationNames = requiredWorkflowNames(

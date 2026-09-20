@@ -129,7 +129,7 @@ describe('resolveGoalfixProjectHint', () => {
 });
 
 describe('parseGoalfixVerificationManifest', () => {
-  it('derives the required provider proof set from tests.workflowCatalog on the default branch', () => {
+  it('derives the required provider proof set from tests.workflowCatalog on the default branch when no separate provider policy is declared', () => {
     expect(parseGoalfixVerificationManifest(workflowManifest(), 'jussray/Sekret-Bip', 'main', 'main')).toEqual({
       manifestRepository: 'jussray/Sekret-Bip',
       requiredVerificationNames: [
@@ -176,16 +176,14 @@ describe('parseGoalfixVerificationManifest', () => {
     });
   });
 
-  it('prefers explicit workflow check authority when a repository exposes both dialects', () => {
+  it('prefers an explicitly declared provider-check policy over workflow display names', () => {
     const combined = JSON.stringify({
       repository: 'jussray/founder-control-room',
       tests: {
+        providerCheckPolicy: '.control-room/test-ledger.manifest.json',
         workflowCatalog: [
           { id: 'ci', name: 'CI', required: true, status: 'active' },
-          { id: 'playwright', name: 'Playwright E2E', required: true, status: 'active' },
-        ],
-        catalog: [
-          { id: 'human-label', name: 'Human Inventory Label', required: true, status: 'active' },
+          { id: 'quality', name: 'Quality Gate', required: true, status: 'active' },
         ],
       },
     });
@@ -195,13 +193,42 @@ describe('parseGoalfixVerificationManifest', () => {
       'jussray/founder-control-room',
       'main',
       'main',
-      providerPolicy('jussray/founder-control-room', ['Wrong fallback']),
-    ).requiredVerificationNames).toEqual(['CI', 'Playwright E2E']);
+      providerPolicy('jussray/founder-control-room', ['Required Gate', 'Verify test-ledger contract']),
+    ).requiredVerificationNames).toEqual(['Required Gate', 'Verify test-ledger contract']);
   });
 
-  it('does not require a main-only lane on a non-default ref', () => {
+  it('requires the exact provider policy when the manifest explicitly declares one', () => {
+    const manifest = JSON.stringify({
+      repository: 'jussray/founder-control-room',
+      tests: {
+        providerCheckPolicy: '.control-room/test-ledger.manifest.json',
+        workflowCatalog: [{ id: 'ci', name: 'CI', required: true, status: 'active' }],
+      },
+    });
+
+    try {
+      parseGoalfixVerificationManifest(manifest, 'jussray/founder-control-room', 'main', 'main');
+      throw new Error('expected provider policy requirement');
+    } catch (error) {
+      expect(error).toBeInstanceOf(GoalfixContextResolutionError);
+      expect((error as GoalfixContextResolutionError).code).toBe('GOALFIX_PROVIDER_CHECK_POLICY_UNAVAILABLE');
+    }
+  });
+
+  it('does not require a main-only lane on an explicitly non-default branch', () => {
     expect(parseGoalfixVerificationManifest(workflowManifest(), 'jussray/Sekret-Bip', 'feature/test', 'main').requiredVerificationNames)
       .toEqual(['Repository Truth Gate', 'Product Design Playwright Proof', 'Control Room Manifest']);
+  });
+
+  it('fails closed by retaining main-only proof for a branch-ambiguous exact SHA', () => {
+    const exactSha = 'a'.repeat(40);
+    expect(parseGoalfixVerificationManifest(workflowManifest(), 'jussray/Sekret-Bip', exactSha, 'main').requiredVerificationNames)
+      .toEqual([
+        'Repository Truth Gate',
+        'Product Design Playwright Proof',
+        'Verify Cloudflare Native Deployment',
+        'Control Room Manifest',
+      ]);
   });
 
   it('fails closed when manifest identity does not match the registered repository', () => {

@@ -160,6 +160,21 @@ describe('founder content analytics CSV review regressions', () => {
     });
   });
 
+  it('marks absent audience rows unavailable instead of presenting an observed empty segment set', () => {
+    const dailyOnlyCsv = safeCsv
+      .split('\n')
+      .filter((line) => !line.includes(',audience,'))
+      .join('\n');
+    const receipt = parseFounderContentAnalyticsCsv(dailyOnlyCsv, metadata);
+
+    expect(receipt.audience_segments).toEqual([]);
+    expect(receipt.metric_availability.audience_segments).toEqual({
+      state: 'UNAVAILABLE',
+      reason: 'audience_rows_not_present_for_comparison_snapshots',
+      observed_empty: false,
+    });
+  });
+
   it('rejects malformed quoted fields and overlong snapshot identities at ingress', () => {
     const malformedQuotedMetric = safeCsv.replace(',100,10,2,,', ',"10"5,10,2,,');
     expect(() => parseFounderContentAnalyticsCsv(malformedQuotedMetric, metadata))

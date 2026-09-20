@@ -8,6 +8,7 @@
 // server logs or land in browser history via a referrer header.
 
 const STORAGE_KEY = 'fcr_session';
+const SAFE_READ_RETRY_MAX_MS = 61_000;
 const root = document.getElementById('root');
 
 const state = {
@@ -83,13 +84,36 @@ function consumeHashSession() {
 
 // ─── API helper ──────────────────────────────────────────────────────────────
 
-async function api(path, opts = {}) {
+function retryAfterDelayMs(value) {
+  if (!value) return null;
+  const seconds = Number(value);
+  let delayMs;
+  if (Number.isFinite(seconds) && seconds >= 0) {
+    delayMs = Math.ceil(seconds * 1000);
+  } else {
+    const timestamp = Date.parse(value);
+    if (!Number.isFinite(timestamp)) return null;
+    delayMs = Math.max(0, timestamp - Date.now());
+  }
+  return delayMs <= SAFE_READ_RETRY_MAX_MS ? delayMs : null;
+}
+
+async function api(path, opts = {}, safeReadRetryAttempt = 0) {
   const headers = { 'Content-Type': 'application/json', ...(opts.headers ?? {}) };
   if (state.session?.access_token) {
     headers.Authorization = `Bearer ${state.session.access_token}`;
   }
 
+  const method = String(opts.method ?? 'GET').toUpperCase();
   const res = await fetch(path, { ...opts, headers });
+  if (res.status === 429 && (method === 'GET' || method === 'HEAD') && safeReadRetryAttempt === 0) {
+    const delayMs = retryAfterDelayMs(res.headers.get('retry-after'));
+    if (delayMs !== null) {
+      await new Promise((resolve) => window.setTimeout(resolve, delayMs));
+      return api(path, opts, 1);
+    }
+  }
+
   const isJson = res.headers.get('content-type')?.includes('application/json');
   const body = isJson ? await res.json().catch(() => null) : null;
 
@@ -164,6 +188,10 @@ function formValues(form) {
 /** Drops blank string fields so an empty optional input means "unset", not "set to ''". */
 function withoutBlanks(values) {
   return Object.fromEntries(Object.entries(values).filter(([, v]) => v !== ''));
+}
+
+function notifyMissionDraftCommitted(detail) {
+  document.dispatchEvent(new CustomEvent('fcr:mission-draft-committed', { detail }));
 }
 
 // ─── render: sign-in ─────────────────────────────────────────────────────────
@@ -564,10 +592,6 @@ function renderMissionDetail(mount) {
   panel.style.display = 'block';
 
   const editable = mission.status === 'sandboxed' || mission.status === 'in_review';
-  // create_branch is proof-gated too (PROOF_GATED_ACTIONS in approvals.ts)
-  // and that gate must run BEFORE the branch exists, i.e. while still
-  // 'proposed' — so this form can't be nested inside `editable` only, or
-  // there would be no way to ever pass the create_branch gate at all.
   const canRunProofGate = mission.status === 'proposed' || editable;
 
   panel.innerHTML = `
@@ -682,10 +706,6 @@ function renderMissionDetail(mount) {
 
   panel.querySelector('#create-branch-form')?.addEventListener('submit', (e) => {
     e.preventDefault();
-    // Blank fields must be OMITTED, not sent as ''. The backend falls back
-    // to 'main' / `mission/${id}` with `?? default`, which only triggers on
-    // undefined — an empty string would silently create a branch/ref with
-    // an empty name instead of the intended default.
     const values = withoutBlanks(formValues(e.target));
     guarded(async () => {
       await api(`/approvals/${mission.id}/execute`, {
@@ -696,6 +716,7 @@ function renderMissionDetail(mount) {
           payload: values,
         }),
       });
+      notifyMissionDraftCommitted({ formId: 'create-branch-form' });
       await loadMissions();
       setBanner('notice', 'Branch created.');
     });
@@ -706,6 +727,7 @@ function renderMissionDetail(mount) {
     const values = withoutBlanks(formValues(e.target));
     guarded(async () => {
       await api(`/missions/${mission.id}`, { method: 'PATCH', body: JSON.stringify(values) });
+      notifyMissionDraftCommitted({ formId: 'assign-agents-form' });
       await loadMissions();
       setBanner('notice', 'Agent assignment saved.');
     });
@@ -720,6 +742,7 @@ function renderMissionDetail(mount) {
         method: 'POST',
         body: JSON.stringify({ participants, outcome: values.outcome || undefined }),
       });
+      notifyMissionDraftCommitted({ formId: 'log-council-form' });
       state.missionCouncil = (await api(`/missions/${mission.id}/council`)).conversations ?? [];
       e.target.reset();
     });
@@ -731,6 +754,7 @@ function renderMissionDetail(mount) {
     if (values.costUsd) values.costUsd = Number(values.costUsd);
     guarded(async () => {
       await api(`/missions/${mission.id}/costs`, { method: 'POST', body: JSON.stringify(values) });
+      notifyMissionDraftCommitted({ formId: 'log-cost-form' });
       state.missionCosts = await api(`/missions/${mission.id}/costs`);
       e.target.reset();
     });
@@ -755,6 +779,8 @@ function renderMissionDetail(mount) {
         method: 'POST',
         body: JSON.stringify({ message, changes: [{ path, content }] }),
       });
+      notifyMissionDraftCommitted({ fieldIds: ['mission-file-path', 'mission-file-editor', 'mission-commit-message'] });
+      state.missionFiles = { path: '', content: '', dirty: false };
       setBanner('notice', `Committed ${path} to ${mission.branch_ref}.`);
     });
   });
@@ -780,6 +806,7 @@ function renderMissionDetail(mount) {
           },
         }),
       });
+      notifyMissionDraftCommitted({ formId: 'proof-gate-form' });
       await loadMissions();
       setBanner('notice', 'Proof gate evaluated.');
     });
@@ -797,6 +824,7 @@ function renderMissionDetail(mount) {
           payload: { expectedHeadSha: values.expectedHeadSha },
         }),
       });
+      notifyMissionDraftCommitted({ formId: 'execute-merge-form' });
       await loadMissions();
       setBanner('notice', 'Merge executed.');
     });
@@ -1042,11 +1070,6 @@ function renderTerminalTab(mount) {
     });
   });
 
-  // guarded() unconditionally re-renders the whole shell after every action,
-  // including a terminal run — so the selection (and its result, below) must
-  // live in state and be rebuilt here, not just written into the DOM inside
-  // the submit handler. A DOM-only write is erased by that same re-render
-  // before anyone could ever see it.
   if (state.terminal.selectedCommandId) {
     showTerminalRunForm(mount, state.terminal.selectedCommandId);
   }
