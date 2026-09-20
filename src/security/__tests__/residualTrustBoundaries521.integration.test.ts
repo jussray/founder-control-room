@@ -1,12 +1,15 @@
 import express from 'express';
 import request from 'supertest';
 import { describe, expect, it } from 'vitest';
-import { createServer } from '../../http/server.js';
+import { debugRouter } from '../../http/routes/debug.js';
 import { portableConsoleRouter } from '../../http/routes/portableConsole.js';
 
 describe('residual trust boundaries from #521', () => {
-  it('does not expose provider debug metadata without founder authentication', async () => {
-    const response = await request(createServer()).get('/_debug/provider');
+  it('keeps provider debug metadata founder-gated when the router is mounted by itself', async () => {
+    const app = express();
+    app.use('/_debug', debugRouter);
+
+    const response = await request(app).get('/_debug/provider');
 
     expect(response.status).toBe(401);
     expect(response.body).toEqual({ error: 'Founder session required' });
