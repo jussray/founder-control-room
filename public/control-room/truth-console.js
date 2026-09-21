@@ -260,13 +260,13 @@ async function renderEvidence(root) {
     root.innerHTML = screenFrame(
       'truth-evidence',
       'Evidence Inbox',
-      'Attach normalized evidence to a claim. New evidence atomically invalidates the prior continuity marker instead of preserving stale proof.',
+      'Attach normalized manual founder evidence to a claim. Provider provenance is server-owned, and new evidence atomically invalidates the prior continuity marker instead of preserving stale proof.',
       `<form class="truth-form" id="truth-attach-evidence">
         <label class="truth-span-2">Claim<select name="claimId" required>${claimOptions}</select></label>
         <label>Status<select name="status"><option>pass</option><option>fail</option><option>warn</option><option>pending</option></select></label>
         <label>Relation<select name="relation"><option>supports</option><option>contradicts</option><option>context</option></select></label>
         <label>Kind<input name="kind" value="founder_observation" maxlength="120" required></label>
-        <label>Provider<input name="provider" value="founder" maxlength="120" required></label>
+        <label>Provider provenance<input value="founder · manual intake" disabled aria-label="Provider provenance is locked to founder for manual evidence"></label>
         <label class="truth-span-2">Evidence reference<input name="detailsRef" maxlength="2000" required placeholder="URL, artifact path, receipt ID, or exact source reference"></label>
         <button type="submit" ${claims?.length ? '' : 'disabled'}>Attach evidence</button>
         <output data-form-status role="status" aria-live="polite"></output>
@@ -284,12 +284,13 @@ async function renderEvidence(root) {
           method: 'POST',
           body: JSON.stringify({
             status: fields.get('status'), relation: fields.get('relation'), kind: fields.get('kind'),
-            provider: fields.get('provider'), detailsRef: fields.get('detailsRef'),
+            detailsRef: fields.get('detailsRef'),
           }),
         });
         const staleCount = body.invalidatedContinuity?.length ?? 0;
         rememberReceipt('truth-evidence', 'Evidence attached', [
           ['evidence', body.evidence?.id ?? '', 'code'],
+          ['provider', body.evidence?.provider ?? 'founder'],
           ['relation', body.evidence?.relation ?? 'context'],
           ['claim revision', body.claim?.revision ?? ''],
           ['prior proof cookies invalidated', staleCount],
