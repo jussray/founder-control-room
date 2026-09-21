@@ -9,8 +9,8 @@ vi.mock('../lib/supabaseClient.js', () => ({
 
 type ExternalToolsModule = typeof import('./externalTools.js');
 type RelayCall = {
-  fromOperator: 'codex' | 'claude-code' | 'perplexity';
-  toOperator: 'codex' | 'claude-code' | 'perplexity';
+  fromOperator: 'gemini' | 'codex' | 'claude-code' | 'perplexity';
+  toOperator: 'gemini' | 'codex' | 'claude-code' | 'perplexity';
   capability: 'research' | 'propose' | 'review' | 'implement';
   goal: string;
   contextSummary: string;
@@ -107,7 +107,7 @@ describe('external FCR operator relay handoff truth', () => {
         toOperator: input.fromOperator,
         status: 'completed',
         answer: 'Provider-bound review result.',
-        evidenceRefs: ['provider:anthropic:model:claude-test:response:msg_safe'],
+        evidenceRefs: ['provider:anthropic:msg_safe'],
         unresolved: [],
       },
     }));
