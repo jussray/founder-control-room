@@ -91,6 +91,7 @@ export async function observeChiefGovernanceWithGitHubApp(input: {
     appId,
     privateKey,
     CHIEF_GOVERNANCE.repository,
+    { administration: "read" },
   );
   const octokit = new Octokit({
     auth: token,
