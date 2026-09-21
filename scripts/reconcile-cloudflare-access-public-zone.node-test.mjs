@@ -7,9 +7,11 @@ import test from 'node:test';
 import {
   FCR_CLOUDFLARE_ACCOUNT_ID,
   FCR_PUBLIC_ZONE,
+  FCR_SPLIT_PUBLIC_ACCESS_APP_NAME,
   appHasBrowserFacingFcrDestination,
   browserFacingDestinationCount,
   isBrowserFacingFcrPublicDestination,
+  isExactFcrSplitPublicApplication,
   matchingAccessReasons,
   reconcileFcrPublicAccessZone,
   rollbackFcrPublicAccessZone,
@@ -50,6 +52,30 @@ function workerOnlyApp() {
     type: 'self_hosted',
     domain: FCR_PUBLIC_ZONE,
     destinations: [{ type: 'worker', uri: 'founder-control-room' }],
+  };
+}
+
+function managedSplitApp() {
+  return {
+    id: 'public-split-1',
+    name: FCR_SPLIT_PUBLIC_ACCESS_APP_NAME,
+    type: 'self_hosted',
+    domain: `www.${FCR_PUBLIC_ZONE}`,
+    destinations: [
+      { type: 'public', uri: `${FCR_PUBLIC_ZONE}/*` },
+      { type: 'public', uri: `www.${FCR_PUBLIC_ZONE}/*` },
+      { type: 'public', uri: `api.${FCR_PUBLIC_ZONE}/version` },
+    ],
+  };
+}
+
+function everyoneBypassPolicy() {
+  return {
+    id: 'public-bypass-policy',
+    decision: 'bypass',
+    include: [{ everyone: {} }],
+    require: [],
+    exclude: [],
   };
 }
 
@@ -155,27 +181,72 @@ test('browser-facing Access means apex or www public destinations, not private W
   assert.deepEqual(matchingAccessReasons(mixedApp()), ['browser-public-destination', 'worker']);
 });
 
+test('exact split identity includes name type domain and all three public destinations', () => {
+  assert.equal(isExactFcrSplitPublicApplication(managedSplitApp()), true);
+  assert.equal(isExactFcrSplitPublicApplication({ ...managedSplitApp(), type: 'saas' }), false);
+  assert.equal(isExactFcrSplitPublicApplication({ ...managedSplitApp(), domain: FCR_PUBLIC_ZONE }), false);
+  assert.equal(isExactFcrSplitPublicApplication({
+    ...managedSplitApp(),
+    destinations: managedSplitApp().destinations.slice(0, 2),
+  }), false);
+});
+
 test('inspect reports clear when Access does not own the FCR browser doorway', async () => {
   const receipt = await reconcileFcrPublicAccessZone({
     env: readEnv,
     fetchImpl: fakeFetch({ applications: [workerOnlyApp()] }),
   });
+  assert.equal(receipt.schemaVersion, 2);
   assert.equal(receipt.state, 'clear');
-  assert.equal(receipt.action, 'browser-access-already-detached');
+  assert.equal(receipt.action, 'none');
+  assert.equal(receipt.alreadyExempt, true);
   assert.equal(receipt.browserAccessDestinationCount, 0);
   assert.equal(receipt.mutationPerformed, false);
 });
 
-test('inspect plans detachment while preserving non-browser destinations', async () => {
+test('inspect plans exact split while preserving non-browser destinations', async () => {
   const receipt = await reconcileFcrPublicAccessZone({
     env: readEnv,
     fetchImpl: fakeFetch({ applications: [mixedApp()] }),
   });
+  assert.equal(receipt.schemaVersion, 2);
   assert.equal(receipt.state, 'attention');
-  assert.equal(receipt.action, 'would-detach-browser-access');
+  assert.equal(receipt.action, 'would-create-public-bypass');
+  assert.equal(receipt.alreadyExempt, false);
   assert.equal(receipt.browserAccessDestinationCount, 1);
   assert.equal(receipt.preservedNonBrowserDestinationCount, 1);
   assert.equal(receipt.mutationPerformed, false);
+});
+
+test('inspect recognizes exact split topology only with exact Everyone Bypass policy', async () => {
+  const receipt = await reconcileFcrPublicAccessZone({
+    env: readEnv,
+    fetchImpl: fakeFetch({
+      applications: [managedSplitApp(), workerOnlyApp()],
+      policiesByApp: { 'public-split-1': [everyoneBypassPolicy()] },
+    }),
+  });
+  assert.equal(receipt.schemaVersion, 2);
+  assert.equal(receipt.state, 'clear');
+  assert.equal(receipt.action, 'already-public-bypass');
+  assert.equal(receipt.alreadyExempt, true);
+  assert.equal(receipt.matchingApplicationCount, 1);
+  assert.equal(receipt.mutationPerformed, false);
+});
+
+test('inspect keeps managed public policy drift as an independent blocked receipt', async () => {
+  await assert.rejects(
+    reconcileFcrPublicAccessZone({
+      env: readEnv,
+      fetchImpl: fakeFetch({
+        applications: [managedSplitApp(), workerOnlyApp()],
+        policiesByApp: {
+          'public-split-1': [{ id: 'wrong-policy', decision: 'allow', include: [{ everyone: {} }] }],
+        },
+      }),
+    }),
+    (error) => error?.classification === 'managed-public-bypass-policy-drift',
+  );
 });
 
 test('inspect never falls back to admin authority', async () => {
@@ -257,7 +328,7 @@ test('automatic mutation blocks a public-only application instead of deleting un
         }],
       }),
     }),
-    (error) => error?.classification === 'public-only-access-app-requires-reviewed-deletion',
+    (error) => error?.classification === 'existing-public-access-app-requires-review',
   );
 });
 
@@ -278,7 +349,7 @@ test('multiple browser-owning Access apps fail closed', async () => {
         ],
       }),
     }),
-    (error) => error?.classification === 'multiple-browser-access-apps-require-review',
+    (error) => error?.classification === 'existing-public-access-app-requires-review',
   );
 });
 

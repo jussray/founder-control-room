@@ -29,8 +29,8 @@ jobs:
             exit 0
           fi
 
-          if [[ "$action" != 'inspect' && "$action" != 'apply' ]]; then
-            echo '::error title=Invalid Cloudflare command::action must be inspect or apply.'
+          if [[ "$action" != 'inspect' && "$action" != 'split' ]]; then
+            echo '::error title=Invalid Cloudflare command::action must be inspect or split.'
             exit 1
           fi
 
@@ -53,7 +53,7 @@ jobs:
             approval_reference=''
           else
             if [[ ! "${approval:-}" =~ ^[A-Za-z0-9._:-]{8,200}$ ]]; then
-              echo '::error title=Missing mutation approval::apply requires an auditable 8-200 character approval reference.'
+              echo '::error title=Missing mutation approval::split requires an auditable 8-200 character approval reference.'
               exit 1
             fi
             apply='true'
@@ -61,6 +61,7 @@ jobs:
           fi
 
           echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "action=$action" >> "$GITHUB_OUTPUT"
           echo "apply=$apply" >> "$GITHUB_OUTPUT"
           echo "approval_reference=$approval_reference" >> "$GITHUB_OUTPUT"
 
@@ -81,6 +82,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           EXPECTED_HEAD_SHA: ${{ steps.parse.outputs.sha }}
+          ACTION: ${{ steps.parse.outputs.action }}
           APPLY: ${{ steps.parse.outputs.apply }}
           APPROVAL_REFERENCE: ${{ steps.parse.outputs.approval_reference }}
         shell: bash
@@ -102,6 +104,7 @@ jobs:
             echo '## FCR Cloudflare command dispatched'
             echo
             echo "- Exact current main: \`$EXPECTED_HEAD_SHA\`"
+            echo "- Action: \`$ACTION\`"
             echo "- Apply: \`$APPLY\`"
-            echo '- Target: foundercontrolroom.org Access front door only'
+            echo '- Split mutation scope: protected Worker application remains protected; only the bounded public front door, www, and exact /version witness receive Everyone Bypass'
           } >> "$GITHUB_STEP_SUMMARY"
