@@ -67,6 +67,19 @@ describe('operator relay transport resolution', () => {
     expect(resolveOperatorRelayTransport(availability).transport).toBe('unavailable');
   });
 
+  it('uses the Gemini transport namespace without falling through to Perplexity flags', () => {
+    const gemini = operatorRelayTransportAvailability('gemini', false, {
+      FCR_RELAY_GEMINI_REMOTE_MCP_HANDOFF: 'enabled',
+      FCR_RELAY_PERPLEXITY_LOCAL_MCP_HANDOFF: 'enabled',
+    });
+    expect(gemini).toEqual({
+      providerApi: false,
+      remoteMcpHandoff: true,
+      localMcpHandoff: false,
+      interactiveBrowserHandoff: false,
+    });
+  });
+
   it('returns a blocked handoff bound to the exact request rather than faking completion', async () => {
     const resolution = resolveOperatorRelayTransport({
       providerApi: false,
