@@ -107,6 +107,7 @@ describe("trusted Chief governance GitHub App observer", () => {
       TEST_FCR_APP_ID,
       "test-private-key",
       "jussray/chief-ai-machine",
+      { administration: "read" },
     );
     expect(mockGetRepoRuleset).toHaveBeenNthCalledWith(1, {
       owner: "jussray",
