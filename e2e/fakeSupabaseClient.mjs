@@ -112,7 +112,13 @@ function classifyTruthEvidence(rows) {
   if (rows.length === 0) return 'unknown';
   if (rows.some((row) => row.relation === 'contradicts' || row.status === 'fail')) return 'conflicted';
   const supporting = rows.filter((row) => row.relation === 'supports');
-  if (supporting.length > 0 && supporting.every((row) => row.status === 'pass')) return 'verified';
+  const allSupportingPass = supporting.length > 0 && supporting.every((row) => row.status === 'pass');
+  const hasIndependentSupport = supporting.some((row) => (
+    row.status === 'pass'
+    && ['github', 'cloudflare', 'supabase', 'playwright'].includes(row.provider)
+    && row.environment !== 'truth-console'
+  ));
+  if (allSupportingPass && hasIndependentSupport) return 'verified';
   if (rows.some((row) => row.status === 'pending')) return 'unknown';
   return 'inferred';
 }
@@ -295,7 +301,14 @@ async function fakeRpc(name, args) {
       .filter((row) => row.id)
       .sort((a, b) => String(a.id).localeCompare(String(b.id)));
     const classification = classifyTruthEvidence(evidenceRows);
-    const identity = evidenceRows.map((row) => ({ id: row.id, status: row.status, relation: row.relation }));
+    const identity = evidenceRows.map((row) => ({
+      id: row.id,
+      status: row.status,
+      relation: row.relation,
+      provider: row.provider,
+      kind: row.kind,
+      environment: row.environment,
+    }));
     const evidenceIds = evidenceRows.map((row) => row.id);
     const evidenceFingerprint = sha256(JSON.stringify(identity));
     const subjectFingerprint = sha256(JSON.stringify({
