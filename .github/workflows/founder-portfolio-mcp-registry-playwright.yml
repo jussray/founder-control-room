@@ -1,0 +1,65 @@
+name: Founder Portfolio MCP Registry Playwright
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/mcp/portfolioRegistry.ts'
+      - 'src/http/routes/mcp.ts'
+      - 'e2e/repository-settings-ruleset.spec.ts'
+      - 'docs/FOUNDER_PORTFOLIO_MCP_REGISTRY.md'
+      - '.github/workflows/founder-portfolio-mcp-registry-playwright.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  EXPECTED_HEAD_SHA: ${{ github.sha }}
+
+jobs:
+  registry-playwright:
+    name: Founder quartet MCP registry Playwright proof
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+
+      - name: Verify exact head
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Prove founder quartet MCP registry over HTTP
+        run: npx playwright test -c playwright.config.ts e2e/repository-settings-ruleset.spec.ts --reporter=list
+        env:
+          NODE_ENV: test
+
+      - name: Upload failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: founder-portfolio-mcp-registry-playwright-${{ github.run_id }}
+          path: |
+            playwright-report
+            test-results
+          if-no-files-found: ignore
+          retention-days: 14
