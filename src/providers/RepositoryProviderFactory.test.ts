@@ -105,7 +105,7 @@ describe("RepositoryProviderFactory", () => {
     )).rejects.toThrow("GITHUB_APP_ID and GITHUB_PRIVATE_KEY must be configured together");
   });
 
-  it("proves live App permissions before returning mutation-capable provider authority", async () => {
+  it("proves live App permissions and binds the minted token to the same declared scope", async () => {
     const observeInstallation = vi.fn().mockResolvedValue({
       repository: "jussray/Sekret-Bip",
       appId: "123456",
@@ -120,6 +120,11 @@ describe("RepositoryProviderFactory", () => {
       accountType: "User",
     });
     const getInstallationToken = vi.fn().mockResolvedValue("installation-token");
+    const requiredPermissions = {
+      contents: "write",
+      pull_requests: "write",
+      checks: "read",
+    } as const;
 
     const result = await createCapabilityAwareAppRepositoryProvider(
       {
@@ -127,11 +132,7 @@ describe("RepositoryProviderFactory", () => {
         repoProvider: "github",
         repoIdentifier: "jussray/Sekret-Bip",
       },
-      {
-        contents: "write",
-        pull_requests: "write",
-        checks: "read",
-      },
+      requiredPermissions,
       {
         GITHUB_APP_ID: "123456",
         GITHUB_PRIVATE_KEY: "test-private-key",
@@ -149,6 +150,7 @@ describe("RepositoryProviderFactory", () => {
       "123456",
       "test-private-key",
       "jussray/Sekret-Bip",
+      requiredPermissions,
     );
     expect(result.provider.name).toBe("github");
     expect(result.authority).toMatchObject({
