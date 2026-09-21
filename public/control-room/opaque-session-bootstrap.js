@@ -93,6 +93,11 @@ function installCookieBackedSignOut() {
 async function bootLegacyCockpit() {
   scrubLegacyBrowserCredentials();
 
+  // Restore only non-sensitive founder navigation/work context before the
+  // shell reads it. Auth remains the opaque HttpOnly server capability above.
+  const { installFounderLocalFirstState } = await import('/control-room/local-first-founder-state.js');
+  installFounderLocalFirstState();
+
   // Safe reads may legitimately cross the founder API's real per-IP budget
   // during a dense cockpit session. Install the bounded same-origin GET/HEAD
   // retry before the first authenticated read. Mutation requests are never
