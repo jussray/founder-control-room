@@ -132,6 +132,26 @@ describe("mergeGitHubPullRequestAsync", () => {
     expect(mockRequest).toHaveBeenCalledTimes(1);
   });
 
+  it("rejects a terminal 409 result before accepting a merge from a different head", async () => {
+    mockRequest.mockRejectedValueOnce({
+      status: 409,
+      response: {
+        data: {
+          status: "merged",
+          details: {
+            uuid: UUID,
+            sha: MERGE_SHA,
+            expected_head_sha: OTHER_HEAD_SHA,
+          },
+        },
+      },
+    });
+
+    await expect(mergeGitHubPullRequestAsync(options()))
+      .rejects.toThrow(`not approved head ${HEAD_SHA}`);
+    expect(mockRequest).toHaveBeenCalledTimes(1);
+  });
+
   it("fails closed when a queued request later reports a different expected head", async () => {
     mockRequest
       .mockResolvedValueOnce({

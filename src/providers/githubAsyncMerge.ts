@@ -173,9 +173,6 @@ export async function mergeGitHubPullRequestAsync(
     reconciledExistingRequest = true;
   }
 
-  const immediateSha = mergedSha(initial);
-  if (immediateSha) return immediateSha;
-
   if (reconciledExistingRequest) {
     assertReconciledHead(
       options.pullRequestNumber,
@@ -184,6 +181,9 @@ export async function mergeGitHubPullRequestAsync(
       "reconcile an existing request",
     );
   }
+
+  const immediateSha = mergedSha(initial);
+  if (immediateSha) return immediateSha;
 
   const uuid = requestUuid(initial);
   if (!uuid) {
