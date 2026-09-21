@@ -95,7 +95,7 @@ describe('createServerOperatorRelayAdapters', () => {
       fromOperator: 'gemini',
       toOperator: 'codex',
       answer: 'Gemini work result',
-      evidenceRefs: ['provider:gemini:gemini-response-1'],
+      evidenceRefs: ['provider:gemini:model:gemini-3.8-flash:response:gemini-response-1'],
       authorityRequested: 'none',
     });
   });
@@ -138,7 +138,9 @@ describe('createServerOperatorRelayAdapters', () => {
     expect(response?.fromOperator).toBe('gemini');
     expect(response?.toOperator).toBe('codex');
     expect(response?.authorityRequested).toBe('none');
-    expect(response?.evidenceRefs).toEqual(['provider:gemini:gemini-spoof-1']);
+    expect(response?.evidenceRefs).toEqual([
+      'provider:gemini:model:gemini-3.8-flash:response:gemini-spoof-1',
+    ]);
   });
 
   it('uses the Perplexity Agent API with grounded search and canonical model mapping', async () => {
@@ -172,7 +174,7 @@ describe('createServerOperatorRelayAdapters', () => {
       fromOperator: 'perplexity',
       toOperator: 'codex',
       answer: 'Perplexity work result',
-      evidenceRefs: ['provider:perplexity:resp_pplx_1'],
+      evidenceRefs: ['provider:perplexity:model:perplexity/sonar:response:resp_pplx_1'],
       authorityRequested: 'none',
     });
   });
@@ -236,7 +238,7 @@ describe('createServerOperatorRelayAdapters', () => {
       fromOperator: 'claude-code',
       toOperator: 'codex',
       answer: 'Claude work result',
-      evidenceRefs: ['provider:anthropic:msg_01safe'],
+      evidenceRefs: ['provider:anthropic:model:claude-test-model:response:msg_01safe'],
       authorityRequested: 'none',
     });
   });
@@ -274,7 +276,9 @@ describe('createServerOperatorRelayAdapters', () => {
     expect(response?.fromOperator).toBe('claude-code');
     expect(response?.toOperator).toBe('codex');
     expect(response?.authorityRequested).toBe('none');
-    expect(response?.evidenceRefs).toEqual(['provider:anthropic:msg_02identity']);
+    expect(response?.evidenceRefs).toEqual([
+      'provider:anthropic:model:claude-test-model:response:msg_02identity',
+    ]);
   });
 
   it('never promotes Anthropic error-body detail into exceptions', async () => {
