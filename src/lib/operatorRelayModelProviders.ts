@@ -16,6 +16,7 @@ const ANTHROPIC_API_VERSION = '2023-06-01';
 const MAX_PROVIDER_RESPONSE_ID_LENGTH = 200;
 const SAFE_GEMINI_MODEL = /^[A-Za-z0-9._-]{1,160}$/;
 const SAFE_PERPLEXITY_AGENT_MODEL = /^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/;
+const SAFE_EVIDENCE_MODEL = /^[A-Za-z0-9._:/-]{1,200}$/;
 const SECRET_VALUE_PATTERNS = [
   /\bBearer\s+[A-Za-z0-9._~+\/-]{16,}\b/i,
   /\b(?:api[_-]?key|secret|token|password|passwd)\s*[:=]\s*["']?[^\s"']{8,}/i,
@@ -266,8 +267,21 @@ function responseIdentity(body: JsonRecord, field: 'id' | 'responseId' = 'id'): 
     : 'unidentified-response';
 }
 
-function evidenceRef(provider: string, body: JsonRecord, field: 'id' | 'responseId' = 'id'): string {
-  return `provider:${provider}:${responseIdentity(body, field)}`;
+function evidenceModel(configuredModel: string): string {
+  const normalized = configuredModel.trim();
+  if (!SAFE_EVIDENCE_MODEL.test(normalized)) {
+    throw new Error('configured provider model is not evidence-safe');
+  }
+  return normalized;
+}
+
+function evidenceRef(
+  provider: string,
+  configuredModel: string,
+  body: JsonRecord,
+  field: 'id' | 'responseId' = 'id',
+): string {
+  return `provider:${provider}:model:${evidenceModel(configuredModel)}:response:${responseIdentity(body, field)}`;
 }
 
 function geminiModelId(value: string): string | null {
@@ -333,7 +347,10 @@ export function createServerOperatorRelayAdapters(
             },
             'Gemini relay',
           );
-          return { text: geminiText(body), evidenceRef: evidenceRef('gemini', body, 'responseId') };
+          return {
+            text: geminiText(body),
+            evidenceRef: evidenceRef('gemini', modelId, body, 'responseId'),
+          };
         },
       });
     }
@@ -358,7 +375,10 @@ export function createServerOperatorRelayAdapters(
           redirect: 'error',
           signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
         }, 'OpenAI relay');
-        return { text: openAiText(body), evidenceRef: evidenceRef('openai', body) };
+        return {
+          text: openAiText(body),
+          evidenceRef: evidenceRef('openai', openAiModel, body),
+        };
       },
     });
   }
@@ -382,7 +402,10 @@ export function createServerOperatorRelayAdapters(
           redirect: 'error',
           signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
         }, 'Anthropic relay');
-        return { text: anthropicText(body), evidenceRef: evidenceRef('anthropic', body) };
+        return {
+          text: anthropicText(body),
+          evidenceRef: evidenceRef('anthropic', anthropicModel, body),
+        };
       },
     });
   }
@@ -409,7 +432,10 @@ export function createServerOperatorRelayAdapters(
             redirect: 'error',
             signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
           }, 'Perplexity Agent relay');
-          return { text: perplexityText(body), evidenceRef: evidenceRef('perplexity', body) };
+          return {
+            text: perplexityText(body),
+            evidenceRef: evidenceRef('perplexity', modelId, body),
+          };
         },
       });
     }
