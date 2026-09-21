@@ -33,6 +33,7 @@ function enabled(value: string | undefined): boolean {
 }
 
 function envStem(operator: RelayOperatorId): string {
+  if (operator === 'gemini') return 'GEMINI';
   if (operator === 'codex') return 'OPENAI';
   if (operator === 'claude-code') return 'ANTHROPIC';
   return 'PERPLEXITY';
