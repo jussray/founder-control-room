@@ -1,9 +1,15 @@
 import { createPrivateKey, createSign, type KeyObject } from "node:crypto";
 import { Octokit } from "@octokit/rest";
 
+export type GitHubInstallationTokenPermissionLevel = "read" | "write";
+export type GitHubInstallationTokenPermissions = Readonly<
+  Record<string, GitHubInstallationTokenPermissionLevel>
+>;
+
 interface CachedInstallationToken {
   token: string;
   expiresAtMs: number;
+  permissions: GitHubInstallationTokenPermissions;
 }
 
 export interface GitHubRepositoryInstallationEvidence {
@@ -120,6 +126,39 @@ function createGitHubAppClient(appId: string, privateKey: string): Octokit {
   });
 }
 
+function normalizeInstallationTokenPermissions(
+  permissions: GitHubInstallationTokenPermissions,
+): Readonly<Record<string, GitHubInstallationTokenPermissionLevel>> {
+  const normalized = Object.fromEntries(
+    Object.entries(permissions)
+      .filter(([, level]) => level === "read" || level === "write")
+      .sort(([left], [right]) => left.localeCompare(right)),
+  ) as Record<string, GitHubInstallationTokenPermissionLevel>;
+  return Object.freeze(normalized);
+}
+
+function permissionLevelSatisfies(
+  observed: GitHubInstallationTokenPermissionLevel | undefined,
+  required: GitHubInstallationTokenPermissionLevel,
+): boolean {
+  return required === "write" ? observed === "write" : observed === "read" || observed === "write";
+}
+
+function tokenPermissionsSatisfy(
+  observed: GitHubInstallationTokenPermissions,
+  required: GitHubInstallationTokenPermissions,
+): boolean {
+  return Object.entries(required).every(([name, level]) =>
+    permissionLevelSatisfies(observed[name], level),
+  );
+}
+
+function installationTokenPermissionFingerprint(
+  permissions: GitHubInstallationTokenPermissions,
+): string {
+  return encodeBase64Url(JSON.stringify(permissions));
+}
+
 async function resolveGitHubRepositoryInstallation(
   appId: string,
   privateKey: string,
@@ -211,20 +250,30 @@ export async function observeGitHubRepositoryInstallation(
 
 /**
  * Resolves the installation owning one repository and returns a cached,
- * repository-scoped installation token. Tokens are refreshed five minutes
- * before GitHub's expiration timestamp. Cache identity includes BOTH App and
- * repository so credentials from separate Apps can never alias each other.
+ * repository- and permission-scoped installation token. Tokens are refreshed
+ * five minutes before GitHub's expiration timestamp. Cache identity includes
+ * App, repository, and the exact requested permission set so a token minted for
+ * one authority class can never alias a broader or newly-required class.
  */
 export async function getGitHubInstallationToken(
   appId: string,
   privateKey: string,
   repositoryIdentifier: string,
+  requiredPermissions: GitHubInstallationTokenPermissions = {},
 ): Promise<string> {
   const normalizedAppId = appId.trim();
   const repository = parseRepositoryIdentifier(repositoryIdentifier);
-  const cacheKey = `${normalizedAppId}:${repository.canonical.toLowerCase()}`;
+  const normalizedRequiredPermissions = normalizeInstallationTokenPermissions(requiredPermissions);
+  const permissionFingerprint = installationTokenPermissionFingerprint(normalizedRequiredPermissions);
+  const cacheKey = `${normalizedAppId}:${repository.canonical.toLowerCase()}:${permissionFingerprint}`;
   const cached = tokenCache.get(cacheKey);
-  if (cached && cached.expiresAtMs - Date.now() > 5 * 60_000) return cached.token;
+  if (
+    cached
+    && cached.expiresAtMs - Date.now() > 5 * 60_000
+    && tokenPermissionsSatisfy(cached.permissions, normalizedRequiredPermissions)
+  ) {
+    return cached.token;
+  }
 
   const { appClient, installation } = await resolveGitHubRepositoryInstallation(
     normalizedAppId,
@@ -234,12 +283,30 @@ export async function getGitHubInstallationToken(
   const { data: access } = await appClient.apps.createInstallationAccessToken({
     installation_id: installation.id,
     repositories: [repository.repo],
+    ...(Object.keys(normalizedRequiredPermissions).length > 0
+      ? { permissions: normalizedRequiredPermissions }
+      : {}),
   });
   const expiresAtMs = Date.parse(access.expires_at);
   if (!access.token || !Number.isFinite(expiresAtMs)) {
     throw new Error(`GitHub App returned an invalid installation token for ${repository.canonical}`);
   }
 
-  tokenCache.set(cacheKey, { token: access.token, expiresAtMs });
+  const grantedPermissions: Record<string, GitHubInstallationTokenPermissionLevel> = {};
+  for (const [name, value] of Object.entries(access.permissions ?? {})) {
+    if (value === "read" || value === "write") grantedPermissions[name] = value;
+  }
+  const frozenGrantedPermissions = Object.freeze(grantedPermissions);
+  if (!tokenPermissionsSatisfy(frozenGrantedPermissions, normalizedRequiredPermissions)) {
+    throw new Error(
+      `GitHub App minted a token with insufficient repository permissions for ${repository.canonical}`,
+    );
+  }
+
+  tokenCache.set(cacheKey, {
+    token: access.token,
+    expiresAtMs,
+    permissions: frozenGrantedPermissions,
+  });
   return access.token;
 }
