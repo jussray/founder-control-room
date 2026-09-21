@@ -13,8 +13,9 @@ type JsonRecord = Record<string, unknown>;
 const MAX_PROVIDER_RESPONSE_BYTES = 64 * 1024;
 const PROVIDER_TIMEOUT_MS = 60_000;
 const ANTHROPIC_API_VERSION = '2023-06-01';
-const SAFE_PROVIDER_ID = /^[A-Za-z0-9._:-]{1,200}$/;
-const SAFE_MODEL_ID = /^[A-Za-z0-9._:/-]{1,200}$/;
+const MAX_PROVIDER_RESPONSE_ID_LENGTH = 200;
+const SAFE_GEMINI_MODEL = /^[A-Za-z0-9._-]{1,160}$/;
+const SAFE_PERPLEXITY_AGENT_MODEL = /^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/;
 const SECRET_VALUE_PATTERNS = [
   /\bBearer\s+[A-Za-z0-9._~+\/-]{16,}\b/i,
   /\b(?:api[_-]?key|secret|token|password|passwd)\s*[:=]\s*["']?[^\s"']{8,}/i,
@@ -22,12 +23,15 @@ const SECRET_VALUE_PATTERNS = [
   /\bsk-ant-[A-Za-z0-9_-]{16,}\b/,
   /\bpplx-[A-Za-z0-9_-]{16,}\b/,
   /\bgh[pousr]_[A-Za-z0-9]{20,}\b/,
+  /\bgithub_pat_[A-Za-z0-9_]{20,}\b/,
   /\bglpat-[A-Za-z0-9_-]{20,}\b/,
   /\b(?:AKIA|ASIA)[A-Z0-9]{16}\b/,
   /\bxox[baprs]-[A-Za-z0-9-]{20,}\b/,
   /\bAIza[0-9A-Za-z_-]{30,}\b/,
   /-----BEGIN (?:RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----/,
 ] as const;
+
+export const SEMANTIC_PEER_REVIEW_SPEND_MODE = 'paused' as const;
 
 function record(value: unknown): JsonRecord | null {
   return value && typeof value === 'object' && !Array.isArray(value)
@@ -53,11 +57,24 @@ function ensureRelaySensitivity(request: OperatorRelayRequestV1): void {
   }
 }
 
+function ensureRelaySpendPolicy(request: OperatorRelayRequestV1): void {
+  if (request.capability === 'review') {
+    throw new Error('semantic peer review is paused by founder cost-control policy');
+  }
+}
+
 function ensureNoSecretValues(request: OperatorRelayRequestV1): void {
   const outbound = `${request.goal}\n${request.context.summary}`;
   if (SECRET_VALUE_PATTERNS.some((pattern) => pattern.test(outbound))) {
     throw new Error('relay context appears to contain secret-bearing material');
   }
+}
+
+function prepareProviderRequest(request: OperatorRelayRequestV1): string {
+  ensureRelaySensitivity(request);
+  ensureRelaySpendPolicy(request);
+  ensureNoSecretValues(request);
+  return relayPrompt(request);
 }
 
 async function boundedResponseText(response: Response, label: string): Promise<string> {
@@ -134,8 +151,8 @@ async function invokeJsonProvider(
   try {
     response = await fetchImpl(url, init);
   } catch {
-    // Do not serialize provider/fetch exceptions. Transport exceptions can
-    // include request metadata, URLs, proxies, or secret-bearing diagnostics.
+    // Do not serialize the provider/fetch exception. A transport exception can
+    // contain request metadata, URLs, proxies, or secret-bearing diagnostics.
     throw new Error(`${label} request failed`);
   }
   return jsonResponse(response, label);
@@ -153,18 +170,23 @@ function openAiText(body: JsonRecord): string {
       if (typeof block?.text === 'string' && block.text.trim()) parts.push(block.text.trim());
     }
   }
-  if (parts.length === 0) throw new Error('Responses-compatible relay response contained no text');
+  if (parts.length === 0) throw new Error('OpenAI relay response contained no text');
   return parts.join('\n');
 }
 
-function anthropicText(body: JsonRecord): { text: string; providerResponseId: string } {
-  if (body.type !== 'message' || body.role !== 'assistant') {
-    throw new Error('Anthropic relay returned an invalid Messages response envelope');
-  }
-  const providerResponseId = typeof body.id === 'string' ? body.id.trim() : '';
-  if (!SAFE_PROVIDER_ID.test(providerResponseId)) {
+function anthropicText(body: JsonRecord): string {
+  const rawId = typeof body.id === 'string' ? body.id.trim() : '';
+  if (
+    !rawId
+    || rawId.length > MAX_PROVIDER_RESPONSE_ID_LENGTH
+    || !/^[A-Za-z0-9._:-]+$/.test(rawId)
+  ) {
     throw new Error('Anthropic relay returned invalid response identity');
   }
+  if (body.type !== 'message' || body.role !== 'assistant') {
+    throw new Error('Anthropic relay returned invalid message envelope');
+  }
+
   const content = Array.isArray(body.content) ? body.content : [];
   const parts = content.flatMap((entry) => {
     const block = record(entry);
@@ -173,36 +195,100 @@ function anthropicText(body: JsonRecord): { text: string; providerResponseId: st
       : [];
   });
   if (parts.length === 0) throw new Error('Anthropic relay response contained no text');
-  return { text: parts.join('\n'), providerResponseId };
+  return parts.join('\n');
 }
 
-function safeEvidencePart(value: unknown, fallback: string, pattern: RegExp): string {
-  return typeof value === 'string' && pattern.test(value.trim()) ? value.trim() : fallback;
+function geminiResponseId(body: JsonRecord): string {
+  const rawId = typeof body.responseId === 'string' ? body.responseId.trim() : '';
+  if (
+    !rawId
+    || rawId.length > MAX_PROVIDER_RESPONSE_ID_LENGTH
+    || !/^[A-Za-z0-9._:-]+$/.test(rawId)
+  ) {
+    throw new Error('Gemini relay returned invalid response identity');
+  }
+  return rawId;
 }
 
-function evidenceRefFromId(provider: string, configuredModel: string, providerResponseId: string): string {
-  const model = safeEvidencePart(configuredModel, 'configured-model', SAFE_MODEL_ID);
-  return `provider:${provider}:model:${model}:response:${providerResponseId}`;
+function geminiText(body: JsonRecord): string {
+  geminiResponseId(body);
+  const promptFeedback = record(body.promptFeedback);
+  if (
+    typeof promptFeedback?.blockReason === 'string'
+    && promptFeedback.blockReason
+    && promptFeedback.blockReason !== 'BLOCK_REASON_UNSPECIFIED'
+  ) {
+    throw new Error('Gemini relay response was blocked');
+  }
+
+  const candidates = Array.isArray(body.candidates) ? body.candidates : [];
+  const first = record(candidates[0]);
+  const content = record(first?.content);
+  if (!content || (content.role !== undefined && content.role !== 'model')) {
+    throw new Error('Gemini relay returned invalid content envelope');
+  }
+  const parts = Array.isArray(content.parts) ? content.parts : [];
+  const textParts = parts.flatMap((entry) => {
+    const block = record(entry);
+    return typeof block?.text === 'string' && block.text.trim() ? [block.text.trim()] : [];
+  });
+  if (textParts.length === 0) throw new Error('Gemini relay response contained no text');
+  return textParts.join('\n');
 }
 
-function evidenceRef(provider: string, configuredModel: string, body: JsonRecord): string {
-  const id = safeEvidencePart(body.id, 'unidentified-response', SAFE_PROVIDER_ID);
-  return evidenceRefFromId(provider, configuredModel, id);
+function perplexityText(body: JsonRecord): string {
+  if (body.status !== 'completed') {
+    throw new Error('Perplexity Agent relay returned a non-completed response');
+  }
+  const output = Array.isArray(body.output) ? body.output : [];
+  const parts: string[] = [];
+  for (const item of output) {
+    const message = record(item);
+    if (message?.type !== 'message') continue;
+    const content = Array.isArray(message.content) ? message.content : [];
+    for (const entry of content) {
+      const block = record(entry);
+      if (block?.type === 'output_text' && typeof block.text === 'string' && block.text.trim()) {
+        parts.push(block.text.trim());
+      }
+    }
+  }
+  if (parts.length === 0) throw new Error('Perplexity Agent relay response contained no text');
+  return parts.join('\n');
 }
 
-function prepareProviderRequest(request: OperatorRelayRequestV1): string {
-  ensureRelaySensitivity(request);
-  ensureNoSecretValues(request);
-  return relayPrompt(request);
+function responseIdentity(body: JsonRecord, field: 'id' | 'responseId' = 'id'): string {
+  const rawId = typeof body[field] === 'string' ? body[field].trim() : '';
+  return rawId
+    && rawId.length <= MAX_PROVIDER_RESPONSE_ID_LENGTH
+    && /^[A-Za-z0-9._:-]+$/.test(rawId)
+    ? rawId
+    : 'unidentified-response';
+}
+
+function evidenceRef(provider: string, body: JsonRecord, field: 'id' | 'responseId' = 'id'): string {
+  return `provider:${provider}:${responseIdentity(body, field)}`;
+}
+
+function geminiModelId(value: string): string | null {
+  const normalized = value.trim().replace(/^models\//, '');
+  return SAFE_GEMINI_MODEL.test(normalized) ? normalized : null;
+}
+
+function perplexityAgentModelId(value: string): string | null {
+  const normalized = value.trim();
+  if (normalized === 'sonar') return 'perplexity/sonar';
+  return normalized.length <= 160 && SAFE_PERPLEXITY_AGENT_MODEL.test(normalized)
+    ? normalized
+    : null;
 }
 
 function handoffIfConfigured(
   adapters: OperatorRelayAdapters,
   operator: RelayOperatorId,
-  providerApiAvailable: boolean,
   env: NodeJS.ProcessEnv,
 ): void {
-  if (providerApiAvailable || adapters[operator]) return;
+  if (adapters[operator]) return;
   const resolution = resolveOperatorRelayTransport(
     operatorRelayTransportAvailability(operator, false, env),
   );
@@ -214,6 +300,8 @@ export function createServerOperatorRelayAdapters(
   fetchImpl: FetchLike = fetch,
 ): OperatorRelayAdapters {
   const adapters: OperatorRelayAdapters = {};
+  const geminiKey = env.GEMINI_API_KEY?.trim() || env.GOOGLE_API_KEY?.trim();
+  const geminiModel = env.FCR_RELAY_GEMINI_MODEL?.trim();
   const openAiKey = env.OPENAI_API_KEY?.trim();
   const openAiModel = env.FCR_RELAY_OPENAI_MODEL?.trim();
   const anthropicKey = env.ANTHROPIC_API_KEY?.trim();
@@ -221,9 +309,35 @@ export function createServerOperatorRelayAdapters(
   const perplexityKey = env.PERPLEXITY_API_KEY?.trim();
   const perplexityModel = env.FCR_RELAY_PERPLEXITY_MODEL?.trim();
 
-  const openAiAvailable = Boolean(openAiKey && openAiModel);
-  const anthropicAvailable = Boolean(anthropicKey && anthropicModel);
-  const perplexityAvailable = Boolean(perplexityKey && perplexityModel);
+  if (geminiKey && geminiModel) {
+    const modelId = geminiModelId(geminiModel);
+    if (modelId) {
+      adapters.gemini = operatorRelayAdapterFromTextProvider({
+        invoke: async ({ request }) => {
+          const prompt = prepareProviderRequest(request);
+          const body = await invokeJsonProvider(
+            fetchImpl,
+            `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(modelId)}:generateContent`,
+            {
+              method: 'POST',
+              headers: {
+                'x-goog-api-key': geminiKey,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                contents: [{ role: 'user', parts: [{ text: prompt }] }],
+                generationConfig: { maxOutputTokens: 2_000 },
+              }),
+              redirect: 'error',
+              signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
+            },
+            'Gemini relay',
+          );
+          return { text: geminiText(body), evidenceRef: evidenceRef('gemini', body, 'responseId') };
+        },
+      });
+    }
+  }
 
   if (openAiKey && openAiModel) {
     adapters.codex = operatorRelayAdapterFromTextProvider({
@@ -244,7 +358,7 @@ export function createServerOperatorRelayAdapters(
           redirect: 'error',
           signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
         }, 'OpenAI relay');
-        return { text: openAiText(body), evidenceRef: evidenceRef('openai', openAiModel, body) };
+        return { text: openAiText(body), evidenceRef: evidenceRef('openai', body) };
       },
     });
   }
@@ -268,43 +382,43 @@ export function createServerOperatorRelayAdapters(
           redirect: 'error',
           signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
         }, 'Anthropic relay');
-        const message = anthropicText(body);
-        return {
-          text: message.text,
-          evidenceRef: evidenceRefFromId('anthropic', anthropicModel, message.providerResponseId),
-        };
+        return { text: anthropicText(body), evidenceRef: evidenceRef('anthropic', body) };
       },
     });
   }
 
   if (perplexityKey && perplexityModel) {
-    adapters.perplexity = operatorRelayAdapterFromTextProvider({
-      invoke: async ({ request }) => {
-        const prompt = prepareProviderRequest(request);
-        const body = await invokeJsonProvider(fetchImpl, 'https://api.perplexity.ai/v1/responses', {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${perplexityKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: perplexityModel,
-            input: prompt,
-            store: false,
-            max_output_tokens: 2_000,
-            tools: [{ type: 'web_search' }],
-          }),
-          redirect: 'error',
-          signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
-        }, 'Perplexity relay');
-        return { text: openAiText(body), evidenceRef: evidenceRef('perplexity', perplexityModel, body) };
-      },
-    });
+    const modelId = perplexityAgentModelId(perplexityModel);
+    if (modelId) {
+      adapters.perplexity = operatorRelayAdapterFromTextProvider({
+        invoke: async ({ request }) => {
+          const prompt = prepareProviderRequest(request);
+          const body = await invokeJsonProvider(fetchImpl, 'https://api.perplexity.ai/v1/agent', {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${perplexityKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: modelId,
+              input: prompt,
+              tools: [{ type: 'web_search' }],
+              store: false,
+              max_output_tokens: 2_000,
+            }),
+            redirect: 'error',
+            signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
+          }, 'Perplexity Agent relay');
+          return { text: perplexityText(body), evidenceRef: evidenceRef('perplexity', body) };
+        },
+      });
+    }
   }
 
-  handoffIfConfigured(adapters, 'codex', openAiAvailable, env);
-  handoffIfConfigured(adapters, 'claude-code', anthropicAvailable, env);
-  handoffIfConfigured(adapters, 'perplexity', perplexityAvailable, env);
+  handoffIfConfigured(adapters, 'gemini', env);
+  handoffIfConfigured(adapters, 'codex', env);
+  handoffIfConfigured(adapters, 'claude-code', env);
+  handoffIfConfigured(adapters, 'perplexity', env);
 
   return adapters;
 }
