@@ -1,10 +1,18 @@
 import { Router } from 'express';
+import { rateLimit } from 'express-rate-limit';
 import { supabase } from '../../lib/supabaseClient.js';
 import { truthContinuityState } from '../../lib/truthConsoleRules.js';
 import { requireFounder, type FounderRequest } from '../middleware/requireFounder.js';
 
 export const truthConsoleRouter = Router();
-truthConsoleRouter.use(requireFounder);
+const rateLimitTruthConsole = rateLimit({
+  windowMs: 60 * 1_000,
+  limit: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Truth console rate limit exceeded.' },
+});
+truthConsoleRouter.use(rateLimitTruthConsole, requireFounder);
 
 const CLAIM_LIMIT = 200;
 const EVIDENCE_LIMIT = 300;
@@ -185,8 +193,12 @@ truthConsoleRouter.post('/claims/:claimId/evidence', async (req: FounderRequest,
     const kind = stringField(req.body?.kind ?? 'founder_observation', 'kind', 120);
     const status = optionalEnum(req.body?.status, EVIDENCE_STATUS, 'pass', 'status');
     const relation = optionalEnum(req.body?.relation, EVIDENCE_RELATION, 'supports', 'relation');
-    const provider = stringField(req.body?.provider ?? 'founder', 'provider', 120);
     const detailsRef = stringField(req.body?.detailsRef, 'detailsRef', 2_000);
+
+    // This endpoint is manual founder intake. Provider identities are reserved
+    // for provider-owned adapters/ingress, so caller input can never impersonate
+    // GitHub, Cloudflare, Supabase, or another external evidence source.
+    const provider = 'founder';
 
     const { data, error } = await supabase.rpc('truth_console_attach_evidence', {
       p_claim_id: req.params.claimId,
