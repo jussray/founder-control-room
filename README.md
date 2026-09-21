@@ -325,3 +325,9 @@ For public crawler and work-directory behavior, `.github/workflows/ci.yml` must 
 ## Cross-repository browser witness freshness
 
 The exact StoryEngine peer configured in `.github/workflows/playwright.yml` is an evidence subject, not a durable alias for current StoryEngine. A peer refresh must be backed by an independent ref/SHA observation and must reset predecessor federation/browser proof until the complete FCR → StoryEngine → receipt → FCR Playwright witness passes on the exact FCR head. Pin alignment alone grants no merge, deploy, production, or provider-mutation authority.
+
+## OAuth MCP bootstrap truth boundary
+
+The canonical OAuth MCP bootstrap has a deliberately narrow browser-security exception: only unauthenticated `POST /mcp` may pass the browser same-origin mutation middleware so the MCP handler can return its Bearer challenge and protected-resource metadata. That exception does not cover `/mcp/read` or other browser mutations, does not use founder cookies for authority, and does not authorize any tool call; Bearer/OAuth authentication still fails closed before dispatch.
+
+Source and exact-head Playwright proof of the challenge establish only that the authentication negotiation is reachable for that exact candidate. They do not prove Supabase OAuth client registration, consent, deployed production identity, or a real external-client discovery/tool-call round trip; those remain separate provider/runtime evidence gates.
