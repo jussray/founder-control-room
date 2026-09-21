@@ -13,8 +13,11 @@ const E2E_SESSION_ENCRYPTION_KEY = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'
 const BRIDGE_FILE = new URL('./.workspace-new-user-auth-bridge.json', import.meta.url).pathname;
 const REPO_ROOT = dirname(fileURLToPath(new URL('.', import.meta.url)));
 const CHIEF_EXPECTED_SHA = process.env.CHIEF_EXPECTED_SHA || '4534fc784e7dd4a84a0e4e766bd43279f9a8c159';
-const CHIEF_AI_BASE_URL = process.env.CHIEF_AI_BASE_URL || 'https://a38745f4-chief-ai.mcgill-raylene.workers.dev';
 const EXPECTED_HEAD_SHA = process.env.EXPECTED_HEAD_SHA || null;
+const CHIEF_CANDIDATE_URLS = [
+  process.env.CHIEF_AI_BASE_URL || 'https://a38745f4-chief-ai.mcgill-raylene.workers.dev',
+  process.env.CHIEF_BRANCH_PREVIEW_URL || 'https://fix-merge-intent-current-base-2fd4fda-chief-ai.mcgill-raylene.workers.dev',
+].filter((value, index, values) => value && values.indexOf(value) === index);
 
 if (existsSync(BRIDGE_FILE)) unlinkSync(BRIDGE_FILE);
 mkdirSync(join(REPO_ROOT, 'logs'), { recursive: true });
@@ -48,22 +51,33 @@ async function waitForBridge() {
 }
 
 async function proveChiefRuntime() {
-  const response = await fetch(`${CHIEF_AI_BASE_URL}/version`, {
-    headers: { Accept: 'application/json' },
-    redirect: 'manual',
-  });
-  const contentType = response.headers.get('content-type') || '';
-  if (!response.ok || !contentType.includes('application/json')) {
-    throw new Error(`Chief exact runtime unavailable: status=${response.status} content-type=${contentType}`);
+  const attempts = [];
+  for (const baseUrl of CHIEF_CANDIDATE_URLS) {
+    try {
+      const response = await fetch(`${baseUrl}/version`, {
+        headers: { Accept: 'application/json' },
+        redirect: 'manual',
+      });
+      const contentType = response.headers.get('content-type') || '';
+      if (!response.ok || !contentType.includes('application/json')) {
+        attempts.push(`${baseUrl}: status=${response.status} content-type=${contentType}`);
+        continue;
+      }
+      const identity = await response.json();
+      if (identity?.sha !== CHIEF_EXPECTED_SHA) {
+        attempts.push(`${baseUrl}: expected ${CHIEF_EXPECTED_SHA}, got ${identity?.sha ?? 'null'}`);
+        continue;
+      }
+      console.log(`Chief exact runtime verified: ${identity.sha} at ${baseUrl}`);
+      return baseUrl;
+    } catch (error) {
+      attempts.push(`${baseUrl}: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
-  const identity = await response.json();
-  if (identity?.sha !== CHIEF_EXPECTED_SHA) {
-    throw new Error(`Chief runtime identity mismatch: expected ${CHIEF_EXPECTED_SHA}, got ${identity?.sha ?? 'null'}`);
-  }
-  console.log(`Chief exact runtime verified: ${identity.sha}`);
+  throw new Error(`No exact-head Chief runtime was reachable without bypass: ${attempts.join(' | ')}`);
 }
 
-await proveChiefRuntime();
+const VERIFIED_CHIEF_BASE_URL = await proveChiefRuntime();
 
 const foreignProject = {
   workspace_id: FOREIGN_WORKSPACE_ID,
@@ -99,7 +113,7 @@ const server = spawn(
       NODE_ENV: 'development',
       FOUNDER_API_URL: BASE_URL,
       FOUNDER_ALLOWED_ORIGINS: BASE_URL,
-      CHIEF_AI_BASE_URL,
+      CHIEF_AI_BASE_URL: VERIFIED_CHIEF_BASE_URL,
       GITHUB_TOKEN: 'fake-github-token',
       GITHUB_API_BASE_URL: 'http://127.0.0.1:9',
     },
@@ -212,7 +226,7 @@ try {
     contract: 'fcr/workspace-founder-chief-pair@v1',
     fcrHead: EXPECTED_HEAD_SHA,
     chiefHead: CHIEF_EXPECTED_SHA,
-    chiefBaseUrl: CHIEF_AI_BASE_URL,
+    chiefBaseUrl: VERIFIED_CHIEF_BASE_URL,
     workspaceId: me.body?.founder?.workspaceId,
     projectSlug: 'customer-launch-demo',
     explicitFounderApprovalObserved: true,
