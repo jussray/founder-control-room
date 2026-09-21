@@ -84,6 +84,30 @@ function requestUuid(result: AsyncMergePayload): string | null {
   return uuid || null;
 }
 
+function expectedHeadSha(result: AsyncMergePayload): string | null {
+  const sha = result.details?.expected_head_sha?.trim().toLowerCase() ?? "";
+  return FULL_SHA.test(sha) ? sha : null;
+}
+
+function assertReconciledHead(
+  pullRequestNumber: number,
+  result: AsyncMergePayload,
+  approvedHeadSha: string,
+  context: string,
+): void {
+  const observedHeadSha = expectedHeadSha(result);
+  if (!observedHeadSha) {
+    throw new Error(
+      `GitHub async merge for pull request #${pullRequestNumber} cannot ${context} without a valid expected_head_sha`,
+    );
+  }
+  if (observedHeadSha !== approvedHeadSha) {
+    throw new Error(
+      `GitHub async merge for pull request #${pullRequestNumber} ${context} is bound to ${observedHeadSha}, not approved head ${approvedHeadSha}`,
+    );
+  }
+}
+
 function terminalFailureMessage(
   pullRequestNumber: number,
   result: AsyncMergePayload,
@@ -113,8 +137,8 @@ export async function mergeGitHubPullRequestAsync(
     throw new Error("GitHub async merge requires a positive pull request number");
   }
 
-  const expectedHeadSha = options.expectedHeadSha.trim().toLowerCase();
-  if (!FULL_SHA.test(expectedHeadSha)) {
+  const approvedHeadSha = options.expectedHeadSha.trim().toLowerCase();
+  if (!FULL_SHA.test(approvedHeadSha)) {
     throw new Error("GitHub async merge requires a full 40-character expected head SHA");
   }
 
@@ -129,6 +153,7 @@ export async function mergeGitHubPullRequestAsync(
   };
 
   let initial: AsyncMergePayload;
+  let reconciledExistingRequest = false;
   try {
     const response = await client.request(
       "PUT /repos/{owner}/{repo}/pulls/{pull_number}/merge-async",
@@ -136,7 +161,7 @@ export async function mergeGitHubPullRequestAsync(
         owner,
         repo,
         pull_number: options.pullRequestNumber,
-        sha: expectedHeadSha,
+        sha: approvedHeadSha,
         merge_action: "default",
         headers,
       },
@@ -145,10 +170,20 @@ export async function mergeGitHubPullRequestAsync(
   } catch (error) {
     if (errorStatus(error) !== 409) throw error;
     initial = errorPayload(error);
+    reconciledExistingRequest = true;
   }
 
   const immediateSha = mergedSha(initial);
   if (immediateSha) return immediateSha;
+
+  if (reconciledExistingRequest) {
+    assertReconciledHead(
+      options.pullRequestNumber,
+      initial,
+      approvedHeadSha,
+      "reconcile an existing request",
+    );
+  }
 
   const uuid = requestUuid(initial);
   if (!uuid) {
@@ -175,7 +210,15 @@ export async function mergeGitHubPullRequestAsync(
     const current = payload(response.data);
     const sha = mergedSha(current);
     if (sha) return sha;
-    if (current.status === "pending") continue;
+    if (current.status === "pending") {
+      assertReconciledHead(
+        options.pullRequestNumber,
+        current,
+        approvedHeadSha,
+        "continue a pending request",
+      );
+      continue;
+    }
     throw new Error(terminalFailureMessage(options.pullRequestNumber, current));
   }
 

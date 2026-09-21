@@ -13,6 +13,7 @@ vi.mock("@octokit/rest", () => ({
 const { mergeGitHubPullRequestAsync } = await import("../githubAsyncMerge.js");
 
 const HEAD_SHA = "b".repeat(40);
+const OTHER_HEAD_SHA = "a".repeat(40);
 const MERGE_SHA = "d".repeat(40);
 const UUID = "630b9d5e-3f2a-4f7e-8b0c-2d5f9a8c1e42";
 
@@ -92,7 +93,7 @@ describe("mergeGitHubPullRequestAsync", () => {
     expect(mockRequest).toHaveBeenCalledTimes(1);
   });
 
-  it("reconciles an existing async request returned as HTTP 409", async () => {
+  it("reconciles an existing async request returned as HTTP 409 only when it matches the approved head", async () => {
     mockRequest
       .mockRejectedValueOnce({
         status: 409,
@@ -113,6 +114,60 @@ describe("mergeGitHubPullRequestAsync", () => {
 
     await expect(mergeGitHubPullRequestAsync(options())).resolves.toBe(MERGE_SHA);
     expect(mockRequest).toHaveBeenCalledTimes(2);
+  });
+
+  it("fails closed when a 409 points at an async request for a different head", async () => {
+    mockRequest.mockRejectedValueOnce({
+      status: 409,
+      response: {
+        data: {
+          status: "pending",
+          details: { uuid: UUID, expected_head_sha: OTHER_HEAD_SHA },
+        },
+      },
+    });
+
+    await expect(mergeGitHubPullRequestAsync(options()))
+      .rejects.toThrow(`not approved head ${HEAD_SHA}`);
+    expect(mockRequest).toHaveBeenCalledTimes(1);
+  });
+
+  it("fails closed when a queued request later reports a different expected head", async () => {
+    mockRequest
+      .mockResolvedValueOnce({
+        status: 202,
+        data: {
+          status: "pending",
+          details: { uuid: UUID, expected_head_sha: HEAD_SHA },
+        },
+      })
+      .mockResolvedValueOnce({
+        status: 200,
+        data: {
+          status: "pending",
+          details: { uuid: UUID, expected_head_sha: OTHER_HEAD_SHA },
+        },
+      });
+
+    await expect(mergeGitHubPullRequestAsync(options()))
+      .rejects.toThrow(`not approved head ${HEAD_SHA}`);
+    expect(mockRequest).toHaveBeenCalledTimes(2);
+  });
+
+  it("fails closed when a 409 cannot prove the existing request head", async () => {
+    mockRequest.mockRejectedValueOnce({
+      status: 409,
+      response: {
+        data: {
+          status: "pending",
+          details: { uuid: UUID },
+        },
+      },
+    });
+
+    await expect(mergeGitHubPullRequestAsync(options()))
+      .rejects.toThrow("without a valid expected_head_sha");
+    expect(mockRequest).toHaveBeenCalledTimes(1);
   });
 
   it("fails closed on a terminal provider failure", async () => {
@@ -141,7 +196,7 @@ describe("mergeGitHubPullRequestAsync", () => {
       })
       .mockResolvedValue({
         status: 200,
-        data: { status: "pending", details: { uuid: UUID } },
+        data: { status: "pending", details: { uuid: UUID, expected_head_sha: HEAD_SHA } },
       });
 
     await expect(mergeGitHubPullRequestAsync({ ...options(), maxPollAttempts: 2 }))
