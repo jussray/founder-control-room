@@ -10,6 +10,8 @@ on:
       - 'src/http/routes/mcp.ts'
       - 'src/http/server.ts'
       - 'e2e/mcp-oauth-bootstrap-proof.mjs'
+      - '.github/workflows/playwright.yml'
+      - 'docs/SECRETS.md'
       - '.github/workflows/mcp-oauth-bootstrap-proof.yml'
   pull_request:
     paths:
@@ -20,6 +22,8 @@ on:
       - 'src/http/routes/mcp.ts'
       - 'src/http/server.ts'
       - 'e2e/mcp-oauth-bootstrap-proof.mjs'
+      - '.github/workflows/playwright.yml'
+      - 'docs/SECRETS.md'
       - '.github/workflows/mcp-oauth-bootstrap-proof.yml'
 
 permissions:
@@ -32,6 +36,7 @@ concurrency:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+  STORYENGINE_PEER_SHA: d3f75adecc99089989f47b953f7b737c0139a921
 
 jobs:
   oauth-bootstrap:
@@ -67,6 +72,15 @@ jobs:
 
       - name: Verify MCP source contract
         run: npm run verify:mcp
+
+      - name: Verify Playwright federation pin is current
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F "STORYENGINE_PEER_SHA: $STORYENGINE_PEER_SHA" .github/workflows/playwright.yml
+          live="$(git ls-remote https://github.com/jussray/StoryEngine.git refs/heads/main | awk 'NR==1 {print $1}')"
+          printf 'storyengine_expected=%s\nstoryengine_live=%s\n' "$STORYENGINE_PEER_SHA" "$live"
+          test "$live" = "$STORYENGINE_PEER_SHA"
 
       - name: Build exact candidate
         run: npm run build
