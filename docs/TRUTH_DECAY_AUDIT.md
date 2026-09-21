@@ -389,6 +389,10 @@ The strongest optimization is not faster claiming. It is shortening the distance
 
 A later StoryEngine `main` observation can justify rebinding the exact Playwright peer, but that observation only selects the new evidence subject. The FCR browser/federation witness remains `UNKNOWN` for that successor until the exact FCR head reruns the complete runtime identity, directive, receipt, and browser path against that peer. A valid ref/SHA match cannot carry predecessor green forward or mint merge, deploy, production, or provider-mutation authority.
 
+## 2026-09 control correction: secret-name registry is wiring, not provider proof
+
+Registering `ANTHROPIC_API_KEY` as the GitHub Actions secret name used by the serialized Claude repair lane documents the expected credential transport only. It cannot prove that a value exists, that Anthropic accepts it, that account credit or quota is available, that the requested model is available, or that a live provider call succeeded. Those live-provider facts require their own current receipt and must remain independent from StoryEngine peer-federation browser proof.
+
 ## Rollback
 
 The Truth Lease, production-specific lease composer, temporal founder-content guards, analytics-authority guard, and Documentation Truth control are additive/fail-closed. Revert the focused contract/test/workflow/documentation change if it causes incompatibility. No database, provider credential, DNS, publication, provider ruleset, or production mutation is performed by the documentation-truth slice.
