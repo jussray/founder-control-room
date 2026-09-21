@@ -44,6 +44,8 @@ The workflow's `STORYENGINE_PEER_SHA` and `STORYENGINE_PEER_REF` are evidence id
 
 On September 20, that freshness gate caught the same class again when StoryEngine `main` advanced from `aa768075f4bd4fcd8b65f7ee0753596cc488d53a` to merge head `39bed061b034793c69c262527d85c3c4b5617cce` after PR #115. The failing FCR witness remains useful historical evidence that its local browser harness passed, but it cannot prove federation against the successor peer. Recovery requires pinning the independently proven StoryEngine merge head and rerunning the complete FCR exact-head federation/browser witness; neither predecessor green nor a founder merge approval for the predecessor FCR head carries across that movement.
 
+Later the same proof cycle, StoryEngine `main` advanced again from `39bed061b034793c69c262527d85c3c4b5617cce` to signed merge head `d3f75adecc99089989f47b953f7b737c0139a921` through PR #117. The predecessor FCR E2E harness itself remained green, but the live peer-pin freshness step correctly failed because the configured fingerprint no longer matched StoryEngine `main`. FCR then rebound the evidence pin and reran the complete exact-head federation chain: live ref match, immutable peer checkout, peer runtime identity, directive/receipt loop, and Playwright browser witness all had to pass again. That successor green proves only the exact FCR/StoryEngine evidence pair exercised by the rerun; it still grants no merge, deploy, production, or provider-mutation authority.
+
 ## 2026-09 control correction: privileged production witness isolation
 
 A post-Deploy `workflow_run` witness is privileged even when its purpose is read-only verification. Treating the triggering workflow's `head_sha` as both the release identity to observe and the code to execute collapses evidence identity into executable authority. A successful upstream workflow must not make its checkout trusted merely by becoming a completed run.
@@ -51,6 +53,14 @@ A post-Deploy `workflow_run` witness is privileged even when its purpose is read
 The corrected rule keeps those roles separate: `.github/workflows/playwright.yml` restricts the production witness to successful `workflow_dispatch` Deploy runs from `main`, executes only the trusted witness source associated with the privileged workflow context, and carries `workflow_run.head_sha` only as the expected release identity to compare against production. The witness can prove that deployed Worker and browser/runtime identity match the Deploy run SHA, but it cannot execute the Deploy-run checkout or use upstream success as authority to widen what code runs in the privileged phase.
 
 This remains a proof contract, not production proof by itself. The witness must actually run for the relevant release and return terminal exact-SHA evidence before a production-runtime claim becomes current.
+
+## 2026-09 control correction: deploy-free production identity witness
+
+The post-Deploy witness is intentionally tied to an authorized deployment event, but that coupling creates a different truth risk when an operator needs only to re-observe an already-deployed release. Running a deployment-capable or publication-capable path merely to manufacture verification evidence would let the desire for proof widen consequence authority.
+
+The correction is a separate manual observation lane in `.github/workflows/exact-sha-production-witness.yml`. It executes trusted current-`main` witness source, requires the requested full release SHA to equal that trusted `GITHUB_SHA`, holds only `contents: read`, and reuses `e2e/production-release-sha.spec.ts` to compare the direct Worker, public proxy, and browser surface before and after the browser journey. The workflow carries no secret reference, deploy command, Proof-of-Ship publication flag, Postiz mutation hook, or merge action.
+
+This lane can only observe an already-deployed release. If production does not serve the requested trusted current-main SHA, the witness must fail closed; that mismatch is evidence that the production claim is unproven or different, not permission to deploy the candidate. A green manual witness can establish exact production identity for its observation window, but it cannot authorize merge, deployment, publication, provider mutation, billing, secret access, or any other consequence.
 
 ## 2026-09 control correction: Capital Decision documentation drift
 
@@ -230,6 +240,8 @@ For cross-repository product-build proof, `.github/workflows/playwright.yml` is 
 
 The same workflow also contains a privileged post-Deploy production witness. That witness must not execute `workflow_run.head_sha`; it must execute trusted witness source and carry the successful main-bound Deploy run SHA only as release evidence. Separating witness code from observed release identity is part of the evidence-authority contract, because upstream workflow success cannot itself grant executable trust to an arbitrary checkout.
 
+The standalone manual exact-SHA production witness follows the same separation more narrowly: it may observe only a trusted current-main identity supplied as both witness source and expected release identity, and it must remain read-only. Its existence cannot be used as evidence that a deployment occurred, that publication authority exists, or that a provider mutation is permissible.
+
 That registration does not mean durable evidence persistence exists. The current Evidence Trust Plane slice defines receipt, validity, and action-ceiling contracts only; `ledgerState` is supplied state until a separately reviewed persistence writer/store exists. Current receipt use must also re-evaluate expiration and bind merge-review preparation to GitHub API evidence for an exact repository, full SHA, workflow, and run identity. Rejected or non-GitHub evidence cannot be relabeled as merge-review-ready merely because readback completed.
 
 ### Release-coverage at-use gate
@@ -384,6 +396,7 @@ The strongest optimization is not faster claiming. It is shortening the distance
 33. `merge_authority: true` cannot be reused as candidate approval; every merge requires a fresh explicit founder decision for the exact live repository/PR/base/head, and candidate movement expires that approval.
 34. Rebinding a cross-repository Playwright peer to a newly verified exact ref/SHA expires predecessor federation/browser proof and requires a complete exact-head rerun; the pin is evidence identity, not production or merge authority.
 35. A live peer ref/SHA match may select the next browser-federation evidence subject, but it cannot carry predecessor green forward; the successor stays `UNKNOWN` until the complete exact-head runtime, directive, receipt, and browser witness passes.
+36. A manual exact-SHA production witness may observe an already-deployed trusted current-main release, but it cannot be used to infer deploy, publication, provider-write, secret, or merge authority.
 
 ## 2026-09 control correction: peer ref refresh resets proof
 
