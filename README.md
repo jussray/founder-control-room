@@ -81,7 +81,7 @@ FCR can issue a separately approved, bounded product-build directive to a produc
 
 Source wiring and unit tests do **not** prove the current peer runtime is reachable or that the federation loop is green for the current FCR head. That requires exact-head runtime/browser evidence.
 
-The StoryEngine peer pin is an evidence identity, not a durable alias for “current StoryEngine.” If the separately versioned StoryEngine carrier moves, earlier FCR Playwright green remains historical for its pinned peer. FCR must bind a separately exact-head-proven StoryEngine successor and rerun the complete FCR → StoryEngine → receipt → FCR browser/runtime witness before making a current federation claim.
+The StoryEngine peer pin is an evidence identity, not a durable alias for “current StoryEngine.” If the separately versioned StoryEngine carrier moves, earlier FCR Playwright green remains historical for its pinned peer. FCR must bind a separately exact-head-proven StoryEngine successor and rerun the complete FCR → StoryEngine → receipt → FCR browser/runtime witness before making a current federation claim. A successful successor rerun proves only that exact FCR/StoryEngine evidence pair; it does not grant merge, deploy, production, or provider-mutation authority.
 
 See [`docs/REPOSITORY_FEDERATION.md`](docs/REPOSITORY_FEDERATION.md).
 
@@ -204,6 +204,8 @@ Production does not deploy merely because `main` moved or a Cloudflare build suc
 A production-specific Truth Lease composes already-authoritative observations. It does not manufacture missing provider/runtime facts.
 
 The privileged post-Deploy Playwright witness is an **independent verifier**, not an executor for the Deploy-run checkout. It must run only for a successful `workflow_dispatch` Deploy run from `main`, execute trusted witness source, and treat the Deploy run SHA only as release evidence to compare with the deployed Worker and public browser/runtime identity. A `workflow_run` SHA must never become executable authority merely because the upstream workflow succeeded.
+
+The repository also defines `.github/workflows/exact-sha-production-witness.yml` as a separate **manual read-only production observation lane**. It runs only from trusted `main`, requires the requested full release SHA to equal the workflow's trusted `GITHUB_SHA`, uses only `contents: read`, and reuses `e2e/production-release-sha.spec.ts` to compare the already-deployed direct Worker, public proxy, and browser surface against that one identity. This lane carries no deploy, publication, Postiz/provider-write, secret, billing, or merge authority. A green witness can prove an already-deployed release identity; it cannot create that deployment or authorize a consequence.
 
 ### Evidence Trust Plane
 
