@@ -26,6 +26,7 @@ test-results/
 logs/plugin-center-ultrathink/
 logs/control-room-composer/
 logs/five-screen-shell/
+logs/founder-local-first/
 artifacts/browser/local-playwright/
 
 # Generated locally by scripts/verify-documentation-truth.mjs; CI uploads it
