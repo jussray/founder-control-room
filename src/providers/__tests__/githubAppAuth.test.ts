@@ -171,4 +171,90 @@ describe("GitHub App authentication", () => {
     expect(mockGetRepoInstallation).toHaveBeenCalledTimes(2);
     expect(mockCreateInstallationAccessToken).toHaveBeenCalledTimes(2);
   });
+
+  it("mints the installation token with the exact declared permission subset", async () => {
+    mockGetRepoInstallation.mockResolvedValueOnce(installation(900201, 501));
+    mockCreateInstallationAccessToken.mockResolvedValueOnce({
+      data: {
+        token: "token-read-scope",
+        expires_at: "2099-01-01T00:00:00Z",
+        permissions: { contents: "read", checks: "read" },
+      },
+    });
+    const key = generatePrivatePem();
+
+    await expect(getGitHubInstallationToken(
+      "900201",
+      key,
+      "jussray/chief-ai-machine",
+      { contents: "read", checks: "read" },
+    )).resolves.toBe("token-read-scope");
+
+    expect(mockCreateInstallationAccessToken).toHaveBeenCalledWith({
+      installation_id: 501,
+      repositories: ["chief-ai-machine"],
+      permissions: { checks: "read", contents: "read" },
+    });
+  });
+
+  it("does not reuse a cached read token when a later operation requires write scope", async () => {
+    mockGetRepoInstallation
+      .mockResolvedValueOnce(installation(900202, 502))
+      .mockResolvedValueOnce(installation(900202, 502));
+    mockCreateInstallationAccessToken
+      .mockResolvedValueOnce({
+        data: {
+          token: "token-read-scope",
+          expires_at: "2099-01-01T00:00:00Z",
+          permissions: { contents: "read" },
+        },
+      })
+      .mockResolvedValueOnce({
+        data: {
+          token: "token-write-scope",
+          expires_at: "2099-01-01T00:00:00Z",
+          permissions: { contents: "write" },
+        },
+      });
+    const key = generatePrivatePem();
+
+    await expect(getGitHubInstallationToken(
+      "900202",
+      key,
+      "jussray/chief-ai-machine",
+      { contents: "read" },
+    )).resolves.toBe("token-read-scope");
+    await expect(getGitHubInstallationToken(
+      "900202",
+      key,
+      "jussray/chief-ai-machine",
+      { contents: "write" },
+    )).resolves.toBe("token-write-scope");
+
+    expect(mockGetRepoInstallation).toHaveBeenCalledTimes(2);
+    expect(mockCreateInstallationAccessToken).toHaveBeenCalledTimes(2);
+    expect(mockCreateInstallationAccessToken).toHaveBeenNthCalledWith(2, {
+      installation_id: 502,
+      repositories: ["chief-ai-machine"],
+      permissions: { contents: "write" },
+    });
+  });
+
+  it("fails closed if GitHub returns a token narrower than the declared permission scope", async () => {
+    mockGetRepoInstallation.mockResolvedValueOnce(installation(900203, 503));
+    mockCreateInstallationAccessToken.mockResolvedValueOnce({
+      data: {
+        token: "token-too-narrow",
+        expires_at: "2099-01-01T00:00:00Z",
+        permissions: { contents: "read" },
+      },
+    });
+
+    await expect(getGitHubInstallationToken(
+      "900203",
+      generatePrivatePem(),
+      "jussray/chief-ai-machine",
+      { contents: "write" },
+    )).rejects.toThrow(/minted a token with insufficient repository permissions/);
+  });
 });
