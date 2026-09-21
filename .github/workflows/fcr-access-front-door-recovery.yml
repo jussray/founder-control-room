@@ -88,7 +88,7 @@ jobs:
             echo '- DNS mutation: none'
             echo '- Worker route mutation: none'
             echo '- Database mutation: none'
-            echo '- Failed stranger browser proof: rollback only from the exact performed split receipt, deleting the run-created public app before restoring the original mixed destinations'
+            echo '- Failed Access apply: rollback only from the exact performed split receipt, deleting the run-created public app before restoring the original mixed destinations'
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Set up Node 24
@@ -139,9 +139,9 @@ jobs:
         continue-on-error: true
         run: node scripts/verify-fcr-front-door-playwright.mjs >/dev/null 2>&1
 
-      - name: Roll back exact performed split after failed apply or stranger proof
+      - name: Roll back exact performed split after failed Access apply
         id: rollback
-        if: (failure() && inputs.apply == true) || (always() && inputs.apply == true && (steps.access_apply.outcome == 'failure' || steps.stranger_browser.outcome == 'failure'))
+        if: always() && inputs.apply == true && steps.access_apply.outcome == 'failure'
         continue-on-error: true
         env:
           CLOUDFLARE_ACCESS_ADMIN_API_TOKEN: ${{ secrets.CLOUDFLARE_ACCESS_ADMIN_API_TOKEN }}
