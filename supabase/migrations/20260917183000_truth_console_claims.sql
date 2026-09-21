@@ -154,6 +154,7 @@ declare
   v_has_conflict boolean := false;
   v_has_support boolean := false;
   v_all_support_pass boolean := true;
+  v_has_independent_support boolean := false;
   v_has_pending boolean := false;
   v_classification text;
   v_evidence_fingerprint text;
@@ -180,9 +181,22 @@ begin
     coalesce(bool_or(l.relation = 'contradicts' or e.status = 'fail'), false),
     coalesce(bool_or(l.relation = 'supports'), false),
     coalesce(bool_and(case when l.relation = 'supports' then e.status = 'pass' else true end), true),
+    coalesce(bool_or(
+      l.relation = 'supports'
+      and e.status = 'pass'
+      and e.provider in ('github','cloudflare','supabase','playwright')
+      and coalesce(e.environment, '') <> 'truth-console'
+    ), false),
     coalesce(bool_or(e.status = 'pending'), false),
     coalesce(jsonb_agg(
-      jsonb_build_object('id', e.id::text, 'status', e.status, 'relation', l.relation)
+      jsonb_build_object(
+        'id', e.id::text,
+        'status', e.status,
+        'relation', l.relation,
+        'provider', e.provider,
+        'kind', e.kind,
+        'environment', e.environment
+      )
       order by e.id::text
     ), '[]'::jsonb),
     coalesce(jsonb_agg(to_jsonb(e.id::text) order by e.id::text), '[]'::jsonb)
@@ -191,6 +205,7 @@ begin
     v_has_conflict,
     v_has_support,
     v_all_support_pass,
+    v_has_independent_support,
     v_has_pending,
     v_identity,
     v_evidence_ids
@@ -202,11 +217,13 @@ begin
     v_classification := 'unknown';
   elsif v_has_conflict then
     v_classification := 'conflicted';
-  elsif v_has_support and v_all_support_pass then
+  elsif v_has_support and v_all_support_pass and v_has_independent_support then
     v_classification := 'verified';
   elsif v_has_pending then
     v_classification := 'unknown';
   else
+    -- Founder/manual observation may support an inference, but it cannot self-promote
+    -- a claim to VERIFIED. Verified requires independent provider/runtime readback.
     v_classification := 'inferred';
   end if;
 
