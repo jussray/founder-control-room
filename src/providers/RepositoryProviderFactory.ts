@@ -3,6 +3,7 @@ import {
   getGitHubInstallationToken,
   observeGitHubRepositoryInstallation,
   type GitHubRepositoryInstallationEvidence,
+  type GitHubInstallationTokenPermissions,
 } from "./githubAppAuth.js";
 import {
   deriveGitHubAppRepositoryCapabilities,
@@ -93,6 +94,7 @@ export interface AppAwareRepositoryProviderDependencies {
     appId: string,
     privateKey: string,
     repositoryIdentifier: string,
+    requiredPermissions?: GitHubInstallationTokenPermissions,
   ) => Promise<string>;
   observeInstallation?: (
     appId: string,
@@ -155,8 +157,8 @@ export interface CapabilityAwareAppRepositoryProviderResult {
  * It deliberately has no GITHUB_TOKEN fallback. The caller declares the exact
  * GitHub repository permissions its operation requires; FCR observes the live
  * installation grant, fails closed if any permission is missing, and only then
- * mints a repository-scoped App token and returns a provider plus immutable
- * authority evidence.
+ * mints a repository- and permission-scoped App token and returns a provider
+ * plus immutable authority evidence.
  */
 export async function createCapabilityAwareAppRepositoryProvider(
   input: RepositoryConnectionInput,
@@ -185,7 +187,12 @@ export async function createCapabilityAwareAppRepositoryProvider(
   requireGitHubAppRepositoryPermissions(authority, requiredPermissions);
 
   const getInstallationToken = dependencies.getInstallationToken ?? getGitHubInstallationToken;
-  const token = await getInstallationToken(appId, privateKey, connection.repository);
+  const token = await getInstallationToken(
+    appId,
+    privateKey,
+    connection.repository,
+    requiredPermissions,
+  );
   const provider = new GitHubProvider({
     token,
     projectMap: { [connection.projectId]: connection.repository },
