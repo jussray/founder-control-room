@@ -37,7 +37,8 @@ test('recovery workflow is production-gated and separates read from mutation aut
   assert.match(recoveryWorkflow, /fcr-access-public-worker-split-cli\.mjs rollback/);
   assert.doesNotMatch(recoveryWorkflow, /reconcile-cloudflare-access-public-zone\.mjs --apply/);
   assert.doesNotMatch(recoveryWorkflow, /reconcile-cloudflare-access-public-zone\.mjs --rollback/);
-  assert.match(recoveryWorkflow, /failure\(\) && inputs\.apply == true/);
+  assert.match(recoveryWorkflow, /always\(\) && inputs\.apply == true && steps\.access_apply\.outcome == 'failure'/);
+  assert.doesNotMatch(recoveryWorkflow, /steps\.stranger_browser\.outcome == 'failure'.*rollback/s);
 });
 
 test('authority gate never publishes a raw approval reference', () => {
