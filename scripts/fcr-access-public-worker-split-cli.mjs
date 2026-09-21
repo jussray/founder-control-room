@@ -118,7 +118,7 @@ export function projectSplitCompatibilityReceipt(receipt, metadata, { rollback =
     return {
       ...compatibilityBase(metadata),
       state: 'blocked',
-      mutationPerformed: receipt.mutationOutcome === 'performed',
+      mutationPerformed: receipt.mutationPerformed === true || receipt.mutationOutcome === 'performed',
       rollbackPerformed: receipt.rollbackPerformed === true,
       alreadyExempt: null,
       action: 'none',
