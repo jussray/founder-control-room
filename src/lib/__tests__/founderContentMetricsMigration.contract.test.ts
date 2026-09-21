@@ -16,6 +16,10 @@ const appendOnlyFkHardeningMigration = readFileSync(
   resolve(repositoryRoot, 'supabase/migrations/20260921051000_harden_founder_content_metric_append_only_fk.sql'),
   'utf8',
 );
+const provenanceHardeningMigration = readFileSync(
+  resolve(repositoryRoot, 'supabase/migrations/20260921052000_harden_founder_content_metric_provenance.sql'),
+  'utf8',
+);
 
 describe('founder content metrics migration contract', () => {
   it('keeps metrics persistence atomic with the metrics_synced lifecycle event', () => {
@@ -48,5 +52,17 @@ describe('founder content metrics migration contract', () => {
       const statement = searchPathHardeningMigration.slice(start, statementEnd + 1);
       expect(statement).toContain('set search_path = pg_catalog');
     }
+  });
+
+  it('enforces the TypeScript provenance ceiling at the database ledger boundary', () => {
+    expect(provenanceHardeningMigration).toContain('public.founder_content_metric_provenance_is_safe');
+    expect(provenanceHardeningMigration).toContain('set search_path = pg_catalog');
+    expect(provenanceHardeningMigration).toContain('pg_catalog.count(*) <= 40');
+    expect(provenanceHardeningMigration).toContain("provenance_entry.key !~ '^[a-zA-Z0-9_.:-]+$'");
+    expect(provenanceHardeningMigration).toContain('pg_catalog.length(provenance_entry.key) not between 1 and 240');
+    expect(provenanceHardeningMigration).toContain("pg_catalog.jsonb_typeof(provenance_entry.value) not in ('string', 'number', 'boolean', 'null')");
+    expect(provenanceHardeningMigration).toContain("pg_catalog.length(provenance_entry.value #>> '{}') > 240");
+    expect(provenanceHardeningMigration).toContain('pg_catalog.octet_length(p_provenance::text) <= 32768');
+    expect(provenanceHardeningMigration).toMatch(/add constraint founder_content_metric_provenance_safe_check[\s\S]*check \(public\.founder_content_metric_provenance_is_safe\(provenance\)\)/i);
   });
 });
