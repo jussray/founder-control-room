@@ -42,6 +42,8 @@ A September peer-rollover incident made the freshness rule concrete. FCR `af87c6
 
 The workflow's `STORYENGINE_PEER_SHA` and `STORYENGINE_PEER_REF` are evidence identities, not durable aliases for “current StoryEngine.” A peer-pin update is valid only after the referenced peer is independently observed to resolve to the intended exact StoryEngine SHA. Changing either pin immediately expires predecessor FCR federation/browser evidence and requires the complete exact-head Playwright loop to rerun against the new peer. A correct pin does not prove StoryEngine production deployment, FCR production deployment, merge authority, deploy authority, or provider mutation.
 
+On September 20, that freshness gate caught the same class again when StoryEngine `main` advanced from `aa768075f4bd4fcd8b65f7ee0753596cc488d53a` to merge head `39bed061b034793c69c262527d85c3c4b5617cce` after PR #115. The failing FCR witness remains useful historical evidence that its local browser harness passed, but it cannot prove federation against the successor peer. Recovery requires pinning the independently proven StoryEngine merge head and rerunning the complete FCR exact-head federation/browser witness; neither predecessor green nor a founder merge approval for the predecessor FCR head carries across that movement.
+
 ## 2026-09 control correction: privileged production witness isolation
 
 A post-Deploy `workflow_run` witness is privileged even when its purpose is read-only verification. Treating the triggering workflow's `head_sha` as both the release identity to observe and the code to execute collapses evidence identity into executable authority. A successful upstream workflow must not make its checkout trusted merely by becoming a completed run.

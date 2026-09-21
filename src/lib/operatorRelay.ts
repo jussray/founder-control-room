@@ -4,7 +4,7 @@ import { agentCanOperate, agentOperatorPolicy, type AgentOperatorCapability } fr
 export const OPERATOR_RELAY_REQUEST_CONTRACT = 'juss/operator-relay/request@v1' as const;
 export const OPERATOR_RELAY_RESPONSE_CONTRACT = 'juss/operator-relay/response@v1' as const;
 
-export type RelayOperatorId = 'codex' | 'claude-code' | 'perplexity';
+export type RelayOperatorId = 'gemini' | 'codex' | 'claude-code' | 'perplexity';
 export type RelayCapability = Exclude<AgentOperatorCapability, 'instruct'>;
 export type RelaySensitivity = 'public' | 'internal' | 'restricted';
 export type RelayStatus = 'accepted' | 'completed' | 'blocked' | 'failed';
@@ -50,7 +50,7 @@ export interface OperatorRelayResponseV1 {
 }
 
 const SHA256 = /^[0-9a-f]{64}$/i;
-const RELAY_OPERATORS = new Set<RelayOperatorId>(['codex', 'claude-code', 'perplexity']);
+const RELAY_OPERATORS = new Set<RelayOperatorId>(['gemini', 'codex', 'claude-code', 'perplexity']);
 const RELAY_CAPABILITIES = new Set<RelayCapability>(['research', 'propose', 'review', 'implement']);
 
 function normalizedList(values: string[]): string[] {
