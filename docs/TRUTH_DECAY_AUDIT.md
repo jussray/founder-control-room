@@ -42,6 +42,8 @@ A September peer-rollover incident made the freshness rule concrete. FCR `af87c6
 
 The workflow's `STORYENGINE_PEER_SHA` and `STORYENGINE_PEER_REF` are evidence identities, not durable aliases for “current StoryEngine.” A peer-pin update is valid only after the referenced peer is independently observed to resolve to the intended exact StoryEngine SHA. Changing either pin immediately expires predecessor FCR federation/browser evidence and requires the complete exact-head Playwright loop to rerun against the new peer. A correct pin does not prove StoryEngine production deployment, FCR production deployment, merge authority, deploy authority, or provider mutation.
 
+On September 20, that freshness gate caught the same class again when StoryEngine `main` advanced from `aa768075f4bd4fcd8b65f7ee0753596cc488d53a` to merge head `39bed061b034793c69c262527d85c3c4b5617cce` after PR #115. The failing FCR witness remains useful historical evidence that its local browser harness passed, but it cannot prove federation against the successor peer. Recovery requires pinning the independently proven StoryEngine merge head and rerunning the complete FCR exact-head federation/browser witness; neither predecessor green nor a founder merge approval for the predecessor FCR head carries across that movement.
+
 ## 2026-09 control correction: privileged production witness isolation
 
 A post-Deploy `workflow_run` witness is privileged even when its purpose is read-only verification. Treating the triggering workflow's `head_sha` as both the release identity to observe and the code to execute collapses evidence identity into executable authority. A successful upstream workflow must not make its checkout trusted merely by becoming a completed run.
@@ -65,18 +67,6 @@ A merge-governance ambiguity treated the existence of merge capability and the f
 The corrected canon separates the planes. `merge_authority: true` means only that the governed merge capability/authority class exists. Every merge still requires fresh explicit founder approval bound to the exact repository, pull request number, current base SHA, and current head SHA. If that exact approval is absent, ambiguous, or stale, the agent or operator must ask and stop. Review requests, `merge review`, `approved`, `cont`, `continue`, `implement`, mergeability, continuity metadata, or green proof cannot manufacture candidate approval. Any base/head movement invalidates the prior merge approval and requires a new founder decision.
 
 This is an authority-freshness correction, not a relaxation of review or proof. Exact-head evidence still constrains what can be claimed and integrated, while founder approval controls whether the exact candidate may cross the merge boundary. Deployment, publication, billing, secrets, database mutation, deletion, and other consequential classes remain separately gated.
-
-## 2026-09 control correction: Founder Truth Console continuity and UI proof
-
-The Founder Truth Console adds a founder-visible layer over existing FCR evidence, truth snapshots, reconciliation receipts, and continuity records. The risk is not merely a bad badge. A claim can be correctly verified at one revision while new evidence, an attack response, time expiry, or a browser/runtime change makes reuse unsafe. If the UI overwrites the historical result instead of invalidating current continuity, provenance is lost. If it keeps a green cookie after the subject changes, stale proof becomes false current truth.
-
-The corrected source model separates those planes. Creating a claim starts at `unknown`. Evidence attachment is an atomic proof transition that records the evidence/link, invalidates matching current continuity, increments the claim revision, and clears the current snapshot pointer. Reconciliation is allowed only for the exact current revision and atomically writes the truth snapshot, reconciliation receipt, evidence fingerprint, continuity record, proof cookie, and claim state. Attack resolution may use only evidence already linked to the challenged claim and invalidates the prior continuity marker before a fresh reconciliation may restore a current cookie.
-
-Historical verification is not erased merely because the current marker becomes stale or expires. `stale` means the subject was explicitly invalidated for reuse; `expired` means its bounded currentness window elapsed; neither state rewrites the historical receipt. This preserves the invariant: **historical truth is immutable; current truth is re-observed**.
-
-The browser has its own truth-decay boundary. Source files, route tests, or the existence of `e2e/truth-console-proof.mjs` do not prove that a signed-in founder can actually traverse Dashboard, Claims, Evidence Inbox, Reconciliation, Attack Center, World Radar, and Continuity on the exact candidate. `.github/workflows/playwright.yml` therefore runs that dedicated journey on the exact FCR head, including canonical repository scope, durable operation receipts, linked-evidence attack resolution, proof-cookie invalidation, keyboard/focus behavior, and mobile overflow checks. Any candidate-head movement expires the prior UI/UX proof.
-
-Every Truth Console result remains non-authorizing. A verified classification, proof cookie, attack resolution, repository identity, responsive browser success, or World Radar observation cannot grant merge, deploy, production, publication, provider mutation, credential, database, billing, or external-contact authority. World Radar must render persisted observations or a truthful empty state rather than manufacturing demo rows. Production database migration and deployed-runtime truth remain separate from local/browser proof.
 
 ## Root causes
 
@@ -238,8 +228,6 @@ The Evidence Trust Plane is now explicitly part of Documentation Truth. Changes 
 
 For cross-repository product-build proof, `.github/workflows/playwright.yml` is part of that same evidence-authority surface. Its StoryEngine federation fixture must preserve the canonical root directive wire shape, require `node-test` and `playwright`, and prove the exact peer runtime identity before and after the browser-governed execution. A source/test change that touches this witness therefore requires current documentation, but documentation cannot promote an unexecuted successor head into browser truth.
 
-The same exact-head workflow now carries the signed-in Founder Truth Console journey before federation proof. That step must verify the seven founder-facing truth surfaces and their continuity semantics on the current FCR candidate, including mobile/keyboard UX where asserted, without converting a browser success into merge, deploy, production, provider, publication, or database authority. If the FCR head moves, the UI receipt is historical and the complete exact-head journey must rerun.
-
 The same workflow also contains a privileged post-Deploy production witness. That witness must not execute `workflow_run.head_sha`; it must execute trusted witness source and carry the successful main-bound Deploy run SHA only as release evidence. Separating witness code from observed release identity is part of the evidence-authority contract, because upstream workflow success cannot itself grant executable trust to an arbitrary checkout.
 
 That registration does not mean durable evidence persistence exists. The current Evidence Trust Plane slice defines receipt, validity, and action-ceiling contracts only; `ledgerState` is supplied state until a separately reviewed persistence writer/store exists. Current receipt use must also re-evaluate expiration and bind merge-review preparation to GitHub API evidence for an exact repository, full SHA, workflow, and run identity. Rejected or non-GitHub evidence cannot be relabeled as merge-review-ready merely because readback completed.
@@ -265,8 +253,6 @@ Preferred visible states are:
 - `Proof missing / Unknown` -> collect evidence before claiming.
 
 The next gate must be visible. A stale claim is not labeled failed merely because it aged, and an unknown claim is never rendered green.
-
-For the Founder Truth Console specifically, the UI must keep the canonical repository scope, claim classification/revision, evidence relation, reconciliation receipt, proof-cookie state, invalidation reason, and `authority effect: none` inspectable rather than collapsing them into a generic success state. Loading, empty, error, mobile, keyboard-focus, and truthful World Radar empty states are part of the product contract and require exact-head browser proof before they are called verified.
 
 For founder content, keep **learning signal**, **claim truth**, **founder approval**, **provider execution**, and **publication outcome** visibly separate.
 
@@ -397,8 +383,12 @@ The strongest optimization is not faster claiming. It is shortening the distance
 32. A capital decision card, recommendation, score, or HOLD state is evidence interpretation, not financing or execution authority; stale or missing capital evidence must remove derived certainty instead of preserving an earlier recommendation.
 33. `merge_authority: true` cannot be reused as candidate approval; every merge requires a fresh explicit founder decision for the exact live repository/PR/base/head, and candidate movement expires that approval.
 34. Rebinding a cross-repository Playwright peer to a newly verified exact ref/SHA expires predecessor federation/browser proof and requires a complete exact-head rerun; the pin is evidence identity, not production or merge authority.
-35. A Truth Console proof cookie or verified claim is not standing authority; evidence attachment, attack resolution, revision change, expiry, or candidate-head movement must invalidate current reuse without rewriting the historical receipt.
+35. A live peer ref/SHA match may select the next browser-federation evidence subject, but it cannot carry predecessor green forward; the successor stays `UNKNOWN` until the complete exact-head runtime, directive, receipt, and browser witness passes.
+
+## 2026-09 control correction: peer ref refresh resets proof
+
+A later StoryEngine `main` observation can justify rebinding the exact Playwright peer, but that observation only selects the new evidence subject. The FCR browser/federation witness remains `UNKNOWN` for that successor until the exact FCR head reruns the complete runtime identity, directive, receipt, and browser path against that peer. A valid ref/SHA match cannot carry predecessor green forward or mint merge, deploy, production, or provider-mutation authority.
 
 ## Rollback
 
-The Truth Lease, production-specific lease composer, temporal founder-content guards, analytics-authority guard, Founder Truth Console continuity semantics, and Documentation Truth control are additive/fail-closed. Revert the focused contract/test/workflow/documentation change if it causes incompatibility. No database, provider credential, DNS, publication, provider ruleset, or production mutation is performed by the documentation-truth slice.
+The Truth Lease, production-specific lease composer, temporal founder-content guards, analytics-authority guard, and Documentation Truth control are additive/fail-closed. Revert the focused contract/test/workflow/documentation change if it causes incompatibility. No database, provider credential, DNS, publication, provider ruleset, or production mutation is performed by the documentation-truth slice.

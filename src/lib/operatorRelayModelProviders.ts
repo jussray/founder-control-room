@@ -9,6 +9,10 @@ const MAX_PROVIDER_RESPONSE_BYTES = 64 * 1024;
 const PROVIDER_TIMEOUT_MS = 60_000;
 const ANTHROPIC_API_VERSION = '2023-06-01';
 const MAX_PROVIDER_RESPONSE_ID_LENGTH = 200;
+const SAFE_GEMINI_MODEL = /^[A-Za-z0-9._-]{1,160}$/;
+const SAFE_PERPLEXITY_AGENT_MODEL = /^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/;
+
+export const SEMANTIC_PEER_REVIEW_SPEND_MODE = 'paused' as const;
 
 function record(value: unknown): JsonRecord | null {
   return value && typeof value === 'object' && !Array.isArray(value)
@@ -31,6 +35,12 @@ function relayPrompt(request: OperatorRelayRequestV1): string {
 function ensureRelaySensitivity(request: OperatorRelayRequestV1): void {
   if (request.sensitivity === 'restricted') {
     throw new Error('restricted relay context requires a separately approved provider data policy');
+  }
+}
+
+function ensureRelaySpendPolicy(request: OperatorRelayRequestV1): void {
+  if (request.capability === 'review') {
+    throw new Error('semantic peer review is paused by founder cost-control policy');
   }
 }
 
@@ -132,6 +142,18 @@ function openAiText(body: JsonRecord): string {
 }
 
 function anthropicText(body: JsonRecord): string {
+  const rawId = typeof body.id === 'string' ? body.id.trim() : '';
+  if (
+    !rawId
+    || rawId.length > MAX_PROVIDER_RESPONSE_ID_LENGTH
+    || !/^[A-Za-z0-9._:-]+$/.test(rawId)
+  ) {
+    throw new Error('Anthropic relay returned invalid response identity');
+  }
+  if (body.type !== 'message' || body.role !== 'assistant') {
+    throw new Error('Anthropic relay returned invalid message envelope');
+  }
+
   const content = Array.isArray(body.content) ? body.content : [];
   const parts = content.flatMap((entry) => {
     const block = record(entry);
@@ -143,24 +165,89 @@ function anthropicText(body: JsonRecord): string {
   return parts.join('\n');
 }
 
-function perplexityText(body: JsonRecord): string {
-  const choices = Array.isArray(body.choices) ? body.choices : [];
-  const first = record(choices[0]);
-  const message = record(first?.message);
-  if (typeof message?.content !== 'string' || !message.content.trim()) {
-    throw new Error('Perplexity relay response contained no text');
+function geminiResponseId(body: JsonRecord): string {
+  const rawId = typeof body.responseId === 'string' ? body.responseId.trim() : '';
+  if (
+    !rawId
+    || rawId.length > MAX_PROVIDER_RESPONSE_ID_LENGTH
+    || !/^[A-Za-z0-9._:-]+$/.test(rawId)
+  ) {
+    throw new Error('Gemini relay returned invalid response identity');
   }
-  return message.content.trim();
+  return rawId;
 }
 
-function evidenceRef(provider: string, body: JsonRecord): string {
-  const rawId = typeof body.id === 'string' ? body.id.trim() : '';
-  const id = rawId
+function geminiText(body: JsonRecord): string {
+  geminiResponseId(body);
+  const promptFeedback = record(body.promptFeedback);
+  if (
+    typeof promptFeedback?.blockReason === 'string'
+    && promptFeedback.blockReason
+    && promptFeedback.blockReason !== 'BLOCK_REASON_UNSPECIFIED'
+  ) {
+    throw new Error('Gemini relay response was blocked');
+  }
+
+  const candidates = Array.isArray(body.candidates) ? body.candidates : [];
+  const first = record(candidates[0]);
+  const content = record(first?.content);
+  if (!content || (content.role !== undefined && content.role !== 'model')) {
+    throw new Error('Gemini relay returned invalid content envelope');
+  }
+  const parts = Array.isArray(content.parts) ? content.parts : [];
+  const textParts = parts.flatMap((entry) => {
+    const block = record(entry);
+    return typeof block?.text === 'string' && block.text.trim() ? [block.text.trim()] : [];
+  });
+  if (textParts.length === 0) throw new Error('Gemini relay response contained no text');
+  return textParts.join('\n');
+}
+
+function perplexityText(body: JsonRecord): string {
+  if (body.status !== 'completed') {
+    throw new Error('Perplexity Agent relay returned a non-completed response');
+  }
+  const output = Array.isArray(body.output) ? body.output : [];
+  const parts: string[] = [];
+  for (const item of output) {
+    const message = record(item);
+    if (message?.type !== 'message') continue;
+    const content = Array.isArray(message.content) ? message.content : [];
+    for (const entry of content) {
+      const block = record(entry);
+      if (block?.type === 'output_text' && typeof block.text === 'string' && block.text.trim()) {
+        parts.push(block.text.trim());
+      }
+    }
+  }
+  if (parts.length === 0) throw new Error('Perplexity Agent relay response contained no text');
+  return parts.join('\n');
+}
+
+function responseIdentity(body: JsonRecord, field: 'id' | 'responseId' = 'id'): string {
+  const rawId = typeof body[field] === 'string' ? body[field].trim() : '';
+  return rawId
     && rawId.length <= MAX_PROVIDER_RESPONSE_ID_LENGTH
     && /^[A-Za-z0-9._:-]+$/.test(rawId)
     ? rawId
     : 'unidentified-response';
-  return `provider:${provider}:${id}`;
+}
+
+function evidenceRef(provider: string, body: JsonRecord, field: 'id' | 'responseId' = 'id'): string {
+  return `provider:${provider}:${responseIdentity(body, field)}`;
+}
+
+function geminiModelId(value: string): string | null {
+  const normalized = value.trim().replace(/^models\//, '');
+  return SAFE_GEMINI_MODEL.test(normalized) ? normalized : null;
+}
+
+function perplexityAgentModelId(value: string): string | null {
+  const normalized = value.trim();
+  if (normalized === 'sonar') return 'perplexity/sonar';
+  return normalized.length <= 160 && SAFE_PERPLEXITY_AGENT_MODEL.test(normalized)
+    ? normalized
+    : null;
 }
 
 export function createServerOperatorRelayAdapters(
@@ -168,6 +255,8 @@ export function createServerOperatorRelayAdapters(
   fetchImpl: FetchLike = fetch,
 ): OperatorRelayAdapters {
   const adapters: OperatorRelayAdapters = {};
+  const geminiKey = env.GEMINI_API_KEY?.trim() || env.GOOGLE_API_KEY?.trim();
+  const geminiModel = env.FCR_RELAY_GEMINI_MODEL?.trim();
   const openAiKey = env.OPENAI_API_KEY?.trim();
   const openAiModel = env.FCR_RELAY_OPENAI_MODEL?.trim();
   const anthropicKey = env.ANTHROPIC_API_KEY?.trim();
@@ -175,10 +264,42 @@ export function createServerOperatorRelayAdapters(
   const perplexityKey = env.PERPLEXITY_API_KEY?.trim();
   const perplexityModel = env.FCR_RELAY_PERPLEXITY_MODEL?.trim();
 
+  if (geminiKey && geminiModel) {
+    const modelId = geminiModelId(geminiModel);
+    if (modelId) {
+      adapters.gemini = operatorRelayAdapterFromTextProvider({
+        invoke: async ({ request }) => {
+          ensureRelaySensitivity(request);
+          ensureRelaySpendPolicy(request);
+          const body = await invokeJsonProvider(
+            fetchImpl,
+            `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(modelId)}:generateContent`,
+            {
+              method: 'POST',
+              headers: {
+                'x-goog-api-key': geminiKey,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                contents: [{ role: 'user', parts: [{ text: relayPrompt(request) }] }],
+                generationConfig: { maxOutputTokens: 2_000 },
+              }),
+              redirect: 'error',
+              signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
+            },
+            'Gemini relay',
+          );
+          return { text: geminiText(body), evidenceRef: evidenceRef('gemini', body, 'responseId') };
+        },
+      });
+    }
+  }
+
   if (openAiKey && openAiModel) {
     adapters.codex = operatorRelayAdapterFromTextProvider({
       invoke: async ({ request }) => {
         ensureRelaySensitivity(request);
+        ensureRelaySpendPolicy(request);
         const body = await invokeJsonProvider(fetchImpl, 'https://api.openai.com/v1/responses', {
           method: 'POST',
           headers: {
@@ -203,6 +324,7 @@ export function createServerOperatorRelayAdapters(
     adapters['claude-code'] = operatorRelayAdapterFromTextProvider({
       invoke: async ({ request }) => {
         ensureRelaySensitivity(request);
+        ensureRelaySpendPolicy(request);
         const body = await invokeJsonProvider(fetchImpl, 'https://api.anthropic.com/v1/messages', {
           method: 'POST',
           headers: {
@@ -224,25 +346,32 @@ export function createServerOperatorRelayAdapters(
   }
 
   if (perplexityKey && perplexityModel) {
-    adapters.perplexity = operatorRelayAdapterFromTextProvider({
-      invoke: async ({ request }) => {
-        ensureRelaySensitivity(request);
-        const body = await invokeJsonProvider(fetchImpl, 'https://api.perplexity.ai/v1/sonar', {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${perplexityKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: perplexityModel,
-            messages: [{ role: 'user', content: relayPrompt(request) }],
-          }),
-          redirect: 'error',
-          signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
-        }, 'Perplexity relay');
-        return { text: perplexityText(body), evidenceRef: evidenceRef('perplexity', body) };
-      },
-    });
+    const modelId = perplexityAgentModelId(perplexityModel);
+    if (modelId) {
+      adapters.perplexity = operatorRelayAdapterFromTextProvider({
+        invoke: async ({ request }) => {
+          ensureRelaySensitivity(request);
+          ensureRelaySpendPolicy(request);
+          const body = await invokeJsonProvider(fetchImpl, 'https://api.perplexity.ai/v1/agent', {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${perplexityKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: modelId,
+              input: relayPrompt(request),
+              tools: [{ type: 'web_search' }],
+              store: false,
+              max_output_tokens: 2_000,
+            }),
+            redirect: 'error',
+            signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
+          }, 'Perplexity Agent relay');
+          return { text: perplexityText(body), evidenceRef: evidenceRef('perplexity', body) };
+        },
+      });
+    }
   }
 
   return adapters;

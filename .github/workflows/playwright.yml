@@ -22,7 +22,7 @@ env:
   PLAYWRIGHT_BROWSERS_PATH: /opt/pw-browsers
   EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
   PR_BASE_SHA: ${{ github.event.pull_request.base.sha || '' }}
-  STORYENGINE_PEER_SHA: 0c0a608affe303b16644a033e492a5f35231f786
+  STORYENGINE_PEER_SHA: 39bed061b034793c69c262527d85c3c4b5617cce
   STORYENGINE_PEER_REF: refs/heads/main
   STORYENGINE_PEER_URL: http://127.0.0.1:3901
   STORYENGINE_PEER_API_KEY: fcr-ci-product-build
@@ -98,14 +98,6 @@ jobs:
           exit "${status}"
         env:
           NODE_ENV: test
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          PERPLEXITY_API_KEY: ${{ secrets.PERPLEXITY_API_KEY }}
-
-      - name: Prove signed-in seven-screen truth console
-        shell: bash
-        run: |
-          set -euo pipefail
-          node e2e/truth-console-proof.mjs 2>&1 | tee logs/truth-console-proof.log
 
       - name: Verify live StoryEngine peer ref still pinned
         shell: bash

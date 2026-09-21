@@ -1,6 +1,5 @@
 import { installMissionBoard } from './mission-board.js';
 import { installProjectShellUi } from './project-shell-ui.js';
-import { installTruthConsole } from './truth-console.js';
 
 const PENDING_TAB_KEY = 'fcr_pending_tab';
 const CONVEYOR_CONTRACT = 'founder-control-room/n8n-conveyor@v3';
@@ -12,13 +11,6 @@ const ALLOWED_TABS = new Set([
   'promptos',
   'analytics',
   'terminal',
-  'truth-dashboard',
-  'truth-claims',
-  'truth-evidence',
-  'truth-reconcile',
-  'truth-attacks',
-  'truth-world',
-  'truth-continuity',
 ]);
 
 const READINESS_COPY = {
@@ -84,9 +76,6 @@ function activateTab(tab) {
   removeTabQueryParameter();
   return true;
 }
-
-installTruthConsole();
-
 const requestedTab = requestedTabFromUrl();
 if (requestedTab) safeSessionSet(PENDING_TAB_KEY, requestedTab);
 const pendingTab = requestedTab ?? safeSessionGet(PENDING_TAB_KEY);

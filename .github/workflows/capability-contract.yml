@@ -13,10 +13,14 @@ on:
       - 'scripts/verify-direct-browser-contract.mjs'
       - 'src/capabilities/**'
       - 'src/lib/pluginCenter.ts'
+      - 'src/lib/growthInboxReply.ts'
+      - 'src/lib/__tests__/growthInboxReply.test.ts'
       - 'src/http/routes/capabilities.ts'
       - 'src/http/routes/pluginCenter.ts'
+      - 'src/http/routes/pluginCenterMessaging.ts'
       - 'src/http/routes/__tests__/pluginCenter.integration.test.ts'
       - 'src/http/routes/__tests__/pluginCenterRevocation.integration.test.ts'
+      - 'src/http/routes/__tests__/pluginCenterMessaging.integration.test.ts'
       - 'src/http/routes/__tests__/tinyFishObservation.integration.test.ts'
       - 'src/http/routes/__tests__/ultrathinkSharedReasoning.integration.test.ts'
       - 'public/control-room/plugin-center.html'
@@ -27,7 +31,7 @@ on:
       - 'package.json'
       - '.github/workflows/capability-contract.yml'
   push:
-    branches: [main]
+    branches: [main, 'fix/growth-inbox-*']
 
 permissions:
   contents: read
@@ -55,8 +59,10 @@ jobs:
           src/capabilities/__tests__/tinyFishWebObservation.test.ts
           src/capabilities/__tests__/sharedCapabilityRuntime.test.ts
           src/capabilities/__tests__/ultrathinkSharedReasoning.test.ts
+          src/lib/__tests__/growthInboxReply.test.ts
           src/http/routes/__tests__/pluginCenter.integration.test.ts
           src/http/routes/__tests__/pluginCenterRevocation.integration.test.ts
+          src/http/routes/__tests__/pluginCenterMessaging.integration.test.ts
           src/http/routes/__tests__/tinyFishObservation.integration.test.ts
           src/http/routes/__tests__/ultrathinkSharedReasoning.integration.test.ts
       - run: npm run typecheck

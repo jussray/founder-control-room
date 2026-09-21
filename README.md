@@ -148,6 +148,8 @@ verified evidence
 
 A draft, provider acceptance, or n8n execution is not publication truth. **Provider readback** is the terminal external-state evidence for the route that actually ran.
 
+The current Postiz source integration is deliberately narrower than publication. `src/lib/postizMcpLifecycleAdapter.ts` may use the server-held `POSTIZ_API_KEY` only for bounded MCP account discovery and post-status readback (`integrationList` and `postsListTool`). It does not expose Postiz `schedulePostTool`, `publish_now`, or any other provider-write path through the generic MCP/readback boundary. A Postiz-reported `PUBLISHED` state without a destination-native permalink or equivalent independently verified terminal artifact remains provider-reported state, not FCR publication truth. Live Postiz authentication, endpoint health, connected-account state, and provider outcomes remain separately unproven until current runtime/provider evidence observes them.
+
 The governed Founder Content n8n production-source lane is source-enabled only when its reviewed configuration sets `N8N_FOUNDER_CONTENT_ENABLED=true`, restricts the enabled provider to Buffer, pins workflow identity `fcrFounderContentV1`, and pins n8n runtime `2.32.6`. That source state does not prove the canonical Worker was deployed with the four required provider-held n8n secret bindings, the production workflow was published at the exact expected fingerprint, the database migrations were applied, or Buffer accepted a schedule. CI may prove the checked workflow on an isolated real n8n runtime without proving production use. Present-tense `live`, `used`, `scheduled`, or `published` claims require exact deployed runtime identity plus provider-native readback.
 
 Investor email is a separate authority class and must not auto-send without the applicable policy, recipient-specific qualification, and send authority.
@@ -159,6 +161,8 @@ FCR's `content-outcome-learning@v1` Attack 3000 adapter and `evaluateContentTren
 Attack 3000 content evidence must bind publication and metrics to one observation identity, content fingerprint, provider, comparable window, completed measurement state, and explicit evaluation time. The adapter independently checks observation/window timestamps, bounded future skew, and an explicit freshness expiry; `CURRENT` alone is insufficient. Distribution evidence such as publication, impressions, reactions, comments, and profile views is not business demand by itself. Supporting external-demand evidence must retain its own evidence references plus a downstream attributed signal. Metric stop floors are evaluated only from their relevant current observation and cannot fire before verified publication and a completed measurement window.
 
 The Trend Radar ranks sourced signals using timeliness, audience interest, content potential, founder fit, closest-legitimate-dollar relevance, competition opportunity, saturation, and content-fingerprint similarity. First-wave eligibility requires evidence id + source + `observedAt` that is current against the explicit evaluation time; the default evidence window is seven days with a two-minute future-skew tolerance. Evidence-less, unattributed, malformed, stale, future-dated, prediction-only, or incompletely framed candidates cannot enter the first wave. Rankings remain advisory and authorize **no publish, scheduling, spend, provider, merge, deploy, or external-contact action**.
+
+The authenticated founder-content conveyor now exposes `fcr/youtube-growth-evaluation@v1` at `/automation/conveyor/founder-content/youtube-growth/evaluate`. This route makes the existing evidence-gated `TEST_AND_VALIDATE -> DOUBLE_DOWN -> SCALE` evaluator reachable without turning it into an execution lane. It rejects malformed experiments, measurements, continuity fingerprints, thresholds, targets, unknown fields, and duplicate repeatability receipts before they can produce a stronger recommendation. A returned `ADVANCE` is advisory strategy evidence only: it authorizes no publication, scheduling, spend, provider mutation, scale execution, merge, or deploy. YouTube publication state, YPP eligibility, revenue, and other provider outcomes remain UNKNOWN until separately proven by authoritative provider/outcome evidence.
 
 Founder-content approval reservations are deterministic for the same founder, platform, normalized public thesis/opening hook, and Current You intent. A retry after a lost issuance response may recover only the exact still-active stored reservation with matching approval id, founder, proposal hash, public payload hash, and platform. Mismatched, consumed, revoked, expired, or otherwise non-current reservations do not recover and do not create fresh authority.
 
@@ -177,12 +181,13 @@ foundercontrolroom.org
 api.foundercontrolroom.org
   -> canonical Worker: founder-control-room
 ```
-
 Public discovery artifacts such as `/robots.txt`, `/sitemap.xml`, `/llms.txt`, and `/crawlers.json` are static Pages assets and must be served through the `ASSETS` binding; API-owned callback assets remain routed through `FCR_API`. This source routing rule does not make crawler policy authentication and cannot grant provider, deploy, publication, or mutation authority.
 
 Source dependence on that topology is not proof the live provider is configured correctly.
 
 `wrangler.worker.toml [secrets].required` is the canonical production binding-name gate for provider-held Worker secrets. A provider-backed capability such as `tinyfish-web-observation-v1` must name `TINYFISH_API_KEY` there before canonical Worker promotion; Deploy verifies only binding-name presence in Cloudflare and never copies the secret value through GitHub Actions. Source and CI readiness therefore remain distinct from live TinyFish provider/runtime activation.
+
+The first-party FCR Shopify paid-order ingress follows the same boundary. `FCR_SHOPIFY_WEBHOOK_SECRET` and `FCR_COMMERCE_HASH_SALT` must remain provider-held required Worker secrets before promotion, while source merely declares their names. Their presence cannot prove that Shopify registered the `orders/paid` callback, that the deployed Worker serves the exact commerce head, that the production Supabase migration exists, or that any payment was collected; those claims require separate provider, deployment, database, runtime, and revenue receipts.
 
 Production does not deploy merely because `main` moved or a Cloudflare build succeeded. A production claim remains incomplete until the authorized lane proves, for one exact candidate:
 
@@ -208,18 +213,6 @@ Current source includes receipt/evaluator foundations that can classify whether 
 
 Even a valid current receipt cannot by itself authorize merge, deploy, production promotion, issue closure, secret mutation, policy mutation, billing, publication, or deletion.
 
-### Founder Truth Console
-
-The signed-in Founder Truth Console is a founder-authenticated evidence surface inside the existing Control Room shell, not a second operating system and not an authority source. Its seven source surfaces are Dashboard, Claims, Evidence Inbox, Reconciliation, Attack Center, World Radar, and Continuity. They reuse the existing `evidence`, `reconciliation_runs`, `truth_snapshots`, and `continuity_records` proof spine while `truth_claims`, claim-evidence links, and truth attacks provide founder-facing organization around that evidence.
-
-A new claim begins `unknown`. Attaching evidence is a proof mutation, so the durable database path must atomically create the normalized evidence/link, invalidate the matching current continuity marker, increment the claim revision, clear the current snapshot pointer, and leave the claim stale until it is reconciled again. Reconciliation requires the exact current claim revision and atomically produces the new truth snapshot, reconciliation receipt, continuity record, proof cookie, and claim update. An attack may be resolved only with evidence already linked to the challenged claim; resolution increments the claim revision and invalidates the prior continuity marker before any fresh reconciliation.
-
-Continuity state is current confidence about reuse, not a rewrite of historical fact. An invalidated marker is `stale`; a time-bounded marker past `valid_until` is `expired`; earlier verification remains historical evidence rather than being erased. A proof cookie, truth snapshot, reconciliation receipt, attack resolution, green classification, canonical repository binding, or browser success has `authority effect: none` and cannot grant merge, deploy, production, publication, provider mutation, billing, database-migration, credential, or external-contact authority.
-
-The UX must make those boundaries inspectable: canonical repository scope, claim revision, classification, evidence relationship, operation receipt, cookie state, invalidation cause, loading/error/empty states, keyboard focus, and responsive mobile behavior are founder-visible. The dedicated `e2e/truth-console-proof.mjs` journey is wired into exact-head Playwright to exercise the signed-in seven-screen path and mobile overflow behavior. Source wiring or the existence of that test file is not browser proof; the exact candidate must complete that Playwright step successfully before the current UI/UX journey may be called verified. Production database migration, deployed runtime identity, and provider state remain separate proof planes.
-
-World Radar is read-only on this surface. When no persisted economic intelligence or portfolio-signal observations exist, the truthful UI state is empty; fixtures or synthetic opportunities must not be substituted merely to make the screen look populated.
-
 ### Founder Capital Decision
 
 The Founder Capital Decision surface is an evidence-evaluation capability, not a financing actuator. It can turn founder-supplied and verified fundraising context into a decision card, surface dilution and option tradeoffs, and return `HOLD` when required evidence is stale, missing, or insufficient.
@@ -235,6 +228,8 @@ A terminal result is verification evidence only for the command and exact checko
 ### MCP and provider bridges
 
 FCR can declare and govern bounded MCP/provider capabilities, including the source contract for a read-only FCR MCP bridge. Repository declarations prove wiring only. Live secret presence, provider authentication, endpoint health, deployed runtime identity, and mutation authority require separate current evidence.
+
+Componecat is one such bounded source capability: its registry entry is read-only portfolio architecture/catalog context for active projects. Catalog discovery does not grant project ownership, repository mutation, merge, deploy, provider-write, or publication authority, and continuity-only/external project identities do not inherit access merely because they exist in the broader portfolio graph.
 
 ## Data boundary
 
@@ -326,3 +321,7 @@ A child-app reconciliation may classify evidence as `CURRENT`, `UNDECLARED`, `SC
 ## Required crawler/public-work browser proof
 
 For public crawler and work-directory behavior, `.github/workflows/ci.yml` must keep `e2e/pages-api-recovery.spec.ts` and `e2e/public-work-directory.spec.ts` inside the load-bearing `Playwright e2e` job that feeds `Required Gate`. The specialized Pages workflow is supplementary evidence only; it cannot replace this required exact-head browser proof or authorize merge.
+
+## Cross-repository browser witness freshness
+
+The exact StoryEngine peer configured in `.github/workflows/playwright.yml` is an evidence subject, not a durable alias for current StoryEngine. A peer refresh must be backed by an independent ref/SHA observation and must reset predecessor federation/browser proof until the complete FCR → StoryEngine → receipt → FCR Playwright witness passes on the exact FCR head. Pin alignment alone grants no merge, deploy, production, or provider-mutation authority.
