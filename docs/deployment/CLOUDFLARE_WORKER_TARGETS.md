@@ -179,6 +179,8 @@ The canonical Worker runtime secret values belong in the Cloudflare Worker secre
 
 `TINYFISH_API_KEY` is one of those required canonical Worker binding names. Its value must remain only in the Cloudflare Worker secret plane; canonical Deploy may verify the provider-held name but never read, log, or re-upload the value. That binding-name receipt still does not prove TinyFish accepted a request, so live activation requires a separately observed key-backed Search or Fetch receipt.
 
+`FCR_SHOPIFY_WEBHOOK_SECRET` and `FCR_COMMERCE_HASH_SALT` are also required canonical Worker binding names for FCR's first-party Shopify paid-order ingress. The first authenticates Shopify's exact webhook body and the second creates a privacy-safe order reference; neither is authority by itself. Source and binding-name verification cannot prove the provider subscription, deployed callback, production database ledger, or a paid outcome, so those layers must remain separately evidenced before the money path is called active or proven.
+
 For the governed Founder Content n8n production-source lane, the same canonical Worker additionally requires the provider-held binding names `N8N_FOUNDER_CONTENT_WEBHOOK_URL`, `N8N_FOUNDER_CONTENT_BEARER_TOKEN`, `N8N_FOUNDER_CONTENT_EXPECTED_WORKFLOW_FINGERPRINT`, and `N8N_FOUNDER_CONTENT_IDENTITY_HMAC_SECRET`. Public-safe source may declare `N8N_FOUNDER_CONTENT_ENABLED=true`, Buffer-only provider selection, workflow ID `fcrFounderContentV1`, and runtime `2.32.6`, but those declarations do not prove any of the four secret values exist or that production n8n is active. Canonical exact-main Deploy must verify required binding-name presence before Worker mutation, and production truth still requires exact deployed Worker identity, production n8n workflow/fingerprint/runtime readback, and provider-native Buffer outcome evidence.
 
 The canonical Deploy authority gate has a smaller GitHub production credential surface. It requires only the credentials needed to perform the release itself:
@@ -216,6 +218,8 @@ At minimum verify:
 9. authentication returns to `/control-room/` on the Pages origin;
 10. required Playwright/browser proof runs against the deployed path; and
 11. founder-content/provider claims use their own exact authorization and provider-readback gates.
+
+For the FCR Shopify money path specifically, production proof additionally requires the exact production database migration, a deployed Worker whose runtime identity matches the authorized release, provider readback that Shopify's `orders/paid` subscription targets the deployed callback, and a genuine provider-confirmed paid-order receipt before `payment_collected` can be presented as a live outcome. No test charge is implied by source or CI proof.
 
 Provider build/deploy comments, preview URLs, and successful uploads are useful evidence for the artifact they name. They do not substitute for runtime binding identity, auth, browser, publication, or fleet-wide proof.
 

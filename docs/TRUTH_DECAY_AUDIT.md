@@ -32,7 +32,7 @@ The corrected contract keeps one authority per secret plane. GitHub production v
 
 The FCR → StoryEngine product-build lane exposed a cross-repository version of the same failure. An FCR browser fixture could remain locally valid while the separately versioned StoryEngine control-room contract changed its proof requirements or request wire shape. Reusing predecessor Playwright green after either repository head, peer runtime identity, required-proof set, or serialized directive shape moved would falsely convert historical integration evidence into current authority.
 
-The corrected evidence-authority rule is explicit: `.github/workflows/playwright.yml` must exercise the canonical product-build directive at the request-body root, require both `node-test` and `playwright`, bind the exact StoryEngine runtime identity before and after execution, and treat every FCR or StoryEngine head movement as a new proof subject. FCR also validates the peer proof boundary before dispatch, but that source guard does not replace the browser/runtime witness.
+The corrected evidence-authority rule is explicit: `.github/workflows/playwright.yml` must exercise the canonical product-build directive at the request-body root, require both `node-test` and `playwright` proof, bind the exact StoryEngine runtime identity before and after execution, and treat every FCR or StoryEngine head movement as a new proof subject. FCR also validates the peer proof boundary before dispatch, but that source guard does not replace the browser/runtime witness.
 
 A unit test, source declaration, reachable endpoint, or earlier successful Playwright run cannot prove the current peer loop. Current federation proof requires one exact FCR head, one exact StoryEngine runtime head, the expected directive/receipt binding, and applicable real-path browser evidence. The receipt remains non-authorizing for merge, deploy, production promotion, or provider mutation.
 
@@ -41,6 +41,8 @@ This is why the exact-head Playwright workflow is registered as `evidence-author
 A September peer-rollover incident made the freshness rule concrete. FCR `af87c67e05584203b04610eb25e6f89ad8c1e7a0` completed a real federation lap against its pinned StoryEngine peer `abd4aab9f33e6c67d7863bd1a03c917901a00668`, but StoryEngine PR #89 had already advanced to separately exact-head-proven `f78492230e88c66b04d4d8c9d6210c6380ba0db1`. The earlier FCR green therefore remains historical for the old peer rather than current integration authority. Refreshing the peer pin is only the start of recovery: the successor FCR head must rerun the entire browser/runtime/receipt witness against the newly bound StoryEngine SHA, and movement on either side expires that successor proof again.
 
 The workflow's `STORYENGINE_PEER_SHA` and `STORYENGINE_PEER_REF` are evidence identities, not durable aliases for “current StoryEngine.” A peer-pin update is valid only after the referenced peer is independently observed to resolve to the intended exact StoryEngine SHA. Changing either pin immediately expires predecessor FCR federation/browser evidence and requires the complete exact-head Playwright loop to rerun against the new peer. A correct pin does not prove StoryEngine production deployment, FCR production deployment, merge authority, deploy authority, or provider mutation.
+
+On September 20, that freshness gate caught the same class again when StoryEngine `main` advanced from `aa768075f4bd4fcd8b65f7ee0753596cc488d53a` to merge head `39bed061b034793c69c262527d85c3c4b5617cce` after PR #115. The failing FCR witness remains useful historical evidence that its local browser harness passed, but it cannot prove federation against the successor peer. Recovery requires pinning the independently proven StoryEngine merge head and rerunning the complete FCR exact-head federation/browser witness; neither predecessor green nor a founder merge approval for the predecessor FCR head carries across that movement.
 
 ## 2026-09 control correction: privileged production witness isolation
 
@@ -381,17 +383,11 @@ The strongest optimization is not faster claiming. It is shortening the distance
 32. A capital decision card, recommendation, score, or HOLD state is evidence interpretation, not financing or execution authority; stale or missing capital evidence must remove derived certainty instead of preserving an earlier recommendation.
 33. `merge_authority: true` cannot be reused as candidate approval; every merge requires a fresh explicit founder decision for the exact live repository/PR/base/head, and candidate movement expires that approval.
 34. Rebinding a cross-repository Playwright peer to a newly verified exact ref/SHA expires predecessor federation/browser proof and requires a complete exact-head rerun; the pin is evidence identity, not production or merge authority.
-35. Fixture-backed five-screen proof against intercepted `fcr.test` APIs cannot prove the public FCR runtime; candidate-head movement or deployed-runtime movement expires browser proof and requires the applicable exact-path witness to run again.
+35. A live peer ref/SHA match may select the next browser-federation evidence subject, but it cannot carry predecessor green forward; the successor stays `UNKNOWN` until the complete exact-head runtime, directive, receipt, and browser witness passes.
 
-## Five-screen cockpit proof boundary
+## 2026-09 control correction: peer ref refresh resets proof
 
-The five-screen cockpit is a source/UI navigation contract, not a production-status shortcut. A fixture-backed Playwright run may prove that Home, Control, Chief, PromptOS, Proof, legacy-route migration, and project/mission context behave correctly when the expected API shapes are supplied. It cannot prove the live Pages/Worker routes, deployed API data, authentication state, or release identity.
-
-The exact-candidate browser journey must exercise the real application path for the candidate head. After an authorized merge and deployment, production truth requires a separately current production-origin browser witness whose observed `/version` identity matches the deployed release. Movement of the candidate head, production deployment identity, or other load-bearing runtime dependency expires predecessor browser proof instead of preserving a false green.
-
-## 2026-09 StoryEngine peer witness renewal
-
-A StoryEngine `main` advance is not permission to retarget FCR automatically. Before `.github/workflows/playwright.yml` may bind a successor peer, that exact StoryEngine candidate must have separately green CI, promotion gates, test-ledger, and browser/guardrail proof, and the resulting StoryEngine `main` identity must be re-observed. The FCR pin update itself expires predecessor FCR federation proof and requires the complete exact-head StoryEngine checkout, runtime-identity, directive/receipt, and Playwright loop to run again. A successful peer renewal remains evidence only and cannot authorize FCR merge, deployment, production promotion, or provider mutation.
+A later StoryEngine `main` observation can justify rebinding the exact Playwright peer, but that observation only selects the new evidence subject. The FCR browser/federation witness remains `UNKNOWN` for that successor until the exact FCR head reruns the complete runtime identity, directive, receipt, and browser path against that peer. A valid ref/SHA match cannot carry predecessor green forward or mint merge, deploy, production, or provider-mutation authority.
 
 ## Rollback
 

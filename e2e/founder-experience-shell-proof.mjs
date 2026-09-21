@@ -41,6 +41,87 @@ mkdirSync(RESULTS_ROOT, { recursive: true });
 
 const browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
 
+async function assertNoHorizontalOverflow(page, label) {
+  const overflow = await page.evaluate(() => ({
+    scrollWidth: document.documentElement.scrollWidth,
+    clientWidth: document.documentElement.clientWidth,
+  }));
+  if (overflow.scrollWidth > overflow.clientWidth + 1) {
+    throw new Error(`${label}: horizontal overflow detected ${JSON.stringify(overflow)}`);
+  }
+}
+
+async function provePublicFrontDoor(label, viewport) {
+  const context = await browser.newContext({ viewport });
+  const page = await context.newPage();
+  const pageErrors = [];
+  page.on('pageerror', (error) => pageErrors.push(error.message));
+
+  await page.goto(`${BASE_URL}/`, { waitUntil: 'networkidle' });
+  await page.locator('[data-fcr-entry]').waitFor({ state: 'visible' });
+
+  const entryChoices = page.locator('[data-entry-choice]');
+  if (await entryChoices.count() !== 2) {
+    throw new Error(`${label}: public front door must expose exactly two role choices`);
+  }
+
+  const userChoice = page.locator('[data-entry-choice="user"]');
+  const founderChoice = page.locator('[data-entry-choice="founder"]');
+  if (await userChoice.getAttribute('href') !== '#discover') {
+    throw new Error(`${label}: user entry must route to the public user onboarding screen`);
+  }
+  if (await founderChoice.getAttribute('href') !== '#founder-start') {
+    throw new Error(`${label}: founder entry must route to founder onboarding`);
+  }
+
+  const authenticatedEntryCount = await page.getByRole('link', { name: /Enter authenticated Control Room/i }).count();
+  if (authenticatedEntryCount !== 1) {
+    throw new Error(`${label}: public site must keep exactly one explicit authenticated Control Room entry`);
+  }
+
+  await userChoice.click();
+  if (new URL(page.url()).hash !== '#discover') {
+    throw new Error(`${label}: user entry did not land on #discover`);
+  }
+  const userOnboarding = page.locator('[data-public-onboarding="user"]');
+  const userCopy = await userOnboarding.innerText();
+  if (!/No account is required to explore the public FCR world/i.test(userCopy)) {
+    throw new Error(`${label}: user onboarding must make the current public/no-account boundary explicit`);
+  }
+  if (await userOnboarding.locator('[data-user-start]').count() !== 4) {
+    throw new Error(`${label}: user onboarding must expose four real public starting lanes`);
+  }
+  if (await userOnboarding.locator('[data-user-start="founders"]').getAttribute('href') !== '/work.html') {
+    throw new Error(`${label}: founder discovery must route to the real public work directory`);
+  }
+
+  await page.goto(`${BASE_URL}/#founder-start`, { waitUntil: 'networkidle' });
+  const founderOnboarding = page.locator('[data-public-onboarding="founder"]');
+  await founderOnboarding.waitFor({ state: 'visible' });
+  const founderCopy = await founderOnboarding.innerText();
+  if (!/General member authentication and multi-tenant founder workspaces remain a separate implementation gate/i.test(founderCopy)) {
+    throw new Error(`${label}: public founder onboarding must not pretend general multi-tenant founder auth is live`);
+  }
+  if (!/Connection never creates authority by itself/i.test(founderCopy)) {
+    throw new Error(`${label}: founder onboarding must preserve the authority boundary`);
+  }
+  const founderStart = founderOnboarding.locator('[data-founder-start="authenticated"]');
+  if (await founderStart.getAttribute('href') !== '/control-room/') {
+    throw new Error(`${label}: founder onboarding must reuse the existing authenticated Control Room path`);
+  }
+
+  await assertNoHorizontalOverflow(page, `${label} public front door`);
+  await userChoice.focus().catch(() => undefined);
+  if (pageErrors.length > 0) throw new Error(`${label}: public browser errors: ${pageErrors.join(' | ')}`);
+
+  await page.screenshot({
+    path: join(RESULTS_ROOT, `public-fcr-entry-${label}.png`),
+    fullPage: true,
+  });
+
+  await context.close();
+}
+
 async function proveViewport(label, viewport) {
   const context = await browser.newContext({ viewport });
   const page = await context.newPage();
@@ -104,13 +185,7 @@ async function proveViewport(label, viewport) {
     throw new Error(`${label}: visual shell must not pretend member auth is already live`);
   }
 
-  const overflow = await page.evaluate(() => ({
-    scrollWidth: document.documentElement.scrollWidth,
-    clientWidth: document.documentElement.clientWidth,
-  }));
-  if (overflow.scrollWidth > overflow.clientWidth + 1) {
-    throw new Error(`${label}: horizontal overflow detected ${JSON.stringify(overflow)}`);
-  }
+  await assertNoHorizontalOverflow(page, label);
 
   await page.locator('.brand').focus();
   const focusOutline = await page.locator('.brand').evaluate((node) => getComputedStyle(node).outlineStyle);
@@ -127,9 +202,11 @@ async function proveViewport(label, viewport) {
 }
 
 try {
+  await provePublicFrontDoor('desktop-1440', { width: 1440, height: 1100 });
+  await provePublicFrontDoor('mobile-390', { width: 390, height: 844 });
   await proveViewport('desktop-1440', { width: 1440, height: 1100 });
   await proveViewport('mobile-390', { width: 390, height: 844 });
-  console.log('PASS: FCR visual signature, user/founder/owner views, owner-only crown authority, Bip platform identity, responsive layout, and keyboard focus are preserved.');
+  console.log('PASS: public FCR user/founder entry, honest onboarding boundaries, FCR visual signature, user/founder/owner views, owner-only crown authority, Bip platform identity, responsive layout, and keyboard focus are preserved.');
 } finally {
   await browser.close();
   await new Promise((resolve) => server.close(resolve));

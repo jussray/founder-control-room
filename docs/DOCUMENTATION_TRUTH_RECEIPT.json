@@ -1,6 +1,6 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Preserve current workflow, Cloudflare, Shopify, founder-merge, content-evidence, public-discovery, five-screen cockpit, and cross-repository StoryEngine federation truth boundaries, including verified peer-head renewal, without converting source, fixture-backed browser proof, analytics, crawler policy, peer pinning, provider configuration, mergeability, or candidate/browser proof into publication, production, provider-mutation, merge, deploy, spend, or external-contact authority.",
+  "purpose": "Preserve current workflow, Cloudflare, Shopify, founder-merge, content-evidence, public-discovery, bounded Postiz readback, Componecat catalog context, and cross-repository StoryEngine federation truth boundaries without converting source, analytics, crawler policy, peer pinning, provider configuration, readback state, mergeability, candidate/browser proof, or growth recommendations into publication, production, provider-mutation, merge, deploy, spend, or external-contact authority.",
   "domains": [
     "cloudflare-authority",
     "repository-provider",
@@ -21,8 +21,7 @@
       "path": ".github/workflows/playwright.yml",
       "claims": [
         "`.github/workflows/playwright.yml` must bind the FCR-to-StoryEngine browser federation witness to a separately verified exact StoryEngine peer SHA and ref; changing that peer identity expires predecessor federation/browser proof and requires the complete exact-head witness to rerun without granting merge, deploy, production, or provider-mutation authority.",
-        "`.github/workflows/playwright.yml` may renew its StoryEngine peer only after that exact StoryEngine successor has separately green CI, promotion gates, test-ledger, and browser/guardrail proof and the resulting main identity is re-observed; the renewed pin remains evidence identity only and must trigger a complete FCR federation rerun.",
-        "`.github/workflows/playwright.yml` must keep the five-screen Founder Control Room journey inside the required exact-head Playwright lane, while fixture-bound `fcr.test` shell proof remains source/UI evidence only and cannot substitute for a production-origin exact-SHA browser witness."
+        "A fresh peer ref/SHA observation may select the successor StoryEngine evidence subject, but the successor FCR federation state remains UNKNOWN until the complete exact-head runtime identity, directive, receipt, and Playwright browser witness succeeds against that peer."
       ]
     },
     {
@@ -34,7 +33,7 @@
     {
       "path": "wrangler.worker.toml",
       "claims": [
-        "`wrangler.worker.toml` must list `TINYFISH_API_KEY` under `[secrets].required`, so canonical exact-main Deploy rejects missing provider-held TinyFish activation before Worker mutation while never copying the secret value through GitHub Actions."
+        "`wrangler.worker.toml` must list `FCR_SHOPIFY_WEBHOOK_SECRET` and `FCR_COMMERCE_HASH_SALT` under `[secrets].required`, so canonical exact-main Deploy rejects a missing FCR Shopify runtime binding before Worker mutation while never reading, logging, or re-uploading either provider-held value; this source boundary cannot prove webhook registration, production migration, runtime delivery, or collected revenue."
       ]
     },
     {
@@ -50,41 +49,100 @@
       ]
     },
     {
+      "path": "src/http/routes/n8nConveyor.ts",
+      "claims": [
+        "`src/http/routes/n8nConveyor.ts` may mount the authenticated YouTube growth evaluator under the existing founder-content conveyor only as a read/evaluation capability; mounting that route must not grant publish, schedule, spend, provider-mutation, scale-execution, merge, or deploy authority and must not weaken the existing founder-content publication membrane."
+      ]
+    },
+    {
+      "path": "src/http/routes/founderContentLifecycleRuntime.ts",
+      "claims": [
+        "`src/http/routes/founderContentLifecycleRuntime.ts` may inject a configured Postiz lifecycle adapter only as the bounded account/status readback dependency declared by that adapter; runtime composition must not add publication authority or bypass the existing founder-content approval and execution membrane."
+      ]
+    },
+    {
+      "path": "src/http/routes/youtubeGrowth.ts",
+      "claims": [
+        "`src/http/routes/youtubeGrowth.ts` must require founder authentication, reject malformed or unknown experiment, measurement, continuity, threshold, target, and repeatability input before core evaluation, and return only the non-authorizing `fcr/youtube-growth-evaluation@v1` result with publication/provider mutation explicitly false."
+      ]
+    },
+    {
+      "path": "src/http/routes/__tests__/n8nConveyor.youtubeGrowth.integration.test.ts",
+      "claims": [
+        "`src/http/routes/__tests__/n8nConveyor.youtubeGrowth.integration.test.ts` must prove unauthenticated access is rejected, malformed state fails closed, duplicate receipts cannot fake repeatability, and a valid Day-31 recommendation remains advisory with no provider mutation or publication claim."
+      ]
+    },
+    {
+      "path": "src/lib/postizMcpLifecycleAdapter.ts",
+      "claims": [
+        "`src/lib/postizMcpLifecycleAdapter.ts` may expose only bounded Postiz account listing and post-status readback and must deny `publish_now`, `schedulePostTool`, and other provider-write operations through this lifecycle adapter.",
+        "A Postiz-reported PUBLISHED state without a destination-native permalink or equivalent independently verified terminal artifact must remain provider-reported, non-terminal evidence and cannot become FCR publication truth."
+      ]
+    },
+    {
+      "path": "src/mcp/defaultRegistry.ts",
+      "claims": [
+        "`src/mcp/defaultRegistry.ts` may register Componecat only as read-only active-portfolio architecture/catalog context; discovery must not grant repository mutation, merge, deploy, provider-write, publication authority, or access to continuity-only external project identities."
+      ]
+    },
+    {
       "path": "README.md",
       "claims": [
         "`README.md` must keep TinyFish source and CI readiness separate from provider/runtime activation and state that canonical Deploy verifies only provider-held binding-name presence before promotion.",
+        "`README.md` must keep FCR Shopify runtime-secret name verification separate from webhook registration, deployed callback identity, production database migration, and collected-revenue outcome proof.",
         "`README.md` must describe Shopify child-provider observation as source-only, non-authorizing evidence and must never relabel a matching snapshot as live provider authority or mutation permission.",
         "`README.md` must document Attack 3000 content currentness as independently evaluated from bounded observation time rather than trusted from a CURRENT label, and must keep distribution, external demand, publication, provider mutation, merge, deploy, spend, and external-contact authority separate.",
         "`README.md` must describe the Content Trend Radar as an advisory existing-lane capability whose first-wave evidence requires current source provenance and whose ranking cannot authorize publication, scheduling, spend, provider mutation, merge, deploy, or external contact.",
+        "`README.md` must describe the authenticated YouTube growth route as an advisory evidence evaluator whose HOLD/ADVANCE result cannot prove publication, YPP eligibility, revenue, provider mutation, or scale execution and whose malformed inputs fail closed.",
         "`README.md` must describe deterministic founder-content approval reservation and exact active retry recovery without allowing evidence rotation, retry, or a stored reservation to mint new publication authority.",
-        "`README.md` must describe the five-screen founder geography as cockpit source behavior and keep fixture-backed shell proof, exact-candidate browser proof, and production-origin exact-SHA proof as separate evidence classes that cannot substitute for one another.",
-        "`README.md` must state that a StoryEngine peer-head renewal requires separately green StoryEngine exact-head proof before FCR rebinding and that the FCR federation witness must rerun without converting the peer pin into merge, deploy, production, or provider authority."
+        "`README.md` must state that rebinding the StoryEngine Playwright peer resets predecessor browser-federation proof and that a ref/SHA match alone cannot grant merge, deploy, production, or provider-mutation authority.",
+        "`README.md` must describe Postiz as bounded server-authenticated account/status readback only, keep Postiz scheduling/publication writes outside that adapter, and refuse to translate provider-reported PUBLISHED state without terminal artifact evidence into publication truth.",
+        "`README.md` must describe Componecat as read-only architecture/catalog context whose discovery grants no project ownership, repository mutation, merge, deploy, provider-write, or publication authority."
+      ]
+    },
+    {
+      "path": "docs/PUBLIC_COMMUNICATION_TRUTH_CONTRACT.md",
+      "claims": [
+        "`docs/PUBLIC_COMMUNICATION_TRUTH_CONTRACT.md` must keep YouTube growth HOLD/ADVANCE and diagnostic recommendations inside observation/recommendation authority and require separate provider/outcome evidence before public claims of publication, YPP eligibility, revenue, conversion, or provider-side state.",
+        "`docs/PUBLIC_COMMUNICATION_TRUTH_CONTRACT.md` must keep Postiz MCP account/status readback separate from provider-write authority and must hold any publication claim when Postiz reports PUBLISHED without a destination-native permalink or equivalent independently verified terminal artifact.",
+        "Componecat catalog/context evidence must remain non-authorizing and cannot be used as public proof of project execution, deployment, or publication."
+      ]
+    },
+    {
+      "path": "public/control-room/content-manager.html",
+      "claims": [
+        "`public/control-room/content-manager.html` may expose Postiz to the founder only as a clearly labeled readback-only provider choice; the UI must continue to state that direct publish is LinkedIn-only and must not present Postiz readback as publication authority."
+      ]
+    },
+    {
+      "path": "e2e/content-manager-proof.mjs",
+      "claims": [
+        "`e2e/content-manager-proof.mjs` must prove the Postiz readback option is founder-visible while remaining non-authorizing, and must preserve the no-provider-mutation-before-explicit-confirmation browser invariant."
       ]
     },
     {
       "path": "docs/CLOUDFLARE_REASONING.md",
       "claims": [
-        "`docs/CLOUDFLARE_REASONING.md` must treat `TINYFISH_API_KEY` as a provider-held Worker binding and require canonical Deploy to fail closed on a missing binding name without exposing or re-uploading its value."
+        "`docs/CLOUDFLARE_REASONING.md` must require both FCR Shopify provider-held Worker binding names to pass the canonical Deploy membrane without treating source, binding-name presence, CI, or Playwright as proof of Shopify callback registration, production migration, or revenue outcome."
       ]
     },
     {
       "path": "docs/TRUTH_DECAY_AUDIT.md",
       "claims": [
         "`docs/TRUTH_DECAY_AUDIT.md` must treat a StoryEngine peer SHA/ref in FCR Playwright as evidence identity rather than a durable alias for current StoryEngine, and must require complete federation re-proof whenever the peer identity or either repository head moves.",
-        "`docs/TRUTH_DECAY_AUDIT.md` must require separately green StoryEngine CI, promotion, test-ledger, and browser/guardrail evidence plus current main re-observation before a successor peer can replace the FCR federation pin, while preserving merge, deploy, production, and provider authority as separate gates.",
-        "`docs/TRUTH_DECAY_AUDIT.md` must expire five-screen browser proof whenever the candidate head or deployed runtime identity moves, and it must never treat fixture-bound `fcr.test` API responses as production-origin evidence."
+        "`docs/TRUTH_DECAY_AUDIT.md` must keep a newly matched StoryEngine ref/SHA in UNKNOWN browser-federation state until the exact successor FCR head completes the runtime, directive, receipt, and browser witness."
       ]
     },
     {
       "path": "docs/deployment/CLOUDFLARE_WORKER_TARGETS.md",
       "claims": [
-        "`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` must name `TINYFISH_API_KEY` as a required canonical Worker secret while preserving live provider observation and real TinyFish Search/Fetch as separate activation proof."
+        "`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` must name `FCR_SHOPIFY_WEBHOOK_SECRET` and `FCR_COMMERCE_HASH_SALT` as required canonical Worker secrets while keeping provider subscription, runtime delivery, production database state, and paid-order outcome as separate activation proof."
       ]
     },
     {
       "path": "docs/SECRETS.md",
       "claims": [
-        "`docs/SECRETS.md` must keep the TinyFish key in the Cloudflare Worker secret plane and never recast the provider-held value as a GitHub Actions secret or proof artifact."
+        "`docs/SECRETS.md` must keep the FCR Shopify signing secret and commerce hash salt in the Cloudflare Worker secret plane and never recast either provider-held value as a public proof artifact."
       ]
     },
     {
@@ -128,7 +186,7 @@
     {
       "path": "src/ultrathink-core/index.ts",
       "claims": [
-        "`src/ultrathink-core/index.ts` may export the Attack 3000 content and Trend Radar evidence contracts, including the evaluation context, only as source capabilities and must not imply provider activation, publication, merge, deploy, spend, or execution authority."
+        "`src/ultrathink-core/index.ts` may export the Attack 3000 content, Trend Radar, and YouTube growth evidence contracts only as source capabilities and must not imply provider activation, publication, merge, deploy, spend, or execution authority."
       ]
     },
     {
