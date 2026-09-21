@@ -1,4 +1,5 @@
 import { getGitHubInstallationToken } from "./githubAppAuth.js";
+import { mergeGitHubPullRequestAsync } from "./githubAsyncMerge.js";
 import { DeterministicReviewGitHubProvider } from "./DeterministicReviewGitHubProvider.js";
 import { SecurityPreservingGitHubProvider } from "./SecurityPreservingGitHubProvider.js";
 import { GitLabProvider } from "./GitLabProvider.js";
@@ -234,6 +235,9 @@ class LazyRepositoryProvider implements RepositoryProvider {
     if (governanceProjectId !== FOUNDER_CONTROL_ROOM_PROJECT_ID) {
       return delegate.integrate(projectId, base, head);
     }
+    if (this.name !== "github") {
+      throw new Error("Founder Control Room reviewed integration requires the GitHub provider");
+    }
 
     const context = this.pullRequestContextByProject.get(governanceProjectId);
     if (!context) {
@@ -269,7 +273,14 @@ class LazyRepositoryProvider implements RepositoryProvider {
     }
 
     this.pullRequestContextByProject.delete(governanceProjectId);
-    return delegate.integrate(governanceProjectId, base, head);
+    const { token } = await githubRepositoryCredential(this.repositoryIdentifier);
+    return mergeGitHubPullRequestAsync({
+      token,
+      repository: this.repositoryIdentifier,
+      pullRequestNumber: context.number,
+      expectedHeadSha: context.headSha,
+      baseUrl: process.env.GITHUB_API_BASE_URL,
+    });
   }
 
   async applyBranchRuleset(projectId: string, config: RulesetConfig): Promise<RulesetResult> {
@@ -313,19 +324,39 @@ export function providerConfigurationError(
   return `No RepositoryProvider implementation for "${project.repo_provider}" yet`;
 }
 
+async function githubRepositoryCredential(
+  repositoryIdentifier: string,
+): Promise<{ token: string; hasAppAuthority: boolean }> {
+  const fallbackToken = process.env.GITHUB_TOKEN?.trim();
+  const appId = process.env.GITHUB_APP_ID?.trim();
+  const privateKey = process.env.GITHUB_PRIVATE_KEY?.trim();
+  const hasAppId = Boolean(appId);
+  const hasPrivateKey = Boolean(privateKey);
+  if (hasAppId !== hasPrivateKey) {
+    throw new Error("GitHub App authentication is incomplete; set both GITHUB_APP_ID and GITHUB_PRIVATE_KEY or neither");
+  }
+  const hasAppAuthority = hasAppId && hasPrivateKey;
+  if (hasAppAuthority) {
+    return {
+      token: await getGitHubInstallationToken(appId!, privateKey!, repositoryIdentifier),
+      hasAppAuthority: true,
+    };
+  }
+  if (!fallbackToken) {
+    throw new Error(
+      "GitHub authentication is not configured; set GITHUB_APP_ID and GITHUB_PRIVATE_KEY or a local GITHUB_TOKEN fallback",
+    );
+  }
+  return { token: fallbackToken, hasAppAuthority: false };
+}
+
 async function githubProvider(project: ProviderProjectConfig): Promise<RepositoryProvider> {
   const configError = providerConfigurationError(project);
   if (configError) throw new Error(configError);
 
-  const fallbackToken = process.env.GITHUB_TOKEN?.trim();
-  const appId = process.env.GITHUB_APP_ID?.trim();
-  const privateKey = process.env.GITHUB_PRIVATE_KEY?.trim();
   // GITHUB_TOKEN remains a local/development fallback only; production prefers
   // repository-scoped GitHub App installation credentials minted on demand.
-  const hasAppAuthority = Boolean(appId && privateKey);
-  const token = hasAppAuthority
-    ? await getGitHubInstallationToken(appId!, privateKey!, project.repo_identifier)
-    : fallbackToken!;
+  const { token, hasAppAuthority } = await githubRepositoryCredential(project.repo_identifier);
 
   const projectMap: Record<string, string> = { [project.slug]: project.repo_identifier };
   if (isFounderControlRoomRepository(project.repo_identifier)) {
