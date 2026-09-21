@@ -1,0 +1,83 @@
+name: MCP OAuth Bootstrap Proof
+
+on:
+  push:
+    paths:
+      - 'src/http/middleware/csrf.ts'
+      - 'src/http/middleware/__tests__/csrf.test.ts'
+      - 'src/http/__tests__/server.integration.test.ts'
+      - 'src/http/routes/remoteReadMcp.ts'
+      - 'src/http/routes/mcp.ts'
+      - 'src/http/server.ts'
+      - 'e2e/mcp-oauth-bootstrap-proof.mjs'
+      - '.github/workflows/mcp-oauth-bootstrap-proof.yml'
+  pull_request:
+    paths:
+      - 'src/http/middleware/csrf.ts'
+      - 'src/http/middleware/__tests__/csrf.test.ts'
+      - 'src/http/__tests__/server.integration.test.ts'
+      - 'src/http/routes/remoteReadMcp.ts'
+      - 'src/http/routes/mcp.ts'
+      - 'src/http/server.ts'
+      - 'e2e/mcp-oauth-bootstrap-proof.mjs'
+      - '.github/workflows/mcp-oauth-bootstrap-proof.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mcp-oauth-bootstrap-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  oauth-bootstrap:
+    name: OAuth bootstrap + Playwright proof
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+
+      - name: Verify exact head
+        shell: bash
+        run: |
+          actual="$(git rev-parse HEAD)"
+          printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Run focused OAuth/CSRF tests
+        run: >-
+          npx vitest run
+          src/http/middleware/__tests__/csrf.test.ts
+          src/http/__tests__/server.integration.test.ts
+          src/http/routes/__tests__/remoteReadMcp.test.ts
+
+      - name: Verify MCP source contract
+        run: npm run verify:mcp
+
+      - name: Build exact candidate
+        run: npm run build
+
+      - name: Run Playwright runtime proof
+        run: node e2e/mcp-oauth-bootstrap-proof.mjs
+
+      - name: Upload Playwright receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: mcp-oauth-bootstrap-proof-${{ env.EXPECTED_HEAD_SHA }}
+          path: test-results/mcp-oauth-bootstrap-proof.json
+          if-no-files-found: error
+          retention-days: 14
