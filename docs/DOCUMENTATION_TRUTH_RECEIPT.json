@@ -1,6 +1,6 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Preserve current workflow, Cloudflare, Shopify, founder-merge, content-evidence, public-discovery, bounded Postiz readback, Componecat catalog context, and cross-repository StoryEngine federation truth boundaries without converting source, analytics, crawler policy, peer pinning, provider configuration, readback state, mergeability, candidate/browser proof, or growth recommendations into publication, production, provider-mutation, merge, deploy, spend, or external-contact authority.",
+  "purpose": "Preserve current workflow, Cloudflare, Shopify, founder-merge, async GitHub merge transport, content-evidence, public-discovery, bounded Postiz readback, Componecat catalog context, and cross-repository StoryEngine federation truth boundaries without converting source, analytics, crawler policy, peer pinning, provider configuration, readback state, merge queue state, mergeability, candidate/browser proof, or growth recommendations into publication, production, provider-mutation, merge, deploy, spend, or external-contact authority.",
   "domains": [
     "cloudflare-authority",
     "repository-provider",
@@ -46,6 +46,19 @@
       "path": "src/http/routes/approvals.ts",
       "claims": [
         "`src/http/routes/approvals.ts` must require exact-head evidence plus provider-backed PR identity, deterministic independent review, and authenticated founder-final confirmation bound to the exact PR, base, and head before FCR integration, then must re-read the mutable branch head immediately before provider integration."
+      ]
+    },
+    {
+      "path": "src/providers/githubAsyncMerge.ts",
+      "claims": [
+        "`src/providers/githubAsyncMerge.ts` must bind GitHub asynchronous merge enqueue to the exact reviewed 40-character head SHA, reconcile an existing request by provider UUID instead of blindly replaying it, poll only to a terminal provider result, return only a valid terminal merged SHA, and fail closed on provider failure, malformed response, or unresolved pending state; an async UUID, queued state, or provider acceptance grants no merge authority."
+      ]
+    },
+    {
+      "path": "src/providers/providerFactory.ts",
+      "claims": [
+        "`src/providers/providerFactory.ts` must keep Founder Control Room integration pinned to exact FCR repository identity and a provider-reviewed direct `main` base, require provider-backed PR context, re-read exact base and head immediately before mutation, route only that FCR path through bounded asynchronous GitHub merge, and leave non-FCR repositories on their existing provider-neutral integration path; this transport cannot replace deterministic independent review or exact founder-final approval.",
+        "Because the governed FCR integration path accepts only a reviewed PR whose direct base is `main`, the requested PR is the bottom of any GitHub stack for that action and the async transport must not be treated as authority to merge lower separately unapproved PRs."
       ]
     },
     {
@@ -97,7 +110,14 @@
         "`README.md` must describe deterministic founder-content approval reservation and exact active retry recovery without allowing evidence rotation, retry, or a stored reservation to mint new publication authority.",
         "`README.md` must state that rebinding the StoryEngine Playwright peer resets predecessor browser-federation proof and that a ref/SHA match alone cannot grant merge, deploy, production, or provider-mutation authority.",
         "`README.md` must describe Postiz as bounded server-authenticated account/status readback only, keep Postiz scheduling/publication writes outside that adapter, and refuse to translate provider-reported PUBLISHED state without terminal artifact evidence into publication truth.",
-        "`README.md` must describe Componecat as read-only architecture/catalog context whose discovery grants no project ownership, repository mutation, merge, deploy, provider-write, or publication authority."
+        "`README.md` must describe Componecat as read-only architecture/catalog context whose discovery grants no project ownership, repository mutation, merge, deploy, provider-write, or publication authority.",
+        "`README.md` must describe FCR asynchronous GitHub merge as exact-SHA-bound transport that runs only after the existing exact PR/base/head and founder-final gates, preserve the direct-`main` stack scope, and refuse to treat queue UUID, provider acceptance, mergeability, or source tests as merge authority or terminal provider proof."
+      ]
+    },
+    {
+      "path": "docs/PROVIDERS.md",
+      "claims": [
+        "`docs/PROVIDERS.md` must document FCR asynchronous GitHub merge as a bounded transport behind existing review/founder authority, require exact-head enqueue plus UUID reconciliation and terminal provider readback, preserve direct-`main` stack scope, and keep non-FCR repository integration on its existing provider-neutral path."
       ]
     },
     {
