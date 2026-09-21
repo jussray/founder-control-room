@@ -50,6 +50,8 @@ Chief keeps its native ProofMode MCP because that endpoint already provides an i
 
 The Playwright proof in `e2e/repository-settings-ruleset.spec.ts` exercises the registry response over HTTP, pins the four logical names and remote URLs, verifies that the three FCR bridges advertise a required secret `Authorization` header, and checks search behavior without retaining a credential value.
 
+`.github/workflows/founder-portfolio-mcp-registry-playwright.yml` runs that exact registry proof independently so unrelated portfolio federation drift cannot suppress the registry evidence gate.
+
 The canonical repository verification path remains:
 
 ```bash
