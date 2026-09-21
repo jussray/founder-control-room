@@ -1,0 +1,98 @@
+name: Workspace Founder Boundary
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/http/routes/auth.ts'
+      - 'src/http/routes/onboarding.ts'
+      - 'src/http/routes/onboardingAssets/workspaceSurface.ts'
+      - 'src/http/routes/__tests__/workspaceAuth.integration.test.ts'
+      - 'e2e/loader.mjs'
+      - 'e2e/fakePublicWorkspaceSupabaseClient.mjs'
+      - 'e2e/workspace-new-user-real-chief-proof.mjs'
+      - 'supabase/migrations/20260921012000_provision_workspace_founder.sql'
+      - '.github/workflows/workspace-founder-boundary.yml'
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+  CHIEF_EXPECTED_SHA: 4534fc784e7dd4a84a0e4e766bd43279f9a8c159
+  CHIEF_AI_BASE_URL: https://a38745f4-chief-ai.mcgill-raylene.workers.dev
+
+jobs:
+  workspace-founder-boundary:
+    name: Workspace Founder Boundary
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out exact PR head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify exact head
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
+
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Focused type and behavior proof
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run typecheck
+          npx vitest run \
+            src/http/routes/__tests__/workspaceAuth.integration.test.ts \
+            src/http/middleware/__tests__/requireFounder.test.ts \
+            src/http/middleware/__tests__/requireFounder.explicitRoleIdentity.contract.test.ts \
+            src/http/routes/__tests__/workspaceProjects.chief.integration.test.ts
+
+      - name: Build exact candidate
+        run: npm run build
+
+      - name: Install Chromium
+        run: npx playwright install chromium --with-deps
+
+      - name: Prove new user to real Chief to isolated Control Room
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p logs
+          node e2e/workspace-new-user-real-chief-proof.mjs 2>&1 | tee logs/workspace-new-user-real-chief.log
+
+      - name: Inspect proof artifacts for accidental secret-like material
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -RniE '(SUPABASE_SERVICE_ROLE_KEY|BEGIN (RSA|OPENSSH|PRIVATE) KEY|sk-proj-|ghp_[A-Za-z0-9]{20,}|github_pat_)' logs 2>/dev/null; then
+            echo 'Secret-like material detected in proof artifacts' >&2
+            exit 1
+          fi
+
+      - name: Upload exact-head proof artifacts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: workspace-founder-boundary-${{ env.EXPECTED_HEAD_SHA }}
+          path: logs/
+          if-no-files-found: warn
+          retention-days: 30

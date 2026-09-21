@@ -7,10 +7,11 @@ import { clearFounderSession, readFounderSession, revokeFounderSession, rotateFo
 import { respondError, respondSuccess } from '../apiResponse.js';
 import { FOUNDER_API_URL, rateLimitMagicLink } from '../middleware/security.js';
 import { requireFounder, requireInteractiveFounder, type FounderRequest } from '../middleware/requireFounder.js';
-import { founderCallbackHtml } from './onboarding.js';
+import { founderCallbackHtml, workspaceFounderCallbackHtml } from './onboarding.js';
 
 export const authRouter = Router();
 const GENERIC_MAGIC_LINK_MESSAGE = 'If this email is on the founder allowlist, a secure login link has been sent.';
+const GENERIC_WORKSPACE_MAGIC_LINK_MESSAGE = 'If this email can receive a secure login link, check your inbox.';
 const MIN_FOUNDER_PASSWORD_LENGTH = 12;
 const rateLimitFounderOAuth = rateLimit({
   windowMs: 15 * 60 * 1_000,
@@ -26,6 +27,18 @@ const rateLimitFounderPassword = rateLimit({
   legacyHeaders: false,
   message: { error: 'Too many password update attempts, please try again later.' },
 });
+
+type WorkspaceFounder = {
+  email: string;
+  userId: string;
+  role: 'workspace_owner';
+  workspaceId: string;
+};
+
+type WorkspaceProvisioningResult =
+  | { state: 'ok'; founder: WorkspaceFounder }
+  | { state: 'forbidden' }
+  | { state: 'error' };
 
 function normalizeEmail(value: unknown): string { return typeof value === 'string' ? value.trim().toLowerCase() : ''; }
 function normalizePassword(value: unknown): string { return typeof value === 'string' ? value : ''; }
@@ -43,17 +56,64 @@ async function establishFounderSession(req: Request, res: Response, session: Ses
   }
 }
 
-authRouter.get('/google', rateLimitFounderOAuth, async (_req, res) => {
+async function provisionWorkspaceFounder(user: Session['user'] | null | undefined): Promise<WorkspaceProvisioningResult> {
+  const userId = typeof user?.id === 'string' ? user.id.trim() : '';
+  const email = normalizeEmail(user?.email);
+  if (!userId || !email) return { state: 'error' };
+
+  const { data, error } = await supabase.rpc('provision_workspace_founder', {
+    p_user_id: userId,
+    p_email: email,
+  });
+  if (error) {
+    if (error.code === '42501') return { state: 'forbidden' };
+    console.error('Workspace founder provisioning failed:', error.code ?? 'unknown');
+    return { state: 'error' };
+  }
+
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return { state: 'error' };
+  const record = data as Record<string, unknown>;
+  const workspaceId = typeof record.workspace_id === 'string' ? record.workspace_id.trim() : '';
+  const returnedUserId = typeof record.user_id === 'string' ? record.user_id.trim() : '';
+  const returnedEmail = normalizeEmail(record.email);
+  if (
+    record.account_role !== 'workspace_owner'
+    || !workspaceId
+    || returnedUserId !== userId
+    || returnedEmail !== email
+  ) {
+    return { state: 'error' };
+  }
+
+  return {
+    state: 'ok',
+    founder: { email, userId, role: 'workspace_owner', workspaceId },
+  };
+}
+
+async function startGoogleLogin(res: Response, callbackPath: string) {
   res.setHeader('Cache-Control', 'no-store');
   try {
-    const { data, error } = await supabaseAuth.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: `${FOUNDER_API_URL}/auth/callback`, skipBrowserRedirect: true } });
-    if (error || !data.url) { console.error('Google OAuth start failed:', error?.message ?? 'No redirect URL returned'); return respondError(res, 503, 'OAUTH_UNAVAILABLE', 'Google sign-in is temporarily unavailable.'); }
+    const { data, error } = await supabaseAuth.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: `${FOUNDER_API_URL}${callbackPath}`, skipBrowserRedirect: true },
+    });
+    if (error || !data.url) {
+      console.error('Google OAuth start failed:', error?.message ?? 'No redirect URL returned');
+      return respondError(res, 503, 'OAUTH_UNAVAILABLE', 'Google sign-in is temporarily unavailable.');
+    }
     return res.redirect(303, data.url);
   } catch (error) {
     console.error('Google OAuth start failed:', error instanceof Error ? error.message : String(error));
     return respondError(res, 503, 'OAUTH_UNAVAILABLE', 'Google sign-in is temporarily unavailable.');
   }
-});
+}
+
+authRouter.get('/google', rateLimitFounderOAuth, async (_req, res) =>
+  startGoogleLogin(res, '/auth/callback'));
+
+authRouter.get('/workspace/google', rateLimitFounderOAuth, async (_req, res) =>
+  startGoogleLogin(res, '/auth/workspace/callback'));
 
 authRouter.post('/magic-link', rateLimitMagicLink, async (req, res) => {
   const email = normalizeEmail(req.body?.email);
@@ -65,6 +125,24 @@ authRouter.post('/magic-link', rateLimitMagicLink, async (req, res) => {
     }
   } catch (error) { console.error('Founder magic-link request failed:', error instanceof Error ? error.message : String(error)); }
   return respondSuccess(res, { message: GENERIC_MAGIC_LINK_MESSAGE }, 202);
+});
+
+authRouter.post('/workspace/magic-link', rateLimitMagicLink, async (req, res) => {
+  const email = normalizeEmail(req.body?.email);
+  if (!email || !email.includes('@')) return respondError(res, 400, 'BAD_REQUEST', 'A valid email is required.');
+  try {
+    const { error } = await supabaseAuth.auth.signInWithOtp({
+      email,
+      options: {
+        emailRedirectTo: `${FOUNDER_API_URL}/auth/workspace/callback`,
+        shouldCreateUser: true,
+      },
+    });
+    if (error) console.error('Workspace signInWithOtp failed:', error.message);
+  } catch (error) {
+    console.error('Workspace magic-link request failed:', error instanceof Error ? error.message : String(error));
+  }
+  return respondSuccess(res, { message: GENERIC_WORKSPACE_MAGIC_LINK_MESSAGE }, 202);
 });
 
 authRouter.get('/callback', rateLimitFounderOAuth, async (req, res) => {
@@ -91,6 +169,34 @@ authRouter.get('/callback', rateLimitFounderOAuth, async (req, res) => {
   return res.redirect(303, '/');
 });
 
+authRouter.get('/workspace/callback', rateLimitFounderOAuth, async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  const tokenHash = typeof req.query.token_hash === 'string' ? req.query.token_hash : null;
+  const type = typeof req.query.type === 'string' ? req.query.type : 'magiclink';
+  if (!tokenHash) return res.status(200).type('html').send(workspaceFounderCallbackHtml());
+
+  const requestAuth = createSupabaseAuthClient();
+  const { data, error } = await requestAuth.auth.verifyOtp({ token_hash: tokenHash, type: type as 'magiclink' | 'email' });
+  if (error || !data.session || !data.user) {
+    return res.status(401).type('html').send(workspaceFounderCallbackHtml());
+  }
+
+  const provisioned = await provisionWorkspaceFounder(data.user);
+  if (provisioned.state === 'forbidden') {
+    return res.status(403).type('html').send(workspaceFounderCallbackHtml());
+  }
+  if (provisioned.state !== 'ok') {
+    return res.status(503).type('html').send(workspaceFounderCallbackHtml());
+  }
+
+  const founderSession = sessionWithVerifiedUser(data.session, data.user);
+  if (!(await establishFounderSession(req, res, founderSession))) {
+    return res.status(503).type('html').send(workspaceFounderCallbackHtml());
+  }
+
+  return res.redirect(303, '/app/');
+});
+
 authRouter.post('/session', async (req, res) => {
   res.setHeader('Cache-Control', 'private, no-store');
   res.setHeader('Pragma', 'no-cache');
@@ -112,6 +218,37 @@ authRouter.post('/session', async (req, res) => {
   const founderSession = sessionWithVerifiedUser(data.session, verifiedUser);
   if (!(await establishFounderSession(req, res, founderSession))) return respondError(res, 503, 'SESSION_UNAVAILABLE', 'Founder browser session storage is temporarily unavailable.');
   return respondSuccess(res, { founder: { email } }, 201);
+});
+
+authRouter.post('/workspace/session', async (req, res) => {
+  res.setHeader('Cache-Control', 'private, no-store');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  const accessToken = typeof req.body?.access_token === 'string' ? req.body.access_token : '';
+  const refreshToken = typeof req.body?.refresh_token === 'string' ? req.body.refresh_token : '';
+  if (!accessToken || !refreshToken || accessToken.length > 16_384 || refreshToken.length > 16_384) {
+    return respondError(res, 400, 'BAD_REQUEST', 'Session credentials are missing or malformed.');
+  }
+
+  const requestAuth = createSupabaseAuthClient();
+  const { data, error } = await requestAuth.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
+  if (error || !data.session || !data.user) {
+    return respondError(res, 401, 'UNAUTHENTICATED', 'The login link is invalid or expired.');
+  }
+
+  const provisioned = await provisionWorkspaceFounder(data.user);
+  if (provisioned.state === 'forbidden') {
+    return respondError(res, 403, 'FORBIDDEN', 'This identity cannot use customer workspace provisioning.');
+  }
+  if (provisioned.state !== 'ok') {
+    return respondError(res, 503, 'WORKSPACE_PROVISIONING_UNAVAILABLE', 'Workspace provisioning is temporarily unavailable.');
+  }
+
+  const founderSession = sessionWithVerifiedUser(data.session, data.user);
+  if (!(await establishFounderSession(req, res, founderSession))) {
+    return respondError(res, 503, 'SESSION_UNAVAILABLE', 'Founder browser session storage is temporarily unavailable.');
+  }
+  return respondSuccess(res, { founder: provisioned.founder }, 201);
 });
 
 authRouter.get('/me', requireFounder, (req: FounderRequest, res) => {
