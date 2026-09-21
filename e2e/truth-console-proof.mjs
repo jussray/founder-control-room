@@ -146,11 +146,16 @@ try {
   assert(claimReceipt.includes('github:jussray/demo-project'), 'claim receipt preserves canonical repository scope');
   assert(claimReceipt.toLowerCase().includes('unknown'), 'new claim remains unknown instead of becoming green by creation');
 
-  console.log('\n[truth-5] Attach real normalized evidence and preserve the mutation receipt');
+  console.log('\n[truth-5] Attach real normalized evidence and preserve locked provenance + mutation receipt');
   await openTruthTab(page, 'truth-evidence');
+  assert((await page.locator('#truth-attach-evidence [name="provider"]').count()) === 0, 'manual evidence form cannot submit a caller-controlled provider identity');
+  const lockedProvider = page.locator('#truth-attach-evidence input[disabled][aria-label*="Provider provenance"]');
+  assert((await lockedProvider.count()) === 1, 'manual evidence provider provenance is visibly locked');
+  assert((await lockedProvider.inputValue()).includes('founder'), 'locked manual evidence provenance names founder intake');
   await page.fill('#truth-attach-evidence input[name="detailsRef"]', 'e2e://truth-console/signed-in-browser-proof');
   await page.click('#truth-attach-evidence button[type="submit"]');
   const evidenceReceipt = await waitForReceipt(page, 'Evidence attached');
+  assert(evidenceReceipt.includes('provider') && evidenceReceipt.includes('founder'), 'evidence receipt exposes the server-owned founder provenance');
   assert(evidenceReceipt.includes('claim revision'), 'evidence receipt survives the list rerender');
   assert(evidenceReceipt.includes('authority effect') && evidenceReceipt.includes('none'), 'evidence receipt remains non-authorizing');
 
