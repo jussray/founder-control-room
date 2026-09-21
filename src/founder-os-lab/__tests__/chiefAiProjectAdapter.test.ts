@@ -30,7 +30,7 @@ describe('Chief AI Founder OS project adapter', () => {
       id: 'chief-ai-machine',
       adapterId: 'chief-ai-machine-project-preview',
       repository: 'jussray/chief-ai-machine',
-      auditedSourceHead: '2fd4fda0cab12e52ab5096e723884d98bcfe7d10',
+      auditedSourceHead: '19a8bb1013dbb8a9663377afeec562086fa55f35',
       authorityOwner: 'founder-control-room',
       mode: 'preview',
       executionAllowed: false,
