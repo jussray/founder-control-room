@@ -318,18 +318,40 @@ export function parseGoalfixVerificationManifest(
 
   const workflowCatalog = testContract.workflowCatalog;
   if (Array.isArray(workflowCatalog)) {
-    const requiredVerificationNames = requiredWorkflowNames(
+    const requiredWorkflowVerificationNames = requiredWorkflowNames(
       workflowCatalog,
       targetRef,
       defaultBranch,
     );
-    if (requiredVerificationNames.length === 0) {
+    if (requiredWorkflowVerificationNames.length === 0) {
       throw new GoalfixContextResolutionError(
         'GOALFIX_VERIFICATION_CONTRACT_UNAVAILABLE',
         'Repository workflow catalog does not expose an applicable required proof set.',
       );
     }
-    return { manifestRepository, requiredVerificationNames };
+
+    // A repository may explicitly declare that workflowCatalog is inventory,
+    // not provider pass evidence. In that case GoalFix must consume exact
+    // provider check-run names from the repository policy instead of guessing
+    // that workflow display names equal check_run.name.
+    if (testContract.catalogIsPassEvidence === false) {
+      if (!providerPolicyText) {
+        throw new GoalfixContextResolutionError(
+          'GOALFIX_PROVIDER_CHECK_POLICY_UNAVAILABLE',
+          'Repository workflow catalog is inventory only; exact provider required-check policy is required before GoalFix can classify provider proof.',
+        );
+      }
+      const requiredVerificationNames = requiredLedgerNames(providerPolicyText, expectedRepository);
+      if (requiredVerificationNames.length === 0) {
+        throw new GoalfixContextResolutionError(
+          'GOALFIX_PROVIDER_CHECK_POLICY_UNAVAILABLE',
+          'Repository provider policy does not expose an applicable required proof set.',
+        );
+      }
+      return { manifestRepository, requiredVerificationNames };
+    }
+
+    return { manifestRepository, requiredVerificationNames: requiredWorkflowVerificationNames };
   }
 
   const catalog = testContract.catalog;
