@@ -1,6 +1,6 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Preserve current workflow, Cloudflare, Shopify, founder-merge, content-evidence, public-discovery, bounded Postiz readback, Componecat catalog context, and cross-repository StoryEngine federation truth boundaries without converting source, analytics, crawler policy, peer pinning, provider configuration, readback state, mergeability, candidate/browser proof, or growth recommendations into publication, production, provider-mutation, merge, deploy, spend, or external-contact authority.",
+  "purpose": "Preserve current workflow, Cloudflare, Shopify, founder-merge, content-evidence, public-discovery, bounded Postiz readback, Componecat catalog context, cross-repository StoryEngine federation, and manual read-only production-witness truth boundaries without converting source, analytics, crawler policy, peer pinning, provider configuration, readback state, mergeability, candidate/browser proof, or growth recommendations into publication, production, provider-mutation, merge, deploy, spend, or external-contact authority.",
   "domains": [
     "cloudflare-authority",
     "repository-provider",
@@ -22,6 +22,13 @@
       "claims": [
         "`.github/workflows/playwright.yml` must bind the FCR-to-StoryEngine browser federation witness to a separately verified exact StoryEngine peer SHA and ref; changing that peer identity expires predecessor federation/browser proof and requires the complete exact-head witness to rerun without granting merge, deploy, production, or provider-mutation authority.",
         "A fresh peer ref/SHA observation may select the successor StoryEngine evidence subject, but the successor FCR federation state remains UNKNOWN until the complete exact-head runtime identity, directive, receipt, and Playwright browser witness succeeds against that peer."
+      ]
+    },
+    {
+      "path": ".github/workflows/exact-sha-production-witness.yml",
+      "claims": [
+        "`.github/workflows/exact-sha-production-witness.yml` must remain a manually dispatched, contents-read-only verifier that executes trusted current-main witness source, requires the requested exact release SHA to equal that trusted current-main SHA, and reuses `e2e/production-release-sha.spec.ts` without acquiring deploy, publication, provider-write, secret, or merge authority.",
+        "A successful manual witness may prove that the already-deployed Worker, public proxy, and browser surface share the requested current-main release identity; it cannot deploy that SHA, publish content, mutate Postiz, manufacture provider state, or authorize a merge."
       ]
     },
     {
@@ -96,6 +103,7 @@
         "`README.md` must describe the authenticated YouTube growth route as an advisory evidence evaluator whose HOLD/ADVANCE result cannot prove publication, YPP eligibility, revenue, provider mutation, or scale execution and whose malformed inputs fail closed.",
         "`README.md` must describe deterministic founder-content approval reservation and exact active retry recovery without allowing evidence rotation, retry, or a stored reservation to mint new publication authority.",
         "`README.md` must state that rebinding the StoryEngine Playwright peer resets predecessor browser-federation proof and that a ref/SHA match alone cannot grant merge, deploy, production, or provider-mutation authority.",
+        "`README.md` must describe the standalone manual exact-SHA production witness as read-only observation of an already-deployed current-main release and must not imply that running the witness grants deploy, publication, provider-mutation, secret, or merge authority.",
         "`README.md` must describe Postiz as bounded server-authenticated account/status readback only, keep Postiz scheduling/publication writes outside that adapter, and refuse to translate provider-reported PUBLISHED state without terminal artifact evidence into publication truth.",
         "`README.md` must describe Componecat as read-only architecture/catalog context whose discovery grants no project ownership, repository mutation, merge, deploy, provider-write, or publication authority."
       ]
@@ -130,7 +138,8 @@
       "path": "docs/TRUTH_DECAY_AUDIT.md",
       "claims": [
         "`docs/TRUTH_DECAY_AUDIT.md` must treat a StoryEngine peer SHA/ref in FCR Playwright as evidence identity rather than a durable alias for current StoryEngine, and must require complete federation re-proof whenever the peer identity or either repository head moves.",
-        "`docs/TRUTH_DECAY_AUDIT.md` must keep a newly matched StoryEngine ref/SHA in UNKNOWN browser-federation state until the exact successor FCR head completes the runtime, directive, receipt, and browser witness."
+        "`docs/TRUTH_DECAY_AUDIT.md` must keep a newly matched StoryEngine ref/SHA in UNKNOWN browser-federation state until the exact successor FCR head completes the runtime, directive, receipt, and browser witness.",
+        "`docs/TRUTH_DECAY_AUDIT.md` must distinguish the manual read-only production witness from deployment authority: the witness may compare an already-deployed Worker, public proxy, and browser to trusted current-main identity, but it cannot deploy, publish, mutate providers, read secrets, or mint merge approval."
       ]
     },
     {
