@@ -4,6 +4,10 @@ import { requireFounder, type FounderRequest } from "../middleware/requireFounde
 import { McpHub, advertisedToolNames } from "../../mcp/hub.js";
 import type { McpInvocationRequest } from "../../mcp/types.js";
 import { hubForMcpProject } from "../../mcp/vaultHub.js";
+import {
+  buildPortfolioMcpRegistryResponse,
+  PORTFOLIO_MCP_BRIDGE_PROJECTS,
+} from "../../mcp/portfolioRegistry.js";
 import { connectionVaultRouter } from "./connectionVault.js";
 import { founderPermissionsRouter } from "./founderPermissions.js";
 import { createRemoteReadMcpHandler } from "./remoteReadMcp.js";
@@ -68,8 +72,38 @@ function invocationFromRequest(
 mcpRouter.post("/", handlePairedRemoteMcp);
 
 // Temporary compatibility lane for existing server-held static-token clients.
-// It exposes the same six narrow tools as /mcp and no generic nested invocation.
+// It exposes the same bounded catalog as /mcp and no generic nested invocation.
 mcpRouter.post("/read", handleRemoteReadMcp);
+
+// Public metadata only. This is a read-only MCP subregistry that lets clients
+// such as Lovable discover the founder quartet without receiving credentials.
+// Server credentials remain separate and are declared only as required secret
+// headers in the registry metadata.
+mcpRouter.get("/registry/v0.1/servers", (req, res) => {
+  const search = typeof req.query.search === "string" ? req.query.search : undefined;
+  const version = typeof req.query.version === "string" ? req.query.version : undefined;
+  res.set("Cache-Control", "public, max-age=60");
+  return res.json(buildPortfolioMcpRegistryResponse({ search, version }));
+});
+
+// FCR-hosted logical MCP servers for the projects that do not expose a native
+// remote MCP endpoint. Each handler is hard-bound server-side to one project.
+// SolContinuity remains an external continuity identity everywhere else: this
+// grants only the dedicated static-token read/preview bridge, not portfolio,
+// merge, deploy, provider-write, publication, billing, or execution authority.
+for (const projectSlug of PORTFOLIO_MCP_BRIDGE_PROJECTS) {
+  const projectScopedEnv: NodeJS.ProcessEnv = {
+    ...process.env,
+    FCR_REMOTE_MCP_READ_PROJECTS: projectSlug,
+  };
+  mcpRouter.post(
+    `/portfolio/${projectSlug}`,
+    createRemoteReadMcpHandler({
+      authMode: "static",
+      env: projectScopedEnv,
+    }),
+  );
+}
 
 // Connection Vault is part of the MCP/connection authority surface. Its
 // workflow-facing resolver uses short-lived hashed FCR bearer tokens; founder

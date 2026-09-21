@@ -1,0 +1,527 @@
+name: AI Failure Repair
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: ai-failure-repair-${{ github.event.workflow_run.id }}
+  cancel-in-progress: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  FAILED_RUN_ID: ${{ github.event.workflow_run.id }}
+  FAILED_RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+  FAILED_SHA: ${{ github.event.workflow_run.head_sha }}
+  FAILED_BRANCH: ${{ github.event.workflow_run.head_branch }}
+
+jobs:
+  prepare:
+    name: Bind exact failed CI receipt
+    if: >-
+      github.event.workflow_run.conclusion == 'failure' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      allowed: ${{ steps.gate.outputs.allowed }}
+      repair_attempt: ${{ steps.gate.outputs.repair_attempt }}
+      fingerprint: ${{ steps.receipt.outputs.fingerprint }}
+    steps:
+      - name: Check out exact failed head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.FAILED_SHA }}
+          fetch-depth: 2
+          persist-credentials: false
+
+      - name: Fail closed on stale head and repair loops
+        id: gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! "$FAILED_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo '::error title=Invalid failed head::workflow_run head_sha is not a 40-character lowercase SHA.'
+            exit 1
+          fi
+
+          actual="$(git rev-parse HEAD)"
+          git fetch --no-tags --depth=1 origin refs/heads/main:refs/remotes/origin/main
+          current_main="$(git rev-parse refs/remotes/origin/main)"
+          test "$actual" = "$FAILED_SHA"
+          if [[ "$current_main" != "$FAILED_SHA" ]]; then
+            echo "::error title=Stale failure::main advanced from $FAILED_SHA to $current_main; refusing to repair stale code."
+            exit 1
+          fi
+
+          subject="$(git log -1 --pretty=%B)"
+          if grep -Fq '[ai-repair 2/2]' <<<"$subject"; then
+            echo 'allowed=false' >> "$GITHUB_OUTPUT"
+            echo 'repair_attempt=3' >> "$GITHUB_OUTPUT"
+            {
+              echo '## AI repair loop stopped'
+              echo
+              echo '- State: `BLOCKED`'
+              echo '- Reason: the same repair chain already consumed two bounded model passes.'
+              echo '- Mutation: none'
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          if grep -Fq '[ai-repair 1/2]' <<<"$subject"; then
+            attempt=2
+          else
+            attempt=1
+          fi
+          echo 'allowed=true' >> "$GITHUB_OUTPUT"
+          echo "repair_attempt=$attempt" >> "$GITHUB_OUTPUT"
+
+      - name: Capture failed-job evidence and fingerprint
+        id: receipt
+        if: steps.gate.outputs.allowed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          WORKFLOW_NAME: ${{ github.event.workflow_run.name }}
+          WORKFLOW_EVENT: ${{ github.event.workflow_run.event }}
+          WORKFLOW_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          WORKFLOW_ACTOR: ${{ github.event.workflow_run.actor.login }}
+          REPAIR_ATTEMPT: ${{ steps.gate.outputs.repair_attempt }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .repair
+          printf '.repair/\n' >> .git/info/exclude
+
+          if ! gh run view "$FAILED_RUN_ID" --repo "$REPOSITORY" --log-failed > .repair/failure.log 2>.repair/log-read-error.txt; then
+            printf '%s\n' 'Failed-job log retrieval was unavailable; the repair agents must reproduce the failure locally.' > .repair/failure.log
+          fi
+
+          normalized="$(printf '%s|%s|%s|%s|%s' "$REPOSITORY" "$FAILED_SHA" "$FAILED_RUN_ID" "$FAILED_RUN_ATTEMPT" "$WORKFLOW_NAME")"
+          fingerprint="sha256:$(printf '%s' "$normalized" | sha256sum | awk '{print $1}')"
+          echo "fingerprint=$fingerprint" >> "$GITHUB_OUTPUT"
+
+          jq -n \
+            --arg schemaVersion '1' \
+            --arg repository "$REPOSITORY" \
+            --arg workflow "$WORKFLOW_NAME" \
+            --arg event "$WORKFLOW_EVENT" \
+            --arg conclusion "$WORKFLOW_CONCLUSION" \
+            --arg actor "$WORKFLOW_ACTOR" \
+            --arg runId "$FAILED_RUN_ID" \
+            --arg runAttempt "$FAILED_RUN_ATTEMPT" \
+            --arg headSha "$FAILED_SHA" \
+            --arg headBranch "$FAILED_BRANCH" \
+            --arg repairAttempt "$REPAIR_ATTEMPT" \
+            --arg fingerprint "$fingerprint" \
+            '{schemaVersion:($schemaVersion|tonumber),repository:$repository,workflow:$workflow,event:$event,conclusion:$conclusion,actor:$actor,runId:($runId|tonumber),runAttempt:($runAttempt|tonumber),headSha:$headSha,headBranch:$headBranch,repairAttempt:($repairAttempt|tonumber),fingerprint:$fingerprint}' \
+            > .repair/failure-receipt.json
+
+          {
+            echo '## Bound failure receipt'
+            echo
+            echo "- Fingerprint: \`$fingerprint\`"
+            echo "- Exact failed head: \`$FAILED_SHA\`"
+            echo "- Failed run: \`$FAILED_RUN_ID\` attempt \`$FAILED_RUN_ATTEMPT\`"
+            echo "- Repair attempt: \`$REPAIR_ATTEMPT/2\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload immutable failure receipt
+        if: steps.gate.outputs.allowed == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: ai-failure-receipt-${{ github.event.workflow_run.id }}
+          path: .repair/
+          if-no-files-found: error
+          retention-days: 30
+
+  codex:
+    name: Codex focused repair pass
+    needs: prepare
+    if: needs.prepare.outputs.allowed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment: production
+    outputs:
+      outcome: ${{ steps.codex.outcome }}
+    steps:
+      - name: Check out exact failed head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.FAILED_SHA }}
+          fetch-depth: 2
+          persist-credentials: false
+
+      - name: Keep repair evidence outside the candidate diff
+        run: |
+          mkdir -p .repair
+          printf '.repair/\n' >> .git/info/exclude
+
+      - name: Download bound failure receipt
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: ai-failure-receipt-${{ github.event.workflow_run.id }}
+          path: .repair
+
+      - name: Run Codex on the smallest causal fix
+        id: codex
+        continue-on-error: true
+        uses: openai/codex-action@86365089eb2b84e0a8fb0717b304f8bdcb13b20e
+        with:
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          permission-profile: ':workspace'
+          output-file: .repair/codex-final-message.txt
+          prompt: |
+            You are the first bounded repair pass for a failed Founder Control Room CI run.
+            Read AGENTS.md, .ai/skills/goalfix/SKILL.md, and .agents/skills/control-room-incident-triage/SKILL.md first.
+            Then read .repair/failure-receipt.json and .repair/failure.log.
+
+            Goal: repair the earliest causal code defect that made this exact CI head fail.
+            Use /goalfix discipline: one cause before symptoms, smallest reversible patch, no unrelated refactor.
+            Reproduce the failing command when practical and run the cheapest focused verification after the patch.
+
+            STRICT AUTHORITY:
+            - Modify source/product code only.
+            - Do not modify .github/, AGENTS.md, GLOBAL_AI.md, .ai/, .agents/, .claude/, docs/, e2e/, test/spec files, verifier scripts, migrations, env files, dependency manifests/lockfiles, wrangler/deploy/provider authority, secrets, billing, DNS, or auth credentials.
+            - Never delete/suppress tests, weaken assertions, swallow errors, fake provider/runtime evidence, or make a failing signal green by hiding it.
+            - Do not commit or push. Leave only the focused working-tree diff.
+            - No public/network research is needed. Use repository evidence and the captured failure only.
+
+            Stop if the root cause requires a forbidden authority surface. In that case leave the tree unchanged and state BLOCKED in your final message.
+
+      - name: Enforce bounded Codex diff and preserve patch
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add -N . >/dev/null 2>&1 || true
+          mapfile -t changed < <(git diff --name-only)
+          for path in "${changed[@]}"; do
+            case "$path" in
+              .github/*|AGENTS.md|GLOBAL_AI.md|.ai/*|.agents/*|.claude/*|docs/*|e2e/*|supabase/migrations/*|.env*|wrangler*|package.json|package-lock.json|pnpm-lock.yaml|yarn.lock|playwright.config.*|*.test.*|*.spec.*|scripts/verify-*|scripts/*test*)
+                echo "::error title=Codex crossed repair authority::$path is not eligible for automatic repair."
+                git checkout -- . >/dev/null 2>&1 || true
+                git clean -fd >/dev/null 2>&1 || true
+                mkdir -p .repair
+                : > .repair/codex.patch
+                exit 1
+                ;;
+            esac
+          done
+          git diff --binary > .repair/codex.patch
+          git diff --stat > .repair/codex-diff-stat.txt
+
+      - name: Upload Codex candidate
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: ai-repair-codex-${{ github.event.workflow_run.id }}
+          path: .repair/
+          if-no-files-found: error
+          retention-days: 30
+
+  claude:
+    name: Claude adversarial repair pass
+    needs: [prepare, codex]
+    if: always() && needs.prepare.result == 'success' && needs.prepare.outputs.allowed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment: production
+    outputs:
+      outcome: ${{ steps.claude.outcome }}
+    steps:
+      - name: Check out exact failed head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.FAILED_SHA }}
+          fetch-depth: 2
+          persist-credentials: false
+
+      - name: Keep repair evidence outside the candidate diff
+        run: |
+          mkdir -p .repair
+          printf '.repair/\n' >> .git/info/exclude
+
+      - name: Download bound failure receipt
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: ai-failure-receipt-${{ github.event.workflow_run.id }}
+          path: .repair
+
+      - name: Download Codex candidate
+        continue-on-error: true
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: ai-repair-codex-${{ github.event.workflow_run.id }}
+          path: .repair/codex
+
+      - name: Apply Codex candidate for review
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -s .repair/codex/codex.patch ]]; then
+            git apply --binary .repair/codex/codex.patch
+          fi
+
+      - name: Run Claude as serialized red-team fixer
+        id: claude
+        continue-on-error: true
+        uses: anthropics/claude-code-action@cfc3eb22bfed5c26ef66e3223c982af27e4524de
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            You are the second, serialized repair pass. Codex has already had one chance.
+            Read AGENTS.md, .ai/skills/goalfix/SKILL.md, .agents/skills/control-room-incident-triage/SKILL.md, .repair/failure-receipt.json, and .repair/failure.log.
+            Inspect the current working-tree diff as Codex's candidate.
+
+            Red-team the candidate against the original failure. Keep it unchanged if it is the smallest correct fix; otherwise repair only what is necessary to make the causal fix correct.
+
+            STRICT AUTHORITY:
+            - Modify source/product code only.
+            - Do not modify .github/, AGENTS.md, GLOBAL_AI.md, .ai/, .agents/, .claude/, docs/, e2e/, test/spec files, verifier scripts, migrations, env files, dependency manifests/lockfiles, wrangler/deploy/provider authority, secrets, billing, DNS, or auth credentials.
+            - Never delete/suppress tests, weaken assertions, hide failures, or invent runtime/provider proof.
+            - Do not commit, push, create a PR, or widen scope.
+            - If the real cause is outside this authority, leave the candidate unchanged and report BLOCKED.
+          claude_args: '--max-turns 12 --allowedTools Read,Glob,Grep,Edit,Write'
+
+      - name: Enforce bounded final model diff
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add -N . >/dev/null 2>&1 || true
+          mapfile -t changed < <(git diff --name-only)
+          for path in "${changed[@]}"; do
+            case "$path" in
+              .github/*|AGENTS.md|GLOBAL_AI.md|.ai/*|.agents/*|.claude/*|docs/*|e2e/*|supabase/migrations/*|.env*|wrangler*|package.json|package-lock.json|pnpm-lock.yaml|yarn.lock|playwright.config.*|*.test.*|*.spec.*|scripts/verify-*|scripts/*test*)
+                echo "::error title=Claude crossed repair authority::$path is not eligible for automatic repair."
+                exit 1
+                ;;
+            esac
+          done
+          git diff --binary > .repair/final.patch
+          git diff --stat > .repair/final-diff-stat.txt
+
+      - name: Upload serialized final candidate
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: ai-repair-final-${{ github.event.workflow_run.id }}
+          path: .repair/
+          if-no-files-found: error
+          retention-days: 30
+
+  verify-and-push:
+    name: Verify, receipt, and push focused repair
+    needs: [prepare, codex, claude]
+    if: always() && needs.prepare.result == 'success' && needs.prepare.outputs.allowed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    environment: production
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - name: Check out exact failed head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.FAILED_SHA }}
+          fetch-depth: 2
+          persist-credentials: false
+
+      - name: Keep repair evidence outside the candidate diff
+        run: |
+          mkdir -p .repair
+          printf '.repair/\n' >> .git/info/exclude
+
+      - name: Reconfirm failed head is still current main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin refs/heads/main:refs/remotes/origin/main
+          test "$(git rev-parse HEAD)" = "$FAILED_SHA"
+          current_main="$(git rev-parse refs/remotes/origin/main)"
+          if [[ "$current_main" != "$FAILED_SHA" ]]; then
+            echo "::error title=Stale before commit::main advanced to $current_main; refusing to overwrite newer work."
+            exit 1
+          fi
+
+      - name: Download failure receipt
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: ai-failure-receipt-${{ github.event.workflow_run.id }}
+          path: .repair/receipt
+
+      - name: Download final Claude-reviewed candidate
+        id: final_candidate
+        continue-on-error: true
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: ai-repair-final-${{ github.event.workflow_run.id }}
+          path: .repair/final
+
+      - name: Download Codex fallback candidate
+        id: codex_candidate
+        continue-on-error: true
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: ai-repair-codex-${{ github.event.workflow_run.id }}
+          path: .repair/codex
+
+      - name: Apply best available bounded candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -s .repair/final/final.patch ]]; then
+            patch=.repair/final/final.patch
+          elif [[ -s .repair/codex/codex.patch ]]; then
+            patch=.repair/codex/codex.patch
+          else
+            echo '::error title=No repair candidate::Both agents produced no source-code patch.'
+            exit 1
+          fi
+          git apply --binary "$patch"
+          git add -N . >/dev/null 2>&1 || true
+
+          mapfile -t changed < <(git diff --name-only)
+          if (( ${#changed[@]} == 0 )); then
+            echo '::error title=Empty repair::Candidate patch made no source changes.'
+            exit 1
+          fi
+          for path in "${changed[@]}"; do
+            case "$path" in
+              .github/*|AGENTS.md|GLOBAL_AI.md|.ai/*|.agents/*|.claude/*|docs/*|e2e/*|supabase/migrations/*|.env*|wrangler*|package.json|package-lock.json|pnpm-lock.yaml|yarn.lock|playwright.config.*|*.test.*|*.spec.*|scripts/verify-*|scripts/*test*)
+                echo "::error title=Forbidden final diff::$path cannot be changed by automatic repair."
+                exit 1
+                ;;
+            esac
+          done
+          git diff --check
+          git diff --stat | tee .repair/verified-diff-stat.txt
+
+      - name: Set up Node 24
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install dependencies without changing manifests
+        run: npm ci --no-audit --no-fund
+
+      - name: Run load-bearing source verification
+        env:
+          DOC_TRUTH_BASE_SHA: ${{ env.FAILED_SHA }}
+          TEST_DISCOVERY_BASE_SHA: ${{ env.FAILED_SHA }}
+        run: |
+          set -euo pipefail
+          npm run verify:mcp
+          npm run typecheck
+          npm run lint
+          npm test
+          python3 -m unittest scripts.test_whoami scripts.test_capability_receipt scripts.test_linkedin_analytics_continuity -v
+          npm run verify:rls-contract
+          npm run verify:test-discovery
+          node scripts/verify-documentation-truth.mjs
+          node --check scripts/provider-credential-contract.mjs
+          node --check scripts/reconcile-cloudflare-access-public-zone.mjs
+          node --check scripts/verify-fcr-front-door-playwright.mjs
+          node --test scripts/provider-credential-contract.node-test.mjs
+          node --test scripts/reconcile-cloudflare-access-public-zone.node-test.mjs
+          node --test scripts/fcr-cloudflare-bridge-contract.node-test.mjs
+
+      - name: Install Chromium for required Playwright proof
+        shell: bash
+        run: |
+          sudo mkdir -p /opt/pw-browsers
+          sudo chown -R "$USER:$USER" /opt/pw-browsers
+          PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers npx playwright install --with-deps chromium
+
+      - name: Run Playwright proof before mutation
+        env:
+          NODE_ENV: test
+          PLAYWRIGHT_BROWSERS_PATH: /opt/pw-browsers
+        run: |
+          set -euo pipefail
+          npm run test:e2e
+          npx playwright test -c playwright.config.ts e2e/pages-api-recovery.spec.ts e2e/public-work-directory.spec.ts
+
+      - name: Mint repository-scoped GitHub App write token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+          permission-contents: write
+
+      - name: Commit and push only the verified repair
+        env:
+          APP_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPAIR_ATTEMPT: ${{ needs.prepare.outputs.repair_attempt }}
+          FAILURE_FINGERPRINT: ${{ needs.prepare.outputs.fingerprint }}
+          CODEX_OUTCOME: ${{ needs.codex.outputs.outcome }}
+          CLAUDE_OUTCOME: ${{ needs.claude.outputs.outcome }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin refs/heads/main:refs/remotes/origin/main
+          test "$(git rev-parse refs/remotes/origin/main)" = "$FAILED_SHA"
+
+          git add -A
+          git reset -- .repair >/dev/null 2>&1 || true
+          git diff --cached --quiet && {
+            echo '::error title=No staged repair::Nothing remains after authority filtering.'
+            exit 1
+          }
+
+          git config user.name 'FCR Repair Loop'
+          git config user.email '286642846+jussray@users.noreply.github.com'
+          git commit -m "fix(ai-repair): repair failed CI [ai-repair ${REPAIR_ATTEMPT}/2]" \
+            -m "Failure-Fingerprint: ${FAILURE_FINGERPRINT}" \
+            -m "Failed-Run: ${FAILED_RUN_ID}" \
+            -m "Codex-Outcome: ${CODEX_OUTCOME}" \
+            -m "Claude-Outcome: ${CLAUDE_OUTCOME}"
+
+          repaired_sha="$(git rev-parse HEAD)"
+          remote="https://x-access-token:${APP_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git push "$remote" HEAD:main
+
+          jq -n \
+            --arg state 'REPAIR_PUSHED_AWAITING_FRESH_CI' \
+            --arg failureFingerprint "$FAILURE_FINGERPRINT" \
+            --arg failedSha "$FAILED_SHA" \
+            --arg repairedSha "$repaired_sha" \
+            --arg repairAttempt "$REPAIR_ATTEMPT" \
+            --arg codex "$CODEX_OUTCOME" \
+            --arg claude "$CLAUDE_OUTCOME" \
+            '{schemaVersion:1,state:$state,failureFingerprint:$failureFingerprint,failedSha:$failedSha,repairedSha:$repairedSha,repairAttempt:($repairAttempt|tonumber),codexOutcome:$codex,claudeOutcome:$claude,verification:{typecheck:true,lint:true,tests:true,rlsContract:true,testDiscovery:true,documentationTruth:true,cloudflareAuthority:true,playwright:true},freshCiRequired:true}' \
+            > .repair/final-repair-receipt.json
+
+          {
+            echo '## AI repair pushed'
+            echo
+            echo "- Failure fingerprint: \`$FAILURE_FINGERPRINT\`"
+            echo "- Failed head: \`$FAILED_SHA\`"
+            echo "- Repaired head: \`$repaired_sha\`"
+            echo "- Repair attempt: \`${REPAIR_ATTEMPT}/2\`"
+            echo "- Codex: \`$CODEX_OUTCOME\`"
+            echo "- Claude: \`$CLAUDE_OUTCOME\`"
+            echo '- Local runner verification: `GREEN` including Playwright'
+            echo '- Final state: `REPAIR_PUSHED_AWAITING_FRESH_CI`'
+            echo '- The GitHub App push is expected to trigger a fresh CI run; that new exact-head run is the final authority.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload final repair receipt
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: ai-repair-receipt-${{ github.event.workflow_run.id }}
+          path: .repair/final-repair-receipt.json
+          if-no-files-found: ignore
+          retention-days: 30

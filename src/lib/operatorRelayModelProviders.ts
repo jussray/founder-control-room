@@ -10,6 +10,7 @@ const PROVIDER_TIMEOUT_MS = 60_000;
 const ANTHROPIC_API_VERSION = '2023-06-01';
 const MAX_PROVIDER_RESPONSE_ID_LENGTH = 200;
 const SAFE_GEMINI_MODEL = /^[A-Za-z0-9._-]{1,160}$/;
+const SAFE_PERPLEXITY_AGENT_MODEL = /^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/;
 
 export const SEMANTIC_PEER_REVIEW_SPEND_MODE = 'paused' as const;
 
@@ -203,13 +204,24 @@ function geminiText(body: JsonRecord): string {
 }
 
 function perplexityText(body: JsonRecord): string {
-  const choices = Array.isArray(body.choices) ? body.choices : [];
-  const first = record(choices[0]);
-  const message = record(first?.message);
-  if (typeof message?.content !== 'string' || !message.content.trim()) {
-    throw new Error('Perplexity relay response contained no text');
+  if (body.status !== 'completed') {
+    throw new Error('Perplexity Agent relay returned a non-completed response');
   }
-  return message.content.trim();
+  const output = Array.isArray(body.output) ? body.output : [];
+  const parts: string[] = [];
+  for (const item of output) {
+    const message = record(item);
+    if (message?.type !== 'message') continue;
+    const content = Array.isArray(message.content) ? message.content : [];
+    for (const entry of content) {
+      const block = record(entry);
+      if (block?.type === 'output_text' && typeof block.text === 'string' && block.text.trim()) {
+        parts.push(block.text.trim());
+      }
+    }
+  }
+  if (parts.length === 0) throw new Error('Perplexity Agent relay response contained no text');
+  return parts.join('\n');
 }
 
 function responseIdentity(body: JsonRecord, field: 'id' | 'responseId' = 'id'): string {
@@ -228,6 +240,14 @@ function evidenceRef(provider: string, body: JsonRecord, field: 'id' | 'response
 function geminiModelId(value: string): string | null {
   const normalized = value.trim().replace(/^models\//, '');
   return SAFE_GEMINI_MODEL.test(normalized) ? normalized : null;
+}
+
+function perplexityAgentModelId(value: string): string | null {
+  const normalized = value.trim();
+  if (normalized === 'sonar') return 'perplexity/sonar';
+  return normalized.length <= 160 && SAFE_PERPLEXITY_AGENT_MODEL.test(normalized)
+    ? normalized
+    : null;
 }
 
 export function createServerOperatorRelayAdapters(
@@ -326,26 +346,32 @@ export function createServerOperatorRelayAdapters(
   }
 
   if (perplexityKey && perplexityModel) {
-    adapters.perplexity = operatorRelayAdapterFromTextProvider({
-      invoke: async ({ request }) => {
-        ensureRelaySensitivity(request);
-        ensureRelaySpendPolicy(request);
-        const body = await invokeJsonProvider(fetchImpl, 'https://api.perplexity.ai/v1/sonar', {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${perplexityKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: perplexityModel,
-            messages: [{ role: 'user', content: relayPrompt(request) }],
-          }),
-          redirect: 'error',
-          signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
-        }, 'Perplexity relay');
-        return { text: perplexityText(body), evidenceRef: evidenceRef('perplexity', body) };
-      },
-    });
+    const modelId = perplexityAgentModelId(perplexityModel);
+    if (modelId) {
+      adapters.perplexity = operatorRelayAdapterFromTextProvider({
+        invoke: async ({ request }) => {
+          ensureRelaySensitivity(request);
+          ensureRelaySpendPolicy(request);
+          const body = await invokeJsonProvider(fetchImpl, 'https://api.perplexity.ai/v1/agent', {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${perplexityKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: modelId,
+              input: relayPrompt(request),
+              tools: [{ type: 'web_search' }],
+              store: false,
+              max_output_tokens: 2_000,
+            }),
+            redirect: 'error',
+            signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
+          }, 'Perplexity Agent relay');
+          return { text: perplexityText(body), evidenceRef: evidenceRef('perplexity', body) };
+        },
+      });
+    }
   }
 
   return adapters;

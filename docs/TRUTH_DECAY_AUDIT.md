@@ -42,6 +42,8 @@ A September peer-rollover incident made the freshness rule concrete. FCR `af87c6
 
 The workflow's `STORYENGINE_PEER_SHA` and `STORYENGINE_PEER_REF` are evidence identities, not durable aliases for “current StoryEngine.” A peer-pin update is valid only after the referenced peer is independently observed to resolve to the intended exact StoryEngine SHA. Changing either pin immediately expires predecessor FCR federation/browser evidence and requires the complete exact-head Playwright loop to rerun against the new peer. A correct pin does not prove StoryEngine production deployment, FCR production deployment, merge authority, deploy authority, or provider mutation.
 
+On September 20, that freshness gate caught the same class again when StoryEngine `main` advanced from `aa768075f4bd4fcd8b65f7ee0753596cc488d53a` to merge head `39bed061b034793c69c262527d85c3c4b5617cce` after PR #115. The failing FCR witness remains useful historical evidence that its local browser harness passed, but it cannot prove federation against the successor peer. Recovery requires pinning the independently proven StoryEngine merge head and rerunning the complete FCR exact-head federation/browser witness; neither predecessor green nor a founder merge approval for the predecessor FCR head carries across that movement.
+
 ## 2026-09 control correction: privileged production witness isolation
 
 A post-Deploy `workflow_run` witness is privileged even when its purpose is read-only verification. Treating the triggering workflow's `head_sha` as both the release identity to observe and the code to execute collapses evidence identity into executable authority. A successful upstream workflow must not make its checkout trusted merely by becoming a completed run.
@@ -65,16 +67,6 @@ A merge-governance ambiguity treated the existence of merge capability and the f
 The corrected canon separates the planes. `merge_authority: true` means only that the governed merge capability/authority class exists. Every merge still requires fresh explicit founder approval bound to the exact repository, pull request number, current base SHA, and current head SHA. If that exact approval is absent, ambiguous, or stale, the agent or operator must ask and stop. Review requests, `merge review`, `approved`, `cont`, `continue`, `implement`, mergeability, continuity metadata, or green proof cannot manufacture candidate approval. Any base/head movement invalidates the prior merge approval and requires a new founder decision.
 
 This is an authority-freshness correction, not a relaxation of review or proof. Exact-head evidence still constrains what can be claimed and integrated, while founder approval controls whether the exact candidate may cross the merge boundary. Deployment, publication, billing, secrets, database mutation, deletion, and other consequential classes remain separately gated.
-
-## 2026-09 control correction: content-metrics import provenance versus provider truth
-
-The portfolio metrics lane exposed a separate false-green risk: a correctly parsed CSV can prove the shape and provenance of imported observations without proving that the observations came from a currently authorized analytics provider. Treating a fixture, export, or repeated import as live platform truth would collapse import integrity into provider authority.
-
-The `content-metrics-csv@v1` contract therefore keeps imports observation-only. Each row must bind content fingerprint, provider, account and page identity, audience segment, metric name, count unit, bounded measurement window, observation time, source reference, and deterministic row provenance. A blank metric remains `UNKNOWN_NO_EVIDENCE`, not zero. Identical duplicate identities may collapse idempotently, while conflicting duplicate identities fail closed rather than last-row-wins.
-
-A safe sample CSV and green ingestion tests prove parser behavior, null handling, duplicate handling, timestamp rules, idempotency, and provenance only. A present-tense claim about impressions, reactions, profile views, attributed visits, conversations, contacts, or deals still requires real authorized provider evidence with current account/page identity and freshness. Imported analytics cannot grant publication, strategy mutation, provider mutation, merge, deploy, spend, or freshness authority.
-
-The provider-neutral founder-content analytics interchange applies the same boundary at the snapshot level. Its receipt requires separate account and page identity and offset-aware generation/capture timestamps. Filename, account display name, and receipt-generation time remain useful provenance, but they are not stable logical evidence identity and therefore must not mint a second import when the same source bytes are renamed or the receipt is regenerated. Logical idempotency stays bound to the stable source SHA-256 plus platform, account ID, page ID, comparison scope, and optional top-post scope. Changing account/page scope changes identity; changing presentation metadata does not. This idempotency rule still grants no provider authenticity or freshness.
 
 ## Root causes
 
@@ -391,8 +383,11 @@ The strongest optimization is not faster claiming. It is shortening the distance
 32. A capital decision card, recommendation, score, or HOLD state is evidence interpretation, not financing or execution authority; stale or missing capital evidence must remove derived certainty instead of preserving an earlier recommendation.
 33. `merge_authority: true` cannot be reused as candidate approval; every merge requires a fresh explicit founder decision for the exact live repository/PR/base/head, and candidate movement expires that approval.
 34. Rebinding a cross-repository Playwright peer to a newly verified exact ref/SHA expires predecessor federation/browser proof and requires a complete exact-head rerun; the pin is evidence identity, not production or merge authority.
-35. A valid content-metrics CSV import proves bounded observation parsing and provenance only; missing metrics stay unknown, conflicting duplicates fail closed, and real provider authority plus freshness is still required for a current external analytics claim.
-36. Renaming identical analytics bytes, changing an account display name, or regenerating a receipt must not manufacture a second logical import; stable idempotency binds the source hash and explicit platform/account/page/comparison scope, while provenance-only presentation metadata remains recorded but non-authorizing.
+35. A live peer ref/SHA match may select the next browser-federation evidence subject, but it cannot carry predecessor green forward; the successor stays `UNKNOWN` until the complete exact-head runtime, directive, receipt, and browser witness passes.
+
+## 2026-09 control correction: peer ref refresh resets proof
+
+A later StoryEngine `main` observation can justify rebinding the exact Playwright peer, but that observation only selects the new evidence subject. The FCR browser/federation witness remains `UNKNOWN` for that successor until the exact FCR head reruns the complete runtime identity, directive, receipt, and browser path against that peer. A valid ref/SHA match cannot carry predecessor green forward or mint merge, deploy, production, or provider-mutation authority.
 
 ## Rollback
 
