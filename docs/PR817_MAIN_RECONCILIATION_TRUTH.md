@@ -27,3 +27,7 @@ A workflow catalog may describe repository test inventory without being provider
 ## Reconciliation choice
 
 Where PR #817 and newer `main` edited the same governance surfaces, current-main semantics win unless the PR invariant remains independently required. In particular, the current-main Repository Settings contract requiring one approving review supersedes #817's older browser expectation of zero approving reviews. This is an explicit authority-age decision, not an accidental conflict resolution.
+
+## Verification materialization
+
+After the two-parent reconciliation was fast-forwarded onto the PR branch, this small truth-only commit was intentionally written through GitHub's normal contents path so the pull request emits a standard synchronize event and re-materializes exact-head CI, browser, documentation, security, and continuity proof. It changes no runtime or provider authority and predecessor green remains stale.
