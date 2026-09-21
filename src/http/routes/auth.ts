@@ -91,12 +91,12 @@ async function provisionWorkspaceFounder(user: Session['user'] | null | undefine
   };
 }
 
-async function startGoogleLogin(res: Response, callbackPath: string) {
+async function startWorkspaceGoogleLogin(res: Response) {
   res.setHeader('Cache-Control', 'no-store');
   try {
     const { data, error } = await supabaseAuth.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: `${FOUNDER_API_URL}${callbackPath}`, skipBrowserRedirect: true },
+      options: { redirectTo: `${FOUNDER_API_URL}/auth/workspace/callback`, skipBrowserRedirect: true },
     });
     if (error || !data.url) {
       console.error('Google OAuth start failed:', error?.message ?? 'No redirect URL returned');
@@ -109,11 +109,20 @@ async function startGoogleLogin(res: Response, callbackPath: string) {
   }
 }
 
-authRouter.get('/google', rateLimitFounderOAuth, async (_req, res) =>
-  startGoogleLogin(res, '/auth/callback'));
+authRouter.get('/google', rateLimitFounderOAuth, async (_req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    const { data, error } = await supabaseAuth.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: `${FOUNDER_API_URL}/auth/callback`, skipBrowserRedirect: true } });
+    if (error || !data.url) { console.error('Google OAuth start failed:', error?.message ?? 'No redirect URL returned'); return respondError(res, 503, 'OAUTH_UNAVAILABLE', 'Google sign-in is temporarily unavailable.'); }
+    return res.redirect(303, data.url);
+  } catch (error) {
+    console.error('Google OAuth start failed:', error instanceof Error ? error.message : String(error));
+    return respondError(res, 503, 'OAUTH_UNAVAILABLE', 'Google sign-in is temporarily unavailable.');
+  }
+});
 
 authRouter.get('/workspace/google', rateLimitFounderOAuth, async (_req, res) =>
-  startGoogleLogin(res, '/auth/workspace/callback'));
+  startWorkspaceGoogleLogin(res));
 
 authRouter.post('/magic-link', rateLimitMagicLink, async (req, res) => {
   const email = normalizeEmail(req.body?.email);
