@@ -177,6 +177,12 @@
       ]
     },
     {
+      "path": "src/providers/githubAppAuth.ts",
+      "claims": [
+        "`src/providers/githubAppAuth.ts` must mint repository installation tokens against the exact declared permission subset, keep cache identity permission-scoped, reject cached or newly minted tokens that cannot satisfy the requested permissions, and must never let a broader installation grant silently widen the caller's operation authority."
+      ]
+    },
+    {
       "path": "src/providers/trustedGithubGovernanceObserver.ts",
       "claims": [
         "`src/providers/trustedGithubGovernanceObserver.ts` must require live `administration: read` GitHub App installation evidence before token minting or Chief ruleset reads; observed `checks: write` capability remains non-authorizing until a separately contracted producer and authority path exist."
