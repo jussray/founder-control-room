@@ -109,9 +109,8 @@ comment on column public.projects.workspace_id is
   'Owning FCR workspace. Workspace-aware service-role queries must filter by this column.';
 
 -- Historical founder_full_access policies call is_founder(). Narrow that
--- helper to the immutable Supabase Auth user id for the platform owner, and
--- require an authenticated Supabase role. Generic preview PostgreSQL does not
--- provide the auth helpers; in that environment install a deny-all helper
+-- helper to the platform owner. Supabase provides auth.jwt(); generic preview
+-- PostgreSQL does not. In a non-Supabase environment install a deny-all helper
 -- instead of widening access or fabricating auth state.
 do $$
 begin
@@ -120,23 +119,7 @@ begin
     from pg_proc p
     join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'auth'
-      and p.proname = 'uid'
-      and p.pronargs = 0
-  )
-  and exists (
-    select 1
-    from pg_proc p
-    join pg_namespace n on n.oid = p.pronamespace
-    where n.nspname = 'auth'
       and p.proname = 'jwt'
-      and p.pronargs = 0
-  )
-  and exists (
-    select 1
-    from pg_proc p
-    join pg_namespace n on n.oid = p.pronamespace
-    where n.nspname = 'auth'
-      and p.proname = 'role'
       and p.pronargs = 0
   ) then
     execute $function$
@@ -147,11 +130,10 @@ begin
       set search_path = public
       as $body$
         select coalesce(
-          (select auth.role()) = 'authenticated'
-          and exists (
+          exists (
             select 1
             from public.founder_users fu
-            where fu.user_id = (select auth.uid())
+            where lower(fu.email) = lower((select auth.jwt()) ->> 'email')
               and fu.account_role = 'platform_owner'
           ),
           false
