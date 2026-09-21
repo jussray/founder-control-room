@@ -12,11 +12,14 @@ const composerProofUrl = new URL('../e2e/control-room-composer-proof.mjs', impor
 const composerProof = fs.readFileSync(composerProofUrl, 'utf8');
 const fiveScreenProofUrl = new URL('../e2e/five-screen-shell-proof.mjs', import.meta.url);
 const fiveScreenProof = fs.readFileSync(fiveScreenProofUrl, 'utf8');
+const localFirstFounderProofUrl = new URL('../e2e/founder-local-first-proof.mjs', import.meta.url);
+const localFirstFounderProof = fs.readFileSync(localFirstFounderProofUrl, 'utf8');
 const osTopologyProofUrl = new URL('../e2e/founder-os-topology-proof.mjs', import.meta.url);
 const osTopologyProof = fs.readFileSync(osTopologyProofUrl, 'utf8');
 const rateLimitProofUrl = new URL('../e2e/safe-rate-limit-fetch-proof.mjs', import.meta.url);
 const rateLimitProof = fs.readFileSync(rateLimitProofUrl, 'utf8');
 const fiveScreenShell = fs.readFileSync(new URL('../public/control-room/five-screen-shell.js', import.meta.url), 'utf8');
+const localFirstFounderState = fs.readFileSync(new URL('../public/control-room/local-first-founder-state.js', import.meta.url), 'utf8');
 const osTopology = fs.readFileSync(new URL('../public/control-room/os-topology.js', import.meta.url), 'utf8');
 const safeRateLimitFetch = fs.readFileSync(new URL('../public/control-room/safe-rate-limit-fetch.js', import.meta.url), 'utf8');
 const opaqueBootstrap = fs.readFileSync(new URL('../public/control-room/opaque-session-bootstrap.js', import.meta.url), 'utf8');
@@ -63,6 +66,18 @@ assert.match(fiveScreenShell, /\['proof', 'Proof'\]/);
 assert.match(fiveScreenShell, /LEGACY_ROUTE_MAP/);
 assert.match(fiveScreenShell, /CONTEXT_KEY/);
 
+assert.match(localFirstFounderProof, /from 'playwright'/);
+assert.match(localFirstFounderProof, /setOffline\(true\)/);
+assert.match(localFirstFounderProof, /fcr_founder_local_first_outbox_v1/);
+assert.match(localFirstFounderProof, /fresh-tab-restored/);
+assert.match(localFirstFounderProof, /leakedSession/);
+assert.match(localFirstFounderState, /FOUNDER_LOCAL_FIRST_VERSION = 1/);
+assert.match(localFirstFounderState, /const ALLOWED_KEYS = Object\.freeze\(\[SCREEN_KEY, VIEW_KEY, CONTEXT_KEY\]\)/);
+assert.match(localFirstFounderState, /scope: 'founder-workspace'/);
+assert.match(localFirstFounderState, /restoreFounderLocalState/);
+assert.match(localFirstFounderState, /snapshotFounderLocalState/);
+assert.doesNotMatch(localFirstFounderState, /fcr_session/);
+
 assert.match(osTopologyProof, /from 'playwright'/);
 assert.match(osTopologyProof, /fcr\/os-topology@v1/);
 assert.match(osTopologyProof, /EXPECTED_SYSTEMS/);
@@ -90,6 +105,8 @@ assert.match(safeRateLimitFetch, /MAX_RETRY_AFTER_SECONDS = 61/);
 assert.match(safeRateLimitFetch, /first\.status !== 429/);
 assert.doesNotMatch(safeRateLimitFetch, /SAFE_METHODS = .*POST/);
 assert.match(opaqueBootstrap, /safe-rate-limit-fetch\.js/);
+assert.match(opaqueBootstrap, /local-first-founder-state\.js/);
+assert.match(opaqueBootstrap, /installFounderLocalFirstState/);
 assert.match(opaqueBootstrap, /five-screen-shell\.js/);
 assert.match(opaqueBootstrap, /os-topology\.js/);
 
@@ -118,9 +135,14 @@ execFileSync(process.execPath, [fileURLToPath(fiveScreenProofUrl)], {
   env: process.env,
 });
 
+execFileSync(process.execPath, [fileURLToPath(localFirstFounderProofUrl)], {
+  stdio: 'inherit',
+  env: process.env,
+});
+
 execFileSync(process.execPath, [fileURLToPath(osTopologyProofUrl)], {
   stdio: 'inherit',
   env: process.env,
 });
 
-console.log('direct browser contract verified with bounded safe-read rate-limit recovery, local proof, ULTRATHINK Plugin Center, Control Room Composer, five-screen cockpit, Founder OS topology, and legacy-journey navigation proofs');
+console.log('direct browser contract verified with bounded safe-read rate-limit recovery, local proof, ULTRATHINK Plugin Center, Control Room Composer, five-screen cockpit, founder local-first offline/fresh-tab persistence, Founder OS topology, and legacy-journey navigation proofs');
