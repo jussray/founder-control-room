@@ -8,6 +8,8 @@ on:
       - 'src/http/routes/onboarding.ts'
       - 'src/http/routes/onboardingAssets/workspaceSurface.ts'
       - 'src/http/routes/__tests__/workspaceAuth.integration.test.ts'
+      - 'src/lib/chiefControlRoomRecommendation.ts'
+      - 'src/lib/__tests__/chiefControlRoomRecommendation.test.ts'
       - 'e2e/loader.mjs'
       - 'e2e/fakePublicWorkspaceSupabaseClient.mjs'
       - 'e2e/workspace-new-user-real-chief-proof.mjs'
@@ -63,7 +65,8 @@ jobs:
             src/http/routes/__tests__/workspaceAuth.integration.test.ts \
             src/http/middleware/__tests__/requireFounder.test.ts \
             src/http/middleware/__tests__/requireFounder.explicitRoleIdentity.contract.test.ts \
-            src/http/routes/__tests__/workspaceProjects.chief.integration.test.ts
+            src/http/routes/__tests__/workspaceProjects.chief.integration.test.ts \
+            src/lib/__tests__/chiefControlRoomRecommendation.test.ts
 
       - name: Build exact candidate
         run: npm run build

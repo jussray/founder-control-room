@@ -18,6 +18,35 @@ const CHIEF_CANDIDATE_URLS = [
   process.env.CHIEF_AI_BASE_URL || 'https://a38745f4-chief-ai.mcgill-raylene.workers.dev',
   process.env.CHIEF_BRANCH_PREVIEW_URL || 'https://fix-merge-intent-current-base-2fd4fda-chief-ai.mcgill-raylene.workers.dev',
 ].filter((value, index, values) => value && values.indexOf(value) === index);
+const CHIEF_ACCESS_CLIENT_ID = (
+  process.env.CHIEF_RUNTIME_ACCESS_CLIENT_ID
+  || process.env.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID
+  || process.env.CLOUDFLARE_ACCESS_CLIENT_ID
+  || ''
+).trim();
+const CHIEF_ACCESS_CLIENT_SECRET = (
+  process.env.CHIEF_RUNTIME_ACCESS_CLIENT_SECRET
+  || process.env.CHIEF_CLOUDFLARE_ACCESS_CLIENT_SECRET
+  || process.env.CLOUDFLARE_ACCESS_CLIENT_SECRET
+  || ''
+).trim();
+
+if (Boolean(CHIEF_ACCESS_CLIENT_ID) !== Boolean(CHIEF_ACCESS_CLIENT_SECRET)) {
+  throw new Error('Chief runtime Access credential pair is incomplete');
+}
+
+const CHIEF_ACCESS_HEADERS = CHIEF_ACCESS_CLIENT_ID
+  ? {
+      'CF-Access-Client-Id': CHIEF_ACCESS_CLIENT_ID,
+      'CF-Access-Client-Secret': CHIEF_ACCESS_CLIENT_SECRET,
+    }
+  : {};
+const CHIEF_ACCESS_ENV = CHIEF_ACCESS_CLIENT_ID
+  ? {
+      CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID: CHIEF_ACCESS_CLIENT_ID,
+      CHIEF_CLOUDFLARE_ACCESS_CLIENT_SECRET: CHIEF_ACCESS_CLIENT_SECRET,
+    }
+  : {};
 
 if (existsSync(BRIDGE_FILE)) unlinkSync(BRIDGE_FILE);
 mkdirSync(join(REPO_ROOT, 'logs'), { recursive: true });
@@ -55,7 +84,7 @@ async function proveChiefRuntime() {
   for (const baseUrl of CHIEF_CANDIDATE_URLS) {
     try {
       const response = await fetch(`${baseUrl}/version`, {
-        headers: { Accept: 'application/json' },
+        headers: { Accept: 'application/json', ...CHIEF_ACCESS_HEADERS },
         redirect: 'manual',
       });
       const contentType = response.headers.get('content-type') || '';
@@ -74,7 +103,7 @@ async function proveChiefRuntime() {
       attempts.push(`${baseUrl}: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
-  throw new Error(`No exact-head Chief runtime was reachable without bypass: ${attempts.join(' | ')}`);
+  throw new Error(`No exact-head Chief runtime was reachable through the configured trust boundary: ${attempts.join(' | ')}`);
 }
 
 const VERIFIED_CHIEF_BASE_URL = await proveChiefRuntime();
@@ -100,6 +129,7 @@ const server = spawn(
   {
     env: {
       ...process.env,
+      ...CHIEF_ACCESS_ENV,
       SUPABASE_URL: 'https://fake.supabase.co',
       SUPABASE_SERVICE_ROLE_KEY: 'fake-service-role-key',
       SUPABASE_PUBLISHABLE_KEY: 'fake-publishable-key',

@@ -53,6 +53,7 @@ type FetchLike = typeof fetch;
 
 const HASH = /^[0-9a-f]{64}$/;
 const MAX_RESPONSE_BYTES = 64 * 1024;
+const TRUSTED_CHIEF_ACCESS_HOST = /^(?:[0-9a-f]{8}-)?chief-ai\.mcgill-raylene\.workers\.dev$/i;
 
 function isRecord(value: unknown): value is JsonRecord {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
@@ -96,6 +97,32 @@ function chiefBaseUrl(env: NodeJS.ProcessEnv): URL {
   url.search = '';
   url.hash = '';
   return url;
+}
+
+function chiefAccessHeaders(env: NodeJS.ProcessEnv, baseUrl: URL): Record<string, string> {
+  const clientId = (
+    env.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID
+    ?? env.CLOUDFLARE_ACCESS_CLIENT_ID
+    ?? ''
+  ).trim();
+  const clientSecret = (
+    env.CHIEF_CLOUDFLARE_ACCESS_CLIENT_SECRET
+    ?? env.CLOUDFLARE_ACCESS_CLIENT_SECRET
+    ?? ''
+  ).trim();
+
+  if (!clientId && !clientSecret) return {};
+  if (!clientId || !clientSecret) {
+    throw new Error('Chief Cloudflare Access credential pair is incomplete');
+  }
+  if (!TRUSTED_CHIEF_ACCESS_HOST.test(baseUrl.hostname)) {
+    throw new Error('Chief Cloudflare Access credentials may only be sent to the trusted Chief workers.dev host');
+  }
+
+  return {
+    'CF-Access-Client-Id': clientId,
+    'CF-Access-Client-Secret': clientSecret,
+  };
 }
 
 async function boundedJson(response: Response): Promise<unknown> {
@@ -218,13 +245,15 @@ export async function requestChiefControlRoomRecommendation(
     fetchImpl?: FetchLike;
   } = {},
 ): Promise<ChiefControlRoomRecommendation> {
-  const baseUrl = chiefBaseUrl(options.env ?? process.env);
+  const env = options.env ?? process.env;
+  const baseUrl = chiefBaseUrl(env);
   const endpoint = new URL('/api/chief/control-room-recommendation', baseUrl);
   const response = await (options.fetchImpl ?? fetch)(endpoint, {
     method: 'POST',
     headers: {
       Accept: 'application/json',
       'Content-Type': 'application/json',
+      ...chiefAccessHeaders(env, baseUrl),
     },
     body: JSON.stringify({
       projectName: input.projectName,

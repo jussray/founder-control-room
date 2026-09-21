@@ -114,6 +114,66 @@ describe('requestChiefControlRoomRecommendation', () => {
     expect(JSON.stringify(init?.headers)).not.toMatch(/authorization|token|secret|password/i);
   });
 
+  it('adds the protected Cloudflare Access service-token pair only for a trusted Chief workers.dev origin', async () => {
+    const fetchImpl = fetchResponse(chiefPayload());
+    const clientId = 'chief-client-id.example.access';
+    const clientSecret = 'chief-client-secret-value';
+
+    await requestChiefControlRoomRecommendation(input(), {
+      env: {
+        CHIEF_AI_BASE_URL: 'https://a38745f4-chief-ai.mcgill-raylene.workers.dev',
+        CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID: clientId,
+        CHIEF_CLOUDFLARE_ACCESS_CLIENT_SECRET: clientSecret,
+      },
+      fetchImpl,
+    });
+
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    const [, init] = vi.mocked(fetchImpl).mock.calls[0];
+    expect(init?.headers).toMatchObject({
+      'CF-Access-Client-Id': clientId,
+      'CF-Access-Client-Secret': clientSecret,
+    });
+  });
+
+  it('fails closed before network access when the Chief Access credential pair is partial', async () => {
+    const fetchImpl = fetchResponse(chiefPayload());
+    const secret = 'must-never-appear-in-an-error';
+
+    let caught: unknown;
+    try {
+      await requestChiefControlRoomRecommendation(input(), {
+        env: {
+          CHIEF_AI_BASE_URL: 'https://a38745f4-chief-ai.mcgill-raylene.workers.dev',
+          CHIEF_CLOUDFLARE_ACCESS_CLIENT_SECRET: secret,
+        },
+        fetchImpl,
+      });
+    } catch (error) {
+      caught = error;
+    }
+
+    expect(caught).toBeInstanceOf(Error);
+    expect((caught as Error).message).toContain('credential pair is incomplete');
+    expect((caught as Error).message).not.toContain(secret);
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('never sends Chief Access credentials to a configurable non-Chief HTTPS origin', async () => {
+    const fetchImpl = fetchResponse(chiefPayload());
+
+    await expect(requestChiefControlRoomRecommendation(input(), {
+      env: {
+        CHIEF_AI_BASE_URL: 'https://chief.example',
+        CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID: 'client-id',
+        CHIEF_CLOUDFLARE_ACCESS_CLIENT_SECRET: 'client-secret',
+      },
+      fetchImpl,
+    })).rejects.toThrow('only be sent to the trusted Chief workers.dev host');
+
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
   it('rejects a non-HTTPS or credential-bearing Chief base URL before network access', async () => {
     const fetchImpl = fetchResponse(chiefPayload());
 
