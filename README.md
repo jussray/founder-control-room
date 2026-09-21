@@ -325,3 +325,9 @@ For public crawler and work-directory behavior, `.github/workflows/ci.yml` must 
 ## Cross-repository browser witness freshness
 
 The exact StoryEngine peer configured in `.github/workflows/playwright.yml` is an evidence subject, not a durable alias for current StoryEngine. A peer refresh must be backed by an independent ref/SHA observation and must reset predecessor federation/browser proof until the complete FCR → StoryEngine → receipt → FCR Playwright witness passes on the exact FCR head. Pin alignment alone grants no merge, deploy, production, or provider-mutation authority.
+
+## Exact-head proof and provider authority
+
+A continuity rollover or branch update establishes candidate identity, not successor proof. The current head must receive its own exact-head CI, test-ledger, browser, security, and required-gate evidence; predecessor green checks never donate authority to a successor head. When a continuity mutation uses workflow-scoped GitHub authority and does not itself produce the normal proof fan-out, a separate non-authorizing materialization or recovery event may re-launch verification, but the resulting checks still prove only the exact head they execute.
+
+Cloudflare preview or build success is likewise evidence for the exact provider artifact it reports, not merge authority or production-promotion authority. GitHub ruleset reconciliation, Cloudflare production mutation, and canonical runtime claims remain separate provider-authority lanes and must fail closed when credential shape, provider identity, required configuration, or fresh readback cannot be verified.
