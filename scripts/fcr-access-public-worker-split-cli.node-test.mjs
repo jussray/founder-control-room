@@ -268,6 +268,7 @@ test('rollback failure keeps latest checkpoint and emits a separate bounded erro
   assert.equal(failure.mutationOutcome, 'unknown');
   const compat = JSON.parse(await readFile(p.compatibilityReceiptPath, 'utf8'));
   assert.equal(compat.state, 'blocked');
+  assert.equal(compat.mutationPerformed, true);
   assert.equal(compat.classification, 'provider-recovery-failed');
   await cleanupPaths(p);
 });
