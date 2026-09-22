@@ -21,9 +21,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - name: Prove deployed prompt workflow router
-        run: npx playwright test src/http/routes/__tests__/builderPromptWorkflow.playwright.spec.ts --project=chromium
+        run: npx playwright test e2e/builder-prompt-workflow-runtime.spec.ts --project=chromium
