@@ -1,0 +1,28 @@
+name: Prompt Workflow Router Proof
+
+on:
+  pull_request:
+    paths:
+      - '.ai-skills/gpts/builder-prompt-workflow-router.md'
+      - 'src/lib/founderControlDecision.ts'
+      - 'src/lib/__tests__/founderControlDecision.test.ts'
+      - '.github/workflows/prompt-workflow-router-proof.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  exact-head-proof:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Founder control + workflow router proof
+        run: npx vitest run src/lib/__tests__/founderControlDecision.test.ts
