@@ -1,0 +1,15 @@
+{
+  "contract": "juss/prompt-workflow-router-implementation-receipt@v1",
+  "repo": "jussray/founder-control-room",
+  "branch": "feat/prompt-workflow-router",
+  "baseSha": "25cf097867fdb9f1e24d426a52f015d9bbcb34d7",
+  "state": "SOURCE_IMPLEMENTED_RUNTIME_MOUNT_BLOCKED",
+  "authorityChanged": false,
+  "executionAuthorizedBySelection": false,
+  "databaseMigration": false,
+  "runtimeMountVerified": false,
+  "ciVerified": false,
+  "deployed": false,
+  "playwrightVerified": false,
+  "nextGate": "mount builderPromptWorkflowRouter in src/http/server.ts behind existing browser mutation gate"
+}
