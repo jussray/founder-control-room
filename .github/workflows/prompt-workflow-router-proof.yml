@@ -10,6 +10,7 @@ on:
       - 'src/lib/__tests__/founderControlDecision.test.ts'
       - 'src/http/routes/builderPromptWorkflow.ts'
       - 'src/http/routes/__tests__/builderPromptWorkflow.integration.test.ts'
+      - 'scripts/verify-prompt-workflow-router.mjs'
       - '.github/workflows/prompt-workflow-router-proof.yml'
   workflow_dispatch:
 
@@ -28,5 +29,7 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
+      - name: Source wiring proof
+        run: node scripts/verify-prompt-workflow-router.mjs
       - name: Founder control + deterministic workflow router proof
         run: npx vitest run src/lib/__tests__/founderControlDecision.test.ts src/lib/__tests__/builderPromptWorkflowRouter.test.ts src/http/routes/__tests__/builderPromptWorkflow.integration.test.ts
