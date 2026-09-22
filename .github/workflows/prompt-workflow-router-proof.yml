@@ -8,6 +8,8 @@ on:
       - 'src/lib/founderControlDecision.ts'
       - 'src/lib/__tests__/builderPromptWorkflowRouter.test.ts'
       - 'src/lib/__tests__/founderControlDecision.test.ts'
+      - 'src/http/routes/builderPromptWorkflow.ts'
+      - 'src/http/routes/__tests__/builderPromptWorkflow.integration.test.ts'
       - '.github/workflows/prompt-workflow-router-proof.yml'
   workflow_dispatch:
 
@@ -27,4 +29,4 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Founder control + deterministic workflow router proof
-        run: npx vitest run src/lib/__tests__/founderControlDecision.test.ts src/lib/__tests__/builderPromptWorkflowRouter.test.ts
+        run: npx vitest run src/lib/__tests__/founderControlDecision.test.ts src/lib/__tests__/builderPromptWorkflowRouter.test.ts src/http/routes/__tests__/builderPromptWorkflow.integration.test.ts
