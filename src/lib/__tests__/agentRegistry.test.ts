@@ -6,7 +6,7 @@ import {
 } from '../agentRegistry.js';
 
 describe('FCR governed agent enablement', () => {
-  it.each(['gemini', 'claude-code', 'codex', 'perplexity'])('%s is enabled as a bounded implementation-capable operator', (agentId) => {
+  it.each(['cursor', 'gemini', 'claude-code', 'codex', 'perplexity'])('%s is enabled as a bounded implementation-capable operator', (agentId) => {
     const policy = agentOperatorPolicy(agentId);
 
     expect(policy).not.toBeNull();
@@ -39,12 +39,16 @@ describe('FCR governed agent enablement', () => {
     expect(agentCanOperate('unknown-agent', 'implement')).toBe(false);
   });
 
-  it('binds provider-specific operators to their instruction contracts', () => {
+  it('binds tool-specific operators to their instruction contracts', () => {
+    const cursor = AGENT_REGISTRY.find((agent) => agent.id === 'cursor');
     const gemini = AGENT_REGISTRY.find((agent) => agent.id === 'gemini');
     const claude = AGENT_REGISTRY.find((agent) => agent.id === 'claude-code');
     const perplexity = AGENT_REGISTRY.find((agent) => agent.id === 'perplexity');
     const deepseek = AGENT_REGISTRY.find((agent) => agent.id === 'deepseek-instructor');
 
+    expect(cursor?.operator?.instructionContracts).toContain('.cursor/rules');
+    expect(cursor?.operator?.instructionContracts).toContain('GLOBAL_AI.md');
+    expect(cursor?.operator?.instructionContracts).toContain('docs/FCR_MULTI_AGENT_ENABLEMENT_CONTRACT.md');
     expect(gemini?.operator?.instructionContracts).toContain('docs/FCR_MULTI_AGENT_ENABLEMENT_CONTRACT.md');
     expect(claude?.operator?.instructionContracts).toContain('CLAUDE.md');
     expect(perplexity?.operator?.instructionContracts).toContain('PERPLEXITY.md');

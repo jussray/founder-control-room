@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { access, cp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { access, cp, mkdir, open, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { constants } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { relative, resolve } from 'node:path';
@@ -10,6 +10,8 @@ await import('./verify-sekret-bip-control-room-bridge.mjs');
 const repositoryRoot = fileURLToPath(new URL('../', import.meta.url));
 const sourceDirectory = resolve(repositoryRoot, 'public');
 const outputDirectory = resolve(repositoryRoot, 'dist-pages');
+const SECRET_SCAN_CHUNK_BYTES = 256 * 1024;
+const SECRET_SCAN_OVERLAP_CHARS = 512;
 
 const requiredAssets = [
   'index.html',
@@ -24,6 +26,9 @@ const requiredAssets = [
   'control-room/index.html',
   'control-room/app.js',
   'control-room/styles.css',
+  'control-room/opaque-session-bootstrap.js',
+  'control-room/stack-router.js',
+  'control-room/mission-live-ux.js',
   'control-room/founder-shell.html',
   'control-room/founder-shell.css',
   'control-room/capabilities.html',
@@ -45,6 +50,99 @@ const requiredAssets = [
   'juss-rayy/index.html',
   'mom8/index.html',
 ];
+
+const forbiddenArtifactPaths = [
+  { label: '.git metadata', pattern: /(^|\/)\.git(?:\/|$)/i },
+  { label: 'environment file', pattern: /(^|\/)\.env(?:\.[^/]+)?$/i },
+  { label: 'OS metadata', pattern: /(^|\/)(?:\.DS_Store|Thumbs\.db)$/i },
+  { label: 'private credential file', pattern: /(^|\/)(?:id_rsa|id_ed25519|credentials(?:\.json)?|service[-_]?account(?:\.json)?|[^/]+\.(?:pem|key|p12|pfx))$/i },
+];
+
+const forbiddenLiteralSecrets = [
+  { label: 'private key material', pattern: /-----BEGIN (?:RSA |EC |OPENSSH |PGP )?PRIVATE KEY-----/ },
+  { label: 'OpenAI/Anthropic-style API key', pattern: /\bsk-(?:ant-)?[A-Za-z0-9_-]{20,}\b/ },
+  { label: 'GitHub token', pattern: /\b(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9_]{16,}\b|\bgithub_pat_[A-Za-z0-9_]{16,}\b/ },
+  { label: 'Slack token', pattern: /\bxox[baprs]-[A-Za-z0-9-]{10,}\b/ },
+  {
+    label: 'sensitive credential assignment',
+    pattern: /(?:"|')?(?:[A-Z][A-Z0-9_]*(?:API_KEY|API_TOKEN|ACCESS_TOKEN|BEARER_TOKEN|PRIVATE_KEY|SERVICE_ROLE_KEY|ENCRYPTION_KEY|WEBHOOK_SECRET|HMAC_SECRET|INGRESS_SECRET|INGEST_SECRET|SHARED_SECRET|MCP_TOKEN|HOOK_URL|PASSWORD|FINGERPRINT)|DATABASE_URL|SUPABASE_DB_URL|GITHUB_TOKEN)(?:"|')?\s*(?:=|:)\s*["']?(?!\$\{|\$[A-Z_]|process\.env\b|env\b|redacted(?:\b|_)|placeholder(?:\b|_)|example(?:\b|_))[^\s"'`,;}{]{8,}/i,
+  },
+];
+
+const leakageScannerRegressionSamples = [
+  '{"SUPABASE_SERVICE_ROLE_KEY":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}',
+  '{"FOUNDER_SESSION_ENCRYPTION_KEY":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}',
+  '{"FOUNDER_SIGNAL_ENGINE_MCP_TOKEN":"cccccccccccccccccccccccccccccccc"}',
+  '{"RECONCILE_SHARED_SECRET":"dddddddddddddddddddddddddddddddd"}',
+  '{"N8N_FOUNDER_CONTENT_IDENTITY_HMAC_SECRET":"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"}',
+  'ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL=https://hooks.invalid/opaque-secret-value',
+  'ghp_0123456789abcdef0123456789abcdef',
+  'gho_0123456789abcdef0123456789abcdef',
+  'ghu_0123456789abcdef0123456789abcdef',
+  'ghs_0123456789abcdef0123456789abcdef',
+  'ghr_0123456789abcdef0123456789abcdef',
+  'github_pat_0123456789abcdef0123456789abcdef',
+];
+
+for (const sample of leakageScannerRegressionSamples) {
+  const detected = forbiddenLiteralSecrets.some((rule) => rule.pattern.test(sample));
+  if (!detected) {
+    throw new Error(`Cloudflare Pages leakage scanner regression: failed to detect synthetic sensitive assignment ${sample.split(/[=:]/, 1)[0]}`);
+  }
+}
+
+async function collectFiles(directory) {
+  const files = [];
+  for (const entry of await readdir(directory, { withFileTypes: true })) {
+    const absolute = resolve(directory, entry.name);
+    if (entry.isDirectory()) files.push(...await collectFiles(absolute));
+    else if (entry.isFile()) files.push(absolute);
+  }
+  return files;
+}
+
+function artifactPath(absolutePath) {
+  return relative(outputDirectory, absolutePath).split('\\').join('/');
+}
+
+async function assertFileContainsNoLiteralSecret(absolutePath, packagedPath) {
+  const handle = await open(absolutePath, 'r');
+  const buffer = Buffer.allocUnsafe(SECRET_SCAN_CHUNK_BYTES);
+  let overlap = '';
+
+  try {
+    while (true) {
+      const { bytesRead } = await handle.read(buffer, 0, buffer.length, null);
+      if (bytesRead === 0) break;
+
+      // Secret signatures are ASCII. Latin-1 gives a byte-preserving one-byte
+      // mapping for every artifact, including binaries, so large or binary
+      // assets cannot escape scanning merely because of size or encoding.
+      const window = overlap + buffer.subarray(0, bytesRead).toString('latin1');
+      for (const rule of forbiddenLiteralSecrets) {
+        if (rule.pattern.test(window)) {
+          throw new Error(`Cloudflare Pages output contains ${rule.label}: ${packagedPath}`);
+        }
+      }
+      overlap = window.slice(-SECRET_SCAN_OVERLAP_CHARS);
+    }
+  } finally {
+    await handle.close();
+  }
+}
+
+async function assertArtifactSafe() {
+  for (const absolutePath of await collectFiles(outputDirectory)) {
+    const packagedPath = artifactPath(absolutePath);
+    for (const rule of forbiddenArtifactPaths) {
+      if (rule.pattern.test(packagedPath)) {
+        throw new Error(`Cloudflare Pages output contains forbidden ${rule.label}: ${packagedPath}`);
+      }
+    }
+
+    await assertFileContainsNoLiteralSecret(absolutePath, packagedPath);
+  }
+}
 
 await rm(outputDirectory, { recursive: true, force: true });
 await mkdir(outputDirectory, { recursive: true });
@@ -70,50 +168,6 @@ for (const relativePath of requiredAssets) {
   }
 }
 
-const blockedNames = [
-  { label: 'git metadata', pattern: /(^|\/)\.git(?:\/|$)/i },
-  { label: 'environment file', pattern: /(^|\/)\.env(?:\.|$)/i },
-  { label: 'credential file', pattern: /(^|\/)(?:credentials|secrets?|id_rsa|id_ed25519|\.npmrc|\.netrc)(?:\.|$)/i },
-];
-const blockedContent = [
-  { label: 'private key material', pattern: /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/ },
-  { label: 'GitHub token', pattern: /\b(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{20,}\b|\bgithub_pat_[A-Za-z0-9_]{20,}\b/ },
-  { label: 'OpenAI secret key', pattern: /\bsk-(?:proj-)?[A-Za-z0-9_-]{20,}\b/ },
-  { label: 'Anthropic secret key', pattern: /\bsk-ant-[A-Za-z0-9_-]{20,}\b/ },
-  { label: 'service-role assignment', pattern: /\bSUPABASE_SERVICE_ROLE_KEY\s*[:=]\s*['"]?[^\s'"<>]{8,}/i },
-];
-const leakageFindings = [];
+await assertArtifactSafe();
 
-async function scanPublicBundle(directory) {
-  for (const entry of await readdir(directory, { withFileTypes: true })) {
-    const fullPath = resolve(directory, entry.name);
-    const relativePath = relative(outputDirectory, fullPath).replaceAll('\\', '/');
-
-    for (const rule of blockedNames) {
-      if (rule.pattern.test(relativePath)) leakageFindings.push(`${relativePath}: ${rule.label}`);
-    }
-
-    if (entry.isDirectory()) {
-      await scanPublicBundle(fullPath);
-      continue;
-    }
-    if (!entry.isFile()) continue;
-
-    const data = await readFile(fullPath);
-    if (data.includes(0)) continue;
-    const text = data.toString('utf8');
-    for (const rule of blockedContent) {
-      if (rule.pattern.test(text)) leakageFindings.push(`${relativePath}: ${rule.label}`);
-    }
-  }
-}
-
-await scanPublicBundle(outputDirectory);
-if (leakageFindings.length) {
-  console.error(`Public bundle leakage scan failed (${leakageFindings.length} finding(s)); matched values are intentionally suppressed.`);
-  for (const finding of leakageFindings) console.error(`- ${finding}`);
-  throw new Error('Cloudflare Pages public bundle failed leakage validation');
-}
-
-console.log('Public bundle leakage scan passed: no blocked metadata or secret signatures detected.');
-console.log(`Cloudflare Pages output ready: ${outputDirectory}`);
+console.log(`Cloudflare Pages output ready and leakage-checked: ${outputDirectory}`);

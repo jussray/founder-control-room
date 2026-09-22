@@ -2,12 +2,24 @@
 
 **Status:** founder-approved additive operator contract  
 **Authority host:** `jussray/founder-control-room`  
-**Applies to:** Gemini Command, Codex / ChatGPT, Claude / Claude Code, Perplexity, DeepSeek Instructor  
+**Applies to:** Cursor, Gemini Command, Codex / ChatGPT, Claude / Claude Code, Perplexity, DeepSeek Instructor  
 **Canonical product rules:** FCR master specification plus the v1.4 ULTRATHINK Self-Attack addendum
 
 ## Boundary
 
-Founder Control Room is the sole implementation host for the current first slice. Gemini is enabled as the foremost operational media-command lane for intake, interpretation, planning, routing, bounded production decisions, targeted repair, and release disposition. Claude and Perplexity remain governed operator lanes alongside Codex/ChatGPT. DeepSeek remains a bounded instructor lane for research, proposal, review, adversarial challenge, and cross-project pattern extraction.
+Founder Control Room is the sole implementation and authority host for the current first slice. Cursor is the preferred local repository implementation cockpit for repo-heavy work when it is actually connected and available. Gemini is enabled as the foremost operational media-command lane for intake, interpretation, planning, routing, bounded production decisions, targeted repair, and release disposition. Claude and Perplexity remain governed operator lanes alongside Codex/ChatGPT. DeepSeek remains a bounded instructor lane for research, proposal, review, adversarial challenge, and cross-project pattern extraction.
+
+The intended repo-heavy implementation chain is:
+
+```text
+FCR / founder intent + truth
+-> Cursor implementation cockpit when available
+-> GitHub durable code/history/CI receipts
+-> Playwright/provider/runtime proof
+-> FCR truth reclassification and next gate
+```
+
+Cursor is not another OS, authority plane, source of truth, or substitute for GitHub/runtime evidence. If Cursor is unavailable, another currently authorized builder may perform the work, but the handoff must record that substitution rather than pretending the Cursor step occurred.
 
 Gemini's media command authority is constrained by the non-bypassable `/LEEVIZE` truth/policy kernel implemented in `src/lib/mediaProductionAuthority.ts`. Gemini may decide what the media workflow should do, but it may not manufacture evidence, promote an unverified claim, convert a continuity fingerprint into authority, or bypass exact-head/canon/freshness/budget/verification gates. Gemini/Veo output receives the same policy and verification treatment as any delegated renderer.
 
@@ -21,8 +33,9 @@ DeepSeek specifically does not receive the `implement` capability. Its instructi
 
 These are different capability classes:
 
-- `gemini`, `claude-code`, `codex`, `perplexity`, and `deepseek-instructor` are bounded operator identities.
+- `cursor`, `gemini`, `claude-code`, `codex`, `perplexity`, and `deepseek-instructor` are bounded operator/workspace identities.
 - `google-ai-platform`, `anthropic-platform`, `openai-platform`, and `deepseek-platform` are replaceable server-side model-provider identities.
+- Cursor workspace availability is not model-provider availability, repository authority, or proof that any edit/test actually ran.
 - Operator enablement does not automatically enable the corresponding model provider.
 - Model-provider availability does not grant operator, truth, mutation, spend, render, or publish authority.
 - A Gemini provider response is provider evidence only. It is not itself a valid `GeminiMediaProductionCommand`; production commands must satisfy the checked-in command contract and `/LEEVIZE` policy evaluation before execution.
@@ -40,16 +53,18 @@ Founder auth
 -> usefulness feedback
 ```
 
-For that slice, Gemini, Claude, ChatGPT/Codex, Perplexity, and DeepSeek may help inspect, design, test, review, and verify the repository within their registered capabilities, but the live product path must not call Google AI, OpenAI, Anthropic, Perplexity, DeepSeek, or another external model.
+For that slice, Cursor, Gemini, Claude, ChatGPT/Codex, Perplexity, and DeepSeek may help inspect, design, test, review, and verify the repository within their registered capabilities, but the live product path must not call Google AI, OpenAI, Anthropic, Perplexity, DeepSeek, or another external model.
 
 ## Enabled operator capabilities
 
-Gemini, Claude, Codex/ChatGPT, and Perplexity may be assigned:
+Cursor, Gemini, Claude, Codex/ChatGPT, and Perplexity may be assigned:
 
 - `research`
 - `propose`
 - `review`
 - `implement`
+
+Cursor's `implement` capability is still capability, not authority. Local edits and local test output remain workspace evidence until they are bound to the exact repository, branch, head, and durable GitHub/runtime receipts.
 
 Gemini's `implement` capability is still capability, not permission. Media production execution requires a valid Gemini command plus `/LEEVIZE` policy acceptance, and any external write/render/spend/publish action remains subject to its own bounded authority.
 
@@ -93,8 +108,15 @@ All enabled operators must preserve:
 12. Raw model output may propose a plan or instruction packet, but cannot itself become a repository/provider/tool execution command. A media command becomes executable only after deterministic contract validation and `/LEEVIZE` policy acceptance.
 13. Gemini may never self-exempt Gemini/Veo output from the same claim, canon, evidence-freshness, continuity, budget, and verification gates applied to other renderers.
 14. A Gemini release disposition is not publish authority. External publication still requires the separately authorized publish transition and its receipt.
+15. Cursor-local edits and local test output remain workspace evidence until they are bound to the exact repository/branch/head and carried into durable GitHub/CI/runtime receipts.
 
 ## Tool-specific overlays
+
+Cursor must also obey:
+
+- `.cursor/rules`
+- `AGENTS.md`
+- `GLOBAL_AI.md`
 
 Gemini media command must also obey:
 
@@ -123,6 +145,6 @@ When tool-specific instructions conflict with the canonical FCR product/authorit
 
 ## Proof rule
 
-Agent participation is bookkeeping/provenance until the exact work is independently evidenced. A model or operator statement that something passed is not test, CI, provider, browser, deployment, or outcome proof.
+Agent participation is bookkeeping/provenance until the exact work is independently evidenced. A model, IDE, or operator statement that something passed is not test, CI, provider, browser, deployment, or outcome proof.
 
 The first-slice completion gate remains real desktop/mobile Playwright plus the seven acceptance gates. No operator may self-declare those gates green without the corresponding evidence.

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { GOALFIX_AUTO_STOP_CONDITION } from '../contextResolution.js';
 import { buildGoalfixSkillRuntimeDecision } from '../skillRuntime.js';
 
 describe('buildGoalfixSkillRuntimeDecision', () => {
@@ -49,6 +50,45 @@ describe('buildGoalfixSkillRuntimeDecision', () => {
     expect(decision.intent.confidence).toBe('low');
     expect(decision.mayProceed).toBe(false);
     expect(decision.nextAction).toContain('Resolve the founder intent');
+  });
+
+  it('blocks an automatic semantic rewrite even when the route supplied confirmed=true', () => {
+    const decision = buildGoalfixSkillRuntimeDecision({
+      intent: {
+        raw: 'Keep the public welcome available before login.',
+        resolved: 'Replace the public welcome with a private dashboard.',
+        confirmed: true,
+      },
+      scope: {
+        firstFilesOrLogs: ['control-room.manifest.json'],
+        maxInitialReads: 1,
+        stopCondition: GOALFIX_AUTO_STOP_CONDITION,
+      },
+    });
+
+    expect(decision.intent.confirmed).toBe(false);
+    expect(decision.intent.confidence).toBe('low');
+    expect(decision.mayProceed).toBe(false);
+    expect(decision.nextAction).toContain('Resolve the founder intent');
+  });
+
+  it('permits an explicit manual assumption-backed resolution outside the automatic lane', () => {
+    const decision = buildGoalfixSkillRuntimeDecision({
+      intent: {
+        raw: 'cont the skill thing',
+        resolved: 'Continue the focused Goalfix skill-runtime implementation.',
+        assumptions: ['The referenced skill is the uploaded Lean Build Suite.'],
+      },
+      scope: {
+        firstFilesOrLogs: ['src/goalfix/engine.ts'],
+        maxInitialReads: 1,
+        stopCondition: 'Stop after the focused runtime contract is verified.',
+      },
+    });
+
+    expect(decision.intent.confirmed).toBe(true);
+    expect(decision.intent.confidence).toBe('medium');
+    expect(decision.mayProceed).toBe(true);
   });
 
   it('blocks a repeated same-signature failure loop', () => {

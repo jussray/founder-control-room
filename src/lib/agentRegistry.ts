@@ -30,6 +30,18 @@ const DEEPSEEK_INSTRUCTOR = 'docs/DEEPSEEK_INSTRUCTOR_CONTRACT.md';
 
 export const AGENT_REGISTRY: readonly AgentDescriptor[] = [
   {
+    id: 'cursor',
+    label: 'Cursor',
+    role: 'Preferred local repository implementation cockpit for repo-heavy work when connected; bounded code edits and local proof, never an independent authority plane.',
+    operator: {
+      enabled: true,
+      capabilities: ['research', 'propose', 'review', 'implement'],
+      firstSliceRuntimeModel: false,
+      externalWritesRequireBoundAuthority: true,
+      instructionContracts: ['.cursor/rules', 'AGENTS.md', 'GLOBAL_AI.md', FCR_V14, MULTI_AGENT],
+    },
+  },
+  {
     id: 'gemini',
     label: 'Gemini Command',
     role: 'Foremost operational media authority for intake, interpretation, planning, routing, production review, and release disposition under the non-bypassable /LEEVIZE truth and policy kernel.',

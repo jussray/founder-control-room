@@ -18,6 +18,23 @@ function apiResponse(body, init = {}) {
   return new Response(body, { ...init, headers });
 }
 
+async function captureRequiredScreenshot(page, path) {
+  let lastError;
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    try {
+      await page.screenshot({ path, fullPage: true });
+      return;
+    } catch (error) {
+      lastError = error;
+      const message = error instanceof Error ? error.message : String(error);
+      const retryable = message.includes('Page.captureScreenshot') && message.includes('Unable to capture screenshot');
+      if (!retryable || attempt === 3) throw error;
+      await page.waitForTimeout(250 * attempt);
+    }
+  }
+  throw lastError;
+}
+
 const env = {
   ASSETS: {
     async fetch(request) {
@@ -148,7 +165,7 @@ try {
     throw new Error(`MAGIC_LINK_EDGE_PROOF_BROWSER_ERROR: ${pageErrors.join(' | ')}`);
   }
 
-  await page.screenshot({ path: 'test-results/pages-auth-callback-proof.png', fullPage: true });
+  await captureRequiredScreenshot(page, 'test-results/pages-auth-callback-proof.png');
   console.log(JSON.stringify({
     result: 'PASS',
     finalUrl: page.url(),

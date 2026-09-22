@@ -194,6 +194,8 @@ Never commit, log, or expose this value through a `NEXT_PUBLIC_*` variable.
 [ ] GITHUB_WEBHOOK_SECRET
 [ ] APP_ID (numeric Founder Control Room GitHub App ID)
 [ ] APP_PRIVATE_KEY (matching GitHub App private-key PEM)
+[ ] ANTHROPIC_API_KEY for the bounded Claude pass in ai-failure-repair.yml; workflow-only and not runtime/provider authority
+[ ] OPENAI_API_KEY for the bounded Codex pass in ai-failure-repair.yml and configured Playwright AI harnesses; workflow-only and not runtime/provider authority
 [ ] CLOUDFLARE_API_TOKEN for canonical founder-control-room mutation only
 [ ] CLOUDFLARE_REVIEW_EMAIL_DEPLOY_TOKEN for founder-control-room-review-email only
 [ ] FCR_CLOUDFLARE_BUILDS_USER_TOKEN for read-only FCR Workers Builds inspection
@@ -250,7 +252,8 @@ This table covers GitHub Actions secret names that are referenced outside the ca
 | `SONAR_TOKEN` | `quality-gate.yml` | Optional SonarQube scan credential; scan runs only when both Sonar names are configured. |
 | `SONAR_HOST_URL` | `quality-gate.yml` | SonarQube server URL stored in the Actions secret plane because the workflow reads it through `secrets.*`. |
 | `NEON_API_KEY` | `neon-pr-branches.yml` | Required for create/delete of PR preview branches when that workflow runs. |
-| `OPENAI_API_KEY` | `playwright.yml` | Injected only into the E2E harness when configured; do not expose it to browser/static assets. |
+| `OPENAI_API_KEY` | `playwright.yml`, `ai-failure-repair.yml` | Injected only into bounded CI/repair execution when configured. It is not a Worker/browser secret and does not grant merge, deploy, or provider mutation authority. |
+| `ANTHROPIC_API_KEY` | `ai-failure-repair.yml` | Required only by the bounded Claude adversarial repair pass in the protected workflow environment. Presence authorizes that model invocation only; it does not grant repository push, merge, deploy, publication, billing, or runtime-provider authority. |
 | `PERPLEXITY_API_KEY` | `playwright.yml` | Injected only into the E2E harness when configured; do not expose it to browser/static assets. |
 | `N8N_CONVEYOR_WEBHOOK_URL` | `n8n-conveyor-live-probe.yml` | Required private webhook URL for the founder-approved live conveyor probe. |
 | `N8N_CONVEYOR_BEARER_TOKEN` | `n8n-conveyor-live-probe.yml` | Required bearer credential paired with the live conveyor webhook probe. |
