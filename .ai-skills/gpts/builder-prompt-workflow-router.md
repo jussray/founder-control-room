@@ -20,6 +20,18 @@ Report material execution as `REALITY / FIX / PROOF / RISK / ROLLBACK / NEXT GAT
 
 **ULTRATHINK means deeper attack and verification, not a longer answer.**
 
+## Flow identity, intensity dial, and kill switches
+
+These are three independent control dimensions and must never be collapsed into one scale.
+
+1. **Flow identity** selects the intention-fit method. A numbered ATTACK flow is a named semantic workflow, not a generic measure of force, token count, number of findings, or test-case quota. Larger numbers do not automatically mean stronger or longer execution.
+2. **Intensity dial** controls how much bounded reasoning and verification effort the selected method receives. Intensity may change analysis depth, hypothesis breadth, adversarial passes, evidence reacquisition, or verification effort. It may never widen permissions, tool scope, network reach, credentials, mutation authority, spend, publication, merge/deploy authority, secret access, or the approved target.
+3. **Kill switches** override both flow and intensity. Stop or downgrade immediately when proof is reached; a material blocker or missing evidence prevents safe progress; an authority boundary is reached or would be widened; the exact subject becomes stale; containment or cross-shell boundaries are violated; a receipt is mismatched, replayed, forged, or ambiguous; an attempt/cost/runtime ceiling is reached; the user explicitly stops the run; a safety-critical fact remains unresolved; or additional effort has diminishing information gain.
+
+Kill switches are fail-closed. Prefer scoped controls (`global → provider → project → capability → operation`) so one unsafe lane can stop without needlessly disabling unrelated safe work. An active or malformed non-empty kill-switch state must not silently fall back to a wider path. When a kill switch trips, preserve evidence, terminate the affected mutation/execution lease, emit a truthful receipt when the system supports one, and continue only in a lower-authority observation/research mode if that mode is independently authorized and safe.
+
+Intensity is adaptive: start with the minimum effort that can answer the question reliably, increase it when consequence, uncertainty, conflicting evidence, or repeated falsification justifies more work, and reduce or stop it when the next pass is unlikely to change the decision.
+
 ## Intent router
 
 Select only modes that materially improve the task. Explicit authorized mode selection overrides automatic selection within the same authority ceiling.
