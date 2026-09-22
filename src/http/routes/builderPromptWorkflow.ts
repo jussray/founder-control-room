@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { requireFounder, type FounderRequest } from '../middleware/requireFounder.js';
+import { rateLimitFounderPermissions } from '../middleware/security.js';
 import {
   BUILDER_PROMPT_WORKFLOW_STACKS,
   selectBuilderPromptWorkflow,
@@ -11,16 +12,15 @@ import {
 } from '../../lib/projectEvidenceAgent.js';
 
 export const builderPromptWorkflowRouter = Router();
-builderPromptWorkflowRouter.use(requireFounder);
 
 const intents = new Set<string>(Object.keys(BUILDER_PROMPT_WORKFLOW_STACKS));
 
 /**
  * POST /prompt-workflows/select
- * Founder-gated, read-only selection. This returns reasoning/evidence modes only;
+ * Founder-gated, rate-limited, read-only selection. This returns reasoning/evidence modes only;
  * it never executes the workflow and never grants execution authority.
  */
-builderPromptWorkflowRouter.post('/select', (req: FounderRequest, res) => {
+builderPromptWorkflowRouter.post('/select', rateLimitFounderPermissions, requireFounder, (req: FounderRequest, res) => {
   const intent = typeof req.body?.intent === 'string' ? req.body.intent.trim() : '';
   if (!intents.has(intent)) {
     return res.status(400).json({
@@ -34,11 +34,11 @@ builderPromptWorkflowRouter.post('/select', (req: FounderRequest, res) => {
 
 /**
  * POST /prompt-workflows/audit
- * Founder-gated OpenAI Responses audit. The only callable tool is the bounded,
+ * Founder-gated, rate-limited OpenAI Responses audit. The only callable tool is the bounded,
  * read-only get_project_evidence function; no merge/deploy/provider mutation
  * capability is exposed through this route.
  */
-builderPromptWorkflowRouter.post('/audit', async (req: FounderRequest, res, next) => {
+builderPromptWorkflowRouter.post('/audit', rateLimitFounderPermissions, requireFounder, async (req: FounderRequest, res, next) => {
   const goal = typeof req.body?.goal === 'string' ? req.body.goal.trim() : '';
   const repository = typeof req.body?.repository === 'string' ? req.body.repository.trim() : '';
   const ref = typeof req.body?.ref === 'string' ? req.body.ref.trim() : '';
