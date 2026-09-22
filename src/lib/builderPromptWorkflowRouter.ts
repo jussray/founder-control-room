@@ -51,6 +51,16 @@ export const BUILDER_PROMPT_KILL_SWITCHES = Object.freeze([
 
 export type BuilderPromptKillSwitch = (typeof BUILDER_PROMPT_KILL_SWITCHES)[number];
 
+export const BUILDER_PROMPT_FOUNDER_AUTHORITY_POLICY = Object.freeze({
+  precedence: 'founder-final-in-system-authority' as const,
+  killSwitchesBeforeApproval: 'fail-closed' as const,
+  killSwitchesAfterApproval: 'advisory-except-founder-stop' as const,
+  founderMayContinueThroughSystemKillSwitch: true,
+  founderMayRevokeAtAnyTime: true,
+  approvalTransfersAcrossScope: false,
+  exactScopeStillRequired: true,
+});
+
 export const BUILDER_PROMPT_WORKFLOW_STACKS = Object.freeze({
   'focused-repair': ['goalfix', 'truthmode', 'confess'],
   'complex-architecture': ['ultrathink', 'l99', 'redteam', 'redteam2'],
@@ -77,6 +87,7 @@ export interface BuilderPromptWorkflowSelection {
     approvalMayWidenAuthority: true;
     selectionAloneMayWidenAuthority: false;
     expiresOnSubjectOrScopeChange: true;
+    founderAuthorityPrecedence: true;
   };
 }
 
@@ -97,6 +108,17 @@ export interface BuilderPromptAuthorityEscalation {
   founderDecisionHash: string;
   authorityChanged: true;
   executionAuthorized: true;
+  authorityPrecedence: 'founder-final-in-system-authority';
+}
+
+export interface BuilderPromptKillSwitchResolution {
+  killSwitch: BuilderPromptKillSwitch;
+  founderApprovalActive: boolean;
+  advisoryOnly: boolean;
+  terminateExecution: boolean;
+  authorityRemainsActive: boolean;
+  requiresFounderAttention: boolean;
+  reason: 'pre-approval-fail-closed' | 'founder-stop' | 'founder-authority-precedence';
 }
 
 function boundedIntensity(value: unknown): BuilderPromptIntensity {
@@ -165,7 +187,57 @@ export function selectBuilderPromptWorkflow(
       approvalMayWidenAuthority: true,
       selectionAloneMayWidenAuthority: false,
       expiresOnSubjectOrScopeChange: true,
+      founderAuthorityPrecedence: true,
     },
+  };
+}
+
+/**
+ * Resolves a workflow kill switch under the founder-authority hierarchy.
+ * Before founder approval, system kill switches fail closed. After exact founder
+ * approval, system kill switches become advisory and cannot revoke the founder's
+ * authorized envelope. The founder's own STOP remains authoritative.
+ * Scope/subject changes are handled separately by exact-scope validation and do
+ * not inherit authority from the predecessor approval.
+ */
+export function resolveBuilderPromptKillSwitch(input: {
+  killSwitch: BuilderPromptKillSwitch;
+  escalation?: BuilderPromptAuthorityEscalation | null;
+}): BuilderPromptKillSwitchResolution {
+  const founderApprovalActive = Boolean(input.escalation?.executionAuthorized);
+
+  if (!founderApprovalActive) {
+    return {
+      killSwitch: input.killSwitch,
+      founderApprovalActive: false,
+      advisoryOnly: false,
+      terminateExecution: true,
+      authorityRemainsActive: false,
+      requiresFounderAttention: true,
+      reason: 'pre-approval-fail-closed',
+    };
+  }
+
+  if (input.killSwitch === 'founder-stop') {
+    return {
+      killSwitch: input.killSwitch,
+      founderApprovalActive: true,
+      advisoryOnly: false,
+      terminateExecution: true,
+      authorityRemainsActive: false,
+      requiresFounderAttention: false,
+      reason: 'founder-stop',
+    };
+  }
+
+  return {
+    killSwitch: input.killSwitch,
+    founderApprovalActive: true,
+    advisoryOnly: true,
+    terminateExecution: false,
+    authorityRemainsActive: true,
+    requiresFounderAttention: true,
+    reason: 'founder-authority-precedence',
   };
 }
 
@@ -205,5 +277,6 @@ export function founderApprovedBuilderPromptAuthorityEscalation(input: {
     founderDecisionHash: input.decision.decisionHash,
     authorityChanged: true,
     executionAuthorized: true,
+    authorityPrecedence: 'founder-final-in-system-authority',
   };
 }
