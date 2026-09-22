@@ -3,12 +3,9 @@ import { requireFounder, type FounderRequest } from '../middleware/requireFounde
 import { rateLimitFounderPermissions } from '../middleware/security.js';
 import {
   BUILDER_PROMPT_WORKFLOW_STACKS,
-  buildBuilderAttackProfile,
-  builderAttackAuditInstruction,
-  isBuilderPromptIntent,
-  parseBuilderAttackScale,
   selectBuilderPromptWorkflow,
-  type BuilderAttackScale,
+  type BuilderPromptIntent,
+  type BuilderPromptIntensity,
 } from '../../lib/builderPromptWorkflowRouter.js';
 import {
   ProjectEvidenceAgentError,
@@ -19,19 +16,15 @@ export const builderPromptWorkflowRouter = Router();
 
 const intents = new Set<string>(Object.keys(BUILDER_PROMPT_WORKFLOW_STACKS));
 
-function optionalAttackScale(value: unknown): BuilderAttackScale | undefined {
-  if (value === undefined || value === null || value === '') return undefined;
-  return parseBuilderAttackScale(value);
-}
-
 /**
  * POST /prompt-workflows/select
- * Founder-gated, rate-limited, read-only selection. This returns reasoning/evidence modes only;
- * it never executes the workflow and never grants execution authority.
+ * Founder-gated, rate-limited workflow selection. Selection is still non-executing.
+ * It may request a separately founder-approved authority escalation, but cannot
+ * widen authority by itself.
  */
 builderPromptWorkflowRouter.post('/select', rateLimitFounderPermissions, requireFounder, (req: FounderRequest, res) => {
   const intent = typeof req.body?.intent === 'string' ? req.body.intent.trim() : '';
-  if (!isBuilderPromptIntent(intent)) {
+  if (!intents.has(intent)) {
     return res.status(400).json({
       error: 'unsupported builder prompt intent',
       supportedIntents: [...intents],
@@ -39,8 +32,13 @@ builderPromptWorkflowRouter.post('/select', rateLimitFounderPermissions, require
   }
 
   try {
-    const attackScale = optionalAttackScale(req.body?.attackScale);
-    return res.json({ selection: selectBuilderPromptWorkflow(intent, { attackScale }) });
+    const rawIntensity = req.body?.intensity;
+    const intensity = rawIntensity === undefined
+      ? undefined
+      : Number(rawIntensity) as BuilderPromptIntensity;
+    return res.json({
+      selection: selectBuilderPromptWorkflow(intent as BuilderPromptIntent, intensity),
+    });
   } catch (error) {
     return res.status(400).json({
       error: error instanceof Error ? error.message : 'invalid builder prompt workflow selection',
@@ -52,8 +50,7 @@ builderPromptWorkflowRouter.post('/select', rateLimitFounderPermissions, require
  * POST /prompt-workflows/audit
  * Founder-gated, rate-limited OpenAI Responses audit. The only callable tool is the bounded,
  * read-only get_project_evidence function; no merge/deploy/provider mutation
- * capability is exposed through this route. Optional progressive attack profiles increase
- * adversarial coverage pressure without increasing execution authority.
+ * capability is exposed through this route.
  */
 builderPromptWorkflowRouter.post('/audit', rateLimitFounderPermissions, requireFounder, async (req: FounderRequest, res, next) => {
   const goal = typeof req.body?.goal === 'string' ? req.body.goal.trim() : '';
@@ -65,31 +62,10 @@ builderPromptWorkflowRouter.post('/audit', rateLimitFounderPermissions, requireF
     return res.status(400).json({ error: 'goal, repository, ref, and environment are required' });
   }
 
-  let attackProfile;
-  let auditGoal = goal;
   try {
-    const attackScale = optionalAttackScale(req.body?.attackScale);
-    if (attackScale !== undefined) {
-      attackProfile = buildBuilderAttackProfile(attackScale);
-      const instruction = builderAttackAuditInstruction(attackProfile);
-      if (goal.length + instruction.length + 2 > 4_000) {
-        return res.status(400).json({ error: 'goal is too long for the selected attack profile' });
-      }
-      auditGoal = `${goal}\n\n${instruction}`;
-    }
-  } catch (error) {
-    return res.status(400).json({
-      error: error instanceof Error ? error.message : 'invalid attack scale',
-    });
-  }
-
-  try {
-    const audit = await runProjectEvidenceAudit({ goal: auditGoal, repository, ref, environment });
+    const audit = await runProjectEvidenceAudit({ goal, repository, ref, environment });
     res.setHeader('Cache-Control', 'no-store');
-    return res.status(200).json({
-      audit,
-      ...(attackProfile ? { attackProfile } : {}),
-    });
+    return res.status(200).json({ audit });
   } catch (error) {
     if (error instanceof ProjectEvidenceAgentError) {
       const status = error.code === 'OPENAI_NOT_CONFIGURED' ? 503 : 502;
