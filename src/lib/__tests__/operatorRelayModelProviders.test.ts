@@ -16,8 +16,9 @@ function relay(
   sensitivity: OperatorRelayRequestV1['sensitivity'] = 'internal',
   toOperator: OperatorRelayRequestV1['toOperator'] = 'perplexity',
   capability: OperatorRelayRequestV1['capability'] = 'implement',
+  contextSummary = 'Perform the current bounded provider task and return evidence.',
 ): OperatorRelayRequestV1 {
-  const summary = 'Perform the current bounded provider task and return evidence.';
+  const summary = contextSummary;
   const sourceRef = 'chat:test';
   const base: Omit<OperatorRelayRequestV1, 'requestHash'> = {
     contract: OPERATOR_RELAY_REQUEST_CONTRACT,
@@ -36,7 +37,7 @@ function relay(
 }
 
 describe('createServerOperatorRelayAdapters', () => {
-  it('does not advertise an operator without both its key and explicit model', () => {
+  it('does not advertise an operator without both its key and explicit model or an authorized handoff', () => {
     const adapters = createServerOperatorRelayAdapters({
       PERPLEXITY_API_KEY: FIXTURE,
       GEMINI_API_KEY: FIXTURE,
@@ -94,7 +95,7 @@ describe('createServerOperatorRelayAdapters', () => {
       fromOperator: 'gemini',
       toOperator: 'codex',
       answer: 'Gemini work result',
-      evidenceRefs: ['provider:gemini:gemini-response-1'],
+      evidenceRefs: ['provider:gemini:model:gemini-3.8-flash:response:gemini-response-1'],
       authorityRequested: 'none',
     });
   });
@@ -137,7 +138,9 @@ describe('createServerOperatorRelayAdapters', () => {
     expect(response?.fromOperator).toBe('gemini');
     expect(response?.toOperator).toBe('codex');
     expect(response?.authorityRequested).toBe('none');
-    expect(response?.evidenceRefs).toEqual(['provider:gemini:gemini-spoof-1']);
+    expect(response?.evidenceRefs).toEqual([
+      'provider:gemini:model:gemini-3.8-flash:response:gemini-spoof-1',
+    ]);
   });
 
   it('uses the Perplexity Agent API with grounded search and canonical model mapping', async () => {
@@ -171,7 +174,7 @@ describe('createServerOperatorRelayAdapters', () => {
       fromOperator: 'perplexity',
       toOperator: 'codex',
       answer: 'Perplexity work result',
-      evidenceRefs: ['provider:perplexity:resp_pplx_1'],
+      evidenceRefs: ['provider:perplexity:model:perplexity/sonar:response:resp_pplx_1'],
       authorityRequested: 'none',
     });
   });
@@ -235,7 +238,7 @@ describe('createServerOperatorRelayAdapters', () => {
       fromOperator: 'claude-code',
       toOperator: 'codex',
       answer: 'Claude work result',
-      evidenceRefs: ['provider:anthropic:msg_01safe'],
+      evidenceRefs: ['provider:anthropic:model:claude-test-model:response:msg_01safe'],
       authorityRequested: 'none',
     });
   });
@@ -273,7 +276,9 @@ describe('createServerOperatorRelayAdapters', () => {
     expect(response?.fromOperator).toBe('claude-code');
     expect(response?.toOperator).toBe('codex');
     expect(response?.authorityRequested).toBe('none');
-    expect(response?.evidenceRefs).toEqual(['provider:anthropic:msg_02identity']);
+    expect(response?.evidenceRefs).toEqual([
+      'provider:anthropic:model:claude-test-model:response:msg_02identity',
+    ]);
   });
 
   it('never promotes Anthropic error-body detail into exceptions', async () => {
@@ -326,5 +331,66 @@ describe('createServerOperatorRelayAdapters', () => {
     }, fetchMock);
     await expect(adapters.perplexity?.(relay('restricted'))).rejects.toThrow('restricted relay context');
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('fails closed before provider dispatch when relay context contains an authorization credential', async () => {
+    const fetchMock = vi.fn() as unknown as typeof fetch;
+    const adapters = createServerOperatorRelayAdapters({
+      PERPLEXITY_API_KEY: FIXTURE,
+      FCR_RELAY_PERPLEXITY_MODEL: 'sonar',
+    }, fetchMock);
+    await expect(adapters.perplexity?.(relay(
+      'internal',
+      'perplexity',
+      'implement',
+      `Authorization: Bearer ${'a'.repeat(32)}`,
+    ))).rejects.toThrow('secret-bearing material');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['GitHub token', `ghp_${'a'.repeat(36)}`],
+    ['GitHub fine-grained token', `github_pat_${'a'.repeat(24)}`],
+    ['GitLab token', `glpat-${'b'.repeat(24)}`],
+    ['AWS access key', `AKIA${'C'.repeat(16)}`],
+    ['PEM private key', '-----BEGIN PRIVATE KEY-----'],
+  ])('fails closed before provider dispatch for a bare %s', async (_label, secret) => {
+    const fetchMock = vi.fn() as unknown as typeof fetch;
+    const adapters = createServerOperatorRelayAdapters({
+      ANTHROPIC_API_KEY: FIXTURE,
+      FCR_RELAY_ANTHROPIC_MODEL: 'claude-test-model',
+    }, fetchMock);
+    await expect(adapters['claude-code']?.(relay(
+      'internal',
+      'claude-code',
+      'implement',
+      `Process this context: ${secret}`,
+    ))).rejects.toThrow('secret-bearing material');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('returns a blocked browser handoff instead of substituting a provider', async () => {
+    const fetchMock = vi.fn() as unknown as typeof fetch;
+    const adapters = createServerOperatorRelayAdapters({
+      FCR_RELAY_PERPLEXITY_INTERACTIVE_BROWSER_HANDOFF: 'enabled',
+    }, fetchMock);
+    const response = await adapters.perplexity?.(relay());
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(response?.status).toBe('blocked');
+    expect(response?.unresolved).toContain('relay_transport:interactive_browser');
+    expect(response?.evidenceRefs).toEqual([]);
+  });
+
+  it('uses Gemini-specific handoff configuration instead of Perplexity configuration', async () => {
+    const fetchMock = vi.fn() as unknown as typeof fetch;
+    const adapters = createServerOperatorRelayAdapters({
+      FCR_RELAY_GEMINI_REMOTE_MCP_HANDOFF: 'enabled',
+    }, fetchMock);
+    const response = await adapters.gemini?.(relay('internal', 'gemini'));
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(response?.status).toBe('blocked');
+    expect(response?.unresolved).toContain('relay_transport:remote_mcp');
+    expect(response?.evidenceRefs).toEqual([]);
+    expect(adapters.perplexity).toBeUndefined();
   });
 });

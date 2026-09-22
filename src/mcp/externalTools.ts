@@ -114,6 +114,13 @@ function isRecord(value: unknown): value is JsonRecord {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
+function relayUsedExternalProvider(value: unknown): boolean {
+  if (!isRecord(value) || !isRecord(value.response)) return false;
+  const evidenceRefs = value.response.evidenceRefs;
+  return Array.isArray(evidenceRefs)
+    && evidenceRefs.some((entry) => typeof entry === 'string' && entry.startsWith('provider:'));
+}
+
 function text(value: unknown, field: string, maxLength = 200): string {
   if (typeof value !== 'string') throw new Error(`${field} must be a string`);
   const normalized = value.trim();
@@ -719,7 +726,6 @@ export function createExternalMcpToolExecutor(
       const fromOperator = sourceOperatorForIdentity(input.identity, env);
       const toOperator = relayOperator(input.arguments.targetOperator, 'targetOperator');
       if (fromOperator === toOperator) throw new Error('operator relay requires a distinct target operator');
-      evidenceRisk = 'external_side_effect';
       result = await relayOperatorCall({
         fromOperator,
         toOperator,
@@ -768,6 +774,10 @@ export function createExternalMcpToolExecutor(
       });
     }
 
+    const relay = input.name === 'fcr_relay_operator';
+    const externalProviderCall = relay && relayUsedExternalProvider(result);
+    if (relay) evidenceRisk = externalProviderCall ? 'external_side_effect' : 'read';
+
     const receipt = await recordEvidence({
       identity: input.identity,
       requestId: input.requestId,
@@ -779,13 +789,12 @@ export function createExternalMcpToolExecutor(
       risk: evidenceRisk,
     });
 
-    const relay = input.name === 'fcr_relay_operator';
     return {
       data: result,
       receipt,
       governanceBoundary: {
-        readOrPreviewOnly: !relay,
-        externalProviderCall: relay,
+        readOrPreviewOnly: !externalProviderCall,
+        externalProviderCall,
         mutationAuthority: false,
         executionAllowed: false,
         founderApprovalGranted: false,

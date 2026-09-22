@@ -96,7 +96,9 @@ When a browser or app connector exists but a live call reports a bridge/session 
 2. **live session**: the connector exposes a usable session to the call;
 3. **provider page**: the actual provider/browser state.
 
-A live-session failure is `BLOCKED_CONNECTOR_BRIDGE`, not proof that provider setup is wrong. Preserve separately observed provider state, re-probe once when useful, prefer an equivalent direct capability only when authority/evidence remain intact, otherwise stop at the exact missing handshake. Continuity fingerprints and proof cookies never authorize browser action.
+A live-session failure is `BLOCKED_CONNECTOR_BRIDGE`, not proof that provider setup is wrong. Preserve separately observed provider state, re-probe once when useful, and do not repeat the same login/setup instructions without fresh bridge evidence. Prefer an equivalent direct capability only when authority and evidence remain intact; otherwise stop at the exact missing handshake. Continuity fingerprints and proof cookies never authorize browser action; they remain non-secret state markers only.
+
+For connector/session failures, separate connector-surface, live-session, and provider-page truth before deciding whether to retry, fall back, or stop.
 
 ## Verification independence
 

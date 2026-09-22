@@ -251,6 +251,7 @@ This table covers GitHub Actions secret names that are referenced outside the ca
 | `SONAR_HOST_URL` | `quality-gate.yml` | SonarQube server URL stored in the Actions secret plane because the workflow reads it through `secrets.*`. |
 | `NEON_API_KEY` | `neon-pr-branches.yml` | Required for create/delete of PR preview branches when that workflow runs. |
 | `OPENAI_API_KEY` | `playwright.yml` | Injected only into the E2E harness when configured; do not expose it to browser/static assets. |
+| `ANTHROPIC_API_KEY` | `ai-failure-repair.yml` | Optional Claude repair credential used only by the serialized second repair pass; workflow absence or provider failure must remain visible and does not grant merge, deploy, publication, or provider-mutation authority. |
 | `PERPLEXITY_API_KEY` | `playwright.yml` | Injected only into the E2E harness when configured; do not expose it to browser/static assets. |
 | `N8N_CONVEYOR_WEBHOOK_URL` | `n8n-conveyor-live-probe.yml` | Required private webhook URL for the founder-approved live conveyor probe. |
 | `N8N_CONVEYOR_BEARER_TOKEN` | `n8n-conveyor-live-probe.yml` | Required bearer credential paired with the live conveyor webhook probe. |

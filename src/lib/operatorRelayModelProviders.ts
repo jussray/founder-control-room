@@ -1,6 +1,11 @@
-import type { OperatorRelayRequestV1 } from './operatorRelay.js';
+import type { OperatorRelayRequestV1, RelayOperatorId } from './operatorRelay.js';
 import type { OperatorRelayAdapters } from './operatorRelayDispatch.js';
 import { operatorRelayAdapterFromTextProvider } from './operatorRelayProvider.js';
+import {
+  operatorRelayHandoffAdapter,
+  operatorRelayTransportAvailability,
+  resolveOperatorRelayTransport,
+} from './operatorRelayTransport.js';
 
 type FetchLike = typeof fetch;
 type JsonRecord = Record<string, unknown>;
@@ -11,6 +16,21 @@ const ANTHROPIC_API_VERSION = '2023-06-01';
 const MAX_PROVIDER_RESPONSE_ID_LENGTH = 200;
 const SAFE_GEMINI_MODEL = /^[A-Za-z0-9._-]{1,160}$/;
 const SAFE_PERPLEXITY_AGENT_MODEL = /^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/;
+const SAFE_EVIDENCE_MODEL = /^[A-Za-z0-9._:/-]{1,200}$/;
+const SECRET_VALUE_PATTERNS = [
+  /\bBearer\s+[A-Za-z0-9._~+\/-]{16,}\b/i,
+  /\b(?:api[_-]?key|secret|token|password|passwd)\s*[:=]\s*["']?[^\s"']{8,}/i,
+  /\bsk-(?:proj-)?[A-Za-z0-9_-]{16,}\b/,
+  /\bsk-ant-[A-Za-z0-9_-]{16,}\b/,
+  /\bpplx-[A-Za-z0-9_-]{16,}\b/,
+  /\bgh[pousr]_[A-Za-z0-9]{20,}\b/,
+  /\bgithub_pat_[A-Za-z0-9_]{20,}\b/,
+  /\bglpat-[A-Za-z0-9_-]{20,}\b/,
+  /\b(?:AKIA|ASIA)[A-Z0-9]{16}\b/,
+  /\bxox[baprs]-[A-Za-z0-9-]{20,}\b/,
+  /\bAIza[0-9A-Za-z_-]{30,}\b/,
+  /-----BEGIN (?:RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----/,
+] as const;
 
 export const SEMANTIC_PEER_REVIEW_SPEND_MODE = 'paused' as const;
 
@@ -42,6 +62,20 @@ function ensureRelaySpendPolicy(request: OperatorRelayRequestV1): void {
   if (request.capability === 'review') {
     throw new Error('semantic peer review is paused by founder cost-control policy');
   }
+}
+
+function ensureNoSecretValues(request: OperatorRelayRequestV1): void {
+  const outbound = `${request.goal}\n${request.context.summary}`;
+  if (SECRET_VALUE_PATTERNS.some((pattern) => pattern.test(outbound))) {
+    throw new Error('relay context appears to contain secret-bearing material');
+  }
+}
+
+function prepareProviderRequest(request: OperatorRelayRequestV1): string {
+  ensureRelaySensitivity(request);
+  ensureRelaySpendPolicy(request);
+  ensureNoSecretValues(request);
+  return relayPrompt(request);
 }
 
 async function boundedResponseText(response: Response, label: string): Promise<string> {
@@ -233,8 +267,21 @@ function responseIdentity(body: JsonRecord, field: 'id' | 'responseId' = 'id'): 
     : 'unidentified-response';
 }
 
-function evidenceRef(provider: string, body: JsonRecord, field: 'id' | 'responseId' = 'id'): string {
-  return `provider:${provider}:${responseIdentity(body, field)}`;
+function evidenceModel(configuredModel: string): string {
+  const normalized = configuredModel.trim();
+  if (!SAFE_EVIDENCE_MODEL.test(normalized)) {
+    throw new Error('configured provider model is not evidence-safe');
+  }
+  return normalized;
+}
+
+function evidenceRef(
+  provider: string,
+  configuredModel: string,
+  body: JsonRecord,
+  field: 'id' | 'responseId' = 'id',
+): string {
+  return `provider:${provider}:model:${evidenceModel(configuredModel)}:response:${responseIdentity(body, field)}`;
 }
 
 function geminiModelId(value: string): string | null {
@@ -248,6 +295,18 @@ function perplexityAgentModelId(value: string): string | null {
   return normalized.length <= 160 && SAFE_PERPLEXITY_AGENT_MODEL.test(normalized)
     ? normalized
     : null;
+}
+
+function handoffIfConfigured(
+  adapters: OperatorRelayAdapters,
+  operator: RelayOperatorId,
+  env: NodeJS.ProcessEnv,
+): void {
+  if (adapters[operator]) return;
+  const resolution = resolveOperatorRelayTransport(
+    operatorRelayTransportAvailability(operator, false, env),
+  );
+  if (resolution.mode === 'handoff') adapters[operator] = operatorRelayHandoffAdapter(resolution);
 }
 
 export function createServerOperatorRelayAdapters(
@@ -269,8 +328,7 @@ export function createServerOperatorRelayAdapters(
     if (modelId) {
       adapters.gemini = operatorRelayAdapterFromTextProvider({
         invoke: async ({ request }) => {
-          ensureRelaySensitivity(request);
-          ensureRelaySpendPolicy(request);
+          const prompt = prepareProviderRequest(request);
           const body = await invokeJsonProvider(
             fetchImpl,
             `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(modelId)}:generateContent`,
@@ -281,7 +339,7 @@ export function createServerOperatorRelayAdapters(
                 'Content-Type': 'application/json',
               },
               body: JSON.stringify({
-                contents: [{ role: 'user', parts: [{ text: relayPrompt(request) }] }],
+                contents: [{ role: 'user', parts: [{ text: prompt }] }],
                 generationConfig: { maxOutputTokens: 2_000 },
               }),
               redirect: 'error',
@@ -289,7 +347,10 @@ export function createServerOperatorRelayAdapters(
             },
             'Gemini relay',
           );
-          return { text: geminiText(body), evidenceRef: evidenceRef('gemini', body, 'responseId') };
+          return {
+            text: geminiText(body),
+            evidenceRef: evidenceRef('gemini', modelId, body, 'responseId'),
+          };
         },
       });
     }
@@ -298,8 +359,7 @@ export function createServerOperatorRelayAdapters(
   if (openAiKey && openAiModel) {
     adapters.codex = operatorRelayAdapterFromTextProvider({
       invoke: async ({ request }) => {
-        ensureRelaySensitivity(request);
-        ensureRelaySpendPolicy(request);
+        const prompt = prepareProviderRequest(request);
         const body = await invokeJsonProvider(fetchImpl, 'https://api.openai.com/v1/responses', {
           method: 'POST',
           headers: {
@@ -308,14 +368,17 @@ export function createServerOperatorRelayAdapters(
           },
           body: JSON.stringify({
             model: openAiModel,
-            input: relayPrompt(request),
+            input: prompt,
             store: false,
             max_output_tokens: 2_000,
           }),
           redirect: 'error',
           signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
         }, 'OpenAI relay');
-        return { text: openAiText(body), evidenceRef: evidenceRef('openai', body) };
+        return {
+          text: openAiText(body),
+          evidenceRef: evidenceRef('openai', openAiModel, body),
+        };
       },
     });
   }
@@ -323,8 +386,7 @@ export function createServerOperatorRelayAdapters(
   if (anthropicKey && anthropicModel) {
     adapters['claude-code'] = operatorRelayAdapterFromTextProvider({
       invoke: async ({ request }) => {
-        ensureRelaySensitivity(request);
-        ensureRelaySpendPolicy(request);
+        const prompt = prepareProviderRequest(request);
         const body = await invokeJsonProvider(fetchImpl, 'https://api.anthropic.com/v1/messages', {
           method: 'POST',
           headers: {
@@ -335,12 +397,15 @@ export function createServerOperatorRelayAdapters(
           body: JSON.stringify({
             model: anthropicModel,
             max_tokens: 2_000,
-            messages: [{ role: 'user', content: relayPrompt(request) }],
+            messages: [{ role: 'user', content: prompt }],
           }),
           redirect: 'error',
           signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
         }, 'Anthropic relay');
-        return { text: anthropicText(body), evidenceRef: evidenceRef('anthropic', body) };
+        return {
+          text: anthropicText(body),
+          evidenceRef: evidenceRef('anthropic', anthropicModel, body),
+        };
       },
     });
   }
@@ -350,8 +415,7 @@ export function createServerOperatorRelayAdapters(
     if (modelId) {
       adapters.perplexity = operatorRelayAdapterFromTextProvider({
         invoke: async ({ request }) => {
-          ensureRelaySensitivity(request);
-          ensureRelaySpendPolicy(request);
+          const prompt = prepareProviderRequest(request);
           const body = await invokeJsonProvider(fetchImpl, 'https://api.perplexity.ai/v1/agent', {
             method: 'POST',
             headers: {
@@ -360,7 +424,7 @@ export function createServerOperatorRelayAdapters(
             },
             body: JSON.stringify({
               model: modelId,
-              input: relayPrompt(request),
+              input: prompt,
               tools: [{ type: 'web_search' }],
               store: false,
               max_output_tokens: 2_000,
@@ -368,11 +432,19 @@ export function createServerOperatorRelayAdapters(
             redirect: 'error',
             signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
           }, 'Perplexity Agent relay');
-          return { text: perplexityText(body), evidenceRef: evidenceRef('perplexity', body) };
+          return {
+            text: perplexityText(body),
+            evidenceRef: evidenceRef('perplexity', modelId, body),
+          };
         },
       });
     }
   }
+
+  handoffIfConfigured(adapters, 'gemini', env);
+  handoffIfConfigured(adapters, 'codex', env);
+  handoffIfConfigured(adapters, 'claude-code', env);
+  handoffIfConfigured(adapters, 'perplexity', env);
 
   return adapters;
 }
