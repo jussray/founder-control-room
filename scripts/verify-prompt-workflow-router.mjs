@@ -26,7 +26,14 @@ for (const intent of [
 }
 
 if (!route.includes('requireFounder')) throw new Error('selection route must remain founder-gated');
-if (!router.includes('executionAuthorized: false')) throw new Error('selection must not mint execution authority');
-if (!router.includes('authorityChanged: false')) throw new Error('selection must not widen authority');
+if (!router.includes('executionAuthorized: false')) throw new Error('selection must not silently mint execution authority');
+if (!router.includes('authorityChanged: false')) throw new Error('selection must not silently widen authority');
+if (!router.includes('approvalMayWidenAuthority: true')) throw new Error('exact founder-approved authority widening contract is missing');
+if (!router.includes('founderApprovedBuilderPromptAuthorityEscalation')) throw new Error('founder-approved escalation validator is missing');
+if (!router.includes('BUILDER_PROMPT_KILL_SWITCHES')) throw new Error('kill-switch contract is missing');
+if (!router.includes('BuilderPromptIntensity')) throw new Error('intensity dial contract is missing');
+if (route.includes('attackScale') || router.includes('attackScale')) {
+  throw new Error('numbered attack flows must not be reinterpreted as a generic intensity scale');
+}
 
 console.log('prompt-workflow-router source proof: PASS');
