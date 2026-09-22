@@ -1,4 +1,4 @@
-import { providerForProject, type ProviderProjectConfig } from '../providers/providerFactory.js';
+import type { ProviderProjectConfig } from '../providers/providerFactory.js';
 import type { RepositoryProvider, VerificationSignal } from '../providers/RepositoryProvider.js';
 
 const DEFAULT_OPENAI_BASE_URL = 'https://api.openai.com/v1';
@@ -159,7 +159,8 @@ export async function getProjectEvidence(
   dependencies: Pick<ProjectEvidenceDependencies, 'providerFactory'> = {},
 ): Promise<ProjectEvidenceReceipt> {
   const parsed = parseEvidenceRequest(request);
-  const createProvider = dependencies.providerFactory ?? providerForProject;
+  const createProvider = dependencies.providerFactory
+    ?? (await import('../providers/providerFactory.js')).providerForProject;
   const config = projectConfig(parsed.repository);
   const provider = createProvider(config);
   const projectId = config.slug;
