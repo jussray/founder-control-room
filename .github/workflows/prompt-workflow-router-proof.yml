@@ -13,6 +13,7 @@ on:
       - 'src/http/server.ts'
       - 'src/http/routes/builderPromptWorkflow.ts'
       - 'src/http/routes/__tests__/builderPromptWorkflow.integration.test.ts'
+      - 'src/http/routes/__tests__/builderPromptWorkflow.server-contract.test.ts'
       - 'src/http/routes/__tests__/builderPromptWorkflow.server-mount.test.ts'
       - 'scripts/verify-prompt-workflow-router.mjs'
       - '.github/workflows/prompt-workflow-router-proof.yml'
@@ -36,4 +37,4 @@ jobs:
       - name: Source wiring proof
         run: node scripts/verify-prompt-workflow-router.mjs
       - name: Founder control + deterministic workflow router proof
-        run: npx vitest run src/lib/__tests__/founderControlDecision.test.ts src/lib/__tests__/builderPromptWorkflowRouter.test.ts src/lib/__tests__/projectEvidenceAgent.test.ts src/http/routes/__tests__/builderPromptWorkflow.integration.test.ts src/http/routes/__tests__/builderPromptWorkflow.server-mount.test.ts
+        run: npx vitest run src/lib/__tests__/founderControlDecision.test.ts src/lib/__tests__/builderPromptWorkflowRouter.test.ts src/lib/__tests__/projectEvidenceAgent.test.ts src/http/routes/__tests__/builderPromptWorkflow.integration.test.ts src/http/routes/__tests__/builderPromptWorkflow.server-contract.test.ts src/http/routes/__tests__/builderPromptWorkflow.server-mount.test.ts
