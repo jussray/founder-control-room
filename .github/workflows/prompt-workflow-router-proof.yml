@@ -4,7 +4,9 @@ on:
   pull_request:
     paths:
       - '.ai-skills/gpts/builder-prompt-workflow-router.md'
+      - 'src/lib/builderPromptWorkflowRouter.ts'
       - 'src/lib/founderControlDecision.ts'
+      - 'src/lib/__tests__/builderPromptWorkflowRouter.test.ts'
       - 'src/lib/__tests__/founderControlDecision.test.ts'
       - '.github/workflows/prompt-workflow-router-proof.yml'
   workflow_dispatch:
@@ -24,5 +26,5 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
-      - name: Founder control + workflow router proof
-        run: npx vitest run src/lib/__tests__/founderControlDecision.test.ts
+      - name: Founder control + deterministic workflow router proof
+        run: npx vitest run src/lib/__tests__/founderControlDecision.test.ts src/lib/__tests__/builderPromptWorkflowRouter.test.ts
