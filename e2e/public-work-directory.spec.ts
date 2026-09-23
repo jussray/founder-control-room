@@ -127,6 +127,7 @@ test('renders Claude Cowork as a GitHub-grounded Council lane in the founder sta
 
   await page.setContent(appHtml);
   await page.addScriptTag({ content: stackRouterSource, type: 'module' });
+  await page.locator('.launch-dock > summary').click();
 
   const cowork = page.locator('[data-lane="cowork"]');
   await expect(cowork).toBeVisible();
