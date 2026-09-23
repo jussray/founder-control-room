@@ -65,6 +65,37 @@ At minimum preserve:
 - Redteam II on the chosen solution
 - loop / re-observation
 
+## Content Foundry protocol
+
+Content is not a bag of disconnected prompts. For content goals, FCR automatically applies the governed Content Foundry contract in `src/lib/contentFoundryCouncil.ts` and threads it through `src/lib/fcrSkillRouter.ts`.
+
+The canonical ordered workflow is:
+
+`DISCOVER -> SCORE -> PACKAGE -> SCRIPT -> LEEVIZE -> PROOF CHECK -> PUBLISH PACKAGE -> REPURPOSE -> MEASURE -> LEARN`
+
+Every content run should start from one canonical content packet containing:
+
+- objective
+- audience
+- source material
+- product or project
+- evidence
+- brand canon
+- platform
+- monetization path
+- constraints
+- success metric
+
+Packaging comes before scripting. Title, thumbnail, opening frame, viewer question, and expected payoff must make the same promise. Curiosity and SEO are hypotheses, not proof of ranking or virality.
+
+For media work, `/LEEVIZE` remains the non-bypassable truth/policy kernel. Shot changes should be job-driven rather than timer-driven. Prefer purposeful shot jobs such as `ENTER`, `FEEL`, `GUIDE`, `CONNECT`, `PROVE`, and `RESOLVE`.
+
+Keep `WORLD FOOTAGE` separate from `PROOF FOOTAGE`. Generated atmosphere, cinematic reconstruction, or illustration may support the story but may not masquerade as product, runtime, user, traction, or business evidence.
+
+Repurposed outputs must derive from the same canonical content fingerprint so the claim, evidence, canon, and CTA cannot drift silently between YouTube, Shorts, TikTok, Reels, LinkedIn, Facebook, newsletters, blogs, or other surfaces.
+
+Measurement is observation-only. Platform metrics, clicks, signups, or revenue can inform the next content bet, but they do not retroactively authorize publication, scheduling, spend, or scaling. Publication still requires the existing proof-led publishing capability plus the normal current approval/provider receipt/readback gates.
+
 ## Council round protocol
 
 Every material Council round should bind itself to:
