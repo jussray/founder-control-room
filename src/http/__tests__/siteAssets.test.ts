@@ -77,8 +77,11 @@ describe('Founder Control Room Cloudflare topology', () => {
     expect(stackRouter).toContain('data-lane="cowork"');
     expect(stackRouter).toContain('Claude Cowork');
     expect(stackRouter).toContain('Shared GitHub source');
+    expect(stackRouter).toContain('Claude GitHub connector required');
     expect(stackRouter).toContain('Founder AI Council');
-    expect(stackRouter).toContain('Cowork receipts return to the shared GitHub project');
+    expect(stackRouter).toContain('FCR receipt adapter not wired');
+    expect(stackRouter).toContain('Cowork changes return through GitHub commit / PR evidence; FCR receipt binding remains separate');
+    expect(stackRouter).not.toContain('GitHub + Council receipts');
   });
 
   it('routes Workflows through the current proof-bound founder content lifecycle', () => {
