@@ -108,13 +108,14 @@ test('redteam: malformed scoring input is rejected', async ({ request }) => {
   expect(response.status()).toBe(400);
 });
 
-test('goalfix: Johnstown AI Center exposes the current City Hall execution gate, not the old portability goal', async ({ request }) => {
+test('goalfix: Johnstown AI Center exposes the current commercial-site City Hall execution gate', async ({ request }) => {
   const response = await request.get('/economic-intelligence/initiative/johnstown-ai-center');
   expect(response.ok()).toBeTruthy();
 
   const snapshot = await response.json();
   expect(snapshot.initiativeName).toBe('Johnstown AI Center');
-  expect(snapshot.goal).toContain('90-day proof-first pilot');
+  expect(snapshot.goal).toContain('90-day proof-first launch');
+  expect(snapshot.goal).toContain('eligible commercial Johnstown site-control path');
   expect(snapshot.nextGateId).toBe('city_hall_working_meeting');
 
   const meetingGate = snapshot.gates.find((gate: { id: string }) => gate.id === 'city_hall_working_meeting');
@@ -125,9 +126,31 @@ test('goalfix: Johnstown AI Center exposes the current City Hall execution gate,
 
   const pilotGate = snapshot.gates.find((gate: { id: string }) => gate.id === 'meeting_ready_pilot');
   expect(pilotGate).toEqual(expect.objectContaining({
-    status: 'VERIFIED',
-    blockers: [],
-    receiptIds: expect.arrayContaining(['repo:city-hall-meeting-packet:2026-09-19']),
+    status: 'PARTIAL',
+    receiptIds: expect.arrayContaining([
+      'plan:johnstown-ai-center:commercial-site:2026-09-23',
+      'plan:johnstown-ai-center:success-gates:2026-09-23',
+    ]),
+  }));
+  expect(pilotGate.blockers).toEqual(expect.arrayContaining([
+    expect.stringContaining('superseded partner/rented-space'),
+  ]));
+
+  const historicalPlan = snapshot.receipts.find(
+    (receipt: { id: string }) => receipt.id === 'plan:johnstown-ai-center:2026-09-09',
+  );
+  expect(historicalPlan).toEqual(expect.objectContaining({
+    classification: 'STALE_SUPERSEDED',
+    freshness: 'SUPERSEDED',
+  }));
+
+  const currentPlan = snapshot.receipts.find(
+    (receipt: { id: string }) => receipt.id === 'plan:johnstown-ai-center:commercial-site:2026-09-23',
+  );
+  expect(currentPlan).toEqual(expect.objectContaining({
+    classification: 'VERIFIED_DECISION',
+    freshness: 'CURRENT',
+    summary: expect.stringContaining('ten part-time roles at $15 per hour'),
   }));
 });
 
@@ -155,6 +178,7 @@ test('l99: funding and facility blockers stay separate and cannot collapse into 
   const fundingGate = snapshot.gates.find((gate: { id: string }) => gate.id === 'funding_facility_path');
 
   expect(fundingGate.status).toBe('BLOCKED');
+  expect(fundingGate.proofToClear).toContain('ten part-time $15/hour roles');
   expect(fundingGate.blockers).toEqual(expect.arrayContaining([
     expect.stringContaining('Site control'),
     expect.stringContaining('job-creation'),
