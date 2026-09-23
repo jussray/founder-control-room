@@ -9,6 +9,39 @@ import { requireFounder, type FounderRequest } from '../middleware/requireFounde
 
 export const YOUTUBE_GROWTH_EVALUATION_CONTRACT = 'fcr/youtube-growth-evaluation@v1' as const;
 
+export const YOUTUBE_CHANNEL_SYSTEM = Object.freeze({
+  sequence: Object.freeze([
+    'audience-problem-promise',
+    'repeatable-format',
+    'content-engine',
+    'return-loop',
+    'money-path',
+    'measure-compound-or-kill',
+  ] as const),
+  pillars: Object.freeze(['DISCOVER', 'PROVE', 'BELONG', 'CONVERT'] as const),
+  contentUnit: Object.freeze(['HOOK', 'VALUE', 'PROOF', 'PAYOFF', 'CTA'] as const),
+  faceless: Object.freeze({
+    allowed: true,
+    originalValueRequired: true,
+    copiedOrReusedContentIsStrategy: false,
+    aiSlideshowSpamRejected: true,
+    faceNotRequiredButPointOfViewIsRequired: true,
+  }),
+  returnLoop: Object.freeze({
+    recurringSeriesPreferredOverRandomPosts: true,
+    questionsPollsAndCommentsAreLearningSignals: true,
+    returningViewerEvidenceShouldBeMeasured: true,
+    communitySignalsAreEvidenceNotAuthority: true,
+  }),
+  monetization: Object.freeze({
+    directMoneyPathDesignedEarly: true,
+    platformAdsAreBonus: true,
+    platformEligibilityRequiresProviderEvidence: true,
+    visibilityIsNotRevenue: true,
+    revenueRequiresOutcomeEvidence: true,
+  }),
+});
+
 const YOUTUBE_GROWTH_PHASES: readonly YouTubeGrowthPhase[] = [
   'TEST_AND_VALIDATE',
   'DOUBLE_DOWN',
@@ -155,8 +188,9 @@ youtubeGrowthRouter.use(requireFounder);
 youtubeGrowthRouter.get('/', (_req: FounderRequest, res) => res.json({
   contract: YOUTUBE_GROWTH_EVALUATION_CONTRACT,
   route: '/automation/conveyor/founder-content/youtube-growth/evaluate',
-  workflow: 'LEEVIZE -> measure -> diagnose -> double-down/repair/kill',
+  workflow: 'audience/problem/promise -> repeatable format -> LEEVIZE -> publish approval -> measure -> return loop -> diagnose -> money path -> double-down/repair/kill',
   phases: YOUTUBE_GROWTH_PHASES,
+  channelSystem: YOUTUBE_CHANNEL_SYSTEM,
   authority: {
     advisoryOnly: true,
     publish: false,
@@ -189,6 +223,7 @@ youtubeGrowthRouter.post('/evaluate', (req: FounderRequest, res) => {
   return res.json({
     ok: true,
     contract: YOUTUBE_GROWTH_EVALUATION_CONTRACT,
+    channelSystem: YOUTUBE_CHANNEL_SYSTEM,
     result,
     published: false,
     providerMutationAttempted: false,
