@@ -68,6 +68,14 @@ The corrected canon separates the planes. `merge_authority: true` means only tha
 
 This is an authority-freshness correction, not a relaxation of review or proof. Exact-head evidence still constrains what can be claimed and integrated, while founder approval controls whether the exact candidate may cross the merge boundary. Deployment, publication, billing, secrets, database mutation, deletion, and other consequential classes remain separately gated.
 
+## 2026-09 control correction: Cowork workspace context versus shared GitHub truth
+
+Adding Cowork to the founder stack creates a new truth-decay risk if a workspace copy, attachment, exported folder, prior model context, or generic FCR activity row is later reused as if it were current GitHub repository state or a Cowork-specific proof receipt. A Cowork session can be correctly grounded at one moment and become stale after the repository branch/head or connector authorization changes.
+
+The corrected rule keeps the authority planes separate. Claude, Claude Code, and Cowork must resolve the authoritative GitHub repository, branch, and exact current head at the use boundary and bind the Council round to that same evidence subject. Cowork workspace state is working context only until reconciled with current GitHub source. Actual GitHub access depends on the current Claude-side GitHub connector and its permissions; repository source cannot prove that connector is configured or authorized in a particular session.
+
+Durable repository changes return through GitHub commit, pull-request, diff, check, and review evidence. The current FCR Cowork lane does **not** have a native Cowork receipt adapter, so generic Activity entries cannot be relabeled as Cowork receipts and FCR must keep that receipt state `UNKNOWN`/unwired until a separately reviewed adapter is implemented and proven. Council membership, model capability, connector availability, or Cowork tools never grant merge, deploy, provider, credential, billing, publication, deletion, or founder authority.
+
 ## Root causes
 
 ### 1. Evidence lifetime was implicit
@@ -386,6 +394,8 @@ The strongest optimization is not faster claiming. It is shortening the distance
 35. A live peer ref/SHA match may select the next browser-federation evidence subject, but it cannot carry predecessor green forward; the successor stays `UNKNOWN` until the complete exact-head runtime, directive, receipt, and browser witness passes.
 36. An external model benchmark is a discovery prior, not local outcome proof; it cannot promote an operator to primary routing or grant selection/execution authority without fresh task-specific receipts.
 37. Model-routing evidence decays by task class and time. Old wins, provider reputation, or Council consensus cannot outrank fresh local false-green, authority-violation, cost, latency, proof-quality, or root-cause evidence.
+38. A Cowork workspace, attachment, model memory, or prior branch observation cannot outrank the current authoritative GitHub repository/branch/head; repository work must re-observe that exact source at use time.
+39. Generic FCR activity cannot be relabeled as Cowork receipt proof while the Cowork receipt adapter is unwired, and connector/tool availability cannot manufacture repository, merge, deploy, provider, or founder authority.
 
 ## 2026-09 control correction: peer ref refresh resets proof
 
