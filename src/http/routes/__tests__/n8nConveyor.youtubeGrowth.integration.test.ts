@@ -17,6 +17,10 @@ import express from 'express';
 import request from 'supertest';
 import { n8nConveyorRouter } from '../n8nConveyor.js';
 import {
+  CONTENT_LANE_SYSTEM_CONTRACT,
+} from '../../../lib/contentLaneSystem.js';
+import { FIRST_PARTY_SOCIAL_PLATFORMS } from '../../../lib/firstPartySocialPublisher.js';
+import {
   YOUTUBE_CHANNEL_SYSTEM,
   YOUTUBE_GROWTH_EVALUATION_CONTRACT,
 } from '../youtubeGrowth.js';
@@ -131,6 +135,46 @@ describe('authenticated YouTube growth evaluation route', () => {
       visibilityIsNotRevenue: true,
       revenueRequiresOutcomeEvidence: true,
     }));
+    expect(res.body.channelSystem.lane).toEqual(expect.objectContaining({
+      platform: 'youtube',
+      laneId: 'content-youtube',
+      northStar: expect.objectContaining({
+        id: 'returning-viewer-watchtime-to-qualified-action',
+      }),
+    }));
+  });
+
+  it('exposes one governed content lane for every existing first-party platform', async () => {
+    const res = await request(buildApp())
+      .get('/automation/conveyor/founder-content/youtube-growth')
+      .set('Authorization', BEARER);
+
+    expect(res.status).toBe(200);
+    expect(res.body.contentLaneSystem).toEqual(expect.objectContaining({
+      contract: CONTENT_LANE_SYSTEM_CONTRACT,
+      shared: expect.objectContaining({
+        pillars: ['DISCOVER', 'PROVE', 'BELONG', 'CONVERT'],
+        contentUnit: ['HOOK', 'VALUE', 'PROOF', 'PAYOFF', 'CTA'],
+        learning: expect.objectContaining({
+          promoteOnlyOnLaneNorthStarOutcomeEvidence: true,
+          missesRemainRevisionMemory: true,
+        }),
+      }),
+      authority: {
+        advisoryOnly: true,
+        authorizesPublish: false,
+        authorizesSchedule: false,
+        authorizesSpend: false,
+        authorizesScaleExecution: false,
+      },
+    }));
+
+    const lanes = res.body.contentLaneSystem.lanes;
+    expect(lanes).toHaveLength(FIRST_PARTY_SOCIAL_PLATFORMS.length);
+    expect(lanes.map((lane: { platform: string }) => lane.platform).sort())
+      .toEqual([...FIRST_PARTY_SOCIAL_PLATFORMS].sort());
+    expect(new Set(lanes.map((lane: { northStar: { id: string } }) => lane.northStar.id)).size)
+      .toBe(FIRST_PARTY_SOCIAL_PLATFORMS.length);
   });
 
   it('rejects malformed experiment evidence before core evaluation', async () => {
