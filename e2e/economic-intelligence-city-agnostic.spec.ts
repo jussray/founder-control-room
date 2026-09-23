@@ -126,15 +126,14 @@ test('goalfix: Johnstown AI Center exposes the current commercial-site City Hall
 
   const pilotGate = snapshot.gates.find((gate: { id: string }) => gate.id === 'meeting_ready_pilot');
   expect(pilotGate).toEqual(expect.objectContaining({
-    status: 'PARTIAL',
+    status: 'VERIFIED',
+    blockers: [],
     receiptIds: expect.arrayContaining([
       'plan:johnstown-ai-center:commercial-site:2026-09-23',
       'plan:johnstown-ai-center:success-gates:2026-09-23',
+      'repo:city-hall-meeting-packet:2026-09-23',
     ]),
   }));
-  expect(pilotGate.blockers).toEqual(expect.arrayContaining([
-    expect.stringContaining('superseded partner/rented-space'),
-  ]));
 
   const historicalPlan = snapshot.receipts.find(
     (receipt: { id: string }) => receipt.id === 'plan:johnstown-ai-center:2026-09-09',
@@ -151,6 +150,15 @@ test('goalfix: Johnstown AI Center exposes the current commercial-site City Hall
     classification: 'VERIFIED_DECISION',
     freshness: 'CURRENT',
     summary: expect.stringContaining('ten part-time roles at $15 per hour'),
+  }));
+
+  const currentPacket = snapshot.receipts.find(
+    (receipt: { id: string }) => receipt.id === 'repo:city-hall-meeting-packet:2026-09-23',
+  );
+  expect(currentPacket).toEqual(expect.objectContaining({
+    classification: 'VERIFIED_EVIDENCE',
+    freshness: 'CURRENT',
+    sourceVersion: 'commercial-site-refresh-2026-09-23',
   }));
 });
 
