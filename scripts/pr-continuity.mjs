@@ -232,7 +232,6 @@ async function patchBody(repository, pr, block, expectedIdentity = null) {
   } catch (error) {
     return { updated: false, blocked: true, reason: error.message };
   }
-  if (next === (pr.body || '')) return { updated: false, blocked: false };
 
   if (expectedIdentity) {
     const livePr = await getPull(repository, pr.number);
@@ -243,6 +242,8 @@ async function patchBody(repository, pr, block, expectedIdentity = null) {
       return { updated: false, blocked: true, reason: error.message };
     }
   }
+
+  if (next === (pr.body || '')) return { updated: false, blocked: false };
 
   await github(`/repos/${repository}/pulls/${pr.number}`, { method: 'PATCH', body: { body: next } });
 
