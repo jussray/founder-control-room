@@ -126,7 +126,19 @@ const johnstownAiCenterReceipts: ReadonlyArray<InitiativeEvidenceReceipt> = Obje
     validThrough: '2026-09-23',
     sourceRef: 'repo:docs/JOHNSTOWN_AI_CENTER_CITY_HALL_MEETING_PACKET.md',
     sourceVersion: 'superseded-2026-09-23',
-    summary: 'The September 19 repository meeting packet is preserved as historical evidence but still carries the earlier partner-space framing and is not current authority for the September 23 property-inclusive commercial-site plan.',
+    summary: 'The September 19 repository meeting-packet version is preserved as historical evidence because it carried the earlier partner-space framing.',
+    authorityEffect: 'none',
+  },
+  {
+    id: 'repo:city-hall-meeting-packet:2026-09-23',
+    classification: 'VERIFIED_EVIDENCE',
+    freshness: 'CURRENT',
+    sourceKind: 'repository_doc',
+    observedAt: '2026-09-23',
+    validThrough: '2026-10-23',
+    sourceRef: 'repo:docs/JOHNSTOWN_AI_CENTER_CITY_HALL_MEETING_PACKET.md',
+    sourceVersion: 'commercial-site-refresh-2026-09-23',
+    summary: 'The repository working-meeting packet now reflects the property-inclusive commercial-site plan, working capitalization range and mid-case stack, ten part-time roles at $15 per hour, current measurable targets, recipient-specific funding lanes, City asks, stop conditions, and explicit non-approval boundaries.',
     authorityEffect: 'none',
   },
 ]);
@@ -154,16 +166,15 @@ const johnstownAiCenterGates: ReadonlyArray<InitiativeGate> = Object.freeze([
   },
   {
     id: 'meeting_ready_pilot',
-    status: 'PARTIAL',
-    summary: 'The current founder decision and measurable targets are defined, but the repository meeting packet has not yet been refreshed from the superseded partner/rented-space framing to the property-inclusive commercial-site plan.',
+    status: 'VERIFIED',
+    summary: 'The current founder decision, measurable targets, and refreshed repository meeting packet now agree on the property-inclusive commercial-site plan and its explicit non-approval boundaries.',
     receiptIds: [
       'plan:johnstown-ai-center:commercial-site:2026-09-23',
       'plan:johnstown-ai-center:success-gates:2026-09-23',
+      'repo:city-hall-meeting-packet:2026-09-23',
     ],
-    proofToClear: 'Refresh the City Hall packet so its capitalization scope, eligible commercial-site/site-control path, ten part-time roles at $15 per hour, measurable targets, financing questions, City asks, and stop conditions match the current September 23 plan without claiming City approval or that ownership is mandatory.',
-    blockers: [
-      'The repository City Hall packet still reflects the superseded partner/rented-space Stage 1 framing and must be refreshed before the current plan can be treated as meeting-ready.',
-    ],
+    proofToClear: 'Satisfied by the September 23 founder decisions and docs/JOHNSTOWN_AI_CENTER_CITY_HALL_MEETING_PACKET.md on the current exact candidate head; external City meeting, financing, and site-control gates remain separate.',
+    blockers: [],
   },
   {
     id: 'funding_facility_path',
