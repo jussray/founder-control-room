@@ -58,6 +58,42 @@ async function refreshConveyorReadiness() {
     setConveyorReadiness(state, label);
   } catch { setConveyorReadiness('error', 'n8n readiness unavailable'); }
 }
+
+function installCoworkLane() {
+  if (document.querySelector('[data-lane="cowork"]')) return;
+
+  const codeLane = document.querySelector('[data-lane="code"]');
+  if (!(codeLane instanceof HTMLElement)) return;
+
+  const projectHandoff = codeLane.nextElementSibling;
+  if (!(projectHandoff instanceof HTMLElement) || !projectHandoff.classList.contains('handoff')) return;
+
+  const intoCowork = document.createElement('div');
+  intoCowork.className = 'handoff';
+  intoCowork.textContent = 'Verified code + repository context becomes the Cowork task';
+
+  const coworkLane = document.createElement('section');
+  coworkLane.className = 'stack-lane';
+  coworkLane.dataset.lane = 'cowork';
+  coworkLane.setAttribute('aria-labelledby', 'stack-cowork');
+  coworkLane.innerHTML = `
+    <h2 class="lane-heading" id="stack-cowork"><span class="lane-number">3C</span>Cowork</h2>
+    <div class="lane-flow">
+      <a class="stage" href="/control-room/github-workspace.html"><small>Ground</small>Shared GitHub source</a>
+      <span class="stage"><small>Delegate</small>Claude Cowork</span>
+      <a class="stage" href="/control-room/?tab=missions"><small>Council</small>Founder AI Council</a>
+      <a class="stage" href="/control-room/github-workspace.html"><small>Build</small>Repository workspace</a>
+      <a class="stage" href="/control-room/?tab=activity"><small>Proof</small>GitHub + Council receipts</a>
+    </div>
+  `;
+
+  const outOfCowork = document.createElement('div');
+  outOfCowork.className = 'handoff';
+  outOfCowork.textContent = 'Cowork receipts return to the shared GitHub project';
+
+  codeLane.after(intoCowork, coworkLane, outOfCowork);
+}
+
 function requestedTabFromUrl() {
   const tab = new URL(window.location.href).searchParams.get('tab');
   return tab && ALLOWED_TABS.has(tab) ? tab : null;
@@ -93,6 +129,7 @@ const launchDock = document.querySelector('.launch-dock');
 if (launchDock instanceof HTMLDetailsElement) {
   launchDock.addEventListener('toggle', () => { if (launchDock.open) void refreshConveyorReadiness(); });
 }
+installCoworkLane();
 installMissionBoard();
 installProjectShellUi();
 void refreshConveyorReadiness();
