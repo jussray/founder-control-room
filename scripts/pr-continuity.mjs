@@ -20,6 +20,24 @@ export function assertExpectedHead(expected, actual) {
   return true;
 }
 
+export function assertMetadataIdentity(expected, actual) {
+  const moved = expected.headSha !== actual.headSha
+    || expected.baseSha !== actual.baseSha
+    || expected.baseRef !== actual.baseRef;
+  if (moved) {
+    throw new Error(
+      `METADATA_IDENTITY_MOVED: expected ${expected.baseRef}@${expected.baseSha} <- ${expected.headSha}, live ${actual.baseRef}@${actual.baseSha} <- ${actual.headSha}`,
+    );
+  }
+  return true;
+}
+
+export const metadataIdentity = (pr, baseSha) => ({
+  baseRef: pr.base.ref,
+  baseSha,
+  headSha: pr.head.sha,
+});
+
 export function isStackedUpdateUnsupported(status, message = '') {
   return status === 403 && /updating a stacked PR's branch via this endpoint is not supported\.?/i.test(message);
 }
@@ -207,15 +225,38 @@ async function listOpenPulls(repository) {
   throw new Error('PULL_PAGINATION_LIMIT_EXCEEDED');
 }
 
-async function patchBody(repository, pr, block) {
+async function patchBody(repository, pr, block, expectedIdentity = null) {
   let next;
   try {
     next = replaceManagedBlock(pr.body || '', block);
   } catch (error) {
     return { updated: false, blocked: true, reason: error.message };
   }
+
+  if (expectedIdentity) {
+    const livePr = await getPull(repository, pr.number);
+    const liveIdentity = metadataIdentity(livePr, await liveBaseSha(repository, livePr));
+    try {
+      assertMetadataIdentity(expectedIdentity, liveIdentity);
+    } catch (error) {
+      return { updated: false, blocked: true, reason: error.message };
+    }
+  }
+
   if (next === (pr.body || '')) return { updated: false, blocked: false };
+
   await github(`/repos/${repository}/pulls/${pr.number}`, { method: 'PATCH', body: { body: next } });
+
+  if (expectedIdentity) {
+    const livePr = await getPull(repository, pr.number);
+    const liveIdentity = metadataIdentity(livePr, await liveBaseSha(repository, livePr));
+    try {
+      assertMetadataIdentity(expectedIdentity, liveIdentity);
+    } catch (error) {
+      return { updated: true, blocked: true, reason: `POST_PATCH_${error.message}` };
+    }
+  }
+
   return { updated: true, blocked: false };
 }
 
@@ -238,13 +279,15 @@ async function updateOnePull(repository, number, rootRef) {
   const rootSha = await branchSha(repository, rootRef);
   let baseSha = await liveBaseSha(repository, pr);
   if (!sameRepositoryPull(pr, repository)) {
-    const metadata = await patchBody(repository, pr, blockFor(repository, pr, rootRef, rootSha, baseSha, 'BLOCKED_FORK', 'BLOCKED'));
+    const expectedIdentity = metadataIdentity(pr, baseSha);
+    const metadata = await patchBody(repository, pr, blockFor(repository, pr, rootRef, rootSha, baseSha, 'BLOCKED_FORK', 'BLOCKED'), expectedIdentity);
     return { number, state: 'BLOCKED_FORK', headRef: pr.head.ref, metadata };
   }
 
   let status = await compare(repository, baseSha, pr.head.sha);
   if (isCurrentCompareStatus(status)) {
-    const metadata = await patchBody(repository, pr, blockFor(repository, pr, rootRef, rootSha, baseSha, 'CURRENT', 'EXACT_HEAD_PROOF_SEPARATE'));
+    const expectedIdentity = metadataIdentity(pr, baseSha);
+    const metadata = await patchBody(repository, pr, blockFor(repository, pr, rootRef, rootSha, baseSha, 'CURRENT', 'EXACT_HEAD_PROOF_SEPARATE'), expectedIdentity);
     return {
       number,
       state: metadata.blocked ? 'BLOCKED_METADATA' : 'CURRENT',
@@ -271,10 +314,11 @@ async function updateOnePull(repository, number, rootRef) {
     if (!failure) {
       throw new Error(`GITHUB_API_${update.status}: ${update.payload?.message || 'pull request branch update rejected'}`);
     }
-    const metadata = await patchBody(repository, pr, blockFor(repository, pr, rootRef, rootSha, baseSha, failure.state, 'BLOCKED'));
+    const expectedIdentity = metadataIdentity(pr, baseSha);
+    const metadata = await patchBody(repository, pr, blockFor(repository, pr, rootRef, rootSha, baseSha, failure.state, 'BLOCKED'), expectedIdentity);
     return {
       number,
-      state: failure.state,
+      state: metadata.blocked ? 'BLOCKED_METADATA' : failure.state,
       headRef: pr.head.ref,
       headSha: pr.head.sha,
       metadata,
@@ -305,7 +349,8 @@ async function updateOnePull(repository, number, rootRef) {
     : state === 'CURRENT_AFTER_RACE'
       ? 'EXACT_HEAD_PROOF_SEPARATE'
       : 'BLOCKED';
-  const metadata = await patchBody(repository, pr, blockFor(repository, pr, rootRef, rootSha, baseSha, state, proof));
+  const expectedIdentity = metadataIdentity(pr, baseSha);
+  const metadata = await patchBody(repository, pr, blockFor(repository, pr, rootRef, rootSha, baseSha, state, proof), expectedIdentity);
   if (metadata.blocked) state = 'BLOCKED_METADATA';
   return { number, state, headRef: pr.head.ref, headBefore: before, headSha: pr.head.sha, metadata };
 }
@@ -361,12 +406,14 @@ export async function metadataMode() {
   const state = sameRepositoryPull(pr, repository)
     ? classifyCompareStatus(await compare(repository, baseSha, pr.head.sha))
     : 'BLOCKED_FORK';
+  const expectedIdentity = metadataIdentity(pr, baseSha);
   const metadata = await patchBody(
     repository,
     pr,
     blockFor(repository, pr, rootRef, rootSha, baseSha, state, state === 'CURRENT' ? 'EXACT_HEAD_PROOF_SEPARATE' : 'REVERIFY_OR_ROLLOVER_REQUIRED'),
+    expectedIdentity,
   );
-  const receipt = { schema: SCHEMA, mode: 'metadata', repository, prNumber: number, state, metadata, ...nonAuthorizingMergeState };
+  const receipt = { schema: SCHEMA, mode: 'metadata', repository, prNumber: number, state, identity: expectedIdentity, metadata, ...nonAuthorizingMergeState };
   writeReceipt(receipt);
   if (metadata.blocked) throw new Error(`METADATA_BLOCKED: ${metadata.reason}`);
   console.log(JSON.stringify(receipt));

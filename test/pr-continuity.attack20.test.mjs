@@ -8,6 +8,8 @@ import {
   isCurrentCompareStatus,
   classifyCompareStatus,
   assertExpectedHead,
+  assertMetadataIdentity,
+  metadataIdentity,
   isStackedUpdateUnsupported,
   classifyUpdateBranchFailure,
   replaceManagedBlock,
@@ -21,7 +23,7 @@ const baseRepo = { full_name: repo };
 const continuitySource = readFileSync(new URL('../scripts/pr-continuity.mjs', import.meta.url), 'utf8');
 
 function pr(number, baseRef, headRef, state = 'open', headRepo = baseRepo) {
-  return { number, state, base: { ref: baseRef, repo: baseRepo }, head: { ref: headRef, repo: headRepo } };
+  return { number, state, base: { ref: baseRef, repo: baseRepo }, head: { ref: headRef, sha: `${headRef}-sha`, repo: headRepo } };
 }
 
 test('AT01 identical base/head is current ancestry', () => assert.equal(isCurrentCompareStatus('identical'), true));
@@ -129,5 +131,25 @@ test('AT30 rollover aggregate preserves per-state and per-failure receipt fields
   assert.match(continuitySource, /failureReceiptCount/);
   assert.match(continuitySource, /failureReceipts/);
   assert.match(continuitySource, /receiptId: `pr-\$\{number\}:\$\{receipt\.code\}`/);
+});
+test('AT31 metadata identity binds base ref, live base SHA, and head SHA', () => {
+  const identity = metadataIdentity(pr(31, 'main', 'candidate'), 'base-sha');
+  assert.deepEqual(identity, { baseRef: 'main', baseSha: 'base-sha', headSha: 'candidate-sha' });
+  assert.equal(assertMetadataIdentity(identity, { ...identity }), true);
+});
+test('AT32 metadata mutation fails closed when the head moves between read and write', () => {
+  const expected = { baseRef: 'main', baseSha: 'base-a', headSha: 'head-a' };
+  const actual = { baseRef: 'main', baseSha: 'base-a', headSha: 'head-b' };
+  assert.throws(() => assertMetadataIdentity(expected, actual), /METADATA_IDENTITY_MOVED/);
+});
+test('AT33 metadata mutation fails closed when main moves between read and write', () => {
+  const expected = { baseRef: 'main', baseSha: 'base-a', headSha: 'head-a' };
+  const actual = { baseRef: 'main', baseSha: 'base-b', headSha: 'head-a' };
+  assert.throws(() => assertMetadataIdentity(expected, actual), /METADATA_IDENTITY_MOVED/);
+});
+test('AT34 body PATCH is guarded by a live metadata identity read and post-patch recheck', () => {
+  assert.match(continuitySource, /assertMetadataIdentity\(expectedIdentity, liveIdentity\)/);
+  assert.match(continuitySource, /POST_PATCH_\$\{error\.message\}/);
+  assert.match(continuitySource, /patchBody\(repository, pr, block, expectedIdentity = null\)/);
 });
 test('schema remains stable', () => assert.equal(SCHEMA, 'juss/pr-continuity@v1'));
