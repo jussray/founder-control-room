@@ -28,9 +28,9 @@ Owns orchestration, decomposition, synthesis, and goal-state framing. Chief may 
 
 Primary strengths: debugging, code review, data analysis, repository operations, implementation support, and founder-readable synthesis.
 
-### Claude / Claude Code
+### Claude / Claude Code / Cowork
 
-Primary strengths: long-context repository analysis, structured implementation, careful refactors, architecture review, and documentation.
+Primary strengths: long-context repository analysis, structured implementation, careful refactors, architecture review, documentation, and governed multi-step project work. Cowork is a Claude work surface inside this authority model, not an independent repository, source of truth, or approval plane.
 
 ### Muse
 
@@ -45,6 +45,19 @@ Primary strength: current public research and source discovery. Public-web evide
 ### Other eligible providers
 
 Gemini, DeepSeek, local models, or future providers may participate when the local registry and capability policy say they are eligible. New availability does not silently create a Council seat with mutation authority.
+
+## Shared GitHub source rule
+
+Council reasoning, Claude, Claude Code, and Cowork must share the same repository authority when repository state matters:
+
+- resolve the authoritative GitHub repository, branch, and exact current head before consequential work;
+- do not promote a Cowork workspace copy, chat attachment, model memory, exported folder, or stale checkout above current GitHub source;
+- bind each Cowork/Council round to the same project/repository, branch/head, truth age, authority ceiling, and stop condition;
+- return implementation evidence to GitHub as the applicable commit/PR/diff/check receipt and back to FCR/Council as evidence, rather than leaving the only state inside Cowork;
+- if the exact repository/head or required access cannot be observed, classify it `UNKNOWN` or `BLOCKED` instead of implying synchronization;
+- Cowork does not inherit merge, deploy, provider, credential, publication, spend, delete, or founder authority from tool availability or Council consensus.
+
+One shared GitHub source does not erase project boundaries. Each repository remains authoritative for its own code and project-local contracts.
 
 ## Automatic founder lenses
 

@@ -1,17 +1,33 @@
 # Claude Operating Contract — founder-control-room
 
-This file governs Claude (claude.ai, Claude Code, MCP-connected sessions) when working in `jussray/founder-control-room`.
+This file governs Claude (claude.ai, Claude Code, Cowork, MCP-connected sessions) when working in `jussray/founder-control-room`.
 
 Before nontrivial work Claude must also read:
 
 - [`GLOBAL_AI.md`](GLOBAL_AI.md) — shared founder constitution and truth order.
 - [`AGENTS.md`](AGENTS.md) — repository entry contract.
+- [`.control-room/COUNCIL.md`](.control-room/COUNCIL.md) — shared Council membership, GitHub-source, and mutation discipline.
 - [`.ai/skills/juss-flow-launch-loop/SKILL.md`](.ai/skills/juss-flow-launch-loop/SKILL.md) — bounded implementation/review/merge loop.
 - [`docs/FOUNDER_MERGE_AUTHORITY.md`](docs/FOUNDER_MERGE_AUTHORITY.md) — current repository integration authority.
 - [`docs/TRUTH_DECAY_AUDIT.md`](docs/TRUTH_DECAY_AUDIT.md) — once-true/current-truth failure model.
 - [`docs/PUBLIC_COMMUNICATION_TRUTH_CONTRACT.md`](docs/PUBLIC_COMMUNICATION_TRUTH_CONTRACT.md) — publication and Sauce Guard boundary.
 
 Repository/provider/runtime evidence inspected now outranks old PR bodies, older provider-routing prose, prior model context, and chat memory. Preserve old evidence as history, but never promote it back into present-tense authority without re-observation.
+
+## Claude Cowork + shared GitHub authority
+
+Claude, Claude Code, and Cowork are work surfaces inside the same repository authority model. Cowork is not a separate source of truth, repository fork, approval plane, or Council authority.
+
+For repository work:
+
+1. resolve the authoritative GitHub repository, branch, and exact current head before consequential action;
+2. bind Cowork to the same project/repository, branch/head, truth age, authority ceiling, and stop condition as the Council round;
+3. treat Cowork workspace files, attachments, exports, model memory, and local copies as working context only until reconciled with current GitHub source;
+4. return implementation state to GitHub through the applicable commit/PR/diff/check receipt and return evidence to Founder Control Room/Council;
+5. if exact GitHub state or required access cannot be observed, classify it `UNKNOWN` or `BLOCKED` instead of implying sync; and
+6. never let Cowork tool access bypass review, merge, deploy, provider, credential, billing, publication, destructive-action, or founder-authority gates.
+
+One shared GitHub source does not collapse project boundaries. Each repository remains authoritative for its own code and project-local contracts.
 
 ## Master build contract
 
