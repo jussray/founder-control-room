@@ -325,3 +325,5 @@ For public crawler and work-directory behavior, `.github/workflows/ci.yml` must 
 ## Cross-repository browser witness freshness
 
 The exact StoryEngine peer configured in `.github/workflows/playwright.yml` is an evidence subject, not a durable alias for current StoryEngine. A peer refresh must be backed by an independent ref/SHA observation and must reset predecessor federation/browser proof until the complete FCR → StoryEngine → receipt → FCR Playwright witness passes on the exact FCR head. Pin alignment alone grants no merge, deploy, production, or provider-mutation authority.
+
+For the current peer-refresh candidate, the independently observed StoryEngine `main` identity is `a5aabd59b4cf515ed7252a44ab10c3f6c1b13b1b`. Binding that SHA selects the new evidence subject only. Predecessor federation proof expires, and current proof exists only if the exact candidate reruns the complete FCR → StoryEngine → receipt → FCR browser/runtime witness successfully; this rebind grants no merge, deploy, production, publication, or provider-mutation authority.
