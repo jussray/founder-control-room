@@ -133,9 +133,12 @@ test('renders Claude Cowork as a GitHub-grounded Council lane in the founder sta
   await expect(cowork).toBeVisible();
   await expect(cowork.getByRole('heading', { name: /Cowork/ })).toBeVisible();
   await expect(cowork).toContainText('Claude Cowork');
+  await expect(cowork).toContainText('Claude GitHub connector required');
+  await expect(cowork).toContainText('FCR receipt adapter not wired');
+  await expect(cowork).not.toContainText('GitHub + Council receipts');
   await expect(cowork.getByRole('link', { name: /Shared GitHub source/ })).toHaveAttribute('href', '/control-room/github-workspace.html');
   await expect(cowork.getByRole('link', { name: /Founder AI Council/ })).toHaveAttribute('href', '/control-room/?tab=missions');
-  await expect(page.getByText('Cowork receipts return to the shared GitHub project')).toBeVisible();
+  await expect(page.getByText('Cowork changes return through GitHub commit / PR evidence; FCR receipt binding remains separate')).toBeVisible();
 
   mkdirSync(outputDir, { recursive: true });
   await page.screenshot({ path: resolve(outputDir, 'desktop-cowork-council.png'), fullPage: true });
