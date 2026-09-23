@@ -7,7 +7,8 @@
  * due repository verification, runs reconciliation, and lets the idempotent
  * external-use scheduler claim at most one hourly search-and-email digest.
  * HTTP routes include signed provider webhooks and repository verification
- * pings.
+ * pings. The Bip proof ingress stays at the Worker edge because it needs the
+ * private Chief service binding as well as GitHub OIDC verification.
  */
 
 import { httpServerHandler } from 'cloudflare:node';
@@ -16,6 +17,10 @@ import express from 'express';
 import { createServer as createNodeHttpServer } from 'node:http';
 import type { ExportedHandler } from '@cloudflare/workers-types';
 import { mountFcrCommerceIngress } from '../http/fcrCommerceIngress.js';
+import {
+  BIP_PROOF_INGRESS_PATH,
+  handleBipControlRoomProofIngress,
+} from './bipChiefEvidenceIngress.js';
 import {
   composeWorkerHandler,
   validateWorkerEnv,
@@ -33,7 +38,7 @@ app.use(createExpressApp());
 const nodeServer = createNodeHttpServer(app);
 const httpHandler = httpServerHandler(nodeServer) as ExportedHandler<ControlRoomWorkerEnv>;
 
-export default composeWorkerHandler(
+const composed = composeWorkerHandler(
   httpHandler,
   async () => {
     const [
@@ -58,3 +63,19 @@ export default composeWorkerHandler(
     };
   },
 );
+
+const composedFetch = composed.fetch;
+if (!composedFetch) throw new Error('Cloudflare HTTP handler is missing fetch');
+
+const worker: ExportedHandler<ControlRoomWorkerEnv> = {
+  async fetch(request, workerEnv, ctx) {
+    const url = new URL(request.url);
+    if (url.pathname === BIP_PROOF_INGRESS_PATH) {
+      return handleBipControlRoomProofIngress(request, workerEnv);
+    }
+    return composedFetch.call(composed, request, workerEnv, ctx);
+  },
+  scheduled: composed.scheduled,
+};
+
+export default worker;
