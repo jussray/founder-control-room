@@ -96,6 +96,23 @@ Repurposed outputs must derive from the same canonical content fingerprint so th
 
 Measurement is observation-only. Platform metrics, clicks, signups, or revenue can inform the next content bet, but they do not retroactively authorize publication, scheduling, spend, or scaling. Publication still requires the existing proof-led publishing capability plus the normal current approval/provider receipt/readback gates.
 
+## Capability market
+
+Council routing should use `src/lib/modelCapabilityMarket.ts` and `docs/MODEL_CAPABILITY_MARKET.md` when choosing among eligible operators for a task.
+
+The capability market is empirical and task-specific. It must:
+
+- treat external benchmarks and provider launch claims as bounded priors, never runtime or outcome proof;
+- promote an operator to primary routing only from fresh local evidence for the same task class;
+- penalize false-green behavior instead of rewarding confident completion claims;
+- block primary routing when fresh evidence contains an authority-boundary violation;
+- expire stale evidence instead of allowing old wins to self-renew;
+- score cost and duration alongside correctness and proof quality;
+- prefer an independent challenger from a different provider family when available;
+- place new or newly upgraded models in shadow-trial status until local receipts satisfy the sample gate.
+
+Capability-market selection is advisory only. A route carries no merge, deploy, provider, publication, spending, or founder authority. Existing action-specific authority gates remain mandatory.
+
 ## Council round protocol
 
 Every material Council round should bind itself to:
