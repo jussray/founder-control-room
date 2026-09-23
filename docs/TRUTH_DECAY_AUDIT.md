@@ -384,10 +384,20 @@ The strongest optimization is not faster claiming. It is shortening the distance
 33. `merge_authority: true` cannot be reused as candidate approval; every merge requires a fresh explicit founder decision for the exact live repository/PR/base/head, and candidate movement expires that approval.
 34. Rebinding a cross-repository Playwright peer to a newly verified exact ref/SHA expires predecessor federation/browser proof and requires a complete exact-head rerun; the pin is evidence identity, not production or merge authority.
 35. A live peer ref/SHA match may select the next browser-federation evidence subject, but it cannot carry predecessor green forward; the successor stays `UNKNOWN` until the complete exact-head runtime, directive, receipt, and browser witness passes.
+36. An external model benchmark is a discovery prior, not local outcome proof; it cannot promote an operator to primary routing or grant selection/execution authority without fresh task-specific receipts.
+37. Model-routing evidence decays by task class and time. Old wins, provider reputation, or Council consensus cannot outrank fresh local false-green, authority-violation, cost, latency, proof-quality, or root-cause evidence.
 
 ## 2026-09 control correction: peer ref refresh resets proof
 
 A later StoryEngine `main` observation can justify rebinding the exact Playwright peer, but that observation only selects the new evidence subject. The FCR browser/federation witness remains `UNKNOWN` for that successor until the exact FCR head reruns the complete runtime identity, directive, receipt, and browser path against that peer. A valid ref/SHA match cannot carry predecessor green forward or mint merge, deploy, production, or provider-mutation authority.
+
+## 2026-09 control correction: capability-market priors are not truth
+
+Frontier model releases can improve coding, research, automation, browser use, or synthesis faster than durable FCR documentation can name specific winners. Treating a provider benchmark or launch table as a permanent routing fact would recreate truth decay at the model layer.
+
+The capability market therefore keeps public benchmarks as bounded priors only and promotes operators from fresh, task-specific local receipts. False-green behavior lowers the score; a fresh authority-boundary violation blocks promotion; stale observations expire; cost and duration remain secondary to verified correctness/proof; and provider-diverse challengers preserve independent disagreement. A routing recommendation is evidence, not permission: it cannot create credentials, founder approval, merge/deploy authority, provider mutation, publication authority, or outcome proof.
+
+The same rule applies when a peer model or repository advances during verification. A newer candidate may become the next shadow trial or evidence subject, but predecessor green cannot be transferred to it. Promotion and federation both require successor-specific receipts.
 
 ## Rollback
 
