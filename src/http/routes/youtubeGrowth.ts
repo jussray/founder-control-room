@@ -5,41 +5,18 @@ import {
   type YouTubeGrowthPhase,
   type YouTubeMeasurement,
 } from '../../ultrathink-core/youtubeGrowthLoop.js';
+import {
+  CONTENT_LANE_SHARED_SYSTEM,
+  contentLaneSystemSnapshot,
+  getContentLane,
+} from '../../lib/contentLaneSystem.js';
 import { requireFounder, type FounderRequest } from '../middleware/requireFounder.js';
 
 export const YOUTUBE_GROWTH_EVALUATION_CONTRACT = 'fcr/youtube-growth-evaluation@v1' as const;
 
 export const YOUTUBE_CHANNEL_SYSTEM = Object.freeze({
-  sequence: Object.freeze([
-    'audience-problem-promise',
-    'repeatable-format',
-    'content-engine',
-    'return-loop',
-    'money-path',
-    'measure-compound-or-kill',
-  ] as const),
-  pillars: Object.freeze(['DISCOVER', 'PROVE', 'BELONG', 'CONVERT'] as const),
-  contentUnit: Object.freeze(['HOOK', 'VALUE', 'PROOF', 'PAYOFF', 'CTA'] as const),
-  faceless: Object.freeze({
-    allowed: true,
-    originalValueRequired: true,
-    copiedOrReusedContentIsStrategy: false,
-    aiSlideshowSpamRejected: true,
-    faceNotRequiredButPointOfViewIsRequired: true,
-  }),
-  returnLoop: Object.freeze({
-    recurringSeriesPreferredOverRandomPosts: true,
-    questionsPollsAndCommentsAreLearningSignals: true,
-    returningViewerEvidenceShouldBeMeasured: true,
-    communitySignalsAreEvidenceNotAuthority: true,
-  }),
-  monetization: Object.freeze({
-    directMoneyPathDesignedEarly: true,
-    platformAdsAreBonus: true,
-    platformEligibilityRequiresProviderEvidence: true,
-    visibilityIsNotRevenue: true,
-    revenueRequiresOutcomeEvidence: true,
-  }),
+  ...CONTENT_LANE_SHARED_SYSTEM,
+  lane: getContentLane('youtube'),
 });
 
 const YOUTUBE_GROWTH_PHASES: readonly YouTubeGrowthPhase[] = [
@@ -191,6 +168,7 @@ youtubeGrowthRouter.get('/', (_req: FounderRequest, res) => res.json({
   workflow: 'audience/problem/promise -> repeatable format -> LEEVIZE -> publish approval -> measure -> return loop -> diagnose -> money path -> double-down/repair/kill',
   phases: YOUTUBE_GROWTH_PHASES,
   channelSystem: YOUTUBE_CHANNEL_SYSTEM,
+  contentLaneSystem: contentLaneSystemSnapshot(),
   authority: {
     advisoryOnly: true,
     publish: false,
