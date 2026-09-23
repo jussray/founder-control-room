@@ -1,4 +1,8 @@
-import { createPublicKey, verify as verifySignature } from 'node:crypto';
+import {
+  createPublicKey,
+  verify as verifySignature,
+  type JsonWebKey as NodeJsonWebKey,
+} from 'node:crypto';
 import { Octokit } from '@octokit/rest';
 import {
   BIP_CONTROL_ROOM_PROJECT,
@@ -89,12 +93,12 @@ function audienceIncludes(value: unknown, expected: string): boolean {
   return Array.isArray(value) && value.some((item) => item === expected);
 }
 
-async function fetchJwk(kid: string): Promise<JsonWebKey> {
+async function fetchJwk(kid: string): Promise<NodeJsonWebKey> {
   const response = await fetch(GITHUB_OIDC_JWKS, {
     headers: { Accept: 'application/json' },
   });
   if (!response.ok) throw new Error(`github_oidc_jwks_unavailable:${response.status}`);
-  const payload = await response.json() as { keys?: JsonWebKey[] };
+  const payload = await response.json() as { keys?: NodeJsonWebKey[] };
   const key = payload.keys?.find((candidate) => candidate.kid === kid);
   if (!key) throw new Error('github_oidc_key_not_found');
   return key;
@@ -104,7 +108,7 @@ export async function verifyGitHubActionsOidc(
   token: string,
   expectedSha: string,
   now = new Date(),
-  fetchJwkImpl: (kid: string) => Promise<JsonWebKey> = fetchJwk,
+  fetchJwkImpl: (kid: string) => Promise<NodeJsonWebKey> = fetchJwk,
 ): Promise<void> {
   const parts = token.split('.');
   if (parts.length !== 3) throw new Error('github_oidc_malformed');
