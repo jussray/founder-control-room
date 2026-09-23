@@ -74,6 +74,9 @@ export interface InitiativeEvidenceReceipt {
     | 'partner_email'
     | 'repository_doc';
   observedAt: string;
+  validThrough: string;
+  sourceRef: string;
+  sourceVersion: string;
   summary: string;
   authorityEffect: 'none';
 }
