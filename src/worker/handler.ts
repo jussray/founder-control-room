@@ -7,6 +7,11 @@ import {
   type ProjectEmailBinding,
 } from './projectEmail.js';
 
+export interface ChiefAiEvidenceServiceBinding {
+  version(): Promise<unknown>;
+  ingestBipEvidence(input: unknown): Promise<unknown>;
+}
+
 export interface ControlRoomWorkerEnv {
   SUPABASE_URL: string;
   SUPABASE_PROJECT_REF: string;
@@ -23,6 +28,8 @@ export interface ControlRoomWorkerEnv {
   FOUNDER_API_URL: string;
   FCR_EMAIL: ProjectEmailBinding;
   FCR_EMAIL_FROM: string;
+  /** Private same-account RPC binding to Chief AI's evidence-only entrypoint. */
+  CHIEF_AI: ChiefAiEvidenceServiceBinding;
   FCR_V10_CAPABILITY_PLAN_CONTRACT: string;
   FCR_V10_CONVEYOR_CONTRACT: string;
   FCR_V10_MAX_RUNTIME_AUTHORITY: string;
@@ -59,6 +66,12 @@ function hasNonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.trim() !== '';
 }
 
+function isChiefAiEvidenceServiceBinding(value: unknown): value is ChiefAiEvidenceServiceBinding {
+  if (!value || typeof value !== 'object') return false;
+  const candidate = value as Partial<ChiefAiEvidenceServiceBinding>;
+  return typeof candidate.version === 'function' && typeof candidate.ingestBipEvidence === 'function';
+}
+
 /** Fail closed before importing environment-backed application modules. */
 export function validateWorkerEnv(
   env: Partial<Record<keyof ControlRoomWorkerEnv, unknown>>,
@@ -71,6 +84,9 @@ export function validateWorkerEnv(
 
   if (!isProjectEmailBinding(env.FCR_EMAIL)) {
     throw new Error('Missing required Worker binding: FCR_EMAIL');
+  }
+  if (!isChiefAiEvidenceServiceBinding(env.CHIEF_AI)) {
+    throw new Error('Missing required Worker binding: CHIEF_AI');
   }
 
   const hasGitHubToken = hasNonEmptyString(env.GITHUB_TOKEN);
