@@ -118,3 +118,31 @@ test('serves the public work directory from Pages and keeps live/source states d
   expect(hasHorizontalOverflow).toBe(false);
   await page.screenshot({ path: resolve(outputDir, 'mobile-work-directory.png'), fullPage: true });
 });
+
+test('renders Claude Cowork as a GitHub-grounded Council lane in the founder stack', async ({ page }) => {
+  const appHtml = readFileSync(resolve(repoRoot, 'public/control-room/index.html'), 'utf8');
+  const stackRouterSource = readFileSync(resolve(repoRoot, 'public/control-room/stack-router.js'), 'utf8')
+    .replace("import { installMissionBoard } from './mission-board.js';", 'const installMissionBoard = () => {};')
+    .replace("import { installProjectShellUi } from './project-shell-ui.js';", 'const installProjectShellUi = () => {};');
+
+  await page.setContent(appHtml);
+  await page.addScriptTag({ content: stackRouterSource, type: 'module' });
+
+  const cowork = page.locator('[data-lane="cowork"]');
+  await expect(cowork).toBeVisible();
+  await expect(cowork.getByRole('heading', { name: /Cowork/ })).toBeVisible();
+  await expect(cowork).toContainText('Claude Cowork');
+  await expect(cowork.getByRole('link', { name: /Shared GitHub source/ })).toHaveAttribute('href', '/control-room/github-workspace.html');
+  await expect(cowork.getByRole('link', { name: /Founder AI Council/ })).toHaveAttribute('href', '/control-room/?tab=missions');
+  await expect(page.getByText('Cowork receipts return to the shared GitHub project')).toBeVisible();
+
+  mkdirSync(outputDir, { recursive: true });
+  await page.screenshot({ path: resolve(outputDir, 'desktop-cowork-council.png'), fullPage: true });
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  const hasHorizontalOverflow = await page.evaluate(
+    () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
+  );
+  expect(hasHorizontalOverflow).toBe(false);
+  await page.screenshot({ path: resolve(outputDir, 'mobile-cowork-council.png'), fullPage: true });
+});
