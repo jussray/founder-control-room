@@ -80,16 +80,17 @@ function installCoworkLane() {
     <h2 class="lane-heading" id="stack-cowork"><span class="lane-number">3C</span>Cowork</h2>
     <div class="lane-flow">
       <a class="stage" href="/control-room/github-workspace.html"><small>Ground</small>Shared GitHub source</a>
+      <span class="stage"><small>Connect</small>Claude GitHub connector required</span>
       <span class="stage"><small>Delegate</small>Claude Cowork</span>
       <a class="stage" href="/control-room/?tab=missions"><small>Council</small>Founder AI Council</a>
       <a class="stage" href="/control-room/github-workspace.html"><small>Build</small>Repository workspace</a>
-      <a class="stage" href="/control-room/?tab=activity"><small>Proof</small>GitHub + Council receipts</a>
+      <span class="stage"><small>Proof</small>FCR receipt adapter not wired</span>
     </div>
   `;
 
   const outOfCowork = document.createElement('div');
   outOfCowork.className = 'handoff';
-  outOfCowork.textContent = 'Cowork receipts return to the shared GitHub project';
+  outOfCowork.textContent = 'Cowork changes return through GitHub commit / PR evidence; FCR receipt binding remains separate';
 
   codeLane.after(intoCowork, coworkLane, outOfCowork);
 }
