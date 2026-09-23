@@ -278,6 +278,8 @@ change operational truth
 -> re-observe provider/runtime facts after integration before reusing present-tense claims
 ```
 
+Economic Intelligence execution truth is part of this truth-sensitive surface. Changes under `src/economic-intelligence/` or `src/http/routes/economicIntelligence.ts` can change the receipts, provenance, freshness, gate state, or decision framing future operators use for civic and financing work, so they must refresh this README and a current path-bound Documentation Truth receipt. A green source or browser test still cannot manufacture City, lender, property, funding, hiring, merge, deploy, or provider authority.
+
 When a newer fingerprint contradicts an older present-tense statement, replace or classify the stale statement instead of leaving competing “current” truths.
 
 Documentation Truth proves documentation coverage/materiality. It does not independently prove provider configuration, deployment, browser behavior, security review, publication, or human outcome.
