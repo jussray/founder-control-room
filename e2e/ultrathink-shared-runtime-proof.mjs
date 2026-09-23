@@ -105,9 +105,9 @@ try {
   page.on('pageerror', (error) => pageErrors.push(error.message));
 
   await page.goto(`${BASE_URL}/control-room/`, { waitUntil: 'domcontentloaded' });
-  await page.waitForSelector('#magic-link-form');
+  await page.waitForSelector('#login-form');
   await page.fill('input[name="email"]', FOUNDER_EMAIL);
-  await page.click('#magic-link-form button[type=submit]');
+  await page.click('#login-form button[type=submit]');
   const bridge = await waitForBridge();
   if (!bridge?.tokenHash) throw new Error('Magic-link bridge did not contain tokenHash.');
 

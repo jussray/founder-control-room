@@ -88,7 +88,6 @@ class QueryBuilder {
       return { data: null, error: null };
     }
 
-    // select
     let result = sortRows(matched, this.orderCol, this.orderAsc);
     if (this.limitN != null) result = result.slice(0, this.limitN);
     return this._shapeResult(result, wantSingle, allowZero);
@@ -193,6 +192,49 @@ async function fakeRpc(name, args) {
     return { data: null, error: null };
   }
 
+  if (name === 'create_workspace_project_with_onboarding_event') {
+    const projects = table('projects');
+    const events = table('project_events');
+    const metadata = args?.p_event_metadata;
+    if (!args?.p_workspace_id || !String(args?.p_slug ?? '').trim() || !String(args?.p_name ?? '').trim()) {
+      return { data: null, error: { code: '22023', message: 'invalid workspace onboarding subject' } };
+    }
+    if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) {
+      return { data: null, error: { code: '22023', message: 'invalid onboarding event metadata' } };
+    }
+    if ('founder' in metadata || 'email' in metadata || 'founderEmail' in metadata) {
+      return { data: null, error: { code: '22023', message: 'founder identity is forbidden in onboarding event metadata' } };
+    }
+    if (projects.some((row) => row.slug === args.p_slug)) {
+      return { data: null, error: { code: '23505', message: 'duplicate project slug' } };
+    }
+
+    const project = withDefaults({
+      workspace_id: args.p_workspace_id,
+      slug: args.p_slug,
+      name: args.p_name,
+      repo_provider: args.p_repo_provider,
+      repo_identifier: args.p_repo_identifier,
+      stack: args.p_stack,
+      status: 'active',
+      risk_level: 'medium',
+    }, 'projects');
+    const event = withDefaults({
+      project_id: project.id,
+      source_event_id: `e2e-onboarding-${project.id}`,
+      event_type: 'founder_onboarding_bootstrapped',
+      severity: 'info',
+      screen: 'chief-workspace-onboarding',
+      metadata,
+    }, 'project_events');
+
+    // Commit both rows only after every validation above has succeeded. This
+    // mirrors the all-or-nothing PostgreSQL function used in production.
+    projects.push(project);
+    events.push(event);
+    return { data: project, error: null };
+  }
+
   if (name === 'is_v10_registry_approved') {
     const candidateHash = String(args?.candidate_hash ?? '').trim().toLowerCase();
     const approved = table('capability_registry_snapshots').some((row) => (
@@ -214,18 +256,33 @@ export function makeSupabaseClient() {
   return supabase;
 }
 
-// Seed the founder allowlist synchronously at process start, mirroring what
-// migration 0002 does for real (`insert into founder_users ...`) — this
-// module is the first thing the loader redirects to, so this runs before
-// the HTTP server accepts any request.
+// Seed the founder allowlist synchronously at process start. Optional workspace
+// fields are test-only state used by the focused tenancy browser proof.
 if (process.env.E2E_SEED_FOUNDER_EMAIL) {
-  table('founder_users').push({ email: process.env.E2E_SEED_FOUNDER_EMAIL, created_at: new Date().toISOString() });
+  const founderRow = {
+    email: process.env.E2E_SEED_FOUNDER_EMAIL,
+    created_at: new Date().toISOString(),
+  };
+  if (process.env.E2E_SEED_FOUNDER_ROLE) founderRow.account_role = process.env.E2E_SEED_FOUNDER_ROLE;
+  if (process.env.E2E_SEED_WORKSPACE_ID) founderRow.workspace_id = process.env.E2E_SEED_WORKSPACE_ID;
+  table('founder_users').push(founderRow);
 }
 
-// E2E-only mirror of the V10 founder approval boundary. The harness must
-// explicitly provide one exact registry hash and its canonical entries;
-// unlike an "always true" fake, every other registry remains unapproved and
-// the real middleware still verifies the entry hash and capability identity.
+if (process.env.E2E_SEED_PROJECTS_JSON) {
+  let seedProjects;
+  try {
+    seedProjects = JSON.parse(process.env.E2E_SEED_PROJECTS_JSON);
+  } catch {
+    throw new Error('E2E_SEED_PROJECTS_JSON must be valid JSON');
+  }
+  if (!Array.isArray(seedProjects)) {
+    throw new Error('E2E_SEED_PROJECTS_JSON must be a JSON array');
+  }
+  for (const project of seedProjects) {
+    table('projects').push(withDefaults(project, 'projects'));
+  }
+}
+
 const approvedV10RegistryHash = String(process.env.E2E_APPROVED_V10_REGISTRY_HASH ?? '').trim().toLowerCase();
 if (/^[0-9a-f]{64}$/.test(approvedV10RegistryHash)) {
   let entries = [];

@@ -110,6 +110,130 @@ jobs:
           EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
 
+      - name: Establish authoritative FCR preview baseline
+        if: steps.neon_scope.outputs.needs_neon == 'true'
+        shell: bash
+        env:
+          NEON_DB_URL: ${{ steps.create_neon_branch.outputs.db_url }}
+        run: |
+          set -euo pipefail
+
+          HAS_PROJECTS="$(psql "$NEON_DB_URL" -X -Atqc "select to_regclass('public.projects') is not null")"
+          HAS_FOUNDER_USERS="$(psql "$NEON_DB_URL" -X -Atqc "select to_regclass('public.founder_users') is not null")"
+
+          if [ "$HAS_PROJECTS" != "$HAS_FOUNDER_USERS" ]; then
+            echo '::error title=Inconsistent Neon FCR baseline::projects and founder_users must both exist or both be absent before PR migrations run.'
+            exit 1
+          fi
+
+          # Neon is generic PostgreSQL, while the authoritative FCR migrations
+          # target Supabase PostgreSQL. Provide only fail-closed auth signatures
+          # and non-login role names required to replay the real migrations.
+          # These compatibility objects carry no user identity and grant no
+          # founder authority in preview.
+          psql "$NEON_DB_URL" -X -1 -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE SCHEMA IF NOT EXISTS auth;
+          CREATE TABLE IF NOT EXISTS auth.users (
+            id uuid PRIMARY KEY,
+            email text
+          );
+          CREATE OR REPLACE FUNCTION auth.jwt() RETURNS jsonb
+          LANGUAGE sql STABLE AS $$ SELECT '{}'::jsonb $$;
+          CREATE OR REPLACE FUNCTION auth.role() RETURNS text
+          LANGUAGE sql STABLE AS $$ SELECT NULL::text $$;
+          CREATE OR REPLACE FUNCTION auth.uid() RETURNS uuid
+          LANGUAGE sql STABLE AS $$ SELECT NULL::uuid $$;
+          DO $$
+          BEGIN
+            IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
+              CREATE ROLE anon NOLOGIN;
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
+              CREATE ROLE authenticated NOLOGIN;
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'service_role') THEN
+              CREATE ROLE service_role NOLOGIN;
+            END IF;
+          END
+          $$;
+          SQL
+
+          if [ "$HAS_PROJECTS" != "t" ]; then
+            CORE_BASELINE_MIGRATIONS=(
+              supabase/migrations/20260711030127_init_control_room_schema.sql
+              supabase/migrations/20260711030936_enable_rls_and_founder_policy.sql
+              supabase/migrations/20260831153313_bind_founder_authority_to_immutable_user_id.sql
+            )
+            for migration in "${CORE_BASELINE_MIGRATIONS[@]}"; do
+              test -f "$migration" || { echo "Missing authoritative FCR baseline migration: $migration" >&2; exit 1; }
+              echo "Applying authoritative FCR baseline migration: $migration"
+              psql "$NEON_DB_URL" -X -1 -v ON_ERROR_STOP=1 -f "$migration"
+            done
+          else
+            echo 'Core FCR preview baseline already exists; checking later historical prerequisites independently.'
+          fi
+
+          HAS_TERMINAL_RUNS="$(psql "$NEON_DB_URL" -X -Atqc "select to_regclass('public.terminal_runs') is not null")"
+          HAS_COMMAND_BRIDGE="$(psql "$NEON_DB_URL" -X -Atqc "select to_regclass('public.command_bridge_requests') is not null")"
+          if [ "$HAS_COMMAND_BRIDGE" = "t" ] && [ "$HAS_TERMINAL_RUNS" != "t" ]; then
+            echo '::error title=Inconsistent Neon command baseline::command_bridge_requests exists without terminal_runs.'
+            exit 1
+          fi
+
+          if [ "$HAS_TERMINAL_RUNS" != "t" ]; then
+            TERMINAL_MIGRATION='supabase/migrations/20260718032552_guarded_terminal_and_schema_reconciliation.sql'
+            test -f "$TERMINAL_MIGRATION" || { echo "Missing authoritative FCR baseline migration: $TERMINAL_MIGRATION" >&2; exit 1; }
+
+            # A reused PR preview may already have the newer workspace_id NOT NULL
+            # invariant even though this older historical migration was omitted by
+            # a previous baseline. Reconstruct historical order without rewriting
+            # either migration: temporarily provide exactly the platform workspace
+            # default that the later workspace migration would have backfilled,
+            # run the real historical migration, then remove the default. Fresh
+            # previews never take this compatibility path.
+            PROJECT_WORKSPACE_COLUMN="$(psql "$NEON_DB_URL" -X -Atqc "select count(*) from information_schema.columns where table_schema='public' and table_name='projects' and column_name='workspace_id' and data_type='uuid'")"
+            if [ "$PROJECT_WORKSPACE_COLUMN" = "1" ]; then
+              PLATFORM_WORKSPACE_ID="$(psql "$NEON_DB_URL" -X -Atqc "select id from public.workspaces where slug='juss-founder-workspace' limit 1")"
+              test -n "$PLATFORM_WORKSPACE_ID" || { echo 'Platform workspace missing while healing reused Neon baseline.' >&2; exit 1; }
+              psql "$NEON_DB_URL" -X -v ON_ERROR_STOP=1 -c "ALTER TABLE public.projects ALTER COLUMN workspace_id SET DEFAULT '$PLATFORM_WORKSPACE_ID'::uuid;"
+              set +e
+              psql "$NEON_DB_URL" -X -1 -v ON_ERROR_STOP=1 -f "$TERMINAL_MIGRATION"
+              TERMINAL_MIGRATION_STATUS=$?
+              set -e
+              psql "$NEON_DB_URL" -X -v ON_ERROR_STOP=1 -c 'ALTER TABLE public.projects ALTER COLUMN workspace_id DROP DEFAULT;'
+              test "$TERMINAL_MIGRATION_STATUS" -eq 0
+            else
+              echo "Applying authoritative FCR baseline migration: $TERMINAL_MIGRATION"
+              psql "$NEON_DB_URL" -X -1 -v ON_ERROR_STOP=1 -f "$TERMINAL_MIGRATION"
+            fi
+          else
+            echo 'Guarded-terminal historical baseline already exists.'
+          fi
+
+          HAS_COMMAND_BRIDGE="$(psql "$NEON_DB_URL" -X -Atqc "select to_regclass('public.command_bridge_requests') is not null")"
+          if [ "$HAS_COMMAND_BRIDGE" != "t" ]; then
+            COMMAND_BRIDGE_MIGRATION='supabase/migrations/20260719193000_founder_command_bridge.sql'
+            test -f "$COMMAND_BRIDGE_MIGRATION" || { echo "Missing authoritative FCR baseline migration: $COMMAND_BRIDGE_MIGRATION" >&2; exit 1; }
+            echo "Applying authoritative FCR baseline migration: $COMMAND_BRIDGE_MIGRATION"
+            psql "$NEON_DB_URL" -X -1 -v ON_ERROR_STOP=1 -f "$COMMAND_BRIDGE_MIGRATION"
+          else
+            echo 'Founder Command Bridge historical baseline already exists.'
+          fi
+
+          HAS_PROJECTS="$(psql "$NEON_DB_URL" -X -Atqc "select to_regclass('public.projects') is not null")"
+          HAS_FOUNDER_USERS="$(psql "$NEON_DB_URL" -X -Atqc "select to_regclass('public.founder_users') is not null")"
+          HAS_TERMINAL_RUNS="$(psql "$NEON_DB_URL" -X -Atqc "select to_regclass('public.terminal_runs') is not null")"
+          HAS_COMMAND_BRIDGE="$(psql "$NEON_DB_URL" -X -Atqc "select to_regclass('public.command_bridge_requests') is not null")"
+          HAS_USER_ID="$(psql "$NEON_DB_URL" -X -Atqc "select count(*) from information_schema.columns where table_schema='public' and table_name='founder_users' and column_name='user_id' and data_type='uuid'")"
+          WORKSPACE_DEFAULT="$(psql "$NEON_DB_URL" -X -Atqc "select coalesce(column_default, '') from information_schema.columns where table_schema='public' and table_name='projects' and column_name='workspace_id'")"
+          test "$HAS_PROJECTS" = "t"
+          test "$HAS_FOUNDER_USERS" = "t"
+          test "$HAS_TERMINAL_RUNS" = "t"
+          test "$HAS_COMMAND_BRIDGE" = "t"
+          test "$HAS_USER_ID" = "1"
+          test -z "$WORKSPACE_DEFAULT"
+          echo 'Authoritative FCR preview baseline verified: core, guarded terminal, Command Bridge, immutable founder identity, and no compatibility default remain.'
+
       - name: Execute added migrations on Neon preview
         if: steps.neon_scope.outputs.needs_neon == 'true'
         shell: bash
@@ -180,6 +304,29 @@ jobs:
             psql "$NEON_DB_URL" -X -v ON_ERROR_STOP=1 \
               -c "INSERT INTO ci_preview.migration_receipts(filename, sha256) VALUES ('$migration', '$CHECKSUM');"
           done
+
+      - name: Verify workspace tenancy preview schema when present
+        if: steps.neon_scope.outputs.needs_neon == 'true'
+        shell: bash
+        env:
+          NEON_DB_URL: ${{ steps.create_neon_branch.outputs.db_url }}
+        run: |
+          set -euo pipefail
+          HAS_WORKSPACES="$(psql "$NEON_DB_URL" -X -Atqc "select to_regclass('public.workspaces') is not null")"
+          if [ "$HAS_WORKSPACES" != "t" ]; then
+            echo 'Workspace tenancy table is not part of this preview.'
+            exit 0
+          fi
+
+          FOUNDER_WORKSPACE="$(psql "$NEON_DB_URL" -X -Atqc "select count(*) from information_schema.columns where table_schema='public' and table_name='founder_users' and column_name='workspace_id' and data_type='uuid' and is_nullable='NO'")"
+          FOUNDER_ROLE="$(psql "$NEON_DB_URL" -X -Atqc "select count(*) from information_schema.columns where table_schema='public' and table_name='founder_users' and column_name='account_role' and is_nullable='NO'")"
+          PROJECT_WORKSPACE="$(psql "$NEON_DB_URL" -X -Atqc "select count(*) from information_schema.columns where table_schema='public' and table_name='projects' and column_name='workspace_id' and data_type='uuid' and is_nullable='NO'")"
+          WORKSPACE_RLS="$(psql "$NEON_DB_URL" -X -Atqc "select relrowsecurity from pg_class where oid='public.workspaces'::regclass")"
+          test "$FOUNDER_WORKSPACE" = "1"
+          test "$FOUNDER_ROLE" = "1"
+          test "$PROJECT_WORKSPACE" = "1"
+          test "$WORKSPACE_RLS" = "t"
+          echo 'Workspace tenancy Neon preview schema verified: founder and project ownership are non-null and workspace RLS is enabled.'
 
       - name: Verify FCR commerce preview schema when present
         if: steps.neon_scope.outputs.needs_neon == 'true'
