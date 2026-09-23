@@ -384,10 +384,19 @@ The strongest optimization is not faster claiming. It is shortening the distance
 33. `merge_authority: true` cannot be reused as candidate approval; every merge requires a fresh explicit founder decision for the exact live repository/PR/base/head, and candidate movement expires that approval.
 34. Rebinding a cross-repository Playwright peer to a newly verified exact ref/SHA expires predecessor federation/browser proof and requires a complete exact-head rerun; the pin is evidence identity, not production or merge authority.
 35. A live peer ref/SHA match may select the next browser-federation evidence subject, but it cannot carry predecessor green forward; the successor stays `UNKNOWN` until the complete exact-head runtime, directive, receipt, and browser witness passes.
+36. An unauthenticated `POST /mcp` may reach the OAuth Bearer challenge without inheriting browser-cookie authority; that bootstrap exemption must stay exact to `/mcp`, and source/browser proof cannot be promoted into live OAuth client, consent, deployment, or external-client proof.
 
 ## 2026-09 control correction: peer ref refresh resets proof
 
 A later StoryEngine `main` observation can justify rebinding the exact Playwright peer, but that observation only selects the new evidence subject. The FCR browser/federation witness remains `UNKNOWN` for that successor until the exact FCR head reruns the complete runtime identity, directive, receipt, and browser path against that peer. A valid ref/SHA match cannot carry predecessor green forward or mint merge, deploy, production, or provider-mutation authority.
+
+## 2026-09 control correction: OAuth bootstrap versus browser CSRF authority
+
+The remote MCP path exposed a different boundary collision: the app-wide browser CSRF mutation gate ran before the canonical `/mcp` handler, so an OAuth-capable client's first unauthenticated `POST /mcp` could be rejected before the handler had a chance to return its Bearer challenge and protected-resource metadata. Reusing the generic “all unauthenticated cross-origin POSTs are browser mutations” rule here was unsafe because MCP OAuth bootstrap is an API authentication negotiation, not cookie-authenticated browser authority.
+
+The corrected boundary is exact and non-authorizing. Only `POST /mcp` may pass the browser same-origin mutation middleware unauthenticated; `/mcp/read` and every other browser mutation retain the existing CSRF rule. The MCP handler still requires Bearer/OAuth authentication before tool dispatch, and the bootstrap uses no founder browser cookie as authority.
+
+Exact-head tests and Playwright may prove that the candidate reaches a `401 Bearer` challenge with the protected-resource metadata URL and no tool dispatch. They do not prove Supabase OAuth Server configuration, OAuth client registration, user consent, deployed production identity, or a real ChatGPT/client tool-call round trip. Those remain separate provider/runtime evidence gates and must be re-observed after integration.
 
 ## Rollback
 

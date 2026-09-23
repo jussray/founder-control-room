@@ -1,6 +1,6 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Preserve current workflow, Cloudflare, Shopify, founder-merge, content-evidence, public-discovery, bounded Postiz readback, Componecat catalog context, and cross-repository StoryEngine federation truth boundaries without converting source, analytics, crawler policy, peer pinning, provider configuration, readback state, mergeability, candidate/browser proof, or growth recommendations into publication, production, provider-mutation, merge, deploy, spend, or external-contact authority.",
+  "purpose": "Preserve current workflow, Cloudflare, Shopify, founder-merge, content-evidence, public-discovery, OAuth MCP bootstrap/CSRF authority, bounded Postiz readback, Componecat catalog context, and cross-repository StoryEngine federation truth boundaries without converting source, analytics, crawler policy, peer pinning, authentication negotiation, provider configuration, readback state, mergeability, candidate/browser proof, or growth recommendations into publication, production, provider-mutation, merge, deploy, spend, or external-contact authority.",
   "domains": [
     "cloudflare-authority",
     "repository-provider",
@@ -21,7 +21,14 @@
       "path": ".github/workflows/playwright.yml",
       "claims": [
         "`.github/workflows/playwright.yml` must bind the FCR-to-StoryEngine browser federation witness to a separately verified exact StoryEngine peer SHA and ref; changing that peer identity expires predecessor federation/browser proof and requires the complete exact-head witness to rerun without granting merge, deploy, production, or provider-mutation authority.",
-        "A fresh peer ref/SHA observation may select the successor StoryEngine evidence subject, but the successor FCR federation state remains UNKNOWN until the complete exact-head runtime identity, directive, receipt, and Playwright browser witness succeeds against that peer."
+        "A fresh peer ref/SHA observation may select the successor StoryEngine evidence subject, but the successor FCR federation state remains UNKNOWN until the complete exact-head runtime identity, directive, receipt, and Playwright browser witness succeeds against that peer.",
+        "The StoryEngine peer pin may be refreshed only from a current independently observed peer ref/SHA, and pin alignment is selection of the next evidence subject rather than proof of production, merge, deploy, or provider-mutation authority."
+      ]
+    },
+    {
+      "path": "src/http/middleware/csrf.ts",
+      "claims": [
+        "`src/http/middleware/csrf.ts` may exempt only the exact unauthenticated `POST /mcp` OAuth bootstrap from browser same-origin mutation enforcement so the MCP handler can emit its Bearer challenge and protected-resource metadata; the exemption must not widen to `/mcp/read` or other mutation paths and must not grant cookie, tool-dispatch, merge, deploy, provider-write, or execution authority."
       ]
     },
     {
@@ -97,7 +104,8 @@
         "`README.md` must describe deterministic founder-content approval reservation and exact active retry recovery without allowing evidence rotation, retry, or a stored reservation to mint new publication authority.",
         "`README.md` must state that rebinding the StoryEngine Playwright peer resets predecessor browser-federation proof and that a ref/SHA match alone cannot grant merge, deploy, production, or provider-mutation authority.",
         "`README.md` must describe Postiz as bounded server-authenticated account/status readback only, keep Postiz scheduling/publication writes outside that adapter, and refuse to translate provider-reported PUBLISHED state without terminal artifact evidence into publication truth.",
-        "`README.md` must describe Componecat as read-only architecture/catalog context whose discovery grants no project ownership, repository mutation, merge, deploy, provider-write, or publication authority."
+        "`README.md` must describe Componecat as read-only architecture/catalog context whose discovery grants no project ownership, repository mutation, merge, deploy, provider-write, or publication authority.",
+        "`README.md` must describe unauthenticated `POST /mcp` as a narrow OAuth bootstrap exception that reaches the MCP Bearer challenge without using founder cookies or granting tool-dispatch authority, while keeping live OAuth client registration, consent, deployment identity, and real external-client round-trip proof separate."
       ]
     },
     {
@@ -130,7 +138,8 @@
       "path": "docs/TRUTH_DECAY_AUDIT.md",
       "claims": [
         "`docs/TRUTH_DECAY_AUDIT.md` must treat a StoryEngine peer SHA/ref in FCR Playwright as evidence identity rather than a durable alias for current StoryEngine, and must require complete federation re-proof whenever the peer identity or either repository head moves.",
-        "`docs/TRUTH_DECAY_AUDIT.md` must keep a newly matched StoryEngine ref/SHA in UNKNOWN browser-federation state until the exact successor FCR head completes the runtime, directive, receipt, and browser witness."
+        "`docs/TRUTH_DECAY_AUDIT.md` must keep a newly matched StoryEngine ref/SHA in UNKNOWN browser-federation state until the exact successor FCR head completes the runtime, directive, receipt, and browser witness.",
+        "`docs/TRUTH_DECAY_AUDIT.md` must distinguish the unauthenticated `/mcp` OAuth bootstrap from cookie-authenticated browser mutation authority, keep the exemption exact to `POST /mcp`, and treat live OAuth client, consent, deployment, and external-client round-trip state as separately unproven until observed."
       ]
     },
     {
@@ -142,7 +151,8 @@
     {
       "path": "docs/SECRETS.md",
       "claims": [
-        "`docs/SECRETS.md` must keep the FCR Shopify signing secret and commerce hash salt in the Cloudflare Worker secret plane and never recast either provider-held value as a public proof artifact."
+        "`docs/SECRETS.md` must keep the FCR Shopify signing secret and commerce hash salt in the Cloudflare Worker secret plane and never recast either provider-held value as a public proof artifact.",
+        "`docs/SECRETS.md` must register `ANTHROPIC_API_KEY` only as the server-side credential for the bounded Claude second repair pass in `ai-failure-repair.yml`, without implying merge, deploy, publication, or provider-mutation authority."
       ]
     },
     {

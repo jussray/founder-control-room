@@ -10,6 +10,8 @@ async function buildApp() {
   const app = express();
   app.use(requireSameOriginBrowserMutation);
   app.all('/mutation', (_req, res) => res.json({ ok: true }));
+  app.all('/mcp', (_req, res) => res.json({ reachedMcp: true }));
+  app.all('/mcp/read', (_req, res) => res.json({ reachedMcpRead: true }));
   return app;
 }
 
@@ -28,6 +30,24 @@ describe('same-origin browser mutation gate', () => {
       .post('/mutation')
       .set('Authorization', 'Bearer explicit-agent-token');
     expect(response.status).toBe(200);
+  });
+
+  it('allows the exact unauthenticated POST /mcp OAuth bootstrap to reach its bearer challenge handler', async () => {
+    const response = await request(await buildApp())
+      .post('/mcp')
+      .set('Origin', 'https://attacker.example')
+      .set('Sec-Fetch-Site', 'cross-site');
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ reachedMcp: true });
+  });
+
+  it('does not widen the OAuth bootstrap exemption to the static-token compatibility lane', async () => {
+    const response = await request(await buildApp())
+      .post('/mcp/read')
+      .set('Origin', 'https://attacker.example')
+      .set('Sec-Fetch-Site', 'cross-site');
+    expect(response.status).toBe(403);
+    expect(response.body.error).toBe('Same-origin browser request required');
   });
 
   it('allows an exact same-origin browser mutation', async () => {

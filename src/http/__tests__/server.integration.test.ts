@@ -85,6 +85,19 @@ describe('createServer', () => {
     expect(res.status).toBe(403);
   });
 
+  it('lets an unauthenticated MCP client reach the OAuth bearer challenge before browser CSRF', async () => {
+    const res = await request(createServer())
+      .post('/mcp')
+      .set('Content-Type', 'application/json')
+      .send({ jsonrpc: '2.0', id: 1, method: 'tools/list' });
+
+    expect(res.status).toBe(401);
+    expect(res.headers['www-authenticate']).toContain(
+      'resource_metadata="https://api.foundercontrolroom.org/.well-known/oauth-protected-resource/mcp"',
+    );
+    expect(res.body.error?.message).toBe('Unauthorized');
+  });
+
   it.each([
     ['broken JSON syntax', '{"goal":'],
     ['a forbidden top-level JSON primitive', '"preview"'],
