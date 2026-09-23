@@ -1,6 +1,6 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Preserve current workflow, Cloudflare, Shopify, founder-merge, content-evidence, public-discovery, bounded Postiz readback, Componecat catalog context, proof-weighted model-routing, and cross-repository StoryEngine federation truth boundaries without converting source, analytics, crawler policy, peer pinning, benchmark priors, provider configuration, readback state, mergeability, candidate/browser proof, or growth recommendations into publication, production, provider-mutation, merge, deploy, spend, or external-contact authority.",
+  "purpose": "Preserve current workflow, truth-governance, Cloudflare, Shopify, founder-merge, content-evidence, public-discovery, bounded Postiz readback, Componecat catalog context, proof-weighted model-routing, Cowork shared-GitHub authority, and cross-repository StoryEngine federation truth boundaries without converting source, workspace context, analytics, crawler policy, peer pinning, benchmark priors, provider configuration, readback state, mergeability, candidate/browser proof, connector availability, or growth recommendations into publication, production, provider-mutation, merge, deploy, spend, or external-contact authority.",
   "domains": [
     "cloudflare-authority",
     "repository-provider",
@@ -8,7 +8,8 @@
     "evidence-authority",
     "publishing",
     "merge-authority",
-    "workflow-authority"
+    "workflow-authority",
+    "truth-governance"
   ],
   "changes": [
     {
@@ -100,6 +101,12 @@
       ]
     },
     {
+      "path": "docs/CLAUDE_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC.md",
+      "claims": [
+        "`docs/CLAUDE_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC.md` must treat Claude Cowork as a governed execution surface inside the existing FCR/Council authority model, resolve authoritative GitHub repository/target/working branch/base/exact head at session time rather than trusting historical branch metadata or workspace state, return repository work through GitHub commit/PR/check evidence, and never let Cowork capability or connector access widen merge, deploy, provider, credential, publication, spend, delete, or founder authority."
+      ]
+    },
+    {
       "path": "README.md",
       "claims": [
         "`README.md` must keep TinyFish source and CI readiness separate from provider/runtime activation and state that canonical Deploy verifies only provider-held binding-name presence before promotion.",
@@ -113,7 +120,8 @@
         "`README.md` must describe Postiz as bounded server-authenticated account/status readback only, keep Postiz scheduling/publication writes outside that adapter, and refuse to translate provider-reported PUBLISHED state without terminal artifact evidence into publication truth.",
         "`README.md` must describe Componecat as read-only architecture/catalog context whose discovery grants no project ownership, repository mutation, merge, deploy, provider-write, or publication authority.",
         "`README.md` must describe the proof-weighted model capability market as task-specific advisory routing where public benchmarks remain bounded priors, local receipts govern promotion, stale proof expires, false-green and authority violations are penalized, and routing never grants execution authority.",
-        "`README.md` must keep a refreshed StoryEngine peer pin in UNKNOWN federation state until the exact successor FCR head completes the full runtime/directive/receipt/Playwright witness."
+        "`README.md` must keep a refreshed StoryEngine peer pin in UNKNOWN federation state until the exact successor FCR head completes the full runtime/directive/receipt/Playwright witness.",
+        "`README.md` must describe Cowork as a governed Claude work surface grounded in the exact current GitHub repository/branch/head, keep Claude-side GitHub connector configuration separate from repository source, and explicitly state that FCR-native Cowork receipt binding is not wired until separately implemented and proven."
       ]
     },
     {
@@ -147,7 +155,8 @@
       "claims": [
         "`docs/TRUTH_DECAY_AUDIT.md` must treat a StoryEngine peer SHA/ref in FCR Playwright as evidence identity rather than a durable alias for current StoryEngine, and must require complete federation re-proof whenever the peer identity or either repository head moves.",
         "`docs/TRUTH_DECAY_AUDIT.md` must keep a newly matched StoryEngine ref/SHA in UNKNOWN browser-federation state until the exact successor FCR head completes the runtime, directive, receipt, and browser witness.",
-        "`docs/TRUTH_DECAY_AUDIT.md` must treat external model benchmarks and prior local wins as decaying evidence rather than permanent routing truth; task-specific fresh receipts, false-green history, authority violations, cost, latency, and proof quality must be re-evaluated before promotion."
+        "`docs/TRUTH_DECAY_AUDIT.md` must treat external model benchmarks and prior local wins as decaying evidence rather than permanent routing truth; task-specific fresh receipts, false-green history, authority violations, cost, latency, and proof quality must be re-evaluated before promotion.",
+        "`docs/TRUTH_DECAY_AUDIT.md` must treat Cowork workspace copies, attachments, model memory, prior branch observations, connector availability, and generic FCR Activity as non-authoritative context until reconciled with the current exact GitHub repository/branch/head and, for receipts, a separately implemented Cowork receipt adapter."
       ]
     },
     {
