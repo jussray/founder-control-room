@@ -22,10 +22,10 @@ env:
   PLAYWRIGHT_BROWSERS_PATH: /opt/pw-browsers
   EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
   PR_BASE_SHA: ${{ github.event.pull_request.base.sha || '' }}
-  STORYENGINE_PEER_SHA: 39bed061b034793c69c262527d85c3c4b5617cce
+  STORYENGINE_PEER_SHA: d3f75adecc99089989f47b953f7b737c0139a921
   STORYENGINE_PEER_REF: refs/heads/main
   STORYENGINE_PEER_URL: http://127.0.0.1:3901
-  STORYENGINE_PEER_API_KEY: fcr-ci-product-build
+  STORYENGINE_PEER_API_KEY: fcr-ci-${{ github.run_id }}
 
 jobs:
   playwright:
@@ -130,7 +130,7 @@ jobs:
       - name: Start exact StoryEngine federation runtime
         shell: bash
         env:
-          L99_API_KEYS_JSON: '[{"key":"fcr-ci-product-build","actor_id":"fcr-storyengine-control-room","tenant_id":"founder-control-room","role":"administrator","workspace_ids":["*"]}]'
+          L99_API_KEYS_JSON: '[{"key":"fcr-ci-${{ github.run_id }}","actor_id":"fcr-storyengine-control-room","tenant_id":"founder-control-room","role":"administrator","workspace_ids":["*"]}]'
         run: |
           set -euo pipefail
           mkdir -p logs

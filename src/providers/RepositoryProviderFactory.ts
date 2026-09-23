@@ -1,5 +1,16 @@
 import { GitHubProvider } from "./GitHubProvider.js";
-import { getGitHubInstallationToken } from "./githubAppAuth.js";
+import {
+  getGitHubInstallationToken,
+  observeGitHubRepositoryInstallation,
+  type GitHubRepositoryInstallationEvidence,
+  type GitHubInstallationTokenPermissions,
+} from "./githubAppAuth.js";
+import {
+  deriveGitHubAppRepositoryCapabilities,
+  requireGitHubAppRepositoryPermissions,
+  type GitHubAppRepositoryCapabilityContract,
+  type GitHubAppRequiredPermissionLevel,
+} from "./githubAppCapabilities.js";
 import type { RepositoryProvider } from "./RepositoryProvider.js";
 
 export interface RepositoryConnectionInput {
@@ -83,16 +94,22 @@ export interface AppAwareRepositoryProviderDependencies {
     appId: string,
     privateKey: string,
     repositoryIdentifier: string,
+    requiredPermissions?: GitHubInstallationTokenPermissions,
   ) => Promise<string>;
+  observeInstallation?: (
+    appId: string,
+    privateKey: string,
+    repositoryIdentifier: string,
+  ) => Promise<GitHubRepositoryInstallationEvidence>;
 }
 
 /**
- * Builds a read-only repository provider with the same credential precedence
- * used by the canonical provider factory: a repository-scoped GitHub App
- * installation token in production, then an explicit local development token.
- * This async seam is deliberately separate from the legacy synchronous helper
- * so callers that need App auth cannot silently fall back or lose the target
- * repository binding.
+ * Builds a repository-scoped provider with the canonical credential precedence:
+ * a GitHub App installation token in production, then an explicit local
+ * development token. The returned RepositoryProvider may expose writes, but
+ * callers that need mutation authority should prefer
+ * createCapabilityAwareAppRepositoryProvider so GitHub's observed installation
+ * permissions are verified before the provider is handed to them.
  */
 export async function createAppAwareRepositoryProvider(
   input: RepositoryConnectionInput,
@@ -106,7 +123,7 @@ export async function createAppAwareRepositoryProvider(
     const appId = env.GITHUB_APP_ID?.trim();
     const privateKey = env.GITHUB_PRIVATE_KEY?.trim();
     if (Boolean(appId) !== Boolean(privateKey)) {
-      throw new Error('GITHUB_APP_ID and GITHUB_PRIVATE_KEY must be configured together');
+      throw new Error("GITHUB_APP_ID and GITHUB_PRIVATE_KEY must be configured together");
     }
     if (!fallbackToken && !(appId && privateKey)) {
       throw new Error(
@@ -127,4 +144,60 @@ export async function createAppAwareRepositoryProvider(
   throw new Error(
     `No RepositoryProvider implementation for "${connection.provider}" yet`,
   );
+}
+
+export interface CapabilityAwareAppRepositoryProviderResult {
+  provider: RepositoryProvider;
+  authority: GitHubAppRepositoryCapabilityContract;
+}
+
+/**
+ * Production mutation/read entrypoint for GitHub App authority.
+ *
+ * It deliberately has no GITHUB_TOKEN fallback. The caller declares the exact
+ * GitHub repository permissions its operation requires; FCR observes the live
+ * installation grant, fails closed if any permission is missing, and only then
+ * mints a repository- and permission-scoped App token and returns a provider
+ * plus immutable authority evidence.
+ */
+export async function createCapabilityAwareAppRepositoryProvider(
+  input: RepositoryConnectionInput,
+  requiredPermissions: Readonly<Record<string, GitHubAppRequiredPermissionLevel>>,
+  env: NodeJS.ProcessEnv = process.env,
+  dependencies: AppAwareRepositoryProviderDependencies = {},
+): Promise<CapabilityAwareAppRepositoryProviderResult> {
+  const connection = normalizeRepositoryConnection(input);
+  if (connection.provider !== "github") {
+    throw new Error(
+      `Capability-aware App authority is only implemented for github, received "${connection.provider}"`,
+    );
+  }
+
+  const appId = env.GITHUB_APP_ID?.trim();
+  const privateKey = env.GITHUB_PRIVATE_KEY?.trim();
+  if (!appId || !privateKey) {
+    throw new Error(
+      "Capability-aware GitHub App authority requires GITHUB_APP_ID and GITHUB_PRIVATE_KEY",
+    );
+  }
+
+  const observeInstallation = dependencies.observeInstallation ?? observeGitHubRepositoryInstallation;
+  const evidence = await observeInstallation(appId, privateKey, connection.repository);
+  const authority = deriveGitHubAppRepositoryCapabilities(evidence);
+  requireGitHubAppRepositoryPermissions(authority, requiredPermissions);
+
+  const getInstallationToken = dependencies.getInstallationToken ?? getGitHubInstallationToken;
+  const token = await getInstallationToken(
+    appId,
+    privateKey,
+    connection.repository,
+    requiredPermissions,
+  );
+  const provider = new GitHubProvider({
+    token,
+    projectMap: { [connection.projectId]: connection.repository },
+    baseUrl: env.GITHUB_API_BASE_URL,
+  });
+
+  return { provider, authority };
 }

@@ -97,7 +97,14 @@
         "`README.md` must describe deterministic founder-content approval reservation and exact active retry recovery without allowing evidence rotation, retry, or a stored reservation to mint new publication authority.",
         "`README.md` must state that rebinding the StoryEngine Playwright peer resets predecessor browser-federation proof and that a ref/SHA match alone cannot grant merge, deploy, production, or provider-mutation authority.",
         "`README.md` must describe Postiz as bounded server-authenticated account/status readback only, keep Postiz scheduling/publication writes outside that adapter, and refuse to translate provider-reported PUBLISHED state without terminal artifact evidence into publication truth.",
-        "`README.md` must describe Componecat as read-only architecture/catalog context whose discovery grants no project ownership, repository mutation, merge, deploy, provider-write, or publication authority."
+        "`README.md` must describe Componecat as read-only architecture/catalog context whose discovery grants no project ownership, repository mutation, merge, deploy, provider-write, or publication authority.",
+        "`README.md` must state that production GitHub App authority is capability-aware and provider-observed before token minting, has no ambient `GITHUB_TOKEN` fallback on that path, does not convert capability into approval, and cannot impersonate founder-user authority for arbitrary upstream forks outside the App installation boundary."
+      ]
+    },
+    {
+      "path": "docs/PROVIDERS.md",
+      "claims": [
+        "`docs/PROVIDERS.md` must document the capability-aware GitHub App path, its no-ambient-token-fallback production rule, and the installation-versus-user authority boundary without claiming arbitrary-upstream fork authority."
       ]
     },
     {
@@ -155,6 +162,30 @@
       "path": "src/providers/ShopifyReadOnlyProvider.ts",
       "claims": [
         "`src/providers/ShopifyReadOnlyProvider.ts` must bind Shopify observation to the exact Founder Control Room permanent and branded store identities, require complete pagination and app scope inventory, withhold CURRENT on incomplete or mismatched provider evidence, keep reconciliation non-authorizing, and never persist provider inventory or perform Shopify mutation."
+      ]
+    },
+    {
+      "path": "src/providers/RepositoryProviderFactory.ts",
+      "claims": [
+        "`src/providers/RepositoryProviderFactory.ts` must require configured GitHub App credentials and provider-observed installation permissions before returning capability-aware repository authority; this path must not fall back to ambient `GITHUB_TOKEN`, and capability evidence alone must not authorize merge, deploy, publication, or other independently gated mutations."
+      ]
+    },
+    {
+      "path": "src/providers/githubAppCapabilities.ts",
+      "claims": [
+        "`src/providers/githubAppCapabilities.ts` must derive readable and writable repository capabilities only from GitHub's observed installation permission map, treat write as satisfying read but never vice versa, preserve raw permissions without inventing implemented authority, and fail closed when a required permission is absent."
+      ]
+    },
+    {
+      "path": "src/providers/githubAppAuth.ts",
+      "claims": [
+        "`src/providers/githubAppAuth.ts` must mint repository installation tokens against the exact declared permission subset, keep cache identity permission-scoped, reject cached or newly minted tokens that cannot satisfy the requested permissions, and must never let a broader installation grant silently widen the caller's operation authority."
+      ]
+    },
+    {
+      "path": "src/providers/trustedGithubGovernanceObserver.ts",
+      "claims": [
+        "`src/providers/trustedGithubGovernanceObserver.ts` must require live `administration: read` GitHub App installation evidence before token minting or Chief ruleset reads; observed `checks: write` capability remains non-authorizing until a separately contracted producer and authority path exist."
       ]
     },
     {

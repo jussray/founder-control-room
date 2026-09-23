@@ -69,7 +69,7 @@ describe("trusted Chief governance GitHub App observer", () => {
       appId: TEST_FCR_APP_ID,
       installationId: "7654321",
       repositorySelection: "selected",
-      permissions: { checks: "write", contents: "read" },
+      permissions: { administration: "read", checks: "write", contents: "read" },
     });
     mockGetRepoRuleset
       .mockResolvedValueOnce(readback(
@@ -91,17 +91,23 @@ describe("trusted Chief governance GitHub App observer", () => {
       ));
   });
 
-  it("mints a repository-scoped installation token instead of accepting caller token authority", async () => {
+  it("proves administration read authority before minting a repository-scoped token", async () => {
     const result = await observeChiefGovernanceWithGitHubApp({
       appId: TEST_FCR_APP_ID,
       privateKey: "test-private-key",
       now: new Date("2026-09-05T21:20:00.000Z"),
     });
 
+    expect(mockObserveGitHubRepositoryInstallation).toHaveBeenCalledWith(
+      TEST_FCR_APP_ID,
+      "test-private-key",
+      "jussray/chief-ai-machine",
+    );
     expect(mockGetGitHubInstallationToken).toHaveBeenCalledWith(
       TEST_FCR_APP_ID,
       "test-private-key",
       "jussray/chief-ai-machine",
+      { administration: "read" },
     );
     expect(mockGetRepoRuleset).toHaveBeenNthCalledWith(1, {
       owner: "jussray",
@@ -116,6 +122,24 @@ describe("trusted Chief governance GitHub App observer", () => {
     expect(result.governanceBoundary.observer).toEqual({ kind: "github-app", appId: TEST_FCR_APP_ID });
     expect(result.exactHeadGate.observer).toEqual({ kind: "github-app", appId: TEST_FCR_APP_ID });
     expect(result.exactHeadGate.authority.providerMutationAuthority).toBe(false);
+  });
+
+  it("fails closed before token minting when the App lacks administration read", async () => {
+    mockObserveGitHubRepositoryInstallation.mockResolvedValueOnce({
+      repository: "jussray/chief-ai-machine",
+      appId: TEST_FCR_APP_ID,
+      installationId: "7654321",
+      repositorySelection: "selected",
+      permissions: { checks: "write", contents: "read" },
+    });
+
+    await expect(observeChiefGovernanceWithGitHubApp({
+      appId: TEST_FCR_APP_ID,
+      privateKey: "test-private-key",
+    })).rejects.toThrow(/administration:read \(observed none\)/);
+
+    expect(mockGetGitHubInstallationToken).not.toHaveBeenCalled();
+    expect(mockGetRepoRuleset).not.toHaveBeenCalled();
   });
 
   it("observes fixed-repository Check Run capability without granting publication authority", async () => {
@@ -150,7 +174,7 @@ describe("trusted Chief governance GitHub App observer", () => {
       appId: TEST_FCR_APP_ID,
       installationId: "7654321",
       repositorySelection: "selected",
-      permissions: { checks: "read", contents: "read" },
+      permissions: { administration: "read", checks: "read", contents: "read" },
     });
 
     const result = await observeChiefCandidateProducerInstallationWithGitHubApp({
@@ -184,11 +208,12 @@ describe("trusted Chief governance GitHub App observer", () => {
     ]);
   });
 
-  it("fails closed before token minting when App identity is malformed", async () => {
+  it("fails closed before provider access when App identity is malformed", async () => {
     await expect(observeChiefGovernanceWithGitHubApp({
       appId: "not-an-app",
       privateKey: "test-private-key",
     })).rejects.toThrow(/numeric GitHub App id/);
+    expect(mockObserveGitHubRepositoryInstallation).not.toHaveBeenCalled();
     expect(mockGetGitHubInstallationToken).not.toHaveBeenCalled();
   });
 
@@ -197,6 +222,7 @@ describe("trusted Chief governance GitHub App observer", () => {
       appId: TEST_FCR_APP_ID,
       privateKey: "  ",
     })).rejects.toThrow(/requires a GitHub App private key/);
+    expect(mockObserveGitHubRepositoryInstallation).not.toHaveBeenCalled();
     expect(mockGetGitHubInstallationToken).not.toHaveBeenCalled();
   });
 });
