@@ -1,5 +1,6 @@
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { OPERATOR_RELAY_PEERS } from '../lib/operatorRelayConstants.js';
+import type { ExternalMcpToolDependencies } from './externalTools.js';
 
 vi.mock('./vaultHub.js', () => ({
   hubForMcpProject: vi.fn(),
@@ -9,15 +10,7 @@ vi.mock('../lib/supabaseClient.js', () => ({
 }));
 
 type ExternalToolsModule = typeof import('./externalTools.js');
-type RelayCall = {
-  fromOperator: 'gemini' | 'codex' | 'claude-code' | 'perplexity';
-  toOperator: 'gemini' | 'codex' | 'claude-code' | 'perplexity';
-  capability: 'research' | 'propose' | 'review' | 'implement';
-  goal: string;
-  contextSummary: string;
-  sourceRef?: string | null;
-  sensitivity: 'public' | 'internal' | 'restricted';
-};
+type RelayCall = Parameters<NonNullable<ExternalMcpToolDependencies['relayOperator']>>[0];
 
 let externalTools: ExternalToolsModule;
 
@@ -63,6 +56,7 @@ describe('external FCR operator relay authority boundary', () => {
       'implement',
     ]);
     expect(String(tool?.description)).toContain('Gemini');
+    expect(String(tool?.description)).toContain('DeepSeek');
     expect(String(tool?.description)).toContain('zero mutation authority');
   });
 
@@ -167,6 +161,63 @@ describe('external FCR operator relay authority boundary', () => {
       fromOperator: 'codex',
       toOperator: 'gemini',
       capability: 'implement',
+    }));
+    expect(result.governanceBoundary).toEqual(expect.objectContaining({
+      externalProviderCall: true,
+      mutationAuthority: false,
+      executionAllowed: false,
+      founderApprovalGranted: false,
+    }));
+    expect(recordEvidence).toHaveBeenCalledWith(expect.objectContaining({
+      risk: 'external_side_effect',
+      toolName: 'fcr_relay_operator',
+    }));
+  });
+
+  it('routes DeepSeek through the canonical bounded peer relay without granting execution authority', async () => {
+    const relayOperator = vi.fn(async (input: RelayCall) => ({
+      request: input,
+      response: {
+        fromOperator: input.toOperator,
+        toOperator: input.fromOperator,
+        answer: 'DeepSeek bounded review',
+        evidenceRefs: ['provider:deepseek:review-1'],
+      },
+    }));
+    const recordEvidence = vi.fn(async (input: { toolName: string }) => (
+      receipt(input.toolName as 'fcr_relay_operator')
+    ));
+    const execute = externalTools.createExternalMcpToolExecutor({
+      env: {
+        FCR_REMOTE_MCP_OPERATOR_CLIENT_MAP: JSON.stringify({ 'chatgpt-client': 'codex' }),
+      },
+      relayOperator,
+      recordEvidence,
+    });
+
+    const result = await execute({
+      name: 'fcr_relay_operator',
+      arguments: {
+        targetOperator: 'deepseek',
+        capability: 'review',
+        goal: 'Challenge the proposed implementation against the bounded relay contract.',
+        contextSummary: 'DeepSeek is a peer operator. DeepSeek Instructor remains outside the public relay target set.',
+        sensitivity: 'internal',
+      },
+      allowedProjects: new Set(['founder-control-room']),
+      identity: {
+        userId: 'founder-user-1',
+        email: 'founder@example.com',
+        clientId: 'chatgpt-client',
+        authMode: 'oauth',
+      },
+      requestId: 'relay-request-deepseek-1',
+    });
+
+    expect(relayOperator).toHaveBeenCalledWith(expect.objectContaining({
+      fromOperator: 'codex',
+      toOperator: 'deepseek',
+      capability: 'review',
     }));
     expect(result.governanceBoundary).toEqual(expect.objectContaining({
       externalProviderCall: true,
