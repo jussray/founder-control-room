@@ -6,29 +6,33 @@
 - Base branch: `main`
 - Original audited base: `cdf45f2759d9383bf24073473eb75e4ea522d3d3`
 - Working branch: `fix/sofa-flaw-finder-review-lane`
-- Last main SHA explicitly rolled into the candidate during this review: `0a79545ecf396d287d977a2f36ee2c5f4ec7b0c1`
-- Candidate immediately before this receipt update: `acf54e85f8cfed59f238ed137023b1ed399c052a`
+- Current main explicitly rolled into this candidate: `0d85257fbb43920fe4b9c7cfab534c29c5e882b8`
+- Merge-refresh commit before this receipt update: `dc20b21b2eb73dafb048b84ad82264915ce07aa3`
+- Last green exact-head proof now historical/superseded for merge freshness: `6d8007910d3a044c794b474c463661b025b6cb0a`
 - Audit goal: bind the configured SOFA `Flaw Finder` to FCR as a bounded external review/evidence lane without falsely promoting it to a trusted peer operator, independent-review witness, publisher, merger, deployer, or provider authority.
 
-> Resolve `main` and this branch again at use time. The repository is moving quickly; a newer base or head supersedes these SHA observations and requires fresh proof.
+> Resolve `main` and this branch again at use time. A newer base or candidate head supersedes predecessor merge proof.
 
 ## VERIFIED
 
-- The SOFA slice remains additive and isolated to six files when compared against the live base during merge review.
-- No canonical FCR registry entry, runtime route, database, deployment, provider configuration, or publication authority is added by this slice.
+- The SOFA slice remains additive and isolated to seven files when compared against the live base during merge review.
+- No canonical FCR agent-registry entry, runtime route, database mutation, deployment mutation, provider configuration, or SOFA publication authority is added by this slice.
 - The external observation contract requires all fifteen attack flows, including `self_attack`, counterexample/steelman passes, and a second-pass attack against the proposed fix.
 - Observations are bound to repository, branch, exact head SHA, source reference/fingerprint, freshness, findings, and a deterministic observation hash.
-- Observations explicitly remain `draft_only`, `proposalOnly: true`, `countsAsIndependentReview: false`, with merge/deploy/publish/provider/registry authority all false.
+- Observations explicitly remain `draft_only`, `proposalOnly: true`, `countsAsIndependentReview: false`, with external-write/merge/deploy/publish/provider/registry authority all false.
 - The SOFA identity preflight creates a fresh `/api/sessions` session, then performs the owned-agent identity read through `/api/me/agents`, binds exactly one `Flaw Finder`, and refuses role/publication-policy drift.
 - Identity receipts deliberately exclude both the API key and session id and remain non-authorizing.
-- Merge review self-attack found a provenance defect in the first identity implementation: a task label had been sent as `X-Sofa-Model-Name`. The candidate now sends neutral session metadata (`unknown`) instead of pretending that label is a model identity, includes the optional provider metadata, and keeps the owned-agent read limited to Bearer + fresh session headers.
-- The owned-agent extractor accepts the currently observed collection shapes used by clients (`[]`, `{agents: []}`, `{items: []}`) while still requiring exactly one named Flaw Finder.
-- Public SOFA evidence confirms session creation requires Bearer auth plus client/model metadata and authenticated reads require a fresh `X-Sofa-Session`.
+- Merge review self-attack found and repaired a provenance defect in the first identity implementation: a task label had been sent as `X-Sofa-Model-Name`. The candidate now sends neutral session metadata rather than pretending the task label is a model identity.
+- The owned-agent extractor accepts the observed collection shapes `[]`, `{agents: []}`, and `{items: []}` while still requiring exactly one named Flaw Finder.
+- A dedicated exact-head proof workflow now exists at `.github/workflows/sofa-flaw-finder-proof.yml`, with read-only repository permissions and pinned checkout/setup actions.
+- Historical exact-head CI proof for `6d8007910d3a044c794b474c463661b025b6cb0a` passed `npm run typecheck`, both focused Flaw Finder Vitest contracts, Playwright Chromium installation, and the repository `npm run test:e2e` gate.
+- The first proof attempt exposed one TypeScript-only test-fixture error; the repair changed only the unsafe authority-widening test cast, and the successor exact head passed all gates.
+- Current `main@0d85257fbb43920fe4b9c7cfab534c29c5e882b8` was rolled into the branch without changing the seven-file SOFA scope.
 
 ## INFERRED
 
 - A future authenticated SOFA adapter can normalize provider-attested Flaw Finder drafts into the external observation contract without changing FCR's existing independent-review authority model.
-- The six-file source slice should rebase/merge cleanly because current `main` changes observed during review do not overlap these paths. This is a source-diff inference, not test or runtime proof.
+- Current main changes observed during the refresh do not overlap the seven SOFA paths, so source integration is expected to remain low-conflict. Exact-head CI, not this inference, decides merge readiness.
 
 ## UNKNOWN
 
@@ -39,14 +43,13 @@
 
 ## BLOCKED
 
-- `npm run typecheck`, focused Vitest, and the repository Playwright lane have not executed on the exact candidate in this tool session.
-- GitHub has no existing pull request for `fix/sofa-flaw-finder-review-lane`, and the available GitHub connector does not expose workflow-dispatch creation for running the normal PR workflow directly.
-- A local clone attempt failed because this execution container cannot resolve `github.com`, so local repository verification cannot substitute for CI.
-- No live SOFA credential is available in this tool session, so authenticated identity/runtime proof cannot be claimed.
-- Main moved again while review was in progress. Any final integration candidate must first be refreshed onto the then-current base and re-proven.
+- The historical green proof on `6d8007910d3a044c794b474c463661b025b6cb0a` cannot authorize a merge after the branch was refreshed onto newer `main`; the new exact candidate must pass the same proof gates.
+- No live SOFA credential is available in this tool session, so authenticated SOFA identity/runtime proof cannot be claimed.
+- No new pull request is being opened for this slice, per founder workflow preference; the dedicated branch proof workflow is the verification path.
 
 ## Changes
 
+- `.github/workflows/sofa-flaw-finder-proof.yml`
 - `src/review/externalFlawFinderObservation.ts`
 - `src/review/externalFlawFinderObservation.test.ts`
 - `src/review/sofaFlawFinderIdentity.ts`
@@ -56,21 +59,20 @@
 
 ## Merge review verdict
 
-**SOURCE REVIEWED / NOT MERGE-PROVEN.**
+**SOURCE-REVIEWED; CURRENT EXACT-HEAD REPROOF REQUIRED.**
 
-Do not merge this candidate merely because the source review is clean. Repository policy and founder operating rules require exact-head verification. A moving base also invalidates predecessor exact-head proof.
+The predecessor exact head proved the source/tests/browser gate once. The current merge-refresh deliberately invalidates that proof for merge freshness. Merge only after the successor candidate is green and `main` still matches the base embedded in that candidate.
 
 ## Rollback
 
-The slice is additive and isolated on `fix/sofa-flaw-finder-review-lane`. Before integration, rollback is deleting the branch. After integration, revert the focused SOFA files. No provider, runtime, database, deployment, or SOFA publication rollback is required because this source slice performs none of those mutations.
+The slice is additive and isolated on `fix/sofa-flaw-finder-review-lane`. Before integration, rollback is deleting the branch. After integration, revert the seven focused SOFA files. No provider, runtime, database, deployment, or SOFA publication rollback is required because this source slice performs none of those mutations.
 
 ## Next proof gate
 
-1. Resolve current `main` and roll the candidate onto that exact base without widening the six-file scope.
-2. Run exact-head `npm run typecheck` plus focused Vitest for both Flaw Finder contracts.
-3. Run the repository Playwright E2E lane on that same exact head.
-4. Inspect logs/artifacts for failures and repair only the causal SOFA slice if needed.
-5. Re-read current base/head after proof; any movement expires the candidate proof.
-6. Obtain fresh founder exact-candidate merge approval bound to repository + base SHA + head SHA.
-7. Merge only when those gates are green.
-8. Separately, once a live SOFA credential is available, run authenticated identity preflight and then build/prove the full Flaw Finder request/draft round trip before considering registry promotion.
+1. Let the receipt update trigger the exact-head SOFA proof workflow.
+2. Require green `npm run typecheck`, both focused Vitest contracts, and repository Playwright E2E on that exact candidate.
+3. Inspect logs/artifacts for any failure and repair only the causal SOFA slice.
+4. Re-read `main` immediately after proof; any base movement expires merge freshness and requires another refresh/proof loop.
+5. When base and candidate are simultaneously fresh and green, obtain founder approval bound to the exact repository + base SHA + candidate SHA.
+6. Merge only that focused candidate.
+7. Separately, once a live SOFA credential is available, run authenticated identity preflight and prove the full Flaw Finder request/draft round trip before considering registry promotion.
