@@ -1,7 +1,7 @@
 const RECEIPT_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const COMMIT_SHA = /^[0-9a-f]{40}$/i;
 const SHA256 = /^[0-9a-f]{64}$/i;
-const SOURCE_REPO = /^jussray\/[A-Za-z0-9._-]{1,100}$/;
+const SOURCE_REPO = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})\/[A-Za-z0-9._-]{1,100}$/;
 const SAFE_TOKEN = /^[A-Za-z0-9._:-]{1,200}$/;
 const SAFE_PROVIDER = /^[A-Za-z0-9._-]{1,80}$/;
 
