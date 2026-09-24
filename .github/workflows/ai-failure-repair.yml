@@ -57,8 +57,9 @@ jobs:
           current_main="$(git rev-parse refs/remotes/origin/main)"
           test "$actual" = "$FAILED_SHA"
           if [[ "$current_main" != "$FAILED_SHA" ]]; then
-            echo "::error title=Stale failure::main advanced from $FAILED_SHA to $current_main; refusing to repair stale code."
-            exit 1
+            echo "::notice title=Stale failure skipped::main advanced from $FAILED_SHA to $current_main; refusing to repair stale code."
+            echo 'allowed=false' >> "$GITHUB_OUTPUT"
+            exit 0
           fi
 
           subject="$(git log -1 --pretty=%B)"
