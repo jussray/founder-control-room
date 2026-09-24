@@ -4,12 +4,13 @@ Status: founder-approved bridge slice
 
 ## Purpose
 
-Let a governed operator hand a bounded task to another governed peer operator through Founder Control Room so the founder does not have to copy/paste between ChatGPT/Codex, Claude/Claude Code, and Perplexity.
+Let a governed operator hand a bounded task to another governed peer operator through Founder Control Room so the founder does not have to copy/paste between ChatGPT/Codex, Claude/Claude Code, Gemini, and Perplexity.
 
 ## Peer operator lane
 
 Peer relay operators:
 
+- `gemini`
 - `codex`
 - `claude-code`
 - `perplexity`
@@ -64,7 +65,7 @@ Each relay response binds back to the exact relay id and request hash, reverses 
 
 ## Intended conversational behavior
 
-When the founder says, for example, `tell Perplexity to attack this`, the active operator should be able to create a relay request, have FCR dispatch it to Perplexity when that provider/operator runtime is actually available, validate the response, and return it to the active conversation without founder copy/paste.
+When the founder says, for example, `tell Claude to build this`, `ask Gemini to attack the visual direction`, or `tell Perplexity to research this`, the active operator should be able to create a relay request, have FCR dispatch it to the exact requested provider/operator runtime when available, validate the response, and return it to the active conversation without founder copy/paste.
 
 If the target operator runtime is unavailable or unauthenticated, FCR must return a precise blocked state. It must never silently substitute a different provider and claim that the requested operator answered.
 
