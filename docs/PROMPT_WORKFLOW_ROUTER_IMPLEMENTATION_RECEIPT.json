@@ -1,15 +1,37 @@
 {
   "contract": "juss/prompt-workflow-router-implementation-receipt@v1",
   "repo": "jussray/founder-control-room",
+  "pullRequest": 860,
   "branch": "feat/prompt-workflow-router",
-  "baseSha": "25cf097867fdb9f1e24d426a52f015d9bbcb34d7",
-  "state": "SOURCE_IMPLEMENTED_RUNTIME_MOUNT_BLOCKED",
+  "baseSha": "b1df38342829b48f53de00b9414e3ebbbb12808b",
+  "headShaAtReceiptWrite": "35538e15031b8affe7b4ee2958af9b9b6acc8c61",
+  "state": "SOURCE_IMPLEMENTED_MOUNT_VERIFIED_EXACT_HEAD_PROOF_PENDING",
   "authorityChanged": false,
   "executionAuthorizedBySelection": false,
   "databaseMigration": false,
+  "sourceMountVerified": true,
   "runtimeMountVerified": false,
   "ciVerified": false,
-  "deployed": false,
+  "deployedExactHeadVerified": false,
   "playwrightVerified": false,
-  "nextGate": "mount builderPromptWorkflowRouter in src/http/server.ts behind existing browser mutation gate"
+  "n8nInstanceMcp": {
+    "contract": "fcr/n8n-instance-mcp@v1",
+    "serverUrl": "https://jussray.app.n8n.cloud/mcp-server/http",
+    "authMode": "oauth",
+    "selectiveExposureRequired": true,
+    "autoExposeNewWorkflows": false,
+    "providerVerified": false,
+    "providerNativeReadbackRequired": true,
+    "connectionMayMintAuthority": false
+  },
+  "proof": {
+    "unitPolicyTestsAdded": true,
+    "founderGatedExecutionSpineRouteAdded": true,
+    "integrationTestsAdded": true,
+    "playwrightRuntimeProofAdded": true,
+    "githubExactHeadRunsQueued": true,
+    "localCloneVerification": "BLOCKED_RUNTIME_DNS_NO_GITHUB_NETWORK"
+  },
+  "nextGate": "Require green exact-head CI for the successor head, then verify deployed /version SHA and run the Playwright execution-spine proof with founder bearer. Do not infer remote n8n MCP enablement from repository policy; require provider-native n8n readback.",
+  "rollback": "Revert the focused n8n MCP commits on feat/prompt-workflow-router; no database migration or provider mutation was performed."
 }
