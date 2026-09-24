@@ -1,4 +1,5 @@
 import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { OPERATOR_RELAY_PEERS } from '../lib/operatorRelayConstants.js';
 
 vi.mock('./vaultHub.js', () => ({
   hubForMcpProject: vi.fn(),
@@ -43,7 +44,7 @@ function receipt(toolName: 'fcr_relay_operator') {
 }
 
 describe('external FCR operator relay authority boundary', () => {
-  it('advertises Gemini plus the bounded work classes without describing mutation authority', () => {
+  it('advertises the canonical peer set plus bounded work classes without mutation authority', () => {
     const tool = externalTools.externalMcpToolDefinitions()
       .find((definition) => definition.name === 'fcr_relay_operator');
     expect(tool).toBeDefined();
@@ -54,12 +55,7 @@ describe('external FCR operator relay authority boundary', () => {
         capability?: { enum?: string[] };
       };
     };
-    expect(inputSchema.properties?.targetOperator?.enum).toEqual([
-      'gemini',
-      'codex',
-      'claude-code',
-      'perplexity',
-    ]);
+    expect(inputSchema.properties?.targetOperator?.enum).toEqual([...OPERATOR_RELAY_PEERS]);
     expect(inputSchema.properties?.capability?.enum).toEqual([
       'research',
       'propose',
