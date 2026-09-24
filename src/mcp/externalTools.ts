@@ -8,6 +8,7 @@ import {
 import type { V10CapabilityPlan } from '../founder-os-lab/capabilityKernel.js';
 import { relayBetweenOperators } from '../lib/operatorRelayBridge.js';
 import { createServerOperatorRelayAdapters } from '../lib/operatorRelayModelProviders.js';
+import { OPERATOR_RELAY_PEERS } from '../lib/operatorRelayConstants.js';
 import type {
   RelayCapability,
   RelayOperatorId,
@@ -103,7 +104,7 @@ const READ_ONLY_ROUTE_ACTIONS = new Set<FcrSkillRouterAction>([
   'review',
   'draft',
 ]);
-const RELAY_OPERATORS = new Set<RelayOperatorId>(['gemini', 'codex', 'claude-code', 'perplexity']);
+const RELAY_OPERATORS = new Set<RelayOperatorId>(OPERATOR_RELAY_PEERS);
 const RELAY_CAPABILITIES = new Set<RelayCapability>(['research', 'propose', 'review', 'implement']);
 const RELAY_SENSITIVITIES = new Set<RelaySensitivity>(['public', 'internal']);
 const FULL_SHA = /^[0-9a-f]{40}$/i;
@@ -608,13 +609,13 @@ export function externalMcpToolDefinitions(): JsonRecord[] {
       name: 'fcr_relay_operator',
       title: 'Relay a bounded task to a peer AI operator',
       description:
-        'Send a bounded research, proposal, review, or implementation-work task to exactly one named peer operator (Gemini, ChatGPT/Codex, Claude, or Perplexity) and return its provider-bound response. Requires OAuth client identity, carries zero mutation authority, never targets DeepSeek Instructor, and never substitutes another provider when the requested operator is unavailable.',
+        'Send a bounded research, proposal, review, or implementation-work task to exactly one named canonical peer operator and return its provider-bound response. Requires OAuth client identity, carries zero mutation authority, never targets DeepSeek Instructor, and never substitutes another provider when the requested operator is unavailable.',
       inputSchema: {
         type: 'object',
         additionalProperties: false,
         required: ['targetOperator', 'capability', 'goal', 'contextSummary'],
         properties: {
-          targetOperator: { type: 'string', enum: ['gemini', 'codex', 'claude-code', 'perplexity'] },
+          targetOperator: { type: 'string', enum: [...OPERATOR_RELAY_PEERS] },
           capability: { type: 'string', enum: ['research', 'propose', 'review', 'implement'] },
           goal: { type: 'string', minLength: 1, maxLength: 4000 },
           contextSummary: { type: 'string', minLength: 1, maxLength: 12000 },

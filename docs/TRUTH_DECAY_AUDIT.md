@@ -401,6 +401,8 @@ The strongest optimization is not faster claiming. It is shortening the distance
 
 A later StoryEngine `main` observation can justify rebinding the exact Playwright peer, but that observation only selects the new evidence subject. The FCR browser/federation witness remains `UNKNOWN` for that successor until the exact FCR head reruns the complete runtime identity, directive, receipt, and browser path against that peer. A valid ref/SHA match cannot carry predecessor green forward or mint merge, deploy, production, or provider-mutation authority.
 
+On September 24, 2026, the same gate blocked FCR when the pinned StoryEngine peer `a5aabd59b4cf515ed7252a44ab10c3f6c1b13b1b` no longer matched StoryEngine `main` at `35a1855798b4dd059b45f67911280966a09f7be8`. The successor was independently compared first: it was seven commits strictly ahead, zero behind, and the delta was limited to Media Router contract, bridge, tests, and workflow files. That justified selecting the new peer evidence subject, not carrying forward prior green. The successor FCR head remains `UNKNOWN` for federation until its exact-head Playwright runtime, directive, receipt, and browser witness succeeds; the refresh is not proof of production state, merge authority, deploy authority, or provider mutation.
+
 ## 2026-09 control correction: capability-market priors are not truth
 
 Frontier model releases can improve coding, research, automation, browser use, or synthesis faster than durable FCR documentation can name specific winners. Treating a provider benchmark or launch table as a permanent routing fact would recreate truth decay at the model layer.
