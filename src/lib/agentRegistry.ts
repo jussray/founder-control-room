@@ -45,8 +45,8 @@ export const AGENT_REGISTRY: readonly AgentDescriptor[] = [
   },
   {
     id: 'claude-code',
-    label: 'Claude / Claude Code',
-    role: 'Long-context repository analysis, structured implementation, careful refactors, and documentation.',
+    label: 'Claude / Claude Code operator',
+    role: 'Bounded Claude operator identity for repository analysis, structured implementation, refactors, and documentation. The current FCR relay runtime is Anthropic Messages API; optional read-only remote Playwright MCP evidence tools do not create a Claude Code shell or mutation authority.',
     operator: {
       enabled: true,
       capabilities: ['research', 'propose', 'review', 'implement'],

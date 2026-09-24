@@ -76,6 +76,16 @@ The corrected rule keeps the authority planes separate. Claude, Claude Code, and
 
 Durable repository changes return through GitHub commit, pull-request, diff, check, and review evidence. The current FCR Cowork lane does **not** have a native Cowork receipt adapter, so generic Activity entries cannot be relabeled as Cowork receipts and FCR must keep that receipt state `UNKNOWN`/unwired until a separately reviewed adapter is implemented and proven. Council membership, model capability, connector availability, or Cowork tools never grant merge, deploy, provider, credential, billing, publication, deletion, or founder authority.
 
+## 2026-09 control correction: configured browser versus observed MCP tool use
+
+The Claude relay exposed another evidence-authority ambiguity: configuring a remote Playwright MCP server is not the same fact as Claude actually invoking that server. Treating MCP configuration, a provider response, or the `claude-code` operator label as browser-use proof would turn capability availability into an observed-action claim.
+
+The corrected relay keeps four identities separate: the stable `claude-code` operator ID, the current `anthropic-messages-api` runtime, the read-only Playwright MCP configuration receipt, and actual correlated `mcp_tool_use` / `mcp_tool_result` receipts. Only allowlisted read-only tools from the exact `playwright` server with a bounded tool-use ID are promoted into tool-use evidence. A result receipt must correlate to an accepted tool-use ID from the same response. Wrong-server blocks, disallowed tools, and configuration without use produce no tool-use proof.
+
+This does not turn the Anthropic Messages API lane into a Claude Code shell. Browser click/type/form/upload and arbitrary unsafe browser-code tools remain outside the allowlist, and MCP evidence grants no merge, deploy, publication, provider-mutation, credential, spend, or founder authority.
+
+The same audit pass found a stale StoryEngine federation peer. The predecessor FCR workflow pin `35a1855798b4dd059b45f67911280966a09f7be8` was independently compared with StoryEngine `main` at `dd1521547c81c1a16d9777e1fc254c6bf9c7d6b9`: the successor was two commits ahead and zero behind, with the delta limited to resident Council contract changes. That comparison justified rebinding the evidence subject only. It did not recover federation proof. The successor FCR head must rerun the live-ref equality check, exact peer checkout, runtime identity, directive/receipt binding, and Playwright federation witness before the new pin can support a current federation claim.
+
 ## Root causes
 
 ### 1. Evidence lifetime was implicit
@@ -396,12 +406,15 @@ The strongest optimization is not faster claiming. It is shortening the distance
 37. Model-routing evidence decays by task class and time. Old wins, provider reputation, or Council consensus cannot outrank fresh local false-green, authority-violation, cost, latency, proof-quality, or root-cause evidence.
 38. A Cowork workspace, attachment, model memory, or prior branch observation cannot outrank the current authoritative GitHub repository/branch/head; repository work must re-observe that exact source at use time.
 39. Generic FCR activity cannot be relabeled as Cowork receipt proof while the Cowork receipt adapter is unwired, and connector/tool availability cannot manufacture repository, merge, deploy, provider, or founder authority.
+40. A configured remote MCP server is capability/configuration evidence, not proof that a provider invoked it. Browser-use truth requires accepted tool-use evidence from the actual provider response, with any result claim correlated to that accepted tool-use identity.
 
 ## 2026-09 control correction: peer ref refresh resets proof
 
 A later StoryEngine `main` observation can justify rebinding the exact Playwright peer, but that observation only selects the new evidence subject. The FCR browser/federation witness remains `UNKNOWN` for that successor until the exact FCR head reruns the complete runtime identity, directive, receipt, and browser path against that peer. A valid ref/SHA match cannot carry predecessor green forward or mint merge, deploy, production, or provider-mutation authority.
 
 On September 24, 2026, the same gate blocked FCR when the pinned StoryEngine peer `a5aabd59b4cf515ed7252a44ab10c3f6c1b13b1b` no longer matched StoryEngine `main` at `35a1855798b4dd059b45f67911280966a09f7be8`. The successor was independently compared first: it was seven commits strictly ahead, zero behind, and the delta was limited to Media Router contract, bridge, tests, and workflow files. That justified selecting the new peer evidence subject, not carrying forward prior green. The successor FCR head remains `UNKNOWN` for federation until its exact-head Playwright runtime, directive, receipt, and browser witness succeeds; the refresh is not proof of production state, merge authority, deploy authority, or provider mutation.
+
+A later September 24 freshness stop repeated the same invariant when the pinned peer `35a1855798b4dd059b45f67911280966a09f7be8` no longer matched StoryEngine `main` at `dd1521547c81c1a16d9777e1fc254c6bf9c7d6b9`. The independent compare showed two commits strictly ahead and zero behind, limited to the resident Council contract changes. The FCR workflow may bind that successor SHA only as the next evidence subject; all predecessor federation/browser green remains historical until the exact successor FCR head completes the whole witness.
 
 ## 2026-09 control correction: capability-market priors are not truth
 
