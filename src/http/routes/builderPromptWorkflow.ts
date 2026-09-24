@@ -11,10 +11,33 @@ import {
   ProjectEvidenceAgentError,
   runProjectEvidenceAudit,
 } from '../../lib/projectEvidenceAgent.js';
+import { readN8nInstanceMcpPolicy } from '../../lib/n8nInstanceMcp.js';
 
 export const builderPromptWorkflowRouter = Router();
 
 const intents = new Set<string>(Object.keys(BUILDER_PROMPT_WORKFLOW_STACKS));
+
+/**
+ * GET /prompt-workflows/execution-spine
+ * Founder-gated declaration of the governed n8n instance-level MCP boundary.
+ * This reports FCR policy intent only and never claims the remote n8n provider
+ * has been enabled or verified without provider-native readback.
+ */
+builderPromptWorkflowRouter.get('/execution-spine', requireFounder, (_req: FounderRequest, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  return res.status(200).json({
+    controlPlane: 'founder-control-room',
+    reasoningRouter: 'promptos-chief-ai-machine',
+    executionSpine: 'n8n-instance-mcp',
+    policy: readN8nInstanceMcpPolicy(),
+    proof: {
+      providerStateVerified: false,
+      providerNativeReadbackRequired: true,
+      exactRuntimeProofRequired: true,
+      playwrightRequiredForUiOrBrowserClaims: true,
+    },
+  });
+});
 
 /**
  * POST /prompt-workflows/select
