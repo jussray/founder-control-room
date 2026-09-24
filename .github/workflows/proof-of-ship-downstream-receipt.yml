@@ -122,8 +122,9 @@ jobs:
           set -euo pipefail
 
           origin="${DEPLOY_URL%/}"
-          repo_name="${GITHUB_REPOSITORY#jussray/}"
-          lookup_url="$origin/ingest/proof-of-ship-receipts/by-commit/jussray/$repo_name/$EXPECTED_SHA"
+          repo_owner="${GITHUB_REPOSITORY%%/*}"
+          repo_name="${GITHUB_REPOSITORY#*/}"
+          lookup_url="$origin/ingest/proof-of-ship-receipts/by-commit/$repo_owner/$repo_name/$EXPECTED_SHA"
           attempts="$RECEIPT_LOOKUP_ATTEMPTS"
           delay="$RECEIPT_LOOKUP_DELAY_SECONDS"
           receipt_token="$(node -e 'const { createHmac } = require("node:crypto"); process.stdout.write(createHmac("sha256", process.env.FOUNDER_SIGNAL_ENGINE_MCP_TOKEN).update(process.env.RECEIPT_TOKEN_CONTEXT).digest("hex"));')"
