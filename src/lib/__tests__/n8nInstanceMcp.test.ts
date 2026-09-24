@@ -46,6 +46,15 @@ describe('n8n instance-level MCP policy', () => {
     expect(policy.violations).toContain('OAuth is required for governed portfolio MCP clients');
   });
 
+  it('fails closed on unknown auth modes instead of silently treating them as OAuth', () => {
+    const policy = readN8nInstanceMcpPolicy({
+      N8N_MCP_AUTH_MODE: 'magic-token',
+    });
+
+    expect(policy.state).toBe('policy-violation');
+    expect(policy.violations).toContain('MCP auth mode must be oauth or api-key');
+  });
+
   it('rejects auto-expose so newly created workflows cannot silently widen MCP authority', () => {
     const policy = readN8nInstanceMcpPolicy({
       N8N_MCP_AUTO_EXPOSE_NEW_WORKFLOWS: 'true',
