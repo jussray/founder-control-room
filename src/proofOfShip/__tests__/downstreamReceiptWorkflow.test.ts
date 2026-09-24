@@ -24,12 +24,15 @@ describe('proof-of-ship downstream receipt workflow contract', () => {
     expect(workflow).toMatch(/github\.event\.workflow_run\.conclusion == 'success'/);
   });
 
-  it('binds lookup to the exact deployed commit and checked-in LinkedIn baseline', () => {
+  it('binds lookup to the exact deployed commit and current repository identity', () => {
     expect(workflow).toMatch(/EXPECTED_SHA:/);
     expect(workflow).toMatch(/test "\$\(git rev-parse HEAD\)" = "\$EXPECTED_SHA"/);
     expect(workflow).toMatch(/config\/linkedin-rising-floor-baseline\.json/);
     expect(workflow).toMatch(/idempotency_key="\$\{GITHUB_REPOSITORY\}:\$\{EXPECTED_SHA\}"/);
-    expect(workflow).toMatch(/proof-of-ship-receipts\/by-commit\/jussray\/\$repo_name\/\$EXPECTED_SHA/);
+    expect(workflow).toContain('repo_owner="${GITHUB_REPOSITORY%%/*}"');
+    expect(workflow).toContain('repo_name="${GITHUB_REPOSITORY#*/}"');
+    expect(workflow).toContain('proof-of-ship-receipts/by-commit/$repo_owner/$repo_name/$EXPECTED_SHA');
+    expect(workflow).not.toContain('proof-of-ship-receipts/by-commit/jussray/$repo_name/$EXPECTED_SHA');
   });
 
   it('derives a receipt-only token from the existing production MCP secret', () => {
