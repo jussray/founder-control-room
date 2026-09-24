@@ -9,6 +9,8 @@ import {
 
 const COMMIT_SHA = /^[0-9a-f]{40}$/i;
 const REPO_NAME = /^[A-Za-z0-9._-]{1,100}$/;
+const GITHUB_OWNER = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$/;
+const DEFAULT_FOUNDER_GITHUB_OWNER = 'jussray';
 const RECEIPT_TOKEN_CONTEXT = 'founder-control-room/proof-of-ship-receipts/v1';
 
 export type ProofOfShipReceiptStoreDisposition = 'stored' | 'duplicate' | 'conflict';
@@ -70,11 +72,33 @@ export function deriveProofOfShipReceiptToken(mcpToken: string): string {
     .digest('hex');
 }
 
-function normalizeSourceRepo(owner: unknown, repo: unknown): string {
-  if (owner !== 'jussray' || typeof repo !== 'string' || !REPO_NAME.test(repo)) {
+function configuredFounderGitHubOwners(): ReadonlySet<string> {
+  const configured = process.env.FOUNDER_GITHUB_OWNERS?.trim();
+  if (!configured) return new Set([DEFAULT_FOUNDER_GITHUB_OWNER]);
+
+  const owners = configured
+    .split(',')
+    .map((owner) => owner.trim())
+    .filter(Boolean);
+
+  if (owners.length === 0 || owners.some((owner) => !GITHUB_OWNER.test(owner))) {
     throw new ProofOfShipReceiptError('invalid_source_repo');
   }
-  return `jussray/${repo}`;
+
+  return new Set(owners);
+}
+
+export function normalizeSourceRepo(owner: unknown, repo: unknown): string {
+  if (
+    typeof owner !== 'string'
+    || !GITHUB_OWNER.test(owner)
+    || typeof repo !== 'string'
+    || !REPO_NAME.test(repo)
+    || !configuredFounderGitHubOwners().has(owner)
+  ) {
+    throw new ProofOfShipReceiptError('invalid_source_repo');
+  }
+  return `${owner}/${repo}`;
 }
 
 function normalizeCommitSha(value: unknown): string {
