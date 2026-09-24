@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 
-const relayOperators = ['codex', 'claude-code', 'perplexity'];
+const relayOperators = ['gemini', 'codex', 'claude-code', 'perplexity'];
 const instructorOnly = 'deepseek-instructor';
 
 function relayEnvelope(fromOperator, toOperator) {
@@ -20,7 +20,11 @@ function relayEnvelope(fromOperator, toOperator) {
   };
 }
 
-const perplexity = relayEnvelope('codex', 'perplexity');
+const gemini = relayEnvelope('codex', 'gemini');
+assert.equal(gemini.toOperator, 'gemini');
+assert.deepEqual(Object.values(gemini.authority), [false, false, false, false, false]);
+
+const perplexity = relayEnvelope('gemini', 'perplexity');
 assert.equal(perplexity.toOperator, 'perplexity');
 assert.deepEqual(Object.values(perplexity.authority), [false, false, false, false, false]);
 
