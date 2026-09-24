@@ -48,6 +48,22 @@ A result receipt is emitted only when its `tool_use_id` correlates to an accepte
 
 Disallowed mutation-capable tools such as `browser_click`, `browser_type`, `browser_fill_form`, `browser_file_upload`, and arbitrary unsafe browser code are not promoted into evidence even if a provider response attempts to claim them.
 
+## StoryEngine federation freshness recovery
+
+The first exact-head audit of this follow-up proved the local FCR browser harness but stopped at the existing immutable StoryEngine freshness gate.
+
+Observed values:
+
+- predecessor FCR pin: `35a1855798b4dd059b45f67911280966a09f7be8`
+- observed StoryEngine `refs/heads/main`: `dd1521547c81c1a16d9777e1fc254c6bf9c7d6b9`
+- compare status: `ahead`
+- ahead: `2`
+- behind: `0`
+
+The two StoryEngine successor commits are the resident Council contract changes, including `fix(council): make Council resident in host and Control Room`. The FCR Playwright workflow therefore refreshes only `STORYENGINE_PEER_SHA` to `dd1521547c81c1a16d9777e1fc254c6bf9c7d6b9`.
+
+This repin is freshness recovery only. It does not inherit predecessor browser/federation green proof. The changed FCR head must earn a new exact-head Playwright result, including the live-ref equality check, exact peer checkout, runtime identity, and FCR↔StoryEngine federation proof.
+
 ## Files
 
 - `src/lib/operatorRelayAnthropicMcp.ts`
@@ -55,15 +71,18 @@ Disallowed mutation-capable tools such as `browser_click`, `browser_type`, `brow
 - `src/lib/operatorRelayProvider.ts`
 - `src/lib/agentRegistry.ts`
 - `src/lib/__tests__/operatorRelayAnthropicMcp.test.ts`
+- `.github/workflows/playwright.yml`
 
-## Truth status at authoring time
+## Truth status
 
 - **VERIFIED:** PR #874 previously merged the governed read-only Anthropic remote MCP attachment into `main`.
-- **VERIFIED:** current implementation differentiates MCP configuration from response-level MCP use/result content.
+- **VERIFIED:** this follow-up differentiates MCP configuration from response-level MCP use/result content.
 - **VERIFIED:** spoof resistance is encoded in tests for wrong server, disallowed tool, and configuration-without-use.
-- **UNKNOWN until CI:** exact branch typecheck/unit/lint status for this follow-up commit set.
-- **UNKNOWN until live runtime:** a real Anthropic production response containing Playwright `mcp_tool_use`/`mcp_tool_result` from the configured trusted endpoint.
+- **VERIFIED on predecessor candidate:** unit tests, typecheck, lint, Python tests, RLS, Cloudflare authority contract, CodeQL, Verification Core, and the local browser harness passed before the StoryEngine freshness gate stopped the long federation workflow.
+- **VERIFIED:** the StoryEngine predecessor pin is an ancestor of live `main`, with the observed live head two commits ahead and zero behind.
+- **UNKNOWN until successor CI completes:** exact-head proof for the FCR candidate after refreshing the StoryEngine peer SHA.
+- **UNKNOWN until live Anthropic runtime:** a real production response containing Playwright `mcp_tool_use` / `mcp_tool_result` from the configured trusted endpoint.
 
 ## Rollback
 
-Revert the follow-up PR/merge commit. The prior PR #874 behavior remains the predecessor state: read-only MCP attachment with provider-message evidence but without tool-level receipt promotion.
+Revert the follow-up PR/merge commit. The prior PR #874 behavior remains the predecessor state: read-only MCP attachment with provider-message evidence but without tool-level receipt promotion. The StoryEngine peer pin would also revert to its predecessor value and would again fail freshness if StoryEngine `main` remains advanced.
