@@ -101,6 +101,15 @@ export function normalizeSourceRepo(owner: unknown, repo: unknown): string {
   return `${owner}/${repo}`;
 }
 
+function assertConfiguredSourceRepo(sourceRepo: string): void {
+  const separator = sourceRepo.indexOf('/');
+  const owner = separator > 0 ? sourceRepo.slice(0, separator) : '';
+  const repo = separator > 0 ? sourceRepo.slice(separator + 1) : '';
+  if (normalizeSourceRepo(owner, repo) !== sourceRepo) {
+    throw new ProofOfShipReceiptError('invalid_source_repo');
+  }
+}
+
 function normalizeCommitSha(value: unknown): string {
   if (typeof value !== 'string' || !COMMIT_SHA.test(value)) {
     throw new ProofOfShipReceiptError('invalid_exact_commit_sha');
@@ -288,6 +297,7 @@ export function createProofOfShipReceiptIngestHandler(
     let receipt: ProofOfShipReceipt;
     try {
       receipt = validateProofOfShipReceipt(req.body);
+      assertConfiguredSourceRepo(receipt.sourceRepo);
     } catch (error) {
       const code = error instanceof ProofOfShipReceiptError ? error.code : 'invalid_receipt';
       return res.status(400).json({ error: code });
