@@ -136,7 +136,7 @@ describe('SOFA Flaw Finder identity preflight', () => {
     const widened = {
       ...receipt,
       authority: { ...receipt.authority, publish: true },
-    } as typeof receipt;
+    } as unknown as typeof receipt;
     expect(validateSofaFlawFinderIdentityReceipt(widened, NOW))
       .toContain('SOFA identity receipt cannot carry mutation or promotion authority');
   });
