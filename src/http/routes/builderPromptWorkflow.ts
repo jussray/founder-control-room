@@ -23,7 +23,7 @@ const intents = new Set<string>(Object.keys(BUILDER_PROMPT_WORKFLOW_STACKS));
  * This reports FCR policy intent only and never claims the remote n8n provider
  * has been enabled or verified without provider-native readback.
  */
-builderPromptWorkflowRouter.get('/execution-spine', requireFounder, (_req: FounderRequest, res) => {
+builderPromptWorkflowRouter.get('/execution-spine', rateLimitFounderPermissions, requireFounder, (_req: FounderRequest, res) => {
   res.setHeader('Cache-Control', 'no-store');
   return res.status(200).json({
     controlPlane: 'founder-control-room',
