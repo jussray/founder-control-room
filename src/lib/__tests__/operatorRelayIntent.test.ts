@@ -30,6 +30,13 @@ describe('parseRelayIntent', () => {
     });
   });
 
+  it('routes Muse as a governed peer relay target', () => {
+    expect(parseRelayIntent('Ask Muse to challenge this implementation.', 'codex')).toEqual({
+      target: 'muse',
+      instruction: 'challenge this implementation.',
+    });
+  });
+
   it('does not treat the DeepSeek Instructor identity as a peer relay target', () => {
     expect(parseRelayIntent('Ask DeepSeek Instructor to review this implementation.', 'codex')).toBeNull();
   });
