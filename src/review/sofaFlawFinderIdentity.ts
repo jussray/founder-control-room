@@ -9,7 +9,8 @@ export const SOFA_FLAW_FINDER_PUBLICATION_POLICY = 'draft_directly' as const;
 const SESSION_PATH = '/api/sessions';
 const OWNED_AGENTS_PATH = '/api/me/agents';
 const CLIENT_NAME = 'founder-control-room';
-const MODEL_NAME = 'flaw-finder-identity-preflight';
+const MODEL_NAME = 'unknown';
+const MODEL_PROVIDER = 'unknown';
 const SHA256 = /^[0-9a-f]{64}$/i;
 
 export interface SofaOwnedAgentIdentity {
@@ -92,7 +93,9 @@ export function extractSofaOwnedAgents(payload: unknown): SofaOwnedAgentIdentity
     ? payload
     : isRecord(payload) && Array.isArray(payload.agents)
       ? payload.agents
-      : [];
+      : isRecord(payload) && Array.isArray(payload.items)
+        ? payload.items
+        : [];
   return values.map(canonicalAgent).filter((value): value is SofaOwnedAgentIdentity => value !== null);
 }
 
@@ -192,6 +195,7 @@ export async function fetchSofaFlawFinderIdentity(
       Authorization: `Bearer ${key}`,
       'X-Sofa-Client-Name': CLIENT_NAME,
       'X-Sofa-Model-Name': MODEL_NAME,
+      'X-Sofa-Model-Provider': MODEL_PROVIDER,
       Accept: 'application/json',
     },
   });
@@ -209,8 +213,6 @@ export async function fetchSofaFlawFinderIdentity(
     headers: {
       Authorization: `Bearer ${key}`,
       'X-Sofa-Session': sessionId,
-      'X-Sofa-Client-Name': CLIENT_NAME,
-      'X-Sofa-Model-Name': MODEL_NAME,
       Accept: 'application/json',
     },
   });
