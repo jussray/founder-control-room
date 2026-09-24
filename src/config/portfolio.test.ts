@@ -16,6 +16,10 @@ describe('founder repository index', () => {
       ['solcontinuity', 'jussray/solcontinuity'],
       ['sleepwealth-agent', 'jussray/SleepWealth-Agent'],
       ['sweats', 'jussray/Sweats'],
+      ['bip-jr', 'jussray/Bip-Jr'],
+      ['truth-compass', 'jussray/truth-compass'],
+      ['truth-weaver', 'jussray/truth-weaver'],
+      ['alexa-commerce-engine', 'jussray/alexa-commerce-engine-'],
     ] as const;
 
     for (const [slug, repository] of expectedExternal) {
