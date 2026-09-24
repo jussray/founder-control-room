@@ -23,7 +23,10 @@ describe('parseRelayIntent', () => {
     });
   });
 
-  it('does not treat DeepSeek as a peer relay target', () => {
-    expect(parseRelayIntent('Ask DeepSeek to review this implementation.', 'codex')).toBeNull();
+  it('routes DeepSeek through the canonical peer relay', () => {
+    expect(parseRelayIntent('Ask DeepSeek to review this implementation.', 'codex')).toEqual({
+      target: 'deepseek',
+      instruction: 'review this implementation.',
+    });
   });
 });
