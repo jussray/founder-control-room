@@ -80,6 +80,18 @@ export const AGENT_REGISTRY: readonly AgentDescriptor[] = [
     },
   },
   {
+    id: 'deepseek',
+    label: 'DeepSeek',
+    role: 'Governed peer reasoning, implementation review, adversarial verification, and bounded implementation through the operator relay without inheriting mutation authority.',
+    operator: {
+      enabled: true,
+      capabilities: ['research', 'propose', 'review', 'implement'],
+      firstSliceRuntimeModel: false,
+      externalWritesRequireBoundAuthority: true,
+      instructionContracts: [FCR_V14, MULTI_AGENT],
+    },
+  },
+  {
     id: 'deepseek-instructor',
     label: 'DeepSeek Instructor',
     role: 'Cross-project instruction, adversarial challenge, solution synthesis, and portable pattern extraction without direct implementation authority.',
