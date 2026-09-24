@@ -8,6 +8,7 @@ export interface OperatorRelayAdapters {
   codex?: OperatorRelayAdapter;
   'claude-code'?: OperatorRelayAdapter;
   perplexity?: OperatorRelayAdapter;
+  deepseek?: OperatorRelayAdapter;
 }
 
 export class OperatorRelayDispatchError extends Error {
