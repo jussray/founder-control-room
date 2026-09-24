@@ -1,0 +1,63 @@
+name: Media Router Contract
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/lib/mediaRouter.ts'
+      - 'src/lib/mediaRouterDomainProtocol.ts'
+      - 'src/lib/mediaRouterPhase1Contracts.ts'
+      - 'src/lib/__tests__/mediaRouter*.test.ts'
+      - 'docs/MEDIA_ROUTER_DOMAIN_PROTOCOL_V1.md'
+      - '.github/workflows/media-router-contract.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/lib/mediaRouter.ts'
+      - 'src/lib/mediaRouterDomainProtocol.ts'
+      - 'src/lib/mediaRouterPhase1Contracts.ts'
+      - 'src/lib/__tests__/mediaRouter*.test.ts'
+      - 'docs/MEDIA_ROUTER_DOMAIN_PROTOCOL_V1.md'
+      - '.github/workflows/media-router-contract.yml'
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  verify:
+    name: Media Router exact-head contract proof
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+
+      - name: Verify exact head
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install root toolchain
+        run: npm install --no-audit --no-fund
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Run focused Media Router tests
+        run: >-
+          npx vitest run
+          src/lib/__tests__/mediaRouterDomainProtocol.test.ts
+          src/lib/__tests__/mediaRouter.test.ts
+          src/lib/__tests__/mediaRouterPhase1Contracts.test.ts
