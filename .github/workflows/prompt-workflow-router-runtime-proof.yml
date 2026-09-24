@@ -1,0 +1,29 @@
+name: Prompt Workflow Router Runtime Proof
+
+on:
+  workflow_dispatch:
+    inputs:
+      runtime_base_url:
+        description: Exact deployed FCR runtime base URL
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  playwright-runtime-proof:
+    runs-on: ubuntu-latest
+    env:
+      FCR_RUNTIME_BASE_URL: ${{ inputs.runtime_base_url }}
+      FCR_PLAYWRIGHT_FOUNDER_BEARER: ${{ secrets.FCR_PLAYWRIGHT_FOUNDER_BEARER }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Prove deployed prompt workflow router
+        run: npx playwright test e2e/builder-prompt-workflow-runtime.spec.ts --project=chromium

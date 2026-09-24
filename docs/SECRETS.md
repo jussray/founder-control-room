@@ -252,6 +252,7 @@ This table covers GitHub Actions secret names that are referenced outside the ca
 | `NEON_API_KEY` | `neon-pr-branches.yml` | Required for create/delete of PR preview branches when that workflow runs. |
 | `OPENAI_API_KEY` | `playwright.yml` | Injected only into the E2E harness when configured; do not expose it to browser/static assets. |
 | `PERPLEXITY_API_KEY` | `playwright.yml` | Injected only into the E2E harness when configured; do not expose it to browser/static assets. |
+| `FCR_PLAYWRIGHT_FOUNDER_BEARER` | `prompt-workflow-router-runtime-proof.yml` | Founder bearer credential used only for authorized deployed-runtime Playwright proof of the prompt workflow router. Keep it workflow-side, never log or expose the value in browser/static assets or receipts. |
 | `N8N_CONVEYOR_WEBHOOK_URL` | `n8n-conveyor-live-probe.yml` | Required private webhook URL for the founder-approved live conveyor probe. |
 | `N8N_CONVEYOR_BEARER_TOKEN` | `n8n-conveyor-live-probe.yml` | Required bearer credential paired with the live conveyor webhook probe. |
 | `CLOUDFLARE_DEPLOY_HOOK_URL` | `pages-production-release.yml` | Required reusable-workflow secret used to trigger the exact-SHA Pages release. |
