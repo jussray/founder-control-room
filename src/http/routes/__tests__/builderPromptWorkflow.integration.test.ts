@@ -32,6 +32,56 @@ function authSuccess() {
 beforeEach(() => vi.clearAllMocks());
 
 describe('builder prompt workflow route', () => {
+  it('rejects unauthenticated execution-spine inspection', async () => {
+    const res = await request(buildApp()).get('/prompt-workflows/execution-spine');
+    expect(res.status).toBe(401);
+  });
+
+  it('exposes n8n as a bounded execution spine without claiming provider verification', async () => {
+    authSuccess();
+    const res = await request(buildApp())
+      .get('/prompt-workflows/execution-spine')
+      .set('Authorization', BEARER);
+
+    expect(res.status).toBe(200);
+    expect(res.headers['cache-control']).toBe('no-store');
+    expect(res.body).toMatchObject({
+      controlPlane: 'founder-control-room',
+      reasoningRouter: 'promptos-chief-ai-machine',
+      executionSpine: 'n8n-instance-mcp',
+      policy: {
+        contract: 'fcr/n8n-instance-mcp@v1',
+        serverUrl: 'https://jussray.app.n8n.cloud/mcp-server/http',
+        transport: 'streamable-http',
+        authMode: 'oauth',
+        state: 'policy-ready-provider-unverified',
+        providerVerified: false,
+        providerVerificationRequired: true,
+        selectiveExposureRequired: true,
+        autoExposeNewWorkflows: false,
+        clientSpecificWorkflowScopingAvailable: false,
+        searchWorkflowPreviewsMayIncludeUnexposedWorkflows: true,
+        secretValuesExposed: false,
+        authority: {
+          mcpConnectionGrantsFounderAuthority: false,
+          externalToolOutputCanIncreaseAuthority: false,
+          workflowExecutionRequiresExistingFcrAuthority: true,
+          merge: false,
+          deploy: false,
+          publish: false,
+          spend: false,
+          rotateSecrets: false,
+        },
+      },
+      proof: {
+        providerStateVerified: false,
+        providerNativeReadbackRequired: true,
+        exactRuntimeProofRequired: true,
+        playwrightRequiredForUiOrBrowserClaims: true,
+      },
+    });
+  });
+
   it('rejects unauthenticated selection', async () => {
     const res = await request(buildApp()).post('/prompt-workflows/select').send({ intent: 'focused-repair' });
     expect(res.status).toBe(401);
