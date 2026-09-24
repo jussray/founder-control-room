@@ -112,6 +112,34 @@ export const EXTERNAL_PROJECTS: readonly PortfolioProject[] = [
     status: "external",
     capabilities: ["product", "continuity"],
   },
+  {
+    slug: "bip-jr",
+    name: "Bip Jr",
+    repository: "jussray/Bip-Jr",
+    status: "external",
+    capabilities: ["bip-universe", "continuity"],
+  },
+  {
+    slug: "truth-compass",
+    name: "Truth Compass",
+    repository: "jussray/truth-compass",
+    status: "external",
+    capabilities: ["truth-analysis", "evidence", "continuity"],
+  },
+  {
+    slug: "truth-weaver",
+    name: "Truth Weaver",
+    repository: "jussray/truth-weaver",
+    status: "external",
+    capabilities: ["decision-control", "evidence", "continuity"],
+  },
+  {
+    slug: "alexa-commerce-engine",
+    name: "Alexa Commerce Engine",
+    repository: "jussray/alexa-commerce-engine-",
+    status: "external",
+    capabilities: ["commerce-agent", "continuity"],
+  },
 ] as const;
 
 export const QUARANTINED_REPOSITORIES = new Set([
