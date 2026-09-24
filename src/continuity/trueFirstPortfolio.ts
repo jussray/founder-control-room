@@ -52,7 +52,9 @@ export interface TruthChallengeInput {
   repository: string;
   branch: string;
   headSha: string;
+  scope: string;
   claimId: string;
+  statement: string;
   value: TruthValue;
   state: TruthEvidenceState;
   evidenceRefs: readonly string[];
@@ -104,7 +106,13 @@ function normalizeClaim(claim: EvidenceBoundTruthClaim): EvidenceBoundTruthClaim
 function sortClaims(claims: readonly EvidenceBoundTruthClaim[]): EvidenceBoundTruthClaim[] {
   return claims
     .map(normalizeClaim)
-    .sort((left, right) => `${left.claimId}:${left.statement}`.localeCompare(`${right.claimId}:${right.statement}`));
+    .sort((left, right) => `${left.claimId}:${left.statement}:${left.state}:${left.value}`.localeCompare(
+      `${right.claimId}:${right.statement}:${right.state}:${right.value}`,
+    ));
+}
+
+function isVerifiedTrueClaim(claim: EvidenceBoundTruthClaim): boolean {
+  return claim.state === 'VERIFIED' && claim.value === 'TRUE' && claim.evidenceRefs.length > 0;
 }
 
 /**
@@ -126,13 +134,8 @@ export function buildTrueFirstBaseline(input: TrueFirstBaselineInput): TrueFirst
 
   const headSha = requireHeadSha(input.headSha);
   const claims = sortClaims(input.claims);
-  const verifiedTrueClaims = claims.filter(
-    (claim) => claim.state === 'VERIFIED' && claim.value === 'TRUE' && claim.evidenceRefs.length > 0,
-  );
-  const acceptedIds = new Set(verifiedTrueClaims.map((claim) => `${claim.claimId}\u0000${claim.statement}`));
-  const rejectedClaims = claims.filter(
-    (claim) => !acceptedIds.has(`${claim.claimId}\u0000${claim.statement}`),
-  );
+  const verifiedTrueClaims = claims.filter(isVerifiedTrueClaim);
+  const rejectedClaims = claims.filter((claim) => !isVerifiedTrueClaim(claim));
 
   const baselineFingerprint = fingerprintNormalized({
     contract: TRUE_FIRST_PORTFOLIO_CONTRACT,
@@ -206,11 +209,15 @@ export function evaluateTruthChallenge(
 ): TruthChallengeEvaluation {
   requireIsoTimestamp(challenge.observedAt, 'challenge.observedAt');
   const challengeHeadSha = requireHeadSha(challenge.headSha);
+  const challengeObservedMs = Date.parse(challenge.observedAt);
+  const baselineObservedMs = Date.parse(baseline.observedAt);
   const challengeFingerprint = fingerprintNormalized({
     repository: challenge.repository.trim(),
     branch: challenge.branch.trim(),
     headSha: challengeHeadSha,
+    scope: challenge.scope.trim(),
     claimId: challenge.claimId.trim(),
+    statement: challenge.statement.trim(),
     value: challenge.value,
     state: challenge.state,
     evidenceRefs: normalizeRefs(challenge.evidenceRefs),
@@ -233,8 +240,9 @@ export function evaluateTruthChallenge(
   if (
     challenge.repository.trim().toLowerCase() !== baseline.project.repository.toLowerCase()
     || challenge.branch.trim() !== baseline.subject.branch
+    || challenge.scope.trim() !== baseline.subject.scope
   ) {
-    return result('SUBJECT_MISMATCH', 'Challenge repository or branch does not match the baseline subject.');
+    return result('SUBJECT_MISMATCH', 'Challenge repository, branch, or scope does not match the baseline subject.');
   }
 
   if (
@@ -252,8 +260,18 @@ export function evaluateTruthChallenge(
     return result('CLAIM_NOT_IN_BASELINE', 'The challenged claim was not part of the verified TRUE baseline.');
   }
 
-  if (challenge.state !== 'VERIFIED' || normalizeRefs(challenge.evidenceRefs).length === 0 || challenge.value === 'UNKNOWN') {
-    return result('UNRESOLVED', 'The challenge is not a fresh evidence-bound verified TRUE/FALSE observation.');
+  if (baselineClaim.statement !== challenge.statement.trim()) {
+    return result('SUBJECT_MISMATCH', 'The challenge reused a claim ID for different claim text.');
+  }
+
+  if (
+    challengeObservedMs > evaluatedAt.getTime()
+    || challengeObservedMs < baselineObservedMs
+    || challenge.state !== 'VERIFIED'
+    || normalizeRefs(challenge.evidenceRefs).length === 0
+    || challenge.value === 'UNKNOWN'
+  ) {
+    return result('UNRESOLVED', 'The challenge is not a fresh evidence-bound verified TRUE/FALSE observation newer than the baseline.');
   }
 
   if (challenge.value === 'FALSE') {
