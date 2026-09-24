@@ -62,8 +62,11 @@ function validMcpServerUrl(value: string): boolean {
   }
 }
 
-function authMode(value: string): N8nInstanceMcpAuthMode {
-  return value.toLowerCase() === 'api-key' ? 'api-key' : 'oauth';
+function normalizedAuthMode(value: string): N8nInstanceMcpAuthMode | null {
+  const candidate = value.toLowerCase();
+  return N8N_INSTANCE_MCP_AUTH_MODES.includes(candidate as N8nInstanceMcpAuthMode)
+    ? candidate as N8nInstanceMcpAuthMode
+    : null;
 }
 
 export function readN8nInstanceMcpPolicy(
@@ -71,14 +74,18 @@ export function readN8nInstanceMcpPolicy(
 ): N8nInstanceMcpPolicy {
   const configuredServerUrl = text(env.N8N_MCP_SERVER_URL);
   const serverUrl = configuredServerUrl || N8N_INSTANCE_MCP_DEFAULT_SERVER_URL;
-  const selectedAuthMode = authMode(text(env.N8N_MCP_AUTH_MODE) || 'oauth');
+  const requestedAuthMode = text(env.N8N_MCP_AUTH_MODE) || 'oauth';
+  const parsedAuthMode = normalizedAuthMode(requestedAuthMode);
+  const selectedAuthMode = parsedAuthMode ?? 'oauth';
   const requestedAutoExpose = boolean(env.N8N_MCP_AUTO_EXPOSE_NEW_WORKFLOWS);
   const violations: string[] = [];
 
   if (!validMcpServerUrl(serverUrl)) {
     violations.push('server URL must use HTTPS and end with /mcp-server/http');
   }
-  if (selectedAuthMode !== 'oauth') {
+  if (!parsedAuthMode) {
+    violations.push('MCP auth mode must be oauth or api-key');
+  } else if (selectedAuthMode !== 'oauth') {
     violations.push('OAuth is required for governed portfolio MCP clients');
   }
   if (requestedAutoExpose) {
