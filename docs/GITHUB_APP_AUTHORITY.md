@@ -74,6 +74,28 @@ Therefore:
 - arbitrary-upstream fork creation does **not** get smuggled through that lane;
 - a future founder user-authority lane must be separately authenticated, scoped, audited, and receipt-backed.
 
+## Claude/Cowork GitHub MCP OAuth boundary
+
+Claude/Cowork connecting to GitHub's remote MCP endpoint is a different authentication plane from FCR's server-to-server GitHub App installation-token path.
+
+The canonical GitHub MCP endpoint is:
+
+```text
+https://api.githubcopilot.com/mcp/
+```
+
+When a hosted MCP client asks for an OAuth client ID and OAuth client secret:
+
+- do **not** paste `GITHUB_APP_ID`, `APP_ID`, `GITHUB_PRIVATE_KEY`, or `APP_PRIVATE_KEY` into those fields;
+- the GitHub App numeric App ID and private-key PEM remain server-side installation authority only;
+- an OAuth **Client ID** and **Client Secret** may be used only when the selected GitHub App or OAuth App is explicitly configured for user authorization and the hosted client's exact callback URL is registered with GitHub;
+- the OAuth client secret stays in the hosted client's protected connector configuration and must never be committed, logged, copied into issues/PRs, or stored in FCR/Chief source;
+- reusing an existing FCR GitHub App for Claude is permitted only after its user-authorization settings, callback URL, repository scope, and requested OAuth permissions are independently inspected and accepted; installation authority alone is not proof that the App is safe or configured for that hosted OAuth flow;
+- Chief must not mint a second independent founder GitHub identity merely because it has its own application/runtime boundary. Consequential repository authority remains governed by FCR and the existing founder gates;
+- if neither existing App has an appropriate user-OAuth configuration, use a dedicated least-privilege Claude/Cowork OAuth client rather than altering or exposing the production installation private key.
+
+A successful Claude authorization proves only that the hosted client obtained the user-scoped GitHub access GitHub granted. It does not grant FCR founder approval, merge authority, deployment authority, provider-admin authority, billing authority, publication authority, or permission to bypass repository evidence gates.
+
 ## Security invariants
 
 - No capability may be inferred from possession of a token alone.
