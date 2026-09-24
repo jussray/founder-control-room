@@ -1,0 +1,76 @@
+name: SOFA Flaw Finder Proof
+
+on:
+  push:
+    paths:
+      - '.github/workflows/sofa-flaw-finder-proof.yml'
+      - 'src/review/externalFlawFinderObservation.ts'
+      - 'src/review/externalFlawFinderObservation.test.ts'
+      - 'src/review/sofaFlawFinderIdentity.ts'
+      - 'src/review/sofaFlawFinderIdentity.test.ts'
+      - 'docs/SOFA_FLAW_FINDER_REVIEW_LANE.md'
+      - 'artifacts/audit/SOFA_FLAW_FINDER_REVIEW_LANE_RECEIPT.md'
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/sofa-flaw-finder-proof.yml'
+      - 'src/review/externalFlawFinderObservation.ts'
+      - 'src/review/externalFlawFinderObservation.test.ts'
+      - 'src/review/sofaFlawFinderIdentity.ts'
+      - 'src/review/sofaFlawFinderIdentity.test.ts'
+      - 'docs/SOFA_FLAW_FINDER_REVIEW_LANE.md'
+      - 'artifacts/audit/SOFA_FLAW_FINDER_REVIEW_LANE_RECEIPT.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sofa-flaw-finder-proof-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  proof:
+    name: SOFA Flaw Finder Exact-Head Proof
+    runs-on: ubuntu-22.04
+    timeout-minutes: 35
+    env:
+      EXPECTED_HEAD_SHA: ${{ github.sha }}
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify exact head
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
+
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck exact candidate
+        run: npm run typecheck
+
+      - name: Run focused Flaw Finder contracts
+        run: npx vitest run src/review/externalFlawFinderObservation.test.ts src/review/sofaFlawFinderIdentity.test.ts
+
+      - name: Install Playwright Chromium
+        run: npx playwright install chromium --with-deps
+
+      - name: Run repository Playwright E2E gate
+        run: npm run test:e2e
