@@ -13,19 +13,21 @@ const HEAD = 'b1df38342829b48f53de00b9414e3ebbbb12808b';
 const NEXT_HEAD = 'c1df38342829b48f53de00b9414e3ebbbb12808b';
 const OBSERVED_AT = '2026-09-24T02:40:00.000Z';
 const WINDOW = 60 * 60 * 1000;
+const SCOPE = 'portfolio truth baseline';
+const STATEMENT = 'The inspected state is bound to the exact main head.';
 
 function baseline() {
   return buildTrueFirstBaseline({
     project,
     branch: 'main',
     headSha: HEAD,
-    scope: 'portfolio truth baseline',
+    scope: SCOPE,
     observedAt: OBSERVED_AT,
     freshnessWindowMs: WINDOW,
     claims: [
       {
         claimId: 'main-head-bound',
-        statement: 'The inspected state is bound to the exact main head.',
+        statement: STATEMENT,
         value: 'TRUE',
         state: 'VERIFIED',
         evidenceRefs: ['github:branches/main', 'github:commit:b1df3834'],
@@ -40,7 +42,7 @@ describe('true-first portfolio continuity', () => {
       project,
       branch: 'main',
       headSha: HEAD.toUpperCase(),
-      scope: 'portfolio truth baseline',
+      scope: SCOPE,
       observedAt: OBSERVED_AT,
       freshnessWindowMs: WINDOW,
       claims: [
@@ -65,7 +67,7 @@ describe('true-first portfolio continuity', () => {
       project,
       branch: 'main',
       headSha: HEAD,
-      scope: 'portfolio truth baseline',
+      scope: SCOPE,
       observedAt: OBSERVED_AT,
       freshnessWindowMs: WINDOW,
       claims: [
@@ -90,7 +92,7 @@ describe('true-first portfolio continuity', () => {
     expect(first.proofCookie.cookieId).toBe(second.proofCookie.cookieId);
   });
 
-  it('keeps inferred, false, unknown, and evidence-free claims out of the TRUE baseline', () => {
+  it('keeps inferred, false, unknown, evidence-free, and duplicate negative claims out of the TRUE baseline', () => {
     const result = buildTrueFirstBaseline({
       project,
       branch: 'main',
@@ -100,6 +102,7 @@ describe('true-first portfolio continuity', () => {
       freshnessWindowMs: WINDOW,
       claims: [
         { claimId: 'verified-true', statement: 'Verified true', value: 'TRUE', state: 'VERIFIED', evidenceRefs: ['ref:1'] },
+        { claimId: 'verified-true', statement: 'Verified true', value: 'FALSE', state: 'VERIFIED', evidenceRefs: ['ref:contradiction'] },
         { claimId: 'inferred-true', statement: 'Inferred true', value: 'TRUE', state: 'INFERRED', evidenceRefs: ['ref:2'] },
         { claimId: 'verified-false', statement: 'Verified false', value: 'FALSE', state: 'VERIFIED', evidenceRefs: ['ref:3'] },
         { claimId: 'unknown', statement: 'Unknown', value: 'UNKNOWN', state: 'UNKNOWN', evidenceRefs: ['ref:4'] },
@@ -107,8 +110,10 @@ describe('true-first portfolio continuity', () => {
       ],
     });
 
-    expect(result.verifiedTrueClaims.map((claim) => claim.claimId)).toEqual(['verified-true']);
-    expect(result.rejectedClaims).toHaveLength(4);
+    expect(result.verifiedTrueClaims).toHaveLength(1);
+    expect(result.verifiedTrueClaims[0]?.value).toBe('TRUE');
+    expect(result.rejectedClaims).toHaveLength(5);
+    expect(result.rejectedClaims.some((claim) => claim.value === 'FALSE' && claim.claimId === 'verified-true')).toBe(true);
     expect(result.status).toBe('ESTABLISHED');
     expect(result.authority).toBe('EVIDENCE_ONLY');
     expect(result.browserCookieStored).toBe(false);
@@ -120,7 +125,9 @@ describe('true-first portfolio continuity', () => {
       repository: project.repository,
       branch: 'main',
       headSha: HEAD,
+      scope: SCOPE,
       claimId: 'main-head-bound',
+      statement: STATEMENT,
       value: 'FALSE',
       state: 'VERIFIED',
       evidenceRefs: ['github:independent-readback'],
@@ -136,7 +143,9 @@ describe('true-first portfolio continuity', () => {
       repository: project.repository,
       branch: 'main',
       headSha: NEXT_HEAD,
+      scope: SCOPE,
       claimId: 'main-head-bound',
+      statement: STATEMENT,
       value: 'FALSE',
       state: 'VERIFIED',
       evidenceRefs: ['github:new-head'],
@@ -145,6 +154,70 @@ describe('true-first portfolio continuity', () => {
 
     expect(result.verdict).toBe('BASELINE_STALE');
     expect(result.reason).toContain('Rebuild the TRUE baseline first');
+  });
+
+  it('rejects claim-id reuse under different wording or scope', () => {
+    const current = baseline();
+    const changedStatement = evaluateTruthChallenge(current, {
+      repository: project.repository,
+      branch: 'main',
+      headSha: HEAD,
+      scope: SCOPE,
+      claimId: 'main-head-bound',
+      statement: 'A different semantic claim using the same identifier.',
+      value: 'FALSE',
+      state: 'VERIFIED',
+      evidenceRefs: ['github:readback'],
+      observedAt: '2026-09-24T02:45:00.000Z',
+    }, new Date('2026-09-24T02:45:01.000Z'));
+
+    const changedScope = evaluateTruthChallenge(current, {
+      repository: project.repository,
+      branch: 'main',
+      headSha: HEAD,
+      scope: 'different scope',
+      claimId: 'main-head-bound',
+      statement: STATEMENT,
+      value: 'FALSE',
+      state: 'VERIFIED',
+      evidenceRefs: ['github:readback'],
+      observedAt: '2026-09-24T02:45:00.000Z',
+    }, new Date('2026-09-24T02:45:01.000Z'));
+
+    expect(changedStatement.verdict).toBe('SUBJECT_MISMATCH');
+    expect(changedScope.verdict).toBe('SUBJECT_MISMATCH');
+  });
+
+  it('does not accept future or pre-baseline observations as fresh contradiction evidence', () => {
+    const current = baseline();
+    const future = evaluateTruthChallenge(current, {
+      repository: project.repository,
+      branch: 'main',
+      headSha: HEAD,
+      scope: SCOPE,
+      claimId: 'main-head-bound',
+      statement: STATEMENT,
+      value: 'FALSE',
+      state: 'VERIFIED',
+      evidenceRefs: ['github:future'],
+      observedAt: '2026-09-24T02:50:00.000Z',
+    }, new Date('2026-09-24T02:45:01.000Z'));
+
+    const older = evaluateTruthChallenge(current, {
+      repository: project.repository,
+      branch: 'main',
+      headSha: HEAD,
+      scope: SCOPE,
+      claimId: 'main-head-bound',
+      statement: STATEMENT,
+      value: 'FALSE',
+      state: 'VERIFIED',
+      evidenceRefs: ['github:older'],
+      observedAt: '2026-09-24T02:39:59.000Z',
+    }, new Date('2026-09-24T02:45:01.000Z'));
+
+    expect(future.verdict).toBe('UNRESOLVED');
+    expect(older.verdict).toBe('UNRESOLVED');
   });
 
   it('links successor proof cookies without transferring authority', () => {
@@ -159,7 +232,7 @@ describe('true-first portfolio continuity', () => {
       predecessorCookieId: first.proofCookie.cookieId,
       claims: [{
         claimId: 'main-head-bound',
-        statement: 'The inspected state is bound to the exact main head.',
+        statement: STATEMENT,
         value: 'TRUE',
         state: 'VERIFIED',
         evidenceRefs: ['github:branches/main'],
