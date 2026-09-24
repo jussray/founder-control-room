@@ -54,6 +54,8 @@ export interface SofaIdentityFetchOptions {
 
 type JsonRecord = Record<string, unknown>;
 
+type SofaFlawFinderFingerprintInput = Omit<SofaFlawFinderIdentityReceipt, 'identityFingerprint'>;
+
 function isRecord(value: unknown): value is JsonRecord {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
@@ -104,7 +106,7 @@ function descriptionDigest(description: string | null): string {
 }
 
 export function sofaFlawFinderIdentityFingerprint(
-  value: Omit<SofaFlawFinderIdentityReceipt, 'identityFingerprint' | 'observedAt' | 'sessionExpiresAt'>,
+  value: SofaFlawFinderFingerprintInput,
 ): string {
   return digest([
     SOFA_FLAW_FINDER_IDENTITY_CONTRACT,
@@ -116,6 +118,8 @@ export function sofaFlawFinderIdentityFingerprint(
     value.publicationPolicy,
     [...value.privileges].sort(),
     value.descriptionDigest,
+    value.observedAt,
+    value.sessionExpiresAt,
     true,
     false,
     false,
@@ -155,12 +159,7 @@ export function validateSofaFlawFinderIdentityReceipt(
   if (!SHA256.test(receipt.identityFingerprint ?? '')) {
     errors.push('identityFingerprint must be sha256');
   } else if (errors.length === 0) {
-    const {
-      identityFingerprint: _identityFingerprint,
-      observedAt: _observedAt,
-      sessionExpiresAt: _sessionExpiresAt,
-      ...identity
-    } = receipt;
+    const { identityFingerprint: _identityFingerprint, ...identity } = receipt;
     if (receipt.identityFingerprint.toLowerCase() !== sofaFlawFinderIdentityFingerprint(identity)) {
       errors.push('identityFingerprint does not match authenticated SOFA identity');
     }
@@ -191,6 +190,7 @@ export async function fetchSofaFlawFinderIdentity(
 
   const sessionResponse = await fetchImpl(`${baseUrl}${SESSION_PATH}`, {
     method: 'POST',
+    redirect: 'error',
     headers: {
       Authorization: `Bearer ${key}`,
       'X-Sofa-Client-Name': CLIENT_NAME,
@@ -210,6 +210,7 @@ export async function fetchSofaFlawFinderIdentity(
 
   const agentsResponse = await fetchImpl(`${baseUrl}${OWNED_AGENTS_PATH}`, {
     method: 'GET',
+    redirect: 'error',
     headers: {
       Authorization: `Bearer ${key}`,
       'X-Sofa-Session': sessionId,
@@ -235,9 +236,9 @@ export async function fetchSofaFlawFinderIdentity(
   }
 
   const observedAt = new Date(nowMs).toISOString();
-  const identityBase = {
+  const receiptBase: SofaFlawFinderFingerprintInput = {
     contract: SOFA_FLAW_FINDER_IDENTITY_CONTRACT,
-    provider: 'sofa' as const,
+    provider: 'sofa',
     baseUrl: SOFA_BASE_URL,
     agentId: agent.agentId,
     agentName: SOFA_FLAW_FINDER_AGENT_NAME,
@@ -245,22 +246,22 @@ export async function fetchSofaFlawFinderIdentity(
     publicationPolicy: SOFA_FLAW_FINDER_PUBLICATION_POLICY,
     privileges: [...agent.privileges].sort(),
     descriptionDigest: descriptionDigest(agent.description),
-    proposalOnly: true as const,
+    observedAt,
+    sessionExpiresAt,
+    proposalOnly: true,
     authority: {
-      externalWrite: false as const,
-      merge: false as const,
-      deploy: false as const,
-      publish: false as const,
-      providerMutation: false as const,
-      registryPromotion: false as const,
+      externalWrite: false,
+      merge: false,
+      deploy: false,
+      publish: false,
+      providerMutation: false,
+      registryPromotion: false,
     },
   };
 
   const receipt: SofaFlawFinderIdentityReceipt = {
-    ...identityBase,
-    observedAt,
-    sessionExpiresAt,
-    identityFingerprint: sofaFlawFinderIdentityFingerprint(identityBase),
+    ...receiptBase,
+    identityFingerprint: sofaFlawFinderIdentityFingerprint(receiptBase),
   };
   const errors = validateSofaFlawFinderIdentityReceipt(receipt, nowMs);
   if (errors.length > 0) throw new Error(`SOFA identity receipt rejected: ${errors.join('; ')}`);
