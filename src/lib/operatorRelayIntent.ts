@@ -8,6 +8,8 @@ const TARGETS: ReadonlyArray<{ id: RelayOperatorId; patterns: RegExp[] }> = [
   { id: 'codex', patterns: [/\b(?:chatgpt|codex)\b/i] },
 ];
 
+const DEEPSEEK_INSTRUCTOR_PATTERN = /\bdeepseek\s+instructor\b/i;
+
 export interface RelayIntent {
   target: RelayOperatorId;
   instruction: string;
@@ -29,6 +31,10 @@ export function parseRelayIntent(input: string, activeOperator: RelayOperatorId)
 
   const delegation = /^(?:tell|ask|send|relay(?:\s+this)?\s+to|have)\s+/i.test(text);
   if (!delegation) return null;
+
+  // DeepSeek Instructor is a distinct adversary/instructor identity and must
+  // never be collapsed into the normal DeepSeek peer lane by shorthand parsing.
+  if (DEEPSEEK_INSTRUCTOR_PATTERN.test(text)) return null;
 
   const target = TARGETS.find(({ id, patterns }) => id !== activeOperator && patterns.some((pattern) => pattern.test(text)))?.id;
   if (!target) return null;
