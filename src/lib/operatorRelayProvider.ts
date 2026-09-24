@@ -9,7 +9,8 @@ export interface TextOperatorProvider {
     context: string;
   }): Promise<{
     text: string;
-    evidenceRef: string;
+    evidenceRef?: string;
+    evidenceRefs?: string[];
   }>;
 }
 
@@ -20,9 +21,11 @@ export function operatorRelayAdapterFromTextProvider(provider: TextOperatorProvi
       goal: request.goal,
       context: request.context.summary,
     });
+    const evidenceRefs = result.evidenceRefs
+      ?? (result.evidenceRef ? [result.evidenceRef] : []);
     return buildOperatorRelayResponse(request, {
       answer: result.text,
-      evidenceRefs: [result.evidenceRef],
+      evidenceRefs,
     });
   };
 }

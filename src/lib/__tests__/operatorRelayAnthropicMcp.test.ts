@@ -7,8 +7,11 @@ import {
 } from '../operatorRelay.js';
 import {
   ANTHROPIC_MCP_BETA,
+  ANTHROPIC_PLAYWRIGHT_CONFIG_EVIDENCE_REF,
   ANTHROPIC_PLAYWRIGHT_READ_TOOL_ALLOWLIST,
+  ANTHROPIC_RELAY_RUNTIME,
   anthropicPlaywrightMcpAttachment,
+  anthropicPlaywrightMcpToolEvidenceRefs,
 } from '../operatorRelayAnthropicMcp.js';
 import { createServerOperatorRelayAdapters } from '../operatorRelayModelProviders.js';
 
@@ -34,6 +37,10 @@ function relay(): OperatorRelayRequestV1 {
 }
 
 describe('anthropicPlaywrightMcpAttachment', () => {
+  it('keeps the claude-code operator identity separate from its current runtime truth', () => {
+    expect(ANTHROPIC_RELAY_RUNTIME).toBe('anthropic-messages-api');
+  });
+
   it('is opt-in and leaves the existing Claude relay unchanged when not configured', () => {
     expect(anthropicPlaywrightMcpAttachment({})).toBeNull();
   });
@@ -77,6 +84,51 @@ describe('anthropicPlaywrightMcpAttachment', () => {
     expect(toolset.configs).not.toHaveProperty('browser_run_code_unsafe');
   });
 
+  it('does not mistake configuration for actual MCP tool use', () => {
+    expect(anthropicPlaywrightMcpToolEvidenceRefs({
+      content: [{ type: 'text', text: 'No browser tool was needed.' }],
+    })).toEqual([]);
+  });
+
+  it('emits correlated receipts only for allowlisted Playwright MCP tool use', () => {
+    const refs = anthropicPlaywrightMcpToolEvidenceRefs({
+      content: [
+        {
+          type: 'mcp_tool_use',
+          id: 'mcptoolu_safe_1',
+          name: 'browser_snapshot',
+          server_name: 'playwright',
+          input: {},
+        },
+        {
+          type: 'mcp_tool_result',
+          tool_use_id: 'mcptoolu_safe_1',
+          is_error: false,
+          content: [{ type: 'text', text: 'snapshot' }],
+        },
+        {
+          type: 'mcp_tool_use',
+          id: 'mcptoolu_write_1',
+          name: 'browser_click',
+          server_name: 'playwright',
+          input: {},
+        },
+        {
+          type: 'mcp_tool_use',
+          id: 'mcptoolu_other_1',
+          name: 'browser_snapshot',
+          server_name: 'other-server',
+          input: {},
+        },
+      ],
+    });
+
+    expect(refs).toEqual([
+      'mcp-tool-use:playwright:browser_snapshot:mcptoolu_safe_1',
+      'mcp-tool-result:playwright:browser_snapshot:mcptoolu_safe_1:success',
+    ]);
+  });
+
   it('wires the MCP attachment only into the Anthropic request and never serializes the API key into the body', async () => {
     const fetchMock = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
       expect(String(url)).toBe('https://api.anthropic.com/v1/messages');
@@ -85,7 +137,7 @@ describe('anthropicPlaywrightMcpAttachment', () => {
         'anthropic-beta': ANTHROPIC_MCP_BETA,
       });
       const serialized = String(init?.body ?? '');
-      expect(serialized).not.toContain(`"x-api-key":"${FIXTURE}"`);
+      expect(serialized).not.toContain(`\"x-api-key\":\"${FIXTURE}\"`);
       const body = JSON.parse(serialized) as Record<string, unknown>;
       expect(body).toMatchObject({
         model: 'claude-test-model',
@@ -125,9 +177,50 @@ describe('anthropicPlaywrightMcpAttachment', () => {
       fromOperator: 'claude-code',
       toOperator: 'codex',
       answer: 'Read-only browser inspection complete.',
-      evidenceRefs: ['provider:anthropic:msg_browser_safe_1'],
+      evidenceRefs: [
+        'provider:anthropic:msg_browser_safe_1',
+        ANTHROPIC_PLAYWRIGHT_CONFIG_EVIDENCE_REF,
+      ],
       authorityRequested: 'none',
     });
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('promotes actual Anthropic MCP tool use into separate evidence receipts', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+      id: 'msg_browser_used_1',
+      type: 'message',
+      role: 'assistant',
+      content: [
+        {
+          type: 'mcp_tool_use',
+          id: 'mcptoolu_runtime_1',
+          name: 'browser_snapshot',
+          server_name: 'playwright',
+          input: {},
+        },
+        {
+          type: 'mcp_tool_result',
+          tool_use_id: 'mcptoolu_runtime_1',
+          is_error: false,
+          content: [{ type: 'text', text: 'snapshot' }],
+        },
+        { type: 'text', text: 'I inspected the page.' },
+      ],
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } })) as typeof fetch;
+
+    const adapters = createServerOperatorRelayAdapters({
+      ANTHROPIC_API_KEY: FIXTURE,
+      FCR_RELAY_ANTHROPIC_MODEL: 'claude-test-model',
+      FCR_RELAY_ANTHROPIC_PLAYWRIGHT_MCP_URL: 'https://browser.example.com/mcp',
+    }, fetchMock);
+
+    const response = await adapters['claude-code']?.(relay());
+    expect(response?.evidenceRefs).toEqual([
+      'provider:anthropic:msg_browser_used_1',
+      ANTHROPIC_PLAYWRIGHT_CONFIG_EVIDENCE_REF,
+      'mcp-tool-use:playwright:browser_snapshot:mcptoolu_runtime_1',
+      'mcp-tool-result:playwright:browser_snapshot:mcptoolu_runtime_1:success',
+    ]);
   });
 });

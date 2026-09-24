@@ -1,6 +1,10 @@
 import type { OperatorRelayRequestV1 } from './operatorRelay.js';
 import type { OperatorRelayAdapters } from './operatorRelayDispatch.js';
-import { anthropicPlaywrightMcpAttachment } from './operatorRelayAnthropicMcp.js';
+import {
+  ANTHROPIC_PLAYWRIGHT_CONFIG_EVIDENCE_REF,
+  anthropicPlaywrightMcpAttachment,
+  anthropicPlaywrightMcpToolEvidenceRefs,
+} from './operatorRelayAnthropicMcp.js';
 import { operatorRelayAdapterFromTextProvider } from './operatorRelayProvider.js';
 
 type FetchLike = typeof fetch;
@@ -374,7 +378,10 @@ export function createServerOperatorRelayAdapters(
           redirect: 'error',
           signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
         }, 'Anthropic relay');
-        return { text: anthropicText(body), evidenceRef: evidenceRef('anthropic', body) };
+        const evidenceRefs = [evidenceRef('anthropic', body)];
+        if (anthropicMcp) evidenceRefs.push(ANTHROPIC_PLAYWRIGHT_CONFIG_EVIDENCE_REF);
+        evidenceRefs.push(...anthropicPlaywrightMcpToolEvidenceRefs(body));
+        return { text: anthropicText(body), evidenceRefs };
       },
     });
   }
