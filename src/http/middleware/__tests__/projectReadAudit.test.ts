@@ -56,6 +56,10 @@ function createProbeApp() {
     res.status(404).json({ error: 'Not found' });
   });
 
+  app.post('/projects/:slug/connections', (req, res) => {
+    res.status(201).json({ config: req.body?.config ?? {}, secretRef: req.body?.secretRef ?? null });
+  });
+
   app.post('/projects', (_req, res) => {
     res.status(201).json({ project: { id: 'project-created' } });
   });
@@ -190,12 +194,44 @@ describe('requireProjectReadAudit', () => {
     expect(mockInsert).not.toHaveBeenCalled();
   });
 
-  it('does not audit non-GET methods', async () => {
+  it('does not audit unrelated non-GET methods', async () => {
     const response = await request(createProbeApp())
       .post('/projects')
       .send({ slug: 'new-project' });
 
     expect(response.status).toBe(201);
+    expect(mockInsert).not.toHaveBeenCalled();
+  });
+
+  it('allows non-secret nested connection config and keeps secretRef as reference-only metadata', async () => {
+    const response = await request(createProbeApp())
+      .post('/projects/one/connections')
+      .send({
+        config: { region: 'us-east', nested: { mode: 'read-only' } },
+        secretRef: 'env:FCR_PROVIDER_TOKEN',
+      });
+
+    expect(response.status).toBe(201);
+    expect(response.body.secretRef).toBe('env:FCR_PROVIDER_TOKEN');
+    expect(response.body.config.nested.mode).toBe('read-only');
+  });
+
+  it.each([
+    [{ nested: { api_key: 'not-even-needed' } }, 'config.nested.api_key'],
+    [{ nested: [{ clientSecret: 'value' }] }, 'config.nested[0].clientSecret'],
+    [{ endpoint: 'Bearer pretend-token' }, 'config.endpoint'],
+    [{ pem: '-----BEGIN PRIVATE KEY-----' }, 'config.pem'],
+    [{ tokenish: 'github_pat_example' }, 'config.tokenish'],
+  ])('rejects credential-shaped nested connection config before persistence', async (config, field) => {
+    const response = await request(createProbeApp())
+      .post('/projects/one/connections')
+      .send({ config, secretRef: 'env:SAFE_REFERENCE' });
+
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual(expect.objectContaining({
+      code: 'CONNECTION_CONFIG_SECRET_REJECTED',
+      field,
+    }));
     expect(mockInsert).not.toHaveBeenCalled();
   });
 });

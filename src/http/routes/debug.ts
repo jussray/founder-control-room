@@ -6,14 +6,17 @@
  *   mode is active, and key presence (never key values).
  *
  * Safety:
+ * - Founder authentication is required at the router boundary
  * - Never exposes key values, only boolean presence
  * - Does not perform any AI call
  * - Does not mutate any state
- * - Safe to call from Playwright in CI with real secrets wired
  */
 import { Router } from 'express';
+import { requireFounder } from '../middleware/requireFounder.js';
 
 export const debugRouter = Router();
+
+debugRouter.use(requireFounder);
 
 debugRouter.get('/provider', (_req, res) => {
   const openaiKeyPresent = typeof process.env.OPENAI_API_KEY === 'string' &&

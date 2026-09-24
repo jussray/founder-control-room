@@ -7,11 +7,12 @@
 // app; a separate gateway Worker + service binding would duplicate it and
 // reintroduce the relay pattern wrangler.toml's own comments say was excluded.
 //
-// Reuses whatever founder-gating auth middleware server.ts already applies
-// upstream of this mount point — this file implements no auth of its own.
+// The router owns its founder-auth boundary itself so a future mount cannot
+// accidentally expose these privileged controls by relying on upstream order.
 
 import { Router } from "express";
 import { Octokit } from "@octokit/rest";
+import { requireFounder } from "../middleware/requireFounder.js";
 import {
   parseDecisionPackage,
   type ApprovalRecord,
@@ -46,6 +47,7 @@ function octokit(env: GhEnv): Octokit {
 }
 
 export const portableConsoleRouter = Router();
+portableConsoleRouter.use(requireFounder);
 
 // ---------------------------------------------------------------------------
 // repo_* tools — trigger and poll the real repo-cycle.yml workflow. This is
@@ -138,13 +140,10 @@ portableConsoleRouter.get("/repo/status", async (req, res) => {
 
     res.json({
       run_id: run.id,
-      status: run.status, // queued | in_progress | completed
-      conclusion: run.conclusion, // success | failure | null
+      status: run.status,
+      conclusion: run.conclusion,
       html_url: run.html_url,
       head_sha: run.head_sha,
-      // Full evidence JSON is uploaded as the "repo-cycle-result" artifact.
-      // Fetching + unzipping it via gh.actions.downloadArtifact is the next
-      // increment — deliberately not added yet so this ships correct and small.
     });
   } catch (err) {
     res.status(502).json({ error: "GitHub Actions status check failed.", detail: String(err) });
@@ -158,7 +157,6 @@ portableConsoleRouter.get("/repo/status", async (req, res) => {
 portableConsoleRouter.post("/decisions", (req, res) => {
   const parsed = parseDecisionPackage(req.body);
   if (!parsed.ok) return res.status(400).json({ error: parsed.error });
-  // Recording the decision is the request itself — never an authorization.
   res.status(201).json({ decisionId: parsed.value.decisionId, status: "SUBMITTED" });
 });
 
@@ -188,9 +186,6 @@ portableConsoleRouter.post("/approvals", (req, res) => {
   res.status(201).json({ status: "APPROVED", decisionId });
 });
 
-// Revalidates SHA + expiry + one-time-use, then deliberately stops short of
-// merging. Wiring a real gh.pulls.merge call here before main is protected and
-// required checks are pinned would defeat the point of this endpoint.
 portableConsoleRouter.post("/executions/:decisionId", async (req, res) => {
   const { decisionId } = req.params;
   const approval = approvals.get(decisionId);
