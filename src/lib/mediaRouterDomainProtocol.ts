@@ -2,6 +2,7 @@ export const MEDIA_ROUTER_DOMAIN_PROTOCOL_V1 = 'fcr/media-router-domain-protocol
 export const MEDIA_REQUEST_V1 = 'fcr/media-request@v1' as const;
 export const MEDIA_ROUTER_OUTPUT_V1 = 'fcr/media-router-output@v1' as const;
 export const MEDIA_RIGHTS_CHANGE_V1 = 'fcr/media-rights-change@v1' as const;
+export const MEDIA_DOMAIN_AUTHORITY_GRANT_V1 = 'fcr/media-domain-authority-grant@v1' as const;
 
 export const MEDIA_INTENTS_V1 = [
   'generate',
@@ -18,7 +19,7 @@ export const MEDIA_INTENTS_V1 = [
   'publish_bundle',
 ] as const;
 
-export const ASSET_KINDS_V1 = ['image', 'video', 'audio'] as const;
+export const ASSET_KINDS_V1 = ['image', 'video', 'audio', 'composition'] as const;
 export const DOMAIN_APPROVAL_KINDS_V1 = [
   'release',
   'commercial_rights',
@@ -26,6 +27,13 @@ export const DOMAIN_APPROVAL_KINDS_V1 = [
   'regulated_claim',
   'cross_project_reuse',
   'manual',
+] as const;
+export const DOMAIN_SOURCE_PROTOCOLS_V1 = ['MAKEVIDEO', 'PROJECT_LOCAL', 'MANUAL'] as const;
+export const DOMAIN_APPROVAL_LEVELS_V1 = [
+  'none',
+  'draft',
+  'internal_review',
+  'release_approved',
 ] as const;
 export const RIGHTS_CHANGE_KINDS_V1 = [
   'commercial_rights',
@@ -37,6 +45,8 @@ export const RELEASE_STATES_V1 = ['candidate', 'published_release'] as const;
 export type MediaIntentV1 = (typeof MEDIA_INTENTS_V1)[number];
 export type AssetKindV1 = (typeof ASSET_KINDS_V1)[number];
 export type DomainApprovalKindV1 = (typeof DOMAIN_APPROVAL_KINDS_V1)[number];
+export type DomainSourceProtocolV1 = (typeof DOMAIN_SOURCE_PROTOCOLS_V1)[number];
+export type DomainApprovalLevelV1 = (typeof DOMAIN_APPROVAL_LEVELS_V1)[number];
 export type RightsChangeKindV1 = (typeof RIGHTS_CHANGE_KINDS_V1)[number];
 export type ReleaseStateV1 = (typeof RELEASE_STATES_V1)[number];
 
@@ -47,6 +57,17 @@ export interface DomainApprovalReferenceV1 {
   reason?: string;
 }
 
+export interface DomainAuthorityGrantV1 {
+  schema: typeof MEDIA_DOMAIN_AUTHORITY_GRANT_V1;
+  kind: DomainApprovalKindV1;
+  sourceProtocol: DomainSourceProtocolV1;
+  sourceRecordId: string;
+  assertedAt: string;
+  approvalLevel: Exclude<DomainApprovalLevelV1, 'none'>;
+  authorityGranted: true;
+  reason?: string;
+}
+
 export interface DomainMediaContextV1 {
   schema: typeof MEDIA_ROUTER_DOMAIN_PROTOCOL_V1;
   workspaceId: string;
@@ -54,6 +75,7 @@ export interface DomainMediaContextV1 {
   releaseState: ReleaseStateV1;
   releaseReceiptId?: string;
   approvalReferences: DomainApprovalReferenceV1[];
+  authorityGrants: DomainAuthorityGrantV1[];
   identityReferenceAssetIds: string[];
 }
 
@@ -72,6 +94,7 @@ export interface MediaRightsChangeV1 {
   assetId: string;
   change: RightsChangeKindV1;
   upstreamAuthorityReference: string;
+  authorityGranted: true;
 }
 
 export interface MediaRouterOutputV1 {
@@ -79,11 +102,12 @@ export interface MediaRouterOutputV1 {
   requestId: string;
   assetIds: string[];
   publicationAuthorized: false;
-  releasePermitted: false;
-  commercialRightsCleared: false;
-  factualClaimsApproved: false;
-  regulatedClaimsApproved: false;
-  crossProjectReuseApproved: false;
+  domainAuthorityGranted: boolean;
+  releasePermitted: boolean;
+  commercialRightsCleared: boolean;
+  factualClaimsApproved: boolean;
+  regulatedClaimsApproved: boolean;
+  crossProjectReuseApproved: boolean;
   upstreamAuthorityReferences: string[];
 }
 
@@ -134,6 +158,13 @@ function stringArray(record: UnknownRecord, key: string, label: string): string[
   });
 }
 
+function booleanValue(record: UnknownRecord, key: string, label: string): boolean {
+  if (typeof record[key] !== 'boolean') {
+    throw new Error(`${label}.${key} must be boolean`);
+  }
+  return record[key] as boolean;
+}
+
 function closedEnum<T extends readonly string[]>(
   record: UnknownRecord,
   key: string,
@@ -162,6 +193,13 @@ function literalFalse(record: UnknownRecord, key: string, label: string): false 
   return false;
 }
 
+function literalTrue(record: UnknownRecord, key: string, label: string): true {
+  if (record[key] !== true) {
+    throw new Error(`${label}.${key} must be literal true`);
+  }
+  return true;
+}
+
 export function parseDomainApprovalReferenceV1(value: unknown): DomainApprovalReferenceV1 {
   const label = 'DomainApprovalReferenceV1';
   const record = asRecord(value, label);
@@ -179,6 +217,55 @@ export function parseDomainApprovalReferenceV1(value: unknown): DomainApprovalRe
   return reason === undefined ? { kind, authorityId, issuedAt } : { kind, authorityId, issuedAt, reason };
 }
 
+export function parseDomainAuthorityGrantV1(value: unknown): DomainAuthorityGrantV1 {
+  const label = 'DomainAuthorityGrantV1';
+  const record = asRecord(value, label);
+  assertExactKeys(
+    record,
+    ['schema', 'kind', 'sourceProtocol', 'sourceRecordId', 'assertedAt', 'approvalLevel', 'authorityGranted', 'reason'],
+    label,
+  );
+  if (record.schema !== MEDIA_DOMAIN_AUTHORITY_GRANT_V1) {
+    throw new Error(`${label}.schema must equal ${MEDIA_DOMAIN_AUTHORITY_GRANT_V1}`);
+  }
+
+  const kind = closedEnum(record, 'kind', DOMAIN_APPROVAL_KINDS_V1, label);
+  const sourceProtocol = closedEnum(record, 'sourceProtocol', DOMAIN_SOURCE_PROTOCOLS_V1, label);
+  const sourceRecordId = requiredString(record, 'sourceRecordId', label);
+  const assertedAt = isoTimestamp(record, 'assertedAt', label);
+  const approvalLevel = closedEnum(record, 'approvalLevel', DOMAIN_APPROVAL_LEVELS_V1, label);
+  const authorityGranted = literalTrue(record, 'authorityGranted', label);
+  const reason = optionalString(record, 'reason', label);
+
+  if (approvalLevel === 'none') {
+    throw new Error('DomainAuthorityGrantV1.approvalLevel cannot be none when authorityGranted=true');
+  }
+  if ((sourceProtocol === 'MANUAL' || kind === 'manual') && !reason) {
+    throw new Error('DomainAuthorityGrantV1.reason is required for manual authority');
+  }
+
+  const base = {
+    schema: MEDIA_DOMAIN_AUTHORITY_GRANT_V1,
+    kind,
+    sourceProtocol,
+    sourceRecordId,
+    assertedAt,
+    approvalLevel: approvalLevel as Exclude<DomainApprovalLevelV1, 'none'>,
+    authorityGranted,
+  };
+  return reason === undefined ? base : { ...base, reason };
+}
+
+export function assertDomainAuthorityGrantResolvable(
+  grant: DomainAuthorityGrantV1,
+  sourceRecordExists: (sourceRecordId: string) => boolean,
+): true {
+  if (!sourceRecordExists(grant.sourceRecordId)) {
+    throw new Error(`Domain authority source record not found: ${grant.sourceRecordId}`);
+  }
+  return true;
+}
+
 export function parseDomainMediaContextV1(value: unknown): DomainMediaContextV1 {
   const label = 'DomainMediaContextV1';
   const record = asRecord(value, label);
@@ -191,6 +278,7 @@ export function parseDomainMediaContextV1(value: unknown): DomainMediaContextV1 
       'releaseState',
       'releaseReceiptId',
       'approvalReferences',
+      'authorityGrants',
       'identityReferenceAssetIds',
     ],
     label,
@@ -210,6 +298,10 @@ export function parseDomainMediaContextV1(value: unknown): DomainMediaContextV1 
   if (!Array.isArray(approvalValue)) {
     throw new Error('DomainMediaContextV1.approvalReferences must be an array');
   }
+  const grantValue = record.authorityGrants ?? [];
+  if (!Array.isArray(grantValue)) {
+    throw new Error('DomainMediaContextV1.authorityGrants must be an array when supplied');
+  }
 
   const base = {
     schema: MEDIA_ROUTER_DOMAIN_PROTOCOL_V1,
@@ -217,6 +309,7 @@ export function parseDomainMediaContextV1(value: unknown): DomainMediaContextV1 
     projectId: requiredString(record, 'projectId', label),
     releaseState,
     approvalReferences: approvalValue.map(parseDomainApprovalReferenceV1),
+    authorityGrants: grantValue.map(parseDomainAuthorityGrantV1),
     identityReferenceAssetIds: stringArray(record, 'identityReferenceAssetIds', label),
   };
 
@@ -250,7 +343,7 @@ export function parseMediaRequestV1(value: unknown): MediaRequestV1 {
 export function parseMediaRightsChangeV1(value: unknown): MediaRightsChangeV1 {
   const label = 'MediaRightsChangeV1';
   const record = asRecord(value, label);
-  assertExactKeys(record, ['schema', 'assetId', 'change', 'upstreamAuthorityReference'], label);
+  assertExactKeys(record, ['schema', 'assetId', 'change', 'upstreamAuthorityReference', 'authorityGranted'], label);
 
   if (record.schema !== MEDIA_RIGHTS_CHANGE_V1) {
     throw new Error(`${label}.schema must equal ${MEDIA_RIGHTS_CHANGE_V1}`);
@@ -261,6 +354,7 @@ export function parseMediaRightsChangeV1(value: unknown): MediaRightsChangeV1 {
     assetId: requiredString(record, 'assetId', label),
     change: closedEnum(record, 'change', RIGHTS_CHANGE_KINDS_V1, label),
     upstreamAuthorityReference: requiredString(record, 'upstreamAuthorityReference', label),
+    authorityGranted: literalTrue(record, 'authorityGranted', label),
   };
 }
 
@@ -274,6 +368,7 @@ export function parseMediaRouterOutputV1(value: unknown): MediaRouterOutputV1 {
       'requestId',
       'assetIds',
       'publicationAuthorized',
+      'domainAuthorityGranted',
       'releasePermitted',
       'commercialRightsCleared',
       'factualClaimsApproved',
@@ -288,16 +383,81 @@ export function parseMediaRouterOutputV1(value: unknown): MediaRouterOutputV1 {
     throw new Error(`${label}.schema must equal ${MEDIA_ROUTER_OUTPUT_V1}`);
   }
 
-  return {
+  const output: MediaRouterOutputV1 = {
     schema: MEDIA_ROUTER_OUTPUT_V1,
     requestId: requiredString(record, 'requestId', label),
     assetIds: stringArray(record, 'assetIds', label),
     publicationAuthorized: literalFalse(record, 'publicationAuthorized', label),
-    releasePermitted: literalFalse(record, 'releasePermitted', label),
-    commercialRightsCleared: literalFalse(record, 'commercialRightsCleared', label),
-    factualClaimsApproved: literalFalse(record, 'factualClaimsApproved', label),
-    regulatedClaimsApproved: literalFalse(record, 'regulatedClaimsApproved', label),
-    crossProjectReuseApproved: literalFalse(record, 'crossProjectReuseApproved', label),
+    domainAuthorityGranted: booleanValue(record, 'domainAuthorityGranted', label),
+    releasePermitted: booleanValue(record, 'releasePermitted', label),
+    commercialRightsCleared: booleanValue(record, 'commercialRightsCleared', label),
+    factualClaimsApproved: booleanValue(record, 'factualClaimsApproved', label),
+    regulatedClaimsApproved: booleanValue(record, 'regulatedClaimsApproved', label),
+    crossProjectReuseApproved: booleanValue(record, 'crossProjectReuseApproved', label),
     upstreamAuthorityReferences: stringArray(record, 'upstreamAuthorityReferences', label),
   };
+
+  const boundedGrantPresent = output.releasePermitted
+    || output.commercialRightsCleared
+    || output.factualClaimsApproved
+    || output.regulatedClaimsApproved
+    || output.crossProjectReuseApproved;
+  if (boundedGrantPresent && !output.domainAuthorityGranted) {
+    throw new Error('MediaRouterOutputV1 domainAuthorityGranted must be true when any bounded domain approval is true');
+  }
+  if (output.domainAuthorityGranted && output.upstreamAuthorityReferences.length === 0) {
+    throw new Error('MediaRouterOutputV1 true domain authority requires upstreamAuthorityReferences');
+  }
+
+  return output;
+}
+
+function hasGrant(
+  context: DomainMediaContextV1,
+  refs: ReadonlySet<string>,
+  kind: DomainApprovalKindV1,
+  approvalLevel?: DomainApprovalLevelV1,
+): boolean {
+  return context.authorityGrants.some((grant) =>
+    refs.has(grant.sourceRecordId)
+    && grant.kind === kind
+    && (approvalLevel === undefined || grant.approvalLevel === approvalLevel),
+  );
+}
+
+export function assertMediaRouterOutputAuthority(
+  outputValue: unknown,
+  contextValue: unknown,
+  sourceRecordExists?: (sourceRecordId: string) => boolean,
+): MediaRouterOutputV1 {
+  const output = parseMediaRouterOutputV1(outputValue);
+  const context = parseDomainMediaContextV1(contextValue);
+  const refs = new Set(output.upstreamAuthorityReferences);
+
+  for (const ref of refs) {
+    const grant = context.authorityGrants.find((candidate) => candidate.sourceRecordId === ref);
+    if (!grant) throw new Error(`Router output references unresolved domain authority: ${ref}`);
+    if (sourceRecordExists) assertDomainAuthorityGrantResolvable(grant, sourceRecordExists);
+  }
+
+  if (output.releasePermitted) {
+    if (!context.releaseReceiptId) throw new Error('releasePermitted=true requires a releaseReceiptId in domain context');
+    if (!hasGrant(context, refs, 'release', 'release_approved')) {
+      throw new Error('releasePermitted=true requires a referenced release_approved domain grant');
+    }
+  }
+  if (output.commercialRightsCleared && !hasGrant(context, refs, 'commercial_rights')) {
+    throw new Error('commercialRightsCleared=true requires a referenced commercial_rights domain grant');
+  }
+  if (output.factualClaimsApproved && !hasGrant(context, refs, 'factual_claim')) {
+    throw new Error('factualClaimsApproved=true requires a referenced factual_claim domain grant');
+  }
+  if (output.regulatedClaimsApproved && !hasGrant(context, refs, 'regulated_claim')) {
+    throw new Error('regulatedClaimsApproved=true requires a referenced regulated_claim domain grant');
+  }
+  if (output.crossProjectReuseApproved && !hasGrant(context, refs, 'cross_project_reuse')) {
+    throw new Error('crossProjectReuseApproved=true requires a referenced cross_project_reuse domain grant');
+  }
+
+  return output;
 }
