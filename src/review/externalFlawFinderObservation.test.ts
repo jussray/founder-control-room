@@ -82,20 +82,19 @@ describe("SOFA Flaw Finder external observation contract", () => {
   });
 
   it("cannot carry publish, merge, execution, provider mutation, or registry-promotion authority", () => {
-    const candidate = observation() as ExternalFlawFinderObservation & {
-      authority: ExternalFlawFinderObservation["authority"] & { publish: boolean };
-    };
-    candidate.authority.publish = true;
+    const candidate = observation() as unknown as Record<string, unknown>;
+    const authority = candidate.authority as Record<string, boolean>;
+    authority.publish = true;
 
-    expect(validateExternalFlawFinderObservation(candidate, Date.parse(OBSERVED_AT) + 1_000))
+    expect(validateExternalFlawFinderObservation(candidate as unknown as ExternalFlawFinderObservation, Date.parse(OBSERVED_AT) + 1_000))
       .toContain("Flaw Finder observation cannot carry mutation or promotion authority");
   });
 
   it("does not become an independent review receipt merely because SOFA produced it", () => {
-    const candidate = observation() as ExternalFlawFinderObservation & { countsAsIndependentReview: boolean };
+    const candidate = observation() as unknown as Record<string, unknown>;
     candidate.countsAsIndependentReview = true;
 
-    expect(validateExternalFlawFinderObservation(candidate, Date.parse(OBSERVED_AT) + 1_000))
+    expect(validateExternalFlawFinderObservation(candidate as unknown as ExternalFlawFinderObservation, Date.parse(OBSERVED_AT) + 1_000))
       .toContain("SOFA observation cannot satisfy independent review by itself");
   });
 
