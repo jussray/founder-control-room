@@ -20,6 +20,9 @@ const SUPPORTED_PROTOCOL_VERSIONS = [
 const SERVER_NAME = 'founder-control-room-paired';
 const SERVER_VERSION = '0.2.0';
 const DEFAULT_RESOURCE = 'https://api.foundercontrolroom.org/mcp';
+const DEFAULT_OAUTH_AUDIENCE = 'authenticated';
+const DEFAULT_OAUTH_SCOPES = ['email'] as const;
+const SUPABASE_STANDARD_OAUTH_SCOPES = new Set(['openid', 'email', 'profile', 'phone']);
 const PROJECT_SLUG = /^[a-z0-9][a-z0-9-]{0,119}$/;
 const MAX_BODY_BYTES = 64 * 1024;
 const PROTOCOL_META = 'io.modelcontextprotocol/protocolVersion';
@@ -85,6 +88,18 @@ function commaList(value: string | undefined): string[] {
     .split(',')
     .map((entry) => entry.trim())
     .filter(Boolean))];
+}
+
+function configuredOauthScopes(env: NodeJS.ProcessEnv): string[] {
+  const configured = env.FCR_REMOTE_MCP_OAUTH_SCOPES?.trim();
+  const legacy = env.FCR_REMOTE_MCP_OAUTH_REQUIRED_SCOPE?.trim();
+  const raw = configured
+    || (legacy && legacy !== 'mcp:read' ? legacy : DEFAULT_OAUTH_SCOPES.join(' '));
+  const scopes = [...new Set(raw.split(/[\s,]+/).map((value) => value.trim()).filter(Boolean))];
+  if (scopes.length === 0 || scopes.some((scope) => !SUPABASE_STANDARD_OAUTH_SCOPES.has(scope))) {
+    throw new Error('FCR remote MCP OAuth scopes must use Supabase standard scopes only');
+  }
+  return scopes;
 }
 
 function configuredProjectScope(env: NodeJS.ProcessEnv): Set<string> {
@@ -159,27 +174,17 @@ function claimAudience(value: unknown): string[] {
   return [];
 }
 
-function claimScopes(value: unknown): string[] {
-  if (typeof value === 'string') return value.split(/\s+/).filter(Boolean);
-  if (Array.isArray(value) && value.every((entry) => typeof entry === 'string')) return value;
-  return [];
-}
-
-function claimProjects(value: unknown): string[] {
-  if (!Array.isArray(value) || !value.every((entry) => typeof entry === 'string')) return [];
-  return [...new Set(value.map((entry) => entry.trim()).filter((entry) => PROJECT_SLUG.test(entry)))];
-}
-
 export async function verifyRemoteMcpOauthToken(
   token: string,
   env: NodeJS.ProcessEnv,
 ): Promise<RemoteMcpOauthIdentity> {
   const issuer = authorizationIssuer(env);
-  const audience = env.FCR_REMOTE_MCP_OAUTH_AUDIENCE?.trim();
+  const audience = env.FCR_REMOTE_MCP_OAUTH_AUDIENCE?.trim() || DEFAULT_OAUTH_AUDIENCE;
   const allowedClients = new Set(commaList(env.FCR_REMOTE_MCP_OAUTH_CLIENT_IDS));
-  const requiredScope = env.FCR_REMOTE_MCP_OAUTH_REQUIRED_SCOPE?.trim() || 'mcp:read';
-  if (!issuer || !audience || allowedClients.size === 0) {
-    throw new Error('OAuth issuer, audience, or client allowlist is not configured');
+  const projectIds = [...configuredProjectScope(env)];
+  configuredOauthScopes(env);
+  if (!issuer || allowedClients.size === 0 || projectIds.length === 0) {
+    throw new Error('OAuth issuer, client allowlist, or server project scope is not configured');
   }
 
   const claims = decodeJwtPayload(token);
@@ -191,11 +196,11 @@ export async function verifyRemoteMcpOauthToken(
   if (!clientId || !allowedClients.has(clientId)) throw new Error('OAuth client is not allowed');
   if (typeof claims.exp !== 'number' || claims.exp <= now) throw new Error('OAuth access token is expired');
   if (typeof claims.nbf === 'number' && claims.nbf > now + 30) throw new Error('OAuth access token is not active');
-  if (!claimScopes(claims.scope).includes(requiredScope)) throw new Error('OAuth scope is insufficient');
 
-  const projectIds = claimProjects(claims.mcp_projects);
-  if (projectIds.length === 0) throw new Error('OAuth access token has no MCP project grant');
-
+  // Supabase OAuth scopes describe OIDC/userinfo disclosure, not FCR project
+  // authority. FCR project access stays server-owned and is intersected again
+  // in the request handler. Do not require unsupported custom scopes or custom
+  // project claims in the OAuth access token.
   const { data: userData, error: userError } = await supabaseAuth.auth.getUser(token);
   const user = userData?.user;
   const email = typeof user?.email === 'string' ? user.email.trim().toLowerCase() : '';
@@ -356,6 +361,7 @@ export function createRemoteReadMcpHandler(
 
     try {
       configuredResource(env);
+      if (authMode === 'oauth') configuredOauthScopes(env);
     } catch (error) {
       res.status(503).json(rpcError(null, -32000, error instanceof Error ? error.message : String(error)));
       return;
@@ -410,13 +416,8 @@ export function createRemoteReadMcpHandler(
         identity = oauthIdentity;
       } catch (error) {
         const message = error instanceof Error ? error.message : 'OAuth access token is invalid';
-        const insufficientScope = /scope|project grant/i.test(message);
-        challenge(res, env, insufficientScope ? {
-          error: 'insufficient_scope',
-          scope: env.FCR_REMOTE_MCP_OAUTH_REQUIRED_SCOPE?.trim() || 'mcp:read',
-          description: message,
-        } : { error: 'invalid_token', description: message });
-        res.status(insufficientScope ? 403 : 401).json(rpcError(null, -32000, message));
+        challenge(res, env, { error: 'invalid_token', description: message });
+        res.status(401).json(rpcError(null, -32000, message));
         return;
       }
     } else {
@@ -486,7 +487,7 @@ export function createRemoteReadMcpHandler(
         supportedVersions: [...SUPPORTED_PROTOCOL_VERSIONS],
         capabilities: { tools: {} },
         instructions:
-          'Paired Chief AI + Founder Control Room connector. It exposes six read/preview tools plus one bounded peer-operator relay tool. The relay calls only the explicitly addressed provider for research/propose/review, carries no mutation authority, fails closed on auth/scope/provider/evidence errors, stores no raw MCP arguments or results, and grants no execution authority.',
+          'Paired Chief AI + Founder Control Room connector. It exposes six read/preview tools plus one bounded peer-operator relay tool. The relay calls only the explicitly addressed provider for research/propose/review/implement work, carries no mutation authority, fails closed on auth/provider/evidence errors, stores no raw MCP arguments or results, and grants no execution authority.',
       }, { ttlMs: 300_000, cacheScope: 'private' })));
       return;
     }
@@ -502,7 +503,7 @@ export function createRemoteReadMcpHandler(
         capabilities: { tools: { listChanged: false } },
         serverInfo: { name: SERVER_NAME, version: SERVER_VERSION },
         instructions:
-          'Paired Chief AI + Founder Control Room connector. Six read/preview tools plus one bounded peer-operator relay; relay is research/propose/review only, fails closed when the addressed provider is unavailable, carries no provider mutation or execution authority, and accepts no credential input.',
+          'Paired Chief AI + Founder Control Room connector. Six read/preview tools plus one bounded peer-operator relay; relay supports research/propose/review/implement work, fails closed when the addressed provider is unavailable, carries no provider mutation or execution authority, and accepts no credential input.',
       }));
       return;
     }
@@ -562,10 +563,11 @@ export function createRemoteMcpProtectedResourceMetadataHandler(
     }
     try {
       const resource = configuredResource(env).toString();
+      const scopes = configuredOauthScopes(env);
       res.status(200).json({
         resource,
         authorization_servers: [issuer],
-        scopes_supported: [env.FCR_REMOTE_MCP_OAUTH_REQUIRED_SCOPE?.trim() || 'mcp:read'],
+        scopes_supported: scopes,
         bearer_methods_supported: ['header'],
         resource_name: 'Founder Control Room paired MCP',
         resource_documentation: 'https://github.com/jussray/founder-control-room/blob/main/docs/MCP_STACK.md',
@@ -578,8 +580,8 @@ export function createRemoteMcpProtectedResourceMetadataHandler(
 
 // Compatibility lane for existing server-held static-token clients.
 export const handleRemoteReadMcp = createRemoteReadMcpHandler({ authMode: 'static' });
-// Canonical ChatGPT/Claude lane. It cannot start until Supabase OAuth claims,
-// client IDs, audience, project grants, and the live evidence ledger are configured.
+// Canonical ChatGPT/Claude lane. OAuth client identity, founder allowlisting,
+// server-owned project scope, and the live evidence ledger remain mandatory.
 export const handlePairedRemoteMcp = createRemoteReadMcpHandler({ authMode: 'oauth' });
 export const handleRemoteMcpProtectedResourceMetadata =
   createRemoteMcpProtectedResourceMetadataHandler();
