@@ -161,12 +161,15 @@ for (const project of externalCoverage) {
   externalRepositories.add(project.repository);
 }
 
-requireValue(externalCoverage.length === externalPortfolioBySlug.size, 'external challenge-stack coverage must match EXTERNAL_PROJECTS exactly');
-for (const [slug, repository] of externalPortfolioBySlug) {
-  requireValue(externalCoverageBySlug.get(slug) === repository, `${slug}: external challenge-stack coverage does not match portfolio.ts`);
-}
-for (const [slug] of externalCoverageBySlug) {
-  requireValue(externalPortfolioBySlug.has(slug), `${slug}: challenge-stack coverage contains a repo not declared in EXTERNAL_PROJECTS`);
+// EXTERNAL_PROJECTS is an identity/continuity discovery set, not proof that each
+// repository has already been re-observed with the challenge stack on main.
+// Coverage therefore stays an evidence-bound subset. Requiring exact equality
+// would force newly discovered external repositories to invent on-main proof.
+for (const [slug, repository] of externalCoverageBySlug) {
+  requireValue(
+    externalPortfolioBySlug.get(slug) === repository,
+    `${slug}: challenge-stack coverage repository does not match EXTERNAL_PROJECTS`,
+  );
 }
 
 requireValue(entrypoint.includes(registryPath), 'Founder Intelligence entrypoint must link the inheritance registry');
