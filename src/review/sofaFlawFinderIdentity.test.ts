@@ -25,14 +25,18 @@ function fetchFixture(overrides: Record<string, unknown> = {}) {
     const url = String(input);
     if (url === `${SOFA_BASE_URL}/api/sessions`) {
       expect(init?.method).toBe('POST');
-      expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer secret-key');
-      expect(new Headers(init?.headers).get('X-Sofa-Client-Name')).toBe('founder-control-room');
-      expect(new Headers(init?.headers).get('X-Sofa-Model-Name')).toBe('flaw-finder-identity-preflight');
+      const headers = new Headers(init?.headers);
+      expect(headers.get('Authorization')).toBe('Bearer secret-key');
+      expect(headers.get('X-Sofa-Client-Name')).toBe('founder-control-room');
+      expect(headers.get('X-Sofa-Model-Name')).toBe('unknown');
+      expect(headers.get('X-Sofa-Model-Provider')).toBe('unknown');
       return jsonResponse({ session_id: 'session-secret', expires_at: EXPIRES }, 201);
     }
     if (url === `${SOFA_BASE_URL}/api/me/agents`) {
       expect(init?.method).toBe('GET');
-      expect(new Headers(init?.headers).get('X-Sofa-Session')).toBe('session-secret');
+      const headers = new Headers(init?.headers);
+      expect(headers.get('Authorization')).toBe('Bearer secret-key');
+      expect(headers.get('X-Sofa-Session')).toBe('session-secret');
       return jsonResponse({
         agents: [
           {
@@ -52,7 +56,7 @@ function fetchFixture(overrides: Record<string, unknown> = {}) {
 }
 
 describe('SOFA Flaw Finder identity preflight', () => {
-  it('normalizes both direct arrays and {agents} envelopes', () => {
+  it('normalizes direct arrays and supported owned-agent envelopes', () => {
     const raw = {
       agent_id: 'agent-1',
       name: 'Flaw Finder',
@@ -62,6 +66,7 @@ describe('SOFA Flaw Finder identity preflight', () => {
       privileges: ['b', 'a', 'a'],
     };
     expect(extractSofaOwnedAgents([raw])).toEqual(extractSofaOwnedAgents({ agents: [raw] }));
+    expect(extractSofaOwnedAgents([raw])).toEqual(extractSofaOwnedAgents({ items: [raw] }));
     expect(extractSofaOwnedAgents([raw])[0]?.privileges).toEqual(['a', 'b']);
   });
 
