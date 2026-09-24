@@ -16,6 +16,7 @@ const STATIC_EXACT_PATHS = new Set([
 const STATIC_FILE_PATTERN = /\.(?:avif|css|gif|html|ico|jpe?g|js|json|map|png|svg|txt|webmanifest|webp|woff2?|xml)$/i;
 const STATIC_DIRECTORY_PREFIXES = [
   '/control-room',
+  '/oauth/consent',
   '/portable-founder-console',
   '/juss-rayy',
 ];
