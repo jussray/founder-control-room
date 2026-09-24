@@ -4,41 +4,46 @@
 
 - Repository: `jussray/founder-control-room`
 - Base branch: `main`
-- Base SHA inspected: `cdf45f2759d9383bf24073473eb75e4ea522d3d3`
+- Original audited base: `cdf45f2759d9383bf24073473eb75e4ea522d3d3`
 - Working branch: `fix/sofa-flaw-finder-review-lane`
-- Audit goal: bind the configured SOFA `Flaw Finder` to FCR as a bounded external review/evidence lane without falsely promoting it to a trusted peer operator or publication authority.
+- Last main SHA explicitly rolled into the candidate during this review: `0a79545ecf396d287d977a2f36ee2c5f4ec7b0c1`
+- Candidate immediately before this receipt update: `acf54e85f8cfed59f238ed137023b1ed399c052a`
+- Audit goal: bind the configured SOFA `Flaw Finder` to FCR as a bounded external review/evidence lane without falsely promoting it to a trusted peer operator, independent-review witness, publisher, merger, deployer, or provider authority.
+
+> Resolve `main` and this branch again at use time. The repository is moving quickly; a newer base or head supersedes these SHA observations and requires fresh proof.
 
 ## VERIFIED
 
-- The canonical FCR agent registry does not currently contain SOFA or `Flaw Finder`.
-- FCR already distinguishes operator capability from merge/deploy/publish/provider authority.
-- FCR independent-review receipts are exact-repository / PR / base / head / diff / policy bound and remain proposal-only/non-authorizing.
-- The branch contains a provider-specific external observation contract requiring all fifteen attack flows, including `self_attack` and a second-pass attack against the proposed fix.
-- The observation contract binds repository, branch, exact head SHA, source reference/fingerprint, freshness, findings, and zero-authority state into a deterministic observation hash.
-- The observation contract explicitly sets `countsAsIndependentReview: false` and `registryPromotion: false`.
-- Current public SOFA API evidence supports an authenticated session flow using `POST /api/sessions` followed by authenticated `GET /api/me/agents` with `X-Sofa-Session`.
-- Current public SOFA evidence describes `GET /api/me/agents` as returning owned agents with role/publication-policy metadata and shows the contributor + `draft_directly` policy vocabulary.
-- `src/review/sofaFlawFinderIdentity.ts` now models the smallest non-mutating identity preflight: create a fresh session, read owned agents, require exactly one `Flaw Finder`, require `contributor`, require `draft_directly`, and emit a non-secret deterministic identity receipt.
-- The identity receipt deliberately omits the API key and session id and carries no write, merge, deploy, publish, provider-mutation, or registry-promotion authority.
+- The SOFA slice remains additive and isolated to six files when compared against the live base during merge review.
+- No canonical FCR registry entry, runtime route, database, deployment, provider configuration, or publication authority is added by this slice.
+- The external observation contract requires all fifteen attack flows, including `self_attack`, counterexample/steelman passes, and a second-pass attack against the proposed fix.
+- Observations are bound to repository, branch, exact head SHA, source reference/fingerprint, freshness, findings, and a deterministic observation hash.
+- Observations explicitly remain `draft_only`, `proposalOnly: true`, `countsAsIndependentReview: false`, with merge/deploy/publish/provider/registry authority all false.
+- The SOFA identity preflight creates a fresh `/api/sessions` session, then performs the owned-agent identity read through `/api/me/agents`, binds exactly one `Flaw Finder`, and refuses role/publication-policy drift.
+- Identity receipts deliberately exclude both the API key and session id and remain non-authorizing.
+- Merge review self-attack found a provenance defect in the first identity implementation: a task label had been sent as `X-Sofa-Model-Name`. The candidate now sends neutral session metadata (`unknown`) instead of pretending that label is a model identity, includes the optional provider metadata, and keeps the owned-agent read limited to Bearer + fresh session headers.
+- The owned-agent extractor accepts the currently observed collection shapes used by clients (`[]`, `{agents: []}`, `{items: []}`) while still requiring exactly one named Flaw Finder.
+- Public SOFA evidence confirms session creation requires Bearer auth plus client/model metadata and authenticated reads require a fresh `X-Sofa-Session`.
 
 ## INFERRED
 
-- If the user's live SOFA credential returns the expected owned-agent record, FCR can bind later review traffic to a stable SOFA agent id before accepting any external observation.
-- A future authenticated draft/review adapter can normalize provider-attested Flaw Finder output into `juss/external-flaw-finder-observation@v1` without changing FCR's independent-review authority model.
+- A future authenticated SOFA adapter can normalize provider-attested Flaw Finder drafts into the external observation contract without changing FCR's existing independent-review authority model.
+- The six-file source slice should rebase/merge cleanly because current `main` changes observed during review do not overlap these paths. This is a source-diff inference, not test or runtime proof.
 
 ## UNKNOWN
 
-- The user's live SOFA `agent_id` for Flaw Finder has not been observed in this tool session.
-- Whether the deployed FCR runtime currently has a `SOFA_API_KEY` configured.
-- Exact provider endpoint/contract for assigning a task specifically to the configured Flaw Finder agent.
-- Whether SOFA exposes a stable draft id, webhook, or retrieval endpoint suitable for cryptographic sourceRef binding in this lane.
+- The real owned-agent payload for this account until FCR uses the actual SOFA credential and receives the live response.
+- The real Flaw Finder agent id and resulting identity fingerprint.
+- Whether the deployed FCR HTTP stack reaches SOFA without a Cloudflare transport challenge.
+- Provider-attested draft/task response fields needed for a full Flaw Finder request → draft → FCR round trip.
 
 ## BLOCKED
 
-- Live SOFA identity preflight is not executed because no SOFA credential is available to this GitHub-only tool session.
-- Real SOFA ↔ FCR review round trip is not implemented yet because provider-attested draft/source binding is still unproven.
-- Playwright proof is not available because there is no founder-visible FCR UI/runtime adapter for this lane yet.
-- Local `npm run typecheck`, focused Vitest, and repository CI have not yet been run in this tool session.
+- `npm run typecheck`, focused Vitest, and the repository Playwright lane have not executed on the exact candidate in this tool session.
+- GitHub has no existing pull request for `fix/sofa-flaw-finder-review-lane`, and the available GitHub connector does not expose workflow-dispatch creation for running the normal PR workflow directly.
+- A local clone attempt failed because this execution container cannot resolve `github.com`, so local repository verification cannot substitute for CI.
+- No live SOFA credential is available in this tool session, so authenticated identity/runtime proof cannot be claimed.
+- Main moved again while review was in progress. Any final integration candidate must first be refreshed onto the then-current base and re-proven.
 
 ## Changes
 
@@ -49,22 +54,23 @@
 - `docs/SOFA_FLAW_FINDER_REVIEW_LANE.md`
 - this continuity receipt
 
-## Provider evidence inspected
+## Merge review verdict
 
-- SOFA public discussions confirming authenticated `POST /api/sessions` + `GET /api/me/agents` behavior and the requirement for `X-Sofa-Session` on authenticated API reads.
-- SOFA public discussions confirming owned-agent metadata includes description, publication policy, and privileges, with `contributor` and `draft_directly` represented in current usage.
-- Reports that some terminal HTTP stacks may receive Cloudflare 403 while browser-backed or other HTTP stacks succeed; transport success must therefore be proven in the actual FCR runtime rather than inferred from source code.
+**SOURCE REVIEWED / NOT MERGE-PROVEN.**
+
+Do not merge this candidate merely because the source review is clean. Repository policy and founder operating rules require exact-head verification. A moving base also invalidates predecessor exact-head proof.
 
 ## Rollback
 
-The slice is additive and isolated on `fix/sofa-flaw-finder-review-lane`. Roll back by deleting the branch or reverting the six additive/modified files listed above. No database, deployment, canonical agent registry, provider account, or SOFA publication state was changed by this source work.
+The slice is additive and isolated on `fix/sofa-flaw-finder-review-lane`. Before integration, rollback is deleting the branch. After integration, revert the focused SOFA files. No provider, runtime, database, deployment, or SOFA publication rollback is required because this source slice performs none of those mutations.
 
 ## Next proof gate
 
-1. Execute the live identity preflight with the user's SOFA credential from an authorized runtime and record only the returned non-secret identity receipt.
-2. Verify the returned agent is exactly `Flaw Finder / contributor / draft_directly`; fail closed on drift or ambiguity.
-3. Run `npm run typecheck` and the two focused Vitest files.
-4. Inspect/implement the smallest provider-attested draft or task path that can bind a SOFA response to the exact Flaw Finder agent id and FCR request fingerprint.
-5. Add founder-visible FCR surface wiring only after that adapter is real.
-6. Run the real Playwright round trip on the exact candidate SHA.
-7. Only then consider merge or registry promotion.
+1. Resolve current `main` and roll the candidate onto that exact base without widening the six-file scope.
+2. Run exact-head `npm run typecheck` plus focused Vitest for both Flaw Finder contracts.
+3. Run the repository Playwright E2E lane on that same exact head.
+4. Inspect logs/artifacts for failures and repair only the causal SOFA slice if needed.
+5. Re-read current base/head after proof; any movement expires the candidate proof.
+6. Obtain fresh founder exact-candidate merge approval bound to repository + base SHA + head SHA.
+7. Merge only when those gates are green.
+8. Separately, once a live SOFA credential is available, run authenticated identity preflight and then build/prove the full Flaw Finder request/draft round trip before considering registry promotion.
