@@ -30,7 +30,7 @@ describe('builder prompt workflow HTTP contract', () => {
 
     const routes = (builderPromptWorkflowRouter.stack as RouteLayer[])
       .filter((layer) => Boolean(layer.route));
-    expect(routes).toHaveLength(2);
+    expect(routes).toHaveLength(3);
 
     for (const layer of routes) {
       const handlers = layer.route?.stack.map((entry) => entry.handle) ?? [];
