@@ -1,5 +1,6 @@
 import type { OperatorRelayRequestV1, OperatorRelayResponseV1, RelayOperatorId } from './operatorRelay.js';
 import { validateOperatorRelayRequest, validateOperatorRelayResponse } from './operatorRelay.js';
+import { createServerMuseRelayAdapter } from './operatorRelayMuseProvider.js';
 
 export type OperatorRelayAdapter = (request: OperatorRelayRequestV1) => Promise<OperatorRelayResponseV1>;
 
@@ -9,6 +10,7 @@ export interface OperatorRelayAdapters {
   'claude-code'?: OperatorRelayAdapter;
   perplexity?: OperatorRelayAdapter;
   deepseek?: OperatorRelayAdapter;
+  muse?: OperatorRelayAdapter;
 }
 
 export class OperatorRelayDispatchError extends Error {
@@ -34,7 +36,8 @@ export async function dispatchOperatorRelay(
     throw new OperatorRelayDispatchError('relay_request_invalid', requestErrors.join('; '));
   }
 
-  const adapter = adapters[request.toOperator as RelayOperatorId];
+  const adapter = adapters[request.toOperator as RelayOperatorId]
+    ?? (request.toOperator === 'muse' ? createServerMuseRelayAdapter() : undefined);
   if (!adapter) {
     throw new OperatorRelayDispatchError(
       'relay_target_unavailable',

@@ -4,6 +4,7 @@ const TARGETS: ReadonlyArray<{ id: RelayOperatorId; patterns: RegExp[] }> = [
   { id: 'gemini', patterns: [/\bgemini\b/i] },
   { id: 'perplexity', patterns: [/\bperplexity\b/i] },
   { id: 'deepseek', patterns: [/\bdeepseek\b/i] },
+  { id: 'muse', patterns: [/\bmuse\b/i] },
   { id: 'claude-code', patterns: [/\bclaude(?:\s+code)?\b/i] },
   { id: 'codex', patterns: [/\b(?:chatgpt|codex)\b/i] },
 ];
@@ -22,6 +23,7 @@ function targetPattern(target: RelayOperatorId): RegExp {
     case 'codex': return /\b(?:chatgpt|codex)\b/i;
     case 'perplexity': return /\bperplexity\b/i;
     case 'deepseek': return /\bdeepseek\b/i;
+    case 'muse': return /\bmuse\b/i;
   }
 }
 
