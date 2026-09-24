@@ -24,16 +24,37 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 8
     steps:
+      - name: Check out exact PR head for scope and migration proof
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
       - name: Classify Neon preview scope
         id: neon_scope
         shell: bash
         env:
-          GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
+
+          live_base_sha="$(git ls-remote --heads origin "refs/heads/${BASE_REF}" | awk 'NR == 1 {print $1}')"
+          if [[ ! "$live_base_sha" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error title=Live base resolution failed::Could not resolve a 40-character SHA for ${BASE_REF}."
+            exit 1
+          fi
+
+          git fetch --no-tags origin "$live_base_sha"
+          if ! git merge-base --is-ancestor "$live_base_sha" "$EXPECTED_HEAD_SHA"; then
+            echo "::error title=Stale PR ancestry::Exact PR head has not incorporated live ${BASE_REF}@${live_base_sha}."
+            exit 1
+          fi
+
           mapfile -t CHANGED_FILES < <(
-            gh api --paginate "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/files?per_page=100" --jq '.[].filename'
+            git diff --name-only "$live_base_sha" "$EXPECTED_HEAD_SHA"
           )
 
           NEEDS_NEON=false
@@ -46,17 +67,18 @@ jobs:
             esac
           done
 
+          echo "live_base_sha=${live_base_sha}" >> "$GITHUB_OUTPUT"
           echo "needs_neon=${NEEDS_NEON}" >> "$GITHUB_OUTPUT"
           if [ "$NEEDS_NEON" = "true" ]; then
-            echo 'Supabase change detected; Neon preview branch is required.'
+            echo 'Supabase change detected against live base; Neon preview branch is required.'
           else
-            echo 'No supabase/ change detected; Neon preview branch is not required.'
+            echo 'No supabase/ change detected against live base; Neon preview branch is not required.'
           fi
 
       - name: Record non-database no-op
         if: steps.neon_scope.outputs.needs_neon == 'false'
         shell: bash
-        run: echo 'Neon preview skipped because this PR does not change supabase/.'
+        run: echo 'Neon preview skipped because this PR does not change supabase/ against live base.'
 
       - name: Validate Neon configuration
         if: steps.neon_scope.outputs.needs_neon == 'true'
@@ -96,13 +118,6 @@ jobs:
           test -n "$NEON_DB_URL" || { echo 'Neon create action returned no database URL' >&2; exit 1; }
           echo 'Neon branch identity and private database URL output are present. URL value was not printed.'
 
-      - name: Check out exact PR head for migration proof
-        if: steps.neon_scope.outputs.needs_neon == 'true'
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-          persist-credentials: false
-
       - name: Verify exact PR head
         if: steps.neon_scope.outputs.needs_neon == 'true'
         shell: bash
@@ -114,31 +129,31 @@ jobs:
         if: steps.neon_scope.outputs.needs_neon == 'true'
         shell: bash
         env:
-          GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
+          LIVE_BASE_SHA: ${{ steps.neon_scope.outputs.live_base_sha }}
+          EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           NEON_DB_URL: ${{ steps.create_neon_branch.outputs.db_url }}
         run: |
           set -euo pipefail
 
-          mapfile -t REWRITTEN_MIGRATIONS < <(
-            gh api --paginate "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/files?per_page=100" \
-              --jq '.[] | select((.filename | startswith("supabase/migrations/")) and (.filename | endswith(".sql")) and .status != "added") | "\(.status) \(.filename)"'
-          )
-          if (( ${#REWRITTEN_MIGRATIONS[@]} > 0 )); then
-            printf '::error title=Migration history rewrite is not preview-safe::%s\n' "${REWRITTEN_MIGRATIONS[*]}"
-            exit 1
-          fi
-
-          mapfile -t MIGRATIONS < <(
-            gh api --paginate "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/files?per_page=100" \
-              --jq '.[] | select((.filename | startswith("supabase/migrations/")) and (.filename | endswith(".sql")) and .status == "added") | .filename' \
-              | sort
+          MIGRATIONS=()
+          while IFS=$'\t' read -r status migration; do
+            [ -n "$status" ] || continue
+            if [ "$status" != "A" ]; then
+              echo "::error title=Migration history rewrite is not preview-safe::${status} ${migration}"
+              exit 1
+            fi
+            MIGRATIONS+=("$migration")
+          done < <(
+            git diff --name-status --no-renames "$LIVE_BASE_SHA" "$EXPECTED_HEAD_SHA" -- 'supabase/migrations/*.sql'
           )
 
           if (( ${#MIGRATIONS[@]} == 0 )); then
             echo 'Supabase scope changed but no added SQL migration was found.'
             exit 0
           fi
+
+          IFS=$'\n' MIGRATIONS=($(printf '%s\n' "${MIGRATIONS[@]}" | sort))
+          unset IFS
 
           # The preview branch is reused across synchronize events. Keep an
           # isolated CI-only checksum ledger so the exact same migration is
@@ -175,8 +190,14 @@ jobs:
               exit 1
             fi
 
-            echo "Applying preview migration atomically: $migration"
-            psql "$NEON_DB_URL" -X -1 -v ON_ERROR_STOP=1 -f "$migration"
+            PREVIEW_CONTRACT="supabase/preview-contracts/${migration##*/}"
+            if [ -f "$PREVIEW_CONTRACT" ]; then
+              echo "Running migration preview contract: $PREVIEW_CONTRACT"
+              psql "$NEON_DB_URL" -X -v ON_ERROR_STOP=1 -f "$PREVIEW_CONTRACT"
+            else
+              echo "Applying preview migration atomically: $migration"
+              psql "$NEON_DB_URL" -X -1 -v ON_ERROR_STOP=1 -f "$migration"
+            fi
             psql "$NEON_DB_URL" -X -v ON_ERROR_STOP=1 \
               -c "INSERT INTO ci_preview.migration_receipts(filename, sha256) VALUES ('$migration', '$CHECKSUM');"
           done
