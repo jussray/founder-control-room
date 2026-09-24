@@ -1,5 +1,6 @@
 import type { OperatorRelayRequestV1 } from './operatorRelay.js';
 import type { OperatorRelayAdapters } from './operatorRelayDispatch.js';
+import { anthropicPlaywrightMcpAttachment } from './operatorRelayAnthropicMcp.js';
 import { operatorRelayAdapterFromTextProvider } from './operatorRelayProvider.js';
 
 type FetchLike = typeof fetch;
@@ -289,6 +290,7 @@ export function createServerOperatorRelayAdapters(
   const openAiModel = env.FCR_RELAY_OPENAI_MODEL?.trim();
   const anthropicKey = env.ANTHROPIC_API_KEY?.trim();
   const anthropicModel = env.FCR_RELAY_ANTHROPIC_MODEL?.trim();
+  const anthropicMcp = anthropicPlaywrightMcpAttachment(env);
   const perplexityKey = env.PERPLEXITY_API_KEY?.trim();
   const perplexityModel = env.FCR_RELAY_PERPLEXITY_MODEL?.trim();
   const deepSeekKey = env.DEEPSEEK_API_KEY?.trim();
@@ -361,11 +363,13 @@ export function createServerOperatorRelayAdapters(
             'x-api-key': anthropicKey,
             'anthropic-version': ANTHROPIC_API_VERSION,
             'Content-Type': 'application/json',
+            ...(anthropicMcp?.headers ?? {}),
           },
           body: JSON.stringify({
             model: anthropicModel,
             max_tokens: 2_000,
             messages: [{ role: 'user', content: relayPrompt(request) }],
+            ...(anthropicMcp?.body ?? {}),
           }),
           redirect: 'error',
           signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
