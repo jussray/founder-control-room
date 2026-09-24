@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="A blank local-first Founder Control Room user workspace." />
+  <meta name="robots" content="noindex,nofollow" />
+  <title>FCR · Your Workspace</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #060713;
+      --panel: rgba(18, 22, 42, 0.9);
+      --line: rgba(192, 172, 255, 0.22);
+      --text: #f8f6ff;
+      --muted: #b8b5c8;
+      --violet: #b69cff;
+      --cyan: #74e6f7;
+      --green: #8df0b0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 12% 0%, rgba(112, 66, 255, .28), transparent 30rem),
+        radial-gradient(circle at 90% 10%, rgba(25, 191, 220, .14), transparent 28rem),
+        linear-gradient(150deg, #04050b, var(--bg) 50%, #0b1022);
+    }
+    a { color: inherit; }
+    .shell { width: min(980px, calc(100% - 2rem)); margin: 0 auto; padding: 1rem 0 4rem; }
+    .topbar { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .7rem 0 2rem; }
+    .brand { display: flex; gap: .7rem; align-items: center; font-weight: 900; }
+    .mark { width: 2.25rem; height: 2.25rem; display: grid; place-items: center; border-radius: .8rem; background: linear-gradient(145deg, #b69cff, #7347ee 55%, #22275f); color: #0b0716; }
+    .back { color: var(--muted); text-decoration: none; font-size: .9rem; }
+    .hero { padding: clamp(2rem, 7vw, 5rem) 0 2rem; }
+    .eyebrow { width: fit-content; padding: .4rem .65rem; border: 1px solid var(--line); border-radius: 999px; color: #e4dcff; font-size: .72rem; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
+    h1 { margin: 1rem 0 .9rem; font-size: clamp(2.8rem, 8vw, 6rem); line-height: .98; letter-spacing: -.055em; }
+    .lede { max-width: 760px; margin: 0; color: var(--muted); font-size: 1.08rem; line-height: 1.65; }
+    .boundary { margin: 1.25rem 0 0; padding: .9rem 1rem; border-left: 3px solid var(--cyan); border-radius: .7rem; background: rgba(116,230,247,.07); color: #d1ccdf; line-height: 1.55; }
+    .grid { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(260px, .9fr); gap: 1rem; align-items: start; }
+    .panel { border: 1px solid var(--line); border-radius: 1.25rem; background: var(--panel); padding: 1.1rem; box-shadow: 0 25px 70px rgba(0,0,0,.28); }
+    .panel h2 { margin: 0 0 .35rem; font-size: 1.2rem; }
+    .panel p { color: var(--muted); line-height: 1.55; }
+    .empty { min-height: 11rem; display: grid; place-items: center; text-align: center; border: 1px dashed rgba(255,255,255,.16); border-radius: 1rem; padding: 1.25rem; background: rgba(255,255,255,.025); }
+    .empty strong { display: block; font-size: 1.25rem; margin-bottom: .4rem; }
+    form { display: grid; gap: .8rem; margin-top: 1rem; }
+    label { display: grid; gap: .35rem; font-size: .82rem; font-weight: 800; color: #ddd5f6; }
+    input, textarea { width: 100%; border: 1px solid rgba(255,255,255,.14); border-radius: .8rem; padding: .78rem .85rem; background: rgba(0,0,0,.23); color: var(--text); font: inherit; }
+    textarea { min-height: 7rem; resize: vertical; }
+    button, .button { border: 1px solid var(--line); border-radius: .8rem; padding: .75rem .9rem; background: rgba(255,255,255,.055); color: var(--text); font: inherit; font-weight: 850; cursor: pointer; text-decoration: none; text-align: center; }
+    button.primary { border-color: transparent; color: #090714; background: linear-gradient(100deg, #f6d3ff, #cbbcff 50%, #74e6f7); }
+    .actions { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; }
+    .saved { display: grid; gap: .55rem; }
+    .saved-row { padding: .85rem; border: 1px solid rgba(255,255,255,.08); border-radius: .8rem; background: rgba(255,255,255,.035); }
+    .saved-row span { display: block; color: var(--muted); font-size: .78rem; margin-bottom: .25rem; }
+    .module-list { display: grid; gap: .65rem; margin-top: 1rem; }
+    .module { display: grid; gap: .25rem; padding: .85rem; border: 1px solid rgba(255,255,255,.09); border-radius: .85rem; text-decoration: none; background: rgba(255,255,255,.035); }
+    .module strong { font-size: .98rem; }
+    .module small { color: var(--muted); line-height: 1.45; }
+    .status { color: var(--green); font-size: .8rem; font-weight: 850; }
+    .tiny { color: #9e99b2; font-size: .78rem; line-height: 1.5; }
+    [hidden] { display: none !important; }
+    @media (max-width: 760px) { .grid { grid-template-columns: 1fr; } .actions { grid-template-columns: 1fr; } .shell { width: min(100% - 1.1rem, 980px); } }
+  </style>
+</head>
+<body data-fcr-user-space>
+  <main class="shell">
+    <header class="topbar">
+      <div class="brand"><span class="mark" aria-hidden="true">F</span><span>Founder Control Room</span></div>
+      <a class="back" href="/">← Public FCR</a>
+    </header>
+
+    <section class="hero">
+      <div class="eyebrow">User space · local-first</div>
+      <h1>Your space starts blank.</h1>
+      <p class="lede">This surface begins with no projects, claims, signals, evidence, account history, or private founder state. It grows only from information you add here.</p>
+      <p class="boundary" data-user-boundary><strong>Hard boundary:</strong> this page does not hydrate the founder Control Room, call founder-only APIs, or copy private operating context into your workspace. Device-local state is not a cloud account or an authority receipt.</p>
+    </section>
+
+    <section class="grid" aria-label="Your FCR workspace">
+      <article class="panel">
+        <h2>Workspace</h2>
+        <p class="tiny">Nothing is prefilled. Add a goal and an observed signal when you are ready.</p>
+
+        <div class="empty" data-user-empty-state>
+          <div><strong>Nothing here yet.</strong><span>Your workspace is clean. No demo records and no founder records were loaded.</span></div>
+        </div>
+
+        <div class="saved" data-user-saved-state hidden>
+          <div class="saved-row"><span>Current goal</span><strong data-user-goal-output></strong></div>
+          <div class="saved-row"><span>Observed signal</span><div data-user-signal-output></div></div>
+          <div class="status">Saved on this device</div>
+        </div>
+
+        <form data-user-space-form>
+          <label>What are you trying to move?
+            <input name="goal" maxlength="180" autocomplete="off" placeholder="Your goal" required />
+          </label>
+          <label>What did you observe?
+            <textarea name="signal" maxlength="1200" placeholder="A real signal, result, question, or piece of evidence" required></textarea>
+          </label>
+          <div class="actions">
+            <button class="primary" type="submit">Save to this device</button>
+            <button type="button" data-clear-user-space>Clear this device</button>
+          </div>
+        </form>
+      </article>
+
+      <aside class="panel">
+        <h2>Attached FCR capabilities</h2>
+        <p class="tiny">These are separate bounded surfaces. Opening one does not grant it access to this page's device-local data.</p>
+        <div class="module-list">
+          <a class="module" data-user-signal-loop href="https://24app.cc/apps/5ac26ftu/" target="_blank" rel="noopener noreferrer">
+            <strong>SignalLoop ↗</strong>
+            <small>Turn observed signals into content hypotheses and learning loops. Publication, engagement, and outcome remain separate facts.</small>
+          </a>
+          <a class="module" href="https://fcr-truth-weaver.lovable.app" target="_blank" rel="noopener noreferrer">
+            <strong>Truth Weaver ↗</strong><small>Challenge a decision before you commit.</small>
+          </a>
+          <a class="module" href="https://fcr-truth-compass.lovable.app" target="_blank" rel="noopener noreferrer">
+            <strong>Truth Compass ↗</strong><small>Reconcile a claim with observed evidence.</small>
+          </a>
+          <a class="module" href="https://fcr-exact-match.lovable.app" target="_blank" rel="noopener noreferrer">
+            <strong>Exact Match Engine ↗</strong><small>Separate exact matches, mismatches, missing evidence, and stale state.</small>
+          </a>
+        </div>
+      </aside>
+    </section>
+  </main>
+
+  <script>
+    (() => {
+      const storageKey = 'fcr.user-space.v1';
+      const form = document.querySelector('[data-user-space-form]');
+      const empty = document.querySelector('[data-user-empty-state]');
+      const saved = document.querySelector('[data-user-saved-state]');
+      const goalOutput = document.querySelector('[data-user-goal-output]');
+      const signalOutput = document.querySelector('[data-user-signal-output]');
+      const clearButton = document.querySelector('[data-clear-user-space]');
+
+      const render = (record) => {
+        if (!record || !record.goal || !record.signal) {
+          empty.hidden = false;
+          saved.hidden = true;
+          goalOutput.textContent = '';
+          signalOutput.textContent = '';
+          return;
+        }
+        goalOutput.textContent = record.goal;
+        signalOutput.textContent = record.signal;
+        empty.hidden = true;
+        saved.hidden = false;
+      };
+
+      let record = null;
+      try {
+        const raw = window.localStorage.getItem(storageKey);
+        if (raw) record = JSON.parse(raw);
+      } catch {
+        record = null;
+      }
+      render(record);
+
+      form.addEventListener('submit', (event) => {
+        event.preventDefault();
+        const data = new FormData(form);
+        const next = {
+          goal: String(data.get('goal') || '').trim(),
+          signal: String(data.get('signal') || '').trim(),
+          savedAt: new Date().toISOString(),
+        };
+        if (!next.goal || !next.signal) return;
+        window.localStorage.setItem(storageKey, JSON.stringify(next));
+        render(next);
+      });
+
+      clearButton.addEventListener('click', () => {
+        window.localStorage.removeItem(storageKey);
+        form.reset();
+        render(null);
+      });
+    })();
+  </script>
+</body>
+</html>
