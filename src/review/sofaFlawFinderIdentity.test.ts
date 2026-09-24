@@ -25,6 +25,7 @@ function fetchFixture(overrides: Record<string, unknown> = {}) {
     const url = String(input);
     if (url === `${SOFA_BASE_URL}/api/sessions`) {
       expect(init?.method).toBe('POST');
+      expect(init?.redirect).toBe('error');
       const headers = new Headers(init?.headers);
       expect(headers.get('Authorization')).toBe('Bearer secret-key');
       expect(headers.get('X-Sofa-Client-Name')).toBe('founder-control-room');
@@ -34,6 +35,7 @@ function fetchFixture(overrides: Record<string, unknown> = {}) {
     }
     if (url === `${SOFA_BASE_URL}/api/me/agents`) {
       expect(init?.method).toBe('GET');
+      expect(init?.redirect).toBe('error');
       const headers = new Headers(init?.headers);
       expect(headers.get('Authorization')).toBe('Bearer secret-key');
       expect(headers.get('X-Sofa-Session')).toBe('session-secret');
@@ -125,13 +127,20 @@ describe('SOFA Flaw Finder identity preflight', () => {
     })).rejects.toThrow(/exactly one owned Flaw Finder agent; found 2/);
   });
 
-  it('rejects stale sessions and authority widening', async () => {
+  it('rejects stale sessions, freshness tampering, and authority widening', async () => {
     const receipt = await fetchSofaFlawFinderIdentity('secret-key', {
       fetchImpl: fetchFixture() as unknown as typeof fetch,
       now: () => NOW,
     });
     expect(validateSofaFlawFinderIdentityReceipt(receipt, Date.parse(EXPIRES)))
       .toContain('SOFA identity session is stale');
+
+    const freshnessTampered = {
+      ...receipt,
+      sessionExpiresAt: '2026-09-24T07:50:00.000Z',
+    };
+    expect(validateSofaFlawFinderIdentityReceipt(freshnessTampered, NOW))
+      .toContain('identityFingerprint does not match authenticated SOFA identity');
 
     const widened = {
       ...receipt,
