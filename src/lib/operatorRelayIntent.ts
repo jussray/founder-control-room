@@ -3,6 +3,7 @@ import type { RelayOperatorId } from './operatorRelay.js';
 const TARGETS: ReadonlyArray<{ id: RelayOperatorId; patterns: RegExp[] }> = [
   { id: 'gemini', patterns: [/\bgemini\b/i] },
   { id: 'perplexity', patterns: [/\bperplexity\b/i] },
+  { id: 'deepseek', patterns: [/\bdeepseek\b/i] },
   { id: 'claude-code', patterns: [/\bclaude(?:\s+code)?\b/i] },
   { id: 'codex', patterns: [/\b(?:chatgpt|codex)\b/i] },
 ];
@@ -18,6 +19,7 @@ function targetPattern(target: RelayOperatorId): RegExp {
     case 'claude-code': return /\bclaude(?:\s+code)?\b/i;
     case 'codex': return /\b(?:chatgpt|codex)\b/i;
     case 'perplexity': return /\bperplexity\b/i;
+    case 'deepseek': return /\bdeepseek\b/i;
   }
 }
 
