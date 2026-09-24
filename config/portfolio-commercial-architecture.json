@@ -1,0 +1,215 @@
+{
+  "schemaVersion": 1,
+  "contractVersion": "2026-09-23.1",
+  "authority": {
+    "repository": "jussray/founder-control-room",
+    "purpose": "Portfolio-wide commercial packaging and money-path classification for FCR-governed work.",
+    "truthBoundary": "This contract defines commercial roles, hypotheses, metrics, and proof requirements. It does not prove customers, revenue, retention, provider state, checkout success, deployment, publication, or market demand.",
+    "authorityBoundary": "This contract grants no pricing, discount, spend, checkout, billing, publication, outreach, merge, deploy, provider, customer-data, or destructive authority."
+  },
+  "invariants": {
+    "repositoryIsNotAutomaticallyACompany": true,
+    "technicalIndependenceDoesNotRequireSeparateCommercialPackaging": true,
+    "enginesAndModulesCompoundParentProductsByDefault": true,
+    "visibilityUsageAndEngagementAreNotRevenue": true,
+    "moneyClaimsRequireEconomicEvidence": true,
+    "customerAndPayerMayDiffer": true,
+    "everyCommercialCandidateNeedsARepeatEngine": true,
+    "everyCommercialCandidateNeedsANextMoneyTest": true,
+    "truthStatuses": ["VERIFIED", "INFERRED", "UNKNOWN", "BLOCKED"]
+  },
+  "publicPillars": [
+    {
+      "id": "founder-software",
+      "leadProduct": "founder-control-room",
+      "customerFacingIdentity": "Founder Control Room",
+      "supportingSystems": ["chief-ai-machine", "promptos", "truth-weaver", "truth-compass", "solcontinuity"],
+      "rule": "Supporting systems may remain technically independent where required, but default commercial packaging compounds Founder Control Room unless separate demand and repeat-payment evidence justify a distinct offer."
+    },
+    {
+      "id": "creator-software",
+      "leadProduct": "storyengine",
+      "customerFacingIdentity": "StoryEngine",
+      "supportingSystems": ["l99-runtime"],
+      "rule": "StoryEngine is the creator-facing product; L99 is its execution, provenance, recovery, and evidence runtime."
+    },
+    {
+      "id": "family-product",
+      "leadProduct": "sekret-bip",
+      "customerFacingIdentity": "Se’kret Bip",
+      "supportingSystems": ["bip-jr"],
+      "rule": "Bip Jr belongs to the Se’kret Bip family world by default and does not become a separate commercial product without independent customer, payer, value, and repeat-payment proof."
+    },
+    {
+      "id": "commerce",
+      "leadProduct": "juss-beautiful-hair",
+      "customerFacingIdentity": "Juss Beautiful Hair",
+      "supportingSystems": ["sweats", "untold-stories-storefront", "alexa-commerce-engine"],
+      "rule": "Each commerce brand keeps its own catalog, customer economics, vendor, fulfillment, pricing, and checkout truth. Shared tooling does not collapse brand authority."
+    }
+  ],
+  "commercialPriority": [
+    "juss-beautiful-hair",
+    "founder-control-room",
+    "storyengine",
+    "sekret-bip",
+    "think-tank"
+  ],
+  "products": {
+    "juss-beautiful-hair": {
+      "repository": "jussray/jussbeautifulhair-site",
+      "role": "core-commerce-business",
+      "pillar": "commerce",
+      "customer": "Hair customer",
+      "payer": "Hair customer",
+      "value": "Branded hair products delivered through a real commerce path.",
+      "revenueMechanism": ["product-margin", "bundles", "repeat-orders", "upsells"],
+      "repeatEngine": "Customer satisfaction and replenishment or next-style demand produce repeat purchases.",
+      "northStar": "contribution-margin-from-real-orders",
+      "requiredEconomicEvidence": ["paid-order", "aov", "gross-or-contribution-margin", "repeat-purchase"],
+      "nextMoneyTest": "Prove the live product-to-cart-to-Shopify-checkout-to-paid-order path and measure unit economics from real orders.",
+      "claimBoundary": "Repository or browser proof is not paid-order or profitability proof."
+    },
+    "founder-control-room": {
+      "repository": "jussray/founder-control-room",
+      "role": "core-software-company",
+      "pillar": "founder-software",
+      "customer": "AI-heavy solo founders, small product teams, and operators managing consequential multi-tool work",
+      "payer": "Founder, team, or organization owning the workspace",
+      "value": "One governed operating plane for intent, current truth, authority, action, evidence, outcomes, release control, and next gates.",
+      "revenueMechanism": ["workspace-subscription", "team-tiers", "onboarding-or-implementation-service"],
+      "repeatEngine": "The workspace becomes more valuable as decisions, evidence, approved workflows, outcomes, and operating continuity accumulate.",
+      "northStar": "paid-retained-founder-workspaces",
+      "requiredEconomicEvidence": ["external-user", "important-job-completed", "return-use", "payment", "paid-repeat-or-retention"],
+      "nextMoneyTest": "Get an external founder to complete an important job in FCR, return for another job, pay, and remain active through a defined retention window.",
+      "claimBoundary": "Builds, deployments, screenshots, internal founder use, and GitHub activity are product evidence but not external paid-retention proof."
+    },
+    "storyengine": {
+      "repository": "jussray/StoryEngine",
+      "role": "core-creator-software-company",
+      "pillar": "creator-software",
+      "customer": "Creators carrying an idea through creation, packaging, release preparation, distribution, commerce, and measurement",
+      "payer": "Creator, author, studio, or creative team",
+      "value": "Carry creative work from idea through a controlled release path without losing provenance, state integrity, or creator authority.",
+      "revenueMechanism": ["subscription", "usage-or-creation-credits"],
+      "repeatEngine": "Creators return for additional projects, formats, release cycles, and measurement loops.",
+      "northStar": "paid-repeat-creators-reaching-approved-release-gates",
+      "requiredEconomicEvidence": ["creator-project-start", "meaningful-artifact-complete", "approved-release-gate", "payment", "second-paid-project-or-renewal"],
+      "nextMoneyTest": "Prove one external creator can complete meaningful work to an approved release gate, pay, and return for another project or paid cycle.",
+      "claimBoundary": "Draft generation is not publishing, creator completion, payment, or repeat usage proof."
+    },
+    "sekret-bip": {
+      "repository": "jussray/Sekret-Bip",
+      "role": "core-family-product",
+      "pillar": "family-product",
+      "customer": "Teen user within a trusted family relationship",
+      "payer": "Parent, guardian, family, or later an approved institution",
+      "value": "Private emotional growth and self-expression with relationship-aware family boundaries rather than surveillance.",
+      "revenueMechanism": ["family-subscription", "premium-family-features", "later-institutional-license"],
+      "repeatEngine": "Ongoing reflection, companion use, growth history, and trusted family value create recurring utility.",
+      "northStar": "retained-family-value-with-teen-trust-preserved",
+      "requiredEconomicEvidence": ["teen-activation", "week-1-return", "week-4-return", "payer-willingness-to-pay", "paid-retention"],
+      "nextMoneyTest": "Prove safe activation and retention first, then test a family willingness-to-pay offer without weakening teen privacy or trust.",
+      "claimBoundary": "Downloads, internal testing, or parent interest are not paid family retention proof."
+    },
+    "think-tank": {
+      "repository": "jussray/THINK-TANK",
+      "role": "acquisition-wedge",
+      "pillar": "founder-software",
+      "customer": "Founder or builder with an idea that needs challenge and structure",
+      "payer": "Founder or builder",
+      "value": "Turn a rough idea into a challenged, scored, versioned, portable Idea Record.",
+      "revenueMechanism": ["free-or-low-cost-entry", "paid-deep-analysis", "conversion-into-fcr-workspace"],
+      "repeatEngine": "Idea evolution and pivots create repeat analysis while the strongest path graduates into ongoing FCR work.",
+      "northStar": "qualified-idea-records-converting-to-paid-founder-work",
+      "requiredEconomicEvidence": ["external-idea-session", "completed-idea-record", "paid-upgrade-or-fcr-conversion", "return-use"],
+      "nextMoneyTest": "Use the deterministic V0 as an entry experience and test whether a completed external Idea Record converts into a paid analysis or FCR workspace.",
+      "claimBoundary": "Local deterministic completion is not provider-backed AI, public deployment, billing, demand, or conversion proof."
+    },
+    "chief-ai-machine": {
+      "repository": "jussray/chief-ai-machine",
+      "role": "monetizable-module",
+      "pillar": "founder-software",
+      "customer": "FCR founder or team needing portable company intelligence and structured executive reasoning",
+      "payer": "FCR workspace owner by default",
+      "value": "Preserve and synthesize company intelligence while remaining provider-neutral and proposal-only across consequential boundaries.",
+      "revenueMechanism": ["included-in-fcr-premium-tiers", "higher-value-intelligence-module"],
+      "repeatEngine": "Company intelligence compounds as approved assets, decisions, evidence, outcomes, and provider comparisons accumulate.",
+      "northStar": "retained-fcr-workspaces-using-chief-for-important-decisions",
+      "technicalIndependence": true,
+      "defaultCommercialPackaging": "inside-founder-control-room",
+      "separateOfferGate": "Requires independent customer, payer, repeated paid usage, and a value proposition that does not create a competing founder-OS story.",
+      "nextMoneyTest": "Measure whether Chief materially improves conversion, retention, or willingness-to-pay inside FCR before creating a separate commercial offer.",
+      "claimBoundary": "Technical standalone capability does not by itself justify a separate company, price, or customer-acquisition funnel."
+    },
+    "promptos": {
+      "repository": "jussray/promptos",
+      "role": "engine-and-acquisition-layer",
+      "pillar": "founder-software",
+      "customer": "FCR users needing governed prompts, skills, instructions, and founder-intent compilation",
+      "payer": "FCR workspace owner by default",
+      "value": "Turn reusable founder intent and instructions into governed workflows with lineage and evidence.",
+      "revenueMechanism": ["included-in-fcr", "public-content-to-fcr-acquisition"],
+      "repeatEngine": "Successful workflows become reusable operating assets and improve future work.",
+      "northStar": "proven-workflows-driving-fcr-value-and-retention",
+      "nextMoneyTest": "Attribute a useful public or in-product PromptOS workflow to an FCR signup, important completed job, and retained paid use.",
+      "claimBoundary": "Prompt usage, prompt count, engagement, or library size are not revenue."
+    },
+    "truth-weaver": {
+      "repository": "jussray/truth-weaver",
+      "role": "premium-decision-module",
+      "pillar": "founder-software",
+      "customer": "FCR founder or team making evidence-sensitive decisions",
+      "payer": "FCR workspace owner by default",
+      "value": "Separate evidence from inference, attack competing hypotheses, and turn survivors into smallest reversible tests.",
+      "revenueMechanism": ["included-in-premium-fcr-tier"],
+      "repeatEngine": "Repeated high-consequence decisions create recurring decision-lab value.",
+      "northStar": "important-fcr-decisions-completed-with-evidence-and-follow-through",
+      "nextMoneyTest": "Test whether the decision lab raises FCR activation, retention, or paid upgrade intent on real founder decisions.",
+      "claimBoundary": "Decision quality must be evidenced by downstream outcomes; a sophisticated reasoning trace is not a business outcome."
+    },
+    "sweats": {
+      "repository": "jussray/Sweats",
+      "role": "commerce-brand-prelaunch",
+      "pillar": "commerce",
+      "customer": "Apparel customer",
+      "payer": "Apparel customer",
+      "value": "SWEATS apparel products once real approved catalog and fulfillment facts exist.",
+      "revenueMechanism": ["product-margin", "capsule-drops", "bundles"],
+      "repeatEngine": "Product satisfaction and future drops may produce repeat purchases once proven.",
+      "northStar": "contribution-margin-from-real-orders",
+      "nextMoneyTest": "Establish real Shopify catalog facts and prove product-to-cart-to-checkout before spending growth effort.",
+      "claimBoundary": "Preview UI is not catalog, inventory, price, checkout, order, or revenue proof."
+    },
+    "sleepwealth-agent": {
+      "repository": "jussray/SleepWealth-Agent",
+      "role": "research-lane",
+      "pillar": "founder-software",
+      "customer": "Not a current commercial priority",
+      "payer": "UNKNOWN",
+      "value": "Governed consequential-agent architecture and paper/simulation research.",
+      "revenueMechanism": [],
+      "repeatEngine": "UNKNOWN",
+      "northStar": "governance-learning-compounded-into-core-systems",
+      "nextMoneyTest": "Do not force monetization yet; extract proven governance primitives into FCR/Chief and require independent demand before creating a paid offer.",
+      "claimBoundary": "Paper simulation, provider observation, and governance correctness are not demonstrated alpha or live-money revenue."
+    }
+  },
+  "contentTeardownContract": {
+    "purpose": "Turn product/business analysis into truthful educational content without confusing attention with economics.",
+    "requiredFields": [
+      "product",
+      "customer",
+      "payer",
+      "problem",
+      "value",
+      "revenueMechanism",
+      "repeatEngine",
+      "northStar",
+      "proof",
+      "unproven",
+      "nextMoneyTest"
+    ],
+    "rule": "A content hook may simplify language, but the underlying teardown must preserve the current truth status of every economic claim."
+  }
+}

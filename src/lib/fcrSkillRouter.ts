@@ -6,6 +6,10 @@ import {
   DESIGN_COMMANDS,
   DESIGN_COMMAND_SHARED_CAPABILITY,
 } from '../design-os/commands.js';
+import {
+  routeContentFoundryCouncil,
+  type ContentFoundryCouncilDecision,
+} from './contentFoundryCouncil.js';
 
 export const FCR_SKILL_ROUTER_CONTRACT = 'juss/fcr-skill-router@v1' as const;
 
@@ -82,6 +86,7 @@ export interface FcrSkillRoutingDecision {
   automaticCouncilLenses: string[];
   requiredParallelLenses: string[];
   missingParallelLenses: string[];
+  contentFoundry: ContentFoundryCouncilDecision;
   requiredTools: string[];
   requiredProof: string[];
   mutationRequested: boolean;
@@ -160,7 +165,7 @@ function isRepositoryGoal(goal: string): boolean {
 }
 
 function isUiGoal(goal: string): boolean {
-  return /\b(ui|screen|design|figma|layout|responsive|mobile|browser|playwright|frontend|visual)\b/.test(goal);
+  return /\b(ui|screen|screenshot|screen recording|product demo|design|figma|layout|responsive|mobile|browser|playwright|frontend|visual)\b/.test(goal);
 }
 
 function isMessagingGoal(goal: string): boolean {
@@ -186,6 +191,7 @@ export function routeFcrSkills(input: RouteFcrSkillsInput): FcrSkillRoutingDecis
   const messagingGoal = isMessagingGoal(goal);
   const commercialGoal = isCommercialGoal(goal);
   const mergeReviewGoal = repositoryGoal && (input.action === 'merge' || input.action === 'review');
+  const contentFoundry = routeContentFoundryCouncil(input.goal, input.action);
 
   pushUnique(requiredProof, 'Founder Council is applied automatically in code; slash commands are optional foreground aliases and never create authority');
   pushUnique(requiredProof, 'Redteam remains two separate passes: premise before selection and solution after selection; distinct failures keep distinct receipts');
@@ -193,6 +199,13 @@ export function routeFcrSkills(input: RouteFcrSkillsInput): FcrSkillRoutingDecis
   pushUnique(requiredProof, 'Product Design disposition recorded for the selected path; UI/runtime claims still require rendered browser evidence');
   pushUnique(requiredProof, 'Data Analytics outcome signals declared before execution and treated as observation-only evidence');
   pushUnique(requiredProof, 'Deep Research uses authoritative primary sources when research can change the decision; research never grants execution authority');
+
+  for (const capabilityId of contentFoundry.policyRequiredCapabilityIds) {
+    pushUnique(policyRequiredCapabilityIds, capabilityId);
+  }
+  for (const proof of contentFoundry.requiredProof) {
+    pushUnique(requiredProof, proof);
+  }
 
   if (designCommandIds.length > 0) {
     pushUnique(
@@ -270,7 +283,7 @@ export function routeFcrSkills(input: RouteFcrSkillsInput): FcrSkillRoutingDecis
   const status = errors.length === 0 ? 'ready_for_runtime_discovery' : 'blocked';
   const nextGate = status === 'blocked'
     ? 'Return the policy failures to Chief AI and require a corrected hash-bound capability plan before runtime discovery or mutation.'
-    : 'Discover runtime availability only for capabilities in the validated Chief AI plan; the automatic Founder Council remains advisory and preserves Product Design, Data Analytics, Deep Research, provider, proof, approval, rollback, and execution boundaries.';
+    : 'Discover runtime availability only for capabilities in the validated Chief AI plan; the automatic Founder Council remains advisory and preserves Product Design, Data Analytics, Deep Research, Content Foundry, provider, proof, approval, rollback, and execution boundaries.';
 
   return {
     contract: FCR_SKILL_ROUTER_CONTRACT,
@@ -285,6 +298,7 @@ export function routeFcrSkills(input: RouteFcrSkillsInput): FcrSkillRoutingDecis
     automaticCouncilLenses,
     requiredParallelLenses,
     missingParallelLenses,
+    contentFoundry,
     requiredTools,
     requiredProof,
     mutationRequested,

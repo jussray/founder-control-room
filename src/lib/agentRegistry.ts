@@ -27,6 +27,8 @@ export interface AgentDescriptor {
 const FCR_V14 = 'docs/FOUNDER_CONTROL_ROOM_AND_CHIEF_AI_MASTER_BUILD_SPEC_V1_4_ADDENDUM.md';
 const MULTI_AGENT = 'docs/FCR_MULTI_AGENT_ENABLEMENT_CONTRACT.md';
 const DEEPSEEK_INSTRUCTOR = 'docs/DEEPSEEK_INSTRUCTOR_CONTRACT.md';
+const MUSE_CONTROL = '.control-room/MUSE.md';
+const COUNCIL_CONTROL = '.control-room/COUNCIL.md';
 
 export const AGENT_REGISTRY: readonly AgentDescriptor[] = [
   {
@@ -66,6 +68,18 @@ export const AGENT_REGISTRY: readonly AgentDescriptor[] = [
     },
   },
   {
+    id: 'muse',
+    label: 'Muse',
+    role: 'Governed Founder AI Council challenger for cross-provider analysis, repository implementation, and GitHub/Supabase/Cloudflare drift detection under existing founder authority gates.',
+    operator: {
+      enabled: true,
+      capabilities: ['research', 'propose', 'review', 'implement'],
+      firstSliceRuntimeModel: false,
+      externalWritesRequireBoundAuthority: true,
+      instructionContracts: [MUSE_CONTROL, COUNCIL_CONTROL, FCR_V14, MULTI_AGENT],
+    },
+  },
+  {
     id: 'deepseek-instructor',
     label: 'DeepSeek Instructor',
     role: 'Cross-project instruction, adversarial challenge, solution synthesis, and portable pattern extraction without direct implementation authority.',
@@ -96,6 +110,11 @@ export const AGENT_REGISTRY: readonly AgentDescriptor[] = [
     id: 'deepseek-platform',
     label: 'DeepSeek Platform',
     role: 'Replaceable server-side reasoning/model capability behind adapters; provider availability never grants operator or mutation authority.',
+  },
+  {
+    id: 'meta-ai-platform',
+    label: 'Meta AI / Muse Platform',
+    role: 'Replaceable server-side Muse model capability behind adapters; provider availability, model capability, or Council membership never grants mutation or founder authority.',
   },
   {
     id: 'perplexity',

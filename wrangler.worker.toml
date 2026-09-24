@@ -27,6 +27,15 @@ command = "node scripts/verify-worker-build-authority.mjs"
 [observability]
 enabled = true
 
+# Private, same-account RPC only. FCR is the caller/authority membrane; Chief
+# receives sanitized evidence and may reason over it, but this binding does not
+# grant Chief repository, approval, deployment, publication, or provider
+# mutation authority.
+[[services]]
+binding = "CHIEF_AI"
+service = "chief-ai"
+entrypoint = "FounderControlRoomEntrypoint"
+
 # Durable release-proof orchestration only. No route creates instances yet,
 # and the Workflow receipt explicitly grants no merge, deploy, or provider
 # mutation authority. A later trigger must use the existing FCR authority

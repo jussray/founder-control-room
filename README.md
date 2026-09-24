@@ -48,6 +48,14 @@ FCR models projects, proposals, missions, exact refs, verification runs, evidenc
 
 Branch creation through `src/http/routes/approvals.ts` is now an exact-action governed repository mutation. A fresh `create_branch` proof and authenticated founder execute request cause FCR to issue a server-derived `AuthorityEnvelopeV1` bound to `github.repository.create_branch`, repository scope, exact branch arguments, current mission-state fingerprint, tool-call identity, expiry, founder identity, and idempotency key. The authority lifetime starts from the server-observed execute request time, not the proof receipt timestamp, so proof freshness and authority expiry remain separate fail-closed windows. FCR reserves the execution before the external write, re-reads mission state immediately before mutation, and `executeAuthorizedCreateBranch()` must reject drift before `RepositoryProvider.createBranch(...)` can be reached. A pending or ambiguous execution remains reconcile-before-retry; source and CI proof of this membrane do not by themselves prove that a live GitHub branch was created.
 
+### Claude Cowork and shared GitHub source
+
+FCR now presents Claude Cowork as a governed founder-stack work surface, not as a second repository or approval plane. For repository work, Claude, Claude Code, and Cowork must resolve the authoritative GitHub repository, branch, and exact current head and bind their Council round to that same evidence subject. Workspace copies, attachments, exports, and model memory remain working context until reconciled against current GitHub source.
+
+Actual Cowork access to GitHub depends on the user's Claude-side GitHub connector and its current permissions. This repository source does not prove that connector is configured or authorized in a particular Claude session. Durable repository changes return through GitHub commit, pull-request, diff, check, and review evidence.
+
+The current FCR Cowork lane intentionally labels its native receipt integration as **not wired**. Generic Activity entries are not promoted to Cowork receipts, and FCR does not claim Cowork-specific receipt ingestion until a separately reviewed adapter exists and is proven. Council participation, connector availability, or Cowork tool access grants no merge, deploy, provider, credential, billing, publication, deletion, or founder authority.
+
 ### PR continuity
 
 The repository has machine-enforced PR continuity. Eligible same-repository branches may roll forward when their live base moves, but every head movement creates a new proof subject.
@@ -126,6 +134,12 @@ canonical capability declaration
 -> active execution capability
 -> observed outcome proof
 ```
+
+### Proof-weighted model capability market
+
+`src/lib/modelCapabilityMarket.ts` adds a task-specific routing layer for Council operators. Public launch benchmarks and provider claims are discovery signals only: they enter as bounded priors and cannot by themselves make a model primary, prove an outcome, or grant execution authority. Promotion requires fresh local receipts for the same task class; stale observations expire, false-green behavior is penalized, and a fresh authority-boundary violation blocks promotion.
+
+The market may recommend a primary, an independent challenger from another provider family, and shadow trials for promising unproven models. Every route remains explicitly non-authorizing (`selectionAuthority: false`, `executionAuthority: false`). Founder approval, repository/provider gates, provider readback, Playwright for load-bearing browser claims, and outcome verification remain separate. See [`docs/MODEL_CAPABILITY_MARKET.md`](docs/MODEL_CAPABILITY_MARKET.md).
 
 ### Founder-content execution
 
@@ -293,7 +307,7 @@ Public-safe configuration may live in `.env.example`. Secret values do not belon
 - [`GLOBAL_AI.md`](GLOBAL_AI.md) — provider-neutral founder operating contract
 - [`AGENTS.md`](AGENTS.md) — repository entry contract
 - [`CHATGPT.md`](CHATGPT.md) — ChatGPT overlay
-- [`CLAUDE.md`](CLAUDE.md) — Claude overlay
+- [`CLAUDE.md`](CLAUDE.md) — Claude / Claude Code / Cowork overlay
 - [`PERPLEXITY.md`](PERPLEXITY.md) — Perplexity overlay
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — architecture
 - [`docs/PR_CONTINUITY.md`](docs/PR_CONTINUITY.md) — branch/head proof rollover law
@@ -325,3 +339,5 @@ For public crawler and work-directory behavior, `.github/workflows/ci.yml` must 
 ## Cross-repository browser witness freshness
 
 The exact StoryEngine peer configured in `.github/workflows/playwright.yml` is an evidence subject, not a durable alias for current StoryEngine. A peer refresh must be backed by an independent ref/SHA observation and must reset predecessor federation/browser proof until the complete FCR → StoryEngine → receipt → FCR Playwright witness passes on the exact FCR head. Pin alignment alone grants no merge, deploy, production, or provider-mutation authority.
+
+When the live StoryEngine ref advances after a previously proven FCR head, updating the pin is recovery setup, not recovered proof. The successor FCR head remains `UNKNOWN` for federation until its own exact-head Playwright job proves runtime identity, directive/receipt binding, replay safety, and the browser loop against that newly observed peer.
