@@ -2,6 +2,9 @@ type JsonRecord = Record<string, unknown>;
 
 export const ANTHROPIC_MCP_BETA = 'mcp-client-2025-11-20' as const;
 export const ANTHROPIC_PLAYWRIGHT_MCP_SERVER = 'playwright' as const;
+export const ANTHROPIC_RELAY_RUNTIME = 'anthropic-messages-api' as const;
+export const ANTHROPIC_PLAYWRIGHT_CONFIG_EVIDENCE_REF =
+  'runtime:anthropic-messages-api:mcp:playwright:configured-readonly-v1' as const;
 
 export const ANTHROPIC_PLAYWRIGHT_READ_TOOL_ALLOWLIST = [
   'browser_navigate',
@@ -21,6 +24,15 @@ export interface AnthropicMcpAttachment {
     mcp_servers: JsonRecord[];
     tools: JsonRecord[];
   };
+}
+
+const SAFE_MCP_TOOL_USE_ID = /^[A-Za-z0-9._:-]{1,200}$/;
+const PLAYWRIGHT_READ_TOOLS = new Set<string>(ANTHROPIC_PLAYWRIGHT_READ_TOOL_ALLOWLIST);
+
+function record(value: unknown): JsonRecord | null {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? value as JsonRecord
+    : null;
 }
 
 function canonicalHttpsUrl(value: string): string | null {
@@ -67,4 +79,44 @@ export function anthropicPlaywrightMcpAttachment(
       }],
     },
   };
+}
+
+/**
+ * Extract immutable evidence that Anthropic actually invoked the configured
+ * Playwright MCP server. Configuration alone is deliberately not treated as
+ * tool-use proof.
+ */
+export function anthropicPlaywrightMcpToolEvidenceRefs(body: unknown): string[] {
+  const message = record(body);
+  const content = Array.isArray(message?.content) ? message.content : [];
+  const toolUses = new Map<string, string>();
+  const refs: string[] = [];
+
+  for (const entry of content) {
+    const block = record(entry);
+    if (block?.type !== 'mcp_tool_use') continue;
+    if (block.server_name !== ANTHROPIC_PLAYWRIGHT_MCP_SERVER) continue;
+
+    const id = typeof block.id === 'string' ? block.id.trim() : '';
+    const name = typeof block.name === 'string' ? block.name.trim() : '';
+    if (!SAFE_MCP_TOOL_USE_ID.test(id) || !PLAYWRIGHT_READ_TOOLS.has(name)) continue;
+
+    toolUses.set(id, name);
+    refs.push(`mcp-tool-use:${ANTHROPIC_PLAYWRIGHT_MCP_SERVER}:${name}:${id}`);
+  }
+
+  for (const entry of content) {
+    const block = record(entry);
+    if (block?.type !== 'mcp_tool_result') continue;
+
+    const toolUseId = typeof block.tool_use_id === 'string' ? block.tool_use_id.trim() : '';
+    const name = toolUses.get(toolUseId);
+    if (!name) continue;
+
+    refs.push(
+      `mcp-tool-result:${ANTHROPIC_PLAYWRIGHT_MCP_SERVER}:${name}:${toolUseId}:${block.is_error === true ? 'error' : 'success'}`,
+    );
+  }
+
+  return refs;
 }
