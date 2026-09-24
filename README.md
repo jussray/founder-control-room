@@ -243,6 +243,8 @@ A terminal result is verification evidence only for the command and exact checko
 
 FCR can declare and govern bounded MCP/provider capabilities, including the source contract for a read-only FCR MCP bridge. Repository declarations prove wiring only. Live secret presence, provider authentication, endpoint health, deployed runtime identity, and mutation authority require separate current evidence.
 
+For the `claude-code` operator identity, the current FCR relay runtime is the Anthropic Messages API. An attached remote Playwright MCP server is a **configuration fact**, not proof that Claude used the browser. FCR may claim actual Playwright use only when the same Anthropic response contains an accepted allowlisted `mcp_tool_use` block for the `playwright` server, with any result claim correlated through its matching `mcp_tool_result` ID. Configuration, provider availability, or the operator label alone cannot create shell, browser-mutation, merge, deploy, publication, provider-mutation, or founder authority.
+
 Componecat is one such bounded source capability: its registry entry is read-only portfolio architecture/catalog context for active projects. Catalog discovery does not grant project ownership, repository mutation, merge, deploy, provider-write, or publication authority, and continuity-only/external project identities do not inherit access merely because they exist in the broader portfolio graph.
 
 ## Data boundary
