@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  FCR_ASK_ME_VIDEO_COUNCIL_RECEIPT_FIELDS,
   FCR_CONTENT_FOUNDRY_STAGES,
   FCR_CONTENT_PACKET_FIELDS,
   isFcrContentGoal,
@@ -40,12 +41,52 @@ describe('FCR Content Foundry Council policy', () => {
     expect(decision.authority.authorizesPublish).toBe(false);
   });
 
+  it('convenes the smallest default Ask Me Video council before video direction', () => {
+    const decision = routeContentFoundryCouncil(
+      'Make a cinematic video from this founder story.',
+      'draft',
+    );
+
+    expect(decision.askMeVideoCouncil.applies).toBe(true);
+    expect(decision.askMeVideoCouncil.operationalAuthority).toBe('gemini-first');
+    expect(decision.askMeVideoCouncil.truthKernel).toBe('/LEEVIZE');
+    expect(decision.askMeVideoCouncil.members.map((member) => member.id)).toEqual([
+      'viewer-advocate',
+      'story-director',
+      'truth-producer',
+      'continuity-director',
+    ]);
+    expect(decision.askMeVideoCouncil.receiptFields).toEqual([
+      ...FCR_ASK_ME_VIDEO_COUNCIL_RECEIPT_FIELDS,
+    ]);
+    expect(decision.askMeVideoCouncil.receiptFields).toContain('dissent');
+    expect(decision.askMeVideoCouncil.deliberationRules.join(' ')).toMatch(/independently/);
+    expect(decision.askMeVideoCouncil.deliberationRules.join(' ')).toMatch(/smallest useful council/);
+    expect(decision.requiredProof.join(' ')).toMatch(/Ask Me Video convenes/);
+  });
+
+  it('adds only the video specialists required by product, distribution, money, and sound work', () => {
+    const decision = routeContentFoundryCouncil(
+      'Publish a YouTube product demo with real app runtime screenshots, voiceover, captions, and a conversion CTA.',
+      'publish',
+    );
+    const members = decision.askMeVideoCouncil.members.map((member) => member.id);
+
+    expect(members).toContain('runtime-proof-specialist');
+    expect(members).toContain('distribution-money-specialist');
+    expect(members).toContain('sound-director');
+    expect(decision.policyRequiredCapabilityIds).toContain('proof-led-publishing');
+    expect(decision.askMeVideoCouncil.deliberationRules.join(' ')).toMatch(/cannot mint publish/);
+  });
+
   it('does not treat a generic engineering goal as content production', () => {
     expect(isFcrContentGoal('Repair the repository typecheck failure.')).toBe(false);
     const decision = routeContentFoundryCouncil('Repair the repository typecheck failure.', 'write');
     expect(decision.applies).toBe(false);
     expect(decision.stages).toEqual([]);
     expect(decision.requiredProof).toEqual([]);
+    expect(decision.askMeVideoCouncil.applies).toBe(false);
+    expect(decision.askMeVideoCouncil.members).toEqual([]);
   });
 
   it('requires the existing proof-led-publishing capability only at the publish gate', () => {
@@ -68,6 +109,10 @@ describe('FCR Content Foundry Council policy', () => {
 
     expect(decision.contentFoundry.applies).toBe(true);
     expect(decision.contentFoundry.stages).toEqual([...FCR_CONTENT_FOUNDRY_STAGES]);
+    expect(decision.contentFoundry.askMeVideoCouncil.applies).toBe(true);
+    expect(decision.contentFoundry.askMeVideoCouncil.members.map((member) => member.id)).toContain(
+      'runtime-proof-specialist',
+    );
     expect(decision.policyRequiredCapabilityIds).toContain('proof-led-publishing');
     expect(decision.requiredTools).toContain('playwright');
     expect(decision.requiredProof).toContain('exact-head Playwright evidence for UI/runtime claims');
