@@ -97,6 +97,7 @@ The former `founder-control-room2` Worker was deleted and must not be recreated 
 | `FCR_SHOPIFY_WEBHOOK_SECRET` | secret | Required Shopify `orders/paid` HMAC signing secret for the FCR first-party commerce ingress. Provider-held; never log or copy its value into proof. |
 | `FCR_COMMERCE_HASH_SALT` | secret | Required independent server-only salt for privacy-safe FCR Shopify order-reference HMACs. This marker creates no Shopify authority. |
 | `TINYFISH_API_KEY` | secret | Required provider-held credential for live `tinyfish-web-observation-v1` Search/Fetch. Canonical production deploy verifies only binding-name presence before mutation; the value remains in Cloudflare and never becomes a GitHub Actions secret or proof receipt. |
+| `MODEL_API_KEY` | secret | Required server-only Meta Muse API credential for the bounded Muse operator relay. The value remains provider-held in the Worker secret plane, never enters prompts/logs/receipts, and its presence grants no provider-mutation, merge, deploy, publish, or founder authority. |
 | `FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON` | secret | Scoped, revocable, fail-closed automation grant. |
 | `FOUNDER_SIGNAL_ENGINE_MCP_TOKEN` | secret | Dedicated MCP bearer token. This is not an OpenAI API key. |
 | `ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL` | secret | Private approved Zapier Catch Hook URL. |
@@ -110,7 +111,7 @@ The former `founder-control-room2` Worker was deleted and must not be recreated 
 
 The Founder Content n8n source lane is Buffer-only and schedule-only. `N8N_FOUNDER_CONTENT_ENABLED=true` is source intent, not runtime proof. A production claim requires exact-main deployment, provider-held secret-name readback, exact `fcrFounderContentV1` workflow fingerprint and n8n `2.32.6` identity, plus provider-native Buffer readback. n8n acceptance never establishes final publication truth.
 
-The Worker intentionally fails closed when required bindings are absent, empty, malformed, or when the GitHub App pair is incomplete. Do not weaken `validateWorkerEnv` to bypass provider configuration. TinyFish remains route-level fail-closed if its provider-held key is later removed.
+The Worker intentionally fails closed when required bindings are absent, empty, malformed, or when the GitHub App pair is incomplete. Do not weaken `validateWorkerEnv` to bypass provider configuration. TinyFish remains route-level fail-closed if its provider-held key is later removed. Muse remains unavailable when `MODEL_API_KEY` or its allowed model selector is absent; mere binding-name presence is configuration evidence, not proof that Muse was invoked or that a provider response exists.
 
 Generate `FOUNDER_SESSION_ENCRYPTION_KEY` as exactly 32 random bytes encoded as unpadded base64url, for example:
 
@@ -227,6 +228,7 @@ The client-ID names above are shared recovery/runtime-witness selectors; the cli
 [ ] FCR_SHOPIFY_WEBHOOK_SECRET (provider-held Shopify HMAC secret)
 [ ] FCR_COMMERCE_HASH_SALT (independent server-only order-reference HMAC salt)
 [ ] TINYFISH_API_KEY (provider-held; required before live TinyFish activation)
+[ ] MODEL_API_KEY (provider-held Muse relay credential; name/configuration presence is not provider-use proof)
 [ ] FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON
 [ ] FOUNDER_SIGNAL_ENGINE_MCP_TOKEN
 [ ] ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL
