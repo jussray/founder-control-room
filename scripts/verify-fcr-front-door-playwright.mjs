@@ -5,7 +5,8 @@ const APEX_ORIGIN = 'https://foundercontrolroom.org';
 const PUBLIC_ORIGIN = 'https://www.foundercontrolroom.org';
 const CONTROL_ROOM_URL = `${PUBLIC_ORIGIN}/control-room/`;
 const AUTH_ME_URL = `${PUBLIC_ORIGIN}/auth/me`;
-const API_VERSION_URL = 'https://api.foundercontrolroom.org/version';
+const DIRECT_API_VERSION_URL = 'https://api.foundercontrolroom.org/version';
+const SAME_ORIGIN_VERSION_URL = `${APEX_ORIGIN}/version`;
 const RECEIPT_PATH = 'test-results/fcr-access-front-door-browser-proof.json';
 const expectedHeadSha = process.env.EXPECTED_HEAD_SHA?.trim() ?? '';
 
@@ -19,7 +20,7 @@ const context = await browser.newContext();
 const page = await context.newPage();
 
 const receipt = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   scope: 'fcr-access-front-door-browser-proof',
   observedAt: new Date().toISOString(),
   expectedHeadSha,
@@ -34,14 +35,25 @@ const receipt = {
   founderShellVisible: false,
   authMeStatus: null,
   founderAuthorityContained: false,
+  directApiVersionStatus: null,
+  directApiAccessProtected: false,
   apiVersionStatus: null,
   apiVersionMatchesExpectedSha: false,
+  apiVersionServiceIdentity: null,
   state: 'unknown',
 };
 
 function cloudflareInterceptDetected(url, body) {
   return /cloudflareaccess\.com/i.test(url)
+    || /\/cdn-cgi\/access\//i.test(url)
     || /Error\s+5(?:00|02|03|04|20|21|22|23|24|25|26)/i.test(body);
+}
+
+function cloudflareAccessGateDetected({ url, status, location, body }) {
+  const evidence = `${url}\n${location ?? ''}\n${body ?? ''}`;
+  if (/cloudflareaccess\.com|\/cdn-cgi\/access\//i.test(evidence)) return true;
+  return (status === 401 || status === 403)
+    && /cloudflare\s+access|access\s+denied|zero\s+trust/i.test(body ?? '');
 }
 
 const failures = [];
@@ -167,16 +179,45 @@ try {
     fail('Founder authority containment was not proven for a random stranger.');
   }
 
+  // Direct API is a protected live-domain surface. A random stranger must hit
+  // Cloudflare Access instead of receiving the Worker payload.
   try {
-    const versionResponse = await context.request.get(API_VERSION_URL, { timeout: 20_000 });
+    const directApiResponse = await context.request.get(DIRECT_API_VERSION_URL, {
+      timeout: 20_000,
+      maxRedirects: 0,
+    });
+    receipt.directApiVersionStatus = directApiResponse.status();
+    const directApiLocation = directApiResponse.headers()['location'] ?? null;
+    const directApiBody = (await directApiResponse.text().catch(() => '')).slice(0, 8_000);
+    receipt.directApiAccessProtected = cloudflareAccessGateDetected({
+      url: directApiResponse.url(),
+      status: directApiResponse.status(),
+      location: directApiLocation,
+      body: directApiBody,
+    });
+    if (!receipt.directApiAccessProtected) {
+      fail('Direct api.foundercontrolroom.org/version did not present a Cloudflare Access boundary to a random stranger.');
+    }
+  } catch (error) {
+    fail(error instanceof Error ? error.message : String(error));
+  }
+
+  // Exact Worker identity remains provable through the public Pages origin,
+  // which reaches the canonical Worker through the FCR_API Service Binding.
+  try {
+    const versionResponse = await context.request.get(SAME_ORIGIN_VERSION_URL, { timeout: 20_000 });
     receipt.apiVersionStatus = versionResponse.status();
+    receipt.apiVersionServiceIdentity = versionResponse.headers()['x-founder-control-room-service'] ?? null;
     if (!versionResponse.ok()) {
-      fail(`${API_VERSION_URL} returned HTTP ${versionResponse.status()}.`);
+      fail(`${SAME_ORIGIN_VERSION_URL} returned HTTP ${versionResponse.status()}.`);
     } else {
       const versionPayload = await versionResponse.text();
       receipt.apiVersionMatchesExpectedSha = versionPayload.includes(expectedHeadSha);
+      if (receipt.apiVersionServiceIdentity !== 'founder-control-room') {
+        fail('Pages /version did not prove the canonical founder-control-room Worker service identity.');
+      }
       if (!receipt.apiVersionMatchesExpectedSha) {
-        fail('API /version is not serving the exact approved current-main SHA.');
+        fail('Pages /version is not serving the exact approved current-main SHA through FCR_API.');
       }
     }
   } catch (error) {
