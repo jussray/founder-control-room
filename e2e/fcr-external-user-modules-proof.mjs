@@ -45,6 +45,16 @@ mkdirSync(RESULTS_ROOT, { recursive: true });
 
 const browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
 
+async function assertNoHorizontalOverflow(page, label) {
+  const overflow = await page.evaluate(() => ({
+    scrollWidth: document.documentElement.scrollWidth,
+    clientWidth: document.documentElement.clientWidth,
+  }));
+  if (overflow.scrollWidth > overflow.clientWidth + 1) {
+    throw new Error(`${label} has horizontal overflow: ${JSON.stringify(overflow)}`);
+  }
+}
+
 async function proveFcrModuleDoorway() {
   const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
   const page = await context.newPage();
@@ -53,6 +63,14 @@ async function proveFcrModuleDoorway() {
 
   await page.goto(baseUrl, { waitUntil: 'networkidle' });
   await page.locator('[data-fcr-entry]').waitFor({ state: 'visible' });
+
+  const entryChoices = page.locator('[data-entry-choice]');
+  if (await entryChoices.count() !== 2) throw new Error('FCR public front door must expose exactly two primary choices');
+  if (await page.locator('[data-entry-choice="user"]').count() !== 1) throw new Error('FCR public front door must expose one User view');
+  if (await page.locator('[data-entry-choice="founder"]').count() !== 1) throw new Error('FCR public front door must expose one Founder view');
+
+  const founderOnboarding = page.locator('#founder-start');
+  if (await founderOnboarding.count() !== 1) throw new Error('FCR must retain the founder onboarding surface');
 
   const founderModuleEntry = page.locator('[data-founder-start="modules"]');
   if (await founderModuleEntry.count() !== 1) throw new Error('FCR must expose one founder entry to the attached OS modules');
@@ -72,15 +90,21 @@ async function proveFcrModuleDoorway() {
     if (!boundary.toLowerCase().includes(phrase.toLowerCase())) throw new Error(`FCR module authority boundary missing: ${phrase}`);
   }
 
-  const overflow = await page.evaluate(() => ({
-    scrollWidth: document.documentElement.scrollWidth,
-    clientWidth: document.documentElement.clientWidth,
-  }));
-  if (overflow.scrollWidth > overflow.clientWidth + 1) throw new Error(`FCR module doorway has horizontal overflow: ${JSON.stringify(overflow)}`);
+  await assertNoHorizontalOverflow(page, 'FCR module doorway desktop');
   if (browserErrors.length) throw new Error(`FCR module doorway browser errors: ${browserErrors.join(' | ')}`);
 
   await page.screenshot({ path: join(RESULTS_ROOT, 'fcr-module-doorway.png'), fullPage: true });
   await context.close();
+
+  const mobileContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const mobile = await mobileContext.newPage();
+  await mobile.goto(baseUrl, { waitUntil: 'networkidle' });
+  await mobile.locator('[data-fcr-entry]').waitFor({ state: 'visible' });
+  if (await mobile.locator('[data-entry-choice]').count() !== 2) throw new Error('FCR mobile front door lost User/Founder choices');
+  if (await mobile.locator('[data-fcr-os-modules] [data-fcr-os-module]').count() !== 3) throw new Error('FCR mobile layout lost attached OS modules');
+  await assertNoHorizontalOverflow(mobile, 'FCR module doorway mobile');
+  await mobile.screenshot({ path: join(RESULTS_ROOT, 'fcr-module-doorway-mobile.png'), fullPage: true });
+  await mobileContext.close();
 }
 
 async function proveTruthWeaver() {
@@ -90,11 +114,21 @@ async function proveTruthWeaver() {
   const consoleErrors = [];
   page.on('pageerror', (error) => browserErrors.push(error.message));
   page.on('console', (message) => {
-    if (message.type() === 'error' || message.type() === 'warning') consoleErrors.push(`${message.type()}: ${message.text()}`);
+    if (message.type() === 'error') consoleErrors.push(`${message.type()}: ${message.text()}`);
   });
 
   await page.goto(MODULE_URLS['truth-weaver'], { waitUntil: 'domcontentloaded', timeout: 45_000 });
   await page.locator('[data-fcr-module="truth-weaver"]').waitFor({ state: 'visible', timeout: 30_000 });
+  await page.getByRole('heading', { name: /Understand the law/i }).waitFor({ state: 'visible', timeout: 15_000 });
+
+  const bodyCopy = await page.locator('body').innerText();
+  for (const phrase of ['Counsel', 'Legal Areas', 'Truth Weaver', 'FCR Control Plane', 'Commerce Surface', 'Authority ceiling']) {
+    if (!bodyCopy.toLowerCase().includes(phrase.toLowerCase())) throw new Error(`Truth Weaver approved screen direction missing: ${phrase}`);
+  }
+  if (/guaranteed legal advice|guaranteed outcome|verified lawyer/i.test(bodyCopy)) throw new Error('Truth Weaver must not manufacture legal authority or guaranteed outcomes');
+
+  const legalAreaCards = page.locator('#legal-areas a');
+  if (await legalAreaCards.count() !== 11) throw new Error(`Truth Weaver must expose the approved 11 legal-area lanes, found ${await legalAreaCards.count()}`);
 
   const form = page.locator('[data-external-tester-loop]');
   const fields = form.locator('textarea');
@@ -140,10 +174,25 @@ async function proveTruthWeaver() {
 
   const receiptCopy = await receipt.innerText();
   if (!/non-authorizing/i.test(receiptCopy)) throw new Error('Truth Weaver completion receipt must remain non-authorizing');
+
+  const localDraft = await page.evaluate(() => window.localStorage.getItem('fcr.truth-weaver.external-tester.v1'));
+  if (!localDraft || !localDraft.includes(values[0])) throw new Error('Truth Weaver local-first draft persistence failed');
+
+  await assertNoHorizontalOverflow(page, 'Truth Weaver desktop');
   if (browserErrors.length) throw new Error(`Truth Weaver browser errors: ${browserErrors.join(' | ')}`);
+  if (consoleErrors.length) throw new Error(`Truth Weaver console errors: ${consoleErrors.join(' | ')}`);
 
   await page.screenshot({ path: join(RESULTS_ROOT, 'truth-weaver-completion.png'), fullPage: true });
   await context.close();
+
+  const mobileContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const mobile = await mobileContext.newPage();
+  await mobile.goto(MODULE_URLS['truth-weaver'], { waitUntil: 'domcontentloaded', timeout: 45_000 });
+  await mobile.locator('[data-fcr-module="truth-weaver"]').waitFor({ state: 'visible', timeout: 30_000 });
+  await mobile.getByRole('heading', { name: /Understand the law/i }).waitFor({ state: 'visible', timeout: 15_000 });
+  await assertNoHorizontalOverflow(mobile, 'Truth Weaver mobile');
+  await mobile.screenshot({ path: join(RESULTS_ROOT, 'truth-weaver-mobile.png'), fullPage: true });
+  await mobileContext.close();
 }
 
 async function proveTruthCompass() {
@@ -168,6 +217,7 @@ async function proveTruthCompass() {
   if (await receipt.getAttribute('data-truth-state') !== 'VERIFIED') throw new Error('Truth Compass exact version plus evidence must produce VERIFIED');
   const receiptCopy = await receipt.innerText();
   if (!/non-authorizing/i.test(receiptCopy)) throw new Error('Truth Compass receipt must remain non-authorizing');
+  await assertNoHorizontalOverflow(page, 'Truth Compass desktop');
   if (browserErrors.length) throw new Error(`Truth Compass browser errors: ${browserErrors.join(' | ')}`);
 
   await page.screenshot({ path: join(RESULTS_ROOT, 'truth-compass-completion.png'), fullPage: true });
@@ -182,6 +232,7 @@ async function proveExactMatch() {
   const copy = await page.locator('body').innerText();
   if (!/FCR/i.test(copy) || !/Exact Match Engine/i.test(copy)) throw new Error('Exact Match Engine must retain visible FCR module identity');
   if (!/receipt/i.test(copy)) throw new Error('Exact Match Engine must expose receipt-oriented completion copy');
+  await assertNoHorizontalOverflow(page, 'Exact Match Engine desktop');
 
   await page.screenshot({ path: join(RESULTS_ROOT, 'exact-match-module.png'), fullPage: true });
   await context.close();
@@ -192,7 +243,7 @@ try {
   await proveTruthWeaver();
   await proveTruthCompass();
   await proveExactMatch();
-  console.log('PASS: FCR exposes three attached OS modules; Truth Weaver and Truth Compass complete real browser workflows and produce non-authorizing receipts; Exact Match retains FCR module identity.');
+  console.log('PASS: FCR retains User/Founder entry + onboarding, exposes the three attached OS modules, Truth Weaver matches the approved Counsel direction and completes a local-first non-authorizing workflow on desktop/mobile, Truth Compass reconciles with a non-authorizing receipt, and Exact Match retains FCR identity.');
 } finally {
   await browser.close();
   await new Promise((resolve) => server.close(resolve));
