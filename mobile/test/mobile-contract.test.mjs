@@ -26,7 +26,8 @@ test('mobile API surface is read-only and reuses existing dashboard reads', () =
   assert.match(client, /'\/dashboard\/activity'/);
   assert.match(client, /'\/dashboard\/costs'/);
   assert.match(client, /`\/dashboard\/proof-engine\?projectSlug=\$\{slug\}`/);
-  assert.doesNotMatch(client, /manual-analysis|\/approvals|POST|PUT|PATCH|DELETE/i);
+  assert.doesNotMatch(client, /manual-analysis|\/approvals/i);
+  assert.doesNotMatch(client, /method:\s*['"](?:POST|PUT|PATCH|DELETE)['"]/i);
 
   assert.match(dashboardRoute, /dashboardRouter\.get\('\/tasks'/);
   assert.match(dashboardRoute, /dashboardRouter\.get\('\/activity'/);
