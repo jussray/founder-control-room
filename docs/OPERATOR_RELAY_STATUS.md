@@ -4,15 +4,17 @@ Current classification: PARTIAL
 
 Verified in authoritative FCR source:
 
-- peer-operator contract for `codex`, `claude-code`, and `perplexity`;
+- peer-operator contract for `gemini`, `codex`, `claude-code`, and `perplexity`;
 - explicit exclusion of `deepseek-instructor` from the peer lane;
 - zero-authority relay envelope for research, propose, review, and bounded implementation work;
 - source-context fingerprinting and exact request/response hash binding;
 - fail-closed dispatch when the requested operator is unavailable;
-- direct OpenAI, Anthropic, and Perplexity server adapters that exist only when both an explicit model and server-held key are configured;
+- direct Gemini, OpenAI, Anthropic, and Perplexity server adapters that exist only when both an explicit model and server-held key are configured;
 - canonical `/mcp` OAuth route mounted through the FCR MCP router with server-owned project scope, OAuth client mapping, founder allowlist checks, and redacted evidence receipts;
 - static-token compatibility clients cannot use peer relay;
 - provider responses cannot grant mutation, merge, deploy, publish, or provider-mutation authority;
+- adapter normalization preserves all four configured peer adapters and invents no fallback provider;
+- contract preflight covers all four peer operators while retaining the zero-authority ceiling;
 - exact current-main CI/check evidence exists independently of the older relay preflight.
 
 The standalone `/api/operator-relay` router remains an unmounted test scaffold. It is not the canonical authority path and must not be mounted merely to create a second relay surface. The authenticated `/mcp` tool is the authoritative relay entry point.

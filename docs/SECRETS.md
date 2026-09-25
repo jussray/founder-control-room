@@ -251,8 +251,8 @@ This table covers GitHub Actions secret names that are referenced outside the ca
 | `SONAR_HOST_URL` | `quality-gate.yml` | SonarQube server URL stored in the Actions secret plane because the workflow reads it through `secrets.*`. |
 | `NEON_API_KEY` | `neon-pr-branches.yml` | Required for create/delete of PR preview branches when that workflow runs. |
 | `OPENAI_API_KEY` | `playwright.yml` | Injected only into the E2E harness when configured; do not expose it to browser/static assets. |
-| `ANTHROPIC_API_KEY` | `ai-failure-repair.yml` | Server-side credential for the serialized Claude repair pass. Keep the value only in the Actions secret plane; secret presence does not prove provider credit, quota, model availability, or a successful live provider call. |
 | `PERPLEXITY_API_KEY` | `playwright.yml` | Injected only into the E2E harness when configured; do not expose it to browser/static assets. |
+| `FCR_PLAYWRIGHT_FOUNDER_BEARER` | `prompt-workflow-router-runtime-proof.yml` | Founder bearer credential used only for authorized deployed-runtime Playwright proof of the prompt workflow router. Keep it workflow-side, never log or expose the value in browser/static assets or receipts. |
 | `N8N_CONVEYOR_WEBHOOK_URL` | `n8n-conveyor-live-probe.yml` | Required private webhook URL for the founder-approved live conveyor probe. |
 | `N8N_CONVEYOR_BEARER_TOKEN` | `n8n-conveyor-live-probe.yml` | Required bearer credential paired with the live conveyor webhook probe. |
 | `CLOUDFLARE_DEPLOY_HOOK_URL` | `pages-production-release.yml` | Required reusable-workflow secret used to trigger the exact-SHA Pages release. |
@@ -264,3 +264,10 @@ This table covers GitHub Actions secret names that are referenced outside the ca
 | `CHIEF_CLOUDFLARE_ACCESS_CLIENT_SECRET` | `chief-proofmode-runtime-witness.yml` | Preferred protected Chief Access client secret for the trusted runtime witness. Never log, echo, or copy the value into source or receipts. |
 | `CLOUDFLARE_ACCESS_CLIENT_ID` | `chief-proofmode-access-recovery.yml`, `chief-proofmode-runtime-witness.yml` | Backward-compatible protected client-ID alias used only if the Chief-specific client-ID name is absent. It is not Access provider-administration authority. |
 | `CLOUDFLARE_ACCESS_CLIENT_SECRET` | `chief-proofmode-runtime-witness.yml` | Backward-compatible protected alias used only if the Chief-specific client-secret name is absent. Never expose the value; alias presence alone is not runtime proof. |
+| `ANTHROPIC_API_KEY` | `ai-failure-repair.yml` | Required for the workflow's serialized Claude repair pass (`anthropics/claude-code-action`), which runs after Codex's candidate patch and is scoped by the workflow's own STRICT AUTHORITY block to source/product code only — it cannot touch `.github/`, docs, tests, migrations, env files, dependency manifests, provider/deploy authority, secrets, billing, DNS, or auth credentials. |
+
+### `MODEL_API_KEY`
+
+- Required by the canonical Founder Control Room Cloudflare Worker for the bounded Muse provider adapter.
+- Store the value only as a provider-held Cloudflare Worker secret; never commit, print, echo, attach, or include it in proof artifacts.
+- Source declaration or documentation proves the required secret name only. Live presence requires a successful provider-side secret-name readback, and successful Council/Muse operation requires a separate authenticated runtime receipt.

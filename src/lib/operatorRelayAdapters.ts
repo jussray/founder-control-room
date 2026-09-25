@@ -10,8 +10,10 @@ import type { OperatorRelayAdapters } from './operatorRelayDispatch.js';
  */
 export function createOperatorRelayAdapters(input: OperatorRelayAdapters): OperatorRelayAdapters {
   return {
+    gemini: input.gemini,
     codex: input.codex,
     'claude-code': input['claude-code'],
     perplexity: input.perplexity,
+    deepseek: input.deepseek,
   };
 }

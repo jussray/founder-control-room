@@ -1,6 +1,6 @@
 import { L99_REPOSITORY_IDENTIFIER } from "./l99Repository.js";
 
-export type PortfolioProjectStatus = "active" | "external";
+export type PortfolioProjectStatus = "active" | "external" | "continuity-only";
 
 export interface PortfolioProject {
   slug: string;
@@ -79,9 +79,9 @@ export const PORTFOLIO_PROJECTS: readonly PortfolioProject[] = [
 ] as const;
 
 /**
- * Founder-owned repositories that are known to FCR for identity/continuity
- * only. Presence here grants no portfolio, MCP, decision, merge, deploy, or
- * execution authority.
+ * Founder-owned repositories whose ordered Founder Intelligence challenge stack
+ * has been re-observed on their current main branch. These remain identity /
+ * continuity metadata only and grant no FCR execution authority.
  */
 export const EXTERNAL_PROJECTS: readonly PortfolioProject[] = [
   {
@@ -124,6 +124,44 @@ export const QUARANTINED_REPOSITORIES = new Set([
   "jussray/jussbeautifulhair1",
 ]);
 
+/**
+ * Founder-owned repositories that should participate in portfolio continuity,
+ * provenance, and TRUE-first observation, but whose canonical Founder
+ * Intelligence challenge-stack inheritance has not yet been proven on current
+ * main. This is deliberately weaker than EXTERNAL_PROJECTS and carries zero
+ * merge, deploy, MCP, provider, publication, payment, or mutation authority.
+ */
+export const CONTINUITY_ONLY_PROJECTS: readonly PortfolioProject[] = [
+  {
+    slug: "bip-jr",
+    name: "Bip Jr",
+    repository: "jussray/Bip-Jr",
+    status: "continuity-only",
+    capabilities: ["bip-universe", "continuity"],
+  },
+  {
+    slug: "truth-compass",
+    name: "Truth Compass",
+    repository: "jussray/truth-compass",
+    status: "continuity-only",
+    capabilities: ["truth-analysis", "evidence", "continuity"],
+  },
+  {
+    slug: "truth-weaver",
+    name: "Truth Weaver",
+    repository: "jussray/truth-weaver",
+    status: "continuity-only",
+    capabilities: ["decision-control", "evidence", "continuity"],
+  },
+  {
+    slug: "alexa-commerce-engine",
+    name: "Alexa Commerce Engine",
+    repository: "jussray/alexa-commerce-engine-",
+    status: "continuity-only",
+    capabilities: ["commerce-agent", "continuity"],
+  },
+] as const;
+
 export const ACTIVE_PROJECT_SLUGS = new Set(
   PORTFOLIO_PROJECTS.map((project) => project.slug),
 );
@@ -132,12 +170,18 @@ export const EXTERNAL_PROJECT_SLUGS = new Set(
   EXTERNAL_PROJECTS.map((project) => project.slug),
 );
 
-/** Authority-bearing lookup. External identities are intentionally invisible. */
+export const CONTINUITY_ONLY_PROJECT_SLUGS = new Set(
+  CONTINUITY_ONLY_PROJECTS.map((project) => project.slug),
+);
+
+/** Authority-bearing lookup. Non-active identities are intentionally invisible. */
 export function getPortfolioProject(slug: string): PortfolioProject | undefined {
   return PORTFOLIO_PROJECTS.find((project) => project.slug === slug);
 }
 
 /** Read-only identity lookup for continuity/provenance code. Never an allowlist. */
 export function getKnownProject(slug: string): PortfolioProject | undefined {
-  return getPortfolioProject(slug) ?? EXTERNAL_PROJECTS.find((project) => project.slug === slug);
+  return getPortfolioProject(slug)
+    ?? EXTERNAL_PROJECTS.find((project) => project.slug === slug)
+    ?? CONTINUITY_ONLY_PROJECTS.find((project) => project.slug === slug);
 }

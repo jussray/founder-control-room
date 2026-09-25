@@ -48,6 +48,14 @@ FCR models projects, proposals, missions, exact refs, verification runs, evidenc
 
 Branch creation through `src/http/routes/approvals.ts` is now an exact-action governed repository mutation. A fresh `create_branch` proof and authenticated founder execute request cause FCR to issue a server-derived `AuthorityEnvelopeV1` bound to `github.repository.create_branch`, repository scope, exact branch arguments, current mission-state fingerprint, tool-call identity, expiry, founder identity, and idempotency key. The authority lifetime starts from the server-observed execute request time, not the proof receipt timestamp, so proof freshness and authority expiry remain separate fail-closed windows. FCR reserves the execution before the external write, re-reads mission state immediately before mutation, and `executeAuthorizedCreateBranch()` must reject drift before `RepositoryProvider.createBranch(...)` can be reached. A pending or ambiguous execution remains reconcile-before-retry; source and CI proof of this membrane do not by themselves prove that a live GitHub branch was created.
 
+### Claude Cowork and shared GitHub source
+
+FCR now presents Claude Cowork as a governed founder-stack work surface, not as a second repository or approval plane. For repository work, Claude, Claude Code, and Cowork must resolve the authoritative GitHub repository, branch, and exact current head and bind their Council round to that same evidence subject. Workspace copies, attachments, exports, and model memory remain working context until reconciled against current GitHub source.
+
+Actual Cowork access to GitHub depends on the user's Claude-side GitHub connector and its current permissions. This repository source does not prove that connector is configured or authorized in a particular Claude session. Durable repository changes return through GitHub commit, pull-request, diff, check, and review evidence.
+
+The current FCR Cowork lane intentionally labels its native receipt integration as **not wired**. Generic Activity entries are not promoted to Cowork receipts, and FCR does not claim Cowork-specific receipt ingestion until a separately reviewed adapter exists and is proven. Council participation, connector availability, or Cowork tool access grants no merge, deploy, provider, credential, billing, publication, deletion, or founder authority.
+
 ### PR continuity
 
 The repository has machine-enforced PR continuity. Eligible same-repository branches may roll forward when their live base moves, but every head movement creates a new proof subject.
@@ -107,8 +115,6 @@ Source policy is not live GitHub provider truth. Current rulesets, bypass actors
 
 Founder self-approval is not relabeled as independent review. The canonical path keeps deterministic independent review and authenticated exact-candidate founder-final approval separate. Merge capability and merge approval are also separate: green evidence, mergeability, review requests, `merge review`, broad `approved`/`cont` language, or `merge_authority: true` cannot silently authorize integration. Before every merge, the founder must explicitly approve the exact current repository, pull request number, current base SHA, and current head SHA; if the candidate moves, approval expires and must be requested again.
 
-For Founder Control Room itself, the current source routes the final GitHub integration transport through GitHub's asynchronous pull-request merge API only after the existing exact PR/base/head, deterministic-review, founder-final, and last-moment base/head freshness checks have passed. The request is locked to the exact reviewed head SHA, an already-pending request is reconciled by provider UUID rather than blindly replayed, and success requires terminal provider state with a valid merge SHA. The FCR wrapper is pinned to a reviewed candidate whose direct base is `main`, which keeps that candidate at the bottom of any GitHub stack and prevents the transport from silently sweeping lower, separately unapproved PRs into the same action. A queued UUID, provider acceptance, mergeability flag, source test, or successful poll setup is not merge authority or terminal merge proof; live integration remains unproven until an authorized exact-candidate execution returns authoritative terminal provider readback.
-
 For Chief governance, FCR contains a **read-only trusted observation and verification boundary** pinned to `jussray/chief-ai-machine` and Chief ruleset IDs `20818149` and `21261587`. It uses the repository-scoped FCR GitHub App installation-token path rather than caller-supplied PAT/token authority, preserves required-check `integration_id` producer identity, requires complete bypass and deployment readback, and fingerprints the provider observation. Under the current founder decision, ruleset `20818149` is accepted exactly as observed when it preserves zero bypass actors, its approved source checks, `Cloudflare Production`, `proofmode-access-admin`, and the unbound reserved candidate runtime context. A compliant observation returns `NO_CHANGE_REQUIRED` with `mutation:null`; drift blocks verification rather than producing a desired-state rewrite. This boundary never grants provider mutation, merge, deploy, or execution authority.
 
 See [`docs/FOUNDER_MERGE_AUTHORITY.md`](docs/FOUNDER_MERGE_AUTHORITY.md).
@@ -128,6 +134,12 @@ canonical capability declaration
 -> active execution capability
 -> observed outcome proof
 ```
+
+### Proof-weighted model capability market
+
+`src/lib/modelCapabilityMarket.ts` adds a task-specific routing layer for Council operators. Public launch benchmarks and provider claims are discovery signals only: they enter as bounded priors and cannot by themselves make a model primary, prove an outcome, or grant execution authority. Promotion requires fresh local receipts for the same task class; stale observations expire, false-green behavior is penalized, and a fresh authority-boundary violation blocks promotion.
+
+The market may recommend a primary, an independent challenger from another provider family, and shadow trials for promising unproven models. Every route remains explicitly non-authorizing (`selectionAuthority: false`, `executionAuthority: false`). Founder approval, repository/provider gates, provider readback, Playwright for load-bearing browser claims, and outcome verification remain separate. See [`docs/MODEL_CAPABILITY_MARKET.md`](docs/MODEL_CAPABILITY_MARKET.md).
 
 ### Founder-content execution
 
@@ -295,7 +307,7 @@ Public-safe configuration may live in `.env.example`. Secret values do not belon
 - [`GLOBAL_AI.md`](GLOBAL_AI.md) — provider-neutral founder operating contract
 - [`AGENTS.md`](AGENTS.md) — repository entry contract
 - [`CHATGPT.md`](CHATGPT.md) — ChatGPT overlay
-- [`CLAUDE.md`](CLAUDE.md) — Claude overlay
+- [`CLAUDE.md`](CLAUDE.md) — Claude / Claude Code / Cowork overlay
 - [`PERPLEXITY.md`](PERPLEXITY.md) — Perplexity overlay
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — architecture
 - [`docs/PR_CONTINUITY.md`](docs/PR_CONTINUITY.md) — branch/head proof rollover law
@@ -324,6 +336,34 @@ A child-app reconciliation may classify evidence as `CURRENT`, `UNDECLARED`, `SC
 
 For public crawler and work-directory behavior, `.github/workflows/ci.yml` must keep `e2e/pages-api-recovery.spec.ts` and `e2e/public-work-directory.spec.ts` inside the load-bearing `Playwright e2e` job that feeds `Required Gate`. The specialized Pages workflow is supplementary evidence only; it cannot replace this required exact-head browser proof or authorize merge.
 
-## Cross-repository browser witness freshness
+## cross-repository browser witness freshness
 
 The exact StoryEngine peer configured in `.github/workflows/playwright.yml` is an evidence subject, not a durable alias for current StoryEngine. A peer refresh must be backed by an independent ref/SHA observation and must reset predecessor federation/browser proof until the complete FCR → StoryEngine → receipt → FCR Playwright witness passes on the exact FCR head. Pin alignment alone grants no merge, deploy, production, or provider-mutation authority.
+
+When the live StoryEngine ref advances after a previously proven FCR head, updating the pin is recovery setup, not recovered proof. The successor FCR head remains `UNKNOWN` for federation until its own exact-head Playwright job proves runtime identity, directive/receipt binding, replay safety, and the browser loop against that newly observed peer.
+
+The exact predecessor/successor SHAs and the comparison that justified a peer refresh belong in the audit/receipt provenance, not as a durable “current SHA” in this README. Rebinding the peer selects a new evidence subject only; it never carries predecessor green forward.
+
+## Resident Council and Muse relay truth
+
+The Founder Council is resident in both the founder assistant host and the project Control Room. `.control-room/council-residency.contract.json` is the machine-readable residency contract; `.control-room/COUNCIL.md` carries the human-readable project policy. Residency means Council selection, challenge, dissent, evidence binding, and project-local routing are available as standing infrastructure. It does **not** centralize project execution authority or expose Council controls to project users.
+
+Muse is a governed Council peer in source. `FCR_RELAY_MUSE_MODEL` is public-safe runtime configuration, while `MODEL_API_KEY` is a provider-held Worker secret name. A source adapter, model name, green unit test, or declared secret requirement cannot prove that Muse is live. A live Muse claim requires the exact deployed FCR runtime, independently observed provider-held secret presence, a successful bounded relay, and a provider evidence reference such as `provider:meta:<response-id>` for that invocation.
+
+`FCR_CLOUDFLARE_MCP_READ_TOKEN` is a separate provider-held credential for the bounded Cloudflare MCP observation lane. The Cloudflare deployment/read credential used to enumerate Worker secret names is itself only an observation prerequisite. If that credential is malformed or unusable and `wrangler secret list` cannot run, the correct state for `MODEL_API_KEY` presence is `UNKNOWN`/`BLOCKED`, not “missing.” A failed observation transport may block proof; it cannot manufacture a negative fact about an unobserved target secret.
+
+### StoryEngine federation proof boundary
+
+The StoryEngine SHA pinned by the Playwright workflow is an exact evidence identity, not a durable alias for current StoryEngine. Any peer-head movement expires predecessor federation proof; a live ref match only selects the next subject and never grants merge, deploy, production, publication, or provider-mutation authority. The successor FCR head must rerun the complete runtime, directive, receipt, and browser witness before the federation path is current.
+
+## Repository base-health build gate
+
+`src/providers/SecurityPreservingGitHubProvider.ts` now treats the exact branch head as a build precondition rather than assuming that any current head is safe to extend. It classifies exact-head verification as `VERIFIED_CLEAN`, `KNOWN_BAD`, or `UNVERIFIED` from current verification signals. Forward patching is allowed only from `VERIFIED_CLEAN`.
+
+When the exact head is `KNOWN_BAD`, the next repository write must be an explicit repair bound to that exact failed head by the `repair-base:<exact-head-sha>` message prefix. A stale repair marker, a repair marker on an unverified/clean head, or ordinary feature work on a known-bad head must fail closed. This repair escape hatch is narrow: it permits the corrective patch only and grants no merge, deploy, publication, provider, or founder authority. After the repair moves the head, exact-head verification must establish the successor as clean before normal forward building resumes.
+
+## Current CI repair truth
+
+A StoryEngine peer-pin refresh is a truth transition, not merely a workflow-line change. The repair must refresh the README, truth-decay audit, and structured documentation receipt in the same exact-head range, and the successor remains non-authorizing until its own CI and Playwright witness pass.
+
+The AI Failure Repair workflow stores its bounded evidence under `.repair/`, a hidden directory. Every `actions/upload-artifact` step that uploads that evidence must explicitly include hidden files; otherwise the upload can fail even when evidence capture succeeded. Artifact transport is part of repair evidence integrity and does not grant merge, deploy, publication, provider, or production authority.

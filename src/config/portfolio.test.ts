@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   ACTIVE_PROJECT_SLUGS,
+  CONTINUITY_ONLY_PROJECTS,
+  CONTINUITY_ONLY_PROJECT_SLUGS,
   EXTERNAL_PROJECTS,
   EXTERNAL_PROJECT_SLUGS,
   PORTFOLIO_PROJECTS,
@@ -10,7 +12,7 @@ import {
 } from './portfolio.js';
 
 describe('founder repository index', () => {
-  it('indexes known external founder projects without exposing them through the authority lookup', () => {
+  it('keeps challenge-stack-proven external projects distinct from continuity-only identities', () => {
     const expectedExternal = [
       ['think-tank', 'jussray/THINK-TANK'],
       ['solcontinuity', 'jussray/solcontinuity'],
@@ -26,6 +28,28 @@ describe('founder repository index', () => {
       });
       expect(getPortfolioProject(slug)).toBeUndefined();
       expect(EXTERNAL_PROJECT_SLUGS.has(slug)).toBe(true);
+      expect(CONTINUITY_ONLY_PROJECT_SLUGS.has(slug)).toBe(false);
+      expect(ACTIVE_PROJECT_SLUGS.has(slug)).toBe(false);
+    }
+  });
+
+  it('indexes unverified portfolio subjects for continuity without claiming inherited challenge-stack state', () => {
+    const expectedContinuityOnly = [
+      ['bip-jr', 'jussray/Bip-Jr'],
+      ['truth-compass', 'jussray/truth-compass'],
+      ['truth-weaver', 'jussray/truth-weaver'],
+      ['alexa-commerce-engine', 'jussray/alexa-commerce-engine-'],
+    ] as const;
+
+    for (const [slug, repository] of expectedContinuityOnly) {
+      expect(getKnownProject(slug)).toMatchObject({
+        slug,
+        repository,
+        status: 'continuity-only',
+      });
+      expect(getPortfolioProject(slug)).toBeUndefined();
+      expect(CONTINUITY_ONLY_PROJECT_SLUGS.has(slug)).toBe(true);
+      expect(EXTERNAL_PROJECT_SLUGS.has(slug)).toBe(false);
       expect(ACTIVE_PROJECT_SLUGS.has(slug)).toBe(false);
     }
   });
@@ -54,7 +78,7 @@ describe('founder repository index', () => {
   });
 
   it('does not allow one repository to occupy more than one known project identity', () => {
-    const known = [...PORTFOLIO_PROJECTS, ...EXTERNAL_PROJECTS];
+    const known = [...PORTFOLIO_PROJECTS, ...EXTERNAL_PROJECTS, ...CONTINUITY_ONLY_PROJECTS];
     const normalized = known.map((project) => project.repository.toLowerCase());
     expect(new Set(normalized).size).toBe(normalized.length);
   });
@@ -62,7 +86,7 @@ describe('founder repository index', () => {
   it('keeps known legacy and do-not-touch repositories quarantined from every project index', () => {
     expect(QUARANTINED_REPOSITORIES.has('jussray/do-not-use')).toBe(true);
     expect(QUARANTINED_REPOSITORIES.has("jussray/don-t-touch-this-one")).toBe(true);
-    for (const project of [...PORTFOLIO_PROJECTS, ...EXTERNAL_PROJECTS]) {
+    for (const project of [...PORTFOLIO_PROJECTS, ...EXTERNAL_PROJECTS, ...CONTINUITY_ONLY_PROJECTS]) {
       expect(QUARANTINED_REPOSITORIES.has(project.repository)).toBe(false);
     }
   });

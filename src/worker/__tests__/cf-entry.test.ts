@@ -27,6 +27,10 @@ const VALID_ENV: ControlRoomWorkerEnv = {
     send: vi.fn().mockResolvedValue({ messageId: 'email-test-id' }),
   },
   FCR_EMAIL_FROM,
+  CHIEF_AI: {
+    version: vi.fn().mockResolvedValue({ ok: true }),
+    ingestBipEvidence: vi.fn().mockResolvedValue({ ok: true }),
+  },
   FCR_V10_CAPABILITY_PLAN_CONTRACT: 'juss-v10/capability-plan@v1',
   FCR_V10_CONVEYOR_CONTRACT: 'founder-control-room/n8n-conveyor@v3',
   FCR_V10_MAX_RUNTIME_AUTHORITY: 'draft',
@@ -68,6 +72,13 @@ describe('Cloudflare Worker binding validation', () => {
   it('rejects a missing outbound FCR email binding', () => {
     expect(() => validateWorkerEnv({ ...VALID_ENV, FCR_EMAIL: undefined }))
       .toThrow('Missing required Worker binding: FCR_EMAIL');
+  });
+
+  it('rejects a missing or malformed Chief evidence RPC binding', () => {
+    expect(() => validateWorkerEnv({ ...VALID_ENV, CHIEF_AI: undefined }))
+      .toThrow('Missing required Worker binding: CHIEF_AI');
+    expect(() => validateWorkerEnv({ ...VALID_ENV, CHIEF_AI: { version: vi.fn() } }))
+      .toThrow('Missing required Worker binding: CHIEF_AI');
   });
 
   it('rejects a sender identity that drifts away from the checked-in FCR identity', () => {

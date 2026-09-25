@@ -27,6 +27,15 @@ command = "node scripts/verify-worker-build-authority.mjs"
 [observability]
 enabled = true
 
+# Private, same-account RPC only. FCR is the caller/authority membrane; Chief
+# receives sanitized evidence and may reason over it, but this binding does not
+# grant Chief repository, approval, deployment, publication, or provider
+# mutation authority.
+[[services]]
+binding = "CHIEF_AI"
+service = "chief-ai"
+entrypoint = "FounderControlRoomEntrypoint"
+
 # Durable release-proof orchestration only. No route creates instances yet,
 # and the Workflow receipt explicitly grants no merge, deploy, or provider
 # mutation authority. A later trigger must use the existing FCR authority
@@ -59,6 +68,7 @@ FOUNDER_ALLOWED_ORIGINS = "https://foundercontrolroom.org"
 FOUNDER_API_URL = "https://foundercontrolroom.org"
 FCR_EMAIL_FROM = "welcome@api.foundercontrolroom.org"
 FCR_REMOTE_MCP_READ_PROJECTS = "chief-ai-machine,founder-control-room"
+FCR_RELAY_MUSE_MODEL = "muse-spark-1.3"
 FCR_V10_CAPABILITY_PLAN_CONTRACT = "juss-v10/capability-plan@v1"
 FCR_V10_CONVEYOR_CONTRACT = "founder-control-room/n8n-conveyor@v3"
 FCR_V10_MAX_RUNTIME_AUTHORITY = "draft"
@@ -66,6 +76,7 @@ FCR_V10_REGISTRY_RESOLUTION_REQUIRED = "true"
 FCR_V10_RECEIPT_PERSISTENCE_REQUIRED = "true"
 MCP_EXA_URL = "https://mcp.exa.ai/mcp"
 MCP_RESEND_URL = "https://mcp.resend.com/mcp"
+MCP_CLOUDFLARE_API_URL = "https://mcp.cloudflare.com/mcp"
 
 # Founder-approved source activation for the governed founder-content n8n lane.
 # Buffer is the only enabled provider, share-now remains forbidden, and runtime
@@ -94,6 +105,8 @@ required = [
   "FCR_SHOPIFY_WEBHOOK_SECRET",
   "FCR_COMMERCE_HASH_SALT",
   "TINYFISH_API_KEY",
+  "FCR_CLOUDFLARE_MCP_READ_TOKEN",
+  "MODEL_API_KEY",
   "FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON",
   "FOUNDER_SIGNAL_ENGINE_MCP_TOKEN",
   "ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL",

@@ -1,5 +1,6 @@
 import type { OperatorRelayRequestV1 } from './operatorRelay.js';
 import type { OperatorRelayAdapters } from './operatorRelayDispatch.js';
+import { anthropicPlaywrightMcpAttachment } from './operatorRelayAnthropicMcp.js';
 import { operatorRelayAdapterFromTextProvider } from './operatorRelayProvider.js';
 
 type FetchLike = typeof fetch;
@@ -11,6 +12,7 @@ const ANTHROPIC_API_VERSION = '2023-06-01';
 const MAX_PROVIDER_RESPONSE_ID_LENGTH = 200;
 const SAFE_GEMINI_MODEL = /^[A-Za-z0-9._-]{1,160}$/;
 const SAFE_PERPLEXITY_AGENT_MODEL = /^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/;
+const SAFE_DEEPSEEK_MODEL = /^(?:deepseek-flash|deepseek-v4-pro)$/;
 
 export const SEMANTIC_PEER_REVIEW_SPEND_MODE = 'paused' as const;
 
@@ -141,6 +143,28 @@ function openAiText(body: JsonRecord): string {
   return parts.join('\n');
 }
 
+function deepSeekText(body: JsonRecord): string {
+  if (body.status !== 'completed') {
+    throw new Error('DeepSeek relay returned a non-completed response');
+  }
+  if (typeof body.output_text === 'string' && body.output_text.trim()) return body.output_text.trim();
+  const output = Array.isArray(body.output) ? body.output : [];
+  const parts: string[] = [];
+  for (const item of output) {
+    const message = record(item);
+    if (message?.type !== 'message') continue;
+    const content = Array.isArray(message.content) ? message.content : [];
+    for (const entry of content) {
+      const block = record(entry);
+      if (block?.type === 'output_text' && typeof block.text === 'string' && block.text.trim()) {
+        parts.push(block.text.trim());
+      }
+    }
+  }
+  if (parts.length === 0) throw new Error('DeepSeek relay response contained no text');
+  return parts.join('\n');
+}
+
 function anthropicText(body: JsonRecord): string {
   const rawId = typeof body.id === 'string' ? body.id.trim() : '';
   if (
@@ -250,6 +274,11 @@ function perplexityAgentModelId(value: string): string | null {
     : null;
 }
 
+function deepSeekModelId(value: string): string | null {
+  const normalized = value.trim();
+  return SAFE_DEEPSEEK_MODEL.test(normalized) ? normalized : null;
+}
+
 export function createServerOperatorRelayAdapters(
   env: NodeJS.ProcessEnv = process.env,
   fetchImpl: FetchLike = fetch,
@@ -261,8 +290,11 @@ export function createServerOperatorRelayAdapters(
   const openAiModel = env.FCR_RELAY_OPENAI_MODEL?.trim();
   const anthropicKey = env.ANTHROPIC_API_KEY?.trim();
   const anthropicModel = env.FCR_RELAY_ANTHROPIC_MODEL?.trim();
+  const anthropicMcp = anthropicPlaywrightMcpAttachment(env);
   const perplexityKey = env.PERPLEXITY_API_KEY?.trim();
   const perplexityModel = env.FCR_RELAY_PERPLEXITY_MODEL?.trim();
+  const deepSeekKey = env.DEEPSEEK_API_KEY?.trim();
+  const deepSeekModel = env.FCR_RELAY_DEEPSEEK_MODEL?.trim();
 
   if (geminiKey && geminiModel) {
     const modelId = geminiModelId(geminiModel);
@@ -331,11 +363,13 @@ export function createServerOperatorRelayAdapters(
             'x-api-key': anthropicKey,
             'anthropic-version': ANTHROPIC_API_VERSION,
             'Content-Type': 'application/json',
+            ...(anthropicMcp?.headers ?? {}),
           },
           body: JSON.stringify({
             model: anthropicModel,
             max_tokens: 2_000,
             messages: [{ role: 'user', content: relayPrompt(request) }],
+            ...(anthropicMcp?.body ?? {}),
           }),
           redirect: 'error',
           signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
@@ -369,6 +403,33 @@ export function createServerOperatorRelayAdapters(
             signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
           }, 'Perplexity Agent relay');
           return { text: perplexityText(body), evidenceRef: evidenceRef('perplexity', body) };
+        },
+      });
+    }
+  }
+
+  if (deepSeekKey && deepSeekModel) {
+    const modelId = deepSeekModelId(deepSeekModel);
+    if (modelId) {
+      adapters.deepseek = operatorRelayAdapterFromTextProvider({
+        invoke: async ({ request }) => {
+          ensureRelaySensitivity(request);
+          ensureRelaySpendPolicy(request);
+          const body = await invokeJsonProvider(fetchImpl, 'https://api.deepseek.com/responses', {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${deepSeekKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: modelId,
+              input: relayPrompt(request),
+              max_output_tokens: 2_000,
+            }),
+            redirect: 'error',
+            signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
+          }, 'DeepSeek relay');
+          return { text: deepSeekText(body), evidenceRef: evidenceRef('deepseek', body) };
         },
       });
     }

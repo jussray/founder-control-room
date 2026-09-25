@@ -1,0 +1,30 @@
+name: Portfolio Commercial Architecture
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'config/portfolio-commercial-architecture.json'
+      - 'docs/COMMERCIAL_PRODUCT_GRADUATION_RULE.md'
+      - 'scripts/verify-portfolio-commercial-architecture.mjs'
+      - '.github/workflows/portfolio-commercial-architecture.yml'
+  pull_request:
+    paths:
+      - 'config/portfolio-commercial-architecture.json'
+      - 'docs/COMMERCIAL_PRODUCT_GRADUATION_RULE.md'
+      - 'scripts/verify-portfolio-commercial-architecture.mjs'
+      - '.github/workflows/portfolio-commercial-architecture.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Verify portfolio commercial architecture
+        run: node scripts/verify-portfolio-commercial-architecture.mjs
