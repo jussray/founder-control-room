@@ -1,0 +1,49 @@
+{
+  "schema": "juss/portfolio-continuity-provider-targets@v1",
+  "generated_at": "2026-09-24",
+  "topology_invariant": {
+    "working_branches": "exact-head PR proof plus conflict-safe rollover",
+    "release_branches": "production-grade provider protections",
+    "forbid_unproven_all_branch_release_rules": true,
+    "unknown_provider_state": "fail_closed"
+  },
+  "repositories": [
+    {
+      "repository": "jussray/founder-control-room",
+      "state": "provider_blocked",
+      "ruleset_id": 20819094,
+      "required_provider_change": "remove ~ALL while preserving ~DEFAULT_BRANCH release rules"
+    },
+    {
+      "repository": "jussray/Sekret-Bip",
+      "state": "topology_compatible",
+      "ruleset_ids": [21250004]
+    },
+    {
+      "repository": "jussray/chief-ai-machine",
+      "state": "topology_compatible",
+      "ruleset_ids": [20818149, 21261587]
+    },
+    {
+      "repository": "jussray/StoryEngine",
+      "state": "release_protection_gap"
+    },
+    {
+      "repository": "jussray/promptos",
+      "state": "release_protection_gap"
+    },
+    {
+      "repository": "jussray/jussbeautifulhair-site",
+      "state": "release_protection_gap"
+    },
+    {
+      "repository": "jussray/untold-stories-storefront",
+      "state": "unknown_provider_state",
+      "reason": "GitHub ruleset API returned plan/privacy 403"
+    },
+    {
+      "repository": "jussray/sync-party-game",
+      "state": "continuity_reference_release_protection_gap"
+    }
+  ]
+}
