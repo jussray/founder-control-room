@@ -51,6 +51,15 @@ async function proveFrontDoorSplit() {
   if (await user.getAttribute('href') !== '#discover') throw new Error('User view must route to the public onboarding screen before the blank workspace');
   if (await founder.getAttribute('href') !== '#founder-start') throw new Error('Founder view must retain the founder onboarding route');
 
+  const publicCopy = await page.locator('body').innerText();
+  for (const phrase of ['Move the company from signal to proof', 'Current Reality', 'Next Gate', 'Verified', 'Unknown', 'Blocked']) {
+    if (!publicCopy.toLowerCase().includes(phrase.toLowerCase())) throw new Error(`FCR public identity missing: ${phrase}`);
+  }
+  const semanticLanes = await page.locator('[data-fcr-semantics] [data-fcr-semantic]').evaluateAll((nodes) => nodes.map((node) => node.getAttribute('data-fcr-semantic')));
+  if (JSON.stringify(semanticLanes) !== JSON.stringify(['decide', 'evidence', 'act', 'outcome'])) {
+    throw new Error(`FCR semantic lanes drifted: ${JSON.stringify(semanticLanes)}`);
+  }
+
   await user.click();
   if (!page.url().endsWith('#discover')) throw new Error('User view click must land on the public onboarding screen');
 
@@ -74,6 +83,7 @@ async function proveBlankUserSpace() {
 
   await page.goto(`${baseUrl}/user-space.html`, { waitUntil: 'networkidle' });
   await page.locator('[data-fcr-user-space]').waitFor({ state: 'visible' });
+  if (await page.locator('[data-fcr-command-surface]').count() !== 1) throw new Error('User workspace must expose one FCR command surface');
 
   const initialStorage = await page.evaluate((key) => window.localStorage.getItem(key), STORAGE_KEY);
   if (initialStorage !== null) throw new Error('User workspace must start with no device-local record');
@@ -81,6 +91,9 @@ async function proveBlankUserSpace() {
   if (await page.locator('[data-user-saved-state]').isVisible()) throw new Error('Blank user workspace must not render saved state before user input');
 
   const body = await page.locator('body').innerText();
+  for (const phrase of ['Current Reality', 'Next Gate', 'Decision', 'Evidence', 'Action', 'Outcome']) {
+    if (!body.toLowerCase().includes(phrase.toLowerCase())) throw new Error(`User workspace lost FCR operating language: ${phrase}`);
+  }
   const forbiddenFounderSpecific = [/Juss\b/i, /jussray/i, /Se.?kret Bip/i, /ULTRATHINK/i, /StoryEngine/i, /Juss Beautiful Hair/i];
   for (const pattern of forbiddenFounderSpecific) {
     if (pattern.test(body)) throw new Error(`User workspace leaked founder-specific content matching ${pattern}`);
@@ -98,6 +111,8 @@ async function proveBlankUserSpace() {
   if (!(await page.locator('[data-user-saved-state]').isVisible())) throw new Error('User-owned input must render after local save');
   const stored = await page.evaluate((key) => window.localStorage.getItem(key), STORAGE_KEY);
   if (!stored || !stored.includes('Three people asked the same question')) throw new Error('User-owned state must persist only after explicit user input');
+  const nextGateCopy = await page.locator('[data-next-gate]').innerText();
+  if (!/Choose one focused move that can test this signal/i.test(nextGateCopy)) throw new Error(`Saved user reality did not produce the bounded FCR next gate: ${nextGateCopy}`);
 
   await page.getByRole('button', { name: 'Clear this device' }).click();
   const cleared = await page.evaluate((key) => window.localStorage.getItem(key), STORAGE_KEY);
@@ -127,7 +142,7 @@ try {
   await proveFrontDoorSplit();
   await proveBlankUserSpace();
   await proveSignalLoopReachability();
-  console.log('PASS: FCR separates founder and user entry; User View preserves public onboarding before the blank workspace; user space starts blank with no founder-specific state; SignalLoop is bound to its exact surviving public surface.');
+  console.log('PASS: FCR preserves its User/Founder entry contract, signal-to-proof identity, semantic lanes, Current Reality/Next Gate hierarchy, blank local-first user space, and exact SignalLoop attachment on desktop/mobile.');
 } finally {
   await browser.close();
   await new Promise((resolve) => server.close(resolve));
