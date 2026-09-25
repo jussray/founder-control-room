@@ -51,7 +51,7 @@ for (const marker of [
   'Founder Work Productization Contract',
   '## Work productization invariant',
   'juss/fcr-workflow-candidate@v1',
-  'all leaf `SKILL.md` files inherit',
+  'All leaf `SKILL.md` files inherit',
   'ONE-OFF',
   'WORKFLOW CANDIDATE',
   'Provider API keys grant provider capability',
