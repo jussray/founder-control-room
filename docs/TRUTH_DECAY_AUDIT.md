@@ -399,12 +399,18 @@ The strongest optimization is not faster claiming. It is shortening the distance
 40. A failed observation transport does not prove the observed target is absent; if provider secret enumeration cannot run, target secret presence remains `UNKNOWN`/`BLOCKED`.
 41. A resident Council seat or source adapter does not prove a live provider participated; a live Muse claim requires a current provider receipt bound to the exact invocation.
 42. Provider-held secret-name policy, secret presence, deployed runtime identity, and successful model invocation are four separate evidence layers and may not be collapsed into one green state.
+43. A shared FCR/Chief contract does not permit identity collapse. FCR and Chief may share schemas and product packaging while retaining independent identity, lifecycle, receipts, failure state, continuity, rollback, and proof.
+44. Bip Control Room mechanics may be extracted only as portfolio-neutral control-plane primitives. Bip branding, user-domain data, teen/parent UX, project-specific routes, storage, and product identity must remain at the Bip boundary.
+45. Chief may plan, route, challenge, and compile candidates, but Chief cannot self-assert final execution authority, proof, or task clearance. FCR may validate and execute authorized actions, but it cannot silently become Chief's capability selector or reasoning identity.
+46. A task cannot clear because code changed, CI turned green, a PR opened, or a UI rendered. `CLEARED` requires current evidence that satisfies the original goal's declared proof level; successor head movement can return it to `PROOF_PENDING`.
 
 ## 2026-09 control correction: peer ref refresh resets proof
 
 A later StoryEngine `main` observation can justify rebinding the exact Playwright peer, but that observation only selects the new evidence subject. The FCR browser/federation witness remains `UNKNOWN` for that successor until the exact FCR head reruns the complete runtime identity, directive, receipt, and browser path against that peer. A valid ref/SHA match cannot carry predecessor green forward or mint merge, deploy, production, or provider-mutation authority.
 
 On September 24, 2026, the same gate blocked FCR when the pinned StoryEngine peer `a5aabd59b4cf515ed7252a44ab10c3f6c1b13b1b` no longer matched StoryEngine `main` at `35a1855798b4dd059b45f67911280966a09f7be8`. The successor was independently compared first: it was seven commits strictly ahead, zero behind, and the delta was limited to Media Router contract, bridge, tests, and workflow files. That justified selecting the new peer evidence subject, not carrying forward prior green. The successor FCR head remains `UNKNOWN` for federation until its exact-head Playwright runtime, directive, receipt, and browser witness succeeds; the refresh is not proof of production state, merge authority, deploy authority, or provider mutation.
+
+A later September 25 peer movement repeated the same class: the predecessor FCR head's local/browser harness was green, but the live StoryEngine ref had advanced from the pinned `dd1521547c81c1a16d9777e1fc254c6bf9c7d6b9` to its direct known successor `120c828275b80b2d60bdb24614ca17d2ded042fa`. Updating `.github/workflows/playwright.yml` to that observed peer fixes only the evidence subject. It expires predecessor exact-head browser proof and requires the successor FCR head to rerun the complete StoryEngine runtime identity, directive, receipt, and browser witness. The peer refresh grants no merge, deploy, production, provider mutation, or outcome authority.
 
 ## 2026-09 control correction: capability-market priors are not truth
 
@@ -422,6 +428,16 @@ The proof lane therefore treats Cloudflare secret enumeration as an observation 
 
 The same separation applies after secret presence is observed. `MODEL_API_KEY` present is only configuration evidence. A live Muse claim additionally requires the exact deployed FCR runtime and one bounded relay whose returned evidence reference is tied to the actual provider response. Council residency, provider availability, model naming, secret-name declaration, secret presence, deployment identity, and invocation outcome are separate facts with separate freshness.
 
+## 2026-09 control correction: Twin Core control-plane inheritance without identity collapse
+
+The Bip founder Control Room exposed a stronger generic mission-control spine than the portfolio had consistently enforced: 5W1H mission framing, one owner lane per artifact, append-only lineage, explicit proof levels, registered action identifiers, bounded execution, provenance/supersession, and proven-only task clearance. The correction imports those mechanics into the FCR/Chief Twin Core as portfolio-neutral contracts rather than copying Bip's product identity.
+
+This creates a new truth-decay boundary of its own. A shared schema or product surface can become unsafe if future operators infer that FCR and Chief have become one authority plane. They have not. Chief remains the cognition/capability-selection/mission-planning peer; FCR remains the durable governance/execution/evidence/clearance peer. Commercially presenting Chief inside FCR does not transfer identity, lifecycle, receipts, failure state, continuity, or authority. One side's green, red, or stale state does not silently become the other's state.
+
+The donor provenance is historical evidence for the extracted mechanism, not a runtime dependency and not proof that the donor remains unchanged. Bip branding, characters, teen/parent UX, project data, product-specific routes/storage, and Bip-specific mission IDs remain excluded. Future reuse must re-check the generic invariant rather than treating the donor SHA as a permanent authority source.
+
+Task clearance follows the same freshness law. A task can be source-implemented, merged, or deployed and still remain `PROOF_PENDING` when the original goal required a stronger proof level. Exact-head, deployment, provider, or dependency movement may invalidate predecessor clearance evidence. The correct recovery is to preserve the predecessor receipt, bind the successor state, and re-prove the required predicate before returning the task to `PROVEN` and then `CLEARED`.
+
 ## Rollback
 
-The Truth Lease, production-specific lease composer, temporal founder-content guards, analytics-authority guard, and Documentation Truth control are additive/fail-closed. Revert the focused contract/test/workflow/documentation change if it causes incompatibility. No database, provider credential, DNS, publication, provider ruleset, or production mutation is performed by the documentation-truth slice.
+The Truth Lease, production-specific lease composer, temporal founder-content guards, analytics-authority guard, Documentation Truth control, Twin Core mission/proof contract, and Bip-derived control-plane invariants are additive/fail-closed. Revert the focused contract/test/workflow/documentation change if it causes incompatibility. No database, provider credential, DNS, publication, provider ruleset, or production mutation is performed by the documentation-truth slice.
