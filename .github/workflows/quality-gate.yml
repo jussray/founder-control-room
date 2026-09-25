@@ -109,6 +109,10 @@ jobs:
         run: npm install
       - run: npm run verify:terminal-contract
       - run: npm run verify:juss-flow
+      - name: Audit live GitHub ruleset topology for rollover
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/audit_pr_continuity_rulesets.mjs
       - name: Verify unified work and deployment continuity
         run: python scripts/continuity_model_guard.py
       - run: npm run verify:production-authority
