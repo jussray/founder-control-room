@@ -1,0 +1,77 @@
+name: FCR External User Modules Proof
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'public/index.html'
+      - 'public/user-space.html'
+      - 'e2e/fcr-external-user-modules-proof.mjs'
+      - 'e2e/fcr-user-space-signal-loop-proof.mjs'
+      - '.github/workflows/fcr-external-user-modules-proof.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fcr-external-user-modules-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+  PR_BASE_SHA: ${{ github.event.pull_request.base.sha || '' }}
+
+jobs:
+  proof:
+    name: Playwright external-user module proof
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify exact head and current-base ancestry
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          printf 'expected=%s\nactual=%s\nbase=%s\n' "$EXPECTED_HEAD_SHA" "$actual" "$PR_BASE_SHA"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
+          if [ -n "$PR_BASE_SHA" ]; then
+            git merge-base --is-ancestor "$PR_BASE_SHA" "$EXPECTED_HEAD_SHA"
+          fi
+
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install chromium --with-deps
+
+      - name: Run existing FCR external-module proof
+        run: node e2e/fcr-external-user-modules-proof.mjs
+
+      - name: Run blank user-space and SignalLoop proof
+        run: node e2e/fcr-user-space-signal-loop-proof.mjs
+
+      - name: Upload browser evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: fcr-external-user-modules-${{ env.EXPECTED_HEAD_SHA }}
+          path: |
+            test-results/fcr-external-user-modules/
+            test-results/fcr-user-space-signal-loop/
+          if-no-files-found: warn
+          retention-days: 30
