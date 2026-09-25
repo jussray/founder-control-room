@@ -259,6 +259,12 @@
       "claims": [
         "`docs/founder-signal-engine/linkedin-analytics-continuity.md` must document independently evaluated content freshness, direct demand evidence, current trend provenance, fingerprint comparison, deterministic approval retry identity, and observation-only authority without rewriting historical evidence when currentness expires."
       ]
+    },
+    {
+      "path": "src/providers/SecurityPreservingGitHubProvider.ts",
+      "claims": [
+        "`src/providers/SecurityPreservingGitHubProvider.ts` must block ordinary forward patching unless the exact branch head is `VERIFIED_CLEAN`; a `KNOWN_BAD` head may accept only an explicit repair message bound to that same exact SHA, while stale repair intent and `UNVERIFIED` heads must fail closed without granting merge, deploy, publication, provider-policy, or founder authority."
+      ]
     }
   ]
 }
