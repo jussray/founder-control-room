@@ -44,5 +44,18 @@
     "requireRuntimeProofForRuntimeClaims": true,
     "requireProviderReceiptForLiveProviderClaims": true,
     "bindFingerprintsAndContinuityReceipts": true
+  },
+  "domainCourts": {
+    "storyEngineCreativeCourt": {
+      "project": "jussray/StoryEngine",
+      "contract": "juss/storyengine-three-council-court@v1",
+      "sourceModule": "src/lib/storyEngineCourt.ts",
+      "projectLocalContract": ".control-room/storyengine-creative-court.contract.json",
+      "councils": ["writers", "ai", "production"],
+      "devilCrossExaminationRequired": true,
+      "creatorMakesRuling": true,
+      "creativeFreedomRule": "Structure should accelerate expression, never restrict it.",
+      "createsSeparateAuthorityPlane": false
+    }
   }
 }
