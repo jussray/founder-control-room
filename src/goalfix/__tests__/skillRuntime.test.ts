@@ -1,6 +1,21 @@
 import { describe, expect, it } from 'vitest';
 import { buildGoalfixSkillRuntimeDecision } from '../skillRuntime.js';
 
+const BAD_SHA = 'a'.repeat(40);
+const CLEAN_SHA = 'b'.repeat(40);
+
+function verifiedCleanBase() {
+  return {
+    repository: 'jussray/founder-control-room',
+    branch: 'main',
+    baseSha: CLEAN_SHA,
+    status: 'VERIFIED_CLEAN' as const,
+    evidenceIds: ['check:goalfix-unit', 'check:goalfix-playwright'],
+    verifiedAt: '2026-09-25T09:30:00.000Z',
+    repairedFromSha: BAD_SHA,
+  };
+}
+
 describe('buildGoalfixSkillRuntimeDecision', () => {
   it('permits a scoped confirmed inspection', () => {
     const decision = buildGoalfixSkillRuntimeDecision({
@@ -21,6 +36,7 @@ describe('buildGoalfixSkillRuntimeDecision', () => {
     expect(decision.scope.firstFilesOrLogs).toEqual(['src/goalfix/engine.ts']);
     expect(decision.scope.maxInitialReads).toBe(1);
     expect(decision.provenance.sourceName).toBe('ai-skill-suite.zip');
+    expect(decision.baseGate.status).toBe('NOT_REQUIRED');
   });
 
   it('deduplicates before applying the read budget', () => {
@@ -93,5 +109,109 @@ describe('buildGoalfixSkillRuntimeDecision', () => {
     expect(decision.scope.maxInitialReads).toBe(1);
     expect(decision.mayProceed).toBe(false);
     expect(decision.nextAction).toContain('Define a concrete stop condition');
+  });
+
+  it('blocks forward build work when exact base-health evidence is missing', () => {
+    const decision = buildGoalfixSkillRuntimeDecision({
+      intent: { raw: 'Continue the queued implementation.', confirmed: true },
+      operation: 'build',
+      scope: {
+        firstFilesOrLogs: ['src/goalfix/skillRuntime.ts'],
+        maxInitialReads: 1,
+        stopCondition: 'Stop after the queued implementation is verified.',
+      },
+    });
+
+    expect(decision.mayProceed).toBe(false);
+    expect(decision.baseGate.status).toBe('BLOCKED');
+    expect(decision.nextAction).toContain('Exact base-health evidence is required');
+  });
+
+  it('blocks forward work on a known-bad base instead of building over it', () => {
+    const decision = buildGoalfixSkillRuntimeDecision({
+      intent: { raw: 'Continue the queued implementation.', confirmed: true },
+      operation: 'build',
+      baseHealth: {
+        repository: 'jussray/founder-control-room',
+        branch: 'main',
+        baseSha: BAD_SHA,
+        status: 'KNOWN_BAD',
+        evidenceIds: ['check:failed-unit'],
+        verifiedAt: '2026-09-25T09:00:00.000Z',
+      },
+      scope: {
+        firstFilesOrLogs: ['src/goalfix/skillRuntime.ts'],
+        maxInitialReads: 1,
+        stopCondition: 'Stop after the queued implementation is verified.',
+      },
+    });
+
+    expect(decision.mayProceed).toBe(false);
+    expect(decision.baseGate.status).toBe('BLOCKED');
+    expect(decision.nextAction).toContain('Repair or revert it first');
+  });
+
+  it('allows only the focused repair path while the base is known bad', () => {
+    const decision = buildGoalfixSkillRuntimeDecision({
+      intent: { raw: 'Repair the verified bad base before continuing.', confirmed: true },
+      operation: 'repair-base',
+      baseHealth: {
+        repository: 'jussray/founder-control-room',
+        branch: 'main',
+        baseSha: BAD_SHA,
+        status: 'KNOWN_BAD',
+        evidenceIds: ['check:failed-unit'],
+        verifiedAt: '2026-09-25T09:00:00.000Z',
+      },
+      scope: {
+        firstFilesOrLogs: ['failing test', 'touched source'],
+        maxInitialReads: 2,
+        stopCondition: 'Stop once the bad base is repaired and the successor SHA is verified.',
+      },
+    });
+
+    expect(decision.mayProceed).toBe(true);
+    expect(decision.baseGate.status).toBe('REPAIR_ONLY');
+    expect(decision.nextAction).toContain('verify the successor exact SHA');
+  });
+
+  it('unlocks queued build work only from an evidence-backed clean successor', () => {
+    const decision = buildGoalfixSkillRuntimeDecision({
+      intent: { raw: 'Continue the queued implementation from the repaired successor.', confirmed: true },
+      operation: 'build',
+      baseHealth: verifiedCleanBase(),
+      scope: {
+        firstFilesOrLogs: ['src/goalfix/skillRuntime.ts'],
+        maxInitialReads: 1,
+        stopCondition: 'Stop after the queued implementation is verified.',
+      },
+    });
+
+    expect(decision.mayProceed).toBe(true);
+    expect(decision.baseGate.status).toBe('PASS');
+    expect(decision.baseGate.reason).toContain('VERIFIED_CLEAN successor');
+  });
+
+  it('rejects a clean label without actual evidence and verification time', () => {
+    const decision = buildGoalfixSkillRuntimeDecision({
+      intent: { raw: 'Continue the queued implementation.', confirmed: true },
+      operation: 'build',
+      baseHealth: {
+        repository: 'jussray/founder-control-room',
+        branch: 'main',
+        baseSha: CLEAN_SHA,
+        status: 'VERIFIED_CLEAN',
+        evidenceIds: [],
+      },
+      scope: {
+        firstFilesOrLogs: ['src/goalfix/skillRuntime.ts'],
+        maxInitialReads: 1,
+        stopCondition: 'Stop after the queued implementation is verified.',
+      },
+    });
+
+    expect(decision.mayProceed).toBe(false);
+    expect(decision.baseGate.status).toBe('BLOCKED');
+    expect(decision.nextAction).toContain('not enough as a label');
   });
 });
