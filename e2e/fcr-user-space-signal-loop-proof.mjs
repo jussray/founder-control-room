@@ -48,8 +48,15 @@ async function proveFrontDoorSplit() {
 
   const user = page.locator('[data-entry-choice="user"]');
   const founder = page.locator('[data-entry-choice="founder"]');
-  if (await user.getAttribute('href') !== '/user-space.html') throw new Error('User view must route to the blank user workspace');
+  if (await user.getAttribute('href') !== '#discover') throw new Error('User view must route to the public onboarding screen before the blank workspace');
   if (await founder.getAttribute('href') !== '#founder-start') throw new Error('Founder view must retain the founder onboarding route');
+
+  await user.click();
+  if (!page.url().endsWith('#discover')) throw new Error('User view click must land on the public onboarding screen');
+
+  const blankWorkspace = page.locator('[data-user-start="workspace"]');
+  if (await blankWorkspace.count() !== 1) throw new Error('Public onboarding must expose exactly one blank user-workspace lane');
+  if (await blankWorkspace.getAttribute('href') !== '/user-space.html') throw new Error('Blank user-workspace lane must route to /user-space.html');
 
   const signalLoop = page.locator('[data-fcr-signal-loop]');
   if (await signalLoop.count() !== 1) throw new Error('FCR must expose exactly one SignalLoop attachment');
@@ -120,7 +127,7 @@ try {
   await proveFrontDoorSplit();
   await proveBlankUserSpace();
   await proveSignalLoopReachability();
-  console.log('PASS: FCR separates founder and user entry; user space starts blank with no founder-specific state; SignalLoop is bound to its exact surviving public surface.');
+  console.log('PASS: FCR separates founder and user entry; User View preserves public onboarding before the blank workspace; user space starts blank with no founder-specific state; SignalLoop is bound to its exact surviving public surface.');
 } finally {
   await browser.close();
   await new Promise((resolve) => server.close(resolve));
