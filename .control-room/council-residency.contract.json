@@ -50,6 +50,7 @@
       "project": "jussray/StoryEngine",
       "contract": "juss/storyengine-three-council-court@v1",
       "sourceModule": "src/lib/storyEngineCourt.ts",
+      "sourceRouter": "src/lib/storyEngineCreativeRouter.ts",
       "projectLocalContract": ".control-room/storyengine-creative-court.contract.json",
       "councils": ["writers", "ai", "production"],
       "devilCrossExaminationRequired": true,
