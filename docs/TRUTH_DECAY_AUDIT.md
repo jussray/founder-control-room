@@ -425,3 +425,7 @@ The same separation applies after secret presence is observed. `MODEL_API_KEY` p
 ## Rollback
 
 The Truth Lease, production-specific lease composer, temporal founder-content guards, analytics-authority guard, and Documentation Truth control are additive/fail-closed. Revert the focused contract/test/workflow/documentation change if it causes incompatibility. No database, provider credential, DNS, publication, provider ruleset, or production mutation is performed by the documentation-truth slice.
+
+## StoryEngine peer-pin decay
+
+A StoryEngine peer SHA in `.github/workflows/playwright.yml` is bounded evidence identity. When StoryEngine or Founder Control Room advances, predecessor browser-federation receipts become historical immediately; matching the live ref to a refreshed pin is setup evidence only, and the successor state remains UNKNOWN until the complete exact-head runtime and Playwright witness succeeds.
