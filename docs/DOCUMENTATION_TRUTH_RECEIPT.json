@@ -43,7 +43,8 @@
         "`.github/workflows/playwright.yml` must bind the FCR-to-StoryEngine browser federation witness to a separately verified exact StoryEngine peer SHA and ref; changing that peer identity expires predecessor federation/browser proof and requires the complete exact-head witness to rerun without granting merge, deploy, production, or provider-mutation authority.",
         "A fresh peer ref/SHA observation may select the successor StoryEngine evidence subject, but the successor FCR federation state remains UNKNOWN until the complete exact-head runtime identity, directive, receipt, and Playwright browser witness succeeds against that peer.",
         "Refreshing `STORYENGINE_PEER_SHA` after independently observing StoryEngine main is recovery setup only; pin alignment must not carry predecessor Playwright green or founder approval onto the successor FCR head.",
-        "The September 24, 2026 StoryEngine peer refresh after Council residency moved the peer head selects a new evidence subject only; predecessor browser green remains historical until the exact successor FCR head reruns the complete federation witness."
+        "The September 24, 2026 StoryEngine peer refresh after Council residency moved the peer head selects a new evidence subject only; predecessor browser green remains historical until the exact successor FCR head reruns the complete federation witness.",
+        "`.github/workflows/playwright.yml` must treat the pinned StoryEngine peer as an exact evidence subject, verify the live ref still resolves to that SHA before starting the peer runtime, and expire predecessor browser proof whenever either repository head advances."
       ]
     },
     {
