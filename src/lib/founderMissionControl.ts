@@ -91,8 +91,12 @@ const PROOF_RANK: Record<FounderMissionProofLevel, number> = {
   'outcome-verified': 4,
 };
 
+const PROOF_LEVEL_SET = new Set<string>(FOUNDER_MISSION_PROOF_LEVELS);
+const TASK_STATE_SET = new Set<string>(FOUNDER_MISSION_TASK_STATES);
+const PROOF_STATE_SET = new Set<string>(['unproven', 'proven']);
+const APPROVAL_GATE_SET = new Set<string>(['none', 'founder']);
 const SHA256 = /^[0-9a-f]{64}$/i;
-const REGISTERED_ACTION_ID = /^[a-z0-9][a-z0-9:_-]{0,127}$/;
+const ACTION_ID_SYNTAX = /^[a-z0-9][a-z0-9:_-]{0,127}$/;
 
 function canonicalize(value: unknown, path = '$'): unknown {
   if (value === null || typeof value === 'string' || typeof value === 'boolean') return value;
@@ -115,6 +119,10 @@ function canonicalize(value: unknown, path = '$'): unknown {
   throw new Error(`unsupported_value:${path}`);
 }
 
+function nonEmptyString(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
 export function canonicalMissionJson(value: unknown): string {
   return JSON.stringify(canonicalize(value));
 }
@@ -127,14 +135,19 @@ export function proofLevelSatisfies(
   current: FounderMissionProofLevel,
   required: FounderMissionProofLevel,
 ): boolean {
-  return PROOF_RANK[current] >= PROOF_RANK[required];
+  return PROOF_LEVEL_SET.has(current)
+    && PROOF_LEVEL_SET.has(required)
+    && PROOF_RANK[current] >= PROOF_RANK[required];
 }
 
-export function isRegisteredActionId(value: string): boolean {
-  return REGISTERED_ACTION_ID.test(value);
+// Syntax validation is not registry authority. FCR execution must separately
+// resolve the current action/workflow registry and authority policy before use.
+export function isActionIdSyntaxValid(value: string): boolean {
+  return typeof value === 'string' && ACTION_ID_SYNTAX.test(value);
 }
 
-function isIsoTimestamp(value: string): boolean {
+function isIsoTimestamp(value: unknown): boolean {
+  if (typeof value !== 'string') return false;
   const parsed = new Date(value);
   return !Number.isNaN(parsed.getTime()) && parsed.toISOString() === value;
 }
@@ -143,7 +156,7 @@ export function evaluateFounderMissionClearance(
   envelope: FounderMissionEnvelope,
 ): FounderMissionClearance {
   const levelSatisfied = proofLevelSatisfies(envelope.currentProofLevel, envelope.requiredProofLevel);
-  const hasEvidence = envelope.proofRefs.length > 0;
+  const hasEvidence = Array.isArray(envelope.proofRefs) && envelope.proofRefs.length > 0;
   const proofSatisfied = envelope.proofState === 'proven' && levelSatisfied && hasEvidence;
 
   let nextGate: string | null = null;
@@ -169,12 +182,10 @@ export function validateFounderMissionEnvelope(
 ): FounderMissionValidationResult {
   const errors: string[] = [];
 
-  if (envelope.contract !== FOUNDER_MISSION_ENVELOPE_CONTRACT) {
-    errors.push('mission contract drifted');
-  }
-  if (!envelope.missionId.trim()) errors.push('missionId is required');
-  if (!envelope.goal.trim()) errors.push('goal is required');
-  if (!envelope.rollback.trim()) errors.push('rollback is required');
+  if (envelope.contract !== FOUNDER_MISSION_ENVELOPE_CONTRACT) errors.push('mission contract drifted');
+  if (!nonEmptyString(envelope.missionId)) errors.push('missionId is required');
+  if (!nonEmptyString(envelope.goal)) errors.push('goal is required');
+  if (!nonEmptyString(envelope.rollback)) errors.push('rollback is required');
 
   for (const [field, value] of Object.entries({
     who: envelope.who,
@@ -184,12 +195,15 @@ export function validateFounderMissionEnvelope(
     why: envelope.why,
     how: envelope.how,
   })) {
-    if (!value.trim()) errors.push(`${field} is required`);
+    if (!nonEmptyString(value)) errors.push(`${field} is required`);
   }
 
-  if (!Number.isInteger(envelope.version) || envelope.version < 1) {
-    errors.push('version must be a positive integer');
-  }
+  if (!PROOF_LEVEL_SET.has(envelope.requiredProofLevel)) errors.push('requiredProofLevel is invalid');
+  if (!PROOF_LEVEL_SET.has(envelope.currentProofLevel)) errors.push('currentProofLevel is invalid');
+  if (!PROOF_STATE_SET.has(envelope.proofState)) errors.push('proofState is invalid');
+  if (!TASK_STATE_SET.has(envelope.taskState)) errors.push('taskState is invalid');
+
+  if (!Number.isInteger(envelope.version) || envelope.version < 1) errors.push('version must be a positive integer');
   if (envelope.version > 1 && !SHA256.test(envelope.predecessorFingerprint ?? '')) {
     errors.push('successor versions require a predecessor fingerprint');
   }
@@ -198,7 +212,9 @@ export function validateFounderMissionEnvelope(
   }
   if (!isIsoTimestamp(envelope.createdAt)) errors.push('createdAt must be a canonical ISO timestamp');
 
-  const artifactIds = envelope.artifacts.map((artifact) => artifact.artifactId);
+  const artifacts = Array.isArray(envelope.artifacts) ? envelope.artifacts : [];
+  if (!Array.isArray(envelope.artifacts)) errors.push('artifacts must be an array');
+  const artifactIds = artifacts.map((artifact) => artifact?.artifactId);
   const uniqueArtifactIds = new Set(artifactIds);
   if (uniqueArtifactIds.size !== artifactIds.length) errors.push('artifact IDs must be unique');
 
@@ -206,22 +222,33 @@ export function validateFounderMissionEnvelope(
     if (!uniqueArtifactIds.has(requiredId)) errors.push(`missing core artifact ${requiredId}`);
   }
 
-  for (const artifact of envelope.artifacts) {
-    if (!artifact.artifactId.trim()) errors.push('artifactId is required');
-    if (!artifact.ownerLane.trim()) errors.push(`artifact ${artifact.artifactId} requires exactly one owner lane`);
-    if (new Set(artifact.supportLanes).size !== artifact.supportLanes.length) {
-      errors.push(`artifact ${artifact.artifactId} support lanes must be unique`);
+  for (const artifact of artifacts) {
+    const artifactId = nonEmptyString(artifact?.artifactId) ? artifact.artifactId : '<unknown>';
+    if (!nonEmptyString(artifact?.artifactId)) errors.push('artifactId is required');
+    if (!nonEmptyString(artifact?.ownerLane)) errors.push(`artifact ${artifactId} requires exactly one owner lane`);
+    if (!TASK_STATE_SET.has(artifact?.status)) errors.push(`artifact ${artifactId} status is invalid`);
+    if (!PROOF_LEVEL_SET.has(artifact?.requiredProofLevel)) {
+      errors.push(`artifact ${artifactId} requiredProofLevel is invalid`);
     }
-    if (artifact.supportLanes.includes(artifact.ownerLane)) {
-      errors.push(`artifact ${artifact.artifactId} owner lane cannot also be a support lane`);
+    if (!APPROVAL_GATE_SET.has(artifact?.approvalGate)) errors.push(`artifact ${artifactId} approvalGate is invalid`);
+
+    const supportLanes = Array.isArray(artifact?.supportLanes) ? artifact.supportLanes : [];
+    if (!Array.isArray(artifact?.supportLanes)) errors.push(`artifact ${artifactId} support lanes must be an array`);
+    if (new Set(supportLanes).size !== supportLanes.length) {
+      errors.push(`artifact ${artifactId} support lanes must be unique`);
     }
-    if (artifact.status === 'cleared') {
-      const artifactProofSatisfied = proofLevelSatisfies(
-        envelope.currentProofLevel,
-        artifact.requiredProofLevel,
-      ) && artifact.evidenceRefs.length > 0;
+    if (supportLanes.includes(artifact?.ownerLane)) {
+      errors.push(`artifact ${artifactId} owner lane cannot also be a support lane`);
+    }
+
+    const evidenceRefs = Array.isArray(artifact?.evidenceRefs) ? artifact.evidenceRefs : [];
+    if (!Array.isArray(artifact?.evidenceRefs)) errors.push(`artifact ${artifactId} evidenceRefs must be an array`);
+    if (artifact?.status === 'cleared') {
+      const artifactProofSatisfied = PROOF_LEVEL_SET.has(artifact.requiredProofLevel)
+        && proofLevelSatisfies(envelope.currentProofLevel, artifact.requiredProofLevel)
+        && evidenceRefs.length > 0;
       if (!artifactProofSatisfied) {
-        errors.push(`artifact ${artifact.artifactId} cannot clear before its required proof is satisfied`);
+        errors.push(`artifact ${artifactId} cannot clear before its required proof is satisfied`);
       }
     }
   }
@@ -244,12 +271,17 @@ export function createFounderMissionSuccessor(
   prior: FounderMissionEnvelope,
   next: Omit<FounderMissionEnvelope, 'version' | 'predecessorFingerprint'>,
 ): FounderMissionEnvelope {
+  const priorValidation = validateFounderMissionEnvelope(prior);
+  if (!priorValidation.valid) throw new Error(`prior mission invalid: ${priorValidation.errors.join('; ')}`);
   if (next.missionId !== prior.missionId) {
     throw new Error('mission identity cannot change across append-only successors');
   }
-  return {
+  const successor: FounderMissionEnvelope = {
     ...next,
     version: prior.version + 1,
     predecessorFingerprint: founderMissionFingerprint(prior),
   };
+  const successorValidation = validateFounderMissionEnvelope(successor);
+  if (!successorValidation.valid) throw new Error(`successor mission invalid: ${successorValidation.errors.join('; ')}`);
+  return successor;
 }
