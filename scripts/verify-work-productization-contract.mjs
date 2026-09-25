@@ -5,6 +5,9 @@ const read = (path) => readFile(new URL(path, root), 'utf8');
 
 const [
   contract,
+  twinCore,
+  missionControl,
+  missionControlTest,
   agents,
   chatgpt,
   claude,
@@ -14,6 +17,9 @@ const [
   audit,
 ] = await Promise.all([
   read('docs/FOUNDER_WORK_PRODUCTIZATION_CONTRACT.md'),
+  read('docs/TWIN_CORE_CONTROL_PLANE_CONTRACT.md'),
+  read('src/lib/founderMissionControl.ts'),
+  read('src/lib/__tests__/founderMissionControl.test.ts'),
   read('AGENTS.md'),
   read('CHATGPT.md'),
   read('CLAUDE.md'),
@@ -54,6 +60,56 @@ for (const marker of [
   'For assistant behavior, words such as `done`, `complete`, `fixed`, `cleared`, `live`, or `working` are proof claims',
   'DECLARED | SOURCE IMPLEMENTED | MERGED | DEPLOYED | RUNTIME VERIFIED | OUTCOME VERIFIED',
 ]) requireText('productization contract', contract, marker);
+
+for (const marker of [
+  '# Twin Core Control Plane Contract',
+  'main@eb7c0861ba6ab3ed772efc672aff307bad7539fa',
+  '## Adopt mechanics, not identity',
+  '5W1H mission contract',
+  'mission-brief',
+  'system-map',
+  'red-team-register',
+  'artifact-ledger',
+  'bottleneck-map',
+  'verification-report',
+  'founder-decision-pack',
+  'Append-only history',
+  'Allowlisted execution',
+  'UI render is not runtime proof',
+  '## Twin Core anti-collapse invariant',
+  'FCR must **not** become the capability selector',
+  'Chief must **not** become the durable workflow registry',
+  'FCR == Chief',
+  'Chief == FCR',
+  'commercial packaging == technical absorption',
+  'Copy the control-plane mechanism. Re-express it in portfolio-neutral contracts.',
+  'Chief creates/decomposes the mission envelope',
+  'FCR validates, persists, executes through authorized paths, records evidence, and controls task clearance.',
+  '## Provenance and supersession',
+]) requireText('Twin Core donor contract', twinCore, marker);
+
+for (const marker of [
+  "FOUNDER_MISSION_ENVELOPE_CONTRACT = 'juss/founder-mission-envelope@v1'",
+  'FOUNDER_MISSION_CORE_ARTIFACT_IDS',
+  "'mission-brief'",
+  "'verification-report'",
+  "'founder-decision-pack'",
+  'evaluateFounderMissionClearance',
+  'task cannot clear before proof is proven at the required level',
+  'createFounderMissionSuccessor',
+  'mission identity cannot change across append-only successors',
+  'isRegisteredActionId',
+  'REGISTERED_ACTION_ID',
+]) requireText('FCR mission control source', missionControl, marker);
+
+for (const marker of [
+  'keeps task clearance separate from progress until required proof is proven',
+  'rejects false clearance when proof is weaker than the original goal',
+  'requires the Bip-derived core artifact spine',
+  'creates append-only successor lineage without changing mission identity',
+  'accepts only registered action identifiers rather than free-form command text',
+  "expect(isRegisteredActionId('npm run verify:frontend')).toBe(false)",
+]) requireText('FCR mission control tests', missionControlTest, marker);
 
 for (const marker of [
   'Founder Work Productization Contract',
@@ -106,9 +162,11 @@ for (const forbidden of [
   'Anthropic API key grants Supabase authority',
   'Court is the execution authority',
   'a PR exists, therefore the task is complete',
+  'FCR owns Chief identity',
+  'Chief owns FCR identity',
 ]) {
-  const all = [contract, agents, council, court].join('\n');
-  if (all.includes(forbidden)) failures.push(`forbidden productization authority/clearance claim: ${forbidden}`);
+  const all = [contract, twinCore, missionControl, agents, council, court].join('\n');
+  if (all.includes(forbidden)) failures.push(`forbidden productization/anti-collapse claim: ${forbidden}`);
 }
 
 if (failures.length) {
@@ -118,5 +176,5 @@ if (failures.length) {
 }
 
 console.log('Work productization contract passed.');
-console.log('Chat → Chief candidate → FCR workflow ownership, provider-key boundaries, Council/Court roles, instruction inheritance, and proven-only task clearance are aligned in source.');
+console.log('Chat → Chief candidate → FCR workflow ownership, Bip-derived control-plane mechanics, Twin Core anti-collapse, provider-key boundaries, Council/Court roles, instruction inheritance, and proven-only task clearance are aligned in source.');
 console.log('This verifier proves source contract alignment only; it does not prove Workflow Library/Runner runtime or user outcomes.');
