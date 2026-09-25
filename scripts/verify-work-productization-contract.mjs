@@ -6,6 +6,7 @@ const read = (path) => readFile(new URL(path, root), 'utf8');
 const [
   contract,
   twinCore,
+  pairContractText,
   missionControl,
   missionControlTest,
   agents,
@@ -18,6 +19,7 @@ const [
 ] = await Promise.all([
   read('docs/FOUNDER_WORK_PRODUCTIZATION_CONTRACT.md'),
   read('docs/TWIN_CORE_CONTROL_PLANE_CONTRACT.md'),
+  read('config/founder-chief-pair.contract.json'),
   read('src/lib/founderMissionControl.ts'),
   read('src/lib/__tests__/founderMissionControl.test.ts'),
   read('AGENTS.md'),
@@ -29,9 +31,13 @@ const [
   read('.control-room/audits/2026-09-25-chat-to-fcr-productization-audit.md'),
 ]);
 
+const pairContract = JSON.parse(pairContractText);
 const failures = [];
 const requireText = (label, source, expected) => {
   if (!source.includes(expected)) failures.push(`${label}: missing ${JSON.stringify(expected)}`);
+};
+const requireValue = (condition, message) => {
+  if (!condition) failures.push(message);
 };
 
 for (const marker of [
@@ -87,6 +93,28 @@ for (const marker of [
   'FCR validates, persists, executes through authorized paths, records evidence, and controls task clearance.',
   '## Provenance and supersession',
 ]) requireText('Twin Core donor contract', twinCore, marker);
+
+requireValue(pairContract.relationship?.topology === 'standalone-peers', 'Twin Core topology must remain standalone-peers');
+requireValue(pairContract.relationship?.controlRoom?.independentlyCallable === true, 'FCR must remain independently callable');
+requireValue(pairContract.relationship?.chiefAI?.independentlyCallable === true, 'Chief must remain independently callable');
+requireValue(pairContract.relationship?.controlRoom?.ownsIdentity === true, 'FCR must retain its own identity');
+requireValue(pairContract.relationship?.chiefAI?.ownsIdentity === true, 'Chief must retain its own identity');
+requireValue(pairContract.relationship?.controlRoom?.ownsLifecycle === true, 'FCR must retain its own lifecycle');
+requireValue(pairContract.relationship?.chiefAI?.ownsLifecycle === true, 'Chief must retain its own lifecycle');
+requireValue(pairContract.relationship?.controlRoom?.ownsReceipts === true, 'FCR must retain its own receipts');
+requireValue(pairContract.relationship?.chiefAI?.ownsReceipts === true, 'Chief must retain its own receipts');
+requireValue(pairContract.relationship?.controlRoom?.ownsFailureState === true, 'FCR must retain its own failure state');
+requireValue(pairContract.relationship?.chiefAI?.ownsFailureState === true, 'Chief must retain its own failure state');
+requireValue(pairContract.relationship?.crossSystem?.identityCollapseAllowed === false, 'FCR/Chief identity collapse must stay forbidden');
+requireValue(pairContract.relationship?.crossSystem?.implicitAuthorityTransferAllowed === false, 'implicit authority transfer must stay forbidden');
+requireValue(pairContract.relationship?.crossSystem?.receiptCollapseAllowed === false, 'receipt collapse must stay forbidden');
+requireValue(pairContract.relationship?.crossSystem?.failureCollapseAllowed === false, 'failure collapse must stay forbidden');
+requireValue(pairContract.relationship?.crossSystem?.continuityCollapseAllowed === false, 'continuity collapse must stay forbidden');
+requireValue(pairContract.commercialPackaging?.technicalTopology === 'standalone-peers', 'commercial packaging must not rewrite technical topology');
+requireValue(pairContract.commercialPackaging?.chiefTechnicalIndependence === true, 'Chief technical independence must remain true');
+requireValue(pairContract.commercialPackaging?.chiefDefaultCommercialPackaging === 'inside-founder-control-room', 'Chief may be packaged inside FCR only as commercial/product packaging');
+requireValue(pairContract.v10?.capabilitySelector === 'chief-ai-machine', 'Chief must remain capability selector');
+requireValue(pairContract.v10?.governanceAuthority === 'founder-control-room', 'FCR must remain governance authority');
 
 for (const marker of [
   "FOUNDER_MISSION_ENVELOPE_CONTRACT = 'juss/founder-mission-envelope@v1'",
@@ -162,8 +190,6 @@ for (const forbidden of [
   'Anthropic API key grants Supabase authority',
   'Court is the execution authority',
   'a PR exists, therefore the task is complete',
-  'FCR owns Chief identity',
-  'Chief owns FCR identity',
 ]) {
   const all = [contract, twinCore, missionControl, agents, council, court].join('\n');
   if (all.includes(forbidden)) failures.push(`forbidden productization/anti-collapse claim: ${forbidden}`);
@@ -176,5 +202,5 @@ if (failures.length) {
 }
 
 console.log('Work productization contract passed.');
-console.log('Chat → Chief candidate → FCR workflow ownership, Bip-derived control-plane mechanics, Twin Core anti-collapse, provider-key boundaries, Council/Court roles, instruction inheritance, and proven-only task clearance are aligned in source.');
+console.log('Chat → Chief candidate → FCR workflow ownership, Bip-derived control-plane mechanics, machine-enforced Twin Core anti-collapse, provider-key boundaries, Council/Court roles, instruction inheritance, and proven-only task clearance are aligned in source.');
 console.log('This verifier proves source contract alignment only; it does not prove Workflow Library/Runner runtime or user outcomes.');
