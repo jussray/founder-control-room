@@ -93,6 +93,18 @@ The StoryEngine peer pin is an evidence identity, not a durable alias for “cur
 
 See [`docs/REPOSITORY_FEDERATION.md`](docs/REPOSITORY_FEDERATION.md).
 
+### Twin Core and Bip-derived control-plane mechanics
+
+Founder Control Room and Chief AI are a **Twin Core of standalone peers**, not one system wearing two names. FCR remains the durable governance/execution/evidence plane. Chief remains the cognition, capability-selection, Council-routing, mission-decomposition, and workflow-candidate compiler. FCR may package Chief inside the product experience, but commercial/product packaging is not technical absorption. The machine pair contract keeps both peers independently callable with separate identity, lifecycle, receipts, failure state, continuity, and proof.
+
+`docs/TWIN_CORE_CONTROL_PLANE_CONTRACT.md` imports the strongest portfolio-neutral mechanics observed in the Se'kret Bip founder Control Room without importing Bip identity. The donor contributes 5W1H mission framing; mission/system/red-team/artifact/bottleneck/verification/decision artifacts; one active owner lane per artifact; append-only successor lineage; explicit proof levels; allowlisted action IDs; provenance and supersession; proven-only task clearance; false-green resistance; rollback/recovery; and human-only authority gates.
+
+The donor boundary is strict. FCR and Chief must not inherit Bip branding, characters, teen/parent product UX, Bip-specific mission IDs, routes, storage keys, project data, or any assumption that Bip is the portfolio center. The rule is: **adopt the control-plane mechanism, re-express it in portfolio-neutral contracts, and keep the donor's product identity at the donor boundary.**
+
+`src/lib/founderMissionControl.ts` is the FCR-side source contract for that generic mission spine. It keeps proof level and task state separate, requires the core artifact ledger, binds successor versions to predecessor fingerprints, rejects free-form shell text as registered action identity, and forbids `CLEARED` until current evidence satisfies the original mission's required proof level. Chief owns mission/capability planning; FCR validates, persists, executes only authorized registered actions, retains evidence/rollback, and controls final proof/clearance state.
+
+The current source implementation is not runtime proof that the FCR Workflow Library/Runner is active for users. Until a real workflow consumes a Chief mission/candidate packet, executes through the guarded FCR path, retains evidence, and moves `PROOF_PENDING → PROVEN → CLEARED` from valid evidence, the correct status is source/CI proof only.
+
 ### Jira work automation
 
 FCR owns the bounded Jira source contract, authenticated service ingress, and importable n8n workflow artifact. The artifact ships inactive and carries no Jira credential authority.
@@ -319,6 +331,8 @@ Public-safe configuration may live in `.env.example`. Secret values do not belon
 - [`docs/PROVIDERS.md`](docs/PROVIDERS.md) — provider handoffs
 - [`docs/CLOUDFLARE_REASONING.md`](docs/CLOUDFLARE_REASONING.md) — Cloudflare reasoning/recovery
 - [`docs/GOALFIX_EXECUTION_WORKFLOW_V2.md`](docs/GOALFIX_EXECUTION_WORKFLOW_V2.md) — canonical repair/verification workflow
+- [`docs/FOUNDER_WORK_PRODUCTIZATION_CONTRACT.md`](docs/FOUNDER_WORK_PRODUCTIZATION_CONTRACT.md) — chat-to-FCR workflow graduation and proven-only task clearance
+- [`docs/TWIN_CORE_CONTROL_PLANE_CONTRACT.md`](docs/TWIN_CORE_CONTROL_PLANE_CONTRACT.md) — FCR/Chief anti-collapse and portfolio-neutral control-plane mechanics derived from the Bip donor
 
 Provider overlays may become stricter. They do not become competing constitutions or expand their own authority.
 
