@@ -13,11 +13,11 @@
   },
   "dependencies": {
     "@expo/metro-runtime": "~56.0.15",
-    "@react-native-async-storage/async-storage": "^2.2.0",
     "@supabase/supabase-js": "^2.45.4",
     "expo": "^56.0.12",
     "expo-haptics": "~56.0.3",
     "expo-router": "^56.2.11",
+    "expo-secure-store": "~56.0.3",
     "expo-status-bar": "~56.0.4",
     "react": "19.2.7",
     "react-native": "0.85.3",
