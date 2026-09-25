@@ -36,6 +36,7 @@ for (const marker of [
   '### Chief AI',
   '### PromptOS',
   '## WorkflowCandidate contract',
+  'required_proof_stage',
   '## Graduation criteria',
   'OpenAI API key != GitHub authority',
   'Anthropic API key != Supabase authority',
@@ -44,6 +45,13 @@ for (const marker of [
   '## Court productization rule',
   'the councils expand possibility; the creator makes the ruling.',
   '## Instruction inheritance',
+  '## Task clearance invariant',
+  'A task clears only when the proof required by the original goal is satisfied by current evidence.',
+  'OPEN | ACTIVE | BLOCKED | PROOF_PENDING | PROVEN | CLEARED',
+  '`PROVEN` is an evidence predicate. `CLEARED` is the task-state transition',
+  'Earlier stages never silently satisfy a later-stage goal.',
+  'Do not mark it complete, close it, archive it, remove it from the active ledger, or tell the user it cleared.',
+  'For assistant behavior, words such as `done`, `complete`, `fixed`, `cleared`, `live`, or `working` are proof claims',
   'DECLARED | SOURCE IMPLEMENTED | MERGED | DEPLOYED | RUNTIME VERIFIED | OUTCOME VERIFIED',
 ]) requireText('productization contract', contract, marker);
 
@@ -97,9 +105,10 @@ for (const forbidden of [
   'OpenAI API key grants GitHub authority',
   'Anthropic API key grants Supabase authority',
   'Court is the execution authority',
+  'a PR exists, therefore the task is complete',
 ]) {
   const all = [contract, agents, council, court].join('\n');
-  if (all.includes(forbidden)) failures.push(`forbidden productization authority claim: ${forbidden}`);
+  if (all.includes(forbidden)) failures.push(`forbidden productization authority/clearance claim: ${forbidden}`);
 }
 
 if (failures.length) {
@@ -109,5 +118,5 @@ if (failures.length) {
 }
 
 console.log('Work productization contract passed.');
-console.log('Chat → Chief candidate → FCR workflow ownership, provider-key boundaries, Council/Court roles, and instruction inheritance are aligned in source.');
+console.log('Chat → Chief candidate → FCR workflow ownership, provider-key boundaries, Council/Court roles, instruction inheritance, and proven-only task clearance are aligned in source.');
 console.log('This verifier proves source contract alignment only; it does not prove Workflow Library/Runner runtime or user outcomes.');
