@@ -396,6 +396,9 @@ The strongest optimization is not faster claiming. It is shortening the distance
 37. Model-routing evidence decays by task class and time. Old wins, provider reputation, or Council consensus cannot outrank fresh local false-green, authority-violation, cost, latency, proof-quality, or root-cause evidence.
 38. A Cowork workspace, attachment, model memory, or prior branch observation cannot outrank the current authoritative GitHub repository/branch/head; repository work must re-observe that exact source at use time.
 39. Generic FCR activity cannot be relabeled as Cowork receipt proof while the Cowork receipt adapter is unwired, and connector/tool availability cannot manufacture repository, merge, deploy, provider, or founder authority.
+40. A failed observation transport does not prove the observed target is absent; if provider secret enumeration cannot run, target secret presence remains `UNKNOWN`/`BLOCKED`.
+41. A resident Council seat or source adapter does not prove a live provider participated; a live Muse claim requires a current provider receipt bound to the exact invocation.
+42. Provider-held secret-name policy, secret presence, deployed runtime identity, and successful model invocation are four separate evidence layers and may not be collapsed into one green state.
 
 ## 2026-09 control correction: peer ref refresh resets proof
 
@@ -411,6 +414,18 @@ The capability market therefore keeps public benchmarks as bounded priors only a
 
 The same rule applies when a peer model or repository advances during verification. A newer candidate may become the next shadow trial or evidence subject, but predecessor green cannot be transferred to it. Promotion and federation both require successor-specific receipts.
 
+## 2026-09 control correction: Muse activation proof transport is not target truth
+
+The resident Council and Muse relay exposed another version of the same evidence-boundary failure. FCR can correctly declare Muse as a governed Council peer, wire a bounded Meta adapter, require `MODEL_API_KEY` in the Worker secret membrane, and still lack live proof that the provider-held key exists or that Muse answered a real request. Those source facts establish implementation and policy, not provider/runtime activation.
+
+The proof lane therefore treats Cloudflare secret enumeration as an observation operation with its own prerequisite credential. If that Cloudflare credential is malformed, rejected, or cannot be placed into the Authorization header, `wrangler secret list` never observes the target Worker secret plane. That failure may prove the observation path is blocked; it does **not** prove `MODEL_API_KEY` is absent. The target secret remains `UNKNOWN`/`BLOCKED` until a valid provider read succeeds.
+
+The same separation applies after secret presence is observed. `MODEL_API_KEY` present is only configuration evidence. A live Muse claim additionally requires the exact deployed FCR runtime and one bounded relay whose returned evidence reference is tied to the actual provider response. Council residency, provider availability, model naming, secret-name declaration, secret presence, deployment identity, and invocation outcome are separate facts with separate freshness.
+
 ## Rollback
 
 The Truth Lease, production-specific lease composer, temporal founder-content guards, analytics-authority guard, and Documentation Truth control are additive/fail-closed. Revert the focused contract/test/workflow/documentation change if it causes incompatibility. No database, provider credential, DNS, publication, provider ruleset, or production mutation is performed by the documentation-truth slice.
+
+## StoryEngine peer-pin decay
+
+A StoryEngine peer SHA in `.github/workflows/playwright.yml` is bounded evidence identity. When StoryEngine or Founder Control Room advances, predecessor browser-federation receipts become historical immediately; matching the live ref to a refreshed pin is setup evidence only, and the successor state remains UNKNOWN until the complete exact-head runtime and Playwright witness succeeds.

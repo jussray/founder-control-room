@@ -13,11 +13,13 @@ recorded in [Proof](#proof). This audit changed no code in either repository.
 This audits an externally supplied build proposal recommending that "chief" and "fcr" be wrapped as
 two new MCP servers, starting read-only, adding writes later behind a confirmation step.
 
+## Current status correction — 2026-09-25
+
+The stale-pin finding below is **HISTORICAL / RESOLVED**. Current FCR `main@d6897f12ca7c359943a56608a724c7fb7cca7d43` pins Chief at `2acf9d527afaa1b43d00e08a85cf7c9e9d48b5a3`, and the focused adapter test asserts the same head. The original evidence remains below as audit history; it must not be used as an instruction to restore `2fd4fda0…` or any predecessor pin. This correction proves repository state only, not deployed MCP reachability or runtime identity.
+
 **Verdict: do not implement as written.** Both repositories are already MCP servers. The proposal's
 recommended end-state architecture is, in its essentials, what already exists — and the parts it
-would add would weaken controls that are currently stronger. Four gaps it does not mention are in
-[Gaps worth fixing](#gaps-worth-fixing); the most consequential is a stale pin that currently blocks
-Chief AI previews at Chief's live head.
+would add would weaken controls that are currently stronger. Four gaps it did not mention are preserved in [Gaps worth fixing](#gaps-worth-fixing). The stale-pin gap was subsequently resolved; the remaining items are historical audit findings unless independently reverified against current heads.
 
 ## Both systems already serve MCP
 
@@ -124,7 +126,7 @@ findings, but it bears on how much of the rest to trust.
 
 ## Gaps worth fixing
 
-### 1. The Chief AI pin is stale, and it currently blocks Chief previews
+### 1. HISTORICAL / RESOLVED — the Chief AI pin was stale
 
 This is the highest-priority finding, and it is only visible with both repositories present.
 
@@ -159,10 +161,7 @@ fail — but the practical result is that the Chief AI adapter does not function
 and the reason is SHA drift rather than any change in substance. This is precisely the distinction
 `CLAUDE.md` draws when it says a hash proves identity, not continued reality.
 
-Refreshing `CHIEF_AI_AUDITED_HEAD` to `2fd4fda0cab12e52ab5096e723884d98bcfe7d10` is a one-line change
-whose safety property is already demonstrated by the blob table above. It is *not* included in this
-change, because moving an audited-head pin is an authority decision for Juss, not an audit finding to
-self-apply.
+The original repair target was `2fd4fda0cab12e52ab5096e723884d98bcfe7d10`. That instruction is now **SUPERSEDED**. Current FCR `main` binds the adapter and its focused test to Chief `2acf9d527afaa1b43d00e08a85cf7c9e9d48b5a3`; do not restore the historical target. Any future pin movement still requires exact-head contract review and successor proof.
 
 ### 2. The pair-contract CI is path-gated and cannot catch that drift
 
@@ -201,8 +200,7 @@ that FCR serves MCP endpoints at all.
 
 ## What to do instead
 
-1. **Refresh the Chief AI audited head** to `2fd4fda0…` once Juss authorizes it — the blob table
-   above is the evidence that the contract surface did not change.
+1. **Preserve the resolved Chief pin.** Current FCR `main` and its focused adapter test agree on Chief `2acf9d52…`. Treat the former `2fd4fda0…` refresh instruction as historical, and require fresh exact-head contract review before any later movement.
 2. **Add `src/founder-os-lab/projectAdapters.ts`** to the pair-contract workflow's trigger paths so
    the next drift is caught by CI rather than by an audit.
 3. **Document `FCR_REMOTE_MCP_READ_TOKEN` and `FCR_REMOTE_MCP_READ_PROJECTS`** in `.env.example` and
