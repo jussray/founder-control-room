@@ -97,6 +97,7 @@ The former `founder-control-room2` Worker was deleted and must not be recreated 
 | `FCR_SHOPIFY_WEBHOOK_SECRET` | secret | Required Shopify `orders/paid` HMAC signing secret for the FCR first-party commerce ingress. Provider-held; never log or copy its value into proof. |
 | `FCR_COMMERCE_HASH_SALT` | secret | Required independent server-only salt for privacy-safe FCR Shopify order-reference HMACs. This marker creates no Shopify authority. |
 | `TINYFISH_API_KEY` | secret | Required provider-held credential for live `tinyfish-web-observation-v1` Search/Fetch. Canonical production deploy verifies only binding-name presence before mutation; the value remains in Cloudflare and never becomes a GitHub Actions secret or proof receipt. |
+| `MODEL_API_KEY` | secret | Required provider-held credential for the governed Muse/model relay. Source declaration and documentation prove only the required binding name; live presence, deployed runtime identity, and successful provider invocation require separate current provider/runtime evidence. Never expose the value to Pages, browser code, logs, PRs, receipts, or chat. |
 | `FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON` | secret | Scoped, revocable, fail-closed automation grant. |
 | `FOUNDER_SIGNAL_ENGINE_MCP_TOKEN` | secret | Dedicated MCP bearer token. This is not an OpenAI API key. |
 | `ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL` | secret | Private approved Zapier Catch Hook URL. |
@@ -227,6 +228,7 @@ The client-ID names above are shared recovery/runtime-witness selectors; the cli
 [ ] FCR_SHOPIFY_WEBHOOK_SECRET (provider-held Shopify HMAC secret)
 [ ] FCR_COMMERCE_HASH_SALT (independent server-only order-reference HMAC salt)
 [ ] TINYFISH_API_KEY (provider-held; required before live TinyFish activation)
+[ ] MODEL_API_KEY (provider-held; required before live Muse/model relay activation)
 [ ] FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON
 [ ] FOUNDER_SIGNAL_ENGINE_MCP_TOKEN
 [ ] ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL
