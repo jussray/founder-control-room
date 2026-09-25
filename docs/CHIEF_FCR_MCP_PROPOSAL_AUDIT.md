@@ -19,7 +19,7 @@ The stale-pin finding below is **HISTORICAL / RESOLVED**. The inspected FCR cand
 
 **Verdict: do not implement as written.** Both repositories are already MCP servers. The proposal's
 recommended end-state architecture is, in its essentials, what already exists — and the parts it
-would add would weaken controls that are currently stronger. Four gaps it did not mention are preserved in [Gaps worth fixing](#gaps-worth-fixing). All four are now historical/resolved at the inspected candidate; the record below is retained as audit history and must not be treated as a current task list.
+would add would weaken controls that are currently stronger. Four gaps it did not mention are preserved in [Gaps worth fixing](#gaps-worth-fixing). The first three and FCR's half of the fourth are historical/resolved at the inspected candidate. Chief's served-MCP verification half remains open until proved at an exact Chief head; the historical record below must not be treated as a current task list.
 
 ## Both systems already serve MCP
 
@@ -161,7 +161,7 @@ fail — but the practical result is that the Chief AI adapter does not function
 and the reason is SHA drift rather than any change in substance. This is precisely the distinction
 `CLAUDE.md` draws when it says a hash proves identity, not continued reality.
 
-The original repair target was `2fd4fda0cab12e52ab5096e723884d98bcfe7d10`. That instruction is now **SUPERSEDED**. Current FCR `main` binds the adapter and its focused test to Chief `2acf9d527afaa1b43d00e08a85cf7c9e9d48b5a3`; do not restore the historical target. Any future pin movement still requires exact-head contract review and successor proof.
+The original repair target was `2fd4fda0cab12e52ab5096e723884d98bcfe7d10`. That instruction is now **SUPERSEDED**. The inspected FCR candidate binds the adapter and its focused test to Chief `2acf9d527afaa1b43d00e08a85cf7c9e9d48b5a3`; consult `src/founder-os-lab/projectAdapters.ts` and its focused test for the authoritative current binding, and do not restore the historical target. Any future pin movement still requires exact-head contract review and successor proof.
 
 ### 2. HISTORICAL / RESOLVED — the pair-contract CI path gate omitted the adapter
 
@@ -188,9 +188,9 @@ from `README.md`, and from `wrangler.worker.toml`. Without both set the handler 
 permanently. Correct fail-closed behavior; but no operator can discover from documentation how to
 open it.
 
-### 4. HISTORICAL / RESOLVED — served MCP lacked a verification contract
+### 4. PARTIALLY RESOLVED — served MCP lacked a verification contract
 
-Resolution at the inspected candidate: `verify:mcp` covers the served-MCP contract, including auth, tool annotations, and fail-closed behavior. The following describes the original finding.
+Resolution at the inspected FCR candidate: FCR's `verify:mcp` covers FCR's served-MCP contract, including auth, tool annotations, and fail-closed behavior. **Chief's half remains OPEN / UNVERIFIED**: this candidate does not execute Chief's `verify:mcp` or verify `worker/proofmode-mcp.js` at an exact Chief head. The following describes the original finding.
 
 `npm run verify:mcp` in **both** repositories validates only the outbound `.mcp.json` client config.
 Nothing verifies that FCR's three inbound endpoints or Chief's ProofMode endpoint keep their auth
@@ -206,10 +206,10 @@ that FCR serves MCP endpoints at all.
 
 ## What to do instead
 
-1. **Preserve the resolved Chief pin.** Current FCR `main` and its focused adapter test agree on Chief `2acf9d52…`. Treat the former `2fd4fda0…` refresh instruction as historical, and require fresh exact-head contract review before any later movement.
+1. **Preserve the resolved Chief pin.** The inspected FCR candidate and its focused adapter test agree on Chief `2acf9d52…`; consult the adapter and test for the authoritative current binding. Treat the former `2fd4fda0…` refresh instruction as historical, and require fresh exact-head contract review before any later movement.
 2. **RESOLVED at the inspected candidate:** `src/founder-os-lab/projectAdapters.ts` is in the pair-contract workflow trigger paths.
 3. **RESOLVED at the inspected candidate:** `FCR_REMOTE_MCP_READ_TOKEN`, `FCR_REMOTE_MCP_READ_PROJECTS`, and `/mcp/read` are documented in `.env.example` and `docs/MCP_STACK.md`.
-4. **RESOLVED at the inspected candidate:** `verify:mcp` covers the served-MCP contract, including auth, tool annotations, and fail-closed behavior.
+4. **PARTIALLY RESOLVED:** FCR's `verify:mcp` covers FCR's served-MCP contract. Chief still needs an exact-head run proving the auth, tool annotations, and fail-closed behavior of `worker/proofmode-mcp.js`.
 5. **Adopt Chief's protocol-version negotiation** in FCR's three endpoints.
 6. **Extend `/mcp/read`'s tool surface** rather than standing up new servers, if more read capability
    is the real need — routing, scoping, evidence, and refusal logic already exist.
