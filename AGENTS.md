@@ -4,6 +4,7 @@ Read these before changing code, configuration, schemas, providers, verification
 
 - [`Juss Founder OS`](.ai/skills/juss-founder-os/SKILL.md) first
 - [`Founder Intelligence Agent Entry Point`](./AGENTS_FOUNDER_INTELLIGENCE.md) for the portfolio constitution, remembrance loop, and inheritance registry
+- [`Founder Work Productization Contract`](./docs/FOUNDER_WORK_PRODUCTIZATION_CONTRACT.md) for the chat → proof → FCR workflow-graduation boundary shared by every agent/provider/skill surface
 - [`founder-control-room-operator`](.agents/skills/founder-control-room-operator/SKILL.md) for the repository-scoped 5W1H operating contract
 - [`GLOBAL_AI.md`](./GLOBAL_AI.md)
 - [`.ai/skills/juss-flow-launch-loop/SKILL.md`](./.ai/skills/juss-flow-launch-loop/SKILL.md)
@@ -32,6 +33,20 @@ For messaging, lead generation, sales automation, unified inbox, consent, outrea
 - [`src/types/growthInbox.ts`](src/types/growthInbox.ts)
 
 The default growth-inbox mode is `draft_only`. No live outreach, calling, campaign, credential creation, paid provider enablement, deployment, pricing/discount action, or publication is authorized merely because a skill or connector exists.
+
+## Work productization invariant
+
+Chat is the invention lab. Founder Control Room is the durable workflow product layer.
+
+For every material task, after proving or bounding the requested outcome, classify the work as `ONE-OFF` or `REPEATABLE`.
+
+If it is repeatable and sufficiently proved, do not leave it dependent on old chats, manual slash-command stacks, provider-specific memory, or hidden assistant behavior. Hand it through Chief as a `juss/fcr-workflow-candidate@v1` and let FCR own the durable workflow registry/library, tenant/project bindings, permissions, guarded execution, evidence, receipts, rollback, and outcome history.
+
+Internal command composition remains backstage. A product user should ask for an outcome such as `Repair my app`, `Launch audit`, or `Decision challenge`; the workflow may automatically route ULTRATHINK, TruthMode, Redteam, Lindy, L99, OODA, `/goalfix`, Council, Playwright, or other internal mechanisms.
+
+Chief owns intent compression, capability/model/agent/tool routing, Council synthesis, repeated-pattern detection, and workflow-candidate compilation. PromptOS owns lane-specific prompt/protocol lineage and outcome attribution. Council and Court advise/challenge; they do not become execution authority. Provider API keys grant provider capability, not unrelated GitHub/Supabase/Cloudflare/Shopify/publishing authority.
+
+All leaf `SKILL.md` files inherit `docs/FOUNDER_WORK_PRODUCTIZATION_CONTRACT.md` through this root contract unless a stricter local rule applies. Skills specialize the parent doctrine; they may not create permanent chat captivity, duplicate execution authority, or require ordinary users to learn founder-internal machinery.
 
 ## Founder stack compatibility and expanded reasoning
 
@@ -81,8 +96,9 @@ Reasoning may run in parallel. Mutation authority stays serialized.
 9. Make the smallest coherent reversible change.
 10. Redteam II: attack the selected implementation for false greens, stale truth, privilege expansion, sauce leakage, duplicate authority, provider drift, stale-branch overwrite, and rollback gaps.
 11. Verify with behavior tests, exact-head repository checks, Playwright when user-facing paths change, and Documentation Truth when current-state truth changes.
-12. Before merge, re-read current `main`, exact candidate head, review state, and applicable provider state.
-13. After merge, re-read resulting `main`, post-merge Documentation Truth, provider/runtime evidence, stale/superseded docs/PRs, and the next launch bottleneck.
+12. Classify the completed pattern as `ONE-OFF` or a possible `WORKFLOW CANDIDATE`; never productize an unstable workaround merely because it sounds reusable.
+13. Before merge, re-read current `main`, exact candidate head, review state, and applicable provider state.
+14. After merge, re-read resulting `main`, post-merge Documentation Truth, provider/runtime evidence, stale/superseded docs/PRs, and the next launch bottleneck.
 
 ## Implementation rule
 
@@ -91,7 +107,7 @@ The reasoning loop continues while code is being written. It is not a decorative
 For material implementation, maintain:
 
 ```text
-Goal → Reality → ULTRATHINK → Product Design + Data Analytics → Redteam I → Lindy → L99 → OODA → Hormozi → Bill Gates → Elon Musk → Implement → Proof → Redteam II → Documentation Truth → Rollback → Next gate
+Goal → Reality → ULTRATHINK → Product Design + Data Analytics → Redteam I → Lindy → L99 → OODA → Hormozi → Bill Gates → Elon Musk → Implement → Proof → Redteam II → Documentation Truth → Rollback → Productize-or-bound → Next gate
 ```
 
 Compilation, unit tests, CI, Documentation Truth, provider readback, deployment, runtime, publication, analytics, and human outcomes are separate evidence layers. Never convert one into a claim about all the others.
@@ -278,7 +294,8 @@ Never commit, log, expose, or publish secret values. Secret-name presence proves
 - Do not invent demand, scarcity, customer statements, eligibility, savings, performance, inventory, delivery, authority, review state, publication, or provider success.
 - Merge only under `docs/FOUNDER_MERGE_AUTHORITY.md` and the current exact-head/review/provider gates.
 - Do not deploy, roll back, alter auth/RLS, contact external parties, publish, change commercial terms, spend funds, mutate provider bindings/rulesets, or perform destructive writes without separate exact authority.
-- Repository-specific skills never replace local product, privacy, verification, sales, brand/IP, Supabase, Product Design, temporal truth, Documentation Truth, or rollback contracts.
+- Repository-specific skills never replace local product, privacy, verification, sales, brand/IP, Supabase, Product Design, temporal truth, Documentation Truth, productization, or rollback contracts.
+- Do not expose founder-internal command/Council machinery as a requirement for ordinary product users.
 
 ## Figma build and implementation
 
@@ -288,7 +305,7 @@ Figma is a founder specification/review surface. It cannot create mission truth,
 
 ## Evidence report
 
-List goal, reality, ULTRATHINK decomposition, Product Design state, Data Analytics/truth state, premise risk, Lindy choice, L99 boundaries, OODA decision, Hormozi value pass, Bill Gates bottleneck/leverage, Elon Musk requirement/deletion/simplification/feedback/automation findings, selected-plan Redteam, files changed, behavior changed, checks run, Playwright result/inapplicability, Documentation Truth, security/provider/Supabase impact, commercial assumptions, rollback, truth age/superseded state, unresolved risk, and next gate.
+List goal, reality, ULTRATHINK decomposition, Product Design state, Data Analytics/truth state, premise risk, Lindy choice, L99 boundaries, OODA decision, Hormozi value pass, Bill Gates bottleneck/leverage, Elon Musk requirement/deletion/simplification/feedback/automation findings, selected-plan Redteam, files changed, behavior changed, checks run, Playwright result/inapplicability, Documentation Truth, security/provider/Supabase impact, commercial assumptions, rollback, truth age/superseded state, unresolved risk, `ONE-OFF` vs `WORKFLOW CANDIDATE`, FCR handoff state when applicable, and next gate.
 
 ## Fact-check and portable founder approvals
 
