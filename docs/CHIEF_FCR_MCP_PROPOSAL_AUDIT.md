@@ -15,11 +15,11 @@ two new MCP servers, starting read-only, adding writes later behind a confirmati
 
 ## Current status correction — 2026-09-25
 
-The stale-pin finding below is **HISTORICAL / RESOLVED**. Current FCR `main@d6897f12ca7c359943a56608a724c7fb7cca7d43` pins Chief at `2acf9d527afaa1b43d00e08a85cf7c9e9d48b5a3`, and the focused adapter test asserts the same head. The original evidence remains below as audit history; it must not be used as an instruction to restore `2fd4fda0…` or any predecessor pin. This correction proves repository state only, not deployed MCP reachability or runtime identity.
+The stale-pin finding below is **HISTORICAL / RESOLVED**. The inspected FCR candidate, reconciled against base `main@d6897f12ca7c359943a56608a724c7fb7cca7d43`, pins Chief at `2acf9d527afaa1b43d00e08a85cf7c9e9d48b5a3`, and the focused adapter test asserts the same head. The authoritative current binding lives in `src/founder-os-lab/projectAdapters.ts` and its focused test; do not infer it from this dated audit. The original evidence remains below as audit history and must not be used as an instruction to restore `2fd4fda0…` or any predecessor pin. This correction proves inspected repository state only, not deployed MCP reachability or runtime identity.
 
 **Verdict: do not implement as written.** Both repositories are already MCP servers. The proposal's
 recommended end-state architecture is, in its essentials, what already exists — and the parts it
-would add would weaken controls that are currently stronger. Four gaps it did not mention are preserved in [Gaps worth fixing](#gaps-worth-fixing). The stale-pin gap was subsequently resolved; the remaining items are historical audit findings unless independently reverified against current heads.
+would add would weaken controls that are currently stronger. Four gaps it did not mention are preserved in [Gaps worth fixing](#gaps-worth-fixing). All four are now historical/resolved at the inspected candidate; the record below is retained as audit history and must not be treated as a current task list.
 
 ## Both systems already serve MCP
 
@@ -163,7 +163,9 @@ and the reason is SHA drift rather than any change in substance. This is precise
 
 The original repair target was `2fd4fda0cab12e52ab5096e723884d98bcfe7d10`. That instruction is now **SUPERSEDED**. Current FCR `main` binds the adapter and its focused test to Chief `2acf9d527afaa1b43d00e08a85cf7c9e9d48b5a3`; do not restore the historical target. Any future pin movement still requires exact-head contract review and successor proof.
 
-### 2. The pair-contract CI is path-gated and cannot catch that drift
+### 2. HISTORICAL / RESOLVED — the pair-contract CI path gate omitted the adapter
+
+Resolution at the inspected candidate: `src/founder-os-lab/projectAdapters.ts` is included in the pair-contract workflow trigger paths. The following describes the original finding.
 
 `.github/workflows/founder-chief-pair-contract.yml` does run the real cross-repository check: it
 resolves Chief's SHA, checks Chief out, asserts the exact checkout, and runs with
@@ -175,7 +177,9 @@ is not among them**. The file holding the audited head and contract-blob pins is
 set, so neither Chief moving nor an edit to the pin itself produces any CI signal. Gap 1 went
 unnoticed for exactly this reason. Adding that path to the workflow closes it.
 
-### 3. `/mcp/read` is configured by two environment variables documented nowhere
+### 3. HISTORICAL / RESOLVED — `/mcp/read` variables were undocumented
+
+Resolution at the inspected candidate: `FCR_REMOTE_MCP_READ_TOKEN` and `FCR_REMOTE_MCP_READ_PROJECTS` are documented in `.env.example` and `docs/MCP_STACK.md`. The following describes the original finding.
 
 `FCR_REMOTE_MCP_READ_TOKEN` and `FCR_REMOTE_MCP_READ_PROJECTS` appear in exactly two files at FCR's
 head — the implementation and its test. They are absent from `.env.example` (which *does* document
@@ -184,7 +188,9 @@ from `README.md`, and from `wrangler.worker.toml`. Without both set the handler 
 permanently. Correct fail-closed behavior; but no operator can discover from documentation how to
 open it.
 
-### 4. No `verify:*` contract covers either repository's served MCP surface
+### 4. HISTORICAL / RESOLVED — served MCP lacked a verification contract
+
+Resolution at the inspected candidate: `verify:mcp` covers the served-MCP contract, including auth, tool annotations, and fail-closed behavior. The following describes the original finding.
 
 `npm run verify:mcp` in **both** repositories validates only the outbound `.mcp.json` client config.
 Nothing verifies that FCR's three inbound endpoints or Chief's ProofMode endpoint keep their auth
@@ -201,12 +207,9 @@ that FCR serves MCP endpoints at all.
 ## What to do instead
 
 1. **Preserve the resolved Chief pin.** Current FCR `main` and its focused adapter test agree on Chief `2acf9d52…`. Treat the former `2fd4fda0…` refresh instruction as historical, and require fresh exact-head contract review before any later movement.
-2. **Add `src/founder-os-lab/projectAdapters.ts`** to the pair-contract workflow's trigger paths so
-   the next drift is caught by CI rather than by an audit.
-3. **Document `FCR_REMOTE_MCP_READ_TOKEN` and `FCR_REMOTE_MCP_READ_PROJECTS`** in `.env.example` and
-   `docs/MCP_STACK.md`, and give `/mcp/read` a doc alongside its two documented siblings.
-4. **Add a served-MCP verification contract** in each repository, pinning auth, tool annotations, and
-   fail-closed behavior, wired into CI like their peers.
+2. **RESOLVED at the inspected candidate:** `src/founder-os-lab/projectAdapters.ts` is in the pair-contract workflow trigger paths.
+3. **RESOLVED at the inspected candidate:** `FCR_REMOTE_MCP_READ_TOKEN`, `FCR_REMOTE_MCP_READ_PROJECTS`, and `/mcp/read` are documented in `.env.example` and `docs/MCP_STACK.md`.
+4. **RESOLVED at the inspected candidate:** `verify:mcp` covers the served-MCP contract, including auth, tool annotations, and fail-closed behavior.
 5. **Adopt Chief's protocol-version negotiation** in FCR's three endpoints.
 6. **Extend `/mcp/read`'s tool surface** rather than standing up new servers, if more read capability
    is the real need — routing, scoping, evidence, and refusal logic already exist.
