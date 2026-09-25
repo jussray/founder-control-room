@@ -361,3 +361,9 @@ The StoryEngine SHA pinned by the Playwright workflow is an exact evidence ident
 `src/providers/SecurityPreservingGitHubProvider.ts` now treats the exact branch head as a build precondition rather than assuming that any current head is safe to extend. It classifies exact-head verification as `VERIFIED_CLEAN`, `KNOWN_BAD`, or `UNVERIFIED` from current verification signals. Forward patching is allowed only from `VERIFIED_CLEAN`.
 
 When the exact head is `KNOWN_BAD`, the next repository write must be an explicit repair bound to that exact failed head by the `repair-base:<exact-head-sha>` message prefix. A stale repair marker, a repair marker on an unverified/clean head, or ordinary feature work on a known-bad head must fail closed. This repair escape hatch is narrow: it permits the corrective patch only and grants no merge, deploy, publication, provider, or founder authority. After the repair moves the head, exact-head verification must establish the successor as clean before normal forward building resumes.
+
+## Current CI repair truth
+
+A StoryEngine peer-pin refresh is a truth transition, not merely a workflow-line change. The repair must refresh the README, truth-decay audit, and structured documentation receipt in the same exact-head range, and the successor remains non-authorizing until its own CI and Playwright witness pass.
+
+The AI Failure Repair workflow stores its bounded evidence under `.repair/`, a hidden directory. Every `actions/upload-artifact` step that uploads that evidence must explicitly include hidden files; otherwise the upload can fail even when evidence capture succeeded. Artifact transport is part of repair evidence integrity and does not grant merge, deploy, publication, provider, or production authority.
