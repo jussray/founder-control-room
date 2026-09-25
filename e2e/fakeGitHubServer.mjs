@@ -39,7 +39,19 @@ export function createFakeGitHubServer() {
     commits.set(rootCommit, { treeSha: rootTreeSha, parents: [] });
     branches.set(defaultBranch, { sha: rootCommit, treeSha: rootTreeSha });
 
-    const state = { owner, repo, defaultBranch, trees, commits, branches, blobs, rootTreeSha };
+    const verificationByCommit = new Map([
+      [rootCommit, [{
+        id: 1,
+        name: 'E2E verified clean base',
+        status: 'completed',
+        conclusion: 'success',
+        head_sha: rootCommit,
+        app: { id: 1, slug: 'e2e-provider' },
+        started_at: '2026-01-01T00:00:00Z',
+        completed_at: '2026-01-01T00:00:01Z',
+      }]],
+    ]);
+    const state = { owner, repo, defaultBranch, trees, commits, branches, blobs, rootTreeSha, verificationByCommit };
     repos.set(`${owner}/${repo}`, state);
     return state;
   }
@@ -60,6 +72,31 @@ export function createFakeGitHubServer() {
     const branch = req.repoState.branches.get(req.params.branch);
     if (!branch) return res.status(404).json({ message: 'Branch not found' });
     res.json({ commit: { sha: branch.sha, commit: { tree: { sha: branch.treeSha } } } });
+  });
+
+  app.get('/repos/:owner/:repo/commits/:ref', requireRepo, (req, res) => {
+    const { branches, commits } = req.repoState;
+    const branch = branches.get(req.params.ref);
+    const commitSha = branch?.sha ?? req.params.ref;
+    const commit = commits.get(commitSha);
+    if (!commit) return res.status(404).json({ message: 'Commit not found' });
+    res.json({
+      sha: commitSha,
+      commit: {
+        author: { date: '2026-01-01T00:00:00Z' },
+        committer: { date: '2026-01-01T00:00:00Z' },
+        tree: { sha: commit.treeSha },
+      },
+    });
+  });
+
+  app.get('/repos/:owner/:repo/commits/:ref/check-runs', requireRepo, (req, res) => {
+    const { branches, commits, verificationByCommit } = req.repoState;
+    const branch = branches.get(req.params.ref);
+    const commitSha = branch?.sha ?? req.params.ref;
+    if (!commits.has(commitSha)) return res.status(404).json({ message: 'Commit not found' });
+    const checkRuns = verificationByCommit.get(commitSha) ?? [];
+    res.json({ total_count: checkRuns.length, check_runs: checkRuns });
   });
 
   function getContents(req, res) {
