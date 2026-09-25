@@ -6,7 +6,7 @@ import {
   createFounderMissionSuccessor,
   evaluateFounderMissionClearance,
   founderMissionFingerprint,
-  isRegisteredActionId,
+  isActionIdSyntaxValid,
   type FounderMissionEnvelope,
   validateFounderMissionEnvelope,
 } from '../founderMissionControl.js';
@@ -105,6 +105,36 @@ describe('founder mission control', () => {
     );
   });
 
+  it('rejects malformed enum state at the external mission boundary', () => {
+    const malformed = baseEnvelope() as unknown as {
+      requiredProofLevel: string;
+      currentProofLevel: string;
+      proofState: string;
+      taskState: string;
+      artifacts: Array<{
+        status: string;
+        requiredProofLevel: string;
+        approvalGate: string;
+      }>;
+    };
+    malformed.requiredProofLevel = 'source-green';
+    malformed.currentProofLevel = 'looks-current';
+    malformed.proofState = 'approved';
+    malformed.taskState = 'done';
+    malformed.artifacts[0].status = 'done';
+    malformed.artifacts[0].requiredProofLevel = 'looks-good';
+    malformed.artifacts[0].approvalGate = 'model';
+
+    const result = validateFounderMissionEnvelope(malformed as unknown as FounderMissionEnvelope);
+    expect(result.errors).toContain('requiredProofLevel is invalid');
+    expect(result.errors).toContain('currentProofLevel is invalid');
+    expect(result.errors).toContain('proofState is invalid');
+    expect(result.errors).toContain('taskState is invalid');
+    expect(result.errors).toContain('artifact mission-brief status is invalid');
+    expect(result.errors).toContain('artifact mission-brief requiredProofLevel is invalid');
+    expect(result.errors).toContain('artifact mission-brief approvalGate is invalid');
+  });
+
   it('creates append-only successor lineage without changing mission identity', () => {
     const prior = baseEnvelope();
     const priorFingerprint = founderMissionFingerprint(prior);
@@ -126,11 +156,11 @@ describe('founder mission control', () => {
     );
   });
 
-  it('accepts only registered action identifiers rather than free-form command text', () => {
-    expect(isRegisteredActionId('verify:frontend')).toBe(true);
-    expect(isRegisteredActionId('recover-system')).toBe(true);
-    expect(isRegisteredActionId('npm run verify:frontend')).toBe(false);
-    expect(isRegisteredActionId('verify; rm -rf /')).toBe(false);
-    expect(isRegisteredActionId('')).toBe(false);
+  it('accepts only bounded action-ID syntax and leaves registry membership to execution policy', () => {
+    expect(isActionIdSyntaxValid('verify:frontend')).toBe(true);
+    expect(isActionIdSyntaxValid('recover-system')).toBe(true);
+    expect(isActionIdSyntaxValid('npm run verify:frontend')).toBe(false);
+    expect(isActionIdSyntaxValid('verify; rm -rf /')).toBe(false);
+    expect(isActionIdSyntaxValid('')).toBe(false);
   });
 });
