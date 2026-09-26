@@ -103,6 +103,28 @@ describe('growth opportunity intelligence', () => {
     ]);
   });
 
+  it('never regresses active funnel progress when later verified evidence is weaker', () => {
+    const qualified = evaluateGrowthOpportunity(input({
+      lead: lead({ stage: 'qualified' }),
+      evidence: [evidence('reply', 'gmail://thread/qualified#reply')],
+    }));
+    expect(qualified.recommendedStage).toBe('qualified');
+    expect(qualified.nextGate).toBe('prepare_evidence_bound_founder_draft');
+
+    const nurture = evaluateGrowthOpportunity(input({
+      lead: lead({ stage: 'nurture' }),
+      evidence: [],
+    }));
+    expect(nurture.recommendedStage).toBe('nurture');
+
+    const booked = evaluateGrowthOpportunity(input({
+      lead: lead({ stage: 'booked' }),
+      evidence: [evidence('price_interest', 'inbox://conversation/booked#price')],
+    }));
+    expect(booked.recommendedStage).toBe('booked');
+    expect(booked.nextGate).toBe('verify_booking_then_prepare_delivery');
+  });
+
   it('recognizes won only when collected-payment evidence is complete, not from a label alone', () => {
     const incomplete = evaluateGrowthOpportunity(input({
       lead: lead({ revenueState: 'payment_collected', actualCollectedValueCents: undefined }),
@@ -110,6 +132,13 @@ describe('growth opportunity intelligence', () => {
     }));
     expect(incomplete.priorityBand).toBe('unknown');
     expect(incomplete.recommendedStage).toBe('new');
+
+    const stageLabelOnly = evaluateGrowthOpportunity(input({
+      lead: lead({ stage: 'won', revenueState: 'conversation', actualCollectedValueCents: undefined }),
+      evidence: [],
+    }));
+    expect(stageLabelOnly.priorityBand).toBe('unknown');
+    expect(stageLabelOnly.recommendedStage).toBe('new');
 
     const collected = evaluateGrowthOpportunity(input({
       lead: lead({ revenueState: 'payment_collected', actualCollectedValueCents: 24900 }),
