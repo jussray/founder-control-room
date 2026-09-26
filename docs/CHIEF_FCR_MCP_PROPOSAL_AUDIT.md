@@ -13,9 +13,9 @@ recorded in [Proof](#proof). This audit changed no code in either repository.
 This audits an externally supplied build proposal recommending that "chief" and "fcr" be wrapped as
 two new MCP servers, starting read-only, adding writes later behind a confirmation step.
 
-## Current status correction — 2026-09-25
+## Current status correction — 2026-09-26
 
-The stale-pin finding below is **HISTORICAL / RESOLVED**. The inspected FCR candidate, reconciled against base `main@d6897f12ca7c359943a56608a724c7fb7cca7d43`, pins Chief at `2acf9d527afaa1b43d00e08a85cf7c9e9d48b5a3`, and the focused adapter test asserts the same head. The authoritative current binding lives in `src/founder-os-lab/projectAdapters.ts` and its focused test; do not infer it from this dated audit. The original evidence remains below as audit history and must not be used as an instruction to restore `2fd4fda0…` or any predecessor pin. This correction proves inspected repository state only, not deployed MCP reachability or runtime identity.
+The stale-pin finding below is **HISTORICAL / RESOLVED**. The inspected FCR candidate, reconciled against base `main@4031a2719498fabc0ff96374f4bb3675861cb817`, pins Chief at `3632192b0e8ebd5b53a7ef4cdc500947155c5064`, and the focused adapter test asserts the same head. The authoritative current binding lives in `src/founder-os-lab/projectAdapters.ts` and its focused test; do not infer it from this dated audit. The original evidence remains below as audit history and must not be used as an instruction to restore `2fd4fda0…` or any predecessor pin. This correction proves inspected repository state only, not deployed MCP reachability or runtime identity.
 
 **Verdict: do not implement as written.** Both repositories are already MCP servers. The proposal's
 recommended end-state architecture is, in its essentials, what already exists — and the parts it
@@ -161,7 +161,7 @@ fail — but the practical result is that the Chief AI adapter does not function
 and the reason is SHA drift rather than any change in substance. This is precisely the distinction
 `CLAUDE.md` draws when it says a hash proves identity, not continued reality.
 
-The original repair target was `2fd4fda0cab12e52ab5096e723884d98bcfe7d10`. That instruction is now **SUPERSEDED**. The inspected FCR candidate binds the adapter and its focused test to Chief `2acf9d527afaa1b43d00e08a85cf7c9e9d48b5a3`; consult `src/founder-os-lab/projectAdapters.ts` and its focused test for the authoritative current binding, and do not restore the historical target. Any future pin movement still requires exact-head contract review and successor proof.
+The original repair target was `2fd4fda0cab12e52ab5096e723884d98bcfe7d10`. That instruction is now **SUPERSEDED**. The inspected FCR candidate binds the adapter and its focused test to Chief `3632192b0e8ebd5b53a7ef4cdc500947155c5064`; consult `src/founder-os-lab/projectAdapters.ts` and its focused test for the authoritative current binding, and do not restore the historical target. Any future pin movement still requires exact-head contract review and successor proof.
 
 ### 2. HISTORICAL / RESOLVED — the pair-contract CI path gate omitted the adapter
 
