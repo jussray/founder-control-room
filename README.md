@@ -378,3 +378,6 @@ The AI Failure Repair workflow stores its bounded evidence under `.repair/`, a h
 ### Exact-head adapter and documentation-receipt freshness
 
 Project-adapter freshness is fail-closed on exact repository identity: unchanged contract blobs cannot make an adapter pinned to a predecessor SHA current. A moved source head requires semantic review and a coordinated audited-head/manifest refresh before the adapter can return fresh. Documentation Truth also requires each truth-sensitive path to gain a new or changed path-bound invariant inside the reviewed base-to-head range; a claim inherited unchanged from the base receipt cannot certify a later source change.
+
+
+The audited Se’kret Bip and Chief adapter heads are updated only after live GitHub readback confirms that every required contract blob is byte-identical at the successor head. This binds strict request validation to the same head used by freshness CI without claiming unrelated repository changes, provider deployment, runtime behavior, or merge authority.
