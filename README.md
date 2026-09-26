@@ -366,4 +366,6 @@ When the exact head is `KNOWN_BAD`, the next repository write must be an explici
 
 A StoryEngine peer-pin refresh is a truth transition, not merely a workflow-line change. The repair must refresh the README, truth-decay audit, and structured documentation receipt in the same exact-head range, and the successor remains non-authorizing until its own CI and Playwright witness pass.
 
+An exact StoryEngine ref/pin match renews only the peer-identity prerequisite; a cancelled, skipped, or non-executed exact-head Playwright run leaves successor federation truth `UNKNOWN` until a successful witness completes.
+
 The AI Failure Repair workflow stores its bounded evidence under `.repair/`, a hidden directory. Every `actions/upload-artifact` step that uploads that evidence must explicitly include hidden files; otherwise the upload can fail even when evidence capture succeeded. Artifact transport is part of repair evidence integrity and does not grant merge, deploy, publication, provider, or production authority.

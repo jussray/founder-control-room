@@ -430,6 +430,7 @@ The Truth Lease, production-specific lease composer, temporal founder-content gu
 
 A StoryEngine peer SHA in `.github/workflows/playwright.yml` is bounded evidence identity. When StoryEngine or Founder Control Room advances, predecessor browser-federation receipts become historical immediately; matching the live ref to a refreshed pin is setup evidence only, and the successor state remains UNKNOWN until the complete exact-head runtime and Playwright witness succeeds.
 
+An exact ref/pin match renews only the identity prerequisite. It does not renew the browser receipt, and a cancelled, skipped, or non-executed Playwright run leaves the successor federation claim `UNKNOWN`.
 
 ## 2026-09-25 CI repair evidence transport
 
