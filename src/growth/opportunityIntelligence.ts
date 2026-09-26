@@ -1,5 +1,10 @@
 import { createHash } from 'node:crypto';
-import type { LeadRecord, LeadStage } from '../types/growthInbox.js';
+import {
+  isCollectedRevenue,
+  type LeadRecord,
+  type LeadStage,
+  type RevenueState,
+} from '../types/growthInbox.js';
 
 export const GROWTH_OPPORTUNITY_INTELLIGENCE_CONTRACT =
   'fcr/growth-opportunity-intelligence@v1' as const;
@@ -122,6 +127,33 @@ const EVIDENCE_STATES = new Set<OpportunityEvidenceState>([
   'expired',
 ]);
 
+const LEAD_STAGES = new Set<LeadStage>([
+  'new',
+  'engaged',
+  'qualified',
+  'nurture',
+  'high_intent',
+  'booked',
+  'won',
+  'lost',
+  'do_not_contact',
+]);
+
+const REVENUE_STATES = new Set<RevenueState>([
+  'attention',
+  'permission',
+  'conversation',
+  'qualified',
+  'booked',
+  'invoiced',
+  'pledged',
+  'payment_collected',
+  'refunded',
+  'charged_back',
+  'retained',
+  'referred',
+]);
+
 const SIGNAL_WEIGHTS: Readonly<Record<OpportunitySignal, number>> = Object.freeze({
   expressed_need: 20,
   fit_question: 15,
@@ -139,9 +171,16 @@ const SIGNAL_WEIGHTS: Readonly<Record<OpportunitySignal, number>> = Object.freez
 
 const SHA256 = /^[0-9a-f]{64}$/i;
 const SAFE_REFERENCE = /^[A-Za-z0-9][A-Za-z0-9._:/#?=&-]{2,255}$/;
+const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{1,127}$/;
 
 function text(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
+}
+
+function record(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
 }
 
 function assertExactTimestamp(label: string, value: unknown): string {
@@ -167,12 +206,42 @@ function uniqueSorted(values: readonly string[]): string[] {
   return [...new Set(values)].sort((a, b) => a.localeCompare(b));
 }
 
+function validateLead(value: unknown): LeadRecord {
+  const raw = record(value);
+  if (!raw) throw new Error('lead is required');
+
+  const projectId = text(raw.projectId);
+  if (!projectId) throw new Error('lead.projectId is required');
+  if (!LEAD_STAGES.has(raw.stage as LeadStage)) throw new Error('lead.stage is unsupported');
+  if (!REVENUE_STATES.has(raw.revenueState as RevenueState)) {
+    throw new Error('lead.revenueState is unsupported');
+  }
+  assertExactTimestamp('lead.lastStageChangeAt', raw.lastStageChangeAt);
+
+  if (
+    raw.actualCollectedValueCents !== undefined
+    && (
+      typeof raw.actualCollectedValueCents !== 'number'
+      || !Number.isFinite(raw.actualCollectedValueCents)
+      || raw.actualCollectedValueCents < 0
+    )
+  ) {
+    throw new Error('lead.actualCollectedValueCents must be a non-negative finite number when provided');
+  }
+
+  if (!Array.isArray(raw.qualificationEvidence)) {
+    throw new Error('lead.qualificationEvidence must be an array');
+  }
+
+  return raw as unknown as LeadRecord;
+}
+
 function recommendedStage(
   lead: LeadRecord,
   verifiedSignals: ReadonlySet<OpportunitySignal>,
 ): LeadStage {
   if (lead.stage === 'do_not_contact') return 'do_not_contact';
-  if (lead.revenueState === 'payment_collected') return 'won';
+  if (isCollectedRevenue(lead)) return 'won';
   if (verifiedSignals.has('booking_action')) return 'booked';
   if (
     verifiedSignals.has('purchase_action')
@@ -208,10 +277,8 @@ function nextGateFor(stage: LeadStage, band: OpportunityPriorityBand): string {
   return band === 'unknown' ? 'collect_qualification_evidence' : 'observe_for_explicit_intent';
 }
 
-function learningDisposition(
-  learning: OpportunityLearningOutcome | undefined,
-): GrowthOpportunityAssessment['learning'] {
-  if (!learning || learning.state === 'unknown') {
+function learningDisposition(value: unknown): GrowthOpportunityAssessment['learning'] {
+  if (value === undefined || value === null) {
     return {
       disposition: 'hold_unknown',
       evidenceReferences: [],
@@ -219,13 +286,39 @@ function learningDisposition(
     };
   }
 
+  const learning = record(value);
+  if (!learning) throw new Error('learningOutcome must be an object when provided');
+  const state = learning.state;
+  if (state !== 'verified_success' && state !== 'verified_miss' && state !== 'unknown') {
+    throw new Error('learningOutcome.state is unsupported');
+  }
+  if (
+    learning.northStarMet !== true
+    && learning.northStarMet !== false
+    && learning.northStarMet !== null
+  ) {
+    throw new Error('learningOutcome.northStarMet must be true, false, or null');
+  }
+  if (!Array.isArray(learning.evidenceReferences)) {
+    throw new Error('learningOutcome.evidenceReferences must be an array');
+  }
+
   const refs = uniqueSorted(learning.evidenceReferences.map((reference, index) =>
     assertReference(`learningOutcome.evidenceReferences[${index}]`, reference)));
+
+  if (state === 'unknown') {
+    return {
+      disposition: 'hold_unknown',
+      evidenceReferences: refs,
+      reason: 'Outcome evidence is still unknown; no prompt or sequence promotion is allowed.',
+    };
+  }
+
   if (refs.length === 0) {
     throw new Error('verified learning outcomes require at least one evidence reference');
   }
 
-  if (learning.state === 'verified_success' && learning.northStarMet === true) {
+  if (state === 'verified_success' && learning.northStarMet === true) {
     return {
       disposition: 'promote_candidate',
       evidenceReferences: refs,
@@ -233,7 +326,7 @@ function learningDisposition(
     };
   }
 
-  if (learning.state === 'verified_miss' && learning.northStarMet === false) {
+  if (state === 'verified_miss' && learning.northStarMet === false) {
     return {
       disposition: 'revision_memory',
       evidenceReferences: refs,
@@ -251,34 +344,35 @@ function learningDisposition(
 export function evaluateGrowthOpportunity(
   input: GrowthOpportunityInput,
 ): GrowthOpportunityAssessment {
-  const projectId = text(input.lead?.projectId);
-  if (!projectId) throw new Error('lead.projectId is required');
-  const northStar = text(input.projectNorthStar);
+  const rawInput = record(input);
+  if (!rawInput) throw new Error('opportunity input is required');
+  const lead = validateLead(rawInput.lead);
+  const projectId = text(lead.projectId);
+  const northStar = text(rawInput.projectNorthStar);
   if (!northStar) throw new Error('projectNorthStar is required');
-  const evaluatedAt = assertExactTimestamp('evaluatedAt', input.evaluatedAt);
+  const evaluatedAt = assertExactTimestamp('evaluatedAt', rawInput.evaluatedAt);
   const evaluatedMs = Date.parse(evaluatedAt);
 
-  const evidence = Array.isArray(input.evidence) ? input.evidence : [];
+  const rawEvidence = rawInput.evidence;
+  if (!Array.isArray(rawEvidence)) throw new Error('evidence must be an array');
   const seenReferences = new Set<string>();
-  const normalizedEvidence = evidence.map((item, index) => {
-    const reference = assertReference(`evidence[${index}].reference`, item?.reference);
+  const normalizedEvidence = rawEvidence.map((value, index) => {
+    const item = record(value);
+    if (!item) throw new Error(`evidence[${index}] must be an object`);
+    const reference = assertReference(`evidence[${index}].reference`, item.reference);
     if (seenReferences.has(reference)) throw new Error(`duplicate evidence reference: ${reference}`);
     seenReferences.add(reference);
 
-    if (!SIGNALS.has(item?.signal)) throw new Error(`evidence[${index}].signal is unsupported`);
-    if (!EVIDENCE_STATES.has(item?.state)) throw new Error(`evidence[${index}].state is unsupported`);
-    const source = text(item?.source);
+    const signal = item.signal as OpportunitySignal;
+    const state = item.state as OpportunityEvidenceState;
+    if (!SIGNALS.has(signal)) throw new Error(`evidence[${index}].signal is unsupported`);
+    if (!EVIDENCE_STATES.has(state)) throw new Error(`evidence[${index}].state is unsupported`);
+    const source = text(item.source);
     if (!source) throw new Error(`evidence[${index}].source is required`);
-    const observedAt = assertExactTimestamp(`evidence[${index}].observedAt`, item?.observedAt);
+    const observedAt = assertExactTimestamp(`evidence[${index}].observedAt`, item.observedAt);
     if (Date.parse(observedAt) > evaluatedMs) throw new Error(`evidence[${index}] cannot be future-dated`);
 
-    return {
-      reference,
-      signal: item.signal,
-      state: item.state,
-      source,
-      observedAt,
-    };
+    return { reference, signal, state, source, observedAt };
   });
 
   const verified = normalizedEvidence.filter((item) => item.state === 'verified');
@@ -287,18 +381,17 @@ export function evaluateGrowthOpportunity(
     100,
     [...verifiedSignals].reduce((sum, signal) => sum + SIGNAL_WEIGHTS[signal], 0),
   );
-  const stage = recommendedStage(input.lead, verifiedSignals);
+  const stage = recommendedStage(lead, verifiedSignals);
 
   let priorityBand: OpportunityPriorityBand;
   if (stage === 'do_not_contact') priorityBand = 'blocked';
-  else if (input.lead.revenueState === 'payment_collected') priorityBand = 'won';
+  else if (isCollectedRevenue(lead)) priorityBand = 'won';
   else if (verifiedSignals.size === 0) priorityBand = 'unknown';
   else if (score >= 50) priorityBand = 'hot';
   else if (score >= 25) priorityBand = 'warm';
   else priorityBand = 'cool';
 
-  const reasons = uniqueSorted(verified.map((item) =>
-    `${item.signal}:${item.reference}`));
+  const reasons = uniqueSorted(verified.map((item) => `${item.signal}:${item.reference}`));
   const unknowns = uniqueSorted(normalizedEvidence
     .filter((item) => item.state !== 'verified')
     .map((item) => `${item.state}:${item.signal}:${item.reference}`));
@@ -313,8 +406,10 @@ export function evaluateGrowthOpportunity(
     }))
     .sort((a, b) => a.reference.localeCompare(b.reference))));
 
-  const offerId = text(input.offerId) || null;
-  const predecessorFingerprint = text(input.predecessorFingerprint) || null;
+  const offerIdRaw = text(rawInput.offerId);
+  if (offerIdRaw && !SAFE_ID.test(offerIdRaw)) throw new Error('offerId is malformed');
+  const offerId = offerIdRaw || null;
+  const predecessorFingerprint = text(rawInput.predecessorFingerprint) || null;
   if (predecessorFingerprint && !SHA256.test(predecessorFingerprint)) {
     throw new Error('predecessorFingerprint must be sha256 when provided');
   }
@@ -322,24 +417,24 @@ export function evaluateGrowthOpportunity(
   const fingerprint = sha256(JSON.stringify({
     contract: GROWTH_OPPORTUNITY_INTELLIGENCE_CONTRACT,
     projectId,
-    contactId: text(input.lead.contactId) || null,
-    stage: input.lead.stage,
-    revenueState: input.lead.revenueState,
-    actualCollectedValueCents: input.lead.actualCollectedValueCents ?? null,
-    expressedNeed: text(input.lead.expressedNeed) || null,
-    productOrOffer: text(input.lead.productOrOffer) || null,
-    sourceCampaign: text(input.lead.sourceCampaign) || null,
+    contactId: text(lead.contactId) || null,
+    stage: lead.stage,
+    revenueState: lead.revenueState,
+    actualCollectedValueCents: lead.actualCollectedValueCents ?? null,
+    expressedNeed: text(lead.expressedNeed) || null,
+    productOrOffer: text(lead.productOrOffer) || null,
+    sourceCampaign: text(lead.sourceCampaign) || null,
     offerId,
     projectNorthStar: northStar,
     evidenceDigest,
   }));
 
-  const learning = learningDisposition(input.learningOutcome);
+  const learning = learningDisposition(rawInput.learningOutcome);
 
   return {
     contract: GROWTH_OPPORTUNITY_INTELLIGENCE_CONTRACT,
     projectId,
-    contactId: text(input.lead.contactId) || null,
+    contactId: text(lead.contactId) || null,
     offerId,
     score,
     priorityBand,
@@ -348,9 +443,9 @@ export function evaluateGrowthOpportunity(
     unknowns,
     nextGate: nextGateFor(stage, priorityBand),
     personalizationContext: {
-      expressedNeed: text(input.lead.expressedNeed) || null,
-      productOrOffer: text(input.lead.productOrOffer) || null,
-      sourceCampaign: text(input.lead.sourceCampaign) || null,
+      expressedNeed: text(lead.expressedNeed) || null,
+      productOrOffer: text(lead.productOrOffer) || null,
+      sourceCampaign: text(lead.sourceCampaign) || null,
       verifiedSignals: [...verifiedSignals].sort((a, b) => a.localeCompare(b)),
       evidenceReferences: uniqueSorted(verified.map((item) => item.reference)),
     },
