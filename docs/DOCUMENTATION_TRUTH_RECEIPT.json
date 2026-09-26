@@ -281,6 +281,12 @@
         "`scripts/verify-documentation-truth.mjs` must compare the base receipt with the candidate receipt and reject a truth-sensitive path unless the reviewed range adds or changes a meaningful path-bound invariant for that exact source path.",
         "`scripts/verify-documentation-truth.mjs` must normalize receipt-claim casing, punctuation, and whitespace before testing reviewed-range novelty so cosmetic rewrites cannot satisfy the new-or-changed invariant gate."
       ]
+    },
+    {
+      "path": "src/founder-os-lab/projectAdapterFreshness.ts",
+      "claims": [
+        "`src/founder-os-lab/projectAdapterFreshness.ts` must remain evidence-authority truth-sensitive so a later change to exact-head freshness semantics requires substantive documentation and a new or changed path-bound receipt invariant."
+      ]
     }
   ]
 }
