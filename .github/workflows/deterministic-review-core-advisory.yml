@@ -149,14 +149,16 @@ jobs:
           pr_json="$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}")"
           state="$(jq -r '.state' <<< "$pr_json")"
           base_ref="$(jq -r '.base.ref' <<< "$pr_json")"
-          base_sha="$(jq -r '.base.sha' <<< "$pr_json")"
+          pr_base_snapshot_sha="$(jq -r '.base.sha' <<< "$pr_json")"
+          base_sha="$current_main"
           head_sha="$(jq -r '.head.sha' <<< "$pr_json")"
 
-          printf 'pr=%s\nstate=%s\nbase_ref=%s\nbase_sha=%s\nhead_sha=%s\n' \
-            "$PR_NUMBER" "$state" "$base_ref" "$base_sha" "$head_sha"
+          printf 'pr=%s\nstate=%s\nbase_ref=%s\npr_base_snapshot_sha=%s\nlive_base_sha=%s\nhead_sha=%s\n' \
+            "$PR_NUMBER" "$state" "$base_ref" "$pr_base_snapshot_sha" "$base_sha" "$head_sha"
 
           test "$state" = 'open'
           test "$base_ref" = 'main'
+          [[ "$pr_base_snapshot_sha" =~ ^[0-9a-f]{40}$ ]]
           test "$base_sha" = "$EXPECTED_MAIN_SHA"
           [[ "$head_sha" =~ ^[0-9a-f]{40}$ ]]
 
@@ -328,7 +330,7 @@ jobs:
           main_sha = parts[1]
           approval = parts[2]
           if not re.fullmatch(r'[0-9a-f]{40}', main_sha):
-              raise SystemExit('Current main SHA must be a lowercase 40-character commit SHA.')
+              raise SystemExit('Current main SHA must be a lowercase full commit SHA.')
           if not re.fullmatch(r'[A-Za-z0-9._:-]{8,200}', approval):
               raise SystemExit('Approval reference must use 8-200 auditable characters: A-Z a-z 0-9 . _ : -')
 
