@@ -112,6 +112,27 @@ export const EXTERNAL_PROJECTS: readonly PortfolioProject[] = [
     status: "external",
     capabilities: ["product", "continuity"],
   },
+  {
+    slug: "truth-compass",
+    name: "Truth Compass",
+    repository: "jussray/truth-compass",
+    status: "external",
+    capabilities: ["truth-analysis", "evidence", "continuity"],
+  },
+  {
+    slug: "truth-weaver",
+    name: "Truth Weaver",
+    repository: "jussray/truth-weaver",
+    status: "external",
+    capabilities: ["decision-control", "evidence", "continuity"],
+  },
+  {
+    slug: "alexa-commerce-engine",
+    name: "Alexa Commerce Engine",
+    repository: "jussray/alexa-commerce-engine-",
+    status: "external",
+    capabilities: ["commerce-agent", "continuity"],
+  },
 ] as const;
 
 export const QUARANTINED_REPOSITORIES = new Set([
@@ -138,27 +159,6 @@ export const CONTINUITY_ONLY_PROJECTS: readonly PortfolioProject[] = [
     repository: "jussray/Bip-Jr",
     status: "continuity-only",
     capabilities: ["bip-universe", "continuity"],
-  },
-  {
-    slug: "truth-compass",
-    name: "Truth Compass",
-    repository: "jussray/truth-compass",
-    status: "continuity-only",
-    capabilities: ["truth-analysis", "evidence", "continuity"],
-  },
-  {
-    slug: "truth-weaver",
-    name: "Truth Weaver",
-    repository: "jussray/truth-weaver",
-    status: "continuity-only",
-    capabilities: ["decision-control", "evidence", "continuity"],
-  },
-  {
-    slug: "alexa-commerce-engine",
-    name: "Alexa Commerce Engine",
-    repository: "jussray/alexa-commerce-engine-",
-    status: "continuity-only",
-    capabilities: ["commerce-agent", "continuity"],
   },
 ] as const;
 
