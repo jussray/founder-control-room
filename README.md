@@ -111,13 +111,15 @@ See [`docs/JIRA_AUTOMATION.md`](docs/JIRA_AUTOMATION.md).
 
 The repository contains FCR's founder-final merge policy, deterministic independent-review contract, exact-head evidence checks, provider-backed GitHub App witness rules, thread resolution, CodeQL floor, and stale-proof handling.
 
-Source policy is not live GitHub provider truth. Current rulesets, bypass actors, required checks, native review settings, and provider enforcement require fresh GitHub provider readback before a merge decision.
+For the constitutional repository `jussray/founder-control-room`, runtime `RepositoryProvider` access requires the FCR GitHub App pair `GITHUB_APP_ID` + `GITHUB_PRIVATE_KEY` and the repository-scoped installation-token path. `GITHUB_TOKEN` is not an accepted fallback for FCR itself; that bounded token fallback remains available only to non-FCR local/development GitHub repositories. GitHub App authentication proves provider identity and configured installation permissions only. It does not grant founder approval, merge approval, deploy, publication, spend, deletion, secret rotation, or permission to widen the App installation scope.
+
+Source policy is not live GitHub provider truth. Current rulesets, bypass actors, required checks, native review settings, installation identity, and provider enforcement require fresh GitHub provider readback before a merge decision.
 
 Founder self-approval is not relabeled as independent review. The canonical path keeps deterministic independent review and authenticated exact-candidate founder-final approval separate. Merge capability and merge approval are also separate: green evidence, mergeability, review requests, `merge review`, broad `approved`/`cont` language, or `merge_authority: true` cannot silently authorize integration. Before every merge, the founder must explicitly approve the exact current repository, pull request number, current base SHA, and current head SHA; if the candidate moves, approval expires and must be requested again.
 
 For Chief governance, FCR contains a **read-only trusted observation and verification boundary** pinned to `jussray/chief-ai-machine` and Chief ruleset IDs `20818149` and `21261587`. It uses the repository-scoped FCR GitHub App installation-token path rather than caller-supplied PAT/token authority, preserves required-check `integration_id` producer identity, requires complete bypass and deployment readback, and fingerprints the provider observation. Under the current founder decision, ruleset `20818149` is accepted exactly as observed when it preserves zero bypass actors, its approved source checks, `Cloudflare Production`, `proofmode-access-admin`, and the unbound reserved candidate runtime context. A compliant observation returns `NO_CHANGE_REQUIRED` with `mutation:null`; drift blocks verification rather than producing a desired-state rewrite. This boundary never grants provider mutation, merge, deploy, or execution authority.
 
-See [`docs/FOUNDER_MERGE_AUTHORITY.md`](docs/FOUNDER_MERGE_AUTHORITY.md).
+See [`docs/FOUNDER_MERGE_AUTHORITY.md`](docs/FOUNDER_MERGE_AUTHORITY.md) and [`docs/GITHUB_APP_AUTHORITY.md`](docs/GITHUB_APP_AUTHORITY.md).
 
 ### Capability authority
 
@@ -199,9 +201,9 @@ Public discovery artifacts such as `/robots.txt`, `/sitemap.xml`, `/llms.txt`, a
 
 Source dependence on that topology is not proof the live provider is configured correctly.
 
-`wrangler.worker.toml [secrets].required` is the canonical production binding-name gate for provider-held Worker secrets. A provider-backed capability such as `tinyfish-web-observation-v1` must name `TINYFISH_API_KEY` there before canonical Worker promotion; Deploy verifies only binding-name presence in Cloudflare and never copies the secret value through GitHub Actions. Source and CI readiness therefore remain distinct from live TinyFish provider/runtime activation.
+`wrangler.worker.toml [secrets].required` is the canonical startup-secret gate and must contain only bindings whose absence blocks the canonical Worker itself. Capability-specific provider-held bindings live in `config/worker-capability-secrets.json`; a missing capability binding disables only its owning capability and must fail closed at the use boundary rather than blocking unrelated Worker promotion. Canonical Deploy verifies binding-name presence only for the authority plane it is actually promoting and never copies provider-held secret values through GitHub Actions. Source declarations and CI readiness therefore remain distinct from live provider/runtime activation.
 
-The first-party FCR Shopify paid-order ingress follows the same boundary. `FCR_SHOPIFY_WEBHOOK_SECRET` and `FCR_COMMERCE_HASH_SALT` must remain provider-held required Worker secrets before promotion, while source merely declares their names. Their presence cannot prove that Shopify registered the `orders/paid` callback, that the deployed Worker serves the exact commerce head, that the production Supabase migration exists, or that any payment was collected; those claims require separate provider, deployment, database, runtime, and revenue receipts.
+The first-party FCR Shopify paid-order ingress follows the capability boundary. `FCR_SHOPIFY_WEBHOOK_SECRET` and `FCR_COMMERCE_HASH_SALT` are provider-held capability bindings for `shopify-commerce-ingress`, not global Worker startup requirements. Their absence must fail that commerce capability closed without being relabeled as a whole-Worker startup failure. Their declaration or provider-side presence cannot prove that Shopify registered the `orders/paid` callback, that the deployed Worker serves the exact commerce head, that the production Supabase migration exists, or that any payment was collected; those claims require separate provider, deployment, database, runtime, and revenue receipts.
 
 Production does not deploy merely because `main` moved or a Cloudflare build succeeded. A production claim remains incomplete until the authorized lane proves, for one exact candidate:
 
@@ -314,6 +316,7 @@ Public-safe configuration may live in `.env.example`. Secret values do not belon
 - [`docs/REPOSITORY_FEDERATION.md`](docs/REPOSITORY_FEDERATION.md) — repository and bounded product-build federation
 - [`docs/JIRA_AUTOMATION.md`](docs/JIRA_AUTOMATION.md) — Jira/n8n bounded automation and activation gate
 - [`docs/FOUNDER_MERGE_AUTHORITY.md`](docs/FOUNDER_MERGE_AUTHORITY.md) — repository integration authority
+- [`docs/GITHUB_APP_AUTHORITY.md`](docs/GITHUB_APP_AUTHORITY.md) — FCR-specific GitHub App installation-auth boundary
 - [`docs/TRUTH_DECAY_AUDIT.md`](docs/TRUTH_DECAY_AUDIT.md) — truth aging and documentation drift
 - [`docs/PUBLIC_COMMUNICATION_TRUTH_CONTRACT.md`](docs/PUBLIC_COMMUNICATION_TRUTH_CONTRACT.md) — public truth and Sauce Guard
 - [`docs/PROVIDERS.md`](docs/PROVIDERS.md) — provider handoffs
