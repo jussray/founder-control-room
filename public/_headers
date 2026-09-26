@@ -22,6 +22,11 @@
   Cache-Control: no-store
   Content-Signal: ai-train=no, search=no, ai-input=no
 
+/oauth/consent/*
+  Cache-Control: no-store
+  X-Robots-Tag: noindex, nofollow
+  Content-Signal: ai-train=no, search=no, ai-input=no
+
 /demo/*
   Cache-Control: no-store
   Content-Signal: ai-train=no, search=no, ai-input=no

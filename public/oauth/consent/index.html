@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <title>Authorize Founder Control Room</title>
+  <link rel="stylesheet" href="/oauth/consent/styles.css">
+</head>
+<body>
+  <main class="shell">
+    <section class="card" aria-labelledby="consent-title">
+      <p class="eyebrow">Founder Control Room · OAuth</p>
+      <h1 id="consent-title">Review connection</h1>
+      <p id="status" class="muted" role="status" aria-live="polite">Loading authorization request…</p>
+
+      <div id="request-details" class="details" hidden>
+        <dl>
+          <div><dt>Application</dt><dd id="client-name"></dd></div>
+          <div><dt>Signed in as</dt><dd id="user-email"></dd></div>
+          <div><dt>Redirect</dt><dd id="redirect-uri"></dd></div>
+          <div><dt>Requested scopes</dt><dd id="scope-list"></dd></div>
+        </dl>
+        <p class="boundary">Approval authorizes this OAuth connection only. It does not grant repository mutation, merge, deploy, publish, billing, or provider-mutation authority.</p>
+        <div class="actions">
+          <button id="approve" class="primary" type="button">Approve connection</button>
+          <button id="deny" class="secondary" type="button">Deny</button>
+        </div>
+      </div>
+
+      <div id="sign-in-required" class="sign-in" hidden>
+        <p>Your interactive Founder Control Room session is required before an external client can be authorized.</p>
+        <a class="primary link-button" href="/control-room/">Open Founder Control Room sign-in</a>
+        <button id="retry" class="secondary" type="button">I signed in · retry</button>
+      </div>
+
+      <p id="error" class="error" role="alert" hidden></p>
+    </section>
+  </main>
+  <script src="/oauth/consent/app.js" defer></script>
+</body>
+</html>

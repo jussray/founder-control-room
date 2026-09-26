@@ -8,6 +8,7 @@ import { respondError, respondSuccess } from '../apiResponse.js';
 import { FOUNDER_API_URL, rateLimitMagicLink } from '../middleware/security.js';
 import { requireFounder, requireInteractiveFounder, type FounderRequest } from '../middleware/requireFounder.js';
 import { founderCallbackHtml } from './onboarding.js';
+import { oauthConsentRouter } from './oauthConsent.js';
 
 export const authRouter = Router();
 const GENERIC_MAGIC_LINK_MESSAGE = 'If this email is on the founder allowlist, a secure login link has been sent.';
@@ -42,6 +43,8 @@ async function establishFounderSession(req: Request, res: Response, session: Ses
     return false;
   }
 }
+
+authRouter.use('/oauth', oauthConsentRouter);
 
 authRouter.get('/google', rateLimitFounderOAuth, async (_req, res) => {
   res.setHeader('Cache-Control', 'no-store');
