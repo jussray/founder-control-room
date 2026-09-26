@@ -1,0 +1,81 @@
+name: Governance Premerge Proof
+
+on:
+  push:
+    branches:
+      - 'governance/**'
+    paths:
+      - 'config/founder-intelligence*.json'
+      - 'scripts/verify-founder-intelligence-inheritance.mjs'
+      - 'src/config/portfolio.ts'
+      - 'src/config/portfolio.test.ts'
+      - 'src/governance/__tests__/founderChallengeStack.contract.test.ts'
+      - '.github/workflows/governance-premerge-proof.yml'
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  EXPECTED_HEAD_SHA: ${{ github.sha }}
+
+jobs:
+  governance-proof:
+    name: Exact-head governance + Playwright proof
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+
+      - name: Verify exact head
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Verify Founder Intelligence inheritance
+        run: node scripts/verify-founder-intelligence-inheritance.mjs
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Run focused governance contracts
+        run: >-
+          npx vitest run
+          src/config/portfolio.test.ts
+          src/governance/__tests__/founderChallengeStack.contract.test.ts
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Playwright browser proof
+        run: npm run test:e2e
+        env:
+          NODE_ENV: test
+
+      - name: Upload browser failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: governance-premerge-playwright-${{ github.run_id }}
+          path: |
+            playwright-report
+            test-results
+          if-no-files-found: ignore
+          retention-days: 14
