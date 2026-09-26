@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 const REQUIRED_CORE = [
   'intent', 'north-star', 'truth', 'authority', 'state', 'continuity',
   'capability-routing', 'verification', 'proof', 'rollback', 'task-accuracy', 'outcome-learning',
-] as const;
+];
 
 describe('self-sufficient architecture kernel', () => {
   it('keeps the project architecture primary and every external system removable', () => {
