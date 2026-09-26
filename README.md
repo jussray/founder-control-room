@@ -367,3 +367,9 @@ When the exact head is `KNOWN_BAD`, the next repository write must be an explici
 A StoryEngine peer-pin refresh is a truth transition, not merely a workflow-line change. The repair must refresh the README, truth-decay audit, and structured documentation receipt in the same exact-head range, and the successor remains non-authorizing until its own CI and Playwright witness pass.
 
 The AI Failure Repair workflow stores its bounded evidence under `.repair/`, a hidden directory. Every `actions/upload-artifact` step that uploads that evidence must explicitly include hidden files; otherwise the upload can fail even when evidence capture succeeded. Artifact transport is part of repair evidence integrity and does not grant merge, deploy, publication, provider, or production authority.
+
+## Manual read-only production identity witness
+
+`.github/workflows/exact-sha-production-witness.yml` is a separate manual observation lane for re-checking an already-deployed release without invoking deployment or publication machinery. It runs only from trusted `main`, requires the requested full release SHA to equal the workflow's trusted `GITHUB_SHA`, uses only `contents: read`, and reuses `e2e/production-release-sha.spec.ts` to compare the direct Worker, public proxy, and browser surface against that one identity.
+
+This witness carries no deploy, publication, Postiz/provider-write, secret, billing, or merge authority. If production does not serve the requested current-main SHA, the witness fails closed; that mismatch is evidence that the production identity is unproven or different, not permission to deploy or publish. A green witness may prove an already-deployed release identity for its observation window, but it cannot create that deployment or authorize any consequence.
