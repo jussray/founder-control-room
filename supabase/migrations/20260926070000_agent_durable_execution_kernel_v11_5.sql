@@ -1,7 +1,6 @@
 -- FCR Durable Agent Execution Kernel v11.5
--- Source-only schema with owner-only authority/execution functions. Existing
--- production executors are intentionally NOT wired to this kernel until a
--- separate activation migration binds distinct issuer, PEP, and worker identities.
+-- Source-only schema and service-role functions. Existing production executors are
+-- intentionally NOT wired to this kernel until migration/provider/runtime proof exists.
 
 create table if not exists public.agent_task_authority_state (
   task_id text primary key,
@@ -416,13 +415,14 @@ begin
 end;
 $$;
 
--- Fail closed by default. The generic Supabase service_role is deliberately
--- denied all kernel entrypoints so a compromised application service cannot
--- mint authority, fabricate permit admission, or drive the outbox directly.
--- A later activation migration must grant each function to a distinct,
--- narrowly held issuer / PEP / worker database identity after runtime proof.
-revoke execute on function public.initialize_agent_task_authority_v11_5(text, bigint) from public, anon, authenticated, service_role;
-revoke execute on function public.transition_agent_task_authority_v11_5(text, bigint, text) from public, anon, authenticated, service_role;
-revoke execute on function public.admit_agent_execution_v11_5(uuid, uuid, uuid, text, text, text, text, text, text, text, bigint, timestamptz, timestamptz, text, text, text, text, text) from public, anon, authenticated, service_role;
-revoke execute on function public.lease_agent_execution_outbox_v11_5(text, integer) from public, anon, authenticated, service_role;
-revoke execute on function public.record_agent_execution_outcome_v11_5(uuid, uuid, text, bigint, text, text) from public, anon, authenticated, service_role;
+revoke execute on function public.initialize_agent_task_authority_v11_5(text, bigint) from public, anon, authenticated;
+revoke execute on function public.transition_agent_task_authority_v11_5(text, bigint, text) from public, anon, authenticated;
+revoke execute on function public.admit_agent_execution_v11_5(uuid, uuid, uuid, text, text, text, text, text, text, text, bigint, timestamptz, timestamptz, text, text, text, text, text) from public, anon, authenticated;
+revoke execute on function public.lease_agent_execution_outbox_v11_5(text, integer) from public, anon, authenticated;
+revoke execute on function public.record_agent_execution_outcome_v11_5(uuid, uuid, text, bigint, text, text) from public, anon, authenticated;
+
+grant execute on function public.initialize_agent_task_authority_v11_5(text, bigint) to service_role;
+grant execute on function public.transition_agent_task_authority_v11_5(text, bigint, text) to service_role;
+grant execute on function public.admit_agent_execution_v11_5(uuid, uuid, uuid, text, text, text, text, text, text, text, bigint, timestamptz, timestamptz, text, text, text, text, text) to service_role;
+grant execute on function public.lease_agent_execution_outbox_v11_5(text, integer) to service_role;
+grant execute on function public.record_agent_execution_outcome_v11_5(uuid, uuid, text, bigint, text, text) to service_role;
