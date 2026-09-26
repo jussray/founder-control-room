@@ -31,6 +31,7 @@ export interface ModelExecutionProfile {
   operatorId: 'codex' | 'claude-code';
   providerId: 'openai-platform' | 'anthropic-platform';
   runtimeIdentitySource: 'observe-per-run';
+  providerIdentitySource: 'observe-per-run';
   toolAvailabilitySource: 'observe-per-run';
   truthSource: 'shared-evidence-spine';
   executionBias: readonly string[];
@@ -170,7 +171,6 @@ const SHARED_MAY_ADAPT = [
   'handoff-format',
   'verification-plan',
 ] as const;
-
 const SHARED_MAY_NOT_ADAPT = [
   'truth-state',
   'authority-state',
@@ -178,9 +178,9 @@ const SHARED_MAY_NOT_ADAPT = [
   'proof-state',
   'project-canon',
 ] as const;
-
 const SHARED_HANDOFF_FIELDS = [
   'modelProfileId',
+  'observedProvider',
   'observedRuntimeModel',
   'observedCapabilities',
   'sourceTruthRefs',
@@ -198,14 +198,10 @@ export const MODEL_EXECUTION_PROFILES: readonly ModelExecutionProfile[] = [
     operatorId: 'codex',
     providerId: 'openai-platform',
     runtimeIdentitySource: 'observe-per-run',
+    providerIdentitySource: 'observe-per-run',
     toolAvailabilitySource: 'observe-per-run',
     truthSource: 'shared-evidence-spine',
-    executionBias: [
-      'cross-system-reconciliation',
-      'tool-and-connector-orchestration',
-      'multimodal-product-analysis',
-      'founder-readable-decision-synthesis',
-    ],
+    executionBias: ['cross-system-reconciliation', 'tool-and-connector-orchestration', 'multimodal-product-analysis', 'founder-readable-decision-synthesis'],
     mayAdapt: SHARED_MAY_ADAPT,
     mayNotAdapt: SHARED_MAY_NOT_ADAPT,
     acceptsModelConsensusAsProof: false,
@@ -217,14 +213,10 @@ export const MODEL_EXECUTION_PROFILES: readonly ModelExecutionProfile[] = [
     operatorId: 'claude-code',
     providerId: 'anthropic-platform',
     runtimeIdentitySource: 'observe-per-run',
+    providerIdentitySource: 'observe-per-run',
     toolAvailabilitySource: 'observe-per-run',
     truthSource: 'shared-evidence-spine',
-    executionBias: [
-      'long-context-repository-analysis',
-      'focused-implementation',
-      'careful-refactor-planning',
-      'structured-documentation',
-    ],
+    executionBias: ['long-context-repository-analysis', 'focused-implementation', 'careful-refactor-planning', 'structured-documentation'],
     mayAdapt: SHARED_MAY_ADAPT,
     mayNotAdapt: SHARED_MAY_NOT_ADAPT,
     acceptsModelConsensusAsProof: false,
@@ -234,22 +226,18 @@ export const MODEL_EXECUTION_PROFILES: readonly ModelExecutionProfile[] = [
 ];
 
 export const AGENT_IDS: ReadonlySet<string> = new Set(AGENT_REGISTRY.map((agent) => agent.id));
-
 export function agentOperatorPolicy(agentId: string): AgentOperatorPolicy | null {
   return AGENT_REGISTRY.find((agent) => agent.id === agentId)?.operator ?? null;
 }
-
 export function agentCanOperate(agentId: string, capability: AgentOperatorCapability): boolean {
   const policy = agentOperatorPolicy(agentId);
   return Boolean(policy?.enabled && policy.capabilities.includes(capability));
 }
-
 export function modelExecutionProfile(profileId: ModelExecutionProfileId): ModelExecutionProfile {
   const profile = MODEL_EXECUTION_PROFILES.find((candidate) => candidate.id === profileId);
   if (!profile) throw new Error(`Unknown model execution profile: ${profileId}`);
   return profile;
 }
-
 export function modelExecutionProfileForOperator(operatorId: string): ModelExecutionProfile | null {
   return MODEL_EXECUTION_PROFILES.find((profile) => profile.operatorId === operatorId) ?? null;
 }
