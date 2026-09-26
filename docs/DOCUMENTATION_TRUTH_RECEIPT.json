@@ -266,6 +266,18 @@
       "claims": [
         "`src/providers/SecurityPreservingGitHubProvider.ts` must block ordinary forward patching unless the exact branch head is `VERIFIED_CLEAN`; a `KNOWN_BAD` head may accept only an explicit repair message bound to that same exact SHA, while stale repair intent and `UNVERIFIED` heads must fail closed without granting merge, deploy, publication, provider-policy, or founder authority."
       ]
+    },
+    {
+      "path": "src/founder-os-lab/projectAdapters.ts",
+      "claims": [
+        "`src/founder-os-lab/projectAdapters.ts` must bind Chief integration evidence to one audited exact Chief head; moving that head expires predecessor adapter and pair-contract proof, requires the focused assertion and path-bound documentation receipt to move together, and grants no Chief runtime, merge, deploy, publication, or provider authority."
+      ]
+    },
+    {
+      "path": "scripts/verify-documentation-truth.mjs",
+      "claims": [
+        "`scripts/verify-documentation-truth.mjs` must classify `src/founder-os-lab/projectAdapters.ts` as evidence-authority truth-sensitive so a Chief exact-head pin movement cannot pass Documentation Truth without substantive README, truth-decay audit, and structured receipt updates that name the changed path."
+      ]
     }
   ]
 }
