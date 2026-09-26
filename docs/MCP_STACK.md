@@ -1,14 +1,14 @@
 # Founder Control Room MCP stack
 
-Last reviewed: 2026-09-13
+Last reviewed: 2026-09-23
 
 This file governs which MCP servers an AI agent may use while **developing this repository**. It is different from the Control Room's own **MCP / Connector Hub** (`project_connections` + `GET /agents` + `GET /authority-levels`), which records connectors and authority for managed projects. Do not conflate the repository agent fleet with the in-app Connector Hub.
 
 The Control Room is a private, repository-agnostic governance service. Its standing repository MCP stack supports repository inspection, current implementation documentation, browser proof, design context, its own database schema, and Cloudflare provider/deployment evidence.
 
-## External governed MCP for ChatGPT, Claude, and Manus
+## External governed MCP for eligible AI clients
 
-The Control Room source defines an external connector boundary:
+The Control Room source defines an external connector boundary for eligible OAuth/static clients, including governed ChatGPT/Codex, Claude, Gemini, Muse, Perplexity, and other clients admitted by the current server policy. Client/model identity never grants mutation authority by itself.
 
 - canonical resource: `https://api.foundercontrolroom.org/mcp`;
 - protected-resource metadata: `/.well-known/oauth-protected-resource` and `/.well-known/oauth-protected-resource/mcp`;
@@ -24,7 +24,11 @@ The external tool catalog is intentionally small and deterministic:
 3. `chief_preview_capability_plan`
 4. `fcr_list_projects`
 5. `fcr_get_current_truth`
-6. `fcr_preview_skill_route`
+6. `fcr_audit_change_genealogy`
+7. `fcr_preview_skill_route`
+8. `fcr_relay_operator`
+
+`fcr_audit_change_genealogy` is read-only and project-grant bound. The caller selects a granted `projectId`; the server resolves that project's registered GitHub repository rather than trusting an arbitrary caller-supplied repository. It defaults to ten recent PRs with bounded comments/reviews and file-level diff evidence, indexes every commit identity in each PR, scans recent default-branch commits, asks GitHub for commit-to-PR associations, preserves squash/merge boundaries, and returns separate failure receipts. Raw patch bodies are not returned. The window can be narrowed or expanded only within the bounded 1–20 range. See `docs/AI_CHANGE_GENEALOGY_CONTRACT.md`.
 
 There is no external generic `invoke_read_tool`. Callers cannot choose an arbitrary nested provider, tool name, mission, approval, credential, mutation action, or project outside the intersection of the OAuth token grant and the server-held allowlist. Skill content remains private: capability results expose metadata/evidence only, never raw `SKILL.md` prompt text.
 
@@ -39,7 +43,7 @@ Source readiness is not production readiness. Before deployment, all of the foll
 - register/allow the exact client IDs for the connected external consoles (CIMD where supported; DCR only for legacy compatibility);
 - configure `FCR_REMOTE_MCP_*` and `CHIEF_AI_BASE_URL` without reusing provider/deploy credentials;
 - prove the Chief URL/binding and FCR Worker SHA, then run the Attack Ten auth/scope/replay/header/evidence/client matrix;
-- connect ChatGPT, Claude, or Manus only after provider evidence proves the resource metadata, OAuth flow, tools list, and calls from the deployed exact head.
+- connect an eligible AI client only after provider evidence proves the resource metadata, OAuth flow, tools list, and calls from the deployed exact head.
 
 The source and provider attack matrix is maintained in `docs/PAIRED_MCP_ATTACK_TEN.md`.
 
@@ -75,7 +79,7 @@ Founder Control Room also serves a separate read-only MCP gateway at `POST https
 - If either the dedicated token or server-held project scope is absent, the endpoint fails closed rather than falling back to a broader grant.
 - The secret value belongs in the surviving `founder-control-room` Worker secret store only. Do not commit it to `.env`, Wrangler config, MCP client config, issues, screenshots, logs, or proof artifacts.
 
-The operator posture is deliberately asymmetric: external consoles may read/inspect the full **active** portfolio, while mutations still require the separate Ask-Founder / Founder Permission / execution-receipt path. A read token, OAuth project claim, messenger link, fingerprint, or proof cookie grants no merge, deploy, provider, database, publication, billing, deletion, or arbitrary command authority.
+The operator posture is deliberately asymmetric: external consoles may read/inspect the full **active** portfolio, while mutations still require the separate Ask-Founder / Founder Permission / execution-receipt path. A read token, OAuth project claim, messenger link, fingerprint, proof cookie, genealogy receipt, or model vote grants no merge, deploy, provider, database, publication, billing, deletion, or arbitrary command authority.
 
 ## In-app Control Room MCP Hub boundary
 
@@ -109,6 +113,10 @@ The Control Room may inspect its own operational schema and sanitized repository
 
 ```text
 Use GitHub MCP to inspect this repository's provider boundary and report where GitHub-specific assumptions leak past RepositoryProvider. Do not change code.
+```
+
+```text
+Use the FCR genealogy audit for the granted project. Start with limit 10, include comments and diff summaries, index every PR commit, inspect recent default-branch attribution, and preserve separate failure receipts. Do not mutate the repository.
 ```
 
 ```text
