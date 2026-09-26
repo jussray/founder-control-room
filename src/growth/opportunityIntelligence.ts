@@ -169,6 +169,15 @@ const SIGNAL_WEIGHTS: Readonly<Record<OpportunitySignal, number>> = Object.freez
   verified_conversion: 30,
 });
 
+const ACTIVE_STAGE_RANK: Readonly<Partial<Record<LeadStage, number>>> = Object.freeze({
+  new: 0,
+  engaged: 1,
+  qualified: 2,
+  nurture: 3,
+  high_intent: 4,
+  booked: 5,
+});
+
 const SHA256 = /^[0-9a-f]{64}$/i;
 const SAFE_REFERENCE = /^[A-Za-z0-9][A-Za-z0-9._:/#?=&-]{2,255}$/;
 const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{1,127}$/;
@@ -236,34 +245,59 @@ function validateLead(value: unknown): LeadRecord {
   return raw as unknown as LeadRecord;
 }
 
+function preserveActiveStageProgress(current: LeadStage, inferred: LeadStage): LeadStage {
+  const currentRank = ACTIVE_STAGE_RANK[current];
+  const inferredRank = ACTIVE_STAGE_RANK[inferred];
+
+  if (
+    typeof currentRank === 'number'
+    && typeof inferredRank === 'number'
+    && currentRank > inferredRank
+  ) {
+    return current;
+  }
+
+  return inferred;
+}
+
 function recommendedStage(
   lead: LeadRecord,
   verifiedSignals: ReadonlySet<OpportunitySignal>,
 ): LeadStage {
   if (lead.stage === 'do_not_contact') return 'do_not_contact';
   if (isCollectedRevenue(lead)) return 'won';
-  if (verifiedSignals.has('booking_action')) return 'booked';
-  if (
+
+  let inferred: LeadStage;
+  if (verifiedSignals.has('booking_action')) {
+    inferred = 'booked';
+  } else if (
     verifiedSignals.has('purchase_action')
     || verifiedSignals.has('price_interest')
     || verifiedSignals.has('availability_interest')
     || verifiedSignals.has('timing_interest')
-  ) return 'high_intent';
-  if (
+  ) {
+    inferred = 'high_intent';
+  } else if (
     verifiedSignals.has('expressed_need')
     && (
       verifiedSignals.has('fit_question')
       || verifiedSignals.has('known_project_relationship')
     )
-  ) return 'qualified';
-  if (
+  ) {
+    inferred = 'qualified';
+  } else if (
     verifiedSignals.has('reply')
     || verifiedSignals.has('return_visit')
     || verifiedSignals.has('referral')
     || verifiedSignals.has('expressed_need')
     || verifiedSignals.has('fit_question')
-  ) return 'engaged';
-  return lead.stage === 'lost' ? 'lost' : 'new';
+  ) {
+    inferred = 'engaged';
+  } else {
+    inferred = lead.stage === 'lost' ? 'lost' : 'new';
+  }
+
+  return preserveActiveStageProgress(lead.stage, inferred);
 }
 
 function nextGateFor(stage: LeadStage, band: OpportunityPriorityBand): string {
