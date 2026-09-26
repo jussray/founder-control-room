@@ -94,9 +94,9 @@ The former `founder-control-room2` Worker was deleted and must not be recreated 
 | `GITHUB_TOKEN` | secret | Local/development fallback only when the GitHub App pair is absent. |
 | `FOUNDER_ALLOWED_ORIGINS` | non-secret variable | `https://foundercontrolroom.org`. |
 | `FOUNDER_API_URL` | non-secret variable | `https://foundercontrolroom.org` so auth callbacks return through Pages and are proxied to the API Worker. |
-| `FCR_SHOPIFY_WEBHOOK_SECRET` | secret | Required Shopify `orders/paid` HMAC signing secret for the FCR first-party commerce ingress. Provider-held; never log or copy its value into proof. |
-| `FCR_COMMERCE_HASH_SALT` | secret | Required independent server-only salt for privacy-safe FCR Shopify order-reference HMACs. This marker creates no Shopify authority. |
-| `TINYFISH_API_KEY` | secret | Required provider-held credential for live `tinyfish-web-observation-v1` Search/Fetch. Canonical production deploy verifies only binding-name presence before mutation; the value remains in Cloudflare and never becomes a GitHub Actions secret or proof receipt. |
+| `FCR_SHOPIFY_WEBHOOK_SECRET` | secret | Capability-required Shopify `orders/paid` HMAC signing secret for the FCR first-party commerce ingress. Provider-held; missing state disables that ingress without globally blocking the Worker. |
+| `FCR_COMMERCE_HASH_SALT` | secret | Capability-required independent server-only salt for privacy-safe FCR Shopify order-reference HMACs. Missing state disables that ingress; this marker creates no Shopify authority. |
+| `TINYFISH_API_KEY` | secret | Capability-required provider-held credential for live `tinyfish-web-observation-v1` Search/Fetch. Its name is declared in `config/worker-capability-secrets.json`; missing state disables TinyFish without globally blocking Worker promotion. |
 | `FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON` | secret | Scoped, revocable, fail-closed automation grant. |
 | `FOUNDER_SIGNAL_ENGINE_MCP_TOKEN` | secret | Dedicated MCP bearer token. This is not an OpenAI API key. |
 | `ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL` | secret | Private approved Zapier Catch Hook URL. |
@@ -118,7 +118,7 @@ Generate `FOUNDER_SESSION_ENCRYPTION_KEY` as exactly 32 random bytes encoded as 
 node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
 ```
 
-Store the generated value in the GitHub `production` environment as `FOUNDER_SESSION_ENCRYPTION_KEY`. The authorized deploy workflow requires that secret name and passes it to Wrangler as the surviving API Worker's secret binding. The value still belongs only in server-side secret planes, never Pages/browser configuration. Source wiring proves the required name and transport, not that the live provider currently has a valid value. After installation, verify only binding-name presence and an opaque-session login flow; never print or copy the secret value into evidence.
+Store the generated value in the canonical Cloudflare Worker secret store as `FOUNDER_SESSION_ENCRYPTION_KEY`. Canonical Deploy treats it as a provider-held startup requirement and preserves the value rather than copying it through GitHub Actions. The value belongs only in server-side secret planes, never Pages/browser configuration. After installation, verify only binding-name presence plus the opaque-session login flow; never print or copy the secret value into evidence.
 
 The existing provider-held OpenAI key reference remains:
 
@@ -141,16 +141,17 @@ After configuration, capture:
 
 ## Deploy
 
-| Secret | Required by | Description |
-|---|---|---|
-| `DEPLOY_URL` | `deploy.yml / smoke-test` | Set to `https://api.foundercontrolroom.org` with no trailing slash. |
-| `FOUNDER_SESSION_ENCRYPTION_KEY` | `deploy.yml / authority-gate`, `deploy.yml / worker-deploy` | Required GitHub `production` secret. The gate requires its presence and the Worker runtime enforces the 43-character unpadded base64url / 32-byte key contract. Wrangler installs it as a Worker secret; never log or expose the value. |
-| `FOUNDER_SIGNAL_ENGINE_MCP_TOKEN` | authority gate and Worker deploy | Must match the encrypted value installed in the surviving Worker. |
-| `ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL` | authority gate and Worker deploy | Must match the approved private provider hook installed in the Worker. |
-| `ZAPIER_CATCH_HOOK_URL` | `deploy.yml / proof-of-ship` | Dedicated Catch Hook for verified allowlisted release payloads; do not reuse the Worker bridge hook. |
-| `PROOF_OF_SHIP_STEERING_GRANT_ID` | `deploy.yml / proof-of-ship` | Revocable standing-policy identifier that explicitly activates scheduled publication; suggested value: `proof-of-ship-publish-v1`. |
+Canonical deployment separates GitHub release credentials from provider-held Worker runtime secrets. The pre-mutation GitHub `production` gate requires only:
 
-The proof-of-ship Catch Hook is intentionally separate from `ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL`. The deployment workflow fails closed when the dedicated hook or `PROOF_OF_SHIP_STEERING_GRANT_ID` is absent, and it sends a payload only after exact-SHA and Supabase proof pass. Configure the downstream Zap according to `docs/founder-signal-engine/proof-of-ship-publish-contract.md`; do not put the hook URL or grant value in repository code or Cloudflare bindings.
+```text
+SUPABASE_DB_URL
+CLOUDFLARE_API_TOKEN
+CLOUDFLARE_ACCOUNT_ID
+```
+
+`DEPLOY_URL=https://api.foundercontrolroom.org` is public release configuration rather than secret material. Worker runtime values such as `FOUNDER_SESSION_ENCRYPTION_KEY`, Supabase runtime keys, GitHub App credentials, and capability credentials remain provider-held in Cloudflare and are not duplicated into canonical Deploy. The one runtime secret canonical Deploy deliberately writes is `FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON`, forced to the checked-in fail-closed `enabled:false` grant.
+
+Proof-of-ship publication uses its separately scoped `ZAPIER_CATCH_HOOK_URL` and `PROOF_OF_SHIP_STEERING_GRANT_ID` only after the exact-SHA release and repository-publication gates pass; those values do not become Worker runtime credentials.
 
 ---
 
@@ -189,7 +190,7 @@ Never commit, log, or expose this value through a `NEXT_PUBLIC_*` variable.
 [ ] SUPABASE_DB_URL
 [ ] SUPABASE_SERVICE_ROLE_KEY
 [ ] SUPABASE_PUBLISHABLE_KEY
-[ ] FOUNDER_SESSION_ENCRYPTION_KEY (32 random bytes, unpadded base64url; supplied to Worker deploy)
+[ ] FOUNDER_SESSION_ENCRYPTION_KEY only if a separate workflow explicitly consumes it; canonical Deploy preserves the provider-held Worker value
 [ ] NEXT_PUBLIC_SUPABASE_URL
 [ ] GITHUB_WEBHOOK_SECRET
 [ ] APP_ID (numeric Founder Control Room GitHub App ID)

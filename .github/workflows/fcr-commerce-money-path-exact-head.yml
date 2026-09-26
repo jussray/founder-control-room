@@ -15,6 +15,7 @@ on:
       - 'supabase/migrations/20260920030000_fcr_commerce_receipts.sql'
       - 'supabase/migrations/20260920031500_fcr_commerce_event_identity.sql'
       - 'wrangler.worker.toml'
+      - 'config/worker-capability-secrets.json'
       - '.github/workflows/fcr-commerce-money-path-exact-head.yml'
   workflow_dispatch:
 
@@ -66,8 +67,8 @@ jobs:
       - name: Prove canonical FCR database and runtime-secret boundary
         run: |
           grep -F "../../lib/supabaseClient.js" src/http/webhooks/shopifyFcrCommerce.ts
-          grep -F '"FCR_SHOPIFY_WEBHOOK_SECRET",' wrangler.worker.toml
-          grep -F '"FCR_COMMERCE_HASH_SALT",' wrangler.worker.toml
+          grep -F '"name": "FCR_SHOPIFY_WEBHOOK_SECRET"' config/worker-capability-secrets.json
+          grep -F '"name": "FCR_COMMERCE_HASH_SALT"' config/worker-capability-secrets.json
           node scripts/verify-production-deploy-authority.mjs
 
       - name: Prove privacy-safe additive and provider-event-idempotent ledger
