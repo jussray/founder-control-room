@@ -24,29 +24,12 @@ export interface AgentDescriptor {
   operator?: AgentOperatorPolicy;
 }
 
-export type ModelExecutionProfileId = 'chatgpt-sol' | 'claude-code';
-
-export interface ModelExecutionProfile {
-  id: ModelExecutionProfileId;
-  operatorId: 'codex' | 'claude-code';
-  providerId: 'openai-platform' | 'anthropic-platform';
-  runtimeIdentitySource: 'observe-per-run';
-  toolAvailabilitySource: 'observe-per-run';
-  truthSource: 'shared-evidence-spine';
-  executionBias: readonly string[];
-  mayAdapt: readonly string[];
-  mayNotAdapt: readonly string[];
-  acceptsModelConsensusAsProof: false;
-  requiresIndependentEvidenceForTruthUpgrade: true;
-  handoffFields: readonly string[];
-}
-
 const FCR_V14 = 'docs/FOUNDER_CONTROL_ROOM_AND_CHIEF_AI_MASTER_BUILD_SPEC_V1_4_ADDENDUM.md';
 const MULTI_AGENT = 'docs/FCR_MULTI_AGENT_ENABLEMENT_CONTRACT.md';
-const MODEL_NATIVE_EXECUTION = 'docs/MODEL_NATIVE_EXECUTION_PROFILES.md';
 const DEEPSEEK_INSTRUCTOR = 'docs/DEEPSEEK_INSTRUCTOR_CONTRACT.md';
 const MUSE_CONTROL = '.control-room/MUSE.md';
 const COUNCIL_CONTROL = '.control-room/COUNCIL.md';
+const CHANGE_GENEALOGY = 'docs/AI_CHANGE_GENEALOGY_CONTRACT.md';
 
 export const AGENT_REGISTRY: readonly AgentDescriptor[] = [
   {
@@ -58,7 +41,7 @@ export const AGENT_REGISTRY: readonly AgentDescriptor[] = [
       capabilities: ['research', 'propose', 'review', 'implement'],
       firstSliceRuntimeModel: false,
       externalWritesRequireBoundAuthority: true,
-      instructionContracts: [FCR_V14, MULTI_AGENT],
+      instructionContracts: ['GEMINI.md', FCR_V14, MULTI_AGENT, CHANGE_GENEALOGY],
     },
   },
   {
@@ -70,7 +53,7 @@ export const AGENT_REGISTRY: readonly AgentDescriptor[] = [
       capabilities: ['research', 'propose', 'review', 'implement'],
       firstSliceRuntimeModel: false,
       externalWritesRequireBoundAuthority: true,
-      instructionContracts: ['CLAUDE.md', 'docs/CLAUDE_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC.md', MODEL_NATIVE_EXECUTION, FCR_V14, MULTI_AGENT],
+      instructionContracts: ['CLAUDE.md', 'docs/CLAUDE_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC.md', FCR_V14, MULTI_AGENT, CHANGE_GENEALOGY],
     },
   },
   {
@@ -82,7 +65,7 @@ export const AGENT_REGISTRY: readonly AgentDescriptor[] = [
       capabilities: ['research', 'propose', 'review', 'implement'],
       firstSliceRuntimeModel: false,
       externalWritesRequireBoundAuthority: true,
-      instructionContracts: ['AGENTS.md', 'GLOBAL_AI.md', MODEL_NATIVE_EXECUTION, FCR_V14, MULTI_AGENT],
+      instructionContracts: ['AGENTS.md', 'GLOBAL_AI.md', 'CHATGPT.md', 'CODEX.md', FCR_V14, MULTI_AGENT, CHANGE_GENEALOGY],
     },
   },
   {
@@ -94,7 +77,7 @@ export const AGENT_REGISTRY: readonly AgentDescriptor[] = [
       capabilities: ['research', 'propose', 'review', 'implement'],
       firstSliceRuntimeModel: false,
       externalWritesRequireBoundAuthority: true,
-      instructionContracts: [MUSE_CONTROL, COUNCIL_CONTROL, FCR_V14, MULTI_AGENT],
+      instructionContracts: [MUSE_CONTROL, COUNCIL_CONTROL, FCR_V14, MULTI_AGENT, CHANGE_GENEALOGY],
     },
   },
   {
@@ -106,7 +89,7 @@ export const AGENT_REGISTRY: readonly AgentDescriptor[] = [
       capabilities: ['research', 'propose', 'review', 'implement'],
       firstSliceRuntimeModel: false,
       externalWritesRequireBoundAuthority: true,
-      instructionContracts: [FCR_V14, MULTI_AGENT],
+      instructionContracts: ['DEEPSEEK.md', FCR_V14, MULTI_AGENT, CHANGE_GENEALOGY],
     },
   },
   {
@@ -118,7 +101,7 @@ export const AGENT_REGISTRY: readonly AgentDescriptor[] = [
       capabilities: ['research', 'propose', 'review', 'instruct'],
       firstSliceRuntimeModel: false,
       externalWritesRequireBoundAuthority: true,
-      instructionContracts: [DEEPSEEK_INSTRUCTOR, FCR_V14, MULTI_AGENT],
+      instructionContracts: ['DEEPSEEK.md', DEEPSEEK_INSTRUCTOR, FCR_V14, MULTI_AGENT, CHANGE_GENEALOGY],
     },
   },
   {
@@ -155,81 +138,11 @@ export const AGENT_REGISTRY: readonly AgentDescriptor[] = [
       capabilities: ['research', 'propose', 'review', 'implement'],
       firstSliceRuntimeModel: false,
       externalWritesRequireBoundAuthority: true,
-      instructionContracts: ['PERPLEXITY.md', 'docs/PERPLEXITY_MCP_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC.md', FCR_V14, MULTI_AGENT],
+      instructionContracts: ['PERPLEXITY.md', 'docs/PERPLEXITY_MCP_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC.md', FCR_V14, MULTI_AGENT, CHANGE_GENEALOGY],
     },
   },
   { id: 'github', label: 'GitHub', role: 'Source control, review, CI evidence, and provenance; a merge is not proof of deployment.' },
   { id: 'supabase', label: 'Supabase', role: "Control Room authentication and operational storage within this project's own trust boundary." },
-];
-
-const SHARED_MAY_ADAPT = [
-  'context-packaging',
-  'reasoning-strategy',
-  'tool-selection',
-  'handoff-format',
-  'verification-plan',
-] as const;
-
-const SHARED_MAY_NOT_ADAPT = [
-  'truth-state',
-  'authority-state',
-  'founder-approval',
-  'proof-state',
-  'project-canon',
-] as const;
-
-const SHARED_HANDOFF_FIELDS = [
-  'modelProfileId',
-  'observedRuntimeModel',
-  'observedCapabilities',
-  'sourceTruthRefs',
-  'authorityRequired',
-  'proofRequired',
-  'claims',
-  'unknowns',
-  'continuityFingerprint',
-  'resultEvidence',
-] as const;
-
-export const MODEL_EXECUTION_PROFILES: readonly ModelExecutionProfile[] = [
-  {
-    id: 'chatgpt-sol',
-    operatorId: 'codex',
-    providerId: 'openai-platform',
-    runtimeIdentitySource: 'observe-per-run',
-    toolAvailabilitySource: 'observe-per-run',
-    truthSource: 'shared-evidence-spine',
-    executionBias: [
-      'cross-system-reconciliation',
-      'tool-and-connector-orchestration',
-      'multimodal-product-analysis',
-      'founder-readable-decision-synthesis',
-    ],
-    mayAdapt: SHARED_MAY_ADAPT,
-    mayNotAdapt: SHARED_MAY_NOT_ADAPT,
-    acceptsModelConsensusAsProof: false,
-    requiresIndependentEvidenceForTruthUpgrade: true,
-    handoffFields: SHARED_HANDOFF_FIELDS,
-  },
-  {
-    id: 'claude-code',
-    operatorId: 'claude-code',
-    providerId: 'anthropic-platform',
-    runtimeIdentitySource: 'observe-per-run',
-    toolAvailabilitySource: 'observe-per-run',
-    truthSource: 'shared-evidence-spine',
-    executionBias: [
-      'long-context-repository-analysis',
-      'focused-implementation',
-      'careful-refactor-planning',
-      'structured-documentation',
-    ],
-    mayAdapt: SHARED_MAY_ADAPT,
-    mayNotAdapt: SHARED_MAY_NOT_ADAPT,
-    acceptsModelConsensusAsProof: false,
-    requiresIndependentEvidenceForTruthUpgrade: true,
-    handoffFields: SHARED_HANDOFF_FIELDS,
-  },
 ];
 
 export const AGENT_IDS: ReadonlySet<string> = new Set(AGENT_REGISTRY.map((agent) => agent.id));
@@ -241,14 +154,4 @@ export function agentOperatorPolicy(agentId: string): AgentOperatorPolicy | null
 export function agentCanOperate(agentId: string, capability: AgentOperatorCapability): boolean {
   const policy = agentOperatorPolicy(agentId);
   return Boolean(policy?.enabled && policy.capabilities.includes(capability));
-}
-
-export function modelExecutionProfile(profileId: ModelExecutionProfileId): ModelExecutionProfile {
-  const profile = MODEL_EXECUTION_PROFILES.find((candidate) => candidate.id === profileId);
-  if (!profile) throw new Error(`Unknown model execution profile: ${profileId}`);
-  return profile;
-}
-
-export function modelExecutionProfileForOperator(operatorId: string): ModelExecutionProfile | null {
-  return MODEL_EXECUTION_PROFILES.find((profile) => profile.operatorId === operatorId) ?? null;
 }

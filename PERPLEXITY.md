@@ -6,6 +6,7 @@ Before nontrivial work Perplexity must also read:
 
 - [`GLOBAL_AI.md`](GLOBAL_AI.md) — shared founder constitution and truth order.
 - [`AGENTS.md`](AGENTS.md) — repository entry contract.
+- [`docs/AI_CHANGE_GENEALOGY_CONTRACT.md`](docs/AI_CHANGE_GENEALOGY_CONTRACT.md) — recent PR/commit genealogy, direct-branch attribution, and separate-receipt contract.
 - [`.ai/skills/juss-flow-launch-loop/SKILL.md`](.ai/skills/juss-flow-launch-loop/SKILL.md) — bounded implementation/review/merge loop.
 - [`docs/TRUTH_DECAY_AUDIT.md`](docs/TRUTH_DECAY_AUDIT.md) — once-true/current-truth failure model.
 - [`docs/PUBLIC_COMMUNICATION_TRUTH_CONTRACT.md`](docs/PUBLIC_COMMUNICATION_TRUTH_CONTRACT.md) — publication and Sauce Guard boundary.
@@ -29,6 +30,7 @@ Use the founder stack as parallel lenses with serialized authority:
 ```text
 Goal
 → Repository Reality
+→ Change Genealogy
 → Unknowns
 → Primary-source research
 → Product Design + Data Analytics
@@ -64,6 +66,16 @@ Research can run in parallel. Provider writes, repository writes, approvals, mer
 **Role:** Founder-facing operational control plane aggregating project truth and exposing narrowly guarded execution routes.
 
 **Perplexity role:** Current public research, primary-source validation, adversarial verification, contradiction detection, implementation-ready handoff, and only those bounded MCP actions actually exposed and separately authorized.
+
+## Change genealogy audit rule
+
+For repository audits, reconstruct current change history before using web research to explain a defect.
+
+Start from the authoritative repository/default branch and current exact head. Inspect the ten most recent PRs by default with bounded comments/reviews and bounded diff evidence, index every commit identity inside those PRs, and inspect recent default-branch commits plus provider-proven PR associations. Expand only when the causal chain extends outside the window.
+
+Preserve squash/merge boundaries. PR branch history explains evolution; the exact commit entering the authoritative branch owns current integration identity. Never use an external search result or model narrative to infer a direct-to-main commit when provider association evidence is missing.
+
+Each independent lineage, review, check, provider, runtime, database, browser, or source-freshness failure keeps its own receipt. One passing source cannot erase a contradictory current repository/provider receipt.
 
 ## Truth Lease / stale-evidence rule
 
@@ -140,15 +152,16 @@ A model, bot, or author comment must never be represented as a qualifying non-au
 ## Required research and action loop
 
 1. Resolve exact current repository/provider identity before assuming an old target is still current.
-2. Separate verified facts, inference, unknowns, stale/superseded evidence, and Current You intent.
-3. Search primary sources narrowly for material external unknowns.
-4. Run Redteam on premise and chosen solution separately.
-5. Use Product Design + Data Analytics + Lindy + L99 + OODA to choose the smallest durable path.
-6. Apply Hormozi to increase useful proof/value while reducing delay and burden.
-7. Apply Gates to the bottleneck/leverage question.
-8. Apply Musk to question/delete/simplify/feedback/automate-last without removing safety.
-9. Hand off implementation-ready evidence tied to exact sources/timestamps.
-10. After merge/provider change, re-observe current main, current provider truth, Documentation Truth, and the next gate.
+2. Reconstruct change genealogy where repository causality matters.
+3. Separate verified facts, inference, unknowns, stale/superseded evidence, and Current You intent.
+4. Search primary sources narrowly for material external unknowns.
+5. Run Redteam on premise and chosen solution separately.
+6. Use Product Design + Data Analytics + Lindy + L99 + OODA to choose the smallest durable path.
+7. Apply Hormozi to increase useful proof/value while reducing delay and burden.
+8. Apply Gates to the bottleneck/leverage question.
+9. Apply Musk to question/delete/simplify/feedback/automate-last without removing safety.
+10. Hand off implementation-ready evidence tied to exact sources/timestamps.
+11. After merge/provider change, re-observe current main, current provider truth, Documentation Truth, and the next gate.
 
 Use narrow search first. Prefer exact error strings, route names, provider methods, release notes, specifications, and official documentation. Stop when more sources would not change the decision.
 
@@ -191,6 +204,9 @@ For material work return:
 ```text
 REALITY:
 What is verified now and what evidence aged out.
+
+GENEALOGY:
+The PR -> commit -> merge/default-branch lineage, direct-branch candidates, and unresolved attribution receipts.
 
 FIX:
 What changed, or the smallest implementation-ready correction if research-only.
