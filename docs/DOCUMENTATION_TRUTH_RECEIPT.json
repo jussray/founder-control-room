@@ -1,6 +1,6 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Document current evidence-authority boundaries across cross-repository browser federation, resident Council/Muse relay activation, and provider-held runtime-secret observation: source wiring, configured bindings, live provider invocation, and mutation authority remain separate claims with separate proof.",
+  "purpose": "Document current evidence-authority boundaries across cross-repository browser federation, resident Council/Muse relay activation, provider-held runtime-secret observation, and manual read-only production identity verification: source wiring, configured bindings, live provider invocation, deployment state, and mutation authority remain separate claims with separate proof.",
   "domains": [
     "cloudflare-authority",
     "repository-provider",
@@ -46,6 +46,13 @@
         "The September 24, 2026 StoryEngine peer refresh after Council residency moved the peer head selects a new evidence subject only; predecessor browser green remains historical until the exact successor FCR head reruns the complete federation witness.",
         "`.github/workflows/playwright.yml` must treat the pinned StoryEngine peer as an exact evidence subject, verify the live ref still resolves to that SHA before starting the peer runtime, and expire predecessor browser proof whenever either repository head advances.",
         "`.github/workflows/playwright.yml` must treat an exact ref/pin match as an identity prerequisite only; a cancelled, skipped, or non-executed exact-head Playwright run cannot renew browser-federation proof and must leave the successor claim UNKNOWN."
+      ]
+    },
+    {
+      "path": ".github/workflows/exact-sha-production-witness.yml",
+      "claims": [
+        "`.github/workflows/exact-sha-production-witness.yml` must remain a manually dispatched, contents-read-only verifier that executes trusted current-main witness source, requires the requested exact release SHA to equal that trusted current-main SHA, and reuses `e2e/production-release-sha.spec.ts` without acquiring deploy, publication, provider-write, secret, billing, or merge authority.",
+        "A successful manual witness may prove that the already-deployed Worker, public proxy, and browser surface share the requested current-main release identity; it cannot deploy that SHA, publish content, mutate Postiz or another provider, manufacture provider state, or authorize a merge."
       ]
     },
     {
@@ -147,7 +154,8 @@
         "`README.md` must keep exact predecessor/successor StoryEngine SHAs in audit/receipt provenance rather than durable current-state prose; a peer refresh selects a new evidence subject only and never carries predecessor green forward.",
         "`README.md` must describe Cowork as a governed Claude work surface grounded in the exact current GitHub repository/branch/head, keep Claude-side GitHub connector configuration separate from repository source, and explicitly state that FCR-native Cowork receipt binding is not wired until separately implemented and proven.",
         "`README.md` must describe the Founder Council as dual-resident in the founder assistant and project Control Room without centralizing execution authority, and must keep Muse source implementation separate from configured Worker secret presence, deployed runtime identity, and a live provider response receipt.",
-        "`README.md` must classify a Cloudflare proof-credential failure that prevents secret enumeration as an observation blocker; it cannot be used to claim `MODEL_API_KEY` absent when the provider-held target secret was never observed."
+        "`README.md` must classify a Cloudflare proof-credential failure that prevents secret enumeration as an observation blocker; it cannot be used to claim `MODEL_API_KEY` absent when the provider-held target secret was never observed.",
+        "`README.md` must describe the standalone manual exact-SHA production witness as read-only observation of an already-deployed current-main release and must not imply that running the witness grants deploy, publication, provider-mutation, secret, billing, or merge authority."
       ]
     },
     {
@@ -183,7 +191,8 @@
         "`docs/TRUTH_DECAY_AUDIT.md` must keep a newly matched StoryEngine ref/SHA in UNKNOWN browser-federation state until the exact successor FCR head completes the runtime, directive, receipt, and browser witness.",
         "`docs/TRUTH_DECAY_AUDIT.md` must treat external model benchmarks and prior local wins as decaying evidence rather than permanent routing truth; task-specific fresh receipts, false-green history, authority violations, cost, latency, and proof quality must be re-evaluated before promotion.",
         "`docs/TRUTH_DECAY_AUDIT.md` must treat Cowork workspace copies, attachments, model memory, prior branch observations, connector availability, and generic FCR Activity as non-authoritative context until reconciled with the current exact GitHub repository/branch/head and, for receipts, a separately implemented Cowork receipt adapter.",
-        "`docs/TRUTH_DECAY_AUDIT.md` must separate observation transport failure from target-secret truth: failure before Cloudflare secret enumeration leaves provider-held Muse secret presence UNKNOWN/BLOCKED and cannot be relabeled as evidence of absence."
+        "`docs/TRUTH_DECAY_AUDIT.md` must separate observation transport failure from target-secret truth: failure before Cloudflare secret enumeration leaves provider-held Muse secret presence UNKNOWN/BLOCKED and cannot be relabeled as evidence of absence.",
+        "`docs/TRUTH_DECAY_AUDIT.md` must distinguish the manual read-only production witness from deployment authority: the witness may compare an already-deployed Worker, public proxy, and browser to trusted current-main identity, but it cannot deploy, publish, mutate providers, read secrets, bill, or mint merge approval."
       ]
     },
     {

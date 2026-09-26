@@ -1,0 +1,75 @@
+name: Exact-SHA Production Witness
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_sha:
+        description: "Exact current-main commit expected to be live in production"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: exact-sha-production-witness-${{ inputs.expected_sha }}
+  cancel-in-progress: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  PRODUCTION_RELEASE_WITNESS_REQUIRED: 'true'
+  EXPECTED_RELEASE_SHA: ${{ inputs.expected_sha }}
+  DEPLOY_URL: https://api.foundercontrolroom.org
+  PUBLIC_URL: https://foundercontrolroom.org
+
+jobs:
+  witness:
+    name: Read-only production exact-SHA witness
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out trusted current-main witness source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Bind requested release identity to current main
+        shell: bash
+        run: |
+          set -euo pipefail
+          witness_source="$(git rev-parse HEAD)"
+          printf 'trusted_witness_source=%s\nrequested_release=%s\ngithub_ref=%s\n' \
+            "$witness_source" "$EXPECTED_RELEASE_SHA" "$GITHUB_REF"
+          test "$witness_source" = "$GITHUB_SHA"
+          test "$GITHUB_REF" = "refs/heads/main"
+          [[ "$EXPECTED_RELEASE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$EXPECTED_RELEASE_SHA" = "$GITHUB_SHA"
+
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install chromium --with-deps
+
+      - name: Prove Worker, public proxy, and browser share current-main SHA
+        run: npx playwright test e2e/production-release-sha.spec.ts --reporter=list
+
+      - name: Upload production release witness evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: manual-production-release-witness-${{ inputs.expected_sha }}
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: warn
+          retention-days: 30

@@ -52,6 +52,14 @@ The corrected rule keeps those roles separate: `.github/workflows/playwright.yml
 
 This remains a proof contract, not production proof by itself. The witness must actually run for the relevant release and return terminal exact-SHA evidence before a production-runtime claim becomes current.
 
+## 2026-09 control correction: deploy-free production identity witness
+
+The post-Deploy witness is intentionally tied to an authorized deployment event, but that coupling creates a different truth risk when an operator needs only to re-observe an already-deployed release. Running a deployment-capable or publication-capable path merely to manufacture verification evidence would let the desire for proof widen consequence authority.
+
+The correction is a separate manual observation lane in `.github/workflows/exact-sha-production-witness.yml`. It executes trusted current-`main` witness source, requires the requested full release SHA to equal that trusted `GITHUB_SHA`, holds only `contents: read`, and reuses `e2e/production-release-sha.spec.ts` to compare the direct Worker, public proxy, and browser surface before and after the browser journey. The workflow carries no secret reference, deploy command, Proof-of-Ship publication flag, Postiz mutation hook, or merge action.
+
+This lane can only observe an already-deployed release. If production does not serve the requested trusted current-main SHA, the witness must fail closed; that mismatch is evidence that the production claim is unproven or different, not permission to deploy the candidate. A green manual witness can establish exact production identity for its observation window, but it cannot authorize merge, deployment, publication, provider mutation, billing, secret access, or any other consequence.
+
 ## 2026-09 control correction: Capital Decision documentation drift
 
 The Founder Capital Decision feature introduced a founder-facing evidence-evaluation surface with freshness-sensitive recommendations, dilution and option-set reasoning, and an explicit authority ceiling. Its source and browser proof correctly keep financing authority false and allow `HOLD` when broader or fresher evidence is missing, but the feature landed without the required durable README, truth-decay audit, and documentation receipt refresh for its evidence-authority semantics.
@@ -399,6 +407,7 @@ The strongest optimization is not faster claiming. It is shortening the distance
 40. A failed observation transport does not prove the observed target is absent; if provider secret enumeration cannot run, target secret presence remains `UNKNOWN`/`BLOCKED`.
 41. A resident Council seat or source adapter does not prove a live provider participated; a live Muse claim requires a current provider receipt bound to the exact invocation.
 42. Provider-held secret-name policy, secret presence, deployed runtime identity, and successful model invocation are four separate evidence layers and may not be collapsed into one green state.
+43. A manual exact-SHA production witness may observe an already-deployed trusted current-main release, but it cannot be used to infer deploy, publication, provider-write, secret, billing, or merge authority.
 
 ## 2026-09 control correction: peer ref refresh resets proof
 
