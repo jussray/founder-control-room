@@ -173,15 +173,17 @@ The sanitized receipt may prove what that provider read observed at that time. C
 
 A failing or unavailable enrichment read is `UNKNOWN`/blocked evidence in that enrichment lane, not permission to infer the missing provider state, not a reason to rewrite the core Worker Git authority verdict, and not permission to mutate DNS, routes, Access, Workers, credentials, or deployment configuration.
 
-## Required Worker secrets and deployment-plane credentials
+## Startup-required Worker secrets, capability credentials, and deployment-plane credentials
 
-The canonical Worker runtime secret values belong in the Cloudflare Worker secret store. Canonical `.github/workflows/deploy.yml` preserves those provider-held values instead of copying them through GitHub Actions. The required runtime secret names are declared by `wrangler.worker.toml [secrets].required`, including `FOUNDER_SESSION_ENCRYPTION_KEY`; Wrangler must fail closed when a required binding name is absent before the Worker promotion can be treated as successful.
+The canonical Worker runtime secret values belong in the Cloudflare Worker secret store. Canonical `.github/workflows/deploy.yml` preserves provider-held values rather than copying them through GitHub Actions. `wrangler.worker.toml [secrets].required` is intentionally limited to startup-critical binding names whose absence would make the whole Worker unsafe to promote, including `FOUNDER_SESSION_ENCRYPTION_KEY`. Wrangler must fail closed when one of those startup-required names is absent.
 
-`TINYFISH_API_KEY` is one of those required canonical Worker binding names. Its value must remain only in the Cloudflare Worker secret plane; canonical Deploy may verify the provider-held name but never read, log, or re-upload the value. That binding-name receipt still does not prove TinyFish accepted a request, so live activation requires a separately observed key-backed Search or Fetch receipt.
+Capability-specific provider credentials are separately declared in `config/worker-capability-secrets.json`. Missing capability credentials disable only their owning path and must fail closed at use; they do not become a reason to hold unrelated FCR routes hostage. The manifest is non-secret source metadata and proves neither provider presence nor successful runtime use.
 
-`FCR_SHOPIFY_WEBHOOK_SECRET` and `FCR_COMMERCE_HASH_SALT` are also required canonical Worker binding names for FCR's first-party Shopify paid-order ingress. The first authenticates Shopify's exact webhook body and the second creates a privacy-safe order reference; neither is authority by itself. Source and binding-name verification cannot prove the provider subscription, deployed callback, production database ledger, or a paid outcome, so those layers must remain separately evidenced before the money path is called active or proven.
+`TINYFISH_API_KEY` is capability-scoped to `tinyfish-web-observation-v1`. Its provider-held value remains only in Cloudflare. A missing key makes TinyFish Search/Fetch unavailable, and live activation still requires a separately observed key-backed provider receipt.
 
-For the governed Founder Content n8n production-source lane, the same canonical Worker additionally requires the provider-held binding names `N8N_FOUNDER_CONTENT_WEBHOOK_URL`, `N8N_FOUNDER_CONTENT_BEARER_TOKEN`, `N8N_FOUNDER_CONTENT_EXPECTED_WORKFLOW_FINGERPRINT`, and `N8N_FOUNDER_CONTENT_IDENTITY_HMAC_SECRET`. Public-safe source may declare `N8N_FOUNDER_CONTENT_ENABLED=true`, Buffer-only provider selection, workflow ID `fcrFounderContentV1`, and runtime `2.32.6`, but those declarations do not prove any of the four secret values exist or that production n8n is active. Canonical exact-main Deploy must verify required binding-name presence before Worker mutation, and production truth still requires exact deployed Worker identity, production n8n workflow/fingerprint/runtime readback, and provider-native Buffer outcome evidence.
+`FCR_SHOPIFY_WEBHOOK_SECRET` and `FCR_COMMERCE_HASH_SALT` are capability-scoped to the first-party Shopify paid-order ingress. The ingress rejects use when either credential is missing; their names or values do not prove provider subscription, deployed callback identity, production database state, or a paid outcome.
+
+The four `N8N_FOUNDER_CONTENT_*` credentials are capability-scoped to the governed Founder Content n8n lane. Public-safe source may declare Buffer-only intent, workflow ID `fcrFounderContentV1`, and runtime `2.32.6`, but production truth still requires the capability credentials plus exact deployed Worker identity, n8n workflow/fingerprint/runtime readback, and provider-native Buffer evidence. Their absence must disable that lane rather than globally block the API Worker.
 
 The canonical Deploy authority gate has a smaller GitHub production credential surface. It requires only the credentials needed to perform the release itself:
 
@@ -210,7 +212,7 @@ At minimum verify:
 1. `npm run build:pages` succeeds and contains required browser assets, `_headers`, and `_worker.js`;
 2. the exact Pages artifact/deployment intended for production succeeds;
 3. the canonical Worker deployment/version intended for production succeeds;
-4. deployment-plane credentials pass the pre-mutation authority gate and provider-held Worker required-secret names pass the Wrangler binding membrane;
+4. deployment-plane credentials pass the pre-mutation authority gate and startup-required provider-held Worker secret names pass the Wrangler binding membrane;
 5. the Pages `FCR_API` Service Binding is provider-proven to target the canonical `founder-control-room` Worker;
 6. `https://api.foundercontrolroom.org/health` returns the expected service identity/health payload;
 7. `https://foundercontrolroom.org/health` reaches the same canonical API service through the Pages binding;

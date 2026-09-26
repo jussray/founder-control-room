@@ -1,6 +1,6 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Document current evidence-authority boundaries across cross-repository browser federation, resident Council/Muse relay activation, and provider-held runtime-secret observation: source wiring, configured bindings, live provider invocation, and mutation authority remain separate claims with separate proof.",
+  "purpose": "Document current evidence-authority boundaries across cross-repository browser federation, resident Council/Muse relay activation, Worker startup-versus-capability secret scope, GitHub App installation authentication, and provider-held runtime observation: source wiring, configured bindings, live provider invocation, and mutation authority remain separate claims with separate proof.",
   "domains": [
     "cloudflare-authority",
     "repository-provider",
@@ -56,8 +56,14 @@
     {
       "path": "wrangler.worker.toml",
       "claims": [
-        "`wrangler.worker.toml` must list `FCR_SHOPIFY_WEBHOOK_SECRET` and `FCR_COMMERCE_HASH_SALT` under `[secrets].required`, so canonical exact-main Deploy rejects a missing FCR Shopify runtime binding before Worker mutation while never reading, logging, or re-uploading either provider-held value; this source boundary cannot prove webhook registration, production migration, runtime delivery, or collected revenue.",
-        "`wrangler.worker.toml` must also declare `FCR_CLOUDFLARE_MCP_READ_TOKEN` and Muse `MODEL_API_KEY` as provider-held required Worker secret names while keeping `FCR_RELAY_MUSE_MODEL` and the official Cloudflare MCP endpoint public-safe configuration; declaration proves required-name policy only, not provider presence or successful Muse/Cloudflare runtime use."
+        "`wrangler.worker.toml` `[secrets].required` must remain the true Worker-startup secret set only; capability-scoped provider bindings such as Shopify ingress, founder-review email ingress, TinyFish, Muse relay, Cloudflare MCP read proof, and founder-content n8n must not be promoted into global startup blockers merely because their owning routes exist.",
+        "A capability secret omitted from `[secrets].required` is not public or optional-at-use: its owning capability must still fail closed when the provider-held binding is unavailable, while unrelated Worker startup and promotion remain independently decidable."
+      ]
+    },
+    {
+      "path": "config/worker-capability-secrets.json",
+      "claims": [
+        "`config/worker-capability-secrets.json` is the canonical source inventory for provider-held capability bindings whose absence disables only the owning capability; it must keep `FCR_SHOPIFY_WEBHOOK_SECRET`, `FCR_COMMERCE_HASH_SALT`, `FOUNDER_REVIEW_EMAIL_INGRESS_SECRET`, TinyFish, Muse/Cloudflare MCP, Founder Signal, and founder-content n8n bindings out of the global Worker-startup authority class unless a future reviewed contract explicitly promotes one."
       ]
     },
     {
@@ -131,8 +137,9 @@
     {
       "path": "README.md",
       "claims": [
-        "`README.md` must keep TinyFish source and CI readiness separate from provider/runtime activation and state that canonical Deploy verifies only provider-held binding-name presence before promotion.",
-        "`README.md` must keep FCR Shopify runtime-secret name verification separate from webhook registration, deployed callback identity, production database migration, and collected-revenue outcome proof.",
+        "`README.md` must separate true Worker-startup secrets from capability-scoped provider-held bindings and state that missing capability credentials fail only the owning capability closed instead of blocking unrelated Worker promotion.",
+        "`README.md` must classify the Shopify signing secret and commerce hash salt as provider-held `shopify-commerce-ingress` capability bindings rather than global Worker-startup requirements while keeping webhook registration, deployed callback identity, production database migration, and collected-revenue outcome proof separate.",
+        "`README.md` must state that runtime RepositoryProvider access to `jussray/founder-control-room` requires the FCR GitHub App credential pair and repository-scoped installation-token path, rejects `GITHUB_TOKEN` fallback for FCR itself, and keeps App identity separate from founder, merge, deploy, publication, spend, deletion, secret-rotation, and scope-widening authority.",
         "`README.md` must describe Shopify child-provider observation as source-only, non-authorizing evidence and must never relabel a matching snapshot as live provider authority or mutation permission.",
         "`README.md` must document Attack 3000 content currentness as independently evaluated from bounded observation time rather than trusted from a CURRENT label, and must keep distribution, external demand, publication, provider mutation, merge, deploy, spend, and external-contact authority separate.",
         "`README.md` must describe the Content Trend Radar as an advisory existing-lane capability whose first-wave evidence requires current source provenance and whose ranking cannot authorize publication, scheduling, spend, provider mutation, merge, deploy, or external contact.",
@@ -172,7 +179,7 @@
     {
       "path": "docs/CLOUDFLARE_REASONING.md",
       "claims": [
-        "`docs/CLOUDFLARE_REASONING.md` must require both FCR Shopify provider-held Worker binding names to pass the canonical Deploy membrane without treating source, binding-name presence, CI, or Playwright as proof of Shopify callback registration, production migration, or revenue outcome."
+        "`docs/CLOUDFLARE_REASONING.md` must separate Worker startup bindings from capability-scoped provider-held bindings, keep Shopify/review-email/n8n and similar capability credentials fail-closed at their owning use boundary, and never treat source, binding-name presence, CI, or Playwright as proof of provider activation or outcome."
       ]
     },
     {
@@ -188,7 +195,7 @@
     {
       "path": "docs/deployment/CLOUDFLARE_WORKER_TARGETS.md",
       "claims": [
-        "`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` must name `FCR_SHOPIFY_WEBHOOK_SECRET` and `FCR_COMMERCE_HASH_SALT` as required canonical Worker secrets while keeping provider subscription, runtime delivery, production database state, and paid-order outcome as separate activation proof."
+        "`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` must distinguish global Worker startup requirements from capability-scoped provider-held bindings, including Shopify commerce and founder-review email ingress, while keeping provider subscription, runtime delivery, database state, and paid-order or email-command outcomes as separate activation proof."
       ]
     },
     {
@@ -264,6 +271,30 @@
       "path": "src/providers/SecurityPreservingGitHubProvider.ts",
       "claims": [
         "`src/providers/SecurityPreservingGitHubProvider.ts` must block ordinary forward patching unless the exact branch head is `VERIFIED_CLEAN`; a `KNOWN_BAD` head may accept only an explicit repair message bound to that same exact SHA, while stale repair intent and `UNVERIFIED` heads must fail closed without granting merge, deploy, publication, provider-policy, or founder authority."
+      ]
+    },
+    {
+      "path": "src/providers/providerFactory.ts",
+      "claims": [
+        "`src/providers/providerFactory.ts` must require a complete `GITHUB_APP_ID` + `GITHUB_PRIVATE_KEY` pair for repository-provider access to `jussray/founder-control-room`, must reject `GITHUB_TOKEN` fallback for that constitutional repository even when a token is present, must fail closed on a partial App pair, and may preserve the bounded token fallback only for non-FCR local/development repositories; authentication does not grant founder, merge, deploy, publication, spend, deletion, secret-rotation, or App-scope authority."
+      ]
+    },
+    {
+      "path": "docs/GITHUB_APP_AUTHORITY.md",
+      "claims": [
+        "`docs/GITHUB_APP_AUTHORITY.md` must remain the FCR-specific override for generic GitHub token-fallback guidance: FCR GitHub operations authenticate through the exact repository installation path, provider identity remains separate from consequential authority, and n8n MCP client OAuth remains a separate authentication boundary."
+      ]
+    },
+    {
+      "path": "docs/PROVIDERS.md",
+      "claims": [
+        "`docs/PROVIDERS.md` must state that `GITHUB_TOKEN` fallback does not apply to the FCR constitutional repository, that FCR uses the repository-scoped GitHub App installation-token path, and that source/credential presence alone does not prove live provider identity or mutation authority."
+      ]
+    },
+    {
+      "path": "scripts/verify-founder-review-email-ingress.mjs",
+      "claims": [
+        "`scripts/verify-founder-review-email-ingress.mjs` must verify `FOUNDER_REVIEW_EMAIL_INGRESS_SECRET` as a `founder-review-email-ingress` capability binding in `config/worker-capability-secrets.json`, must reject promotion of that binding into the global API Worker startup secret list, and must retain the route's minimum-secret-length and fail-closed authorization checks."
       ]
     }
   ]

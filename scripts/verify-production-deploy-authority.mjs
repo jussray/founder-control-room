@@ -346,18 +346,13 @@ const requiredWorkerSecrets = [
   'GITHUB_WEBHOOK_SECRET',
   'GITHUB_APP_ID',
   'GITHUB_PRIVATE_KEY',
-  'FCR_REMOTE_MCP_READ_TOKEN',
-  'TINYFISH_API_KEY',
   'FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON',
-  'FOUNDER_SIGNAL_ENGINE_MCP_TOKEN',
-  'ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL',
-  'FOUNDER_REVIEW_EMAIL_INGRESS_SECRET',
 ];
 
 assert.match(
   wrangler,
   /^\[secrets\]\nrequired = \[/m,
-  'wrangler.worker.toml must declare required provider-held Worker secrets',
+  'wrangler.worker.toml must declare startup-required provider-held Worker secrets',
 );
 
 const deploySectionStart = workflow.indexOf('  worker-deploy:');
@@ -370,7 +365,7 @@ for (const name of requiredWorkerSecrets) {
   assert.match(
     wrangler,
     new RegExp(`^  "${name}",$`, 'm'),
-    `${name} must be declared as a required provider-held Worker secret`,
+    `${name} must be declared as a startup-required provider-held Worker secret`,
   );
 }
 

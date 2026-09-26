@@ -19,6 +19,7 @@ const [
   executionMigration,
   manifest,
   apiManifest,
+  capabilityManifest,
   server,
   workflow,
   packageJson,
@@ -36,6 +37,7 @@ const [
   read('supabase/migrations/20260812004000_founder_signal_review_execution_bridge.sql'),
   read('wrangler.email.toml'),
   read('wrangler.worker.toml'),
+  read('config/worker-capability-secrets.json'),
   read('src/http/server.ts'),
   read('.github/workflows/founder-review-email-ingress.yml'),
   read('package.json'),
@@ -287,8 +289,20 @@ if (/\[\[routes\]\]/.test(manifest)) {
 if (/FOUNDER_REVIEW_EMAIL_INGRESS_SECRET\s*=/.test(manifest)) {
   fail('email Worker manifest must not contain the ingress secret value');
 }
-if (!apiManifest.includes('"FOUNDER_REVIEW_EMAIL_INGRESS_SECRET"')) {
-  fail('api Worker deployment contract must require FOUNDER_REVIEW_EMAIL_INGRESS_SECRET');
+if (apiManifest.includes('"FOUNDER_REVIEW_EMAIL_INGRESS_SECRET"')) {
+  fail('api Worker startup contract must not globally require the founder-review ingress capability secret');
+}
+let capabilitySecrets;
+try {
+  capabilitySecrets = JSON.parse(capabilityManifest);
+} catch {
+  fail('worker capability secret manifest must be valid JSON');
+}
+const reviewIngressBinding = capabilitySecrets?.capabilityOptional?.find?.(
+  entry => entry?.name === 'FOUNDER_REVIEW_EMAIL_INGRESS_SECRET',
+);
+if (reviewIngressBinding?.capability !== 'founder-review-email-ingress') {
+  fail('founder-review ingress secret must remain capability-scoped to founder-review-email-ingress');
 }
 if (/FOUNDER_REVIEW_EMAIL_INGRESS_SECRET\s*=/.test(apiManifest)) {
   fail('api Worker manifest must not contain the ingress secret value');
@@ -309,5 +323,5 @@ if (failures.length > 0) {
 }
 
 console.log(
-  'Founder review-email ingress verified: isolated Email Worker, immutable intake receipt, private subject capability hashed at ingress, constant-time server-side capability binding, deterministic private context registration, RLS-only correlation ledgers, idempotent post-intake Zapier dispatch, deadline and context fail-closed behavior, exact provider-acceptance semantics, and no embedded provider credentials.',
+  'Founder review-email ingress verified: isolated Email Worker, immutable intake receipt, private subject capability hashed at ingress, constant-time server-side capability binding, deterministic private context registration, RLS-only correlation ledgers, idempotent post-intake Zapier dispatch, deadline and context fail-closed behavior, exact provider-acceptance semantics, capability-scoped ingress secret, and no embedded provider credentials.',
 );

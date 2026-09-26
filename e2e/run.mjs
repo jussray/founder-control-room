@@ -189,15 +189,16 @@ const demoRepo = addRepo({
   seedFiles: { 'README.md': '# Demo Project\n', 'src/index.ts': 'console.log("hello");\n' },
 });
 const { branches: fakeGitHubBranches, trees: fakeGitHubTrees } = demoRepo;
-// This repo's "main" tip is pinned to the real, current HEAD of this actual
-// checkout — see REAL_REPO_HEAD_SHA above — so that when the guarded
-// terminal proof (below) creates a branch off it, GitHubProvider.resolveRef
-// returns exactly the sha the real local `git rev-parse HEAD` will also
-// return, letting the terminal's exact-head check pass for real.
+// The terminal's project slug remains "founder-control-room" because that is
+// the real local command-registry key, but the provider-facing E2E repository
+// deliberately uses a non-constitutional fixture identity. This harness does
+// not prove production GitHub App authentication and must never bypass FCR's
+// App-only rule by impersonating jussray/founder-control-room with a fake PAT.
 const TERMINAL_PROOF_REPO = 'founder-control-room';
+const TERMINAL_PROOF_PROVIDER_REPO = 'founder-control-room-e2e-fixture';
 addRepo({
   owner: GITHUB_OWNER,
-  repo: TERMINAL_PROOF_REPO,
+  repo: TERMINAL_PROOF_PROVIDER_REPO,
   defaultBranch: 'main',
   rootCommitSha: REAL_REPO_HEAD_SHA,
 });
@@ -271,10 +272,10 @@ async function runGuardedTerminalProof(page) {
     body: JSON.stringify({
       slug: TERMINAL_PROOF_REPO,
       name: 'Founder Control Room (self)',
-      repoIdentifier: `${GITHUB_OWNER}/${TERMINAL_PROOF_REPO}`,
+      repoIdentifier: `${GITHUB_OWNER}/${TERMINAL_PROOF_PROVIDER_REPO}`,
     }),
   });
-  assert(projectRes.ok, `registered the ${TERMINAL_PROOF_REPO} project so the terminal's command registry (keyed on this exact slug) has somewhere real to run (status ${projectRes.status})`);
+  assert(projectRes.ok, `registered the ${TERMINAL_PROOF_REPO} terminal project against the non-constitutional ${TERMINAL_PROOF_PROVIDER_REPO} provider fixture (status ${projectRes.status})`);
 
   const missionRes = await fetch(`${BASE_URL}/projects/${TERMINAL_PROOF_REPO}/missions`, {
     method: 'POST',
@@ -319,8 +320,8 @@ async function runGuardedTerminalProof(page) {
     `branch creation pinned policy_snapshot.expectedHeadSha to this real repo's actual HEAD (${REAL_REPO_HEAD_SHA}), not just a fake sha — this is the fix for bug #7 below (expectedHeadSha was previously only ever written at merge time, which the guarded terminal's own sandboxed/in_review precondition can never reach)`,
   );
   assert(
-    getRepo(GITHUB_OWNER, TERMINAL_PROOF_REPO)?.branches.get('terminal-proof')?.sha === REAL_REPO_HEAD_SHA,
-    "the fake repo's new branch head really does equal this checkout's real git HEAD",
+    getRepo(GITHUB_OWNER, TERMINAL_PROOF_PROVIDER_REPO)?.branches.get('terminal-proof')?.sha === REAL_REPO_HEAD_SHA,
+    "the fake provider repo's new branch head really does equal this checkout's real git HEAD",
   );
 
   await page.click('.tabs button[data-tab=terminal]');

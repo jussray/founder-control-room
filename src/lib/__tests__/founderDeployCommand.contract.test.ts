@@ -143,7 +143,7 @@ describe('Founder deploy command authority contract', () => {
     expect(reconcileWorkflow).not.toContain('PUBLISH_ALLOWED');
   });
 
-  it('preserves every declared Worker secret name while forcing the publication grant disabled through the canonical config', () => {
+  it('preserves every startup-required Worker secret while forcing the publication grant disabled through the canonical config', () => {
     expect(reconcileWorkflow).toContain('Existing Worker runtime secrets: preserved except \\`FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON\\`, which this workflow forces disabled');
     expect(reconcileWorkflow).toContain('CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}');
     expect(reconcileWorkflow).not.toContain('CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}');
@@ -162,20 +162,7 @@ describe('Founder deploy command authority contract', () => {
       'GITHUB_WEBHOOK_SECRET',
       'GITHUB_APP_ID',
       'GITHUB_PRIVATE_KEY',
-      'FCR_REMOTE_MCP_READ_TOKEN',
-      'FCR_SHOPIFY_WEBHOOK_SECRET',
-      'FCR_COMMERCE_HASH_SALT',
-      'TINYFISH_API_KEY',
-      'FCR_CLOUDFLARE_MCP_READ_TOKEN',
-      'MODEL_API_KEY',
       'FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON',
-      'FOUNDER_SIGNAL_ENGINE_MCP_TOKEN',
-      'ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL',
-      'FOUNDER_REVIEW_EMAIL_INGRESS_SECRET',
-      'N8N_FOUNDER_CONTENT_WEBHOOK_URL',
-      'N8N_FOUNDER_CONTENT_BEARER_TOKEN',
-      'N8N_FOUNDER_CONTENT_EXPECTED_WORKFLOW_FINGERPRINT',
-      'N8N_FOUNDER_CONTENT_IDENTITY_HMAC_SECRET',
     ]);
     expect(reconcileWorkflow).toContain('./node_modules/.bin/wrangler secret put FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON \\');
     expect(reconcileWorkflow).toContain('--config wrangler.worker.toml < "$grant_file"');

@@ -18,6 +18,7 @@ const workflow = read(".github/workflows/cloudflare-mcp-read-diagnostic.yml");
 const registry = read("src/mcp/defaultRegistry.ts");
 const secrets = read("docs/SECRETS.md");
 const worker = read("wrangler.worker.toml");
+const capabilitySecrets = JSON.parse(read("config/worker-capability-secrets.json"));
 
 assert(
   probe.includes('"https://mcp.cloudflare.com/mcp"'),
@@ -83,11 +84,19 @@ assert(
   worker.includes('MCP_CLOUDFLARE_API_URL = "https://mcp.cloudflare.com/mcp"'),
   "canonical Worker must expose the official Cloudflare API MCP endpoint to the runtime registry",
 );
+const cloudflareReadCapabilitySecret = capabilitySecrets.capabilityOptional?.find(
+  (entry) => entry?.name === "FCR_CLOUDFLARE_MCP_READ_TOKEN",
+);
 assert(
-  worker.includes('"FCR_CLOUDFLARE_MCP_READ_TOKEN"'),
-  "canonical Worker must require the dedicated Cloudflare MCP read credential",
+  capabilitySecrets.schema === "fcr/worker-capability-secrets@v1"
+    && cloudflareReadCapabilitySecret?.capability === "cloudflare-mcp-read-proof",
+  "capability secret contract must bind FCR_CLOUDFLARE_MCP_READ_TOKEN to cloudflare-mcp-read-proof",
+);
+assert(
+  !/required\s*=\s*\[[\s\S]*?"FCR_CLOUDFLARE_MCP_READ_TOKEN"[\s\S]*?\]/m.test(worker),
+  "Cloudflare MCP read credential must remain capability-scoped instead of blocking unrelated Worker startup",
 );
 
 console.log(
-  "[verify:cloudflare-mcp-read] official endpoint, exact-head workflow, GET-only witness, dedicated credential, Worker runtime binding, and fail-closed policy are pinned.",
+  "[verify:cloudflare-mcp-read] official endpoint, exact-head workflow, GET-only witness, capability-scoped dedicated credential, Worker runtime binding, and fail-closed policy are pinned.",
 );
