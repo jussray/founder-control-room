@@ -429,3 +429,9 @@ The Truth Lease, production-specific lease composer, temporal founder-content gu
 ## StoryEngine peer-pin decay
 
 A StoryEngine peer SHA in `.github/workflows/playwright.yml` is bounded evidence identity. When StoryEngine or Founder Control Room advances, predecessor browser-federation receipts become historical immediately; matching the live ref to a refreshed pin is setup evidence only, and the successor state remains UNKNOWN until the complete exact-head runtime and Playwright witness succeeds.
+
+## 2026-09-26 control correction: StoryEngine peer rollover during v11.5 proof
+
+During v11.5 exact-head verification, the FCR browser harness itself passed while the federation freshness gate correctly stopped downstream proof because the pinned StoryEngine peer `4ef0558ac5708565b62779de0609ef38cd7870f8` no longer matched StoryEngine `main` at `51f4697cb67f6dd1d45e557c702fd45307092891`. An independent repository comparison showed the successor strictly three commits ahead and zero behind; the delta was limited to StoryEngine's self-sufficient architecture-kernel contract, verifier, and contract test rather than a hidden federation/runtime rewrite.
+
+That comparison justified rebinding `.github/workflows/playwright.yml` to `51f4697cb67f6dd1d45e557c702fd45307092891` as the next exact evidence subject. It did **not** carry forward predecessor Playwright green, prove either production deployment, or grant merge, deploy, publication, provider-mutation, or founder authority. The successor FCR head remains `UNKNOWN` for federation until its own exact-head workflow verifies the live peer ref, checks out that immutable StoryEngine SHA, proves runtime identity, and completes the full FCR → StoryEngine → receipt → FCR browser witness.
