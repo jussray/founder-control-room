@@ -1,6 +1,6 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Document current evidence-authority boundaries across cross-repository browser federation, resident Council/Muse relay activation, and provider-held runtime-secret observation: source wiring, configured bindings, live provider invocation, and mutation authority remain separate claims with separate proof.",
+  "purpose": "Close two inherited false-green gaps by making project-adapter freshness exact-head strict and documentation receipts prove a new or changed path-bound invariant in the reviewed range.",
   "domains": [
     "cloudflare-authority",
     "repository-provider",
@@ -276,7 +276,8 @@
     {
       "path": "scripts/verify-documentation-truth.mjs",
       "claims": [
-        "`scripts/verify-documentation-truth.mjs` must classify `src/founder-os-lab/projectAdapters.ts` as evidence-authority truth-sensitive so a Chief exact-head pin movement cannot pass Documentation Truth without substantive README, truth-decay audit, and structured receipt updates that name the changed path."
+        "`scripts/verify-documentation-truth.mjs` must classify `src/founder-os-lab/projectAdapters.ts` as evidence-authority truth-sensitive so a Chief exact-head pin movement cannot pass Documentation Truth without substantive README, truth-decay audit, and structured receipt updates that name the changed path.",
+        "`scripts/verify-documentation-truth.mjs` must compare the base receipt with the candidate receipt and reject a truth-sensitive path unless the reviewed range adds or changes a meaningful path-bound invariant for that exact source path."
       ]
     }
   ]

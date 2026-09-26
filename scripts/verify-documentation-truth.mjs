@@ -158,6 +158,18 @@ function meaningfulInvariant(claim, sourcePath) {
     && /\b(must|cannot|requires?|rejects?|withhold|binds?|only|never|fail(?:s|ed)?\s+closed)\b/i.test(claim);
 }
 
+function receiptClaimsAtRevision(revision) {
+  try {
+    const parsed = JSON.parse(git('show', `${revision}:${DOCUMENTATION_RECEIPT_PATH}`));
+    if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.changes)) return new Map();
+    return new Map(parsed.changes
+      .filter((change) => change && typeof change === 'object' && nonEmptyString(change.path, 300) && Array.isArray(change.claims))
+      .map((change) => [change.path, change.claims.filter((claim) => nonEmptyString(claim))]));
+  } catch {
+    return new Map();
+  }
+}
+
 function documentationReceipt() {
   let parsed;
   try {
@@ -220,10 +232,13 @@ if (truthSensitiveChanges.length > 0) {
         failures.push(`documentation truth receipt must name changed domain: ${domain}`);
       }
     }
+    const baseClaimsByPath = receiptClaimsAtRevision(baseSha);
     for (const change of truthSensitiveChanges) {
       const claims = receipt.claimsByPath.get(change.file) ?? [];
-      if (!claims.some((claim) => meaningfulInvariant(claim, change.file))) {
-        failures.push(`documentation truth receipt must name a meaningful path-bound invariant for: ${change.file}`);
+      const previousClaims = new Set(baseClaimsByPath.get(change.file) ?? []);
+      const currentRangeClaims = claims.filter((claim) => !previousClaims.has(claim));
+      if (!currentRangeClaims.some((claim) => meaningfulInvariant(claim, change.file))) {
+        failures.push(`documentation truth receipt must add or change a meaningful path-bound invariant in the reviewed range for: ${change.file}`);
       }
     }
   }

@@ -167,15 +167,15 @@ export function assessProjectAdapterFreshness(
   if (!sourceHeadMatchesAudited) {
     return {
       ...shared,
-      state: 'verified',
-      freshness: 'fresh',
-      recommendation: 'hold',
+      state: 'attention',
+      freshness: 'stale',
+      recommendation: 'review',
       sourceHeadMatchesAudited: false,
       contractPathsMissing: [],
       contractPathsDrifted: [],
-      blocker: null,
-      nextAction: 'Keep the adapter read-only and refresh the audited head only when intentionally updating the provenance snapshot.',
-      reasons: ['Repository main advanced, but every required project contract blob still matches the audited adapter snapshot.'],
+      blocker: `Repository main advanced from audited head ${normalizedAuditedHead} to ${normalizedCurrentHead}; exact-head adapter provenance is stale even though required contract blobs are unchanged.`,
+      nextAction: 'Perform an exact-head semantic review, then refresh the audited head and contract manifest together before treating the adapter as current.',
+      reasons: ['Unchanged contract blobs do not prove that an adapter pinned to a predecessor SHA accepts or represents the current repository head.'],
     };
   }
 

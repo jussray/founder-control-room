@@ -47,19 +47,20 @@ describe('project adapter freshness', () => {
     }
   });
 
-  it('stays verified when authoritative main advances but required project contracts are unchanged', () => {
+  it('requires review when authoritative main advances even if required project contracts are unchanged', () => {
     const result = assess({
       currentHead: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
     });
 
-    expect(result.state).toBe('verified');
-    expect(result.freshness).toBe('fresh');
+    expect(result.state).toBe('attention');
+    expect(result.freshness).toBe('stale');
+    expect(result.recommendation).toBe('review');
     expect(result.sourceHeadMatchesAudited).toBe(false);
     expect(result.contractPathsMissing).toEqual([]);
     expect(result.contractPathsDrifted).toEqual([]);
-    expect(result.blocker).toBeNull();
+    expect(result.blocker).toContain('exact-head adapter provenance is stale');
     expect(result.reasons).toContain(
-      'Repository main advanced, but every required project contract blob still matches the audited adapter snapshot.',
+      'Unchanged contract blobs do not prove that an adapter pinned to a predecessor SHA accepts or represents the current repository head.',
     );
   });
 
