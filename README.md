@@ -373,3 +373,11 @@ The AI Failure Repair workflow stores its bounded evidence under `.repair/`, a h
 ## Chief adapter exact-head truth
 
 `src/founder-os-lab/projectAdapters.ts` binds Chief integration evidence to one audited exact Chief head. Moving that pin is an evidence-authority transition: the same change must refresh this README, `docs/TRUTH_DECAY_AUDIT.md`, and `docs/DOCUMENTATION_TRUTH_RECEIPT.json`, and the successor FCR head must earn its own adapter, pair-contract, CI, and applicable runtime/browser proof. Pin alignment selects the next evidence subject only; it does not prove Chief deployment, served-MCP reachability, production behavior, merge authority, or deploy authority.
+
+
+### Exact-head adapter and documentation-receipt freshness
+
+Project-adapter freshness is fail-closed on exact repository identity: unchanged contract blobs cannot make an adapter pinned to a predecessor SHA current. A moved source head requires semantic review and a coordinated audited-head/manifest refresh before the adapter can return fresh. Documentation Truth also requires each truth-sensitive path to gain a new or changed path-bound invariant inside the reviewed base-to-head range; a claim inherited unchanged from the base receipt cannot certify a later source change.
+
+
+The audited Se’kret Bip and Chief adapter heads are updated only after live GitHub readback confirms that every required contract blob is byte-identical at the successor head. This binds strict request validation to the same head used by freshness CI without claiming unrelated repository changes, provider deployment, runtime behavior, or merge authority.

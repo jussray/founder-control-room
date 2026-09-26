@@ -138,6 +138,12 @@ describe('repository documentation truth control', () => {
     expect(documentationVerifier).toContain('visibleOutsideHtmlComments');
     expect(documentationVerifier).toContain('meaningfulInvariant(claim, sourcePath)');
     expect(documentationVerifier).toContain('meaningful path-bound invariant');
+    expect(documentationVerifier).toContain('receiptClaimsAtRevision(baseSha)');
+    expect(documentationVerifier).toContain('currentRangeClaims');
+    expect(documentationVerifier).toContain('normalizedClaimFingerprint');
+    expect(documentationVerifier).toContain('previousClaimFingerprints');
+    expect(documentationVerifier).toContain('projectAdapters|projectAdapterFreshness');
+    expect(documentationVerifier).toContain('must add or change a meaningful path-bound invariant in the reviewed range');
   });
 
   it('keeps documentation analytics observation-only', () => {

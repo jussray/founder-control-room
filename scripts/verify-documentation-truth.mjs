@@ -65,7 +65,7 @@ const truthSensitiveRules = [
   { domain: 'evidence-authority', match: /^src\/evidence\/(?!__tests__\/)(?!.*\.test\.ts$)/ },
   { domain: 'evidence-authority', match: /^public\/control-room\/evidence-trust\.html$/ },
   { domain: 'evidence-authority', match: /^\.github\/workflows\/playwright\.yml$/ },
-  { domain: 'evidence-authority', match: /^src\/founder-os-lab\/projectAdapters\.ts$/ },
+  { domain: 'evidence-authority', match: /^src\/founder-os-lab\/(?:projectAdapters|projectAdapterFreshness)\.ts$/ },
   { domain: 'capability-authority', match: /^\.control\/capability\.(?:json|yaml)$/ },
   { domain: 'workflow-authority', match: /^\.github\/workflows\/(?:ci|quality-gate|pr-recovery-exact-head|founder-repo-cycle|documentation-truth)\.yml$/ },
   { domain: 'cloudflare-authority', match: /^public\/_worker\.js$/ },
@@ -119,6 +119,13 @@ function meaningfulNarrative(value, minimumLength = MINIMUM_MEANINGFUL_DOC_TEXT_
     && words.some((word) => word.length >= 4);
 }
 
+function normalizedClaimFingerprint(value) {
+  return normalizedNarrativeText(value)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
 function visibleOutsideHtmlComments(value, state) {
   let cursor = 0;
   let visible = '';
@@ -156,6 +163,18 @@ function meaningfulInvariant(claim, sourcePath) {
   return meaningfulNarrative(claim, MINIMUM_MEANINGFUL_INVARIANT_LENGTH)
     && String(claim).includes(sourcePath)
     && /\b(must|cannot|requires?|rejects?|withhold|binds?|only|never|fail(?:s|ed)?\s+closed)\b/i.test(claim);
+}
+
+function receiptClaimsAtRevision(revision) {
+  try {
+    const parsed = JSON.parse(git('show', `${revision}:${DOCUMENTATION_RECEIPT_PATH}`));
+    if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.changes)) return new Map();
+    return new Map(parsed.changes
+      .filter((change) => change && typeof change === 'object' && nonEmptyString(change.path, 300) && Array.isArray(change.claims))
+      .map((change) => [change.path, change.claims.filter((claim) => nonEmptyString(claim))]));
+  } catch {
+    return new Map();
+  }
 }
 
 function documentationReceipt() {
@@ -220,10 +239,17 @@ if (truthSensitiveChanges.length > 0) {
         failures.push(`documentation truth receipt must name changed domain: ${domain}`);
       }
     }
+    const baseClaimsByPath = receiptClaimsAtRevision(baseSha);
     for (const change of truthSensitiveChanges) {
       const claims = receipt.claimsByPath.get(change.file) ?? [];
-      if (!claims.some((claim) => meaningfulInvariant(claim, change.file))) {
-        failures.push(`documentation truth receipt must name a meaningful path-bound invariant for: ${change.file}`);
+      const previousClaimFingerprints = new Set(
+        (baseClaimsByPath.get(change.file) ?? []).map((claim) => normalizedClaimFingerprint(claim)),
+      );
+      const currentRangeClaims = claims.filter(
+        (claim) => !previousClaimFingerprints.has(normalizedClaimFingerprint(claim)),
+      );
+      if (!currentRangeClaims.some((claim) => meaningfulInvariant(claim, change.file))) {
+        failures.push(`documentation truth receipt must add or change a meaningful path-bound invariant in the reviewed range for: ${change.file}`);
       }
     }
   }
