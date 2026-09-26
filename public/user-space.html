@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="A blank local-first Founder Control Room user workspace for moving a goal from signal to proof." />
+  <meta name="robots" content="noindex,nofollow" />
+  <meta name="theme-color" content="#07090f" />
+  <title>FCR · Your Control Surface</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #07090f;
+      --panel: #0f131b;
+      --surface: #141a24;
+      --line: #232c3b;
+      --line-strong: #39465d;
+      --text: #f7f8fb;
+      --muted: #98a5b7;
+      --muted-2: #738095;
+      --decide: #8b6cf6;
+      --evidence: #4fa5ff;
+      --act: #f29b4b;
+      --outcome: #e9cf66;
+      --ok: #6fe6aa;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--text);
+      background:
+        linear-gradient(rgba(255,255,255,.018) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.018) 1px, transparent 1px),
+        radial-gradient(circle at 12% -8%, rgba(139,108,246,.1), transparent 28rem),
+        radial-gradient(circle at 90% 2%, rgba(79,165,255,.07), transparent 24rem),
+        var(--bg);
+      background-size: 40px 40px, 40px 40px, auto, auto, auto;
+    }
+    a { color: inherit; }
+    .shell { width: min(1180px, calc(100% - 2rem)); margin: 0 auto; padding: 1rem 0 4rem; }
+    .topbar { min-height: 60px; display: flex; align-items: center; justify-content: space-between; gap: 1rem; border-bottom: 1px solid rgba(255,255,255,.055); }
+    .brand { display: flex; gap: .7rem; align-items: center; font-weight: 900; }
+    .mark { width: 36px; height: 36px; display: grid; place-items: center; border: 1px solid rgba(139,108,246,.45); border-radius: 10px; background: #111521; box-shadow: inset 3px 0 0 var(--decide); }
+    .back { color: var(--muted); text-decoration: none; font-size: .84rem; font-weight: 750; }
+    .hero { padding: clamp(2.4rem,6vw,4.8rem) 0 1.7rem; }
+    .eyebrow { color: #bdc5d1; font-size: .69rem; font-weight: 900; letter-spacing: .13em; text-transform: uppercase; }
+    .eyebrow::before { content:""; display:inline-block; width:18px; height:2px; margin:0 .5rem .2rem 0; background:var(--evidence); vertical-align:middle; }
+    h1 { max-width: 900px; margin: .8rem 0 .85rem; font-size: clamp(3rem,7.5vw,6.2rem); line-height: .96; letter-spacing: -.06em; }
+    h2, h3, p { margin-top: 0; }
+    h2 { margin-bottom: .45rem; font-size: 1.22rem; letter-spacing: -.025em; }
+    h3 { margin-bottom: .3rem; font-size: 1rem; }
+    .signal-word { color: var(--evidence); }
+    .proof-word { color: var(--outcome); }
+    .lede { max-width: 790px; margin: 0; color: #b0bbc9; font-size: 1.04rem; line-height: 1.65; }
+    .boundary { margin: 1rem 0 0; padding: .8rem .9rem; border: 1px solid rgba(79,165,255,.18); border-radius: 10px; background: rgba(79,165,255,.035); color: #aeb8c6; font-size: .8rem; }
+    .workspace-grid { display: grid; grid-template-columns: minmax(0,1.5fr) minmax(300px,.7fr); gap: .9rem; align-items: start; }
+    .panel { border: 1px solid var(--line); border-radius: 15px; background: rgba(15,19,27,.96); padding: 1rem; box-shadow: 0 22px 70px rgba(0,0,0,.24); }
+    .command-panel { padding: 0; overflow: hidden; }
+    .command-top { display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:.8rem .95rem; border-bottom:1px solid var(--line); color:var(--muted); font-size:.74rem; }
+    .command-top strong { color:#fff; letter-spacing:.03em; }
+    .device-state { display:inline-flex; align-items:center; gap:.42rem; }
+    .device-state::before { content:""; width:7px; height:7px; border-radius:50%; background:var(--ok); }
+    .command-body { padding: .95rem; }
+    .reality-grid { display:grid; grid-template-columns: minmax(0,1fr) minmax(240px,.62fr); gap:.75rem; }
+    .reality-card, .next-gate { border:1px solid var(--line); border-radius:12px; background:#111722; padding:.9rem; }
+    .reality-card { box-shadow: inset 3px 0 0 var(--evidence); }
+    .next-gate { box-shadow: inset 3px 0 0 var(--decide); }
+    .label { color:var(--muted-2); font-size:.68rem; font-weight:900; letter-spacing:.12em; text-transform:uppercase; }
+    .current-goal { margin:.42rem 0 .3rem; font-size:1.08rem; font-weight:900; }
+    .current-signal { color:#adb7c5; font-size:.88rem; line-height:1.55; }
+    .gate-copy { margin:.42rem 0 .2rem; font-size:1rem; font-weight:900; }
+    .gate-note { color:var(--muted); font-size:.8rem; }
+    .move-row { display:flex; flex-wrap:wrap; gap:.45rem; margin-top:.75rem; }
+    .move-chip { padding:.42rem .58rem; border:1px solid var(--line); border-radius:8px; background:#0e141d; color:#aeb9c7; font-size:.76rem; font-weight:850; }
+    .state-strip { display:grid; grid-template-columns:repeat(4,1fr); margin-top:.75rem; border:1px solid var(--line); border-radius:12px; overflow:hidden; }
+    .state-cell { min-width:0; padding:.72rem; border-right:1px solid var(--line); background:#0c1118; }
+    .state-cell:last-child { border-right:0; }
+    .state-cell b { display:block; font-size:.77rem; }
+    .state-cell small { color:var(--muted-2); font-size:.68rem; line-height:1.35; }
+    .state-cell[data-lane="decide"] { box-shadow: inset 0 3px 0 var(--decide); }
+    .state-cell[data-lane="evidence"] { box-shadow: inset 0 3px 0 var(--evidence); }
+    .state-cell[data-lane="act"] { box-shadow: inset 0 3px 0 var(--act); }
+    .state-cell[data-lane="outcome"] { box-shadow: inset 0 3px 0 var(--outcome); }
+    .composer { margin-top:.75rem; padding-top:.8rem; border-top:1px solid var(--line); }
+    .empty { min-height: 8.8rem; display: grid; place-items: center; text-align:center; border:1px dashed #334055; border-radius:11px; padding:1rem; background:rgba(255,255,255,.012); }
+    .empty strong { display:block; margin-bottom:.3rem; font-size:1.05rem; }
+    .empty span { color:var(--muted); font-size:.85rem; }
+    .saved { display:grid; gap:.5rem; }
+    .saved-row { padding:.78rem; border:1px solid var(--line); border-radius:10px; background:#101620; }
+    .saved-row span { display:block; color:var(--muted-2); font-size:.68rem; margin-bottom:.25rem; text-transform:uppercase; letter-spacing:.08em; font-weight:850; }
+    .saved-row div, .saved-row strong { color:#dce2ea; }
+    .status { color:var(--ok); font-size:.76rem; font-weight:850; }
+    form { display:grid; gap:.72rem; margin-top:.75rem; }
+    label { display:grid; gap:.32rem; color:#cfd6df; font-size:.78rem; font-weight:800; }
+    input, textarea { width:100%; border:1px solid var(--line-strong); border-radius:9px; padding:.76rem .8rem; background:#090e15; color:var(--text); font:inherit; }
+    textarea { min-height:6.4rem; resize:vertical; }
+    input:focus-visible, textarea:focus-visible, button:focus-visible, a:focus-visible { outline:2px solid rgba(79,165,255,.65); outline-offset:2px; }
+    button, .button { border:1px solid var(--line-strong); border-radius:9px; padding:.72rem .85rem; background:#121925; color:var(--text); font:inherit; font-weight:850; cursor:pointer; text-decoration:none; text-align:center; }
+    button.primary { border-color:rgba(139,108,246,.62); box-shadow:inset 3px 0 0 var(--decide); }
+    .actions { display:grid; grid-template-columns:1fr 1fr; gap:.55rem; }
+    .side-stack { display:grid; gap:.9rem; }
+    .tiny { color:var(--muted); font-size:.78rem; line-height:1.5; }
+    .semantic-list { display:grid; gap:.5rem; margin-top:.7rem; }
+    .semantic-row { display:grid; grid-template-columns:76px 1fr; gap:.6rem; align-items:start; padding:.66rem .7rem; border:1px solid var(--line); border-radius:9px; background:#101620; }
+    .semantic-row b { font-size:.75rem; }
+    .semantic-row span { color:var(--muted); font-size:.76rem; }
+    .semantic-row[data-lane="decide"] b { color:#c6b8ff; }
+    .semantic-row[data-lane="evidence"] b { color:#8ec8ff; }
+    .semantic-row[data-lane="act"] b { color:#ffc08a; }
+    .semantic-row[data-lane="outcome"] b { color:#f7e592; }
+    .module-list { display:grid; gap:.55rem; margin-top:.7rem; }
+    .module { display:grid; gap:.22rem; padding:.78rem; border:1px solid var(--line); border-radius:9px; text-decoration:none; background:#101620; }
+    .module:hover { border-color:#4b5a72; }
+    .module strong { font-size:.9rem; }
+    .module small { color:var(--muted); line-height:1.42; }
+    [hidden] { display:none !important; }
+    @media (max-width: 860px) { .workspace-grid, .reality-grid { grid-template-columns:1fr; } .state-strip { grid-template-columns:repeat(2,1fr); } .state-cell:nth-child(2) { border-right:0; } .state-cell:nth-child(-n+2) { border-bottom:1px solid var(--line); } }
+    @media (max-width: 560px) { .shell { width:min(100% - 1rem,1180px); } .brand span:last-child { display:none; } .hero { padding-top:2.2rem; } .state-strip, .actions { grid-template-columns:1fr; } .state-cell { border-right:0; border-bottom:1px solid var(--line); } .state-cell:last-child { border-bottom:0; } }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition:none !important; scroll-behavior:auto !important; } }
+  </style>
+</head>
+<body data-fcr-user-space>
+  <main class="shell">
+    <header class="topbar">
+      <div class="brand"><span class="mark" aria-hidden="true">F</span><span>Founder Control Room</span></div>
+      <a class="back" href="/">← Public FCR</a>
+    </header>
+
+    <section class="hero">
+      <div class="eyebrow">User control surface · local-first</div>
+      <h1>Move what matters from <span class="signal-word">signal</span> to <span class="proof-word">proof.</span></h1>
+      <p class="lede">Start with current reality. Capture one goal and one observed signal. FCR keeps decision, action, evidence, and outcome separate so activity does not masquerade as proof.</p>
+      <p class="boundary" data-user-boundary><strong>Hard boundary:</strong> this page starts with no projects, claims, account history, or private founder state. It does not call founder-only APIs. Device-local state is not a cloud account or an authority receipt.</p>
+    </section>
+
+    <section class="workspace-grid" aria-label="Your FCR workspace">
+      <article class="panel command-panel" data-fcr-command-surface>
+        <div class="command-top"><strong>FCR / YOUR SPACE</strong><span class="device-state">Device local</span></div>
+        <div class="command-body">
+          <div class="reality-grid">
+            <section class="reality-card" aria-labelledby="current-reality-title">
+              <div class="label">Current Reality</div>
+              <div class="current-goal" id="current-reality-title" data-current-goal>No reality loaded yet.</div>
+              <div class="current-signal" data-current-signal>Capture one real goal and one observed signal. FCR will not invent the missing evidence.</div>
+            </section>
+            <section class="next-gate" aria-labelledby="next-gate-title">
+              <div class="label">Next Gate</div>
+              <div class="gate-copy" id="next-gate-title" data-next-gate>Capture reality first.</div>
+              <div class="gate-note" data-next-gate-note>One focused move before anything else.</div>
+              <div class="move-row" aria-label="FCR move types">
+                <span class="move-chip">Build</span><span class="move-chip">Fix</span><span class="move-chip">Launch</span><span class="move-chip">Prove</span>
+              </div>
+            </section>
+          </div>
+
+          <div class="state-strip" data-fcr-state-strip aria-label="FCR operating states">
+            <div class="state-cell" data-lane="decide"><b>Decision</b><small>Choose the next gate.</small></div>
+            <div class="state-cell" data-lane="evidence"><b>Evidence</b><small data-evidence-state>Unknown until you add a signal.</small></div>
+            <div class="state-cell" data-lane="act"><b>Action</b><small>Not recorded on this surface.</small></div>
+            <div class="state-cell" data-lane="outcome"><b>Outcome</b><small data-outcome-state>Unknown until observed.</small></div>
+          </div>
+
+          <div class="composer">
+            <div class="empty" data-user-empty-state>
+              <div><strong>Your control surface is clean.</strong><span>No demo records and no founder records were loaded.</span></div>
+            </div>
+
+            <div class="saved" data-user-saved-state hidden>
+              <div class="saved-row"><span>Current goal</span><strong data-user-goal-output></strong></div>
+              <div class="saved-row"><span>Observed signal</span><div data-user-signal-output></div></div>
+              <div class="status">Saved on this device · evidence is still user-provided, not independently verified</div>
+            </div>
+
+            <form data-user-space-form>
+              <label>What are you trying to move?
+                <input name="goal" maxlength="180" autocomplete="off" placeholder="One outcome that matters" required />
+              </label>
+              <label>What did you actually observe?
+                <textarea name="signal" maxlength="1200" placeholder="A real signal, result, question, or piece of evidence" required></textarea>
+              </label>
+              <div class="actions">
+                <button class="primary" type="submit">Save to this device</button>
+                <button type="button" data-clear-user-space>Clear this device</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </article>
+
+      <div class="side-stack">
+        <aside class="panel" aria-labelledby="semantic-title">
+          <h2 id="semantic-title">FCR color language</h2>
+          <p class="tiny">Color carries one job only. Status still requires words and evidence.</p>
+          <div class="semantic-list">
+            <div class="semantic-row" data-lane="decide"><b>Decide</b><span>Purple marks core decisions and next gates.</span></div>
+            <div class="semantic-row" data-lane="evidence"><b>Evidence</b><span>Blue marks truth, proof, and observed signals.</span></div>
+            <div class="semantic-row" data-lane="act"><b>Act</b><span>Orange marks motion and bounded execution.</span></div>
+            <div class="semantic-row" data-lane="outcome"><b>Outcome</b><span>Yellow marks results and learned lift.</span></div>
+          </div>
+        </aside>
+
+        <aside class="panel">
+          <h2>Attached FCR capabilities</h2>
+          <p class="tiny">These are separate bounded surfaces. Opening one does not grant it access to this page's device-local data.</p>
+          <div class="module-list">
+            <a class="module" data-user-signal-loop href="https://24app.cc/apps/5ac26ftu/" target="_blank" rel="noopener noreferrer">
+              <strong>SignalLoop ↗</strong>
+              <small>Turn observed signals into content hypotheses and learning loops. Publication, engagement, and outcome remain separate facts.</small>
+            </a>
+            <a class="module" href="https://fcr-truth-weaver.lovable.app" target="_blank" rel="noopener noreferrer">
+              <strong>Truth Weaver ↗</strong><small>Challenge a decision before you commit.</small>
+            </a>
+            <a class="module" href="https://fcr-truth-compass.lovable.app" target="_blank" rel="noopener noreferrer">
+              <strong>Truth Compass ↗</strong><small>Reconcile a claim with observed evidence.</small>
+            </a>
+            <a class="module" href="https://fcr-exact-match.lovable.app" target="_blank" rel="noopener noreferrer">
+              <strong>Exact Match Engine ↗</strong><small>Separate exact matches, mismatches, missing evidence, and stale state.</small>
+            </a>
+          </div>
+        </aside>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    (() => {
+      const storageKey = 'fcr.user-space.v1';
+      const form = document.querySelector('[data-user-space-form]');
+      const empty = document.querySelector('[data-user-empty-state]');
+      const saved = document.querySelector('[data-user-saved-state]');
+      const goalOutput = document.querySelector('[data-user-goal-output]');
+      const signalOutput = document.querySelector('[data-user-signal-output]');
+      const currentGoal = document.querySelector('[data-current-goal]');
+      const currentSignal = document.querySelector('[data-current-signal]');
+      const nextGate = document.querySelector('[data-next-gate]');
+      const nextGateNote = document.querySelector('[data-next-gate-note]');
+      const evidenceState = document.querySelector('[data-evidence-state]');
+      const outcomeState = document.querySelector('[data-outcome-state]');
+      const clearButton = document.querySelector('[data-clear-user-space]');
+
+      const render = (record) => {
+        if (!record || !record.goal || !record.signal) {
+          empty.hidden = false;
+          saved.hidden = true;
+          goalOutput.textContent = '';
+          signalOutput.textContent = '';
+          currentGoal.textContent = 'No reality loaded yet.';
+          currentSignal.textContent = 'Capture one real goal and one observed signal. FCR will not invent the missing evidence.';
+          nextGate.textContent = 'Capture reality first.';
+          nextGateNote.textContent = 'One focused move before anything else.';
+          evidenceState.textContent = 'Unknown until you add a signal.';
+          outcomeState.textContent = 'Unknown until observed.';
+          return;
+        }
+        goalOutput.textContent = record.goal;
+        signalOutput.textContent = record.signal;
+        currentGoal.textContent = record.goal;
+        currentSignal.textContent = record.signal;
+        nextGate.textContent = 'Choose one focused move that can test this signal.';
+        nextGateNote.textContent = 'Do not promote the signal into an outcome until you observe the result.';
+        evidenceState.textContent = 'User-provided signal captured.';
+        outcomeState.textContent = 'Unknown until a result is observed.';
+        empty.hidden = true;
+        saved.hidden = false;
+      };
+
+      let record = null;
+      try {
+        const raw = window.localStorage.getItem(storageKey);
+        if (raw) record = JSON.parse(raw);
+      } catch {
+        record = null;
+      }
+      render(record);
+
+      form.addEventListener('submit', (event) => {
+        event.preventDefault();
+        const data = new FormData(form);
+        const next = {
+          goal: String(data.get('goal') || '').trim(),
+          signal: String(data.get('signal') || '').trim(),
+          savedAt: new Date().toISOString(),
+        };
+        if (!next.goal || !next.signal) return;
+        window.localStorage.setItem(storageKey, JSON.stringify(next));
+        render(next);
+      });
+
+      clearButton.addEventListener('click', () => {
+        window.localStorage.removeItem(storageKey);
+        form.reset();
+        render(null);
+      });
+    })();
+  </script>
+</body>
+</html>
