@@ -6,6 +6,12 @@ import { describe, expect, it } from 'vitest';
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 const workflow = readFileSync(resolve(repositoryRoot, '.github/workflows/deploy.yml'), 'utf8');
 const workerConfig = readFileSync(resolve(repositoryRoot, 'wrangler.worker.toml'), 'utf8');
+const capabilitySecrets = JSON.parse(
+  readFileSync(resolve(repositoryRoot, 'config/worker-capability-secrets.json'), 'utf8'),
+) as {
+  schema?: string;
+  capabilityOptional?: Array<{ name?: string; capability?: string }>;
+};
 
 function section(start: string, end: string): string {
   const startIndex = workflow.indexOf(start);
@@ -29,7 +35,7 @@ describe('production deploy recovery contract', () => {
     expect(push).toContain('--include-all');
   });
 
-  it('keeps the founder review ingress secret provider-held while requiring its Worker binding', () => {
+  it('keeps the founder review ingress secret provider-held and capability-scoped', () => {
     const authority = section(
       '      - name: Validate required production configuration',
       '      - name: Record authority receipt',
@@ -37,8 +43,11 @@ describe('production deploy recovery contract', () => {
     const worker = section('  worker-deploy:', '  # ── 3.');
     const secret = 'FOUNDER_REVIEW_EMAIL_INGRESS_SECRET';
     const secretMapping = `${secret}: ` + '${{ secrets.' + secret + ' }}';
+    const capability = capabilitySecrets.capabilityOptional?.find((entry) => entry.name === secret);
 
-    expect(workerConfig).toContain(`"${secret}",`);
+    expect(capabilitySecrets.schema).toBe('fcr/worker-capability-secrets@v1');
+    expect(capability?.capability).toBe('founder-review-email-ingress');
+    expect(workerConfig).not.toContain(`"${secret}",`);
     expect(authority).toContain('Worker runtime secrets remain provider-held');
     expect(authority).toContain('name-read-back in the next authority-gate step');
     expect(authority).not.toContain(secretMapping);
