@@ -44,7 +44,8 @@
         "A fresh peer ref/SHA observation may select the successor StoryEngine evidence subject, but the successor FCR federation state remains UNKNOWN until the complete exact-head runtime identity, directive, receipt, and Playwright browser witness succeeds against that peer.",
         "Refreshing `STORYENGINE_PEER_SHA` after independently observing StoryEngine main is recovery setup only; pin alignment must not carry predecessor Playwright green or founder approval onto the successor FCR head.",
         "The September 24, 2026 StoryEngine peer refresh after Council residency moved the peer head selects a new evidence subject only; predecessor browser green remains historical until the exact successor FCR head reruns the complete federation witness.",
-        "`.github/workflows/playwright.yml` must treat the pinned StoryEngine peer as an exact evidence subject, verify the live ref still resolves to that SHA before starting the peer runtime, and expire predecessor browser proof whenever either repository head advances."
+        "`.github/workflows/playwright.yml` must treat the pinned StoryEngine peer as an exact evidence subject, verify the live ref still resolves to that SHA before starting the peer runtime, and expire predecessor browser proof whenever either repository head advances.",
+        "`.github/workflows/playwright.yml` must treat an exact ref/pin match as an identity prerequisite only; a cancelled, skipped, or non-executed exact-head Playwright run cannot renew browser-federation proof and must leave the successor claim UNKNOWN."
       ]
     },
     {
@@ -264,6 +265,18 @@
       "path": "src/providers/SecurityPreservingGitHubProvider.ts",
       "claims": [
         "`src/providers/SecurityPreservingGitHubProvider.ts` must block ordinary forward patching unless the exact branch head is `VERIFIED_CLEAN`; a `KNOWN_BAD` head may accept only an explicit repair message bound to that same exact SHA, while stale repair intent and `UNVERIFIED` heads must fail closed without granting merge, deploy, publication, provider-policy, or founder authority."
+      ]
+    },
+    {
+      "path": "src/founder-os-lab/projectAdapters.ts",
+      "claims": [
+        "`src/founder-os-lab/projectAdapters.ts` must bind Chief integration evidence to one audited exact Chief head; moving that head expires predecessor adapter and pair-contract proof, requires the focused assertion and path-bound documentation receipt to move together, and grants no Chief runtime, merge, deploy, publication, or provider authority."
+      ]
+    },
+    {
+      "path": "scripts/verify-documentation-truth.mjs",
+      "claims": [
+        "`scripts/verify-documentation-truth.mjs` must classify `src/founder-os-lab/projectAdapters.ts` as evidence-authority truth-sensitive so a Chief exact-head pin movement cannot pass Documentation Truth without substantive README, truth-decay audit, and structured receipt updates that name the changed path."
       ]
     }
   ]

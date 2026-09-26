@@ -18,7 +18,16 @@ describe('project-specific FCR shells', () => {
     for (const shell of PROJECT_SHELLS) {
       expect(shell.projectSpecificViews.length).toBeGreaterThan(0);
       expect(shell.inheritedFcrContracts).toEqual(
-        expect.arrayContaining(['founder-intent', 'authority', 'evidence', 'outcome', 'recovery', 'continuity', 'next-gate']),
+        expect.arrayContaining([
+          'founder-intent',
+          'authority',
+          'evidence',
+          'outcome',
+          'recovery',
+          'continuity',
+          'next-gate',
+          'growth-opportunity-intelligence',
+        ]),
       );
       expect(shell.emphasis.every((family) => CONTAINER_FAMILIES.includes(family))).toBe(true);
     }

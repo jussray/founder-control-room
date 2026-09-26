@@ -1,0 +1,139 @@
+name: Growth Opportunity Intelligence Proof
+
+on:
+  push:
+    paths:
+      - 'src/growth/**'
+      - 'src/config/projectShells.ts'
+      - 'src/config/__tests__/projectShells.test.ts'
+      - '.control-room/receipts/2026-09-26-growth-opportunity-intelligence.json'
+      - '.github/workflows/growth-opportunity-intelligence-proof.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/growth/**'
+      - 'src/config/projectShells.ts'
+      - 'src/config/__tests__/projectShells.test.ts'
+      - '.control-room/receipts/2026-09-26-growth-opportunity-intelligence.json'
+      - '.github/workflows/growth-opportunity-intelligence-proof.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: growth-opportunity-intelligence-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  exact-head-proof:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify exact head and current main ancestry
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
+          git fetch --no-tags origin main
+          git merge-base --is-ancestor origin/main "$EXPECTED_HEAD_SHA"
+          printf 'current-main=%s\n' "$(git rev-parse origin/main)"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Typecheck repository source
+        run: npm run typecheck
+
+      - name: Run focused opportunity tests
+        run: >-
+          npx vitest run
+          src/growth/__tests__/opportunityIntelligence.test.ts
+          src/config/__tests__/projectShells.test.ts
+
+      - name: Build Pages exact head
+        run: npm run build:pages
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Start exact-head Pages witness
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m http.server 3000 --bind 127.0.0.1 --directory dist-pages > /tmp/fcr-pages.log 2>&1 &
+          echo $! > /tmp/fcr-pages.pid
+          timeout 30s npx wait-on http://127.0.0.1:3000
+
+      - name: Run Playwright desktop and mobile proof
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/growth-opportunity-intelligence
+          node --input-type=module <<'NODE'
+          import { chromium } from 'playwright';
+
+          const origin = 'http://127.0.0.1:3000';
+          const browser = await chromium.launch({ headless: true });
+          const cases = [
+            { name: 'desktop', viewport: { width: 1440, height: 900 } },
+            { name: 'mobile', viewport: { width: 390, height: 844 } },
+          ];
+
+          try {
+            for (const testCase of cases) {
+              const page = await browser.newPage({ viewport: testCase.viewport });
+              const response = await page.goto(origin, { waitUntil: 'domcontentloaded' });
+              if (!response || response.status() >= 400) {
+                throw new Error(`${testCase.name} root navigation failed: ${response?.status() ?? 'no-response'}`);
+              }
+              const body = (await page.locator('body').innerText()).trim();
+              if (body.length < 20) {
+                throw new Error(`${testCase.name} rendered body is unexpectedly empty`);
+              }
+              await page.screenshot({
+                path: `artifacts/growth-opportunity-intelligence/${testCase.name}.png`,
+                fullPage: true,
+              });
+              console.log(JSON.stringify({
+                case: testCase.name,
+                status: response.status(),
+                bodyLength: body.length,
+                url: page.url(),
+              }));
+              await page.close();
+            }
+          } finally {
+            await browser.close();
+          }
+          NODE
+
+      - name: Preserve proof artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: growth-opportunity-intelligence-${{ env.EXPECTED_HEAD_SHA }}
+          path: |
+            artifacts/growth-opportunity-intelligence/
+            /tmp/fcr-pages.log
+          if-no-files-found: warn
+          retention-days: 14

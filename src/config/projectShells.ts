@@ -22,6 +22,7 @@ const inheritedFcrContracts = [
   'recovery',
   'continuity',
   'next-gate',
+  'growth-opportunity-intelligence',
 ] as const;
 
 export const PROJECT_SHELLS: readonly ProjectShellDefinition[] = [
