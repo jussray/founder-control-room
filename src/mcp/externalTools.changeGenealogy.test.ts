@@ -1,4 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
+
+vi.mock('../lib/supabaseClient.js', () => ({
+  supabase: { from: vi.fn() },
+}));
+
 import {
   createExternalMcpToolExecutor,
   externalMcpToolDefinitions,

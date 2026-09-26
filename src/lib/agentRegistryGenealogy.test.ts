@@ -8,6 +8,7 @@ const EXPECTED_OPERATORS = [
   'claude-code',
   'codex',
   'muse',
+  'deepseek',
   'deepseek-instructor',
   'perplexity',
 ] as const;
@@ -28,6 +29,7 @@ describe('agent change genealogy inheritance', () => {
     expect(agentCanOperate('codex', 'implement')).toBe(true);
     expect(agentCanOperate('muse', 'implement')).toBe(true);
     expect(agentCanOperate('perplexity', 'implement')).toBe(true);
+    expect(agentCanOperate('deepseek', 'implement')).toBe(true);
 
     expect(agentCanOperate('deepseek-instructor', 'instruct')).toBe(true);
     expect(agentCanOperate('deepseek-instructor', 'implement')).toBe(false);

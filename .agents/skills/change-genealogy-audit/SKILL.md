@@ -1,7 +1,9 @@
 ---
 name: change-genealogy-audit
 description: Reconstruct recent repository change lineage before assigning root cause. Uses a 10-PR default window, bounded comments/diffs, every PR commit identity, recent default-branch commits, provider-proven PR associations, separate failure receipts, and exact-head proof escalation.
-version: 1.0
+version: 1.0.0
+status: active
+scope: founder-control-room
 owner: Juss
 trigger:
   - /genealogy
@@ -136,6 +138,7 @@ All enabled Council operators inherit the same genealogy contract:
 - Gemini
 - Muse
 - Perplexity
+- DeepSeek
 - DeepSeek Instructor
 - eligible local/future operators admitted by registry
 
