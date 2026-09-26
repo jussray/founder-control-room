@@ -25,7 +25,7 @@ export type SupabaseVisibilityState =
 
 export const SUPABASE_ORGANIZATIONS = {
   rayleneProjects: 'vercel_icfg_v3CousBaJVAqOT9wXYPLhyR2',
-  sekretBipLegacy: 'adfsemxgosfkioxaefoq',
+  sekretBipOrganization: 'adfsemxgosfkioxaefoq',
 } as const;
 
 /**
@@ -56,7 +56,7 @@ export const SUPABASE_PROJECT_AUTHORITIES: readonly SupabaseProjectAuthorityBind
   {
     projectSlug: 'l99',
     projectRef: 'tarnmxcjpvaxapnjnesf',
-    organizationRef: SUPABASE_ORGANIZATIONS.sekretBipLegacy,
+    organizationRef: SUPABASE_ORGANIZATIONS.sekretBipOrganization,
     role: 'canonical-runtime',
     evidence: 'repo-source+provider-receipt',
     mutationAuthority: false,
@@ -64,7 +64,7 @@ export const SUPABASE_PROJECT_AUTHORITIES: readonly SupabaseProjectAuthorityBind
   {
     projectSlug: 'chief-ai-machine',
     projectRef: 'lghpwoktsytutssjiwgy',
-    organizationRef: SUPABASE_ORGANIZATIONS.sekretBipLegacy,
+    organizationRef: SUPABASE_ORGANIZATIONS.sekretBipOrganization,
     role: 'known-unclassified',
     evidence: 'provider-receipt-only',
     mutationAuthority: false,
