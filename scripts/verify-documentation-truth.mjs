@@ -2,6 +2,8 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
+import { normalizedClaimFingerprint } from '../src/lib/documentationTruthClaimFingerprint.js';
+
 const root = process.cwd();
 const FULL_SHA = /^[0-9a-f]{40}$/i;
 const DOCUMENTATION_RECEIPT_PATH = 'docs/DOCUMENTATION_TRUTH_RECEIPT.json';
@@ -117,13 +119,6 @@ function meaningfulNarrative(value, minimumLength = MINIMUM_MEANINGFUL_DOC_TEXT_
   return normalized.length >= minimumLength
     && words.length >= 5
     && words.some((word) => word.length >= 4);
-}
-
-function normalizedClaimFingerprint(value) {
-  return normalizedNarrativeText(value)
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, ' ')
-    .trim();
 }
 
 function visibleOutsideHtmlComments(value, state) {
