@@ -330,7 +330,7 @@ jobs:
           main_sha = parts[1]
           approval = parts[2]
           if not re.fullmatch(r'[0-9a-f]{40}', main_sha):
-              raise SystemExit('Current main SHA must be a lowercase full commit SHA.')
+              raise SystemExit('Current main SHA must be a lowercase 40-character commit SHA.')
           if not re.fullmatch(r'[A-Za-z0-9._:-]{8,200}', approval):
               raise SystemExit('Approval reference must use 8-200 auditable characters: A-Z a-z 0-9 . _ : -')
 
