@@ -220,11 +220,18 @@ export class SecurityPreservingGitHubProvider extends GitHubProvider {
   }
 
   override async applyBranchRuleset(projectId: string, config: RulesetConfig): Promise<RulesetResult> {
-    if (projectId === FOUNDER_CONTROL_ROOM_PROJECT_ID) return super.applyBranchRuleset(projectId, config);
-
     const { owner, repo } = this.locateRulesetRepository(projectId);
     const { data: summaries } = await this.adminOctokit.repos.getRepoRulesets({ owner, repo, per_page: 100 });
     const existing = summaries.find((ruleset) => ruleset.name === config.name);
+
+    if (projectId === FOUNDER_CONTROL_ROOM_PROJECT_ID) {
+      if (existing) {
+        throw new Error(
+          "SecurityPreservingGitHubProvider: existing Founder Control Room ruleset updates are blocked until a preservation-safe provider reconciliation contract exists",
+        );
+      }
+      return super.applyBranchRuleset(projectId, config);
+    }
 
     if (!existing) {
       const { data } = await this.adminOctokit.repos.createRepoRuleset({
