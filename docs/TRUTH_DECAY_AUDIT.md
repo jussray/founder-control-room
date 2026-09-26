@@ -429,3 +429,10 @@ The Truth Lease, production-specific lease composer, temporal founder-content gu
 ## StoryEngine peer-pin decay
 
 A StoryEngine peer SHA in `.github/workflows/playwright.yml` is bounded evidence identity. When StoryEngine or Founder Control Room advances, predecessor browser-federation receipts become historical immediately; matching the live ref to a refreshed pin is setup evidence only, and the successor state remains UNKNOWN until the complete exact-head runtime and Playwright witness succeeds.
+
+
+## 2026-09-25 CI repair evidence transport
+
+The current-main CI repair cycle added an exact StoryEngine peer-pin transition and repaired hidden `.repair/` artifact uploads by setting `include-hidden-files: true` on every evidence upload. This is repository/CI evidence only: it does not prove a deployment, Cloudflare runtime, data/auth state, or user-visible outcome.
+
+Truth boundary: peer-pin and repair-artifact changes must refresh the README, this truth-decay audit, and `docs/DOCUMENTATION_TRUTH_RECEIPT.json` in the same exact-head range. A successor head must earn its own CI and Playwright proof; predecessor green runs do not transfer.
