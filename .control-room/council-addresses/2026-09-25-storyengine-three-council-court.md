@@ -7,8 +7,6 @@ Observed FCR main before address: `0d9b09613cf60c432743635fcdf6633ca86dd7be`
 Owning product for implementation: `jussray/StoryEngine`
 Authority ceiling: advise, challenge, reconcile, and specify. Do not merge, deploy, publish, spend, or mutate StoryEngine production from this address alone.
 
-This Court address also inherits `docs/FOUNDER_WORK_PRODUCTIZATION_CONTRACT.md`. The Court may discover a repeatable creative workflow, but the durable product surface belongs in FCR/StoryEngine. Court deliberation must not become a permanent chat ritual or a fourth execution authority plane.
-
 ## Founder address
 
 Council,
@@ -166,30 +164,6 @@ LLMs, MCPs, SDKs, databases, memory systems, media routers, and model runtimes a
 
 MCP may expose Story Memory, project files, research, GitHub, approved data, media assets, and publishing/export capabilities according to policy. Access to a capability never authorizes canon mutation, publication, spend, deploy, deletion, or cross-project writes.
 
-Provider credentials remain provider-scoped capability. An OpenAI or Anthropic API key does not become GitHub, Supabase, publishing, or unrelated service authority merely because the provider can reason about those systems.
-
-## Court workflow graduation
-
-A Court session remains one-off deliberation unless the pattern proves reusable.
-
-When the same jurisdiction routing repeatedly serves a stable creator outcome, Chief may compile it into a `juss/fcr-workflow-candidate@v1` for FCR/StoryEngine. The candidate must preserve:
-
-- plain user-facing outcome label;
-- Base Context and project canon boundaries;
-- smallest relevant Court quorum;
-- independent-first findings;
-- `/DEVIL` cross-examination;
-- creator override/ruling;
-- real-vs-simulated provider labels;
-- required proof;
-- privacy/cost limits;
-- failure/stop behavior; and
-- rollback without damaging the creator's project or canon.
-
-The creator should not have to type the internal Court stack every time. The graduated workflow owns that composition behind the product surface.
-
-Productization never authorizes publication, canon mutation, spend, deploy, or other separately gated action and never removes creator ruling.
-
 ## Proposed StoryEngine court receipt
 
 For substantial sessions, leave a compact receipt:
@@ -224,11 +198,6 @@ custom instruction:
 CANON EFFECT
 none / proposed / approved:
 
-WORKFLOW
-one-off / existing workflow id / candidate id:
-public outcome:
-graduation evidence:
-
 NEXT ACTION
 ...
 ```
@@ -244,6 +213,5 @@ Please deliberate and return one FCR synthesis packet using the existing Council
 - `RISK`: orchestration bloat, cost/latency, fake consensus, over-editing, voice flattening, provider lock-in, canon corruption, user trapping, and any additional failure modes discovered.
 - `ROLLBACK`: how to disable Court routing without damaging a creator's project or canon.
 - `NEXT GATE`: one exact founder decision or smallest implementation action.
-- `WORKFLOW`: whether this remains one-off, maps to an existing FCR workflow, or should become a Chief-compiled workflow candidate.
 
-Do not treat this address as merge/deploy approval. Do not create duplicate authority systems. Prefer extension of FCR's resident Council, capability market, task routing, receipts, StoryEngine's existing memory/canon paths, and the shared work-productization contract.
+Do not treat this address as merge/deploy approval. Do not create duplicate authority systems. Prefer extension of FCR's resident Council, capability market, task routing, receipts, and StoryEngine's existing memory/canon paths.

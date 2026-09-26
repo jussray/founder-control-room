@@ -1,43 +1,269 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Bind the current evidence-authority correction for the FCR/StoryEngine browser witness and document the Twin Core control-plane boundary: peer refresh selects a new proof subject only, Bip contributes generic mechanics without product identity, and FCR/Chief remain standalone peers with proven-only task clearance.",
+  "purpose": "Document current evidence-authority boundaries across cross-repository browser federation, resident Council/Muse relay activation, and provider-held runtime-secret observation: source wiring, configured bindings, live provider invocation, and mutation authority remain separate claims with separate proof.",
   "domains": [
-    "evidence-authority"
+    "cloudflare-authority",
+    "repository-provider",
+    "content-evidence",
+    "evidence-authority",
+    "publishing",
+    "merge-authority",
+    "workflow-authority",
+    "truth-governance"
   ],
   "changes": [
     {
+      "path": ".github/workflows/openai-runtime-secret-proof.yml",
+      "claims": [
+        "`.github/workflows/openai-runtime-secret-proof.yml` must prove only provider-held Worker secret-name presence for both `OPENAI_API_KEY` and Muse `MODEL_API_KEY`; it must never read or print either secret value and must not convert a failed Cloudflare observation prerequisite into a claim that an unobserved target secret is absent.",
+        "If the Cloudflare credential needed to execute `wrangler secret list` is malformed, rejected, or otherwise unusable before the provider list is observed, `MODEL_API_KEY` presence remains UNKNOWN/BLOCKED rather than missing; transport failure is not negative provider evidence."
+      ]
+    },
+    {
+      "path": "src/lib/operatorRelayMuseProvider.ts",
+      "claims": [
+        "`src/lib/operatorRelayMuseProvider.ts` may expose Muse only through a bounded server-side adapter with explicit model allow-listing, non-stored requests, response/time limits, restricted-context rejection, provider evidence identity, and zero inherited founder/merge/deploy/publish authority; source implementation does not prove a live Muse invocation."
+      ]
+    },
+    {
+      "path": ".control-room/council-residency.contract.json",
+      "claims": [
+        "`.control-room/council-residency.contract.json` defines one logical Founder Council resident in the assistant host and this project Control Room while preserving project-local execution authority, behind-the-scenes user benefit, smallest-useful-seat routing, provider-proof requirements, and founder consequential authority."
+      ]
+    },
+    {
+      "path": "public/_worker.js",
+      "claims": [
+        "`public/_worker.js` must route public static discovery artifacts, including `crawlers.json`, through the Pages `ASSETS` binding while API-owned callback assets remain on `FCR_API`; this routing classification cannot authorize provider mutation or treat a static crawler policy as authentication."
+      ]
+    },
+    {
       "path": ".github/workflows/playwright.yml",
       "claims": [
-        "`.github/workflows/playwright.yml` must bind the FCR-to-StoryEngine federation witness to the independently observed exact StoryEngine peer SHA and ref; changing that peer identity invalidates predecessor browser/federation proof and requires the complete successor exact-head runtime, directive, receipt, and Playwright witness before any current federation claim.",
-        "`.github/workflows/playwright.yml` cannot treat peer-pin alignment, predecessor green, source implementation, founder approval for another head, or a successful local browser harness as proof of the successor federation state; merge, deploy, production, provider-mutation, and outcome authority remain separate."
+        "`.github/workflows/playwright.yml` must bind the FCR-to-StoryEngine browser federation witness to a separately verified exact StoryEngine peer SHA and ref; changing that peer identity expires predecessor federation/browser proof and requires the complete exact-head witness to rerun without granting merge, deploy, production, or provider-mutation authority.",
+        "A fresh peer ref/SHA observation may select the successor StoryEngine evidence subject, but the successor FCR federation state remains UNKNOWN until the complete exact-head runtime identity, directive, receipt, and Playwright browser witness succeeds against that peer.",
+        "Refreshing `STORYENGINE_PEER_SHA` after independently observing StoryEngine main is recovery setup only; pin alignment must not carry predecessor Playwright green or founder approval onto the successor FCR head.",
+        "The September 24, 2026 StoryEngine peer refresh after Council residency moved the peer head selects a new evidence subject only; predecessor browser green remains historical until the exact successor FCR head reruns the complete federation witness.",
+        "`.github/workflows/playwright.yml` must treat the pinned StoryEngine peer as an exact evidence subject, verify the live ref still resolves to that SHA before starting the peer runtime, and expire predecessor browser proof whenever either repository head advances."
+      ]
+    },
+    {
+      "path": ".github/workflows/ci.yml",
+      "claims": [
+        "`.github/workflows/ci.yml` must keep the existing crawler and public-work Playwright specs inside the load-bearing `Playwright e2e` job that feeds `Required Gate`; a separate advisory Pages workflow cannot substitute for required exact-head browser execution or grant merge authority."
+      ]
+    },
+    {
+      "path": "wrangler.worker.toml",
+      "claims": [
+        "`wrangler.worker.toml` must list `FCR_SHOPIFY_WEBHOOK_SECRET` and `FCR_COMMERCE_HASH_SALT` under `[secrets].required`, so canonical exact-main Deploy rejects a missing FCR Shopify runtime binding before Worker mutation while never reading, logging, or re-uploading either provider-held value; this source boundary cannot prove webhook registration, production migration, runtime delivery, or collected revenue.",
+        "`wrangler.worker.toml` must also declare `FCR_CLOUDFLARE_MCP_READ_TOKEN` and Muse `MODEL_API_KEY` as provider-held required Worker secret names while keeping `FCR_RELAY_MUSE_MODEL` and the official Cloudflare MCP endpoint public-safe configuration; declaration proves required-name policy only, not provider presence or successful Muse/Cloudflare runtime use."
+      ]
+    },
+    {
+      "path": ".github/workflows/fcr-access-front-door-recovery.yml",
+      "claims": [
+        "`.github/workflows/fcr-access-front-door-recovery.yml` must keep FCR product authentication inside the app, may detach only browser-facing public destinations from one uniquely identified mixed Cloudflare Access application, must preserve every non-browser destination and existing policy, and must fail closed on ambiguous or public-only provider state."
+      ]
+    },
+    {
+      "path": "src/http/routes/approvals.ts",
+      "claims": [
+        "`src/http/routes/approvals.ts` must require exact-head evidence plus provider-backed PR identity, deterministic independent review, and authenticated founder-final confirmation bound to the exact PR, base, and head before FCR integration, then must re-read the mutable branch head immediately before provider integration."
+      ]
+    },
+    {
+      "path": "src/http/routes/n8nConveyor.ts",
+      "claims": [
+        "`src/http/routes/n8nConveyor.ts` may mount the authenticated YouTube growth evaluator under the existing founder-content conveyor only as a read/evaluation capability; mounting that route must not grant publish, schedule, spend, provider-mutation, scale-execution, merge, or deploy authority and must not weaken the existing founder-content publication membrane."
+      ]
+    },
+    {
+      "path": "src/http/routes/founderContentLifecycleRuntime.ts",
+      "claims": [
+        "`src/http/routes/founderContentLifecycleRuntime.ts` may inject a configured Postiz lifecycle adapter only as the bounded account/status readback dependency declared by that adapter; runtime composition must not add publication authority or bypass the existing founder-content approval and execution membrane."
+      ]
+    },
+    {
+      "path": "src/http/routes/youtubeGrowth.ts",
+      "claims": [
+        "`src/http/routes/youtubeGrowth.ts` must require founder authentication, reject malformed or unknown experiment, measurement, continuity, threshold, target, and repeatability input before core evaluation, and return only the non-authorizing `fcr/youtube-growth-evaluation@v1` result with publication/provider mutation explicitly false."
+      ]
+    },
+    {
+      "path": "src/http/routes/__tests__/n8nConveyor.youtubeGrowth.integration.test.ts",
+      "claims": [
+        "`src/http/routes/__tests__/n8nConveyor.youtubeGrowth.integration.test.ts` must prove unauthenticated access is rejected, malformed state fails closed, duplicate receipts cannot fake repeatability, and a valid Day-31 recommendation remains advisory with no provider mutation or publication claim."
+      ]
+    },
+    {
+      "path": "src/lib/postizMcpLifecycleAdapter.ts",
+      "claims": [
+        "`src/lib/postizMcpLifecycleAdapter.ts` may expose only bounded Postiz account listing and post-status readback and must deny `publish_now`, `schedulePostTool`, and other provider-write operations through this lifecycle adapter.",
+        "A Postiz-reported PUBLISHED state without a destination-native permalink or equivalent independently verified terminal artifact must remain provider-reported, non-terminal evidence and cannot become FCR publication truth."
+      ]
+    },
+    {
+      "path": "src/mcp/defaultRegistry.ts",
+      "claims": [
+        "`src/mcp/defaultRegistry.ts` may register Componecat only as read-only active-portfolio architecture/catalog context; discovery must not grant repository mutation, merge, deploy, provider-write, publication authority, or access to continuity-only external project identities."
+      ]
+    },
+    {
+      "path": "src/lib/modelCapabilityMarket.ts",
+      "claims": [
+        "`src/lib/modelCapabilityMarket.ts` may rank Council operators only from task-specific evidence with external benchmarks treated as bounded priors; a benchmark win cannot by itself establish local eligibility, outcome proof, selection authority, or execution authority.",
+        "Fresh authority-boundary violations must block promotion, false-green behavior must reduce ranking, stale local evidence must expire, and challenger selection should preserve provider-family independence when available without granting mutation authority."
+      ]
+    },
+    {
+      "path": "docs/MODEL_CAPABILITY_MARKET.md",
+      "claims": [
+        "`docs/MODEL_CAPABILITY_MARKET.md` must keep the model market empirical and reversible: new or upgraded models begin as trials, promotion requires fresh local receipts for the same task class, and routing remains separate from founder/provider execution authority."
+      ]
+    },
+    {
+      "path": "docs/CLAUDE_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC.md",
+      "claims": [
+        "`docs/CLAUDE_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC.md` must treat Claude Cowork as a governed execution surface inside the existing FCR/Council authority model, resolve authoritative GitHub repository/target/working branch/base/exact head at session time rather than trusting historical branch metadata or workspace state, return repository work through GitHub commit/PR/check evidence, and never let Cowork capability or connector access widen merge, deploy, provider, credential, publication, spend, delete, or founder authority."
       ]
     },
     {
       "path": "README.md",
       "claims": [
-        "`README.md` must describe Founder Control Room and Chief AI as standalone Twin Core peers whose shared contracts and product packaging cannot collapse identity, lifecycle, receipts, failure state, continuity, or authority.",
-        "`README.md` must describe the Bip Control Room only as a donor of portfolio-neutral control-plane mechanics and must exclude Bip branding, teen/parent UX, project data, project-specific routes/storage, and Bip product identity from FCR/Chief inheritance.",
-        "`README.md` must keep task progress separate from task clearance and must state that FCR can clear only after current evidence satisfies the original goal's required proof level."
+        "`README.md` must keep TinyFish source and CI readiness separate from provider/runtime activation and state that canonical Deploy verifies only provider-held binding-name presence before promotion.",
+        "`README.md` must keep FCR Shopify runtime-secret name verification separate from webhook registration, deployed callback identity, production database migration, and collected-revenue outcome proof.",
+        "`README.md` must describe Shopify child-provider observation as source-only, non-authorizing evidence and must never relabel a matching snapshot as live provider authority or mutation permission.",
+        "`README.md` must document Attack 3000 content currentness as independently evaluated from bounded observation time rather than trusted from a CURRENT label, and must keep distribution, external demand, publication, provider mutation, merge, deploy, spend, and external-contact authority separate.",
+        "`README.md` must describe the Content Trend Radar as an advisory existing-lane capability whose first-wave evidence requires current source provenance and whose ranking cannot authorize publication, scheduling, spend, provider mutation, merge, deploy, or external contact.",
+        "`README.md` must describe the authenticated YouTube growth route as an advisory evidence evaluator whose HOLD/ADVANCE result cannot prove publication, YPP eligibility, revenue, provider mutation, or scale execution and whose malformed inputs fail closed.",
+        "`README.md` must describe deterministic founder-content approval reservation and exact active retry recovery without allowing evidence rotation, retry, or a stored reservation to mint new publication authority.",
+        "`README.md` must state that rebinding the StoryEngine Playwright peer resets predecessor browser-federation proof and that a ref/SHA match alone cannot grant merge, deploy, production, or provider-mutation authority.",
+        "`README.md` must describe Postiz as bounded server-authenticated account/status readback only, keep Postiz scheduling/publication writes outside that adapter, and refuse to translate provider-reported PUBLISHED state without terminal artifact evidence into publication truth.",
+        "`README.md` must describe Componecat as read-only architecture/catalog context whose discovery grants no project ownership, repository mutation, merge, deploy, provider-write, or publication authority.",
+        "`README.md` must describe the proof-weighted model capability market as task-specific advisory routing where public benchmarks remain bounded priors, local receipts govern promotion, stale proof expires, false-green and authority violations are penalized, and routing never grants execution authority.",
+        "`README.md` must keep a refreshed StoryEngine peer pin in UNKNOWN federation state until the exact successor FCR head completes the full runtime/directive/receipt/Playwright witness.",
+        "`README.md` must keep exact predecessor/successor StoryEngine SHAs in audit/receipt provenance rather than durable current-state prose; a peer refresh selects a new evidence subject only and never carries predecessor green forward.",
+        "`README.md` must describe Cowork as a governed Claude work surface grounded in the exact current GitHub repository/branch/head, keep Claude-side GitHub connector configuration separate from repository source, and explicitly state that FCR-native Cowork receipt binding is not wired until separately implemented and proven.",
+        "`README.md` must describe the Founder Council as dual-resident in the founder assistant and project Control Room without centralizing execution authority, and must keep Muse source implementation separate from configured Worker secret presence, deployed runtime identity, and a live provider response receipt.",
+        "`README.md` must classify a Cloudflare proof-credential failure that prevents secret enumeration as an observation blocker; it cannot be used to claim `MODEL_API_KEY` absent when the provider-held target secret was never observed."
+      ]
+    },
+    {
+      "path": "docs/PUBLIC_COMMUNICATION_TRUTH_CONTRACT.md",
+      "claims": [
+        "`docs/PUBLIC_COMMUNICATION_TRUTH_CONTRACT.md` must keep YouTube growth HOLD/ADVANCE and diagnostic recommendations inside observation/recommendation authority and require separate provider/outcome evidence before public claims of publication, YPP eligibility, revenue, conversion, or provider-side state.",
+        "`docs/PUBLIC_COMMUNICATION_TRUTH_CONTRACT.md` must keep Postiz MCP account/status readback separate from provider-write authority and must hold any publication claim when Postiz reports PUBLISHED without a destination-native permalink or equivalent independently verified terminal artifact.",
+        "Componecat catalog/context evidence must remain non-authorizing and cannot be used as public proof of project execution, deployment, or publication."
+      ]
+    },
+    {
+      "path": "public/control-room/content-manager.html",
+      "claims": [
+        "`public/control-room/content-manager.html` may expose Postiz to the founder only as a clearly labeled readback-only provider choice; the UI must continue to state that direct publish is LinkedIn-only and must not present Postiz readback as publication authority."
+      ]
+    },
+    {
+      "path": "e2e/content-manager-proof.mjs",
+      "claims": [
+        "`e2e/content-manager-proof.mjs` must prove the Postiz readback option is founder-visible while remaining non-authorizing, and must preserve the no-provider-mutation-before-explicit-confirmation browser invariant."
+      ]
+    },
+    {
+      "path": "docs/CLOUDFLARE_REASONING.md",
+      "claims": [
+        "`docs/CLOUDFLARE_REASONING.md` must require both FCR Shopify provider-held Worker binding names to pass the canonical Deploy membrane without treating source, binding-name presence, CI, or Playwright as proof of Shopify callback registration, production migration, or revenue outcome."
       ]
     },
     {
       "path": "docs/TRUTH_DECAY_AUDIT.md",
       "claims": [
-        "`docs/TRUTH_DECAY_AUDIT.md` must treat an FCR or StoryEngine head movement as a new proof subject and must preserve predecessor browser evidence as historical rather than carrying it forward after the peer pin changes.",
-        "`docs/TRUTH_DECAY_AUDIT.md` must preserve the anti-collapse rule that Chief plans/routes/compiles while FCR governs/executes/proves, and neither peer may inherit the other's identity or final authority from shared schemas, packaging, or green evidence.",
-        "`docs/TRUTH_DECAY_AUDIT.md` must keep Bip donor provenance separate from current portfolio authority and must require successor-specific proof for proven-only task clearance after exact-head, deployment, provider, or dependency movement."
+        "`docs/TRUTH_DECAY_AUDIT.md` must treat a StoryEngine peer SHA/ref in FCR Playwright as evidence identity rather than a durable alias for current StoryEngine, and must require complete federation re-proof whenever the peer identity or either repository head moves.",
+        "`docs/TRUTH_DECAY_AUDIT.md` must keep a newly matched StoryEngine ref/SHA in UNKNOWN browser-federation state until the exact successor FCR head completes the runtime, directive, receipt, and browser witness.",
+        "`docs/TRUTH_DECAY_AUDIT.md` must treat external model benchmarks and prior local wins as decaying evidence rather than permanent routing truth; task-specific fresh receipts, false-green history, authority violations, cost, latency, and proof quality must be re-evaluated before promotion.",
+        "`docs/TRUTH_DECAY_AUDIT.md` must treat Cowork workspace copies, attachments, model memory, prior branch observations, connector availability, and generic FCR Activity as non-authoritative context until reconciled with the current exact GitHub repository/branch/head and, for receipts, a separately implemented Cowork receipt adapter.",
+        "`docs/TRUTH_DECAY_AUDIT.md` must separate observation transport failure from target-secret truth: failure before Cloudflare secret enumeration leaves provider-held Muse secret presence UNKNOWN/BLOCKED and cannot be relabeled as evidence of absence."
       ]
     },
     {
-      "path": "docs/TWIN_CORE_CONTROL_PLANE_CONTRACT.md",
+      "path": "docs/deployment/CLOUDFLARE_WORKER_TARGETS.md",
       "claims": [
-        "`docs/TWIN_CORE_CONTROL_PLANE_CONTRACT.md` must adopt only generic mission, ownership, proof, provenance, bounded-execution, and recovery mechanics from the Bip donor while forbidding product-identity contamination and FCR/Chief identity collapse."
+        "`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` must name `FCR_SHOPIFY_WEBHOOK_SECRET` and `FCR_COMMERCE_HASH_SALT` as required canonical Worker secrets while keeping provider subscription, runtime delivery, production database state, and paid-order outcome as separate activation proof."
       ]
     },
     {
-      "path": "src/lib/founderMissionControl.ts",
+      "path": "docs/SECRETS.md",
       "claims": [
-        "`src/lib/founderMissionControl.ts` must keep proof level separate from task state, require the generic mission artifact spine, bind append-only successor lineage, reject free-form shell text as registered action identity, and never allow CLEARED before current evidence satisfies the required proof level."
+        "`docs/SECRETS.md` must keep the FCR Shopify signing secret and commerce hash salt in the Cloudflare Worker secret plane and never recast either provider-held value as a public proof artifact."
+      ]
+    },
+    {
+      "path": "src/lib/providerObservation.ts",
+      "claims": [
+        "`src/lib/providerObservation.ts` must classify child-provider evidence as current, undeclared, scope drift, identity drift, stale, or unknown without granting execution authority, and it must fail closed when observation freshness, completeness, declaration identity, or scope equality is not proven."
+      ]
+    },
+    {
+      "path": "src/providers/ShopifyReadOnlyProvider.ts",
+      "claims": [
+        "`src/providers/ShopifyReadOnlyProvider.ts` must bind Shopify observation to the exact Founder Control Room permanent and branded store identities, require complete pagination and app scope inventory, withhold CURRENT on incomplete or mismatched provider evidence, keep reconciliation non-authorizing, and never persist provider inventory or perform Shopify mutation."
+      ]
+    },
+    {
+      "path": "src/ultrathink-core/attack3000Content.ts",
+      "claims": [
+        "`src/ultrathink-core/attack3000Content.ts` must bind publication and metrics to one content observation, independently evaluate evaluatedAt, window ordering, future skew, observedAt, explicit bounded expiry, measurement completion, and evidence, and must reject stale or future observations even when a caller labels freshness CURRENT.",
+        "`src/ultrathink-core/attack3000Content.ts` must preserve metric-local stop floors and direct external-demand evidence without treating publication, reach, reactions, comments, profile views, or generic analytics references as business demand or execution authority."
+      ]
+    },
+    {
+      "path": "src/ultrathink-core/__tests__/attack3000Content.test.ts",
+      "claims": [
+        "`src/ultrathink-core/__tests__/attack3000Content.test.ts` must prove stale-at-evaluation, future-dated, overlong-lease, mixed-identity, incomplete-window, demand-evidence, metric-local floor, profile-view, and non-authorizing behavior instead of trusting caller freshness labels."
+      ]
+    },
+    {
+      "path": "src/ultrathink-core/contentTrendRadar.ts",
+      "claims": [
+        "`src/ultrathink-core/contentTrendRadar.ts` must require at least one evidence id with source and observedAt that is current against an explicit evaluation time before first-wave eligibility, while keeping prediction-only, stale, future-dated, malformed, unattributed, and incompletely framed candidates out of the first wave.",
+        "`src/ultrathink-core/contentTrendRadar.ts` must keep ranking advisory and must never authorize publication, scheduling, spend, provider mutation, merge, deploy, or external contact."
+      ]
+    },
+    {
+      "path": "src/ultrathink-core/__tests__/contentTrendRadar.test.ts",
+      "claims": [
+        "`src/ultrathink-core/__tests__/contentTrendRadar.test.ts` must adversarially cover missing provenance, stale and future evidence, prediction-only signals, required content angles, saturation, duplicate fingerprints, deterministic first-wave selection, and the non-authorizing ceiling."
+      ]
+    },
+    {
+      "path": "src/ultrathink-core/index.ts",
+      "claims": [
+        "`src/ultrathink-core/index.ts` may export the Attack 3000 content, Trend Radar, and YouTube growth evidence contracts only as source capabilities and must not imply provider activation, publication, merge, deploy, spend, or execution authority."
+      ]
+    },
+    {
+      "path": "src/lib/founderContentApprovalStore.ts",
+      "claims": [
+        "`src/lib/founderContentApprovalStore.ts` must reserve the same public thesis/opening-hook pattern within one founder, platform, and Current You intent under one deterministic approval id, and a retry may recover only the exact matching active stored proposal/public-payload reservation while rejecting mismatched, consumed, revoked, expired, or non-current state.",
+        "`src/lib/founderContentApprovalStore.ts` must return the original stored authorization hash and timestamps on exact retry recovery and must never use a retry, deterministic identity, or evidence rotation to create or renew publication authority."
+      ]
+    },
+    {
+      "path": "src/lib/__tests__/founderContentApprovalStore.test.ts",
+      "claims": [
+        "`src/lib/__tests__/founderContentApprovalStore.test.ts` must prove exact retry recovery after a lost issuance response while preserving the existing one-reservation behavior across source SHA, evidence reference, evidence digest, and proposal-hash rotation."
+      ]
+    },
+    {
+      "path": "docs/founder-signal-engine/linkedin-analytics-continuity.md",
+      "claims": [
+        "`docs/founder-signal-engine/linkedin-analytics-continuity.md` must document independently evaluated content freshness, direct demand evidence, current trend provenance, fingerprint comparison, deterministic approval retry identity, and observation-only authority without rewriting historical evidence when currentness expires."
+      ]
+    },
+    {
+      "path": "src/providers/SecurityPreservingGitHubProvider.ts",
+      "claims": [
+        "`src/providers/SecurityPreservingGitHubProvider.ts` must block ordinary forward patching unless the exact branch head is `VERIFIED_CLEAN`; a `KNOWN_BAD` head may accept only an explicit repair message bound to that same exact SHA, while stale repair intent and `UNVERIFIED` heads must fail closed without granting merge, deploy, publication, provider-policy, or founder authority."
       ]
     }
   ]

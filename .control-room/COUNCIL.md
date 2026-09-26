@@ -4,8 +4,6 @@ Status: active control-room documentation.
 
 The Council is a multi-model reasoning and review layer. It is not a substitute for founder authority, repository/provider truth, security policy, or runtime proof.
 
-Also apply `docs/FOUNDER_WORK_PRODUCTIZATION_CONTRACT.md`. Chat is the invention lab; FCR is the durable workflow product layer. When a Council route becomes repeatable and proves a stable user outcome, package that route into the FCR workflow product instead of making the founder manually reconstruct the same Council/command composition in future chats.
-
 ## Resident Council invariant
 
 The Council is resident in two places at once:
@@ -15,7 +13,7 @@ The Council is resident in two places at once:
 
 These are two residences of the same logical Founder Council, not one centralized executor. Project agents must read the residency contract with this file before material Council work.
 
-Default invocation is automatic when Council participation is materially useful. Route the smallest useful task-specific set of seats rather than waking every provider by default. Product-user workflows may invoke the Council behind the scenes only when project policy allows it; users receive the governed product outcome, not raw Council deliberation, founder controls, provider credentials, cross-project private data, or a requirement to type the internal command stack.
+Default invocation is automatic when Council participation is materially useful. Route the smallest useful task-specific set of seats rather than waking every provider by default. Product-user workflows may invoke the Council behind the scenes only when project policy allows it; users receive the governed product outcome, not raw Council deliberation, founder controls, provider credentials, or cross-project private data.
 
 A named Council seat counts as **live** only when an actual connector/API/runtime call is verified by provider evidence. Simulated role analysis must never be labeled as a live provider response.
 
@@ -39,15 +37,15 @@ The founder is the final human authority for separately gated actions. Silence i
 
 ### Chief AI
 
-Owns orchestration, decomposition, synthesis, goal-state framing, repeated-pattern detection, and workflow-candidate compilation. Chief may recommend, route, compare, summarize, and hand a `juss/fcr-workflow-candidate@v1` package to FCR. It may not self-authorize execution or activate durable workflow state by recommendation alone.
+Owns orchestration, decomposition, synthesis, and goal-state framing. Chief may recommend, route, compare, and summarize. It may not self-authorize execution.
 
 ### Codex / ChatGPT
 
-Primary strengths: debugging, code review, data analysis, repository operations, implementation support, founder-readable synthesis, and invention-lab work. Chat is not the durable state store for repeatable operations once those operations graduate into FCR.
+Primary strengths: debugging, code review, data analysis, repository operations, implementation support, and founder-readable synthesis.
 
 ### Claude / Claude Code / Cowork
 
-Primary strengths: long-context repository analysis, structured implementation, careful refactors, architecture review, documentation, and governed multi-step project work. Cowork is a Claude work surface inside this authority model, not an independent repository, source of truth, approval plane, or durable workflow product plane.
+Primary strengths: long-context repository analysis, structured implementation, careful refactors, architecture review, documentation, and governed multi-step project work. Cowork is a Claude work surface inside this authority model, not an independent repository, source of truth, or approval plane.
 
 ### Muse
 
@@ -57,13 +55,11 @@ Muse may research, propose, review, and implement only through separately author
 
 ### Perplexity
 
-Primary strength: current public research and source discovery. Public-web evidence does not substitute for private repository, Supabase, Cloudflare, or runtime truth. Perplexity may strengthen a workflow candidate with source-backed evidence but does not approve or activate it.
+Primary strength: current public research and source discovery. Public-web evidence does not substitute for private repository, Supabase, Cloudflare, or runtime truth.
 
 ### Other eligible providers
 
 Gemini, DeepSeek, local models, or future providers may participate when the local registry and capability policy say they are eligible. New availability does not silently create a Council seat with mutation authority.
-
-Provider credentials grant provider capability only. An OpenAI or Anthropic API key does not become unrelated GitHub, Supabase, Cloudflare, Shopify, publication, billing, or external-service authority.
 
 ## Shared GitHub source rule
 
@@ -96,8 +92,6 @@ At minimum preserve:
 - first-principles simplification
 - Redteam II on the chosen solution
 - loop / re-observation
-
-These are internal composition tools. A graduated FCR workflow owns the required composition so an ordinary user does not need to know or invoke the stack manually.
 
 ## Content Foundry protocol
 
@@ -146,23 +140,6 @@ The capability market is empirical and task-specific. It must:
 - place new or newly upgraded models in shadow-trial status until local receipts satisfy the sample gate.
 
 Capability-market selection is advisory only. A route carries no merge, deploy, provider, publication, spending, or founder authority. Existing action-specific authority gates remain mandatory.
-
-## Council productization rule
-
-A Council route becomes a workflow-graduation candidate when it repeatedly serves the same stable user outcome with definable inputs, output semantics, authority, proof, rollback, privacy, and acceptable cost/latency.
-
-When that threshold is reached:
-
-1. preserve the Council evidence and meaningful dissent;
-2. have Chief compile the pattern into an FCR `WorkflowCandidate` rather than creating another chat-only ritual;
-3. give the workflow a plain user-facing outcome label;
-4. keep the internal Council/model/command composition behind the workflow surface;
-5. let FCR own durable registry, permissions, execution, receipts, rollback, and outcome state; and
-6. measure whether the workflow actually helps the user, not whether the Council produced a sophisticated discussion.
-
-Council recommendation can keep a pattern one-off, continue proving it, propose graduation, revise an active workflow, or recommend retirement. Council consensus never activates the workflow.
-
-The StoryEngine Court remains the Writers Council + AI Council + Production Council deliberation overlay. A repeated Court pattern may graduate into an FCR/StoryEngine workflow only while preserving independent-first findings, `/DEVIL`, creator ruling, canon boundaries, and `tool capability != permission`.
 
 ## Council round protocol
 
@@ -232,11 +209,4 @@ Return one synthesis packet:
 - `ROLLBACK`: safe reversal
 - `NEXT GATE`: one exact founder decision/action
 
-When a repeated pattern is discovered, append:
-
-- `WORKFLOW`: existing workflow id or proposed candidate id
-- `PUBLIC OUTCOME`: plain user-facing label/outcome
-- `REPEATABILITY`: evidence for or against graduation
-- `HANDOFF`: Chief/FCR next state
-
-The Council exists to improve the founder's decision quality and execution proof, not to dilute founder control or become a permanent chat dependency.
+The Council exists to improve the founder's decision quality and execution proof, not to dilute founder control.

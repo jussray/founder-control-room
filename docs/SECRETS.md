@@ -97,7 +97,6 @@ The former `founder-control-room2` Worker was deleted and must not be recreated 
 | `FCR_SHOPIFY_WEBHOOK_SECRET` | secret | Required Shopify `orders/paid` HMAC signing secret for the FCR first-party commerce ingress. Provider-held; never log or copy its value into proof. |
 | `FCR_COMMERCE_HASH_SALT` | secret | Required independent server-only salt for privacy-safe FCR Shopify order-reference HMACs. This marker creates no Shopify authority. |
 | `TINYFISH_API_KEY` | secret | Required provider-held credential for live `tinyfish-web-observation-v1` Search/Fetch. Canonical production deploy verifies only binding-name presence before mutation; the value remains in Cloudflare and never becomes a GitHub Actions secret or proof receipt. |
-| `MODEL_API_KEY` | secret | Required provider-held credential for the governed Muse/model relay. Source declaration and documentation prove only the required binding name; live presence, deployed runtime identity, and successful provider invocation require separate current provider/runtime evidence. Never expose the value to Pages, browser code, logs, PRs, receipts, or chat. |
 | `FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON` | secret | Scoped, revocable, fail-closed automation grant. |
 | `FOUNDER_SIGNAL_ENGINE_MCP_TOKEN` | secret | Dedicated MCP bearer token. This is not an OpenAI API key. |
 | `ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL` | secret | Private approved Zapier Catch Hook URL. |
@@ -228,7 +227,6 @@ The client-ID names above are shared recovery/runtime-witness selectors; the cli
 [ ] FCR_SHOPIFY_WEBHOOK_SECRET (provider-held Shopify HMAC secret)
 [ ] FCR_COMMERCE_HASH_SALT (independent server-only order-reference HMAC salt)
 [ ] TINYFISH_API_KEY (provider-held; required before live TinyFish activation)
-[ ] MODEL_API_KEY (provider-held; required before live Muse/model relay activation)
 [ ] FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON
 [ ] FOUNDER_SIGNAL_ENGINE_MCP_TOKEN
 [ ] ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL
@@ -267,3 +265,9 @@ This table covers GitHub Actions secret names that are referenced outside the ca
 | `CLOUDFLARE_ACCESS_CLIENT_ID` | `chief-proofmode-access-recovery.yml`, `chief-proofmode-runtime-witness.yml` | Backward-compatible protected client-ID alias used only if the Chief-specific client-ID name is absent. It is not Access provider-administration authority. |
 | `CLOUDFLARE_ACCESS_CLIENT_SECRET` | `chief-proofmode-runtime-witness.yml` | Backward-compatible protected alias used only if the Chief-specific client-secret name is absent. Never expose the value; alias presence alone is not runtime proof. |
 | `ANTHROPIC_API_KEY` | `ai-failure-repair.yml` | Required for the workflow's serialized Claude repair pass (`anthropics/claude-code-action`), which runs after Codex's candidate patch and is scoped by the workflow's own STRICT AUTHORITY block to source/product code only — it cannot touch `.github/`, docs, tests, migrations, env files, dependency manifests, provider/deploy authority, secrets, billing, DNS, or auth credentials. |
+
+### `MODEL_API_KEY`
+
+- Required by the canonical Founder Control Room Cloudflare Worker for the bounded Muse provider adapter.
+- Store the value only as a provider-held Cloudflare Worker secret; never commit, print, echo, attach, or include it in proof artifacts.
+- Source declaration or documentation proves the required secret name only. Live presence requires a successful provider-side secret-name readback, and successful Council/Muse operation requires a separate authenticated runtime receipt.
