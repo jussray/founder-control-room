@@ -238,3 +238,6 @@ Current executable source and authoritative provider readback outrank an older v
 - Access: roll back only an incomplete or ambiguous browser-destination detachment using the receipt-bound original destination set and unchanged application/policy identity; a later runtime/browser failure alone must not automatically reintroduce a Cloudflare Access product-login screen.
 - Credentials: remove/revoke only the affected credential; do not rotate unrelated keys to repair binding drift.
 - Preserve build logs, deployment IDs, provider readback, browser traces, and runtime receipts.
+## Deployment does not authorize publication
+
+Canonical `.github/workflows/deploy.yml` may promote the approved exact release and collect release/proof evidence, but its Proof-of-Ship terminal state is founder-review retention, not scheduling or publication. The Deploy job keeps `PUBLISH_ALLOWED=false` and does not receive `ZAPIER_CATCH_HOOK_URL` or `PROOF_OF_SHIP_STEERING_GRANT_ID`. Those publication capabilities belong to a separate authority path; deployment success, smoke proof, or a retained proof artifact cannot by themselves authorize or prove a published post.
