@@ -74,6 +74,25 @@ Council reasoning, Claude, Claude Code, and Cowork must share the same repositor
 
 One shared GitHub source does not erase project boundaries. Each repository remains authoritative for its own code and project-local contracts.
 
+## Change genealogy audit inheritance
+
+Every Council member performing repository or software audits inherits `docs/AI_CHANGE_GENEALOGY_CONTRACT.md`.
+
+The default recent-change window is ten PRs with bounded comment/review evidence and bounded diff evidence. Every commit identity inside those PRs is indexed before causality is assigned. Recent commits on the authoritative default branch are also inspected and mapped back to PRs when provider evidence can prove that relationship.
+
+The Council must preserve both sides of a squash or merge boundary: branch commits explain evolution; the commit that actually entered the authoritative branch owns current integration identity. Historical green cannot silently authorize a successor SHA.
+
+Every independent lineage, review, check, provider, runtime, database, or browser failure keeps its own receipt. One passing layer cannot erase another failing or unknown layer.
+
+Every AI matters, but roles remain bounded:
+
+- Codex / ChatGPT, Claude / Claude Code, Gemini, Muse, and Perplexity may research, propose, review, and implement only through their separately authorized paths.
+- DeepSeek Instructor remains a research/proposal/review/instruction challenger unless a separately reviewed contract expands that role.
+- Chief orchestrates and synthesizes but does not mint authority.
+- local and future providers inherit the same truth/evidence contract when admitted by the governed registry.
+
+Parallel genealogy reconstruction, review analysis, adversarial challenge, and runtime verification are allowed. Mutation remains serialized. Model consensus, fingerprints, proof cookies, comments, or votes are evidence only and never founder authority.
+
 ## Automatic founder lenses
 
 The canonical FCR reasoning lenses remain code-owned and provider-neutral. Council members should apply the active FCR lenses rather than replacing them with provider personality or majority vote.
