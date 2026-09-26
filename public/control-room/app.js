@@ -440,11 +440,21 @@ function renderProjectDetail(mount) {
   panel.querySelectorAll('.connection-check-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
       guarded(async () => {
-        await api(`/projects/${encodeURIComponent(p.project.slug)}/connections/${btn.dataset.connectionId}/check`, {
+        const data = await api(`/projects/${encodeURIComponent(p.project.slug)}/connections/${btn.dataset.connectionId}/check`, {
           method: 'POST',
           body: JSON.stringify({ status: 'active' }),
         });
-        await loadProjectConnections(p.project.slug);
+        const updatedConnection = data?.connection;
+        if (!updatedConnection || updatedConnection.id !== btn.dataset.connectionId || !updatedConnection.last_checked_at) {
+          throw new Error('Connection check did not return the updated connection receipt.');
+        }
+        const loadedIndex = state.projectConnections.findIndex((connection) => connection.id === updatedConnection.id);
+        if (loadedIndex < 0) {
+          throw new Error('Connection check receipt does not match the loaded project connection.');
+        }
+        state.projectConnections = state.projectConnections.map((connection) => (
+          connection.id === updatedConnection.id ? updatedConnection : connection
+        ));
         setBanner('notice', 'Connection check recorded.');
       });
     });
