@@ -22,8 +22,10 @@ on:
       - 'scripts/publish-chief-runtime-witness.node-test.mjs'
       - 'scripts/chief-proofmode-runtime-witness-contract.node-test.mjs'
       - 'scripts/fcr-cloudflare-bridge-contract.node-test.mjs'
+      - 'scripts/fcr-stranger-front-door-contract.node-test.mjs'
       - 'scripts/verify-fcr-front-door-playwright.mjs'
       - 'docs/CHIEF_PROOFMODE_ACCESS_RECOVERY.md'
+      - 'docs/audits/2026-09-25-cloudflare-live-domain-access-boundary.md'
   push:
     branches: [main]
     paths:
@@ -45,8 +47,10 @@ on:
       - 'scripts/publish-chief-runtime-witness.node-test.mjs'
       - 'scripts/chief-proofmode-runtime-witness-contract.node-test.mjs'
       - 'scripts/fcr-cloudflare-bridge-contract.node-test.mjs'
+      - 'scripts/fcr-stranger-front-door-contract.node-test.mjs'
       - 'scripts/verify-fcr-front-door-playwright.mjs'
       - 'docs/CHIEF_PROOFMODE_ACCESS_RECOVERY.md'
+      - 'docs/audits/2026-09-25-cloudflare-live-domain-access-boundary.md'
 
 permissions:
   contents: read
@@ -95,3 +99,4 @@ jobs:
           node --test scripts/publish-chief-runtime-witness.node-test.mjs
           node --test scripts/chief-proofmode-runtime-witness-contract.node-test.mjs
           node --test scripts/fcr-cloudflare-bridge-contract.node-test.mjs
+          node --test scripts/fcr-stranger-front-door-contract.node-test.mjs
