@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "owner": "Juss",
   "inspectedOn": "2026-09-26",
-  "authorityBoundary": "External continuity evidence only. These receipts grant no FCR portfolio, MCP, decision, merge, deployment, provider, publication, payment, mutation, or execution authority.",
+  "authorityBoundary": "External continuity evidence only. This receipt grants no FCR portfolio, MCP, decision, merge, deployment, provider, publication, payment, mutation, or execution authority.",
   "promotions": [
     {
       "slug": "truth-compass",
