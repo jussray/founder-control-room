@@ -54,14 +54,32 @@ BEGIN
     RAISE EXCEPTION 'direct outbox table access must remain closed';
   END IF;
 
-  IF NOT has_function_privilege(
+  IF has_function_privilege(
+    'service_role',
+    'public.initialize_agent_task_authority_v11_5(text,bigint)',
+    'EXECUTE'
+  ) OR has_function_privilege(
+    'service_role',
+    'public.transition_agent_task_authority_v11_5(text,bigint,text)',
+    'EXECUTE'
+  ) OR has_function_privilege(
     'service_role',
     'public.admit_agent_execution_v11_5(uuid,uuid,uuid,text,text,text,text,text,text,text,bigint,timestamptz,timestamptz,text,text,text,text,text)',
     'EXECUTE'
+  ) OR has_function_privilege(
+    'service_role',
+    'public.lease_agent_execution_outbox_v11_5(text,integer)',
+    'EXECUTE'
+  ) OR has_function_privilege(
+    'service_role',
+    'public.record_agent_execution_outcome_v11_5(uuid,uuid,text,bigint,text,text)',
+    'EXECUTE'
   ) THEN
-    RAISE EXCEPTION 'service_role must be able to execute admission function';
+    RAISE EXCEPTION 'generic service_role must not hold v11.5 kernel execution authority';
   END IF;
 
+  -- The preview connection is the migration owner, which is intentionally the
+  -- only identity allowed to exercise these source-only functions pre-activation.
   PERFORM public.initialize_agent_task_authority_v11_5('preview-task-v11-5', 9);
 
   SELECT admitted, reason, admission_id, fencing_token, operation_id

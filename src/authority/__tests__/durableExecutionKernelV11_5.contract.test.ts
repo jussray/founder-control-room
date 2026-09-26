@@ -48,11 +48,17 @@ describe('durable execution kernel v11.5 SQL contract', () => {
     expect(migration).toMatch(/lease_expires_at > clock_timestamp\(\)/);
   });
 
-  it('keeps direct table access closed and exposes only service-role functions', () => {
+  it('fails closed against generic service_role authority fabrication', () => {
+    expect(migration).toMatch(/revoke execute on function public\.initialize_agent_task_authority_v11_5\([^)]+\) from public, anon, authenticated, service_role/);
+    expect(migration).toMatch(/revoke execute on function public\.transition_agent_task_authority_v11_5\([^)]+\) from public, anon, authenticated, service_role/);
+    expect(migration).toMatch(/revoke execute on function public\.admit_agent_execution_v11_5\([^)]+\) from public, anon, authenticated, service_role/);
+    expect(migration).toMatch(/revoke execute on function public\.lease_agent_execution_outbox_v11_5\([^)]+\) from public, anon, authenticated, service_role/);
+    expect(migration).toMatch(/revoke execute on function public\.record_agent_execution_outcome_v11_5\([^)]+\) from public, anon, authenticated, service_role/);
+    expect(migration).not.toMatch(/grant execute on function public\.[a-z_]+_v11_5\([^)]+\) to service_role/);
+  });
+
+  it('keeps direct table access closed to browser and generic service roles', () => {
     expect(migration).toMatch(/enable row level security/);
     expect(migration).toMatch(/revoke all on table public\.agent_execution_outbox from public, anon, authenticated, service_role/);
-    expect(migration).toMatch(/grant execute on function public\.admit_agent_execution_v11_5[\s\S]*to service_role/);
-    expect(migration).toMatch(/grant execute on function public\.lease_agent_execution_outbox_v11_5[\s\S]*to service_role/);
-    expect(migration).toMatch(/grant execute on function public\.record_agent_execution_outcome_v11_5[\s\S]*to service_role/);
   });
 });
