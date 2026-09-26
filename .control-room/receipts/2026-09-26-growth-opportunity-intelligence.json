@@ -4,16 +4,22 @@
   "authoritativeRepository": "jussray/founder-control-room",
   "baseBranch": "main",
   "initialBaseSha": "24a82d0359a0ce20a667844b978b42a2994df167",
-  "reconciledMainSha": "4a5a3378ff1aaaec63616c8c6e6c4a7cb39ca2f8",
+  "reconciledMainSha": "b2a68a68febdf5a63eadc28e4f00e7a1ccf6567f",
   "workingBranch": "agent/unified-growth-inbox",
   "proofSubjectRef": "HEAD",
   "proofWorkflow": ".github/workflows/growth-opportunity-intelligence-proof.yml",
+  "latestCompletedProof": {
+    "runId": 36269324475,
+    "headSha": "fee201191af62209c40b46d340007afe662cc15d",
+    "conclusion": "success",
+    "note": "Superseded only by a conflict-free current-main reconciliation and this continuity refresh; final HEAD must still pass the same exact-head workflow."
+  },
   "state": {
     "sourceImplemented": true,
     "merged": false,
     "previewDeployed": true,
     "productionMainDeployed": false,
-    "runtimeVerified": false,
+    "runtimeVerified": true,
     "outcomeVerified": false
   },
   "changes": [
@@ -25,16 +31,17 @@
     ".control-room/receipts/2026-09-26-growth-opportunity-intelligence.json"
   ],
   "verified": [
-    "The feature branch was reconciled with main 4a5a3378ff1aaaec63616c8c6e6c4a7cb39ca2f8 without force and without overlapping source-file conflicts.",
+    "The feature branch was reconciled with main b2a68a68febdf5a63eadc28e4f00e7a1ccf6567f without force and without overlapping revenue-intelligence source-file conflicts.",
     "The opportunity engine remains advisory-only and cannot authorize outreach, pricing, lead mutation, provider mutation, or spend.",
     "Only verified explicit evidence contributes to prioritization; unknown, conflicting, and expired evidence remains visible without scoring as truth.",
     "Active funnel progress is monotonic from new through booked, while do-not-contact remains a hard ceiling and won still requires collected-revenue evidence.",
     "Collected revenue is recognized through the existing isCollectedRevenue contract rather than a payment_collected or won label alone.",
     "All FCR project shells inherit growth-opportunity-intelligence, including PromptOS, Chief, StoryEngine/L99, Se’kret Bip, and commerce shells, while existing project-specific privacy and authority boundaries remain in force.",
-    "A reusable exact-head proof workflow now binds typecheck, focused Vitest, Pages build, current-main ancestry, and desktop/mobile Playwright evidence to the candidate head."
+    "Run 36269324475 proved exact-head checkout, current-main ancestry, repository typecheck, 13 focused tests, Pages build, and desktop/mobile Playwright before the latest conflict-free main reconciliation.",
+    "A reusable exact-head proof workflow binds typecheck, focused Vitest, Pages build, current-main ancestry, and desktop/mobile Playwright evidence to each candidate head."
   ],
   "unknownOrBlocked": [
-    "The final exact-head proof run for this receipt-bearing HEAD must complete successfully before merge.",
+    "The final receipt-bearing HEAD must complete the exact-head proof successfully before merge.",
     "Production-main runtime and revenue outcomes remain unverified until after a proven merge and subsequent outcome observation."
   ],
   "rollback": "Before merge, move agent/unified-growth-inbox back to reconciledMainSha or revert the focused revenue-intelligence commits. No database, provider credential, billing, outreach, or customer state is mutated by this source implementation.",
