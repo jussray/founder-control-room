@@ -14,7 +14,7 @@ describe('self-sufficient architecture kernel', () => {
     expect(kernel.project).toBe('founder-control-room');
     expect(kernel.coreOwner).toBe('project');
     expect(new Set(kernel.coreCapabilities).size).toBe(kernel.coreCapabilities.length);
-    expect(kernel.coreCapabilities).toEqual(expect.arrayContaining(REQUIRED_CORE));
+    expect(kernel.coreCapabilities).toEqual(expect.arrayContaining([...REQUIRED_CORE]));
 
     expect(kernel.externalSystems).toMatchObject({
       role: 'plugin',
