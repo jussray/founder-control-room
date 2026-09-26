@@ -25,7 +25,7 @@ describe('Supabase provider authority registry', () => {
 
     expect(getCanonicalSupabaseProjectAuthority('l99')).toMatchObject({
       projectRef: 'tarnmxcjpvaxapnjnesf',
-      organizationRef: SUPABASE_ORGANIZATIONS.sekretBipLegacy,
+      organizationRef: SUPABASE_ORGANIZATIONS.sekretBipOrganization,
       role: 'canonical-runtime',
       mutationAuthority: false,
     });
@@ -34,7 +34,7 @@ describe('Supabase provider authority registry', () => {
   it('keeps the historical Chief project known without promoting it to canonical runtime authority', () => {
     expect(getSupabaseProjectAuthority('chief-ai-machine')).toMatchObject({
       projectRef: 'lghpwoktsytutssjiwgy',
-      organizationRef: SUPABASE_ORGANIZATIONS.sekretBipLegacy,
+      organizationRef: SUPABASE_ORGANIZATIONS.sekretBipOrganization,
       role: 'known-unclassified',
       mutationAuthority: false,
     });
@@ -67,13 +67,13 @@ describe('Supabase provider authority registry', () => {
   it('keeps same-organization absence and unknown provider identity distinct', () => {
     expect(classifySupabaseProjectVisibility(
       'tarnmxcjpvaxapnjnesf',
-      [SUPABASE_ORGANIZATIONS.sekretBipLegacy],
+      [SUPABASE_ORGANIZATIONS.sekretBipOrganization],
       [],
     )).toBe('known-project-not-visible');
 
     expect(classifySupabaseProjectVisibility(
       'aaaaaaaaaaaaaaaaaaaa',
-      [SUPABASE_ORGANIZATIONS.sekretBipLegacy],
+      [SUPABASE_ORGANIZATIONS.sekretBipOrganization],
       [],
     )).toBe('unknown-project');
   });
