@@ -173,7 +173,7 @@ export function assessProjectAdapterFreshness(
       sourceHeadMatchesAudited: false,
       contractPathsMissing: [],
       contractPathsDrifted: [],
-      blocker: `Repository main advanced from audited head ${normalizedAuditedHead} to ${normalizedCurrentHead}; exact-head adapter provenance is stale even though required contract blobs are unchanged.`,
+      blocker: `Repository main advanced from audited head ${input.auditedHead} to ${input.currentHead}; exact-head adapter provenance is stale even though required contract blobs are unchanged.`,
       nextAction: 'Perform an exact-head semantic review, then refresh the audited head and contract manifest together before treating the adapter as current.',
       reasons: ['Unchanged contract blobs do not prove that an adapter pinned to a predecessor SHA accepts or represents the current repository head.'],
     };
