@@ -437,3 +437,9 @@ An exact ref/pin match renews only the identity prerequisite. It does not renew 
 The current-main CI repair cycle added an exact StoryEngine peer-pin transition and repaired hidden `.repair/` artifact uploads by setting `include-hidden-files: true` on every evidence upload. This is repository/CI evidence only: it does not prove a deployment, Cloudflare runtime, data/auth state, or user-visible outcome.
 
 Truth boundary: peer-pin and repair-artifact changes must refresh the README, this truth-decay audit, and `docs/DOCUMENTATION_TRUTH_RECEIPT.json` in the same exact-head range. A successor head must earn its own CI and Playwright proof; predecessor green runs do not transfer.
+
+## Chief adapter exact-head decay
+
+The Chief SHA in `src/founder-os-lab/projectAdapters.ts` is an audited evidence identity, not a durable alias for current Chief. Any Chief-head or FCR-head movement expires predecessor adapter, pair-contract, CI, runtime, and browser proof according to the witness actually affected. A blob comparison can justify selecting a successor evidence subject when the audited contract paths are unchanged, but it cannot donate predecessor green or establish Chief deployment, served-MCP reachability, or production behavior.
+
+Documentation Truth therefore treats the adapter source path as evidence-authority-sensitive. Every pin transition must update the focused assertion, README boundary, this truth-decay record, and the structured documentation receipt in the same exact-head range before successor CI can certify the documentation contract. None of those source artifacts grants merge, deploy, publication, provider mutation, or founder authority.

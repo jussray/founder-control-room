@@ -15,7 +15,7 @@ two new MCP servers, starting read-only, adding writes later behind a confirmati
 
 ## Current status correction — 2026-09-26
 
-The stale-pin finding below is **HISTORICAL / RESOLVED**. The inspected FCR candidate, reconciled against base `main@58e1a4bee2300bd1123b6081fce9dd595626f8d7`, pins Chief at `8d1e76fa22d6fa5a04310c736b59d1d5a755c87d`, and the focused adapter test asserts the same head. The authoritative current binding lives in `src/founder-os-lab/projectAdapters.ts` and its focused test; do not infer it from this dated audit. The original evidence remains below as audit history and must not be used as an instruction to restore `2fd4fda0…` or any predecessor pin. This correction proves inspected repository state only, not deployed MCP reachability or runtime identity.
+The stale-pin finding below is **HISTORICAL / RESOLVED**. The inspected FCR candidate, reconciled against base `main@24a82d0359a0ce20a667844b978b42a2994df167`, pins Chief at `161cd3af4ffd1d64f5f65b8aed0e7108f021194a`, and the focused adapter test asserts the same head. The authoritative current binding lives in `src/founder-os-lab/projectAdapters.ts` and its focused test; do not infer it from this dated audit. The original evidence remains below as audit history and must not be used as an instruction to restore `2fd4fda0…` or any predecessor pin. This correction proves inspected repository state only, not deployed MCP reachability or runtime identity.
 
 **Verdict: do not implement as written.** Both repositories are already MCP servers. The proposal's
 recommended end-state architecture is, in its essentials, what already exists — and the parts it
@@ -161,7 +161,7 @@ fail — but the practical result is that the Chief AI adapter does not function
 and the reason is SHA drift rather than any change in substance. This is precisely the distinction
 `CLAUDE.md` draws when it says a hash proves identity, not continued reality.
 
-The original repair target was `2fd4fda0cab12e52ab5096e723884d98bcfe7d10`. That instruction is now **SUPERSEDED**. The inspected FCR candidate binds the adapter and its focused test to Chief `8d1e76fa22d6fa5a04310c736b59d1d5a755c87d`; consult `src/founder-os-lab/projectAdapters.ts` and its focused test for the authoritative current binding, and do not restore the historical target. Any future pin movement still requires exact-head contract review and successor proof.
+The original repair target was `2fd4fda0cab12e52ab5096e723884d98bcfe7d10`. That instruction is now **SUPERSEDED**. The inspected FCR candidate binds the adapter and its focused test to Chief `161cd3af4ffd1d64f5f65b8aed0e7108f021194a`; consult `src/founder-os-lab/projectAdapters.ts` and its focused test for the authoritative current binding, and do not restore the historical target. Any future pin movement still requires exact-head contract review and successor proof.
 
 ### 2. HISTORICAL / RESOLVED — the pair-contract CI path gate omitted the adapter
 
@@ -206,7 +206,7 @@ that FCR serves MCP endpoints at all.
 
 ## What to do instead
 
-1. **Preserve the resolved Chief pin.** The inspected FCR candidate and its focused adapter test agree on Chief `2acf9d52…`; consult the adapter and test for the authoritative current binding. Treat the former `2fd4fda0…` refresh instruction as historical, and require fresh exact-head contract review before any later movement.
+1. **Preserve the resolved Chief pin.** The inspected FCR candidate and its focused adapter test agree on Chief `161cd3af4ffd1d64f5f65b8aed0e7108f021194a`; consult the adapter and test for the authoritative current binding. Treat the former `2fd4fda0…` refresh instruction as historical, and require fresh exact-head contract review before any later movement.
 2. **RESOLVED at the inspected candidate:** `src/founder-os-lab/projectAdapters.ts` is in the pair-contract workflow trigger paths.
 3. **RESOLVED at the inspected candidate:** `FCR_REMOTE_MCP_READ_TOKEN`, `FCR_REMOTE_MCP_READ_PROJECTS`, and `/mcp/read` are documented in `.env.example` and `docs/MCP_STACK.md`.
 4. **PARTIALLY RESOLVED:** FCR's `verify:mcp` covers FCR's served-MCP contract. Chief still needs an exact-head run proving the auth, tool annotations, and fail-closed behavior of `worker/proofmode-mcp.js`.
