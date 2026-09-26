@@ -1,6 +1,6 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Document current evidence-authority boundaries across cross-repository browser federation, resident Council/Muse relay activation, provider-held runtime-secret observation, and manual read-only production identity verification: source wiring, configured bindings, live provider invocation, deployment state, and mutation authority remain separate claims with separate proof.",
+  "purpose": "Document current evidence-authority boundaries across cross-repository browser federation, resident Council/Muse relay activation, provider-held runtime-secret observation, manual read-only production identity verification, and the separation of deployment from publication authority: source wiring, configured bindings, live provider invocation, deployment state, publication state, and mutation authority remain separate claims with separate proof.",
   "domains": [
     "cloudflare-authority",
     "repository-provider",
@@ -52,6 +52,12 @@
       "claims": [
         "`.github/workflows/exact-sha-production-witness.yml` must remain a manually dispatched, contents-read-only verifier that executes trusted current-main witness source, requires the requested exact release SHA to equal that trusted current-main SHA, and reuses `e2e/production-release-sha.spec.ts` without acquiring deploy, publication, provider-write, secret, billing, or merge authority.",
         "A successful manual witness may prove that the already-deployed Worker, public proxy, and browser surface share the requested current-main release identity; it cannot deploy that SHA, publish content, mutate Postiz or another provider, manufacture provider state, or authorize a merge."
+      ]
+    },
+    {
+      "path": ".github/workflows/deploy.yml",
+      "claims": [
+        "`.github/workflows/deploy.yml` must keep deployment and publication as separate authority classes: canonical Deploy may verify and retain exact-release Proof-of-Ship evidence, but it must keep `PUBLISH_ALLOWED=false`, inject no Zapier catch-hook or Proof-of-Ship publication-grant secret into that job, and must not schedule or publish; any later publication requires separate exact reviewed-content authority plus provider/outcome proof."
       ]
     },
     {
@@ -154,7 +160,8 @@
         "`README.md` must describe Cowork as a governed Claude work surface grounded in the exact current GitHub repository/branch/head, keep Claude-side GitHub connector configuration separate from repository source, and explicitly state that FCR-native Cowork receipt binding is not wired until separately implemented and proven.",
         "`README.md` must describe the Founder Council as dual-resident in the founder assistant and project Control Room without centralizing execution authority, and must keep Muse source implementation separate from configured Worker secret presence, deployed runtime identity, and a live provider response receipt.",
         "`README.md` must classify a Cloudflare proof-credential failure that prevents secret enumeration as an observation blocker; it cannot be used to claim `MODEL_API_KEY` absent when the provider-held target secret was never observed.",
-        "`README.md` must describe the standalone manual exact-SHA production witness as read-only observation of an already-deployed current-main release and must not imply that running the witness grants deploy, publication, provider-mutation, secret, billing, or merge authority."
+        "`README.md` must describe the standalone manual exact-SHA production witness as read-only observation of an already-deployed current-main release and must not imply that running the witness grants deploy, publication, provider-mutation, secret, billing, or merge authority.",
+        "`README.md` must describe canonical Deploy as deployment/release-verification authority only, keep Proof-of-Ship publication separate, and must not imply that deployment approval authorizes scheduling or publication."
       ]
     },
     {

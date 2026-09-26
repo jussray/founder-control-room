@@ -193,7 +193,7 @@ jobs:
             echo "- Trigger: manual workflow dispatch"
             echo "- Existing Worker runtime secrets: preserved; provider-held required names read back from Cloudflare before any production mutation"
             echo "- Broad Founder Signal automation grant: disabled"
-            echo "- Proof-of-ship scheduled publication: enabled with 20-minute founder review"
+            echo "- Proof-of-ship publication: not authorized by Deploy; verified proof is retained for separate founder review"
           } >> "$GITHUB_STEP_SUMMARY"
 
   # ── 1. Supabase migrations ──────────────────────────────────────────────────────
@@ -510,7 +510,7 @@ jobs:
 
   # ── 4. Verified proof-of-ship payload ───────────────────────────────────────
   proof-of-ship:
-    name: Proof of Ship — Verify and Schedule with Founder Review
+    name: Proof of Ship — Verify and Retain for Founder Review
     runs-on: ubuntu-latest
     timeout-minutes: 12
     environment: production
@@ -520,10 +520,8 @@ jobs:
       EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha }}
       DEPLOY_URL: https://api.foundercontrolroom.org
       SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
-      ZAPIER_CATCH_HOOK_URL: ${{ secrets.ZAPIER_CATCH_HOOK_URL }}
-      PROOF_OF_SHIP_STEERING_GRANT_ID: ${{ secrets.PROOF_OF_SHIP_STEERING_GRANT_ID }}
       GITHUB_TOKEN: ${{ github.token }}
-      PUBLISH_ALLOWED: 'true'
+      PUBLISH_ALLOWED: 'false'
       LINKEDIN_BASELINE_PATH: config/linkedin-rising-floor-baseline.json
       REPOSITORY_PUBLICATION_POLICY_PATH: config/proof-of-ship-repository-policy.json
     steps:

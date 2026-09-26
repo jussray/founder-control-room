@@ -263,3 +263,6 @@ npx playwright test e2e/cloudflare-reasoning.spec.ts
 ```
 
 The browser/API suite verifies the public-safe contract, founder protection, absence of credential leakage, presence of the implementation stack, and absence of an accidental deployment endpoint. Unit tests verify exact-commit reasoning, stale evidence, duplicate authority, authentication failures, runtime failure, rollback preparation, first-principles deletion/simplification output, and approval boundaries.
+## Deploy/publication authority split
+
+The canonical Cloudflare Deploy lane may mutate the separately approved production deployment scope, verify the exact Worker/Pages release, and retain a verified Proof-of-Ship artifact for founder review. It must not convert that deployment authority into content-publication authority: `PUBLISH_ALLOWED` remains false in Deploy, publication transport/grant secrets are not injected into its Proof-of-Ship job, and no Zapier or downstream publishing call is authorized by the deployment decision. A later publication attempt is a separate authority/use boundary with its own exact reviewed-content approval, freshness checks, and provider readback.
