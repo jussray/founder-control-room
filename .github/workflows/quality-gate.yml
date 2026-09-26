@@ -91,6 +91,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ env.EXPECTED_HEAD_SHA }}
+          fetch-depth: 0
       - name: Verify exact PR head
         shell: bash
         run: |
@@ -101,10 +102,19 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
       - name: Install dependencies
         run: npm install
       - run: npm run verify:terminal-contract
       - run: npm run verify:juss-flow
+      - name: Audit live GitHub ruleset topology for rollover
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/audit_pr_continuity_rulesets.mjs
+      - name: Verify unified work and deployment continuity
+        run: python scripts/continuity_model_guard.py
       - run: npm run verify:production-authority
       - run: npm run verify:ai-skills
 

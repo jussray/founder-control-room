@@ -1,6 +1,6 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Document current evidence-authority boundaries across cross-repository browser federation, resident Council/Muse relay activation, and provider-held runtime-secret observation: source wiring, configured bindings, live provider invocation, and mutation authority remain separate claims with separate proof.",
+  "purpose": "Document current evidence-authority boundaries across cross-repository browser federation, resident Council/Muse relay activation, provider-held runtime-secret observation, and load-bearing Quality Gate governance: source wiring, configured bindings, live provider invocation, provider ruleset state, and mutation authority remain separate claims with separate proof.",
   "domains": [
     "cloudflare-authority",
     "repository-provider",
@@ -52,6 +52,14 @@
       "path": ".github/workflows/ci.yml",
       "claims": [
         "`.github/workflows/ci.yml` must keep the existing crawler and public-work Playwright specs inside the load-bearing `Playwright e2e` job that feeds `Required Gate`; a separate advisory Pages workflow cannot substitute for required exact-head browser execution or grant merge authority."
+      ]
+    },
+    {
+      "path": ".github/workflows/quality-gate.yml",
+      "claims": [
+        "`.github/workflows/quality-gate.yml` must keep `python3 scripts/continuity_model_guard.py` and `node scripts/audit_pr_continuity_rulesets.mjs` load-bearing on the exact pull-request head: the continuity guard protects source continuity semantics and the ruleset audit independently re-reads live GitHub governance.",
+        "If live GitHub applies release or linear-history rules across all branches in a way that blocks lawful PR rollover, the ruleset audit must fail closed as provider-state evidence; source green must not relabel that provider drift as fixed, and agents must not delete, bypass, or weaken the audit merely to manufacture a green Quality Gate.",
+        "The continuity-model guard and ruleset audit are evidence gates only and grant no ruleset mutation, merge, deploy, publication, provider-write, or founder authority."
       ]
     },
     {
@@ -147,7 +155,8 @@
         "`README.md` must keep exact predecessor/successor StoryEngine SHAs in audit/receipt provenance rather than durable current-state prose; a peer refresh selects a new evidence subject only and never carries predecessor green forward.",
         "`README.md` must describe Cowork as a governed Claude work surface grounded in the exact current GitHub repository/branch/head, keep Claude-side GitHub connector configuration separate from repository source, and explicitly state that FCR-native Cowork receipt binding is not wired until separately implemented and proven.",
         "`README.md` must describe the Founder Council as dual-resident in the founder assistant and project Control Room without centralizing execution authority, and must keep Muse source implementation separate from configured Worker secret presence, deployed runtime identity, and a live provider response receipt.",
-        "`README.md` must classify a Cloudflare proof-credential failure that prevents secret enumeration as an observation blocker; it cannot be used to claim `MODEL_API_KEY` absent when the provider-held target secret was never observed."
+        "`README.md` must classify a Cloudflare proof-credential failure that prevents secret enumeration as an observation blocker; it cannot be used to claim `MODEL_API_KEY` absent when the provider-held target secret was never observed.",
+        "`README.md` must document the Quality Gate continuity-model guard and live ruleset audit as load-bearing evidence gates, keep live GitHub provider drift separate from source green, and forbid weakening those checks merely to manufacture a merge-ready state."
       ]
     },
     {
