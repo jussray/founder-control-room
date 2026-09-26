@@ -71,13 +71,13 @@ jobs:
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
-      - name: Start exact-head Pages runtime
+      - name: Start exact-head Pages witness
         shell: bash
         run: |
           set -euo pipefail
-          npx wrangler pages dev dist-pages --port 3000 > /tmp/fcr-pages.log 2>&1 &
+          python3 -m http.server 3000 --bind 127.0.0.1 --directory dist-pages > /tmp/fcr-pages.log 2>&1 &
           echo $! > /tmp/fcr-pages.pid
-          npx wait-on http://127.0.0.1:3000
+          timeout 30s npx wait-on http://127.0.0.1:3000
 
       - name: Run Playwright desktop and mobile proof
         shell: bash
