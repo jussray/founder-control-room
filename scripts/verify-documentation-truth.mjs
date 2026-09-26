@@ -119,6 +119,13 @@ function meaningfulNarrative(value, minimumLength = MINIMUM_MEANINGFUL_DOC_TEXT_
     && words.some((word) => word.length >= 4);
 }
 
+function normalizedClaimFingerprint(value) {
+  return normalizedNarrativeText(value)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
 function visibleOutsideHtmlComments(value, state) {
   let cursor = 0;
   let visible = '';
@@ -235,8 +242,12 @@ if (truthSensitiveChanges.length > 0) {
     const baseClaimsByPath = receiptClaimsAtRevision(baseSha);
     for (const change of truthSensitiveChanges) {
       const claims = receipt.claimsByPath.get(change.file) ?? [];
-      const previousClaims = new Set(baseClaimsByPath.get(change.file) ?? []);
-      const currentRangeClaims = claims.filter((claim) => !previousClaims.has(claim));
+      const previousClaimFingerprints = new Set(
+        (baseClaimsByPath.get(change.file) ?? []).map((claim) => normalizedClaimFingerprint(claim)),
+      );
+      const currentRangeClaims = claims.filter(
+        (claim) => !previousClaimFingerprints.has(normalizedClaimFingerprint(claim)),
+      );
       if (!currentRangeClaims.some((claim) => meaningfulInvariant(claim, change.file))) {
         failures.push(`documentation truth receipt must add or change a meaningful path-bound invariant in the reviewed range for: ${change.file}`);
       }

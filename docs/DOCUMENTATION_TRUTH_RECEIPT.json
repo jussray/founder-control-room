@@ -278,7 +278,8 @@
       "path": "scripts/verify-documentation-truth.mjs",
       "claims": [
         "`scripts/verify-documentation-truth.mjs` must classify `src/founder-os-lab/projectAdapters.ts` as evidence-authority truth-sensitive so a Chief exact-head pin movement cannot pass Documentation Truth without substantive README, truth-decay audit, and structured receipt updates that name the changed path.",
-        "`scripts/verify-documentation-truth.mjs` must compare the base receipt with the candidate receipt and reject a truth-sensitive path unless the reviewed range adds or changes a meaningful path-bound invariant for that exact source path."
+        "`scripts/verify-documentation-truth.mjs` must compare the base receipt with the candidate receipt and reject a truth-sensitive path unless the reviewed range adds or changes a meaningful path-bound invariant for that exact source path.",
+        "`scripts/verify-documentation-truth.mjs` must normalize receipt-claim casing, punctuation, and whitespace before testing reviewed-range novelty so cosmetic rewrites cannot satisfy the new-or-changed invariant gate."
       ]
     }
   ]
