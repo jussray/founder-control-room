@@ -12,7 +12,7 @@ Model agreement is never proof. A truth-state upgrade requires independent evide
 
 ## Runtime discovery
 
-`chatgpt-sol` and `claude-code` are execution-profile identities, not permanent claims about a provider's current model build or enabled tools. Every run must observe the actual runtime model identity and currently available capabilities before relying on them. Missing tools are not simulated.
+`chatgpt-sol` and `claude-code` are execution-profile identities, not permanent claims about a provider's current model build or enabled tools. Every run must observe the actual provider identity, runtime model identity, and currently available capabilities before relying on them. Missing tools are not simulated, and profile selection cannot substitute for observed provider evidence.
 
 ### ChatGPT Sol profile
 
@@ -28,7 +28,8 @@ These biases guide routing only. Neither profile receives additional GitHub, Sup
 
 Every consequential model handoff should preserve:
 
-- model profile id and observed runtime model;
+- model profile id;
+- observed provider and observed runtime model;
 - observed capabilities rather than assumed tools;
 - authoritative truth references;
 - authority required and proof required;
