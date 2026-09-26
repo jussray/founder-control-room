@@ -3,9 +3,11 @@
   "task": "Implant evidence-bound revenue opportunity intelligence from the reusable lead-generation sequence into FCR and inherit it across portfolio project shells.",
   "authoritativeRepository": "jussray/founder-control-room",
   "baseBranch": "main",
-  "baseSha": "24a82d0359a0ce20a667844b978b42a2994df167",
+  "initialBaseSha": "24a82d0359a0ce20a667844b978b42a2994df167",
+  "reconciledMainSha": "4a5a3378ff1aaaec63616c8c6e6c4a7cb39ca2f8",
   "workingBranch": "agent/unified-growth-inbox",
-  "proofSubjectSha": "3f5914c94e4e17f88f845f70b17b97a747a859b4",
+  "proofSubjectRef": "HEAD",
+  "proofWorkflow": ".github/workflows/growth-opportunity-intelligence-proof.yml",
   "state": {
     "sourceImplemented": true,
     "merged": false,
@@ -18,25 +20,23 @@
     "src/growth/opportunityIntelligence.ts",
     "src/growth/__tests__/opportunityIntelligence.test.ts",
     "src/config/projectShells.ts",
-    "src/config/__tests__/projectShells.test.ts"
+    "src/config/__tests__/projectShells.test.ts",
+    ".github/workflows/growth-opportunity-intelligence-proof.yml",
+    ".control-room/receipts/2026-09-26-growth-opportunity-intelligence.json"
   ],
   "verified": [
-    "The reused agent/unified-growth-inbox branch was fast-forwarded from its historical merged head to current main without force.",
-    "The proof subject is five commits ahead of main and zero commits behind.",
-    "The source diff at the proof subject is limited to four files: the opportunity engine, its focused tests, shared project-shell inheritance, and the inheritance test.",
-    "Cloudflare Pages completed successfully for proof subject 3f5914c94e4e17f88f845f70b17b97a747a859b4.",
-    "Cloudflare Workers Builds completed successfully for proof subject 3f5914c94e4e17f88f845f70b17b97a747a859b4.",
-    "The engine is advisory-only and cannot authorize outreach, pricing, lead mutation, provider mutation, or spend.",
+    "The feature branch was reconciled with main 4a5a3378ff1aaaec63616c8c6e6c4a7cb39ca2f8 without force and without overlapping source-file conflicts.",
+    "The opportunity engine remains advisory-only and cannot authorize outreach, pricing, lead mutation, provider mutation, or spend.",
     "Only verified explicit evidence contributes to prioritization; unknown, conflicting, and expired evidence remains visible without scoring as truth.",
-    "Collected revenue is recognized through the existing isCollectedRevenue contract rather than a payment_collected label alone.",
-    "All FCR project shells now inherit growth-opportunity-intelligence, including PromptOS, Chief, StoryEngine/L99, Se’kret Bip, and commerce shells, while existing project-specific privacy and authority boundaries remain in force."
+    "Active funnel progress is monotonic from new through booked, while do-not-contact remains a hard ceiling and won still requires collected-revenue evidence.",
+    "Collected revenue is recognized through the existing isCollectedRevenue contract rather than a payment_collected or won label alone.",
+    "All FCR project shells inherit growth-opportunity-intelligence, including PromptOS, Chief, StoryEngine/L99, Se’kret Bip, and commerce shells, while existing project-specific privacy and authority boundaries remain in force.",
+    "A reusable exact-head proof workflow now binds typecheck, focused Vitest, Pages build, current-main ancestry, and desktop/mobile Playwright evidence to the candidate head."
   ],
   "unknownOrBlocked": [
-    "No exact-head GitHub Actions CI run exists because this work reused an existing branch and did not create a new pull request.",
-    "Focused Vitest and repository typecheck have not been observed on the proof subject.",
-    "Playwright exact-head proof has not been observed on the proof subject.",
-    "No merge or production-main deployment is authorized by this receipt."
+    "The final exact-head proof run for this receipt-bearing HEAD must complete successfully before merge.",
+    "Production-main runtime and revenue outcomes remain unverified until after a proven merge and subsequent outcome observation."
   ],
-  "rollback": "Reset the reused working branch back to baseSha 24a82d0359a0ce20a667844b978b42a2994df167 or revert the focused growth-opportunity commits before any merge. No database, provider credential, billing, outreach, or customer state was mutated by the source implementation.",
-  "nextGate": "Obtain exact-head typecheck, focused Vitest, and Playwright proof for the current candidate, then re-observe main and request one explicit founder merge decision."
+  "rollback": "Before merge, move agent/unified-growth-inbox back to reconciledMainSha or revert the focused revenue-intelligence commits. No database, provider credential, billing, outreach, or customer state is mutated by this source implementation.",
+  "nextGate": "Require a green exact-head Growth Opportunity Intelligence Proof for HEAD, re-observe main, and if main remains an ancestor of the proven head, apply the already-approved founder merge as a non-force fast-forward."
 }
