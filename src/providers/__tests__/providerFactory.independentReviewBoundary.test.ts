@@ -1,11 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
+  mockGetGitHubInstallationToken,
   mockGetPullRequestReviewContext,
   mockListReviewSignals,
   mockResolveRef,
   mockIntegrate,
 } = vi.hoisted(() => ({
+  mockGetGitHubInstallationToken: vi.fn(),
   mockGetPullRequestReviewContext: vi.fn(),
   mockListReviewSignals: vi.fn(),
   mockResolveRef: vi.fn(),
@@ -13,7 +15,7 @@ const {
 }));
 
 vi.mock("../githubAppAuth.js", () => ({
-  getGitHubInstallationToken: vi.fn(),
+  getGitHubInstallationToken: mockGetGitHubInstallationToken,
 }));
 
 vi.mock("../GitHubProvider.js", () => ({
@@ -71,8 +73,9 @@ describe("LazyRepositoryProvider independent-review boundary", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.stubEnv("GITHUB_TOKEN", "test-token");
-    vi.stubEnv("GITHUB_APP_ID", "");
-    vi.stubEnv("GITHUB_PRIVATE_KEY", "");
+    vi.stubEnv("GITHUB_APP_ID", "12345");
+    vi.stubEnv("GITHUB_PRIVATE_KEY", "test-private-key");
+    mockGetGitHubInstallationToken.mockResolvedValue("installation-token");
     mockGetPullRequestReviewContext.mockResolvedValue(reviewContext);
     mockListReviewSignals.mockResolvedValue([{ id: "review-1" }]);
     mockResolveRef.mockImplementation(async (_projectId: string, ref: string) =>
@@ -92,19 +95,24 @@ describe("LazyRepositoryProvider independent-review boundary", () => {
     await expect(provider.listReviewSignals!("founder-control-room", 474))
       .resolves.toEqual([{ id: "review-1" }]);
 
+    expect(mockGetGitHubInstallationToken).toHaveBeenCalledWith(
+      "12345",
+      "test-private-key",
+      "jussray/founder-control-room",
+    );
     expect(mockGetPullRequestReviewContext).toHaveBeenCalledWith("founder-control-room", 474);
     expect(mockListReviewSignals).toHaveBeenCalledWith("founder-control-room", 474);
   });
 
-  it("does not expose deterministic witness authority through the GITHUB_TOKEN fallback", async () => {
+  it("fails closed for FCR before provider construction when only GITHUB_TOKEN exists", async () => {
+    vi.stubEnv("GITHUB_APP_ID", "");
+    vi.stubEnv("GITHUB_PRIVATE_KEY", "");
     const provider = providerForProject(FCR_PROJECT);
 
-    await expect(provider.publishDeterministicReviewWitness!("founder-control-room", {
-      headSha: HEAD_SHA,
-      name: "Independent Review / fcr-deterministic-review-v1 / abcdef123456",
-      reviewHash: "d".repeat(64),
-      summary: "must not publish with fallback token authority",
-    })).rejects.toThrow(/requires GitHub App authority/i);
+    await expect(provider.getPullRequestReviewContext!("founder-control-room", 474))
+      .rejects.toThrow(/requires GITHUB_APP_ID and GITHUB_PRIVATE_KEY/i);
+    expect(mockGetGitHubInstallationToken).not.toHaveBeenCalled();
+    expect(mockGetPullRequestReviewContext).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -194,11 +202,14 @@ describe("LazyRepositoryProvider independent-review boundary", () => {
   });
 
   it("does not impose the FCR PR-context membrane on other projects", async () => {
+    vi.stubEnv("GITHUB_APP_ID", "");
+    vi.stubEnv("GITHUB_PRIVATE_KEY", "");
     const provider = providerForProject(OTHER_PROJECT);
 
     await expect(provider.integrate("sekret-bip", "main", "mission/feature"))
       .resolves.toBe("merge-sha");
 
+    expect(mockGetGitHubInstallationToken).not.toHaveBeenCalled();
     expect(mockResolveRef).not.toHaveBeenCalled();
     expect(mockIntegrate).toHaveBeenCalledWith("sekret-bip", "main", "mission/feature");
   });
