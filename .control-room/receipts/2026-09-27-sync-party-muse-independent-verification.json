@@ -58,24 +58,42 @@
     "exact_sha": "INFERRED_FROM_EXISTING_COURT_REPORT_NOT_REPRODUCED_BY_CHALLENGER",
     "asset_hashing": "Assets observed with unhashed filenames; no independent runtime version string found.",
     "console": "No page-level render failures observed; verbatim console logs were unobtainable on the challenger route and therefore remain inferred rather than verified.",
-    "in_game_visuals": "Timer, choices, reveal bars, scores and game-over were not reached by Muse; those surfaces remain single-witness on the original exact-SHA Playwright receipt.",
+    "in_game_visuals": "Timer, choices, reveal bars, scores and game-over were not reached by Muse; those surfaces remain without a second independent visual witness.",
     "production_mutation": "NONE"
+  },
+  "challenger_flags": {
+    "stale_anchor": {
+      "state": "SUSTAINED",
+      "finding": "The original 7920be25 visual case cannot continue to describe the current live runtime once production advances. Proof does not transfer across heads.",
+      "court_reanchor": "a5e27a8d2dfb8383c5d9a35cbb14e8a69ae088a1",
+      "relation_to_original_case": "18 commits ahead at Court recheck",
+      "court_automated_proof": "github-actions:core-proof:36346310394; github-actions:deploy:36346385988:SUCCESS",
+      "muse_exact_sha_binding": "NOT_VERIFIED"
+    },
+    "threads_ordering": {
+      "state": "RECORDED",
+      "finding": "The Threads post went live approximately 30 minutes before the visual fix and therefore briefly pointed to a visual-fail runtime under the same Workers URL.",
+      "current_destination": "HEALED",
+      "remediation_required": false,
+      "historical_truth_rule": "Later healing does not erase the earlier exposure window."
+    }
   },
   "court_crosscheck": {
     "state": "VERIFIED_BY_COURT_NOT_BY_MUSE",
-    "production_branch_sha_at_review": "416bdf9f81962d052bc5cac3950b6696e6251c26",
-    "relation_to_reported_source_sha": "9 commits ahead",
-    "core_proof": "github-actions:36345129049:SUCCESS",
-    "deploy_and_public_exact_sha_proof": "github-actions:36345212190:SUCCESS",
+    "current_production_sha_at_reanchor": "a5e27a8d2dfb8383c5d9a35cbb14e8a69ae088a1",
+    "relation_to_reported_source_sha": "18 commits ahead",
+    "core_proof": "github-actions:36346310394:SUCCESS",
+    "deploy_and_public_exact_sha_proof": "github-actions:36346385988:SUCCESS",
     "public_multiplayer_suite": "SUCCESS",
     "identity_boundary": "These GitHub/Cloudflare proof facts establish the current production successor separately. They do not retroactively prove which exact SHA Muse's browser session observed.",
-    "successor_note": "The successor includes runtime/product and proof-system changes beyond the original 7920be25 visual case, so Court keeps the original case and current production successor as distinct states."
+    "successor_note": "Court re-anchors current production independently of Muse testimony and keeps the original 7920be25 case as historical visual evidence."
   },
   "court_effect": {
     "runtime_green": "UNCHALLENGED",
     "visual_green": "CONCURRED_FOR_LANDING_HOST_SETUP_AND_LOBBY",
     "threads_visual_hold": false,
-    "in_game_visual_annotation": "single-witness (original receipt); Muse reproduction reached lobby only"
+    "historical_threads_visual_fail_window": "RECORDED",
+    "in_game_visual_annotation": "automated exact-SHA proof exists; Muse reproduction reached lobby only"
   },
   "remaining_gates": [
     "second independent witness for in-game surfaces using two clients or equivalent",
