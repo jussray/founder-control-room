@@ -61,6 +61,16 @@
     "in_game_visuals": "Timer, choices, reveal bars, scores and game-over were not reached by Muse; those surfaces remain single-witness on the original exact-SHA Playwright receipt.",
     "production_mutation": "NONE"
   },
+  "court_crosscheck": {
+    "state": "VERIFIED_BY_COURT_NOT_BY_MUSE",
+    "production_branch_sha_at_review": "416bdf9f81962d052bc5cac3950b6696e6251c26",
+    "relation_to_reported_source_sha": "9 commits ahead",
+    "core_proof": "github-actions:36345129049:SUCCESS",
+    "deploy_and_public_exact_sha_proof": "github-actions:36345212190:SUCCESS",
+    "public_multiplayer_suite": "SUCCESS",
+    "identity_boundary": "These GitHub/Cloudflare proof facts establish the current production successor separately. They do not retroactively prove which exact SHA Muse's browser session observed.",
+    "successor_note": "The successor includes runtime/product and proof-system changes beyond the original 7920be25 visual case, so Court keeps the original case and current production successor as distinct states."
+  },
   "court_effect": {
     "runtime_green": "UNCHALLENGED",
     "visual_green": "CONCURRED_FOR_LANDING_HOST_SETUP_AND_LOBBY",
