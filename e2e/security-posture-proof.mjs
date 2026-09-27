@@ -44,6 +44,7 @@ const projects = [
   ['l99', 'L99 StoryEngine', 'jussray/StoryEngine', 8, false],
   ['chief-ai-machine', 'Chief AI Prompt Machine', 'jussray/chief-ai-machine', 10, false],
   ['untold-stories', 'Untold Stories Storefront', 'jussray/untold-stories-storefront', 9, true],
+  ['sync-party', 'SYNC Party Game', 'jussray/sync-party-game', 8, true],
   ['founder-control-room', 'Founder Control Room', 'jussray/founder-control-room', 10, false],
   ['promptos', 'PromptOS', 'jussray/promptos', 9, false],
 ].map(([slug, name, repository, targetVersion, playwright]) => ({
@@ -90,6 +91,7 @@ const cryptographicReviewRequired = [
   ['chief-ai-machine', 'Canonical runtime public-key boundary not proven.'],
   ['juss-beautiful-hair', 'Provider-owned storefront crypto requires deeper evidence.'],
   ['promptos', 'Canonical runtime auth/signing primitive not proven.'],
+  ['sync-party', 'Multiplayer/runtime cryptographic boundary not yet proven.'],
 ].map(([projectSlug, reason]) => ({
   projectSlug,
   reason,
@@ -127,16 +129,16 @@ const fixture = {
   contract: 'juss-v10/security-posture@v1',
   generatedAt: '2026-08-16T06:30:00.000Z',
   summary: {
-    totalProjects: 8,
-    v8Targets: 1,
+    totalProjects: 9,
+    v8Targets: 2,
     v9Targets: 4,
     v10Targets: 3,
-    playwrightRequiredProjects: 3,
-    totalStageObligations: 74,
+    playwrightRequiredProjects: 4,
+    totalStageObligations: 82,
     uniqueControlCount: 62,
     frameworkSignalCount: 23,
     cryptographicInventoryEntries: 7,
-    cryptographicReviewRequiredProjects: 3,
+    cryptographicReviewRequiredProjects: 4,
     publicKeyMigrationEntries: 4,
     providerPqcEvidenceEntries: 10,
     providerPqcCurrentEntries: 2,
@@ -152,10 +154,10 @@ const fixture = {
     inventory: cryptographicInventory,
     reviewRequired: cryptographicReviewRequired,
     coverage: {
-      activeProjectCount: 8,
-      representedProjectCount: 8,
+      activeProjectCount: 9,
+      representedProjectCount: 9,
       inventoryEntryCount: 7,
-      reviewRequiredProjectCount: 3,
+      reviewRequiredProjectCount: 4,
       publicKeyMigrationEntryCount: 4,
       missingProjectSlugs: [],
       overlappingProjectSlugs: [],
@@ -231,16 +233,16 @@ async function proveViewport(browser, { name, width, height, isMobile = false })
 
   await page.getByRole('heading', { name: 'Security posture without the green-check theater.' }).waitFor({ state: 'visible' });
   assert.equal(await page.locator('.stage-card').count(), 10, `${name}: V1-V10 ladder renders all stages`);
-  assert.equal(await page.locator('.project-card:not(.crypto-entry-card):not(.crypto-review-card):not(.pqc-provider-card)').count(), 8, `${name}: registered portfolio renders all project cards`);
+  assert.equal(await page.locator('.project-card:not(.crypto-entry-card):not(.crypto-review-card):not(.pqc-provider-card)').count(), 9, `${name}: registered portfolio renders all project cards`);
   assert.equal(await page.locator('.project-card[data-target-version="10"]').count(), 3, `${name}: V10 target count is visible`);
-  assert.equal(await page.locator('.target-badge span', { hasText: 'NOT PROVEN' }).count(), 8, `${name}: every project denies maturity proof`);
+  assert.equal(await page.locator('.target-badge span', { hasText: 'NOT PROVEN' }).count(), 9, `${name}: every project denies maturity proof`);
   assert.match(await page.locator('.truth-grid').innerText(), /TARGET ≠ PROOF/i, `${name}: target/proof boundary is visible`);
   assert.match(await page.locator('.truth-grid').innerText(), /FRAMEWORK ≠ CERTIFICATION/i, `${name}: framework/certification boundary is visible`);
   assert.match(await page.locator('.truth-grid').innerText(), /ROADMAP ≠ RUNTIME/i, `${name}: provider roadmaps cannot become runtime truth`);
   assert.match(await page.locator('.truth-grid').innerText(), /INVENTORY ≠ QUANTUM SAFETY/i, `${name}: crypto inventory cannot become a quantum-safe claim`);
   assert.equal(await page.locator('.crypto-entry-card').count(), 7, `${name}: all observed crypto entries render`);
   assert.equal(await page.locator('.crypto-entry-card[data-migration-class="PUBLIC_KEY_MIGRATION_REQUIRED"]').count(), 4, `${name}: public-key migration entries stay explicit`);
-  assert.equal(await page.locator('.crypto-review-card').count(), 3, `${name}: unresolved projects remain review-required`);
+  assert.equal(await page.locator('.crypto-review-card').count(), 4, `${name}: unresolved projects remain review-required`);
   assert.match(await page.locator('.crypto-panel').first().innerText(), /Uncovered active projects\s+0/i, `${name}: active portfolio has no silent crypto coverage holes`);
   assert.match(await page.locator('.crypto-panel').first().innerText(), /AES-256-GCM/i, `${name}: symmetric crypto remains separately classified`);
   assert.match(await page.locator('.crypto-panel').first().innerText(), /HMAC-SHA-256/i, `${name}: webhook MAC remains separately classified`);
@@ -291,11 +293,11 @@ try {
     verified: true,
     assertions: {
       stages: 10,
-      projects: 8,
+      projects: 9,
       v10Targets: 3,
       cryptoInventoryEntries: 7,
       publicKeyMigrationEntries: 4,
-      cryptoReviewRequiredProjects: 3,
+      cryptoReviewRequiredProjects: 4,
       uncoveredActiveProjects: 0,
       providerPqcEvidenceEntries: 10,
       providerPqcCurrentEntries: 2,
