@@ -444,7 +444,6 @@ The Chief SHA in `src/founder-os-lab/projectAdapters.ts` is an audited evidence 
 
 Documentation Truth therefore treats the adapter source path as evidence-authority-sensitive. Every pin transition must update the focused assertion, README boundary, this truth-decay record, and the structured documentation receipt in the same exact-head range before successor CI can certify the documentation contract. None of those source artifacts grants merge, deploy, publication, provider mutation, or founder authority.
 
-
 ## Exact-head adapter and receipt-range repair
 
 The project-adapter freshness assessment previously returned `verified/fresh` after authoritative `main` advanced when the required contract blobs were unchanged. That contradicted the strict request adapter, which rejects a source SHA different from its audited head, and allowed the portfolio freshness workflow to report a false green. The assessment must now classify any exact-head mismatch as stale/review-required until the audited head and contract manifest are intentionally refreshed together.
@@ -454,6 +453,8 @@ Documentation Truth also previously evaluated all claims present in the current 
 
 The successor adapter audit refresh binds Se’kret Bip and Chief to their newly observed main heads only because all required contract blob identities remained unchanged under live GitHub readback. That establishes exact-head provenance for the bounded preview contracts; it does not semantically certify unrelated commits or promote source evidence into deployment, runtime, browser, or human-outcome proof.
 
-## StoryEngine Sync Avenue peer transition
+## 2026-09-27 StoryEngine peer transition after Sync Avenue
 
-StoryEngine `main` advanced by two commits that added the Sync Avenue route, renderer bridge, tests, and workflow while modifying the video engine and server wiring. That reviewed delta justifies selecting the successor as the next peer evidence subject, but it does not donate predecessor FCR browser green. Federation remains UNKNOWN until the exact successor FCR head proves the live ref, immutable peer checkout, runtime identity, directive/receipt binding, replay safety, and browser loop; production and provider state remain separate.
+Founder Control Room independently observed StoryEngine `main` at `d0689af02675b2d278654ca37ba727dd8d2b6836`, exactly two commits ahead and zero behind the previously pinned `3eada5660ad16493f5b26b179a5da215a8b01ef2`. The intervening StoryEngine work adds the reality-first Sync Avenue engine with its exact-head Node/Playwright proof and a subsequent static-file path-containment security repair. StoryEngine's `Reality engine + renderer + Playwright` check succeeded on the successor SHA, which is sufficient to select that SHA as the next FCR federation evidence subject.
+
+That observation does not prove StoryEngine production. Its Cloudflare Workers build check on the same successor SHA was failing, so production remains a separate unresolved plane. Updating FCR's `STORYENGINE_PEER_SHA` therefore resets FCR federation/browser proof to `UNKNOWN`; the successor FCR exact head must complete the full peer-ref check, immutable checkout, runtime identity, directive/receipt, replay-safety, and Playwright browser loop before FCR may call the federation path current. No predecessor browser green, merge approval, deploy authority, or provider-mutation authority transfers across this peer transition.

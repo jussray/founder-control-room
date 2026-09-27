@@ -46,7 +46,7 @@
         "The September 24, 2026 StoryEngine peer refresh after Council residency moved the peer head selects a new evidence subject only; predecessor browser green remains historical until the exact successor FCR head reruns the complete federation witness.",
         "`.github/workflows/playwright.yml` must treat the pinned StoryEngine peer as an exact evidence subject, verify the live ref still resolves to that SHA before starting the peer runtime, and expire predecessor browser proof whenever either repository head advances.",
         "`.github/workflows/playwright.yml` must treat an exact ref/pin match as an identity prerequisite only; a cancelled, skipped, or non-executed exact-head Playwright run cannot renew browser-federation proof and must leave the successor claim UNKNOWN.",
-        "On September 27, 2026, `.github/workflows/playwright.yml` moved its StoryEngine peer from `3eada5660ad16493f5b26b179a5da215a8b01ef2` to `d0689af02675b2d278654ca37ba727dd8d2b6836` only after reviewing the two-commit Sync Avenue/runtime delta; the move selects a successor evidence subject and keeps federation UNKNOWN until the exact successor FCR Playwright witness passes."
+        "`.github/workflows/playwright.yml` must treat the September 27, 2026 transition from StoryEngine `3eada5660ad16493f5b26b179a5da215a8b01ef2` to independently observed `d0689af02675b2d278654ca37ba727dd8d2b6836` as recovery setup only; predecessor FCR browser proof is historical and the successor federation claim remains UNKNOWN until the exact successor FCR head completes the full runtime, directive, receipt, replay-safety, and Playwright witness, while StoryEngine production remains separately unproven."
       ]
     },
     {

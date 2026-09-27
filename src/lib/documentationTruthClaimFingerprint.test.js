@@ -28,6 +28,13 @@ describe('documentation truth claim fingerprints', () => {
       .not.toBe(normalizedClaimFingerprint('count > limit must hold'));
   });
 
+  it('treats standalone angle-bracket prefixes as cosmetic punctuation', () => {
+    expect(normalizedClaimFingerprint('Claim must hold'))
+      .toBe(normalizedClaimFingerprint('> Claim must hold'));
+    expect(normalizedClaimFingerprint('Claim must hold'))
+      .toBe(normalizedClaimFingerprint('< Claim must hold'));
+  });
+
   it('distinguishes logical operators', () => {
     expect(normalizedClaimFingerprint('ready && approved must hold'))
       .not.toBe(normalizedClaimFingerprint('ready || approved must hold'));

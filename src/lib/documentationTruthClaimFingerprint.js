@@ -15,7 +15,8 @@ const OPERATOR_TOKENS = new Map([
 export function normalizedClaimFingerprint(value) {
   return String(value)
     .toLowerCase()
-    .replace(/!==|===|<=|>=|&&|\|\||==|!=|<|>|(?<!!)!(?!!)(?=[a-z_(])/g, (operator) => ` ${OPERATOR_TOKENS.get(operator)} `)
+    .replace(/!==|===|<=|>=|&&|\|\||==|!=|(?<!!)!(?!!)(?=[a-z_(])/g, (operator) => ` ${OPERATOR_TOKENS.get(operator)} `)
+    .replace(/([a-z0-9_)])\s*([<>])\s*(?=[a-z0-9_(])/g, (_match, left, operator) => `${left} ${OPERATOR_TOKENS.get(operator)} `)
     .replace(/[^a-z0-9]+/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
