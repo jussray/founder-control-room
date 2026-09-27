@@ -235,6 +235,8 @@ A docs-only truth-sync merge closes an existing drift cycle. The post-merge veri
 
 Do not hard-code a durable “current main SHA” into prose. Exact SHAs belong in evidence/provenance; resolve current identity at use time.
 
+`.github/workflows/quality-gate.yml` is itself a truth-sensitive authority surface. Its load-bearing sequence must retain `python3 scripts/continuity_model_guard.py` and `node scripts/audit_pr_continuity_rulesets.mjs`: the first guards continuity-model semantics, while the second re-reads live GitHub ruleset topology and must fail closed if an all-branch release/linear-history rule blocks lawful PR rollover. Treat that red as provider-state evidence, not permission to remove the audit or relabel it as source green. Neither check grants provider mutation, merge, deploy, or founder authority.
+
 ## Founder product publishing / Sauce Guard
 
 Founder Control Room should be able to publish verified progress about Juss's own products from Juss's own product without giving away the private implementation recipe.
@@ -344,7 +346,7 @@ FCR in-app deterministic-review/founder-final enforcement and the live GitHub re
 
 ### Chief candidate-proof producer trust
 
-A Chief pre-merge required-check name plus GitHub Actions integration `15368` does not authenticate the exact workflow file or event that produced that check. A PR-authored workflow can otherwise counterfeit the expected context under the same GitHub Actions App.
+A Chief pre-merge required-check name plus GitHub Actions integration `15368` does not authenticate the exact workflow file or event that produced the check. A PR-authored workflow can otherwise counterfeit the expected context under the same GitHub Actions App.
 
 When reconciling Chief governance, fail closed until the candidate ProofMode context is bound to a provider-observed external GitHub App/check producer that PR-authored Chief Actions cannot mint. Also reject `Cloudflare Production` as a pre-merge required deployment because it is a post-merge production plane. Do not mutate the live rulesets, grant merge authority, or call the candidate proof trusted while either producer provenance or deployment-phase separation is unresolved.
 

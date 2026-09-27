@@ -12,6 +12,11 @@ const files = {
   localWorkspace: await readFile(new URL('../scripts/verify-local-workspace.mjs', import.meta.url), 'utf8'),
   localWorkspaceDocs: await readFile(new URL('../docs/LOCAL_WORKSPACE.md', import.meta.url), 'utf8'),
   localWorkspaceUx: await readFile(new URL('../docs/product-design/LOCAL_WORKSPACE_MISSION_UX.md', import.meta.url), 'utf8'),
+  claudeSettings: await readFile(new URL('../.claude/settings.json', import.meta.url), 'utf8'),
+  claudeTemporaryPermissions: await readFile(
+    new URL('../.claude/temporary-permissions.json', import.meta.url),
+    'utf8',
+  ),
   migration: await readFile(
     new URL('../supabase/migrations/20260718032552_guarded_terminal_and_schema_reconciliation.sql', import.meta.url),
     'utf8',
@@ -38,6 +43,66 @@ function requireCount(label, source, expected, minimum) {
 function forbidText(label, source, forbidden) {
   if (source.includes(forbidden)) {
     failures.push(`${label}: forbidden stale or unsafe text ${JSON.stringify(forbidden)}`);
+  }
+}
+
+function parseJson(label, source) {
+  try {
+    return JSON.parse(source);
+  } catch (error) {
+    failures.push(`${label}: invalid JSON (${error instanceof Error ? error.message : String(error)})`);
+    return null;
+  }
+}
+
+const claudeSettings = parseJson('Claude settings', files.claudeSettings);
+const claudeTemporaryPermissions = parseJson(
+  'Claude temporary permissions',
+  files.claudeTemporaryPermissions,
+);
+
+if (claudeSettings && claudeTemporaryPermissions) {
+  const allow = Array.isArray(claudeSettings.permissions?.allow)
+    ? claudeSettings.permissions.allow
+    : [];
+  const deny = Array.isArray(claudeSettings.permissions?.deny)
+    ? claudeSettings.permissions.deny
+    : [];
+  const directMainPushRule = 'Bash(git push origin main)';
+
+  if (allow.includes(directMainPushRule)) {
+    failures.push('Claude settings: direct push to main must not be allowed');
+  }
+  if (!deny.includes(directMainPushRule)) {
+    failures.push('Claude settings: direct push to main must remain explicitly denied');
+  }
+
+  const temporaryPermissions = Array.isArray(claudeTemporaryPermissions.temporaryPermissions)
+    ? claudeTemporaryPermissions.temporaryPermissions
+    : [];
+  const now = Date.now();
+
+  for (const permission of temporaryPermissions) {
+    if (!permission || typeof permission !== 'object') {
+      failures.push('Claude temporary permissions: malformed permission entry');
+      continue;
+    }
+
+    const {toolRule, expiresAt, id} = permission;
+    if (typeof toolRule !== 'string' || !toolRule) {
+      failures.push(`Claude temporary permissions: ${id ?? 'unknown'} missing toolRule`);
+      continue;
+    }
+    if (typeof expiresAt !== 'string' || Number.isNaN(Date.parse(expiresAt))) {
+      failures.push(`Claude temporary permissions: ${id ?? toolRule} has invalid expiresAt`);
+      continue;
+    }
+
+    if (Date.parse(expiresAt) <= now && allow.includes(toolRule)) {
+      failures.push(
+        `Claude settings: expired temporary permission ${id ?? toolRule} is still allowed`,
+      );
+    }
   }
 }
 

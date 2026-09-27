@@ -74,6 +74,12 @@ Under the current merge canon, `merge_authority: true` means only that the gover
 
 See [`docs/PR_CONTINUITY.md`](docs/PR_CONTINUITY.md).
 
+### Quality Gate continuity and live ruleset audit
+
+`.github/workflows/quality-gate.yml` keeps `python3 scripts/continuity_model_guard.py` and `node scripts/audit_pr_continuity_rulesets.mjs` load-bearing after the focused verification commands. The continuity guard protects source continuity semantics. The ruleset audit independently re-reads live GitHub governance and must fail closed when release or linear-history rules are applied across all branches in a way that blocks lawful PR rollover.
+
+A red ruleset audit is **provider-state evidence**, not a source-code regression and not permission to remove, bypass, or soften the audit. Repository green cannot relabel live provider drift as fixed. Conversely, the audit itself grants no ruleset mutation, merge, deploy, publication, or founder authority; provider repair requires an authorized provider path plus fresh post-write readback.
+
 ### Repository federation and StoryEngine
 
 FCR can issue a separately approved, bounded product-build directive to a product-owned control-room contract. The current StoryEngine federation seam is intentionally narrow:

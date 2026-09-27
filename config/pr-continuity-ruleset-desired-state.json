@@ -1,0 +1,25 @@
+{
+  "schema": "juss/pr-continuity-ruleset-desired-state@v1",
+  "repository": "jussray/founder-control-room",
+  "ruleset_id": 20819094,
+  "ruleset_name": "Founder Control Room main exact-head gate",
+  "target": "branch",
+  "required_ref_includes": [
+    "~DEFAULT_BRANCH"
+  ],
+  "forbidden_ref_includes": [
+    "~ALL"
+  ],
+  "preserve_release_rules": [
+    "deletion",
+    "required_status_checks",
+    "code_scanning",
+    "code_quality",
+    "required_linear_history",
+    "required_deployments"
+  ],
+  "reason": "Release/main protections must remain strong while active PR branches remain eligible for conflict-safe rollover. Production deployment requirements and linear-history enforcement on ~ALL branches make GitHub update-branch structurally impossible.",
+  "working_branch_authority": "PR workflows and exact-head proof",
+  "release_branch_authority": "ruleset checks, deployment gates, linear history, and explicit merge authority",
+  "fail_closed": true
+}

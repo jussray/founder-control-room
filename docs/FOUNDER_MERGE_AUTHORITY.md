@@ -44,6 +44,7 @@ A merge is appropriate only when:
 - required checks have genuinely executed and passed, or a documented infrastructure failure has been classified and distinguished from code-test evidence;
 - **Quality Gate jobs on pull requests must checkout and verify the exact `github.event.pull_request.head.sha`; GitHub's synthetic PR merge ref is merge-simulation evidence and cannot satisfy exact-head proof for the candidate;**
 - FCR `Required Gate` includes the secret-free exact-head Cloudflare bridge authority contract, and that dependency must succeed whenever the required gate is used; live Cloudflare/GitHub provider state remains separate evidence;
+- `.github/workflows/quality-gate.yml` keeps `python3 scripts/continuity_model_guard.py` and `node scripts/audit_pr_continuity_rulesets.mjs` load-bearing: the first protects continuity-model semantics and the second re-reads live GitHub ruleset topology; an all-branch release/linear-history ruleset that blocks lawful PR rollover must fail closed as provider-state evidence and must not be bypassed, deleted, or relabeled as a source-code failure merely to make Quality Gate green;
 - zero-step/no-log GitHub Actions failures are classified as `runner_startup_failure` or `workflow_no_jobs`, not as code regressions;
 - a `workflow_step_failure` is not waved away as infrastructure when logs show a real failing command, assertion, build, type, lint, or Playwright step;
 - Playwright has passed for any changed user-facing web/runtime path, or is explicitly inapplicable;
@@ -54,6 +55,8 @@ A merge is appropriate only when:
 - privacy, security, brand, IP, credential, sauce, and user-data boundaries remain intact;
 - rollback or safe forward-fix is understood;
 - the merge itself does not silently execute a separately gated action.
+
+The Quality Gate continuity/ruleset checks are observational and fail-closed. Passing them grants no merge, deploy, ruleset-mutation, provider-write, or founder authority; failing the provider audit must remain a separate live-provider blocker until an authorized provider path changes the ruleset and fresh readback proves the intended topology.
 
 ## Governed branch-creation authority
 
