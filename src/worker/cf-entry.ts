@@ -95,7 +95,7 @@ function observeChiefAssessment(
 
   ctx.waitUntil((async () => {
     try {
-      const assessment = await chief.assessActiveDefense(decision);
+      const assessment = await chief.assessActiveDefense!(decision);
       console.info(JSON.stringify({
         type: 'juss.active-defense.chief',
         status: 'assessed',
