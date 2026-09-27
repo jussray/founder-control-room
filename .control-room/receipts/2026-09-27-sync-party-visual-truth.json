@@ -1,6 +1,7 @@
 {
   "contract": "juss/court-visual-truth-receipt@v1",
   "observed_at": "2026-09-27T18:59:15Z",
+  "last_challenged_at": "2026-09-27T19:40:00Z",
   "subject": {
     "project": "jussray/sync-party-game",
     "surface": "https://sync-party-game.mcgill-raylene.workers.dev",
@@ -43,9 +44,25 @@
     },
     {
       "class": "independent_challenger",
-      "state": "UNKNOWN",
-      "evidence": null,
-      "limitation": "Muse has not independently reproduced this successor visual state yet."
+      "state": "PARTIAL_VERIFIED",
+      "witness": "Muse",
+      "evidence": ".control-room/receipts/2026-09-27-sync-party-muse-independent-verification.json@7b768291320d908e92d4c5d56bc33b57b4ee9ddb",
+      "verified_scope": [
+        "tagged Workers destination returned HTTP 200",
+        "landing visual direction",
+        "host setup flow",
+        "live pre-game lobby visual direction",
+        "single-player start gate and lobby configuration"
+      ],
+      "unverified_scope": [
+        "independent exact-SHA runtime identity",
+        "timer and in-game choice surfaces",
+        "reveal bars",
+        "score surfaces",
+        "game-over surface",
+        "chatgpt.site runtime equivalence"
+      ],
+      "annotation": "In-game surface visual truth remains single-witness on the original exact-SHA Playwright receipt; Muse reproduction reached lobby only."
     }
   ],
   "visual_canon": {
@@ -63,23 +80,29 @@
       "feature strip for player count, no account, cross-device and room code",
       "shared neon visual language across gameplay controls and result surfaces"
     ],
-    "claim_scope": "visual-system alignment on the exact promoted Workers destination; not pixel identity with marketing collage references"
+    "claim_scope": "visual-system alignment on the exact promoted Workers destination; not pixel identity with marketing collage references",
+    "independent_reproduction_scope": "Muse independently reproduced landing, host setup and lobby only. The deeper in-game visual surfaces retain the original browser-visual witness as their sole current witness."
   },
   "supersedes": {
     "visual_fail_state": "workers runtime before showcase-aligned successor",
-    "temporary_recovery_sha": "42990809c01e28a648f797807367049a1a9d1e08"
+    "temporary_recovery_sha": "42990809c01e28a648f797807367049a1a9d1e08",
+    "independent_challenger_unknown": "Resolved to PARTIAL_VERIFIED for landing/host/lobby dimensions."
   },
   "promotion_gate": {
     "visual_hold": false,
     "functional_hold": false,
-    "destination_identity": "VERIFIED",
+    "destination_identity": "VERIFIED_BY_ORIGINAL_CI_RUNTIME_WITNESS",
+    "independent_destination_identity": "NOT_VERIFIED_BY_MUSE",
     "campaign_attribution_required": true,
     "threads_campaign_link": "https://sync-party-game.mcgill-raylene.workers.dev/?utm_campaign=sync-launch-threads-01&utm_source=threads&utm_medium=organic-social&utm_content=launch-post-01"
   },
   "limitations": [
     "The separate chatgpt.site host remains unproven as runtime-equivalent to the Workers destination.",
     "No player, retention, conversion, referral, or revenue outcome is claimed by this receipt.",
-    "Independent Muse reproduction remains pending."
+    "Muse did not independently verify exact SHA identity because the inspected runtime exposed no version string and used unhashed asset filenames.",
+    "Muse reached the pre-game lobby only; timer, choices, reveal bars, scores and game-over remain single-witness on the original exact-SHA Playwright proof.",
+    "Muse observed no page-level render failures, but verbatim console logs were unobtainable on that route and are not promoted to verified console evidence.",
+    "One host-setup screenshot failed disk read; three of four challenger screenshots were visually confirmed and the failure is retained as evidence boundary."
   ],
-  "next_gate": "Independent challenger review or measured campaign outcome evidence."
+  "next_gate": "Collect real campaign/player outcomes; preserve a two-client independent in-game visual reproduction as the open second-witness gate."
 }
