@@ -48,7 +48,7 @@ describe('readSyncPartyGrowthOutcome', () => {
       return json({
         campaign_key: 'sync-launch-threads-01',
         campaign_fingerprint: 'campaign-fingerprint-123',
-        seq: 17,
+        seq: 21,
         unique_visitors: 6,
         counters: {
           landing_view: 8,
@@ -58,7 +58,6 @@ describe('readSyncPartyGrowthOutcome', () => {
           game_started: 3,
           game_finished: 2,
           rematch_started: 1,
-          unsupported_event: 999,
         },
         source_counts: { threads: 8 },
         medium_counts: { 'organic-social': 8 },
@@ -69,10 +68,10 @@ describe('readSyncPartyGrowthOutcome', () => {
           {
             event: 'game_finished',
             event_id: 'private-ish-source-id-is-not-forwarded',
-            seq: 16,
+            seq: 20,
             at: 1900,
             game_seq: 5,
-            event_fingerprint: 'event-fingerprint-16',
+            event_fingerprint: 'event-fingerprint-20',
           },
         ],
       });
@@ -90,7 +89,7 @@ describe('readSyncPartyGrowthOutcome', () => {
       requestedCampaignId: 'sync-launch-threads-01',
       sourceCampaignKey: 'sync-launch-threads-01',
       emptyLedger: false,
-      sequence: 17,
+      sequence: 21,
       uniqueVisitors: 6,
       runtime: stableVersion(),
       funnel: {
@@ -112,10 +111,10 @@ describe('readSyncPartyGrowthOutcome', () => {
     expect(result.status === 'KNOWN' ? result.recentEvents : []).toEqual([
       {
         event: 'game_finished',
-        seq: 16,
+        seq: 20,
         at: 1900,
         gameSeq: 5,
-        eventFingerprint: 'event-fingerprint-16',
+        eventFingerprint: 'event-fingerprint-20',
       },
     ]);
     expect(JSON.stringify(result)).not.toContain('provider-held-test-key');
@@ -162,13 +161,34 @@ describe('readSyncPartyGrowthOutcome', () => {
     });
   });
 
+  it('refuses to turn a malformed source body into a clean zero', async () => {
+    const fetchImpl = vi.fn<typeof fetch>(async (input) => {
+      if (String(input).endsWith('/api/version')) return json(stableVersion());
+      return json({});
+    });
+
+    const result = await readSyncPartyGrowthOutcome({
+      campaignId: 'sync-launch-threads-01',
+      config: { readKey: 'test-key' },
+      fetchImpl,
+      now: () => NOW,
+    });
+
+    expect(result).toMatchObject({
+      status: 'UNKNOWN',
+      reason: 'SOURCE_INVALID',
+      requestedCampaignId: 'sync-launch-threads-01',
+      runtime: stableVersion(),
+    });
+  });
+
   it('does not call a rematch a returning user', async () => {
     const fetchImpl = vi.fn<typeof fetch>(async (input) => {
       if (String(input).endsWith('/api/version')) return json(stableVersion());
       return json({
         campaign_key: 'sync-launch-threads-01',
         campaign_fingerprint: 'fp',
-        seq: 1,
+        seq: 7,
         unique_visitors: 1,
         counters: { rematch_started: 7 },
         source_counts: {},
@@ -176,7 +196,16 @@ describe('readSyncPartyGrowthOutcome', () => {
         content_counts: {},
         first_at: 1,
         last_at: 2,
-        recent_events: [],
+        recent_events: [
+          {
+            event: 'rematch_started',
+            event_id: 'ignored-source-event-id',
+            seq: 7,
+            at: 2,
+            game_seq: 6,
+            event_fingerprint: 'rematch-event-fingerprint',
+          },
+        ],
       });
     });
 
@@ -224,10 +253,17 @@ describe('readSyncPartyGrowthOutcome', () => {
         });
       }
       return json({
-        campaign_key: 'sync-launch-threads-01',
+        campaign_key: 'unattributed',
+        campaign_fingerprint: null,
         seq: 0,
         unique_visitors: 0,
         counters: {},
+        source_counts: {},
+        medium_counts: {},
+        content_counts: {},
+        first_at: null,
+        last_at: null,
+        recent_events: [],
       });
     });
 
