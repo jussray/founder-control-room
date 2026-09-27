@@ -17,7 +17,11 @@ import express from 'express';
 import { createServer as createNodeHttpServer } from 'node:http';
 import type { ExportedHandler } from '@cloudflare/workers-types';
 import { mountFcrCommerceIngress } from '../http/fcrCommerceIngress.js';
-import { enforceActiveDefense } from '../security/activeDefense.js';
+import {
+  activeDefenseResponse,
+  evaluateActiveDefenseRequest,
+  type ActiveDefenseDecision,
+} from '../security/activeDefense.js';
 import {
   BIP_PROOF_INGRESS_PATH,
   handleBipControlRoomProofIngress,
@@ -68,12 +72,57 @@ const composed = composeWorkerHandler(
 const composedFetch = composed.fetch;
 if (!composedFetch) throw new Error('Cloudflare HTTP handler is missing fetch');
 
+type ActiveDefenseChiefBinding = ControlRoomWorkerEnv['CHIEF_AI'] & {
+  assessActiveDefense?: (input: ActiveDefenseDecision) => Promise<unknown>;
+};
+
+function observeChiefAssessment(
+  workerEnv: ControlRoomWorkerEnv,
+  ctx: ExecutionContext,
+  decision: ActiveDefenseDecision,
+): void {
+  if (decision.verdict !== 'HALLWAY' && decision.verdict !== 'OBSERVE_AUTOMATION') return;
+
+  const chief = workerEnv.CHIEF_AI as ActiveDefenseChiefBinding;
+  if (typeof chief.assessActiveDefense !== 'function') {
+    console.warn(JSON.stringify({
+      type: 'juss.active-defense.chief',
+      status: 'assessment_unavailable',
+      incident_fingerprint: decision.incidentFingerprint,
+    }));
+    return;
+  }
+
+  ctx.waitUntil((async () => {
+    try {
+      const assessment = await chief.assessActiveDefense(decision);
+      console.info(JSON.stringify({
+        type: 'juss.active-defense.chief',
+        status: 'assessed',
+        incident_fingerprint: decision.incidentFingerprint,
+        assessment,
+      }));
+    } catch (error) {
+      console.error(JSON.stringify({
+        type: 'juss.active-defense.chief',
+        status: 'assessment_failed',
+        incident_fingerprint: decision.incidentFingerprint,
+        error: error instanceof Error ? error.message : 'unknown',
+      }));
+    }
+  })());
+}
+
 const worker: ExportedHandler<ControlRoomWorkerEnv> = {
   async fetch(request, workerEnv, ctx) {
-    const activeDefense = enforceActiveDefense(request, {
+    const secret = workerEnv.FOUNDER_SESSION_ENCRYPTION_KEY;
+    const decision = evaluateActiveDefenseRequest(request, {
       ACTIVE_DEFENSE_MODE: 'contain',
-      FOUNDER_SESSION_ENCRYPTION_KEY: workerEnv.FOUNDER_SESSION_ENCRYPTION_KEY,
+      FOUNDER_SESSION_ENCRYPTION_KEY: secret,
     });
+    observeChiefAssessment(workerEnv, ctx, decision);
+
+    const activeDefense = activeDefenseResponse(request, decision, secret);
     if (activeDefense) return activeDefense;
 
     const url = new URL(request.url);
