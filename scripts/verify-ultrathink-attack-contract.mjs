@@ -146,8 +146,15 @@ function normalizeSql(sql) {
 function collectCreatedPublicTables(sql) {
   const tables = new Set();
   const normalized = normalizeSql(sql);
-  const pattern = /\bcreate\s+(?:unlogged\s+)?table\s+(?:if\s+not\s+exists\s+)?(?:(?:public)\s*\.\s*)?"?([a-z_][a-z0-9_$]*)"?/g;
-  for (const match of normalized.matchAll(pattern)) tables.add(match[1]);
+  const pattern = /\bcreate\s+(?:unlogged\s+)?table\s+(?:if\s+not\s+exists\s+)?(?:("?public"?)\s*\.\s*)?"?([a-z_][a-z0-9_$]*)"?/g;
+  for (const match of normalized.matchAll(pattern)) {
+    const explicitPublicSchema = Boolean(match[1]);
+    const table = match[2];
+    const end = (match.index ?? 0) + match[0].length;
+    const remainder = normalized.slice(end);
+    if (!explicitPublicSchema && /^\s*\./.test(remainder)) continue;
+    tables.add(table);
+  }
   return [...tables];
 }
 
@@ -158,7 +165,7 @@ function tableAccessStatementMentionsRole(sql, table, role) {
   const statements = normalized.split(';');
   return statements.some(statement => {
     if (!/\b(grant|revoke)\b/.test(statement)) return false;
-    const targetsTable = new RegExp(`\\bon\\s+(?:table\\s+)?(?:public\\s*\\.\\s*)?"?${escaped}"?\\b`).test(statement);
+    const targetsTable = new RegExp(`\\bon\\s+(?:table\\s+)?(?:"?public"?\\s*\\.\\s*)?"?${escaped}"?\\b`).test(statement);
     if (!targetsTable) return false;
     return new RegExp(`\\b${roleEscaped}\\b`).test(statement);
   });
@@ -167,7 +174,7 @@ function tableAccessStatementMentionsRole(sql, table, role) {
 function enablesRls(sql, table) {
   const normalized = normalizeSql(sql);
   const escaped = table.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  return new RegExp(`\\balter\\s+table\\s+(?:if\\s+exists\\s+)?(?:public\\s*\\.\\s*)?"?${escaped}"?\\s+enable\\s+row\\s+level\\s+security\\b`).test(normalized);
+  return new RegExp(`\\balter\\s+table\\s+(?:if\\s+exists\\s+)?(?:"?public"?\\s*\\.\\s*)?"?${escaped}"?\\s+enable\\s+row\\s+level\\s+security\\b`).test(normalized);
 }
 
 const migrationsDirectory = path.join(root, 'supabase', 'migrations');
