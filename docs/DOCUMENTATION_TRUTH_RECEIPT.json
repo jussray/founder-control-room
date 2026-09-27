@@ -280,13 +280,19 @@
         "`scripts/verify-documentation-truth.mjs` must classify `src/founder-os-lab/projectAdapters.ts` as evidence-authority truth-sensitive so a Chief exact-head pin movement cannot pass Documentation Truth without substantive README, truth-decay audit, and structured receipt updates that name the changed path.",
         "`scripts/verify-documentation-truth.mjs` must compare the base receipt with the candidate receipt and reject a truth-sensitive path unless the reviewed range adds or changes a meaningful path-bound invariant for that exact source path.",
         "`scripts/verify-documentation-truth.mjs` must normalize receipt-claim casing, punctuation, and whitespace before testing reviewed-range novelty so cosmetic rewrites cannot satisfy the new-or-changed invariant gate.",
-        "`scripts/verify-documentation-truth.mjs` must preserve semantic comparison and logical operators inside code spans when fingerprinting receipt claims, so a behavior-changing operator edit cannot collapse into cosmetic normalization."
+        "`scripts/verify-documentation-truth.mjs` must preserve semantic comparison, logical, ordering, and unary operators when fingerprinting receipt claims while treating Markdown code-span delimiters as cosmetic, so neither behavior-changing operators nor formatting-only rewrites can create a false result."
       ]
     },
     {
       "path": "src/founder-os-lab/projectAdapterFreshness.ts",
       "claims": [
         "`src/founder-os-lab/projectAdapterFreshness.ts` must remain evidence-authority truth-sensitive so a later change to exact-head freshness semantics requires substantive documentation and a new or changed path-bound receipt invariant."
+      ]
+    },
+    {
+      "path": "src/lib/documentationTruthClaimFingerprint.js",
+      "claims": [
+        "`src/lib/documentationTruthClaimFingerprint.js` must remain truth-governance-sensitive and produce identical fingerprints for formatting-only claim rewrites while preserving comparison, logical, ordering, and unary operator semantics so behavior changes cannot collapse into cosmetic normalization."
       ]
     }
   ]
