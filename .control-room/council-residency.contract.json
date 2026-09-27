@@ -24,6 +24,31 @@
     "allSeatsByDefault": false,
     "liveProviderInvocationMustBeVerified": true
   },
+  "jurisdiction": {
+    "sameCourtCouncilKernel": true,
+    "repoProductProductionScoped": true,
+    "subjects": [
+      "portfolio_truth",
+      "workflow_authority",
+      "execution",
+      "revenue_and_money_path",
+      "deployment_and_runtime",
+      "task_accuracy",
+      "evidence_receipts",
+      "rollback",
+      "outcome_proof",
+      "production_proof"
+    ]
+  },
+  "intelligenceBoundary": {
+    "principle": "learn_encode_verify_compound_expose_value_protect_machinery",
+    "reusableIntelligenceMustBecomeDurableCapability": true,
+    "intelligenceMustNotDependOnFounderMemory": true,
+    "durableForms": ["code", "internal_modules", "policies", "evaluators", "workflow_engines", "tests", "receipts"],
+    "internalOnly": ["internal_orchestration", "hidden_prompts", "private_reasoning", "evaluator_notes", "private_learning_records", "proprietary_lineage"],
+    "usersOwnTheirDataAndOutputs": true,
+    "externalProvidersReplaceable": true
+  },
   "userBoundary": {
     "usersReceiveOutcomesNotCouncilControls": true,
     "internalDeliberationIsNotProductData": true,
@@ -44,5 +69,11 @@
     "requireRuntimeProofForRuntimeClaims": true,
     "requireProviderReceiptForLiveProviderClaims": true,
     "bindFingerprintsAndContinuityReceipts": true
+  },
+  "completion": {
+    "affectedLiveProjectsRequireEndToEndRuntimeProof": true,
+    "doneWordsRequireRuntimeVerificationWhenLiveGoal": true,
+    "earlierStagesDoNotSatisfyLive": true,
+    "requiredLiveProof": ["source_head", "deployment_identity", "runtime_path", "playwright_evidence", "successor_fingerprint"]
   }
 }
