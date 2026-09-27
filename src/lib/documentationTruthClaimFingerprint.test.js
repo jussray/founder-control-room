@@ -40,6 +40,11 @@ describe('documentation truth claim fingerprints', () => {
       .toBe(normalizedClaimFingerprint('<code>State must remain current</code>'));
   });
 
+  it('ignores Markdown link destinations while retaining visible labels', () => {
+    expect(normalizedClaimFingerprint('`scripts/verify-documentation-truth.mjs` must remain current'))
+      .toBe(normalizedClaimFingerprint('[`scripts/verify-documentation-truth.mjs`](https://docs.example/verifier) must remain current'));
+  });
+
   it('preserves ordering operators next to quoted and signed literals', () => {
     expect(normalizedClaimFingerprint('value < "limit" must hold'))
       .not.toBe(normalizedClaimFingerprint('value > "limit" must hold'));

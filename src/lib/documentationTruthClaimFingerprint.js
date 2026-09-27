@@ -25,6 +25,7 @@ function tokenizeOperators(value, { allowSpacedUnary = false } = {}) {
 
 export function normalizedClaimFingerprint(value) {
   const codeAware = String(value)
+    .replace(/\[([^\]]+)\]\((?:\\.|[^)])*\)/g, '$1')
     .replace(/<\/?[a-z][^>]*>/gi, ' ')
     .toLowerCase()
     .replace(/`([^`]*)`/g, (_match, code) => tokenizeOperators(code, { allowSpacedUnary: true }));
