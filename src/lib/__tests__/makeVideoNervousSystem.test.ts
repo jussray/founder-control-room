@@ -44,6 +44,12 @@ function baseInput(): MakeVideoExecutionInput {
       overloadRisk: false,
       releaseConditionMet: false,
     },
+    devilReview: {
+      verdict: 'proceed',
+      sourceRecordId: 'devil:makevideo:1',
+      reviewedAt: '2026-09-27T02:00:00.000Z',
+      rationale: 'Provider-neutral routing preserves replaceability and rollback.',
+    },
   };
 }
 
@@ -162,22 +168,69 @@ describe('compileMakeVideoDirectorPlan', () => {
     expect(conflict?.rationale).toContain('Repetition alone is not meaning growth');
   });
 
-  it('keeps providers as replaceable workers and requires /devil before routing', () => {
+  it('keeps providers replaceable, routes through Media Router, and requires /devil', () => {
     const plan = compileMakeVideoDirectorPlan(baseInput());
 
     expect(plan.providerRouting).toEqual({
       authority: 'media-router-only',
       permanentProviderAuthority: false,
       selectionMode: 'cheapest-qualified-live',
-      requiredPreflight: ['capability', 'availability', 'budget', 'devil'],
+      requiredPreflight: ['fingerprint-cookie', 'capability', 'availability', 'budget', 'devil'],
+      preflightStatus: 'READY',
       publishAuthority: false,
     });
+    expect(plan.governance).toMatchObject({
+      devilReviewPassesRoutingGate: true,
+      executionAuthority: false,
+    });
+    expect(plan.postRenderGates).toEqual(['motion-continuity-proof', 'assembly', 'release-authority']);
   });
 
-  it('is deterministic so continuity fingerprints do not drift between identical compilations', () => {
+  it('blocks renderer routing when /devil is absent or returns revise', () => {
+    const absent = baseInput();
+    delete absent.devilReview;
+    const absentPlan = compileMakeVideoDirectorPlan(absent);
+
+    expect(absentPlan.providerRouting.preflightStatus).toBe('BLOCKED');
+    expect(absentPlan.directives).toContain('BLOCK_PROVIDER_ROUTING_UNTIL_DEVIL_REVIEW_PASSES');
+    expect(absentPlan.governance.executionAuthority).toBe(false);
+
+    const revise = baseInput();
+    revise.devilReview = {
+      verdict: 'revise',
+      sourceRecordId: 'devil:makevideo:revise',
+      reviewedAt: '2026-09-27T02:05:00.000Z',
+      rationale: 'Provider lock was found and must be removed before routing.',
+    };
+    const revisePlan = compileMakeVideoDirectorPlan(revise);
+
+    expect(revisePlan.providerRouting.preflightStatus).toBe('BLOCKED');
+    expect(revisePlan.governance.devilReviewPassesRoutingGate).toBe(false);
+  });
+
+  it('allows a /devil test verdict only into a test-only route', () => {
+    const input = baseInput();
+    input.devilReview = {
+      verdict: 'test',
+      sourceRecordId: 'devil:makevideo:test',
+      reviewedAt: '2026-09-27T02:06:00.000Z',
+      rationale: 'Allow bounded evidence collection only.',
+    };
+
+    const plan = compileMakeVideoDirectorPlan(input);
+
+    expect(plan.providerRouting.preflightStatus).toBe('TEST_ONLY');
+    expect(plan.directives).toContain('ROUTE_TEST_ONLY');
+    expect(plan.governance.executionAuthority).toBe(false);
+  });
+
+  it('issues deterministic continuity fingerprints and cookies before provider routing', () => {
     const first = compileMakeVideoDirectorPlan(baseInput());
     const second = compileMakeVideoDirectorPlan(baseInput());
 
+    expect(first.continuity.fingerprint).toMatch(/^[0-9a-f]{64}$/);
+    expect(first.continuity.cookie).toMatch(/^makevideo:[0-9a-f]{24}$/);
+    expect(first.continuity).toEqual(second.continuity);
     expect(first.fingerprint).toBe(second.fingerprint);
     expect(first.conflicts.map((conflict) => conflict.conflictId)).toEqual(second.conflicts.map((conflict) => conflict.conflictId));
   });
