@@ -143,6 +143,7 @@ describe('repository documentation truth control', () => {
     expect(documentationVerifier).toContain('normalizedClaimFingerprint');
     expect(documentationVerifier).toContain('previousClaimFingerprints');
     expect(documentationVerifier).toContain('projectAdapters|projectAdapterFreshness');
+    expect(documentationVerifier).toContain('documentationTruthClaimFingerprint');
     expect(documentationVerifier).toContain('must add or change a meaningful path-bound invariant in the reviewed range');
   });
 
