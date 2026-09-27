@@ -78,8 +78,15 @@ function normalizeSql(value: string) {
 function createdPublicTables(value: string) {
   const normalized = normalizeSql(value);
   const tables = new Set<string>();
-  const pattern = /\bcreate\s+(?:unlogged\s+)?table\s+(?:if\s+not\s+exists\s+)?(?:public\s*\.\s*)?"?([a-z_][a-z0-9_$]*)"?/g;
-  for (const match of normalized.matchAll(pattern)) tables.add(match[1]);
+  const pattern = /\bcreate\s+(?:unlogged\s+)?table\s+(?:if\s+not\s+exists\s+)?(?:("?public"?)\s*\.\s*)?"?([a-z_][a-z0-9_$]*)"?/g;
+  for (const match of normalized.matchAll(pattern)) {
+    const explicitPublicSchema = Boolean(match[1]);
+    const table = match[2];
+    const end = (match.index ?? 0) + match[0].length;
+    const remainder = normalized.slice(end);
+    if (!explicitPublicSchema && /^\s*\./.test(remainder)) continue;
+    tables.add(table);
+  }
   return [...tables];
 }
 
@@ -87,8 +94,10 @@ function hasRoleAccessDecision(value: string, table: string, role: string) {
   const normalized = normalizeSql(value);
   return normalized.split(';').some(statement => {
     if (!/\b(grant|revoke)\b/.test(statement)) return false;
-    const target = `public.${table}`;
-    const targetsTable = statement.includes(`on table ${target}`) || statement.includes(`on ${target}`);
+    const targetsTable = statement.includes(`on table public.${table}`)
+      || statement.includes(`on public.${table}`)
+      || statement.includes(`on table "public".${table}`)
+      || statement.includes(`on "public".${table}`);
     return targetsTable && new RegExp(`\\b${role}\\b`).test(statement);
   });
 }
@@ -96,7 +105,9 @@ function hasRoleAccessDecision(value: string, table: string, role: string) {
 function enablesRls(value: string, table: string) {
   const normalized = normalizeSql(value);
   return normalized.includes(`alter table public.${table} enable row level security`)
-    || normalized.includes(`alter table if exists public.${table} enable row level security`);
+    || normalized.includes(`alter table if exists public.${table} enable row level security`)
+    || normalized.includes(`alter table "public".${table} enable row level security`)
+    || normalized.includes(`alter table if exists "public".${table} enable row level security`);
 }
 
 describe('Supabase V10 capability governance migration', () => {
