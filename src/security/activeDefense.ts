@@ -53,10 +53,6 @@ interface CloudflareSignals {
   botManagement?: BotManagementSignals | null;
 }
 
-interface RequestWithCloudflare extends Request {
-  cf?: CloudflareSignals;
-}
-
 export interface ActiveDefenseEnv {
   ACTIVE_DEFENSE_MODE?: ActiveDefenseMode;
   FOUNDER_SESSION_ENCRYPTION_KEY?: string;
@@ -199,8 +195,6 @@ function runAttackUnit(input: {
   const mutationMethod = !['GET', 'HEAD', 'OPTIONS'].includes(input.method);
   const activeHallway = input.hallwayContinuation;
 
-  // Every meaningful request is evaluated by the entire ensemble against one
-  // bounded evidence object. Expensive attack suites remain CI/proof gates.
   return [
     flow('attack10', input.suspiciousPath ? 95 : lowBotScore ? 70 : 10, input.suspiciousPath ? 'known reconnaissance path' : 'baseline ingress abuse checks'),
     flow('attack20', noRay ? 55 : activeHallway ? 25 : 5, noRay ? 'continuity witness missing' : activeHallway ? 'hallway successor observed' : 'edge continuity present'),
@@ -234,8 +228,7 @@ export function evaluateActiveDefenseRequest(
   request: Request,
   env: ActiveDefenseEnv,
 ): ActiveDefenseDecision {
-  const cfRequest = request as RequestWithCloudflare;
-  const cf = cfRequest.cf;
+  const cf = (request as unknown as { cf?: CloudflareSignals }).cf;
   const bot = cf?.botManagement ?? null;
   const url = new URL(request.url);
   const mode = normalizedMode(env.ACTIVE_DEFENSE_MODE);
