@@ -8,6 +8,7 @@ export type AwarenessLevel = 'PRIMARY_FOCUS' | 'SECONDARY_AWARENESS' | 'AMBIENT_
 export type ResponsePhase = 'ANTICIPATORY' | 'IMPACT' | 'CONFIRMATION' | 'SETTLE' | 'PERSISTENT';
 export type SubsystemType = 'PLAYER' | 'OBJECT' | 'ENVIRONMENT' | 'CAMERA' | 'AUDIO' | 'UI' | 'TEXT';
 export type ResponseChannel = SubsystemType | 'MOTION' | 'SILENCE' | 'SPATIAL';
+export type DevilVerdict = 'proceed' | 'revise' | 'test' | 'defer' | 'reject';
 
 export interface LeevizeVisualCanon {
   worldId: string;
@@ -128,6 +129,13 @@ export interface LeevizeDirectives {
   requiredCompositionRules?: readonly string[];
 }
 
+export interface MakeVideoDevilReview {
+  verdict: DevilVerdict;
+  sourceRecordId: string;
+  reviewedAt: string;
+  rationale: string;
+}
+
 export interface DirectorConflict {
   conflictId: string;
   domain: 'AESTHETIC_VS_CAUSAL' | 'DENSITY_VS_RESTRAINT' | 'REPETITION_VS_STAGNATION' | 'FOCUS_SWITCH';
@@ -149,6 +157,7 @@ export interface MakeVideoExecutionInput {
   latentStates?: readonly LatentState[];
   accumulatedMeaning?: readonly AccumulatedMeaning[];
   relationalStates?: readonly RelationalState[];
+  devilReview?: MakeVideoDevilReview;
 }
 
 export interface MakeVideoDirectorPlan {
@@ -175,13 +184,24 @@ export interface MakeVideoDirectorPlan {
   directives: readonly string[];
   conflicts: readonly DirectorConflict[];
   evidenceSummary: Record<EvidenceClass, number>;
+  continuity: {
+    fingerprint: string;
+    cookie: string;
+  };
+  governance: {
+    devilReview: MakeVideoDevilReview | null;
+    devilReviewPassesRoutingGate: boolean;
+    executionAuthority: false;
+  };
   providerRouting: {
     authority: 'media-router-only';
     permanentProviderAuthority: false;
     selectionMode: 'cheapest-qualified-live';
-    requiredPreflight: readonly ['capability', 'availability', 'budget', 'devil'];
+    requiredPreflight: readonly ['fingerprint-cookie', 'capability', 'availability', 'budget', 'devil'];
+    preflightStatus: 'BLOCKED' | 'TEST_ONLY' | 'READY';
     publishAuthority: false;
   };
+  postRenderGates: readonly ['motion-continuity-proof', 'assembly', 'release-authority'];
   fingerprint: string;
 }
 
@@ -226,6 +246,13 @@ function evidenceSummary(input: MakeVideoExecutionInput): Record<EvidenceClass, 
   return summary;
 }
 
+function validateDevilReview(review: MakeVideoDevilReview | undefined): void {
+  if (!review) return;
+  nonEmpty(review.sourceRecordId, 'devil sourceRecordId');
+  nonEmpty(review.rationale, 'devil rationale');
+  if (!Number.isFinite(Date.parse(review.reviewedAt))) throw new Error('devil reviewedAt must be a valid timestamp');
+}
+
 function validateInput(input: MakeVideoExecutionInput): void {
   nonEmpty(input.founderIntent, 'founder intent');
   nonEmpty(input.leeVizeCanon.worldId, 'LEEVIZE worldId');
@@ -233,6 +260,7 @@ function validateInput(input: MakeVideoExecutionInput): void {
   unit(input.cognitiveLoad.listeningLoad, 'listening load');
   unit(input.cognitiveLoad.visualTrackingLoad, 'visual tracking load');
   unit(input.cognitiveLoad.novelty, 'novelty');
+  validateDevilReview(input.devilReview);
   for (const state of input.latentStates ?? []) {
     nonNegative(state.persistenceDuration, 'latent persistence duration');
     unit(state.intensity, 'latent intensity');
@@ -323,6 +351,13 @@ function reconcile(input: MakeVideoExecutionInput, attention: MakeVideoDirectorP
   return conflicts;
 }
 
+function devilPreflightStatus(review: MakeVideoDevilReview | undefined): MakeVideoDirectorPlan['providerRouting']['preflightStatus'] {
+  if (!review) return 'BLOCKED';
+  if (review.verdict === 'proceed') return 'READY';
+  if (review.verdict === 'test') return 'TEST_ONLY';
+  return 'BLOCKED';
+}
+
 export function compileMakeVideoDirectorPlan(input: MakeVideoExecutionInput): MakeVideoDirectorPlan {
   validateInput(input);
 
@@ -330,6 +365,8 @@ export function compileMakeVideoDirectorPlan(input: MakeVideoExecutionInput): Ma
   const attention = resolveAttention(input);
   const conflicts = reconcile(input, attention);
   const directives: string[] = [];
+  const summary = evidenceSummary(input);
+  const preflightStatus = devilPreflightStatus(input.devilReview);
 
   if (input.cognitiveLoad.overloadRisk) {
     directives.push('COGNITIVE_RELEASE', 'TEMPORAL_GATE_NEW_HIGH_ATTENTION_CHANNELS');
@@ -338,7 +375,9 @@ export function compileMakeVideoDirectorPlan(input: MakeVideoExecutionInput): Ma
   if (paths.length === 2) directives.push('RUN_CAUSAL_AND_ACCUMULATION_PATHS_IN_PARALLEL');
   if ((input.viewerContract.hiddenElements?.length ?? 0) > 0) directives.push('HONOR_INFORMATION_WITHHOLD');
   if (attention.decision === 'KEEP_CURRENT') directives.push('HONOR_FOCUS_INERTIA');
-  if (evidenceSummary(input).UNKNOWN > 0) directives.push('KEEP_UNKNOWN_STATE_NON_AUTHORITATIVE');
+  if (summary.UNKNOWN > 0) directives.push('KEEP_UNKNOWN_STATE_NON_AUTHORITATIVE');
+  if (preflightStatus === 'BLOCKED') directives.push('BLOCK_PROVIDER_ROUTING_UNTIL_DEVIL_REVIEW_PASSES');
+  if (preflightStatus === 'TEST_ONLY') directives.push('ROUTE_TEST_ONLY');
 
   const canonFingerprint = mediaFingerprint(input.leeVizeCanon);
   const syncState = {
@@ -351,7 +390,13 @@ export function compileMakeVideoDirectorPlan(input: MakeVideoExecutionInput): Ma
     relationalStates: input.relationalStates ?? [],
   };
   const stateFingerprint = mediaFingerprint(syncState);
-  const summary = evidenceSummary(input);
+  const continuityFingerprint = mediaFingerprint({
+    founderIntent: input.founderIntent.trim(),
+    viewerContract: input.viewerContract,
+    canonFingerprint,
+    stateFingerprint,
+  });
+  const continuityCookie = `makevideo:${continuityFingerprint.slice(0, 24)}`;
 
   const withoutFingerprint: Omit<MakeVideoDirectorPlan, 'fingerprint'> = {
     contract: MAKEVIDEO_NERVOUS_SYSTEM_CONTRACT,
@@ -372,13 +417,24 @@ export function compileMakeVideoDirectorPlan(input: MakeVideoExecutionInput): Ma
     directives,
     conflicts,
     evidenceSummary: summary,
+    continuity: {
+      fingerprint: continuityFingerprint,
+      cookie: continuityCookie,
+    },
+    governance: {
+      devilReview: input.devilReview ?? null,
+      devilReviewPassesRoutingGate: preflightStatus === 'READY' || preflightStatus === 'TEST_ONLY',
+      executionAuthority: false,
+    },
     providerRouting: {
       authority: 'media-router-only',
       permanentProviderAuthority: false,
       selectionMode: 'cheapest-qualified-live',
-      requiredPreflight: ['capability', 'availability', 'budget', 'devil'],
+      requiredPreflight: ['fingerprint-cookie', 'capability', 'availability', 'budget', 'devil'],
+      preflightStatus,
       publishAuthority: false,
     },
+    postRenderGates: ['motion-continuity-proof', 'assembly', 'release-authority'],
   };
 
   return {
