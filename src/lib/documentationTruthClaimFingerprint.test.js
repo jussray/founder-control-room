@@ -38,6 +38,11 @@ describe('documentation truth claim fingerprints', () => {
       .not.toBe(normalizedClaimFingerprint('state != CURRENT must hold'));
   });
 
+  it('treats sentence exclamation separators as cosmetic punctuation', () => {
+    expect(normalizedClaimFingerprint('Claims. Never widen authority.'))
+      .toBe(normalizedClaimFingerprint('Claims! Never widen authority.'));
+  });
+
   it('distinguishes unary negation from the same unnegated invariant', () => {
     expect(normalizedClaimFingerprint('!ready must hold'))
       .not.toBe(normalizedClaimFingerprint('ready must hold'));
