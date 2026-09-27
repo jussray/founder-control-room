@@ -24,6 +24,33 @@
     "allSeatsByDefault": false,
     "liveProviderInvocationMustBeVerified": true
   },
+  "jurisdiction": {
+    "sameCourtCouncilKernel": true,
+    "repoProductProductionScoped": true,
+    "subjects": [
+      "portfolio_truth",
+      "workflow_authority",
+      "execution",
+      "revenue_and_money_path",
+      "deployment_and_runtime",
+      "visual_truth",
+      "witness_provenance",
+      "task_accuracy",
+      "evidence_receipts",
+      "rollback",
+      "outcome_proof",
+      "production_proof"
+    ]
+  },
+  "intelligenceBoundary": {
+    "principle": "learn_encode_verify_compound_expose_value_protect_machinery",
+    "reusableIntelligenceMustBecomeDurableCapability": true,
+    "intelligenceMustNotDependOnFounderMemory": true,
+    "durableForms": ["code", "internal_modules", "policies", "evaluators", "workflow_engines", "tests", "receipts"],
+    "internalOnly": ["internal_orchestration", "hidden_prompts", "private_reasoning", "evaluator_notes", "private_learning_records", "proprietary_lineage"],
+    "usersOwnTheirDataAndOutputs": true,
+    "externalProvidersReplaceable": true
+  },
   "userBoundary": {
     "usersReceiveOutcomesNotCouncilControls": true,
     "internalDeliberationIsNotProductData": true,
@@ -39,10 +66,48 @@
     "providerAvailabilityGrantsAuthority": false
   },
   "evidence": {
-    "statuses": ["VERIFIED", "INFERRED", "UNKNOWN", "BLOCKED"],
+    "statuses": ["VERIFIED", "INFERRED", "UNKNOWN", "BLOCKED", "FAIL"],
+    "witnessClasses": [
+      "repository_source",
+      "ci_receipt",
+      "provider_readback",
+      "runtime_identity",
+      "browser_functional",
+      "browser_visual",
+      "independent_challenger",
+      "human_observation"
+    ],
+    "verifiedClaimsRequireWitnessClass": true,
+    "singleEvidenceChainMustBeLabeled": true,
+    "repeatedUpstreamReceiptDoesNotCreateIndependence": true,
     "preserveMeaningfulDissent": true,
     "requireRuntimeProofForRuntimeClaims": true,
     "requireProviderReceiptForLiveProviderClaims": true,
     "bindFingerprintsAndContinuityReceipts": true
+  },
+  "visualTruth": {
+    "functionalAndVisualTruthAreSeparate": true,
+    "runtimeVerifiedDoesNotImplyVisualVerified": true,
+    "sourceDoesNotProveRenderedFidelity": true,
+    "visualProofRequiresCurrentTargetRender": true,
+    "compareAgainstCurrentApprovedCanon": true,
+    "crossDomainVisualProofTransferForbiddenWithoutEquivalenceProof": true,
+    "launchHoldStates": ["FAIL", "UNKNOWN", "BLOCKED"]
+  },
+  "promotionGate": {
+    "requireDestinationIdentity": true,
+    "requireFunctionalRuntimeWhenApplicable": true,
+    "requireVisualCanonWhenPresentationMatters": true,
+    "requireCampaignAttributionWhenMeasurementIsGoal": true,
+    "preserveWitnessLimitations": true,
+    "holdPublicationWhenVisualTruthFails": true
+  },
+  "completion": {
+    "affectedLiveProjectsRequireEndToEndRuntimeProof": true,
+    "doneWordsRequireRuntimeVerificationWhenLiveGoal": true,
+    "userFacingLaunchRequiresVisualVerification": true,
+    "earlierStagesDoNotSatisfyLive": true,
+    "requiredLiveProof": ["source_head", "deployment_identity", "runtime_path", "playwright_evidence", "successor_fingerprint"],
+    "layeredCompletion": ["SOURCE_IMPLEMENTED", "MERGED", "DEPLOYED", "RUNTIME_VERIFIED", "VISUAL_VERIFIED", "OUTCOME_VERIFIED"]
   }
 }

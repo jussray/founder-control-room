@@ -4,6 +4,11 @@ on:
   push:
     paths:
       - 'src/growth/**'
+      - 'src/quickscan/store.ts'
+      - 'src/http/routes/quickscan.ts'
+      - 'src/http/routes/__tests__/quickscan.opportunity.integration.test.ts'
+      - 'public/control-room/quickscan.html'
+      - 'public/control-room/quickscan.js'
       - 'src/config/projectShells.ts'
       - 'src/config/__tests__/projectShells.test.ts'
       - '.control-room/receipts/2026-09-26-growth-opportunity-intelligence.json'
@@ -12,6 +17,11 @@ on:
     branches: [main]
     paths:
       - 'src/growth/**'
+      - 'src/quickscan/store.ts'
+      - 'src/http/routes/quickscan.ts'
+      - 'src/http/routes/__tests__/quickscan.opportunity.integration.test.ts'
+      - 'public/control-room/quickscan.html'
+      - 'public/control-room/quickscan.js'
       - 'src/config/projectShells.ts'
       - 'src/config/__tests__/projectShells.test.ts'
       - '.control-room/receipts/2026-09-26-growth-opportunity-intelligence.json'
@@ -64,10 +74,12 @@ jobs:
       - name: Typecheck repository source
         run: npm run typecheck
 
-      - name: Run focused opportunity tests
+      - name: Run focused opportunity and QuickScan tests
         run: >-
           npx vitest run
           src/growth/__tests__/opportunityIntelligence.test.ts
+          src/growth/__tests__/quickScanOpportunityBridge.test.ts
+          src/http/routes/__tests__/quickscan.opportunity.integration.test.ts
           src/config/__tests__/projectShells.test.ts
 
       - name: Build Pages exact head
@@ -99,25 +111,113 @@ jobs:
             { name: 'mobile', viewport: { width: 390, height: 844 } },
           ];
 
+          const quickScanFixture = {
+            contract: 'founder-control-room/quickscan@v1',
+            authority: {
+              sendExternal: false,
+              executeN8n: false,
+              stripeWebhookConfigured: true,
+              chiefConfigured: false,
+            },
+            prospects: [
+              {
+                id: 'manual-paid',
+                businessName: 'Manual Claim Studio',
+                ownerName: 'Maya',
+                segment: 'salon_studio_team_owner',
+                lifecycleState: 'paid',
+                score: { total: 7 },
+                evidence: [],
+                approvals: [],
+                qualification: null,
+                payment: { status: 'paid', amountCents: 24900 },
+                audit: [],
+                opportunity: {
+                  priorityBand: 'unknown',
+                  score: 0,
+                  nextGate: 'verify_problem_offer_fit',
+                },
+              },
+              {
+                id: 'stripe-paid',
+                businessName: 'Verified Revenue Studio',
+                ownerName: 'Jae',
+                segment: 'salon_studio_team_owner',
+                lifecycleState: 'paid',
+                score: { total: 8 },
+                evidence: [],
+                approvals: [],
+                qualification: null,
+                payment: {
+                  status: 'paid',
+                  amountCents: 24900,
+                  verifiedBy: 'stripe_webhook',
+                  stripeEventId: 'evt_proof_001',
+                },
+                audit: [],
+                opportunity: {
+                  priorityBand: 'won',
+                  score: 55,
+                  nextGate: 'deliver_and_verify_customer_value',
+                },
+              },
+            ],
+          };
+
           try {
             for (const testCase of cases) {
               const page = await browser.newPage({ viewport: testCase.viewport });
-              const response = await page.goto(origin, { waitUntil: 'domcontentloaded' });
-              if (!response || response.status() >= 400) {
-                throw new Error(`${testCase.name} root navigation failed: ${response?.status() ?? 'no-response'}`);
+
+              const rootResponse = await page.goto(origin, { waitUntil: 'domcontentloaded' });
+              if (!rootResponse || rootResponse.status() >= 400) {
+                throw new Error(`${testCase.name} root navigation failed: ${rootResponse?.status() ?? 'no-response'}`);
               }
-              const body = (await page.locator('body').innerText()).trim();
-              if (body.length < 20) {
-                throw new Error(`${testCase.name} rendered body is unexpectedly empty`);
+              const rootBody = (await page.locator('body').innerText()).trim();
+              if (rootBody.length < 20) {
+                throw new Error(`${testCase.name} rendered root body is unexpectedly empty`);
               }
               await page.screenshot({
-                path: `artifacts/growth-opportunity-intelligence/${testCase.name}.png`,
+                path: `artifacts/growth-opportunity-intelligence/${testCase.name}-root.png`,
                 fullPage: true,
               });
+
+              await page.route(/\/quickscan$/, async (route) => {
+                await route.fulfill({
+                  status: 200,
+                  contentType: 'application/json',
+                  body: JSON.stringify(quickScanFixture),
+                });
+              });
+
+              const quickScanResponse = await page.goto(`${origin}/control-room/quickscan.html`, { waitUntil: 'domcontentloaded' });
+              if (!quickScanResponse || quickScanResponse.status() >= 400) {
+                throw new Error(`${testCase.name} QuickScan navigation failed: ${quickScanResponse?.status() ?? 'no-response'}`);
+              }
+              await page.waitForFunction(() => document.querySelectorAll('.prospect').length === 2);
+              const quickScanBody = await page.locator('body').innerText();
+              for (const expected of [
+                'Manual Claim Studio',
+                'Verified Revenue Studio',
+                'unknown · 0/100',
+                'won · 55/100',
+                'Collected\n1',
+                'Verified revenue\n$249.00',
+              ]) {
+                if (!quickScanBody.includes(expected)) {
+                  throw new Error(`${testCase.name} QuickScan witness missing: ${expected}`);
+                }
+              }
+              await page.screenshot({
+                path: `artifacts/growth-opportunity-intelligence/${testCase.name}-quickscan.png`,
+                fullPage: true,
+              });
+
               console.log(JSON.stringify({
                 case: testCase.name,
-                status: response.status(),
-                bodyLength: body.length,
+                rootStatus: rootResponse.status(),
+                quickScanStatus: quickScanResponse.status(),
+                verifiedRevenueText: '$249.00',
+                manualPaidExcludedFromCollectedRevenue: true,
                 url: page.url(),
               }));
               await page.close();

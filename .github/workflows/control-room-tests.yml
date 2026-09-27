@@ -6,7 +6,9 @@ on:
     paths:
       - "control-room.manifest.json"
       - ".control-room/repository.manifest.json"
+      - ".control-room/council-residency.contract.json"
       - "scripts/verify-control-room-tests.mjs"
+      - "scripts/verify-protected-intelligence-contract.mjs"
       - "src/types/repositoryVerification.ts"
       - "src/services/repositoryVerification.ts"
       - "src/services/__tests__/repositoryVerification.test.ts"
@@ -17,7 +19,9 @@ on:
     paths:
       - "control-room.manifest.json"
       - ".control-room/repository.manifest.json"
+      - ".control-room/council-residency.contract.json"
       - "scripts/verify-control-room-tests.mjs"
+      - "scripts/verify-protected-intelligence-contract.mjs"
       - "src/types/repositoryVerification.ts"
       - "src/services/repositoryVerification.ts"
       - "src/services/__tests__/repositoryVerification.test.ts"
@@ -59,6 +63,9 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "24"
+
+      - name: Verify protected intelligence and live-proof contract
+        run: node scripts/verify-protected-intelligence-contract.mjs
 
       - name: Verify dynamic package-script and workflow catalog
         run: node scripts/verify-control-room-tests.mjs
