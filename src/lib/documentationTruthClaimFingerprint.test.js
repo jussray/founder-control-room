@@ -35,6 +35,18 @@ describe('documentation truth claim fingerprints', () => {
       .toBe(normalizedClaimFingerprint('< Claim must hold'));
   });
 
+  it('ignores HTML formatting wrappers around the same invariant', () => {
+    expect(normalizedClaimFingerprint('State must remain current'))
+      .toBe(normalizedClaimFingerprint('<code>State must remain current</code>'));
+  });
+
+  it('preserves ordering operators next to quoted and signed literals', () => {
+    expect(normalizedClaimFingerprint('value < "limit" must hold'))
+      .not.toBe(normalizedClaimFingerprint('value > "limit" must hold'));
+    expect(normalizedClaimFingerprint('count < -1 must hold'))
+      .not.toBe(normalizedClaimFingerprint('count > -1 must hold'));
+  });
+
   it('distinguishes logical operators', () => {
     expect(normalizedClaimFingerprint('ready && approved must hold'))
       .not.toBe(normalizedClaimFingerprint('ready || approved must hold'));

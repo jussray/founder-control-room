@@ -15,7 +15,7 @@ const OPERATOR_TOKENS = new Map([
 function tokenizeOperators(value, { allowSpacedUnary = false } = {}) {
   const withBinaryOperators = value
     .replace(/!==|===|<=|>=|&&|\|\||==|!=/g, (operator) => ` ${OPERATOR_TOKENS.get(operator)} `)
-    .replace(/([a-z0-9_)])\s*([<>])\s*(?=[a-z0-9_(])/g, (_match, left, operator) => `${left} ${OPERATOR_TOKENS.get(operator)} `);
+    .replace(/([a-z0-9_)"'\]}])\s*([<>])\s*(?=(?:["'([{]|[+-]?\s*[a-z0-9_]))/g, (_match, left, operator) => `${left} ${OPERATOR_TOKENS.get(operator)} `);
 
   const unaryPattern = allowSpacedUnary
     ? /(?<!!)!(?!!)\s*(?=[a-z_(])/g
@@ -25,6 +25,7 @@ function tokenizeOperators(value, { allowSpacedUnary = false } = {}) {
 
 export function normalizedClaimFingerprint(value) {
   const codeAware = String(value)
+    .replace(/<\/?[a-z][^>]*>/gi, ' ')
     .toLowerCase()
     .replace(/`([^`]*)`/g, (_match, code) => tokenizeOperators(code, { allowSpacedUnary: true }));
 
