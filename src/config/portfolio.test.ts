@@ -64,6 +64,7 @@ describe('founder repository index', () => {
       'l99',
       'promptos',
       'sekret-bip',
+      'sync-party',
       'untold-stories',
     ]);
   });

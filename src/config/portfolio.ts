@@ -63,6 +63,13 @@ export const PORTFOLIO_PROJECTS: readonly PortfolioProject[] = [
     capabilities: ["shopify", "story-commerce", "playwright"],
   },
   {
+    slug: "sync-party",
+    name: "SYNC Party Game",
+    repository: "jussray/sync-party-game",
+    status: "active",
+    capabilities: ["multiplayer-game", "control-room", "playwright", "continuity"],
+  },
+  {
     slug: "founder-control-room",
     name: "Founder Control Room",
     repository: "jussray/founder-control-room",
