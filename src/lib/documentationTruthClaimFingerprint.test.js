@@ -54,4 +54,11 @@ describe('documentation truth claim fingerprints', () => {
     expect(normalizedClaimFingerprint('!ready must hold'))
       .not.toBe(normalizedClaimFingerprint('ready must hold'));
   });
+
+  it('normalizes whitespace after unary negation inside code spans', () => {
+    expect(normalizedClaimFingerprint('`!ready` must hold'))
+      .toBe(normalizedClaimFingerprint('`! ready` must hold'));
+    expect(normalizedClaimFingerprint('`! ready` must hold'))
+      .not.toBe(normalizedClaimFingerprint('`ready` must hold'));
+  });
 });

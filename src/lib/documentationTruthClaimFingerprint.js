@@ -12,11 +12,23 @@ const OPERATOR_TOKENS = new Map([
   ['!', 'semantic_operator_not'],
 ]);
 
+function tokenizeOperators(value, { allowSpacedUnary = false } = {}) {
+  const withBinaryOperators = value
+    .replace(/!==|===|<=|>=|&&|\|\||==|!=/g, (operator) => ` ${OPERATOR_TOKENS.get(operator)} `)
+    .replace(/([a-z0-9_)])\s*([<>])\s*(?=[a-z0-9_(])/g, (_match, left, operator) => `${left} ${OPERATOR_TOKENS.get(operator)} `);
+
+  const unaryPattern = allowSpacedUnary
+    ? /(?<!!)!(?!!)\s*(?=[a-z_(])/g
+    : /(?<!!)!(?!!)(?=[a-z_(])/g;
+  return withBinaryOperators.replace(unaryPattern, () => ` ${OPERATOR_TOKENS.get('!')} `);
+}
+
 export function normalizedClaimFingerprint(value) {
-  return String(value)
+  const codeAware = String(value)
     .toLowerCase()
-    .replace(/!==|===|<=|>=|&&|\|\||==|!=|(?<!!)!(?!!)(?=[a-z_(])/g, (operator) => ` ${OPERATOR_TOKENS.get(operator)} `)
-    .replace(/([a-z0-9_)])\s*([<>])\s*(?=[a-z0-9_(])/g, (_match, left, operator) => `${left} ${OPERATOR_TOKENS.get(operator)} `)
+    .replace(/`([^`]*)`/g, (_match, code) => tokenizeOperators(code, { allowSpacedUnary: true }));
+
+  return tokenizeOperators(codeAware)
     .replace(/[^a-z0-9]+/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
