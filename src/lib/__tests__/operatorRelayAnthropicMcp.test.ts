@@ -8,6 +8,7 @@ import {
 import {
   ANTHROPIC_MCP_BETA,
   ANTHROPIC_PLAYWRIGHT_READ_TOOL_ALLOWLIST,
+  anthropicPlaywrightBridgeReadiness,
   anthropicPlaywrightMcpAttachment,
 } from '../operatorRelayAnthropicMcp.js';
 import { createServerOperatorRelayAdapters } from '../operatorRelayModelProviders.js';
@@ -38,6 +39,32 @@ describe('anthropicPlaywrightMcpAttachment', () => {
     expect(anthropicPlaywrightMcpAttachment({})).toBeNull();
   });
 
+  it('does not confuse source configuration with runtime browser proof', () => {
+    expect(anthropicPlaywrightBridgeReadiness({})).toEqual({
+      state: 'not_configured',
+      runtimeReachable: false,
+      reason: 'missing_remote_mcp_url',
+    });
+
+    expect(anthropicPlaywrightBridgeReadiness({
+      FCR_RELAY_ANTHROPIC_PLAYWRIGHT_MCP_URL: 'https://browser.example.com/mcp',
+    })).toEqual({
+      state: 'configured_unverified',
+      runtimeReachable: false,
+      url: 'https://browser.example.com/mcp',
+      reason: 'awaiting_browser_tabs_receipt',
+    });
+
+    expect(anthropicPlaywrightBridgeReadiness({
+      FCR_RELAY_ANTHROPIC_PLAYWRIGHT_MCP_URL: 'https://browser.example.com/mcp',
+    }, 'receipt:browser-tabs:abc123')).toEqual({
+      state: 'runtime_verified',
+      runtimeReachable: true,
+      url: 'https://browser.example.com/mcp',
+      receiptRef: 'receipt:browser-tabs:abc123',
+    });
+  });
+
   it.each([
     'http://browser.example.com/mcp',
     'https://user:pass@browser.example.com/mcp',
@@ -45,6 +72,9 @@ describe('anthropicPlaywrightMcpAttachment', () => {
     'not-a-url',
   ])('fails closed for an unsafe MCP URL: %s', (url) => {
     expect(() => anthropicPlaywrightMcpAttachment({
+      FCR_RELAY_ANTHROPIC_PLAYWRIGHT_MCP_URL: url,
+    })).toThrow('must be a canonical https URL');
+    expect(() => anthropicPlaywrightBridgeReadiness({
       FCR_RELAY_ANTHROPIC_PLAYWRIGHT_MCP_URL: url,
     })).toThrow('must be a canonical https URL');
   });
@@ -85,7 +115,7 @@ describe('anthropicPlaywrightMcpAttachment', () => {
         'anthropic-beta': ANTHROPIC_MCP_BETA,
       });
       const serialized = String(init?.body ?? '');
-      expect(serialized).not.toContain(`"x-api-key":"${FIXTURE}"`);
+      expect(serialized).not.toContain(`\"x-api-key\":\"${FIXTURE}\"`);
       const body = JSON.parse(serialized) as Record<string, unknown>;
       expect(body).toMatchObject({
         model: 'claude-test-model',
