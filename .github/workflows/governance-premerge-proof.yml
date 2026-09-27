@@ -9,7 +9,13 @@ on:
       - 'scripts/verify-founder-intelligence-inheritance.mjs'
       - 'src/config/portfolio.ts'
       - 'src/config/portfolio.test.ts'
+      - 'src/config/__tests__/portfolio.sync.test.ts'
       - 'src/governance/__tests__/founderChallengeStack.contract.test.ts'
+      - 'public/_worker.js'
+      - 'public/control-room/sync.html'
+      - 'public/control-room/sync.css'
+      - 'public/control-room/sync.js'
+      - 'e2e/sync-control-room-bridge.spec.ts'
       - '.github/workflows/governance-premerge-proof.yml'
 
 permissions:
@@ -59,6 +65,7 @@ jobs:
         run: >-
           npx vitest run
           src/config/portfolio.test.ts
+          src/config/__tests__/portfolio.sync.test.ts
           src/governance/__tests__/founderChallengeStack.contract.test.ts
 
       - name: Install Chromium
@@ -66,6 +73,11 @@ jobs:
 
       - name: Run Playwright browser proof
         run: npm run test:e2e
+        env:
+          NODE_ENV: test
+
+      - name: Run Sync control bridge Playwright proof
+        run: npx playwright test -c playwright.config.ts e2e/sync-control-room-bridge.spec.ts
         env:
           NODE_ENV: test
 
