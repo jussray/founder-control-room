@@ -174,7 +174,7 @@ function parseRecentEvents(value: unknown): readonly SyncPartyRecentGrowthEvent[
     const at = finiteTimestamp(item.at);
     const gameSeq = item.game_seq === null ? null : nonNegativeInteger(item.game_seq);
     const fingerprint = typeof item.event_fingerprint === 'string' ? item.event_fingerprint.trim() : '';
-    if (seq === null || at === null || gameSeq === null && item.game_seq !== null || !fingerprint) return null;
+    if (seq === null || at === null || (gameSeq === null && item.game_seq !== null) || !fingerprint) return null;
     events.push(Object.freeze({
       event: item.event as KnownEvent,
       seq,
@@ -294,13 +294,13 @@ async function readVersion(fetchImpl: typeof fetch): Promise<VersionRead> {
       method: 'GET',
       headers: { accept: 'application/json' },
     });
-    if (!response.ok) return Object.freeze({ identity: null, reason: 'VERSION_UNAVAILABLE' });
+    if (!response.ok) return Object.freeze({ identity: null, reason: 'VERSION_UNAVAILABLE' as const });
     const identity = parseRuntime(await readJson(response));
     return identity
       ? Object.freeze({ identity, reason: null })
-      : Object.freeze({ identity: null, reason: 'VERSION_INVALID' });
+      : Object.freeze({ identity: null, reason: 'VERSION_INVALID' as const });
   } catch {
-    return Object.freeze({ identity: null, reason: 'VERSION_UNAVAILABLE' });
+    return Object.freeze({ identity: null, reason: 'VERSION_UNAVAILABLE' as const });
   }
 }
 

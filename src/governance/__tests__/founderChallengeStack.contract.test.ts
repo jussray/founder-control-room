@@ -10,7 +10,7 @@ describe('Founder challenge stack contract', () => {
     );
 
     expect(output).toContain('Founder Intelligence inheritance contract passed.');
-    expect(output).toContain('Challenge stack — on-main: 7; pending-main: 1');
+    expect(output).toContain('Challenge stack — on-main: 8; pending-main: 1');
     expect(output).toContain('External continuity coverage: 7; authority promoted: 0');
   });
 });
