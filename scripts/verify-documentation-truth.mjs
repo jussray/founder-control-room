@@ -2,7 +2,11 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
-import { normalizedClaimFingerprint } from '../src/lib/documentationTruthClaimFingerprint.js';
+import {
+  claimInvariantUnits,
+  normalizedClaimFingerprint,
+  normalizedClaimUnits,
+} from '../src/lib/documentationTruthClaimFingerprint.js';
 
 const root = process.cwd();
 const FULL_SHA = /^[0-9a-f]{40}$/i;
@@ -238,13 +242,13 @@ if (truthSensitiveChanges.length > 0) {
     const baseClaimsByPath = receiptClaimsAtRevision(baseSha);
     for (const change of truthSensitiveChanges) {
       const claims = receipt.claimsByPath.get(change.file) ?? [];
-      const previousClaimFingerprints = new Set(
-        (baseClaimsByPath.get(change.file) ?? []).map((claim) => normalizedClaimFingerprint(claim)),
+      const previousClaimUnitFingerprints = new Set(
+        (baseClaimsByPath.get(change.file) ?? []).flatMap((claim) => normalizedClaimUnits(claim)),
       );
-      const currentRangeClaims = claims.filter(
-        (claim) => !previousClaimFingerprints.has(normalizedClaimFingerprint(claim)),
+      const currentRangeClaimUnits = claims.flatMap((claim) => claimInvariantUnits(claim)).filter(
+        (unit) => !previousClaimUnitFingerprints.has(normalizedClaimFingerprint(unit)),
       );
-      if (!currentRangeClaims.some((claim) => meaningfulInvariant(claim, change.file))) {
+      if (!currentRangeClaimUnits.some((unit) => meaningfulInvariant(unit, change.file))) {
         failures.push(`documentation truth receipt must add or change a meaningful path-bound invariant in the reviewed range for: ${change.file}`);
       }
     }

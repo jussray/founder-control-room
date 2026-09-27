@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { normalizedClaimFingerprint } from './documentationTruthClaimFingerprint.js';
+import {
+  claimInvariantUnits,
+  normalizedClaimFingerprint,
+  normalizedClaimUnits,
+} from './documentationTruthClaimFingerprint.js';
 
 describe('documentation truth claim fingerprints', () => {
   it('normalizes cosmetic casing, whitespace, and punctuation', () => {
@@ -43,6 +47,13 @@ describe('documentation truth claim fingerprints', () => {
   it('ignores Markdown link destinations while retaining visible labels', () => {
     expect(normalizedClaimFingerprint('`scripts/verify-documentation-truth.mjs` must remain current'))
       .toBe(normalizedClaimFingerprint('[`scripts/verify-documentation-truth.mjs`](https://docs.example/verifier) must remain current'));
+    expect(normalizedClaimFingerprint('Claim must remain current'))
+      .toBe(normalizedClaimFingerprint('[Claim](https://docs.example/path_(nested)) must remain current'));
+  });
+
+  it('ignores HTML comments rather than treating them as claim novelty', () => {
+    expect(normalizedClaimFingerprint('State must remain current'))
+      .toBe(normalizedClaimFingerprint('State must remain current <!-- cosmetic note -->'));
   });
 
   it('preserves ordering operators next to quoted and signed literals', () => {
@@ -77,5 +88,15 @@ describe('documentation truth claim fingerprints', () => {
       .toBe(normalizedClaimFingerprint('`! ready` must hold'));
     expect(normalizedClaimFingerprint('`! ready` must hold'))
       .not.toBe(normalizedClaimFingerprint('`ready` must hold'));
+  });
+
+  it('normalizes invariant units independently of claim splitting or merging', () => {
+    const merged = normalizedClaimUnits('`path/a.ts` must remain current. `path/b.ts` must fail closed.');
+    const split = [
+      ...normalizedClaimUnits('`path/a.ts` must remain current.'),
+      ...normalizedClaimUnits('`path/b.ts` must fail closed.'),
+    ];
+    expect(merged).toEqual(split);
+    expect(claimInvariantUnits('`! ready` must hold. Next invariant must remain current.')).toHaveLength(2);
   });
 });
