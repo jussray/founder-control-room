@@ -1,6 +1,6 @@
 # Founder Control Room MCP stack
 
-Last reviewed: 2026-09-23
+Last reviewed: 2026-09-27
 
 This file governs which MCP servers an AI agent may use while **developing this repository**. It is different from the Control Room's own **MCP / Connector Hub** (`project_connections` + `GET /agents` + `GET /authority-levels`), which records connectors and authority for managed projects. Do not conflate the repository agent fleet with the in-app Connector Hub.
 
@@ -71,7 +71,7 @@ No migration, OAuth dashboard change, Worker secret/binding change, merge, or de
 Founder Control Room also serves a separate read-only MCP gateway at `POST https://api.foundercontrolroom.org/mcp/read`. This is the remote bridge intended for external MCP clients that need governed repository/provider reads without inheriting Founder Control Room execution authority.
 
 - Authentication uses the dedicated Worker secret `FCR_REMOTE_MCP_READ_TOKEN`. It must not be reused for the write-capable Founder Signal Engine MCP or any provider credential.
-- Production project scope is server-held as `FCR_REMOTE_MCP_READ_PROJECTS=sekret-bip,juss-beautiful-hair,juss-beautiful-hair-private,l99,chief-ai-machine,untold-stories,founder-control-room,promptos`. These are the current active authority-bearing entries in `PORTFOLIO_PROJECTS`; callers cannot add or substitute a project slug in order to widen the grant.
+- Production project scope is server-held as `FCR_REMOTE_MCP_READ_PROJECTS=sekret-bip,juss-beautiful-hair,juss-beautiful-hair-private,l99,chief-ai-machine,untold-stories,sync-party,founder-control-room,promptos`. These are the current active authority-bearing entries in `PORTFOLIO_PROJECTS`; callers cannot add or substitute a project slug in order to widen the grant.
 - External continuity-only projects (`think-tank`, `solcontinuity`, `sleepwealth-agent`, `sweats`) and quarantined repositories remain outside this operator grant unless a later explicit founder authority decision promotes them through the normal portfolio contract.
 - The gateway advertises only `list_read_servers` and `invoke_read_tool`; both remain behind the in-app MCP registry and policy boundary.
 - Provider tools still have to pass the configured server allowlist/denylist. A tool name matching create/update/delete/merge/write authority remains blocked by the underlying FCR MCP policy.

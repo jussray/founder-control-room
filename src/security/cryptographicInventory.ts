@@ -150,6 +150,11 @@ export const CRYPTOGRAPHIC_REVIEW_REQUIRED: readonly CryptographicReviewRequired
     reason: 'PromptOS is primarily a rules/registry surface and this pass did not prove a canonical runtime authentication or signing primitive.',
     nextEvidence: 'Confirm whether any production runtime auth/signing path exists; otherwise retain provider-managed transport as an external dependency rather than inventing an app crypto layer.',
   },
+  {
+    projectSlug: 'sync-party',
+    reason: 'SYNC is now an authority-bearing portfolio project, but this FCR source pass has not independently proven its runtime authentication, signing, or provider-managed cryptographic boundary.',
+    nextEvidence: 'Inspect the exact deployed SYNC Worker and provider bindings for auth, signing, transport, Durable Object, and secret-dependent cryptography before assigning a migration class.',
+  },
 ] as const;
 
 export function cryptographicInventoryForProject(projectSlug: string): readonly CryptographicInventoryEntry[] {
