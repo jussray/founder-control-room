@@ -56,7 +56,7 @@ export const PROJECT_SHELLS: readonly ProjectShellDefinition[] = [
   {
     projectSlug: 'l99',
     shellName: 'StoryEngine Capability Shell',
-    identity: 'story and artifact generation capability inside FCR',
+    identity: 'story and artifact generation capability represented through FCR without erasing its product boundary',
     primaryOutcome: 'turn founder intent into governed, provenance-bearing content and artifacts',
     emphasis: ['intent', 'work', 'truth'],
     projectSpecificViews: ['story-brief', 'artifact-generation', 'provenance', 'review', 'distribution-handoff', 'outcome'],
@@ -64,9 +64,9 @@ export const PROJECT_SHELLS: readonly ProjectShellDefinition[] = [
   },
   {
     projectSlug: 'chief-ai-machine',
-    shellName: 'Chief Reasoning Shell',
-    identity: 'reasoning, synthesis, routing, and executive recommendation capability inside FCR',
-    primaryOutcome: 'help FCR choose and compose capabilities without becoming a separate founder operating system',
+    shellName: 'Chief Intelligence Peer Shell',
+    identity: 'FCR integration shell for the standalone Chief executive synthesis and reasoning intelligence peer',
+    primaryOutcome: 'let FCR exchange governed intent, evidence, recommendations, and receipts with Chief while both systems remain independently operable',
     emphasis: ['intent', 'authority', 'truth'],
     projectSpecificViews: ['reasoning', 'recommendations', 'provider-routing', 'constraints', 'evidence-needed', 'next-gate'],
     inheritedFcrContracts,
@@ -91,9 +91,9 @@ export const PROJECT_SHELLS: readonly ProjectShellDefinition[] = [
   },
   {
     projectSlug: 'founder-control-room',
-    shellName: 'Founder Control Room Shell',
-    identity: 'single founder operating system, control plane, and first-party commerce business',
-    primaryOutcome: 'turn founder intent into governed execution, verified outcomes, recovery, first-party revenue, and one exact next gate',
+    shellName: 'Founder Control Room Operating Environment',
+    identity: 'standalone founder operating and build intelligence, portfolio control plane, and first-party commerce business',
+    primaryOutcome: 'let the founder reason, build, inspect, operate, verify, recover, and advance the portfolio with or without external AI providers while preserving governed execution, verified outcomes, revenue, and one exact next gate',
     emphasis: ['intent', 'work', 'authority', 'truth', 'lifecycle'],
     projectSpecificViews: [
       'portfolio',
@@ -117,9 +117,9 @@ export const PROJECT_SHELLS: readonly ProjectShellDefinition[] = [
   },
   {
     projectSlug: 'promptos',
-    shellName: 'PromptOS Governance Shell',
-    identity: 'prompt, skill, instruction, and agent-behavior governance capability inside FCR',
-    primaryOutcome: 'constrain how capabilities behave without becoming a parallel operating system',
+    shellName: 'PromptOS Intelligence Peer Shell',
+    identity: 'FCR integration shell for the standalone PromptOS prompt, workflow, compiler, routing, and evaluation intelligence peer',
+    primaryOutcome: 'let FCR exchange governed workflow and protocol intelligence with PromptOS while both systems remain independently operable',
     emphasis: ['authority', 'intent', 'truth'],
     projectSpecificViews: ['prompt-registry', 'skills', 'policy', 'ooda', 'redteam', 'l99', 'lindymode', 'behavior-proof'],
     inheritedFcrContracts,
