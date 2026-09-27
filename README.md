@@ -373,3 +373,7 @@ The AI Failure Repair workflow stores its bounded evidence under `.repair/`, a h
 ## Chief adapter exact-head truth
 
 `src/founder-os-lab/projectAdapters.ts` binds Chief integration evidence to one audited exact Chief head. Moving that pin is an evidence-authority transition: the same change must refresh this README, `docs/TRUTH_DECAY_AUDIT.md`, and `docs/DOCUMENTATION_TRUTH_RECEIPT.json`, and the successor FCR head must earn its own adapter, pair-contract, CI, and applicable runtime/browser proof. Pin alignment selects the next evidence subject only; it does not prove Chief deployment, served-MCP reachability, production behavior, merge authority, or deploy authority.
+
+## September 27 StoryEngine peer transition
+
+The current StoryEngine peer refresh is recovery setup only. The successor peer was selected from a fresh independent `main` observation, while its exact predecessor/successor SHAs and comparison remain in the audit/receipt provenance rather than durable current-state prose. FCR federation remains `UNKNOWN` until the exact successor FCR head completes the full runtime, directive, receipt, replay-safety, and Playwright browser witness; pin alignment alone grants no production, merge, deploy, publication, or provider-mutation authority.
