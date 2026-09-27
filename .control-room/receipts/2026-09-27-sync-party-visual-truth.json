@@ -1,0 +1,85 @@
+{
+  "contract": "juss/court-visual-truth-receipt@v1",
+  "observed_at": "2026-09-27T18:59:15Z",
+  "subject": {
+    "project": "jussray/sync-party-game",
+    "surface": "https://sync-party-game.mcgill-raylene.workers.dev",
+    "source_sha": "7920be25c2371051d4cf4efe66a5a24a80c749a8"
+  },
+  "goal": "Restore the live SYNC game to the founder-approved showcase visual direction while preserving multiplayer and growth authority.",
+  "statuses": {
+    "SOURCE_IMPLEMENTED": "VERIFIED",
+    "MERGED": "VERIFIED",
+    "DEPLOYED": "VERIFIED",
+    "RUNTIME_VERIFIED": "VERIFIED",
+    "VISUAL_VERIFIED": "VERIFIED",
+    "OUTCOME_VERIFIED": "UNKNOWN"
+  },
+  "witnesses": [
+    {
+      "class": "repository_source",
+      "state": "VERIFIED",
+      "evidence": "github:jussray/sync-party-game@7920be25c2371051d4cf4efe66a5a24a80c749a8"
+    },
+    {
+      "class": "ci_receipt",
+      "state": "VERIFIED",
+      "evidence": "github-actions:core-proof:36342507146"
+    },
+    {
+      "class": "runtime_identity",
+      "state": "VERIFIED",
+      "evidence": "github-actions:deploy:36342578040; cloudflare-build:6a4b1142-0ff5-4f15-b822-1aea92b77f79"
+    },
+    {
+      "class": "browser_functional",
+      "state": "VERIFIED",
+      "evidence": "github-actions:deploy:36342578040:public-exact-sha-playwright"
+    },
+    {
+      "class": "browser_visual",
+      "state": "VERIFIED",
+      "evidence": "artifact:10939831049:visual-sync-home.png; sha256:26b3a16c0e093b46345514e300d73a9b50cdb5686fbbb1d8a5910b8800185f8d"
+    },
+    {
+      "class": "independent_challenger",
+      "state": "UNKNOWN",
+      "evidence": null,
+      "limitation": "Muse has not independently reproduced this successor visual state yet."
+    }
+  ],
+  "visual_canon": {
+    "authority": [
+      "Library:SYNC Multiplayer Party Game Showcase.png",
+      "Library:Neon SYNC Multiplayer Game Showcase.png",
+      "Library:Neon Sync: Think Alike, Play Together.png"
+    ],
+    "verified_traits": [
+      "deep navy and electric blue field",
+      "hot pink, purple, cyan and gold accent hierarchy",
+      "oversized white SYNC identity",
+      "party-friend character energy framing the hero",
+      "polished Create and Join panels",
+      "feature strip for player count, no account, cross-device and room code",
+      "shared neon visual language across gameplay controls and result surfaces"
+    ],
+    "claim_scope": "visual-system alignment on the exact promoted Workers destination; not pixel identity with marketing collage references"
+  },
+  "supersedes": {
+    "visual_fail_state": "workers runtime before showcase-aligned successor",
+    "temporary_recovery_sha": "42990809c01e28a648f797807367049a1a9d1e08"
+  },
+  "promotion_gate": {
+    "visual_hold": false,
+    "functional_hold": false,
+    "destination_identity": "VERIFIED",
+    "campaign_attribution_required": true,
+    "threads_campaign_link": "https://sync-party-game.mcgill-raylene.workers.dev/?utm_campaign=sync-launch-threads-01&utm_source=threads&utm_medium=organic-social&utm_content=launch-post-01"
+  },
+  "limitations": [
+    "The separate chatgpt.site host remains unproven as runtime-equivalent to the Workers destination.",
+    "No player, retention, conversion, referral, or revenue outcome is claimed by this receipt.",
+    "Independent Muse reproduction remains pending."
+  ],
+  "next_gate": "Independent challenger review or measured campaign outcome evidence."
+}
