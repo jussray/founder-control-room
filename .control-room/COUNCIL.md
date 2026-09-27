@@ -2,22 +2,34 @@
 
 Status: active control-room documentation.
 
-The Council is a multi-model reasoning and review layer. It is not a substitute for founder authority, repository/provider truth, security policy, or runtime proof.
+The Council is a multi-model reasoning and review layer carried through a neutral shared protocol/ledger. It is not a substitute for founder authority, repository/provider truth, security policy, runtime proof, or the standalone intelligence of any core system.
 
-## Resident Council invariant
+## Neutral shared Council invariant
 
-The Council is resident in two places at once:
+The Council connects four first-class standalone core systems:
 
-1. **Founder assistant host**: ChatGPT or a successor founder-facing host carries standing Council selection, challenge, reconciliation, continuity, and evidence discipline for founder work.
-2. **This project Control Room**: this repository carries the project-local Council contract and machine-readable residency contract at `.control-room/council-residency.contract.json`.
+- **Founder Control Room** — standalone founder operating/build intelligence.
+- **Chief AI** — standalone executive synthesis/reasoning intelligence.
+- **Sol** — standalone challenge/evaluation/continuity intelligence.
+- **PromptOS** — standalone prompt/workflow/compiler/routing intelligence.
 
-These are two residences of the same logical Founder Council, not one centralized executor. Project agents must read the residency contract with this file before material Council work.
+No one of these systems owns the shared Council layer, and none depends on the Council layer or an external provider for its core function. Each repository owns only its project-local Council adapter, evidence bindings, receipts, routing constraints, and authority membrane at `.control-room`.
+
+FCR is not a dashboard, shell, host, or mere workflow registry. It can accept founder intent, reason, plan, inspect projects, build, repair, verify, operate, preserve continuity, and advance the portfolio without requiring ChatGPT, Claude, Muse, DeepSeek, Perplexity, or another external AI product to remain available. FCR may expose a first-class Council surface and invoke external AI seats from that surface without becoming the owner of the neutral shared layer.
+
+Chief, Sol, and PromptOS remain independently useful standalone peers with their own interfaces, intelligence, architecture, and jobs. Shared work must not collapse them into FCR submodules or make one core peer a hidden dependency of another.
+
+ChatGPT, Claude, Muse, DeepSeek, Perplexity, Gemini, local models, and future providers participate as replaceable Council seats when actually available and authorized. Provider loss must not erase plans, architecture, decisions, prompts, receipts, fingerprints, state, evidence, or the operating capability of FCR, Chief, Sol, or PromptOS.
+
+The physical backing for the neutral shared Council protocol/ledger is intentionally undecided until separately authorized. Do not silently make GitHub, FCR, Google Drive, Google Docs, Google Sheets, Supabase, Slack, or an external model the owner merely because it is convenient.
+
+Project agents must read `.control-room/council-residency.contract.json` with this file before material Council work.
 
 Default invocation is automatic when Council participation is materially useful. Route the smallest useful task-specific set of seats rather than waking every provider by default. Product-user workflows may invoke the Council behind the scenes only when project policy allows it; users receive the governed product outcome, not raw Council deliberation, founder controls, provider credentials, or cross-project private data.
 
 A named Council seat counts as **live** only when an actual connector/API/runtime call is verified by provider evidence. Simulated role analysis must never be labeled as a live provider response.
 
-All execution remains inside the owning Control Room's local authority membrane. Cross-project Council reasoning may coordinate evidence and recommendations, but cross-project mutation must be handed to the Control Room that owns the affected system.
+All execution remains inside the owning repository/system's local authority membrane. Cross-project Council reasoning may coordinate evidence and recommendations, but cross-project mutation must be handed to the repository/system that owns the affected state. The neutral shared Council layer grants no execution authority of its own.
 
 ## Authority order
 
@@ -29,15 +41,27 @@ All execution remains inside the owning Control Room's local authority membrane.
 
 No number of model votes can promote item 4 above items 1-3.
 
-## Council members
+## Council members and core peers
 
 ### Founder
 
 The founder is the final human authority for separately gated actions. Silence is not approval. Approval does not automatically carry across changed scope, branch/head movement, changed provider state, or a different mutation class.
 
+### Founder Control Room
+
+FCR is the standalone founder operating/build intelligence. It may plan, inspect, build, repair, verify, operate, preserve continuity, and advance the portfolio on its own. Its first-class Council view is an interface to the neutral shared layer, not ownership of that layer.
+
 ### Chief AI
 
-Owns orchestration, decomposition, synthesis, and goal-state framing. Chief may recommend, route, compare, and summarize. It may not self-authorize execution.
+Chief is standalone executive synthesis/reasoning intelligence for orchestration, decomposition, synthesis, routing, decision quality, and goal-state framing. Chief may recommend, route, compare, and summarize. It may not self-authorize execution.
+
+### Sol
+
+Sol is standalone challenge/evaluation/continuity intelligence for adversarial review, state recovery, drift detection, fingerprints, evidence lineage, and continuity.
+
+### PromptOS
+
+PromptOS is standalone prompt/workflow/compiler/routing intelligence for protocol compilation, routing, evaluation, promotion, lineage, and reusable workflow intelligence.
 
 ### Codex / ChatGPT
 
