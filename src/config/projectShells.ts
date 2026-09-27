@@ -81,6 +81,15 @@ export const PROJECT_SHELLS: readonly ProjectShellDefinition[] = [
     inheritedFcrContracts,
   },
   {
+    projectSlug: 'sync-party',
+    shellName: 'SYNC Party Game Shell',
+    identity: 'multiplayer game product with a governed project-local Control Room and continuity boundary',
+    primaryOutcome: 'advance the real multiplayer experience while preserving runtime identity, browser proof, and project-local authority',
+    emphasis: ['work', 'truth', 'lifecycle', 'authority'],
+    projectSpecificViews: ['game-runtime', 'multiplayer', 'sessions', 'control-room', 'continuity', 'playwright-proof'],
+    inheritedFcrContracts,
+  },
+  {
     projectSlug: 'founder-control-room',
     shellName: 'Founder Control Room Shell',
     identity: 'single founder operating system, control plane, and first-party commerce business',
