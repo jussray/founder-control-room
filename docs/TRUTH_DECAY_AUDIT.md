@@ -453,3 +453,7 @@ Documentation Truth also previously evaluated all claims present in the current 
 
 
 The successor adapter audit refresh binds Se’kret Bip and Chief to their newly observed main heads only because all required contract blob identities remained unchanged under live GitHub readback. That establishes exact-head provenance for the bounded preview contracts; it does not semantically certify unrelated commits or promote source evidence into deployment, runtime, browser, or human-outcome proof.
+
+## StoryEngine Sync Avenue peer transition
+
+StoryEngine `main` advanced by two commits that added the Sync Avenue route, renderer bridge, tests, and workflow while modifying the video engine and server wiring. That reviewed delta justifies selecting the successor as the next peer evidence subject, but it does not donate predecessor FCR browser green. Federation remains UNKNOWN until the exact successor FCR head proves the live ref, immutable peer checkout, runtime identity, directive/receipt binding, replay safety, and browser loop; production and provider state remain separate.
