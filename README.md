@@ -381,3 +381,5 @@ Project-adapter freshness is fail-closed on exact repository identity: unchanged
 
 
 The audited Se’kret Bip and Chief adapter heads are updated only after live GitHub readback confirms that every required contract blob is byte-identical at the successor head. This binds strict request validation to the same head used by freshness CI without claiming unrelated repository changes, provider deployment, runtime behavior, or merge authority.
+
+A later StoryEngine Sync Avenue/runtime change moved the live peer again. The Playwright pin now selects that successor solely as the next federation evidence subject; FCR federation remains UNKNOWN until the exact successor FCR head completes the full runtime-identity, directive, receipt, replay-safety, and browser witness. This rebind grants no production, merge, deploy, publication, or provider-mutation authority.
