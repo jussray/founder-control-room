@@ -95,6 +95,23 @@ export interface ReadSyncPartyGrowthOptions {
 }
 
 type JsonRecord = Record<string, unknown>;
+type VersionRead =
+  | Readonly<{ identity: SyncPartyRuntimeIdentity; reason: null }>
+  | Readonly<{ identity: null; reason: 'VERSION_UNAVAILABLE' | 'VERSION_INVALID' }>;
+
+type ParsedSummary = Readonly<{
+  sourceCampaignKey: string;
+  campaignFingerprint: string | null;
+  sequence: number;
+  uniqueVisitors: number;
+  funnel: Readonly<Record<KnownEvent, number>>;
+  sourceCounts: CountMap;
+  mediumCounts: CountMap;
+  contentCounts: CountMap;
+  firstAt: number | null;
+  lastAt: number | null;
+  recentEvents: readonly SyncPartyRecentGrowthEvent[];
+}>;
 
 function isRecord(value: unknown): value is JsonRecord {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
@@ -114,21 +131,22 @@ function normalizedToken(value: unknown, max: number): string | null {
   return normalized && CAMPAIGN_TOKEN.test(normalized) ? normalized : null;
 }
 
-function finiteNonNegativeInteger(value: unknown): number {
-  return Number.isInteger(value) && Number(value) >= 0 ? Number(value) : 0;
+function nonNegativeInteger(value: unknown): number | null {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0 ? value : null;
 }
 
 function finiteTimestamp(value: unknown): number | null {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null;
 }
 
-function safeCountMap(value: unknown): CountMap {
-  if (!isRecord(value)) return Object.freeze({});
+function parseCountMap(value: unknown): CountMap | null {
+  if (!isRecord(value)) return null;
   const output: Record<string, number> = {};
   for (const [key, count] of Object.entries(value)) {
     const normalizedKey = normalizedToken(key, 160);
-    if (!normalizedKey) continue;
-    output[normalizedKey] = finiteNonNegativeInteger(count);
+    const normalizedCount = nonNegativeInteger(count);
+    if (!normalizedKey || normalizedCount === null) return null;
+    output[normalizedKey] = normalizedCount;
   }
   return Object.freeze(output);
 }
@@ -146,23 +164,102 @@ function sameRuntime(left: SyncPartyRuntimeIdentity, right: SyncPartyRuntimeIden
   return left.sha === right.sha && left.build === right.build;
 }
 
-function parseRecentEvents(value: unknown): readonly SyncPartyRecentGrowthEvent[] {
-  if (!Array.isArray(value)) return Object.freeze([]);
+function parseRecentEvents(value: unknown): readonly SyncPartyRecentGrowthEvent[] | null {
+  if (!Array.isArray(value) || value.length > 20) return null;
   const events: SyncPartyRecentGrowthEvent[] = [];
-  for (const item of value.slice(-20)) {
-    if (!isRecord(item) || typeof item.event !== 'string') continue;
-    if (!KNOWN_EVENTS.includes(item.event as KnownEvent)) continue;
+  for (const item of value) {
+    if (!isRecord(item) || typeof item.event !== 'string') return null;
+    if (!KNOWN_EVENTS.includes(item.event as KnownEvent)) return null;
+    const seq = nonNegativeInteger(item.seq);
+    const at = finiteTimestamp(item.at);
+    const gameSeq = item.game_seq === null ? null : nonNegativeInteger(item.game_seq);
     const fingerprint = typeof item.event_fingerprint === 'string' ? item.event_fingerprint.trim() : '';
-    if (!fingerprint) continue;
+    if (seq === null || at === null || gameSeq === null && item.game_seq !== null || !fingerprint) return null;
     events.push(Object.freeze({
       event: item.event as KnownEvent,
-      seq: finiteNonNegativeInteger(item.seq),
-      at: finiteTimestamp(item.at) ?? 0,
-      gameSeq: Number.isInteger(item.game_seq) && Number(item.game_seq) >= 0 ? Number(item.game_seq) : null,
+      seq,
+      at,
+      gameSeq,
       eventFingerprint: fingerprint.slice(0, 128),
     }));
   }
   return Object.freeze(events);
+}
+
+function parseSummary(value: unknown, requestedCampaignId: string): ParsedSummary | null {
+  if (!isRecord(value)) return null;
+
+  const sourceCampaignKey = normalizedToken(value.campaign_key, 120);
+  const sequence = nonNegativeInteger(value.seq);
+  const uniqueVisitors = nonNegativeInteger(value.unique_visitors);
+  const sourceCounts = parseCountMap(value.source_counts);
+  const mediumCounts = parseCountMap(value.medium_counts);
+  const contentCounts = parseCountMap(value.content_counts);
+  const recentEvents = parseRecentEvents(value.recent_events);
+  const firstAt = value.first_at === null ? null : finiteTimestamp(value.first_at);
+  const lastAt = value.last_at === null ? null : finiteTimestamp(value.last_at);
+
+  if (
+    !sourceCampaignKey
+    || sequence === null
+    || uniqueVisitors === null
+    || !isRecord(value.counters)
+    || sourceCounts === null
+    || mediumCounts === null
+    || contentCounts === null
+    || recentEvents === null
+    || (value.first_at !== null && firstAt === null)
+    || (value.last_at !== null && lastAt === null)
+  ) return null;
+
+  const funnelEntries: Array<[KnownEvent, number]> = [];
+  for (const event of KNOWN_EVENTS) {
+    const raw = value.counters[event];
+    if (raw === undefined) {
+      funnelEntries.push([event, 0]);
+      continue;
+    }
+    const count = nonNegativeInteger(raw);
+    if (count === null) return null;
+    funnelEntries.push([event, count]);
+  }
+
+  for (const key of Object.keys(value.counters)) {
+    if (!KNOWN_EVENTS.includes(key as KnownEvent)) return null;
+  }
+
+  const funnel = Object.freeze(Object.fromEntries(funnelEntries) as Record<KnownEvent, number>);
+  const counterTotal = Object.values(funnel).reduce((sum, count) => sum + count, 0);
+  if (counterTotal !== sequence || uniqueVisitors > sequence) return null;
+
+  const rawFingerprint = value.campaign_fingerprint;
+  const campaignFingerprint = rawFingerprint === null
+    ? null
+    : typeof rawFingerprint === 'string' && rawFingerprint.trim()
+      ? rawFingerprint.trim().slice(0, 128)
+      : null;
+
+  if (sequence === 0) {
+    if (rawFingerprint !== null || firstAt !== null || lastAt !== null || recentEvents.length !== 0) return null;
+  } else {
+    if (!campaignFingerprint || !firstAt || !lastAt) return null;
+    if (sourceCampaignKey !== requestedCampaignId) return null;
+    if (recentEvents.length === 0) return null;
+  }
+
+  return Object.freeze({
+    sourceCampaignKey,
+    campaignFingerprint,
+    sequence,
+    uniqueVisitors,
+    funnel,
+    sourceCounts,
+    mediumCounts,
+    contentCounts,
+    firstAt,
+    lastAt,
+    recentEvents,
+  });
 }
 
 function unknown(
@@ -191,16 +288,19 @@ async function readJson(response: Response): Promise<unknown> {
   }
 }
 
-async function readVersion(fetchImpl: typeof fetch): Promise<SyncPartyRuntimeIdentity | null> {
+async function readVersion(fetchImpl: typeof fetch): Promise<VersionRead> {
   try {
     const response = await fetchImpl(`${SYNC_PARTY_GROWTH_SOURCE}/api/version`, {
       method: 'GET',
       headers: { accept: 'application/json' },
     });
-    if (!response.ok) return null;
-    return parseRuntime(await readJson(response));
+    if (!response.ok) return Object.freeze({ identity: null, reason: 'VERSION_UNAVAILABLE' });
+    const identity = parseRuntime(await readJson(response));
+    return identity
+      ? Object.freeze({ identity, reason: null })
+      : Object.freeze({ identity: null, reason: 'VERSION_INVALID' });
   } catch {
-    return null;
+    return Object.freeze({ identity: null, reason: 'VERSION_UNAVAILABLE' });
   }
 }
 
@@ -223,8 +323,8 @@ export async function readSyncPartyGrowthOutcome(
   if (!readKey) return unknown('READ_KEY_MISSING', now, requestedCampaignId);
 
   const fetchImpl = options.fetchImpl ?? fetch;
-  const runtimeBefore = await readVersion(fetchImpl);
-  if (!runtimeBefore) return unknown('VERSION_UNAVAILABLE', now, requestedCampaignId);
+  const before = await readVersion(fetchImpl);
+  if (!before.identity) return unknown(before.reason, now, requestedCampaignId);
 
   let response: Response;
   try {
@@ -238,31 +338,22 @@ export async function readSyncPartyGrowthOutcome(
       },
     });
   } catch {
-    return unknown('SOURCE_ERROR', now, requestedCampaignId, runtimeBefore);
+    return unknown('SOURCE_ERROR', now, requestedCampaignId, before.identity);
   }
 
-  if (response.status === 401) return unknown('READ_KEY_REJECTED', now, requestedCampaignId, runtimeBefore);
-  if (response.status === 503) return unknown('SOURCE_NOT_CONFIGURED', now, requestedCampaignId, runtimeBefore);
-  if (!response.ok) return unknown('SOURCE_ERROR', now, requestedCampaignId, runtimeBefore);
+  if (response.status === 401) return unknown('READ_KEY_REJECTED', now, requestedCampaignId, before.identity);
+  if (response.status === 503) return unknown('SOURCE_NOT_CONFIGURED', now, requestedCampaignId, before.identity);
+  if (!response.ok) return unknown('SOURCE_ERROR', now, requestedCampaignId, before.identity);
 
   const body = await readJson(response);
-  if (!isRecord(body)) return unknown('SOURCE_INVALID', now, requestedCampaignId, runtimeBefore);
+  const summary = parseSummary(body, requestedCampaignId);
+  if (!summary) return unknown('SOURCE_INVALID', now, requestedCampaignId, before.identity);
 
-  const runtimeAfter = await readVersion(fetchImpl);
-  if (!runtimeAfter) return unknown('VERSION_UNAVAILABLE', now, requestedCampaignId, runtimeBefore);
-  if (!sameRuntime(runtimeBefore, runtimeAfter)) {
-    return unknown('RUNTIME_MOVED_DURING_READ', now, requestedCampaignId, runtimeAfter);
+  const after = await readVersion(fetchImpl);
+  if (!after.identity) return unknown(after.reason, now, requestedCampaignId, before.identity);
+  if (!sameRuntime(before.identity, after.identity)) {
+    return unknown('RUNTIME_MOVED_DURING_READ', now, requestedCampaignId, after.identity);
   }
-
-  const sequence = finiteNonNegativeInteger(body.seq);
-  const counters = isRecord(body.counters) ? body.counters : {};
-  const funnel = Object.fromEntries(
-    KNOWN_EVENTS.map((event) => [event, finiteNonNegativeInteger(counters[event])]),
-  ) as Record<KnownEvent, number>;
-  const sourceCampaignKey = normalizedToken(body.campaign_key, 120) ?? 'unattributed';
-  const campaignFingerprint = typeof body.campaign_fingerprint === 'string' && body.campaign_fingerprint.trim()
-    ? body.campaign_fingerprint.trim().slice(0, 128)
-    : null;
 
   return Object.freeze({
     contract: SYNC_PARTY_GROWTH_CONTRACT,
@@ -271,19 +362,19 @@ export async function readSyncPartyGrowthOutcome(
     source: SYNC_PARTY_GROWTH_SOURCE,
     observedAt: now.toISOString(),
     requestedCampaignId,
-    sourceCampaignKey,
-    emptyLedger: sequence === 0,
-    runtime: runtimeBefore,
-    campaignFingerprint,
-    sequence,
-    uniqueVisitors: finiteNonNegativeInteger(body.unique_visitors),
-    funnel: Object.freeze(funnel),
-    sourceCounts: safeCountMap(body.source_counts),
-    mediumCounts: safeCountMap(body.medium_counts),
-    contentCounts: safeCountMap(body.content_counts),
-    firstAt: finiteTimestamp(body.first_at),
-    lastAt: finiteTimestamp(body.last_at),
-    recentEvents: parseRecentEvents(body.recent_events),
+    sourceCampaignKey: summary.sourceCampaignKey,
+    emptyLedger: summary.sequence === 0,
+    runtime: before.identity,
+    campaignFingerprint: summary.campaignFingerprint,
+    sequence: summary.sequence,
+    uniqueVisitors: summary.uniqueVisitors,
+    funnel: summary.funnel,
+    sourceCounts: summary.sourceCounts,
+    mediumCounts: summary.mediumCounts,
+    contentCounts: summary.contentCounts,
+    firstAt: summary.firstAt,
+    lastAt: summary.lastAt,
+    recentEvents: summary.recentEvents,
     semanticBoundaries: Object.freeze({
       signups: 'UNKNOWN',
       returningUsers: 'UNKNOWN',
