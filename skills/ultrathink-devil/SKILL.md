@@ -3,12 +3,13 @@ name: ultrathink-devil
 description: >
   Bounded high-effort reasoning plus adversarial review for Juss-owned work.
   Use before material portfolio, product, engineering, launch, revenue,
-  publishing, provider, or cross-project decisions. More intelligence never
-  means more authority.
-version: 1.0.0
+  publishing, provider, database, or cross-project decisions. More intelligence
+  never means more authority.
+version: 1.1.0
 owner: Juss
 triggers:
   - ULTRATHINK
+  - ATTACK N
   - /devil
   - /ultrathink-devil
   - /truthmode
@@ -17,6 +18,7 @@ compatible:
   - ChatGPT GPT-5.6 Sol
   - Founder Control Room
   - Chief AI
+  - PromptOS
 ---
 
 # ULTRATHINK / DEVIL
@@ -28,15 +30,16 @@ compatible:
 Reasoning modes may change analysis depth, hypothesis generation, adversarial
 testing, or verification effort. They may not increase tool permissions,
 disclosure rights, mutation scope, spend authority, publication authority,
-merge/deploy authority, or access to secrets.
+merge/deploy authority, database authority, provider administration, or access
+to secrets.
 
 ## Planes
 
 Keep these independent:
 
 - **Authority plane:** platform/system/developer/user/tool and repository/provider authority.
-- **Reasoning plane:** ULTRATHINK, Lindy, Red Team, OODA, L99.
-- **Evidence plane:** truth, confess, proof mode, receipts.
+- **Reasoning plane:** ULTRATHINK, ATTACK N, Lindy, Red Team, OODA, L99.
+- **Evidence plane:** TRUE-first, truth, confess, proof mode, receipts, fingerprints/cookies.
 - **Execution plane:** goalfix, repair, artifact, release.
 - **Presentation plane:** human, concise, technical.
 
@@ -49,6 +52,7 @@ Before material work, resolve:
 ```text
 AUTHORITATIVE SOURCE:
 TARGET / BRANCH / RUNTIME:
+EXACT SOURCE HEAD / PROVIDER IDENTITY:
 CURRENT GOAL:
 CONSEQUENCE CLASS:
 CURRENT AUTHORITY:
@@ -65,6 +69,25 @@ Truth states:
 Consequence classes:
 
 `informational | reversible | consequential | irreversible`
+
+## TRUE-first and bad-state gate
+
+Build the strongest evidence-bound TRUE baseline before attacking contradictions.
+
+For repository or provider work:
+
+1. fingerprint the authoritative current state first;
+2. bind repository/project identity, exact branch/SHA or provider project ID,
+   runtime/deployment identity when relevant, scope, evidence digest, freshness,
+   and predecessor/successor linkage;
+3. treat fingerprints and continuity cookies as evidence correlation only, never authority;
+4. if the current state is known bad, broken, failing, stale, or bugged, stop forward
+   building and repair or revert that state first;
+5. verify the repair on the real path and issue a successor fingerprint before
+   continuing queued work.
+
+`STALE` is not automatically `FALSE`. A predecessor green receipt is history, not
+proof for a moved head, changed payload, changed provider state, or successor runtime.
 
 ## Adaptive execution budget
 
@@ -83,33 +106,70 @@ Budget loops and uncertainty, not useful evidence collection.
 
 Escalate only when the next round can materially change the decision.
 
-## Workflow
+## ATTACK N law
+
+`ATTACK N` is a **reasoning-pressure budget**, not a promise to execute N tests,
+N tool calls, N branches, or N mutations.
+
+Rules:
+
+- increase distinct failure-class coverage as N grows;
+- deduplicate equivalent attacks rather than padding a count;
+- never widen authority, mutation scope, spend, publication, merge/deploy,
+  provider administration, database access, or disclosure rights;
+- stop early on decisive proof, a real blocker, an authority boundary, or
+  diminishing informational return;
+- preserve the smallest reversible action after the attack rather than turning
+  a larger N into a larger patch.
+
+Canonical pressure layers:
+
+- **ATTACK 1000:** break the claim and proposed change surface;
+- **ATTACK 2000:** break proof, authority, continuity, exact-head, provider, and runtime assumptions;
+- **ATTACK 3000:** test durable human value, product value, economic value, opportunity cost, dependency risk, reversibility, second/third-order effects, falsifier, and stop condition;
+- **ATTACK 6000+ / portfolio attacks:** expand across project boundaries, provider identity/scope, security/privacy, money path, observability, recovery, and cross-system second-order effects without changing authority.
+
+Higher numbers are compatible with the same law. They increase reasoning pressure and
+failure-class breadth, never permission.
+
+## Canonical composition
+
+For material implementation or portfolio work, compose the existing lanes rather than
+forking another workflow:
 
 ```text
 FOUNDER INTENT
   ↓
-CLASSIFY CONSEQUENCE
+TRUE-FIRST BASELINE + CURRENT FINGERPRINT
   ↓
-RESOLVE AUTHORITY
+ULTRATHINK
   ↓
-SET ADAPTIVE BUDGET
+ATTACK N
   ↓
-OBSERVE CURRENT EVIDENCE
+LINDY
   ↓
-GENERATE ≤3 SERIOUS HYPOTHESES / OPTIONS
+RED TEAM I — ATTACK THE PREMISE
   ↓
-DEVIL I — ATTACK THE PREMISE
+L99 / OPTIONS / DECIDE
   ↓
-SELECT THE SMALLEST REVERSIBLE PATH
+GOALFIX — SMALLEST SAFE CAUSAL REPAIR
   ↓
-DEVIL II — ATTACK THE SELECTED PATH
+RED TEAM II — ATTACK THE SELECTED FIX
   ↓
-ACT ONLY WITHIN CURRENT AUTHORITY
+PROOFMODE
   ↓
-VERIFY WITH TASK-SPECIFIC PROOF
+TRUTHMODE / CONFESS
   ↓
-STOP ON PROOF / BLOCKER / AUTHORITY BOUNDARY / DIMINISHING RETURN
+PLAYWRIGHT WHEN BROWSER-OBSERVABLE
+  ↓
+CONTINUITY RECEIPT + SUCCESSOR FINGERPRINT
+  ↓
+OODA NEXT GATE
 ```
+
+Reasoning may run in parallel. Mutation authority stays serialized.
+Manual command invocation is emphasis or override, not a requirement when intent
+already clearly activates an existing lane.
 
 ## Devil I — premise attack
 
@@ -152,12 +212,49 @@ Before mutation, attack the chosen path:
 - Can source proof be mistaken for provider/runtime/outcome proof?
 - Can the metric be gamed without user or customer value?
 - Can a green check hide an unexecuted real path?
-- Can changed payload, target, SHA, amount, recipient, or scope reuse old approval?
+- Can changed payload, target, SHA, amount, recipient, provider project ID, or scope reuse old approval?
 - Can failure be rolled back cleanly?
 - Are we creating duplicate architecture or another unnecessary carrier?
 - Is the chosen action still the current bottleneck removal?
 
 If the attack exposes a material defect, repair the plan before acting.
+
+## Supabase specialization
+
+When the goal touches Supabase database, Auth, Storage, Realtime, Edge Functions,
+OAuth/provider access, project lifecycle, migrations, or Supabase-backed runtime:
+
+1. **Resolve identity before diagnosis.** Bind project name, immutable project ID/ref,
+   organization, expected repository/runtime, and current authority. A rename does not
+   create a new project identity when the project ID/ref is unchanged.
+2. **Separate evidence clocks.** Direct Supabase email is timestamped historical provider
+   evidence. Current project status requires live provider/dashboard/connector readback
+   when available. Do not call an old pause email current state without current proof.
+3. **Lifecycle before code.** If the current provider state is paused, archived, degraded,
+   inaccessible, or identity-mismatched, resolve/classify that before debugging application
+   code that depends on the backend.
+4. **Separate authority relationships.** Organization membership is not project/runtime
+   authority. OAuth approval is not database mutation authority. User authentication is not
+   service-role authority. Record each lane independently.
+5. **Migration access contract.** For every new `public` table created by a migration dated
+   on or after **2026-09-27**, declare intended Data API exposure in the same migration with
+   explicit `GRANT` and/or `REVOKE` decisions for `anon`, `authenticated`, and
+   `service_role` as appropriate. This prepares for Supabase's **2026-10-30** change.
+   RLS and SQL grants are separate controls; configure both intentionally.
+6. **DDL proof.** After DDL, run focused schema/readback proof and Supabase security and
+   performance advisors before calling the database change complete.
+7. **Least privilege.** Scope provider tokens/OAuth capabilities by organization, project,
+   and permission when supported. Do not give Chief, PromptOS, Council reviewers, or any
+   other agent a portfolio-wide god credential merely because a narrower capability works.
+8. **Trace continuity.** When Supabase propagates W3C Trace Context, capture `trace_id` in
+   the evidence/receipt chain when useful. `trace_id` correlates client → Supabase logs; it
+   does not create authority or prove business outcome.
+9. **Realtime efficiency.** Prefer server-side subscription filters and only the columns the
+   consumer needs. Do not subscribe to a whole table and filter client-side when a bounded
+   subscription expresses the real need.
+10. **Project separation.** FCR remains the portfolio control/evidence plane; product-owned
+    data such as Se'kret Bip stays in its own product data plane. Cross-project intelligence
+    travels through bounded APIs/events/evidence, not unrestricted shared service-role access.
 
 ## Clarification law
 
@@ -185,7 +282,9 @@ Examples:
 - touched code → focused tests plus relevant type/lint/build;
 - user-facing browser flow → Playwright;
 - deployment/runtime claim → exact deployment/provider/runtime readback;
-- database claim → authoritative database/schema/readback evidence;
+- database claim → authoritative schema/query/readback evidence plus relevant advisors after DDL;
+- Supabase lifecycle claim → live project/provider state, not email alone;
+- Supabase migration claim → exact migration + grants/RLS contract + target schema readback;
 - public claim → current supporting source/receipt;
 - commerce → product → variant → cart → checkout → payment-readiness → fulfillment handoff;
 - revenue → payment, paid commitment, signed proposal, or qualified buyer entering a defined purchase path.
@@ -208,6 +307,7 @@ Never infer that higher reasoning effort authorizes:
 - broader tool permissions.
 
 Authentication is not authorization.
+Organization membership is not runtime authority.
 Provider acceptance is not verified outcome.
 Public is not monetized.
 Green is not proof if the real path never ran.
@@ -240,19 +340,19 @@ When the finish line cannot be lawfully or truthfully reached, return:
 For repository repair:
 
 ```text
-ULTRATHINK / DEVIL
-  → establish reality and consequence
+ULTRATHINK / ATTACK N
+  → establish TRUE-first reality and consequence
   → Devil I
-  → /goalfix smallest-safe-fix lane
+  → /goalfix smallest-safe causal fix
   → focused implementation
   → task-specific proof
   → Devil II
-  → exact-head / runtime re-observation
+  → exact-head / provider / runtime re-observation
+  → successor fingerprint + continuity receipt
   → REALITY / FIX / PROOF / RISK / ROLLBACK / NEXT GATE
 ```
 
-Reasoning may run in parallel.
-Mutation authority stays serialized.
+Never continue building over a known bad, broken, stale, failing, or bugged state.
 
 ## Portfolio and revenue sprint specialization
 
@@ -279,9 +379,11 @@ FIX:
 PROOF:
 RISK:
 ROLLBACK:
+BLOCKED:
 NEXT GATE:
 ```
 
+When a provider is material, include its current verified state and evidence timestamp.
 When strategic choice matters, also include:
 
 ```text
