@@ -242,12 +242,29 @@ if (truthSensitiveChanges.length > 0) {
     const baseClaimsByPath = receiptClaimsAtRevision(baseSha);
     for (const change of truthSensitiveChanges) {
       const claims = receipt.claimsByPath.get(change.file) ?? [];
-      const previousClaimUnitFingerprints = new Set(
-        (baseClaimsByPath.get(change.file) ?? []).flatMap((claim) => normalizedClaimUnits(claim)),
-      );
-      const currentRangeClaimUnits = claims.flatMap((claim) => claimInvariantUnits(claim)).filter(
-        (unit) => !previousClaimUnitFingerprints.has(normalizedClaimFingerprint(unit)),
-      );
+      const previousClaims = baseClaimsByPath.get(change.file) ?? [];
+      const previousClaimFingerprints = new Set(previousClaims.map((claim) => normalizedClaimFingerprint(claim)));
+      const previousClaimUnitFingerprints = previousClaims.flatMap((claim) => normalizedClaimUnits(claim));
+      const previousClaimUnitFingerprintSet = new Set(previousClaimUnitFingerprints);
+      const inheritedAdjacentUnitSequence = (fingerprint) => {
+        for (let start = 0; start < previousClaimUnitFingerprints.length; start += 1) {
+          let sequence = '';
+          for (let end = start; end < previousClaimUnitFingerprints.length; end += 1) {
+            sequence = sequence ? `${sequence} ${previousClaimUnitFingerprints[end]}` : previousClaimUnitFingerprints[end];
+            if (sequence === fingerprint) return true;
+            if (sequence.length >= fingerprint.length) break;
+          }
+        }
+        return false;
+      };
+      const currentRangeClaimUnits = claims.flatMap((claim) => {
+        if (previousClaimFingerprints.has(normalizedClaimFingerprint(claim))) return [];
+        return claimInvariantUnits(claim);
+      }).filter((unit) => {
+        const fingerprint = normalizedClaimFingerprint(unit);
+        return !previousClaimUnitFingerprintSet.has(fingerprint)
+          && !inheritedAdjacentUnitSequence(fingerprint);
+      });
       if (!currentRangeClaimUnits.some((unit) => meaningfulInvariant(unit, change.file))) {
         failures.push(`documentation truth receipt must add or change a meaningful path-bound invariant in the reviewed range for: ${change.file}`);
       }

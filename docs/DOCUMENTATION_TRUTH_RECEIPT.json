@@ -282,7 +282,7 @@
         "`scripts/verify-documentation-truth.mjs` must compare the base receipt with the candidate receipt and reject a truth-sensitive path unless the reviewed range adds or changes a meaningful path-bound invariant for that exact source path.",
         "`scripts/verify-documentation-truth.mjs` must normalize receipt-claim casing, punctuation, and whitespace before testing reviewed-range novelty so cosmetic rewrites cannot satisfy the new-or-changed invariant gate.",
         "`scripts/verify-documentation-truth.mjs` must preserve semantic comparison, logical, ordering, and unary operators when fingerprinting receipt claims while treating Markdown code-span delimiters as cosmetic, so neither behavior-changing operators nor formatting-only rewrites can create a false result.",
-        "`scripts/verify-documentation-truth.mjs` must compare normalized sentence/invariant units across base and candidate receipts so splitting or merging inherited claim entries cannot manufacture a new path-bound invariant."
+        "`scripts/verify-documentation-truth.mjs` must compare normalized sentence/invariant units and adjacent inherited-unit sequences across base and candidate receipts so splitting, merging, or punctuation-only regrouping cannot manufacture a new path-bound invariant."
       ]
     },
     {
@@ -295,7 +295,7 @@
       "path": "src/lib/documentationTruthClaimFingerprint.js",
       "claims": [
         "`src/lib/documentationTruthClaimFingerprint.js` must remain truth-governance-sensitive and produce identical fingerprints for formatting-only claim rewrites while preserving comparison, logical, ordering, and unary operator semantics so behavior changes cannot collapse into cosmetic normalization.",
-        "`src/lib/documentationTruthClaimFingerprint.js` must remove HTML comments and Markdown link destinations with bounded parsing, retain visible labels, and expose stable sentence/invariant units so cosmetic wrappers and claim-array regrouping cannot create receipt novelty."
+        "`src/lib/documentationTruthClaimFingerprint.js` must remove HTML comments and Markdown link destinations with bounded parsing, retain visible labels, and expose sentence/invariant units with normalized punctuation boundaries so cosmetic wrappers and claim-array regrouping cannot create receipt novelty."
       ]
     }
   ]

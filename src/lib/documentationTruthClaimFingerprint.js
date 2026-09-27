@@ -92,7 +92,7 @@ export function claimInvariantUnits(value) {
       continue;
     }
     const followedByBoundary = index + 1 === text.length || /\s/.test(text[index + 1]);
-    if (!inCodeSpan && (character === ';' || character === '\n' || ('.?!'.includes(character) && followedByBoundary))) {
+    if (!inCodeSpan && (character === '\n' || ('.?!,;:'.includes(character) && followedByBoundary))) {
       const unit = text.slice(start, index + 1).trim();
       if (unit) units.push(unit);
       start = index + 1;

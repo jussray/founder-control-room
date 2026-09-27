@@ -99,4 +99,11 @@ describe('documentation truth claim fingerprints', () => {
     expect(merged).toEqual(split);
     expect(claimInvariantUnits('`! ready` must hold. Next invariant must remain current.')).toHaveLength(2);
   });
+
+  it('treats sentence-boundary punctuation changes as the same unit sequence', () => {
+    expect(normalizedClaimUnits('`path/a.ts` must remain current. `path/b.ts` must fail closed.'))
+      .toEqual(normalizedClaimUnits('`path/a.ts` must remain current, `path/b.ts` must fail closed.'));
+    expect(normalizedClaimUnits('`path/a.ts` must remain current; `path/b.ts` must fail closed.'))
+      .toEqual(normalizedClaimUnits('`path/a.ts` must remain current: `path/b.ts` must fail closed.'));
+  });
 });
