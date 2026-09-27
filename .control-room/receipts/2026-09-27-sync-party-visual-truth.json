@@ -5,7 +5,8 @@
   "subject": {
     "project": "jussray/sync-party-game",
     "surface": "https://sync-party-game.mcgill-raylene.workers.dev",
-    "source_sha": "7920be25c2371051d4cf4efe66a5a24a80c749a8"
+    "source_sha": "7920be25c2371051d4cf4efe66a5a24a80c749a8",
+    "current_production_successor_sha": "416bdf9f81962d052bc5cac3950b6696e6251c26"
   },
   "goal": "Restore the live SYNC game to the founder-approved showcase visual direction while preserving multiplayer and growth authority.",
   "statuses": {
@@ -14,6 +15,9 @@
     "DEPLOYED": "VERIFIED",
     "RUNTIME_VERIFIED": "VERIFIED",
     "VISUAL_VERIFIED": "VERIFIED",
+    "INDEPENDENT_LANDING_VISUAL": "VERIFIED",
+    "INDEPENDENT_LOBBY_VISUAL": "VERIFIED",
+    "INDEPENDENT_IN_GAME_VISUAL": "UNKNOWN",
     "OUTCOME_VERIFIED": "UNKNOWN"
   },
   "witnesses": [
@@ -46,7 +50,7 @@
       "class": "independent_challenger",
       "state": "PARTIAL_VERIFIED",
       "witness": "Muse",
-      "evidence": ".control-room/receipts/2026-09-27-sync-party-muse-independent-verification.json@7b768291320d908e92d4c5d56bc33b57b4ee9ddb",
+      "evidence": ".control-room/receipts/2026-09-27-sync-party-muse-independent-verification.json@192a12f761e7f76509acebd43b9063a8012450cd",
       "verified_scope": [
         "tagged Workers destination returned HTTP 200",
         "landing visual direction",
@@ -62,7 +66,13 @@
         "game-over surface",
         "chatgpt.site runtime equivalence"
       ],
-      "annotation": "In-game surface visual truth remains single-witness on the original exact-SHA Playwright receipt; Muse reproduction reached lobby only."
+      "annotation": "In-game surface visual truth remains single-witness for independent visual reproduction; Muse reached lobby only."
+    },
+    {
+      "class": "production_successor",
+      "state": "VERIFIED",
+      "evidence": "github:jussray/sync-party-game@416bdf9f81962d052bc5cac3950b6696e6251c26; github-actions:core-proof:36345129049; github-actions:deploy:36345212190",
+      "scope": "Current production successor is nine commits ahead of the original visual case; exact-SHA public multiplayer proof passed separately from Muse."
     }
   ],
   "visual_canon": {
@@ -80,8 +90,17 @@
       "feature strip for player count, no account, cross-device and room code",
       "shared neon visual language across gameplay controls and result surfaces"
     ],
-    "claim_scope": "visual-system alignment on the exact promoted Workers destination; not pixel identity with marketing collage references",
-    "independent_reproduction_scope": "Muse independently reproduced landing, host setup and lobby only. The deeper in-game visual surfaces retain the original browser-visual witness as their sole current witness."
+    "claim_scope": "visual-system alignment on the promoted Workers destination; not pixel identity with marketing collage references",
+    "independent_reproduction_scope": "Muse independently reproduced landing, host setup and lobby only. Deeper in-game visual surfaces have exact-head Playwright authority but no second independent visual witness yet."
+  },
+  "successor_state": {
+    "sha": "416bdf9f81962d052bc5cac3950b6696e6251c26",
+    "relation_to_original_case": "9 commits ahead",
+    "production_branch": "VERIFIED",
+    "core_proof": "VERIFIED",
+    "public_exact_sha_suite": "VERIFIED",
+    "independent_muse_sha_binding": "UNRESOLVED",
+    "note": "Successor includes runtime/product and proof-system changes beyond the original 7920be25 visual case. Court keeps the original case and current successor as distinct states."
   },
   "supersedes": {
     "visual_fail_state": "workers runtime before showcase-aligned successor",
@@ -91,7 +110,8 @@
   "promotion_gate": {
     "visual_hold": false,
     "functional_hold": false,
-    "destination_identity": "VERIFIED_BY_ORIGINAL_CI_RUNTIME_WITNESS",
+    "destination_identity": "VERIFIED_BY_CI_RUNTIME_WITNESS",
+    "current_successor_exact_sha_proof": "VERIFIED",
     "independent_destination_identity": "NOT_VERIFIED_BY_MUSE",
     "campaign_attribution_required": true,
     "threads_campaign_link": "https://sync-party-game.mcgill-raylene.workers.dev/?utm_campaign=sync-launch-threads-01&utm_source=threads&utm_medium=organic-social&utm_content=launch-post-01"
@@ -100,9 +120,17 @@
     "The separate chatgpt.site host remains unproven as runtime-equivalent to the Workers destination.",
     "No player, retention, conversion, referral, or revenue outcome is claimed by this receipt.",
     "Muse did not independently verify exact SHA identity because the inspected runtime exposed no version string and used unhashed asset filenames.",
-    "Muse reached the pre-game lobby only; timer, choices, reveal bars, scores and game-over remain single-witness on the original exact-SHA Playwright proof.",
+    "Muse reached the pre-game lobby only; timer, choices, reveal bars, scores and game-over remain without a second independent visual witness.",
     "Muse observed no page-level render failures, but verbatim console logs were unobtainable on that route and are not promoted to verified console evidence.",
-    "One host-setup screenshot failed disk read; three of four challenger screenshots were visually confirmed and the failure is retained as evidence boundary."
+    "One host-setup screenshot failed disk read; three of four challenger screenshots were visually confirmed and the failure is retained as evidence boundary.",
+    "Current production is a successor to the original 7920be25 case and must not be silently treated as the identical source state."
   ],
+  "court_ruling": {
+    "verdict": "CONCUR",
+    "runtime": "GREEN",
+    "visual": "GREEN",
+    "threads_visual_hold": "LIFTED",
+    "annotation": "Landing and lobby now have independent Muse reproduction. In-game surfaces retain exact-head Playwright authority but remain open for a second independent visual witness."
+  },
   "next_gate": "Collect real campaign/player outcomes; preserve a two-client independent in-game visual reproduction as the open second-witness gate."
 }
