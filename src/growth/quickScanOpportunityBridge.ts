@@ -50,8 +50,11 @@ function revenueStateFor(prospect: QuickScanProspect): RevenueState {
 }
 
 function transitionAudit(prospect: QuickScanProspect, to: QuickScanLifecycleState) {
-  return prospect.audit.find((entry) =>
-    entry.type === 'lifecycle.transition' && entry.message.endsWith(` -> ${to}`));
+  for (let index = prospect.audit.length - 1; index >= 0; index -= 1) {
+    const entry = prospect.audit[index];
+    if (entry?.type === 'lifecycle.transition' && entry.message.endsWith(` -> ${to}`)) return entry;
+  }
+  return undefined;
 }
 
 function opportunityEvidence(prospect: QuickScanProspect): OpportunityEvidence[] {
