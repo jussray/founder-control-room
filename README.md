@@ -377,3 +377,7 @@ The AI Failure Repair workflow stores its bounded evidence under `.repair/`, a h
 ## September 27 StoryEngine peer transition
 
 The current StoryEngine peer refresh is recovery setup only. The successor peer was selected from a fresh independent `main` observation, while its exact predecessor/successor SHAs and comparison remain in the audit/receipt provenance rather than durable current-state prose. FCR federation remains `UNKNOWN` until the exact successor FCR head completes the full runtime, directive, receipt, replay-safety, and Playwright browser witness; pin alignment alone grants no production, merge, deploy, publication, or provider-mutation authority.
+
+## September 27 StoryEngine peer transition, governance refresh
+
+StoryEngine `main` advanced again after the prior federation witness. FCR independently observed the successor as the next evidence subject and keeps StoryEngine production separate because the successor's source and exact-head test-ledger, Node, provider-smoke, and preview checks can be green while its Cloudflare Workers build is still failing. This pin refresh is recovery setup only. FCR federation remains `UNKNOWN` until the exact successor FCR head completes the full live-ref, immutable-checkout, runtime-identity, directive/receipt, replay-safety, and Playwright browser witness. No predecessor green, founder approval, merge authority, deploy authority, publication authority, or provider-mutation authority transfers across this peer transition.
