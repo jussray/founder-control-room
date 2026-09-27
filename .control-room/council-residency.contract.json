@@ -33,6 +33,8 @@
       "execution",
       "revenue_and_money_path",
       "deployment_and_runtime",
+      "visual_truth",
+      "witness_provenance",
       "task_accuracy",
       "evidence_receipts",
       "rollback",
@@ -64,16 +66,48 @@
     "providerAvailabilityGrantsAuthority": false
   },
   "evidence": {
-    "statuses": ["VERIFIED", "INFERRED", "UNKNOWN", "BLOCKED"],
+    "statuses": ["VERIFIED", "INFERRED", "UNKNOWN", "BLOCKED", "FAIL"],
+    "witnessClasses": [
+      "repository_source",
+      "ci_receipt",
+      "provider_readback",
+      "runtime_identity",
+      "browser_functional",
+      "browser_visual",
+      "independent_challenger",
+      "human_observation"
+    ],
+    "verifiedClaimsRequireWitnessClass": true,
+    "singleEvidenceChainMustBeLabeled": true,
+    "repeatedUpstreamReceiptDoesNotCreateIndependence": true,
     "preserveMeaningfulDissent": true,
     "requireRuntimeProofForRuntimeClaims": true,
     "requireProviderReceiptForLiveProviderClaims": true,
     "bindFingerprintsAndContinuityReceipts": true
   },
+  "visualTruth": {
+    "functionalAndVisualTruthAreSeparate": true,
+    "runtimeVerifiedDoesNotImplyVisualVerified": true,
+    "sourceDoesNotProveRenderedFidelity": true,
+    "visualProofRequiresCurrentTargetRender": true,
+    "compareAgainstCurrentApprovedCanon": true,
+    "crossDomainVisualProofTransferForbiddenWithoutEquivalenceProof": true,
+    "launchHoldStates": ["FAIL", "UNKNOWN", "BLOCKED"]
+  },
+  "promotionGate": {
+    "requireDestinationIdentity": true,
+    "requireFunctionalRuntimeWhenApplicable": true,
+    "requireVisualCanonWhenPresentationMatters": true,
+    "requireCampaignAttributionWhenMeasurementIsGoal": true,
+    "preserveWitnessLimitations": true,
+    "holdPublicationWhenVisualTruthFails": true
+  },
   "completion": {
     "affectedLiveProjectsRequireEndToEndRuntimeProof": true,
     "doneWordsRequireRuntimeVerificationWhenLiveGoal": true,
+    "userFacingLaunchRequiresVisualVerification": true,
     "earlierStagesDoNotSatisfyLive": true,
-    "requiredLiveProof": ["source_head", "deployment_identity", "runtime_path", "playwright_evidence", "successor_fingerprint"]
+    "requiredLiveProof": ["source_head", "deployment_identity", "runtime_path", "playwright_evidence", "successor_fingerprint"],
+    "layeredCompletion": ["SOURCE_IMPLEMENTED", "MERGED", "DEPLOYED", "RUNTIME_VERIFIED", "VISUAL_VERIFIED", "OUTCOME_VERIFIED"]
   }
 }
