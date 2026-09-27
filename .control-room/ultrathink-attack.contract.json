@@ -1,0 +1,147 @@
+{
+  "schema": "juss/ultrathink-attack-workflow@v2",
+  "version": 2,
+  "status": "SOURCE_IMPLEMENTED_PENDING_EXACT_HEAD_PROOF",
+  "authorityRepository": "jussray/founder-control-room",
+  "canonicalSkill": "skills/ultrathink-devil/SKILL.md",
+  "mirrors": [
+    ".ai/skills/ultrathink-devil/SKILL.md",
+    ".claude/skills/ultrathink/SKILL.md"
+  ],
+  "authorityInvariant": "More intelligence never means more authority.",
+  "truth": {
+    "trueFirst": true,
+    "fingerprintBeforeMaterialMutation": true,
+    "continuityMarkersAuthorizeNothing": true,
+    "staleDoesNotMeanFalse": true,
+    "predecessorGreenDoesNotProveSuccessor": true,
+    "knownBadStateBlocksForwardBuild": true,
+    "repairOrRevertBeforeQueuedWork": true,
+    "successorFingerprintRequiredAfterRepair": true
+  },
+  "workflow": [
+    "true-first-baseline",
+    "ultrathink",
+    "attack-n",
+    "lindy",
+    "red-team-i",
+    "l99-decide",
+    "goalfix",
+    "red-team-ii",
+    "proofmode",
+    "truthmode-confess",
+    "playwright-when-browser-observable",
+    "continuity",
+    "ooda-next-gate"
+  ],
+  "attackN": {
+    "numericLabelIsReasoningPressureBudget": true,
+    "externalTestCountClaimed": false,
+    "deduplicateFailureClasses": true,
+    "largerBudgetNeverWidensAuthority": true,
+    "largerBudgetNeverRequiresLargerPatch": true,
+    "stopOnDecisiveProof": true,
+    "stopOnAuthorityBoundary": true,
+    "stopOnDiminishingReturn": true,
+    "profiles": {
+      "1000": [
+        "claim",
+        "proposed-change"
+      ],
+      "2000": [
+        "proof",
+        "authority",
+        "continuity",
+        "exact-head",
+        "provider",
+        "runtime"
+      ],
+      "3000": [
+        "durable-human-value",
+        "product-value",
+        "economic-value",
+        "opportunity-cost",
+        "dependency-risk",
+        "reversibility",
+        "second-third-order-effects",
+        "falsifier",
+        "stop-condition"
+      ],
+      "6000-plus": [
+        "cross-project-boundary",
+        "provider-identity-scope",
+        "security-privacy",
+        "money-path",
+        "observability",
+        "recovery",
+        "cross-system-second-order-effects"
+      ]
+    }
+  },
+  "supabase": {
+    "triggerDomains": [
+      "database",
+      "auth",
+      "storage",
+      "realtime",
+      "edge-functions",
+      "oauth-provider-access",
+      "project-lifecycle",
+      "migrations",
+      "supabase-backed-runtime"
+    ],
+    "projectIdentityUsesImmutableProjectRef": true,
+    "renameDoesNotCreateNewProjectIdentity": true,
+    "emailIsTimestampedHistoricalProviderEvidence": true,
+    "liveProviderReadbackRequiredForCurrentLifecycleClaimWhenAvailable": true,
+    "resolvePausedDegradedOrInaccessibleBeforeDependentCodeDebugging": true,
+    "organizationMembershipIsNotRuntimeAuthority": true,
+    "oauthApprovalIsNotDatabaseMutationAuthority": true,
+    "userAuthenticationIsNotServiceRoleAuthority": true,
+    "migrationGrantContract": {
+      "enforceForMigrationTimestampAtOrAfter": "20260927000000",
+      "supabaseBehaviorChangeDate": "2026-10-30",
+      "newPublicTableRequiresExplicitDataApiDecision": true,
+      "roles": [
+        "anon",
+        "authenticated",
+        "service_role"
+      ],
+      "allowGrantOrRevokeDecision": true,
+      "rlsIsSeparateControl": true
+    },
+    "ddlProof": {
+      "focusedSchemaReadback": true,
+      "securityAdvisor": true,
+      "performanceAdvisor": true
+    },
+    "traceContinuity": {
+      "captureW3CTraceIdWhenAvailable": true,
+      "traceIdCreatesAuthority": false,
+      "traceIdProvesBusinessOutcome": false
+    },
+    "realtimeEfficiency": {
+      "preferServerSideFilters": true,
+      "selectOnlyNeededColumns": true,
+      "avoidWholeTableClientFilteringWhenBoundedSubscriptionFits": true
+    },
+    "credentialScope": {
+      "leastPrivilege": true,
+      "scopeByOrganizationProjectPermissionWhenSupported": true,
+      "portfolioWideGodCredentialByDefault": false
+    },
+    "projectSeparation": {
+      "fcrIsPortfolioControlEvidencePlane": true,
+      "productDataRemainsProductOwned": true,
+      "crossProjectSharedServiceRoleByDefault": false,
+      "boundedApisEventsEvidencePreferred": true
+    }
+  },
+  "completion": {
+    "sourceImplementedIsNotMerged": true,
+    "mergedIsNotDeployed": true,
+    "deployedIsNotRuntimeVerified": true,
+    "runtimeVerifiedIsNotOutcomeVerified": true,
+    "browserObservableClaimsRequirePlaywright": true
+  }
+}

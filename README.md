@@ -374,6 +374,15 @@ The AI Failure Repair workflow stores its bounded evidence under `.repair/`, a h
 
 `src/founder-os-lab/projectAdapters.ts` binds Chief integration evidence to one audited exact Chief head. Moving that pin is an evidence-authority transition: the same change must refresh this README, `docs/TRUTH_DECAY_AUDIT.md`, and `docs/DOCUMENTATION_TRUTH_RECEIPT.json`, and the successor FCR head must earn its own adapter, pair-contract, CI, and applicable runtime/browser proof. Pin alignment selects the next evidence subject only; it does not prove Chief deployment, served-MCP reachability, production behavior, merge authority, or deploy authority.
 
+### Exact-head adapter and documentation-receipt freshness
+
+Project-adapter freshness is fail-closed on exact repository identity: unchanged contract blobs cannot make an adapter pinned to a predecessor SHA current. A moved source head requires semantic review and a coordinated audited-head/manifest refresh before the adapter can return fresh. Documentation Truth also requires each truth-sensitive path to gain a new or changed path-bound invariant inside the reviewed base-to-head range; a claim inherited unchanged from the base receipt cannot certify a later source change.
+
+Receipt novelty is evaluated at normalized sentence/invariant-unit boundaries rather than whole claim-array entries. Splitting one inherited claim into several entries, merging inherited adjacent units, changing sentence-boundary punctuation, adding HTML comments, changing Markdown link destinations, or wrapping text in formatting cannot manufacture novelty. Link destinations are removed with bounded parsing rather than an ambiguous regular expression; comparison, logical, ordering, and unary operators remain semantic evidence.
+
+
+The audited Se’kret Bip and Chief adapter heads are updated only after live GitHub readback confirms that every required contract blob is byte-identical at the successor head. This binds strict request validation to the same head used by freshness CI without claiming unrelated repository changes, provider deployment, runtime behavior, or merge authority.
+
 ## September 27 StoryEngine peer transition
 
 The current StoryEngine peer refresh is recovery setup only. The successor peer was selected from a fresh independent `main` observation, while its exact predecessor/successor SHAs and comparison remain in the audit/receipt provenance rather than durable current-state prose. FCR federation remains `UNKNOWN` until the exact successor FCR head completes the full runtime, directive, receipt, replay-safety, and Playwright browser witness; pin alignment alone grants no production, merge, deploy, publication, or provider-mutation authority.

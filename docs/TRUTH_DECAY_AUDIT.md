@@ -444,6 +444,17 @@ The Chief SHA in `src/founder-os-lab/projectAdapters.ts` is an audited evidence 
 
 Documentation Truth therefore treats the adapter source path as evidence-authority-sensitive. Every pin transition must update the focused assertion, README boundary, this truth-decay record, and the structured documentation receipt in the same exact-head range before successor CI can certify the documentation contract. None of those source artifacts grants merge, deploy, publication, provider mutation, or founder authority.
 
+## Exact-head adapter and receipt-range repair
+
+The project-adapter freshness assessment previously returned `verified/fresh` after authoritative `main` advanced when the required contract blobs were unchanged. That contradicted the strict request adapter, which rejects a source SHA different from its audited head, and allowed the portfolio freshness workflow to report a false green. The assessment must now classify any exact-head mismatch as stale/review-required until the audited head and contract manifest are intentionally refreshed together.
+
+Documentation Truth also previously evaluated all claims present in the current cumulative receipt. An invariant copied unchanged from the base receipt could therefore satisfy a later truth-sensitive source edit. The verifier must compare the base receipt with the candidate receipt and require a new or changed meaningful path-bound invariant for every truth-sensitive path in the reviewed range. This is source/CI traceability only; it does not prove provider, deployment, runtime, browser, or human outcomes.
+
+Whole claim-array entries are also too coarse for novelty. Splitting an inherited multi-sentence claim into separate entries, merging inherited adjacent units, or replacing one sentence-boundary punctuation mark with another must not create new evidence. The verifier therefore compares normalized sentence/invariant units and adjacent inherited-unit sequences across base and candidate receipts. HTML comments, Markdown link destinations, and formatting wrappers are removed before comparison, while semantic operators remain preserved. Destination removal uses bounded parsing so the truth gate itself does not acquire a denial-of-service-shaped backtracking path.
+
+
+The successor adapter audit refresh binds Se’kret Bip and Chief to their newly observed main heads only because all required contract blob identities remained unchanged under live GitHub readback. That establishes exact-head provenance for the bounded preview contracts; it does not semantically certify unrelated commits or promote source evidence into deployment, runtime, browser, or human-outcome proof.
+
 ## 2026-09-27 StoryEngine peer transition after Sync Avenue
 
 Founder Control Room independently observed StoryEngine `main` at `d0689af02675b2d278654ca37ba727dd8d2b6836`, exactly two commits ahead and zero behind the previously pinned `3eada5660ad16493f5b26b179a5da215a8b01ef2`. The intervening StoryEngine work adds the reality-first Sync Avenue engine with its exact-head Node/Playwright proof and a subsequent static-file path-containment security repair. StoryEngine's `Reality engine + renderer + Playwright` check succeeded on the successor SHA, which is sufficient to select that SHA as the next FCR federation evidence subject.
