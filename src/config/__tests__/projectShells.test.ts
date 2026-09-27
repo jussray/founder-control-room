@@ -33,15 +33,20 @@ describe('project-specific FCR shells', () => {
     }
   });
 
-  it('keeps Chief and PromptOS as individualized capability shells, not rival operating systems', () => {
-    expect(getProjectShell('chief-ai-machine')).toMatchObject({
-      identity: expect.stringContaining('inside FCR'),
-      primaryOutcome: expect.stringContaining('without becoming a separate founder operating system'),
+  it('represents Chief and PromptOS as standalone peers rather than FCR submodules', () => {
+    const chief = getProjectShell('chief-ai-machine');
+    const promptos = getProjectShell('promptos');
+
+    expect(chief).toMatchObject({
+      identity: expect.stringContaining('standalone Chief'),
+      primaryOutcome: expect.stringContaining('both systems remain independently operable'),
     });
-    expect(getProjectShell('promptos')).toMatchObject({
-      identity: expect.stringContaining('inside FCR'),
-      primaryOutcome: expect.stringContaining('without becoming a parallel operating system'),
+    expect(promptos).toMatchObject({
+      identity: expect.stringContaining('standalone PromptOS'),
+      primaryOutcome: expect.stringContaining('both systems remain independently operable'),
     });
+    expect(chief?.identity).not.toContain('capability inside FCR');
+    expect(promptos?.identity).not.toContain('capability inside FCR');
   });
 
   it('preserves Se’kret Bip as a distinct customer-product boundary', () => {
@@ -51,10 +56,10 @@ describe('project-specific FCR shells', () => {
     });
   });
 
-  it('treats Founder Control Room as its own first-party commerce business', () => {
+  it('treats Founder Control Room as a full standalone operating/build environment and first-party business', () => {
     expect(getProjectShell('founder-control-room')).toMatchObject({
-      identity: expect.stringContaining('first-party commerce business'),
-      primaryOutcome: expect.stringContaining('first-party revenue'),
+      identity: expect.stringContaining('standalone founder operating and build intelligence'),
+      primaryOutcome: expect.stringContaining('with or without external AI providers'),
       projectSpecificViews: expect.arrayContaining([
         'catalog',
         'storefront-runtime',
