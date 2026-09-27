@@ -2,22 +2,34 @@
 
 Status: active control-room documentation.
 
-The Council is a multi-model reasoning and review layer. It is not a substitute for founder authority, repository/provider truth, security policy, or runtime proof.
+The Council is a multi-model reasoning and review layer carried through a neutral shared protocol/ledger. It is not a substitute for founder authority, repository/provider truth, security policy, runtime proof, or the standalone intelligence of any core system.
 
-## Resident Council invariant
+## Neutral shared Council invariant
 
-The Council is resident in two places at once:
+The Council connects four first-class standalone core systems:
 
-1. **Founder assistant host**: ChatGPT or a successor founder-facing host carries standing Council selection, challenge, reconciliation, continuity, and evidence discipline for founder work.
-2. **This project Control Room**: this repository carries the project-local Council contract and machine-readable residency contract at `.control-room/council-residency.contract.json`.
+- **Founder Control Room** — standalone founder operating/build intelligence.
+- **Chief AI** — standalone executive synthesis/reasoning intelligence.
+- **Sol** — standalone challenge/evaluation/continuity intelligence.
+- **PromptOS** — standalone prompt/workflow/compiler/routing intelligence.
 
-These are two residences of the same logical Founder Council, not one centralized executor. Project agents must read the residency contract with this file before material Council work.
+No one of these systems owns the shared Council layer, and none depends on the Council layer or an external provider for its core function. Each repository owns only its project-local Council adapter, evidence bindings, receipts, routing constraints, and authority membrane at `.control-room`.
+
+FCR is not a dashboard, shell, host, or mere workflow registry. It can accept founder intent, reason, plan, inspect projects, build, repair, verify, operate, preserve continuity, and advance the portfolio without requiring ChatGPT, Claude, Muse, DeepSeek, Perplexity, or another external AI product to remain available. FCR may expose a first-class Council surface and invoke external AI seats from that surface without becoming the owner of the neutral shared layer.
+
+Chief, Sol, and PromptOS remain independently useful standalone peers with their own interfaces, intelligence, architecture, and jobs. Shared work must not collapse them into FCR submodules or make one core peer a hidden dependency of another.
+
+ChatGPT, Claude, Muse, DeepSeek, Perplexity, Gemini, local models, and future providers participate as replaceable Council seats when actually available and authorized. Provider loss must not erase plans, architecture, decisions, prompts, receipts, fingerprints, state, evidence, or the operating capability of FCR, Chief, Sol, or PromptOS.
+
+The physical backing for the neutral shared Council protocol/ledger is intentionally undecided until separately authorized. Do not silently make GitHub, FCR, Google Drive, Google Docs, Google Sheets, Supabase, Slack, or an external model the owner merely because it is convenient.
+
+Project agents must read `.control-room/council-residency.contract.json` with this file before material Council work.
 
 Default invocation is automatic when Council participation is materially useful. Route the smallest useful task-specific set of seats rather than waking every provider by default. Product-user workflows may invoke the Council behind the scenes only when project policy allows it; users receive the governed product outcome, not raw Council deliberation, founder controls, provider credentials, or cross-project private data.
 
 A named Council seat counts as **live** only when an actual connector/API/runtime call is verified by provider evidence. Simulated role analysis must never be labeled as a live provider response.
 
-All execution remains inside the owning Control Room's local authority membrane. Cross-project Council reasoning may coordinate evidence and recommendations, but cross-project mutation must be handed to the Control Room that owns the affected system.
+All execution remains inside the owning repository/system's local authority membrane. Cross-project Council reasoning may coordinate evidence and recommendations, but cross-project mutation must be handed to the repository/system that owns the affected state. The neutral shared Council layer grants no execution authority of its own.
 
 ## Authority order
 
@@ -29,15 +41,27 @@ All execution remains inside the owning Control Room's local authority membrane.
 
 No number of model votes can promote item 4 above items 1-3.
 
-## Council members
+## Council members and core peers
 
 ### Founder
 
 The founder is the final human authority for separately gated actions. Silence is not approval. Approval does not automatically carry across changed scope, branch/head movement, changed provider state, or a different mutation class.
 
+### Founder Control Room
+
+FCR is the standalone founder operating/build intelligence. It may plan, inspect, build, repair, verify, operate, preserve continuity, and advance the portfolio on its own. Its first-class Council view is an interface to the neutral shared layer, not ownership of that layer.
+
 ### Chief AI
 
-Owns orchestration, decomposition, synthesis, and goal-state framing. Chief may recommend, route, compare, and summarize. It may not self-authorize execution.
+Chief is standalone executive synthesis/reasoning intelligence for orchestration, decomposition, synthesis, routing, decision quality, and goal-state framing. Chief may recommend, route, compare, and summarize. It may not self-authorize execution.
+
+### Sol
+
+Sol is standalone challenge/evaluation/continuity intelligence for adversarial review, state recovery, drift detection, fingerprints, evidence lineage, and continuity.
+
+### PromptOS
+
+PromptOS is standalone prompt/workflow/compiler/routing intelligence for protocol compilation, routing, evaluation, promotion, lineage, and reusable workflow intelligence.
 
 ### Codex / ChatGPT
 
@@ -120,18 +144,7 @@ The canonical ordered workflow is:
 
 `DISCOVER -> SCORE -> PACKAGE -> SCRIPT -> LEEVIZE -> PROOF CHECK -> PUBLISH PACKAGE -> REPURPOSE -> MEASURE -> LEARN`
 
-Every content run should start from one canonical content packet containing:
-
-- objective
-- audience
-- source material
-- product or project
-- evidence
-- brand canon
-- platform
-- monetization path
-- constraints
-- success metric
+Every content run should start from one canonical content packet containing objective, audience, source material, product or project, evidence, brand canon, platform, monetization path, constraints, and success metric.
 
 Packaging comes before scripting. Title, thumbnail, opening frame, viewer question, and expected payoff must make the same promise. Curiosity and SEO are hypotheses, not proof of ranking or virality.
 
@@ -139,47 +152,23 @@ For media work, `/LEEVIZE` remains the non-bypassable truth/policy kernel. Shot 
 
 Keep `WORLD FOOTAGE` separate from `PROOF FOOTAGE`. Generated atmosphere, cinematic reconstruction, or illustration may support the story but may not masquerade as product, runtime, user, traction, or business evidence.
 
-Repurposed outputs must derive from the same canonical content fingerprint so the claim, evidence, canon, and CTA cannot drift silently between YouTube, Shorts, TikTok, Reels, LinkedIn, Facebook, newsletters, blogs, or other surfaces.
+Repurposed outputs must derive from the same canonical content fingerprint so the claim, evidence, canon, and CTA cannot drift silently between surfaces.
 
-Measurement is observation-only. Platform metrics, clicks, signups, or revenue can inform the next content bet, but they do not retroactively authorize publication, scheduling, spend, or scaling. Publication still requires the existing proof-led publishing capability plus the normal current approval/provider receipt/readback gates.
+Measurement is observation-only. Platform metrics, clicks, signups, or revenue can inform the next content bet, but they do not retroactively authorize publication, scheduling, spend, or scaling.
 
 ## Capability market
 
 Council routing should use `src/lib/modelCapabilityMarket.ts` and `docs/MODEL_CAPABILITY_MARKET.md` when choosing among eligible operators for a task.
 
-The capability market is empirical and task-specific. It must:
+The capability market is empirical and task-specific. External benchmarks and provider launch claims are bounded priors, not runtime proof. Promote an operator only from fresh local evidence for the same task class, penalize false-green behavior, expire stale evidence, score cost and duration with correctness/proof, prefer independent provider-family challenge when useful, and keep new/upgraded models in shadow-trial status until local receipts satisfy the sample gate.
 
-- treat external benchmarks and provider launch claims as bounded priors, never runtime or outcome proof;
-- promote an operator to primary routing only from fresh local evidence for the same task class;
-- penalize false-green behavior instead of rewarding confident completion claims;
-- block primary routing when fresh evidence contains an authority-boundary violation;
-- expire stale evidence instead of allowing old wins to self-renew;
-- score cost and duration alongside correctness and proof quality;
-- prefer an independent challenger from a different provider family when available;
-- place new or newly upgraded models in shadow-trial status until local receipts satisfy the sample gate.
-
-Capability-market selection is advisory only. A route carries no merge, deploy, provider, publication, spending, or founder authority. Existing action-specific authority gates remain mandatory.
+Capability-market selection is advisory only. A route carries no merge, deploy, provider, publication, spending, or founder authority.
 
 ## Council round protocol
 
-Every material Council round should bind itself to:
+Every material Council round should bind itself to founder goal, authoritative repository/project, branch and exact current head when repository state matters, provider surfaces involved, truth age, authority ceiling, and stop condition.
 
-- founder goal
-- authoritative repository/project
-- branch and exact current head when repository state matters
-- provider surfaces involved
-- truth age / observation time
-- authority ceiling
-- stop condition
-
-Each participating member should distinguish:
-
-- `VERIFIED`
-- `INFERRED`
-- `UNKNOWN`
-- `BLOCKED`
-
-Preserve meaningful dissent. Do not flatten disagreement into fake consensus.
+Each participating member distinguishes `VERIFIED`, `INFERRED`, `UNKNOWN`, and `BLOCKED`. Preserve meaningful dissent. Do not flatten disagreement into fake consensus.
 
 ## Mutation discipline
 
@@ -202,19 +191,9 @@ Repository write, merge, deploy, migration, DNS/provider mutation, secret change
 
 ## GitHub + Supabase + Cloudflare triangulation
 
-When all three are relevant, the Council should not ask only whether code is correct. It should triangulate:
+When all three are relevant, triangulate `GitHub source/CI -> Supabase schema/auth/data boundary -> Cloudflare deployment/runtime -> user-visible outcome`.
 
-`GitHub source/CI -> Supabase schema/auth/data boundary -> Cloudflare deployment/runtime -> user-visible outcome`
-
-A green result at one layer cannot certify the next layer.
-
-Examples:
-
-- merged code is not deployment proof
-- deployed Worker/Pages is not database/RLS proof
-- successful migration is not UI proof
-- provider 2xx is not user-outcome proof
-- model agreement is not provider readback
+A green result at one layer cannot certify the next layer. Merged code is not deployment proof, a deployed Worker/Pages surface is not database/RLS proof, a successful migration is not UI proof, provider 2xx is not user-outcome proof, and model agreement is not provider readback.
 
 ## Council output
 
