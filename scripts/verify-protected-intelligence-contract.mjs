@@ -1,6 +1,7 @@
 import {readFile} from 'node:fs/promises';
 
 const EXPECTED_PROJECT = 'jussray/founder-control-room';
+const EXPECTED_ROLE = 'founder_operating_build_intelligence';
 const REQUIRED_SUBJECTS = [
   'portfolio_truth',
   'workflow_authority',
@@ -36,11 +37,18 @@ const REQUIRED_COMPLETION_LAYERS = [
   'VISUAL_VERIFIED',
   'OUTCOME_VERIFIED',
 ];
+const REQUIRED_CORE_SYSTEMS = new Map([
+  ['jussray/founder-control-room', 'founder_operating_build_intelligence'],
+  ['jussray/chief-ai-machine', 'executive_synthesis_reasoning_intelligence'],
+  ['jussray/solcontinuity', 'challenge_evaluation_continuity_intelligence'],
+  ['jussray/promptos', 'prompt_workflow_compiler_routing_intelligence'],
+]);
 
 const contract = JSON.parse(await readFile('.control-room/council-residency.contract.json', 'utf8'));
 const court = await readFile('.control-room/COURT.md', 'utf8');
 const errors = [];
 const requireTrue = (label, value) => { if (value !== true) errors.push(`${label}: expected true`); };
+const requireFalse = (label, value) => { if (value !== false) errors.push(`${label}: expected false`); };
 const requireIncludes = (label, values, expected) => {
   if (!Array.isArray(values) || !values.includes(expected)) errors.push(`${label}: missing ${expected}`);
 };
@@ -48,8 +56,46 @@ const requireCourtPhrase = (phrase) => {
   if (!court.includes(phrase)) errors.push(`Court contract missing phrase: ${phrase}`);
 };
 
-if (contract.contract !== 'juss/founder-council-residency@v1') errors.push('wrong Council residency contract id');
+if (contract.contract !== 'juss/founder-council-federation@v2') errors.push('wrong Council federation contract id');
 if (contract.project !== EXPECTED_PROJECT) errors.push(`wrong project: expected ${EXPECTED_PROJECT}`);
+if (contract.projectRole !== EXPECTED_ROLE) errors.push(`wrong project role: expected ${EXPECTED_ROLE}`);
+
+const shared = contract.topology?.sharedCouncilLayer;
+requireTrue('shared Council layer is neutral', shared?.neutral);
+requireFalse('shared Council layer is not owned by a core system', shared?.ownedByCoreSystem);
+requireFalse('shared Council layer is not owned by an external provider', shared?.ownedByExternalProvider);
+requireTrue('shared Council survives provider replacement', shared?.mustRemainAvailableAcrossExternalProviderReplacement);
+requireTrue('shared Council is not required for peer core operation', shared?.mustNotBecomeCoreDependencyForPeerOperation);
+if (shared?.physicalBacking !== 'UNDECIDED_UNTIL_SEPARATELY_AUTHORIZED') errors.push('shared Council physical backing was pre-selected without a separate authority gate');
+
+const coreSystems = Array.isArray(contract.topology?.coreSystems) ? contract.topology.coreSystems : [];
+for (const [repository, role] of REQUIRED_CORE_SYSTEMS) {
+  const peer = coreSystems.find((entry) => entry?.repository === repository);
+  if (!peer) {
+    errors.push(`missing core peer: ${repository}`);
+    continue;
+  }
+  requireTrue(`${repository} standalone`, peer.standalone);
+  requireTrue(`${repository} peer`, peer.peer);
+  requireTrue(`${repository} core function survives Council unavailability`, peer.coreFunctionSurvivesCouncilUnavailable);
+  if (peer.role !== role) errors.push(`${repository}: wrong core role ${String(peer.role)}`);
+}
+
+const fcr = coreSystems.find((entry) => entry?.repository === EXPECTED_PROJECT);
+if (!String(fcr?.description ?? '').includes('planning, inspecting, building, repairing, verifying, operating, and advancing the portfolio')) {
+  errors.push('FCR standalone founder operating/build capability drifted');
+}
+
+const external = contract.topology?.externalProviderSeats;
+requireTrue('external providers remain replaceable Council seats', external?.replaceable);
+requireFalse('external providers are not a core dependency', external?.coreDependency);
+requireTrue('external providers may be invoked from FCR', external?.mayBeInvokedFromFCR);
+requireTrue('provider loss cannot erase portfolio state', external?.providerLossMustNotErasePortfolioState);
+requireTrue('local project adapter is required', contract.topology?.localProjectAdapter?.required);
+if (contract.topology?.localProjectAdapter?.path !== '.control-room') errors.push('local project adapter path drifted');
+requireFalse('shared Council does not centralize execution authority', contract.topology?.centralizedExecutionAuthority);
+requireFalse('shared Council layer grants no execution authority', contract.authority?.sharedCouncilLayerGrantsExecutionAuthority);
+
 requireTrue('same Court/Council kernel', contract.jurisdiction?.sameCourtCouncilKernel);
 requireTrue('repo/product/production scope', contract.jurisdiction?.repoProductProductionScoped);
 for (const subject of REQUIRED_SUBJECTS) requireIncludes('FCR subject', contract.jurisdiction?.subjects, subject);
@@ -104,7 +150,9 @@ if (errors.length) {
 console.log(JSON.stringify({
   contract: contract.contract,
   project: contract.project,
+  projectRole: contract.projectRole,
   status: 'passed',
+  topology: 'neutral-shared-council-with-standalone-core-peers',
   subjects: REQUIRED_SUBJECTS,
   witnesses: REQUIRED_WITNESS_CLASSES,
   liveCompletion: REQUIRED_LIVE_PROOF,
