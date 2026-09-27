@@ -9,6 +9,7 @@ on:
       - security/*-edge-entry.*
       - test/reciprocal-defense.test.mjs
       - test/reciprocal-ingress.test.mjs
+      - wrangler.worker.toml
       - .github/workflows/reciprocal-defense.yml
   workflow_dispatch:
 permissions:
@@ -24,3 +25,8 @@ jobs:
           node-version: "22"
       - name: Verify reciprocal defense and ingress invariants
         run: node --test test/reciprocal-defense.test.mjs test/reciprocal-ingress.test.mjs
+      - name: Verify FCR edge wiring
+        run: |
+          grep -q '^main = "security/fcr-edge-entry.ts"' wrangler.worker.toml
+          grep -q '"RECIPROCAL_DEFENSE_SECRET"' wrangler.worker.toml
+          grep -q "export \* from '../src/worker/cf-entry.js'" security/fcr-edge-entry.ts
