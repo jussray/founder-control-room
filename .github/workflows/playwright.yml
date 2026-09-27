@@ -116,13 +116,17 @@ jobs:
           path: .federation/storyengine
           persist-credentials: false
 
-      - name: Verify immutable StoryEngine federation peer
+      - name: Re-observe StoryEngine ref and verify immutable federation peer
         shell: bash
         run: |
           set -euo pipefail
           actual="$(git -C .federation/storyengine rev-parse HEAD)"
-          printf 'storyengine_expected=%s\nstoryengine_actual=%s\n' "$STORYENGINE_PEER_SHA" "$actual"
+          live_after_checkout="$(git ls-remote https://github.com/jussray/StoryEngine.git "$STORYENGINE_PEER_REF" | awk 'NR==1 {print $1}')"
+          printf 'storyengine_expected=%s\nstoryengine_actual=%s\nstoryengine_live_after_checkout=%s\n' "$STORYENGINE_PEER_SHA" "$actual" "$live_after_checkout"
+          test -n "$live_after_checkout"
           test "$actual" = "$STORYENGINE_PEER_SHA"
+          test "$live_after_checkout" = "$STORYENGINE_PEER_SHA"
+          test "$live_after_checkout" = "$actual"
 
       - name: Install StoryEngine federation peer
         run: npm ci --prefix .federation/storyengine/story-engine
