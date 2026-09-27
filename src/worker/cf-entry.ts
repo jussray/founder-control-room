@@ -17,6 +17,7 @@ import express from 'express';
 import { createServer as createNodeHttpServer } from 'node:http';
 import type { ExportedHandler } from '@cloudflare/workers-types';
 import { mountFcrCommerceIngress } from '../http/fcrCommerceIngress.js';
+import { enforceActiveDefense } from '../security/activeDefense.js';
 import {
   BIP_PROOF_INGRESS_PATH,
   handleBipControlRoomProofIngress,
@@ -69,6 +70,12 @@ if (!composedFetch) throw new Error('Cloudflare HTTP handler is missing fetch');
 
 const worker: ExportedHandler<ControlRoomWorkerEnv> = {
   async fetch(request, workerEnv, ctx) {
+    const activeDefense = enforceActiveDefense(request, {
+      ACTIVE_DEFENSE_MODE: 'contain',
+      FOUNDER_SESSION_ENCRYPTION_KEY: workerEnv.FOUNDER_SESSION_ENCRYPTION_KEY,
+    });
+    if (activeDefense) return activeDefense;
+
     const url = new URL(request.url);
     if (url.pathname === BIP_PROOF_INGRESS_PATH) {
       return handleBipControlRoomProofIngress(request, workerEnv);
