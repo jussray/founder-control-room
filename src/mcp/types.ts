@@ -28,10 +28,18 @@ export interface McpServerDefinition {
   federatedProof?: McpFederatedProofPolicy;
 }
 
+export interface McpToolAnnotations {
+  readOnlyHint?: boolean;
+  destructiveHint?: boolean;
+  idempotentHint?: boolean;
+  openWorldHint?: boolean;
+}
+
 export interface McpToolDefinition {
   name: string;
   description?: string;
   inputSchema?: Record<string, unknown>;
+  annotations?: McpToolAnnotations;
 }
 
 export interface McpCapabilitySnapshot {
