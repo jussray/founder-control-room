@@ -91,6 +91,31 @@ describe('capability workbench registry', () => {
     expect(browser?.implementation).toContain('costClass=LOCAL_NO_PROVIDER_FEE');
   });
 
+  it('routes commodity assistant-workspace jobs through existing FCR lanes without granting authority', () => {
+    const lane = capabilities.find((capability) => capability.id === 'assistant-workspace-lane-v1');
+
+    expect(lane).toBeDefined();
+    expect(lane?.kind).toBe('Contract');
+    expect(lane?.category).toBe('integrations');
+    expect(lane?.runtime).toBeUndefined();
+    expect(lane?.purpose).toContain('FCR does not re-implement the assistant');
+    expect(lane?.risk).toContain('grants no execution, merge, deploy, publish, provider, credential, or billing authority');
+    expect(lane?.risk).toContain('If /mcp is not deployed');
+    expect(lane?.proof).toContain('Prototype and UI claims require Playwright evidence before completion');
+    expect(lane?.proof).toContain('Data analysis remains observation-only and never renews truth or authorizes publication');
+
+    for (const job of ['automate', 'edit_documents', 'build_prototype', 'research', 'analyze_data', 'integrate_apps']) {
+      expect(lane?.implementation).toContain(`${job}:`);
+    }
+    // Every job names an existing lane; none of them names a new service or credential.
+    expect(lane?.implementation).toContain('shared-capability-runtime-v1');
+    expect(lane?.implementation).toContain('local-playwright-browser-v1');
+    expect(lane?.implementation).toContain('FOUNDER_MERGE_AUTHORITY');
+    expect(lane?.implementation).toContain('Nothing here is new runtime');
+    // No job may claim the strongest truth state statically; that is only earned by live readback.
+    expect(lane?.implementation).not.toContain("truthState: 'provider-outcome-proven'");
+  });
+
   it('keeps external application submission inside the shared evidence and authority spine', () => {
     const submission = capabilities.find((capability) => capability.id === 'external-application-submission-v1');
 

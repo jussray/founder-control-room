@@ -187,6 +187,33 @@ export const capabilities = [
     implementation: `${summary}\nContext: [BUSINESS] [AUDIENCE] [GOAL]\nConstraints: use specific evidence, avoid generic advice, protect private implementation.\nOutput: review-ready draft plus assumptions and one next action.`,
   })),
   {
+    id: 'assistant-workspace-lane-v1', kind: 'Contract', category: 'integrations', score: 94,
+    summary: 'Route the standard AI-workspace jobs (automate, edit documents, build prototypes, research, analyze data, integrate apps) through FCR instead of rebuilding them.',
+    purpose: 'Let a connected assistant (Claude, ChatGPT, or another MCP client) perform the commodity workspace jobs while FCR keeps intent, authority, evidence, and outcome truth for the founder quartet. FCR does not re-implement the assistant; it governs the lane.',
+    inputs: [
+      ['job', 'enum', 'automate | edit_documents | build_prototype | research | analyze_data | integrate_apps'],
+      ['projectSlug', 'string', 'Registered active FCR project slug (Chief AI, SolContinuity, and PromptOS reach this lane through the portfolio bridge)'],
+      ['assistant', 'string', 'Connected MCP client identity observed at /mcp, never self-declared'],
+      ['consequence', 'enum', 'READ | REVERSIBLE_WRITE | CONSEQUENTIAL_WRITE'],
+    ],
+    environment: [
+      'Paired remote MCP lane at /mcp with token-bound project scope',
+      'Portfolio registry at /mcp/registry/v0.1/servers for discovery',
+      'Repository-pinned Playwright for prototype and UI proof',
+      'No new provider credentials; existing connector, vault, and Zapier/n8n boundaries apply',
+    ],
+    proof: [
+      'Each job maps to one existing FCR lane and one truth state (contract-capable, configured, adapter-proven, provider-outcome-proven)',
+      'The assistant performs the job; FCR records intent, approval binding, execution receipt, and outcome separately',
+      'Document, slide, and spreadsheet edits stay assistant-side artifacts until an evidence receipt references them',
+      'Prototype and UI claims require Playwright evidence before completion',
+      'Research output is advisory until fact-checked line by line',
+      'Data analysis remains observation-only and never renews truth or authorizes publication',
+    ],
+    risk: 'This lane grants no execution, merge, deploy, publish, provider, credential, or billing authority. Assistant capability is a hint, not permission. If /mcp is not deployed, every job here is contract-capable only and must not be described as live.',
+    implementation: `type WorkspaceJob = 'automate' | 'edit_documents' | 'build_prototype' | 'research' | 'analyze_data' | 'integrate_apps';\n\n// Which existing FCR lane carries each commodity job. Nothing here is new runtime.\nconst WORKSPACE_LANES: Record<WorkspaceJob, { lane: string; truthState: 'contract-capable' | 'configured' | 'adapter-proven' | 'provider-outcome-proven' }> = {\n  automate:        { lane: 'shared-capability-runtime-v1 + controller_outbox runs (POST /capabilities/:id/runs)', truthState: 'adapter-proven' },\n  edit_documents:  { lane: 'assistant-side artifact + evidence receipt reference', truthState: 'contract-capable' },\n  build_prototype: { lane: 'assistant build + local-playwright-browser-v1 proof + FOUNDER_MERGE_AUTHORITY gate', truthState: 'adapter-proven' },\n  research:        { lane: 'tinyfish read-only observation + fact-check-every-claim', truthState: 'adapter-proven' },\n  analyze_data:    { lane: 'observation-only analytics (safe counts, rates, state transitions)', truthState: 'configured' },\n  integrate_apps:  { lane: '/mcp paired lane + portfolio registry + Connection Vault + bounded Zapier/n8n adapters', truthState: 'configured' },\n};\n\n// Truth state is re-observed at use time; a static map proves routing, not liveness.`,
+  },
+  {
     id: 'conversation-command-contracts-v1', kind: 'Contract', category: 'contracts', score: 78,
     summary: 'Typed intent contracts for compact, btw, loop, goal, resume, plan, and effort.',
     purpose: 'Keep commands explicit so monitoring, context, and execution authority cannot blur together.',
