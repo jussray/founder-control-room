@@ -113,7 +113,7 @@ export const PORTFOLIO_GOVERNANCE_PROFILES: readonly PortfolioGovernanceProfile[
     actionRiskFloors: { production_claim: 'observe', account_authority_change: 'consequential' },
   },
   {
-    id: 'sekret-bip-jr', repositories: ['jussray/Bip-Jr'], implementationState: 'bounded',
+    id: 'sekret-bip-jr', repositories: ['jussray/Bip-Jr', 'jussray/Se-kretBip'], implementationState: 'bounded',
     humanAuthority: 'adult authority with child input inside age-banded scope', objectiveTruthSources: ['provider_evidence', 'system_observation'], minimumRecoveryLevel: 'R2',
     hardConstraints: ['adult setup and server-enforced authority remain mandatory', 'child input cannot expand adult-granted permissions', 'public social feed, peer search, followers, DMs, peer voice/video, and child-created groups remain prohibited', 'continuity-only identity does not carry FCR mutation authority'],
     blockedActions: ['enable-public-social', 'enable-child-dm', 'expand-child-permissions-without-adult'], requiredClaims: { authority_change: ['adult_authority_verified', 'server_authority_verified'] },
@@ -172,7 +172,7 @@ export const PORTFOLIO_GOVERNANCE_PROFILES: readonly PortfolioGovernanceProfile[
 export function portfolioGovernanceProfile(repository: string): PortfolioGovernanceProfile | null {
   const canonical = canonicalRepository(repository);
   return PORTFOLIO_GOVERNANCE_PROFILES.find((profile) =>
-    profile.repositories.some((candidate) => normalizeRepository(candidate) === canonical)) ?? null;
+    profile.repositories.some((candidate) => canonicalRepository(candidate) === canonical)) ?? null;
 }
 
 export function portfolioHardConstraintViolations(
