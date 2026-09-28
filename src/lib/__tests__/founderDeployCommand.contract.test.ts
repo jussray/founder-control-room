@@ -169,6 +169,7 @@ describe('Founder deploy command authority contract', () => {
       'TINYFISH_API_KEY',
       'FCR_CLOUDFLARE_MCP_READ_TOKEN',
       'OPENAI_API_KEY',
+      'ANTHROPIC_API_KEY',
       'MODEL_API_KEY',
       'FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON',
       'FOUNDER_SIGNAL_ENGINE_MCP_TOKEN',
