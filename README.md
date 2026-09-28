@@ -379,3 +379,7 @@ The AI Failure Repair workflow stores its bounded evidence under `.repair/`, a h
 ## September 27 StoryEngine peer transition
 
 The successor exact-head Playwright witness completed successfully after the independently observed StoryEngine peer refresh. That success makes federation proof current only for the exact FCR/StoryEngine evidence pair bound by the run and recorded in the structured receipt; it does not prove either product's production deployment and grants no merge, deploy, publication, or provider-mutation authority. Any movement of FCR or StoryEngine expires that witness and requires a new exact-head run.
+
+## September 27 StoryEngine peer transition, current recovery
+
+StoryEngine later advanced again after the previously proven pair. Rebinding the FCR Playwright peer selects that independently observed successor as the next evidence subject and immediately makes the predecessor exact-pair browser proof historical. Until the successor FCR exact head completes the live-ref check, immutable peer checkout, runtime identity, directive/receipt loop, and Playwright witness against that exact StoryEngine head, current federation remains `UNKNOWN`. This recovery grants no merge, deploy, production, publication, provider-mutation, credential, or founder authority; exact predecessor/successor SHAs remain in audit and receipt provenance rather than durable current-state prose.
