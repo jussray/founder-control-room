@@ -358,6 +358,8 @@ Muse is a governed Council peer in source. `FCR_RELAY_MUSE_MODEL` is public-safe
 
 The StoryEngine SHA pinned by the Playwright workflow is an exact evidence identity, not a durable alias for current StoryEngine. Any peer-head movement expires predecessor federation proof; a live ref match only selects the next subject and never grants merge, deploy, production, publication, or provider-mutation authority. The successor FCR head must rerun the complete runtime, directive, receipt, and browser witness before the federation path is current.
 
+When the pin is advanced because the live peer ref moved (as on the evening of September 27, 2026), that commit is recovery setup: it restores the ability to observe the current peer and nothing more. Until the exact successor FCR head completes the Playwright federation job against the newly pinned peer, the federation claim for that head is `UNKNOWN`, and predecessor green is history.
+
 ## Repository base-health build gate
 
 `src/providers/SecurityPreservingGitHubProvider.ts` now treats the exact branch head as a build precondition rather than assuming that any current head is safe to extend. It classifies exact-head verification as `VERIFIED_CLEAN`, `KNOWN_BAD`, or `UNVERIFIED` from current verification signals. Forward patching is allowed only from `VERIFIED_CLEAN`.
