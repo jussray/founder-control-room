@@ -1,0 +1,8 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "juss-buffer-control",
+  "version": "0.1.0",
+  "description": "Governed Buffer publishing for Juss/FCR campaigns using Buffer's official MCP transport.",
+  "repository": "https://github.com/jussray/founder-control-room",
+  "keywords": ["buffer", "social-media", "mcp", "founder-control-room"]
+}
