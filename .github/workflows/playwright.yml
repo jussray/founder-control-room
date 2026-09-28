@@ -22,7 +22,7 @@ env:
   PLAYWRIGHT_BROWSERS_PATH: /opt/pw-browsers
   EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
   PR_BASE_SHA: ${{ github.event.pull_request.base.sha || '' }}
-  STORYENGINE_PEER_SHA: e2473a10945b57bb7abedba6d45ea0dbacbd904a
+  STORYENGINE_PEER_SHA: 0a1d3b521967a3643daf56cf2ad60b1392bb6e0c
   STORYENGINE_PEER_REF: refs/heads/main
   STORYENGINE_PEER_URL: http://127.0.0.1:3901
   STORYENGINE_PEER_API_KEY: fcr-ci-product-build
