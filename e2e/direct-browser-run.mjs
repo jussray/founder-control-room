@@ -25,16 +25,8 @@ for (const key of proxyEnvKeys) delete process.env[key];
 process.env.NO_PROXY = '*';
 process.env.no_proxy = '*';
 
-// The real E2E server persists opaque founder sessions through the same
-// encrypted-at-rest path as production. Supply a deterministic test-only key
-// at the harness boundary so every spawned scenario proves that path without
-// adding a production fallback or requiring a repository secret.
 process.env.FOUNDER_SESSION_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString('base64url');
 
-// Keep the public package-script contract stable while proving each long
-// journey against a fresh real server. The application correctly enforces a
-// per-IP general request limit; running all three journeys in one process
-// would test shared limiter exhaustion instead of their independent behavior.
 if (!process.env.FCR_E2E_SCENARIO) {
   const runnerPath = new URL('./direct-browser-run.mjs', import.meta.url).pathname;
   for (const scenario of ['full', 'capability-workbench', 'guarded-terminal']) {
@@ -152,12 +144,6 @@ async function runLegacyBearerCallThroughOpaqueBrowser(url, init) {
     throw new Error('E2E_OPAQUE_BROWSER_BODY_UNSUPPORTED: legacy compatibility calls must use a string body');
   }
 
-  // The stale long-form harness still constructs a few Node-side requests as
-  // `Bearer undefined` after the browser credential cutover. Do not extract
-  // or replay the HttpOnly capability from Node. Execute only that exact stale
-  // request shape inside the already-authenticated Chromium page instead, so
-  // the real same-origin cookie, Origin semantics, and browser transport are
-  // exercised exactly as the product uses them.
   headers.delete('authorization');
   const request = {
     url,
@@ -187,11 +173,6 @@ async function runLegacyBearerCallThroughOpaqueBrowser(url, init) {
   });
 }
 
-// run.mjs still contains a few provider-boundary calls whose historical code
-// asks sessionStorage for an access token. After the opaque-session cutover
-// that value must be absent. Route only that explicit stale test shape through
-// the authenticated Chromium page and fail if a readable bearer token ever
-// reappears. No browser cookie is exposed to Node by this compatibility bridge.
 const originalFetch = globalThis.fetch.bind(globalThis);
 globalThis.fetch = async (input, init = {}) => {
   const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
@@ -212,6 +193,33 @@ globalThis.fetch = async (input, init = {}) => {
   if (browserResponse) return browserResponse;
   return originalFetch(input, init);
 };
+
+const LEGACY_TAB_ROUTES = {
+  projects: { screen: 'Control', view: 'Overview' },
+  missions: { screen: 'Control', view: 'Work' },
+  analytics: { screen: 'Control', view: 'Costs' },
+  terminal: { screen: 'Control', view: 'Execution' },
+  l99: { screen: 'Chief', view: null },
+  promptos: { screen: 'PromptOS', view: null },
+  activity: { screen: 'Proof', view: null },
+};
+
+function legacyTabRoute(selector) {
+  if (typeof selector !== 'string') return null;
+  const match = selector.match(/^\.tabs button\[data-tab=(?:"|')?([a-z0-9-]+)(?:"|')?\]$/i);
+  return match ? LEGACY_TAB_ROUTES[match[1]] ?? null : null;
+}
+
+async function driveFiveScreenNavigation(page, route) {
+  const primary = page.locator('.founder-screen-nav button', { hasText: route.screen });
+  await primary.waitFor({ state: 'visible' });
+  await primary.click();
+  if (route.view) {
+    const secondary = page.locator('.founder-subnav button', { hasText: route.view });
+    await secondary.waitFor({ state: 'visible' });
+    await secondary.click();
+  }
+}
 
 async function withV10PlanAwarePage(page) {
   activeBrowserPage = page;
@@ -241,27 +249,52 @@ async function withV10PlanAwarePage(page) {
       const source = typeof pageFunction === 'function' ? pageFunction.toString() : '';
       const staleBearerRead = source.includes("JSON.parse(sessionStorage.getItem('fcr_session')).access_token");
       if (staleBearerRead && error instanceof Error && /Cannot read properties of null/.test(error.message)) {
-        // Opaque browser sessions intentionally leave no readable fcr_session.
-        // Return undefined only for this exact historical harness read so the
-        // existing fetch bridge can exercise the authenticated HttpOnly-cookie
-        // path. Any real readable token is returned normally and then rejected
-        // by E2E_BROWSER_BEARER_REGRESSION above.
         return undefined;
       }
       throw error;
     }
   };
 
+  const originalWaitForSelector = page.waitForSelector.bind(page);
+  page.waitForSelector = async (selector, options) => {
+    if (selector === '#new-project-form') {
+      // app.js performs an authenticated boot load after the document load event
+      // and re-renders the shell when those reads settle. Wait for that real
+      // startup traffic before driving Control so the proof cannot race a
+      // legitimate boot render back to Home.
+      await page.waitForLoadState('networkidle');
+      const target = page.locator(selector);
+      if (!(await target.isVisible().catch(() => false))) {
+        await driveFiveScreenNavigation(page, LEGACY_TAB_ROUTES.projects);
+      }
+    }
+    return originalWaitForSelector(selector, options);
+  };
+
+  const originalFill = page.fill.bind(page);
+  page.fill = async (selector, value, options) => {
+    if (typeof selector === 'string' && selector.startsWith('#new-project-form')) {
+      const target = page.locator(selector);
+      if (!(await target.isVisible().catch(() => false))) {
+        await driveFiveScreenNavigation(page, LEGACY_TAB_ROUTES.projects);
+      }
+    }
+    return originalFill(selector, value, options);
+  };
+
   const originalClick = page.click.bind(page);
   page.click = async (selector, options) => {
+    const fiveScreenRoute = legacyTabRoute(selector);
+
     if (selector === '.tabs button[data-tab=terminal]' && await page.locator(selector).count() === 0) {
-      // The opaque-session callback lands on the newer root shell. The guarded
-      // terminal remains in the canonical legacy cockpit at /control-room/.
-      // Enter that real surface with the same HttpOnly founder session before
-      // continuing the historical terminal journey. Do not synthesize DOM or
-      // bypass the normal tab click.
       await page.goto(new URL('/control-room/', page.url()).href, { waitUntil: 'domcontentloaded' });
-      await page.waitForSelector(selector);
+    }
+
+    if (fiveScreenRoute) {
+      const primaryNav = page.locator('.founder-screen-nav');
+      await primaryNav.waitFor({ state: 'visible' });
+      await driveFiveScreenNavigation(page, fiveScreenRoute);
+      return;
     }
 
     if (selector === '#create-branch-form button[type=submit]') {

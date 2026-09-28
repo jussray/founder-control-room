@@ -21,6 +21,14 @@ __pycache__/
 playwright-report/
 test-results/
 
+# Generated browser proof receipts. CI may upload/inspect these outputs, but
+# verification must not dirty the candidate checkout or hide tracked evidence.
+logs/plugin-center-ultrathink/
+logs/control-room-composer/
+logs/five-screen-shell/
+logs/founder-local-first/
+artifacts/browser/local-playwright/
+
 # Generated locally by scripts/verify-documentation-truth.mjs; CI uploads it
 # as a workflow artifact instead of committing it. Scoped to this exact file
 # so other artifacts/ content (decision records, provenance) stays tracked.

@@ -114,3 +114,23 @@ textarea.code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; min
 .capabilities-link { color: var(--text); text-decoration: none; border: 1px solid var(--panel-border); border-radius: 8px; padding: 0.45rem 0.75rem; font-size: 0.85rem; }
 .capabilities-link:hover { border-color: #8558ff; color: #cbbcff; }
 .capabilities-link:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+
+@media (max-width: 760px) {
+  .topbar {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    padding: 0.75rem;
+  }
+
+  .topbar > div:last-child {
+    flex: 1 1 100%;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    min-width: 0;
+  }
+
+  .topbar .founder-email {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+}

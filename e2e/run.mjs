@@ -598,22 +598,61 @@ async function main() {
   await page.fill('#log-cost-form input[name="agentName"]', 'perplexity');
   await page.fill('#log-cost-form input[name="costUsd"]', '0.05');
   await page.click('#log-cost-form button[type=submit]');
-  const costText = await waitForText(page, '#mission-detail', 'Total: $');
+  const costText = await waitForText(page, '#mission-detail', 'Total: $', 65000);
   assert(costText.includes('0.0500'), 'cost entry round-tripped and totals correctly');
 
   console.log('\n[8] Register an MCP connector and record a health check');
+  // The full founder journey compresses many legitimate API interactions into
+  // seconds, so this final UI mutation can honestly arrive after the real
+  // 60-requests/minute security budget is exhausted. Do not weaken or bypass
+  // that limiter for proof. If it returns 429, require its bounded Retry-After
+  // receipt, wait for the real bucket to reset, then retry the same browser UI
+  // mutation once against the unchanged application boundary.
+  const fillFigmaConnectionForm = async () => {
+    await page.waitForSelector('#new-connection-form');
+    await page.selectOption('#new-connection-form select[name=connectionType]', 'figma');
+    await page.fill('#new-connection-form input[name=label]', 'design-system');
+    await page.selectOption('#new-connection-form select[name=authorityLevel]', 'L2');
+    await page.fill('#new-connection-form input[name=capabilities]', 'inspect_designs, compare_design_vs_implementation');
+  };
+  const waitForConnectionPost = () => page.waitForResponse((response) => {
+    try {
+      return response.request().method() === 'POST'
+        && new URL(response.url()).pathname === '/projects/demo-project/connections';
+    } catch {
+      return false;
+    }
+  }, { timeout: 15000 });
+
   // The project detail panel is already showing from step 5's selection
   // (state.selectedProjectSlug persists across tabs) — re-clicking the
   // card here would trigger a redundant re-fetch mid-fill and wipe the
   // form the test is actively filling in, a real timing hazard worth not
   // repeating in the app's own click handlers either.
   await page.click('.tabs button[data-tab=projects]');
-  await page.waitForSelector('#new-connection-form');
-  await page.selectOption('#new-connection-form select[name=connectionType]', 'figma');
-  await page.fill('#new-connection-form input[name=label]', 'design-system');
-  await page.selectOption('#new-connection-form select[name=authorityLevel]', 'L2');
-  await page.fill('#new-connection-form input[name=capabilities]', 'inspect_designs, compare_design_vs_implementation');
+  await fillFigmaConnectionForm();
+  let connectionResponsePromise = waitForConnectionPost();
   await page.click('#new-connection-form button[type=submit]');
+  let connectionResponse = await connectionResponsePromise;
+
+  if (connectionResponse.status() === 429) {
+    const retryAfterHeader = await connectionResponse.headerValue('retry-after');
+    const retryAfterSeconds = Number(retryAfterHeader);
+    if (!Number.isFinite(retryAfterSeconds) || retryAfterSeconds <= 0 || retryAfterSeconds > 61) {
+      throw new Error(`General API limiter returned invalid Retry-After: ${String(retryAfterHeader)}`);
+    }
+    assert(true, `real general API limiter failed closed with bounded Retry-After=${retryAfterSeconds}s during accelerated browser proof`);
+    await sleep((retryAfterSeconds * 1000) + 250);
+
+    await fillFigmaConnectionForm();
+    connectionResponsePromise = waitForConnectionPost();
+    await page.click('#new-connection-form button[type=submit]');
+    connectionResponse = await connectionResponsePromise;
+  }
+
+  if (!connectionResponse.ok()) {
+    throw new Error(`figma connection registration failed after real rate-limit handling: HTTP ${connectionResponse.status()}`);
+  }
   await waitForText(page, '[data-connection-id]', 'figma');
   assert(true, 'figma connector registered with authority level L2 and capabilities');
 
