@@ -1,4 +1,10 @@
 import {
+  CONTINUITY_ONLY_PROJECTS,
+  EXTERNAL_PROJECTS,
+  PORTFOLIO_PROJECTS,
+  QUARANTINED_REPOSITORIES,
+} from '../config/portfolio.js';
+import {
   evaluateGovernedAction,
   type ActionRisk,
   type GovernedActionVerdict,
@@ -10,6 +16,7 @@ import {
 } from './portfolioDecisionContext.js';
 
 export type PortfolioImplementationState = 'active' | 'bounded' | 'foundation' | 'not_implemented';
+export type PortfolioRepositoryAuthorityClass = 'active' | 'external' | 'continuity-only' | 'quarantined' | 'unknown';
 
 export interface PortfolioGovernanceProfile {
   id: string;
@@ -27,6 +34,38 @@ export interface PortfolioGovernanceProfile {
 const DAY = 24 * 60 * 60 * 1000;
 const RECOVERY_RANK: Record<RecoveryLevel, number> = { R0: 0, R1: 1, R2: 2, R3: 3, R4: 4 };
 const ACTION_RISK_RANK: Record<ActionRisk, number> = { observe: 0, reversible: 1, consequential: 2, irreversible: 3 };
+
+const LEGACY_REPOSITORY_ALIASES = new Map<string, string>([
+  ['jussray/se-kretbip', 'jussray/bip-jr'],
+]);
+
+function normalizeRepository(repository: string): string {
+  return repository.trim().toLowerCase();
+}
+
+function canonicalRepository(repository: string): string {
+  const normalized = normalizeRepository(repository);
+  return LEGACY_REPOSITORY_ALIASES.get(normalized) ?? normalized;
+}
+
+function repositoryInCollection(
+  repository: string,
+  collection: readonly { repository: string }[],
+): boolean {
+  const normalized = normalizeRepository(repository);
+  return collection.some((project) => normalizeRepository(project.repository) === normalized);
+}
+
+export function portfolioRepositoryAuthorityClass(repository: string): PortfolioRepositoryAuthorityClass {
+  const normalized = normalizeRepository(repository);
+  if ([...QUARANTINED_REPOSITORIES].some((candidate) => normalizeRepository(candidate) === normalized)) {
+    return 'quarantined';
+  }
+  if (repositoryInCollection(repository, PORTFOLIO_PROJECTS)) return 'active';
+  if (repositoryInCollection(repository, EXTERNAL_PROJECTS)) return 'external';
+  if (repositoryInCollection(repository, CONTINUITY_ONLY_PROJECTS)) return 'continuity-only';
+  return 'unknown';
+}
 
 function maxRisk(requested: ActionRisk, floor?: ActionRisk): ActionRisk {
   if (!floor) return requested;
@@ -74,9 +113,9 @@ export const PORTFOLIO_GOVERNANCE_PROFILES: readonly PortfolioGovernanceProfile[
     actionRiskFloors: { production_claim: 'observe', account_authority_change: 'consequential' },
   },
   {
-    id: 'sekret-bip-jr', repositories: ['jussray/Se-kretBip'], implementationState: 'bounded',
+    id: 'sekret-bip-jr', repositories: ['jussray/Bip-Jr'], implementationState: 'bounded',
     humanAuthority: 'adult authority with child input inside age-banded scope', objectiveTruthSources: ['provider_evidence', 'system_observation'], minimumRecoveryLevel: 'R2',
-    hardConstraints: ['adult setup and server-enforced authority remain mandatory', 'child input cannot expand adult-granted permissions', 'public social feed, peer search, followers, DMs, peer voice/video, and child-created groups remain prohibited'],
+    hardConstraints: ['adult setup and server-enforced authority remain mandatory', 'child input cannot expand adult-granted permissions', 'public social feed, peer search, followers, DMs, peer voice/video, and child-created groups remain prohibited', 'continuity-only identity does not carry FCR mutation authority'],
     blockedActions: ['enable-public-social', 'enable-child-dm', 'expand-child-permissions-without-adult'], requiredClaims: { authority_change: ['adult_authority_verified', 'server_authority_verified'] },
     actionRiskFloors: { authority_change: 'consequential' },
   },
@@ -93,6 +132,13 @@ export const PORTFOLIO_GOVERNANCE_PROFILES: readonly PortfolioGovernanceProfile[
     hardConstraints: ['source analysis may propose canon but cannot promote canon without explicit creator approval', 'semantic similarity is not authorization', 'revocation beats cache TTL'],
     blockedActions: ['auto-promote-canon'], requiredClaims: { canonize: ['creator_approval_verified', 'source_lineage_verified'] },
     actionRiskFloors: { canonize: 'consequential' },
+  },
+  {
+    id: 'sync-party', repositories: ['jussray/sync-party-game'], implementationState: 'active',
+    humanAuthority: 'founder for portfolio operations; game runtime retains project-local player and gameplay authority', objectiveTruthSources: ['provider_evidence', 'system_observation'], minimumRecoveryLevel: 'R2',
+    hardConstraints: ['gameplay or player state cannot self-promote into repository, provider, merge, or deployment authority', 'continuity and Council observations remain advisory until independently proven', 'production claims require exact deployed identity plus multiplayer runtime evidence'],
+    blockedActions: ['cross-project-player-data-authority', 'council-grants-gameplay-authority'], requiredClaims: { production_claim: ['exact_production_version_verified', 'multiplayer_runtime_verified'] },
+    actionRiskFloors: { production_claim: 'observe' },
   },
   {
     id: 'solcontinuity', repositories: ['jussray/solcontinuity'], implementationState: 'active',
@@ -124,9 +170,9 @@ export const PORTFOLIO_GOVERNANCE_PROFILES: readonly PortfolioGovernanceProfile[
 ] as const;
 
 export function portfolioGovernanceProfile(repository: string): PortfolioGovernanceProfile | null {
-  const normalized = repository.trim().toLowerCase();
+  const canonical = canonicalRepository(repository);
   return PORTFOLIO_GOVERNANCE_PROFILES.find((profile) =>
-    profile.repositories.some((candidate) => candidate.toLowerCase() === normalized)) ?? null;
+    profile.repositories.some((candidate) => normalizeRepository(candidate) === canonical)) ?? null;
 }
 
 export function portfolioHardConstraintViolations(
@@ -137,7 +183,18 @@ export function portfolioHardConstraintViolations(
 ): string[] {
   const profile = portfolioGovernanceProfile(repository);
   if (!profile) return ['repository has no governed portfolio profile'];
+
+  const authorityClass = portfolioRepositoryAuthorityClass(repository);
   const reasons: string[] = [];
+
+  if (authorityClass === 'quarantined') {
+    reasons.push('repository is quarantined and cannot receive FCR mutation authority');
+  } else if (authorityClass === 'unknown') {
+    reasons.push('repository is not registered in an FCR portfolio authority tier');
+  } else if (authorityClass !== 'active' && effectiveRisk && effectiveRisk !== 'observe') {
+    reasons.push(`${authorityClass} repository has zero FCR mutation authority`);
+  }
+
   if (profile.implementationState === 'not_implemented' && action !== 'observe') {
     reasons.push('project has no implemented runtime authority');
   }
