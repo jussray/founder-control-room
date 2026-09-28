@@ -21,6 +21,8 @@ import type {
 
 const CAPABILITY_CACHE_MS = 5 * 60_000;
 
+class McpInvocationBlockedError extends Error {}
+
 interface McpEvidenceProject {
   id: string;
   repoIdentifier?: string;
@@ -308,12 +310,13 @@ export class McpHub {
       request.approvalId,
     );
     const server = this.registry.get(request.serverId);
-    const policy = evaluateMcpPolicy({
+    const preflightPolicy = evaluateMcpPolicy({
       server,
       projectId: request.projectId,
       toolName: request.toolName,
       env: this.env,
     });
+    let effectivePolicy = preflightPolicy;
     const hash = requestHash({
       serverId: request.serverId,
       projectId: request.projectId,
@@ -321,21 +324,21 @@ export class McpHub {
       arguments: request.arguments,
     });
 
-    if (policy.decision !== "allow") {
+    if (preflightPolicy.decision !== "allow") {
       const evidenceId = await writeEvidence({
         projectId: request.projectId,
         missionId: request.missionId,
         approvalId: request.approvalId,
         serverId: request.serverId,
         toolName: request.toolName,
-        risk: policy.risk,
-        policyDecision: policy.decision,
+        risk: preflightPolicy.risk,
+        policyDecision: preflightPolicy.decision,
         status: "blocked",
         requestHash: hash,
         requestSummary: summarizeRequest(request),
         estimatedCostUsd: 0,
       }, evidenceProject.id);
-      throw new Error(`MCP invocation blocked (${evidenceId}): ${policy.reason}`);
+      throw new Error(`MCP invocation blocked (${evidenceId}): ${preflightPolicy.reason}`);
     }
 
     const started = Date.now();
@@ -350,6 +353,34 @@ export class McpHub {
       if (!tool) {
         throw new Error(
           `Tool ${request.toolName} was not advertised by ${request.serverId}`,
+        );
+      }
+
+      effectivePolicy = evaluateMcpPolicy({
+        server,
+        projectId: request.projectId,
+        toolName: request.toolName,
+        tool,
+        env: this.env,
+      });
+      if (effectivePolicy.decision !== "allow") {
+        const durationMs = Date.now() - started;
+        const evidenceId = await writeEvidence({
+          projectId: request.projectId,
+          missionId: request.missionId,
+          approvalId: request.approvalId,
+          serverId: request.serverId,
+          toolName: request.toolName,
+          risk: effectivePolicy.risk,
+          policyDecision: effectivePolicy.decision,
+          status: "blocked",
+          requestHash: hash,
+          requestSummary: summarizeRequest(request),
+          durationMs,
+          estimatedCostUsd: 0,
+        }, evidenceProject.id);
+        throw new McpInvocationBlockedError(
+          `MCP invocation blocked (${evidenceId}) after capability discovery: ${effectivePolicy.reason}`,
         );
       }
 
@@ -375,8 +406,8 @@ export class McpHub {
         approvalId: request.approvalId,
         serverId: request.serverId,
         toolName: request.toolName,
-        risk: policy.risk,
-        policyDecision: policy.decision,
+        risk: effectivePolicy.risk,
+        policyDecision: effectivePolicy.decision,
         status: "passed",
         requestHash: hash,
         requestSummary: summarizeRequest(request),
@@ -389,12 +420,13 @@ export class McpHub {
         serverId: request.serverId,
         projectId: request.projectId,
         toolName: request.toolName,
-        policy,
+        policy: effectivePolicy,
         durationMs,
         result,
         evidenceId,
       };
     } catch (error) {
+      if (error instanceof McpInvocationBlockedError) throw error;
       const durationMs = Date.now() - started;
       const message = error instanceof Error ? error.message : String(error);
       await writeEvidence({
@@ -403,8 +435,8 @@ export class McpHub {
         approvalId: request.approvalId,
         serverId: request.serverId,
         toolName: request.toolName,
-        risk: policy.risk,
-        policyDecision: policy.decision,
+        risk: effectivePolicy.risk,
+        policyDecision: effectivePolicy.decision,
         status: "failed",
         requestHash: hash,
         requestSummary: summarizeRequest(request),
