@@ -125,8 +125,9 @@
     {
       "path": "src/lib/capabilityObservationFeed.ts",
       "claims": [
-        "`src/lib/capabilityObservationFeed.ts` may fold operator relay receipts into capability observations only for the operator that answered them, only from outcome statuses, and must count completed-without-evidence as false green and any non-`none` authorityRequested as an authority violation.",
-        "The fold is contract-capable tested source; it does not persist observations, call the market from any live route, infer task class, invent cost or duration, or grant selection or execution authority."
+        "`src/lib/capabilityObservationFeed.ts` may fold operator relay receipts into capability observations only for the operator that answered them, only from outcome statuses, deduplicated by response hash with the latest outcome per relay id, and only inside the caller's freshness window so stale evidence cannot renew itself.",
+        "`src/lib/capabilityObservationFeed.ts` must treat a provider answering as unproven: only independently verified relay ids contribute proof or evidence references, completed-without-evidence is a false green, any non-`none` authorityRequested is an authority violation, and `blocked` never lowers success.",
+        "The fold is contract-capable tested source; relay responses are not persisted, no outcome verifier exists, no live route calls the market, and the fold grants no selection or execution authority."
       ]
     },
     {
