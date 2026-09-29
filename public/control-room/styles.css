@@ -179,7 +179,19 @@ label { display: block; font-size: 0.78rem; color: var(--muted); margin: 0.6rem 
 .topbar-actions { display: flex; align-items: center; gap: 0.75rem; }
 .topbar .founder-email { color: var(--muted); font-size: 0.82rem; }
 
-.content { flex: 1; width: 100%; max-width: 1440px; margin: 0 auto; padding: 1.4rem; min-width: 0; }
+.content {
+  flex: 1;
+  width: 100%;
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 1.4rem;
+  /* index.html pins a fixed launch dock to the bottom-right of the viewport.
+     With the sidebar pushing content into the dock's x-range, the last form
+     on a tab must be able to scroll clear of it, so reserve the dock's
+     collapsed height (plus its 1rem offset) below the content. */
+  padding-bottom: calc(7.5rem + env(safe-area-inset-bottom, 0px));
+  min-width: 0;
+}
 
 /* ─── panels & cards (shared with goalfix.html / evidence-trust.html) ────── */
 
@@ -464,7 +476,7 @@ textarea.code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; min
   .side-status { margin-top: 0; }
   .topbar { padding: 0.6rem 1rem; flex-wrap: wrap; }
   .topbar-tagline { display: none; }
-  .content { padding: 1rem; }
+  .content { padding: 1rem; padding-bottom: calc(7.5rem + env(safe-area-inset-bottom, 0px)); }
   .hero { grid-template-columns: 1fr; padding: 1.2rem 1.1rem; }
   .home-grid { grid-template-columns: 1fr; }
 }

@@ -189,10 +189,10 @@ async function withPage(browser, viewport, fn) {
 mkdirSync(OUT_DIR, { recursive: true });
 const browser = await chromium.launch();
 
-console.log('\n[1] Signed-in founder lands on the Home dashboard (desktop 1440)');
+console.log('\n[1] Signed-in founder lands on the Home dashboard (desktop 1280×720, the run.mjs viewport)');
 {
   const { server, baseUrl } = await startServer('full');
-  const { pageErrors, consoleErrors } = await withPage(browser, { width: 1440, height: 960 }, async (page) => {
+  const { pageErrors, consoleErrors } = await withPage(browser, { width: 1280, height: 720 }, async (page) => {
     await page.goto(`${baseUrl}/control-room/`, { waitUntil: 'load' });
     await page.waitForSelector('.topbar', { timeout: 10_000 });
     await page.waitForSelector('[data-home-kpis] [data-kpi="projects"]', { timeout: 10_000 });
@@ -244,6 +244,18 @@ console.log('\n[1] Signed-in founder lands on the Home dashboard (desktop 1440)'
     await page.waitForSelector('#mission-detail', { state: 'visible', timeout: 10_000 });
     assert((await page.locator('#mission-lanes .lane').count()) === 8, 'focus item routes to the Missions board (8 lanes)');
     assert((await page.locator('#mission-detail').innerText()).includes('Review Bip partnership proposal'), 'the clicked mission is selected in its detail panel');
+
+    // index.html pins a fixed launch dock to the bottom of the viewport. With
+    // the sidebar shifting content into the dock's x-range, the last submit
+    // button on a tab must scroll clear of it or every click on it times out
+    // (this is exactly how run.mjs failed on the first CI run of this shell).
+    for (const selector of ['#log-council-form button[type=submit]', '#log-cost-form button[type=submit]']) {
+      await page.locator(selector).scrollIntoViewIfNeeded();
+      const box = await page.locator(selector).boundingBox();
+      const dock = await page.locator('.launch-dock').boundingBox();
+      const overlaps = Boolean(box && dock) && box.x < dock.x + dock.width && box.x + box.width > dock.x && box.y < dock.y + dock.height && box.y + box.height > dock.y;
+      assert(box && dock && !overlaps, `${selector} scrolls clear of the fixed launch dock (button y=${box && Math.round(box.y)}, dock top=${dock && Math.round(dock.y)})`);
+    }
 
     // Sidebar → Home again; KPI tile → Signals tab.
     await page.click('.tabs button[data-tab="home"]');
