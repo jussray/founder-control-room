@@ -204,9 +204,11 @@ export interface ContentFoundryCouncilDecision {
 const CONTENT_GOAL_PATTERN = /\b(content|video|youtube|shorts?|tiktok|reels?|script|thumbnail|title|b-?roll|seo|hashtags?|repurpose|newsletter|blog|campaign|social post|facebook post|linkedin post|creator|publishing|publish)\b/i;
 // Founder social-discoverability asks ("get found in search on my socials", "fix my Instagram bio")
 // are content work too, but the same platform words appear in engineering goals (adapters, OAuth,
-// webhooks, logins). Route the social phrasing only when no engineering marker is present.
-const SOCIAL_GOAL_PATTERN = /\b(social[\s-]?medias?|socials|instagram|insta|ig|facebook|fb|linkedin|discoverab(?:le|ility)|bio)\b/i;
-const SOCIAL_ENGINEERING_VETO = /\b(adapters?|oauth|webhooks?|tokens?|api|sdk|inbox|login|sign[\s-]?in|auth|authentication|typecheck|repos?|repository|bug|regression|migrations?|router|mcp|skills?)\b/i;
+// webhooks, share buttons, schema fields). Route only when a platform noun meets a discoverability or
+// profile-copy term, and no engineering marker is present.
+const SOCIAL_PLATFORM_PATTERN = /\b(social[\s-]?medias?|socials|instagram|insta|facebook|linkedin|tiktok|youtube|threads)\b/i;
+const SOCIAL_DISCOVERY_PATTERN = /\b(bio|caption|profile|handle|found|search|searchable|discoverab(?:le|ility)|reach|followers|audience|post(?:s|ing)?)\b/i;
+const SOCIAL_ENGINEERING_VETO = /\b(adapters?|oauth|webhooks?|tokens?|api|sdk|inbox|login|sign[\s-]?in|auth|authentication|typecheck|bug|regression|migrations?|router|mcp|skills?|schema|widget|buttons?|embed|pixel|cache|pipeline|field|component)\b/i;
 const MEDIA_GOAL_PATTERN = /\b(video|youtube|shorts?|tiktok|reels?|b-?roll|storyboard|shot|footage|cinematic|thumbnail)\b/i;
 const RUNTIME_PROOF_PATTERN = /\b(product|demo|ui|app|runtime|screen|website|feature|workflow|playwright)\b/i;
 const DISTRIBUTION_MONEY_PATTERN = /\b(publish|youtube|shorts?|tiktok|reels?|linkedin|facebook|campaign|cta|sell|sales|conversion|revenue|moneti[sz]e|offer)\b/i;
@@ -394,7 +396,11 @@ function routeAskMeVideoCouncil(goal: string): AskMeVideoCouncilDecision {
 export function isFcrContentGoal(goal: string): boolean {
   const normalizedGoal = clean(goal);
   if (CONTENT_GOAL_PATTERN.test(normalizedGoal)) return true;
-  return SOCIAL_GOAL_PATTERN.test(normalizedGoal) && !SOCIAL_ENGINEERING_VETO.test(normalizedGoal);
+  return (
+    SOCIAL_PLATFORM_PATTERN.test(normalizedGoal) &&
+    SOCIAL_DISCOVERY_PATTERN.test(normalizedGoal) &&
+    !SOCIAL_ENGINEERING_VETO.test(normalizedGoal)
+  );
 }
 
 /**

@@ -221,6 +221,8 @@ describe('FCR Content Foundry Council policy', () => {
       'improve discoverability of my socials',
       'tiktok seo keywords for my hair brand',
       'write hashtags for my facebook post',
+      'update my instagram bio with the new store link',
+      'post the release on socials',
     ]) {
       expect(isFcrContentGoal(goal), goal).toBe(true);
     }
@@ -233,6 +235,10 @@ describe('FCR Content Foundry Council policy', () => {
       'Rotate the Facebook OAuth token in the worker',
       'Repair the LinkedIn publisher regression',
       'fix the failing playwright test in checkout',
+      'fix social media share buttons on the storefront',
+      'rename the bio field in the user profile schema',
+      'fb pixel not firing on checkout',
+      'ig cache invalidation',
     ]) {
       expect(isFcrContentGoal(goal), goal).toBe(false);
     }
