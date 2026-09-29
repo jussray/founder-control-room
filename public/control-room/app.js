@@ -35,7 +35,21 @@ const state = {
   agents: [],
   authorityLevels: [],
   banner: null, // { kind: 'error'|'notice', text }
+  // Per-read truth for the Home KPIs: 'pending' until a load settles, then
+  // 'ok' or 'failed'. An empty array is only "0" once its read succeeded.
+  reads: { projects: 'pending', missions: 'pending', activity: 'pending', costs: 'pending' },
 };
+
+/** Runs a loader and records whether its read succeeded, without swallowing the error. */
+async function trackedRead(key, load) {
+  try {
+    await load();
+    state.reads[key] = 'ok';
+  } catch (err) {
+    state.reads[key] = 'failed';
+    throw err;
+  }
+}
 
 /** Renders a <datalist> of registered multitool agents — free text still allowed, per the API. */
 function agentDatalist(id) {
@@ -284,12 +298,6 @@ function greetingForNow(date = new Date()) {
   return 'Good evening';
 }
 
-function founderDisplayName() {
-  const local = (state.session?.email ?? '').split('@')[0] ?? '';
-  const first = local.split(/[._+-]/)[0] ?? '';
-  return first ? first.charAt(0).toUpperCase() + first.slice(1) : 'Founder';
-}
-
 function relativeTime(iso) {
   const then = Date.parse(iso);
   if (!Number.isFinite(then)) return '';
@@ -302,7 +310,23 @@ function relativeTime(iso) {
   return `${Math.round(hours / 24)}d ago`;
 }
 
+// GET /projects and GET /l99/status write their own `*_read` audit events into
+// the activity feed, so a Home load must not count itself as a live signal.
+const READ_AUDIT_EVENT = /_read$/;
+// Server-side windows (src/http/routes/dashboard.ts): tasks 200, activity 100.
+const TASKS_WINDOW = 200;
+const ACTIVITY_WINDOW = 100;
+
+function liveSignals() {
+  return state.activity.filter((ev) => !READ_AUDIT_EVENT.test(String(ev.event_type ?? '')));
+}
+
+function unknownMetric(id, label, readState, tab) {
+  return { id, label, value: 'UNKNOWN', sub: readState === 'failed' ? 'read failed' : 'not read yet', truth: 'unknown', tab };
+}
+
 function homeMetrics() {
+  const reads = state.reads;
   const projects = state.projects;
   const missions = state.missions;
   const inFlight = missions.filter((m) => IN_FLIGHT_LANES.has(m.status));
@@ -310,24 +334,37 @@ function homeMetrics() {
   const landed = missions.filter((m) => LANDED_LANES.has(m.status));
   const deployed = missions.filter((m) => m.status === 'deployed');
   const activeProjects = projects.filter((p) => p.status === 'active');
+  const missionsCapped = missions.length >= TASKS_WINDOW ? ` · latest ${TASKS_WINDOW} only` : '';
+
+  const signals = liveSignals();
+  const signalsCapped = state.activity.length >= ACTIVITY_WINDOW;
+  const latestSignal = signals[0]?.created_at ?? null;
 
   const l99 = state.l99;
   const l99Gates = l99 && !l99.error && Array.isArray(l99.oodaFiringOrder) ? l99.oodaFiringOrder : null;
   const l99Pass = l99Gates ? l99Gates.filter((g) => g.status === 'pass').length : 0;
 
-  const latestSignal = state.activity[0]?.created_at ?? null;
+  const spend = state.costs && Number.isFinite(Number(state.costs.totalUsd)) ? Number(state.costs.totalUsd) : null;
 
   return [
-    { id: 'projects', label: 'Projects', value: String(projects.length), sub: `${activeProjects.length} active`, truth: 'observed', tab: 'projects' },
-    { id: 'missions', label: 'Missions in flight', value: String(inFlight.length), sub: `${inReview.length} in review`, truth: 'observed', tab: 'missions' },
-    { id: 'landed', label: 'Integrated', value: String(landed.length), sub: `${deployed.length} deployed`, truth: 'observed', tab: 'missions' },
-    { id: 'signals', label: 'Live signals', value: String(state.activity.length), sub: latestSignal ? `latest ${relativeTime(latestSignal)}` : 'none recorded', truth: 'observed', tab: 'activity' },
+    reads.projects === 'ok'
+      ? { id: 'projects', label: 'Projects', value: String(projects.length), sub: `${activeProjects.length} active`, truth: 'observed', tab: 'projects' }
+      : unknownMetric('projects', 'Projects', reads.projects, 'projects'),
+    reads.missions === 'ok'
+      ? { id: 'missions', label: 'Missions in flight', value: String(inFlight.length), sub: `${inReview.length} in review${missionsCapped}`, truth: 'observed', tab: 'missions' }
+      : unknownMetric('missions', 'Missions in flight', reads.missions, 'missions'),
+    reads.missions === 'ok'
+      ? { id: 'landed', label: 'Integrated', value: String(landed.length), sub: `${deployed.length} deployed${missionsCapped}`, truth: 'observed', tab: 'missions' }
+      : unknownMetric('landed', 'Integrated', reads.missions, 'missions'),
+    reads.activity === 'ok'
+      ? { id: 'signals', label: 'Live signals', value: signalsCapped ? `${signals.length}+` : String(signals.length), sub: latestSignal ? `latest ${relativeTime(latestSignal)}${signalsCapped ? ` · latest ${ACTIVITY_WINDOW} only` : ''}` : 'none recorded', truth: 'observed', tab: 'activity' }
+      : unknownMetric('signals', 'Live signals', reads.activity, 'activity'),
     l99Gates
       ? { id: 'l99', label: 'L99 gates', value: `${l99Pass}/${l99Gates.length}`, sub: l99.standaloneLaunchReady ? 'launch ready' : 'not ready yet', truth: 'observed', tab: 'l99' }
-      : { id: 'l99', label: 'L99 gates', value: 'UNKNOWN', sub: l99?.error ? 'status read failed' : 'not read yet', truth: 'unknown', tab: 'l99' },
-    state.costs
-      ? { id: 'spend', label: 'Agent spend', value: `$${Number(state.costs.totalUsd ?? 0).toFixed(2)}`, sub: `${state.costs.byAgent?.length ?? 0} agents billed`, truth: 'observed', tab: 'analytics' }
-      : { id: 'spend', label: 'Agent spend', value: 'UNKNOWN', sub: 'not read yet', truth: 'unknown', tab: 'analytics' },
+      : { id: 'l99', label: 'L99 gates', value: 'UNKNOWN', sub: l99?.error ? 'read failed' : 'not read yet', truth: 'unknown', tab: 'l99' },
+    reads.costs === 'ok' && spend !== null
+      ? { id: 'spend', label: 'Agent spend', value: `$${spend.toFixed(4)}`, sub: `${state.costs.byAgent?.length ?? 0} agents billed`, truth: 'observed', tab: 'analytics' }
+      : unknownMetric('spend', 'Agent spend', reads.costs, 'analytics'),
     { id: 'revenue', label: 'Revenue', value: 'Not connected', sub: 'no revenue source is wired to FCR', truth: 'not-wired', href: '/control-room/plugin-center.html' },
     { id: 'community', label: 'Community', value: 'Not connected', sub: 'no community source is wired to FCR', truth: 'not-wired', href: '/control-room/plugin-center.html' },
   ];
@@ -349,7 +386,7 @@ const HOME_TILES = [
   ['Signals', 'See what changed', 'tab', 'activity'],
   ['Content', 'Ideas to impact', 'href', '/control-room/content-manager.html'],
   ['Automation', 'Do more, faster', 'href', '/control-room/command-bridge.html'],
-  ['Integrations', 'Everything connected', 'href', '/control-room/plugin-center.html'],
+  ['Integrations', 'Plugins and connections', 'href', '/control-room/plugin-center.html'],
   ['Security', 'Posture and receipts', 'href', '/control-room/security.html'],
 ];
 
@@ -363,13 +400,13 @@ function routeMarkup(label, sub, kind, target, className) {
 function renderHomeTab(mount) {
   const metrics = homeMetrics();
   const focus = state.missions.filter((m) => IN_FLIGHT_LANES.has(m.status)).slice(0, 6);
-  const signals = state.activity.slice(0, 6);
+  const signals = liveSignals().slice(0, 6);
 
   mount.appendChild(el(`
     <section class="home" data-home>
       <div class="hero" data-home-hero>
         <div class="hero-copy">
-          <p class="hero-greeting">${escapeHtml(greetingForNow())}, ${escapeHtml(founderDisplayName())}</p>
+          <p class="hero-greeting">${escapeHtml(greetingForNow())}, founder</p>
           <h1 class="hero-title">ULTRA<span>THINK</span></h1>
           <p class="hero-tagline">Bigger thinking. Realer outcomes.</p>
           <p class="hero-lede">One command space to turn ideas into products, products into proof, and proof into lasting impact.</p>
@@ -400,7 +437,7 @@ function renderHomeTab(mount) {
 
       <div class="home-grid">
         <div class="panel home-projects" data-home-projects>
-          <div class="panel-head"><h2>Active projects</h2><button type="button" class="link-button" data-go-tab="projects">View all →</button></div>
+          <div class="panel-head"><h2>Projects</h2><button type="button" class="link-button" data-go-tab="projects">View all →</button></div>
         </div>
         <div class="panel home-focus" id="today-focus" data-home-focus>
           <div class="panel-head"><h2>Today’s focus</h2><span class="count-pill">${focus.length}</span></div>
@@ -439,11 +476,8 @@ function renderHomeTab(mount) {
   // The projects module is the real one — same forms, same list, same detail
   // panel — mounted inside the dashboard so the founder's first screen is the
   // working Portfolio, not a picture of one.
-  const projectsMount = mount.querySelector('[data-home-projects]');
-  renderProjectsTab(projectsMount);
-  const detail = projectsMount.querySelector('#project-detail');
-  if (detail) mount.querySelector('[data-home-detail]').appendChild(detail);
-
+  // Bind the Home routes first so a failure inside the projects module can
+  // never leave the hero, Chief, KPI and tile buttons dead.
   mount.querySelectorAll('[data-go-tab]').forEach((node) => {
     node.addEventListener('click', () => { state.tab = node.dataset.goTab; render(); });
   });
@@ -453,6 +487,11 @@ function renderHomeTab(mount) {
       guarded(() => selectMission(node.dataset.focusMission));
     });
   });
+
+  const projectsMount = mount.querySelector('[data-home-projects]');
+  renderProjectsTab(projectsMount);
+  const detail = projectsMount.querySelector('#project-detail');
+  if (detail) mount.querySelector('[data-home-detail]').appendChild(detail);
 }
 
 function renderTabContent() {
@@ -486,8 +525,10 @@ async function loadAuthorityLevels() {
 // ─── Projects tab ────────────────────────────────────────────────────────────
 
 async function loadProjects() {
-  const data = await api('/projects');
-  state.projects = data.projects ?? [];
+  await trackedRead('projects', async () => {
+    const data = await api('/projects');
+    state.projects = data.projects ?? [];
+  });
 }
 
 function renderProjectsTab(mount) {
@@ -535,7 +576,7 @@ function renderProjectsTab(mount) {
     });
   }
 
-  if (state.selectedProjectSlug) renderProjectDetail(mount);
+  if (state.selectedProjectSlug && state.selectedProject) renderProjectDetail(mount);
 }
 
 async function selectProject(slug) {
@@ -727,8 +768,10 @@ function renderProjectDetail(mount) {
 const MISSION_LANES = ['proposed', 'sandboxed', 'in_review', 'approved', 'integrated', 'deployed', 'rejected', 'rolled_back'];
 
 async function loadMissions() {
-  const data = await api('/dashboard/tasks');
-  state.missions = data.tasks ?? [];
+  await trackedRead('missions', async () => {
+    const data = await api('/dashboard/tasks');
+    state.missions = data.tasks ?? [];
+  });
 }
 
 function renderMissionsTab(mount) {
@@ -1027,8 +1070,10 @@ function renderMissionDetail(mount) {
 // ─── Activity tab ────────────────────────────────────────────────────────────
 
 async function loadActivity() {
-  const data = await api('/dashboard/activity');
-  state.activity = data.activity ?? [];
+  await trackedRead('activity', async () => {
+    const data = await api('/dashboard/activity');
+    state.activity = data.activity ?? [];
+  });
 }
 
 function renderActivityTab(mount) {
@@ -1191,8 +1236,10 @@ function renderTemplateDetail(mount) {
 // ─── Analytics tab ───────────────────────────────────────────────────────────
 
 async function loadCosts() {
-  const data = await api('/dashboard/costs');
-  state.costs = data;
+  await trackedRead('costs', async () => {
+    const data = await api('/dashboard/costs');
+    state.costs = data;
+  });
 }
 
 function renderAnalyticsTab(mount) {
@@ -1320,7 +1367,11 @@ async function boot() {
   if (!state.session) return;
 
   await guarded(async () => {
-    await Promise.all([loadProjects(), loadMissions(), loadActivity(), loadL99(), loadPromptTemplates(), loadCosts(), loadAgents(), loadAuthorityLevels()]);
+    // Let every read settle so a single failure cannot freeze the others at
+    // their pre-load state; then surface every failure in one banner.
+    const results = await Promise.allSettled([loadProjects(), loadMissions(), loadActivity(), loadL99(), loadPromptTemplates(), loadCosts(), loadAgents(), loadAuthorityLevels()]);
+    const failures = results.filter((r) => r.status === 'rejected').map((r) => (r.reason instanceof Error ? r.reason.message : String(r.reason)));
+    if (failures.length > 0) throw new Error([...new Set(failures)].join(' · '));
   });
 }
 

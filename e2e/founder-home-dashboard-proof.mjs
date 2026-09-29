@@ -17,7 +17,7 @@
 // nothing but Node, Playwright and the checked-out public/ directory.
 
 import { createServer } from 'node:http';
-import { createReadStream, existsSync, mkdirSync, statSync } from 'node:fs';
+import { createReadStream, existsSync, mkdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, extname, join, normalize, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
@@ -30,6 +30,16 @@ const REPO_ROOT = dirname(fileURLToPath(new URL('.', import.meta.url)));
 const PUBLIC_DIR = resolve(REPO_ROOT, 'public');
 const OUT_DIR = resolve(REPO_ROOT, 'test-results');
 const FOUNDER_EMAIL = 'founder@example.com';
+
+// Serve the production CSP so an inline script, external font/image, or
+// disallowed connect surfaces here as a console error instead of only in prod.
+const CSP = readFileSync(resolve(PUBLIC_DIR, '_headers'), 'utf8')
+  .split('\n')
+  .map((line) => line.trim())
+  .find((line) => line.startsWith('Content-Security-Policy:'))
+  ?.slice('Content-Security-Policy:'.length)
+  .trim();
+if (!CSP) throw new Error('public/_headers no longer declares a Content-Security-Policy');
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -60,6 +70,10 @@ const FIXTURE = {
     { id: 'm-7', title: 'Old idea', status: 'rejected', risk_level: 'low', project: { slug: 'chief-ai' } },
   ],
   activity: [
+    // Read-audit rows the server writes on every GET /projects and /l99/status
+    // read — real events, but a Home load must not count itself as a signal.
+    { created_at: iso(0), project: { slug: 'founder-control-room' }, severity: 'info', event_type: 'project_registry_read' },
+    { created_at: iso(0), project: { slug: 'founder-control-room' }, severity: 'info', event_type: 'l99_status_read' },
     { created_at: iso(2), project: { slug: 'sekret-bip' }, severity: 'info', event_type: 'mission.in_review' },
     { created_at: iso(14), project: { slug: 'chief-ai' }, severity: 'warning', event_type: 'ci.failed' },
     { created_at: iso(37), project: { slug: 'storyengine' }, severity: 'info', event_type: 'mission.integrated' },
@@ -79,19 +93,20 @@ const FIXTURE = {
   },
   costs: { totalUsd: 1.2345, byAgent: [{ agentName: 'claude-builder', provider: 'anthropic', inputTokens: 100, outputTokens: 50, costUsd: 1.2345 }] },
   agents: [{ id: 'claude-builder', label: 'Claude builder' }],
-  levels: [{ id: 'read', label: 'Read' }],
+  levels: [{ level: 'L1', label: 'Read' }],
   templates: [],
 };
 
 const IN_FLIGHT = new Set(['proposed', 'sandboxed', 'in_review', 'approved']);
+const LIVE_SIGNALS = FIXTURE.activity.filter((ev) => !/_read$/.test(ev.event_type));
 const expectedInFlight = FIXTURE.tasks.filter((t) => IN_FLIGHT.has(t.status)).length;
 const expectedInReview = FIXTURE.tasks.filter((t) => t.status === 'in_review').length;
 const expectedLanded = FIXTURE.tasks.filter((t) => t.status === 'integrated' || t.status === 'deployed').length;
 
-/** mode: 'full' | 'l99-down' | 'signed-out' */
+/** mode: 'full' | 'l99-down' | 'reads-down' | 'signed-out' */
 function startServer(mode) {
   const json = (res, status, body) => {
-    res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+    res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'Content-Security-Policy': CSP });
     res.end(JSON.stringify(body));
   };
 
@@ -118,6 +133,9 @@ function startServer(mode) {
     if (path === '/l99/status') {
       return mode === 'l99-down' ? json(res, 503, { error: 'L99 status unavailable' }) : json(res, 200, FIXTURE.l99);
     }
+    if (mode === 'reads-down' && (path === '/projects' || path === '/dashboard/activity')) {
+      return json(res, 503, { error: `${path} unavailable` });
+    }
     if (path in api) return json(res, 200, api[path]);
     const projectMatch = path.match(/^\/projects\/([^/]+)(?:\/(releases|connections|files))?$/);
     if (projectMatch) {
@@ -134,7 +152,7 @@ function startServer(mode) {
     // Sibling scripts loaded by index.html (stack-router.js, project-shell-ui.js)
     // poll these; they are outside this proof's subject and answered with
     // their honest "not configured" shapes so the console stays clean.
-    if (path === '/automation/conveyor/') return json(res, 200, { readiness: { state: 'not-configured' } });
+    if (path === '/automation/conveyor/') return json(res, 200, { contract: 'founder-control-room/n8n-conveyor@v3', readiness: { state: 'not-configured' } });
     if (path === '/projects/sekret-bip/shell-state') return json(res, 404, { error: 'shell-state not stubbed' });
     if (path.startsWith('/api/')) { console.log(`  (unstubbed 404: ${path})`); return json(res, 404, { error: 'not stubbed' }); }
 
@@ -143,7 +161,7 @@ function startServer(mode) {
     if (!filePath.startsWith(PUBLIC_DIR)) { res.writeHead(403); return res.end(); }
     if (existsSync(filePath) && statSync(filePath).isDirectory()) filePath = join(filePath, 'index.html');
     if (!existsSync(filePath)) { console.log(`  (static 404: ${path})`); return json(res, 404, { error: 'not found' }); }
-    res.writeHead(200, { 'Content-Type': MIME[extname(filePath)] ?? 'application/octet-stream', 'Cache-Control': 'no-store' });
+    res.writeHead(200, { 'Content-Type': MIME[extname(filePath)] ?? 'application/octet-stream', 'Cache-Control': 'no-store', 'Content-Security-Policy': CSP });
     createReadStream(filePath).pipe(res);
   });
 
@@ -193,9 +211,20 @@ console.log('\n[1] Signed-in founder lands on the Home dashboard (desktop 1280×
 {
   const { server, baseUrl } = await startServer('full');
   const { pageErrors, consoleErrors } = await withPage(browser, { width: 1280, height: 720 }, async (page) => {
+    // Hold the API until the first paint has been inspected: before any read
+    // settles every KPI must be UNKNOWN, never an "observed" zero.
+    let releaseApi;
+    const apiGate = new Promise((r) => { releaseApi = r; });
+    await page.route((url) => /\/(projects|dashboard\/tasks|dashboard\/activity|dashboard\/costs|l99\/status)$/.test(url.pathname), async (route) => { await apiGate; await route.continue(); });
     await page.goto(`${baseUrl}/control-room/`, { waitUntil: 'load' });
     await page.waitForSelector('.topbar', { timeout: 10_000 });
     await page.waitForSelector('[data-home-kpis] [data-kpi="projects"]', { timeout: 10_000 });
+    const firstPaint = await page.locator('[data-kpi]').evaluateAll((nodes) => nodes.map((n) => [n.dataset.kpi, n.dataset.truth, n.querySelector('.kpi-value').textContent.trim()]));
+    assert(firstPaint.filter(([, truth]) => truth === 'observed').length === 0, `first paint claims nothing as observed (${JSON.stringify(firstPaint)})`);
+    assert(firstPaint.every(([, truth, value]) => truth === 'not-wired' || value === 'UNKNOWN'), 'every unread KPI shows UNKNOWN before its read settles');
+    releaseApi();
+    await page.waitForSelector('[data-kpi="projects"][data-truth="observed"]', { timeout: 10_000 });
+    await page.waitForSelector('[data-kpi="spend"][data-truth="observed"]', { timeout: 10_000 });
 
     assert((await page.locator('.founder-email').innerText()) === FOUNDER_EMAIL, 'topbar shows the founder email');
     assert((await page.locator('.tabs button[data-tab="home"].active').count()) === 1, 'Home is the active tab without any click');
@@ -214,9 +243,10 @@ console.log('\n[1] Signed-in founder lands on the Home dashboard (desktop 1280×
     assert((await kpi('missions')) === String(expectedInFlight), `Missions-in-flight KPI equals served in-flight count (${expectedInFlight})`);
     assert((await page.locator('[data-kpi="missions"] .kpi-sub').innerText()).includes(`${expectedInReview} in review`), 'in-review sub-count matches');
     assert((await kpi('landed')) === String(expectedLanded), `Integrated KPI equals integrated+deployed (${expectedLanded})`);
-    assert((await kpi('signals')) === String(FIXTURE.activity.length), `Live-signals KPI equals served activity count (${FIXTURE.activity.length})`);
+    assert((await kpi('signals')) === String(LIVE_SIGNALS.length), `Live-signals KPI counts served events minus the *_read audit rows (${LIVE_SIGNALS.length} of ${FIXTURE.activity.length})`);
+    assert(!(await page.locator('[data-home-signals]').innerText()).includes('_read'), 'Live signals panel hides the read-audit rows this page load produced');
     assert((await kpi('l99')) === '2/3', 'L99 KPI equals passing/total gates from served status');
-    assert((await kpi('spend')) === '$1.23', 'Spend KPI equals served totalUsd (2dp)');
+    assert((await kpi('spend')) === '$1.2345', 'Spend KPI equals served totalUsd at the Analytics tab precision (4dp)');
     for (const id of ['revenue', 'community']) {
       const value = await kpi(id);
       const truth = await page.locator(`[data-kpi="${id}"]`).getAttribute('data-truth');
@@ -227,7 +257,7 @@ console.log('\n[1] Signed-in founder lands on the Home dashboard (desktop 1280×
     assert((await page.locator('#new-project-form').isVisible()), 'register-project form is present on Home without a click (run.mjs contract)');
     assert((await page.locator('#project-list .card').count()) === FIXTURE.projects.length, 'Active projects lists every served project through the real projects module');
     assert((await page.locator('[data-home-focus] .focus-item').count()) === expectedInFlight, `Today's focus lists the ${expectedInFlight} in-flight missions`);
-    assert((await page.locator('[data-home-signals] .signal').count()) === Math.min(6, FIXTURE.activity.length), 'Live signals shows the latest six events');
+    assert((await page.locator('[data-home-signals] .signal').count()) === Math.min(6, LIVE_SIGNALS.length), 'Live signals shows the latest six non-audit events');
     assert((await page.locator('.home-tiles .tile').count()) === 8, 'eight section tiles render');
 
     await noOverflow(page, 'desktop');
@@ -262,7 +292,7 @@ console.log('\n[1] Signed-in founder lands on the Home dashboard (desktop 1280×
     await page.waitForSelector('[data-home-kpis]');
     await page.click('[data-kpi="signals"]');
     await page.waitForSelector('.tabs button[data-tab="activity"].active');
-    assert((await page.locator('#activity-list .card').count()) === FIXTURE.activity.length, 'KPI tile routes to the Signals tab with the full activity list');
+    assert((await page.locator('#activity-list .card').count()) === FIXTURE.activity.length, 'KPI tile routes to the Signals tab with the full activity list (audit rows included there)');
   });
   assert(pageErrors.length === 0, `no uncaught JS exceptions (saw: ${JSON.stringify(pageErrors)})`);
   assert(consoleErrors.length === 0, `no console errors (saw: ${JSON.stringify(consoleErrors)})`);
@@ -275,7 +305,7 @@ console.log('\n[2] ?tab= deep link still activates a tab through stack-router.js
   const { pageErrors } = await withPage(browser, { width: 390, height: 844 }, async (page) => {
     await page.goto(`${baseUrl}/control-room/?tab=terminal`, { waitUntil: 'load' });
     await page.waitForSelector('.tabs button[data-tab="terminal"].active', { timeout: 10_000 });
-    assert(true, 'terminal tab activated from the URL');
+    assert((await page.locator('.tabs button.active').count()) === 1 && (await page.locator('#terminal-project-slug').count()) === 1, 'terminal tab activated from the URL and rendered its form');
     await page.click('.tabs button[data-tab="home"]');
     await page.waitForSelector('[data-home-kpis]');
     await noOverflow(page, 'mobile');
@@ -287,16 +317,52 @@ console.log('\n[2] ?tab= deep link still activates a tab through stack-router.js
   server.close();
 }
 
+console.log('\n[2b] Desktop 1440 overflow pass');
+{
+  const { server, baseUrl } = await startServer('full');
+  const { pageErrors, consoleErrors } = await withPage(browser, { width: 1440, height: 960 }, async (page) => {
+    await page.goto(`${baseUrl}/control-room/`, { waitUntil: 'load' });
+    await page.waitForSelector('[data-kpi="projects"][data-truth="observed"]', { timeout: 10_000 });
+    await noOverflow(page, 'desktop 1440');
+    await page.screenshot({ path: join(OUT_DIR, 'founder-home-desktop-1440.png'), fullPage: true });
+  });
+  assert(pageErrors.length === 0, `no uncaught JS exceptions (saw: ${JSON.stringify(pageErrors)})`);
+  assert(consoleErrors.length === 0, `no console errors under the production CSP (saw: ${JSON.stringify(consoleErrors)})`);
+  server.close();
+}
+
 console.log('\n[3] A failed L99 read renders UNKNOWN, never a number');
 {
   const { server, baseUrl } = await startServer('l99-down');
   const { pageErrors } = await withPage(browser, { width: 1280, height: 900 }, async (page) => {
     await page.goto(`${baseUrl}/control-room/`, { waitUntil: 'load' });
-    await page.waitForSelector('[data-kpi="l99"]', { timeout: 10_000 });
+    await page.waitForSelector('[data-kpi="projects"][data-truth="observed"]', { timeout: 10_000 });
     const value = (await page.locator('[data-kpi="l99"] .kpi-value').innerText()).trim();
     const truth = await page.locator('[data-kpi="l99"]').getAttribute('data-truth');
-    assert(value === 'UNKNOWN' && truth === 'unknown', `L99 KPI shows UNKNOWN with data-truth=unknown (got "${value}", ${truth})`);
-    assert((await page.locator('[data-kpi="l99"] .kpi-sub').innerText()).includes('status read failed'), 'and says the status read failed');
+    assert(value === 'UNKNOWN' && truth === 'unknown', `L99 KPI shows UNKNOWN with data-truth=unknown after the other reads settled (got "${value}", ${truth})`);
+    assert((await page.locator('[data-kpi="l99"] .kpi-sub').innerText()).includes('read failed'), 'and says the read failed, not "not read yet"');
+    assert((await page.locator('[data-kpi="spend"][data-truth="observed"]').count()) === 1, 'a sibling read that succeeded is still observed');
+  });
+  assert(pageErrors.length === 0, `no uncaught JS exceptions (saw: ${JSON.stringify(pageErrors)})`);
+  server.close();
+}
+
+console.log('\n[3b] Failed project and activity reads render UNKNOWN, not an observed zero, and the banner names both');
+{
+  const { server, baseUrl } = await startServer('reads-down');
+  const { pageErrors } = await withPage(browser, { width: 1280, height: 720 }, async (page) => {
+    await page.goto(`${baseUrl}/control-room/`, { waitUntil: 'load' });
+    await page.waitForSelector('[data-kpi="missions"][data-truth="observed"]', { timeout: 10_000 });
+    for (const id of ['projects', 'signals']) {
+      const truth = await page.locator(`[data-kpi="${id}"]`).getAttribute('data-truth');
+      const value = (await page.locator(`[data-kpi="${id}"] .kpi-value`).innerText()).trim();
+      const sub = await page.locator(`[data-kpi="${id}"] .kpi-sub`).innerText();
+      assert(truth === 'unknown' && value === 'UNKNOWN' && sub.includes('read failed'), `${id} KPI is UNKNOWN / read failed after a 503 (got ${truth} "${value}" "${sub}")`);
+    }
+    assert((await page.locator('[data-kpi="missions"] .kpi-value').innerText()).trim() === String(expectedInFlight), 'missions KPI is still observed from its own successful read');
+    const banner = await page.locator('#tab-content > .error').first().innerText();
+    assert(banner.includes('/projects') && banner.includes('/dashboard/activity'), `banner names every failed read (got "${banner}")`);
+    assert((await page.locator('[data-home-focus] .focus-item').count()) === expectedInFlight, "Today's focus still renders from the successful missions read");
   });
   assert(pageErrors.length === 0, `no uncaught JS exceptions (saw: ${JSON.stringify(pageErrors)})`);
   server.close();
@@ -308,7 +374,7 @@ console.log('\n[4] Signed-out surface is the unchanged magic-link card');
   const { pageErrors } = await withPage(browser, { width: 1280, height: 900 }, async (page) => {
     await page.goto(`${baseUrl}/control-room/`, { waitUntil: 'load' });
     await page.waitForSelector('#magic-link-form', { timeout: 10_000 });
-    assert((await page.locator('.sign-in-card h2').innerText()) === 'Founder Control Room', 'sign-in card heading unchanged');
+    assert((await page.locator('.sign-in-card h2').innerText()) === 'Founder Control Room', 'sign-in card still renders with its heading and form');
     assert((await page.locator('[data-home]').count()) === 0, 'no dashboard is rendered without a founder session');
     await page.screenshot({ path: join(OUT_DIR, 'founder-home-signed-out.png'), fullPage: true });
   });
