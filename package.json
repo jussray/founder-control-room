@@ -27,6 +27,7 @@
     "test:e2e": "npm run build && npm run verify:direct-browser && node e2e/pages-auth-callback-proof.mjs && node e2e/direct-browser-run.mjs",
     "setup:test-browser": "playwright install chromium",
     "verify:direct-browser": "node scripts/verify-direct-browser-contract.mjs",
+    "verify:founder-home": "node e2e/founder-home-dashboard-proof.mjs",
     "verify:parallel": "node scripts/verify-parallel.mjs",
     "preview:evidence": "node scripts/import-preview-evidence.mjs",
     "verify:capability-contract": "node scripts/verify-capability-contract.mjs",
