@@ -213,6 +213,31 @@ describe('FCR Content Foundry Council policy', () => {
     expect(decision.continuity.cookieFields).toEqual([]);
   });
 
+  it('routes founder social-discoverability asks to the content council', () => {
+    for (const goal of [
+      'I wanna get search for more on my social medias ULTRATHINK',
+      'get found more in search on my social media',
+      'optimize my instagram bio for search',
+      'improve discoverability of my socials',
+      'tiktok seo keywords for my hair brand',
+      'write hashtags for my facebook post',
+    ]) {
+      expect(isFcrContentGoal(goal), goal).toBe(true);
+    }
+  });
+
+  it('keeps platform-named engineering goals out of the content council', () => {
+    for (const goal of [
+      'Fix the Instagram adapter webhook signature check',
+      'Add social media login to Bip',
+      'Rotate the Facebook OAuth token in the worker',
+      'Repair the LinkedIn publisher regression',
+      'fix the failing playwright test in checkout',
+    ]) {
+      expect(isFcrContentGoal(goal), goal).toBe(false);
+    }
+  });
+
   it('requires the existing proof-led-publishing capability only at the publish gate', () => {
     const draft = routeContentFoundryCouncil('Draft a LinkedIn post.', 'draft');
     const publish = routeContentFoundryCouncil('Publish the LinkedIn post.', 'publish');
