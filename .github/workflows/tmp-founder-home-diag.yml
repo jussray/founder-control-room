@@ -41,5 +41,5 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          { echo '<!-- tmp-founder-home-diag -->'; echo '```'; grep -n "FAIL\|Error\|error\|E2E RESULT\|^==\|\[[0-9]" diag.txt | grep -v "Node.js 20\|npm warn\|ExperimentalWarning" | tail -150; echo '```'; } > comment.md
+          { echo '<!-- tmp-founder-home-diag -->'; echo '```'; grep -n -B60 -A6 "TimeoutError\|FAIL —\|E2E RUN THREW" diag.txt | grep -v "npm warn\|ExperimentalWarning" | cut -c1-400 | tail -260; echo '```'; } > comment.md
           gh pr comment 900 --repo "${{ github.repository }}" --body-file comment.md
