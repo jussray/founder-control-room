@@ -118,7 +118,15 @@
       "path": "src/lib/modelCapabilityMarket.ts",
       "claims": [
         "`src/lib/modelCapabilityMarket.ts` may rank Council operators only from task-specific evidence with external benchmarks treated as bounded priors; a benchmark win cannot by itself establish local eligibility, outcome proof, selection authority, or execution authority.",
-        "Fresh authority-boundary violations must block promotion, false-green behavior must reduce ranking, stale local evidence must expire, and challenger selection should preserve provider-family independence when available without granting mutation authority."
+        "Fresh authority-boundary violations must block promotion, false-green behavior must reduce ranking, stale local evidence must expire, and challenger selection should preserve provider-family independence when available without granting mutation authority.",
+        "`src/lib/modelCapabilityMarket.ts` names `multimodal-generation` as a task class so provider-dependent generation work is ranked from local receipts like every other class; adding a task class grants no operator eligibility, selection authority, or execution authority."
+      ]
+    },
+    {
+      "path": "src/lib/capabilityObservationFeed.ts",
+      "claims": [
+        "`src/lib/capabilityObservationFeed.ts` may fold operator relay receipts into capability observations only for the operator that answered them, only from outcome statuses, and must count completed-without-evidence as false green and any non-`none` authorityRequested as an authority violation.",
+        "The fold is contract-capable tested source; it does not persist observations, call the market from any live route, infer task class, invent cost or duration, or grant selection or execution authority."
       ]
     },
     {

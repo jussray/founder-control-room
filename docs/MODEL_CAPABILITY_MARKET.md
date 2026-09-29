@@ -16,8 +16,33 @@ The capability market measures operators by task class rather than one global in
 - cross-provider drift
 - browser/runtime work
 - founder synthesis
+- multimodal generation
 
 The implementation lives in `src/lib/modelCapabilityMarket.ts`.
+
+## Feed: from relay receipts to observations
+
+The market ranks from `CapabilityObservation` records. Its first receipt source is the operator relay: every relay response FCR already holds records which operator answered, the outcome status, the evidence references, whether authority was requested, and when it completed. `src/lib/capabilityObservationFeed.ts` folds those receipts into one observation per operator and task class, deterministically, so the observation can itself be receipted.
+
+Fold rules:
+
+- `accepted` receipts are in-flight, not outcomes, and are excluded from the sample
+- receipts answered by another operator are ignored, never re-attributed
+- a `completed` receipt with no evidence reference is a false green, even if it bypassed the relay validator
+- any `authorityRequested` other than `none` is an authority violation
+- cost and duration are not invented; the relay receipt does not carry them
+- task classification is upstream — the caller names the task class, the fold does not infer it
+
+Current state, in the repository's own capability vocabulary:
+
+```text
+contract-capable        market ranking + relay-receipt fold exist as tested source
+configured / allowlisted  no live route calls the market; no store persists observations
+adapter-proven          not yet
+provider-outcome-proven not yet
+```
+
+Until a live route calls `buildCapabilityRoute` with observations produced from real relay receipts, the market is advisory source, not enforced routing. Do not describe it in present tense as selecting operators.
 
 ## Evidence hierarchy
 
