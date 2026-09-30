@@ -1,0 +1,61 @@
+name: External Site Snapshot
+
+# Read-only Playwright evidence for a public URL (e.g. a third-party draft of a Juss site).
+# No secrets are used. Screenshots + report.json are committed to the `snapshots` branch
+# so they can be read over git from environments where Actions artifacts are unreachable.
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_url:
+        description: 'Public https URL to snapshot (no credentials, no private hosts)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: external-site-snapshot
+  cancel-in-progress: false
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SNAPSHOT_TARGET_URL: ${{ inputs.target_url }}
+      SNAPSHOT_OUT_DIR: ${{ runner.temp }}/snapshots
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            scripts/external-site-snapshot.mjs
+            package.json
+            package-lock.json
+          sparse-checkout-cone-mode: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install Playwright Chromium
+        run: npm i --no-save --no-audit --no-fund playwright@1 && npx playwright install chromium --with-deps
+      - name: Capture snapshot
+        run: node scripts/external-site-snapshot.mjs
+      - name: Publish snapshot to the snapshots branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          rm -rf "$RUNNER_TEMP/snapbranch"
+          git clone --depth 1 --branch snapshots "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "$RUNNER_TEMP/snapbranch" 2>/dev/null \
+            || { git init -q "$RUNNER_TEMP/snapbranch"; cd "$RUNNER_TEMP/snapbranch"; git checkout -q -b snapshots; git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"; cd - >/dev/null; }
+          cd "$RUNNER_TEMP/snapbranch"
+          mkdir -p snapshots
+          cp -R "$SNAPSHOT_OUT_DIR"/. snapshots/
+          git config user.name "external-site-snapshot[bot]"
+          git config user.email "external-site-snapshot@users.noreply.github.com"
+          git add snapshots
+          git commit -q -m "snapshot: ${SNAPSHOT_TARGET_URL} (run ${GITHUB_RUN_ID})"
+          git push -q origin HEAD:snapshots
+          echo "published: $(ls snapshots | tail -1)"
