@@ -1,11 +1,11 @@
 #!/usr/bin/env node
-// Juss & Co status sync: fills evidence fields in jussray/juss-and-co data/worlds.json from
+// Juss & Co status sync: fills evidence fields in jussray/jussray data/worlds.json from
 // live GitHub state of each world's repository. Founder-declared fields are never touched.
 // Delivery: with JUSS_AND_CO_SYNC_TOKEN → branch fcr/status-sync + PR on the site repo.
 // Without it → receipt-only (JSON printed + written to $SYNC_OUT), nothing delivered.
 
 const API = 'https://api.github.com';
-const TARGET = process.env.SYNC_TARGET_REPO || 'jussray/juss-and-co';
+const TARGET = process.env.SYNC_TARGET_REPO || 'jussray/jussray';
 const DECLARED = ['name', 'repo', 'st', 'label', 'link', 'held', 'contact'];
 
 export function summarizeChecks(runs) {
@@ -58,7 +58,7 @@ async function run() {
   const readToken = process.env.GITHUB_TOKEN;
   const syncToken = process.env.JUSS_AND_CO_SYNC_TOKEN || '';
   if (!readToken) { console.error('::error::GITHUB_TOKEN missing'); process.exit(2); }
-  const file = await gh(`/repos/${TARGET}/contents/data/worlds.json`, readToken);
+  const file = await gh(`/repos/${TARGET}/contents/site/data/worlds.json`, readToken);
   const current = JSON.parse(Buffer.from(file.content, 'base64').toString('utf8'));
   const evidence = {};
   for (const w of current.worlds) {
@@ -78,8 +78,8 @@ async function run() {
   let branchSha = null;
   try { branchSha = (await gh(`/repos/${TARGET}/git/ref/heads/${branch}`, syncToken)).object.sha; }
   catch { await gh(`/repos/${TARGET}/git/refs`, syncToken, { method: 'POST', body: JSON.stringify({ ref: `refs/heads/${branch}`, sha: baseRef.object.sha }) }); branchSha = baseRef.object.sha; }
-  let existingSha; try { existingSha = (await gh(`/repos/${TARGET}/contents/data/worlds.json?ref=${branch}`, syncToken)).sha; } catch { existingSha = undefined; }
-  await gh(`/repos/${TARGET}/contents/data/worlds.json`, syncToken, { method: 'PUT', body: JSON.stringify({ message: `chore(status): sync world evidence from Founder Control Room (${new Date().toISOString().slice(0, 16)}Z)`, content: Buffer.from(body).toString('base64'), branch, sha: existingSha }) });
+  let existingSha; try { existingSha = (await gh(`/repos/${TARGET}/contents/site/data/worlds.json?ref=${branch}`, syncToken)).sha; } catch { existingSha = undefined; }
+  await gh(`/repos/${TARGET}/contents/site/data/worlds.json`, syncToken, { method: 'PUT', body: JSON.stringify({ message: `chore(status): sync world evidence from Founder Control Room (${new Date().toISOString().slice(0, 16)}Z)`, content: Buffer.from(body).toString('base64'), branch, sha: existingSha }) });
   const open = await gh(`/repos/${TARGET}/pulls?state=open&head=${TARGET.split('/')[0]}:${branch}`, syncToken);
   if (!open.length) {
     const pr = await gh(`/repos/${TARGET}/pulls`, syncToken, { method: 'POST', body: JSON.stringify({ title: 'chore(status): sync world evidence from Founder Control Room', head: branch, base, body: 'Evidence fields in `data/worlds.json` refreshed from live GitHub state (main SHA, latest merged PR, CI on main). Founder-declared fields untouched. Opened by the FCR `juss-and-co-status-sync` workflow; merge only on founder approval.' }) });

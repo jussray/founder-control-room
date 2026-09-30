@@ -1,10 +1,10 @@
 name: Juss & Co Status Sync
 
 # Reads live GitHub state of each Juss & Co world (main SHA, latest merged PR, CI on main)
-# and refreshes the evidence fields of jussray/juss-and-co data/worlds.json through a PR.
+# and refreshes the evidence fields of jussray/jussray data/worlds.json through a PR.
 # Founder-declared fields (status, links, contacts) are never written by this workflow.
 # Delivery requires the JUSS_AND_CO_SYNC_TOKEN secret (fine-grained, contents+pull-requests
-# write on jussray/juss-and-co only). Without it the run is receipt-only and delivers nothing.
+# write on jussray/jussray only). Without it the run is receipt-only and delivers nothing.
 
 on:
   schedule:
