@@ -1,0 +1,46 @@
+name: Juss & Co Status Sync
+
+# Reads live GitHub state of each Juss & Co world (main SHA, latest merged PR, CI on main)
+# and refreshes the evidence fields of jussray/juss-and-co data/worlds.json through a PR.
+# Founder-declared fields (status, links, contacts) are never written by this workflow.
+# Delivery requires the JUSS_AND_CO_SYNC_TOKEN secret (fine-grained, contents+pull-requests
+# write on jussray/juss-and-co only). Without it the run is receipt-only and delivers nothing.
+
+on:
+  schedule:
+    - cron: '17 */6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: juss-and-co-status-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            scripts/juss-and-co-status-sync.mjs
+          sparse-checkout-cone-mode: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Observe worlds and deliver evidence
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          JUSS_AND_CO_SYNC_TOKEN: ${{ secrets.JUSS_AND_CO_SYNC_TOKEN }}
+          SYNC_OUT: ${{ runner.temp }}/worlds.json
+        run: node scripts/juss-and-co-status-sync.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: worlds-${{ github.run_id }}
+          path: ${{ runner.temp }}/worlds.json
+          retention-days: 30
