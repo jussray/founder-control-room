@@ -118,7 +118,16 @@
       "path": "src/lib/modelCapabilityMarket.ts",
       "claims": [
         "`src/lib/modelCapabilityMarket.ts` may rank Council operators only from task-specific evidence with external benchmarks treated as bounded priors; a benchmark win cannot by itself establish local eligibility, outcome proof, selection authority, or execution authority.",
-        "Fresh authority-boundary violations must block promotion, false-green behavior must reduce ranking, stale local evidence must expire, and challenger selection should preserve provider-family independence when available without granting mutation authority."
+        "Fresh authority-boundary violations must block promotion, false-green behavior must reduce ranking, stale local evidence must expire, and challenger selection should preserve provider-family independence when available without granting mutation authority.",
+        "`src/lib/modelCapabilityMarket.ts` names `multimodal-generation` as a task class so provider-dependent generation work is ranked from local receipts like every other class; adding a task class grants no operator eligibility, selection authority, or execution authority."
+      ]
+    },
+    {
+      "path": "src/lib/capabilityObservationFeed.ts",
+      "claims": [
+        "`src/lib/capabilityObservationFeed.ts` may fold operator relay receipts into capability observations only for the operator that answered them, only from outcome statuses, deduplicated by response hash with the latest outcome per relay id, and only inside the caller's freshness window so stale evidence cannot renew itself.",
+        "`src/lib/capabilityObservationFeed.ts` must treat a provider answering as unproven: only independently verified relay ids contribute proof or evidence references, completed-without-evidence is a false green, any non-`none` authorityRequested is an authority violation, and `blocked` never lowers success.",
+        "The fold is contract-capable tested source; relay responses are not persisted, no outcome verifier exists, no live route calls the market, and the fold grants no selection or execution authority."
       ]
     },
     {

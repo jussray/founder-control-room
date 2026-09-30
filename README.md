@@ -147,6 +147,8 @@ canonical capability declaration
 
 The market may recommend a primary, an independent challenger from another provider family, and shadow trials for promising unproven models. Every route remains explicitly non-authorizing (`selectionAuthority: false`, `executionAuthority: false`). Founder approval, repository/provider gates, provider readback, Playwright for load-bearing browser claims, and outcome verification remain separate. See [`docs/MODEL_CAPABILITY_MARKET.md`](docs/MODEL_CAPABILITY_MARKET.md).
 
+The market's intended first receipt source is the operator relay: `src/lib/capabilityObservationFeed.ts` folds relay responses into per-operator, per-task-class observations (only independently verified receipts count as proof; false green = completed without evidence; authority violation = any `authorityRequested` other than `none`; stale, duplicate, in-flight and foreign-operator receipts excluded). State: the ranking and the fold are **contract-capable** tested source; relay responses are not yet persisted, no outcome verifier exists, and no live route calls the market — advisory, not enforced routing.
+
 ### Founder-content execution
 
 The founder-content architecture separates story, authority, transport, and outcome:
