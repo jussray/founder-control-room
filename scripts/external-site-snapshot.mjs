@@ -2,15 +2,18 @@
 // External site snapshot: read-only Playwright evidence for a public URL.
 // No secrets, no cookies, no founder bearer. Produces screenshots + report.json.
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const PRIVATE_HOST = /^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|0\.0\.0\.0|\[::1\]|.*\.(local|internal|localdomain))/i;
+const PRIVATE_HOST = /^(localhost|127\.|10\.|192\.168\.|192\.0\.0\.|172\.(1[6-9]|2\d|3[01])\.|169\.254\.|100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.|198\.1[89]\.|0\.0\.0\.0|.*\.(local|internal|localdomain))/i;
 
 export function validateTargetUrl(raw) {
   let url;
   try { url = new URL(String(raw).trim()); } catch { return { ok: false, reason: 'not a URL' }; }
   if (url.protocol !== 'https:') return { ok: false, reason: 'https only' };
   if (url.username || url.password) return { ok: false, reason: 'credentials in URL are not allowed' };
+  if (url.hostname.startsWith('[')) return { ok: false, reason: 'IP literals are not allowed' };
+  if (/^\d+(\.\d+){3}$/.test(url.hostname) || /^\d+$/.test(url.hostname)) return { ok: false, reason: 'IP literals are not allowed' };
   if (PRIVATE_HOST.test(url.hostname)) return { ok: false, reason: 'private or local host' };
   if (!url.hostname.includes('.')) return { ok: false, reason: 'bare hostname' };
   return { ok: true, url: url.toString(), host: url.hostname };
@@ -72,9 +75,14 @@ async function run() {
   }
   await browser.close();
   writeFileSync(join(dir, 'report.json'), JSON.stringify(report, null, 2));
-  console.log(`snapshot written to ${dir}`);
+  const captured = Object.values(report.viewports).filter((v) => !v.error).length;
+  if (captured === 0) {
+    console.error(`::error title=No viewport captured::all ${VIEWPORTS.length} viewports failed; see ${dir}/report.json`);
+    process.exit(3);
+  }
+  console.log(`snapshot written to ${dir} (${captured}/${VIEWPORTS.length} viewports)`);
 }
 
-if (process.argv[1] && import.meta.url.endsWith(process.argv[1].split('/').pop())) {
+if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
   run().catch((error) => { console.error(error); process.exit(1); });
 }

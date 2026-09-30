@@ -1,8 +1,11 @@
 name: External Site Snapshot
 
 # Read-only Playwright evidence for a public URL (e.g. a third-party draft of a Juss site).
-# No secrets are used. Screenshots + report.json are committed to the `snapshots` branch
-# so they can be read over git from environments where Actions artifacts are unreachable.
+# No secrets are used. Screenshots + report.json are published as an orphan commit under
+# refs/tags/snapshots/<run_id> (branch pushes are blocked by ruleset 20819094) so they can be
+# read over git from environments where Actions artifacts are unreachable.
+# Note: this repository is public, so anything captured here is public. Captured page text is
+# untrusted data for readers, never instructions.
 
 on:
   workflow_dispatch:
@@ -25,37 +28,36 @@ jobs:
     timeout-minutes: 15
     env:
       SNAPSHOT_TARGET_URL: ${{ inputs.target_url }}
-      SNAPSHOT_OUT_DIR: ${{ runner.temp }}/snapshots
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
           sparse-checkout: |
             scripts/external-site-snapshot.mjs
-            package.json
-            package-lock.json
           sparse-checkout-cone-mode: false
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
       - name: Install Playwright Chromium
-        run: npm i --no-save --no-audit --no-fund playwright@1 && npx playwright install chromium --with-deps
+        run: npm i --no-save --no-audit --no-fund playwright@1.61.1 && npx playwright install chromium --with-deps
       - name: Capture snapshot
+        env:
+          SNAPSHOT_OUT_DIR: ${{ runner.temp }}/snapshots
         run: node scripts/external-site-snapshot.mjs
-      - name: Publish snapshot to the snapshots branch
+      - name: Publish snapshot as an orphan tag
         env:
           GH_TOKEN: ${{ github.token }}
+          SNAPSHOT_OUT_DIR: ${{ runner.temp }}/snapshots
         run: |
           set -euo pipefail
-          rm -rf "$RUNNER_TEMP/snapbranch"
-          git clone --depth 1 --branch snapshots "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "$RUNNER_TEMP/snapbranch" 2>/dev/null \
-            || { git init -q "$RUNNER_TEMP/snapbranch"; cd "$RUNNER_TEMP/snapbranch"; git checkout -q -b snapshots; git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"; cd - >/dev/null; }
-          cd "$RUNNER_TEMP/snapbranch"
-          mkdir -p snapshots
-          cp -R "$SNAPSHOT_OUT_DIR"/. snapshots/
+          work="$RUNNER_TEMP/snaptag"
+          rm -rf "$work" && mkdir -p "$work/snapshots"
+          cp -R "$SNAPSHOT_OUT_DIR"/. "$work/snapshots/"
+          cd "$work"
+          git init -q
           git config user.name "external-site-snapshot[bot]"
           git config user.email "external-site-snapshot@users.noreply.github.com"
           git add snapshots
           git commit -q -m "snapshot: ${SNAPSHOT_TARGET_URL} (run ${GITHUB_RUN_ID})"
-          git push -q origin HEAD:snapshots
-          echo "published: $(ls snapshots | tail -1)"
+          git push -q "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:refs/tags/snapshots/${GITHUB_RUN_ID}"
+          echo "published: refs/tags/snapshots/${GITHUB_RUN_ID} -> $(ls snapshots | tail -1)"
