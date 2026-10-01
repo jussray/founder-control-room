@@ -189,15 +189,14 @@ export function evaluateUrlFixVerificationReceipt(receipt: UrlFixVerificationRec
     };
   }
 
-  if (receipt.after.evidenceMode !== 'REAL') {
-    return {
-      validSameWitness: true,
-      proofState: 'PATCHED_NOT_LIVE',
-      errors: ['mocked, intercepted, or fixture evidence cannot establish browser proof'],
-    };
-  }
-
   if (receipt.after.target === 'LIVE') {
+    if (receipt.after.evidenceMode !== 'REAL' || receipt.before.evidenceMode !== 'REAL') {
+      return {
+        validSameWitness: true,
+        proofState: 'PATCHED_NOT_LIVE',
+        errors: ['live before/after proof requires real, non-mocked dependencies'],
+      };
+    }
     if (!receipt.after.runtimeIdentity?.trim()) {
       return {
         validSameWitness: true,
@@ -205,17 +204,17 @@ export function evaluateUrlFixVerificationReceipt(receipt: UrlFixVerificationRec
         errors: ['live browser proof requires a known repaired runtime identity'],
       };
     }
-    if (receipt.before.evidenceMode !== 'REAL') {
-      return {
-        validSameWitness: true,
-        proofState: 'PATCHED_NOT_LIVE',
-        errors: ['live before/after proof requires a real baseline witness'],
-      };
-    }
     return { validSameWitness: true, proofState: 'LIVE_BROWSER_PROVEN', errors: [] };
   }
 
   if (receipt.after.target === 'PREVIEW') {
+    if (receipt.after.evidenceMode !== 'REAL') {
+      return {
+        validSameWitness: true,
+        proofState: 'LOCAL_BROWSER_PROVEN',
+        errors: ['preview dependencies are non-real; proof is capped at local browser behavior'],
+      };
+    }
     return { validSameWitness: true, proofState: 'PREVIEW_BROWSER_PROVEN', errors: [] };
   }
 
