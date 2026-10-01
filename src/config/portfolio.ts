@@ -114,7 +114,7 @@ export const EXTERNAL_PROJECTS: readonly PortfolioProject[] = [
   },
   {
     slug: "sweats",
-    name: "Sweats",
+    name: "SWEATS",
     repository: "jussray/Sweats",
     status: "external",
     capabilities: ["product", "continuity"],
@@ -128,10 +128,10 @@ export const EXTERNAL_PROJECTS: readonly PortfolioProject[] = [
   },
   {
     slug: "truth-weaver",
-    name: "Truth Weaver",
+    name: "Truth Weaver Counsel",
     repository: "jussray/truth-weaver",
     status: "external",
-    capabilities: ["decision-control", "evidence", "continuity"],
+    capabilities: ["legal-knowledge", "decision-support", "evidence", "continuity"],
   },
   {
     slug: "alexa-commerce-engine",
@@ -166,6 +166,20 @@ export const CONTINUITY_ONLY_PROJECTS: readonly PortfolioProject[] = [
     repository: "jussray/Bip-Jr",
     status: "continuity-only",
     capabilities: ["bip-universe", "continuity"],
+  },
+  {
+    slug: "exact-match-engine",
+    name: "Exact Match Engine",
+    repository: "jussray/exact-match-engine",
+    status: "continuity-only",
+    capabilities: ["claim-reconciliation", "evidence-provenance", "continuity"],
+  },
+  {
+    slug: "ayure",
+    name: "AYURE",
+    repository: "jussray/Ayure-",
+    status: "continuity-only",
+    capabilities: ["property-network", "intent-matching", "cloudflare-d1", "playwright", "continuity"],
   },
 ] as const;
 
