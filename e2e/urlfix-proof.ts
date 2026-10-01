@@ -17,6 +17,7 @@ import {
 const proofDir = resolve(process.env.URLFIX_PROOF_DIR || 'test-results/urlfix-proof');
 mkdirSync(proofDir, { recursive: true });
 
+const EXPECTATION_REF = 'fixture-contract:checkout-ready';
 const witnessSpec: UrlFixWitnessSpec = {
   route: '/cart',
   browser: 'chromium',
@@ -24,6 +25,7 @@ const witnessSpec: UrlFixWitnessSpec = {
   preconditions: ['fixture cart contains one item'],
   actions: ['open /cart', 'click Checkout'],
   expectedObservableResult: 'checkout-ready',
+  expectationEvidenceRef: EXPECTATION_REF,
 };
 
 interface FixtureRuntime {
@@ -140,16 +142,25 @@ for (const ref of [beforeRun.trace, afterRun.trace]) {
   if (ref) verifiedArtifacts.set(ref.id, ref.sha256);
 }
 
-const decision = evaluateUrlFixVerificationReceipt(receipt, {
+const verificationTrust = {
   verifiedArtifacts,
   verifiedRuntimeEvidence: [],
-});
+  verifiedWitnessRuns: [beforeRun, afterRun],
+  verifiedExpectations: [{
+    ref: EXPECTATION_REF,
+    route: witnessSpec.route,
+    browser: witnessSpec.browser,
+    expectedObservableResult: witnessSpec.expectedObservableResult,
+  }],
+} as const;
+
+const decision = evaluateUrlFixVerificationReceipt(receipt, verificationTrust);
 
 if (!decision.validSameWitness || decision.proofState !== 'LOCAL_BROWSER_PROVEN' || decision.errors.length > 0) {
   throw new Error(`unexpected URLFix local proof decision: ${JSON.stringify(decision)}`);
 }
 
-const falseLiveDecision = evaluateUrlFixVerificationReceipt({
+const falseLiveReceipt: UrlFixVerificationReceipt = {
   ...receipt,
   before: {
     ...beforeRun,
@@ -166,12 +177,16 @@ const falseLiveDecision = evaluateUrlFixVerificationReceipt({
     runtimeIdentity: 'pretend-live-runtime',
     runtimeEvidenceRef: 'pretend-after-runtime-receipt',
   },
-}, {
+};
+
+const falseLiveDecision = evaluateUrlFixVerificationReceipt(falseLiveReceipt, {
   verifiedArtifacts,
   verifiedRuntimeEvidence: [
     { ref: 'pretend-before-runtime-receipt', runtimeIdentity: beforeRun.runtimeIdentity || '', origin: 'https://example.invalid' },
     { ref: 'pretend-after-runtime-receipt', runtimeIdentity: 'pretend-live-runtime', origin: 'https://example.invalid' },
   ],
+  verifiedWitnessRuns: [falseLiveReceipt.before, falseLiveReceipt.after],
+  verifiedExpectations: verificationTrust.verifiedExpectations,
 });
 
 if (falseLiveDecision.proofState === 'LIVE_BROWSER_PROVEN') {
@@ -179,8 +194,9 @@ if (falseLiveDecision.proofState === 'LIVE_BROWSER_PROVEN') {
 }
 
 writeFileSync(join(proofDir, 'receipt.json'), JSON.stringify({
-  schema: 'juss/urlfix-playwright-contract-proof@v2',
+  schema: 'juss/urlfix-playwright-contract-proof@v3',
   witnessFingerprint: createUrlFixWitnessFingerprint(witnessSpec),
+  expectationEvidenceRef: EXPECTATION_REF,
   beforeRun,
   afterRun,
   decision,
