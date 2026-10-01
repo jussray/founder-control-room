@@ -8,11 +8,13 @@ import {
   isUrlFixFailurePlane,
   type UrlFixTrustContext,
   type UrlFixVerificationReceipt,
+  type UrlFixVerificationTrustContext,
   type UrlFixWitnessSpec,
 } from '../urlfix.js';
 
 const HASH_BEFORE = 'a'.repeat(64);
 const HASH_AFTER = 'b'.repeat(64);
+const EXPECTATION_REF = 'product-contract:checkout-ready';
 
 const spec: UrlFixWitnessSpec = {
   route: '/cart',
@@ -21,36 +23,7 @@ const spec: UrlFixWitnessSpec = {
   preconditions: ['cart contains one restored item'],
   actions: ['open /cart', 'click Checkout'],
   expectedObservableResult: 'checkout-ready',
-};
-
-const EMPTY_TRUST: UrlFixTrustContext = {
-  verifiedUrlBindings: [],
-  verifiedRepairAuthorities: [],
-  verifiedArtifacts: new Map(),
-  verifiedRuntimeEvidence: [],
-};
-
-const FULL_TRUST: UrlFixTrustContext = {
-  verifiedUrlBindings: [{
-    origin: 'https://app.sekretbip.net',
-    projectSlug: 'sekret-bip',
-    repository: 'jussray/Sekret-Bip',
-    evidenceRef: 'fcr:ownership:sekret-bip:app',
-  }],
-  verifiedRepairAuthorities: [{
-    receiptRef: 'fcr:repair:urlfix:sekret-bip:001',
-    projectSlug: 'sekret-bip',
-    repository: 'jussray/Sekret-Bip',
-  }],
-  verifiedArtifacts: new Map([
-    ['trace-before', HASH_BEFORE],
-    ['trace-after', HASH_AFTER],
-  ]),
-  verifiedRuntimeEvidence: [
-    { ref: 'runtime:before:receipt', runtimeIdentity: 'runtime-old', origin: 'https://app.sekretbip.net' },
-    { ref: 'runtime:after:receipt', runtimeIdentity: 'runtime-new', origin: 'https://app.sekretbip.net' },
-    { ref: 'runtime:preview:receipt', runtimeIdentity: 'preview-runtime', origin: 'https://preview.sekretbip.net' },
-  ],
+  expectationEvidenceRef: EXPECTATION_REF,
 };
 
 const artifact = (id: string, sha256: string) => ({ id, sha256 });
@@ -88,6 +61,51 @@ function receipt(overrides: Partial<UrlFixVerificationReceipt> = {}): UrlFixVeri
   };
 }
 
+function verificationTrust(subject = receipt()): UrlFixVerificationTrustContext {
+  return {
+    verifiedArtifacts: new Map([
+      [subject.before.trace!.id, subject.before.trace!.sha256],
+      [subject.after.trace!.id, subject.after.trace!.sha256],
+    ]),
+    verifiedRuntimeEvidence: [
+      { ref: 'runtime:before:receipt', runtimeIdentity: 'runtime-old', origin: 'https://app.sekretbip.net' },
+      { ref: 'runtime:after:receipt', runtimeIdentity: 'runtime-new', origin: 'https://app.sekretbip.net' },
+      { ref: 'runtime:preview:receipt', runtimeIdentity: 'preview-runtime', origin: 'https://preview.sekretbip.net' },
+    ],
+    verifiedWitnessRuns: [subject.before, subject.after],
+    verifiedExpectations: [{
+      ref: EXPECTATION_REF,
+      route: subject.witnessSpec.route,
+      browser: subject.witnessSpec.browser,
+      expectedObservableResult: subject.witnessSpec.expectedObservableResult,
+    }],
+  };
+}
+
+const FULL_TRUST: UrlFixTrustContext = {
+  ...verificationTrust(),
+  verifiedUrlBindings: [{
+    origin: 'https://app.sekretbip.net',
+    projectSlug: 'sekret-bip',
+    repository: 'jussray/Sekret-Bip',
+    evidenceRef: 'fcr:ownership:sekret-bip:app',
+  }],
+  verifiedRepairAuthorities: [{
+    receiptRef: 'fcr:repair:urlfix:sekret-bip:001',
+    projectSlug: 'sekret-bip',
+    repository: 'jussray/Sekret-Bip',
+  }],
+};
+
+const EMPTY_TRUST: UrlFixTrustContext = {
+  verifiedUrlBindings: [],
+  verifiedRepairAuthorities: [],
+  verifiedArtifacts: new Map(),
+  verifiedRuntimeEvidence: [],
+  verifiedWitnessRuns: [],
+  verifiedExpectations: [],
+};
+
 describe('urlfix same-witness proof', () => {
   it('fingerprints behavior without pinning environment mode', () => {
     const first = createUrlFixWitnessFingerprint(spec);
@@ -95,19 +113,75 @@ describe('urlfix same-witness proof', () => {
     expect(first).toBe(second);
   });
 
-  it('requires tuple-bound artifacts and before/after runtime evidence for live proof', () => {
-    const result = evaluateUrlFixVerificationReceipt(receipt(), FULL_TRUST);
+  it('requires tuple-bound artifacts, run receipts, expectation evidence, and runtime receipts for live proof', () => {
+    const subject = receipt();
+    const result = evaluateUrlFixVerificationReceipt(subject, verificationTrust(subject));
     expect(result).toEqual({ validSameWitness: true, proofState: 'LIVE_BROWSER_PROVEN', errors: [] });
   });
 
+  it('fails closed when the caller changes observedResult without a matching trusted run receipt', () => {
+    const trusted = receipt();
+    const forged = {
+      ...trusted,
+      after: { ...trusted.after, observedResult: 'checkout-ready-but-not-observed' },
+    };
+    const result = evaluateUrlFixVerificationReceipt(forged, verificationTrust(trusted));
+    expect(result.proofState).toBe('PATCHED');
+    expect(result.errors.join(' ')).toContain('after witness run receipt');
+  });
+
+  it('fails closed when the caller changes the expected result without trusted expectation evidence', () => {
+    const trusted = receipt();
+    const forgedSpec = {
+      ...trusted.witnessSpec,
+      expectedObservableResult: 'whatever-the-page-already-does',
+    };
+    const forged = {
+      ...trusted,
+      witnessSpec: forgedSpec,
+      before: { ...trusted.before, witnessFingerprint: createUrlFixWitnessFingerprint(forgedSpec) },
+      after: { ...trusted.after, witnessFingerprint: createUrlFixWitnessFingerprint(forgedSpec), observedResult: 'whatever-the-page-already-does' },
+    };
+    const result = evaluateUrlFixVerificationReceipt(forged, verificationTrust(trusted));
+    expect(result.proofState).toBe('PATCHED');
+    expect(result.errors.join(' ')).toContain('expected observable result');
+  });
+
+  it('fails closed when expectationEvidenceRef is swapped without a matching trusted expectation', () => {
+    const trusted = receipt();
+    const forgedSpec = { ...trusted.witnessSpec, expectationEvidenceRef: 'made-up-expectation' };
+    const forged = {
+      ...trusted,
+      witnessSpec: forgedSpec,
+      before: { ...trusted.before, witnessFingerprint: createUrlFixWitnessFingerprint(forgedSpec) },
+      after: { ...trusted.after, witnessFingerprint: createUrlFixWitnessFingerprint(forgedSpec) },
+    };
+    const result = evaluateUrlFixVerificationReceipt(forged, verificationTrust(trusted));
+    expect(result.proofState).toBe('PATCHED');
+    expect(result.errors.join(' ')).toContain('expected observable result');
+  });
+
   it('fails closed when artifact ids are known but hashes do not match trusted evidence', () => {
-    const base = receipt();
-    const result = evaluateUrlFixVerificationReceipt({
-      ...base,
-      after: { ...base.after, trace: artifact('trace-after', 'c'.repeat(64)) },
-    }, FULL_TRUST);
+    const trusted = receipt();
+    const forged = {
+      ...trusted,
+      after: { ...trusted.after, trace: artifact('trace-after', 'c'.repeat(64)) },
+    };
+    const result = evaluateUrlFixVerificationReceipt(forged, verificationTrust(trusted));
     expect(result.proofState).toBe('PATCHED');
     expect(result.errors.join(' ')).toContain('id/hash');
+  });
+
+  it('requires distinct trace artifacts for before and after executions', () => {
+    const trusted = receipt();
+    const duplicateTrace = {
+      ...trusted,
+      after: { ...trusted.after, trace: trusted.before.trace },
+    };
+    const trust = verificationTrust(duplicateTrace);
+    const result = evaluateUrlFixVerificationReceipt(duplicateTrace, trust);
+    expect(result.proofState).toBe('PATCHED');
+    expect(result.errors.join(' ')).toContain('distinct trace artifacts');
   });
 
   it('fails closed when artifact references have no independent trust record', () => {
@@ -117,31 +191,33 @@ describe('urlfix same-witness proof', () => {
   });
 
   it('rejects run-id reuse', () => {
-    const base = receipt();
-    const result = evaluateUrlFixVerificationReceipt({
-      ...base,
-      after: { ...base.after, runId: base.before.runId },
-    }, FULL_TRUST);
+    const trusted = receipt();
+    const forged = { ...trusted, after: { ...trusted.after, runId: trusted.before.runId } };
+    const result = evaluateUrlFixVerificationReceipt(forged, verificationTrust(trusted));
     expect(result.validSameWitness).toBe(false);
     expect(result.proofState).toBe('PATCHED');
   });
 
   it('does not let a local baseline plus a live after-run become live proof', () => {
-    const base = receipt();
-    const result = evaluateUrlFixVerificationReceipt({
-      ...base,
-      before: { ...base.before, target: 'LOCAL', targetUrl: 'http://127.0.0.1:4173/cart' },
-    }, FULL_TRUST);
+    const subject = receipt();
+    const local = {
+      ...subject,
+      before: { ...subject.before, target: 'LOCAL' as const, targetUrl: 'http://127.0.0.1:4173/cart' },
+    };
+    const result = evaluateUrlFixVerificationReceipt(local, verificationTrust(local));
     expect(result.proofState).toBe('PATCHED_NOT_LIVE');
     expect(result.errors.join(' ')).toContain('live baseline');
   });
 
   it('does not let a different live origin satisfy the same behavioral witness', () => {
-    const base = receipt();
-    const result = evaluateUrlFixVerificationReceipt({
-      ...base,
-      after: { ...base.after, targetUrl: 'https://example.net/cart' },
-    }, FULL_TRUST);
+    const subject = receipt();
+    const crossOrigin = { ...subject, after: { ...subject.after, targetUrl: 'https://example.net/cart' } };
+    const trust = verificationTrust(crossOrigin);
+    trust.verifiedRuntimeEvidence = [
+      ...trust.verifiedRuntimeEvidence.filter((evidence) => evidence.ref !== 'runtime:after:receipt'),
+      { ref: 'runtime:after:receipt', runtimeIdentity: 'runtime-new', origin: 'https://example.net' },
+    ];
+    const result = evaluateUrlFixVerificationReceipt(crossOrigin, trust);
     expect(result.proofState).toBe('PATCHED_NOT_LIVE');
     expect(result.errors.join(' ')).toContain('same origin');
   });
@@ -149,7 +225,7 @@ describe('urlfix same-witness proof', () => {
   it('does not launder a different query state through the same pathname', () => {
     const querySpec: UrlFixWitnessSpec = { ...spec, route: '/cart?mode=restored' };
     const fingerprint = createUrlFixWitnessFingerprint(querySpec);
-    const base = receipt({
+    const subject = receipt({
       witnessSpec: querySpec,
       before: {
         ...receipt().before,
@@ -162,101 +238,96 @@ describe('urlfix same-witness proof', () => {
         targetUrl: 'https://app.sekretbip.net/cart?mode=fresh',
       },
     });
-    const result = evaluateUrlFixVerificationReceipt(base, FULL_TRUST);
+    const result = evaluateUrlFixVerificationReceipt(subject, verificationTrust(subject));
     expect(result.proofState).toBe('PATCHED');
     expect(result.validSameWitness).toBe(false);
     expect(result.errors.join(' ')).toContain('full witness route');
   });
 
   it('requires real preview dependencies and a verified preview runtime receipt', () => {
-    const base = receipt();
-    const result = evaluateUrlFixVerificationReceipt({
-      ...base,
+    const subject = receipt();
+    const preview = {
+      ...subject,
       after: {
-        ...base.after,
-        target: 'PREVIEW',
+        ...subject.after,
+        target: 'PREVIEW' as const,
         targetUrl: 'https://preview.sekretbip.net/cart',
         runtimeIdentity: 'preview-runtime',
         runtimeEvidenceRef: 'runtime:preview:receipt',
       },
-    }, FULL_TRUST);
+    };
+    const result = evaluateUrlFixVerificationReceipt(preview, verificationTrust(preview));
     expect(result).toEqual({ validSameWitness: true, proofState: 'PREVIEW_BROWSER_PROVEN', errors: [] });
   });
 
   it('does not prove preview from a real-looking URL without bound runtime evidence', () => {
-    const base = receipt();
-    const result = evaluateUrlFixVerificationReceipt({
-      ...base,
+    const subject = receipt();
+    const preview = {
+      ...subject,
       after: {
-        ...base.after,
-        target: 'PREVIEW',
+        ...subject.after,
+        target: 'PREVIEW' as const,
         targetUrl: 'https://preview.sekretbip.net/cart',
         runtimeIdentity: 'preview-runtime',
         runtimeEvidenceRef: 'untrusted-preview-runtime',
       },
-    }, FULL_TRUST);
+    };
+    const trust = verificationTrust(preview);
+    trust.verifiedRuntimeEvidence = trust.verifiedRuntimeEvidence.filter((evidence) => evidence.ref !== 'untrusted-preview-runtime');
+    const result = evaluateUrlFixVerificationReceipt(preview, trust);
     expect(result.proofState).toBe('PATCHED_NOT_LIVE');
     expect(result.errors.join(' ')).toContain('preview runtime identity');
   });
 
   it('rejects a runtime evidence ref reused for a different runtime identity', () => {
-    const base = receipt();
-    const result = evaluateUrlFixVerificationReceipt({
-      ...base,
-      after: { ...base.after, runtimeIdentity: 'runtime-not-in-receipt' },
-    }, FULL_TRUST);
+    const subject = receipt();
+    const forged = { ...subject, after: { ...subject.after, runtimeIdentity: 'runtime-not-in-receipt' } };
+    const result = evaluateUrlFixVerificationReceipt(forged, verificationTrust(forged));
     expect(result.proofState).toBe('PATCHED_NOT_LIVE');
     expect(result.errors.join(' ')).toContain('repaired runtime identity');
   });
 
   it('rejects live proof when the failing baseline runtime has no bound receipt', () => {
-    const base = receipt();
-    const result = evaluateUrlFixVerificationReceipt({
-      ...base,
-      before: { ...base.before, runtimeEvidenceRef: 'stale-or-missing-receipt' },
-    }, FULL_TRUST);
+    const subject = receipt();
+    const forged = { ...subject, before: { ...subject.before, runtimeEvidenceRef: 'stale-or-missing-receipt' } };
+    const trust = verificationTrust(forged);
+    trust.verifiedRuntimeEvidence = trust.verifiedRuntimeEvidence.filter((evidence) => evidence.ref !== 'stale-or-missing-receipt');
+    const result = evaluateUrlFixVerificationReceipt(forged, trust);
     expect(result.proofState).toBe('PATCHED_NOT_LIVE');
     expect(result.errors.join(' ')).toContain('baseline runtime identity');
   });
 
   it('never lets mocked live dependencies establish live proof', () => {
-    const base = receipt();
-    const result = evaluateUrlFixVerificationReceipt({
-      ...base,
-      after: { ...base.after, evidenceMode: 'MOCKED' },
-    }, FULL_TRUST);
+    const subject = receipt();
+    const mocked = { ...subject, after: { ...subject.after, evidenceMode: 'MOCKED' as const } };
+    const result = evaluateUrlFixVerificationReceipt(mocked, verificationTrust(mocked));
     expect(result.proofState).toBe('PATCHED_NOT_LIVE');
   });
 
   it('allows a fixture to prove only the local browser layer', () => {
-    const base = receipt();
-    const localTrust: UrlFixTrustContext = {
-      ...FULL_TRUST,
-      verifiedArtifacts: new Map([
-        ['trace-before', HASH_BEFORE],
-        ['trace-after', HASH_AFTER],
-      ]),
-      verifiedRuntimeEvidence: [],
-    };
-    const result = evaluateUrlFixVerificationReceipt({
-      ...base,
+    const subject = receipt();
+    const local = {
+      ...subject,
       before: {
-        ...base.before,
-        target: 'LOCAL',
+        ...subject.before,
+        target: 'LOCAL' as const,
         targetUrl: 'http://127.0.0.1:4173/cart',
-        evidenceMode: 'FIXTURE',
+        evidenceMode: 'FIXTURE' as const,
         runtimeIdentity: 'fixture-before',
         runtimeEvidenceRef: null,
       },
       after: {
-        ...base.after,
-        target: 'LOCAL',
+        ...subject.after,
+        target: 'LOCAL' as const,
         targetUrl: 'http://127.0.0.1:4173/cart',
-        evidenceMode: 'FIXTURE',
+        evidenceMode: 'FIXTURE' as const,
         runtimeIdentity: 'fixture-after',
         runtimeEvidenceRef: null,
       },
-    }, localTrust);
+    };
+    const trust = verificationTrust(local);
+    trust.verifiedRuntimeEvidence = [];
+    const result = evaluateUrlFixVerificationReceipt(local, trust);
     expect(result.proofState).toBe('LOCAL_BROWSER_PROVEN');
   });
 });
@@ -288,7 +359,6 @@ describe('urlfix FCR URL binding', () => {
       ownershipEvidenceRefs: ['made-up-proof'],
       repairAuthorityReceiptRef: 'made-up-authority',
     }, EMPTY_TRUST);
-
     expect(result.sourceMutationAllowed).toBe(false);
     expect(result.errors.join(' ')).toContain('tuple-bound');
   });
@@ -323,11 +393,7 @@ describe('urlfix FCR URL binding', () => {
   });
 
   it('downgrades an owned input that redirects outside the tuple-bound origin set', () => {
-    const result = evaluateUrlFixUrlBinding({
-      ...binding,
-      finalUrl: 'https://example.net/cart',
-    }, FULL_TRUST);
-
+    const result = evaluateUrlFixUrlBinding({ ...binding, finalUrl: 'https://example.net/cart' }, FULL_TRUST);
     expect(result.sourceMutationAllowed).toBe(false);
     expect(result.errors.join(' ')).toContain('final URL origin');
   });
@@ -357,7 +423,6 @@ describe('urlfix FCR URL binding', () => {
       repairAuthorityReceiptRef: 'fcr:repair:urlfix:truth-weaver:001',
       runtimeIdentity: 'runtime-1',
     }, trust);
-
     expect(result.sourceMutationAllowed).toBe(false);
     expect(result.errors.join(' ')).toContain('not authority-bearing');
   });
