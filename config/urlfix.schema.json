@@ -134,6 +134,37 @@
           "then": { "required": ["verification"] }
         },
         {
+          "if": { "properties": { "state": { "const": "LOCAL_BROWSER_PROVEN" } }, "required": ["state"] },
+          "then": {
+            "properties": {
+              "verification": {
+                "properties": {
+                  "after": { "properties": { "target": { "const": "LOCAL" } } }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "state": { "const": "PREVIEW_BROWSER_PROVEN" } }, "required": ["state"] },
+          "then": {
+            "properties": {
+              "verification": {
+                "properties": {
+                  "after": {
+                    "properties": {
+                      "target": { "const": "PREVIEW" },
+                      "evidenceMode": { "const": "REAL" },
+                      "runtimeIdentity": { "type": "string", "minLength": 1 },
+                      "runtimeEvidenceRef": { "type": "string", "minLength": 1 }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
           "if": { "properties": { "state": { "const": "LIVE_BROWSER_PROVEN" } }, "required": ["state"] },
           "then": {
             "properties": {
