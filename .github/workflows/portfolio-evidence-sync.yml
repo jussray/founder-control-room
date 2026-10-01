@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'scripts/sync-jussco-portfolio-evidence.mjs'
+      - 'scripts/mint-portfolio-github-app-token.mjs'
       - '.github/workflows/portfolio-evidence-sync.yml'
   schedule:
     - cron: '17 */6 * * *'
@@ -48,25 +49,28 @@ jobs:
       - name: Verify evidence-only mutation contract
         run: node scripts/sync-jussco-portfolio-evidence.mjs --self-test
 
-      - name: Mint portfolio GitHub App token
-        id: app-token
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1
-        with:
-          app-id: ${{ secrets.APP_ID }}
-          private-key: ${{ secrets.APP_PRIVATE_KEY }}
-          owner: jussray
-          permission-contents: write
-          permission-pull-requests: read
-          permission-checks: read
+      - name: Normalize key and mint portfolio GitHub App token
+        env:
+          APP_ID: ${{ secrets.APP_ID }}
+          APP_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}
+          GITHUB_APP_OWNER: jussray
+          PORTFOLIO_SYNC_TOKEN_FILE: ${{ runner.temp }}/portfolio-sync-token
+        run: node scripts/mint-portfolio-github-app-token.mjs
 
       - name: Observe canonical repositories and publish evidence atomically
         id: sync
         env:
-          PORTFOLIO_SYNC_TOKEN: ${{ steps.app-token.outputs.token }}
+          PORTFOLIO_SYNC_TOKEN_FILE: ${{ runner.temp }}/portfolio-sync-token
         shell: bash
         run: |
           set -euo pipefail
-          node scripts/sync-jussco-portfolio-evidence.mjs | tee /tmp/portfolio-sync-output.jsonl
+          test -s "$PORTFOLIO_SYNC_TOKEN_FILE"
+          token="$(tr -d '\r\n' < "$PORTFOLIO_SYNC_TOKEN_FILE")"
+          test -n "$token"
+          echo "::add-mask::$token"
+          PORTFOLIO_SYNC_TOKEN="$token" node scripts/sync-jussco-portfolio-evidence.mjs | tee /tmp/portfolio-sync-output.jsonl
+          unset token
+          rm -f "$PORTFOLIO_SYNC_TOKEN_FILE"
           test -s "$PORTFOLIO_SYNC_RECEIPT"
           jq -e '.contract == "juss/fcr-portfolio-evidence@v1"' "$PORTFOLIO_SYNC_RECEIPT" >/dev/null
           echo "state=$(jq -r '.state' "$PORTFOLIO_SYNC_RECEIPT")" >> "$GITHUB_OUTPUT"
