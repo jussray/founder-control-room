@@ -168,11 +168,14 @@ Side/terminal states:
 
 The stable witness fingerprint covers behavior only:
 
-- route;
+- full browser route: pathname + query + fragment;
+- Playwright browser family: `chromium`;
 - viewport;
 - preconditions;
 - ordered browser actions;
 - expected observable result.
+
+A query string or hash route can change product behavior and may not be silently dropped from the witness. A different browser family is not the same witness.
 
 Environment and evidence mode are execution metadata, not part of the behavioral fingerprint. This allows the same behavior to be replayed from local to preview to live without pretending those environments are equivalent.
 
@@ -196,7 +199,7 @@ Fixture/mocked/intercepted evidence may establish local interaction or branching
 - real live before execution;
 - real live after execution;
 - same behavioral witness fingerprint;
-- same live origin and route;
+- same live origin and full browser route;
 - failing before observable result;
 - expected after observable result;
 - before and after trace artifact ids bound to their exact SHA-256 in trusted evidence;
