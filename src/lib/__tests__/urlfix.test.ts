@@ -11,6 +11,9 @@ import {
   type UrlFixWitnessSpec,
 } from '../urlfix.js';
 
+const HASH_BEFORE = 'a'.repeat(64);
+const HASH_AFTER = 'b'.repeat(64);
+
 const spec: UrlFixWitnessSpec = {
   route: '/cart',
   viewport: { width: 390, height: 844 },
@@ -20,22 +23,35 @@ const spec: UrlFixWitnessSpec = {
 };
 
 const EMPTY_TRUST: UrlFixTrustContext = {
-  ownedOrigins: new Set(),
-  verifiedOwnershipEvidenceRefs: new Set(),
-  verifiedRepairAuthorityReceiptRefs: new Set(),
-  verifiedArtifactIds: new Set(),
-  verifiedRuntimeEvidenceRefs: new Set(),
+  verifiedUrlBindings: [],
+  verifiedRepairAuthorities: [],
+  verifiedArtifacts: new Map(),
+  verifiedRuntimeEvidence: [],
 };
 
 const FULL_TRUST: UrlFixTrustContext = {
-  ownedOrigins: new Set(['https://app.sekretbip.net']),
-  verifiedOwnershipEvidenceRefs: new Set(['fcr:ownership:sekret-bip:app']),
-  verifiedRepairAuthorityReceiptRefs: new Set(['fcr:repair:urlfix:sekret-bip:001']),
-  verifiedArtifactIds: new Set(['trace-before', 'trace-after']),
-  verifiedRuntimeEvidenceRefs: new Set(['runtime:after:receipt']),
+  verifiedUrlBindings: [{
+    origin: 'https://app.sekretbip.net',
+    projectSlug: 'sekret-bip',
+    repository: 'jussray/Sekret-Bip',
+    evidenceRef: 'fcr:ownership:sekret-bip:app',
+  }],
+  verifiedRepairAuthorities: [{
+    receiptRef: 'fcr:repair:urlfix:sekret-bip:001',
+    projectSlug: 'sekret-bip',
+    repository: 'jussray/Sekret-Bip',
+  }],
+  verifiedArtifacts: new Map([
+    ['trace-before', HASH_BEFORE],
+    ['trace-after', HASH_AFTER],
+  ]),
+  verifiedRuntimeEvidence: [
+    { ref: 'runtime:before:receipt', runtimeIdentity: 'runtime-old', origin: 'https://app.sekretbip.net' },
+    { ref: 'runtime:after:receipt', runtimeIdentity: 'runtime-new', origin: 'https://app.sekretbip.net' },
+  ],
 };
 
-const artifact = (id: string) => ({ id, sha256: 'a'.repeat(64) });
+const artifact = (id: string, sha256: string) => ({ id, sha256 });
 
 function receipt(overrides: Partial<UrlFixVerificationReceipt> = {}): UrlFixVerificationReceipt {
   const fingerprint = createUrlFixWitnessFingerprint(spec);
@@ -48,11 +64,11 @@ function receipt(overrides: Partial<UrlFixVerificationReceipt> = {}): UrlFixVeri
       target: 'LIVE',
       targetUrl: 'https://app.sekretbip.net/cart',
       runtimeIdentity: 'runtime-old',
-      runtimeEvidenceRef: null,
+      runtimeEvidenceRef: 'runtime:before:receipt',
       evidenceMode: 'REAL',
       observedResult: 'checkout-error',
-      trace: artifact('trace-before'),
-      screenshot: artifact('shot-before'),
+      trace: artifact('trace-before', HASH_BEFORE),
+      screenshot: null,
     },
     after: {
       runId: 'after-1',
@@ -63,8 +79,8 @@ function receipt(overrides: Partial<UrlFixVerificationReceipt> = {}): UrlFixVeri
       runtimeEvidenceRef: 'runtime:after:receipt',
       evidenceMode: 'REAL',
       observedResult: 'checkout-ready',
-      trace: artifact('trace-after'),
-      screenshot: artifact('shot-after'),
+      trace: artifact('trace-after', HASH_AFTER),
+      screenshot: null,
     },
     ...overrides,
   };
@@ -77,12 +93,22 @@ describe('urlfix same-witness proof', () => {
     expect(first).toBe(second);
   });
 
-  it('requires independently verified artifacts and repaired runtime evidence for live proof', () => {
+  it('requires tuple-bound artifacts and before/after runtime evidence for live proof', () => {
     const result = evaluateUrlFixVerificationReceipt(receipt(), FULL_TRUST);
     expect(result).toEqual({ validSameWitness: true, proofState: 'LIVE_BROWSER_PROVEN', errors: [] });
   });
 
-  it('fails closed when artifact references are merely strings', () => {
+  it('fails closed when artifact ids are known but hashes do not match trusted evidence', () => {
+    const base = receipt();
+    const result = evaluateUrlFixVerificationReceipt({
+      ...base,
+      after: { ...base.after, trace: artifact('trace-after', 'c'.repeat(64)) },
+    }, FULL_TRUST);
+    expect(result.proofState).toBe('PATCHED');
+    expect(result.errors.join(' ')).toContain('id/hash');
+  });
+
+  it('fails closed when artifact references have no independent trust record', () => {
     const result = evaluateUrlFixVerificationReceipt(receipt(), EMPTY_TRUST);
     expect(result.proofState).toBe('PATCHED');
     expect(result.errors.join(' ')).toContain('independently verified');
@@ -118,6 +144,26 @@ describe('urlfix same-witness proof', () => {
     expect(result.errors.join(' ')).toContain('same origin');
   });
 
+  it('rejects a runtime evidence ref reused for a different runtime identity', () => {
+    const base = receipt();
+    const result = evaluateUrlFixVerificationReceipt({
+      ...base,
+      after: { ...base.after, runtimeIdentity: 'runtime-not-in-receipt' },
+    }, FULL_TRUST);
+    expect(result.proofState).toBe('PATCHED_NOT_LIVE');
+    expect(result.errors.join(' ')).toContain('repaired runtime identity');
+  });
+
+  it('rejects live proof when the failing baseline runtime has no bound receipt', () => {
+    const base = receipt();
+    const result = evaluateUrlFixVerificationReceipt({
+      ...base,
+      before: { ...base.before, runtimeEvidenceRef: 'stale-or-missing-receipt' },
+    }, FULL_TRUST);
+    expect(result.proofState).toBe('PATCHED_NOT_LIVE');
+    expect(result.errors.join(' ')).toContain('baseline runtime identity');
+  });
+
   it('never lets mocked live dependencies establish live proof', () => {
     const base = receipt();
     const result = evaluateUrlFixVerificationReceipt({
@@ -131,7 +177,11 @@ describe('urlfix same-witness proof', () => {
     const base = receipt();
     const localTrust: UrlFixTrustContext = {
       ...FULL_TRUST,
-      verifiedArtifactIds: new Set(['trace-before', 'trace-after']),
+      verifiedArtifacts: new Map([
+        ['trace-before', HASH_BEFORE],
+        ['trace-after', HASH_AFTER],
+      ]),
+      verifiedRuntimeEvidence: [],
     };
     const result = evaluateUrlFixVerificationReceipt({
       ...base,
@@ -141,6 +191,7 @@ describe('urlfix same-witness proof', () => {
         targetUrl: 'http://127.0.0.1:4173/cart',
         evidenceMode: 'FIXTURE',
         runtimeIdentity: 'fixture-before',
+        runtimeEvidenceRef: null,
       },
       after: {
         ...base.after,
@@ -156,50 +207,70 @@ describe('urlfix same-witness proof', () => {
 });
 
 describe('urlfix FCR URL binding', () => {
-  it('allows bounded source repair only with FCR-verified ownership and repair authority', () => {
-    const result = evaluateUrlFixUrlBinding({
-      originalUrl: 'https://app.sekretbip.net/cart',
-      finalUrl: 'https://app.sekretbip.net/cart',
-      projectSlug: 'sekret-bip',
-      repository: 'jussray/Sekret-Bip',
-      ownership: 'OWNED_CONFIRMED',
-      ownershipEvidenceRefs: ['fcr:ownership:sekret-bip:app'],
-      repairAuthorityReceiptRef: 'fcr:repair:urlfix:sekret-bip:001',
-      runtimeIdentity: null,
-      deploymentProvider: 'cloudflare',
-      deploymentProject: 'sekret-bip',
-    }, FULL_TRUST);
+  const binding = {
+    originalUrl: 'https://app.sekretbip.net/cart',
+    finalUrl: 'https://app.sekretbip.net/cart',
+    projectSlug: 'sekret-bip',
+    repository: 'jussray/Sekret-Bip',
+    ownership: 'OWNED_CONFIRMED' as const,
+    ownershipEvidenceRefs: ['fcr:ownership:sekret-bip:app'],
+    repairAuthorityReceiptRef: 'fcr:repair:urlfix:sekret-bip:001',
+    runtimeIdentity: null,
+    deploymentProvider: 'cloudflare',
+    deploymentProject: 'sekret-bip',
+  };
 
+  it('allows bounded source repair only with tuple-bound FCR ownership and repair authority', () => {
+    const result = evaluateUrlFixUrlBinding(binding, FULL_TRUST);
     expect(result.sourceMutationAllowed).toBe(true);
     expect(result.runtimeIdentityKnown).toBe(false);
+    expect(result.errors).toEqual([]);
   });
 
   it('rejects forged ownership or repair-authority strings', () => {
     const result = evaluateUrlFixUrlBinding({
-      originalUrl: 'https://app.sekretbip.net/cart',
-      finalUrl: 'https://app.sekretbip.net/cart',
-      projectSlug: 'sekret-bip',
-      repository: 'jussray/Sekret-Bip',
-      ownership: 'OWNED_CONFIRMED',
+      ...binding,
       ownershipEvidenceRefs: ['made-up-proof'],
       repairAuthorityReceiptRef: 'made-up-authority',
-      runtimeIdentity: null,
     }, EMPTY_TRUST);
 
     expect(result.sourceMutationAllowed).toBe(false);
-    expect(result.errors.join(' ')).toContain('not verified by FCR');
+    expect(result.errors.join(' ')).toContain('tuple-bound');
   });
 
-  it('downgrades an owned input that redirects outside the trusted origin set', () => {
+  it('rejects recombining a true origin fact with ownership evidence from another project', () => {
+    const mixedTrust: UrlFixTrustContext = {
+      ...FULL_TRUST,
+      verifiedUrlBindings: [{
+        origin: 'https://app.sekretbip.net',
+        projectSlug: 'juss-beautiful-hair',
+        repository: 'jussray/jussbeautifulhair-site',
+        evidenceRef: 'fcr:ownership:sekret-bip:app',
+      }],
+    };
+    const result = evaluateUrlFixUrlBinding(binding, mixedTrust);
+    expect(result.sourceMutationAllowed).toBe(false);
+    expect(result.errors.join(' ')).toContain('original URL origin');
+  });
+
+  it('rejects a repair receipt that belongs to a different project', () => {
+    const mixedTrust: UrlFixTrustContext = {
+      ...FULL_TRUST,
+      verifiedRepairAuthorities: [{
+        receiptRef: 'fcr:repair:urlfix:sekret-bip:001',
+        projectSlug: 'juss-beautiful-hair',
+        repository: 'jussray/jussbeautifulhair-site',
+      }],
+    };
+    const result = evaluateUrlFixUrlBinding(binding, mixedTrust);
+    expect(result.sourceMutationAllowed).toBe(false);
+    expect(result.errors.join(' ')).toContain('repair authority');
+  });
+
+  it('downgrades an owned input that redirects outside the tuple-bound origin set', () => {
     const result = evaluateUrlFixUrlBinding({
-      originalUrl: 'https://app.sekretbip.net/cart',
+      ...binding,
       finalUrl: 'https://example.net/cart',
-      projectSlug: 'sekret-bip',
-      repository: 'jussray/Sekret-Bip',
-      ownership: 'OWNED_CONFIRMED',
-      ownershipEvidenceRefs: ['fcr:ownership:sekret-bip:app'],
-      repairAuthorityReceiptRef: 'fcr:repair:urlfix:sekret-bip:001',
-      runtimeIdentity: null,
     }, FULL_TRUST);
 
     expect(result.sourceMutationAllowed).toBe(false);
@@ -209,7 +280,17 @@ describe('urlfix FCR URL binding', () => {
   it('does not turn an external project into source mutation authority', () => {
     const trust: UrlFixTrustContext = {
       ...FULL_TRUST,
-      ownedOrigins: new Set(['https://truth.example.com']),
+      verifiedUrlBindings: [{
+        origin: 'https://truth.example.com',
+        projectSlug: 'truth-weaver',
+        repository: 'jussray/truth-weaver',
+        evidenceRef: 'fcr:ownership:truth-weaver',
+      }],
+      verifiedRepairAuthorities: [{
+        receiptRef: 'fcr:repair:urlfix:truth-weaver:001',
+        projectSlug: 'truth-weaver',
+        repository: 'jussray/truth-weaver',
+      }],
     };
     const result = evaluateUrlFixUrlBinding({
       originalUrl: 'https://truth.example.com',
@@ -217,8 +298,8 @@ describe('urlfix FCR URL binding', () => {
       projectSlug: 'truth-weaver',
       repository: 'jussray/truth-weaver',
       ownership: 'OWNED_CONFIRMED',
-      ownershipEvidenceRefs: ['fcr:ownership:sekret-bip:app'],
-      repairAuthorityReceiptRef: 'fcr:repair:urlfix:sekret-bip:001',
+      ownershipEvidenceRefs: ['fcr:ownership:truth-weaver'],
+      repairAuthorityReceiptRef: 'fcr:repair:urlfix:truth-weaver:001',
       runtimeIdentity: 'runtime-1',
     }, trust);
 
