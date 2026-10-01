@@ -217,6 +217,30 @@ function runtimeEvidenceVerified(run: UrlFixWitnessRun, trust: Pick<UrlFixTrustC
   );
 }
 
+function validateRunBehaviorTarget(
+  run: UrlFixWitnessRun,
+  spec: UrlFixWitnessSpec,
+  label: 'before' | 'after',
+  errors: string[],
+): URL | null {
+  let parsed: URL;
+  try {
+    parsed = new URL(run.targetUrl);
+  } catch {
+    errors.push(`${label} target URL is invalid`);
+    return null;
+  }
+
+  if (parsed.username || parsed.password) errors.push(`${label} target URL must not contain credentials`);
+  if (run.target !== 'LOCAL' && parsed.protocol !== 'https:') {
+    errors.push(`${label} ${run.target.toLowerCase()} target URL must use https`);
+  }
+  if (browserRoute(parsed) !== spec.route) {
+    errors.push(`${label} target URL does not match the full witness route including query and fragment`);
+  }
+  return parsed;
+}
+
 export function createUrlFixWitnessFingerprint(spec: UrlFixWitnessSpec): string {
   const canonical = JSON.stringify({
     route: spec.route.trim(),
@@ -277,32 +301,14 @@ export function evaluateUrlFixUrlBinding(
   };
 }
 
-function sameLiveBehaviorTarget(receipt: UrlFixVerificationReceipt, errors: string[]): void {
-  let before: URL;
-  let after: URL;
-  try {
-    before = new URL(receipt.before.targetUrl);
-    after = new URL(receipt.after.targetUrl);
-  } catch {
-    errors.push('before and after target URLs must be valid');
-    return;
-  }
-
-  if (before.protocol !== 'https:' || after.protocol !== 'https:') {
-    errors.push('live witness URLs must use https');
-  }
-  if (before.origin !== after.origin) errors.push('live before/after witnesses must target the same origin');
-  if (browserRoute(before) !== receipt.witnessSpec.route || browserRoute(after) !== receipt.witnessSpec.route) {
-    errors.push('live before/after URLs must match the full witness route including query and fragment');
-  }
-}
-
 export function evaluateUrlFixVerificationReceipt(
   receipt: UrlFixVerificationReceipt,
   trust: Pick<UrlFixTrustContext, 'verifiedArtifacts' | 'verifiedRuntimeEvidence'>,
 ): UrlFixReceiptDecision {
   const errors: string[] = [];
   const expectedFingerprint = createUrlFixWitnessFingerprint(receipt.witnessSpec);
+  const beforeUrl = validateRunBehaviorTarget(receipt.before, receipt.witnessSpec, 'before', errors);
+  const afterUrl = validateRunBehaviorTarget(receipt.after, receipt.witnessSpec, 'after', errors);
 
   if (receipt.before.runId === receipt.after.runId) errors.push('before and after executions must have distinct run IDs');
   if (receipt.before.witnessFingerprint !== expectedFingerprint) errors.push('before run does not match the witness specification fingerprint');
@@ -313,7 +319,10 @@ export function evaluateUrlFixVerificationReceipt(
   if (receipt.after.observedResult !== receipt.witnessSpec.expectedObservableResult) errors.push('after run does not produce the expected observable result');
 
   const sameWitnessErrors = errors.filter((error) =>
-    error.includes('witness specification') || error.includes('run IDs') || error.includes('trace artifact'),
+    error.includes('witness specification')
+      || error.includes('run IDs')
+      || error.includes('trace artifact')
+      || error.includes('witness route'),
   );
   const validSameWitness = sameWitnessErrors.length === 0;
 
@@ -337,6 +346,13 @@ export function evaluateUrlFixVerificationReceipt(
         errors: ['preview browser proof requires real, non-mocked dependencies'],
       };
     }
+    if (!receipt.after.runtimeIdentity?.trim() || !runtimeEvidenceVerified(receipt.after, trust)) {
+      return {
+        validSameWitness: true,
+        proofState: 'PATCHED_NOT_LIVE',
+        errors: ['preview browser proof requires an independently verified preview runtime identity'],
+      };
+    }
     return { validSameWitness: true, proofState: 'PREVIEW_BROWSER_PROVEN', errors: [] };
   }
 
@@ -355,7 +371,9 @@ export function evaluateUrlFixVerificationReceipt(
     };
   }
 
-  sameLiveBehaviorTarget(receipt, errors);
+  if (beforeUrl && afterUrl && beforeUrl.origin !== afterUrl.origin) {
+    errors.push('live before/after witnesses must target the same origin');
+  }
   if (!receipt.before.runtimeIdentity?.trim() || !runtimeEvidenceVerified(receipt.before, trust)) {
     errors.push('live baseline runtime identity is not independently verified for its origin');
   }
