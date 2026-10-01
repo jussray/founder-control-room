@@ -36,6 +36,14 @@ binding = "RELEASE_PROOF_WORKFLOW"
 name = "fcr-release-proof-v0"
 class_name = "ReleaseProofWorkflowV0"
 
+# Durable governed-execution carrier. It persists DECLARE -> PERMIT -> ATTEMPT
+# receipt -> PROVE -> DECIDE state, but does not authenticate authority or perform
+# provider mutation. Trusted broker/executor wiring remains a separate authority gate.
+[[workflows]]
+binding = "GOVERNED_EXECUTION_WORKFLOW"
+name = "fcr-governed-execution-v1"
+class_name = "GovernedExecutionWorkflowV1"
+
 # Outbound transactional email capability. This binding alone sends nothing;
 # application code must explicitly invoke it. Keep the provider boundary
 # project-scoped: FCR code uses FCR_EMAIL and may send only from the checked-in
