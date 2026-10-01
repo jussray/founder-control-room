@@ -29,15 +29,6 @@ type GovernedExecutionWorkflowV1Env = {
   GOVERNED_EXECUTION_EVIDENCE: R2Bucket;
 };
 
-const LOCAL_RETRY = {
-  retries: {
-    limit: 3,
-    delay: '1 second',
-    backoff: 'exponential' as const,
-  },
-  timeout: '30 seconds',
-};
-
 /**
  * Staged durable coordinator for one governed execution.
  *
@@ -47,6 +38,11 @@ const LOCAL_RETRY = {
  * - This class does not create canonical Supabase/FCR governance receipts.
  * - D1 is only the local execution journal/idempotency/reconciliation projection.
  * - R2 is only an evidence artifact vault; evidence still requires Verification Core adjudication.
+ *
+ * Local D1 steps are intentionally safe to retry because their helpers are idempotent
+ * and transactionally reserve/update the execution journal. Provider mutation is not
+ * performed inside any retryable Workflow step. An UNKNOWN provider outcome must be
+ * reconciled before another mutation can be considered.
  *
  * The external mutation executor must consume the D1 command claim only after the
  * canonical FCR/Supabase execution-time authority reread has been supplied. The
@@ -84,7 +80,6 @@ export class GovernedExecutionWorkflowV1 extends WorkflowEntrypoint<
 
     const command = await step.do(
       'reserve idempotent D1 command claim',
-      LOCAL_RETRY,
       async () => reserveGovernedCommand(
         this.env.GOVERNED_EXECUTION_JOURNAL,
         envelope,
@@ -102,7 +97,6 @@ export class GovernedExecutionWorkflowV1 extends WorkflowEntrypoint<
 
     await step.do(
       'record provider execution claim in local journal',
-      LOCAL_RETRY,
       async () => recordProviderExecutionReceipt(
         this.env.GOVERNED_EXECUTION_JOURNAL,
         envelope,
@@ -124,7 +118,6 @@ export class GovernedExecutionWorkflowV1 extends WorkflowEntrypoint<
 
       await step.do(
         'record provider reconciliation result',
-        LOCAL_RETRY,
         async () => recordProviderReconciliation(
           this.env.GOVERNED_EXECUTION_JOURNAL,
           envelope,
@@ -158,7 +151,6 @@ export class GovernedExecutionWorkflowV1 extends WorkflowEntrypoint<
 
     await step.do(
       'index evidence references in D1 local projection',
-      LOCAL_RETRY,
       async () => {
         for (const evidence of verificationEvent.payload.evidence) {
           await indexEvidenceReference(
