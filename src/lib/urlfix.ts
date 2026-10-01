@@ -105,16 +105,35 @@ export interface UrlFixUrlBinding {
   deploymentProject?: string | null;
 }
 
+export interface UrlFixTrustedUrlBinding {
+  origin: string;
+  projectSlug: string;
+  repository: string;
+  evidenceRef: string;
+}
+
+export interface UrlFixTrustedRepairAuthority {
+  receiptRef: string;
+  projectSlug: string;
+  repository: string;
+}
+
+export interface UrlFixTrustedRuntimeEvidence {
+  ref: string;
+  runtimeIdentity: string;
+  origin: string;
+}
+
 /**
  * Trust facts must be supplied by the FCR authority/evidence layer, not copied
- * from arbitrary URLFix input. Empty sets fail closed.
+ * from arbitrary URLFix input. Every trusted fact is tuple-bound so unrelated
+ * true facts cannot be recombined into false authority or proof.
  */
 export interface UrlFixTrustContext {
-  ownedOrigins: ReadonlySet<string>;
-  verifiedOwnershipEvidenceRefs: ReadonlySet<string>;
-  verifiedRepairAuthorityReceiptRefs: ReadonlySet<string>;
-  verifiedArtifactIds: ReadonlySet<string>;
-  verifiedRuntimeEvidenceRefs: ReadonlySet<string>;
+  verifiedUrlBindings: readonly UrlFixTrustedUrlBinding[];
+  verifiedRepairAuthorities: readonly UrlFixTrustedRepairAuthority[];
+  verifiedArtifacts: ReadonlyMap<string, string>;
+  verifiedRuntimeEvidence: readonly UrlFixTrustedRuntimeEvidence[];
 }
 
 export interface UrlFixBindingDecision {
@@ -148,8 +167,47 @@ function parseHttpsUrl(raw: string, label: string, errors: string[]): URL | null
   return parsed;
 }
 
-function artifactVerified(ref: UrlFixArtifactRef | null | undefined, trusted: ReadonlySet<string>): boolean {
-  return Boolean(ref?.id && /^[a-f0-9]{64}$/i.test(ref.sha256) && trusted.has(ref.id));
+function artifactVerified(ref: UrlFixArtifactRef | null | undefined, trusted: ReadonlyMap<string, string>): boolean {
+  if (!ref?.id || !/^[a-f0-9]{64}$/i.test(ref.sha256)) return false;
+  const trustedHash = trusted.get(ref.id);
+  return Boolean(trustedHash && trustedHash.toLowerCase() === ref.sha256.toLowerCase());
+}
+
+function originBindingVerified(
+  origin: string,
+  binding: UrlFixUrlBinding,
+  trust: UrlFixTrustContext,
+): boolean {
+  return trust.verifiedUrlBindings.some((trusted) =>
+    trusted.origin === origin
+      && trusted.projectSlug === binding.projectSlug
+      && trusted.repository === binding.repository
+      && binding.ownershipEvidenceRefs.includes(trusted.evidenceRef),
+  );
+}
+
+function repairAuthorityVerified(binding: UrlFixUrlBinding, trust: UrlFixTrustContext): boolean {
+  if (!binding.repairAuthorityReceiptRef) return false;
+  return trust.verifiedRepairAuthorities.some((trusted) =>
+    trusted.receiptRef === binding.repairAuthorityReceiptRef
+      && trusted.projectSlug === binding.projectSlug
+      && trusted.repository === binding.repository,
+  );
+}
+
+function runtimeEvidenceVerified(run: UrlFixWitnessRun, trust: Pick<UrlFixTrustContext, 'verifiedRuntimeEvidence'>): boolean {
+  if (!run.runtimeEvidenceRef || !run.runtimeIdentity?.trim()) return false;
+  let origin: string;
+  try {
+    origin = new URL(run.targetUrl).origin;
+  } catch {
+    return false;
+  }
+  return trust.verifiedRuntimeEvidence.some((trusted) =>
+    trusted.ref === run.runtimeEvidenceRef
+      && trusted.runtimeIdentity === run.runtimeIdentity
+      && trusted.origin === origin,
+  );
 }
 
 export function createUrlFixWitnessFingerprint(spec: UrlFixWitnessSpec): string {
@@ -182,18 +240,15 @@ export function evaluateUrlFixUrlBinding(
   }
   if (binding.ownership !== 'OWNED_CONFIRMED') errors.push('ownership is not confirmed');
   if (binding.ownershipEvidenceRefs.length === 0) errors.push('ownership confirmation has no evidence reference');
-  if (binding.ownershipEvidenceRefs.some((ref) => !trust.verifiedOwnershipEvidenceRefs.has(ref))) {
-    errors.push('ownership evidence is not verified by FCR');
-  }
-  if (!binding.repairAuthorityReceiptRef || !trust.verifiedRepairAuthorityReceiptRefs.has(binding.repairAuthorityReceiptRef)) {
-    errors.push('bounded repair authority receipt is not verified by FCR');
-  }
 
-  if (original && !trust.ownedOrigins.has(original.origin)) {
-    errors.push('original URL origin is outside the FCR-confirmed owned origin set');
+  if (original && !originBindingVerified(original.origin, binding, trust)) {
+    errors.push('original URL origin is not tuple-bound to this project/repository by verified FCR evidence');
   }
-  if (final && !trust.ownedOrigins.has(final.origin)) {
-    errors.push('final URL origin is outside the FCR-confirmed owned origin set');
+  if (final && !originBindingVerified(final.origin, binding, trust)) {
+    errors.push('final URL origin is not tuple-bound to this project/repository by verified FCR evidence');
+  }
+  if (!repairAuthorityVerified(binding, trust)) {
+    errors.push('bounded repair authority receipt is not tuple-bound to this project/repository by FCR');
   }
 
   const sourceMutationAllowed = Boolean(
@@ -236,7 +291,7 @@ function sameLiveBehaviorTarget(receipt: UrlFixVerificationReceipt, errors: stri
 
 export function evaluateUrlFixVerificationReceipt(
   receipt: UrlFixVerificationReceipt,
-  trust: Pick<UrlFixTrustContext, 'verifiedArtifactIds' | 'verifiedRuntimeEvidenceRefs'>,
+  trust: Pick<UrlFixTrustContext, 'verifiedArtifacts' | 'verifiedRuntimeEvidence'>,
 ): UrlFixReceiptDecision {
   const errors: string[] = [];
   const expectedFingerprint = createUrlFixWitnessFingerprint(receipt.witnessSpec);
@@ -244,8 +299,8 @@ export function evaluateUrlFixVerificationReceipt(
   if (receipt.before.runId === receipt.after.runId) errors.push('before and after executions must have distinct run IDs');
   if (receipt.before.witnessFingerprint !== expectedFingerprint) errors.push('before run does not match the witness specification fingerprint');
   if (receipt.after.witnessFingerprint !== expectedFingerprint) errors.push('after run does not match the witness specification fingerprint');
-  if (!artifactVerified(receipt.before.trace, trust.verifiedArtifactIds)) errors.push('before trace artifact is not independently verified');
-  if (!artifactVerified(receipt.after.trace, trust.verifiedArtifactIds)) errors.push('after trace artifact is not independently verified');
+  if (!artifactVerified(receipt.before.trace, trust.verifiedArtifacts)) errors.push('before trace artifact id/hash is not independently verified');
+  if (!artifactVerified(receipt.after.trace, trust.verifiedArtifacts)) errors.push('after trace artifact id/hash is not independently verified');
   if (receipt.before.observedResult === receipt.witnessSpec.expectedObservableResult) errors.push('before run does not demonstrate the defect');
   if (receipt.after.observedResult !== receipt.witnessSpec.expectedObservableResult) errors.push('after run does not produce the expected observable result');
 
@@ -293,9 +348,11 @@ export function evaluateUrlFixVerificationReceipt(
   }
 
   sameLiveBehaviorTarget(receipt, errors);
-  if (!receipt.after.runtimeIdentity?.trim()) errors.push('live browser proof requires a known repaired runtime identity');
-  if (!receipt.after.runtimeEvidenceRef || !trust.verifiedRuntimeEvidenceRefs.has(receipt.after.runtimeEvidenceRef)) {
-    errors.push('live repaired runtime identity is not independently verified');
+  if (!receipt.before.runtimeIdentity?.trim() || !runtimeEvidenceVerified(receipt.before, trust)) {
+    errors.push('live baseline runtime identity is not independently verified for its origin');
+  }
+  if (!receipt.after.runtimeIdentity?.trim() || !runtimeEvidenceVerified(receipt.after, trust)) {
+    errors.push('live repaired runtime identity is not independently verified for its origin');
   }
 
   if (errors.length > 0) {
