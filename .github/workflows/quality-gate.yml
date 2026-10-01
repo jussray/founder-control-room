@@ -107,6 +107,7 @@ jobs:
       - run: npm run verify:juss-flow
       - run: npm run verify:production-authority
       - run: npm run verify:ai-skills
+      - run: npm run verify:asset-continuity
 
   rls-contract:
     name: "RLS Migration Contract"
