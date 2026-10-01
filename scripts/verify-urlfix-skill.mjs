@@ -9,6 +9,8 @@ const tests = readFileSync(new URL('../src/lib/__tests__/urlfix.test.ts', import
 const aiAdapter = readFileSync(new URL('../.ai/skills/urlfix/SKILL.md', import.meta.url), 'utf8');
 const claudeAdapter = readFileSync(new URL('../.claude/skills/urlfix/SKILL.md', import.meta.url), 'utf8');
 
+const issueSchemaText = JSON.stringify(schema.$defs?.issue?.allOf || []);
+
 const checks = [
   ['candidate version is 0.2.0', /version:\s*0\.2\.0/.test(skill) && /status:\s*candidate/.test(skill)],
   ['existing FCR registry remains authority', /existing FCR active portfolio registry/.test(skill) && /Do not create a parallel project registry/.test(skill)],
@@ -17,8 +19,10 @@ const checks = [
   ['behavioral fingerprint excludes environment mode', !source.match(/createUrlFixWitnessFingerprint[\s\S]{0,900}dependencyMode/)],
   ['behavioral fingerprint binds Chromium', source.includes('browser: spec.browser') && /Playwright browser family: `chromium`/.test(skill)],
   ['full route includes query and fragment', source.includes('`${url.pathname}${url.search}${url.hash}`') && /pathname \+ query \+ fragment/.test(skill)],
+  ['every run is checked against the witness route', source.includes('validateRunBehaviorTarget(receipt.before') && source.includes('validateRunBehaviorTarget(receipt.after')],
   ['live proof requires live before and after', source.includes("receipt.before.target !== 'LIVE'") && /real live before execution/.test(skill)],
-  ['live proof requires same origin', source.includes('before.origin !== after.origin') && /same live origin and full browser route/.test(skill)],
+  ['live proof requires same origin', source.includes('beforeUrl.origin !== afterUrl.origin') && /same live origin and full browser route/.test(skill)],
+  ['preview proof requires verified runtime identity', source.includes('preview browser proof requires an independently verified preview runtime identity')],
   ['artifact trust binds id to hash', source.includes('verifiedArtifacts') && source.includes('trustedHash.toLowerCase() === ref.sha256.toLowerCase()')],
   ['runtime evidence binds ref identity and origin', source.includes('verifiedRuntimeEvidence') && source.includes('trusted.runtimeIdentity === run.runtimeIdentity') && source.includes('trusted.origin === origin')],
   ['ownership evidence is tuple-bound', source.includes('verifiedUrlBindings') && /origin \+ project slug \+ canonical repository/.test(skill)],
@@ -30,13 +34,15 @@ const checks = [
   ['public artifact leakage is forbidden', /Do not publish arbitrary screenshots/.test(skill)],
   ['schema id/version matches', schema.$id === 'https://foundercontrolroom.org/schemas/urlfix-v0.2.0.json' && schema.properties?.schema?.const === 'juss/urlfix@v0.2.0'],
   ['schema binds browser to Chromium', schema.$defs?.witnessSpec?.properties?.browser?.const === 'chromium' && schema.$defs?.witnessSpec?.required?.includes('browser')],
-  ['schema live state requires verification', JSON.stringify(schema.$defs?.issue?.allOf || []).includes('LIVE_BROWSER_PROVEN') && JSON.stringify(schema.$defs?.issue?.allOf || []).includes('verification')],
-  ['schema live before and after require runtime receipts', (JSON.stringify(schema.$defs?.issue?.allOf || []).match(/runtimeEvidenceRef/g) || []).length >= 2],
+  ['schema browser states require verification', issueSchemaText.includes('LOCAL_BROWSER_PROVEN') && issueSchemaText.includes('PREVIEW_BROWSER_PROVEN') && issueSchemaText.includes('LIVE_BROWSER_PROVEN') && issueSchemaText.includes('verification')],
+  ['schema preview state requires real runtime receipt', issueSchemaText.includes('PREVIEW_BROWSER_PROVEN') && issueSchemaText.includes('PREVIEW') && issueSchemaText.includes('runtimeEvidenceRef')],
+  ['schema live before and after require runtime receipts', (issueSchemaText.match(/runtimeEvidenceRef/g) || []).length >= 3],
   ['adversarial tests cover forged authority', tests.includes('rejects forged ownership or repair-authority strings')],
   ['adversarial tests cover trust-fact recombination', tests.includes('recombining a true origin fact') && tests.includes('repair receipt that belongs to a different project')],
   ['adversarial tests cover stale runtime receipt reuse', tests.includes('reused for a different runtime identity')],
   ['adversarial tests cover cross-origin false proof', tests.includes('different live origin')],
   ['adversarial tests cover query-state laundering', tests.includes('different query state')],
+  ['adversarial tests cover untrusted preview runtime', tests.includes('without bound runtime evidence')],
   ['AI adapter routes to canonical contract', /Canonical contract: `skills\/urlfix\/SKILL\.md`/.test(aiAdapter)],
   ['Claude adapter routes to canonical contract', /Canonical contract: `skills\/urlfix\/SKILL\.md`/.test(claudeAdapter)],
 ];
