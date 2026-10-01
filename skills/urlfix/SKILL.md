@@ -44,13 +44,20 @@ Keep these truths separate:
 - deploy authority;
 - consequential external-effect authority.
 
-A URLFix payload cannot grant itself authority. Ownership and repair authority references become usable only when FCR independently recognizes them in the trusted evidence context.
+A URLFix payload cannot grant itself authority. FCR trust facts must be tuple-bound, not loose booleans or reusable strings:
+
+- origin + project slug + canonical repository + ownership evidence ref;
+- repair receipt + project slug + canonical repository;
+- artifact id + exact SHA-256;
+- runtime evidence ref + runtime identity + origin.
+
+Do not combine individually true facts from different projects, origins, runs, or runtimes into authority or proof.
 
 External, ambiguous, continuity-only, quarantined, unverified-origin, or otherwise non-authority targets remain observation-only.
 
 ## Invocation repair scope
 
-For a confirmed-owned active project, a trusted founder/operator URLFix invocation may authorize the bounded repair loop only when FCR produces or recognizes the matching repair-authority receipt.
+For a confirmed-owned active project, a trusted founder/operator URLFix invocation may authorize the bounded repair loop only when FCR produces or recognizes the matching project-bound repair-authority receipt.
 
 That bounded scope may cover:
 
@@ -80,7 +87,7 @@ Execution shorthand: `SEE -> PRIORITIZE -> ATTACK -> PIVOT -> SIMPLIFY -> PROVE`
 
 Record original URL, final URL, redirect chain, host/origin, path, query/fragment presence, and capture timestamp.
 
-Both the original and final origin must be inside the FCR-confirmed owned-origin set before source mutation is considered. A redirect that leaves that set downgrades the run to observation-only until separately resolved.
+Both original and final origins must have FCR evidence binding that exact origin to the same project slug and canonical repository before source mutation is considered. A redirect that lacks that exact tuple downgrades the run to observation-only until separately resolved.
 
 Hostname text alone is never authority.
 
@@ -192,11 +199,11 @@ Fixture/mocked/intercepted evidence may establish local interaction or branching
 - same live origin and route;
 - failing before observable result;
 - expected after observable result;
-- independently verified before/after trace artifacts;
-- known repaired runtime identity;
-- independently verified runtime-identity evidence reference.
+- before and after trace artifact ids bound to their exact SHA-256 in trusted evidence;
+- known baseline runtime identity with a trusted runtime receipt bound to that identity and origin;
+- known repaired runtime identity with a trusted runtime receipt bound to that identity and origin.
 
-A caller-supplied artifact ID or runtime string is not proof by itself.
+A caller-supplied artifact ID, hash, authority receipt, or runtime string is not proof by itself.
 
 ## Reproduction count
 
@@ -222,7 +229,7 @@ Mapping disagreement must return evidence. Do not patch on vibes.
 
 ## Goalfix handoff
 
-Provide Goalfix with issue ID, severity, exact behavioral witness, before evidence, failure plane, root-cause hypothesis, canonical repository/branch/SHA facts, compatible carrier, authority receipt reference, external-effect boundary, and required same-witness retest.
+Provide Goalfix with issue ID, severity, exact behavioral witness, before evidence, failure plane, root-cause hypothesis, canonical repository/branch/SHA facts, compatible carrier, project-bound authority receipt reference, external-effect boundary, and required same-witness retest.
 
 Expect root cause, smallest reversible patch, files changed, source checks, focused regression test, local/preview result, candidate runtime identity when available, residual risk, and rollback.
 
@@ -280,7 +287,7 @@ Return:
 - critical paths/viewports tested;
 - issue ledger with failure plane and proof state;
 - before/after behavioral fingerprint plus distinct run IDs;
-- evidence mode and independently verified artifact refs;
+- evidence mode and tuple-bound artifact/runtime refs;
 - Goalfix patch/carrier refs when applicable;
 - highest proof state actually observed;
 - blockers, residual risk, and untested consequential flows.
