@@ -1,6 +1,7 @@
 name: External Site Snapshot
 
 # Read-only Playwright evidence for a public URL (e.g. a third-party draft of a Juss site).
+# The workflow also proves the URLFix same-witness contract on a local deterministic fixture.
 # No secrets are used. Screenshots + report.json are published as an orphan commit under
 # refs/tags/snapshots/<run_id>-<run_attempt> (branch pushes are blocked by ruleset 20819094)
 # so they can be read over git from environments where Actions artifacts are unreachable.
@@ -35,14 +36,27 @@ jobs:
           sparse-checkout: |
             scripts/external-site-snapshot.mjs
             scripts/__tests__/external-site-snapshot.test.mjs
+            scripts/verify-urlfix-skill.mjs
+            skills/urlfix/SKILL.md
+            config/urlfix.schema.json
+            src/lib/urlfix.ts
+            src/config/portfolio.ts
+            src/config/l99Repository.ts
+            e2e/urlfix-proof.ts
           sparse-checkout-cone-mode: false
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
       - name: Validate snapshot guardrails
         run: node --test scripts/__tests__/external-site-snapshot.test.mjs
-      - name: Install Playwright Chromium
-        run: npm i --no-save --no-audit --no-fund playwright@1.61.1 && npx playwright install chromium --with-deps
+      - name: Validate URLFix source contract
+        run: node scripts/verify-urlfix-skill.mjs
+      - name: Install Playwright Chromium + TS runner
+        run: npm i --no-save --no-audit --no-fund playwright@1.61.1 tsx@4.19.0 && npx playwright install chromium --with-deps
+      - name: Prove URLFix same-witness boundary
+        env:
+          URLFIX_PROOF_DIR: ${{ runner.temp }}/urlfix-proof
+        run: npx tsx e2e/urlfix-proof.ts
       - name: Capture snapshot
         env:
           SNAPSHOT_OUT_DIR: ${{ runner.temp }}/snapshots
