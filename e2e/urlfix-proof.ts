@@ -19,6 +19,7 @@ mkdirSync(proofDir, { recursive: true });
 
 const witnessSpec: UrlFixWitnessSpec = {
   route: '/cart',
+  browser: 'chromium',
   viewport: { width: 390, height: 844 },
   preconditions: ['fixture cart contains one item'],
   actions: ['open /cart', 'click Checkout'],
