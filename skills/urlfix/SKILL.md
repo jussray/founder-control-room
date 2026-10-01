@@ -21,13 +21,13 @@ Turn a live URL into a truthful repair loop:
 
 `URL -> resolve -> browser baseline -> issue ledger -> failure plane -> causal hypothesis -> goalfix -> same witness -> runtime identity -> live recheck`
 
-URLFix observes, diagnoses, and verifies. Goalfix owns source-repair discipline. FCR owns project identity, authority, runtime truth, and evidence trust. Playwright supplies browser evidence.
+URLFix observes, diagnoses, and verifies. Goalfix owns source-repair discipline. FCR owns project identity, authority, runtime truth, expectation truth, and evidence trust. Playwright supplies browser evidence.
 
 ## Governing axiom
 
 URLFix may advance a defect only to the highest proof state actually observed.
 
-`LIVE_BROWSER_PROVEN` requires the same meaningful behavioral witness that exposed the defect to fail on the real live baseline and pass on the identified repaired live runtime, using real dependencies and independently verified evidence artifacts.
+`LIVE_BROWSER_PROVEN` requires the same meaningful behavioral witness that exposed the defect to fail on the real live baseline and pass on the identified repaired live runtime, using real dependencies and independently verified semantic and artifact evidence.
 
 A stable URL is a locator, not runtime identity. Source green, local green, preview green, provider acceptance, or a page merely loading are not live repair proof.
 
@@ -40,18 +40,22 @@ Keep these truths separate:
 - source ownership;
 - URL/origin ownership;
 - bounded repair authority;
+- expected product behavior;
+- observed browser behavior;
 - runtime identity;
 - deploy authority;
 - consequential external-effect authority.
 
-A URLFix payload cannot grant itself authority. FCR trust facts must be tuple-bound, not loose booleans or reusable strings:
+A URLFix payload cannot grant itself authority or truth. FCR trust facts must be tuple-bound, not loose booleans or reusable strings:
 
 - origin + project slug + canonical repository + ownership evidence ref;
 - repair receipt + project slug + canonical repository;
 - artifact id + exact SHA-256;
-- runtime evidence ref + runtime identity + origin.
+- runtime evidence ref + runtime identity + origin;
+- witness-run receipt + run id + fingerprint + target URL + evidence mode + observed result + artifacts;
+- expectation evidence ref + full route + browser family + expected observable result.
 
-Do not combine individually true facts from different projects, origins, runs, or runtimes into authority or proof.
+Do not combine individually true facts from different projects, origins, runs, expectations, or runtimes into authority or proof.
 
 External, ambiguous, continuity-only, quarantined, unverified-origin, or otherwise non-authority targets remain observation-only.
 
@@ -118,6 +122,14 @@ Inspect reachability, redirects, console/page errors, failed requests, broken as
 
 Never improvise into a consequential action.
 
+## Expected-behavior provenance
+
+Do not let the tester invent success after seeing the page.
+
+Every witness must carry an `expectationEvidenceRef` that independently supports the expected observable result for the exact route/browser contract. Acceptable sources include an explicit founder/product requirement, established behavior test, API/UI contract, or other authoritative product evidence.
+
+A caller-supplied `expectedObservableResult` is not proof by itself. If expectation provenance is missing or contradicts current product truth, do not advance the issue to a browser-proven state.
+
 ## Failure-plane contract
 
 Classify each reproduced defect before editing:
@@ -179,7 +191,13 @@ A query string or hash route can change product behavior and may not be silently
 
 Environment and evidence mode are execution metadata, not part of the behavioral fingerprint. This allows the same behavior to be replayed from local to preview to live without pretending those environments are equivalent.
 
-Before and after executions must have different run IDs and the same witness fingerprint.
+Before and after executions must have different run IDs, distinct trace artifacts, and the same witness fingerprint.
+
+## Observed-result provenance
+
+The semantic observation must come from the verified browser-run receipt, not from a caller rewriting `observedResult` after the trace exists.
+
+A trusted witness-run receipt binds the exact run id, witness fingerprint, target, target URL, runtime identity/ref, evidence mode, observed result, trace, and screenshot metadata. If the supplied run disagrees with that trusted receipt, it cannot satisfy browser proof.
 
 ## Evidence modes
 
@@ -196,17 +214,19 @@ Fixture/mocked/intercepted evidence may establish local interaction or branching
 
 `LIVE_BROWSER_PROVEN` requires all of:
 
+- trusted expected-behavior evidence;
+- independently trusted before and after witness-run receipts;
 - real live before execution;
 - real live after execution;
 - same behavioral witness fingerprint;
 - same live origin and full browser route;
 - failing before observable result;
 - expected after observable result;
-- before and after trace artifact ids bound to their exact SHA-256 in trusted evidence;
+- distinct before and after trace artifacts bound to their exact SHA-256 in trusted evidence;
 - known baseline runtime identity with a trusted runtime receipt bound to that identity and origin;
 - known repaired runtime identity with a trusted runtime receipt bound to that identity and origin.
 
-A caller-supplied artifact ID, hash, authority receipt, or runtime string is not proof by itself.
+A caller-supplied expected/observed result, artifact ID, hash, authority receipt, or runtime string is not proof by itself.
 
 ## Reproduction count
 
@@ -232,7 +252,7 @@ Mapping disagreement must return evidence. Do not patch on vibes.
 
 ## Goalfix handoff
 
-Provide Goalfix with issue ID, severity, exact behavioral witness, before evidence, failure plane, root-cause hypothesis, canonical repository/branch/SHA facts, compatible carrier, project-bound authority receipt reference, external-effect boundary, and required same-witness retest.
+Provide Goalfix with issue ID, severity, exact behavioral witness, expectation evidence, verified before-run evidence, failure plane, root-cause hypothesis, canonical repository/branch/SHA facts, compatible carrier, project-bound authority receipt reference, external-effect boundary, and required same-witness retest.
 
 Expect root cause, smallest reversible patch, files changed, source checks, focused regression test, local/preview result, candidate runtime identity when available, residual risk, and rollback.
 
@@ -266,12 +286,13 @@ Do not publish arbitrary screenshots, traces, DOM/body text, or network logs int
 
 ## Verification ladder
 
-1. source checks from Goalfix;
-2. same-witness local browser proof;
-3. same-witness preview browser proof when meaningful, bound to the preview runtime;
-4. real live baseline + repaired runtime identity;
-5. real live repaired same-witness recheck;
-6. before/after comparison and regression scan.
+1. expectation provenance + trusted failing run receipt;
+2. source checks from Goalfix;
+3. same-witness local browser proof;
+4. same-witness preview browser proof when meaningful, bound to the preview runtime;
+5. real live baseline + repaired runtime identity;
+6. real live repaired same-witness recheck;
+7. before/after comparison and regression scan.
 
 The exact defect witness must pass. A generic page-load check is not a substitute.
 
@@ -279,7 +300,7 @@ The exact defect witness must pass. A generic page-load check is not a substitut
 
 Stop when material P0/P1 issues and selected bounded P2 issues are proven at the highest reachable state or explicitly blocked, and the remainder is P3, duplicate, speculative, or not reproducible.
 
-Also stop when the next move requires missing authority, credentials, provider repair, incompatible carrier scope, deployment access, or consequential-action authorization.
+Also stop when the next move requires missing authority, expectation provenance, credentials, provider repair, incompatible carrier scope, deployment access, or consequential-action authorization.
 
 ## Final receipt
 
@@ -289,8 +310,9 @@ Return:
 - project slug, canonical repo, branch/SHA, runtime identity when observed;
 - critical paths/viewports tested;
 - issue ledger with failure plane and proof state;
+- expectation evidence ref;
 - before/after behavioral fingerprint plus distinct run IDs;
-- evidence mode and tuple-bound artifact/runtime refs;
+- trusted witness-run refs and tuple-bound artifact/runtime refs;
 - Goalfix patch/carrier refs when applicable;
 - highest proof state actually observed;
 - blockers, residual risk, and untested consequential flows.
