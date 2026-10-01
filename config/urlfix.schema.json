@@ -74,9 +74,10 @@
     },
     "witnessSpec": {
       "type": "object",
-      "required": ["route", "viewport", "preconditions", "actions", "expectedObservableResult"],
+      "required": ["route", "browser", "viewport", "preconditions", "actions", "expectedObservableResult"],
       "properties": {
         "route": { "type": "string", "pattern": "^/" },
+        "browser": { "const": "chromium" },
         "viewport": { "$ref": "#/$defs/viewport" },
         "preconditions": { "type": "array", "items": { "type": "string" } },
         "actions": { "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 1 },
