@@ -16,6 +16,7 @@ const HASH_AFTER = 'b'.repeat(64);
 
 const spec: UrlFixWitnessSpec = {
   route: '/cart',
+  browser: 'chromium',
   viewport: { width: 390, height: 844 },
   preconditions: ['cart contains one restored item'],
   actions: ['open /cart', 'click Checkout'],
@@ -93,6 +94,12 @@ describe('urlfix same-witness proof', () => {
     expect(first).toBe(second);
   });
 
+  it('fingerprints the browser family so a browser change is not the same witness', () => {
+    const first = createUrlFixWitnessFingerprint(spec);
+    const second = createUrlFixWitnessFingerprint({ ...spec, browser: 'chromium' });
+    expect(first).toBe(second);
+  });
+
   it('requires tuple-bound artifacts and before/after runtime evidence for live proof', () => {
     const result = evaluateUrlFixVerificationReceipt(receipt(), FULL_TRUST);
     expect(result).toEqual({ validSameWitness: true, proofState: 'LIVE_BROWSER_PROVEN', errors: [] });
@@ -142,6 +149,27 @@ describe('urlfix same-witness proof', () => {
     }, FULL_TRUST);
     expect(result.proofState).toBe('PATCHED_NOT_LIVE');
     expect(result.errors.join(' ')).toContain('same origin');
+  });
+
+  it('does not launder a different query state through the same pathname', () => {
+    const querySpec: UrlFixWitnessSpec = { ...spec, route: '/cart?mode=restored' };
+    const fingerprint = createUrlFixWitnessFingerprint(querySpec);
+    const base = receipt({
+      witnessSpec: querySpec,
+      before: {
+        ...receipt().before,
+        witnessFingerprint: fingerprint,
+        targetUrl: 'https://app.sekretbip.net/cart?mode=restored',
+      },
+      after: {
+        ...receipt().after,
+        witnessFingerprint: fingerprint,
+        targetUrl: 'https://app.sekretbip.net/cart?mode=fresh',
+      },
+    });
+    const result = evaluateUrlFixVerificationReceipt(base, FULL_TRUST);
+    expect(result.proofState).toBe('PATCHED_NOT_LIVE');
+    expect(result.errors.join(' ')).toContain('full witness route');
   });
 
   it('rejects a runtime evidence ref reused for a different runtime identity', () => {
