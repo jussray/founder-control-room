@@ -43,6 +43,7 @@ export const URLFIX_STATES = [
 export type UrlFixState = (typeof URLFIX_STATES)[number];
 export type UrlFixEvidenceMode = 'REAL' | 'INTERCEPTED' | 'MOCKED' | 'FIXTURE';
 export type UrlFixTarget = 'LOCAL' | 'PREVIEW' | 'LIVE';
+export type UrlFixBrowser = 'chromium';
 export type UrlFixOwnershipState =
   | 'OWNED_CONFIRMED'
   | 'OWNED_AMBIGUOUS'
@@ -58,9 +59,11 @@ export interface UrlFixViewport {
 /**
  * Stable behavioral witness. Environment/dependency mode is intentionally NOT
  * fingerprinted so the same behavior can be replayed from local -> preview -> live.
+ * Route means pathname + query + fragment because SPA/hash/query state can be causal.
  */
 export interface UrlFixWitnessSpec {
   route: string;
+  browser: UrlFixBrowser;
   viewport: UrlFixViewport;
   preconditions: readonly string[];
   actions: readonly string[];
@@ -167,6 +170,10 @@ function parseHttpsUrl(raw: string, label: string, errors: string[]): URL | null
   return parsed;
 }
 
+function browserRoute(url: URL): string {
+  return `${url.pathname}${url.search}${url.hash}`;
+}
+
 function artifactVerified(ref: UrlFixArtifactRef | null | undefined, trusted: ReadonlyMap<string, string>): boolean {
   if (!ref?.id || !/^[a-f0-9]{64}$/i.test(ref.sha256)) return false;
   const trustedHash = trusted.get(ref.id);
@@ -213,6 +220,7 @@ function runtimeEvidenceVerified(run: UrlFixWitnessRun, trust: Pick<UrlFixTrustC
 export function createUrlFixWitnessFingerprint(spec: UrlFixWitnessSpec): string {
   const canonical = JSON.stringify({
     route: spec.route.trim(),
+    browser: spec.browser,
     viewport: { width: spec.viewport.width, height: spec.viewport.height },
     preconditions: normalizeStringList(spec.preconditions),
     actions: normalizeStringList(spec.actions),
@@ -284,8 +292,8 @@ function sameLiveBehaviorTarget(receipt: UrlFixVerificationReceipt, errors: stri
     errors.push('live witness URLs must use https');
   }
   if (before.origin !== after.origin) errors.push('live before/after witnesses must target the same origin');
-  if (before.pathname !== receipt.witnessSpec.route || after.pathname !== receipt.witnessSpec.route) {
-    errors.push('live before/after URLs must match the witness route');
+  if (browserRoute(before) !== receipt.witnessSpec.route || browserRoute(after) !== receipt.witnessSpec.route) {
+    errors.push('live before/after URLs must match the full witness route including query and fragment');
   }
 }
 
