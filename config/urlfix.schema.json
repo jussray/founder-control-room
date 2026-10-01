@@ -141,7 +141,9 @@
                   "before": {
                     "properties": {
                       "target": { "const": "LIVE" },
-                      "evidenceMode": { "const": "REAL" }
+                      "evidenceMode": { "const": "REAL" },
+                      "runtimeIdentity": { "type": "string", "minLength": 1 },
+                      "runtimeEvidenceRef": { "type": "string", "minLength": 1 }
                     }
                   },
                   "after": {
