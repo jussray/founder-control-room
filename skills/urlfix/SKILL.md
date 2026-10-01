@@ -192,7 +192,7 @@ Every browser execution records one mode:
 
 Fixture/mocked/intercepted evidence may establish local interaction or branching behavior. It may not establish preview or live provider/API/data outcomes.
 
-`PREVIEW_BROWSER_PROVEN` requires real preview dependencies.
+`PREVIEW_BROWSER_PROVEN` requires real preview dependencies plus a preview runtime identity independently bound to its runtime evidence receipt and origin.
 
 `LIVE_BROWSER_PROVEN` requires all of:
 
@@ -268,9 +268,9 @@ Do not publish arbitrary screenshots, traces, DOM/body text, or network logs int
 
 1. source checks from Goalfix;
 2. same-witness local browser proof;
-3. same-witness preview browser proof when meaningful;
-4. candidate runtime/deployment identity;
-5. real live baseline + real live repaired same-witness recheck;
+3. same-witness preview browser proof when meaningful, bound to the preview runtime;
+4. real live baseline + repaired runtime identity;
+5. real live repaired same-witness recheck;
 6. before/after comparison and regression scan.
 
 The exact defect witness must pass. A generic page-load check is not a substitute.
