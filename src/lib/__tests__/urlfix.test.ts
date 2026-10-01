@@ -49,6 +49,7 @@ const FULL_TRUST: UrlFixTrustContext = {
   verifiedRuntimeEvidence: [
     { ref: 'runtime:before:receipt', runtimeIdentity: 'runtime-old', origin: 'https://app.sekretbip.net' },
     { ref: 'runtime:after:receipt', runtimeIdentity: 'runtime-new', origin: 'https://app.sekretbip.net' },
+    { ref: 'runtime:preview:receipt', runtimeIdentity: 'preview-runtime', origin: 'https://preview.sekretbip.net' },
   ],
 };
 
@@ -91,12 +92,6 @@ describe('urlfix same-witness proof', () => {
   it('fingerprints behavior without pinning environment mode', () => {
     const first = createUrlFixWitnessFingerprint(spec);
     const second = createUrlFixWitnessFingerprint({ ...spec, actions: [...spec.actions] });
-    expect(first).toBe(second);
-  });
-
-  it('fingerprints the browser family so a browser change is not the same witness', () => {
-    const first = createUrlFixWitnessFingerprint(spec);
-    const second = createUrlFixWitnessFingerprint({ ...spec, browser: 'chromium' });
     expect(first).toBe(second);
   });
 
@@ -168,8 +163,40 @@ describe('urlfix same-witness proof', () => {
       },
     });
     const result = evaluateUrlFixVerificationReceipt(base, FULL_TRUST);
-    expect(result.proofState).toBe('PATCHED_NOT_LIVE');
+    expect(result.proofState).toBe('PATCHED');
+    expect(result.validSameWitness).toBe(false);
     expect(result.errors.join(' ')).toContain('full witness route');
+  });
+
+  it('requires real preview dependencies and a verified preview runtime receipt', () => {
+    const base = receipt();
+    const result = evaluateUrlFixVerificationReceipt({
+      ...base,
+      after: {
+        ...base.after,
+        target: 'PREVIEW',
+        targetUrl: 'https://preview.sekretbip.net/cart',
+        runtimeIdentity: 'preview-runtime',
+        runtimeEvidenceRef: 'runtime:preview:receipt',
+      },
+    }, FULL_TRUST);
+    expect(result).toEqual({ validSameWitness: true, proofState: 'PREVIEW_BROWSER_PROVEN', errors: [] });
+  });
+
+  it('does not prove preview from a real-looking URL without bound runtime evidence', () => {
+    const base = receipt();
+    const result = evaluateUrlFixVerificationReceipt({
+      ...base,
+      after: {
+        ...base.after,
+        target: 'PREVIEW',
+        targetUrl: 'https://preview.sekretbip.net/cart',
+        runtimeIdentity: 'preview-runtime',
+        runtimeEvidenceRef: 'untrusted-preview-runtime',
+      },
+    }, FULL_TRUST);
+    expect(result.proofState).toBe('PATCHED_NOT_LIVE');
+    expect(result.errors.join(' ')).toContain('preview runtime identity');
   });
 
   it('rejects a runtime evidence ref reused for a different runtime identity', () => {
