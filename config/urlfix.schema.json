@@ -1,0 +1,164 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://foundercontrolroom.org/schemas/urlfix-v0.2.0.json",
+  "title": "Juss URLFix v0.2.0 Contract",
+  "type": "object",
+  "required": ["schema", "urlBinding", "issues"],
+  "properties": {
+    "schema": { "const": "juss/urlfix@v0.2.0" },
+    "urlBinding": { "$ref": "#/$defs/urlBinding" },
+    "issues": { "type": "array", "items": { "$ref": "#/$defs/issue" } }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "ownershipState": {
+      "enum": ["OWNED_CONFIRMED", "OWNED_AMBIGUOUS", "EXTERNAL", "UNKNOWN", "BLOCKED"]
+    },
+    "state": {
+      "enum": [
+        "OBSERVED", "REPRODUCED", "CAUSE_BOUNDED", "PATCHED", "SOURCE_PROVEN",
+        "LOCAL_BROWSER_PROVEN", "PREVIEW_BROWSER_PROVEN", "LIVE_BROWSER_PROVEN",
+        "NOT_REPRODUCED", "DUPLICATE", "P3_LOGGED", "OBSERVATION_ONLY",
+        "BLOCKED_AUTHORITY", "BLOCKED_PROVIDER", "BLOCKED_MAPPING", "BLOCKED_CARRIER_SCOPE",
+        "BLOCKED_CONSEQUENTIAL_ACTION", "PATCHED_NOT_LIVE", "ROLLBACK_REQUIRED"
+      ]
+    },
+    "failurePlane": {
+      "enum": [
+        "BROWSER", "APPLICATION", "API", "DATABASE", "AUTH", "CONFIG_SECRET",
+        "DEPLOYMENT", "DNS", "CDN_EDGE", "THIRD_PARTY_PROVIDER", "UNKNOWN"
+      ]
+    },
+    "evidenceMode": { "enum": ["REAL", "INTERCEPTED", "MOCKED", "FIXTURE"] },
+    "target": { "enum": ["LOCAL", "PREVIEW", "LIVE"] },
+    "artifactRef": {
+      "type": "object",
+      "required": ["id", "sha256"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "sha256": { "type": "string", "pattern": "^[A-Fa-f0-9]{64}$" }
+      },
+      "additionalProperties": false
+    },
+    "urlBinding": {
+      "type": "object",
+      "required": [
+        "originalUrl", "finalUrl", "projectSlug", "repository", "ownership",
+        "ownershipEvidenceRefs", "repairAuthorityReceiptRef", "runtimeIdentity"
+      ],
+      "properties": {
+        "originalUrl": { "type": "string", "format": "uri", "pattern": "^https://" },
+        "finalUrl": { "type": "string", "format": "uri", "pattern": "^https://" },
+        "projectSlug": { "type": "string", "minLength": 1 },
+        "repository": { "type": "string", "pattern": "^[^/]+/[^/]+$" },
+        "ownership": { "$ref": "#/$defs/ownershipState" },
+        "ownershipEvidenceRefs": {
+          "type": "array", "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }, "uniqueItems": true
+        },
+        "repairAuthorityReceiptRef": { "type": ["string", "null"] },
+        "runtimeIdentity": { "type": ["string", "null"] },
+        "deploymentProvider": { "type": ["string", "null"] },
+        "deploymentProject": { "type": ["string", "null"] }
+      },
+      "additionalProperties": false
+    },
+    "viewport": {
+      "type": "object",
+      "required": ["width", "height"],
+      "properties": {
+        "width": { "type": "integer", "minimum": 1 },
+        "height": { "type": "integer", "minimum": 1 }
+      },
+      "additionalProperties": false
+    },
+    "witnessSpec": {
+      "type": "object",
+      "required": ["route", "viewport", "preconditions", "actions", "expectedObservableResult"],
+      "properties": {
+        "route": { "type": "string", "pattern": "^/" },
+        "viewport": { "$ref": "#/$defs/viewport" },
+        "preconditions": { "type": "array", "items": { "type": "string" } },
+        "actions": { "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 1 },
+        "expectedObservableResult": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "witnessRun": {
+      "type": "object",
+      "required": [
+        "runId", "witnessFingerprint", "target", "targetUrl", "runtimeIdentity",
+        "runtimeEvidenceRef", "evidenceMode", "observedResult", "trace"
+      ],
+      "properties": {
+        "runId": { "type": "string", "minLength": 1 },
+        "witnessFingerprint": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "target": { "$ref": "#/$defs/target" },
+        "targetUrl": { "type": "string", "format": "uri" },
+        "runtimeIdentity": { "type": ["string", "null"] },
+        "runtimeEvidenceRef": { "type": ["string", "null"] },
+        "evidenceMode": { "$ref": "#/$defs/evidenceMode" },
+        "observedResult": { "type": "string" },
+        "trace": { "oneOf": [{ "$ref": "#/$defs/artifactRef" }, { "type": "null" }] },
+        "screenshot": { "oneOf": [{ "$ref": "#/$defs/artifactRef" }, { "type": "null" }] }
+      },
+      "additionalProperties": false
+    },
+    "verificationReceipt": {
+      "type": "object",
+      "required": ["issueId", "witnessSpec", "before", "after"],
+      "properties": {
+        "issueId": { "type": "string", "pattern": "^URLFIX-[0-9]+$" },
+        "witnessSpec": { "$ref": "#/$defs/witnessSpec" },
+        "before": { "$ref": "#/$defs/witnessRun" },
+        "after": { "$ref": "#/$defs/witnessRun" }
+      },
+      "additionalProperties": false
+    },
+    "issue": {
+      "type": "object",
+      "required": ["id", "state", "severity", "failurePlane", "title"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^URLFIX-[0-9]+$" },
+        "state": { "$ref": "#/$defs/state" },
+        "severity": { "enum": ["P0", "P1", "P2", "P3"] },
+        "failurePlane": { "$ref": "#/$defs/failurePlane" },
+        "title": { "type": "string", "minLength": 1 },
+        "verification": { "$ref": "#/$defs/verificationReceipt" },
+        "residualRisk": { "type": ["string", "null"] }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "state": { "enum": ["LOCAL_BROWSER_PROVEN", "PREVIEW_BROWSER_PROVEN", "LIVE_BROWSER_PROVEN"] } }, "required": ["state"] },
+          "then": { "required": ["verification"] }
+        },
+        {
+          "if": { "properties": { "state": { "const": "LIVE_BROWSER_PROVEN" } }, "required": ["state"] },
+          "then": {
+            "properties": {
+              "verification": {
+                "properties": {
+                  "before": {
+                    "properties": {
+                      "target": { "const": "LIVE" },
+                      "evidenceMode": { "const": "REAL" }
+                    }
+                  },
+                  "after": {
+                    "properties": {
+                      "target": { "const": "LIVE" },
+                      "evidenceMode": { "const": "REAL" },
+                      "runtimeIdentity": { "type": "string", "minLength": 1 },
+                      "runtimeEvidenceRef": { "type": "string", "minLength": 1 }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ],
+      "additionalProperties": false
+    }
+  }
+}
