@@ -68,6 +68,7 @@ export interface UrlFixWitnessSpec {
   preconditions: readonly string[];
   actions: readonly string[];
   expectedObservableResult: string;
+  expectationEvidenceRef: string;
 }
 
 export interface UrlFixArtifactRef {
@@ -127,16 +128,28 @@ export interface UrlFixTrustedRuntimeEvidence {
   origin: string;
 }
 
+export interface UrlFixTrustedExpectationEvidence {
+  ref: string;
+  route: string;
+  browser: UrlFixBrowser;
+  expectedObservableResult: string;
+}
+
+export interface UrlFixVerificationTrustContext {
+  verifiedArtifacts: ReadonlyMap<string, string>;
+  verifiedRuntimeEvidence: readonly UrlFixTrustedRuntimeEvidence[];
+  verifiedWitnessRuns: readonly UrlFixWitnessRun[];
+  verifiedExpectations: readonly UrlFixTrustedExpectationEvidence[];
+}
+
 /**
  * Trust facts must be supplied by the FCR authority/evidence layer, not copied
  * from arbitrary URLFix input. Every trusted fact is tuple-bound so unrelated
  * true facts cannot be recombined into false authority or proof.
  */
-export interface UrlFixTrustContext {
+export interface UrlFixTrustContext extends UrlFixVerificationTrustContext {
   verifiedUrlBindings: readonly UrlFixTrustedUrlBinding[];
   verifiedRepairAuthorities: readonly UrlFixTrustedRepairAuthority[];
-  verifiedArtifacts: ReadonlyMap<string, string>;
-  verifiedRuntimeEvidence: readonly UrlFixTrustedRuntimeEvidence[];
 }
 
 export interface UrlFixBindingDecision {
@@ -174,10 +187,43 @@ function browserRoute(url: URL): string {
   return `${url.pathname}${url.search}${url.hash}`;
 }
 
+function artifactEqual(left: UrlFixArtifactRef | null | undefined, right: UrlFixArtifactRef | null | undefined): boolean {
+  if (!left && !right) return true;
+  if (!left || !right) return false;
+  return left.id === right.id && left.sha256.toLowerCase() === right.sha256.toLowerCase();
+}
+
 function artifactVerified(ref: UrlFixArtifactRef | null | undefined, trusted: ReadonlyMap<string, string>): boolean {
   if (!ref?.id || !/^[a-f0-9]{64}$/i.test(ref.sha256)) return false;
   const trustedHash = trusted.get(ref.id);
   return Boolean(trustedHash && trustedHash.toLowerCase() === ref.sha256.toLowerCase());
+}
+
+function witnessRunVerified(run: UrlFixWitnessRun, trustedRuns: readonly UrlFixWitnessRun[]): boolean {
+  return trustedRuns.some((trusted) =>
+    trusted.runId === run.runId
+      && trusted.witnessFingerprint === run.witnessFingerprint
+      && trusted.target === run.target
+      && trusted.targetUrl === run.targetUrl
+      && trusted.runtimeIdentity === run.runtimeIdentity
+      && trusted.runtimeEvidenceRef === run.runtimeEvidenceRef
+      && trusted.evidenceMode === run.evidenceMode
+      && trusted.observedResult === run.observedResult
+      && artifactEqual(trusted.trace, run.trace)
+      && artifactEqual(trusted.screenshot, run.screenshot),
+  );
+}
+
+function expectationVerified(
+  spec: UrlFixWitnessSpec,
+  trustedExpectations: readonly UrlFixTrustedExpectationEvidence[],
+): boolean {
+  return trustedExpectations.some((trusted) =>
+    trusted.ref === spec.expectationEvidenceRef
+      && trusted.route === spec.route
+      && trusted.browser === spec.browser
+      && trusted.expectedObservableResult === spec.expectedObservableResult,
+  );
 }
 
 function originBindingVerified(
@@ -202,7 +248,7 @@ function repairAuthorityVerified(binding: UrlFixUrlBinding, trust: UrlFixTrustCo
   );
 }
 
-function runtimeEvidenceVerified(run: UrlFixWitnessRun, trust: Pick<UrlFixTrustContext, 'verifiedRuntimeEvidence'>): boolean {
+function runtimeEvidenceVerified(run: UrlFixWitnessRun, trust: Pick<UrlFixVerificationTrustContext, 'verifiedRuntimeEvidence'>): boolean {
   if (!run.runtimeEvidenceRef || !run.runtimeIdentity?.trim()) return false;
   let origin: string;
   try {
@@ -303,14 +349,26 @@ export function evaluateUrlFixUrlBinding(
 
 export function evaluateUrlFixVerificationReceipt(
   receipt: UrlFixVerificationReceipt,
-  trust: Pick<UrlFixTrustContext, 'verifiedArtifacts' | 'verifiedRuntimeEvidence'>,
+  trust: UrlFixVerificationTrustContext,
 ): UrlFixReceiptDecision {
   const errors: string[] = [];
   const expectedFingerprint = createUrlFixWitnessFingerprint(receipt.witnessSpec);
   const beforeUrl = validateRunBehaviorTarget(receipt.before, receipt.witnessSpec, 'before', errors);
   const afterUrl = validateRunBehaviorTarget(receipt.after, receipt.witnessSpec, 'after', errors);
 
+  if (!expectationVerified(receipt.witnessSpec, trust.verifiedExpectations)) {
+    errors.push('expected observable result is not bound to trusted expectation evidence');
+  }
+  if (!witnessRunVerified(receipt.before, trust.verifiedWitnessRuns)) {
+    errors.push('before witness run receipt is not independently verified');
+  }
+  if (!witnessRunVerified(receipt.after, trust.verifiedWitnessRuns)) {
+    errors.push('after witness run receipt is not independently verified');
+  }
   if (receipt.before.runId === receipt.after.runId) errors.push('before and after executions must have distinct run IDs');
+  if (receipt.before.trace?.id && receipt.after.trace?.id && receipt.before.trace.id === receipt.after.trace.id) {
+    errors.push('before and after executions must have distinct trace artifacts');
+  }
   if (receipt.before.witnessFingerprint !== expectedFingerprint) errors.push('before run does not match the witness specification fingerprint');
   if (receipt.after.witnessFingerprint !== expectedFingerprint) errors.push('after run does not match the witness specification fingerprint');
   if (!artifactVerified(receipt.before.trace, trust.verifiedArtifacts)) errors.push('before trace artifact id/hash is not independently verified');
@@ -322,7 +380,8 @@ export function evaluateUrlFixVerificationReceipt(
     error.includes('witness specification')
       || error.includes('run IDs')
       || error.includes('trace artifact')
-      || error.includes('witness route'),
+      || error.includes('witness route')
+      || error.includes('witness run receipt'),
   );
   const validSameWitness = sameWitnessErrors.length === 0;
 
