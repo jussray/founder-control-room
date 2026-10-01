@@ -2,23 +2,89 @@
 // External site snapshot: read-only Playwright evidence for a public URL.
 // No secrets, no cookies, no founder bearer. Produces screenshots + report.json.
 import { createHash } from 'node:crypto';
+import { lookup as dnsLookup } from 'node:dns/promises';
 import { mkdirSync, writeFileSync } from 'node:fs';
+import { isIP } from 'node:net';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const PRIVATE_HOST = /^(localhost|127\.|10\.|192\.168\.|192\.0\.0\.|172\.(1[6-9]|2\d|3[01])\.|169\.254\.|100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.|198\.1[89]\.|0\.0\.0\.0|.*\.(local|internal|localdomain))/i;
 const SOURCE_META_NAMES = new Set(['git-sha', 'commit-sha', 'source-sha', 'build-sha', 'version']);
 
+function privateOrReservedIpv4(address) {
+  const octets = address.split('.').map(Number);
+  if (octets.length !== 4 || octets.some((value) => !Number.isInteger(value) || value < 0 || value > 255)) return true;
+  const [a, b, c] = octets;
+  return (
+    a === 0 ||
+    a === 10 ||
+    a === 127 ||
+    (a === 100 && b >= 64 && b <= 127) ||
+    (a === 169 && b === 254) ||
+    (a === 172 && b >= 16 && b <= 31) ||
+    (a === 192 && b === 0 && c === 0) ||
+    (a === 192 && b === 0 && c === 2) ||
+    (a === 192 && b === 168) ||
+    (a === 198 && (b === 18 || b === 19)) ||
+    (a === 198 && b === 51 && c === 100) ||
+    (a === 203 && b === 0 && c === 113) ||
+    a >= 224
+  );
+}
+
+function privateOrReservedIpv6(address) {
+  const value = address.toLowerCase();
+  return (
+    value === '::' ||
+    value === '::1' ||
+    value.startsWith('fc') ||
+    value.startsWith('fd') ||
+    /^fe[89ab]/.test(value) ||
+    value.startsWith('ff') ||
+    value.startsWith('2001:db8:') ||
+    value === '2001:db8::'
+  );
+}
+
+export function isPrivateOrReservedAddress(address) {
+  const family = isIP(address);
+  if (family === 4) return privateOrReservedIpv4(address);
+  if (family === 6) return privateOrReservedIpv6(address);
+  return true;
+}
+
 export function validateTargetUrl(raw) {
   let url;
   try { url = new URL(String(raw).trim()); } catch { return { ok: false, reason: 'not a URL' }; }
   if (url.protocol !== 'https:') return { ok: false, reason: 'https only' };
   if (url.username || url.password) return { ok: false, reason: 'credentials in URL are not allowed' };
+  if (url.search || url.hash) return { ok: false, reason: 'query strings and fragments are not allowed for public snapshot publication' };
   if (url.hostname.startsWith('[')) return { ok: false, reason: 'IP literals are not allowed' };
   if (/^\d+(\.\d+){3}$/.test(url.hostname) || /^\d+$/.test(url.hostname)) return { ok: false, reason: 'IP literals are not allowed' };
   if (PRIVATE_HOST.test(url.hostname)) return { ok: false, reason: 'private or local host' };
   if (!url.hostname.includes('.')) return { ok: false, reason: 'bare hostname' };
   return { ok: true, url: url.toString(), host: url.hostname };
+}
+
+export async function validatePublicRequestUrl(raw, resolver = dnsLookup) {
+  let url;
+  try { url = new URL(String(raw)); } catch { return { ok: false, reason: 'invalid request URL' }; }
+  if (!['http:', 'https:'].includes(url.protocol)) return { ok: true, reason: 'non-network URL' };
+  if (url.username || url.password) return { ok: false, reason: 'credentials in request URL are not allowed' };
+  if (url.hostname.startsWith('[') || isIP(url.hostname)) return { ok: false, reason: 'IP literal request blocked' };
+  if (PRIVATE_HOST.test(url.hostname) || !url.hostname.includes('.')) return { ok: false, reason: 'private or local request host' };
+
+  let records;
+  try {
+    records = await resolver(url.hostname, { all: true, verbatim: true });
+  } catch {
+    return { ok: false, reason: 'DNS resolution failed' };
+  }
+  if (!Array.isArray(records) || records.length === 0) return { ok: false, reason: 'DNS returned no addresses' };
+  if (records.some((record) => isPrivateOrReservedAddress(record.address))) {
+    return { ok: false, reason: 'DNS resolved to a private or reserved address' };
+  }
+  return { ok: true, reason: 'public network destination' };
 }
 
 export function sanitizePublishedUrl(raw, base) {
@@ -65,13 +131,19 @@ async function run() {
     process.exit(2);
   }
 
+  const initialNetworkCheck = await validatePublicRequestUrl(target.url);
+  if (!initialNetworkCheck.ok) {
+    console.error(`::error title=Unsafe target::${initialNetworkCheck.reason}`);
+    process.exit(2);
+  }
+
   const outRoot = process.env.SNAPSHOT_OUT_DIR || 'snapshots';
   const dir = join(outRoot, snapshotDirName(target.host));
   mkdirSync(dir, { recursive: true });
 
   const capturedAt = new Date().toISOString();
   const report = {
-    schema: 'juss/external-site-snapshot@v2',
+    schema: 'juss/external-site-snapshot@v3',
     collector: {
       repository: process.env.GITHUB_REPOSITORY || null,
       commitSha: process.env.GITHUB_SHA || null,
@@ -82,7 +154,7 @@ async function run() {
     target: {
       host: target.host,
       publicUrl: sanitizePublishedUrl(target.url),
-      queryOrFragmentRedacted: /[?#]/.test(target.url),
+      queryOrFragmentAccepted: false,
     },
     capturedAt,
     viewports: {},
@@ -90,12 +162,14 @@ async function run() {
     proofBoundary: {
       runtimeReadback: 'UNKNOWN',
       repositoryToRuntimeEquivalence: 'UNKNOWN',
+      networkBoundary: 'PUBLIC_DESTINATIONS_ONLY',
       note: 'A successful browser capture proves only that the public runtime was observed at capture time. It does not prove that runtime content came from the collector repository or commit unless the runtime independently exposes matching source identity.',
     },
   };
 
   const { chromium } = await import('playwright');
   const browser = await chromium.launch();
+  const verdictCache = new Map();
 
   for (const vp of VIEWPORTS) {
     const context = await browser.newContext({
@@ -103,10 +177,37 @@ async function run() {
       isMobile: vp.mobile,
       hasTouch: vp.mobile,
     });
-    const page = await context.newPage();
     const consoleErrors = [];
     const requestFailures = [];
 
+    await context.route('**/*', async (route) => {
+      const requestUrl = route.request().url();
+      let parsed;
+      try { parsed = new URL(requestUrl); } catch {
+        requestFailures.push({ url: String(requestUrl).slice(0, 300), reason: 'invalid request URL blocked' });
+        await route.abort('blockedbyclient');
+        return;
+      }
+      if (!['http:', 'https:'].includes(parsed.protocol)) {
+        await route.continue();
+        return;
+      }
+      const cacheKey = `${parsed.protocol}//${parsed.hostname}:${parsed.port || ''}`;
+      let verdictPromise = verdictCache.get(cacheKey);
+      if (!verdictPromise) {
+        verdictPromise = validatePublicRequestUrl(requestUrl);
+        verdictCache.set(cacheKey, verdictPromise);
+      }
+      const verdict = await verdictPromise;
+      if (!verdict.ok) {
+        requestFailures.push({ url: sanitizePublishedUrl(requestUrl), reason: verdict.reason });
+        await route.abort('blockedbyclient');
+        return;
+      }
+      await route.continue();
+    });
+
+    const page = await context.newPage();
     page.on('console', (message) => {
       if (message.type() === 'error') consoleErrors.push(message.text().slice(0, 300));
     });
@@ -131,7 +232,7 @@ async function run() {
       }
       await page.waitForTimeout(1500);
     } catch (error) {
-      report.viewports[vp.name] = { error: String(error).slice(0, 300) };
+      report.viewports[vp.name] = { error: String(error).slice(0, 300), requestFailures: requestFailures.slice(0, 30) };
       await context.close();
       continue;
     }
@@ -158,7 +259,6 @@ async function run() {
         sourceIdentityHints,
         overflowX: document.documentElement.scrollWidth - window.innerWidth,
         brokenImages: [...document.images].filter((image) => image.complete && image.naturalWidth === 0).map((image) => image.src).slice(0, 20),
-        bodyTextHead: document.body.innerText.slice(0, 4000),
       };
     }, [...SOURCE_META_NAMES]);
 
@@ -185,7 +285,6 @@ async function run() {
       sourceIdentityHints: facts.sourceIdentityHints,
       overflowX: facts.overflowX,
       brokenImages,
-      bodyTextHead: facts.bodyTextHead,
       consoleErrors,
       requestFailures: requestFailures.slice(0, 30),
     };
