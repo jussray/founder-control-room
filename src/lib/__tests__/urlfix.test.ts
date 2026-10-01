@@ -74,7 +74,7 @@ describe('urlfix witness proof', () => {
       after: { ...base.after, evidenceMode: 'MOCKED' },
     }));
     expect(result.proofState).toBe('PATCHED_NOT_LIVE');
-    expect(result.errors.join(' ')).toContain('cannot establish browser proof');
+    expect(result.errors.join(' ')).toContain('requires real, non-mocked dependencies');
   });
 
   it('caps a live repair at patched-not-live while runtime identity is unknown', () => {
