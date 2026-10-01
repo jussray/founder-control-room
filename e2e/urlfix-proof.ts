@@ -134,14 +134,14 @@ const receipt: UrlFixVerificationReceipt = {
   after: afterRun,
 };
 
-const verifiedArtifactIds = new Set([
-  beforeRun.trace?.id,
-  afterRun.trace?.id,
-].filter((value): value is string => Boolean(value)));
+const verifiedArtifacts = new Map<string, string>();
+for (const ref of [beforeRun.trace, afterRun.trace]) {
+  if (ref) verifiedArtifacts.set(ref.id, ref.sha256);
+}
 
 const decision = evaluateUrlFixVerificationReceipt(receipt, {
-  verifiedArtifactIds,
-  verifiedRuntimeEvidenceRefs: new Set(),
+  verifiedArtifacts,
+  verifiedRuntimeEvidence: [],
 });
 
 if (!decision.validSameWitness || decision.proofState !== 'LOCAL_BROWSER_PROVEN' || decision.errors.length > 0) {
@@ -155,6 +155,7 @@ const falseLiveDecision = evaluateUrlFixVerificationReceipt({
     target: 'LIVE',
     targetUrl: 'https://example.invalid/cart',
     evidenceMode: 'FIXTURE',
+    runtimeEvidenceRef: 'pretend-before-runtime-receipt',
   },
   after: {
     ...afterRun,
@@ -162,11 +163,14 @@ const falseLiveDecision = evaluateUrlFixVerificationReceipt({
     targetUrl: 'https://example.invalid/cart',
     evidenceMode: 'FIXTURE',
     runtimeIdentity: 'pretend-live-runtime',
-    runtimeEvidenceRef: 'pretend-runtime-receipt',
+    runtimeEvidenceRef: 'pretend-after-runtime-receipt',
   },
 }, {
-  verifiedArtifactIds,
-  verifiedRuntimeEvidenceRefs: new Set(['pretend-runtime-receipt']),
+  verifiedArtifacts,
+  verifiedRuntimeEvidence: [
+    { ref: 'pretend-before-runtime-receipt', runtimeIdentity: beforeRun.runtimeIdentity || '', origin: 'https://example.invalid' },
+    { ref: 'pretend-after-runtime-receipt', runtimeIdentity: 'pretend-live-runtime', origin: 'https://example.invalid' },
+  ],
 });
 
 if (falseLiveDecision.proofState === 'LIVE_BROWSER_PROVEN') {
