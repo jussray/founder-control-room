@@ -219,12 +219,29 @@ export const rateLimitMagicLink = createRateLimiter(
   { error: 'Too many magic-link requests, please try again later.' },
 );
 
-/** 60 requests per minute per process/IP for general API routes. */
-export const rateLimitGeneral = createRateLimiter(
+/**
+ * 60 requests per minute per process/IP for every HTTP request.
+ *
+ * requestAudit applies this baseline before server.ts mounts any public route.
+ * Some routes also reference rateLimitGeneral explicitly, so the wrapper is
+ * idempotent for the lifetime of a single Express Request and counts it once.
+ */
+const generalRateLimitCore = createRateLimiter(
   60 * 1_000,
   60,
   { error: 'Rate limit exceeded.' },
 );
+const generalRateLimitedRequests = new WeakSet<Request>();
+
+export const rateLimitGeneral: RequestHandler = (req, res, next): void => {
+  if (generalRateLimitedRequests.has(req)) {
+    next();
+    return;
+  }
+
+  generalRateLimitedRequests.add(req);
+  generalRateLimitCore(req, res, next);
+};
 
 /**
  * 60 founder-permission requests per minute per process/IP.
@@ -269,11 +286,11 @@ export function requestAudit(
     );
   });
 
-  next();
+  rateLimitGeneral(req, res, next);
 }
 
 // ---------------------------------------------------------------------------
-// Centralized error handler — must be last in server.ts
+// Centralized error handler - must be last in server.ts
 // ---------------------------------------------------------------------------
 export function errorHandler(
   err: unknown,
