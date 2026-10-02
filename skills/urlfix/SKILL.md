@@ -11,6 +11,7 @@ requires:
   - playwright
   - goalfix
   - fcr-portfolio-registry
+  - review-verify-merge
 ---
 
 # URLFix
@@ -19,9 +20,11 @@ requires:
 
 Turn a live URL into a truthful repair loop:
 
-`URL -> resolve -> browser baseline -> issue ledger -> failure plane -> causal hypothesis -> goalfix -> same witness -> runtime identity -> live recheck`
+`URL -> resolve -> browser baseline -> issue ledger -> failure plane -> causal hypothesis -> goalfix -> same witness -> runtime identity -> live recheck -> merge-review handoff when applicable`
 
-URLFix observes, diagnoses, and verifies. Goalfix owns source-repair discipline. FCR owns project identity, authority, runtime truth, expectation truth, and evidence trust. Playwright supplies browser evidence.
+URLFix observes, diagnoses, and verifies. Goalfix owns source-repair discipline. FCR owns project identity, authority, runtime truth, expectation truth, and evidence trust. Playwright supplies browser evidence. `review-verify-merge` owns merge readiness and merge execution authority after a separately valid handoff.
+
+The mandatory merge-review annex is `skills/urlfix/MERGE_REVIEW.md`.
 
 ## Governing axiom
 
@@ -29,7 +32,7 @@ URLFix may advance a defect only to the highest proof state actually observed.
 
 `LIVE_BROWSER_PROVEN` requires the same meaningful behavioral witness that exposed the defect to fail on the real live baseline and pass on the identified repaired live runtime, using real dependencies and independently verified semantic and artifact evidence.
 
-A stable URL is a locator, not runtime identity. Source green, local green, preview green, provider acceptance, or a page merely loading are not live repair proof.
+A stable URL is a locator, not runtime identity. Source green, local green, preview green, provider acceptance, a page merely loading, or browser proof itself are not merge approval.
 
 ## Authority model
 
@@ -43,6 +46,8 @@ Keep these truths separate:
 - expected product behavior;
 - observed browser behavior;
 - runtime identity;
+- merge-review readiness;
+- merge authority;
 - deploy authority;
 - consequential external-effect authority.
 
@@ -55,7 +60,7 @@ A URLFix payload cannot grant itself authority or truth. FCR trust facts must be
 - witness-run receipt + run id + fingerprint + target URL + evidence mode + observed result + artifacts;
 - expectation evidence ref + full route + browser family + expected observable result.
 
-Do not combine individually true facts from different projects, origins, runs, expectations, or runtimes into authority or proof.
+Do not combine individually true facts from different projects, origins, runs, expectations, candidates, or runtimes into authority or proof.
 
 External, ambiguous, continuity-only, quarantined, unverified-origin, or otherwise non-authority targets remain observation-only.
 
@@ -71,7 +76,8 @@ That bounded scope may cover:
 - modify a compatible current authorized repair carrier;
 - make the smallest reversible P0/P1/P2 source fix;
 - add focused regression proof;
-- run local/preview browser verification.
+- run local/preview browser verification;
+- prepare a review-only merge-review handoff when a compatible PR already exists.
 
 It does not itself authorize merge, production deployment, database/provider mutation, payment, publication, messaging, deletion, credential changes, or authority widening.
 
@@ -176,6 +182,8 @@ Side/terminal states:
 - `PATCHED_NOT_LIVE`
 - `ROLLBACK_REQUIRED`
 
+Merge-review status is tracked separately from the issue proof state. Legal URLFix merge-review statuses are defined by `skills/urlfix/MERGE_REVIEW.md`; merge approval is never a URLFix issue state.
+
 ## Same behavioral witness law
 
 The stable witness fingerprint covers behavior only:
@@ -270,6 +278,27 @@ Reuse an existing carrier only when all are true:
 
 Otherwise stop at `BLOCKED_CARRIER_SCOPE`. A separately authorized branch may preserve source work without implying a new PR or merge authority.
 
+## Merge review handoff
+
+URLFix never treats source proof, browser proof, runtime proof, or a repair commit as merge authority.
+
+When a compatible existing PR carries the repair and merge review is requested by the founder/operator or checked-in policy:
+
+1. re-read the current repository, PR number, base ref + exact base SHA, and head ref + exact head SHA;
+2. ensure URLFix proof references are bound to that exact head SHA;
+3. emit `juss/urlfix-merge-review@v1` using `config/urlfix-merge-review.schema.json`;
+4. validate the packet with `scripts/urlfix-merge-review-contract.mjs`;
+5. keep handoff intent `REVIEW_ONLY` and `mergeAuthorized: false`;
+6. hand the packet to the existing `review-verify-merge` skill;
+7. require `review-verify-merge` to independently reacquire current PR/base/head/diff/checks/reviews/mergeability/browser proof and exact-candidate approval before any merge decision;
+8. expire the packet on any base/head movement and rebuild it from fresh truth.
+
+If there is no compatible existing PR, report `MERGE_REVIEW_BLOCKED_NO_PR`. Do not create a PR merely to satisfy URLFix.
+
+URLFix may report `READY_FOR_MERGE_REVIEW`; it must not report `MERGE_APPROVED`, `MERGED`, or equivalent from its own evidence. Merge execution and post-merge source verification belong to `review-verify-merge`. Deployment/runtime verification remains separate after merge.
+
+See `skills/urlfix/MERGE_REVIEW.md` for the complete handoff contract.
+
 ## Consequential-action boundary
 
 Stop before account creation, payments, subscriptions, publication, deletion, messaging, invitations, role changes, production configuration, credential changes, or other real external effects unless separately authorized.
@@ -292,15 +321,16 @@ Do not publish arbitrary screenshots, traces, DOM/body text, or network logs int
 4. same-witness preview browser proof when meaningful, bound to the preview runtime;
 5. real live baseline + repaired runtime identity;
 6. real live repaired same-witness recheck;
-7. before/after comparison and regression scan.
+7. before/after comparison and regression scan;
+8. when merge review is applicable, exact repo/PR/base/head handoff to `review-verify-merge` without carrying merge approval forward.
 
-The exact defect witness must pass. A generic page-load check is not a substitute.
+The exact defect witness must pass. A generic page-load check is not a substitute. Merge review must bind to the exact candidate head; a branch name alone is not enough.
 
 ## Stop conditions
 
 Stop when material P0/P1 issues and selected bounded P2 issues are proven at the highest reachable state or explicitly blocked, and the remainder is P3, duplicate, speculative, or not reproducible.
 
-Also stop when the next move requires missing authority, expectation provenance, credentials, provider repair, incompatible carrier scope, deployment access, or consequential-action authorization.
+Also stop when the next move requires missing authority, expectation provenance, credentials, provider repair, incompatible carrier scope, deployment access, merge-review carrier/PR truth, exact-candidate approval, or consequential-action authorization.
 
 ## Final receipt
 
@@ -315,6 +345,8 @@ Return:
 - trusted witness-run refs and tuple-bound artifact/runtime refs;
 - Goalfix patch/carrier refs when applicable;
 - highest proof state actually observed;
+- merge-review status: `MERGE_REVIEW_NOT_REQUESTED`, `READY_FOR_MERGE_REVIEW`, or the exact blocking status from the annex;
+- exact PR/base/head identifiers when a merge-review handoff exists;
 - blockers, residual risk, and untested consequential flows.
 
-No fake green. No authority inflation. No live claim from mock evidence.
+No fake green. No authority inflation. No live claim from mock evidence. No merge claim from URLFix evidence alone.
