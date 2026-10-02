@@ -6,8 +6,9 @@ description: Start from a live URL, reproduce material defects with Playwright, 
 # URLFix
 
 Canonical contract: `skills/urlfix/SKILL.md`.
+Mandatory merge-review annex: `skills/urlfix/MERGE_REVIEW.md`.
 
-Read and obey the canonical contract before acting. Treat `$ARGUMENTS` as the URL plus
+Read and obey both contracts before acting. Treat `$ARGUMENTS` as the URL plus
 any explicitly bounded flow or repair target.
 
 ## Execution boundary
@@ -19,10 +20,15 @@ any explicitly bounded flow or repair target.
 5. Delegate source mutation to Goalfix only with project-bound repair authority.
 6. Rerun the same behavioral witness at the highest reachable proof layer.
 7. Report the exact proof state and blockers. Never promote a lower layer by wording.
+8. If a compatible existing PR carries the repair and merge review is requested, bind repository + PR + exact base SHA + exact head SHA + exact-head proof into `juss/urlfix-merge-review@v1` and hand it to `review-verify-merge`.
 
-Do not create or contaminate a PR merely because a defect was found. Do not perform
-merge, deploy, provider/database mutation, publication, payment, messaging, deletion,
-credential, or other consequential external effects unless separately authorized.
+Do not create or contaminate a PR merely because a defect was found. URLFix merge-review
+handoff is `REVIEW_ONLY`; it never authorizes merge. Base/head movement expires the
+packet and requires fresh review/proof against the new exact candidate.
+
+Do not perform merge, deploy, provider/database mutation, publication, payment,
+messaging, deletion, credential, or other consequential external effects unless
+separately authorized through the owning lane.
 
 `LIVE_BROWSER_PROVEN` requires real live before/after runs, tuple-bound artifact hashes,
 and tuple-bound runtime receipts for the exact live origin. Fixture/mocked/intercepted
