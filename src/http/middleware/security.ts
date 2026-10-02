@@ -220,15 +220,18 @@ export const rateLimitMagicLink = createRateLimiter(
 );
 
 /**
- * 60 requests per minute per process/IP for every HTTP request.
+ * 120 requests per minute per process/IP for every HTTP request.
  *
+ * The broad baseline must leave headroom for a normal founder workflow, which
+ * can combine UI navigation, dashboard refreshes, and signed server ingress in
+ * one minute. Sensitive or expensive routes keep their stricter local limits.
  * requestAudit applies this baseline before server.ts mounts any public route.
  * Some routes also reference rateLimitGeneral explicitly, so the wrapper is
  * idempotent for the lifetime of a single Express Request and counts it once.
  */
 const generalRateLimitCore = createRateLimiter(
   60 * 1_000,
-  60,
+  120,
   { error: 'Rate limit exceeded.' },
 );
 const generalRateLimitedRequests = new WeakSet<Request>();
