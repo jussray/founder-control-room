@@ -129,6 +129,7 @@ requireContains('runtime referrer policy', security, "res.setHeader('Referrer-Po
 requireContains('runtime frame policy', security, "res.setHeader('X-Frame-Options', 'SAMEORIGIN');");
 requireContains('runtime hsts', security, "res.setHeader('Strict-Transport-Security', 'max-age=15552000; includeSubDomains');");
 if (!/const generalRateLimitCore = createRateLimiter\(\s*60 \* 1_000,\s*120,/s.test(security)) failures.push('application general rate limiter drifted from 120 requests per 60 seconds');
+if (!/export const rateLimitGeneral: RequestHandler = \(req, res, next\): void => \{[\s\S]*?generalRateLimitCore\(req,\s*res,\s*next\);[\s\S]*?\n\};/.test(security)) failures.push('exported general rate limiter must invoke the verified generalRateLimitCore');
 if (!/export const rateLimitMagicLink = createRateLimiter\(\s*15 \* 60 \* 1_000,\s*5,/s.test(security)) failures.push('application magic-link limiter drifted from 5 requests per 15 minutes');
 
 const csrfIndex = server.indexOf('app.use(requireSameOriginBrowserMutation);');
