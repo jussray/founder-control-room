@@ -11,6 +11,13 @@ describe('HTTP rate-limit baseline contract', () => {
     expect(source).toContain('const generalRateLimitCore = createRateLimiter(');
   });
 
+  it('sets a 120 requests/minute broad baseline while preserving stricter local limiters', () => {
+    const source = fs.readFileSync(securityPath, 'utf8');
+    expect(source).toMatch(/generalRateLimitCore = createRateLimiter\(\s*60 \* 1_000,\s*120,/s);
+    expect(source).toContain('export const rateLimitMagicLink = createRateLimiter(');
+    expect(source).toContain('export const rateLimitFounderPermissions = rateLimit({');
+  });
+
   it('counts each Express request at most once even when routes reuse the limiter', () => {
     const source = fs.readFileSync(securityPath, 'utf8');
     expect(source).toContain('const generalRateLimitedRequests = new WeakSet<Request>();');
