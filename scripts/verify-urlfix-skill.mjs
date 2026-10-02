@@ -1,15 +1,55 @@
 #!/usr/bin/env node
 import { readFileSync } from 'node:fs';
+import { evaluateUrlFixMergeReviewHandoff } from './urlfix-merge-review-contract.mjs';
 
 const skill = readFileSync(new URL('../skills/urlfix/SKILL.md', import.meta.url), 'utf8');
+const mergeAnnex = readFileSync(new URL('../skills/urlfix/MERGE_REVIEW.md', import.meta.url), 'utf8');
 const schema = JSON.parse(readFileSync(new URL('../config/urlfix.schema.json', import.meta.url), 'utf8'));
+const mergeSchema = JSON.parse(readFileSync(new URL('../config/urlfix-merge-review.schema.json', import.meta.url), 'utf8'));
 const source = readFileSync(new URL('../src/lib/urlfix.ts', import.meta.url), 'utf8');
 const proof = readFileSync(new URL('../e2e/urlfix-proof.ts', import.meta.url), 'utf8');
 const tests = readFileSync(new URL('../src/lib/__tests__/urlfix.test.ts', import.meta.url), 'utf8');
 const aiAdapter = readFileSync(new URL('../.ai/skills/urlfix/SKILL.md', import.meta.url), 'utf8');
 const claudeAdapter = readFileSync(new URL('../.claude/skills/urlfix/SKILL.md', import.meta.url), 'utf8');
+const reviewMergeSkill = readFileSync(new URL('../.claude/skills/review-verify-merge/SKILL.md', import.meta.url), 'utf8');
 
 const issueSchemaText = JSON.stringify(schema.$defs?.issue?.allOf || []);
+
+const validMergePacket = {
+  schema: 'juss/urlfix-merge-review@v1',
+  repository: 'jussray/founder-control-room',
+  pullRequest: 999,
+  base: { ref: 'main', sha: 'a'.repeat(40) },
+  head: { ref: 'fix/urlfix-proof', sha: 'b'.repeat(40) },
+  repair: { issueIds: ['URLFIX-001'], carrier: 'PR #999' },
+  proof: {
+    highestState: 'LIVE_BROWSER_PROVEN',
+    exactHeadSha: 'b'.repeat(40),
+    proofRefs: ['urlfix:receipt:001'],
+    residualRisk: [],
+  },
+  handoff: {
+    intent: 'REVIEW_ONLY',
+    reviewSkill: 'review-verify-merge',
+    mergeAuthorized: false,
+  },
+  issuedAt: '2026-10-02T00:00:00.000Z',
+  expiresOnRefMovement: true,
+};
+
+const validMergeDecision = evaluateUrlFixMergeReviewHandoff(validMergePacket);
+const forgedMergeAuthorityDecision = evaluateUrlFixMergeReviewHandoff({
+  ...validMergePacket,
+  handoff: { ...validMergePacket.handoff, mergeAuthorized: true },
+});
+const staleProofHeadDecision = evaluateUrlFixMergeReviewHandoff({
+  ...validMergePacket,
+  proof: { ...validMergePacket.proof, exactHeadSha: 'c'.repeat(40) },
+});
+const noPrDecision = evaluateUrlFixMergeReviewHandoff({
+  ...validMergePacket,
+  pullRequest: null,
+});
 
 const checks = [
   ['candidate version is 0.2.0', /version:\s*0\.2\.0/.test(skill) && /status:\s*candidate/.test(skill)],
@@ -45,6 +85,17 @@ const checks = [
   ['adversarial tests cover untrusted preview runtime', tests.includes('without bound runtime evidence')],
   ['AI adapter routes to canonical contract', /Canonical contract: `skills\/urlfix\/SKILL\.md`/.test(aiAdapter)],
   ['Claude adapter routes to canonical contract', /Canonical contract: `skills\/urlfix\/SKILL\.md`/.test(claudeAdapter)],
+  ['merge-review annex is mandatory from adapters', aiAdapter.includes('skills/urlfix/MERGE_REVIEW.md') && claudeAdapter.includes('skills/urlfix/MERGE_REVIEW.md')],
+  ['canonical skill delegates merge review instead of claiming authority', skill.includes('review-verify-merge') && skill.includes('mergeAuthorized: false') && /browser proof itself are not merge approval/.test(skill)],
+  ['merge handoff schema is review-only and non-authorizing', mergeSchema.$id === 'https://foundercontrolroom.org/schemas/urlfix-merge-review-v1.json' && mergeSchema.properties?.handoff?.properties?.intent?.const === 'REVIEW_ONLY' && mergeSchema.properties?.handoff?.properties?.mergeAuthorized?.const === false],
+  ['valid exact-head merge-review packet is accepted', validMergeDecision.reviewHandoffReady === true && validMergeDecision.mergeAuthorized === false],
+  ['URLFix cannot forge merge authority', forgedMergeAuthorityDecision.reviewHandoffReady === false && forgedMergeAuthorityDecision.mergeAuthorized === false && forgedMergeAuthorityDecision.errors.join(' ').includes('never grant merge authority')],
+  ['proof head mismatch blocks merge review', staleProofHeadDecision.reviewHandoffReady === false && staleProofHeadDecision.errors.join(' ').includes('does not match')],
+  ['merge review requires an existing PR', noPrDecision.reviewHandoffReady === false && noPrDecision.errors.join(' ').includes('pull request number')],
+  ['base/head movement explicitly expires URLFix handoff', /expires the packet/.test(mergeAnnex) && /base\/head movement/.test(skill)],
+  ['merge review does not inherit stale approval', /do not carry prior approval forward/.test(mergeAnnex)],
+  ['existing review skill reacquires repo truth and exact-head gates', reviewMergeSkill.includes('Invoke `/repo-truth`') && reviewMergeSkill.includes('exact head') && reviewMergeSkill.includes('browser evidence exists when required')],
+  ['existing review skill keeps merge separate from deploy proof', reviewMergeSkill.includes('Verify deployment separately if production state is part of the goal')],
 ];
 
 const failures = checks.filter(([, ok]) => !ok);
