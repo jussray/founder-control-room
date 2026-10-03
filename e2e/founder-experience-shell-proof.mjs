@@ -88,8 +88,11 @@ async function provePublicFrontDoor(label, viewport) {
   if (!/No account is required to explore the public FCR world/i.test(userCopy)) {
     throw new Error(`${label}: user onboarding must make the current public/no-account boundary explicit`);
   }
-  if (await userOnboarding.locator('[data-user-start]').count() !== 4) {
-    throw new Error(`${label}: user onboarding must expose four real public starting lanes`);
+  if (await userOnboarding.locator('[data-user-start]').count() !== 5) {
+    throw new Error(`${label}: user onboarding must expose five real public starting lanes`);
+  }
+  if (await userOnboarding.locator('[data-user-start="workspace"]').getAttribute('href') !== '/user-space.html') {
+    throw new Error(`${label}: blank user workspace must route to /user-space.html`);
   }
   if (await userOnboarding.locator('[data-user-start="founders"]').getAttribute('href') !== '/work.html') {
     throw new Error(`${label}: founder discovery must route to the real public work directory`);
@@ -206,7 +209,7 @@ try {
   await provePublicFrontDoor('mobile-390', { width: 390, height: 844 });
   await proveViewport('desktop-1440', { width: 1440, height: 1100 });
   await proveViewport('mobile-390', { width: 390, height: 844 });
-  console.log('PASS: public FCR user/founder entry, honest onboarding boundaries, FCR visual signature, user/founder/owner views, owner-only crown authority, Bip platform identity, responsive layout, and keyboard focus are preserved.');
+  console.log('PASS: public FCR user/founder entry, honest onboarding boundaries, five public starting lanes including the blank local-first workspace, FCR visual signature, user/founder/owner views, owner-only crown authority, Bip platform identity, responsive layout, and keyboard focus are preserved.');
 } finally {
   await browser.close();
   await new Promise((resolve) => server.close(resolve));
