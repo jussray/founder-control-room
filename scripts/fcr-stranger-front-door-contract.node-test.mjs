@@ -6,10 +6,18 @@ const workflow = readFileSync('.github/workflows/fcr-access-front-door-recovery.
 const browserProof = readFileSync('scripts/verify-fcr-front-door-playwright.mjs', 'utf8');
 const authRoute = readFileSync('src/http/routes/auth.ts', 'utf8');
 
-test('stranger proof tests reachability and founder containment rather than public membership', () => {
+test('stranger proof tests public reachability, founder containment, protected direct API, and service-bound version proof', () => {
   assert.match(browserProof, /audience:\s*'random-stranger'/);
   assert.match(browserProof, /https:\/\/foundercontrolroom\.org/);
   assert.match(browserProof, /https:\/\/www\.foundercontrolroom\.org/);
+  assert.match(browserProof, /DIRECT_API_VERSION_URL\s*=\s*'https:\/\/api\.foundercontrolroom\.org\/version'/);
+  assert.match(browserProof, /SAME_ORIGIN_VERSION_URL\s*=\s*`\$\{APEX_ORIGIN\}\/version`/);
+  assert.match(browserProof, /maxRedirects:\s*0/);
+  assert.match(browserProof, /directApiAccessProtected/);
+  assert.match(browserProof, /cloudflareAccessGateDetected/);
+  assert.match(browserProof, /x-founder-control-room-service/);
+  assert.match(browserProof, /apiVersionServiceIdentity\s*!==\s*'founder-control-room'/);
+  assert.match(browserProof, /versionPayload\.includes\(expectedHeadSha\)/);
   assert.match(browserProof, /CONTROL_ROOM_URL/);
   assert.match(browserProof, /\.sign-in-wrap/);
   assert.match(browserProof, /\.shell/);
@@ -18,6 +26,13 @@ test('stranger proof tests reachability and founder containment rather than publ
   assert.match(browserProof, /founderAuthorityContained/);
   assert.match(browserProof, /chromium\.launch/);
   assert.doesNotMatch(browserProof, /signup/i);
+});
+
+test('direct API proof fails closed unless Cloudflare Access evidence is observable', () => {
+  assert.match(browserProof, /if \(!receipt\.directApiAccessProtected\)/);
+  assert.match(browserProof, /did not present a Cloudflare Access boundary to a random stranger/);
+  assert.match(browserProof, /cloudflareaccess\\\.com\|\\\/cdn-cgi\\\/access\\\//);
+  assert.doesNotMatch(browserProof, /if \(!versionResponse\.ok\(\)\)[\s\S]{0,400}DIRECT_API_VERSION_URL/);
 });
 
 test('founder auth contract remains allowlist-first and founder-gated', () => {
