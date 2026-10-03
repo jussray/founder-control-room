@@ -17,12 +17,14 @@ For a storyboard-bound video shot:
 1. the canonical opening frame is a registered image asset;
 2. the image belongs to the same workspace/project boundary, or has explicit reusable-across-project authority;
 3. revoked, quarantined, and archived assets cannot establish frame zero;
-4. the opening frame is the first reference passed into the media-routing request;
-5. the request requires reference fidelity;
-6. Media Router keeps provider choice replaceable;
-7. because the request now carries references, the existing router selects `video.image_to_video` rather than `video.text_to_video` when the provider catalog supports it;
-8. the storyboard state receives a deterministic fingerprint and continuity cookie;
-9. `/MAKEVIDEO` combines its director-plan fingerprint with the storyboard fingerprint, so a changed frame zero invalidates the combined continuity identity.
+4. every storyboard/reference asset must already have an upstream per-asset domain reference policy;
+5. the storyboard bridge may not synthesize provider-send permission from a request-level flag or continuity record;
+6. the opening frame is the first reference passed into the media-routing request;
+7. the request requires reference fidelity;
+8. Media Router keeps provider choice replaceable;
+9. because the request now carries references, the existing router selects `video.image_to_video` rather than `video.text_to_video` when the provider catalog supports it;
+10. the storyboard state receives a deterministic fingerprint and continuity cookie;
+11. `/MAKEVIDEO` combines its director-plan fingerprint with the storyboard fingerprint, so a changed frame zero invalidates the combined continuity identity.
 
 ## Typed visual-state inputs
 
@@ -40,6 +42,8 @@ The Media Router still receives its provider-neutral `referenceAssetIds` array. 
 
 This avoids turning provider-specific reference conventions into FCR authority.
 
+The binding itself is not a source of external-provider permission. Each flattened reference must already exist in `MediaRouterDomainContextV1.assetInputs`; otherwise preparation fails closed with `REFERENCE_POLICY_MISSING`. The request-level `maySendToExternalProvider` flag is necessary but never sufficient by itself.
+
 ## `/MAKEVIDEO` bridge
 
 `compileMakeVideoStoryboardBundle(...)` composes:
@@ -51,7 +55,7 @@ This avoids turning provider-specific reference conventions into FCR authority.
 
 The combined identity changes when either the director plan or storyboard visual state changes.
 
-A continuity fingerprint or cookie is evidence only. It does not grant provider, release, publication, or commercial-rights authority.
+A continuity fingerprint or cookie is evidence only. It does not grant provider, release, publication, commercial-rights, or per-reference provider-send authority.
 
 ## Why this exists
 
@@ -70,7 +74,7 @@ This contract narrows that freedom at the correct layer. Creative motion remains
 
 ## Truth boundary
 
-This contract proves only that FCR can bind approved image state into a provider-neutral video-routing request.
+This contract proves only that FCR can bind approved image state into a provider-neutral video-routing request while preserving the existing domain reference-policy boundary.
 
 It does **not** prove that any specific renderer is currently connected, funded, licensed, callable, or capable of generating the requested output. Live provider capability remains runtime evidence.
 
@@ -82,12 +86,13 @@ The focused contract tests must prove:
 
 1. frame zero must exist and be an image;
 2. unusable visual-state assets fail closed;
-3. frame zero is first in the reference list;
-4. reference fidelity is required;
-5. provider routing can use the existing image-to-video capability path;
-6. storyboard continuity receives a deterministic fingerprint/cookie;
-7. changing frame zero changes the storyboard fingerprint;
-8. changing frame zero changes the combined `/MAKEVIDEO` continuity identity.
+3. missing per-reference domain policy fails closed instead of being synthesized;
+4. frame zero is first in the reference list;
+5. reference fidelity is required;
+6. provider routing can use the existing image-to-video capability path;
+7. storyboard continuity receives a deterministic fingerprint/cookie;
+8. changing frame zero changes the storyboard fingerprint;
+9. changing frame zero changes the combined `/MAKEVIDEO` continuity identity.
 
 ## Rollback
 
