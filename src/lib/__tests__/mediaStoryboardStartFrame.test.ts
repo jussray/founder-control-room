@@ -62,6 +62,10 @@ function context(overrides: Partial<MediaRouterDomainContextV1> = {}): MediaRout
   };
 }
 
+function referencePolicies(...assetIds: string[]): MediaRouterDomainContextV1['assetInputs'] {
+  return assetIds.map((assetId) => ({ assetId, role: 'reference' as const, maySendToExternalProvider: true }));
+}
+
 function imageAsset(assetId = 'opening-frame-1', overrides: Partial<AssetRegistryEntryV1> = {}): AssetRegistryEntryV1 {
   return {
     assetId,
@@ -157,11 +161,20 @@ describe('media storyboard start-frame contract', () => {
     expect(wrongKind.map((error) => error.code)).toContain('OPENING_FRAME_NOT_IMAGE');
   });
 
-  it('binds the approved opening frame first, preserves semantic references, and fingerprints continuity', () => {
+  it('never synthesizes domain reference policy from request-level permission', () => {
+    expect(() => prepareStoryboardVideoRouting({
+      request: request(),
+      context: context(),
+      binding: binding(),
+      availableAssets: [imageAsset('opening-frame-1'), imageAsset('character-ref-1')],
+    })).toThrow(/REFERENCE_POLICY_MISSING/);
+  });
+
+  it('binds the approved opening frame first, preserves domain reference policy, and fingerprints continuity', () => {
     const prepared = prepareStoryboardVideoRouting({
       request: request({ referenceAssetIds: ['legacy-reference-1'] }),
       context: context({
-        assetInputs: [{ assetId: 'legacy-reference-1', role: 'reference', maySendToExternalProvider: true }],
+        assetInputs: referencePolicies('legacy-reference-1', 'opening-frame-1', 'character-ref-1'),
       }),
       binding: binding(),
       availableAssets: [
@@ -190,7 +203,7 @@ describe('media storyboard start-frame contract', () => {
     const assets = [imageAsset('opening-frame-1'), imageAsset('character-ref-1')];
     const prepared = prepareStoryboardVideoRouting({
       request: request(),
-      context: context(),
+      context: context({ assetInputs: referencePolicies('opening-frame-1', 'character-ref-1') }),
       binding: binding(),
       availableAssets: assets,
     });
@@ -225,15 +238,16 @@ describe('media storyboard start-frame contract', () => {
       imageAsset('opening-frame-2'),
       imageAsset('character-ref-1'),
     ];
+    const ctx = context({ assetInputs: referencePolicies('opening-frame-1', 'opening-frame-2', 'character-ref-1') });
     const first = prepareStoryboardVideoRouting({
       request: request(),
-      context: context(),
+      context: ctx,
       binding: binding({ openingFrameAssetId: 'opening-frame-1' }),
       availableAssets: baseAssets,
     });
     const second = prepareStoryboardVideoRouting({
       request: request(),
-      context: context(),
+      context: ctx,
       binding: binding({ openingFrameAssetId: 'opening-frame-2' }),
       availableAssets: baseAssets,
     });
