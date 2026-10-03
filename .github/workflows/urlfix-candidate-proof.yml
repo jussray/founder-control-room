@@ -9,6 +9,7 @@ on:
       - '.claude/skills/urlfix/**'
       - 'config/urlfix*.json'
       - 'e2e/urlfix-proof.ts'
+      - 'e2e/urlfix-live-sekretbip.ts'
       - 'scripts/urlfix-merge-review-contract.mjs'
       - 'scripts/verify-urlfix-skill.mjs'
       - 'skills/urlfix/**'
@@ -34,7 +35,7 @@ jobs:
   urlfix-proof:
     name: Exact-head URLFix contract + Playwright proof
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     steps:
       - name: Check out exact candidate head
         uses: actions/checkout@v4
@@ -65,7 +66,12 @@ jobs:
         run: npm run typecheck
 
       - name: Lint URLFix source and focused tests
-        run: npx eslint src/lib/urlfix.ts src/lib/__tests__/urlfix.test.ts --max-warnings 0
+        run: >-
+          npx eslint
+          src/lib/urlfix.ts
+          src/lib/__tests__/urlfix.test.ts
+          e2e/urlfix-live-sekretbip.ts
+          --max-warnings 0
 
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
@@ -74,6 +80,21 @@ jobs:
         env:
           URLFIX_PROOF_DIR: ${{ runner.temp }}/urlfix-proof
         run: npx tsx e2e/urlfix-proof.ts
+
+      - name: Run read-only live Se’kret Bip dogfood
+        env:
+          EXPECTED_SEKRET_SOURCE_SHA: 36c109d9a15ef348540a3d92ca93377f963e9505
+          URLFIX_LIVE_PROOF_DIR: ${{ runner.temp }}/urlfix-live-sekretbip
+        run: npx tsx e2e/urlfix-live-sekretbip.ts
+
+      - name: Upload live dogfood evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: urlfix-live-sekretbip-${{ github.run_id }}
+          path: ${{ runner.temp }}/urlfix-live-sekretbip
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: Upload failure evidence
         if: failure()
@@ -84,5 +105,6 @@ jobs:
             test-results
             playwright-report
             ${{ runner.temp }}/urlfix-proof
+            ${{ runner.temp }}/urlfix-live-sekretbip
           if-no-files-found: ignore
           retention-days: 14
