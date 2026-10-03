@@ -53,13 +53,13 @@ function commandCard(overrides: Record<string, unknown> = {}) {
     id: REQUEST_ID,
     project_id: PROJECT_ID,
     mission_id: MISSION_ID,
-    command_id: 'verify.typecheck',
+    command_id: 'git.head',
     expected_commit_sha: HEAD,
     requesting_agent: 'codex',
     requested_by: FOUNDER_EMAIL,
     reason: 'Need exact proof.',
     rollback_plan: 'Do not mark executed without a matching run receipt.',
-    risk: 'verify',
+    risk: 'read',
     status: 'approved',
     expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
     approved_by: FOUNDER_EMAIL,
@@ -79,18 +79,23 @@ function terminalRun(overrides: Record<string, unknown> = {}) {
     id: RUN_ID,
     project_id: PROJECT_ID,
     mission_id: MISSION_ID,
-    command_id: 'verify.typecheck',
+    command_id: 'git.head',
     expected_commit_sha: HEAD,
     observed_commit_sha: HEAD,
     status: 'passed',
+    output_truncated: false,
     finished_at: '2026-08-20T20:01:00.000Z',
     ...overrides,
   };
 }
 
-function installDatabase(run: Record<string, unknown>) {
-  const approved = commandCard();
+function installDatabase(
+  run: Record<string, unknown> | null,
+  approvedOverrides: Record<string, unknown> = {},
+) {
+  const approved = commandCard(approvedOverrides);
   const executed = commandCard({
+    ...approvedOverrides,
     status: 'executed',
     terminal_run_id: RUN_ID,
     updated_at: '2026-08-20T20:02:00.000Z',
@@ -141,7 +146,7 @@ beforeEach(() => {
 });
 
 describe('POST /command-bridge/requests/:requestId/mark-executed receipt binding', () => {
-  it('accepts only a completed terminal run bound to the approved card and exact observed head', async () => {
+  it('accepts a successful non-truncated read receipt bound to the approved card and exact observed head', async () => {
     const { requestUpdate } = installDatabase(terminalRun());
 
     const res = await request(buildApp())
@@ -155,8 +160,60 @@ describe('POST /command-bridge/requests/:requestId/mark-executed receipt binding
     expect(requestUpdate).toHaveBeenCalledTimes(1);
   });
 
+  it('rejects an arbitrary terminalRunId that resolves to no terminal receipt', async () => {
+    const { requestUpdate } = installDatabase(null);
+
+    const res = await request(buildApp())
+      .post(`/command-bridge/requests/${REQUEST_ID}/mark-executed`)
+      .set('Authorization', BEARER)
+      .send({ terminalRunId: RUN_ID });
+
+    expect(res.status).toBe(409);
+    expect(res.body.code).toBe('TERMINAL_RUN_RECEIPT_MISMATCH');
+    expect(requestUpdate).not.toHaveBeenCalled();
+  });
+
   it('rejects a terminal run from a different mission before changing the card', async () => {
     const { requestUpdate } = installDatabase(terminalRun({ mission_id: 'other-mission' }));
+
+    const res = await request(buildApp())
+      .post(`/command-bridge/requests/${REQUEST_ID}/mark-executed`)
+      .set('Authorization', BEARER)
+      .send({ terminalRunId: RUN_ID });
+
+    expect(res.status).toBe(409);
+    expect(res.body.code).toBe('TERMINAL_RUN_RECEIPT_MISMATCH');
+    expect(requestUpdate).not.toHaveBeenCalled();
+  });
+
+  it('rejects a terminal run for a different command', async () => {
+    const { requestUpdate } = installDatabase(terminalRun({ command_id: 'git.status' }));
+
+    const res = await request(buildApp())
+      .post(`/command-bridge/requests/${REQUEST_ID}/mark-executed`)
+      .set('Authorization', BEARER)
+      .send({ terminalRunId: RUN_ID });
+
+    expect(res.status).toBe(409);
+    expect(res.body.code).toBe('TERMINAL_RUN_RECEIPT_MISMATCH');
+    expect(requestUpdate).not.toHaveBeenCalled();
+  });
+
+  it('rejects a receipt whose expected head differs from the approved card', async () => {
+    const { requestUpdate } = installDatabase(terminalRun({ expected_commit_sha: 'b'.repeat(40) }));
+
+    const res = await request(buildApp())
+      .post(`/command-bridge/requests/${REQUEST_ID}/mark-executed`)
+      .set('Authorization', BEARER)
+      .send({ terminalRunId: RUN_ID });
+
+    expect(res.status).toBe(409);
+    expect(res.body.code).toBe('TERMINAL_RUN_RECEIPT_MISMATCH');
+    expect(requestUpdate).not.toHaveBeenCalled();
+  });
+
+  it('rejects a completed run that observed a different commit', async () => {
+    const { requestUpdate } = installDatabase(terminalRun({ observed_commit_sha: 'b'.repeat(40) }));
 
     const res = await request(buildApp())
       .post(`/command-bridge/requests/${REQUEST_ID}/mark-executed`)
@@ -181,8 +238,8 @@ describe('POST /command-bridge/requests/:requestId/mark-executed receipt binding
     expect(requestUpdate).not.toHaveBeenCalled();
   });
 
-  it('rejects a completed run that observed a different commit', async () => {
-    const { requestUpdate } = installDatabase(terminalRun({ observed_commit_sha: 'b'.repeat(40) }));
+  it.each(['failed', 'timed_out', 'cancelled'])('rejects a %s terminal result as an execution witness', async (status) => {
+    const { requestUpdate } = installDatabase(terminalRun({ status }));
 
     const res = await request(buildApp())
       .post(`/command-bridge/requests/${REQUEST_ID}/mark-executed`)
@@ -192,5 +249,52 @@ describe('POST /command-bridge/requests/:requestId/mark-executed receipt binding
     expect(res.status).toBe(409);
     expect(res.body.code).toBe('TERMINAL_RUN_RECEIPT_MISMATCH');
     expect(requestUpdate).not.toHaveBeenCalled();
+  });
+
+  it('rejects a passed but truncated terminal result as non-proof execution', async () => {
+    const { requestUpdate } = installDatabase(terminalRun({ output_truncated: true }));
+
+    const res = await request(buildApp())
+      .post(`/command-bridge/requests/${REQUEST_ID}/mark-executed`)
+      .set('Authorization', BEARER)
+      .send({ terminalRunId: RUN_ID });
+
+    expect(res.status).toBe(409);
+    expect(res.body.code).toBe('TERMINAL_RUN_RECEIPT_MISMATCH');
+    expect(requestUpdate).not.toHaveBeenCalled();
+  });
+
+  it.each(['verify', 'write'])('rejects legacy terminal execution receipts for %s-risk cards', async (risk) => {
+    const commandId = risk === 'verify' ? 'verify.typecheck' : 'deps.install';
+    const { requestUpdate } = installDatabase(
+      terminalRun({ command_id: commandId }),
+      { command_id: commandId, risk },
+    );
+
+    const res = await request(buildApp())
+      .post(`/command-bridge/requests/${REQUEST_ID}/mark-executed`)
+      .set('Authorization', BEARER)
+      .send({ terminalRunId: RUN_ID });
+
+    expect(res.status).toBe(409);
+    expect(res.body.code).toBe('L99_AUTHORITY_REQUIRED');
+    expect(res.body.authorityRequired).toBe('L99_APPROVAL_RECEIPT');
+    expect(requestUpdate).not.toHaveBeenCalled();
+  });
+
+  it('expires an approved card instead of binding a receipt after its execution window closes', async () => {
+    const { requestUpdate } = installDatabase(
+      terminalRun(),
+      { expires_at: new Date(Date.now() - 60_000).toISOString() },
+    );
+
+    const res = await request(buildApp())
+      .post(`/command-bridge/requests/${REQUEST_ID}/mark-executed`)
+      .set('Authorization', BEARER)
+      .send({ terminalRunId: RUN_ID });
+
+    expect(res.status).toBe(409);
+    expect(res.body.code).toBe('COMMAND_CARD_EXPIRED');
+    expect(requestUpdate).toHaveBeenCalledTimes(1);
   });
 });
