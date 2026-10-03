@@ -152,6 +152,7 @@ describe('Founder deploy command authority contract', () => {
     expect(reconcileWorkflow).not.toContain('SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}');
     expect(reconcileWorkflow).not.toContain('GITHUB_PRIVATE_KEY: ${{ secrets.GITHUB_PRIVATE_KEY }}');
     expect(reconcileWorkflow).not.toContain('FCR_SHOPIFY_WEBHOOK_SECRET: ${{ secrets.FCR_SHOPIFY_WEBHOOK_SECRET }}');
+    expect(reconcileWorkflow).not.toContain('FCR_WHOP_WEBHOOK_SECRET: ${{ secrets.FCR_WHOP_WEBHOOK_SECRET }}');
     expect(reconcileWorkflow).not.toContain('FCR_COMMERCE_HASH_SALT: ${{ secrets.FCR_COMMERCE_HASH_SALT }}');
     expect(reconcileWorkflow).not.toContain('TINYFISH_API_KEY: ${{ secrets.TINYFISH_API_KEY }}');
     expect(reconcileWorkflow).not.toContain('OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}');
@@ -165,6 +166,7 @@ describe('Founder deploy command authority contract', () => {
       'GITHUB_PRIVATE_KEY',
       'FCR_REMOTE_MCP_READ_TOKEN',
       'FCR_SHOPIFY_WEBHOOK_SECRET',
+      'FCR_WHOP_WEBHOOK_SECRET',
       'FCR_COMMERCE_HASH_SALT',
       'TINYFISH_API_KEY',
       'FCR_CLOUDFLARE_MCP_READ_TOKEN',
