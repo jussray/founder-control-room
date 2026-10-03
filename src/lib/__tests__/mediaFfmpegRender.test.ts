@@ -132,6 +132,9 @@ describe('ffmpeg render adapter', () => {
       expect(resultA.probe.durationSec).toBeLessThan(2.3);
       expect(resultA.probe.frameCount).toBe(48);
 
+      const collision = await renderFfmpegTimelineV1({ ...spec, segments: [{ ...spec.segments[0], imagePath: outA }, spec.segments[1]] }, outA);
+      expect(collision.kind).toBe('REJECTED');
+
       const ppmB = 'P3\n2 2\n255\n0 0 0  0 255 0\n0 0 255  255 255 0\n';
       await writeFile(image, ppmB, 'utf8');
       const outB = join(dir, 'out-b.mp4');
