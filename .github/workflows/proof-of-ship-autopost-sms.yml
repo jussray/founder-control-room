@@ -76,7 +76,7 @@ jobs:
           }
 
       - name: Check out exact deployed commit
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        uses: actions/checkout@v4
         with:
           ref: ${{ env.EXPECTED_SHA }}
           fetch-depth: 1
@@ -89,7 +89,7 @@ jobs:
           test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
 
       - name: Download verified Deploy proof artifact
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        uses: actions/download-artifact@v4
         with:
           name: proof-of-ship-founder-review-${{ env.EXPECTED_SHA }}
           path: verified-proof

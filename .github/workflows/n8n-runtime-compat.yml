@@ -25,7 +25,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Check out exact head
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        uses: actions/checkout@v4
 
       - name: Verify immutable head
         shell: bash
@@ -40,7 +40,7 @@ jobs:
           bash scripts/verify-n8n-runtime-compat.sh | tee n8n-runtime-compat-receipt.json
 
       - name: Upload runtime receipt
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@v4
         with:
           name: n8n-runtime-compat-${{ github.sha }}
           path: n8n-runtime-compat-receipt.json
