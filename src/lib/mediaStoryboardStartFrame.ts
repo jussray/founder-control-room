@@ -28,6 +28,15 @@ export interface PreparedStoryboardVideoRoutingV1 {
   storyboardFingerprint: string;
   continuityCookie: string;
   referenceAssetIds: string[];
+  referenceRoles: {
+    openingFrameAssetId: string;
+    endFrameAssetId: string | null;
+    characterReferenceAssetIds: string[];
+    environmentReferenceAssetIds: string[];
+    productReferenceAssetIds: string[];
+    styleReferenceAssetIds: string[];
+    continuityReferenceAssetIds: string[];
+  };
 }
 
 export type StoryboardStartFrameErrorCodeV1 =
@@ -36,6 +45,7 @@ export type StoryboardStartFrameErrorCodeV1 =
   | 'OPENING_FRAME_NOT_FOUND'
   | 'OPENING_FRAME_NOT_IMAGE'
   | 'OPENING_FRAME_NOT_USABLE'
+  | 'END_FRAME_NOT_IMAGE'
   | 'REFERENCE_NOT_FOUND'
   | 'REFERENCE_NOT_USABLE'
   | 'SOURCE_RECORD_REQUIRED'
@@ -79,7 +89,9 @@ function assetUsableForRequest(asset: AssetRegistryEntryV1, request: MediaRoutin
   if (asset.workspaceId !== request.workspaceId) return false;
   if (asset.status === 'revoked' || asset.status === 'quarantined' || asset.status === 'archived') return false;
   if (asset.projectId === request.projectId) return true;
-  return asset.rights.reusableAcrossProjects && Boolean(asset.rights.reusableAcrossProjectsAuthorityRecordId);
+  return request.referencePolicy.mayReuseCrossProject
+    && asset.rights.reusableAcrossProjects
+    && Boolean(asset.rights.reusableAcrossProjectsAuthorityRecordId);
 }
 
 export function validateStoryboardStartFrameBinding(
@@ -133,6 +145,13 @@ export function validateStoryboardStartFrameBinding(
       errors.push({ code: 'REFERENCE_NOT_FOUND', assetId, message: `Storyboard reference ${assetId} is not registered.` });
       continue;
     }
+    if (assetId === binding.endFrameAssetId && asset.kind !== 'image') {
+      errors.push({
+        code: 'END_FRAME_NOT_IMAGE',
+        assetId,
+        message: `End-frame asset ${assetId} must be an image.`,
+      });
+    }
     if (!assetUsableForRequest(asset, request)) {
       errors.push({
         code: 'REFERENCE_NOT_USABLE',
@@ -158,6 +177,18 @@ export function prepareStoryboardVideoRouting(input: {
 
   const storyboardReferences = storyboardReferenceAssetIds(input.binding);
   const referenceAssetIds = dedupe([...storyboardReferences, ...input.request.referenceAssetIds]);
+  const availableById = new Map(input.availableAssets.map((asset) => [asset.assetId, asset]));
+  for (const assetId of referenceAssetIds) {
+    const asset = availableById.get(assetId);
+    if (!asset) {
+      throw new Error(`REFERENCE_NOT_FOUND:Routing reference ${assetId} is not registered.`);
+    }
+    if (!assetUsableForRequest(asset, input.request)) {
+      throw new Error(
+        `REFERENCE_NOT_USABLE:Routing reference ${assetId} is not usable in this workspace/project boundary.`,
+      );
+    }
+  }
   const existingPolicyById = new Map(input.context.assetInputs.map((asset) => [asset.assetId, asset]));
   const missingPolicyIds = referenceAssetIds.filter((assetId) => !existingPolicyById.has(assetId));
   if (missingPolicyIds.length > 0) {
@@ -183,7 +214,15 @@ export function prepareStoryboardVideoRouting(input: {
     approvedAt: input.binding.approvedAt,
     openingFrameAssetId: input.binding.openingFrameAssetId,
     endFrameAssetId: input.binding.endFrameAssetId ?? null,
-    referenceAssetIds: storyboardReferences,
+    referenceRoles: {
+      openingFrameAssetId: input.binding.openingFrameAssetId,
+      endFrameAssetId: input.binding.endFrameAssetId ?? null,
+      characterReferenceAssetIds: input.binding.characterReferenceAssetIds,
+      environmentReferenceAssetIds: input.binding.environmentReferenceAssetIds,
+      productReferenceAssetIds: input.binding.productReferenceAssetIds,
+      styleReferenceAssetIds: input.binding.styleReferenceAssetIds,
+      continuityReferenceAssetIds: input.binding.continuityReferenceAssetIds,
+    },
   });
 
   return {
@@ -192,5 +231,14 @@ export function prepareStoryboardVideoRouting(input: {
     storyboardFingerprint,
     continuityCookie: `storyboard:${input.binding.sceneId}:${input.binding.shotId}:${storyboardFingerprint.slice(0, 24)}`,
     referenceAssetIds,
+    referenceRoles: {
+      openingFrameAssetId: input.binding.openingFrameAssetId,
+      endFrameAssetId: input.binding.endFrameAssetId ?? null,
+      characterReferenceAssetIds: [...input.binding.characterReferenceAssetIds],
+      environmentReferenceAssetIds: [...input.binding.environmentReferenceAssetIds],
+      productReferenceAssetIds: [...input.binding.productReferenceAssetIds],
+      styleReferenceAssetIds: [...input.binding.styleReferenceAssetIds],
+      continuityReferenceAssetIds: [...input.binding.continuityReferenceAssetIds],
+    },
   };
 }
