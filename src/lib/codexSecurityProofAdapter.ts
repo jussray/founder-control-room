@@ -15,7 +15,12 @@ export const CODEX_SECURITY_TERMINAL_STATES = [
 
 export type CodexSecurityTerminalState = (typeof CODEX_SECURITY_TERMINAL_STATES)[number];
 
-export type CodexSecurityEvidenceSource = 'github-actions-artifact' | 'provider-readback';
+export const CODEX_SECURITY_EVIDENCE_SOURCES = [
+  'github-actions-artifact',
+  'provider-readback',
+] as const;
+
+export type CodexSecurityEvidenceSource = (typeof CODEX_SECURITY_EVIDENCE_SOURCES)[number];
 
 export interface CodexSecurityEvidenceSubject {
   repository: string;
@@ -67,7 +72,7 @@ export interface CodexSecurityExpectedSubject {
 
 export type CodexSecurityEvidenceClassification = 'VERIFIED' | 'BLOCKED' | 'UNKNOWN';
 export type CodexSecurityCandidateDisposition = 'CONTINUE' | 'HOLD' | 'REPAIR';
-export type CodexSecurityProofLevel = 'exact-head' | 'provider-observation';
+export type CodexSecurityProofLevel = 'exact-head' | 'provider-observation' | 'unknown';
 
 export interface CodexSecurityNormalizedEvidence {
   classification: CodexSecurityEvidenceClassification;
@@ -93,12 +98,14 @@ export interface CodexSecurityNormalizedEvidence {
 const SHA_40 = /^[a-f0-9]{40}$/i;
 const SHA256_DIGEST = /^sha256:[a-f0-9]{64}$/i;
 const NONEMPTY_TOKEN = /^\S(?:.*\S)?$/;
+const ABSOLUTE_TIMESTAMP = /(?:Z|[+-]\d{2}:\d{2})$/i;
 
 function hasText(value: unknown): value is string {
   return typeof value === 'string' && value.length > 0 && NONEMPTY_TOKEN.test(value);
 }
 
-function validDate(value: string): number | null {
+function validDate(value: unknown): number | null {
+  if (typeof value !== 'string' || !ABSOLUTE_TIMESTAMP.test(value)) return null;
   const timestamp = Date.parse(value);
   return Number.isFinite(timestamp) ? timestamp : null;
 }
@@ -117,8 +124,10 @@ function findingsAreValid(findings: CodexSecurityFindingSummary): boolean {
   ].every(nonNegativeInteger);
 }
 
-function proofLevelFor(source: CodexSecurityEvidenceSource): CodexSecurityProofLevel {
-  return source === 'provider-readback' ? 'provider-observation' : 'exact-head';
+function proofLevelFor(source: unknown): CodexSecurityProofLevel {
+  if (source === 'provider-readback') return 'provider-observation';
+  if (source === 'github-actions-artifact') return 'exact-head';
+  return 'unknown';
 }
 
 function baseEvidence(
@@ -161,6 +170,14 @@ export function evaluateCodexSecurityScanReceipt(
 
   if (!CODEX_SECURITY_PROGRAMS.includes(receipt.program)) {
     blockers.push('program is not an allowlisted OpenAI cyber deployment lane');
+  }
+
+  if (!CODEX_SECURITY_TERMINAL_STATES.includes(receipt.terminalState)) {
+    blockers.push('terminal state is not allowlisted');
+  }
+
+  if (!CODEX_SECURITY_EVIDENCE_SOURCES.includes(receipt.evidenceSource)) {
+    blockers.push('evidence source is not allowlisted');
   }
 
   if (!hasText(receipt.scanId)) {
