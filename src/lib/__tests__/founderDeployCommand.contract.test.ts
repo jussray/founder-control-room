@@ -155,6 +155,7 @@ describe('Founder deploy command authority contract', () => {
     expect(reconcileWorkflow).not.toContain('FCR_COMMERCE_HASH_SALT: ${{ secrets.FCR_COMMERCE_HASH_SALT }}');
     expect(reconcileWorkflow).not.toContain('TINYFISH_API_KEY: ${{ secrets.TINYFISH_API_KEY }}');
     expect(reconcileWorkflow).not.toContain('OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}');
+    expect(reconcileWorkflow).not.toContain('ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}');
     expect(reconcileWorkflow).not.toContain('FOUNDER_SIGNAL_ENGINE_MCP_TOKEN: ${{ secrets.FOUNDER_SIGNAL_ENGINE_MCP_TOKEN }}');
     expect(configuredWorkerSecretNames()).toEqual([
       'SUPABASE_SERVICE_ROLE_KEY',
