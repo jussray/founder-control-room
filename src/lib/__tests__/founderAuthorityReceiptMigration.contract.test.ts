@@ -22,22 +22,32 @@ describe('canonical founder authority receipt migration', () => {
     expect(sql).toContain("if to_regclass('public.founder_permission_requests') is not null");
     expect(sql).toContain('foreign key (permission_request_id)');
     expect(sql).toContain('on delete restrict');
-    expect(sql).toContain('Production Supabase has the parent relation');
+    expect(sql).toContain('Production Supabase has those');
   });
 
-  it('keeps the canonical receipt service-role-only', () => {
+  it('keeps the canonical receipt service-role-only without requiring Supabase roles in Neon preview', () => {
     expect(sql).toContain('alter table public.founder_authority_receipts enable row level security');
-    expect(sql).toContain('revoke all on table public.founder_authority_receipts from anon, authenticated');
+    expect(sql).toContain('revoke all on table public.founder_authority_receipts from public');
+    expect(sql).toContain("if to_regrole('anon') is not null");
+    expect(sql).toContain("if to_regrole('authenticated') is not null");
+    expect(sql).toContain("if to_regrole('service_role') is not null");
+    expect(sql).toContain('revoke all on table public.founder_authority_receipts from anon');
+    expect(sql).toContain('revoke all on table public.founder_authority_receipts from authenticated');
+    expect(sql).toContain('grant select, insert, update, delete on table public.founder_authority_receipts to service_role');
+    expect(sql).toContain('grant execute on function public.reserve_founder_authority_receipt');
     expect(sql).toContain('to service_role');
   });
 
   it('reserves exact action scope atomically before external mutation', () => {
     expect(sql).toContain('create or replace function public.reserve_founder_authority_receipt');
+    expect(sql).toContain('security definer');
     expect(sql).toContain('for update');
     expect(sql).toContain('FOUNDER_AUTHORITY_RECEIPT_SCOPE_MISMATCH');
     expect(sql).toContain('FOUNDER_AUTHORITY_RECEIPT_ALREADY_RESERVED');
     expect(sql).toContain("set status = 'reserved'");
     expect(sql).toContain('reserved_by = coalesce(reserved_by, p_execution_key)');
+    expect(sql).toContain('revoke all on function public.reserve_founder_authority_receipt');
+    expect(sql).toContain('from public');
   });
 
   it('does not relabel D1 or an external provider as canonical founder authority', () => {
