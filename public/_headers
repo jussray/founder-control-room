@@ -31,3 +31,10 @@
   Cache-Control: no-store
   Content-Signal: ai-train=no, search=no, ai-input=no
   Vary: Origin
+
+/.well-known/lovable-project-surfaces.json
+  Access-Control-Allow-Origin: *
+  Cross-Origin-Resource-Policy: cross-origin
+  Cache-Control: no-store
+  Content-Type: application/json; charset=utf-8
+  Content-Signal: ai-train=no, search=no, ai-input=no

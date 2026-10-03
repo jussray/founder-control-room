@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://foundercontrolroom.org/schemas/lovable-project-surfaces.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "provider", "authorityRepository", "bindings"],
+  "properties": {
+    "schema": { "const": "juss/external-project-surfaces@v1" },
+    "provider": { "const": "lovable" },
+    "authorityRepository": { "const": "jussray/founder-control-room" },
+    "bindings": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["surfaceId", "name", "role", "canonicalRepository", "canonicalBranch", "surfaceCommit", "surfaceState", "truthAuthority", "executionAllowed", "externalMutationAllowed", "rules"],
+        "properties": {
+          "surfaceId": { "type": "string", "pattern": "^lovable:[0-9a-f-]{36}$" },
+          "name": { "type": "string", "minLength": 1, "maxLength": 120 },
+          "role": { "enum": ["founder-control-surface", "reconciliation-prototype", "reasoning-proposal-surface"] },
+          "canonicalRepository": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$" },
+          "canonicalBranch": { "const": "main" },
+          "surfaceCommit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+          "surfaceState": { "type": "string", "minLength": 1, "maxLength": 120 },
+          "truthAuthority": { "const": false },
+          "executionAllowed": { "const": false },
+          "externalMutationAllowed": { "const": false },
+          "rules": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1, "maxLength": 1000 } }
+        }
+      }
+    }
+  }
+}
