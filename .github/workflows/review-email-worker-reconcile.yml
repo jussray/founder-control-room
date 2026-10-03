@@ -38,7 +38,7 @@ jobs:
       DEPLOYMENT_REASON: ${{ inputs.deployment_reason }}
     steps:
       - name: Checkout exact approved commit
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ inputs.expected_head_sha }}
           fetch-depth: 0
@@ -121,12 +121,12 @@ jobs:
     environment: production
     needs: authority-gate
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ inputs.expected_head_sha }}
           persist-credentials: false
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '24'
           cache: 'npm'
@@ -257,7 +257,7 @@ jobs:
 
       - name: Upload redacted reconciliation receipt
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: fcr-review-email-worker-reconcile-${{ github.run_id }}-${{ github.run_attempt }}
           path: test-results/fcr-review-email-worker-reconcile.json

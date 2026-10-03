@@ -41,7 +41,7 @@ jobs:
       EXPECTED_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || inputs.expected_sha }}
     steps:
       - name: Check out the exact deployed commit
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ env.EXPECTED_SHA }}
           fetch-depth: 1

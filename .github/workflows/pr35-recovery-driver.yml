@@ -40,7 +40,7 @@ jobs:
           }
 
       - name: Check out immutable target
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ env.TARGET_SHA }}
           fetch-depth: 1
@@ -56,7 +56,7 @@ jobs:
           test "$observed" = "$TARGET_SHA"
 
       - name: Set up Node 24
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '24'
           cache: npm
@@ -101,7 +101,7 @@ jobs:
 
       - name: Upload code recovery packet
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: pr-recovery-code-${{ env.TARGET_SHA }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: recovery-logs/
@@ -123,7 +123,7 @@ jobs:
           }
 
       - name: Check out immutable target
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ env.TARGET_SHA }}
           fetch-depth: 1
@@ -175,7 +175,7 @@ jobs:
 
       - name: Upload migration recovery packet
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: pr-recovery-migration-${{ env.TARGET_SHA }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: recovery-logs/
