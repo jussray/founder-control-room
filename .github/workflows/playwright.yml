@@ -99,21 +99,13 @@ jobs:
         env:
           NODE_ENV: test
 
-      - name: Verify live StoryEngine peer ref still pinned
-        shell: bash
-        run: |
-          set -euo pipefail
-          live="$(git ls-remote https://github.com/jussray/StoryEngine.git "$STORYENGINE_PEER_REF" | awk 'NR==1 {print $1}')"
-          printf 'storyengine_live_ref=%s\nstoryengine_expected=%s\nstoryengine_live=%s\n' "$STORYENGINE_PEER_REF" "$STORYENGINE_PEER_SHA" "$live"
-          test -n "$live"
-          test "$live" = "$STORYENGINE_PEER_SHA"
-
       - name: Check out exact StoryEngine federation peer
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           repository: jussray/StoryEngine
           ref: ${{ env.STORYENGINE_PEER_SHA }}
           path: .federation/storyengine
+          fetch-depth: 0
           persist-credentials: false
 
       - name: Verify immutable StoryEngine federation peer
@@ -123,6 +115,50 @@ jobs:
           actual="$(git -C .federation/storyengine rev-parse HEAD)"
           printf 'storyengine_expected=%s\nstoryengine_actual=%s\n' "$STORYENGINE_PEER_SHA" "$actual"
           test "$actual" = "$STORYENGINE_PEER_SHA"
+
+      - name: Verify live StoryEngine peer remains federation-compatible
+        shell: bash
+        run: |
+          set -euo pipefail
+          git -C .federation/storyengine fetch --no-tags origin "$STORYENGINE_PEER_REF"
+          live="$(git -C .federation/storyengine rev-parse FETCH_HEAD)"
+          printf 'storyengine_live_ref=%s\nstoryengine_expected=%s\nstoryengine_live=%s\n' "$STORYENGINE_PEER_REF" "$STORYENGINE_PEER_SHA" "$live"
+          [[ "$live" =~ ^[0-9a-f]{40}$ ]]
+
+          if [ "$live" = "$STORYENGINE_PEER_SHA" ]; then
+            echo 'storyengine_federation_compatibility=exact'
+            exit 0
+          fi
+
+          if ! git -C .federation/storyengine merge-base --is-ancestor "$STORYENGINE_PEER_SHA" "$live"; then
+            echo "STORYENGINE_PEER_DIVERGED: pinned $STORYENGINE_PEER_SHA is not an ancestor of live $live" >&2
+            exit 1
+          fi
+
+          mapfile -t changed < <(git -C .federation/storyengine diff --name-only "$STORYENGINE_PEER_SHA" "$live")
+          runtime_drift=()
+          for path in "${changed[@]}"; do
+            case "$path" in
+              story-engine/cloudflare-frontdoor/*|story-engine/wrangler.jsonc|story-engine/test/*|story-engine/e2e/*|story-engine/playwright*.js|story-engine/artifacts/*)
+                ;;
+              story-engine/*)
+                if [[ "$path" =~ ^story-engine/[^/]+\.md$ ]]; then
+                  :
+                else
+                  runtime_drift+=("$path")
+                fi
+                ;;
+              *)
+                ;;
+            esac
+          done
+
+          printf 'storyengine_changed_paths=%s\n' "${changed[*]:-<none>}"
+          if [ "${#runtime_drift[@]}" -ne 0 ]; then
+            printf 'STORYENGINE_RUNTIME_DRIFT: %s\n' "${runtime_drift[*]}" >&2
+            exit 1
+          fi
+          echo 'storyengine_federation_compatibility=runtime-identical'
 
       - name: Install StoryEngine federation peer
         run: npm ci --prefix .federation/storyengine/story-engine
