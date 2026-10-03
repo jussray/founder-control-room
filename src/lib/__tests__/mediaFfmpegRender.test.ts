@@ -93,14 +93,24 @@ describe('ffmpeg render adapter', () => {
     expect(() => wrapText('x', 0)).toThrow(/positive integer/);
   });
 
-  it('requires the real ffmpeg/ffprobe capability and renders a probed MP4 with bound provenance', async () => {
+  it('proves explicit capability behavior and renders a probed MP4 with bound provenance when ffmpeg is available', async () => {
     const binary = await probeFfmpegBinary();
-    expect(binary.available).toBe(true);
-    expect(binary.version).toBeTruthy();
-    expect(binary.ffprobeVersion).toBeTruthy();
-
     const dir = await mkdtemp(join(tmpdir(), 'fcr-ffmpeg-test-'));
     try {
+      if (!binary.available) {
+        expect(binary.version).toBeNull();
+        expect(binary.ffprobeVersion).toBeNull();
+        const unavailable = await renderFfmpegTimelineV1(baseSpec, join(dir, 'unavailable.mp4'));
+        expect(unavailable).toEqual({
+          kind: 'CAPABILITY_UNAVAILABLE',
+          reason: 'ffmpeg and ffprobe binaries are required on PATH',
+        });
+        return;
+      }
+
+      expect(binary.version).toBeTruthy();
+      expect(binary.ffprobeVersion).toBeTruthy();
+
       const image = join(dir, 'source.ppm');
       const ppmA = 'P3\n2 2\n255\n255 0 0  0 255 0\n0 0 255  255 255 0\n';
       await writeFile(image, ppmA, 'utf8');
