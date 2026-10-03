@@ -1,0 +1,75 @@
+name: Agent Contract v1
+
+on:
+  pull_request:
+    branches: [main]
+  merge_group:
+    types: [checks_requested]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha || github.sha }}
+
+concurrency:
+  group: agent-contract-v1-${{ github.event.pull_request.number || github.event.merge_group.head_sha || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify-agent-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out exact proof subject
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Verify exact head
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
+
+      - name: Verify juss/agent-contract@v1
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const crypto = require('node:crypto');
+          const path = '.control-room/agent-contract.v1.json';
+          const fail = (message) => { console.error(`agent-contract-v1: ${message}`); process.exit(1); };
+          if (!fs.existsSync(path)) fail(`missing ${path}`);
+          const contract = JSON.parse(fs.readFileSync(path, 'utf8'));
+          if (contract.contract !== 'juss/agent-contract@v1') fail('wrong contract identity');
+          if (contract.version !== 1 || contract.status !== 'active') fail('wrong version/status');
+          if (contract.binding?.repository !== process.env.GITHUB_REPOSITORY) fail(`repository binding mismatch: ${contract.binding?.repository ?? 'missing'}`);
+          if (contract.binding?.defaultBranch !== 'main') fail('defaultBranch must remain main');
+          if (contract.binding?.canonicalSchema !== 'github:jussray/founder-control-room/contracts/juss-agent-contract-v1.schema.json') fail('canonical schema provenance drifted');
+          if (contract.binding?.schemaRequiredAtRuntime !== false) fail('canonical schema must not become a cross-repository runtime dependency');
+          if (contract.binding?.runtimeDependencyOnPeers !== false) fail('peer systems must not become runtime dependencies');
+          const digest = crypto.createHash('sha256').update(JSON.stringify(contract.kernel)).digest('hex');
+          if (contract.kernelFingerprint !== `sha256:${digest}`) fail('kernel fingerprint mismatch');
+          const exact = (actual, expected, label) => { if (JSON.stringify(actual) !== JSON.stringify(expected)) fail(`${label} drifted`); };
+          exact(contract.kernel?.controlModel, ['DECLARE','PERMIT','ATTEMPT','RECORD','PROVE','DECIDE'], 'control model');
+          exact(contract.kernel?.truthClassifications, ['VERIFIED','INFERRED','UNKNOWN','BLOCKED'], 'truth classifications');
+          exact(contract.kernel?.returnContract, ['REALITY','FIX','PROOF','RISK','ROLLBACK','NEXT GATE'], 'return contract');
+          const requiredInvariantNames = ['humanAuthorityIsRoot','intentIsNotAuthority','capabilityIsNotPermission','planIsNotAction','actionIsNotOutcomeProof','receiptIsNotOutcomeProof','evidenceIsNotDecision','providerSuccessIsNotOutcomeTruth','consensusDoesNotAuthorizeMutation','mutationRequiresBoundAuthority','ambiguousMutationRequiresReconciliation','staleProofCannotCarryForward','localStricterRulesWin','rollbackOrSafeContinuationRequired'];
+          for (const name of requiredInvariantNames) if (contract.kernel?.invariants?.[name] !== true) fail(`required invariant disabled: ${name}`);
+          const overlays = contract.binding?.localOverlays;
+          if (!Array.isArray(overlays) || overlays.length === 0) fail('localOverlays must be non-empty');
+          for (const overlay of overlays) {
+            if (typeof overlay !== 'string' || overlay.startsWith('/') || overlay.includes('..')) fail(`unsafe overlay path: ${String(overlay)}`);
+            if (!fs.existsSync(overlay)) fail(`missing declared local overlay: ${overlay}`);
+          }
+          const authorityRule = String(contract.binding?.authorityRule ?? '');
+          if (!authorityRule.includes('no merge') || !authorityRule.includes('deploy')) fail('authority rule must preserve consequential-action separation');
+          console.log(`agent-contract-v1 VERIFIED ${process.env.GITHUB_REPOSITORY} ${contract.kernelFingerprint} exact-head=${process.env.EXPECTED_HEAD_SHA}`);
+          NODE
