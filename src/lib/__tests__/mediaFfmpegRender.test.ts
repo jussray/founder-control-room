@@ -43,7 +43,7 @@ describe('ffmpeg render adapter', () => {
         width: 3840,
         height: 3840,
         fps: 60,
-        segments: [{ durationSec: 30, background: '#000000', lines: [] }, { durationSec: 30, background: '#000000', lines: [] }, { durationSec: 30, background: '#000000', lines: [] }, { durationSec: 30, background: '#000000', lines: [] }],
+        segments: Array.from({ length: 4 }, () => ({ durationSec: 30, background: '#000000', lines: [] })),
       }),
     ).toMatch(/render-work ceiling/);
     expect(
