@@ -372,7 +372,7 @@ When the pin is advanced because the live peer ref moved (as on the evening of S
 
 `src/providers/SecurityPreservingGitHubProvider.ts` now treats the exact branch head as a build precondition rather than assuming that any current head is safe to extend. It classifies exact-head verification as `VERIFIED_CLEAN`, `KNOWN_BAD`, or `UNVERIFIED` from current verification signals. Forward patching is allowed only from `VERIFIED_CLEAN`.
 
-When the exact head is `KNOWN_BAD`, the next repository write must be an explicit repair bound to that exact failed head by the `repair-base:<exact-head-sha>` message prefix. A stale repair marker, a repair marker on an unverified/clean head, or ordinary feature work on a known-bad head must fail closed. This repair escape hatch is narrow: it permits the corrective patch only and grants no merge, deploy, publication, provider, or founder authority. After the repair moves the head, exact-head verification must establish the successor as clean before normal forward building resumes.
+When the exact head is `KNOWN_BAD`, the next repository write must be an explicit repair bound to that exact failed head by the `repair-base:<exact-head-sha>` message prefix. A stale repair marker, a repair marker on an unverified/clean head, or ordinary feature work on a known-bad head must fail closed. This repair escape hatch is narrow: it permits the corrective patch only and grants no merge, deploy, publication, provider-policy, or founder authority. After the repair moves the head, exact-head verification must establish the successor as clean before normal forward building resumes.
 
 ## Current CI repair truth
 
@@ -395,3 +395,9 @@ The successor exact-head Playwright witness completed successfully after the ind
 The current FCR repair carrier aligns the Firewall v10 policy and verifier with the already-implemented 120-requests-per-minute idempotent application baseline while leaving stricter route-local limits unchanged. This is source/policy proof only: the firewall policy still records production application as unknown, and the change does not mutate Cloudflare or another provider.
 
 The same carrier refreshes the StoryEngine evidence pin to the independently observed peer that adds a fail-closed Cloudflare front door and focused API rate-limit coverage. The pin change makes every predecessor federation witness historical; only a complete exact-head FCR Playwright run against the pinned StoryEngine identity can establish current browser-federation proof for the new pair.
+
+## October 3 StoryEngine peer refresh during URLFix merge review
+
+URLFix PR #914's exact-head merge review passed the local FCR browser harness but correctly failed the separate StoryEngine freshness check after the peer repository advanced. PR #896 is the focused recovery carrier for that external evidence-subject drift.
+
+Refreshing the StoryEngine peer pin is recovery setup only. The successor FCR state remains `UNKNOWN` for federation until PR #896's exact-head Playwright run passes the live-ref check, immutable peer checkout, exact runtime identity, directive/receipt loop, replay protections, and browser witnesses. This recovery grants no merge, deploy, production, publication, or provider-mutation authority, and any later movement of either repository expires the resulting pair-specific proof again.
