@@ -263,3 +263,10 @@ npx playwright test e2e/cloudflare-reasoning.spec.ts
 ```
 
 The browser/API suite verifies the public-safe contract, founder protection, absence of credential leakage, presence of the implementation stack, and absence of an accidental deployment endpoint. Unit tests verify exact-commit reasoning, stale evidence, duplicate authority, authentication failures, runtime failure, rollback preparation, first-principles deletion/simplification output, and approval boundaries.
+
+
+## Whop commerce webhook secret boundary
+
+The FCR Whop money path follows the same Cloudflare authority rule as other provider-held runtime credentials: `FCR_WHOP_WEBHOOK_SECRET` is named in `wrangler.worker.toml [secrets].required`, but its value must remain only in the surviving Founder Control Room Worker secret store. Canonical deploy may verify required binding-name presence before promotion; repository source, CI, PR text, and documentation must never contain the `ws_...` value.
+
+The source-mounted endpoint is `POST /webhooks/whop/fcr/payments-succeeded`. Its presence in source proves only that the Worker candidate can accept and verify Whop Standard Webhooks when correctly configured. It does not prove provider webhook registration, secret installation, production migration, signed delivery, checkout completion, or collected revenue. A missing or unobserved provider binding leaves activation BLOCKED/UNKNOWN rather than authorizing a fallback or secret copy through GitHub Actions.
