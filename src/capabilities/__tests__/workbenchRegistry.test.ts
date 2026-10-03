@@ -91,6 +91,50 @@ describe('capability workbench registry', () => {
     expect(browser?.implementation).toContain('costClass=LOCAL_NO_PROVIDER_FEE');
   });
 
+  it('routes commodity assistant-workspace jobs through existing FCR lanes without granting authority', () => {
+    const lane = capabilities.find((capability) => capability.id === 'assistant-workspace-lane-v1');
+
+    expect(lane).toBeDefined();
+    expect(lane?.kind).toBe('Contract');
+    expect(lane?.category).toBe('integrations');
+    expect(lane?.runtime).toBeUndefined();
+    expect(lane?.purpose).toContain('FCR does not re-implement the assistant');
+    expect(lane?.risk).toContain('grants no execution, merge, deploy, publish, provider, credential, or billing authority');
+    expect(lane?.risk).toContain('If /mcp is not deployed');
+    expect(lane?.proof).toContain('Prototype and UI claims require Playwright evidence before completion');
+    expect(lane?.proof).toContain('Data analysis remains observation-only and never renews truth or authorizes publication');
+
+    for (const job of ['automate', 'edit_documents', 'build_prototype', 'research', 'analyze_data', 'integrate_apps']) {
+      expect(lane?.implementation).toContain(`${job}:`);
+    }
+    // Every job names an existing lane; none of them names a new service or credential.
+    expect(lane?.implementation).toContain('shared-capability-runtime-v1');
+    expect(lane?.implementation).toContain('local-playwright-browser-v1');
+    expect(lane?.implementation).toContain('FOUNDER_MERGE_AUTHORITY');
+    expect(lane?.implementation).toContain('Nothing here is new runtime');
+    // No job may claim the strongest truth state statically; that is only earned by live readback.
+    expect(lane?.implementation).not.toContain("truthState: 'provider-outcome-proven'");
+  });
+
+  it('routes recurring founder tasks to portfolio-owned execution by default without spending a ChatGPT slot', () => {
+    const lane = capabilities.find((capability) => capability.id === 'portfolio-recurring-task-router-v1');
+
+    expect(lane).toBeDefined();
+    expect(lane?.kind).toBe('Contract');
+    expect(lane?.category).toBe('integrations');
+    expect(lane?.purpose).toContain('ChatGPT automation is an explicit founder-selected target');
+    expect(lane?.environment).toContain('FCR owns task identity, authority, continuity, evidence, and outcome receipts');
+    expect(lane?.environment).toContain('Chief AI owns reasoning, synthesis, source selection, materiality, and recommendations only');
+    expect(lane?.proof).toContain('Founder intent defaults to portfolio_owned execution unless ChatGPT execution is explicit');
+    expect(lane?.proof).toContain('No-change observations stay silent and material observations alert once per dedupe fingerprint');
+    expect(lane?.risk).toContain('does not activate n8n');
+    expect(lane?.implementation).toContain("executionPreference = 'portfolio_owned'");
+    expect(lane?.implementation).toContain('CAPABILITY_GAP/BLOCKED');
+    expect(lane?.implementation).toContain('CHATGPT_PLUS_MATERIAL_CHANGE_WATCH');
+    expect(lane?.implementation).toContain("dedupeFingerprint: 'change-subject + effective-state'");
+    expect(lane?.implementation).toContain("'WHAT CHANGED', 'STATUS', 'WHY IT MATTERS', 'WHAT TO REVIEW', 'STALE CLEARED'");
+  });
+
   it('keeps external application submission inside the shared evidence and authority spine', () => {
     const submission = capabilities.find((capability) => capability.id === 'external-application-submission-v1');
 
