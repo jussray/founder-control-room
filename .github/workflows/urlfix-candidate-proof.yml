@@ -4,20 +4,6 @@ on:
   push:
     branches:
       - 'feat/urlfix-v0.2.0-candidate'
-    paths:
-      - '.ai/skills/urlfix/**'
-      - '.claude/skills/urlfix/**'
-      - 'config/urlfix*.json'
-      - 'e2e/urlfix-proof.ts'
-      - 'e2e/urlfix-live-sekretbip.ts'
-      - 'scripts/urlfix-merge-review-contract.mjs'
-      - 'scripts/verify-urlfix-skill.mjs'
-      - 'skills/urlfix/**'
-      - 'src/lib/urlfix.ts'
-      - 'src/lib/__tests__/urlfix.test.ts'
-      - 'package.json'
-      - 'package-lock.json'
-      - '.github/workflows/urlfix-candidate-proof.yml'
   workflow_dispatch:
 
 permissions:
