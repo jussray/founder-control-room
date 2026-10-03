@@ -319,4 +319,117 @@ describe('founder content outcome observation contract', () => {
       issued_at: '2026-08-19T22:00:00.000Z',
     })).toThrow(/authority must remain advisory-only and non-authorizing/);
   });
+
+  it('keeps a personal Facebook profile OUT_OF_SCOPE when Metricool is connected to a brand Page', () => {
+    const receipt = buildFounderContentOutcomeObservation({
+      ...base,
+      platform: 'facebook',
+      provider: 'metricool',
+      provider_state: 'published',
+      provider_receipt_id: 'metricool-empty-query-2026-10-02',
+      source_account: {
+        network: 'facebook',
+        lane: 'facebook.creator',
+        account_type: 'personal_profile',
+        account_id: 'raylene-facebook-personal',
+        connector_account_type: 'brand_page',
+        connector_account_id: '235882889600658',
+        coverage_state: 'OUT_OF_SCOPE',
+      },
+      metrics: {},
+    });
+
+    expect(receipt.source_account).toEqual({
+      network: 'facebook',
+      lane: 'facebook.creator',
+      account_type: 'personal_profile',
+      account_id: 'raylene-facebook-personal',
+      connector_account_type: 'brand_page',
+      connector_account_id: '235882889600658',
+      coverage_state: 'OUT_OF_SCOPE',
+    });
+    expect(receipt.metrics.impressions).toBeNull();
+    expect(receipt.metric_states.impressions).toBe('UNKNOWN');
+    expect(receipt.authority.cross_account_metric_donation_forbidden).toBe(true);
+  });
+
+  it('refuses to turn an out-of-scope empty provider response into an observed zero', () => {
+    expect(() => buildFounderContentOutcomeObservation({
+      ...base,
+      platform: 'facebook',
+      provider: 'metricool',
+      provider_state: 'published',
+      provider_receipt_id: 'metricool-empty-query-2026-10-02',
+      source_account: {
+        network: 'facebook',
+        lane: 'facebook.creator',
+        account_type: 'personal_profile',
+        account_id: 'raylene-facebook-personal',
+        connector_account_type: 'brand_page',
+        connector_account_id: '235882889600658',
+        coverage_state: 'OUT_OF_SCOPE',
+      },
+      metrics: { impressions: 0 },
+    })).toThrow(/metrics\.impressions cannot be observed when source_account\.coverage_state is OUT_OF_SCOPE/);
+  });
+
+  it('allows an observed Facebook commerce Page zero without donating it to the creator lane', () => {
+    const receipt = buildFounderContentOutcomeObservation({
+      ...base,
+      platform: 'facebook',
+      provider: 'metricool',
+      provider_state: 'published',
+      provider_receipt_id: 'metricool-page-readback-1',
+      source_account: {
+        network: 'facebook',
+        lane: 'facebook.commerce',
+        account_type: 'brand_page',
+        account_id: '235882889600658',
+        connector_account_type: 'brand_page',
+        connector_account_id: '235882889600658',
+        coverage_state: 'observed',
+      },
+      metrics: { impressions: 0 },
+    });
+
+    expect(receipt.metrics.impressions).toBe(0);
+    expect(receipt.metric_states.impressions).toBe('observed');
+    expect(receipt.source_account.lane).toBe('facebook.commerce');
+    expect(receipt.authority.cross_account_metric_donation_forbidden).toBe(true);
+  });
+
+  it('binds the observation hash to Facebook lane and account identity', () => {
+    const creator = buildFounderContentOutcomeObservation({
+      ...base,
+      platform: 'facebook',
+      provider: 'metricool',
+      source_account: {
+        network: 'facebook',
+        lane: 'facebook.creator',
+        account_type: 'personal_profile',
+        account_id: 'raylene-facebook-personal',
+        connector_account_type: 'brand_page',
+        connector_account_id: '235882889600658',
+        coverage_state: 'OUT_OF_SCOPE',
+      },
+      metrics: {},
+    });
+    const commerce = buildFounderContentOutcomeObservation({
+      ...base,
+      platform: 'facebook',
+      provider: 'metricool',
+      source_account: {
+        network: 'facebook',
+        lane: 'facebook.commerce',
+        account_type: 'brand_page',
+        account_id: '235882889600658',
+        connector_account_type: 'brand_page',
+        connector_account_id: '235882889600658',
+        coverage_state: 'observed',
+      },
+      metrics: {},
+    });
+
+    expect(creator.observation_hash).not.toBe(commerce.observation_hash);
+  });
 });
