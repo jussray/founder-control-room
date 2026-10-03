@@ -1,35 +1,43 @@
 name: Agent Contract v1
 
 on:
-  push:
-    paths:
-      - '.control-room/agent-contract.v1.json'
-      - '.github/workflows/agent-contract-v1.yml'
-      - 'AGENTS.md'
-      - 'REPAIR_AUTHORITY.md'
-      - 'GLOBAL_AI.md'
-      - 'CLAUDE.md'
-      - 'docs/**'
-      - 'artifacts/l99/**'
   pull_request:
-    paths:
-      - '.control-room/agent-contract.v1.json'
-      - '.github/workflows/agent-contract-v1.yml'
-      - 'AGENTS.md'
-      - 'REPAIR_AUTHORITY.md'
-      - 'GLOBAL_AI.md'
-      - 'CLAUDE.md'
-      - 'docs/**'
-      - 'artifacts/l99/**'
+    branches: [main]
+  merge_group:
+    types: [checks_requested]
+  push:
+    branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
+
+env:
+  EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha || github.sha }}
+
+concurrency:
+  group: agent-contract-v1-${{ github.event.pull_request.number || github.event.merge_group.head_sha || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   verify-agent-contract:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out exact proof subject
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Verify exact head
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
+
       - name: Verify juss/agent-contract@v1
         shell: bash
         run: |
@@ -63,5 +71,5 @@ jobs:
           }
           const authorityRule = String(contract.binding?.authorityRule ?? '');
           if (!authorityRule.includes('no merge') || !authorityRule.includes('deploy')) fail('authority rule must preserve consequential-action separation');
-          console.log(`agent-contract-v1 VERIFIED ${process.env.GITHUB_REPOSITORY} ${contract.kernelFingerprint}`);
+          console.log(`agent-contract-v1 VERIFIED ${process.env.GITHUB_REPOSITORY} ${contract.kernelFingerprint} exact-head=${process.env.EXPECTED_HEAD_SHA}`);
           NODE
