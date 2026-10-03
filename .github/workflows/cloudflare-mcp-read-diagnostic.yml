@@ -25,7 +25,7 @@ jobs:
 
     steps:
       - name: Checkout exact diagnostic head
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        uses: actions/checkout@v4
         with:
           ref: ${{ env.EXPECTED_HEAD_SHA }}
           fetch-depth: 0
@@ -54,7 +54,7 @@ jobs:
           test "$CURRENT_MAIN_SHA" = "$EXPECTED_HEAD_SHA"
 
       - name: Setup Node
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        uses: actions/setup-node@v4
         with:
           node-version-file: .node-version
 
@@ -86,7 +86,7 @@ jobs:
 
       - name: Upload redacted MCP receipt
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@v4
         with:
           name: cloudflare-api-mcp-read-${{ github.run_id }}-${{ github.run_attempt }}
           path: test-results/cloudflare-mcp-read-receipt.json
