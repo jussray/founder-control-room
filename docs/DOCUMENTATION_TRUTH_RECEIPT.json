@@ -165,7 +165,8 @@
         "`README.md` must classify a Cloudflare proof-credential failure that prevents secret enumeration as an observation blocker; it cannot be used to claim any required Worker secret absent when the provider-held target set was never observed.",
         "`README.md` must keep the GitHub Actions and Cloudflare Worker copies of `OPENAI_API_KEY` as separate CI/runtime authority planes and state that the all-secret proof derives names from the canonical Worker registry without reading values.",
         "`README.md` must treat a successful successor StoryEngine Playwright witness as current only for the exact FCR/StoryEngine evidence pair recorded by the run and expire that proof when either repository moves.",
-        "`README.md` must record that the StoryEngine peer refresh discovered during URLFix PR #914 merge review is a focused recovery transition handled by PR #896, not URLFix failure, and that pin alignment alone cannot promote the successor federation state beyond UNKNOWN."
+        "`README.md` must record that the StoryEngine peer refresh discovered during URLFix PR #914 merge review is a focused recovery transition handled by PR #896, not URLFix failure, and that pin alignment alone cannot promote the successor federation state beyond UNKNOWN.",
+        "`README.md` must state that StoryEngine peer movement limited to portable agent-contract and CI metadata still changes the exact federation evidence subject, requires audit/receipt provenance plus a full successor Playwright witness, and cannot inherit predecessor green."
       ]
     },
     {
