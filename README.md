@@ -390,6 +390,14 @@ The AI Failure Repair workflow stores its bounded evidence under `.repair/`, a h
 
 The successor exact-head Playwright witness completed successfully after the independently observed StoryEngine peer refresh. That success makes federation proof current only for the exact FCR/StoryEngine evidence pair bound by the run and recorded in the structured receipt; it does not prove either product's production deployment and grants no merge, deploy, publication, or provider-mutation authority. Any movement of FCR or StoryEngine expires that witness and requires a new exact-head run.
 
+## September 30 CI snapshot testing
+
+FCR's CI pipeline now includes an external-site snapshot test (`fix/ci-run-external-site-snapshot-test`, merged as PR #903) that exercises the published artifact and verifies snapshot consistency across runs. The test is source/CI proof only: it exercises a bounded checkout state and does not prove the artifact is currently deployed to production, that the snapshot policy is active in Cloudflare, or that previous snapshots remain cached. Snapshot validation is independent verification for a pinned FCR head; movement of FCR or the external asset service invalidates the binding and requires rerun.
+
+## October 1 Status sync idempotent evidence
+
+FCR's status sync now runs idempotent evidence reconciliation (`fix/status-sync-idempotent-evidence`, merged Oct 1 6:08 PM) to bind operational status claims to exact provider/runtime observation. The sync compares declared state against observed state and reconciles drift without mutation; it does not grant deploy, provider-write, merge, or production authority. Status reconciliation is idempotent and safe to rerun; repeated cycles with identical input produce identical outputs and leave provider state unchanged. This is source/capability proof only: the capability integration itself must still pass provider/runtime witness before claiming live status accuracy.
+
 ## October 2 proof reconciliation
 
 The current FCR repair carrier aligns the Firewall v10 policy and verifier with the already-implemented 120-requests-per-minute idempotent application baseline while leaving stricter route-local limits unchanged. This is source/policy proof only: the firewall policy still records production application as unknown, and the change does not mutate Cloudflare or another provider.
