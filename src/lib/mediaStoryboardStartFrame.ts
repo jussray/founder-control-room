@@ -159,14 +159,12 @@ export function prepareStoryboardVideoRouting(input: {
   const storyboardReferences = storyboardReferenceAssetIds(input.binding);
   const referenceAssetIds = dedupe([...storyboardReferences, ...input.request.referenceAssetIds]);
   const existingPolicyById = new Map(input.context.assetInputs.map((asset) => [asset.assetId, asset]));
-  const addedPolicies = referenceAssetIds
-    .filter((assetId) => !existingPolicyById.has(assetId))
-    .map((assetId) => ({
-      assetId,
-      role: 'reference' as const,
-      maySendToExternalProvider: input.request.referencePolicy.maySendToExternalProvider,
-      domainApprovalSourceRecordId: input.binding.sourceRecordId,
-    }));
+  const missingPolicyIds = referenceAssetIds.filter((assetId) => !existingPolicyById.has(assetId));
+  if (missingPolicyIds.length > 0) {
+    throw new Error(
+      `REFERENCE_POLICY_MISSING:Storyboard binding cannot synthesize domain reference policy for ${missingPolicyIds.join(',')}`,
+    );
+  }
 
   const request: MediaRoutingRequestV1 = {
     ...input.request,
@@ -175,10 +173,6 @@ export function prepareStoryboardVideoRouting(input: {
       ...input.request.constraints,
       needsReferenceFidelity: true,
     },
-  };
-  const context: MediaRouterDomainContextV1 = {
-    ...input.context,
-    assetInputs: [...input.context.assetInputs, ...addedPolicies],
   };
 
   const storyboardFingerprint = mediaFingerprint({
@@ -194,7 +188,7 @@ export function prepareStoryboardVideoRouting(input: {
 
   return {
     request,
-    context,
+    context: input.context,
     storyboardFingerprint,
     continuityCookie: `storyboard:${input.binding.sceneId}:${input.binding.shotId}:${storyboardFingerprint.slice(0, 24)}`,
     referenceAssetIds,
