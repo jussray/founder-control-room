@@ -1,0 +1,158 @@
+:root{
+  --fcr-cyan:#42d7ff;
+  --fcr-blue:#2c83ff;
+  --fcr-purple:#8658ff;
+  --fcr-violet:#b35ff0;
+  --fcr-orange:#ff9550;
+  --fcr-sun:#ffc56f;
+  --fcr-ombre:linear-gradient(108deg,var(--fcr-cyan) 0%,var(--fcr-blue) 29%,var(--fcr-purple) 58%,var(--fcr-violet) 75%,var(--fcr-orange) 100%);
+}
+
+body{
+  background:
+    radial-gradient(circle at 11% 3%,rgba(53,184,255,.22),transparent 27rem),
+    radial-gradient(circle at 83% 3%,rgba(138,83,255,.23),transparent 31rem),
+    radial-gradient(circle at 91% 25%,rgba(255,149,80,.14),transparent 24rem),
+    linear-gradient(180deg,#071127 0%,#050816 51%,#03050b 100%);
+}
+
+body::before{
+  background:
+    linear-gradient(135deg,rgba(18,55,118,.96),rgba(66,32,109,.95) 49%,rgba(56,27,74,.95) 72%,rgba(89,42,38,.86));
+  filter:drop-shadow(0 -26px 58px rgba(96,89,255,.14)) drop-shadow(38px -10px 60px rgba(255,145,75,.08));
+}
+
+.brand-mark,
+.button-primary,
+.mini-cta,
+.owner-cta,
+.role-action,
+.founder-auth a:first-child{
+  background:var(--fcr-ombre)!important;
+}
+
+.hero h1 span,
+.intro h1 span,
+.masthead h1,
+.view-hero h2 em{
+  background:linear-gradient(98deg,#ffffff 0%,#bceeff 30%,#bfa6ff 62%,#ffc18b 100%);
+  -webkit-background-clip:text;
+  background-clip:text;
+  color:transparent!important;
+}
+
+.masthead,
+.public-masthead{
+  border-color:rgba(123,123,255,.28)!important;
+  box-shadow:0 18px 64px rgba(0,0,0,.34),0 0 34px rgba(91,111,255,.08)!important;
+}
+
+.view-card,
+.onboarding,
+.authority-map{
+  border-color:rgba(135,113,255,.24)!important;
+  box-shadow:0 30px 92px rgba(0,0,0,.4),0 0 46px rgba(100,92,255,.09)!important;
+}
+
+.view-card.user-view,
+.view-card.founder-view{
+  position:relative;
+}
+
+.view-card.user-view::after,
+.view-card.founder-view::after{
+  content:"";
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+  border-radius:inherit;
+  box-shadow:inset 0 0 0 1px rgba(84,207,255,.08),inset -1px 0 0 rgba(176,87,255,.08);
+}
+
+.view-hero.public-user,
+.user-view .view-hero{
+  position:relative;
+  overflow:hidden;
+  background:
+    radial-gradient(circle at 73% 42%,rgba(255,197,107,.95) 0 1.8rem,rgba(255,152,77,.42) 1.9rem 5rem,transparent 8.5rem),
+    linear-gradient(160deg,rgba(37,104,176,.78) 0%,rgba(40,56,127,.74) 34%,rgba(101,50,129,.72) 67%,rgba(191,88,92,.48) 84%,rgba(255,159,86,.34) 100%)!important;
+}
+
+.view-hero.public-user::before,
+.user-view .view-hero::before{
+  content:"";
+  position:absolute;
+  inset:auto -4% 0;
+  height:48%;
+  z-index:1;
+  background:linear-gradient(135deg,rgba(7,22,48,.95),rgba(15,34,68,.96) 48%,rgba(33,21,59,.98));
+  clip-path:polygon(0 82%,8% 68%,17% 75%,28% 44%,37% 69%,48% 29%,58% 61%,67% 45%,76% 73%,86% 35%,95% 62%,100% 54%,100% 100%,0 100%);
+  filter:drop-shadow(0 -16px 24px rgba(54,152,255,.18));
+}
+
+.view-hero.public-founder,
+.founder-view .view-hero{
+  position:relative;
+  overflow:hidden;
+  background:
+    radial-gradient(circle at 71% 26%,rgba(61,167,255,.31),transparent 10rem),
+    radial-gradient(circle at 88% 5%,rgba(153,79,255,.34),transparent 15rem),
+    radial-gradient(circle at 95% 72%,rgba(255,142,72,.15),transparent 12rem),
+    linear-gradient(155deg,rgba(15,42,91,.96),rgba(24,20,66,.96) 52%,rgba(52,20,78,.94) 80%,rgba(67,27,51,.84))!important;
+}
+
+.view-hero.public-founder::before,
+.founder-view .view-hero::before{
+  content:"";
+  position:absolute;
+  inset:auto -5% 0;
+  height:44%;
+  z-index:1;
+  background:linear-gradient(135deg,#10284f,#251b4d 50%,#3b1c50 76%,#4a2639);
+  clip-path:polygon(0 86%,12% 68%,23% 78%,39% 40%,50% 68%,63% 24%,74% 67%,87% 36%,100% 72%,100% 100%,0 100%);
+  filter:drop-shadow(0 -14px 28px rgba(120,85,255,.2));
+}
+
+.view-hero.public-user > *,
+.view-hero.public-founder > *,
+.user-view .view-hero > *,
+.founder-view .view-hero > *{
+  position:relative;
+  z-index:3;
+}
+
+.public-lane,
+.command-card,
+.start-card,
+.founder-step,
+.metric-grid>div,
+.focus-panel,
+.control-stack a{
+  background:
+    radial-gradient(circle at 100% 0%,rgba(255,146,77,.045),transparent 9rem),
+    linear-gradient(145deg,rgba(12,25,48,.94),rgba(16,12,39,.94))!important;
+}
+
+.command-card.current,
+.public-lane:hover{
+  border-color:rgba(66,215,255,.3)!important;
+}
+.command-card.next,
+.start-card:hover{
+  border-color:rgba(157,95,255,.34)!important;
+}
+
+.action-rail span::before{
+  background:var(--fcr-ombre)!important;
+}
+
+.signature-strip{
+  background:linear-gradient(90deg,rgba(66,215,255,.065),rgba(134,88,255,.1) 54%,rgba(255,149,80,.07))!important;
+}
+
+@media(max-width:780px){
+  .view-hero.public-user::before,
+  .user-view .view-hero::before,
+  .view-hero.public-founder::before,
+  .founder-view .view-hero::before{height:38%}
+}
