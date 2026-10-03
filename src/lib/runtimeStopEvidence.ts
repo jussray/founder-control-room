@@ -233,19 +233,31 @@ function classify(observation: RuntimeStopObservationV1): RuntimeStopClassificat
   return 'UNKNOWN';
 }
 
+function semanticStoppedAt(
+  classification: RuntimeStopClassification,
+  observation: RuntimeStopObservationV1,
+  boundaryStoppedAt: RuntimeBoundary | 'UNKNOWN',
+): RuntimeBoundary | 'UNKNOWN' {
+  if (classification === 'MODEL_REFUSAL' && observation.modelExecution === 'VERIFIED') return 'MODEL';
+  if (classification === 'MONITORED_STOP_AFTER_ACTION' && observation.tools.some((tool) => tool.ran && tool.changed)) return 'TOOL';
+  if (classification === 'TOOL_STOP' && observation.tools.some((tool) => tool.ran)) return 'TOOL';
+  return boundaryStoppedAt;
+}
+
 export function diagnoseRuntimeStop(observation: RuntimeStopObservationV1): RuntimeStopDiagnosis {
   validateObservation(observation);
   const boundary = diagnoseBoundary(observation.boundaries);
+  const classification = classify(observation);
   const ranTools = observation.tools.filter((tool) => tool.ran);
   const changedTools = ranTools.filter((tool) => tool.changed);
   const changeRefs = cleanRefs(changedTools.flatMap((tool) => tool.changeRefs));
-  const rollbackRefs = cleanRefs(changedTools.flatMap((tool) => tool.rollbackRefs ?? []));
   const rollbackProven = changedTools.length === 0 || changedTools.every((tool) => (tool.rollbackRefs?.length ?? 0) > 0);
 
   return {
     schema: 'juss/runtime-stop-diagnosis@v1',
-    classification: classify(observation),
+    classification,
     ...boundary,
+    stoppedAt: semanticStoppedAt(classification, observation, boundary.stoppedAt),
     requestDigest: sha256(observation.exactRequest),
     responseDigest: sha256(observation.exactResponse),
     requestIds: cleanRefs(observation.requestIds),
