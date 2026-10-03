@@ -401,3 +401,9 @@ The same carrier refreshes the StoryEngine evidence pin to the independently obs
 URLFix PR #914's exact-head merge review passed the local FCR browser harness but correctly failed the separate StoryEngine freshness check after the peer repository advanced. PR #896 is the focused recovery carrier for that external evidence-subject drift.
 
 Refreshing the StoryEngine peer pin is recovery setup only. The successor FCR state remains `UNKNOWN` for federation until PR #896's exact-head Playwright run passes the live-ref check, immutable peer checkout, exact runtime identity, directive/receipt loop, replay protections, and browser witnesses. This recovery grants no merge, deploy, production, publication, or provider-mutation authority, and any later movement of either repository expires the resulting pair-specific proof again.
+
+## October 3 StoryEngine peer refresh after agent-contract v1 rollout
+
+StoryEngine `main` advanced from `18d9ba257a69c3d1743f346d424daf31796aaeed` through the agent-contract v1 commits to independently observed `168d65ede38d2477ea00902fa1f0e76f292c583d`, so FCR's live StoryEngine peer-ref check fails closed on every FCR head, including Chief Access recovery PR #913. This refresh is a focused recovery transition for that external evidence-subject drift, not a defect in #913 or any other carrier.
+
+Pin alignment alone cannot promote the successor federation state beyond `UNKNOWN`. The successor FCR head must earn its own exact-head Playwright witness against `168d65ede38d2477ea00902fa1f0e76f292c583d`; any later movement of either repository expires that pair-specific proof again. This refresh grants no merge, deploy, production, publication, or provider-mutation authority.
