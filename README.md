@@ -389,3 +389,9 @@ The AI Failure Repair workflow stores its bounded evidence under `.repair/`, a h
 ## September 27 StoryEngine peer transition
 
 The successor exact-head Playwright witness completed successfully after the independently observed StoryEngine peer refresh. That success makes federation proof current only for the exact FCR/StoryEngine evidence pair bound by the run and recorded in the structured receipt; it does not prove either product's production deployment and grants no merge, deploy, publication, or provider-mutation authority. Any movement of FCR or StoryEngine expires that witness and requires a new exact-head run.
+
+## October 2 proof reconciliation
+
+The current FCR repair carrier aligns the Firewall v10 policy and verifier with the already-implemented 120-requests-per-minute idempotent application baseline while leaving stricter route-local limits unchanged. This is source/policy proof only: the firewall policy still records production application as unknown, and the change does not mutate Cloudflare or another provider.
+
+The same carrier refreshes the StoryEngine evidence pin to the independently observed peer that adds a fail-closed Cloudflare front door and focused API rate-limit coverage. The pin change makes every predecessor federation witness historical; only a complete exact-head FCR Playwright run against the pinned StoryEngine identity can establish current browser-federation proof for the new pair.
