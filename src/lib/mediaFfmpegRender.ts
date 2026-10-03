@@ -1,20 +1,21 @@
 import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { createReadStream, existsSync } from 'node:fs';
-import { copyFile, mkdtemp, rm, stat, writeFile } from 'node:fs/promises';
+import { copyFile, lstat, mkdtemp, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { extname, isAbsolute, join } from 'node:path';
 
 /**
  * First-party local-process post adapter (ffmpeg).
  *
- * This module renders declared graphic timelines into MP4 files. A successful
- * result binds the exact declared inputs and snapshotted source bytes to an
- * input fingerprint, then binds the rendered bytes to a sha256 digest and
- * ffprobe readback. It does not grant truth, release, or publication authority.
+ * Renders declared graphic timelines into MP4 files. A successful result binds
+ * the declared timeline, snapshotted source/font bytes, renderer contract, and
+ * observed ffmpeg/ffprobe toolchain to an input fingerprint, then binds the
+ * rendered bytes to a sha256 digest plus fail-closed ffprobe readback.
  *
  * Runtime scope is intentionally LOCAL_PROCESS: Cloudflare Worker code cannot
- * execute child processes. Router/runtime wiring is a separate gate.
+ * execute child processes. Router/runtime wiring is a separate gate. This
+ * adapter grants no truth, release, or publication authority.
  */
 
 export const FFMPEG_RENDER_CONTRACT = 'founder-control-room/ffmpeg-render@v1' as const;
@@ -77,6 +78,12 @@ export interface FfmpegFontFingerprints {
   boldSha256: string;
 }
 
+export interface FfmpegToolchainProbe {
+  available: boolean;
+  version: string | null;
+  ffprobeVersion: string | null;
+}
+
 export type FfmpegRenderResult =
   | {
       kind: 'RENDERED';
@@ -89,6 +96,7 @@ export type FfmpegRenderResult =
       sourceAssets: readonly FfmpegSourceAssetFingerprint[];
       fonts: FfmpegFontFingerprints;
       ffmpegVersion: string;
+      ffprobeVersion: string;
       probe: FfmpegProbeSummary;
       motionClass: 'GRAPHIC_ANIMATION';
       truthAuthority: false;
@@ -160,17 +168,32 @@ function canonicalJson(value: unknown): string {
   throw new TypeError(`canonical JSON does not support ${typeof value}`);
 }
 
-export async function probeFfmpegBinary(): Promise<{ available: boolean; version: string | null }> {
+export async function probeFfmpegBinary(): Promise<FfmpegToolchainProbe> {
   const ffmpeg = await run('ffmpeg', ['-version'], 10_000);
-  if (ffmpeg.code !== 0) return { available: false, version: null };
+  if (ffmpeg.code !== 0) return { available: false, version: null, ffprobeVersion: null };
   const ffprobe = await run('ffprobe', ['-version'], 10_000);
-  if (ffprobe.code !== 0) return { available: false, version: null };
-  const match = /ffmpeg version (\S+)/.exec(ffmpeg.stdout);
-  return { available: true, version: match?.[1] ?? 'unknown' };
+  if (ffprobe.code !== 0) return { available: false, version: null, ffprobeVersion: null };
+  const ffmpegMatch = /ffmpeg version (\S+)/.exec(ffmpeg.stdout);
+  const ffprobeMatch = /ffprobe version (\S+)/.exec(ffprobe.stdout);
+  return {
+    available: true,
+    version: ffmpegMatch?.[1] ?? 'unknown',
+    ffprobeVersion: ffprobeMatch?.[1] ?? 'unknown',
+  };
+}
+
+function splitLongWord(word: string, maxChars: number): string[] {
+  const chunks: string[] = [];
+  for (let i = 0; i < word.length; i += maxChars) chunks.push(word.slice(i, i + maxChars));
+  return chunks;
 }
 
 export function wrapText(text: string, maxChars: number): string {
-  const words = text.split(/\s+/).filter(Boolean);
+  if (!Number.isInteger(maxChars) || maxChars < 1) throw new Error('maxChars must be a positive integer');
+  const words = text
+    .split(/\s+/)
+    .filter(Boolean)
+    .flatMap((word) => word.length > maxChars ? splitLongWord(word, maxChars) : [word]);
   const lines: string[] = [];
   let current = '';
   for (const word of words) {
@@ -252,7 +275,7 @@ export function buildFfmpegArgs(
 
   const { width: w, height: h, fps } = spec;
   const edge = spec.edgeFadeSec ?? 0.25;
-  const args: string[] = ['-hide_banner', '-y', '-loglevel', 'error'];
+  const args: string[] = ['-hide_banner', '-nostdin', '-y', '-loglevel', 'error'];
   const chains: string[] = [];
   const total = spec.segments.reduce((sum, seg) => sum + seg.durationSec, 0);
 
@@ -370,9 +393,18 @@ async function snapshotSourceAssets(
   return { renderSpec: { ...spec, segments }, sourceAssets };
 }
 
-function inputFingerprint(spec: FfmpegTimelineSpec, sourceAssets: readonly FfmpegSourceAssetFingerprint[], fonts: FfmpegFontFingerprints): string {
+function inputFingerprint(
+  spec: FfmpegTimelineSpec,
+  sourceAssets: readonly FfmpegSourceAssetFingerprint[],
+  fonts: FfmpegFontFingerprints,
+  ffmpegVersion: string,
+  ffprobeVersion: string,
+): string {
   const assetBySegment = new Map(sourceAssets.map((asset) => [asset.segmentIndex, asset]));
   const canonicalSpec = {
+    contract: FFMPEG_RENDER_CONTRACT,
+    executionScope: FFMPEG_RENDER_EXECUTION_SCOPE,
+    toolchain: { ffmpegVersion, ffprobeVersion },
     width: spec.width,
     height: spec.height,
     fps: spec.fps,
@@ -396,14 +428,32 @@ function inputFingerprint(spec: FfmpegTimelineSpec, sourceAssets: readonly Ffmpe
   return sha256Text(canonicalJson(canonicalSpec));
 }
 
+function probeMatchesTimeline(spec: FfmpegTimelineSpec, probe: FfmpegProbeSummary): boolean {
+  if (probe.width !== spec.width || probe.height !== spec.height || probe.videoCodec !== 'h264') return false;
+  if (spec.audio ? probe.audioCodec !== 'aac' : probe.audioCodec !== null) return false;
+  const expectedDuration = spec.segments.reduce((sum, segment) => sum + segment.durationSec, 0);
+  return Math.abs(probe.durationSec - expectedDuration) <= Math.max(0.25, 2 / spec.fps);
+}
+
+async function outputPathIsSymlink(path: string): Promise<boolean> {
+  try {
+    return (await lstat(path)).isSymbolicLink();
+  } catch {
+    return false;
+  }
+}
+
 export async function renderFfmpegTimelineV1(spec: FfmpegTimelineSpec, outputPath: string): Promise<FfmpegRenderResult> {
   const invalid = validateTimelineSpec(spec);
   if (invalid) return { kind: 'REJECTED', reason: invalid };
   if (!isAbsolute(outputPath) || !outputPath.endsWith('.mp4')) return { kind: 'REJECTED', reason: 'outputPath must be an absolute .mp4 path' };
   if (spec.segments.some((segment) => segment.imagePath === outputPath)) return { kind: 'REJECTED', reason: 'outputPath must not overwrite an input image' };
+  if (await outputPathIsSymlink(outputPath)) return { kind: 'REJECTED', reason: 'outputPath may not be a symbolic link' };
 
   const binary = await probeFfmpegBinary();
-  if (!binary.available || !binary.version) return { kind: 'CAPABILITY_UNAVAILABLE', reason: 'ffmpeg and ffprobe binaries are required on PATH' };
+  if (!binary.available || !binary.version || !binary.ffprobeVersion) {
+    return { kind: 'CAPABILITY_UNAVAILABLE', reason: 'ffmpeg and ffprobe binaries are required on PATH' };
+  }
 
   const sourceRegular = spec.fontFile ?? firstExisting(FONT_CANDIDATES);
   const sourceBold = spec.fontFileBold ?? firstExisting(FONT_BOLD_CANDIDATES) ?? sourceRegular;
@@ -423,7 +473,13 @@ export async function renderFfmpegTimelineV1(spec: FfmpegTimelineSpec, outputPat
       boldSha256: await sha256File(fontBold),
     };
     const { renderSpec, sourceAssets } = await snapshotSourceAssets(spec, dir);
-    const declaredInputFingerprint = inputFingerprint(spec, sourceAssets, fonts);
+    const declaredInputFingerprint = inputFingerprint(
+      spec,
+      sourceAssets,
+      fonts,
+      binary.version,
+      binary.ffprobeVersion,
+    );
 
     const base = Math.min(renderSpec.width, renderSpec.height);
     const textFiles: string[][] = [];
@@ -441,14 +497,14 @@ export async function renderFfmpegTimelineV1(spec: FfmpegTimelineSpec, outputPat
 
     const args = buildFfmpegArgs(renderSpec, { outputPath, textFiles, fontRegular, fontBold });
     const res = await run('ffmpeg', args, 10 * 60_000);
-    if (res.code !== 0) return { kind: 'FAILED', code: 'FFMPEG_EXIT', safeMessage: res.stderr.slice(0, 500) };
+    if (res.code !== 0) return { kind: 'FAILED', code: 'FFMPEG_EXIT', safeMessage: 'ffmpeg render failed' };
 
     const info = await stat(outputPath);
     if (!info.isFile() || info.size < 1) return { kind: 'FAILED', code: 'OUTPUT_INVALID', safeMessage: 'ffmpeg did not produce a non-empty regular file' };
     const probe = await probeVideo(outputPath);
     if (!probe) return { kind: 'FAILED', code: 'PROBE_FAILED', safeMessage: 'ffprobe could not read the rendered file' };
-    if (probe.width !== spec.width || probe.height !== spec.height) {
-      return { kind: 'FAILED', code: 'PROBE_DIMENSION_MISMATCH', safeMessage: 'rendered dimensions do not match the declared timeline' };
+    if (!probeMatchesTimeline(spec, probe)) {
+      return { kind: 'FAILED', code: 'PROBE_MISMATCH', safeMessage: 'rendered media did not match the declared timeline contract' };
     }
 
     return {
@@ -462,16 +518,17 @@ export async function renderFfmpegTimelineV1(spec: FfmpegTimelineSpec, outputPat
       sourceAssets,
       fonts,
       ffmpegVersion: binary.version,
+      ffprobeVersion: binary.ffprobeVersion,
       probe,
       motionClass: 'GRAPHIC_ANIMATION',
       truthAuthority: false,
       publishAuthority: false,
     };
-  } catch (error) {
+  } catch {
     return {
       kind: 'FAILED',
       code: 'RENDER_PREP_FAILED',
-      safeMessage: error instanceof Error ? error.message.slice(0, 500) : 'render preparation failed',
+      safeMessage: 'render preparation failed safely',
     };
   } finally {
     await rm(dir, { recursive: true, force: true });
