@@ -116,6 +116,25 @@ describe('capability workbench registry', () => {
     expect(lane?.implementation).not.toContain("truthState: 'provider-outcome-proven'");
   });
 
+  it('routes recurring founder tasks to portfolio-owned execution by default without spending a ChatGPT slot', () => {
+    const lane = capabilities.find((capability) => capability.id === 'portfolio-recurring-task-router-v1');
+
+    expect(lane).toBeDefined();
+    expect(lane?.kind).toBe('Contract');
+    expect(lane?.category).toBe('integrations');
+    expect(lane?.purpose).toContain('ChatGPT automation is an explicit founder-selected target');
+    expect(lane?.environment).toContain('FCR owns task identity, authority, continuity, evidence, and outcome receipts');
+    expect(lane?.environment).toContain('Chief AI owns reasoning, synthesis, source selection, materiality, and recommendations only');
+    expect(lane?.proof).toContain('Founder intent defaults to portfolio_owned execution unless ChatGPT execution is explicit');
+    expect(lane?.proof).toContain('No-change observations stay silent and material observations alert once per dedupe fingerprint');
+    expect(lane?.risk).toContain('does not activate n8n');
+    expect(lane?.implementation).toContain("executionPreference = 'portfolio_owned'");
+    expect(lane?.implementation).toContain('CAPABILITY_GAP/BLOCKED');
+    expect(lane?.implementation).toContain('CHATGPT_PLUS_MATERIAL_CHANGE_WATCH');
+    expect(lane?.implementation).toContain("dedupeFingerprint: 'change-subject + effective-state'");
+    expect(lane?.implementation).toContain("'WHAT CHANGED', 'STATUS', 'WHY IT MATTERS', 'WHAT TO REVIEW', 'STALE CLEARED'");
+  });
+
   it('keeps external application submission inside the shared evidence and authority spine', () => {
     const submission = capabilities.find((capability) => capability.id === 'external-application-submission-v1');
 
