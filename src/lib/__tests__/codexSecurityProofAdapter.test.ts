@@ -201,4 +201,30 @@ describe('Codex Security proof adapter', () => {
     expect(evidence.reasons.join(' ')).toMatch(/sha256/);
     expect(evidence.reasons.join(' ')).toMatch(/precedes startedAt/);
   });
+
+  it('rejects timezone-less timestamps instead of interpreting them as absolute evidence', () => {
+    const evidence = evaluateCodexSecurityScanReceipt(
+      receipt({ startedAt: '2026-10-03T01:00:00.000' }),
+      expected,
+    );
+
+    expect(evidence.classification).toBe('BLOCKED');
+    expect(evidence.reasons.join(' ')).toMatch(/absolute timestamps/i);
+  });
+
+  it('fails closed on non-allowlisted terminal states and evidence sources at runtime', () => {
+    const malformed = receipt() as unknown as Record<string, unknown>;
+    malformed.terminalState = 'skipped';
+    malformed.evidenceSource = 'model-assertion';
+
+    const evidence = evaluateCodexSecurityScanReceipt(
+      malformed as unknown as CodexSecurityScanReceiptV1,
+      expected,
+    );
+
+    expect(evidence.classification).toBe('BLOCKED');
+    expect(evidence.proofLevel).toBe('unknown');
+    expect(evidence.reasons.join(' ')).toMatch(/terminal state is not allowlisted/i);
+    expect(evidence.reasons.join(' ')).toMatch(/evidence source is not allowlisted/i);
+  });
 });
