@@ -395,3 +395,10 @@ The successor exact-head Playwright witness completed successfully after the ind
 The current FCR repair carrier aligns the Firewall v10 policy and verifier with the already-implemented 120-requests-per-minute idempotent application baseline while leaving stricter route-local limits unchanged. This is source/policy proof only: the firewall policy still records production application as unknown, and the change does not mutate Cloudflare or another provider.
 
 The same carrier refreshes the StoryEngine evidence pin to the independently observed peer that adds a fail-closed Cloudflare front door and focused API rate-limit coverage. The pin change makes every predecessor federation witness historical; only a complete exact-head FCR Playwright run against the pinned StoryEngine identity can establish current browser-federation proof for the new pair.
+
+
+### Whop commerce witness
+
+FCR now contains a source-level Whop payment witness lane beside the existing Shopify and Stripe evidence paths. The checked-in Whop route is `POST /webhooks/whop/fcr/payments-succeeded`, mounted at the raw-body commerce ingress so Standard Webhooks verification can bind the exact request bytes before JSON parsing. The source contract normalizes only privacy-safe payment evidence into the additive provider-neutral external-commerce receipt ledger and preserves `stored`, `duplicate`, and `conflict` outcomes.
+
+`FCR_WHOP_WEBHOOK_SECRET` is a provider-held Worker secret name in `wrangler.worker.toml [secrets].required`. That declaration proves only the required-name policy. It does **not** prove the secret exists in Cloudflare, that a Whop webhook is registered, that the Supabase migration is applied, that a signed Whop delivery reached production, that checkout returned successfully, or that revenue was collected. Those remain separate provider/runtime/database/browser/outcome proof gates.
