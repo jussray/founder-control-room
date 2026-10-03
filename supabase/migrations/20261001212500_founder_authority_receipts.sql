@@ -6,10 +6,10 @@
 -- founder decision and are atomically reserved before an external mutation.
 --
 -- The repository's Neon migration preview is not a canonical Supabase mirror
--- and can lack older FCR broker tables. Create this ledger independently there,
--- then attach the broker FK whenever the canonical parent relation exists.
--- Production Supabase has the parent relation; the application also rereads the
--- broker decision before it can issue any receipt.
+-- and can lack older FCR broker tables and Supabase-specific roles. Create this
+-- ledger independently there, then attach the broker FK and role grants whenever
+-- the canonical Supabase identities exist. Production Supabase has those
+-- identities; the application also rereads the broker decision before issuance.
 
 create table if not exists public.founder_authority_receipts (
   receipt_id text primary key,
@@ -86,7 +86,21 @@ create index if not exists founder_authority_receipts_active_idx
   where status in ('active', 'reserved') and consumed_at is null and revoked_at is null;
 
 alter table public.founder_authority_receipts enable row level security;
-revoke all on table public.founder_authority_receipts from anon, authenticated;
+revoke all on table public.founder_authority_receipts from public;
+
+do $$
+begin
+  if to_regrole('anon') is not null then
+    execute 'revoke all on table public.founder_authority_receipts from anon';
+  end if;
+  if to_regrole('authenticated') is not null then
+    execute 'revoke all on table public.founder_authority_receipts from authenticated';
+  end if;
+  if to_regrole('service_role') is not null then
+    execute 'grant select, insert, update, delete on table public.founder_authority_receipts to service_role';
+  end if;
+end
+$$;
 
 comment on table public.founder_authority_receipts is
   'Service-role-only exact-action authority receipts derived from explicit founder permission decisions. Broker decisions alone remain non-authorizing.';
@@ -184,6 +198,18 @@ end;
 $$;
 
 revoke all on function public.reserve_founder_authority_receipt(text, text, text, text, text, bigint, text, text)
-  from public, anon, authenticated;
-grant execute on function public.reserve_founder_authority_receipt(text, text, text, text, text, bigint, text, text)
-  to service_role;
+  from public;
+
+do $$
+begin
+  if to_regrole('anon') is not null then
+    execute 'revoke all on function public.reserve_founder_authority_receipt(text, text, text, text, text, bigint, text, text) from anon';
+  end if;
+  if to_regrole('authenticated') is not null then
+    execute 'revoke all on function public.reserve_founder_authority_receipt(text, text, text, text, text, bigint, text, text) from authenticated';
+  end if;
+  if to_regrole('service_role') is not null then
+    execute 'grant execute on function public.reserve_founder_authority_receipt(text, text, text, text, text, bigint, text, text) to service_role';
+  end if;
+end
+$$;
