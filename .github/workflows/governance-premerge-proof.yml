@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - 'governance/**'
+      - 'security/**'
     paths:
       - 'config/founder-intelligence*.json'
       - 'scripts/verify-founder-intelligence-inheritance.mjs'
@@ -11,6 +12,8 @@ on:
       - 'src/config/portfolio.test.ts'
       - 'src/config/__tests__/portfolio.sync.test.ts'
       - 'src/governance/__tests__/founderChallengeStack.contract.test.ts'
+      - 'src/http/middleware/security.ts'
+      - 'src/http/__tests__/rateLimitBaseline.contract.test.ts'
       - 'public/_worker.js'
       - 'public/control-room/sync.html'
       - 'public/control-room/sync.css'
@@ -65,12 +68,13 @@ jobs:
       - name: Type check
         run: npm run typecheck
 
-      - name: Run focused governance contracts
+      - name: Run focused governance and security contracts
         run: >-
           npx vitest run
           src/config/portfolio.test.ts
           src/config/__tests__/portfolio.sync.test.ts
           src/governance/__tests__/founderChallengeStack.contract.test.ts
+          src/http/__tests__/rateLimitBaseline.contract.test.ts
 
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
