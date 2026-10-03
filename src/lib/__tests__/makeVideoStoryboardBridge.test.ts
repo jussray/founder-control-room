@@ -99,7 +99,11 @@ function context(): MediaRouterDomainContextV1 {
     workspaceId: 'workspace-1',
     intendedUse: 'storyboard',
     releaseContext: { approvalRequiredBeforePublication: true },
-    assetInputs: [],
+    assetInputs: ['opening-frame-1', 'opening-frame-2', 'character-ref-1'].map((assetId) => ({
+      assetId,
+      role: 'reference' as const,
+      maySendToExternalProvider: true,
+    })),
     authorityGrants: [],
   };
 }
