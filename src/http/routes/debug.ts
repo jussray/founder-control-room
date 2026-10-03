@@ -22,6 +22,9 @@ debugRouter.get('/provider', (_req, res) => {
   const perplexityKeyPresent = typeof process.env.PERPLEXITY_API_KEY === 'string' &&
     process.env.PERPLEXITY_API_KEY.length > 10;
 
+  const deepseekKeyPresent = typeof process.env.DEEPSEEK_API_KEY === 'string' &&
+    process.env.DEEPSEEK_API_KEY.length > 10;
+
   // Explicit mock/fallback detection
   const isMock = process.env.USE_MOCK_AI === 'true' ||
     process.env.AI_PROVIDER === 'mock';
@@ -34,6 +37,8 @@ debugRouter.get('/provider', (_req, res) => {
     provider = 'mock';
   } else if (isFallback) {
     provider = 'fallback';
+  } else if (process.env.AI_PROVIDER === 'deepseek' || deepseekKeyPresent && !openaiKeyPresent && !perplexityKeyPresent) {
+    provider = 'deepseek';
   } else if (process.env.AI_PROVIDER === 'perplexity' || perplexityKeyPresent && !openaiKeyPresent) {
     provider = 'perplexity';
   } else if (openaiKeyPresent) {
@@ -48,6 +53,7 @@ debugRouter.get('/provider', (_req, res) => {
     fallback: isFallback,
     openaiKeyPresent,
     perplexityKeyPresent,
+    deepseekKeyPresent,
     nodeEnv: process.env.NODE_ENV ?? 'unknown',
   });
 });

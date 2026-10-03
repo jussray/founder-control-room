@@ -7,6 +7,7 @@ Before nontrivial work Claude must also read:
 - [`GLOBAL_AI.md`](GLOBAL_AI.md) — shared founder constitution and truth order.
 - [`AGENTS.md`](AGENTS.md) — repository entry contract.
 - [`.control-room/COUNCIL.md`](.control-room/COUNCIL.md) — shared Council membership, GitHub-source, and mutation discipline.
+- [`docs/AI_CHANGE_GENEALOGY_CONTRACT.md`](docs/AI_CHANGE_GENEALOGY_CONTRACT.md) — recent-PR, commit-lineage, direct-branch, receipt, and freshness audit contract.
 - [`.ai/skills/juss-flow-launch-loop/SKILL.md`](.ai/skills/juss-flow-launch-loop/SKILL.md) — bounded implementation/review/merge loop.
 - [`docs/FOUNDER_MERGE_AUTHORITY.md`](docs/FOUNDER_MERGE_AUTHORITY.md) — current repository integration authority.
 - [`docs/TRUTH_DECAY_AUDIT.md`](docs/TRUTH_DECAY_AUDIT.md) — once-true/current-truth failure model.
@@ -75,6 +76,16 @@ The named lenses are engineering review methods, not sources of authority or tru
 - **When** — lifecycle/release state, timing, truth age, use boundary, rollback window.
 - **Why** — verified founder decision or operational need and evidence.
 - **How** — smallest safe implementation, permissions, proof, rollout, rollback.
+
+## Change genealogy audit rule
+
+For repository audits, reconstruct the change genealogy before assigning root cause.
+
+Start from the authoritative repository/default branch and current exact head. Inspect the ten most recent PRs by default with bounded comments/reviews and bounded diff evidence, index every commit identity inside those PRs, and inspect recent default-branch commits plus provider-proven PR associations. Expand only when the causal chain or an attribution gap extends outside the default window.
+
+Preserve squash/merge boundaries and distinguish branch-evolution commits from the commit that actually entered the authoritative branch. Historical green evidence remains historical after head/base movement unless a stronger continuity contract explicitly proves otherwise.
+
+Every distinct lineage, review, check, provider, runtime, database, or Playwright failure or unknown keeps its own receipt. A passing compilation/test/CI/provider layer may not erase another failing evidence layer.
 
 ## Mirror Engine, fact-checking, and portable approvals
 
@@ -252,18 +263,19 @@ After every merge, re-read current main, applicable Documentation Truth, relevan
 ## Required loop
 
 1. Observe exact repository/main/branch, provider state, docs, user surface, and evidence.
-2. Complete 5W1H and identify authority/freshness/safety gaps.
-3. Run Redteam I on the premise.
-4. Apply Product Design + Data Analytics + Lindy + L99 + OODA.
-5. Apply Hormozi + Gates + Musk to reduce low-value complexity without deleting safety.
-6. Implement the smallest reversible action.
-7. Run Redteam II, focused tests, Playwright when relevant, Documentation Truth, and exact-head repository gates.
-8. Re-read head/main/review/provider state before merge.
-9. Merge only when the active authority membrane is satisfied.
-10. Post-merge, re-observe docs and provider/runtime truth.
+2. Reconstruct change genealogy where repository causality matters.
+3. Complete 5W1H and identify authority/freshness/safety gaps.
+4. Run Redteam I on the premise.
+5. Apply Product Design + Data Analytics + Lindy + L99 + OODA.
+6. Apply Hormozi + Gates + Musk to reduce low-value complexity without deleting safety.
+7. Implement the smallest reversible action.
+8. Run Redteam II, focused tests, Playwright when relevant, Documentation Truth, and exact-head repository gates.
+9. Re-read head/main/review/provider state before merge.
+10. Merge only when the active authority membrane is satisfied.
+11. Post-merge, re-observe docs and provider/runtime truth.
 
 ## Output format
 
-Return: REALITY · FIX · PROOF · RISK · ROLLBACK · NEXT GATE, including exact repo/branch/SHA, files touched, checks actually run, preserved history, truth age/superseded state, documentation state, and blocked evidence.
+Return: REALITY · GENEALOGY · FIX · PROOF · RISK · ROLLBACK · NEXT GATE, including exact repo/branch/SHA, files touched, checks actually run, preserved history, truth age/superseded state, documentation state, and blocked evidence.
 
 Claude should strengthen founder control, not build an autonomous bureaucracy with an API key and delusions of governance.

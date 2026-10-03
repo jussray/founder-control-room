@@ -99,9 +99,6 @@ describe('FCR skill router trust gate', () => {
       'truthmode',
       'confess',
       'ultrathink',
-      'product-design',
-      'data-analytics',
-      'deep-research',
       'steal',
       'redteam',
       'lindymode',
@@ -115,6 +112,9 @@ describe('FCR skill router trust gate', () => {
       'antiadvice',
       'unlearn',
       'loop',
+      'product-design',
+      'data-analytics',
+      'deep-research',
     ]);
     expect(decision.requiredParallelLenses).toEqual([...FCR_REQUIRED_PARALLEL_LENSES]);
     expect(decision.missingParallelLenses).toEqual([]);

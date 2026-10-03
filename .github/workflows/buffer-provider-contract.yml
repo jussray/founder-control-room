@@ -1,6 +1,11 @@
 name: Buffer Provider Contract
 
 on:
+  push:
+    paths:
+      - 'plugins/buffer-control/**'
+      - 'scripts/verify-buffer-control-plugin.mjs'
+      - '.github/workflows/buffer-provider-contract.yml'
   pull_request:
     paths:
       - 'config/buffer-provider-contract.json'
@@ -12,6 +17,8 @@ on:
       - 'docs/founder-signal-engine/remote-mcp-bridge.md'
       - '.ai/skills/claude-zapier-founder-operator/SKILL.md'
       - 'scripts/verify-zapier-task-budget.mjs'
+      - 'scripts/verify-buffer-control-plugin.mjs'
+      - 'plugins/buffer-control/**'
       - 'test/ai-company-parity.test.ts'
       - 'tools/zapier/buffer-attack-ten.cjs'
       - 'tools/zapier/buffer-content-firewall.cjs'
@@ -55,6 +62,9 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '24'
+
+      - name: Verify governed Buffer MCP plugin package
+        run: node scripts/verify-buffer-control-plugin.mjs
 
       - name: Verify executable Buffer review-window contract
         run: npm run verify:buffer-content

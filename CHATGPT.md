@@ -6,6 +6,8 @@ Before nontrivial work, also read:
 
 - [`AGENTS.md`](AGENTS.md)
 - [`GLOBAL_AI.md`](GLOBAL_AI.md)
+- [`CODEX.md`](CODEX.md)
+- [`docs/AI_CHANGE_GENEALOGY_CONTRACT.md`](docs/AI_CHANGE_GENEALOGY_CONTRACT.md)
 - [`.ai/skills/juss-flow-launch-loop/SKILL.md`](.ai/skills/juss-flow-launch-loop/SKILL.md)
 - [`docs/FOUNDER_CONTROL_ROOM_AND_CHIEF_AI_MASTER_BUILD_SPEC.md`](docs/FOUNDER_CONTROL_ROOM_AND_CHIEF_AI_MASTER_BUILD_SPEC.md)
 - [`docs/FOUNDER_MERGE_AUTHORITY.md`](docs/FOUNDER_MERGE_AUTHORITY.md)
@@ -62,6 +64,16 @@ Reasoning may run in parallel. Writes, merges, deployments, provider mutations, 
 **Current browser surface:** Founder Control Room has a web UI under `public/control-room/` backed by founder-gated API routes. Do not describe the repository as having no frontend or as a status-only dashboard.
 
 **Trust boundary:** Guarded execution exists, but its existence is not blanket authority. Reads, proposals, approvals, terminal runs, repository writes, merges, deploys, migrations, provider actions, publication, and destructive operations keep separate policy/evidence gates.
+
+## Change genealogy audit rule
+
+For repository audits, use `docs/AI_CHANGE_GENEALOGY_CONTRACT.md` before assigning causality.
+
+Default to the ten most recent PRs with bounded comments/reviews and bounded diff evidence, index every commit identity inside those PRs, inspect recent commits on the authoritative default branch, and use provider evidence to map branch commits back to PRs. Expand beyond ten only when the causal chain or missing attribution requires it.
+
+Preserve both sides of squash/merge boundaries. Historical branch commits explain evolution; the exact commit that entered the authoritative branch owns current integration identity. Never donate predecessor CI, semantic review, runtime, or browser proof to a moved or successor head without an explicit continuity contract.
+
+Every independent lineage, review, check, provider, runtime, database, or browser failure/unknown keeps its own receipt. One passing layer cannot erase another failing layer.
 
 ## Non-negotiable boundaries
 
@@ -190,4 +202,4 @@ Do not claim launch merely because the merge loop is moving quickly.
 
 ## Output format
 
-Return: REALITY · FIX · PROOF · RISK · ROLLBACK · NEXT GATE, including exact repo/branch/SHA, files touched, checks actually run, preserved work/history, truth age/superseded state, documentation state, and blocked evidence.
+Return: REALITY · GENEALOGY · FIX · PROOF · RISK · ROLLBACK · NEXT GATE, including exact repo/branch/SHA, files touched, checks actually run, preserved work/history, truth age/superseded state, documentation state, and blocked evidence.
