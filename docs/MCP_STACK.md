@@ -1,6 +1,6 @@
 # Founder Control Room MCP stack
 
-Last reviewed: 2026-09-27
+Last reviewed: 2026-10-03
 
 This file governs which MCP servers an AI agent may use while **developing this repository**. It is different from the Control Room's own **MCP / Connector Hub** (`project_connections` + `GET /agents` + `GET /authority-levels`), which records connectors and authority for managed projects. Do not conflate the repository agent fleet with the in-app Connector Hub.
 
@@ -8,13 +8,16 @@ The Control Room is a private, repository-agnostic governance service. Its stand
 
 ## External governed MCP for eligible AI clients
 
-The Control Room source defines an external connector boundary for eligible OAuth/static clients, including governed ChatGPT/Codex, Claude, Gemini, Muse, Perplexity, and other clients admitted by the current server policy. Client/model identity never grants mutation authority by itself.
+The Control Room source defines one provider-neutral external connector boundary for eligible OAuth/static clients, including governed ChatGPT/Codex, Claude, Gemini, Muse, Perplexity, and other clients admitted by the current server policy. Client/model identity never grants mutation authority by itself.
 
 - canonical resource: `https://api.foundercontrolroom.org/mcp`;
 - protected-resource metadata: `/.well-known/oauth-protected-resource` and `/.well-known/oauth-protected-resource/mcp`;
 - transport: stateless Streamable HTTP with MCP `2026-07-28`, plus initialization-based `2025-11-25`, `2025-06-18`, and `2025-03-26` compatibility;
-- canonical auth: Supabase OAuth access tokens validated for issuer, audience, expiry/not-before, `client_id`, `mcp:read`, `mcp_projects`, current Supabase user validity, and the server-side `founder_users` allowlist;
-- temporary compatibility auth: `/mcp/read` with a dedicated static token and the same server-held project scope;
+- canonical auth: Supabase OAuth 2.1 access tokens using PKCE/DCR, standard audience `authenticated`, standard scope `email`, a non-empty `client_id`, current Supabase user validity, and the server-side `founder_users` allowlist;
+- project authority: the server-owned FCR portfolio registry is the maximum external project grant. An optional `mcp_projects` claim may narrow that grant when present but is never required and can never widen it;
+- client registration: dynamically registered client IDs are accepted after Supabase authorization and founder validation. Exact static client-ID allowlisting is optional hardening when `FCR_REMOTE_MCP_OAUTH_ENFORCE_CLIENT_ALLOWLIST=true`;
+- compatibility auth: `/mcp/read` is an auto-dynamic compatibility alias. An exact timing-safe match to `FCR_REMOTE_MCP_READ_TOKEN` retains the legacy bounded static path; every other credential shape uses the same OAuth/DCR verifier as `/mcp`. Failed OAuth never downgrades to static auth;
+- resource identity: `/mcp` remains the canonical protected OAuth resource. `/mcp/read` is a compatibility alias, not a second authorization server or independent authority root;
 - evidence: every successful external tool call must persist a redacted `mcp_tool_calls` receipt or the call fails closed.
 
 The external tool catalog is intentionally small and deterministic:
@@ -30,7 +33,7 @@ The external tool catalog is intentionally small and deterministic:
 
 `fcr_audit_change_genealogy` is read-only and project-grant bound. The caller selects a granted `projectId`; the server resolves that project's registered GitHub repository rather than trusting an arbitrary caller-supplied repository. It defaults to ten recent PRs with bounded comments/reviews and file-level diff evidence, indexes every commit identity in each PR, scans recent default-branch commits, asks GitHub for commit-to-PR associations, preserves squash/merge boundaries, and returns separate failure receipts. Raw patch bodies are not returned. The window can be narrowed or expanded only within the bounded 1–20 range. See `docs/AI_CHANGE_GENEALOGY_CONTRACT.md`.
 
-There is no external generic `invoke_read_tool`. Callers cannot choose an arbitrary nested provider, tool name, mission, approval, credential, mutation action, or project outside the intersection of the OAuth token grant and the server-held allowlist. Skill content remains private: capability results expose metadata/evidence only, never raw `SKILL.md` prompt text.
+There is no external generic `invoke_read_tool`. Callers cannot choose an arbitrary nested provider, tool name, mission, approval, credential, mutation action, or project outside the server-owned grant. An optional OAuth `mcp_projects` claim can only narrow that grant. Skill content remains private: capability results expose metadata/evidence only, never raw `SKILL.md` prompt text.
 
 MCP identity uses the validated subject, OAuth client ID, JSON-RPC request ID, exact project, and redacted request/result hashes. It uses no browser session cookie, tracking cookie, device fingerprint, or probabilistic fingerprint. Raw MCP arguments and results are not written to the evidence ledger.
 
@@ -39,11 +42,13 @@ MCP identity uses the validated subject, OAuth client ID, JSON-RPC request ID, e
 Source readiness is not production readiness. Before deployment, all of the following must be verified at the same exact commit:
 
 - reconcile the live Supabase migration ledger so `mcp_servers`, `mcp_project_policies`, and `mcp_tool_calls` actually exist with the checked-in RLS/grant contract;
-- enable/configure Supabase OAuth and a custom access-token hook that emits the exact audience, `mcp:read`, and bounded `mcp_projects` claims;
-- register/allow the exact client IDs for the connected external consoles (CIMD where supported; DCR only for legacy compatibility);
+- enable Supabase OAuth 2.1 and dynamic client registration for MCP, using the current supported standard access-token audience/scope contract (`authenticated` + `email`);
+- preserve explicit founder consent and validate every issued token against the current Supabase user plus the FCR `founder_users` allowlist;
+- use DCR for compatible external clients. Static client-ID allowlisting may be enabled as optional hardening but is not a prerequisite for DCR;
 - configure `FCR_REMOTE_MCP_*` and `CHIEF_AI_BASE_URL` without reusing provider/deploy credentials;
 - prove the Chief URL/binding and FCR Worker SHA, then run the Attack Ten auth/scope/replay/header/evidence/client matrix;
-- connect an eligible AI client only after provider evidence proves the resource metadata, OAuth flow, tools list, and calls from the deployed exact head.
+- prove both compatibility branches on `/mcp/read`: OAuth/DCR bootstrap for non-legacy credentials and exact legacy-token operation without downgrade from failed OAuth;
+- connect an eligible AI client only after provider evidence proves the canonical `/mcp` resource metadata, OAuth flow, tools list, and calls from the deployed exact head.
 
 The source and provider attack matrix is maintained in `docs/PAIRED_MCP_ATTACK_TEN.md`.
 
@@ -66,20 +71,22 @@ No migration, OAuth dashboard change, Worker secret/binding change, merge, or de
 
 `cloudflare-stack` / `https://stack.mcp.cloudflare.com/mcp` is intentionally **not installed** in standing repository-agent configuration because it is not present in Cloudflare's current documented agent-setup fleet. `scripts/verify-mcp-config.mjs` rejects it so stale client configuration cannot silently reintroduce it.
 
-## Served remote read MCP boundary
+## Served remote compatibility MCP boundary
 
-Founder Control Room also serves a separate read-only MCP gateway at `POST https://api.foundercontrolroom.org/mcp/read`. This is the remote bridge intended for external MCP clients that need governed repository/provider reads without inheriting Founder Control Room execution authority.
+Founder Control Room also serves `POST https://api.foundercontrolroom.org/mcp/read` for backward compatibility with existing server-held-token clients. It now auto-negotiates into the same OAuth/DCR identity membrane as canonical `/mcp` for every request that does not present the exact legacy token.
 
-- Authentication uses the dedicated Worker secret `FCR_REMOTE_MCP_READ_TOKEN`. It must not be reused for the write-capable Founder Signal Engine MCP or any provider credential.
-- Production project scope is server-held as `FCR_REMOTE_MCP_READ_PROJECTS=sekret-bip,juss-beautiful-hair,juss-beautiful-hair-private,l99,chief-ai-machine,untold-stories,sync-party,founder-control-room,promptos`. These are the current active authority-bearing entries in `PORTFOLIO_PROJECTS`; callers cannot add or substitute a project slug in order to widen the grant.
-- External continuity-only projects (`think-tank`, `solcontinuity`, `sleepwealth-agent`, `sweats`) and quarantined repositories remain outside this operator grant unless a later explicit founder authority decision promotes them through the normal portfolio contract.
-- The gateway advertises only `list_read_servers` and `invoke_read_tool`; both remain behind the in-app MCP registry and policy boundary.
-- Provider tools still have to pass the configured server allowlist/denylist. A tool name matching create/update/delete/merge/write authority remains blocked by the underlying FCR MCP policy.
+- `FCR_REMOTE_MCP_READ_TOKEN` is legacy compatibility authority only. Keep it distinct from write-capable MCP tokens and provider credentials.
+- Static selection requires an exact timing-safe Bearer-token match. Missing, malformed, or non-matching credentials are routed to OAuth/DCR rather than static auth.
+- A token that fails OAuth validation is rejected. It is never retried or downgraded as a static credential.
+- Exact unauthenticated `POST /mcp/read` may reach the bearer handler only so an OAuth-capable client can receive the canonical protected-resource challenge. The CSRF exemption does not extend to `/mcp/read/*` or neighboring mutation routes.
+- Production project scope remains server-held. The route cannot widen beyond `PORTFOLIO_PROJECTS`; optional token project claims may only narrow the scope.
+- The compatibility alias advertises the same bounded eight-tool catalog as canonical `/mcp`; it does not expose a generic nested provider invocation surface.
+- Provider tools still have to pass the configured server allowlist/denylist. Create/update/delete/merge/write authority remains blocked by underlying FCR policy unless a separate governed execution path explicitly permits it.
 - Mission IDs, approval IDs, bearer tokens, and other authority-bearing fields are not accepted as tool arguments. Nested secret-bearing arguments are rejected before the provider boundary.
-- If either the dedicated token or server-held project scope is absent, the endpoint fails closed rather than falling back to a broader grant.
-- The secret value belongs in the surviving `founder-control-room` Worker secret store only. Do not commit it to `.env`, Wrangler config, MCP client config, issues, screenshots, logs, or proof artifacts.
+- If server-held project scope is absent, the endpoint fails closed. If the static token is absent, the legacy static branch is unavailable but OAuth/DCR remains independently governed.
+- The static secret value belongs in the surviving `founder-control-room` Worker secret store only. Do not commit it to `.env`, Wrangler config, MCP client config, issues, screenshots, logs, or proof artifacts.
 
-The operator posture is deliberately asymmetric: external consoles may read/inspect the full **active** portfolio, while mutations still require the separate Ask-Founder / Founder Permission / execution-receipt path. A read token, OAuth project claim, messenger link, fingerprint, proof cookie, genealogy receipt, or model vote grants no merge, deploy, provider, database, publication, billing, deletion, or arbitrary command authority.
+The operator posture is deliberately asymmetric: external consoles may read/inspect only their bounded active portfolio grant, while mutations still require the separate Ask-Founder / Founder Permission / execution-receipt path. A static read token, OAuth client registration, optional project claim, messenger link, fingerprint, proof cookie, genealogy receipt, or model vote grants no merge, deploy, provider, database, publication, billing, deletion, or arbitrary command authority.
 
 ## In-app Control Room MCP Hub boundary
 
