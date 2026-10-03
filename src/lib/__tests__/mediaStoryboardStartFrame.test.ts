@@ -255,4 +255,135 @@ describe('media storyboard start-frame contract', () => {
     expect(first.storyboardFingerprint).not.toBe(second.storyboardFingerprint);
     expect(first.continuityCookie).not.toBe(second.continuityCookie);
   });
+
+  it('fails closed when a pre-existing request reference is unregistered or revoked', () => {
+    const ctx = context({
+      assetInputs: referencePolicies('opening-frame-1', 'character-ref-1', 'legacy-reference-1'),
+    });
+    const base = {
+      request: request({ referenceAssetIds: ['legacy-reference-1'] }),
+      context: ctx,
+      binding: binding(),
+    };
+
+    expect(() => prepareStoryboardVideoRouting({
+      ...base,
+      availableAssets: [imageAsset('opening-frame-1'), imageAsset('character-ref-1')],
+    })).toThrow(/REFERENCE_NOT_FOUND/);
+
+    expect(() => prepareStoryboardVideoRouting({
+      ...base,
+      availableAssets: [
+        imageAsset('opening-frame-1'),
+        imageAsset('character-ref-1'),
+        imageAsset('legacy-reference-1', { status: 'revoked' }),
+      ],
+    })).toThrow(/REFERENCE_NOT_USABLE/);
+  });
+
+  it('requires both request permission and asset authority for cross-project reuse', () => {
+    const sharedReference = imageAsset('character-ref-1', {
+      projectId: 'project-2',
+      rights: {
+        commercialUseStatus: 'unknown',
+        reusableAcrossProjects: true,
+        reusableAcrossProjectsAuthorityRecordId: 'reuse-authority-1',
+        domainAuthorityGranted: false,
+        domainAuthorityRecordId: null,
+      },
+    });
+    const assets = [imageAsset('opening-frame-1'), sharedReference];
+    const denied = validateStoryboardStartFrameBinding(request(), binding(), assets);
+    expect(denied.map((error) => error.code)).toContain('REFERENCE_NOT_USABLE');
+
+    const prepared = prepareStoryboardVideoRouting({
+      request: request({
+        referencePolicy: {
+          maySendToExternalProvider: true,
+          mayStoreInLibrary: true,
+          mayReuseCrossProject: true,
+        },
+      }),
+      context: context({ assetInputs: referencePolicies('opening-frame-1', 'character-ref-1') }),
+      binding: binding(),
+      availableAssets: assets,
+    });
+    expect(prepared.referenceAssetIds).toContain('character-ref-1');
+  });
+
+  it('requires an image when an end-frame asset is supplied', () => {
+    const errors = validateStoryboardStartFrameBinding(
+      request(),
+      binding({ endFrameAssetId: 'end-frame-1' }),
+      [
+        imageAsset('opening-frame-1'),
+        imageAsset('character-ref-1'),
+        imageAsset('end-frame-1', { kind: 'video' }),
+      ],
+    );
+    expect(errors.map((error) => error.code)).toContain('END_FRAME_NOT_IMAGE');
+  });
+
+  it('binds semantic reference roles into continuity identity and output', () => {
+    const assets = [imageAsset('opening-frame-1'), imageAsset('shared-reference-1')];
+    const ctx = context({ assetInputs: referencePolicies('opening-frame-1', 'shared-reference-1') });
+    const character = prepareStoryboardVideoRouting({
+      request: request(),
+      context: ctx,
+      binding: binding({
+        characterReferenceAssetIds: ['shared-reference-1'],
+        styleReferenceAssetIds: [],
+      }),
+      availableAssets: assets,
+    });
+    const style = prepareStoryboardVideoRouting({
+      request: request(),
+      context: ctx,
+      binding: binding({
+        characterReferenceAssetIds: [],
+        styleReferenceAssetIds: ['shared-reference-1'],
+      }),
+      availableAssets: assets,
+    });
+
+    expect(character.referenceAssetIds).toEqual(style.referenceAssetIds);
+    expect(character.storyboardFingerprint).not.toBe(style.storyboardFingerprint);
+    expect(character.referenceRoles.characterReferenceAssetIds).toEqual(['shared-reference-1']);
+    expect(style.referenceRoles.styleReferenceAssetIds).toEqual(['shared-reference-1']);
+  });
+
+  it('revalidates a prepared reference against current registry state before provider routing', () => {
+    const assets = [imageAsset('opening-frame-1'), imageAsset('character-ref-1')];
+    const prepared = prepareStoryboardVideoRouting({
+      request: request(),
+      context: context({ assetInputs: referencePolicies('opening-frame-1', 'character-ref-1') }),
+      binding: binding(),
+      availableAssets: assets,
+    });
+
+    const result = evaluateMediaRoute({
+      request: prepared.request,
+      context: prepared.context,
+      attackFlow: passingAttackFlow(),
+      catalog: imageToVideoCatalog,
+      allowance: snapshotAllowance({ entries: [] }),
+      budget: snapshotBudget({
+        dailyCapUsd: 10,
+        monthlyCapUsd: 100,
+        spentTodayUsd: 0,
+        spentThisMonthUsd: 0,
+        activeReservationsUsd: 0,
+      }),
+      availableAssets: [
+        imageAsset('opening-frame-1', { status: 'revoked' }),
+        imageAsset('character-ref-1'),
+      ],
+    });
+
+    expect(result.outcome).toMatchObject({
+      kind: 'BLOCKED',
+      reason: 'REFERENCE_NOT_APPROVED',
+    });
+  });
+
 });
