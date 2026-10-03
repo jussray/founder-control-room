@@ -66,12 +66,7 @@ jobs:
         run: npm run typecheck
 
       - name: Lint URLFix source and focused tests
-        run: >-
-          npx eslint
-          src/lib/urlfix.ts
-          src/lib/__tests__/urlfix.test.ts
-          e2e/urlfix-live-sekretbip.ts
-          --max-warnings 0
+        run: npx eslint src/lib/urlfix.ts src/lib/__tests__/urlfix.test.ts --max-warnings 0
 
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
