@@ -98,7 +98,7 @@ jobs:
           fi
 
       - name: Checkout approved exact head
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        uses: actions/checkout@v4
         with:
           repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
           ref: ${{ env.EXPECTED_HEAD_SHA }}
@@ -123,7 +123,7 @@ jobs:
           fi
 
       - name: Setup Node
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        uses: actions/setup-node@v4
         with:
           node-version: '24'
           cache: npm
@@ -177,7 +177,7 @@ jobs:
 
       - name: Upload evidence receipt
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@v4
         with:
           name: repo-cycle-${{ env.REPO_CYCLE_OPERATION }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: repo-cycle-result.json
