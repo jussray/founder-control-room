@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -70,12 +70,13 @@ describe('ffmpeg render adapter', () => {
     expect(validateTimelineSpec(baseSpec)).toBeNull();
   });
 
-  it('keeps user text out of the filter graph and rejects unsafe filter paths', () => {
+  it('keeps user text out of the filter graph, disables stdin, and rejects unsafe filter paths', () => {
     const args = buildFfmpegArgs(
       { ...baseSpec, segments: [{ durationSec: 1, background: '#000000', lines: [{ text: "x':y;[evil]", sizeFrac: 0.1, yFrac: 0.5, color: '#ffffff' }] }] },
       { outputPath: '/tmp/out.mp4', textFiles: [['/tmp/t-0-0.txt']], fontRegular: '/f.ttf', fontBold: '/fb.ttf' },
     );
     const graph = args[args.indexOf('-filter_complex') + 1] ?? '';
+    expect(args).toContain('-nostdin');
     expect(graph).toContain("textfile='/tmp/t-0-0.txt'");
     expect(graph).not.toContain('evil');
     expect(() => buildFfmpegArgs(baseSpec, {
@@ -86,14 +87,17 @@ describe('ffmpeg render adapter', () => {
     })).toThrow(/unsupported filter-graph path characters/);
   });
 
-  it('wraps text on word boundaries', () => {
+  it('wraps text on word boundaries and splits oversized tokens', () => {
     expect(wrapText('one two three four', 9)).toBe('one two\nthree\nfour');
+    expect(wrapText('abcdefghijk two', 5)).toBe('abcde\nfghij\nk two');
+    expect(() => wrapText('x', 0)).toThrow(/positive integer/);
   });
 
   it('requires the real ffmpeg/ffprobe capability and renders a probed MP4 with bound provenance', async () => {
     const binary = await probeFfmpegBinary();
     expect(binary.available).toBe(true);
     expect(binary.version).toBeTruthy();
+    expect(binary.ffprobeVersion).toBeTruthy();
 
     const dir = await mkdtemp(join(tmpdir(), 'fcr-ffmpeg-test-'));
     try {
@@ -124,6 +128,8 @@ describe('ffmpeg render adapter', () => {
       expect(resultA.sourceAssets).toEqual([{ segmentIndex: 0, sha256: sha256(ppmA), bytes: Buffer.byteLength(ppmA) }]);
       expect(resultA.fonts.regularSha256).toMatch(/^[0-9a-f]{64}$/);
       expect(resultA.fonts.boldSha256).toMatch(/^[0-9a-f]{64}$/);
+      expect(resultA.ffmpegVersion).toBe(binary.version);
+      expect(resultA.ffprobeVersion).toBe(binary.ffprobeVersion);
       expect(resultA.probe.width).toBe(320);
       expect(resultA.probe.height).toBe(180);
       expect(resultA.probe.videoCodec).toBe('h264');
@@ -134,6 +140,16 @@ describe('ffmpeg render adapter', () => {
 
       const collision = await renderFfmpegTimelineV1({ ...spec, segments: [{ ...spec.segments[0], imagePath: outA }, spec.segments[1]] }, outA);
       expect(collision.kind).toBe('REJECTED');
+
+      const symlinkOut = join(dir, 'linked.mp4');
+      await symlink(outA, symlinkOut);
+      const symlinkResult = await renderFfmpegTimelineV1(baseSpec, symlinkOut);
+      expect(symlinkResult).toEqual({ kind: 'REJECTED', reason: 'outputPath may not be a symbolic link' });
+
+      const badOutput = join(dir, 'directory.mp4');
+      await mkdir(badOutput);
+      const failed = await renderFfmpegTimelineV1(baseSpec, badOutput);
+      expect(failed).toEqual({ kind: 'FAILED', code: 'FFMPEG_EXIT', safeMessage: 'ffmpeg render failed' });
 
       const ppmB = 'P3\n2 2\n255\n0 0 0  0 255 0\n0 0 255  255 255 0\n';
       await writeFile(image, ppmB, 'utf8');
