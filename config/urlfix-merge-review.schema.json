@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://foundercontrolroom.org/schemas/urlfix-merge-review-v1.json",
+  "title": "Juss URLFix Merge Review Handoff v1",
+  "type": "object",
+  "required": ["schema", "repository", "pullRequest", "base", "head", "repair", "proof", "handoff", "issuedAt", "expiresOnRefMovement"],
+  "properties": {
+    "schema": { "const": "juss/urlfix-merge-review@v1" },
+    "repository": { "type": "string", "pattern": "^[^/]+/[^/]+$" },
+    "pullRequest": { "type": "integer", "minimum": 1 },
+    "base": { "$ref": "#/$defs/ref" },
+    "head": { "$ref": "#/$defs/ref" },
+    "repair": {
+      "type": "object",
+      "required": ["issueIds", "carrier"],
+      "properties": {
+        "issueIds": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^URLFIX-[0-9]+$" }
+        },
+        "carrier": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "proof": {
+      "type": "object",
+      "required": ["highestState", "exactHeadSha", "proofRefs", "residualRisk"],
+      "properties": {
+        "highestState": {
+          "enum": [
+            "SOURCE_PROVEN",
+            "LOCAL_BROWSER_PROVEN",
+            "PREVIEW_BROWSER_PROVEN",
+            "LIVE_BROWSER_PROVEN",
+            "PATCHED_NOT_LIVE"
+          ]
+        },
+        "exactHeadSha": { "$ref": "#/$defs/sha" },
+        "proofRefs": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "residualRisk": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "handoff": {
+      "type": "object",
+      "required": ["intent", "reviewSkill", "mergeAuthorized"],
+      "properties": {
+        "intent": { "const": "REVIEW_ONLY" },
+        "reviewSkill": { "const": "review-verify-merge" },
+        "mergeAuthorized": { "const": false }
+      },
+      "additionalProperties": false
+    },
+    "issuedAt": { "type": "string", "format": "date-time" },
+    "expiresOnRefMovement": { "const": true }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "sha": { "type": "string", "pattern": "^[A-Fa-f0-9]{40}$" },
+    "ref": {
+      "type": "object",
+      "required": ["ref", "sha"],
+      "properties": {
+        "ref": { "type": "string", "minLength": 1 },
+        "sha": { "$ref": "#/$defs/sha" }
+      },
+      "additionalProperties": false
+    }
+  }
+}
