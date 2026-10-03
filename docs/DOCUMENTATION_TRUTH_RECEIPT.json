@@ -1,6 +1,6 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Document current evidence-authority boundaries across cross-repository browser federation, resident Council/Muse relay activation, and provider-held runtime-secret observation: source wiring, canonical secret-name policy, configured bindings, live provider invocation, and mutation authority remain separate claims with separate proof.",
+  "purpose": "Document current evidence-authority boundaries across cross-repository browser federation, resident Council/Muse relay activation, and provider-held runtime-secret observation: source wiring, canonical secret-name policy, configured bindings, live provider invocation, and mutation authority remain separate claims with separate proof; this refresh also records the Whop commerce witness secret-name boundary, raw-body ingress, and separation of source/configuration from provider/runtime/payment outcome proof.",
   "domains": [
     "cloudflare-authority",
     "repository-provider",
@@ -63,7 +63,8 @@
       "claims": [
         "`wrangler.worker.toml` must list `FCR_SHOPIFY_WEBHOOK_SECRET` and `FCR_COMMERCE_HASH_SALT` under `[secrets].required`, so canonical exact-main Deploy rejects a missing FCR Shopify runtime binding before Worker mutation while never reading, logging, or re-uploading either provider-held value; this source boundary cannot prove webhook registration, production migration, runtime delivery, or collected revenue.",
         "`wrangler.worker.toml` must declare `FCR_CLOUDFLARE_MCP_READ_TOKEN`, `OPENAI_API_KEY`, and Muse `MODEL_API_KEY` as provider-held required Worker secret names while keeping public-safe runtime configuration outside the secret plane; declaration proves required-name policy only, not provider presence, deployed runtime identity, or successful provider use.",
-        "A separate GitHub Actions copy of `OPENAI_API_KEY` may serve CI-only OpenAI consumers such as AI Failure Repair, but it is a distinct authority plane and does not prove or replace the provider-held Worker runtime binding."
+        "A separate GitHub Actions copy of `OPENAI_API_KEY` may serve CI-only OpenAI consumers such as AI Failure Repair, but it is a distinct authority plane and does not prove or replace the provider-held Worker runtime binding.",
+        "`wrangler.worker.toml` must list `FCR_WHOP_WEBHOOK_SECRET` under `[secrets].required` so canonical exact-main Deploy fails closed when the Whop provider-held Worker signing-secret binding is absent; the required-name declaration never proves the secret value, provider webhook registration, signed delivery, database migration, checkout completion, or collected revenue."
       ]
     },
     {
@@ -162,7 +163,8 @@
         "`README.md` must describe the Founder Council as dual-resident in the founder assistant and project Control Room without centralizing execution authority, and must keep Muse source implementation separate from configured Worker secret presence, deployed runtime identity, and a live provider response receipt.",
         "`README.md` must classify a Cloudflare proof-credential failure that prevents secret enumeration as an observation blocker; it cannot be used to claim any required Worker secret absent when the provider-held target set was never observed.",
         "`README.md` must keep the GitHub Actions and Cloudflare Worker copies of `OPENAI_API_KEY` as separate CI/runtime authority planes and state that the all-secret proof derives names from the canonical Worker registry without reading values.",
-        "`README.md` must treat a successful successor StoryEngine Playwright witness as current only for the exact FCR/StoryEngine evidence pair recorded by the run and expire that proof when either repository moves."
+        "`README.md` must treat a successful successor StoryEngine Playwright witness as current only for the exact FCR/StoryEngine evidence pair recorded by the run and expire that proof when either repository moves.",
+        "`README.md` must document Whop as a bounded external commerce witness, keep FCR as the verification/truth plane, and separate source route/secret-name declaration from Cloudflare binding presence, Whop webhook registration, migration state, signed delivery, checkout-return proof, and revenue outcome."
       ]
     },
     {
@@ -188,7 +190,8 @@
     {
       "path": "docs/CLOUDFLARE_REASONING.md",
       "claims": [
-        "`docs/CLOUDFLARE_REASONING.md` must require FCR provider-held Worker binding names to pass the canonical Deploy membrane without treating source, binding-name presence, CI, or Playwright as proof of downstream provider activation or business outcomes."
+        "`docs/CLOUDFLARE_REASONING.md` must require FCR provider-held Worker binding names to pass the canonical Deploy membrane without treating source, binding-name presence, CI, or Playwright as proof of downstream provider activation or business outcomes.",
+        "`docs/CLOUDFLARE_REASONING.md` must treat `FCR_WHOP_WEBHOOK_SECRET` as a provider-held Worker secret whose checked-in required-name policy may be verified by canonical deploy without copying, reading, or logging the `ws_...` value."
       ]
     },
     {
@@ -205,7 +208,8 @@
     {
       "path": "docs/deployment/CLOUDFLARE_WORKER_TARGETS.md",
       "claims": [
-        "`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` must keep canonical Worker runtime secret bindings provider-held while separating provider subscription, runtime delivery, production database state, and business outcomes into their own activation proof."
+        "`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` must keep canonical Worker runtime secret bindings provider-held while separating provider subscription, runtime delivery, production database state, and business outcomes into their own activation proof.",
+        "`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` must bind the Whop webhook route and `FCR_WHOP_WEBHOOK_SECRET` to the canonical Founder Control Room API Worker only, not Pages, browser code, GitHub Actions substitution, or any sibling project runtime."
       ]
     },
     {
