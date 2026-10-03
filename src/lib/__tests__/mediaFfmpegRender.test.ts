@@ -40,6 +40,15 @@ describe('ffmpeg render adapter', () => {
     expect(
       validateTimelineSpec({
         ...baseSpec,
+        width: 3840,
+        height: 3840,
+        fps: 60,
+        segments: [{ durationSec: 30, background: '#000000', lines: [] }, { durationSec: 30, background: '#000000', lines: [] }, { durationSec: 30, background: '#000000', lines: [] }, { durationSec: 30, background: '#000000', lines: [] }],
+      }),
+    ).toMatch(/render-work ceiling/);
+    expect(
+      validateTimelineSpec({
+        ...baseSpec,
         segments: [{ durationSec: 1, background: '#000000', lines: Array.from({ length: 13 }, (_, i) => ({ text: `line ${i}`, sizeFrac: 0.1, yFrac: 0.5, color: '#ffffff' })) }],
       }),
     ).toMatch(/lines/);
