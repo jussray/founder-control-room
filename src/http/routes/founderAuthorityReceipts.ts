@@ -5,6 +5,7 @@ import { supabase } from '../../lib/supabaseClient.js';
 import {
   createFounderPermissionRequest,
   type FounderPermissionActionTarget,
+  type FounderPermissionStatus,
 } from '../../lib/founderPermissionBroker.js';
 import { storedFounderPermissionDecisionMatches } from '../../lib/founderPermissionStoredDecision.js';
 import {
@@ -74,6 +75,17 @@ function isRecord(value: unknown): value is JsonRecord {
 
 function text(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
+}
+
+function founderPermissionStatus(value: unknown): FounderPermissionStatus | null {
+  const candidate = text(value);
+  if (candidate === 'pending'
+    || candidate === 'approved'
+    || candidate === 'rejected'
+    || candidate === 'change_requested') {
+    return candidate;
+  }
+  return null;
 }
 
 function founderOriginPresent(req: FounderRequest): boolean {
@@ -230,7 +242,7 @@ founderAuthorityReceiptsRouter.get(
     if (error) {
       return res.status(503).json({ valid: false, code: 'FOUNDER_AUTHORITY_STORE_UNAVAILABLE' });
     }
-    const rows = (data ?? []) as JsonRecord[];
+    const rows = Array.isArray(data) ? data.filter(isRecord) : [];
     if (rows.length === 0) {
       return res.json({ valid: false, code: 'FOUNDER_AUTHORITY_RECEIPT_NOT_FOUND' });
     }
@@ -278,8 +290,15 @@ founderAuthorityReceiptsRouter.post(
       .maybeSingle();
     if (error) return res.status(500).json({ error: 'Unable to read founder permission decision.' });
     if (!data) return res.status(404).json({ error: 'Founder permission request not found.' });
+    if (!isRecord(data)) {
+      return res.status(503).json({
+        error: 'Founder permission decision store returned an invalid row shape.',
+        code: 'FOUNDER_PERMISSION_STORE_INVALID',
+      });
+    }
 
-    const row = data as JsonRecord;
+    const row: JsonRecord = data;
+    const status = founderPermissionStatus(row.status);
     const expiresAt = text(row.expires_at);
     const decidedAt = text(row.decided_at);
     const requestHash = text(row.request_hash).toLowerCase();
@@ -287,7 +306,7 @@ founderAuthorityReceiptsRouter.post(
     const founderUserId = text(row.founder_user_id);
     const founderEmail = text(row.founder_email).toLowerCase();
 
-    if (text(row.status) !== 'approved'
+    if (status !== 'approved'
       || text(row.decision_surface) !== 'fcr'
       || !decidedAt
       || !expiresAt
@@ -335,7 +354,7 @@ founderAuthorityReceiptsRouter.post(
 
     if (permissionRequest.requestHash !== requestHash
       || !storedFounderPermissionDecisionMatches(permissionRequest, {
-        status: row.status,
+        status,
         decision: row.decision,
         decisionHash: row.decision_hash,
         decisionSurface: row.decision_surface,
