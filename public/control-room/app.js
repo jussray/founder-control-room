@@ -12,7 +12,7 @@ const root = document.getElementById('root');
 
 const state = {
   session: null,
-  tab: 'projects',
+  tab: 'home',
   projects: [],
   selectedProjectSlug: null,
   selectedProject: null,
@@ -35,7 +35,21 @@ const state = {
   agents: [],
   authorityLevels: [],
   banner: null, // { kind: 'error'|'notice', text }
+  // Per-read truth for the Home KPIs: 'pending' until a load settles, then
+  // 'ok' or 'failed'. An empty array is only "0" once its read succeeded.
+  reads: { projects: 'pending', missions: 'pending', activity: 'pending', costs: 'pending' },
 };
+
+/** Runs a loader and records whether its read succeeded, without swallowing the error. */
+async function trackedRead(key, load) {
+  try {
+    await load();
+    state.reads[key] = 'ok';
+  } catch (err) {
+    state.reads[key] = 'failed';
+    throw err;
+  }
+}
 
 /** Renders a <datalist> of registered multitool agents — free text still allowed, per the API. */
 function agentDatalist(id) {
@@ -197,32 +211,65 @@ function renderSignIn() {
 
 // ─── render: shell ───────────────────────────────────────────────────────────
 
+// Tab ids are a stable contract: stack-router.js deep-links `?tab=<id>` through
+// `.tabs button[data-tab]` and the e2e harness clicks the same selectors. Only
+// the visible labels and the surrounding shell are presentation.
 const TABS = [
-  ['projects', 'Projects'],
-  ['missions', 'Missions'],
-  ['activity', 'Activity'],
-  ['l99', 'L99'],
-  ['promptos', 'PromptOS'],
-  ['analytics', 'Analytics'],
-  ['terminal', 'Terminal'],
+  ['home', 'Home', '⌂'],
+  ['projects', 'Portfolio', '◫'],
+  ['missions', 'Missions', '⟁'],
+  ['activity', 'Signals', '◉'],
+  ['l99', 'Proof · L99', '✓'],
+  ['promptos', 'PromptOS', '✎'],
+  ['analytics', 'Spend', '$'],
+  ['terminal', 'Terminal', '>_'],
+];
+
+// Sibling Control Room surfaces that ship as their own pages. Plain links —
+// they are deliberately not `.tabs button[data-tab]` so the tab router never
+// treats them as in-app tabs.
+const SURFACE_LINKS = [
+  ['Content', '/control-room/content-manager.html'],
+  ['Automation', '/control-room/command-bridge.html'],
+  ['Integrations', '/control-room/plugin-center.html'],
+  ['Security', '/control-room/security.html'],
+  ['QuickScan', '/control-room/quickscan.html'],
+  ['Evidence trust', '/control-room/evidence-trust.html'],
 ];
 
 function renderShell() {
   root.innerHTML = '';
   const shell = el(`
     <div class="shell">
-      <div class="topbar">
-        <div class="brand">Founder Control Room</div>
-        <div style="display:flex; align-items:center; gap:0.75rem;">
-          <a class="capabilities-link" href="/control-room/capabilities.html">Capabilities</a>
-          <span class="founder-email">${escapeHtml(state.session.email)}</span>
-          <button id="sign-out">Sign out</button>
+      <aside class="sidebar" aria-label="Control Room navigation">
+        <a class="brand-mark" href="/control-room/" aria-label="Founder Control Room home">
+          <span class="brand-fcr">FCR</span>
+          <small>Founder Control Room</small>
+        </a>
+        <nav class="tabs" aria-label="Control Room sections">
+          ${TABS.map(([id, label, glyph]) => `<button type="button" data-tab="${id}" class="${state.tab === id ? 'active' : ''}"><span class="tab-glyph" aria-hidden="true">${glyph}</span><span>${label}</span></button>`).join('')}
+        </nav>
+        <div class="side-section">
+          <small>Surfaces</small>
+          ${SURFACE_LINKS.map(([label, href]) => `<a class="side-link" href="${href}">${label}</a>`).join('')}
         </div>
+        <div class="side-status" data-systems-truth="unknown" role="status">
+          <small>Systems</small>
+          <span>Not observed from this surface</span>
+        </div>
+      </aside>
+      <div class="main">
+        <div class="topbar">
+          <div class="brand">Founder Control Room</div>
+          <div class="topbar-tagline" aria-hidden="true">Same truth. Higher outcomes.</div>
+          <div class="topbar-actions">
+            <a class="capabilities-link" href="/control-room/capabilities.html">Capabilities</a>
+            <span class="founder-email">${escapeHtml(state.session.email)}</span>
+            <button id="sign-out">Sign out</button>
+          </div>
+        </div>
+        <div class="content" id="tab-content"></div>
       </div>
-      <div class="tabs">
-        ${TABS.map(([id, label]) => `<button data-tab="${id}" class="${state.tab === id ? 'active' : ''}">${label}</button>`).join('')}
-      </div>
-      <div class="content" id="tab-content"></div>
     </div>
   `);
   root.appendChild(shell);
@@ -235,6 +282,218 @@ function renderShell() {
   renderTabContent();
 }
 
+// ─── Home tab ────────────────────────────────────────────────────────────────
+//
+// Every number on this surface is derived from state the API already returned
+// in this session. Anything FCR does not observe is rendered as UNKNOWN or
+// "Not connected" with a `data-truth` marker — never as a placeholder figure.
+
+const IN_FLIGHT_LANES = new Set(['proposed', 'sandboxed', 'in_review', 'approved']);
+const LANDED_LANES = new Set(['integrated', 'deployed']);
+
+function greetingForNow(date = new Date()) {
+  const hour = date.getHours();
+  if (hour < 12) return 'Good morning';
+  if (hour < 18) return 'Good afternoon';
+  return 'Good evening';
+}
+
+function relativeTime(iso) {
+  const then = Date.parse(iso);
+  if (!Number.isFinite(then)) return '';
+  const seconds = Math.max(0, Math.round((Date.now() - then) / 1000));
+  if (seconds < 60) return `${seconds}s ago`;
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 48) return `${hours}h ago`;
+  return `${Math.round(hours / 24)}d ago`;
+}
+
+// GET /projects and GET /l99/status write their own `*_read` audit events into
+// the activity feed, so a Home load must not count itself as a live signal.
+const READ_AUDIT_EVENT = /_read$/;
+// Server-side windows (src/http/routes/dashboard.ts): tasks 200, activity 100.
+const TASKS_WINDOW = 200;
+const ACTIVITY_WINDOW = 100;
+
+function liveSignals() {
+  return state.activity.filter((ev) => !READ_AUDIT_EVENT.test(String(ev.event_type ?? '')));
+}
+
+function unknownMetric(id, label, readState, tab) {
+  return { id, label, value: 'UNKNOWN', sub: readState === 'failed' ? 'read failed' : 'not read yet', truth: 'unknown', tab };
+}
+
+function homeMetrics() {
+  const reads = state.reads;
+  const projects = state.projects;
+  const missions = state.missions;
+  const inFlight = missions.filter((m) => IN_FLIGHT_LANES.has(m.status));
+  const inReview = missions.filter((m) => m.status === 'in_review');
+  const landed = missions.filter((m) => LANDED_LANES.has(m.status));
+  const deployed = missions.filter((m) => m.status === 'deployed');
+  const activeProjects = projects.filter((p) => p.status === 'active');
+  const missionsCapped = missions.length >= TASKS_WINDOW ? ` · latest ${TASKS_WINDOW} only` : '';
+
+  const signals = liveSignals();
+  const signalsCapped = state.activity.length >= ACTIVITY_WINDOW;
+  const latestSignal = signals[0]?.created_at ?? null;
+
+  const l99 = state.l99;
+  const l99Gates = l99 && !l99.error && Array.isArray(l99.oodaFiringOrder) ? l99.oodaFiringOrder : null;
+  const l99Pass = l99Gates ? l99Gates.filter((g) => g.status === 'pass').length : 0;
+
+  const spend = state.costs && Number.isFinite(Number(state.costs.totalUsd)) ? Number(state.costs.totalUsd) : null;
+
+  return [
+    reads.projects === 'ok'
+      ? { id: 'projects', label: 'Projects', value: String(projects.length), sub: `${activeProjects.length} active`, truth: 'observed', tab: 'projects' }
+      : unknownMetric('projects', 'Projects', reads.projects, 'projects'),
+    reads.missions === 'ok'
+      ? { id: 'missions', label: 'Missions in flight', value: String(inFlight.length), sub: `${inReview.length} in review${missionsCapped}`, truth: 'observed', tab: 'missions' }
+      : unknownMetric('missions', 'Missions in flight', reads.missions, 'missions'),
+    reads.missions === 'ok'
+      ? { id: 'landed', label: 'Integrated', value: String(landed.length), sub: `${deployed.length} deployed${missionsCapped}`, truth: 'observed', tab: 'missions' }
+      : unknownMetric('landed', 'Integrated', reads.missions, 'missions'),
+    reads.activity === 'ok'
+      ? { id: 'signals', label: 'Live signals', value: signalsCapped ? `${signals.length}+` : String(signals.length), sub: latestSignal ? `latest ${relativeTime(latestSignal)}${signalsCapped ? ` · latest ${ACTIVITY_WINDOW} only` : ''}` : 'none recorded', truth: 'observed', tab: 'activity' }
+      : unknownMetric('signals', 'Live signals', reads.activity, 'activity'),
+    l99Gates
+      ? { id: 'l99', label: 'L99 gates', value: `${l99Pass}/${l99Gates.length}`, sub: l99.standaloneLaunchReady ? 'launch ready' : 'not ready yet', truth: 'observed', tab: 'l99' }
+      : { id: 'l99', label: 'L99 gates', value: 'UNKNOWN', sub: l99?.error ? 'read failed' : 'not read yet', truth: 'unknown', tab: 'l99' },
+    reads.costs === 'ok' && spend !== null
+      ? { id: 'spend', label: 'Agent spend', value: `$${spend.toFixed(4)}`, sub: `${state.costs.byAgent?.length ?? 0} agents billed`, truth: 'observed', tab: 'analytics' }
+      : unknownMetric('spend', 'Agent spend', reads.costs, 'analytics'),
+    { id: 'revenue', label: 'Revenue', value: 'Not connected', sub: 'no revenue source is wired to FCR', truth: 'not-wired', href: '/control-room/plugin-center.html' },
+    { id: 'community', label: 'Community', value: 'Not connected', sub: 'no community source is wired to FCR', truth: 'not-wired', href: '/control-room/plugin-center.html' },
+  ];
+}
+
+const CHIEF_ROUTES = [
+  ['Strategize', 'Shape the prompt', 'tab', 'promptos'],
+  ['Analyze', 'Inspect a repo with GoalFix', 'href', '/control-room/goalfix.html'],
+  ['Create', 'Draft in the content manager', 'href', '/control-room/content-manager.html'],
+  ['Solve', 'Run a focused repair', 'href', '/control-room/goalfix.html'],
+  ['Pressure-test', 'Check the L99 gates', 'tab', 'l99'],
+  ['Take action', 'Open the mission board', 'tab', 'missions'],
+];
+
+const HOME_TILES = [
+  ['Portfolio', 'Build what matters', 'tab', 'projects'],
+  ['Missions', 'Move one thing forward', 'tab', 'missions'],
+  ['Proof', 'Show what’s real', 'tab', 'l99'],
+  ['Signals', 'See what changed', 'tab', 'activity'],
+  ['Content', 'Ideas to impact', 'href', '/control-room/content-manager.html'],
+  ['Automation', 'Do more, faster', 'href', '/control-room/command-bridge.html'],
+  ['Integrations', 'Plugins and connections', 'href', '/control-room/plugin-center.html'],
+  ['Security', 'Posture and receipts', 'href', '/control-room/security.html'],
+];
+
+function routeMarkup(label, sub, kind, target, className) {
+  const inner = `<strong>${escapeHtml(label)}</strong><span>${escapeHtml(sub)}</span>`;
+  return kind === 'tab'
+    ? `<button type="button" class="${className}" data-go-tab="${escapeHtml(target)}">${inner}</button>`
+    : `<a class="${className}" href="${escapeHtml(target)}">${inner}</a>`;
+}
+
+function renderHomeTab(mount) {
+  const metrics = homeMetrics();
+  const focus = state.missions.filter((m) => IN_FLIGHT_LANES.has(m.status)).slice(0, 6);
+  const signals = liveSignals().slice(0, 6);
+
+  mount.appendChild(el(`
+    <section class="home" data-home>
+      <div class="hero" data-home-hero>
+        <div class="hero-copy">
+          <p class="hero-greeting">${escapeHtml(greetingForNow())}, founder</p>
+          <h1 class="hero-title">ULTRA<span>THINK</span></h1>
+          <p class="hero-tagline">Bigger thinking. Realer outcomes.</p>
+          <p class="hero-lede">One command space to turn ideas into products, products into proof, and proof into lasting impact.</p>
+          <div class="hero-actions">
+            <button type="button" class="primary hero-cta" data-go-tab="missions">Take action →</button>
+            <a class="hero-cta secondary" href="#today-focus">View focus</a>
+          </div>
+        </div>
+        <aside class="chief" aria-labelledby="chief-heading">
+          <p class="chief-kicker">Chief</p>
+          <h2 id="chief-heading">Your intelligence partner</h2>
+          <p class="chief-prompt">What are you trying to move forward?</p>
+          <div class="chief-routes">
+            ${CHIEF_ROUTES.map(([label, sub, kind, target]) => routeMarkup(label, sub, kind, target, 'chief-route')).join('')}
+          </div>
+        </aside>
+      </div>
+
+      <div class="kpi-strip" data-home-kpis>
+        ${metrics.map((m) => `
+          ${m.tab ? `<button type="button" class="kpi" data-kpi="${m.id}" data-truth="${m.truth}" data-go-tab="${m.tab}">` : `<a class="kpi" data-kpi="${m.id}" data-truth="${m.truth}" href="${escapeHtml(m.href)}">`}
+            <span class="kpi-label">${escapeHtml(m.label)}</span>
+            <span class="kpi-value">${escapeHtml(m.value)}</span>
+            <span class="kpi-sub">${escapeHtml(m.sub)}</span>
+          ${m.tab ? '</button>' : '</a>'}
+        `).join('')}
+      </div>
+
+      <div class="home-grid">
+        <div class="panel home-projects" data-home-projects>
+          <div class="panel-head"><h2>Projects</h2><button type="button" class="link-button" data-go-tab="projects">View all →</button></div>
+        </div>
+        <div class="panel home-focus" id="today-focus" data-home-focus>
+          <div class="panel-head"><h2>Today’s focus</h2><span class="count-pill">${focus.length}</span></div>
+          ${focus.length === 0
+            ? '<p class="muted">No missions in flight. Propose one from the mission board.</p>'
+            : `<ul class="focus-list">${focus.map((m) => `
+              <li>
+                <button type="button" class="focus-item" data-focus-mission="${escapeHtml(m.id)}">
+                  <span class="focus-state" data-state="${escapeHtml(m.status)}" aria-hidden="true"></span>
+                  <span class="focus-copy"><strong>${escapeHtml(m.title)}</strong><small>${escapeHtml(m.project?.slug ?? 'unknown')} · ${escapeHtml(m.status)}</small></span>
+                  ${riskBadge(m.risk_level)}
+                </button>
+              </li>`).join('')}</ul>`}
+        </div>
+        <div class="panel home-signals" data-home-signals>
+          <div class="panel-head"><h2>Live signals</h2><button type="button" class="link-button" data-go-tab="activity">View all →</button></div>
+          ${signals.length === 0
+            ? '<p class="muted">No activity recorded yet.</p>'
+            : `<ul class="signal-list">${signals.map((ev) => `
+              <li class="signal" data-severity="${escapeHtml(ev.severity ?? '')}">
+                <span class="signal-dot" aria-hidden="true"></span>
+                <span class="signal-copy"><strong>${escapeHtml(ev.event_type)}</strong><small>${escapeHtml(ev.project?.slug ?? 'unknown')} · ${escapeHtml(ev.severity ?? '')}</small></span>
+                <time datetime="${escapeHtml(ev.created_at)}">${escapeHtml(relativeTime(ev.created_at))}</time>
+              </li>`).join('')}</ul>`}
+        </div>
+      </div>
+
+      <div class="home-detail" data-home-detail></div>
+
+      <div class="home-tiles">
+        ${HOME_TILES.map(([label, sub, kind, target]) => routeMarkup(label, sub, kind, target, 'tile')).join('')}
+      </div>
+    </section>
+  `));
+
+  // The projects module is the real one — same forms, same list, same detail
+  // panel — mounted inside the dashboard so the founder's first screen is the
+  // working Portfolio, not a picture of one.
+  // Bind the Home routes first so a failure inside the projects module can
+  // never leave the hero, Chief, KPI and tile buttons dead.
+  mount.querySelectorAll('[data-go-tab]').forEach((node) => {
+    node.addEventListener('click', () => { state.tab = node.dataset.goTab; render(); });
+  });
+  mount.querySelectorAll('[data-focus-mission]').forEach((node) => {
+    node.addEventListener('click', () => {
+      state.tab = 'missions';
+      guarded(() => selectMission(node.dataset.focusMission));
+    });
+  });
+
+  const projectsMount = mount.querySelector('[data-home-projects]');
+  renderProjectsTab(projectsMount);
+  const detail = projectsMount.querySelector('#project-detail');
+  if (detail) mount.querySelector('[data-home-detail]').appendChild(detail);
+}
+
 function renderTabContent() {
   const mount = document.getElementById('tab-content');
   if (!mount) return;
@@ -243,6 +502,7 @@ function renderTabContent() {
     mount.appendChild(el(`<p class="${state.banner.kind === 'error' ? 'error' : 'notice'}">${escapeHtml(state.banner.text)}</p>`));
   }
 
+  if (state.tab === 'home') return renderHomeTab(mount);
   if (state.tab === 'projects') return renderProjectsTab(mount);
   if (state.tab === 'missions') return renderMissionsTab(mount);
   if (state.tab === 'activity') return renderActivityTab(mount);
@@ -265,8 +525,10 @@ async function loadAuthorityLevels() {
 // ─── Projects tab ────────────────────────────────────────────────────────────
 
 async function loadProjects() {
-  const data = await api('/projects');
-  state.projects = data.projects ?? [];
+  await trackedRead('projects', async () => {
+    const data = await api('/projects');
+    state.projects = data.projects ?? [];
+  });
 }
 
 function renderProjectsTab(mount) {
@@ -314,7 +576,7 @@ function renderProjectsTab(mount) {
     });
   }
 
-  if (state.selectedProjectSlug) renderProjectDetail(mount);
+  if (state.selectedProjectSlug && state.selectedProject) renderProjectDetail(mount);
 }
 
 async function selectProject(slug) {
@@ -506,8 +768,10 @@ function renderProjectDetail(mount) {
 const MISSION_LANES = ['proposed', 'sandboxed', 'in_review', 'approved', 'integrated', 'deployed', 'rejected', 'rolled_back'];
 
 async function loadMissions() {
-  const data = await api('/dashboard/tasks');
-  state.missions = data.tasks ?? [];
+  await trackedRead('missions', async () => {
+    const data = await api('/dashboard/tasks');
+    state.missions = data.tasks ?? [];
+  });
 }
 
 function renderMissionsTab(mount) {
@@ -806,8 +1070,10 @@ function renderMissionDetail(mount) {
 // ─── Activity tab ────────────────────────────────────────────────────────────
 
 async function loadActivity() {
-  const data = await api('/dashboard/activity');
-  state.activity = data.activity ?? [];
+  await trackedRead('activity', async () => {
+    const data = await api('/dashboard/activity');
+    state.activity = data.activity ?? [];
+  });
 }
 
 function renderActivityTab(mount) {
@@ -970,8 +1236,10 @@ function renderTemplateDetail(mount) {
 // ─── Analytics tab ───────────────────────────────────────────────────────────
 
 async function loadCosts() {
-  const data = await api('/dashboard/costs');
-  state.costs = data;
+  await trackedRead('costs', async () => {
+    const data = await api('/dashboard/costs');
+    state.costs = data;
+  });
 }
 
 function renderAnalyticsTab(mount) {
@@ -1099,7 +1367,11 @@ async function boot() {
   if (!state.session) return;
 
   await guarded(async () => {
-    await Promise.all([loadProjects(), loadMissions(), loadActivity(), loadL99(), loadPromptTemplates(), loadCosts(), loadAgents(), loadAuthorityLevels()]);
+    // Let every read settle so a single failure cannot freeze the others at
+    // their pre-load state; then surface every failure in one banner.
+    const results = await Promise.allSettled([loadProjects(), loadMissions(), loadActivity(), loadL99(), loadPromptTemplates(), loadCosts(), loadAgents(), loadAuthorityLevels()]);
+    const failures = results.filter((r) => r.status === 'rejected').map((r) => (r.reason instanceof Error ? r.reason.message : String(r.reason)));
+    if (failures.length > 0) throw new Error([...new Set(failures)].join(' · '));
   });
 }
 
