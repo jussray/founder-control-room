@@ -58,12 +58,14 @@ describe('runtime stop evidence', () => {
       boundaries: [
         { boundary: 'CLIENT', received: 'VERIFIED', forwarded: 'VERIFIED', evidenceRefs: ['client:req'] },
         { boundary: 'PROVIDER_API', received: 'VERIFIED', forwarded: 'VERIFIED', evidenceRefs: ['provider:req_123'] },
-        { boundary: 'MODEL', received: 'VERIFIED', forwarded: 'FAILED', evidenceRefs: ['model:completion'] },
+        { boundary: 'MODEL', received: 'VERIFIED', forwarded: 'VERIFIED', evidenceRefs: ['model:completion'] },
+        { boundary: 'POST_PROCESSING', received: 'VERIFIED', forwarded: 'VERIFIED', evidenceRefs: ['response:delivered'] },
       ],
       authorization: { state: 'AUTHORIZED', evidenceRefs: ['authority:separate-approval'] },
     }));
 
     expect(diagnosis.classification).toBe('MODEL_REFUSAL');
+    expect(diagnosis.lastVerifiedBoundary).toBe('POST_PROCESSING');
     expect(diagnosis.stoppedAt).toBe('MODEL');
     expect(diagnosis.authorization.state).toBe('AUTHORIZED');
   });
@@ -102,6 +104,7 @@ describe('runtime stop evidence', () => {
     }));
 
     expect(diagnosis.classification).toBe('MONITORED_STOP_AFTER_ACTION');
+    expect(diagnosis.stoppedAt).toBe('TOOL');
     expect(diagnosis.toolEffects.changed).toBe(true);
     expect(diagnosis.toolEffects.rollbackProven).toBe(false);
     expect(diagnosis.work.complete).toBe(false);
