@@ -2,7 +2,7 @@
 
 Status: **source contract candidate**
 Owner: Founder Control Room
-Applies to: OpenAI Advanced Cyber Deployment training inputs, Codex Security scan evidence, Daybreak Blue / Daybreak Red evidence, GitHub Actions security artifacts, and future provider readback adapters.
+Applies to: OpenAI Advanced Cyber Deployment training inputs, Codex Security scan evidence, Daybreak Blue / Daybreak Red evidence, GitHub Actions security artifacts, application-security workflows, runtime stop/refusal evidence, and future provider readback adapters.
 
 ## Decision
 
@@ -21,14 +21,25 @@ external training / provider capability
 
 Codex Security and Daybreak are therefore **evidence/capability providers**, not a second control plane.
 
+## Secure SDLC / AppSec fit
+
+Security belongs inside the software-delivery loop rather than being deferred until production. FCR treats these as representative pre-ship security workflows:
+
+1. **continuous code scanning** — scan current source/candidate state and bind findings to the exact repository, head, and scope;
+2. **scanning in a test environment** — observe the built/running candidate in a bounded non-production environment and keep runtime evidence separate from source evidence;
+3. **security-finding validation** — independently confirm whether a reported finding is reproducible, applicable, stale, false-positive, or still `UNKNOWN`;
+4. **security patch automation** — propose or apply the smallest bounded repair only through separately granted write authority, then reacquire exact-head and runtime proof.
+
+A scanner result can supply evidence. It cannot grant merge, deploy, remediation, provider-write, or production authority. Automated patching must preserve the exact finding, changed files, diff identity, tests, rollback, and the authority receipt that allowed the write.
+
 ## Current implementation state
 
 ```text
-contract-capable           yes — bounded receipt evaluator exists in source
-configured / allowlisted   no — no live Codex Security provider route is configured here
-adapter-proven             source/unit-test only
-provider-outcome-proven    no
-merge-authority            unchanged / separately gated
+contract-capable            yes — bounded receipt evaluator + runtime-stop diagnosis exist in source
+configured / allowlisted    no — no live Codex Security provider route is configured here
+adapter-proven              source/unit-test only
+provider-outcome-proven     no
+merge-authority             unchanged / separately gated
 production-deploy-authority unchanged / separately gated
 ```
 
@@ -64,6 +75,91 @@ The adapter keeps these evidence planes distinct:
 | provider readback | `provider-observation` | the provider reported the normalized scan state for the bound subject |
 
 Neither proof level by itself proves merge approval, deploy approval, external-write approval, runtime safety, remediation success, or a user/business outcome.
+
+## Runtime stop/refusal evidence
+
+`src/lib/runtimeStopEvidence.ts` implements the evidence-first stop contract.
+
+Before interpreting a refusal, error, monitor stop, or tool failure, preserve the internal evidence record containing:
+
+- the exact request;
+- selected model;
+- product surface;
+- organization and user references;
+- intended defensive outcome;
+- the actual notice, error, or response rather than a remembered template;
+- available request IDs and timing;
+- boundary-by-boundary receive/forward evidence;
+- which tools ran;
+- what those tools changed;
+- rollback references when they exist; and
+- which requested work is complete versus incomplete.
+
+The exact request/response remain private evidence. A review packet must be redacted through the approved review route: no credentials, no raw request/response by default, no unnecessary organization/user identifiers, and no unrelated sensitive content.
+
+### Diagnose where the request stopped
+
+Use the ordered execution chain:
+
+```text
+CLIENT
+-> EDGE
+-> APPLICATION
+-> PROVIDER_API
+-> MODEL
+-> TOOL
+-> POST_PROCESSING
+```
+
+For each boundary, record `received`, `forwarded`, and evidence references. Diagnose the **last boundary proven to have received the request** and the **first transition whose successful forward progress is not proven**. Do not infer the producer of a customer-visible response from text alone.
+
+A refusal-looking message does not prove a model refusal. A model refusal requires independent evidence that model execution occurred and that the completion itself produced the refusal. An upstream service error remains a possible system-refusal path when model execution is not proven.
+
+### Real-world stop examples
+
+**Example A — upstream outcome**
+
+An engineer submits a defensive request about an owned staging system and receives a service error instead of a useful completion. Preserve the exact request, status/error, selected model, organization/user context, intended defensive outcome, request IDs, timing, and boundary evidence. Classify it as a **possible system-refusal path** unless model execution is independently proven. Do not attribute it to the model from HTTP status or message text.
+
+**Example B — model response**
+
+A request reaches the model and the completion declines to execute an exploit against a live target while redirecting toward defensive validation/remediation. When model execution and the model completion are both evidenced, classify it as a **model-refusal path**. Preserve the request, completion, identity context, intended outcome, and request/trace evidence.
+
+**Example C — monitored stop after an action**
+
+An approved security review is stopped by monitoring after a tool writes a file. Preserve the monitor error, request IDs, tool record, exact changed-file evidence, and remaining incomplete work. The stop does not complete the review and does not restore the file. Reconcile the file change with the responsible operator. **Do not automatically resubmit the blocked workflow.**
+
+## Refusal behavior does not define authorization
+
+None of the signals above establishes whether the work was authorized.
+
+```text
+observed runtime behavior != authorization state
+```
+
+Diagnose what happened first. Review what actually changed second. Make the authorization judgment separately from current authority evidence.
+
+Therefore all of these combinations are valid and must remain representable:
+
+- authorized request + provider/system refusal;
+- authorized request + model refusal;
+- authorized request + monitored stop after a partial write;
+- unauthorized request + ordinary response;
+- unknown authorization + refusal/error/stop.
+
+Never infer authorization from a refusal, acceptance, successful tool call, provider status, model completion, monitor stop, or customer-visible wording. Authorization must come from the separate authority plane and remain bound to exact scope, subject, action, freshness, and replay rules.
+
+## Stop response protocol
+
+When a security workflow stops unexpectedly:
+
+1. **Preserve** the exact internal request/response evidence and request IDs before normalization.
+2. **Diagnose** last verified boundary + first unproven transition without guessing the producer.
+3. **Reconcile side effects** by inspecting every tool invocation and changed artifact. A stop never implies rollback.
+4. **Mark incomplete work** explicitly. A partial action is not a completed review.
+5. **Evaluate authorization separately** from runtime behavior and security classification.
+6. **Do not blind-retry** an ambiguous or monitored stop, especially after a mutation. Reconcile before retry.
+7. **Share only a redacted review record** through the approved review route, excluding credentials and unnecessary sensitive content.
 
 ## Terminal-state semantics
 
@@ -140,12 +236,18 @@ Use these classifications as course material arrives:
 
 The initial baseline is:
 
-| OpenAI cyber-deployment theme | Current decision |
+| OpenAI cyber-deployment / AppSec theme | Current decision |
 | --- | --- |
+| secure SDLC / pre-ship AppSec | `ADAPT` into existing exact-head + runtime proof planes |
+| continuous code scanning | `ADAPT` as exact-subject scan evidence |
+| test-environment scanning | `ADAPT` as bounded runtime evidence distinct from source proof |
+| finding validation | `ALREADY HAVE` evidence/review primitives; extend per provider as needed |
+| security patch automation | `ADAPT` behind separate write authority + rollback + successor proof |
 | explicit scope + human approval | `ALREADY HAVE` |
 | bounded external writes | `ALREADY HAVE` |
 | proof / provenance / stale-evidence handling | `ALREADY HAVE` |
 | recovery / rollback | `ALREADY HAVE` |
+| runtime stop/refusal diagnosis | `ADOPT` as `juss/runtime-stop-evidence@v1` |
 | GitHub PR proof gates | `ADAPT` only where new evidence is additive |
 | Codex Security normalized evidence | `ADOPT` as this bounded proof contract |
 | live Codex Security provider adapter | `WAIT` until provider surface is observed |
@@ -158,6 +260,8 @@ Focused source proof lives in:
 
 - `src/lib/codexSecurityProofAdapter.ts`
 - `src/lib/__tests__/codexSecurityProofAdapter.test.ts`
+- `src/lib/runtimeStopEvidence.ts`
+- `src/lib/__tests__/runtimeStopEvidence.test.ts`
 
 The tests cover:
 
@@ -168,14 +272,21 @@ The tests cover:
 - undeclared/unapproved external-write evidence rejection;
 - false-green resistance for failed/cancelled scans;
 - findings -> verified evidence + hold;
-- provider-observation vs exact-head proof separation; and
-- malformed digest/time evidence rejection.
+- provider-observation vs exact-head proof separation;
+- malformed digest/time evidence rejection;
+- upstream error vs model-refusal separation;
+- producer attribution remaining unknown without model evidence;
+- monitored stop after a tool mutation preserving side-effect truth;
+- incomplete work remaining incomplete after a stop;
+- no automatic resubmission after monitored stop;
+- refusal behavior remaining independent from authorization state; and
+- redacted review records omitting raw request/response and direct organization/user identifiers.
 
 ## Rollback
 
-Before merge: close the carrier branch/PR. `main` remains unchanged.
+Before merge: discard the focused candidate branch. `main` remains unchanged.
 
-After a lawful merge: revert the focused adapter, tests, and this document. No provider-side rollback is implied because this source contract performs no provider mutation.
+After a lawful merge: revert the focused adapter, runtime-stop contract, tests, and this document. No provider-side rollback is implied because this source contract performs no provider mutation.
 
 ## Next gate
 
