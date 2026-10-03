@@ -164,7 +164,21 @@ export function validateOperatorRelayResponse(value: OperatorRelayResponseV1, re
   if (value.answer.length > 20_000) errors.push('response answer exceeds 20000 characters');
   if (value.status === 'completed' && normalizedList(value.evidenceRefs).length === 0) errors.push('completed response requires provider evidence');
   if (value.authorityRequested !== 'none') errors.push('relay response cannot request authority');
-  if (!Number.isFinite(Date.parse(value.completedAt))) errors.push('completedAt must be RFC3339-compatible');
+
+  const completedAt = Date.parse(value.completedAt);
+  const createdAt = Date.parse(request.createdAt);
+  const expiresAt = Date.parse(request.expiresAt);
+  if (!Number.isFinite(completedAt)) {
+    errors.push('completedAt must be RFC3339-compatible');
+  } else {
+    if (Number.isFinite(createdAt) && completedAt < createdAt) {
+      errors.push('relay response completed before request creation');
+    }
+    if (Number.isFinite(expiresAt) && completedAt > expiresAt) {
+      errors.push('relay response completed after request expiry');
+    }
+  }
+
   if (!SHA256.test(value.responseHash ?? '')) errors.push('responseHash must be sha256');
   if (errors.length === 0) {
     const { responseHash: _responseHash, ...identity } = value;
