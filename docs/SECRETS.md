@@ -95,6 +95,7 @@ The former `founder-control-room2` Worker was deleted and must not be recreated 
 | `FOUNDER_ALLOWED_ORIGINS` | non-secret variable | `https://foundercontrolroom.org`. |
 | `FOUNDER_API_URL` | non-secret variable | `https://foundercontrolroom.org` so auth callbacks return through Pages and are proxied to the API Worker. |
 | `FCR_SHOPIFY_WEBHOOK_SECRET` | secret | Required Shopify `orders/paid` HMAC signing secret for the FCR first-party commerce ingress. Provider-held; never log or copy its value into proof. |
+| `FCR_WHOP_WEBHOOK_SECRET` | secret | Required Whop Standard Webhooks signing secret for `POST /webhooks/whop/fcr/payments-succeeded`. Provider-held in the canonical Worker secret store; checked-in name presence does not prove provider registration, runtime installation, or signed delivery. |
 | `FCR_COMMERCE_HASH_SALT` | secret | Required independent server-only salt for privacy-safe FCR Shopify order-reference HMACs. This marker creates no Shopify authority. |
 | `TINYFISH_API_KEY` | secret | Required provider-held credential for live `tinyfish-web-observation-v1` Search/Fetch. Canonical production deploy verifies only binding-name presence before mutation; the value remains in Cloudflare and never becomes a GitHub Actions secret or proof receipt. |
 | `FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON` | secret | Scoped, revocable, fail-closed automation grant. |
@@ -111,6 +112,8 @@ The former `founder-control-room2` Worker was deleted and must not be recreated 
 The Founder Content n8n source lane is Buffer-only and schedule-only. `N8N_FOUNDER_CONTENT_ENABLED=true` is source intent, not runtime proof. A production claim requires exact-main deployment, provider-held secret-name readback, exact `fcrFounderContentV1` workflow fingerprint and n8n `2.32.6` identity, plus provider-native Buffer readback. n8n acceptance never establishes final publication truth.
 
 The Worker intentionally fails closed when required bindings are absent, empty, malformed, or when the GitHub App pair is incomplete. Do not weaken `validateWorkerEnv` to bypass provider configuration. TinyFish remains route-level fail-closed if its provider-held key is later removed.
+
+For the Whop commerce lane, source route wiring and the `FCR_WHOP_WEBHOOK_SECRET` declaration prove configuration intent only. Production truth additionally requires provider-side webhook registration, Worker binding-name readback without exposing the value, the provider-neutral commerce migration, and a valid signed delivery/readback. Checkout completion and collected revenue require separate runtime/outcome evidence.
 
 Generate `FOUNDER_SESSION_ENCRYPTION_KEY` as exactly 32 random bytes encoded as unpadded base64url, for example:
 
@@ -225,6 +228,7 @@ The client-ID names above are shared recovery/runtime-witness selectors; the cli
 [ ] FOUNDER_ALLOWED_ORIGINS=https://foundercontrolroom.org
 [ ] FOUNDER_API_URL=https://foundercontrolroom.org
 [ ] FCR_SHOPIFY_WEBHOOK_SECRET (provider-held Shopify HMAC secret)
+[ ] FCR_WHOP_WEBHOOK_SECRET (provider-held Whop Standard Webhooks signing secret)
 [ ] FCR_COMMERCE_HASH_SALT (independent server-only order-reference HMAC salt)
 [ ] TINYFISH_API_KEY (provider-held; required before live TinyFish activation)
 [ ] FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON

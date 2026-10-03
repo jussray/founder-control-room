@@ -238,3 +238,10 @@ Current executable source and authoritative provider readback outrank an older v
 - Access: roll back only an incomplete or ambiguous browser-destination detachment using the receipt-bound original destination set and unchanged application/policy identity; a later runtime/browser failure alone must not automatically reintroduce a Cloudflare Access product-login screen.
 - Credentials: remove/revoke only the affected credential; do not rotate unrelated keys to repair binding drift.
 - Preserve build logs, deployment IDs, provider readback, browser traces, and runtime receipts.
+
+
+### Whop commerce ingress
+
+The canonical `founder-control-room` API Worker is the only intended runtime target for the Whop commerce witness route `POST /webhooks/whop/fcr/payments-succeeded`. The provider signing value is held as the Worker secret `FCR_WHOP_WEBHOOK_SECRET`; it is not a Pages variable, browser secret, GitHub Actions substitute, or product-wide credential.
+
+Repository declaration, route mounting, and exact-head CI are source/configuration evidence only. Production activation additionally requires provider-side Whop webhook registration, observed Worker secret-name presence, the additive external-commerce migration, at least one valid signed delivery/readback, and separate browser/runtime evidence for any checkout-return claim. No Whop provider state may be inferred from source configuration alone.

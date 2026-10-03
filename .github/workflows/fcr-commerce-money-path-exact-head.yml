@@ -7,13 +7,16 @@ on:
       - 'src/fcrCommerce/**'
       - 'src/http/fcrCommerceIngress.ts'
       - 'src/http/webhooks/shopifyFcrCommerce.ts'
+      - 'src/http/webhooks/whopFcrCommerce.ts'
       - 'src/http/webhooks/__tests__/shopifyFcrCommerce.test.ts'
+      - 'src/http/webhooks/__tests__/whopFcrCommerce.test.ts'
       - 'src/config/projectShells.ts'
       - 'src/config/__tests__/projectShells.test.ts'
       - 'src/index.ts'
       - 'src/worker/cf-entry.ts'
       - 'supabase/migrations/20260920030000_fcr_commerce_receipts.sql'
       - 'supabase/migrations/20260920031500_fcr_commerce_event_identity.sql'
+      - 'supabase/migrations/20261003010000_provider_neutral_commerce_receipts.sql'
       - 'wrangler.worker.toml'
       - '.github/workflows/fcr-commerce-money-path-exact-head.yml'
   workflow_dispatch:
@@ -27,7 +30,7 @@ env:
 
 jobs:
   proof:
-    name: FCR Shopify Money Path Exact-Head Proof
+    name: FCR Commerce Money Path Exact-Head Proof
     runs-on: ubuntu-22.04
     timeout-minutes: 20
     steps:
@@ -54,27 +57,32 @@ jobs:
       - name: Focused FCR commerce and shell tests
         run: >-
           npx vitest run
+          src/fcrCommerce/__tests__/whopMoneyPath.test.ts
           src/http/webhooks/__tests__/shopifyFcrCommerce.test.ts
+          src/http/webhooks/__tests__/whopFcrCommerce.test.ts
           src/config/__tests__/projectShells.test.ts
 
-      - name: Prove raw webhook boundary is mounted in both runtimes
+      - name: Prove raw webhook boundaries are mounted in both runtimes
         run: |
           grep -F "mountFcrCommerceIngress(app);" src/index.ts
           grep -F "mountFcrCommerceIngress(app);" src/worker/cf-entry.ts
           grep -F "'/webhooks/shopify/fcr/orders-paid'" src/http/fcrCommerceIngress.ts
+          grep -F "'/webhooks/whop/fcr/payments-succeeded'" src/http/fcrCommerceIngress.ts
 
       - name: Prove canonical FCR database and runtime-secret boundary
         run: |
           grep -F "../../lib/supabaseClient.js" src/http/webhooks/shopifyFcrCommerce.ts
+          grep -F "../../lib/supabaseClient.js" src/http/webhooks/whopFcrCommerce.ts
           grep -F '"FCR_SHOPIFY_WEBHOOK_SECRET",' wrangler.worker.toml
+          grep -F '"FCR_WHOP_WEBHOOK_SECRET",' wrangler.worker.toml
           grep -F '"FCR_COMMERCE_HASH_SALT",' wrangler.worker.toml
           node scripts/verify-production-deploy-authority.mjs
 
-      - name: Prove privacy-safe additive and provider-event-idempotent ledger
+      - name: Prove privacy-safe additive and provider-event-idempotent ledgers
         run: |
           grep -F "CREATE TABLE IF NOT EXISTS public.fcr_commerce_receipts" supabase/migrations/20260920030000_fcr_commerce_receipts.sql
-          grep -F "CREATE UNIQUE INDEX IF NOT EXISTS fcr_commerce_receipts_order_event_uidx" supabase/migrations/20260920030000_fcr_commerce_receipts.sql
-          grep -F "ADD COLUMN IF NOT EXISTS event_id UUID" supabase/migrations/20260920031500_fcr_commerce_event_identity.sql
           grep -F "CREATE UNIQUE INDEX IF NOT EXISTS fcr_commerce_receipts_provider_event_uidx" supabase/migrations/20260920031500_fcr_commerce_event_identity.sql
-          grep -F "ALTER TABLE public.fcr_commerce_receipts ENABLE ROW LEVEL SECURITY" supabase/migrations/20260920030000_fcr_commerce_receipts.sql
-          ! grep -Eiq 'customer_(name|email|phone)|shipping_address|payment_instrument|raw_order' supabase/migrations/20260920030000_fcr_commerce_receipts.sql supabase/migrations/20260920031500_fcr_commerce_event_identity.sql
+          grep -F "CREATE TABLE IF NOT EXISTS public.fcr_external_commerce_receipts" supabase/migrations/20261003010000_provider_neutral_commerce_receipts.sql
+          grep -F "CREATE UNIQUE INDEX IF NOT EXISTS fcr_external_commerce_provider_event_uidx" supabase/migrations/20261003010000_provider_neutral_commerce_receipts.sql
+          grep -F "ALTER TABLE public.fcr_external_commerce_receipts ENABLE ROW LEVEL SECURITY" supabase/migrations/20261003010000_provider_neutral_commerce_receipts.sql
+          ! grep -Eiq 'customer_(name|email|phone)|shipping_address|payment_instrument|raw_order' supabase/migrations/20261003010000_provider_neutral_commerce_receipts.sql
