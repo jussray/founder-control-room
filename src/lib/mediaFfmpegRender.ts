@@ -1,17 +1,17 @@
 import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { createReadStream, existsSync } from 'node:fs';
-import { copyFile, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { copyFile, mkdtemp, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { isAbsolute, join } from 'node:path';
+import { extname, isAbsolute, join } from 'node:path';
 
 /**
  * First-party local-process post adapter (ffmpeg).
  *
  * This module renders declared graphic timelines into MP4 files. A successful
- * result binds the exact declared inputs and source bytes to an input
- * fingerprint, then binds the rendered bytes to a sha256 digest and ffprobe
- * readback. It does not grant truth, release, or publication authority.
+ * result binds the exact declared inputs and snapshotted source bytes to an
+ * input fingerprint, then binds the rendered bytes to a sha256 digest and
+ * ffprobe readback. It does not grant truth, release, or publication authority.
  *
  * Runtime scope is intentionally LOCAL_PROCESS: Cloudflare Worker code cannot
  * execute child processes. Router/runtime wiring is a separate gate.
@@ -104,6 +104,7 @@ const MAX_TEXT = 200;
 const MAX_SEGMENTS = 40;
 const MAX_LINES_PER_SEGMENT = 12;
 const MAX_EDGE_FADE_SEC = 5;
+const MAX_PIXEL_FRAMES = 1920 * 1080 * 60 * 120;
 const FILTER_SAFE_PATH = /^\/[A-Za-z0-9_./ -]+$/;
 const FONT_CANDIDATES = [
   '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
@@ -215,6 +216,7 @@ export function validateTimelineSpec(spec: FfmpegTimelineSpec): string | null {
     }
   }
   if (total > MAX_TOTAL_SEC) return `total duration must be <= ${MAX_TOTAL_SEC}s`;
+  if (spec.width * spec.height * spec.fps * total > MAX_PIXEL_FRAMES) return 'timeline exceeds the bounded local render-work ceiling';
   if (spec.frameColor !== undefined && !HEX.test(spec.frameColor)) return 'frameColor must be #rrggbb';
   if (spec.audio && (
     !Number.isFinite(spec.audio.bpm)
@@ -340,15 +342,32 @@ export async function probeVideo(path: string): Promise<FfmpegProbeSummary | nul
   }
 }
 
-async function fingerprintSourceAssets(spec: FfmpegTimelineSpec): Promise<FfmpegSourceAssetFingerprint[]> {
-  const fingerprints: FfmpegSourceAssetFingerprint[] = [];
+function safeSnapshotExtension(path: string): string {
+  const extension = extname(path).toLowerCase();
+  return /^\.[a-z0-9]{1,8}$/.test(extension) ? extension : '.asset';
+}
+
+async function snapshotSourceAssets(
+  spec: FfmpegTimelineSpec,
+  dir: string,
+): Promise<{ renderSpec: FfmpegTimelineSpec; sourceAssets: FfmpegSourceAssetFingerprint[] }> {
+  const sourceAssets: FfmpegSourceAssetFingerprint[] = [];
+  const segments: FfmpegSegment[] = [];
   for (const [segmentIndex, segment] of spec.segments.entries()) {
-    if (!segment.imagePath) continue;
-    const info = await stat(segment.imagePath);
-    if (!info.isFile()) throw new Error(`segment ${segmentIndex}: imagePath must resolve to a regular file`);
-    fingerprints.push({ segmentIndex, sha256: await sha256File(segment.imagePath), bytes: info.size });
+    if (!segment.imagePath) {
+      segments.push({ ...segment });
+      continue;
+    }
+    const sourceInfo = await stat(segment.imagePath);
+    if (!sourceInfo.isFile()) throw new Error(`segment ${segmentIndex}: imagePath must resolve to a regular file`);
+    const snapshotPath = join(dir, `source-${segmentIndex}${safeSnapshotExtension(segment.imagePath)}`);
+    await copyFile(segment.imagePath, snapshotPath);
+    const snapshotInfo = await stat(snapshotPath);
+    const fingerprint = { segmentIndex, sha256: await sha256File(snapshotPath), bytes: snapshotInfo.size };
+    sourceAssets.push(fingerprint);
+    segments.push({ ...segment, imagePath: snapshotPath });
   }
-  return fingerprints;
+  return { renderSpec: { ...spec, segments }, sourceAssets };
 }
 
 function inputFingerprint(spec: FfmpegTimelineSpec, sourceAssets: readonly FfmpegSourceAssetFingerprint[], fonts: FfmpegFontFingerprints): string {
@@ -403,16 +422,16 @@ export async function renderFfmpegTimelineV1(spec: FfmpegTimelineSpec, outputPat
       regularSha256: await sha256File(fontRegular),
       boldSha256: await sha256File(fontBold),
     };
-    const sourceAssets = await fingerprintSourceAssets(spec);
+    const { renderSpec, sourceAssets } = await snapshotSourceAssets(spec, dir);
     const declaredInputFingerprint = inputFingerprint(spec, sourceAssets, fonts);
 
-    const base = Math.min(spec.width, spec.height);
+    const base = Math.min(renderSpec.width, renderSpec.height);
     const textFiles: string[][] = [];
-    for (const [i, seg] of spec.segments.entries()) {
+    for (const [i, seg] of renderSpec.segments.entries()) {
       const files: string[] = [];
       for (const [j, line] of seg.lines.entries()) {
         const px = Math.max(12, Math.round(line.sizeFrac * base));
-        const maxChars = Math.max(6, Math.floor((spec.width * 0.84) / (px * 0.62)));
+        const maxChars = Math.max(6, Math.floor((renderSpec.width * 0.84) / (px * 0.62)));
         const file = join(dir, `t-${i}-${j}.txt`);
         await writeFile(file, wrapText(line.text, maxChars), 'utf8');
         files.push(file);
@@ -420,7 +439,7 @@ export async function renderFfmpegTimelineV1(spec: FfmpegTimelineSpec, outputPat
       textFiles.push(files);
     }
 
-    const args = buildFfmpegArgs(spec, { outputPath, textFiles, fontRegular, fontBold });
+    const args = buildFfmpegArgs(renderSpec, { outputPath, textFiles, fontRegular, fontBold });
     const res = await run('ffmpeg', args, 10 * 60_000);
     if (res.code !== 0) return { kind: 'FAILED', code: 'FFMPEG_EXIT', safeMessage: res.stderr.slice(0, 500) };
 
