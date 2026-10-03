@@ -73,6 +73,11 @@ function isRecord(value: unknown): value is JsonRecord {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
+function recordsFrom(value: unknown): JsonRecord[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter(isRecord);
+}
+
 function text(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
 }
@@ -242,7 +247,7 @@ founderAuthorityReceiptsRouter.get(
     if (error) {
       return res.status(503).json({ valid: false, code: 'FOUNDER_AUTHORITY_STORE_UNAVAILABLE' });
     }
-    const rows = Array.isArray(data) ? data.filter(isRecord) : [];
+    const rows = recordsFrom(data);
     if (rows.length === 0) {
       return res.json({ valid: false, code: 'FOUNDER_AUTHORITY_RECEIPT_NOT_FOUND' });
     }
