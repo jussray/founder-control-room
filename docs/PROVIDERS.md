@@ -62,6 +62,12 @@ This preserves separate membranes instead of weakening either one: the current f
 
 The signed GitHub webhook surface uses `GITHUB_WEBHOOK_SECRET` to verify `X-Hub-Signature-256` before accepting provider events. Private keys and webhook secrets never belong in source, PR bodies, issue comments, logs, screenshots, browser bundles, or chat-visible documentation.
 
+### Repository base-health gate
+
+`src/providers/SecurityPreservingGitHubProvider.ts` now makes exact-head health a prerequisite for repository patching. Current verification signals are reduced to one latest signal per name for the exact 40-character head SHA and classified as `VERIFIED_CLEAN`, `KNOWN_BAD`, or `UNVERIFIED`. An exact-head failure/cancellation is `KNOWN_BAD`; queued/running/unknown evidence or no passing exact-head signal is `UNVERIFIED`.
+
+Ordinary forward patches must be rejected unless the exact head is `VERIFIED_CLEAN`. A `KNOWN_BAD` head may accept only a repair whose message begins `repair-base:<exact-head-sha>`, binding the corrective write to the failed state being repaired. Stale repair markers and repair markers on clean/unverified heads must be rejected. The marker is repair intent only: it does not grant merge, deploy, publication, provider-policy, or founder authority, and normal work must remain blocked until the repair successor receives fresh exact-head clean verification.
+
 ## Supabase
 
 Owns Control Room authentication and operational storage inside this project's separate trust boundary. Service-role credentials stay server-side. Founder access requires session validation plus allowlist authorization.

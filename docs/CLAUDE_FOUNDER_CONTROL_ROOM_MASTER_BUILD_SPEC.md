@@ -18,15 +18,19 @@ Claude must treat `docs/FOUNDER_CONTROL_ROOM_AND_CHIEF_AI_MASTER_BUILD_SPEC.md` 
 
 This file is a Claude execution overlay. It does not fork, weaken, summarize away, or replace either canonical contract. If this overlay conflicts with the canonical execution workflow, the canonical workflow wins for execution order, verification separation, exact-head merge gating, founder-final authority, and post-merge truth.
 
-Claude must also obey `CLAUDE.md`, `AGENTS.md`, `GLOBAL_AI.md`, `docs/FOUNDER_MERGE_AUTHORITY.md`, `docs/PORTABLE_FOUNDER_APPROVALS.md`, and the repository's existing security, privacy, evidence, and rollback contracts.
+Claude, Claude Code, and Cowork must also obey `CLAUDE.md`, `AGENTS.md`, `GLOBAL_AI.md`, `.control-room/COUNCIL.md`, `docs/FOUNDER_MERGE_AUTHORITY.md`, `docs/PORTABLE_FOUNDER_APPROVALS.md`, and the repository's existing security, privacy, evidence, and rollback contracts.
+
+The historical `Target branch` metadata above is provenance, not standing branch authority. At session time, resolve the actual authoritative repository, target branch, working branch, base, and exact current head from GitHub before acting.
 
 ---
 
 ## 1. Mission
 
-Use Claude, Claude Code, and connected MCP tools as a bounded implementation operator for Founder Control Room + Chief AI.
+Use Claude, Claude Code, Cowork, and connected MCP tools as bounded implementation operators for Founder Control Room + Chief AI.
 
-Claude may inspect, reason, patch, test, review, and prepare evidence within the exact authority exposed by the current session. Claude must never convert tool availability into permission.
+Claude/Cowork may inspect, reason, patch, test, review, and prepare evidence within the exact authority exposed by the current session. Tool or workspace availability never becomes permission.
+
+Cowork is a governed work surface, not a second repository or source of truth. For repository work it must resolve the same current GitHub repository/branch/head used by the Council, reconcile working context against that source, and return changes/proof through the applicable GitHub commit/PR/check path plus the FCR evidence receipt. If current GitHub identity or access cannot be observed, report `UNKNOWN` or `BLOCKED` rather than implying synchronization.
 
 The objective is production-grade implementation with the smallest reversible verified change, not speculative rewrites or parallel architecture.
 
@@ -40,9 +44,10 @@ Before any nontrivial implementation, first load the repository entry contract i
 2. `AGENTS_FOUNDER_INTELLIGENCE.md`
 3. `.agents/skills/founder-control-room-operator/SKILL.md`
 4. `GLOBAL_AI.md`
-5. `docs/FOUNDER_MERGE_AUTHORITY.md`
-6. `skills/portfolio-control-plane/SKILL.md`
-7. the additional task-specific skills required by `AGENTS.md`
+5. `.control-room/COUNCIL.md`
+6. `docs/FOUNDER_MERGE_AUTHORITY.md`
+7. `skills/portfolio-control-plane/SKILL.md`
+8. the additional task-specific skills required by `AGENTS.md`
 
 After that repository preflight, continue narrowly in this order:
 
@@ -80,7 +85,7 @@ Founder Intent
 -> Recover / Learn / Next Gate
 ```
 
-Within that lane, Claude must apply the expanded reasoning semantics required by `AGENTS.md`, including Product Design, Data Analytics, Redteam I, Lindy, L99, OODA, Hormozi, Bill Gates, Elon Musk, Redteam II, and Documentation Truth when applicable.
+Within that lane, Claude/Cowork must apply the expanded reasoning semantics required by `AGENTS.md`, including Product Design, Data Analytics, Redteam I, Lindy, L99, OODA, Hormozi, Bill Gates, Elon Musk, Redteam II, and Documentation Truth when applicable.
 
 The checklist below is a Claude-specific implementation aid only. It may not replace, reorder away, or omit the canonical Builder → Independent Verifier → Independent Red Team → exact-head merge gate → Founder Final → final mutable reread → post-merge truth sequence.
 
@@ -106,9 +111,9 @@ Translate `/goalfix` into this concrete loop:
 
 ## 4. Claude tool policy
 
-Connected MCP tools are capability surfaces, not blanket authority.
+Connected MCP tools and Cowork integrations are capability surfaces, not blanket authority.
 
-Claude may use an exposed tool only when all of the following are true:
+Claude/Cowork may use an exposed tool only when all of the following are true:
 
 - it is necessary for the current goal;
 - the tool action is within the current founder-approved scope;
@@ -119,15 +124,15 @@ Claude may use an exposed tool only when all of the following are true:
 
 ### Read operations
 
-Prefer exact repository, PR, CI, provider, and runtime reads over recollection.
+Prefer exact repository, PR, CI, provider, and runtime reads over recollection or workspace copies.
 
 ### Repository writes
 
-Use focused diffs. No unrelated refactors. Never create duplicate replacement branches to escape repair of the canonical change path.
+Use focused diffs. No unrelated refactors. Never create duplicate replacement branches to escape repair of the canonical change path. Cowork repository writes must return to the same GitHub authority path rather than remaining workspace-only.
 
 ### Merge
 
-A green patch is not self-authorizing. `merge_authority: true` means merge capability exists, not that the current candidate is approved. Before every merge, Claude must have fresh explicit founder approval bound to the exact repository, PR, current base SHA, and current head SHA. If absent, ambiguous, or stale, Claude must ask and stop. Any base/head movement expires the approval.
+A green patch is not self-authorizing. `merge_authority: true` means merge capability exists, not that the current candidate is approved. Before every merge, Claude/Cowork must have fresh explicit founder approval bound to the exact repository, PR, current base SHA, and current head SHA. If absent, ambiguous, or stale, Claude/Cowork must ask and stop. Any base/head movement expires the approval.
 
 ### Production or external writes
 
@@ -137,7 +142,7 @@ Deployment, DNS, credentials, auth/RLS, billing, destructive changes, publicatio
 
 ## 5. Implementation discipline
 
-Claude must continue reasoning while editing. Do not perform a thoughtful audit and then switch to broad autonomous coding.
+Claude/Cowork must continue reasoning while editing. Do not perform a thoughtful audit and then switch to broad autonomous coding.
 
 For code changes:
 
@@ -183,13 +188,15 @@ Every material change must be traceable to:
 - known risk;
 - rollback path.
 
+Cowork work is not durable repository proof until its applicable GitHub commit/PR/check evidence exists and is bound to the same current repository/branch/head.
+
 Never report "green", "live", "fixed", "merged", or "deployed" without the evidence matching that exact claim.
 
 ---
 
 ## 8. Cross-agent handoff
 
-Claude may consume research from Perplexity MCP and implementation/review artifacts from Codex, but must not inherit their conclusions as proof.
+Claude/Cowork may consume research from Perplexity MCP and implementation/review artifacts from Codex, but must not inherit their conclusions as proof.
 
 Before acting on another agent's output:
 
@@ -198,7 +205,7 @@ Before acting on another agent's output:
 3. distinguish recommendation from executable authority;
 4. reproduce the narrowest critical proof when feasible.
 
-Claude may produce a handoff packet for Codex or Perplexity with:
+Claude/Cowork may produce a handoff packet for Codex or Perplexity with:
 
 ```text
 GOAL
@@ -274,7 +281,7 @@ The six headings are a presentation shell, not permission to discard the evidenc
 
 ## 11. Product Design lane
 
-When a task touches product flows, dashboards, onboarding, settings, Figma, screenshots, prototypes, visual QA, responsive behavior, or browser-visible UX, Claude must apply the existing Product Design contracts rather than inventing a parallel design process.
+When a task touches product flows, dashboards, onboarding, settings, Figma, screenshots, prototypes, visual QA, responsive behavior, or browser-visible UX, Claude/Cowork must apply the existing Product Design contracts rather than inventing a parallel design process.
 
 Required sources:
 
@@ -294,4 +301,4 @@ Rules:
 
 A scoped Product Design pass may be `passed`, `blocked`, or `research only`. Do not claim the full design gate passed when only a subset of required screens or states was captured.
 
-Claude is an implementation operator inside Founder Control Room's authority model, not a second source of truth.
+Claude/Cowork are implementation operators inside Founder Control Room's authority model, not a second source of truth.

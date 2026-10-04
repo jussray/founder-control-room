@@ -68,6 +68,14 @@ The corrected canon separates the planes. `merge_authority: true` means only tha
 
 This is an authority-freshness correction, not a relaxation of review or proof. Exact-head evidence still constrains what can be claimed and integrated, while founder approval controls whether the exact candidate may cross the merge boundary. Deployment, publication, billing, secrets, database mutation, deletion, and other consequential classes remain separately gated.
 
+## 2026-09 control correction: Cowork workspace context versus shared GitHub truth
+
+Adding Cowork to the founder stack creates a new truth-decay risk if a workspace copy, attachment, exported folder, prior model context, or generic FCR activity row is later reused as if it were current GitHub repository state or a Cowork-specific proof receipt. A Cowork session can be correctly grounded at one moment and become stale after the repository branch/head or connector authorization changes.
+
+The corrected rule keeps the authority planes separate. Claude, Claude Code, and Cowork must resolve the authoritative GitHub repository, branch, and exact current head at the use boundary and bind the Council round to that same evidence subject. Cowork workspace state is working context only until reconciled with current GitHub source. Actual GitHub access depends on the current Claude-side GitHub connector and its permissions; repository source cannot prove that connector is configured or authorized in a particular session.
+
+Durable repository changes return through GitHub commit, pull-request, diff, check, and review evidence. The current FCR Cowork lane does **not** have a native Cowork receipt adapter, so generic Activity entries cannot be relabeled as Cowork receipts and FCR must keep that receipt state `UNKNOWN`/unwired until a separately reviewed adapter is implemented and proven. Council membership, model capability, connector availability, or Cowork tools never grant merge, deploy, provider, credential, billing, publication, deletion, or founder authority.
+
 ## Root causes
 
 ### 1. Evidence lifetime was implicit
@@ -384,11 +392,92 @@ The strongest optimization is not faster claiming. It is shortening the distance
 33. `merge_authority: true` cannot be reused as candidate approval; every merge requires a fresh explicit founder decision for the exact live repository/PR/base/head, and candidate movement expires that approval.
 34. Rebinding a cross-repository Playwright peer to a newly verified exact ref/SHA expires predecessor federation/browser proof and requires a complete exact-head rerun; the pin is evidence identity, not production or merge authority.
 35. A live peer ref/SHA match may select the next browser-federation evidence subject, but it cannot carry predecessor green forward; the successor stays `UNKNOWN` until the complete exact-head runtime, directive, receipt, and browser witness passes.
+36. An external model benchmark is a discovery prior, not local outcome proof; it cannot promote an operator to primary routing or grant selection/execution authority without fresh task-specific receipts.
+37. Model-routing evidence decays by task class and time. Old wins, provider reputation, or Council consensus cannot outrank fresh local false-green, authority-violation, cost, latency, proof-quality, or root-cause evidence.
+38. A Cowork workspace, attachment, model memory, or prior branch observation cannot outrank the current authoritative GitHub repository/branch/head; repository work must re-observe that exact source at use time.
+39. Generic FCR activity cannot be relabeled as Cowork receipt proof while the Cowork receipt adapter is unwired, and connector/tool availability cannot manufacture repository, merge, deploy, provider, or founder authority.
+40. A failed observation transport does not prove the observed target is absent; if provider secret enumeration cannot run, target secret presence remains `UNKNOWN`/`BLOCKED`.
+41. A resident Council seat or source adapter does not prove a live provider participated; a live Muse claim requires a current provider receipt bound to the exact invocation.
+42. Provider-held secret-name policy, secret presence, deployed runtime identity, and successful model invocation are four separate evidence layers and may not be collapsed into one green state.
+43. A GitHub Actions copy of a logical provider credential may serve a CI-only consumer without proving that the separately held runtime binding exists; CI and runtime secret planes must be evaluated independently.
+44. An all-secret presence verifier must derive required names from the canonical registry rather than maintain a second drifting allowlist, and failure of its Cloudflare credential before enumeration leaves the target presence set unobserved.
 
 ## 2026-09 control correction: peer ref refresh resets proof
 
 A later StoryEngine `main` observation can justify rebinding the exact Playwright peer, but that observation only selects the new evidence subject. The FCR browser/federation witness remains `UNKNOWN` for that successor until the exact FCR head reruns the complete runtime identity, directive, receipt, and browser path against that peer. A valid ref/SHA match cannot carry predecessor green forward or mint merge, deploy, production, or provider-mutation authority.
 
+On September 24, 2026, the same gate blocked FCR when the pinned StoryEngine peer `a5aabd59b4cf515ed7252a44ab10c3f6c1b13b1b` no longer matched StoryEngine `main` at `35a1855798b4dd059b45f67911280966a09f7be8`. The successor was independently compared first: it was seven commits strictly ahead, zero behind, and the delta was limited to Media Router contract, bridge, tests, and workflow files. That justified selecting the new peer evidence subject, not carrying forward prior green. The successor FCR head remains `UNKNOWN` for federation until its exact-head Playwright runtime, directive, receipt, and browser witness succeeds; the refresh is not proof of production state, merge authority, deploy authority, or provider mutation.
+
+## 2026-09 control correction: capability-market priors are not truth
+
+Frontier model releases can improve coding, research, automation, browser use, or synthesis faster than durable FCR documentation can name specific winners. Treating a provider benchmark or launch table as a permanent routing fact would recreate truth decay at the model layer.
+
+The capability market therefore keeps public benchmarks as bounded priors only and promotes operators from fresh, task-specific local receipts. False-green behavior lowers the score; a fresh authority-boundary violation blocks promotion; stale observations expire; cost and duration remain secondary to verified correctness/proof; and provider-diverse challengers preserve independent disagreement. A routing recommendation is evidence, not permission: it cannot create credentials, founder approval, merge/deploy authority, provider mutation, publication authority, or outcome proof.
+
+The same rule applies when a peer model or repository advances during verification. A newer candidate may become the next shadow trial or evidence subject, but predecessor green cannot be transferred to it. Promotion and federation both require successor-specific receipts.
+
+## 2026-09 control correction: Muse activation proof transport is not target truth
+
+The resident Council and Muse relay exposed another version of the same evidence-boundary failure. FCR can correctly declare Muse as a governed Council peer, wire a bounded Meta adapter, require `MODEL_API_KEY` in the Worker secret membrane, and still lack live proof that the provider-held key exists or that Muse answered a real request. Those source facts establish implementation and policy, not provider/runtime activation.
+
+The proof lane therefore treats Cloudflare secret enumeration as an observation operation with its own prerequisite credential. If that Cloudflare credential is malformed, rejected, or cannot be placed into the Authorization header, `wrangler secret list` never observes the target Worker secret plane. That failure may prove the observation path is blocked; it does **not** prove `MODEL_API_KEY` is absent. The target secret remains `UNKNOWN`/`BLOCKED` until a valid provider read succeeds.
+
+The same separation applies after secret presence is observed. `MODEL_API_KEY` present is only configuration evidence. A live Muse claim additionally requires the exact deployed FCR runtime and one bounded relay whose returned evidence reference is tied to the actual provider response. Council residency, provider availability, model naming, secret-name declaration, secret presence, deployment identity, and invocation outcome are separate facts with separate freshness.
+
 ## Rollback
 
 The Truth Lease, production-specific lease composer, temporal founder-content guards, analytics-authority guard, and Documentation Truth control are additive/fail-closed. Revert the focused contract/test/workflow/documentation change if it causes incompatibility. No database, provider credential, DNS, publication, provider ruleset, or production mutation is performed by the documentation-truth slice.
+
+## StoryEngine peer-pin decay
+
+A StoryEngine peer SHA in `.github/workflows/playwright.yml` is bounded evidence identity. When StoryEngine or Founder Control Room advances, predecessor browser-federation receipts become historical immediately; matching the live ref to a refreshed pin is setup evidence only, and the successor state remains UNKNOWN until the complete exact-head runtime and Playwright witness succeeds.
+
+An exact ref/pin match renews only the identity prerequisite. It does not renew the browser receipt, and a cancelled, skipped, or non-executed Playwright run leaves the successor federation claim `UNKNOWN`.
+
+## 2026-09-25 CI repair evidence transport
+
+The current-main CI repair cycle added an exact StoryEngine peer-pin transition and repaired hidden `.repair/` artifact uploads by setting `include-hidden-files: true` on every evidence upload. This is repository/CI evidence only: it does not prove a deployment, Cloudflare runtime, data/auth state, or user-visible outcome.
+
+Truth boundary: peer-pin and repair-artifact changes must refresh the README, this truth-decay audit, and `docs/DOCUMENTATION_TRUTH_RECEIPT.json` in the same exact-head range. A successor head must earn its own CI and Playwright proof; predecessor green runs do not transfer.
+
+## Chief adapter exact-head decay
+
+The Chief SHA in `src/founder-os-lab/projectAdapters.ts` is an audited evidence identity, not a durable alias for current Chief. Any Chief-head or FCR-head movement expires predecessor adapter, pair-contract, CI, runtime, and browser proof according to the witness actually affected. A blob comparison can justify selecting a successor evidence subject when the audited contract paths are unchanged, but it cannot donate predecessor green or establish Chief deployment, served-MCP reachability, or production behavior.
+
+Documentation Truth therefore treats the adapter source path as evidence-authority-sensitive. Every pin transition must update the focused assertion, README boundary, this truth-decay record, and the structured documentation receipt in the same exact-head range before successor CI can certify the documentation contract. None of those source artifacts grants merge, deploy, publication, provider mutation, or founder authority.
+
+## 2026-09-27 StoryEngine peer transition after Sync Avenue
+
+Founder Control Room independently observed StoryEngine `main` at `d0689af02675b2d278654ca37ba727dd8d2b6836`, exactly two commits ahead and zero behind the previously pinned `3eada5660ad16493f5b26b179a5da215a8b01ef2`. The intervening StoryEngine work adds the reality-first Sync Avenue engine with its exact-head Node/Playwright proof and a subsequent static-file path-containment security repair. StoryEngine's `Reality engine + renderer + Playwright` check succeeded on the successor SHA, which is sufficient to select that SHA as the next FCR federation evidence subject.
+
+That observation does not prove StoryEngine production. Its Cloudflare Workers build check on the same successor SHA was failing, so production remains a separate unresolved plane. Updating FCR's `STORYENGINE_PEER_SHA` therefore resets FCR federation/browser proof to `UNKNOWN`; the successor FCR exact head must complete the full peer-ref check, immutable checkout, runtime identity, directive/receipt, replay-safety, and Playwright browser loop before FCR may call the federation path current. No predecessor browser green, merge approval, deploy authority, or provider-mutation authority transfers across this peer transition.
+
+## 2026-09-27 correction: successor StoryEngine witness and all-secret runtime proof
+
+A later independent StoryEngine `main` observation moved the peer evidence subject again, from `d0689af02675b2d278654ca37ba727dd8d2b6836` to `e2473a10945b57bb7abedba6d45ea0dbacbd904a`. Founder Control Room then ran the exact-head Playwright workflow at FCR `c75a361cdee0a56ccd4351c48f38231429cf9e74`; run `36344620958` completed successfully, including the live-ref pin check and the FCR → StoryEngine receipt/browser loop. That renews federation proof only for this exact FCR/StoryEngine pair. It does not prove either production deployment and grants no merge, deploy, publication, or provider-mutation authority. Any movement of either repository immediately makes this witness historical.
+
+The same repair cycle closed a runtime-secret truth gap. `OPENAI_API_KEY` is now a required provider-held Worker binding in the canonical `wrangler.worker.toml [secrets].required` registry, while a separate GitHub Actions copy may serve CI-only OpenAI consumers. The runtime proof workflow now derives **all** required secret names from that canonical registry instead of maintaining a second target list, fingerprints the name set, and compares names against Cloudflare without reading values.
+
+That verifier currently fails closed earlier because the GitHub Actions `CLOUDFLARE_API_TOKEN` contains a non-ASCII character and cannot safely form the provider Authorization header. This proves the observation transport is malformed; it does not prove any target Worker secret absent. Until the credential is replaced and enumeration succeeds, actual Cloudflare presence for `OPENAI_API_KEY` and the rest of the required runtime bindings remains `UNKNOWN`/`BLOCKED`.
+
+StoryEngine `main` moved again after that witness, from `e2473a10945b57bb7abedba6d45ea0dbacbd904a` to independently observed `0a1d3b521967a3643daf56cf2ad60b1392bb6e0c` (`git ls-remote`, 2026-09-27 evening). The Playwright workflow pin was advanced to that head so the federation check observes the current peer instead of failing on a historical one. Run `36344620958` remains historical evidence for the previous pair; the new pair has no federation proof until the exact-head Playwright workflow completes against it. Separately, `fd61ee7` added `ANTHROPIC_API_KEY` to the Worker's required secrets without updating the deploy-command contract test; the test now expects it. Neither change grants production, merge, deploy, publication, or provider-mutation authority.
+
+## 2026-10-02 StoryEngine edge-front-door peer transition
+
+StoryEngine `main` advanced from the previously pinned `0a1d3b521967a3643daf56cf2ad60b1392bb6e0c` to independently observed `4ec29c1821de8c7bb8c381df31e3f98d0c6016f4`. The bounded source review found a fail-closed Cloudflare front door, an exact `/api` and `/api/*` rate-limit boundary, hashed authorization/session/IP limit keys, and focused Node coverage; it did not establish a live StoryEngine deployment or runtime outcome.
+
+Refreshing `STORYENGINE_PEER_SHA` selects the successor integration subject only. All predecessor FCR-to-StoryEngine Playwright evidence becomes historical, and the successor FCR exact head must pass the live-ref check, immutable peer checkout, runtime identity, directive/receipt, replay-safety, and browser federation witness before the pair can be called current. No merge, deploy, publication, provider-mutation, or founder authority transfers with the pin.
+
+The same exact-head observation exposed a separate FCR policy contradiction: the application runtime and regression test intentionally moved the broad idempotent limiter to 120 requests per 60 seconds, while `security/firewall-v10.policy.json` and `scripts/verify-firewall-v10.mjs` still required the historical 60-request value and the pre-wrapper source shape. Aligning those two repository witnesses to the already-implemented 120-request baseline repairs source/policy proof only; `productionApplied` remains `unknown`, and no Cloudflare rule or production configuration is changed.
+
+## 2026-10-03 StoryEngine successor discovered during URLFix merge review
+
+URLFix PR #914 reached its exact-head merge-review stage with the local FCR browser harness green, then failed closed at the separate live StoryEngine peer-ref check because StoryEngine `main` had advanced beyond the pinned evidence identity. That failure is current evidence of dependency drift, not evidence that URLFix itself is broken.
+
+PR #896 is the focused recovery carrier for the peer transition. Rebinding `.github/workflows/playwright.yml` to the independently observed StoryEngine successor selects the next federation evidence subject only. The successor FCR head remains `UNKNOWN` for federation until its own exact-head workflow proves live ref equality, immutable peer checkout, runtime identity, directive/receipt binding, replay safety, and the complete browser loop. A later move of either FCR or StoryEngine expires that proof again. No prior green, founder approval, merge, deploy, production, publication, or provider-mutation authority transfers through the pin refresh.
+
+## 2026-10-03 StoryEngine successor after agent-contract v1 rollout
+
+StoryEngine `main` advanced beyond the pinned `18d9ba257a69c3d1743f346d424daf31796aaeed` to independently observed `168d65ede38d2477ea00902fa1f0e76f292c583d` (agent-contract v1 binding, CI enforcement, and exact-PR-head verification). FCR Playwright on Chief Access recovery PR #913 then failed closed at the live StoryEngine peer-ref check. That failure is current dependency-drift evidence, not evidence that #913 is broken.
+
+Rebinding `.github/workflows/playwright.yml` to `168d65ede38d2477ea00902fa1f0e76f292c583d` selects the next federation evidence subject only. The successor FCR head stays `UNKNOWN` for federation until its own exact-head workflow proves live ref equality, immutable peer checkout, runtime identity, directive/receipt binding, replay safety, and the complete browser loop. A later move of either FCR or StoryEngine expires that proof again. No prior green, founder approval, merge, deploy, production, publication, or provider-mutation authority transfers through the pin refresh.

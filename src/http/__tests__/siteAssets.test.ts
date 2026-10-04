@@ -52,7 +52,7 @@ describe('Founder Control Room Cloudflare topology', () => {
     expect(existsSync(resolve(repoRoot, 'public/portable-founder-console/index.html'))).toBe(true);
   });
 
-  it('turns the founder stack into a five-lane execution loop', () => {
+  it('turns the founder stack into a six-lane execution loop with Claude Cowork', () => {
     const app = read('public/control-room/index.html');
     const stackRouter = read('public/control-room/stack-router.js');
 
@@ -63,8 +63,6 @@ describe('Founder Control Room Cloudflare topology', () => {
     expect(app).toContain('data-lane="projects"');
     expect(app).toContain('data-lane="skills"');
     expect(app).toContain('Workflows output becomes the Code prompt');
-    expect(app).not.toContain('Cowork');
-    expect(app).not.toContain('data-lane="cowork"');
     expect(app).toContain('Terminal build/test');
     expect(app).toContain('href="/control-room/?tab=terminal"');
     expect(app).toContain('Create / Add to Project');
@@ -75,6 +73,15 @@ describe('Founder Control Room Cloudflare topology', () => {
     expect(stackRouter).toContain("'terminal'");
     expect(stackRouter).toContain('.tabs button[data-tab=');
     expect(stackRouter).toContain('new MutationObserver');
+    expect(stackRouter).toContain('installCoworkLane');
+    expect(stackRouter).toContain('data-lane="cowork"');
+    expect(stackRouter).toContain('Claude Cowork');
+    expect(stackRouter).toContain('Shared GitHub source');
+    expect(stackRouter).toContain('Claude GitHub connector required');
+    expect(stackRouter).toContain('Founder AI Council');
+    expect(stackRouter).toContain('FCR receipt adapter not wired');
+    expect(stackRouter).toContain('Cowork changes return through GitHub commit / PR evidence; FCR receipt binding remains separate');
+    expect(stackRouter).not.toContain('GitHub + Council receipts');
   });
 
   it('routes Workflows through the current proof-bound founder content lifecycle', () => {
@@ -85,7 +92,6 @@ describe('Founder Control Room Cloudflare topology', () => {
     expect(app).toContain('href="/control-room/content-manager.html"');
     expect(app).toContain('Content manager');
     expect(contentManager).toContain('Workflow content lifecycle');
-    expect(contentManager).not.toContain('Cowork');
     expect(contentManager).toContain('Proof → draft → review → approval → schedule → publish → metrics');
     expect(contentManager).toContain('First-party LinkedIn publish capability implemented');
     expect(contentManager).toContain('Temporal truth UNKNOWN until execution');
@@ -145,7 +151,6 @@ describe('Founder Control Room Cloudflare topology', () => {
 
   it('applies browser security headers to Pages assets', () => {
     const headers = read('public/_headers');
-
     expect(headers).toContain("Content-Security-Policy: default-src 'self'");
     expect(headers).toContain('X-Frame-Options: DENY');
     expect(headers).toContain('/control-room/*');

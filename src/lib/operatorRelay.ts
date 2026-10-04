@@ -1,10 +1,11 @@
 import { createHash } from 'node:crypto';
 import { agentCanOperate, agentOperatorPolicy, type AgentOperatorCapability } from './agentRegistry.js';
+import { OPERATOR_RELAY_PEERS } from './operatorRelayConstants.js';
 
 export const OPERATOR_RELAY_REQUEST_CONTRACT = 'juss/operator-relay/request@v1' as const;
 export const OPERATOR_RELAY_RESPONSE_CONTRACT = 'juss/operator-relay/response@v1' as const;
 
-export type RelayOperatorId = 'gemini' | 'codex' | 'claude-code' | 'perplexity';
+export type RelayOperatorId = (typeof OPERATOR_RELAY_PEERS)[number];
 export type RelayCapability = Exclude<AgentOperatorCapability, 'instruct'>;
 export type RelaySensitivity = 'public' | 'internal' | 'restricted';
 export type RelayStatus = 'accepted' | 'completed' | 'blocked' | 'failed';
@@ -50,7 +51,7 @@ export interface OperatorRelayResponseV1 {
 }
 
 const SHA256 = /^[0-9a-f]{64}$/i;
-const RELAY_OPERATORS = new Set<RelayOperatorId>(['gemini', 'codex', 'claude-code', 'perplexity']);
+const RELAY_OPERATORS = new Set<RelayOperatorId>(OPERATOR_RELAY_PEERS);
 const RELAY_CAPABILITIES = new Set<RelayCapability>(['research', 'propose', 'review', 'implement']);
 
 function normalizedList(values: string[]): string[] {

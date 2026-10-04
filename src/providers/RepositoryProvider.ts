@@ -123,6 +123,12 @@ export interface PullRequestReviewContext {
   authorIdentity: string;
 }
 
+export interface ChangeGenealogyReadInput {
+  limit?: number;
+  includeComments?: boolean;
+  includeDiff?: boolean;
+}
+
 export interface DiffFile {
   path: string;
   status: "added" | "modified" | "removed" | "renamed";
@@ -224,6 +230,17 @@ export interface RepositoryProvider {
   readonly name: string;
 
   getProject(projectId: string): Promise<ProjectRepo>;
+
+  /**
+   * Optional bounded recent-change evidence read. The provider owns project
+   * isolation and credentials; callers must feature-detect and fail closed.
+   * The payload stays opaque here so this provider-neutral membrane does not
+   * import a host-specific evidence schema.
+   */
+  readChangeGenealogyEvidence?(
+    projectId: string,
+    input?: ChangeGenealogyReadInput,
+  ): Promise<unknown>;
 
   listFiles(projectId: string, ref: string, path?: string): Promise<FileEntry[]>;
 

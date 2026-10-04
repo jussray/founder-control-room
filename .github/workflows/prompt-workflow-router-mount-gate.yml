@@ -1,0 +1,27 @@
+name: Prompt Workflow Router Mount Gate
+
+on:
+  pull_request:
+    paths:
+      - 'src/http/server.ts'
+      - 'src/http/routes/builderPromptWorkflow.ts'
+      - 'src/http/routes/__tests__/builderPromptWorkflow.server-mount.test.ts'
+      - '.github/workflows/prompt-workflow-router-mount-gate.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  server-mount:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Require real server mount
+        run: npx vitest run src/http/routes/__tests__/builderPromptWorkflow.server-mount.test.ts

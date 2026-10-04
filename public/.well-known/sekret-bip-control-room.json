@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "1.0.0",
+  "schemaVersion": "1.1.0",
   "bridgeId": "sekret-bip-founder-control-room",
   "publisher": {
     "projectId": "founder-control-room",
@@ -11,14 +11,21 @@
   "peer": {
     "projectId": "sekret-bip",
     "runtimeOrigin": "https://sekret-bip-audit.p9s5nbwqyt.chatgpt.site",
-    "controlRoom": "https://sekret-bip-audit.p9s5nbwqyt.chatgpt.site/control-room",
+    "role": "audit-mirror",
+    "auditView": "https://sekret-bip-audit.p9s5nbwqyt.chatgpt.site/control-room",
+    "legacyRouteAlias": "/control-room",
     "manifest": "https://sekret-bip-audit.p9s5nbwqyt.chatgpt.site/api/control-room-link"
+  },
+  "canonicalBipControlRoom": {
+    "repository": "jussray/Sekret-Bip",
+    "entry": "app/(dev)/control-room.tsx",
+    "singleton": true
   },
   "authority": {
     "founderControlRoom": {
       "actions": ["approve", "execute"]
     },
-    "sekretBip": {
+    "sekretBipAuditMirror": {
       "actions": ["observe", "request"]
     }
   },

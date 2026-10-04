@@ -1,0 +1,6 @@
+REALITY: source implementation exists on feat/prompt-workflow-router; real server mount is still missing.
+FIX: deterministic router + authority registry + founder-gated adapter + proof gates added.
+PROOF: GitHub source readback; execution tests/CI/Playwright are NOT RUN in this chat.
+RISK: route is unreachable until src/http/server.ts mounts it.
+ROLLBACK: additive patch; revert branch/files, no migration.
+NEXT GATE: two-line server mount, focused tests, exact-head CI, deploy, Playwright.

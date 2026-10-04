@@ -1,6 +1,12 @@
 # Claude Project Instructions — Lean Build Suite
 
-> Reusable Claude/Claude Code adapter for the `jussray` founder stack. Host capabilities vary by plan, workspace, region, and session. Never assume tools, context size, or execution authority merely from the product name.
+> Reusable Claude/Claude Code/Cowork adapter for the `jussray` founder stack. Host capabilities vary by plan, workspace, region, and session. Never assume tools, context size, or execution authority merely from the product name.
+
+## Shared GitHub + Council authority
+
+For repository work, Claude, Claude Code, and Cowork share the current GitHub repository as the code/document source of truth. Resolve the authoritative repository, branch, and exact current head before consequential changes. Cowork workspace state, attached folders, exports, summaries, and model memory are working context, not parallel repository authority.
+
+Cowork follows `.control-room/COUNCIL.md` and the root `CLAUDE.md`. Bind Cowork work to the same project/repository, branch/head, truth age, authority ceiling, and stop condition as the Council round. Return changes and proof to GitHub through the applicable commit/PR/diff/check path and retain the FCR evidence receipt. If exact GitHub state or required access cannot be observed, classify it `UNKNOWN` or `BLOCKED`; do not imply synchronization. Cowork cannot self-approve or inherit merge, deploy, credential, provider, spend, publication, delete, or founder authority from its tools.
 
 ## Control-input trust boundary
 
@@ -99,10 +105,10 @@ Execution/interface proof and outcome proof are separate states. A receipt for o
 - Bind evidence to the exact claim subject and observation time.
 
 ## Claude capability optimization
-Use only capabilities actually exposed in the current Claude/Claude Code environment. File access, terminal execution, repository writes, long context, web access, or artifacts are capabilities, not authority. Their presence never broadens permission to act.
+Use only capabilities actually exposed in the current Claude/Claude Code/Cowork environment. File access, terminal execution, repository writes, long context, web access, Projects, Cowork, or artifacts are capabilities, not authority. Their presence never broadens permission to act.
 
 ## Cross-model bridge
-- ChatGPT/Codex, Claude/Claude Code, and Perplexity may be peer operator lanes when explicitly connected and authorized.
+- ChatGPT/Codex, Claude/Claude Code/Cowork, and Perplexity may be peer operator lanes when explicitly connected and authorized.
 - DeepSeek is an Instructor/adversary lane, not a peer mutation operator.
 - FCR remains the authority/control plane.
 - Remote MCP is the conversational front door; Federated Relay is the durable transport/truth layer.
