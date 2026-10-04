@@ -6,7 +6,9 @@ on:
     paths:
       - "control-room.manifest.json"
       - ".control-room/repository.manifest.json"
+      - ".control-room/council-residency.contract.json"
       - "scripts/verify-control-room-tests.mjs"
+      - "scripts/verify-protected-intelligence-contract.mjs"
       - "src/types/repositoryVerification.ts"
       - "src/services/repositoryVerification.ts"
       - "src/services/__tests__/repositoryVerification.test.ts"
@@ -17,7 +19,9 @@ on:
     paths:
       - "control-room.manifest.json"
       - ".control-room/repository.manifest.json"
+      - ".control-room/council-residency.contract.json"
       - "scripts/verify-control-room-tests.mjs"
+      - "scripts/verify-protected-intelligence-contract.mjs"
       - "src/types/repositoryVerification.ts"
       - "src/services/repositoryVerification.ts"
       - "src/services/__tests__/repositoryVerification.test.ts"
@@ -44,7 +48,7 @@ jobs:
     timeout-minutes: 8
     steps:
       - name: Check out exact head
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ env.EXPECTED_HEAD_SHA }}
 
@@ -56,16 +60,19 @@ jobs:
           test "$actual" = "$EXPECTED_HEAD_SHA"
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: "24"
+
+      - name: Verify protected intelligence and live-proof contract
+        run: node scripts/verify-protected-intelligence-contract.mjs
 
       - name: Verify dynamic package-script and workflow catalog
         run: node scripts/verify-control-room-tests.mjs
 
       - name: Retain sanitized self-test receipt
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: founder-control-room-tests-${{ env.EXPECTED_HEAD_SHA }}
           path: artifacts/control-room-tests.json

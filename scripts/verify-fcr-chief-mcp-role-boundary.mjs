@@ -18,6 +18,7 @@ const externalTools = read('src/mcp/externalTools.ts');
 const fcrTruthTools = [
   'fcr_list_projects',
   'fcr_get_current_truth',
+  'fcr_audit_change_genealogy',
   'fcr_preview_skill_route',
 ];
 
@@ -56,6 +57,13 @@ assert(
   'project scope must fail closed instead of widening silently',
 );
 assert(
+  externalTools.includes("name: 'fcr_audit_change_genealogy'")
+    && externalTools.includes('includeComments')
+    && externalTools.includes('includeDiff')
+    && externalTools.includes('default: 10'),
+  'change genealogy must remain an explicit bounded read-only FCR truth tool',
+);
+assert(
   externalTools.includes("truthBoundary: {")
     && externalTools.includes('repositoryEvidenceOnly: true')
     && externalTools.includes('liveRuntimeVerified: false')
@@ -64,6 +72,6 @@ assert(
 );
 
 console.log('[verify:mcp-role-boundary] PASS');
-console.log('  FCR MCP: scoped truth/governance observations and previews only.');
+console.log('  FCR MCP: scoped truth/governance observations, genealogy, and previews only.');
 console.log('  Chief through FCR MCP: reasoning/audit/capability previews only.');
 console.log('  MCP transport does not mint founder approval, execution authority, or runtime truth.');
