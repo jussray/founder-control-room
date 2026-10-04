@@ -160,6 +160,9 @@ async function invokeJsonProvider(
 }
 
 function openAiText(body: JsonRecord): string {
+  if (body.status !== 'completed') {
+    throw new Error('OpenAI relay returned a non-completed response');
+  }
   if (typeof body.output_text === 'string' && body.output_text.trim()) return body.output_text.trim();
   const output = Array.isArray(body.output) ? body.output : [];
   const parts: string[] = [];

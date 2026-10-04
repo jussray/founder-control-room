@@ -37,6 +37,36 @@ function relay(
 }
 
 describe('createServerOperatorRelayAdapters', () => {
+  it.each(['incomplete', 'failed', 'cancelled', 'queued', 'in_progress', undefined])(
+    'rejects OpenAI status %s even when partial text exists, without retrying', async (status) => {
+      const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+        id: 'resp_partial', status, output_text: 'unfinished answer',
+        error: { message: 'untrusted-provider-detail' },
+      }), { status: 200 })) as typeof fetch;
+      const adapters = createServerOperatorRelayAdapters({
+        OPENAI_API_KEY: FIXTURE, FCR_RELAY_OPENAI_MODEL: 'gpt-test-model',
+      }, fetchMock);
+      await expect(adapters.codex?.(relay('internal', 'codex')))
+        .rejects.toThrow('OpenAI relay returned a non-completed response');
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it('accepts completed OpenAI output with a provider receipt and no authority', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+      id: 'resp_completed', status: 'completed',
+      output: [{ type: 'message', content: [{ type: 'output_text', text: 'finished answer' }] }],
+    }), { status: 200 })) as typeof fetch;
+    const adapters = createServerOperatorRelayAdapters({
+      OPENAI_API_KEY: FIXTURE, FCR_RELAY_OPENAI_MODEL: 'gpt-test-model',
+    }, fetchMock);
+    const response = await adapters.codex?.(relay('internal', 'codex'));
+    expect(response?.answer).toBe('finished answer');
+    expect(response?.authorityRequested).toBe('none');
+    expect(response?.evidenceRefs).toEqual(['provider:openai:model:gpt-test-model:response:resp_completed']);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it('does not advertise an operator without both its key and explicit model or an authorized handoff', () => {
     const adapters = createServerOperatorRelayAdapters({
       PERPLEXITY_API_KEY: FIXTURE,

@@ -40,3 +40,5 @@ Still not proven by source code alone:
 Current repository-level continuity debt is tracked separately from relay correctness. A stale or conflicting PR graph must not be treated as proof that focused relay code failed, but it does block integration until the candidate is rolled onto the current authority tree and exact-head proof is reacquired.
 
 Provider configuration or a green source test cannot substitute for live receipts. Do not label the bridge VERIFIED until exact-head source gates, deployed runtime identity, and the applicable real peer/Playwright round-trip agree on the same exact subject.
+
+OpenAI completion boundary: the server adapter now rejects any response whose status is not `completed` before normalizing text into a relay result. This local guard is regression-tested and does not establish successful deployed provider execution.

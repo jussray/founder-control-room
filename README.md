@@ -327,3 +327,8 @@ For public crawler and work-directory behavior, `.github/workflows/ci.yml` must 
 The exact StoryEngine peer configured in `.github/workflows/playwright.yml` is an evidence subject, not a durable alias for current StoryEngine. A peer refresh must be backed by an independent ref/SHA observation and must reset predecessor federation/browser proof until the complete FCR → StoryEngine → receipt → FCR Playwright witness passes on the exact FCR head. Pin alignment alone grants no merge, deploy, production, or provider-mutation authority.
 
 Refreshing that peer pin is evidence selection only. The successor FCR head must pass the full exact-head Playwright federation lane again before the refreshed FCR/StoryEngine pair can be called current; the pin update itself grants no merge, deploy, production, spend, or provider-mutation authority.
+
+
+### OpenAI response completion boundary
+
+The bounded OpenAI adapter requires `status: completed` before returning text as a successful result. Incomplete, failed, cancelled, queued, in-progress, and missing-status responses fail closed, even when they contain partial text. This check does not retry a stopped request, change model defaults, enable a provider, or grant execution authority. Source tests are separate from live provider and deployment evidence.
