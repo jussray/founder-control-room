@@ -89,6 +89,18 @@ jobs:
             echo '- Mutation boundary: evidence fields + registry generatedAt only'
           } >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Fallback to GITHUB_TOKEN if GitHub App mint failed
+        if: always() && failure()
+        env:
+          PORTFOLIO_SYNC_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          test -n "$PORTFOLIO_SYNC_TOKEN"
+          echo "::notice::Using built-in GITHUB_TOKEN (GitHub App token mint failed)"
+          PORTFOLIO_SYNC_TOKEN="$PORTFOLIO_SYNC_TOKEN" node scripts/sync-jussco-portfolio-evidence.mjs | tee /tmp/portfolio-sync-output-fallback.jsonl
+          test -s "$PORTFOLIO_SYNC_RECEIPT"
+          jq -e '.contract == "juss/fcr-portfolio-evidence@v1"' "$PORTFOLIO_SYNC_RECEIPT" >/dev/null
+
       - name: Install Chromium for deployed proof
         env:
           PLAYWRIGHT_BROWSERS_PATH: /opt/pw-browsers
