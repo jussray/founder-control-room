@@ -14,10 +14,12 @@ const adapter = (label, evidenceRef) => async (request) => {
   });
 };
 
+// Deliberately simulated adapters. This proves browser transport and lineage,
+// not live external-provider reachability or provider receipts.
 const adapters = {
-  codex: adapter('Codex', 'provider:openai:browser-proof'),
-  'claude-code': adapter('Claude', 'provider:anthropic:browser-proof'),
-  muse: adapter('Muse', 'provider:muse:browser-proof'),
+  codex: adapter('Codex', 'simulated:openai:browser-proof'),
+  'claude-code': adapter('Claude', 'simulated:anthropic:browser-proof'),
+  muse: adapter('Muse', 'simulated:muse:browser-proof'),
 };
 
 const app = express();
@@ -67,7 +69,7 @@ try {
   const hops = result.body.transcript.hops;
   assert.equal(hops.length, 3);
   for (let i = 1; i < hops.length; i += 1) assert.equal(hops[i].inputSha256, hops[i - 1].answerSha256);
-  assert.equal(hops.every((hop) => hop.liveProviderEvidence), true);
+  assert.equal(hops.every((hop) => hop.liveProviderEvidence === false), true);
 
   console.log(JSON.stringify({
     contract: 'fcr/live-council-browser-proof@v1',
