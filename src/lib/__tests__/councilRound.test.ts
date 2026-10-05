@@ -5,7 +5,6 @@ import type { OperatorRelayAdapter, OperatorRelayAdapters } from '../operatorRel
 
 const fixedNow = () => new Date('2026-10-05T16:00:00.000Z');
 
-/** Fake seat: records exactly what it received and answers deterministically. */
 function seat(name: string, seen: Record<string, string>, opts: { fail?: boolean; status?: 'blocked' } = {}): OperatorRelayAdapter {
   return async (request) => {
     seen[name] = request.context.summary;
@@ -27,7 +26,7 @@ const seats = [
 ] as const;
 
 describe('runCouncilRound', () => {
-  it('chains seats with zero human relay: each seat receives the previous answer byte-for-byte', async () => {
+  it('chains seats with zero human relay and preserves exact hop lineage', async () => {
     const seen: Record<string, string> = {};
     const adapters: OperatorRelayAdapters = {
       'claude-code': seat('claude', seen),
@@ -38,7 +37,8 @@ describe('runCouncilRound', () => {
     const written: CouncilConversationRow[] = [];
     const row = await runCouncilRound({
       goal: 'Council telephone proof gate',
-      initiator: 'codex',
+      initiator: 'fcr',
+      sourceRef: 'founder-attested:claude-code',
       seed: 'A',
       seats: [...seats],
       now: fixedNow,
@@ -53,13 +53,14 @@ describe('runCouncilRound', () => {
     const hops = row.transcript.hops;
     expect(row.transcript.state).toBe('complete');
     expect(row.transcript.humanRelay).toBe(false);
+    expect(row.transcript.sourceRef).toBe('founder-attested:claude-code');
     expect(hops.map((h) => `${h.fromOperator}>${h.toOperator}`)).toEqual([
-      'codex>claude-code', 'claude-code>deepseek', 'deepseek>muse', 'muse>gemini',
+      'fcr>claude-code', 'claude-code>deepseek', 'deepseek>muse', 'muse>gemini',
     ]);
     expect(hops[0].inputSha256).toBe(sha256('A'));
     for (let i = 1; i < hops.length; i += 1) expect(hops[i].inputSha256).toBe(hops[i - 1].answerSha256);
     expect(hops.every((h) => h.liveProviderEvidence)).toBe(true);
-    expect(row.participants).toEqual(['codex', 'claude-code', 'deepseek', 'muse', 'gemini']);
+    expect(row.participants).toEqual(['fcr', 'claude-code', 'deepseek', 'muse', 'gemini']);
     expect(row.outcome).toBe(hops[3].answer);
     expect(written).toEqual([row]);
   });
@@ -72,7 +73,7 @@ describe('runCouncilRound', () => {
       return inner(r);
     };
     const first = await runCouncilRound({
-      goal: 'g', initiator: 'codex', seed: 'A', seats: [...seats], now: fixedNow,
+      goal: 'g', initiator: 'fcr', sourceRef: 'mission:m1', seed: 'A', seats: [...seats], now: fixedNow,
     }, {
       'claude-code': counted('claude', seat('claude', seen)),
       deepseek: counted('deepseek', seat('deepseek', seen, { fail: true })),
@@ -83,7 +84,7 @@ describe('runCouncilRound', () => {
     expect(first.outcome).toBe('interrupted at seat 1');
 
     const resumed = await runCouncilRound({
-      goal: 'g', initiator: 'codex', seed: 'A', seats: [...seats], now: fixedNow, resumeFrom: first.transcript,
+      goal: 'g', initiator: 'fcr', sourceRef: 'mission:m1', seed: 'A', seats: [...seats], now: fixedNow, resumeFrom: first.transcript,
     }, {
       'claude-code': counted('claude', seat('claude', seen)),
       deepseek: counted('deepseek', seat('deepseek', seen)),
@@ -95,29 +96,62 @@ describe('runCouncilRound', () => {
     expect(seen.deepseek).toBe('claude on [A]');
   });
 
-  it('stops (not success) when a seat returns blocked', async () => {
-    const row = await runCouncilRound({
-      goal: 'g', initiator: 'codex', seed: 'A', seats: [...seats], now: fixedNow,
-    }, { 'claude-code': seat('claude', {}, { status: 'blocked' }) });
-    expect(row.transcript.state).toBe('interrupted');
-    expect(row.transcript.hops).toHaveLength(1);
-    expect(row.outcome).not.toContain('claude on');
+  it('does not advance past a blocked seat and retries that exact seat on resume', async () => {
+    const calls: string[] = [];
+    const blocked = await runCouncilRound({
+      goal: 'g', initiator: 'fcr', seed: 'A', seats: [...seats], now: fixedNow,
+    }, {
+      'claude-code': async (request) => {
+        calls.push('blocked-claude');
+        return buildOperatorRelayResponse(request, {
+          status: 'blocked',
+          answer: 'not accepted',
+          evidenceRefs: ['provider:claude:blocked-1'],
+          completedAt: '2026-10-05T16:00:01.000Z',
+        });
+      },
+    });
+    expect(blocked.transcript.state).toBe('interrupted');
+    expect(blocked.transcript.hops).toHaveLength(0);
+    expect(blocked.transcript.nextSeatIndex).toBe(0);
+    expect(blocked.transcript.interruption).toMatchObject({ seatIndex: 0, operator: 'claude-code', status: 'blocked' });
+
+    const resumed = await runCouncilRound({
+      goal: 'g', initiator: 'fcr', seed: 'A', seats: [...seats], now: fixedNow, resumeFrom: blocked.transcript,
+    }, {
+      'claude-code': async (request) => {
+        calls.push('completed-claude');
+        return buildOperatorRelayResponse(request, {
+          answer: 'claude accepted', evidenceRefs: ['provider:claude:ok-2'], completedAt: '2026-10-05T16:00:02.000Z',
+        });
+      },
+      deepseek: seat('deepseek', {}),
+      muse: seat('muse', {}),
+      gemini: seat('gemini', {}),
+    });
+    expect(resumed.transcript.state).toBe('complete');
+    expect(calls).toEqual(['blocked-claude', 'completed-claude']);
+    expect(resumed.transcript.hops[0].toOperator).toBe('claude-code');
   });
 
-  it('fails closed when a resume transcript was tampered with', async () => {
+  it('fails closed when a resume transcript was tampered with or provenance changed', async () => {
     const first = await runCouncilRound({
-      goal: 'g', initiator: 'codex', seed: 'A', seats: [...seats], now: fixedNow,
+      goal: 'g', initiator: 'fcr', sourceRef: 'founder-attested:claude-code', seed: 'A', seats: [...seats], now: fixedNow,
     }, { 'claude-code': seat('claude', {}) });
     const tampered = structuredClone(first.transcript);
     tampered.hops[0].answer = 'forged';
     await expect(runCouncilRound({
-      goal: 'g', initiator: 'codex', seed: 'A', seats: [...seats], now: fixedNow, resumeFrom: tampered,
+      goal: 'g', initiator: 'fcr', sourceRef: 'founder-attested:claude-code', seed: 'A', seats: [...seats], now: fixedNow, resumeFrom: tampered,
     }, {})).rejects.toBeInstanceOf(CouncilLineageError);
+
+    await expect(runCouncilRound({
+      goal: 'g', initiator: 'fcr', sourceRef: 'founder-attested:codex', seed: 'A', seats: [...seats], now: fixedNow, resumeFrom: first.transcript,
+    }, {})).rejects.toThrow('resume source reference mismatch');
   });
 
   it('labels a hop backed only by non-provider evidence as not live', async () => {
     const row = await runCouncilRound({
-      goal: 'g', initiator: 'codex', seed: 'A', seats: [seats[0]], now: fixedNow,
+      goal: 'g', initiator: 'fcr', seed: 'A', seats: [seats[0]], now: fixedNow,
     }, {
       'claude-code': async (request) => buildOperatorRelayResponse(request, {
         answer: 'simulated', evidenceRefs: ['simulated:role-analysis'], completedAt: '2026-10-05T16:00:01.000Z',
