@@ -32,7 +32,8 @@ import { assertScheduledTaskResults } from './scheduledTaskResults.js';
 
 export { ReleaseProofWorkflowV0 } from '../workflows/releaseProofWorkflow.js';
 
-validateWorkerEnv(env);
+const workerEnv = env as unknown as ControlRoomWorkerEnv;
+validateWorkerEnv(workerEnv);
 
 const { createServer: createExpressApp } = await import('../http/server.js');
 const app = express();
@@ -62,7 +63,7 @@ const composed = composeWorkerHandler(
         const [reconcilerResult, externalUseResult, mondayOrientationResult] = await Promise.allSettled([
           runReconcilerCycle(),
           runExternalUseHourlyCycle(),
-          runMondayPortfolioOrientationCycle(env),
+          runMondayPortfolioOrientationCycle(workerEnv),
         ]);
         assertScheduledTaskResults([
           { name: 'reconciler', result: reconcilerResult },
@@ -78,12 +79,12 @@ const composedFetch = composed.fetch;
 if (!composedFetch) throw new Error('Cloudflare HTTP handler is missing fetch');
 
 const worker: ExportedHandler<ControlRoomWorkerEnv> = {
-  async fetch(request, workerEnv, ctx) {
+  async fetch(request, runtimeEnv, ctx) {
     const url = new URL(request.url);
     if (url.pathname === BIP_PROOF_INGRESS_PATH) {
-      return handleBipControlRoomProofIngress(request, workerEnv);
+      return handleBipControlRoomProofIngress(request, runtimeEnv);
     }
-    return composedFetch.call(composed, request, workerEnv, ctx);
+    return composedFetch.call(composed, request, runtimeEnv, ctx);
   },
   scheduled: composed.scheduled,
 };
