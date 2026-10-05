@@ -40,4 +40,17 @@ create trigger portfolio_orientation_runs_touch_updated_at
 before update on public.portfolio_orientation_runs
 for each row execute function public.touch_portfolio_orientation_runs_updated_at();
 
-revoke all on table public.portfolio_orientation_runs from anon, authenticated;
+-- Supabase defines browser roles named anon/authenticated; generic PostgreSQL
+-- preview providers such as Neon do not necessarily define them. Revoke only
+-- when each role exists so the same append-only migration is portable while
+-- remaining fail-closed under RLS in Supabase.
+do $$
+begin
+  if exists (select 1 from pg_roles where rolname = 'anon') then
+    execute 'revoke all on table public.portfolio_orientation_runs from anon';
+  end if;
+  if exists (select 1 from pg_roles where rolname = 'authenticated') then
+    execute 'revoke all on table public.portfolio_orientation_runs from authenticated';
+  end if;
+end;
+$$;
