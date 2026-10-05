@@ -125,6 +125,8 @@ Source wiring and unit tests do **not** prove the current peer runtime is reacha
 
 The StoryEngine peer pin is an evidence identity, not a durable alias for “current StoryEngine.” If the separately versioned StoryEngine carrier moves, earlier FCR Playwright green remains historical for its pinned peer. FCR must bind a separately exact-head-proven StoryEngine successor and rerun the complete FCR → StoryEngine → receipt → FCR browser/runtime witness before making a current federation claim.
 
+On October 5, 2026, FCR predecessor `main@e5d6d87885553d018a9af2fcb97eb7aa7d8d2bf5` rebound the StoryEngine federation evidence subject to exact StoryEngine `91af998c2c7adad0792dd394735ca738b92ab26d` and completed Playwright run `37346101986`, including live-ref freshness, immutable peer checkout, exact StoryEngine runtime startup, and the FCR-to-StoryEngine receipt loop. That witness belongs only to that predecessor FCR/StoryEngine pair. Any successor FCR head must earn fresh exact-head browser proof before present-tense federation readiness can be claimed; this receipt grants no merge, production deploy, publication, spend, or provider-mutation authority.
+
 See [`docs/REPOSITORY_FEDERATION.md`](docs/REPOSITORY_FEDERATION.md).
 
 ### Jira work automation
