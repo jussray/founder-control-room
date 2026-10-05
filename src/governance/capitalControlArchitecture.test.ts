@@ -76,7 +76,7 @@ describe('capital control architecture', () => {
     expect(verdict.missingClaims).toEqual(['post_change_control_verified']);
   });
 
-  it('never turns complete capital evidence into execution authority', () => {
+  it('never turns complete capital evidence labels into execution authority', () => {
     const verifiedClaims = capitalRequiredClaims('publish-offering', 'project') as CapitalEvidenceClaim[];
     const verdict = evaluateCapitalAction({
       action: 'publish-offering',
@@ -90,22 +90,24 @@ describe('capital control architecture', () => {
       executionAuthorized: false,
       missingClaims: [],
       reasons: [
-        'capital policy evidence is complete, but this evaluator is advisory only; separate verified legal and founder execution authority is still required',
+        'capital policy evidence labels are complete, but this evaluator is advisory only; separate trusted evidence verification and founder/legal execution authority are still required',
       ],
     });
   });
 
-  it('allows only a non-executing legal-state claim after its proof is complete', () => {
+  it('never turns bare evidence labels into a verified legal-state claim', () => {
     const verdict = evaluateCapitalAction({
       action: 'claim-parent-formed',
       verifiedClaims: ['legal_entity_verified', 'governing_documents_verified'],
     });
 
     expect(verdict).toEqual({
-      decision: 'allow',
+      decision: 'reconfirm',
       executionAuthorized: false,
       missingClaims: [],
-      reasons: ['all registered evidence requirements for this non-executing capital claim are satisfied'],
+      reasons: [
+        'capital evidence labels are complete, but this v1 evaluator does not verify their provenance; independent trusted evidence verification is required before recording the legal-state claim',
+      ],
     });
   });
 });
