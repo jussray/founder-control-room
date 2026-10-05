@@ -33,11 +33,12 @@ beforeEach(() => {
   mockGetUser.mockResolvedValue({ data: { user: { id: 'u1', email: FOUNDER_EMAIL } }, error: null });
   runLiveCouncilRelayMock.mockResolvedValue({
     contract: 'juss/live-council-relay@v1',
+    originRef: 'founder-attested:claude-code',
     status: 'completed',
     participants: ['codex', 'claude-code', 'muse'],
     completedParticipants: ['codex', 'claude-code', 'muse'],
     blockedParticipants: [],
-    hops: [{ seat: 'codex', source: 'fcr', status: 'completed', requestHash: 'a'.repeat(64), responseHash: 'b'.repeat(64), answer: 'one', evidenceRefs: ['provider:openai:r1'], unresolved: [], failureCode: null }],
+    hops: [{ seat: 'codex', source: 'fcr', originRef: 'founder-attested:claude-code', status: 'completed', requestHash: 'a'.repeat(64), responseHash: 'b'.repeat(64), answer: 'one', evidenceRefs: ['provider:openai:r1'], unresolved: [], failureCode: null }],
     finalAnswer: 'three',
     evidenceRefs: ['provider:openai:r1', 'provider:anthropic:r2', 'provider:muse:r3'],
   });
@@ -72,17 +73,27 @@ describe('POST /missions/:missionId/council/run', () => {
         goal: 'Return the Council recommendation.',
         contextSummary: 'Use bounded provider relay.',
         participants: ['codex', 'claude-code', 'muse'],
+        sourceRef: 'founder-attested:claude-code',
       });
 
     expect(response.status).toBe(201);
     expect(response.body.relay.status).toBe('completed');
+    expect(response.body.relay.originRef).toBe('founder-attested:claude-code');
     expect(inserted).toMatchObject({
       mission_id: MISSION_ID,
       round: 5,
       participants: ['codex', 'claude-code', 'muse'],
       outcome: 'live_relay_completed',
     });
-    expect(inserted?.transcript.contract).toBe('juss/live-council-relay@v1');
-    expect(inserted?.transcript.evidenceRefs).toContain('provider:muse:r3');
+    const persisted = inserted as unknown as {
+      transcript: {
+        contract: string;
+        evidenceRefs: string[];
+        hops: Array<{ originRef?: string | null }>;
+      };
+    };
+    expect(persisted.transcript.contract).toBe('juss/live-council-relay@v1');
+    expect(persisted.transcript.evidenceRefs).toContain('provider:muse:r3');
+    expect(persisted.transcript.hops[0]?.originRef).toBe('founder-attested:claude-code');
   });
 });
