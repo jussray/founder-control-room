@@ -45,7 +45,7 @@ try {
   assert.match(detailText, /Prompt provenance: quickscan-outreach-v1/);
   assert.match(detailText, /Chief-proposed/);
   assert.match(detailText, /who handles those requests now\?/i);
-  assert.match(detailText, /decision path remains unknown/i);
+  assert.match(detailText, /unknown · 0\/100 · next proof gate: collect_qualification_evidence/i);
   assert.equal(await page.locator('#chiefButton').isDisabled(), true);
   assert.equal(await page.locator('[data-decision="APPROVE"]').count(), 1);
   assert.equal(await page.locator('[data-decision="EDIT"]').count(), 1);
