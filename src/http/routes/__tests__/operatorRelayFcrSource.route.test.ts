@@ -9,7 +9,7 @@ describe('operator relay reserved FCR source', () => {
     app.use(express.json());
     app.use(createOperatorRelayRouter({}));
 
-    const response = await request(app()).post('/api/operator-relay').send({ fromOperator: 'fcr' });
+    const response = await request(app).post('/api/operator-relay').send({ fromOperator: 'fcr' });
 
     expect(response.status).toBe(403);
     expect(response.body.code).toBe('relay_source_reserved');
