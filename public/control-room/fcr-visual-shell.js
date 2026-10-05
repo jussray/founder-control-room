@@ -47,7 +47,8 @@ function decorateSidebar() {
   const labels = { home: 'Home', projects: 'My Work', missions: 'Build', activity: 'Live Signals', l99: 'Proof', promptos: 'PromptOS', analytics: 'Spend', terminal: 'Run' };
   side.querySelectorAll('.tabs button[data-tab]').forEach((button) => {
     const label = button.querySelector('span:last-child');
-    if (label && labels[button.dataset.tab]) label.textContent = labels[button.dataset.tab];
+    const desired = labels[button.dataset.tab];
+    if (label && desired && label.textContent !== desired) label.textContent = desired;
   });
 
   if (!side.querySelector('[data-founder-chip]')) {
@@ -80,9 +81,12 @@ function decorateCouncil(chief) {
 
   const commandLabels = ['Strategize', 'Build', 'Create', 'Analyze', 'Solve', 'Launch'];
   chief.querySelectorAll('.chief-route strong').forEach((strong, index) => {
-    if (commandLabels[index]) strong.textContent = commandLabels[index];
+    const desired = commandLabels[index];
+    if (desired && strong.textContent !== desired) strong.textContent = desired;
   });
-  chief.querySelectorAll('.chief-route span').forEach((span) => { span.textContent = ''; });
+  chief.querySelectorAll('.chief-route span').forEach((span) => {
+    if (span.textContent !== '') span.textContent = '';
+  });
 }
 
 function decorateHome() {
