@@ -16,6 +16,7 @@ export type LiveCouncilStatus = 'completed' | 'partial' | 'blocked';
 export interface LiveCouncilRelayHop {
   seat: RelayOperatorId;
   source: RelaySourceId;
+  originRef: string | null;
   status: 'completed' | 'blocked' | 'failed';
   requestHash: string | null;
   responseHash: string | null;
@@ -104,6 +105,7 @@ export async function runLiveCouncilRelay(
       const hop: LiveCouncilRelayHop = {
         seat,
         source,
+        originRef,
         status: response.status === 'completed' ? 'completed' : 'blocked',
         requestHash: request.requestHash,
         responseHash: response.responseHash,
@@ -119,6 +121,7 @@ export async function runLiveCouncilRelay(
       hops.push({
         seat,
         source,
+        originRef,
         status: 'failed',
         requestHash: null,
         responseHash: null,
