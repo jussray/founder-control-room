@@ -90,7 +90,7 @@ try {
     assert.equal(panelStyle.borderRadius, '18px');
     assert.match(panelStyle.backgroundImage, /gradient/i);
 
-    const projectGridTracks = await page.locator('.project-type-grid').evaluate((node) => countGridTracks(getComputedStyle(node).gridTemplateColumns));
+    const projectGridTracks = countGridTracks(await page.locator('.project-type-grid').evaluate((node) => getComputedStyle(node).gridTemplateColumns));
     assert.equal(projectGridTracks, 4, 'desktop project choices use the canonical four-column card rhythm');
 
     const primaryButtonBackground = await page.locator('[data-next-step="2"]').evaluate((node) => getComputedStyle(node).backgroundImage);
@@ -102,7 +102,7 @@ try {
 
     await page.locator('[data-next-step="2"]').click();
     await page.getByText('What do you need FCR to do?', { exact: true }).waitFor();
-    const missionGridTracks = await page.locator('.mission-grid').evaluate((node) => countGridTracks(getComputedStyle(node).gridTemplateColumns));
+    const missionGridTracks = countGridTracks(await page.locator('.mission-grid').evaluate((node) => getComputedStyle(node).gridTemplateColumns));
     assert.equal(missionGridTracks, 4, 'desktop mission choices retain the same four-column visual system');
 
     await noOverflow(page, 'desktop onboarding');
@@ -118,7 +118,7 @@ try {
     page.on('pageerror', (error) => pageErrors.push(error.message));
     await mount(page);
 
-    const projectGridTracks = await page.locator('.project-type-grid').evaluate((node) => countGridTracks(getComputedStyle(node).gridTemplateColumns));
+    const projectGridTracks = countGridTracks(await page.locator('.project-type-grid').evaluate((node) => getComputedStyle(node).gridTemplateColumns));
     assert.equal(projectGridTracks, 2, 'mobile onboarding condenses to two premium cards per row');
 
     const actionsPosition = await page.locator('.step-actions').evaluate((node) => getComputedStyle(node).position);
