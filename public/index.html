@@ -3,466 +3,360 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="description" content="Founder Control Room is the public front door for a founder operating system that connects intent, authority, execution, evidence, Chief, and PromptOS without exposing private founder state." />
+  <meta name="description" content="Founder Control Room is the public front door for discovering founder work and entering the governed founder operating plane without exposing private founder state." />
   <meta name="robots" content="index,follow" />
   <link rel="canonical" href="https://www.foundercontrolroom.org/" />
+  <link rel="stylesheet" href="/control-room/founder-shell.css" />
   <title>Founder Control Room</title>
   <style>
     :root {
-      color-scheme: dark;
-      --bg: #060713;
-      --panel: rgba(19, 22, 42, 0.84);
-      --panel-soft: rgba(255, 255, 255, 0.045);
-      --line: rgba(192, 172, 255, 0.2);
-      --line-strong: rgba(192, 172, 255, 0.42);
-      --text: #f8f6ff;
-      --muted: #b8b5c8;
-      --violet: #b69cff;
-      --pink: #f3b4ff;
-      --cyan: #74e6f7;
-      --green: #8df0b0;
-      --nav-h: 5rem;
-      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --public-cyan:#65dcff;
+      --public-blue:#5688ff;
+      --public-violet:#a679ff;
+      --public-pink:#d67df0;
+      --public-gold:#ffd17a;
+      --public-green:#67e4ac;
+      --panel:rgba(8,12,31,.78);
+      --panel-strong:rgba(9,13,34,.94);
+      --line:rgba(167,145,255,.18);
+      --muted:#9ca9c3;
     }
-
-    * { box-sizing: border-box; }
-    html { scroll-behavior: smooth; scroll-padding-bottom: calc(var(--nav-h) + 1rem); }
+    * { box-sizing:border-box; }
+    html { scroll-behavior:smooth; }
     body {
-      margin: 0;
-      min-height: 100vh;
-      color: var(--text);
       background:
-        radial-gradient(circle at 12% 3%, rgba(112, 66, 255, 0.28), transparent 30rem),
-        radial-gradient(circle at 90% 12%, rgba(25, 191, 220, 0.15), transparent 28rem),
-        linear-gradient(150deg, #04050b 0%, var(--bg) 48%, #0b1022 100%);
-      overflow-x: hidden;
+        linear-gradient(rgba(110,122,255,.032) 1px,transparent 1px),
+        linear-gradient(90deg,rgba(110,122,255,.032) 1px,transparent 1px),
+        radial-gradient(circle at 12% 5%,rgba(63,155,255,.22),transparent 29rem),
+        radial-gradient(circle at 88% 4%,rgba(184,77,255,.24),transparent 30rem),
+        linear-gradient(180deg,#070b20 0%,#040713 61%,#03050b 100%);
+      background-size:48px 48px,48px 48px,auto,auto,auto;
     }
-
-    body::before {
-      content: "";
-      position: fixed;
-      inset: 0;
-      z-index: -1;
-      opacity: 0.15;
-      pointer-events: none;
-      background-image:
-        linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px);
-      background-size: 34px 34px;
-      mask-image: linear-gradient(to bottom, black 0%, transparent 88%);
+    .public-shell { width:min(1540px,calc(100% - 1.5rem)); margin:auto; padding:1rem 0 7rem; }
+    .public-masthead {
+      position:sticky; top:.65rem; z-index:50; display:flex; align-items:center; justify-content:space-between; gap:1rem;
+      padding:.72rem .86rem; border:1px solid rgba(155,164,255,.24); border-radius:1rem;
+      background:rgba(5,8,22,.84); backdrop-filter:blur(22px); box-shadow:0 18px 60px rgba(0,0,0,.28);
     }
+    .public-status { display:flex; align-items:center; gap:.55rem; color:#bcc6dd; text-decoration:none; font-size:.76rem; }
+    .public-status-dot { width:.52rem; height:.52rem; border-radius:999px; background:var(--public-green); box-shadow:0 0 16px rgba(92,224,163,.7); }
 
-    a { color: inherit; }
-    .shell { width: min(1160px, calc(100% - 2rem)); margin: 0 auto; padding-bottom: calc(var(--nav-h) + 3rem); }
-
-    .topbar {
-      position: sticky;
-      top: 0;
-      z-index: 20;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 1rem;
-      padding: 1rem 0;
-      backdrop-filter: blur(18px);
+    .intro {
+      display:grid; grid-template-columns:minmax(0,1.15fr) minmax(250px,.55fr); gap:2rem; align-items:end;
+      padding:clamp(3rem,6vw,5.3rem) clamp(.2rem,2vw,2rem) 1.45rem;
     }
-
-    .brand { display: flex; align-items: center; gap: 0.75rem; font-weight: 850; letter-spacing: -0.025em; }
-    .mark {
-      width: 2.3rem;
-      height: 2.3rem;
-      display: grid;
-      place-items: center;
-      border: 1px solid var(--line-strong);
-      border-radius: 0.85rem;
-      background: linear-gradient(145deg, #b69cff, #7347ee 55%, #22275f);
-      box-shadow: 0 0 34px rgba(182, 156, 255, 0.35);
-      color: #0b0716;
-      font-weight: 950;
+    .intro h1 { max-width:980px; margin:0; font-size:clamp(3.1rem,6.4vw,6.5rem); line-height:.9; letter-spacing:-.06em; }
+    .intro h1 span { background:linear-gradient(90deg,#fff 0%,#7ee7ff 40%,#bd8dff 78%); -webkit-background-clip:text; background-clip:text; color:transparent; }
+    .intro p { max-width:760px; margin:1rem 0 0; color:#b8c2d7; line-height:1.62; font-size:clamp(.98rem,1.35vw,1.12rem); }
+    .intro-console {
+      display:grid; gap:.6rem; padding:1rem; border:1px solid var(--line); border-radius:1rem;
+      background:linear-gradient(145deg,rgba(13,19,46,.9),rgba(11,8,30,.88)); box-shadow:0 18px 52px rgba(0,0,0,.22);
     }
+    .intro-console strong { font-size:.82rem; }
+    .intro-console small { color:var(--muted); line-height:1.45; }
+    .console-row { display:flex; align-items:center; justify-content:space-between; gap:.7rem; padding:.55rem .65rem; border:1px solid rgba(255,255,255,.06); border-radius:.72rem; background:rgba(255,255,255,.025); font-size:.69rem; }
+    .console-row b { color:#e8e4ff; }
+    .state-chip { display:inline-flex; align-items:center; gap:.35rem; padding:.25rem .46rem; border-radius:999px; font-size:.58rem; font-weight:900; letter-spacing:.06em; text-transform:uppercase; }
+    .state-chip.verified { color:#a5f7cf; background:rgba(80,208,148,.11); border:1px solid rgba(80,208,148,.25); }
+    .state-chip.boundary { color:#d9c7ff; background:rgba(166,121,255,.11); border:1px solid rgba(166,121,255,.24); }
+    .intro-note { margin:.15rem 0 0; color:#cfc8ea; font-size:.7rem; font-weight:800; letter-spacing:.02em; }
 
-    .status {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.55rem;
-      color: var(--muted);
-      text-decoration: none;
-      font-size: 0.86rem;
+    .public-dual { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1rem; align-items:stretch; }
+    .public-dual .view-card {
+      min-height:720px; overflow:hidden; border-color:rgba(159,142,255,.2);
+      background:linear-gradient(160deg,rgba(12,17,42,.92),rgba(6,8,24,.95));
+      box-shadow:0 28px 85px rgba(0,0,0,.3);
     }
-    .status-dot { width: 0.55rem; height: 0.55rem; border-radius: 999px; background: var(--green); box-shadow: 0 0 15px rgba(141,240,176,0.72); }
+    .view-menu { display:flex; flex-wrap:wrap; gap:.38rem; padding:.65rem 1rem; border-bottom:1px solid rgba(255,255,255,.06); }
+    .view-menu a { padding:.38rem .55rem; border-radius:.65rem; color:#aeb8ce; text-decoration:none; font-size:.68rem; font-weight:800; }
+    .view-menu a:first-child { color:#fff; background:color-mix(in srgb,var(--accent) 20%,transparent); }
 
-    .screen {
-      min-height: min(820px, calc(100svh - 5.4rem));
-      display: grid;
-      align-content: center;
-      gap: 1.35rem;
-      padding: clamp(4rem, 9vw, 8rem) 0;
-      border-bottom: 1px solid rgba(255,255,255,0.07);
-    }
-
-    .hero { grid-template-columns: minmax(0, 1fr) minmax(320px, 0.95fr); align-items: center; column-gap: clamp(2rem, 6vw, 5.5rem); }
-    .eyebrow {
-      display: inline-flex;
-      width: fit-content;
-      align-items: center;
-      gap: 0.5rem;
-      padding: 0.45rem 0.72rem;
-      border: 1px solid var(--line);
-      border-radius: 999px;
-      color: #e2d9ff;
-      background: rgba(94, 56, 190, 0.18);
-      font-size: 0.76rem;
-      font-weight: 800;
-      letter-spacing: 0.085em;
-      text-transform: uppercase;
-    }
-
-    h1, h2 { margin: 0; letter-spacing: -0.055em; line-height: 0.97; }
-    h1 { max-width: 780px; font-size: clamp(3.3rem, 8.5vw, 7.6rem); }
-    h2 { max-width: 760px; font-size: clamp(2.6rem, 6vw, 5.2rem); }
-    .gradient { background: linear-gradient(90deg, #fff 4%, var(--pink) 48%, var(--cyan)); -webkit-background-clip: text; background-clip: text; color: transparent; }
-    .lede { max-width: 760px; margin: 0; color: var(--muted); font-size: clamp(1.05rem, 2vw, 1.28rem); line-height: 1.68; }
-
-    .actions { display: flex; flex-wrap: wrap; gap: 0.8rem; margin-top: 0.45rem; }
-    .button {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      min-height: 3rem;
-      padding: 0.78rem 1.08rem;
-      border: 1px solid var(--line);
-      border-radius: 0.9rem;
-      text-decoration: none;
-      font-weight: 850;
-      background: rgba(255,255,255,0.04);
-    }
-    .button-primary { color: #0b0814; border-color: transparent; background: linear-gradient(100deg, #f6d3ff, #cbbcff 46%, #74e6f7); box-shadow: 0 18px 52px rgba(132, 89, 240, 0.22); }
-
-    .entry-panel {
-      display: grid;
-      gap: 0.9rem;
-      padding: clamp(1rem, 3vw, 1.35rem);
-      border: 1px solid rgba(205, 193, 255, 0.28);
-      border-radius: 1.6rem;
+    .view-hero.public-user {
+      min-height:285px; display:grid; align-content:center;
       background:
-        radial-gradient(circle at 20% 0%, rgba(116,230,247,.16), transparent 19rem),
-        linear-gradient(150deg, rgba(32,31,69,.94), rgba(10,12,28,.92));
-      box-shadow: 0 30px 90px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.08);
+        radial-gradient(circle at 78% 20%,rgba(255,207,110,.22),transparent 11rem),
+        radial-gradient(circle at 15% 75%,rgba(67,194,255,.13),transparent 12rem),
+        linear-gradient(145deg,rgba(25,74,124,.82),rgba(25,18,61,.62));
     }
-    .entry-panel h2 { font-size: clamp(1.75rem, 4vw, 2.7rem); letter-spacing: -.04em; line-height: 1.05; }
-    .entry-panel > p { margin: 0; color: #cac6da; line-height: 1.55; }
-    .entry-card {
-      display: grid;
-      gap: .5rem;
-      padding: 1.05rem;
-      border: 1px solid rgba(255,255,255,.1);
-      border-radius: 1.1rem;
-      text-decoration: none;
-      background: rgba(255,255,255,.045);
-      transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
+    .view-hero.public-founder {
+      min-height:245px; display:grid; align-content:center;
+      background:
+        radial-gradient(circle at 76% 17%,rgba(106,184,255,.23),transparent 13rem),
+        radial-gradient(circle at 16% 90%,rgba(181,100,255,.18),transparent 13rem),
+        linear-gradient(145deg,rgba(26,38,86,.88),rgba(30,14,67,.76));
     }
-    .entry-card:hover, .entry-card:focus-visible { transform: translateY(-2px); border-color: rgba(184,166,255,.58); background: rgba(182,156,255,.1); outline: none; }
-    .entry-card[data-entry-choice="user"] { box-shadow: inset 3px 0 0 rgba(116,230,247,.8); }
-    .entry-card[data-entry-choice="founder"] { box-shadow: inset 3px 0 0 rgba(182,156,255,.86); }
-    .entry-kicker { color: #dfd5ff; font-size: .72rem; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; }
-    .entry-card strong { font-size: 1.18rem; }
-    .entry-card span:last-child { color: var(--muted); line-height: 1.45; }
-    .entry-arrow { justify-self: end; color: #fff; font-weight: 900; }
-    .entry-truth { margin: .1rem 0 0; color: #9e99b2; font-size: .78rem; line-height: 1.5; }
+    .view-hero h2 { max-width:640px; margin:0; font-size:clamp(2rem,3.45vw,3.65rem); line-height:.94; letter-spacing:-.052em; }
+    .view-hero h2 em { font-style:normal; color:#83e3ff; }
+    .founder-view .view-hero h2 em { color:#c99dff; }
+    .role-action {
+      position:relative; z-index:3; display:inline-flex; width:max-content; margin-top:1rem; padding:.72rem .95rem;
+      border-radius:.82rem; background:linear-gradient(95deg,var(--public-cyan),#8279ff 58%,#bd70ed);
+      color:#07101c; text-decoration:none; font-size:.78rem; font-weight:900; box-shadow:0 14px 38px rgba(78,105,255,.26);
+    }
+    .founder-view .role-action { background:linear-gradient(95deg,#8bdcff,#9c7cff 45%,#d179ec); }
 
-    .onboarding-grid { display: grid; grid-template-columns: minmax(0,.85fr) minmax(0,1.15fr); gap: clamp(1.5rem,5vw,4rem); align-items: start; }
-    .start-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: .85rem; }
-    .start-card {
-      display: grid;
-      gap: .45rem;
-      min-height: 10rem;
-      padding: 1.15rem;
-      border: 1px solid rgba(255,255,255,.09);
-      border-radius: 1.15rem;
-      background: linear-gradient(155deg, rgba(26,29,56,.82), rgba(10,12,27,.88));
-      text-decoration: none;
+    .public-lanes { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.65rem; padding:1rem; }
+    .public-lane {
+      display:block; min-height:7.6rem; padding:.9rem; border:1px solid rgba(255,255,255,.075); border-radius:.9rem;
+      background:rgba(255,255,255,.035); text-decoration:none; transition:transform .18s ease,border-color .18s ease,background .18s ease;
     }
-    .start-card:hover, .start-card:focus-visible { border-color: rgba(144,214,255,.5); outline: 2px solid rgba(116,230,247,.35); outline-offset: 2px; }
-    .start-card strong { font-size: 1.08rem; }
-    .start-card p { margin: 0; color: var(--muted); line-height: 1.5; }
-    .onboarding-note { margin: 1rem 0 0; color: #aaa5bb; font-size: .84rem; line-height: 1.6; }
-    .steps { display: grid; gap: .8rem; counter-reset: founder-step; }
-    .step { position: relative; display: grid; grid-template-columns: auto 1fr; gap: .8rem; align-items: start; padding: 1rem; border: 1px solid rgba(255,255,255,.08); border-radius: 1rem; background: rgba(255,255,255,.04); }
-    .step::before { counter-increment: founder-step; content: counter(founder-step); display: grid; place-items: center; width: 2rem; height: 2rem; border-radius: .7rem; background: rgba(182,156,255,.16); color: #e9e1ff; font-weight: 900; }
-    .step strong { display: block; margin-bottom: .2rem; }
-    .step span { color: var(--muted); line-height: 1.45; }
-    .boundary-note { margin-top: 1rem; padding: .9rem 1rem; border-left: 3px solid rgba(182,156,255,.75); border-radius: .65rem; background: rgba(182,156,255,.07); color: #c8c3d7; line-height: 1.55; font-size: .86rem; }
+    .public-lane:hover,.public-lane:focus-visible { transform:translateY(-2px); border-color:rgba(101,220,255,.25); background:rgba(101,220,255,.055); outline:none; }
+    .public-lane strong,.public-lane small { display:block; }
+    .public-lane strong { margin-top:.35rem; font-size:.88rem; }
+    .public-lane small { color:#98a5be; line-height:1.45; font-size:.7rem; }
+    .public-lane .lane-kicker { color:#b4eaff; font-size:.62rem; font-weight:900; letter-spacing:.1em; text-transform:uppercase; }
 
-    .truth-card {
-      border: 1px solid var(--line);
-      border-radius: 1.5rem;
-      padding: 1.15rem;
-      background: linear-gradient(160deg, rgba(28, 24, 55, 0.94), rgba(8, 10, 21, 0.94));
-      box-shadow: 0 32px 90px rgba(0,0,0,0.42);
+    .founder-command { display:grid; gap:.65rem; padding:1rem; }
+    .command-pair { display:grid; grid-template-columns:1.08fr .92fr; gap:.65rem; }
+    .command-card {
+      min-height:8.7rem; padding:.9rem; border:1px solid rgba(255,255,255,.075); border-radius:.95rem;
+      background:linear-gradient(145deg,rgba(255,255,255,.045),rgba(255,255,255,.018));
     }
-    .truth-card-head { display: flex; justify-content: space-between; gap: 1rem; color: var(--muted); font-size: 0.76rem; padding: 0.25rem 0.2rem 0.95rem; }
-    .truth-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
-    .metric { min-height: 6.3rem; padding: 0.9rem; border: 1px solid rgba(255,255,255,0.07); border-radius: 1rem; background: var(--panel-soft); }
-    .metric strong { display: block; margin-top: 0.7rem; font-size: 1.05rem; }
-    .metric small { color: var(--muted); }
-    .metric-wide { grid-column: 1 / -1; }
+    .command-card.current { border-color:rgba(101,220,255,.18); background:linear-gradient(145deg,rgba(62,158,255,.09),rgba(255,255,255,.02)); }
+    .command-card.next { border-color:rgba(190,128,255,.23); background:linear-gradient(145deg,rgba(165,103,255,.12),rgba(255,255,255,.02)); }
+    .command-label { display:flex; align-items:center; justify-content:space-between; gap:.6rem; color:#99a6be; font-size:.61rem; font-weight:900; letter-spacing:.08em; text-transform:uppercase; }
+    .command-card strong { display:block; margin-top:.55rem; font-size:.96rem; line-height:1.24; }
+    .command-card p { margin:.42rem 0 0; color:#9ca9c1; font-size:.7rem; line-height:1.45; }
+    .action-rail { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:.5rem; }
+    .action-rail span {
+      padding:.62rem .5rem; border:1px solid rgba(160,141,255,.12); border-radius:.72rem; background:rgba(255,255,255,.026);
+      color:#d9d6ec; text-align:center; font-size:.66rem; font-weight:850;
+    }
+    .action-rail span::before { content:""; display:block; width:.36rem; height:.36rem; margin:0 auto .38rem; border-radius:999px; background:linear-gradient(120deg,var(--public-cyan),var(--public-violet)); box-shadow:0 0 12px rgba(126,141,255,.4); }
 
-    .screen-grid { display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); gap: clamp(1.5rem, 5vw, 4rem); align-items: start; }
-    .stack { display: grid; gap: 0.85rem; }
-    .card {
-      padding: 1.15rem;
-      border: 1px solid rgba(255,255,255,0.08);
-      border-radius: 1.1rem;
-      background: var(--panel);
-      backdrop-filter: blur(12px);
-    }
-    .card-kicker { color: #d9cffd; font-size: 0.74rem; font-weight: 850; letter-spacing: 0.08em; text-transform: uppercase; }
-    .card h3 { margin: 0.55rem 0 0.45rem; font-size: 1.12rem; }
-    .card p { margin: 0; color: var(--muted); line-height: 1.55; font-size: 0.93rem; }
-    .flow { display: flex; flex-wrap: wrap; align-items: center; gap: 0.55rem; margin-top: 0.65rem; color: #e9e3ff; font-weight: 760; font-size: 0.88rem; }
-    .flow span { padding: 0.42rem 0.58rem; border: 1px solid var(--line); border-radius: 0.7rem; background: rgba(112,66,255,0.09); }
+    .backend-paths { margin:0 1rem 1rem; padding:.86rem 1rem; border:1px solid rgba(170,119,255,.18); border-radius:1rem; background:rgba(142,89,255,.055); }
+    .backend-paths p { margin:0 0 .55rem; color:#e5dcff; font-size:.72rem; font-weight:850; }
+    .backend-paths ul { display:grid; gap:.4rem; margin:0; padding:0; list-style:none; color:#aeb8cf; font-size:.69rem; }
+    .backend-paths li { display:flex; justify-content:space-between; gap:1rem; }
+    .backend-paths code { color:#d8caff; font-size:.64rem; }
+    .truth-strip { display:flex; justify-content:space-between; gap:1rem; margin-top:auto; padding:.78rem 1rem; border-top:1px solid rgba(255,255,255,.06); color:#8f9bb4; font-size:.63rem; }
+
+    .onboarding { margin-top:1rem; padding:clamp(1.3rem,3vw,2rem); border:1px solid rgba(151,160,255,.18); border-radius:1.4rem; background:linear-gradient(145deg,rgba(11,19,42,.94),rgba(10,8,28,.95)); }
+    .onboarding-grid { display:grid; grid-template-columns:minmax(0,.86fr) minmax(0,1.14fr); gap:clamp(1.3rem,4vw,3.5rem); align-items:start; }
+    .onboarding h2,.info-section h2 { margin:0; font-size:clamp(2.2rem,4.8vw,4.8rem); line-height:.95; letter-spacing:-.05em; }
+    .onboarding .lede,.info-section .lede { color:#aeb8cf; line-height:1.65; }
+    .start-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.7rem; }
+    .start-card { min-height:9rem; padding:1rem; border:1px solid rgba(255,255,255,.075); border-radius:.95rem; background:rgba(255,255,255,.035); text-decoration:none; }
+    .start-card strong,.start-card span,.start-card p { display:block; }
+    .start-card span { color:#b7adff; font-size:.63rem; font-weight:900; letter-spacing:.1em; text-transform:uppercase; }
+    .start-card strong { margin-top:.35rem; }
+    .start-card p { margin:.35rem 0 0; color:#98a4bd; line-height:1.45; font-size:.76rem; }
+    .founder-steps { display:grid; gap:.6rem; }
+    .founder-step { display:grid; grid-template-columns:2rem 1fr; gap:.7rem; padding:.85rem; border:1px solid rgba(255,255,255,.07); border-radius:.9rem; background:rgba(255,255,255,.03); }
+    .founder-step b:first-child { display:grid; place-items:center; width:2rem; height:2rem; border-radius:.65rem; background:rgba(166,121,255,.14); color:#d7c5ff; }
+    .founder-step strong { display:block; }
+    .founder-step span { display:block; margin-top:.2rem; color:#98a5bd; font-size:.76rem; line-height:1.45; }
+    .boundary { margin-top:1rem; padding:.9rem 1rem; border-left:3px solid #9a7dff; border-radius:.45rem .8rem .8rem .45rem; background:rgba(142,102,255,.07); color:#aeb8cf; line-height:1.55; font-size:.78rem; }
+    .founder-auth { display:flex; flex-wrap:wrap; gap:.65rem; margin-top:1rem; }
+    .founder-auth a { padding:.72rem .9rem; border:1px solid rgba(166,135,255,.3); border-radius:.8rem; background:rgba(142,102,255,.08); color:#ece5ff; text-decoration:none; font-weight:850; font-size:.78rem; }
+    .founder-auth a:first-child { background:linear-gradient(95deg,#82dcff,#9678ff 52%,#d476ea); color:#090812; border-color:transparent; }
+
+    .info-section { display:grid; grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr); gap:2rem; align-items:start; padding:clamp(4rem,8vw,7rem) .4rem; border-bottom:1px solid rgba(255,255,255,.06); }
+    .info-cards { display:grid; gap:.65rem; }
+    .info-card { padding:1rem; border:1px solid rgba(255,255,255,.07); border-radius:.9rem; background:rgba(255,255,255,.03); }
+    .info-card b { color:#d9ceff; }
+    .info-card p { margin:.35rem 0 0; color:#9ea9c0; line-height:1.55; font-size:.8rem; }
 
     .bottom-nav {
-      position: fixed;
-      left: 50%;
-      bottom: max(0.7rem, env(safe-area-inset-bottom));
-      z-index: 50;
-      width: min(720px, calc(100% - 1rem));
-      min-height: var(--nav-h);
-      display: grid;
-      grid-template-columns: repeat(5, 1fr);
-      gap: 0.4rem;
-      padding: 0.5rem;
-      transform: translateX(-50%);
-      border: 1px solid rgba(198, 178, 255, 0.22);
-      border-radius: 1.35rem;
-      background: rgba(8, 10, 21, 0.9);
-      backdrop-filter: blur(22px);
-      box-shadow: 0 18px 65px rgba(0,0,0,0.45);
+      position:fixed; left:50%; bottom:max(.7rem,env(safe-area-inset-bottom)); z-index:70; width:min(720px,calc(100% - 1rem));
+      display:grid; grid-template-columns:repeat(5,1fr); gap:.35rem; padding:.46rem; transform:translateX(-50%);
+      border:1px solid rgba(166,139,255,.22); border-radius:1.15rem; background:rgba(5,8,22,.9); backdrop-filter:blur(22px); box-shadow:0 20px 60px rgba(0,0,0,.4);
     }
-    .bottom-nav a {
-      min-width: 0;
-      display: grid;
-      place-items: center;
-      gap: 0.2rem;
-      padding: 0.6rem 0.35rem;
-      border-radius: 0.95rem;
-      color: var(--muted);
-      text-decoration: none;
-      font-size: 0.73rem;
-      font-weight: 780;
-      text-align: center;
-    }
-    .bottom-nav a:hover, .bottom-nav a:focus-visible { color: var(--text); background: rgba(182,156,255,0.1); outline: 1px solid var(--line); }
-    .nav-glyph { display: block; font-size: 1rem; color: #e6ddff; }
+    .bottom-nav a { padding:.58rem .28rem; border-radius:.78rem; color:#a8b1c8; text-decoration:none; text-align:center; font-size:.67rem; font-weight:800; }
+    .bottom-nav a:focus-visible,.bottom-nav a:hover { outline:1px solid rgba(166,139,255,.35); color:#fff; background:rgba(156,118,255,.1); }
+    footer { display:flex; justify-content:space-between; gap:1rem; padding:2rem .25rem; color:#77839d; font-size:.7rem; }
 
-    footer { padding: 2rem 0 0.5rem; color: #8f8aa3; font-size: 0.82rem; text-align: center; }
-
-    @media (max-width: 860px) {
-      .hero, .screen-grid, .onboarding-grid { grid-template-columns: 1fr; }
-      .hero { align-content: start; }
-      .truth-card, .entry-panel { max-width: 650px; }
-      .screen { min-height: auto; }
+    @media(max-width:1000px) {
+      .intro { grid-template-columns:1fr; }
+      .intro-console { max-width:600px; }
+      .public-dual { grid-template-columns:1fr; }
+      .public-dual .view-card { min-height:660px; }
+      .onboarding-grid,.info-section { grid-template-columns:1fr; }
     }
-    @media (max-width: 580px) {
-      .shell { width: min(100% - 1.15rem, 1160px); }
-      .brand span:last-child { font-size: 0.9rem; }
-      .status span:last-child { display: none; }
-      h1 { font-size: clamp(3rem, 16vw, 4.8rem); }
-      h2 { font-size: clamp(2.6rem, 13vw, 4rem); }
-      .truth-grid, .start-grid { grid-template-columns: 1fr; }
-      .metric-wide { grid-column: auto; }
-      .actions { display: grid; }
-      .button { width: 100%; }
-      .bottom-nav { gap: 0.15rem; padding: 0.4rem; }
-      .bottom-nav a { font-size: 0.66rem; padding-inline: 0.15rem; }
+    @media(max-width:600px) {
+      .public-shell { width:min(100% - .75rem,1540px); }
+      .public-masthead { top:.35rem; }
+      .public-status span:last-child { display:none; }
+      .intro { padding-top:3.4rem; }
+      .intro h1 { font-size:clamp(2.85rem,15vw,4.7rem); }
+      .public-lanes,.start-grid,.command-pair { grid-template-columns:1fr; }
+      .action-rail { grid-template-columns:repeat(2,minmax(0,1fr)); }
+      .view-hero.public-user { min-height:265px; }
+      .view-menu { overflow:auto; flex-wrap:nowrap; }
+      .truth-strip { font-size:.6rem; }
+      .backend-paths li { display:block; }
+      .bottom-nav { gap:.12rem; padding:.38rem; }
+      .bottom-nav a { font-size:.61rem; padding-inline:.1rem; }
+      footer { flex-direction:column; }
     }
   </style>
 </head>
 <body>
-  <main class="shell">
-    <header class="topbar">
-      <div class="brand">
-        <div class="mark" aria-hidden="true">F</div>
-        <span>Founder Control Room</span>
-      </div>
-      <a class="status" href="https://www.foundercontrolroom.org/#proof" aria-label="Open the public proof screen">
-        <span class="status-dot" aria-hidden="true"></span>
-        <span>Public proof boundary</span>
+  <main class="public-shell">
+    <header class="public-masthead">
+      <a class="brand" href="#home" aria-label="Founder Control Room home">
+        <span class="brand-mark" aria-hidden="true">F</span>
+        <span><strong>FCR</strong><small>Founder Control Room</small></span>
+      </a>
+      <a class="public-status" href="https://www.foundercontrolroom.org/guardrails">
+        <span class="public-status-dot" aria-hidden="true"></span>
+        <span>Public truth boundary</span>
       </a>
     </header>
 
-    <section class="screen hero" id="home" data-public-screen="home" aria-labelledby="home-title">
+    <section class="intro" id="home" data-public-screen="home">
       <div>
-        <div class="eyebrow">Welcome to FCR</div>
-        <h1 id="home-title">People. Ideas.<br /><span class="gradient">Progress.</span></h1>
-        <p class="lede">
-          Discover founders and useful work, or step into a founder workspace built around reality, evidence, and the next thing that matters. The public doorway stays public. Private projects, approvals, credentials, and operating evidence stay behind product authentication.
-        </p>
-        <div class="actions">
-          <a class="button" href="/work.html">Explore public work</a>
-          <a class="button" href="/juss-rayy/">Meet Juss Rayy</a>
-        </div>
+        <p class="eyebrow">Founder operating system · public front door</p>
+        <h1>Know what’s real.<br /><span>Move what matters.</span></h1>
+        <p>FCR gives users a public window into useful founder work and gives founders a governed path into projects, proof, decisions, and the next action. Private state stays behind authentication.</p>
       </div>
-
-      <aside class="entry-panel" aria-labelledby="entry-title" data-fcr-entry>
-        <div class="eyebrow">Choose your path</div>
-        <h2 id="entry-title">What brings you to FCR?</h2>
-        <p>Same mission. Different experience and authority.</p>
-        <a class="entry-card" data-entry-choice="user" href="#discover">
-          <span class="entry-kicker">User view</span>
-          <strong>Explore &amp; Support</strong>
-          <span>Discover founders, learn, follow public progress, and support work you believe in.</span>
-          <span class="entry-arrow" aria-hidden="true">→</span>
-        </a>
-        <a class="entry-card" data-entry-choice="founder" href="#founder-start">
-          <span class="entry-kicker">Founder view</span>
-          <strong>Build &amp; Grow</strong>
-          <span>Bring your company or project into a workspace for goals, evidence, decisions, and progress.</span>
-          <span class="entry-arrow" aria-hidden="true">→</span>
-        </a>
-        <p class="entry-truth">Choosing a view does not grant private authority. Founder access still passes through FCR authentication.</p>
+      <aside class="intro-console" aria-label="FCR operating promise">
+        <strong>One control surface. Clear truth states.</strong>
+        <div class="console-row"><b>Public discovery</b><span class="state-chip verified">Live</span></div>
+        <div class="console-row"><b>Founder workspace</b><span class="state-chip boundary">Auth gated</span></div>
+        <small>Source, deployment, runtime, and outcome are never collapsed into the same claim.</small>
+        <p class="intro-note">Same mission. Bigger impact.</p>
       </aside>
     </section>
 
-    <section class="screen" id="discover" data-public-onboarding="user" aria-labelledby="discover-title">
+    <section class="public-dual" data-fcr-entry aria-label="Choose your FCR experience">
+      <article class="view-card user-view" aria-labelledby="user-view-title">
+        <header class="view-topbar">
+          <span class="view-brand">FCR</span>
+          <span class="view-badge">User View</span>
+        </header>
+        <nav class="view-menu" aria-label="User View navigation">
+          <a href="#discover">Discover</a><a href="#chief">Learn</a><a href="#proof">Trust</a><a href="/work.html">Community</a>
+        </nav>
+        <div class="view-hero public-user">
+          <p class="micro">People × ideas × impact</p>
+          <h2 id="user-view-title">Find real work.<br />Back a <em>brighter tomorrow.</em></h2>
+          <p>Explore public projects, founder stories, and proof without exposing anyone’s private operating state.</p>
+          <a class="role-action" data-entry-choice="user" href="#discover">Explore FCR →</a>
+        </div>
+        <div class="public-lanes">
+          <a class="public-lane" href="/work.html" aria-label="Explore public work"><span class="lane-kicker">Discover</span><strong>Founder work</strong><small>Products, projects, and public proof ready to be seen.</small></a>
+          <a class="public-lane" href="/juss-rayy/" aria-label="Meet Juss Rayy"><span class="lane-kicker">People</span><strong>Founder story</strong><small>Meet the person behind the work and why it exists.</small></a>
+          <a class="public-lane" href="#chief"><span class="lane-kicker">Learn</span><strong>How FCR works</strong><small>Intent, authority, evidence, Chief, and PromptOS.</small></a>
+          <a class="public-lane" href="#proof"><span class="lane-kicker">Trust</span><strong>Proof boundary</strong><small>See what is public, private, verified, or still unknown.</small></a>
+        </div>
+        <div class="truth-strip"><span>Public discovery</span><span>No owner authority</span></div>
+      </article>
+
+      <article class="view-card founder-view" aria-labelledby="founder-view-title">
+        <header class="view-topbar">
+          <span class="view-brand">FCR</span>
+          <span class="view-badge">Founder View</span>
+        </header>
+        <nav class="view-menu" aria-label="Founder View preview navigation">
+          <a href="#founder-start">Control</a><a href="#founder-start">Projects</a><a href="#proof">Proof</a><a href="#founder-start">Automations</a>
+        </nav>
+        <div class="view-hero public-founder">
+          <p class="micro">Observe · decide · act · prove</p>
+          <h2 id="founder-view-title">Your work has a <em>next gate.</em></h2>
+          <p>See current reality first, choose one bounded move, then keep evidence attached to what actually happened.</p>
+          <a class="role-action" data-entry-choice="founder" href="#founder-start">Enter Founder Path →</a>
+        </div>
+
+        <div class="founder-command" data-founder-command-preview>
+          <div class="command-pair">
+            <section class="command-card current" data-command-state="current-reality">
+              <div class="command-label"><span>Current Reality</span><span class="state-chip verified">Verified</span></div>
+              <strong>Know the state before the story.</strong>
+              <p>Repo, runtime, evidence, blockers, and unknowns stay separate so the dashboard cannot fake certainty.</p>
+            </section>
+            <section class="command-card next" data-command-state="next-gate">
+              <div class="command-label"><span>Next Gate</span><span class="state-chip boundary">One move</span></div>
+              <strong>Advance the smallest valid action.</strong>
+              <p>Build, fix, launch, or prove only after authority and the stop condition are clear.</p>
+            </section>
+          </div>
+          <div class="action-rail" aria-label="Founder action lanes">
+            <span>Build</span><span>Fix</span><span>Launch</span><span>Prove</span>
+          </div>
+        </div>
+
+        <div class="backend-paths">
+          <p>Existing product paths</p>
+          <ul>
+            <li><span>Authenticated workspace</span><code>/control-room/</code></li>
+            <li><span>Projects + missions</span><code>founder session</code></li>
+            <li><span>Evidence + proof</span><code>truth-bound</code></li>
+            <li><span>Content + automations</span><code>authority-gated</code></li>
+          </ul>
+        </div>
+        <div class="truth-strip"><span>Founder workspace preview</span><span>Authentication required for private state</span></div>
+      </article>
+    </section>
+
+    <section class="onboarding" id="discover" data-public-onboarding="user" aria-labelledby="discover-title">
       <div class="onboarding-grid">
         <div>
-          <div class="eyebrow">User onboarding</div>
+          <p class="eyebrow">User onboarding</p>
           <h2 id="discover-title">Start with what matters to you.</h2>
           <p class="lede">No account is required to explore the public FCR world. Pick a real starting lane now. Account-based interests and a personalized member feed are not claimed until member authentication exists.</p>
-          <p class="onboarding-note">Public browsing never exposes founder-only projects, approvals, credentials, private evidence, or owner controls.</p>
+          <p class="boundary">Public browsing never exposes founder-only projects, approvals, credentials, private evidence, or owner controls. Private projects, approvals, credentials, and operating evidence stay behind product authentication.</p>
         </div>
         <div class="start-grid" aria-label="Public FCR starting lanes">
-          <a class="start-card" href="/work.html" data-user-start="founders">
-            <span class="entry-kicker">Discover</span>
-            <strong>Founder work</strong>
-            <p>See public products, projects, proof, and useful work that is actually ready to be seen.</p>
-          </a>
-          <a class="start-card" href="/juss-rayy/" data-user-start="story">
-            <span class="entry-kicker">People</span>
-            <strong>Founder story</strong>
-            <p>Meet the person behind the work and understand what is being built and why.</p>
-          </a>
-          <a class="start-card" href="#chief" data-user-start="learn">
-            <span class="entry-kicker">Learn</span>
-            <strong>How FCR works</strong>
-            <p>Understand Chief, PromptOS, authority, and how FCR turns intent into controlled execution.</p>
-          </a>
-          <a class="start-card" href="#proof" data-user-start="proof">
-            <span class="entry-kicker">Trust</span>
-            <strong>See the proof boundary</strong>
-            <p>See what FCR can say publicly, what remains private, and why unknown stays unknown.</p>
-          </a>
+          <a class="start-card" href="/work.html" data-user-start="founders"><span>Discover</span><strong>Founder work</strong><p>See public products, projects, proof, and useful work that is actually ready to be seen.</p></a>
+          <a class="start-card" href="/juss-rayy/" data-user-start="story"><span>People</span><strong>Founder story</strong><p>Meet the person behind the work and understand what is being built and why.</p></a>
+          <a class="start-card" href="#chief" data-user-start="learn"><span>Learn</span><strong>How FCR works</strong><p>Understand Chief, PromptOS, authority, and controlled execution.</p></a>
+          <a class="start-card" href="#proof" data-user-start="proof"><span>Trust</span><strong>See the proof boundary</strong><p>See what FCR can say publicly, what remains private, and why unknown stays unknown.</p></a>
         </div>
       </div>
     </section>
 
-    <section class="screen" id="founder-start" data-public-onboarding="founder" aria-labelledby="founder-start-title">
+    <section class="onboarding" id="founder-start" data-public-onboarding="founder" aria-labelledby="founder-start-title">
       <div class="onboarding-grid">
         <div>
-          <div class="eyebrow">Founder onboarding</div>
-          <h2 id="founder-start-title">Turn what you are building into a working control room.</h2>
-          <p class="lede">The founder path begins with product authentication, then uses the existing FCR onboarding flow to establish the project, mission, current reality, and evidence connections before private workspace state is shown.</p>
-          <div class="actions">
-            <a class="button button-primary" href="/control-room/" data-founder-start="authenticated">Continue as a Founder</a>
-            <a class="button" href="/control-room/founder-shell.html">Preview the experience</a>
+          <p class="eyebrow">Founder onboarding</p>
+          <h2 id="founder-start-title">Build from reality, not dashboard theater.</h2>
+          <p class="lede">The founder path begins with product authentication, then reuses the existing FCR backend for project reality, missions, evidence, governed actions, content workflows, and verification.</p>
+          <div class="founder-auth">
+            <a href="/control-room/" data-founder-start="authenticated">Enter authenticated Control Room</a>
+            <a href="/control-room/founder-shell.html">Preview account boundaries</a>
           </div>
-          <p class="boundary-note"><strong>Authority boundary:</strong> the existing FCR owner session remains founder-gated. General member authentication and multi-tenant founder workspaces remain a separate implementation gate and are not silently simulated by this public screen.</p>
+          <p class="boundary"><strong>Authority boundary:</strong> General member authentication and multi-tenant founder workspaces remain a separate implementation gate. Connection never creates authority by itself. The existing FCR owner session remains founder-gated.</p>
         </div>
-        <div class="steps" aria-label="Founder onboarding steps">
-          <div class="step"><div><strong>You</strong><span>Authenticate through FCR so private workspace state is never exposed at the public doorway.</span></div></div>
-          <div class="step"><div><strong>What are you building?</strong><span>Set the project type, mission, current reality, repository or stack, and the work that matters now.</span></div></div>
-          <div class="step"><div><strong>What needs to move?</strong><span>Choose the current outcome and keep the next gate bounded instead of turning onboarding into a giant setup checklist.</span></div></div>
-          <div class="step"><div><strong>Connect evidence</strong><span>Add the providers and proof surfaces that can verify what really happened. Connection never creates authority by itself.</span></div></div>
-          <div class="step"><div><strong>Enter the Control Room</strong><span>See project reality, proof, decisions, and controlled actions only after the authority boundary is satisfied.</span></div></div>
+        <div class="founder-steps" aria-label="Founder onboarding path">
+          <div class="founder-step"><b>1</b><div><strong>Authenticate</strong><span>Private project state starts only after the FCR product boundary.</span></div></div>
+          <div class="founder-step"><b>2</b><div><strong>Establish project reality</strong><span>Mission, repo, runtime, blockers, and evidence stay distinct.</span></div></div>
+          <div class="founder-step"><b>3</b><div><strong>Choose one next gate</strong><span>FCR keeps work bounded instead of turning every session into a giant checklist.</span></div></div>
+          <div class="founder-step"><b>4</b><div><strong>Connect evidence</strong><span>Provider connections can observe or execute only within their own authority class.</span></div></div>
+          <div class="founder-step"><b>5</b><div><strong>Verify the real path</strong><span>Tests, browser proof, provider readback, runtime identity, and rollback remain separate receipts.</span></div></div>
         </div>
       </div>
     </section>
 
-    <section class="screen" id="control-room" data-public-screen="control-room" aria-labelledby="control-room-title">
-      <div class="screen-grid">
-        <div>
-          <div class="eyebrow">Founder Control Room</div>
-          <h2 id="control-room-title">The command surface.</h2>
-          <p class="lede">See project reality, approve bounded actions, inspect evidence, track costs, and move one thing forward without treating a green tool response as production truth.</p>
-          <div class="actions">
-            <a class="button button-primary" href="https://www.foundercontrolroom.org/control-room/">Enter authenticated Control Room</a>
-            <a class="button" href="https://www.foundercontrolroom.org/#proof">Read the proof boundary</a>
-          </div>
-        </div>
-        <div class="stack">
-          <article class="card"><span class="card-kicker">Observe</span><h3>Portfolio reality</h3><p>Repositories, runtime identity, checks, deployments, blockers, and evidence remain distinct truth planes.</p></article>
-          <article class="card"><span class="card-kicker">Decide</span><h3>Scoped authority</h3><p>Branch, patch, merge, deploy, provider mutation, publication, and destructive actions are separate permissions.</p></article>
-          <article class="card"><span class="card-kicker">Verify</span><h3>Proof before claims</h3><p>Browser and provider evidence must match the exact approved state before a launch or outcome becomes true.</p></article>
-        </div>
-      </div>
+    <section class="info-section" id="control-room" data-public-screen="control-room" aria-labelledby="control-room-title">
+      <div><p class="eyebrow">Founder Control Room</p><h2 id="control-room-title">The governed command surface.</h2><p class="lede">The public preview explains the product. The authenticated Control Room carries private projects, evidence, approvals, guarded execution, content workflows, and rollback.</p><p><a href="https://www.foundercontrolroom.org/control-room/">Open the owner control plane</a></p></div>
+      <div class="info-cards"><article class="info-card"><b>Observe</b><p>Repository state, runtime identity, provider state, database state, browser evidence, and human outcomes remain separate truth planes.</p></article><article class="info-card"><b>Decide</b><p>Branch, patch, merge, deploy, provider mutation, publication, credentials, and destructive actions remain separate authority classes.</p></article><article class="info-card"><b>Verify</b><p>Green source tests are never silently upgraded into a production claim.</p></article></div>
     </section>
 
-    <section class="screen" id="chief" data-public-screen="chief" aria-labelledby="chief-title">
-      <div class="screen-grid">
-        <div>
-          <div class="eyebrow">Chief</div>
-          <h2 id="chief-title">Authority for agent work.</h2>
-          <p class="lede">Chief turns founder intent into governed execution. It keeps permission, leases, receipts, evidence, and claims connected so an agent cannot quietly promote its own work into truth.</p>
-          <div class="flow" aria-label="Chief authority chain">
-            <span>Intent</span><strong>→</strong><span>Authority</span><strong>→</strong><span>Lease</span><strong>→</strong><span>Receipt</span><strong>→</strong><span>Evidence</span>
-          </div>
-        </div>
-        <div class="stack">
-          <article class="card"><span class="card-kicker">Why Chief exists</span><h3>Execution is not outcome</h3><p>A provider can accept an action while the human result is still unknown. Chief keeps that distinction explicit.</p></article>
-          <article class="card"><span class="card-kicker">Proof Mode</span><h3>Claims need witnesses</h3><p>Receipts say what executed. Evidence says what can be observed. Founder authority decides what may be claimed next.</p></article>
-          <article class="card"><span class="card-kicker">Inside FCR</span><h3>One governance plane</h3><p>Chief is presented here as a first-class product screen while Founder Control Room remains the portfolio authority surface.</p></article>
-        </div>
-      </div>
+    <section class="info-section" id="chief" data-public-screen="chief" aria-labelledby="chief-title">
+      <div><p class="eyebrow">Chief</p><h2 id="chief-title">Authority for agent work.</h2><p class="lede">Chief turns founder intent into governed execution. Permission, leases, receipts, evidence, and claims stay connected so an agent cannot quietly promote its own work into truth.</p></div>
+      <div class="info-cards"><article class="info-card"><b>Intent → authority</b><p>Chief turns founder intent into governed execution.</p></article><article class="info-card"><b>Execution ≠ outcome</b><p>A provider can accept an action while the real-world result is still unknown.</p></article><article class="info-card"><b>Proof Mode</b><p>Receipts record what executed. Evidence determines what may be claimed.</p></article></div>
     </section>
 
-    <section class="screen" id="promptos" data-public-screen="promptos" aria-labelledby="promptos-title">
-      <div class="screen-grid">
-        <div>
-          <div class="eyebrow">PromptOS</div>
-          <h2 id="promptos-title">Intent becomes a reusable operating asset.</h2>
-          <p class="lede">PromptOS is an intention compiler. It takes what the founder means, preserves the intent, and turns it into prompts, commands, workflows, skills, constraints, tests, aliases, and stop conditions that can be reused instead of rewritten from scratch.</p>
-          <div class="flow" aria-label="PromptOS compiler flow">
-            <span>Intent</span><strong>→</strong><span>Constraints</span><strong>→</strong><span>Workflow</span><strong>→</strong><span>Verification</span><strong>→</strong><span>Reusable asset</span>
-          </div>
-        </div>
-        <div class="stack">
-          <article class="card"><span class="card-kicker">Preserve meaning</span><h3>Improve the script, not the founder away</h3><p>PromptOS can make instructions clearer and more executable without changing the outcome the founder actually asked for.</p></article>
-          <article class="card"><span class="card-kicker">Remember patterns</span><h3>Approved workflows compound</h3><p>Good operating patterns become named assets with authority, privacy, schemas, versioning, aliases, tests, and rollback behavior attached.</p></article>
-          <article class="card"><span class="card-kicker">Generate new systems</span><h3>Patterns become factories</h3><p>Once a workflow is proven, PromptOS can use its structure to create the next prompt, skill, command, or operating procedure.</p></article>
-        </div>
-      </div>
+    <section class="info-section" id="promptos" data-public-screen="promptos" aria-labelledby="promptos-title">
+      <div><p class="eyebrow">PromptOS</p><h2 id="promptos-title">Turn intent into reusable operating assets.</h2><p class="lede">PromptOS is an intention compiler. It preserves what the founder means while turning it into reusable prompts, commands, workflows, constraints, tests, aliases, and stop conditions.</p></div>
+      <div class="info-cards"><article class="info-card"><b>Preserve meaning</b><p>Improve execution without rewriting the founder's actual goal.</p></article><article class="info-card"><b>Reuse proven patterns</b><p>Approved workflows become durable operating assets instead of repeated instructions.</p></article></div>
     </section>
 
-    <section class="screen" id="proof" data-public-screen="proof" aria-labelledby="proof-title">
-      <div class="screen-grid">
-        <div>
-          <div class="eyebrow">Proof</div>
-          <h2 id="proof-title">Public enough to trust. Private enough to operate.</h2>
-          <p class="lede">The public site explains what Founder Control Room, Chief, and PromptOS are. It does not publish founder sessions, private project state, credentials, customer data, raw internal evidence, or hidden operating instructions.</p>
-          <div class="actions">
-            <a class="button button-primary" href="https://www.foundercontrolroom.org/guardrails">View public guardrails</a>
-            <a class="button" href="https://www.foundercontrolroom.org/#home">Return home</a>
-          </div>
-        </div>
-        <div class="stack">
-          <article class="card"><span class="card-kicker">Reality</span><h3>Unknown stays unknown</h3><p>A draft, workflow run, provider acceptance, deployment, runtime observation, and human outcome are not interchangeable proof.</p></article>
-          <article class="card"><span class="card-kicker">Authority</span><h3>No silent permission carry-forward</h3><p>One approved action cannot quietly become permission to merge, deploy, publish, delete, spend, or expose private state.</p></article>
-          <article class="card"><span class="card-kicker">Recovery</span><h3>Reversible by design</h3><p>Focused changes, explicit rollback, and evidence-bound claims make the system easier to trust when agents move quickly.</p></article>
-        </div>
-      </div>
+    <section class="info-section" id="proof" data-public-screen="proof" aria-labelledby="proof-title">
+      <div><p class="eyebrow">Proof</p><h2 id="proof-title">Public enough to trust. Private enough to operate.</h2><p class="lede">FCR can explain the product, public work, and guardrails without publishing founder sessions, credentials, private project state, customer data, raw internal evidence, or hidden operating instructions.</p><p><a href="https://www.foundercontrolroom.org/guardrails">View public guardrails</a></p></div>
+      <div class="info-cards"><article class="info-card"><b>Reality</b><p>Unknown stays unknown. A draft, workflow run, or green unit test does not become a live outcome by wording.</p></article><article class="info-card"><b>Authority</b><p>Evidence can support a decision but cannot mint its own permission.</p></article></div>
     </section>
 
-    <footer>Founder Control Room · Chief · PromptOS · Intent → Authority → Execution → Evidence → Outcome</footer>
+    <footer><span>FCR · More builders. A brighter tomorrow.</span><span>Truth · Proof · Progress</span></footer>
   </main>
 
-  <nav class="bottom-nav" aria-label="Founder Control Room public screens" data-bottom-nav="five-screen">
-    <a href="https://www.foundercontrolroom.org/#home" data-nav-screen="home"><span class="nav-glyph" aria-hidden="true">⌂</span><span>Home</span></a>
-    <a href="https://www.foundercontrolroom.org/#control-room" data-nav-screen="control-room"><span class="nav-glyph" aria-hidden="true">◎</span><span>Control</span></a>
-    <a href="https://www.foundercontrolroom.org/#chief" data-nav-screen="chief"><span class="nav-glyph" aria-hidden="true">◇</span><span>Chief</span></a>
-    <a href="https://www.foundercontrolroom.org/#promptos" data-nav-screen="promptos"><span class="nav-glyph" aria-hidden="true">⌘</span><span>PromptOS</span></a>
-    <a href="https://www.foundercontrolroom.org/#proof" data-nav-screen="proof"><span class="nav-glyph" aria-hidden="true">✓</span><span>Proof</span></a>
+  <nav class="bottom-nav" data-bottom-nav="five-screen" aria-label="Public FCR screens">
+    <a href="#home" data-nav-screen="home">Home</a>
+    <a href="#control-room" data-nav-screen="control-room">Control Room</a>
+    <a href="#chief" data-nav-screen="chief">Chief</a>
+    <a href="#promptos" data-nav-screen="promptos">PromptOS</a>
+    <a href="#proof" data-nav-screen="proof">Proof</a>
   </nav>
 </body>
 </html>
