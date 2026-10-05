@@ -2,6 +2,11 @@ const API_ORIGIN = 'https://api.foundercontrolroom.org';
 const API_SERVICE_HEADER = 'x-founder-control-room-service';
 const EXPECTED_API_SERVICE = 'founder-control-room';
 const RETRY_AFTER_SECONDS = '120';
+const SYNC_CONTROL_ROUTE = '/api/project-control/sync';
+const SYNC_CONTROL_UPSTREAM = 'https://sync-party-game.mcgill-raylene.workers.dev/api/control-room/snapshot';
+const SYNC_CONTROL_SCHEMA = 'sync-control-room/v1';
+const SYNC_CONTROL_SERVICE = 'sync-party-game';
+const SYNC_CONTROL_REPOSITORY = 'jussray/sync-party-game';
 const STATIC_METHODS = new Set(['GET', 'HEAD']);
 const RETRYABLE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 const NON_RETRYABLE_GET_PATHS = new Set(['/auth/callback']);
@@ -20,6 +25,21 @@ const STATIC_DIRECTORY_PREFIXES = [
   '/juss-rayy',
 ];
 const CLOUDFLARE_UPSTREAM_FAILURES = new Set([520, 521, 522, 523, 524, 525, 526, 527, 530]);
+const SYNC_PROHIBITED_KEYS = new Set([
+  'room',
+  'roomCode',
+  'room_code',
+  'code',
+  'player',
+  'playerName',
+  'player_name',
+  'name',
+  'resumeToken',
+  'resume_token',
+  'answers',
+  'choiceIndex',
+  'choice_index',
+]);
 
 function shouldServeFromPages(request) {
   if (!STATIC_METHODS.has(request.method)) return false;
@@ -185,6 +205,91 @@ function upstreamFailureCode(response) {
   return null;
 }
 
+function syncRelayError(code, status = 502) {
+  return new Response(JSON.stringify({
+    ok: false,
+    error: 'SYNC Control Room relay could not verify upstream truth.',
+    code,
+  }), {
+    status,
+    headers: {
+      'Content-Type': 'application/json; charset=utf-8',
+      'Cache-Control': 'no-store',
+      'X-Content-Type-Options': 'nosniff',
+      'X-Robots-Tag': 'noindex, nofollow',
+    },
+  });
+}
+
+function hasProhibitedSyncKey(value) {
+  if (Array.isArray(value)) return value.some(hasProhibitedSyncKey);
+  if (!value || typeof value !== 'object') return false;
+  for (const [key, child] of Object.entries(value)) {
+    if (SYNC_PROHIBITED_KEYS.has(key)) return true;
+    if (hasProhibitedSyncKey(child)) return true;
+  }
+  return false;
+}
+
+function validSyncControlSnapshot(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  if (value.schema !== SYNC_CONTROL_SCHEMA || value.service !== SYNC_CONTROL_SERVICE) return false;
+  if (value.authority?.repository !== SYNC_CONTROL_REPOSITORY) return false;
+  if (!value.runtime || !value.control) return false;
+  if (value.control.rooms !== undefined || hasProhibitedSyncKey(value)) return false;
+
+  const sha = value.runtime.sha;
+  if (sha !== null && sha !== undefined && !/^[0-9a-f]{40}$/.test(sha)) return false;
+  const fingerprint = value.control.control_fingerprint;
+  if (fingerprint !== null && fingerprint !== undefined && !/^[0-9a-f]{64}$/.test(fingerprint)) return false;
+  const cookie = value.control.continuity_cookie;
+  if (cookie !== null && cookie !== undefined && !/^sync-control-v1\.[0-9a-f]{16}\.[0-9]+$/.test(cookie)) return false;
+  if (!Array.isArray(value.control.recent_events)) return false;
+  return true;
+}
+
+async function relaySyncControl(request, env) {
+  if (!STATIC_METHODS.has(request.method)) {
+    return new Response(null, { status: 405, headers: { Allow: 'GET, HEAD' } });
+  }
+
+  const upstreamRequest = new Request(SYNC_CONTROL_UPSTREAM, {
+    method: 'GET',
+    headers: { Accept: 'application/json' },
+    redirect: 'error',
+  });
+
+  let response;
+  try {
+    response = env?.SYNC_CONTROL && typeof env.SYNC_CONTROL.fetch === 'function'
+      ? await env.SYNC_CONTROL.fetch(upstreamRequest)
+      : await fetch(upstreamRequest);
+  } catch {
+    return syncRelayError('SYNC_CONTROL_UPSTREAM_UNREACHABLE', 503);
+  }
+
+  if (!response.ok) return syncRelayError('SYNC_CONTROL_UPSTREAM_FAILED', 502);
+
+  let snapshot;
+  try {
+    snapshot = await response.json();
+  } catch {
+    return syncRelayError('SYNC_CONTROL_INVALID_JSON', 502);
+  }
+  if (!validSyncControlSnapshot(snapshot)) {
+    return syncRelayError('SYNC_CONTROL_PRIVACY_OR_IDENTITY_MISMATCH', 502);
+  }
+
+  const headers = new Headers({
+    'Content-Type': 'application/json; charset=utf-8',
+    'Cache-Control': 'no-store',
+    'X-Content-Type-Options': 'nosniff',
+    'X-Robots-Tag': 'noindex, nofollow',
+    'X-Founder-Control-Room-Project-Source': SYNC_CONTROL_SERVICE,
+  });
+  return new Response(request.method === 'HEAD' ? null : JSON.stringify(snapshot), { status: 200, headers });
+}
+
 export default {
   async fetch(request, env) {
     if (!env?.ASSETS || typeof env.ASSETS.fetch !== 'function') {
@@ -194,6 +299,10 @@ export default {
     const requestUrl = new URL(request.url);
     if (requestUrl.origin === API_ORIGIN) {
       return new Response('Founder Control Room proxy loop blocked.', { status: 508 });
+    }
+
+    if (requestUrl.pathname === SYNC_CONTROL_ROUTE) {
+      return relaySyncControl(request, env);
     }
 
     if (shouldServeFromPages(request)) {

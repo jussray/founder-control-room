@@ -1,6 +1,11 @@
 name: Buffer Provider Contract
 
 on:
+  push:
+    paths:
+      - 'plugins/buffer-control/**'
+      - 'scripts/verify-buffer-control-plugin.mjs'
+      - '.github/workflows/buffer-provider-contract.yml'
   pull_request:
     paths:
       - 'config/buffer-provider-contract.json'
@@ -12,6 +17,8 @@ on:
       - 'docs/founder-signal-engine/remote-mcp-bridge.md'
       - '.ai/skills/claude-zapier-founder-operator/SKILL.md'
       - 'scripts/verify-zapier-task-budget.mjs'
+      - 'scripts/verify-buffer-control-plugin.mjs'
+      - 'plugins/buffer-control/**'
       - 'test/ai-company-parity.test.ts'
       - 'tools/zapier/buffer-attack-ten.cjs'
       - 'tools/zapier/buffer-content-firewall.cjs'
@@ -39,7 +46,7 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Check out exact candidate head
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ env.EXPECTED_HEAD_SHA }}
           persist-credentials: false
@@ -52,9 +59,12 @@ jobs:
           test "$actual" = "$EXPECTED_HEAD_SHA"
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '24'
+
+      - name: Verify governed Buffer MCP plugin package
+        run: node scripts/verify-buffer-control-plugin.mjs
 
       - name: Verify executable Buffer review-window contract
         run: npm run verify:buffer-content

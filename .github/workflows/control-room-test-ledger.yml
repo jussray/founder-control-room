@@ -28,21 +28,47 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Check out exact head
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ env.EXPECTED_HEAD_SHA }}
+          persist-credentials: false
 
       - name: Record and verify exact head
         shell: bash
         run: |
+          set -euo pipefail
           actual="$(git rev-parse HEAD)"
           printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
           test "$actual" = "$EXPECTED_HEAD_SHA"
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '24'
+
+      - name: Verify portable agent contract in required merge membrane
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const crypto = require('node:crypto');
+          const expectedFingerprint = 'sha256:f0262e382adb0c65bd7d430db92584cdc31316b2c0bbff07bc9afea0bab58f05';
+          const path = '.control-room/agent-contract.v1.json';
+          const fail = (message) => { console.error(`required-agent-contract: ${message}`); process.exit(1); };
+          if (!fs.existsSync(path)) fail(`missing ${path}`);
+          const contract = JSON.parse(fs.readFileSync(path, 'utf8'));
+          if (contract.contract !== 'juss/agent-contract@v1' || contract.version !== 1 || contract.status !== 'active') fail('identity/version/status drift');
+          if (contract.binding?.repository !== process.env.GITHUB_REPOSITORY) fail('repository binding mismatch');
+          if (contract.kernelFingerprint !== expectedFingerprint) fail('canonical kernel fingerprint drift');
+          const actualFingerprint = `sha256:${crypto.createHash('sha256').update(JSON.stringify(contract.kernel)).digest('hex')}`;
+          if (actualFingerprint !== expectedFingerprint) fail('kernel bytes no longer match canonical v1');
+          for (const invariant of ['humanAuthorityIsRoot','consensusDoesNotAuthorizeMutation','mutationRequiresBoundAuthority','ambiguousMutationRequiresReconciliation','staleProofCannotCarryForward','localStricterRulesWin']) {
+            if (contract.kernel?.invariants?.[invariant] !== true) fail(`merge invariant disabled: ${invariant}`);
+          }
+          const authority = String(contract.binding?.authorityRule ?? '');
+          if (!authority.includes('no merge') || !authority.includes('deploy')) fail('contract may not grant merge/deploy authority');
+          console.log(`required-agent-contract VERIFIED ${process.env.GITHUB_REPOSITORY} ${expectedFingerprint}`);
+          NODE
 
       - name: Run control-room test-ledger contracts
         run: node --test test/control-room-test-ledger.test.mjs
@@ -54,19 +80,21 @@ jobs:
     timeout-minutes: 25
     steps:
       - name: Check out exact head
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ env.EXPECTED_HEAD_SHA }}
+          persist-credentials: false
 
       - name: Record and verify exact head
         shell: bash
         run: |
+          set -euo pipefail
           actual="$(git rev-parse HEAD)"
           printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
           test "$actual" = "$EXPECTED_HEAD_SHA"
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '24'
 
@@ -77,7 +105,7 @@ jobs:
 
       - name: Upload repository-local Control Room ledger
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: control-room-test-ledger-${{ env.EXPECTED_HEAD_SHA }}
           path: artifacts/control-room-test-ledger.json
