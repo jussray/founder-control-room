@@ -15,7 +15,7 @@ describe('QuickScan outreach negotiation contract', () => {
     expect(QUICKSCAN_CHIEF_SYSTEM_PROMPT).toContain('Never invent competing offers, deadlines, demand, or scarcity');
     expect(QUICKSCAN_CHIEF_SYSTEM_PROMPT).toContain('STRUCTURE before TERMS');
     expect(QUICKSCAN_CHIEF_SYSTEM_PROMPT).toContain('Never lie, omit required disclosures, or create a false impression');
-    expect(QUICKSCAN_CHIEF_SYSTEM_PROMPT).toContain('observable next step or question');
+    expect(QUICKSCAN_CHIEF_SYSTEM_PROMPT).toContain('concrete next step or question whose answer can be observed and recorded');
   });
 
   it('versions the workflow when negotiation behavior changes', () => {
