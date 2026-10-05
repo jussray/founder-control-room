@@ -1,8 +1,16 @@
 import { describe, expect, it, vi } from 'vitest';
 
-// The publisher is exercised through injected dependencies; never build the real
-// Supabase client at import time (it throws when SUPABASE_URL is absent).
-vi.mock('../../lib/supabaseClient.js', () => ({ supabase: {} }));
+vi.mock('../../events/inbox.js', () => ({
+  persistProviderEvent: vi.fn(),
+}));
+
+vi.mock('../../events/outbox.js', () => ({
+  enqueueReconcile: vi.fn(),
+}));
+
+vi.mock('../../lib/supabaseClient.js', () => ({
+  supabase: {},
+}));
 
 import {
   CLOUDFLARE_RUNTIME_SIGNAL_CONTRACT,
