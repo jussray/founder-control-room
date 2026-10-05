@@ -2,7 +2,7 @@ export const CAPITAL_CONTROL_CONTRACT = 'fcr/capital-control-architecture@v1' as
 
 export type CapitalArchitectureState = 'design_only' | 'legally_verified';
 export type InvestmentLane = 'portfolio' | 'project';
-export type CapitalDecision = 'allow' | 'reconfirm' | 'deny';
+export type CapitalDecision = 'reconfirm' | 'deny';
 
 export type CapitalAction =
   | 'claim-parent-formed'
@@ -78,6 +78,7 @@ export const CAPITAL_CONTROL_ARCHITECTURE = {
     'a project-level raise must not silently transfer portfolio IP or another project economic interest',
     'founder-control surrender is never an automated capital action',
     'capital policy evaluation never authorizes execution of a consequential legal or securities action',
+    'caller-supplied evidence labels never prove a legal-state claim by themselves',
     'no public offering may be represented as live before the issuer, compliance path, required intermediary, and disclosure packet are independently verified',
   ],
 } as const;
@@ -199,15 +200,17 @@ export function evaluateCapitalAction(request: CapitalActionRequest): CapitalAct
       executionAuthorized: false,
       missingClaims: [],
       reasons: [
-        'capital policy evidence is complete, but this evaluator is advisory only; separate verified legal and founder execution authority is still required',
+        'capital policy evidence labels are complete, but this evaluator is advisory only; separate trusted evidence verification and founder/legal execution authority are still required',
       ],
     };
   }
 
   return {
-    decision: 'allow',
+    decision: 'reconfirm',
     executionAuthorized: false,
     missingClaims: [],
-    reasons: ['all registered evidence requirements for this non-executing capital claim are satisfied'],
+    reasons: [
+      'capital evidence labels are complete, but this v1 evaluator does not verify their provenance; independent trusted evidence verification is required before recording the legal-state claim',
+    ],
   };
 }
