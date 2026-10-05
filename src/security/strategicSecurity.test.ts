@@ -109,6 +109,33 @@ describe('strategic security v10', () => {
     ]));
   });
 
+  it('does not let declared scope substitute for enforced runtime authority', () => {
+    const accidentallyExposedRuntimeCapability = true;
+    const promptDeclaresCapabilityUnavailable = true;
+
+    expect(accidentallyExposedRuntimeCapability).toBe(true);
+    expect(promptDeclaresCapabilityUnavailable).toBe(true);
+
+    expect(validateStrategicSecurityExecution({
+      expectedHeadSha: 'b'.repeat(40),
+      rollback: 'Revoke the exposed capability and restore the prior runtime boundary.',
+      proofRequirements: ['runtime authority readback', 'containment verification'],
+      requestedAuthority: 'privileged',
+      approvalBound: true,
+      providerAuthorityDeclared: false,
+    })).toContain('Provider authority must be declared before non-reasoning security execution.');
+
+    expect(STRATEGIC_SECURITY_STAGES[5]?.controls).toEqual(expect.arrayContaining([
+      'kill-switches',
+      'session-revocation',
+      'quarantine',
+    ]));
+    expect(STRATEGIC_SECURITY_STAGES[7]?.controls).toEqual(expect.arrayContaining([
+      'incident-state-machine',
+      'recovery-runbook',
+    ]));
+  });
+
   it('uses minimum defensive force instead of treating every anomaly as an attack', () => {
     expect(strategicSecurityDecision({ risk: 'low', evidenceConfidence: 'low', privilegedAction: false, containmentAvailable: true })).toBe('allow');
     expect(strategicSecurityDecision({ risk: 'medium', evidenceConfidence: 'medium', privilegedAction: false, containmentAvailable: true })).toBe('limit');
