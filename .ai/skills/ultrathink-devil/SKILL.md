@@ -3,8 +3,8 @@ name: ultrathink-devil
 description: >
   Bounded high-effort reasoning plus adversarial review for Juss-owned work.
   Use before material portfolio, product, engineering, launch, revenue,
-  publishing, provider, database, or cross-project decisions. More intelligence
-  never means more authority.
+  publishing, provider, database, runtime, or cross-project decisions. More
+  intelligence never means more authority.
 version: 1.1.0
 owner: Juss
 triggers:
@@ -38,9 +38,9 @@ to secrets.
 Keep these independent:
 
 - **Authority plane:** platform/system/developer/user/tool and repository/provider authority.
-- **Reasoning plane:** ULTRATHINK, ATTACK N, Lindy, Red Team, OODA, L99.
-- **Evidence plane:** TRUE-first, truth, confess, proof mode, receipts, fingerprints/cookies.
-- **Execution plane:** goalfix, repair, artifact, release.
+- **Reasoning plane:** ULTRATHINK, ATTACK N, Lindy I/II, Red Team I/II, Socratic falsification, MoSCoW, Pareto 80/20, OODA, L99.
+- **Evidence plane:** TRUE-first, runtime-first 5W1H, truth, confess, proof mode, receipts, fingerprints/cookies.
+- **Execution plane:** goalfix, repository-native implementation, Python/JavaScript when appropriate, repair, artifact, release.
 - **Presentation plane:** human, concise, technical.
 
 A mode may compose across planes. It never promotes itself into a higher authority plane.
@@ -70,6 +70,35 @@ Consequence classes:
 
 `informational | reversible | consequential | irreversible`
 
+## Runtime First-Class Kernel
+
+Runtime truth outranks labels, prose, provider wording, and synthesized attribution.
+
+For runtime-sensitive work:
+
+1. Preserve the **exact request** and **exact observed response** as immutable evidence.
+2. Diagnose the **last execution boundary proven to have received the request** and the
+   **first forward transition that cannot be proven**.
+3. Keep forensic actor attribution separate from authority:
+   - `WHO` remains `UNKNOWN` until the runtime actor that produced the outcome is proven.
+   - An executor may be `PROVEN` while its authority is `UNAUTHORIZED` or `UNKNOWN`.
+4. Never attribute a refusal, error, stop, provider code, HTTP status, message text, or
+   customer-visible wording to a component merely from that wording or status.
+5. Represent every 5W1H slot with `value`, `status`, and `evidence`:
+   - **Who** — requester, decision owner, execution actor, authority.
+   - **What** — exact requested action and exact observed outcome.
+   - **Where** — repository, environment, runtime, provider, route, job, process, or boundary.
+   - **When** — evidence timestamp, commit/deployment/runtime identity, sequence.
+   - **Why** — proven policy/rule/cause only when evidenced; otherwise `UNKNOWN`.
+   - **How** — proven path, transition, tool/provider call, or mechanism.
+6. `VERIFIED` requires minimum runtime proof for relevant `WHAT`, `WHERE`, and `WHEN`,
+   plus environment/artifact bindings. Do not mark `WHO`, `WHY`, or `HOW` verified unless
+   their evidence independently supports them.
+7. If the evidence stops at a boundary, say so. Do not fill the gap with a plausible actor.
+
+Prospective authority remains a precondition for action. Forensic attribution remains a
+separate evidence question after or during observation.
+
 ## TRUE-first and bad-state gate
 
 Build the strongest evidence-bound TRUE baseline before attacking contradictions.
@@ -88,6 +117,44 @@ For repository or provider work:
 
 `STALE` is not automatically `FALSE`. A predecessor green receipt is history, not
 proof for a moved head, changed payload, changed provider state, or successor runtime.
+
+## Decision lenses
+
+These lenses sharpen a decision. They do not create evidence or authority.
+
+### Socratic falsification
+
+Interrogate the claim before optimizing it:
+
+- What do we know?
+- How do we know it?
+- What assumption carries the most weight?
+- What evidence would reverse the conclusion?
+- What alternative explanation fits the same observations?
+- What is still unknown?
+
+### MoSCoW
+
+Prioritize after evidence and authority are established:
+
+- **Must:** required for the founder outcome, safety, correctness, authority, or proof.
+- **Should:** high-value but not blocking the valid path.
+- **Could:** useful only if budget remains after the bottleneck moves.
+- **Won't now:** explicitly deferred, not silently forgotten.
+
+Never demote a required safety, authorization, evidence, or rollback gate to "Should" or "Could".
+
+### Pareto 80/20
+
+Seek the smallest set of actions that removes most of the bottleneck or creates most of
+the founder value. Use 80/20 to cut waste, not to skip correctness, proof, or required gates.
+
+### Lindy twins
+
+- **Lindy I:** before selection, prefer fixes and architecture that remain understandable,
+  reversible, interoperable, and supportable over fragile novelty.
+- **Lindy II:** after selection, attack whether the chosen fix creates avoidable future
+  maintenance, lock-in, hidden state, or migration debt.
 
 ## Adaptive execution budget
 
@@ -142,19 +209,27 @@ FOUNDER INTENT
   ↓
 TRUE-FIRST BASELINE + CURRENT FINGERPRINT
   ↓
+RUNTIME FIRST-CLASS 5W1H + BOUNDARY DIAGNOSIS
+  ↓
+SOCRATIC FALSIFICATION
+  ↓
 ULTRATHINK
   ↓
 ATTACK N
   ↓
-LINDY
+LINDY I
   ↓
 RED TEAM I — ATTACK THE PREMISE
+  ↓
+MOSCOW + PARETO 80/20
   ↓
 L99 / OPTIONS / DECIDE
   ↓
 GOALFIX — SMALLEST SAFE CAUSAL REPAIR
   ↓
-RED TEAM II — ATTACK THE SELECTED FIX
+REPOSITORY-NATIVE IMPLEMENTATION
+  ↓
+RED TEAM II + LINDY II — ATTACK THE SELECTED FIX
   ↓
 PROOFMODE
   ↓
@@ -171,7 +246,20 @@ Reasoning may run in parallel. Mutation authority stays serialized.
 Manual command invocation is emphasis or override, not a requirement when intent
 already clearly activates an existing lane.
 
-## Devil I — premise attack
+## Implementation-language rule
+
+Turn founder intent into the code the owning repository actually needs.
+
+- Preserve the repository's native language, framework, conventions, tests, and deployment path.
+- Use **Python** when it is the narrowest fit for analysis, data, automation, verification,
+  orchestration, or an existing Python-owned surface.
+- Use **JavaScript/TypeScript** when it is the narrowest fit for browser, Node.js,
+  web/runtime, API, workflow, or an existing JS/TS-owned surface.
+- Never rewrite a working subsystem into Python or JavaScript merely because either is available.
+- Prefer one reversible causal patch over broad refactors.
+- Preserve unrelated work and existing carriers.
+
+## Devil / Red Team I — premise attack
 
 Ask:
 
@@ -202,7 +290,7 @@ For each option identify:
 
 Do not pad the list with weak alternatives.
 
-## Devil II — selected-path attack
+## Devil / Red Team II — selected-path attack
 
 Before mutation, attack the chosen path:
 
@@ -216,6 +304,7 @@ Before mutation, attack the chosen path:
 - Can failure be rolled back cleanly?
 - Are we creating duplicate architecture or another unnecessary carrier?
 - Is the chosen action still the current bottleneck removal?
+- Did we attribute `WHO` beyond what runtime evidence proves?
 
 If the attack exposes a material defect, repair the plan before acting.
 
@@ -233,16 +322,16 @@ OAuth/provider access, project lifecycle, migrations, or Supabase-backed runtime
 3. **Lifecycle before code.** If the current provider state is paused, archived, degraded,
    inaccessible, or identity-mismatched, resolve/classify that before debugging application
    code that depends on the backend.
-4. **Separate authority relationships.** Organization membership is not project/runtime
-   authority. OAuth approval is not database mutation authority. User authentication is not
+4. **Separate authority relationships.** Organization membership is not project/runtime authority.
+   OAuth approval is not database mutation authority. User authentication is not
    service-role authority. Record each lane independently.
 5. **Migration access contract.** For every new `public` table created by a migration dated
    on or after **2026-09-27**, declare intended Data API exposure in the same migration with
    explicit `GRANT` and/or `REVOKE` decisions for `anon`, `authenticated`, and
    `service_role` as appropriate. This prepares for Supabase's **2026-10-30** change.
    RLS and SQL grants are separate controls; configure both intentionally.
-6. **DDL proof.** After DDL, run focused schema/readback proof and Supabase security and
-   performance advisors before calling the database change complete.
+6. **DDL proof.** After DDL, run focused schema/readback proof plus relevant Supabase
+   security and performance advisors before calling the database change complete.
 7. **Least privilege.** Scope provider tokens/OAuth capabilities by organization, project,
    and permission when supported. Do not give Chief, PromptOS, Council reviewers, or any
    other agent a portfolio-wide god credential merely because a narrower capability works.
@@ -282,6 +371,7 @@ Examples:
 - touched code → focused tests plus relevant type/lint/build;
 - user-facing browser flow → Playwright;
 - deployment/runtime claim → exact deployment/provider/runtime readback;
+- runtime attribution claim → exact request/response + boundary evidence + proven actor;
 - database claim → authoritative schema/query/readback evidence plus relevant advisors after DDL;
 - Supabase lifecycle claim → live project/provider state, not email alone;
 - Supabase migration claim → exact migration + grants/RLS contract + target schema readback;
@@ -308,6 +398,7 @@ Never infer that higher reasoning effort authorizes:
 
 Authentication is not authorization.
 Organization membership is not runtime authority.
+Observed execution is not proof of authorized execution.
 Provider acceptance is not verified outcome.
 Public is not monetized.
 Green is not proof if the real path never ran.
@@ -342,11 +433,12 @@ For repository repair:
 ```text
 ULTRATHINK / ATTACK N
   → establish TRUE-first reality and consequence
+  → runtime-first 5W1H / boundary diagnosis
   → Devil I
   → /goalfix smallest-safe causal fix
-  → focused implementation
+  → repository-native implementation
   → task-specific proof
-  → Devil II
+  → Devil II + Lindy II
   → exact-head / provider / runtime re-observation
   → successor fingerprint + continuity receipt
   → REALITY / FIX / PROOF / RISK / ROLLBACK / NEXT GATE
@@ -382,6 +474,9 @@ ROLLBACK:
 BLOCKED:
 NEXT GATE:
 ```
+
+For runtime-sensitive work, include the proven boundary and leave `WHO` unknown unless
+attribution evidence crosses that gate.
 
 When a provider is material, include its current verified state and evidence timestamp.
 When strategic choice matters, also include:
