@@ -1,4 +1,5 @@
 name: FCR Remote Video Render
+run-name: FCR video render ${{ inputs.request_id || github.run_id }}
 
 on:
   push:
@@ -10,8 +11,20 @@ on:
       - '.github/workflows/video-remote-render.yml'
   workflow_dispatch:
     inputs:
+      request_id:
+        description: 'Caller-generated request identifier used only for correlation.'
+        required: false
+        type: string
+      expected_head_sha:
+        description: 'Exact current main SHA observed before dispatch.'
+        required: false
+        type: string
+      input_sha256:
+        description: 'SHA-256 of the canonical timeline_json payload.'
+        required: false
+        type: string
       timeline_json:
-        description: 'Validated FCR timeline JSON. Leave blank for the proof render.'
+        description: 'Validated graphic-only FCR timeline JSON. Local paths are rejected. Leave blank for the proof render.'
         required: false
         type: string
 
@@ -22,6 +35,11 @@ concurrency:
   group: fcr-video-render-queue
   cancel-in-progress: false
 
+env:
+  EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha || github.sha }}
+  REQUEST_ID: ${{ inputs.request_id || '' }}
+  EXPECTED_INPUT_SHA: ${{ inputs.input_sha256 || '' }}
+
 jobs:
   render:
     runs-on: ubuntu-latest
@@ -29,8 +47,18 @@ jobs:
     steps:
       - name: Check out exact render subject
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          fetch-depth: 1
+          persist-credentials: false
       - name: Verify exact head
-        run: test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            test "$GITHUB_SHA" = "$EXPECTED_HEAD_SHA"
+          fi
       - name: Set up Node
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
         with:
@@ -45,7 +73,25 @@ jobs:
         run: |
           mkdir -p .tmp/remote-video
           node --input-type=module <<'NODE'
+          import crypto from 'node:crypto';
           import fs from 'node:fs';
+
+          function canonicalJson(value) {
+            if (value === null || typeof value === 'string' || typeof value === 'boolean') return JSON.stringify(value);
+            if (typeof value === 'number') {
+              if (!Number.isFinite(value)) throw new TypeError('canonical JSON rejects non-finite numbers');
+              return JSON.stringify(Object.is(value, -0) ? 0 : value);
+            }
+            if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
+            if (value && typeof value === 'object') {
+              const entries = Object.entries(value)
+                .filter(([, child]) => child !== undefined)
+                .sort(([left], [right]) => left.localeCompare(right));
+              return `{${entries.map(([key, child]) => `${JSON.stringify(key)}:${canonicalJson(child)}`).join(',')}}`;
+            }
+            throw new TypeError(`canonical JSON does not support ${typeof value}`);
+          }
+
           const supplied = process.env.TIMELINE_JSON?.trim();
           const fallback = {
             width: 320,
@@ -58,7 +104,40 @@ jobs:
             }]
           };
           const value = supplied ? JSON.parse(supplied) : fallback;
-          fs.writeFileSync('.tmp/remote-video/input.json', `${JSON.stringify(value, null, 2)}\n`);
+
+          if (value?.fontFile !== undefined || value?.fontFileBold !== undefined) {
+            throw new Error('External render requests may not supply local font paths.');
+          }
+          if (Array.isArray(value?.segments) && value.segments.some((segment) => segment?.imagePath !== undefined)) {
+            throw new Error('External render requests may not supply local image paths.');
+          }
+
+          const canonical = canonicalJson(value);
+          const actualInputSha = crypto.createHash('sha256').update(canonical).digest('hex');
+          const expectedInputSha = process.env.EXPECTED_INPUT_SHA?.trim();
+          const requestId = process.env.REQUEST_ID?.trim();
+          const externallySupplied = Boolean(supplied);
+
+          if (externallySupplied && process.env.GITHUB_EVENT_NAME === 'workflow_dispatch') {
+            if (!requestId || !process.env.EXPECTED_HEAD_SHA?.trim() || !expectedInputSha) {
+              throw new Error('External dispatch requires request_id, expected_head_sha, and input_sha256.');
+            }
+          }
+          if (expectedInputSha && expectedInputSha !== actualInputSha) {
+            throw new Error(`Input fingerprint mismatch: expected ${expectedInputSha}, observed ${actualInputSha}`);
+          }
+
+          fs.writeFileSync('.tmp/remote-video/input.json', canonical);
+          fs.writeFileSync('.tmp/remote-video/admission-receipt.json', `${JSON.stringify({
+            schema: 'founder-control-room/remote-video-admission@v1',
+            requestId: requestId || null,
+            expectedHeadSha: process.env.EXPECTED_HEAD_SHA,
+            inputSha256: actualInputSha,
+            externalInput: externallySupplied,
+            localPathInputsAllowed: false,
+            renderAuthority: true,
+            publishAuthority: false
+          }, null, 2)}\n`);
           NODE
       - name: Render through FCR-owned CLI
         run: |
@@ -79,10 +158,13 @@ jobs:
           import crypto from 'node:crypto';
           const media = fs.readFileSync('.tmp/remote-video/output.mp4');
           const input = fs.readFileSync('.tmp/remote-video/input.json');
+          const admission = JSON.parse(fs.readFileSync('.tmp/remote-video/admission-receipt.json', 'utf8'));
           const receipt = {
             schema: 'founder-control-room/remote-video-render@v1',
             project: 'founder-control-room',
+            requestId: admission.requestId,
             gitSha: process.env.GITHUB_SHA,
+            expectedHeadSha: admission.expectedHeadSha,
             runId: process.env.RUN_ID,
             runAttempt: process.env.RUN_ATTEMPT,
             inputSha256: crypto.createHash('sha256').update(input).digest('hex'),
@@ -91,6 +173,7 @@ jobs:
             publishAuthority: false,
             verifiedBy: ['ffprobe', 'playwright'],
           };
+          if (receipt.inputSha256 !== admission.inputSha256) throw new Error('Admission/render input fingerprint drifted.');
           fs.writeFileSync('.tmp/remote-video/remote-execution-receipt.json', `${JSON.stringify(receipt, null, 2)}\n`);
           NODE
       - name: Retain rendered artifact and receipts
