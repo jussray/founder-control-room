@@ -4,18 +4,18 @@ Current classification: PARTIAL
 
 Verified in authoritative FCR source:
 
-- peer-operator contract for `gemini`, `codex`, `claude-code`, and `perplexity`;
-- explicit exclusion of `deepseek-instructor` from the peer lane;
+- canonical peer registry for `gemini`, `codex`, `claude-code`, `perplexity`, `deepseek`, and `muse`;
+- explicit separation of peer `deepseek` from non-peer `deepseek-instructor`;
 - zero-authority relay envelope for research, propose, review, and bounded implementation work;
 - source-context fingerprinting and exact request/response hash binding;
 - fail-closed dispatch when the requested operator is unavailable;
-- direct Gemini, OpenAI, Anthropic, and Perplexity server adapters that exist only when both an explicit model and server-held key are configured;
+- source-wired Gemini, OpenAI/Codex, Anthropic/Claude, Perplexity, DeepSeek, and Muse provider adapters, each gated by its required server-side credential/model configuration;
 - canonical `/mcp` OAuth route mounted through the FCR MCP router with server-owned project scope, OAuth client mapping, founder allowlist checks, and redacted evidence receipts;
 - static-token compatibility clients cannot use peer relay;
 - provider responses cannot grant mutation, merge, deploy, publish, or provider-mutation authority;
-- adapter normalization preserves all four configured peer adapters and invents no fallback provider;
-- contract preflight covers all four peer operators while retaining the zero-authority ceiling;
-- exact current-main CI/check evidence exists independently of the older relay preflight.
+- MCP target schema derives from the canonical peer registry rather than a duplicated peer list;
+- dispatch invents no fallback provider and must not silently substitute a different peer or role;
+- exact current-main CI/check evidence exists independently of older relay preflight receipts.
 
 The standalone `/api/operator-relay` router remains an unmounted test scaffold. It is not the canonical authority path and must not be mounted merely to create a second relay surface. The authenticated `/mcp` tool is the authoritative relay entry point.
 
@@ -26,4 +26,4 @@ Not yet proven:
 - a real browser/Playwright round trip from founder-issued relay intent through FCR to the requested provider and back;
 - same-head post-deployment runtime identity for that live round trip.
 
-Provider configuration or a green source test cannot substitute for those live receipts. Do not label the bridge VERIFIED until the live provider and Playwright gates pass on the same exact deployed head.
+Source wiring, provider configuration, or a green source test cannot substitute for those live receipts. Provider paths remain `PARTIAL` until the provider/runtime and Playwright gates pass on the same exact deployed head for the claimed invocation.
