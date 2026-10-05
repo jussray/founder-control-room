@@ -1,6 +1,13 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { agentOperatorPolicy } from '../agentRegistry.js';
 import { OPERATOR_RELAY_INSTRUCTOR, OPERATOR_RELAY_PEERS } from '../operatorRelayConstants.js';
+
+const relayFacingDocs = [
+  new URL('../../../docs/OPERATOR_RELAY_CONTRACT.md', import.meta.url),
+  new URL('../../../docs/OPERATOR_RELAY_STATUS.md', import.meta.url),
+  new URL('../../../.ai-skills/claude-project-instructions.md', import.meta.url),
+];
 
 describe('operator relay lanes', () => {
   it('keeps the six governed peer operators in one canonical lane', () => {
@@ -23,5 +30,14 @@ describe('operator relay lanes', () => {
   it('keeps the DeepSeek instructor identity outside the peer operator lane', () => {
     expect(OPERATOR_RELAY_PEERS).not.toContain(OPERATOR_RELAY_INSTRUCTOR as never);
     expect(OPERATOR_RELAY_PEERS).toContain('deepseek');
+  });
+
+  it('keeps relay-facing governance docs aligned with the canonical peer registry', () => {
+    for (const docUrl of relayFacingDocs) {
+      const contents = readFileSync(docUrl, 'utf8');
+      for (const peer of OPERATOR_RELAY_PEERS) {
+        expect(contents, `${docUrl.pathname} is missing canonical peer ${peer}`).toContain(`\`${peer}\``);
+      }
+    }
   });
 });
