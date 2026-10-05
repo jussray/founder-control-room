@@ -1,0 +1,134 @@
+name: Documentation Truth Repair Once
+
+on:
+  push:
+    branches: [automation/docs-truth-repair-e5d6d87]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docs-truth-repair-e5d6d87
+  cancel-in-progress: false
+
+env:
+  TARGET_MAIN_SHA: e5d6d87885553d018a9af2fcb97eb7aa7d8d2bf5
+  TRUTH_RANGE_BASE_SHA: 3a8d622a4eaaec89d3c0120d65ea555e98cd1c7d
+  STORYENGINE_SHA: 91af998c2c7adad0792dd394735ca738b92ab26d
+  PLAYWRIGHT_RUN_ID: '37346101986'
+
+jobs:
+  repair:
+    name: Repair exact StoryEngine truth receipt
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Mint repository-scoped GitHub App write token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+          permission-contents: write
+
+      - name: Check out exact current main candidate
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.TARGET_MAIN_SHA }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Refuse stale repair target
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$TARGET_MAIN_SHA"
+          git fetch --no-tags origin refs/heads/main:refs/remotes/origin/main
+          live="$(git rev-parse refs/remotes/origin/main)"
+          printf 'target=%s\nlive_main=%s\n' "$TARGET_MAIN_SHA" "$live"
+          test "$live" = "$TARGET_MAIN_SHA"
+
+      - name: Refresh only the required truth artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import json
+          import os
+
+          fcr_sha = os.environ['TARGET_MAIN_SHA']
+          story_sha = os.environ['STORYENGINE_SHA']
+          run_id = os.environ['PLAYWRIGHT_RUN_ID']
+
+          readme_path = Path('README.md')
+          readme = readme_path.read_text()
+          paragraph = (
+              f"On October 5, 2026, the prior StoryEngine evidence pin drifted from live `main`, so the successor evidence subject was rebound to exact StoryEngine `{story_sha}`. "
+              f"FCR exact head `{fcr_sha}` then completed Playwright run `{run_id}`, including the live-ref freshness check, immutable peer checkout, exact StoryEngine runtime start, and FCR-to-StoryEngine receipt loop. "
+              "That renews browser-federation proof only for this exact FCR/StoryEngine pair; it grants no merge, production deploy, publication, spend, or provider-mutation authority."
+          )
+          if paragraph not in readme:
+              marker = "\nSee [`docs/REPOSITORY_FEDERATION.md`](docs/REPOSITORY_FEDERATION.md)."
+              if marker not in readme:
+                  raise SystemExit('README StoryEngine insertion marker not found')
+              readme = readme.replace(marker, f"\n{paragraph}\n{marker}", 1)
+              readme_path.write_text(readme)
+
+          truth_path = Path('docs/TRUTH_DECAY_AUDIT.md')
+          truth = truth_path.read_text()
+          heading = '## 2026-10-05 StoryEngine exact-peer browser witness reacquired'
+          section = (
+              f"\n\n{heading}\n\n"
+              f"The previously pinned StoryEngine evidence subject no longer matched live `refs/heads/main`. The repair selected exact StoryEngine `{story_sha}` as the successor evidence subject and intentionally expired predecessor federation green rather than carrying it forward.\n\n"
+              f"FCR exact head `{fcr_sha}` then completed Playwright run `{run_id}` successfully. The witness rechecked the live StoryEngine ref, checked out that immutable peer SHA, started the exact StoryEngine runtime, and completed the FCR-to-StoryEngine directive/receipt browser loop. This is current exact-pair browser-federation evidence only; it cannot authorize merge, production deployment, publication, spend, or provider mutation, and it becomes historical again when either evidence subject moves."
+          )
+          if heading not in truth:
+              truth_path.write_text(truth.rstrip() + section + '\n')
+
+          receipt_path = Path('docs/DOCUMENTATION_TRUTH_RECEIPT.json')
+          receipt = json.loads(receipt_path.read_text())
+          purpose_suffix = ' It also records the October 5 StoryEngine exact-peer browser witness reacquisition without widening merge, deployment, publication, or provider authority.'
+          if purpose_suffix.strip() not in receipt['purpose']:
+              receipt['purpose'] = receipt['purpose'].rstrip() + purpose_suffix
+
+          claim = (
+              f"On October 5, 2026, `.github/workflows/playwright.yml` must bind FCR exact head `{fcr_sha}` to StoryEngine `{story_sha}`; Playwright run `{run_id}` successfully verified the live ref, immutable peer checkout, exact peer runtime, and FCR-to-StoryEngine receipt loop, renewing browser-federation proof only for that exact pair and granting no merge, deploy, production, publication, spend, or provider-mutation authority."
+          )
+          change = next((item for item in receipt['changes'] if item.get('path') == '.github/workflows/playwright.yml'), None)
+          if change is None:
+              raise SystemExit('documentation receipt lacks playwright evidence-authority entry')
+          if claim not in change['claims']:
+              change['claims'].append(claim)
+          receipt_path.write_text(json.dumps(receipt, indent=2, ensure_ascii=False) + '\n')
+          PY
+
+          changed="$(git diff --name-only)"
+          printf '%s\n' "$changed"
+          test "$changed" = $'README.md\ndocs/DOCUMENTATION_TRUTH_RECEIPT.json\ndocs/TRUTH_DECAY_AUDIT.md'
+          git diff --check
+
+      - name: Commit candidate and verify cumulative truth range
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'FCR Truth Repair'
+          git config user.email '286642846+jussray@users.noreply.github.com'
+          git add README.md docs/TRUTH_DECAY_AUDIT.md docs/DOCUMENTATION_TRUTH_RECEIPT.json
+          git commit -m 'docs(truth): record StoryEngine peer witness'
+          repaired_sha="$(git rev-parse HEAD)"
+          echo "REPAIRED_SHA=$repaired_sha" >> "$GITHUB_ENV"
+          DOC_TRUTH_BASE_SHA="$TRUTH_RANGE_BASE_SHA" node scripts/verify-documentation-truth.mjs
+
+      - name: Push only if main is still the exact repair target
+        env:
+          APP_TOKEN: ${{ steps.app-token.outputs.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          remote="https://x-access-token:${APP_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          live="$(git ls-remote "$remote" refs/heads/main | awk 'NR==1 {print $1}')"
+          printf 'target=%s\nlive_main=%s\nrepaired=%s\n' "$TARGET_MAIN_SHA" "$live" "$REPAIRED_SHA"
+          test "$live" = "$TARGET_MAIN_SHA"
+          git push "$remote" HEAD:main
