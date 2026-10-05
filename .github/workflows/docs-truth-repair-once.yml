@@ -22,6 +22,7 @@ jobs:
     name: Repair exact StoryEngine truth receipt
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    environment: production
     steps:
       - name: Mint repository-scoped GitHub App write token
         id: app-token
