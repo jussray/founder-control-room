@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "contractVersion": "2026-10-05.1",
+  "contractVersion": "2026-10-05.2",
   "authority": {
     "repository": "jussray/founder-control-room",
     "purpose": "Portfolio-wide commercial packaging and money-path classification for FCR-governed work.",
@@ -11,6 +11,7 @@
     "repositoryIsNotAutomaticallyACompany": true,
     "technicalIndependenceDoesNotRequireSeparateCommercialPackaging": true,
     "standaloneProductIdentityIsIndependentOfBundling": true,
+    "standalonePeersDoNotDefaultToParentPackaging": true,
     "enginesAndModulesCompoundParentProductsByDefault": true,
     "visibilityUsageAndEngagementAreNotRevenue": true,
     "moneyClaimsRequireEconomicEvidence": true,
@@ -24,8 +25,8 @@
       "id": "founder-software",
       "leadProduct": "founder-control-room",
       "customerFacingIdentity": "Founder Control Room",
-      "supportingSystems": ["promptos", "truth-weaver", "truth-compass", "solcontinuity"],
-      "rule": "Supporting systems may remain technically independent where required, but default commercial packaging compounds Founder Control Room unless their own product contract declares a separate commercial identity."
+      "supportingSystems": ["truth-weaver", "truth-compass"],
+      "rule": "Supporting modules may compound Founder Control Room, but first-class standalone peers keep their own product identity and packaging unless an explicit bundle says otherwise."
     },
     {
       "id": "founder-intelligence",
@@ -33,6 +34,20 @@
       "customerFacingIdentity": "Chief AI",
       "supportingSystems": [],
       "rule": "Chief AI is a standalone Founder Intelligence product. It may be sold directly or included in an explicit bundle without collapsing product identity, runtime, authority, receipts, pricing truth, or evidence."
+    },
+    {
+      "id": "prompt-governance",
+      "leadProduct": "promptos",
+      "customerFacingIdentity": "PromptOS",
+      "supportingSystems": [],
+      "rule": "PromptOS is a standalone human-AI instruction governance product. Its public/free layer, direct paid paths, and explicit bundles are packaging choices and never collapse PromptOS into Founder Control Room."
+    },
+    {
+      "id": "continuity-infrastructure",
+      "leadProduct": "solcontinuity",
+      "customerFacingIdentity": "SolContinuity",
+      "supportingSystems": [],
+      "rule": "SolContinuity is a standalone application-continuity and resilience product. It may exchange evidence with portfolio peers or participate in explicit bundles without becoming an FCR module."
     },
     {
       "id": "creator-software",
@@ -154,16 +169,39 @@
     },
     "promptos": {
       "repository": "jussray/promptos",
-      "role": "engine-and-acquisition-layer",
-      "pillar": "founder-software",
-      "customer": "FCR users needing governed prompts, skills, instructions, and founder-intent compilation",
-      "payer": "FCR workspace owner by default",
-      "value": "Turn reusable founder intent and instructions into governed workflows with lineage and evidence.",
-      "revenueMechanism": ["included-in-fcr", "public-content-to-fcr-acquisition"],
-      "repeatEngine": "Successful workflows become reusable operating assets and improve future work.",
-      "northStar": "proven-workflows-driving-fcr-value-and-retention",
-      "nextMoneyTest": "Attribute a useful public or in-product PromptOS workflow to an FCR signup, important completed job, and retained paid use.",
-      "claimBoundary": "Prompt usage, prompt count, engagement, or library size are not revenue."
+      "role": "core-prompt-governance-product",
+      "pillar": "prompt-governance",
+      "customer": "Founders, builders, and teams needing reusable governed AI instructions and workflows across providers",
+      "payer": "Founder, team, organization, or deployment owner purchasing PromptOS directly or through an explicit bundle",
+      "value": "Turn reusable intent, context, prompts, skills, and workflow patterns into portable governed operating assets with lineage and evidence.",
+      "revenueMechanism": ["free-public-layer", "workspace-subscription", "team-or-enterprise-license", "premium-workflow-capability", "explicit-bundle-allocation"],
+      "repeatEngine": "Successful workflows and approved instruction assets compound into reusable operating leverage across future work.",
+      "northStar": "retained-promptos-users-reusing-proven-workflows",
+      "technicalIndependence": true,
+      "commercialIndependence": true,
+      "defaultCommercialPackaging": "promptos-owned-offer",
+      "bundleRule": "PromptOS may participate in an explicit multi-product bundle without becoming a module or subordinate product.",
+      "separateOfferGate": "PromptOS does not require FCR demand proof to exist as a separate offer; economic claims still require PromptOS-specific evidence.",
+      "nextMoneyTest": "Prove an external user completes an important PromptOS-native workflow job, returns to reuse or create another governed workflow, and enters or commits to a paid PromptOS path.",
+      "claimBoundary": "Prompt usage, prompt count, catalog size, repository separation, internal use, or browser proof do not prove revenue, retention, or paid demand."
+    },
+    "solcontinuity": {
+      "repository": "jussray/solcontinuity",
+      "role": "core-continuity-infrastructure-product",
+      "pillar": "continuity-infrastructure",
+      "customer": "Developers and teams operating applications across multiple infrastructure providers or recovery paths",
+      "payer": "Developer, team, organization, or deployment owner purchasing SolContinuity directly or through an explicit bundle",
+      "value": "Detect route disagreement and provider dependence, preserve continuity evidence, and support failover and recovery without silently trusting one infrastructure path.",
+      "revenueMechanism": ["subscription", "license", "hosted-or-enterprise-deployment", "support-or-implementation-service", "explicit-bundle-allocation"],
+      "repeatEngine": "Continuity manifests, evidence history, route coverage, and recovery knowledge compound as applications and provider paths evolve.",
+      "northStar": "retained-solcontinuity-applications-with-verified-continuity-coverage",
+      "technicalIndependence": true,
+      "commercialIndependence": true,
+      "defaultCommercialPackaging": "solcontinuity-owned-offer",
+      "bundleRule": "SolContinuity may participate in an explicit multi-product bundle without becoming an FCR module or subordinate product.",
+      "separateOfferGate": "SolContinuity does not require FCR demand proof to exist as a separate offer; economic claims still require SolContinuity-specific evidence.",
+      "nextMoneyTest": "Prove an external developer or team integrates SolContinuity for a real continuity job, returns to operate or extend that coverage, and pays or commits to a paid pilot, license, or deployment path.",
+      "claimBoundary": "Package installability, self-host verification, Devnet evidence, tests, or repository independence do not prove adoption, revenue, retention, or paid demand."
     },
     "truth-weaver": {
       "repository": "jussray/truth-weaver",
