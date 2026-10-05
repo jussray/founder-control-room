@@ -69,15 +69,12 @@ jobs:
 
           receipt_path.write_text(json.dumps(receipt, indent=2, ensure_ascii=False) + '\n')
 
-      - name: Remove one-shot workflow from final diff
-        run: rm .github/workflows/capital-control-doc-truth-repair.yml
-
       - name: Commit bounded documentation refresh
         run: |
           set -euo pipefail
           git config user.name "Juss Documentation Truth Repair"
           git config user.email "286642846+jussray@users.noreply.github.com"
-          git add README.md docs/TRUTH_DECAY_AUDIT.md docs/DOCUMENTATION_TRUTH_RECEIPT.json .github/workflows/capital-control-doc-truth-repair.yml
+          git add README.md docs/TRUTH_DECAY_AUDIT.md docs/DOCUMENTATION_TRUTH_RECEIPT.json
           git diff --cached --check
           git commit -m "docs(governance): bind capital authority truth surfaces"
           git push origin HEAD:fix/capital-control-non-authorizing-20261005
