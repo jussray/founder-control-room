@@ -17,7 +17,7 @@ export interface CloudflareRuntimeSignalInput {
 
 export type CloudflareRuntimeSignalResult =
   | { status: 'stored' | 'duplicate'; eventId: string; gitSha: string }
-  | { status: 'skipped'; reason: 'runtime_sha_unavailable' | 'project_unavailable' };
+  | { status: 'failed'; reason: 'runtime_sha_unavailable' | 'project_unavailable' };
 
 interface CloudflareRuntimeSignalDependencies {
   resolveProjectId(): Promise<string | null>;
@@ -53,6 +53,8 @@ const DEFAULT_DEPENDENCIES: CloudflareRuntimeSignalDependencies = {
  * intentionally bounded to runtime identity only: no request data, provider
  * credentials, or mutable Cloudflare account metadata enters the signal bus.
  * Provider-event dedupe makes the observation one receipt per exact SHA.
+ * Missing runtime identity or project authority is a reported failure so the
+ * scheduled task cannot look healthy while silently publishing nothing.
  */
 export async function publishCloudflareRuntimeSignal(
   input: CloudflareRuntimeSignalInput = {},
@@ -60,12 +62,12 @@ export async function publishCloudflareRuntimeSignal(
 ): Promise<CloudflareRuntimeSignalResult> {
   const gitSha = (input.gitSha ?? process.env.GIT_SHA ?? '').trim().toLowerCase();
   if (!EXACT_COMMIT_SHA.test(gitSha)) {
-    return { status: 'skipped', reason: 'runtime_sha_unavailable' };
+    return { status: 'failed', reason: 'runtime_sha_unavailable' };
   }
 
   const projectId = await dependencies.resolveProjectId();
   if (!projectId) {
-    return { status: 'skipped', reason: 'project_unavailable' };
+    return { status: 'failed', reason: 'project_unavailable' };
   }
 
   const environment = (input.environment ?? process.env.ENVIRONMENT ?? 'unknown').trim() || 'unknown';
