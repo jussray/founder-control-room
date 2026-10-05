@@ -26,6 +26,7 @@ import {
   validateWorkerEnv,
   type ControlRoomWorkerEnv,
 } from './handler.js';
+import { assertScheduledTaskResults } from './scheduledTaskResults.js';
 
 export { ReleaseProofWorkflowV0 } from '../workflows/releaseProofWorkflow.js';
 
@@ -54,11 +55,14 @@ const composed = composeWorkerHandler(
     return {
       runReconcilerCycle: async () => {
         await enqueueDuePortfolioVerification();
-        const [reconcilerResult] = await Promise.allSettled([
+        const [reconcilerResult, externalUseResult] = await Promise.allSettled([
           runReconcilerCycle(),
           runExternalUseHourlyCycle(),
         ]);
-        if (reconcilerResult.status === 'rejected') throw reconcilerResult.reason;
+        assertScheduledTaskResults([
+          { name: 'reconciler', result: reconcilerResult },
+          { name: 'external-use', result: externalUseResult },
+        ]);
       },
     };
   },
