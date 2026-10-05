@@ -1,0 +1,95 @@
+name: FCR Remote Video Render
+
+on:
+  workflow_dispatch:
+    inputs:
+      timeline_json:
+        description: 'Validated FCR timeline JSON. Leave blank for the proof render.'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fcr-video-render-queue
+  cancel-in-progress: false
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact render subject
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+      - name: Verify exact head
+        run: test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
+      - name: Set up Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: '22'
+      - name: Install dependencies
+        run: npm ci
+      - name: Install FFmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - name: Materialize bounded render request
+        env:
+          TIMELINE_JSON: ${{ inputs.timeline_json }}
+        run: |
+          mkdir -p .tmp/remote-video
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const supplied = process.env.TIMELINE_JSON?.trim();
+          const fallback = {
+            width: 320,
+            height: 180,
+            fps: 24,
+            segments: [{
+              durationSec: 2,
+              background: '#101018',
+              lines: [{ text: 'FCR remote render', sizeFrac: 0.08, yFrac: 0.5, color: '#FFFFFF', bold: true }]
+            }]
+          };
+          const value = supplied ? JSON.parse(supplied) : fallback;
+          fs.writeFileSync('.tmp/remote-video/input.json', `${JSON.stringify(value, null, 2)}\n`);
+          NODE
+      - name: Render through FCR-owned CLI
+        run: |
+          npx tsx scripts/render-video.mts --input .tmp/remote-video/input.json --output .tmp/remote-video/output.mp4 | tee .tmp/remote-video/render-receipt.json
+          grep -q '"kind": "RENDERED"' .tmp/remote-video/render-receipt.json
+          test -s .tmp/remote-video/output.mp4
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Playwright playback proof
+        run: node scripts/verify-video-playback.mjs --media .tmp/remote-video/output.mp4 | tee .tmp/remote-video/playback-receipt.json
+      - name: Bind remote execution receipt
+        env:
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import crypto from 'node:crypto';
+          const media = fs.readFileSync('.tmp/remote-video/output.mp4');
+          const input = fs.readFileSync('.tmp/remote-video/input.json');
+          const receipt = {
+            schema: 'founder-control-room/remote-video-render@v1',
+            project: 'founder-control-room',
+            gitSha: process.env.GITHUB_SHA,
+            runId: process.env.RUN_ID,
+            runAttempt: process.env.RUN_ATTEMPT,
+            inputSha256: crypto.createHash('sha256').update(input).digest('hex'),
+            outputSha256: crypto.createHash('sha256').update(media).digest('hex'),
+            renderAuthority: true,
+            publishAuthority: false,
+            verifiedBy: ['ffprobe', 'playwright'],
+          };
+          fs.writeFileSync('.tmp/remote-video/remote-execution-receipt.json', `${JSON.stringify(receipt, null, 2)}\n`);
+          NODE
+      - name: Retain rendered artifact and receipts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: fcr-video-render-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .tmp/remote-video/
+          if-no-files-found: error
+          retention-days: 7
