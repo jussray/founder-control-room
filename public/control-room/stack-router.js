@@ -1,3 +1,4 @@
+import './fcr-visual-shell.js';
 import { installMissionBoard } from './mission-board.js';
 import { installProjectShellUi } from './project-shell-ui.js';
 
@@ -61,17 +62,13 @@ async function refreshConveyorReadiness() {
 
 function installCoworkLane() {
   if (document.querySelector('[data-lane="cowork"]')) return;
-
   const codeLane = document.querySelector('[data-lane="code"]');
   if (!(codeLane instanceof HTMLElement)) return;
-
   const projectHandoff = codeLane.nextElementSibling;
   if (!(projectHandoff instanceof HTMLElement) || !projectHandoff.classList.contains('handoff')) return;
-
   const intoCowork = document.createElement('div');
   intoCowork.className = 'handoff';
   intoCowork.textContent = 'Verified code + repository context becomes the Cowork task';
-
   const coworkLane = document.createElement('section');
   coworkLane.className = 'stack-lane';
   coworkLane.dataset.lane = 'cowork';
@@ -87,11 +84,9 @@ function installCoworkLane() {
       <span class="stage"><small>Proof</small>FCR receipt adapter not wired</span>
     </div>
   `;
-
   const outOfCowork = document.createElement('div');
   outOfCowork.className = 'handoff';
   outOfCowork.textContent = 'Cowork changes return through GitHub commit / PR evidence; FCR receipt binding remains separate';
-
   codeLane.after(intoCowork, coworkLane, outOfCowork);
 }
 

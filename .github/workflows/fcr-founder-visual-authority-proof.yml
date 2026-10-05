@@ -1,0 +1,44 @@
+name: FCR Founder Visual Authority Proof
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'public/index.html'
+      - 'public/control-room/stack-router.js'
+      - 'public/control-room/fcr-visual-shell.js'
+      - 'public/control-room/fcr-visual-shell.css'
+      - 'e2e/fcr-founder-visual-authority-proof.mjs'
+      - '.github/workflows/fcr-founder-visual-authority-proof.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  proof:
+    name: Playwright founder visual authority
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install chromium --with-deps
+      - run: node e2e/fcr-founder-visual-authority-proof.mjs
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: fcr-founder-visual-authority-${{ github.sha }}
+          path: test-results/fcr-founder-visual-authority/
+          if-no-files-found: warn
+          retention-days: 30

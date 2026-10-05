@@ -5,6 +5,7 @@ import { callbackJs } from './onboardingAssets/callbackJs.js';
 import { controlRoomCss } from './onboardingAssets/controlRoomCss.js';
 import { controlRoomHtml } from './onboardingAssets/controlRoomHtml.js';
 import { controlRoomJs } from './onboardingAssets/controlRoomJs.js';
+import { controlRoomVisualBridge } from './onboardingAssets/controlRoomVisualBridge.js';
 
 export const onboardingRouter = Router();
 
@@ -21,7 +22,7 @@ function sendAsset(res: Response, type: string, body: string) {
 onboardingRouter.get('/', (_req, res) =>
   sendAsset(res, 'text/html; charset=utf-8', controlRoomHtml));
 onboardingRouter.get('/assets/control-room.css', (_req, res) =>
-  sendAsset(res, 'text/css; charset=utf-8', controlRoomCss));
+  sendAsset(res, 'text/css; charset=utf-8', `${controlRoomCss}\n${controlRoomVisualBridge}`));
 onboardingRouter.get('/assets/control-room.js', (_req, res) =>
   sendAsset(res, 'text/javascript; charset=utf-8', controlRoomJs));
 onboardingRouter.get('/assets/auth-callback.js', (_req, res) =>

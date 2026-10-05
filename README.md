@@ -48,6 +48,40 @@ FCR models projects, proposals, missions, exact refs, verification runs, evidenc
 
 Branch creation through `src/http/routes/approvals.ts` is now an exact-action governed repository mutation. A fresh `create_branch` proof and authenticated founder execute request cause FCR to issue a server-derived `AuthorityEnvelopeV1` bound to `github.repository.create_branch`, repository scope, exact branch arguments, current mission-state fingerprint, tool-call identity, expiry, founder identity, and idempotency key. The authority lifetime starts from the server-observed execute request time, not the proof receipt timestamp, so proof freshness and authority expiry remain separate fail-closed windows. FCR reserves the execution before the external write, re-reads mission state immediately before mutation, and `executeAuthorizedCreateBranch()` must reject drift before `RepositoryProvider.createBranch(...)` can be reached. A pending or ambiguous execution remains reconcile-before-retry; source and CI proof of this membrane do not by themselves prove that a live GitHub branch was created.
 
+### First-party video rendering
+
+FCR now owns a bounded first-party video-rendering path instead of treating video production as an external-provider-only capability. `src/lib/mediaFfmpegRender.ts` renders declared graphic timelines through a local `ffmpeg` process and verifies the produced MP4 with `ffprobe`; `scripts/render-video.mts` exposes that adapter through the repository CLI, and `.claude/skills/makevideo/SKILL.md` maps FCR-owned `/MAKEVIDEO`, `/makevideo`, and ordinary video requests to the same renderer.
+
+The renderer is intentionally narrow. It accepts validated timeline specs, bounded dimensions/frame rates/segment counts/durations, optional still-image assets, timed text and graphic motion, and optional synthesized audio. It fingerprints the normalized input, source assets, and fonts; records the output SHA-256 plus ffmpeg/ffprobe versions; and fails closed when the probed dimensions, duration, codecs, audio presence, or deterministic frame count do not match the declared timeline. Output is classified as `GRAPHIC_ANIMATION` and the adapter explicitly returns `truthAuthority: false` and `publishAuthority: false`.
+
+```bash
+npx tsx scripts/render-video.mts --input <timeline.json> --output <output.mp4>
+npx vitest run src/lib/__tests__/mediaFfmpegRender.test.ts
+node scripts/verify-video-playback.mjs --media <output.mp4>
+```
+
+A successful render authorizes bounded byte production only. It does not grant truth, release, publication, billing, deployment, or cross-project authority. FCR does not route its own render through Chief, Se’kret Bip, StoryEngine, or an external media provider unless a separate current capability and authority decision explicitly selects that route. The dedicated `.github/workflows/video-renderer-proof.yml` is the exact-head CI witness for invocation plus Playwright playback; predecessor green becomes historical whenever the FCR head moves.
+
+### Capital control architecture
+
+`src/governance/capitalControlArchitecture.ts` now defines the FCR-owned `fcr/capital-control-architecture@v1` contract for reasoning about future portfolio-level and project-level investment lanes while preserving founder control and project ownership boundaries. Its current architecture state is **`design_only`**. That means the source contract and tests exist, but FCR does not claim that a parent entity, project subsidiaries, share classes, cap table, valuation, securities terms, or a public offering have been legally formed or verified.
+
+The evaluator can require evidence for issuer identity, governing documents, cap table, security terms, post-change control, project ownership boundaries, asset ownership, transfer instruments, offering compliance, intermediaries when required, and disclosures. It hard-blocks automated surrender of founder control and investor operational authority, and it keeps economic ownership separate from repository, deployment, provider, credential, and product-execution authority.
+
+No security issuance, offering publication, core-IP transfer, or founder-control modification becomes authorized merely because this contract exists. Those actions remain denied while the architecture is `design_only` and require separately verified legal and founder evidence before the contract can return a stronger state. See [`docs/CAPITAL_CONTROL_ARCHITECTURE.md`](docs/CAPITAL_CONTROL_ARCHITECTURE.md).
+
+### FCR and Chief product boundary
+
+Founder Control Room and Chief are standalone peer products. `config/founder-chief-pair.contract.json` keeps their technical topology separate and now also records commercial independence: Chief’s default role is `standalone-product`, its default packaging is `chief-owned-offer`, and any bundle with FCR or another first-party product must be an explicit go-to-market choice rather than an identity collapse.
+
+Bundling does not merge product identity, runtime, authority, receipts, pricing truth, or evidence. Chief may have its own customer-acquisition path, pricing, licensing, deployment, or service layer, but standalone-product status does not prove deployment, product-market fit, revenue, retention, or paid demand. FCR remains the founder operating plane; it does not become Chief’s runtime merely because the products can cooperate.
+
+### Founder Home surface
+
+The signed-in Control Room at `/control-room/` opens on a **Home** tab rendered by `public/control-room/app.js` (styles in `public/control-room/styles.css`): a sidebar of in-app tabs plus links to the sibling Control Room pages, a hero with the `ULTRATHINK` headline, a Chief route panel (links into existing surfaces; no model is called from it), a KPI strip, and Projects / Today's focus / Live signals panels. Every KPI figure is derived from JSON the founder API returned in the session (`/projects`, `/dashboard/tasks`, `/dashboard/activity`, `/l99/status`, `/dashboard/costs`) and each tile carries a `data-truth` marker: `observed` only after that read succeeded, `unknown` (shown as `UNKNOWN` with "not read yet" or "read failed") before it settles or when it fails, and `not-wired` (shown as `Not connected`) for revenue and community, which have no source in FCR. The sidebar systems status is rendered as not observed. Read-audit events the page load itself produces (`*_read`) are excluded from the Live signals panel and count, and windowed reads are labelled when they hit the server window. The Home tab embeds the real projects module, so `#new-project-form` and `#project-list` remain the first signed-in screen; the tab ids consumed by `stack-router.js` and `e2e/run.mjs` are unchanged (`home` is prepended and some labels changed).
+
+`npm run verify:founder-home` runs `e2e/founder-home-dashboard-proof.mjs` (also wave two of `npm run verify:parallel`): real Chromium against the checked-out `public/` directory served with the `public/_headers` Content-Security-Policy, with the founder API stubbed at the network boundary. It proves the first paint claims nothing as observed, rendered KPIs equal the served data once reads settle, `*_read` rows are excluded, not-wired tiles contain no digits, failed L99 / projects / activity reads show `UNKNOWN` with "read failed" while sibling reads stay observed and the banner names every failed read, the `?tab=` deep link still activates a tab, bottom-of-tab submit buttons scroll clear of the fixed launch dock, nothing overflows at 1280, 1440, or 390, no console errors occur under the production CSP, and the signed-out surface still renders the magic-link card. It does not prove the real Express routes, Supabase, GitHub, or production deployment; `npm run test:e2e` and CI remain that authority.
+
 ### Claude Cowork and shared GitHub source
 
 FCR now presents Claude Cowork as a governed founder-stack work surface, not as a second repository or approval plane. For repository work, Claude, Claude Code, and Cowork must resolve the authoritative GitHub repository, branch, and exact current head and bind their Council round to that same evidence subject. Workspace copies, attachments, exports, and model memory remain working context until reconciled against current GitHub source.
@@ -141,6 +175,8 @@ canonical capability declaration
 
 The market may recommend a primary, an independent challenger from another provider family, and shadow trials for promising unproven models. Every route remains explicitly non-authorizing (`selectionAuthority: false`, `executionAuthority: false`). Founder approval, repository/provider gates, provider readback, Playwright for load-bearing browser claims, and outcome verification remain separate. See [`docs/MODEL_CAPABILITY_MARKET.md`](docs/MODEL_CAPABILITY_MARKET.md).
 
+The market's intended first receipt source is the operator relay: `src/lib/capabilityObservationFeed.ts` folds relay responses into per-operator, per-task-class observations (only independently verified receipts count as proof; false green = completed without evidence; authority violation = any `authorityRequested` other than `none`; stale, duplicate, in-flight and foreign-operator receipts excluded). State: the ranking and the fold are **contract-capable** tested source; relay responses are not yet persisted, no outcome verifier exists, and no live route calls the market — advisory, not enforced routing.
+
 ### Founder-content execution
 
 The founder-content architecture separates story, authority, transport, and outcome:
@@ -200,6 +236,8 @@ Public discovery artifacts such as `/robots.txt`, `/sitemap.xml`, `/llms.txt`, a
 Source dependence on that topology is not proof the live provider is configured correctly.
 
 `wrangler.worker.toml [secrets].required` is the canonical production binding-name gate for provider-held Worker secrets. A provider-backed capability such as `tinyfish-web-observation-v1` must name `TINYFISH_API_KEY` there before canonical Worker promotion; Deploy verifies only binding-name presence in Cloudflare and never copies the secret value through GitHub Actions. Source and CI readiness therefore remain distinct from live TinyFish provider/runtime activation.
+
+`OPENAI_API_KEY` follows the same split authority. The canonical Worker registry requires the provider-held runtime binding because live FCR OpenAI paths consume it. GitHub Actions may separately hold the same logical credential for CI-only consumers such as the bounded AI Failure Repair workflow, but the Actions copy is not runtime proof and must not be copied into the Worker during deploy. `Runtime Secret Proof` derives its complete required-name set from `wrangler.worker.toml`, asks Cloudflare only for secret names, fingerprints that registry, and never reads or prints secret values. If the Cloudflare observation credential is malformed or unusable before enumeration, every unobserved runtime-secret presence claim remains `UNKNOWN`/`BLOCKED`, not missing.
 
 The first-party FCR Shopify paid-order ingress follows the same boundary. `FCR_SHOPIFY_WEBHOOK_SECRET` and `FCR_COMMERCE_HASH_SALT` must remain provider-held required Worker secrets before promotion, while source merely declares their names. Their presence cannot prove that Shopify registered the `orders/paid` callback, that the deployed Worker serves the exact commerce head, that the production Supabase migration exists, or that any payment was collected; those claims require separate provider, deployment, database, runtime, and revenue receipts.
 
@@ -351,3 +389,63 @@ The Founder Council is resident in both the founder assistant host and the proje
 Muse is a governed Council peer in source. `FCR_RELAY_MUSE_MODEL` is public-safe runtime configuration, while `MODEL_API_KEY` is a provider-held Worker secret name. A source adapter, model name, green unit test, or declared secret requirement cannot prove that Muse is live. A live Muse claim requires the exact deployed FCR runtime, independently observed provider-held secret presence, a successful bounded relay, and a provider evidence reference such as `provider:meta:<response-id>` for that invocation.
 
 `FCR_CLOUDFLARE_MCP_READ_TOKEN` is a separate provider-held credential for the bounded Cloudflare MCP observation lane. The Cloudflare deployment/read credential used to enumerate Worker secret names is itself only an observation prerequisite. If that credential is malformed or unusable and `wrangler secret list` cannot run, the correct state for `MODEL_API_KEY` presence is `UNKNOWN`/`BLOCKED`, not “missing.” A failed observation transport may block proof; it cannot manufacture a negative fact about an unobserved target secret.
+
+### StoryEngine federation proof boundary
+
+The StoryEngine SHA pinned by the Playwright workflow is an exact evidence identity, not a durable alias for current StoryEngine. Any peer-head movement expires predecessor federation proof; a live ref match only selects the next subject and never grants merge, deploy, production, publication, or provider-mutation authority. The successor FCR head must rerun the complete runtime, directive, receipt, and browser witness before the federation path is current.
+
+When the pin is advanced because the live peer ref moved (as on the evening of September 27, 2026), that commit is recovery setup: it restores the ability to observe the current peer and nothing more. Until the exact successor FCR head completes the Playwright federation job against the newly pinned peer, the federation claim for that head is `UNKNOWN`, and predecessor green is history.
+
+## Repository base-health build gate
+
+`src/providers/SecurityPreservingGitHubProvider.ts` now treats the exact branch head as a build precondition rather than assuming that any current head is safe to extend. It classifies exact-head verification as `VERIFIED_CLEAN`, `KNOWN_BAD`, or `UNVERIFIED` from current verification signals. Forward patching is allowed only from `VERIFIED_CLEAN`.
+
+When the exact head is `KNOWN_BAD`, the next repository write must be an explicit repair bound to that exact failed head by the `repair-base:<exact-head-sha>` message prefix. A stale repair marker, a repair marker on an unverified/clean head, or ordinary feature work on a known-bad head must fail closed. This repair escape hatch is narrow: it permits the corrective patch only and grants no merge, deploy, publication, provider, or founder authority. After the repair moves the head, exact-head verification must establish the successor as clean before normal forward building resumes.
+
+## Current CI repair truth
+
+A StoryEngine peer-pin refresh is a truth transition, not merely a workflow-line change. The repair must refresh the README, truth-decay audit, and structured documentation receipt in the same exact-head range, and the successor remains non-authorizing until its own CI and Playwright witness pass.
+
+An exact StoryEngine ref/pin match renews only the peer-identity prerequisite; a cancelled, skipped, or non-executed exact-head Playwright run leaves successor federation truth `UNKNOWN` until a successful witness completes. A successful successor witness renews browser-federation proof only for the exact FCR/StoryEngine pair recorded by that run; movement of either evidence identity expires it again.
+
+The AI Failure Repair workflow stores its bounded evidence under `.repair/`, a hidden directory. Every `actions/upload-artifact` step that uploads that evidence must explicitly include hidden files; otherwise the upload can fail even when evidence capture succeeded. Artifact transport is part of repair evidence integrity and does not grant merge, deploy, publication, provider, or production authority.
+
+## Chief adapter exact-head truth
+
+`src/founder-os-lab/projectAdapters.ts` binds Chief integration evidence to one audited exact Chief head. Moving that pin is an evidence-authority transition: the same change must refresh this README, `docs/TRUTH_DECAY_AUDIT.md`, and `docs/DOCUMENTATION_TRUTH_RECEIPT.json`, and the successor FCR head must earn its own adapter, pair-contract, CI, and applicable runtime/browser proof. Pin alignment selects the next evidence subject only; it does not prove Chief deployment, served-MCP reachability, production behavior, merge authority, or deploy authority.
+
+## September 27 StoryEngine peer transition
+
+The successor exact-head Playwright witness completed successfully after the independently observed StoryEngine peer refresh. That success makes federation proof current only for the exact FCR/StoryEngine evidence pair bound by the run and recorded in the structured receipt; it does not prove either product's production deployment and grants no merge, deploy, publication, or provider-mutation authority. Any movement of FCR or StoryEngine expires that witness and requires a new exact-head run.
+
+## September 30 CI snapshot testing
+
+FCR's CI pipeline now includes an external-site snapshot test (`fix/ci-run-external-site-snapshot-test`, merged as PR #903) that exercises the published artifact and verifies snapshot consistency across runs. The test is source/CI proof only: it exercises a bounded checkout state and does not prove the artifact is currently deployed to production, that the snapshot policy is active in Cloudflare, or that previous snapshots remain cached. Snapshot validation is independent verification for a pinned FCR head; movement of FCR or the external asset service invalidates the binding and requires rerun.
+
+## October 1 Status sync idempotent evidence
+
+FCR's status sync now runs idempotent evidence reconciliation (`fix/status-sync-idempotent-evidence`, merged Oct 1 6:08 PM) to bind operational status claims to exact provider/runtime observation. The sync compares declared state against observed state and reconciles drift without mutation; it does not grant deploy, provider-write, merge, or production authority. Status reconciliation is idempotent and safe to rerun; repeated cycles with identical input produce identical outputs and leave provider state unchanged. This is source/capability proof only: the capability integration itself must still pass provider/runtime witness before claiming live status accuracy.
+
+## October 2 proof reconciliation
+
+The current FCR repair carrier aligns the Firewall v10 policy and verifier with the already-implemented 120-requests-per-minute idempotent application baseline while leaving stricter route-local limits unchanged. This is source/policy proof only: the firewall policy still records production application as unknown, and the change does not mutate Cloudflare or another provider.
+
+The same carrier refreshes the StoryEngine evidence pin to the independently observed peer that adds a fail-closed Cloudflare front door and focused API rate-limit coverage. The pin change makes every predecessor federation witness historical; only a complete exact-head FCR Playwright run against the pinned StoryEngine identity can establish current browser-federation proof for the new pair.
+
+## October 3 StoryEngine peer refresh during URLFix merge review
+
+URLFix PR #914's exact-head merge review passed the local FCR browser harness but correctly failed the separate StoryEngine freshness check after the peer repository advanced. PR #896 is the focused recovery carrier for that external evidence-subject drift.
+
+Refreshing the StoryEngine peer pin is recovery setup only. The successor FCR state remains `UNKNOWN` for federation until PR #896's exact-head Playwright run passes the live-ref check, immutable peer checkout, exact runtime identity, directive/receipt loop, replay protections, and browser witnesses. This recovery grants no merge, deploy, production, publication, or provider-mutation authority, and any later movement of either repository expires the resulting pair-specific proof again.
+
+## October 3 StoryEngine peer refresh after agent-contract v1 rollout
+
+StoryEngine `main` advanced from `18d9ba257a69c3d1743f346d424daf31796aaeed` through the agent-contract v1 commits to independently observed `168d65ede38d2477ea00902fa1f0e76f292c583d`, so FCR's live StoryEngine peer-ref check fails closed on every FCR head, including Chief Access recovery PR #913. This refresh is a focused recovery transition for that external evidence-subject drift, not a defect in #913 or any other carrier.
+
+Pin alignment alone cannot promote the successor federation state beyond `UNKNOWN`. The successor FCR head must earn its own exact-head Playwright witness against `168d65ede38d2477ea00902fa1f0e76f292c583d`; any later movement of either repository expires that pair-specific proof again. This refresh grants no merge, deploy, production, publication, or provider-mutation authority.
+
+## October 5 StoryEngine MAKEVIDEO peer transition
+
+StoryEngine `main` advanced from the previously pinned `168d65ede38d2477ea00902fa1f0e76f292c583d` through `c9af4ea095561d0837a141e311e8977d796aaaa7` (`feat(video): expose StoryEngine MAKEVIDEO skill`) to independently observed `3c1689fe67142e783fe7d18b5ff610640bdc81d6` (`ci(video): prove StoryEngine MAKEVIDEO skill path`). FCR Playwright run #6969 on `897083276b6c775c49ce30be189a50bd610b5d4c` passed its local/direct browser harness but failed the separate live peer-ref freshness check, so that run is historical browser evidence for the predecessor peer rather than current federation proof.
+
+Rebinding `.github/workflows/playwright.yml` to `3c1689fe67142e783fe7d18b5ff610640bdc81d6` selects the successor evidence subject only. The successor FCR head must complete the live-ref check, immutable peer checkout, exact StoryEngine runtime identity, directive/receipt binding, replay protections, and full Playwright browser witness before federation may be called current. Pin alignment grants no merge, deploy, production, publication, billing, or provider-mutation authority.

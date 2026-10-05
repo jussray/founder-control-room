@@ -60,6 +60,43 @@ async function provePublicFrontDoor(label, viewport) {
   await page.goto(`${BASE_URL}/`, { waitUntil: 'networkidle' });
   await page.locator('[data-fcr-entry]').waitFor({ state: 'visible' });
 
+  const visualSignature = await page.locator('body').getAttribute('data-fcr-visual');
+  if (visualSignature !== 'founder-os-v2') {
+    throw new Error(`${label}: public FCR visual signature drifted: ${visualSignature}`);
+  }
+
+  if (await page.locator('[data-command-shell]').count() !== 1) {
+    throw new Error(`${label}: public FCR must render exactly one canonical command shell`);
+  }
+
+  const headline = await page.locator('#home-title').innerText();
+  if (!headline.includes('Founder') || !headline.includes('Control Room')) {
+    throw new Error(`${label}: canonical Founder Control Room headline drifted: ${headline}`);
+  }
+
+  const commandColumns = await page.locator('.command-shell').evaluate((node) => getComputedStyle(node).gridTemplateColumns);
+  const commandTrackCount = commandColumns.split(/\s+/).filter(Boolean).length;
+  if (viewport.width >= 920 && commandTrackCount < 2) {
+    throw new Error(`${label}: desktop command shell must preserve hero + entry split; got ${commandColumns}`);
+  }
+  if (viewport.width < 920 && commandTrackCount !== 1) {
+    throw new Error(`${label}: mobile command shell must collapse to one column; got ${commandColumns}`);
+  }
+
+  const bottomNav = page.locator('[data-bottom-nav="five-screen"]');
+  if (await bottomNav.locator('a').count() !== 5) {
+    throw new Error(`${label}: canonical public FCR bottom nav must expose five screens`);
+  }
+  const navPosition = await bottomNav.evaluate((node) => getComputedStyle(node).position);
+  if (navPosition !== 'fixed') {
+    throw new Error(`${label}: public FCR bottom nav must remain fixed; got ${navPosition}`);
+  }
+
+  const footerCopy = await page.locator('footer').innerText();
+  if (!footerCopy.includes('Same truth. Higher outcomes.')) {
+    throw new Error(`${label}: canonical FCR visual thesis missing from footer`);
+  }
+
   const entryChoices = page.locator('[data-entry-choice]');
   if (await entryChoices.count() !== 2) {
     throw new Error(`${label}: public front door must expose exactly two role choices`);
@@ -88,11 +125,8 @@ async function provePublicFrontDoor(label, viewport) {
   if (!/No account is required to explore the public FCR world/i.test(userCopy)) {
     throw new Error(`${label}: user onboarding must make the current public/no-account boundary explicit`);
   }
-  if (await userOnboarding.locator('[data-user-start]').count() !== 5) {
-    throw new Error(`${label}: user onboarding must expose five real public starting lanes`);
-  }
-  if (await userOnboarding.locator('[data-user-start="workspace"]').getAttribute('href') !== '/user-space.html') {
-    throw new Error(`${label}: blank user workspace must route to /user-space.html`);
+  if (await userOnboarding.locator('[data-user-start]').count() !== 4) {
+    throw new Error(`${label}: user onboarding must expose four real public starting lanes`);
   }
   if (await userOnboarding.locator('[data-user-start="founders"]').getAttribute('href') !== '/work.html') {
     throw new Error(`${label}: founder discovery must route to the real public work directory`);
@@ -209,7 +243,7 @@ try {
   await provePublicFrontDoor('mobile-390', { width: 390, height: 844 });
   await proveViewport('desktop-1440', { width: 1440, height: 1100 });
   await proveViewport('mobile-390', { width: 390, height: 844 });
-  console.log('PASS: public FCR user/founder entry, honest onboarding boundaries, five public starting lanes including the blank local-first workspace, FCR visual signature, user/founder/owner views, owner-only crown authority, Bip platform identity, responsive layout, and keyboard focus are preserved.');
+  console.log('PASS: public FCR founder-os-v2 command surface, responsive visual contract, honest user/founder entry, FCR cinematic signature, user/founder/owner authority classes, owner-only crown authority, Bip platform identity, responsive layout, and keyboard focus are preserved.');
 } finally {
   await browser.close();
   await new Promise((resolve) => server.close(resolve));
