@@ -19,6 +19,7 @@ requireValue(/^\d{4}-\d{2}-\d{2}\.\d+$/.test(contract.contractVersion), 'contrac
 requireValue(contract.authority?.repository === 'jussray/founder-control-room', 'FCR must own the portfolio commercial contract');
 requireValue(contract.invariants?.repositoryIsNotAutomaticallyACompany === true, 'repo != company invariant is required');
 requireValue(contract.invariants?.technicalIndependenceDoesNotRequireSeparateCommercialPackaging === true, 'technical/commercial separation invariant is required');
+requireValue(contract.invariants?.standaloneProductIdentityIsIndependentOfBundling === true, 'standalone product identity must survive bundling');
 requireValue(contract.invariants?.visibilityUsageAndEngagementAreNotRevenue === true, 'visibility/usage/revenue separation invariant is required');
 requireValue(contract.invariants?.moneyClaimsRequireEconomicEvidence === true, 'money claims must require economic evidence');
 requireValue(contract.invariants?.customerAndPayerMayDiffer === true, 'customer/payer distinction is required');
@@ -28,6 +29,7 @@ requireValue(JSON.stringify(contract.invariants?.truthStatuses) === JSON.stringi
 
 const expectedPillars = [
   ['founder-software', 'founder-control-room'],
+  ['founder-intelligence', 'chief-ai-machine'],
   ['creator-software', 'storyengine'],
   ['family-product', 'sekret-bip'],
   ['commerce', 'juss-beautiful-hair'],
@@ -72,9 +74,13 @@ for (const [productId, product] of Object.entries(contract.products ?? {})) {
 }
 
 const chief = contract.products?.['chief-ai-machine'];
+requireValue(chief?.role === 'core-founder-intelligence-product', 'Chief commercial role must remain standalone');
+requireValue(chief?.pillar === 'founder-intelligence', 'Chief must retain its own public product pillar');
 requireValue(chief?.technicalIndependence === true, 'Chief must preserve technical independence');
-requireValue(chief?.defaultCommercialPackaging === 'inside-founder-control-room', 'Chief must default to FCR commercial packaging');
-requireValue(typeof chief?.separateOfferGate === 'string' && chief.separateOfferGate.includes('independent customer'), 'Chief separate-offer gate is required');
+requireValue(chief?.commercialIndependence === true, 'Chief must preserve commercial independence');
+requireValue(chief?.defaultCommercialPackaging === 'chief-owned-offer', 'Chief must default to its own commercial offer');
+requireValue(typeof chief?.bundleRule === 'string' && chief.bundleRule.includes('without becoming a module'), 'Chief bundle boundary is required');
+requireValue(typeof chief?.separateOfferGate === 'string' && chief.separateOfferGate.includes('does not require FCR demand proof'), 'Chief standalone offer boundary is required');
 
 const promptos = contract.products?.promptos;
 requireValue(promptos?.role === 'engine-and-acquisition-layer', 'PromptOS commercial role drifted');
@@ -113,5 +119,5 @@ if (failures.length > 0) {
 }
 
 console.log(`Portfolio commercial architecture ${contract.contractVersion} passed.`);
-console.log('Four public pillars, money-path fields, truth boundaries, and module-vs-company roles verified.');
+console.log('Five public pillars, money-path fields, truth boundaries, and standalone-vs-bundle roles verified.');
 console.log('This verification does not prove customers, payments, revenue, retention, checkout, deployment, or demand.');
