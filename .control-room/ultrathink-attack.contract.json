@@ -19,15 +19,48 @@
     "repairOrRevertBeforeQueuedWork": true,
     "successorFingerprintRequiredAfterRepair": true
   },
+  "runtimeFirstClass": {
+    "enabled": true,
+    "preserveExactRequest": true,
+    "preserveExactObservedResponse": true,
+    "whoUnknownUntilProven": true,
+    "attributionSeparateFromAuthority": true,
+    "diagnoseLastProvenBoundary": true,
+    "diagnoseFirstUnprovenForwardTransition": true,
+    "neverAttributeFromStatusOrWordingAlone": true,
+    "fiveWOneHUsesValueStatusEvidence": true,
+    "verifiedRequiresWhatWhereWhenAndBindings": true
+  },
+  "decisionLenses": {
+    "socraticFalsification": true,
+    "moscowPrioritization": true,
+    "pareto8020": true,
+    "lindyTwin": true,
+    "redTeamTwin": true,
+    "lensesCreateAuthority": false,
+    "paretoCanSkipRequiredProof": false
+  },
+  "implementation": {
+    "repositoryNativeFirst": true,
+    "pythonWhenNarrowestFit": true,
+    "javascriptTypescriptWhenNarrowestFit": true,
+    "languageAvailabilityDoesNotAuthorizeRewrite": true
+  },
   "workflow": [
     "true-first-baseline",
+    "runtime-first-5w1h-boundary-diagnosis",
+    "socratic-falsification",
     "ultrathink",
     "attack-n",
     "lindy",
+    "lindy-i",
     "red-team-i",
+    "moscow-pareto-80-20",
     "l99-decide",
     "goalfix",
+    "repository-native-implementation",
     "red-team-ii",
+    "lindy-ii",
     "proofmode",
     "truthmode-confess",
     "playwright-when-browser-observable",
