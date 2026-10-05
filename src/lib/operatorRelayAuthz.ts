@@ -1,8 +1,8 @@
-import type { OperatorRelayRequestV1 } from './operatorRelay.js';
+import type { OperatorRelayRequestV1, RelayOperatorId } from './operatorRelay.js';
 
 export interface RelaySessionAuthority {
   authenticated: boolean;
-  operator: OperatorRelayRequestV1['fromOperator'];
+  operator: RelayOperatorId;
 }
 
 export function authorizeOperatorRelay(session: RelaySessionAuthority, request: OperatorRelayRequestV1): string[] {

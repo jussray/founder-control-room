@@ -4,30 +4,33 @@
  *
  * `council_conversations`, `agent_runs`, and `agent_costs` already exist in
  * 0001_init.sql with founder-gated RLS from
- * 0002_enable_rls_and_founder_policy.sql — they were never wrong, just
- * never exposed over HTTP.
+ * 0002_enable_rls_and_founder_policy.sql.
  *
  * Bench (`agent_runs`) stays READ-ONLY here: those rows are meant to be
  * objective CI/test evidence produced by the guarded terminal + proof-gate
- * path, not something fabricated through this API — a write route here
- * would let a founder action masquerade as machine evidence.
+ * path, not something fabricated through this API.
  *
- * Council rounds and cost entries are legitimately founder/agent-logged
- * bookkeeping (what was discussed, what was spent) — those get real write
- * routes, because multitool orchestration (assigning which tool builds and
- * reviews a mission, logging council rounds between tools, attributing
- * spend) is exactly what `builder_agent`/`reviewer_agent`/
- * `council_conversations.participants`/`agent_costs.agent_name` already
- * modeled. This does not call any AI provider — it records what already
- * happened outside this process.
+ * The legacy POST /missions/:missionId/council route records a Council round
+ * supplied by an authenticated founder caller. POST /missions/:missionId/council/run
+ * is different: it executes the bounded provider relay in-process, chains each
+ * completed seat into the next seat, and persists provider-bound request/response
+ * hashes and evidence references. Neither route grants mutation authority.
  */
 
 import { Router } from 'express';
+import { runLiveCouncilRelay } from '../../lib/councilRelay.js';
+import { OPERATOR_RELAY_PEERS } from '../../lib/operatorRelayConstants.js';
+import { createServerOperatorRelayAdapters } from '../../lib/operatorRelayModelProviders.js';
+import type { RelayCapability, RelayOperatorId, RelaySensitivity } from '../../lib/operatorRelay.js';
 import { supabase } from '../../lib/supabaseClient.js';
 import { requireFounder, type FounderRequest } from '../middleware/requireFounder.js';
 
 export const missionsRouter = Router();
 missionsRouter.use(requireFounder);
+
+const RELAY_PEERS = new Set<string>(OPERATOR_RELAY_PEERS);
+const RELAY_CAPABILITIES = new Set<RelayCapability>(['research', 'propose', 'review', 'implement']);
+const RELAY_SENSITIVITIES = new Set<RelaySensitivity>(['public', 'internal']);
 
 interface MissionRow {
   id: string;
@@ -41,6 +44,17 @@ async function findMission(missionId: string): Promise<MissionRow | null> {
 
 async function missionExists(missionId: string): Promise<boolean> {
   return (await findMission(missionId)) !== null;
+}
+
+async function nextCouncilRound(missionId: string): Promise<number> {
+  const { data: latest } = await supabase
+    .from('council_conversations')
+    .select('round')
+    .eq('mission_id', missionId)
+    .order('round', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return (latest?.round ?? 0) + 1;
 }
 
 /**
@@ -98,9 +112,8 @@ missionsRouter.get('/:missionId/council', async (req: FounderRequest, res) => {
  * POST /missions/:missionId/council
  * Body: { participants, outcome?, transcript?, round? }
  *
- * Logs one Agent Council round — which tools participated and what they
- * concluded. `round` defaults to one past the highest existing round for
- * this mission, so callers don't need to track round numbers themselves.
+ * Logs one Agent Council round supplied by the caller. This route does not
+ * invoke model providers; use /council/run for an actual live relay round.
  */
 missionsRouter.post('/:missionId/council', async (req: FounderRequest, res) => {
   const { missionId } = req.params;
@@ -113,17 +126,7 @@ missionsRouter.post('/:missionId/council', async (req: FounderRequest, res) => {
 
   if (!(await missionExists(missionId))) return res.status(404).json({ error: 'Mission not found' });
 
-  let round = typeof body['round'] === 'number' ? body['round'] : null;
-  if (round === null) {
-    const { data: latest } = await supabase
-      .from('council_conversations')
-      .select('round')
-      .eq('mission_id', missionId)
-      .order('round', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    round = (latest?.round ?? 0) + 1;
-  }
+  const round = typeof body['round'] === 'number' ? body['round'] : await nextCouncilRound(missionId);
 
   const { data: conversation, error } = await supabase
     .from('council_conversations')
@@ -139,6 +142,80 @@ missionsRouter.post('/:missionId/council', async (req: FounderRequest, res) => {
 
   if (error) return res.status(500).json({ error: error.message });
   return res.status(201).json({ conversation });
+});
+
+/**
+ * POST /missions/:missionId/council/run
+ * Body: { goal, contextSummary, participants?, capability?, sensitivity?, sourceRef? }
+ *
+ * Executes one real, bounded Council round. FCR is the truthful source of the
+ * first hop. Every later hop is sourced from the last provider that actually
+ * completed. Failed/unconfigured seats are receipted, not impersonated.
+ */
+missionsRouter.post('/:missionId/council/run', async (req: FounderRequest, res) => {
+  const { missionId } = req.params;
+  const body = req.body as Record<string, unknown>;
+
+  const goal = typeof body['goal'] === 'string' ? body['goal'].trim() : '';
+  const contextSummary = typeof body['contextSummary'] === 'string' ? body['contextSummary'].trim() : '';
+  if (!goal || goal.length > 4_000) return res.status(400).json({ error: 'goal must be 1..4000 characters' });
+  if (!contextSummary || contextSummary.length > 12_000) return res.status(400).json({ error: 'contextSummary must be 1..12000 characters' });
+
+  let participants: RelayOperatorId[] | undefined;
+  if (body['participants'] !== undefined) {
+    const raw = body['participants'];
+    if (!Array.isArray(raw) || raw.length === 0 || raw.length > OPERATOR_RELAY_PEERS.length) {
+      return res.status(400).json({ error: 'participants must be a non-empty bounded array of Council peers' });
+    }
+    if (!raw.every((seat) => typeof seat === 'string' && RELAY_PEERS.has(seat))) {
+      return res.status(400).json({ error: 'participants contains an unsupported Council peer' });
+    }
+    participants = raw as RelayOperatorId[];
+  }
+
+  const capability = body['capability'] === undefined ? 'propose' : body['capability'];
+  if (typeof capability !== 'string' || !RELAY_CAPABILITIES.has(capability as RelayCapability)) {
+    return res.status(400).json({ error: 'capability is unsupported' });
+  }
+
+  const sensitivity = body['sensitivity'] === undefined ? 'internal' : body['sensitivity'];
+  if (typeof sensitivity !== 'string' || !RELAY_SENSITIVITIES.has(sensitivity as RelaySensitivity)) {
+    return res.status(400).json({ error: 'sensitivity must be public or internal for live Council relay' });
+  }
+
+  if (!(await missionExists(missionId))) return res.status(404).json({ error: 'Mission not found' });
+
+  const relay = await runLiveCouncilRelay({
+    goal,
+    contextSummary,
+    participants,
+    capability: capability as RelayCapability,
+    sensitivity: sensitivity as RelaySensitivity,
+    sourceRef: typeof body['sourceRef'] === 'string' ? body['sourceRef'] : `mission:${missionId}`,
+  }, createServerOperatorRelayAdapters(process.env));
+
+  const round = await nextCouncilRound(missionId);
+  const transcript = {
+    contract: relay.contract,
+    status: relay.status,
+    hops: relay.hops,
+    finalAnswer: relay.finalAnswer,
+    evidenceRefs: relay.evidenceRefs,
+  };
+  const { data: conversation, error } = await supabase
+    .from('council_conversations')
+    .insert({
+      mission_id: missionId,
+      round,
+      participants: relay.participants,
+      transcript,
+      outcome: `live_relay_${relay.status}`,
+    })
+    .select('id, round, participants, transcript, outcome, created_at')
+    .single();
+
+  if (error) return res.status(500).json({ error: error.message });
+  return res.status(201).set('Cache-Control', 'no-store').json({ conversation, relay });
 });
 
 /** GET /missions/:missionId/runs — Bench: runner/CI check results for this mission. */
@@ -175,9 +252,6 @@ missionsRouter.get('/:missionId/costs', async (req: FounderRequest, res) => {
 /**
  * POST /missions/:missionId/costs
  * Body: { agentName, provider?, model?, inputTokens?, outputTokens?, costUsd? }
- *
- * Attributes spend to whichever tool did the work — the Analytics rollup
- * (GET /dashboard/costs) reads exactly this table.
  */
 missionsRouter.post('/:missionId/costs', async (req: FounderRequest, res) => {
   const { missionId } = req.params;

@@ -7,8 +7,16 @@ export function createOperatorRelayRouter(adapters: OperatorRelayAdapters): Rout
   const router = Router();
 
   router.post('/api/operator-relay', async (req, res) => {
+    const incoming = req.body as OperatorRelayRequestV1;
+    if (incoming?.fromOperator === 'fcr') {
+      return res.status(403).set('Cache-Control', 'no-store').json({
+        error: 'The fcr relay source is reserved for authenticated internal Council orchestration.',
+        code: 'relay_source_reserved',
+      });
+    }
+
     try {
-      const response = await dispatchOperatorRelay(req.body as OperatorRelayRequestV1, adapters);
+      const response = await dispatchOperatorRelay(incoming, adapters);
       return res.status(200).set('Cache-Control', 'no-store').json(response);
     } catch (error) {
       if (error instanceof OperatorRelayDispatchError) {
