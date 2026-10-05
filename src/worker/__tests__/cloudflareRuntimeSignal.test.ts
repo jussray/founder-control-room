@@ -1,5 +1,17 @@
 import { describe, expect, it, vi } from 'vitest';
 
+vi.mock('../../events/inbox.js', () => ({
+  persistProviderEvent: vi.fn(),
+}));
+
+vi.mock('../../events/outbox.js', () => ({
+  enqueueReconcile: vi.fn(),
+}));
+
+vi.mock('../../lib/supabaseClient.js', () => ({
+  supabase: {},
+}));
+
 import {
   CLOUDFLARE_RUNTIME_SIGNAL_CONTRACT,
   publishCloudflareRuntimeSignal,
