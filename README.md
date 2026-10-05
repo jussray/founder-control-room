@@ -48,6 +48,34 @@ FCR models projects, proposals, missions, exact refs, verification runs, evidenc
 
 Branch creation through `src/http/routes/approvals.ts` is now an exact-action governed repository mutation. A fresh `create_branch` proof and authenticated founder execute request cause FCR to issue a server-derived `AuthorityEnvelopeV1` bound to `github.repository.create_branch`, repository scope, exact branch arguments, current mission-state fingerprint, tool-call identity, expiry, founder identity, and idempotency key. The authority lifetime starts from the server-observed execute request time, not the proof receipt timestamp, so proof freshness and authority expiry remain separate fail-closed windows. FCR reserves the execution before the external write, re-reads mission state immediately before mutation, and `executeAuthorizedCreateBranch()` must reject drift before `RepositoryProvider.createBranch(...)` can be reached. A pending or ambiguous execution remains reconcile-before-retry; source and CI proof of this membrane do not by themselves prove that a live GitHub branch was created.
 
+### First-party video rendering
+
+FCR now owns a bounded first-party video-rendering path instead of treating video production as an external-provider-only capability. `src/lib/mediaFfmpegRender.ts` renders declared graphic timelines through a local `ffmpeg` process and verifies the produced MP4 with `ffprobe`; `scripts/render-video.mts` exposes that adapter through the repository CLI, and `.claude/skills/makevideo/SKILL.md` maps FCR-owned `/MAKEVIDEO`, `/makevideo`, and ordinary video requests to the same renderer.
+
+The renderer is intentionally narrow. It accepts validated timeline specs, bounded dimensions/frame rates/segment counts/durations, optional still-image assets, timed text and graphic motion, and optional synthesized audio. It fingerprints the normalized input, source assets, and fonts; records the output SHA-256 plus ffmpeg/ffprobe versions; and fails closed when the probed dimensions, duration, codecs, audio presence, or deterministic frame count do not match the declared timeline. Output is classified as `GRAPHIC_ANIMATION` and the adapter explicitly returns `truthAuthority: false` and `publishAuthority: false`.
+
+```bash
+npx tsx scripts/render-video.mts --input <timeline.json> --output <output.mp4>
+npx vitest run src/lib/__tests__/mediaFfmpegRender.test.ts
+node scripts/verify-video-playback.mjs --media <output.mp4>
+```
+
+A successful render authorizes bounded byte production only. It does not grant truth, release, publication, billing, deployment, or cross-project authority. FCR does not route its own render through Chief, Se’kret Bip, StoryEngine, or an external media provider unless a separate current capability and authority decision explicitly selects that route. The dedicated `.github/workflows/video-renderer-proof.yml` is the exact-head CI witness for invocation plus Playwright playback; predecessor green becomes historical whenever the FCR head moves.
+
+### Capital control architecture
+
+`src/governance/capitalControlArchitecture.ts` now defines the FCR-owned `fcr/capital-control-architecture@v1` contract for reasoning about future portfolio-level and project-level investment lanes while preserving founder control and project ownership boundaries. Its current architecture state is **`design_only`**. That means the source contract and tests exist, but FCR does not claim that a parent entity, project subsidiaries, share classes, cap table, valuation, securities terms, or a public offering have been legally formed or verified.
+
+The evaluator can require evidence for issuer identity, governing documents, cap table, security terms, post-change control, project ownership boundaries, asset ownership, transfer instruments, offering compliance, intermediaries when required, and disclosures. It hard-blocks automated surrender of founder control and investor operational authority, and it keeps economic ownership separate from repository, deployment, provider, credential, and product-execution authority.
+
+No security issuance, offering publication, core-IP transfer, or founder-control modification becomes authorized merely because this contract exists. Those actions remain denied while the architecture is `design_only` and require separately verified legal and founder evidence before the contract can return a stronger state. See [`docs/CAPITAL_CONTROL_ARCHITECTURE.md`](docs/CAPITAL_CONTROL_ARCHITECTURE.md).
+
+### FCR and Chief product boundary
+
+Founder Control Room and Chief are standalone peer products. `config/founder-chief-pair.contract.json` keeps their technical topology separate and now also records commercial independence: Chief’s default role is `standalone-product`, its default packaging is `chief-owned-offer`, and any bundle with FCR or another first-party product must be an explicit go-to-market choice rather than an identity collapse.
+
+Bundling does not merge product identity, runtime, authority, receipts, pricing truth, or evidence. Chief may have its own customer-acquisition path, pricing, licensing, deployment, or service layer, but standalone-product status does not prove deployment, product-market fit, revenue, retention, or paid demand. FCR remains the founder operating plane; it does not become Chief’s runtime merely because the products can cooperate.
+
 ### Founder Home surface
 
 The signed-in Control Room at `/control-room/` opens on a **Home** tab rendered by `public/control-room/app.js` (styles in `public/control-room/styles.css`): a sidebar of in-app tabs plus links to the sibling Control Room pages, a hero with the `ULTRATHINK` headline, a Chief route panel (links into existing surfaces; no model is called from it), a KPI strip, and Projects / Today's focus / Live signals panels. Every KPI figure is derived from JSON the founder API returned in the session (`/projects`, `/dashboard/tasks`, `/dashboard/activity`, `/l99/status`, `/dashboard/costs`) and each tile carries a `data-truth` marker: `observed` only after that read succeeded, `unknown` (shown as `UNKNOWN` with "not read yet" or "read failed") before it settles or when it fails, and `not-wired` (shown as `Not connected`) for revenue and community, which have no source in FCR. The sidebar systems status is rendered as not observed. Read-audit events the page load itself produces (`*_read`) are excluded from the Live signals panel and count, and windowed reads are labelled when they hit the server window. The Home tab embeds the real projects module, so `#new-project-form` and `#project-list` remain the first signed-in screen; the tab ids consumed by `stack-router.js` and `e2e/run.mjs` are unchanged (`home` is prepended and some labels changed).
