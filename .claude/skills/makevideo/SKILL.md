@@ -18,7 +18,7 @@ A render request authorizes bounded byte production only. It does not grant trut
 3. Run:
 
 ```bash
-npx tsx scripts/render-video.mts --input <timeline.json> --output <absolute-or-relative-output.mp4>
+npx tsx scripts/render-video.mts --input <timeline.json> --output <output.mp4>
 ```
 
 4. Require `kind: "RENDERED"`. Treat `CAPABILITY_UNAVAILABLE`, `REJECTED`, and `FAILED` as non-green states.
@@ -28,8 +28,14 @@ npx tsx scripts/render-video.mts --input <timeline.json> --output <absolute-or-r
 npx vitest run src/lib/__tests__/mediaFfmpegRender.test.ts
 ```
 
-6. When the output is presented through a browser/UI, run the repository Playwright proof path against the real rendered artifact before calling the UI path verified.
+6. Run Playwright playback against the real rendered bytes:
+
+```bash
+node scripts/verify-video-playback.mjs --media <output.mp4>
+```
+
+7. Keep rendering, product truth, release approval, and publication as separate gates.
 
 ## Stop conditions
 
-Stop instead of improvising when source authority is unknown, ffmpeg/ffprobe is unavailable, the timeline is rejected, the output cannot be probed, or the requested claim would require publication/product-truth authority the renderer does not possess.
+Stop instead of improvising when source authority is unknown, ffmpeg/ffprobe is unavailable, the timeline is rejected, the output cannot be probed or played, or the requested claim would require publication/product-truth authority the renderer does not possess.
