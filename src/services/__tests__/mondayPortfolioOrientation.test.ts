@@ -13,7 +13,7 @@ describe('Monday portfolio orientation', () => {
     expect(mondayPortfolioOrientationWeekKey(new Date('2026-10-06T12:00:00Z'))).toBeNull();
   });
 
-  it('orders proof-critical blockers ahead of unknown, routine, and already-verified work', () => {
+  it('orders proof-critical blockers ahead of stale, unknown, routine, and already-verified work', () => {
     const orientation = buildMondayPortfolioOrientation({
       now: new Date('2026-10-05T12:00:00Z'),
       weekKey: '2026-10-05',
@@ -21,6 +21,7 @@ describe('Monday portfolio orientation', () => {
         { id: 'fcr', slug: 'founder-control-room', repo_identifier: 'jussray/founder-control-room' },
         { id: 'bip', slug: 'sekret-bip', repo_identifier: 'jussray/Sekret-Bip' },
         { id: 'chief', slug: 'chief-ai-machine', repo_identifier: 'jussray/chief-ai-machine' },
+        { id: 'story', slug: 'story-engine', repo_identifier: 'jussray/StoryEngine' },
         { id: 'sync', slug: 'sync-party', repo_identifier: 'jussray/sync-party-game' },
       ],
       verificationRuns: [
@@ -33,6 +34,11 @@ describe('Monday portfolio orientation', () => {
           project_id: 'bip', repository_identifier: 'jussray/Sekret-Bip', branch: 'main',
           commit_sha: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', overall_status: 'failed',
           signature_verified: false, scanned_at: '2026-10-05T11:40:00Z', received_at: '2026-10-05T11:41:00Z',
+        },
+        {
+          project_id: 'story', repository_identifier: 'jussray/StoryEngine', branch: 'main',
+          commit_sha: 'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee', overall_status: 'passed',
+          signature_verified: true, scanned_at: '2026-09-20T12:00:00Z', received_at: '2026-09-20T12:01:00Z',
         },
         {
           project_id: 'sync', repository_identifier: 'jussray/sync-party-game', branch: 'main',
@@ -52,11 +58,38 @@ describe('Monday portfolio orientation', () => {
       'founder-control-room',
       'sekret-bip',
     ]);
+    expect(orientation.stale.map((item) => item.project)).toEqual(['story-engine']);
     expect(orientation.unknown.map((item) => item.project)).toEqual(['chief-ai-machine']);
     expect(orientation.routine.map((item) => item.project)).toEqual(['sync-party']);
     expect(orientation.verified).toEqual([]);
     expect(orientation.orderOfOperations[0]).toContain('founder-control-room');
     expect(orientation.orderOfOperations[1]).toContain('sekret-bip');
+    expect(orientation.orderOfOperations[2]).toContain('story-engine');
+  });
+
+  it('selects the newest receipt itself instead of trusting caller order', () => {
+    const orientation = buildMondayPortfolioOrientation({
+      now: new Date('2026-10-05T12:00:00Z'),
+      weekKey: '2026-10-05',
+      projects: [{ id: 'fcr', slug: 'founder-control-room', repo_identifier: 'jussray/founder-control-room' }],
+      verificationRuns: [
+        {
+          project_id: 'fcr', repository_identifier: 'jussray/founder-control-room', branch: 'main',
+          commit_sha: '1111111111111111111111111111111111111111', overall_status: 'failed',
+          signature_verified: false, scanned_at: '2026-10-04T10:00:00Z', received_at: '2026-10-04T10:01:00Z',
+        },
+        {
+          project_id: 'fcr', repository_identifier: 'jussray/founder-control-room', branch: 'main',
+          commit_sha: '2222222222222222222222222222222222222222', overall_status: 'passed',
+          signature_verified: true, scanned_at: '2026-10-05T11:00:00Z', received_at: '2026-10-05T11:01:00Z',
+        },
+      ],
+      findings: [],
+    });
+
+    expect(orientation.proofCriticalBlockers).toEqual([]);
+    expect(orientation.verified).toHaveLength(1);
+    expect(orientation.verified[0]?.reason).toContain('222222222222');
   });
 
   it('keeps verified work separate and labels unavailable Gmail, Calendar, and Chief ranking instead of inventing coverage', () => {
@@ -74,12 +107,14 @@ describe('Monday portfolio orientation', () => {
 
     expect(orientation.verified).toHaveLength(1);
     expect(orientation.proofCriticalBlockers).toHaveLength(0);
+    expect(orientation.stale).toHaveLength(0);
     expect(orientation.sourceStatus.calendar).toBe('UNAVAILABLE_SCOPE_NOT_PROVEN');
     expect(orientation.sourceStatus.gmail).toBe('UNAVAILABLE_SCOPE_NOT_PROVEN');
     expect(orientation.sourceStatus.chief).toBe('PROPOSAL_ONLY_NO_WEEKLY_RANKING_RPC');
 
     const text = renderMondayPortfolioOrientation(orientation);
     expect(text).toContain('PROOF-CRITICAL BLOCKERS:\n- None evidenced.');
+    expect(text).toContain('STALE / REFRESH REQUIRED:\n- None evidenced.');
     expect(text).toContain('VERIFIED / NO FOUNDER ACTION:');
     expect(text).toContain('Calendar: UNAVAILABLE_SCOPE_NOT_PROVEN');
     expect(text).toContain('Gmail: UNAVAILABLE_SCOPE_NOT_PROVEN');
