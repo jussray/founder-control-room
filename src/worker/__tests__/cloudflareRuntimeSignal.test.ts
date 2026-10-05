@@ -25,7 +25,7 @@ describe('Cloudflare runtime signal publisher', () => {
     const deps = dependencies();
 
     await expect(publishCloudflareRuntimeSignal({ gitSha: 'not-a-sha' }, deps)).resolves.toEqual({
-      status: 'skipped',
+      status: 'failed',
       reason: 'runtime_sha_unavailable',
     });
 
@@ -34,11 +34,11 @@ describe('Cloudflare runtime signal publisher', () => {
     expect(deps.enqueue).not.toHaveBeenCalled();
   });
 
-  it('does not publish when the authoritative FCR project is unavailable', async () => {
+  it('fails closed when the authoritative FCR project is unavailable', async () => {
     const deps = dependencies({ projectId: null });
 
     await expect(publishCloudflareRuntimeSignal({ gitSha: SHA }, deps)).resolves.toEqual({
-      status: 'skipped',
+      status: 'failed',
       reason: 'project_unavailable',
     });
 
