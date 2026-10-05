@@ -4,7 +4,6 @@ import {
   dispatchVideoGraphicRender,
   prepareVideoGraphicRender,
   readVideoGraphicRenderStatus,
-  VideoGraphicRenderError,
   type VideoGraphicRenderProvider,
 } from '../videoGraphicRender.js';
 import type { MediaRoutingRequestV1 } from '../../lib/mediaRouter.js';
@@ -157,7 +156,7 @@ describe('video graphic render capability', () => {
     const { fake, dispatch } = provider({ resolveMainSha: vi.fn().mockResolvedValue('b'.repeat(40)) });
 
     await expect(dispatchVideoGraphicRender({ request: mediaRequest(), timeline: timeline() }, fake))
-      .rejects.toMatchObject<Partial<VideoGraphicRenderError>>({
+      .rejects.toMatchObject({
         code: 'runtime_not_exact_main',
         status: 409,
       });
