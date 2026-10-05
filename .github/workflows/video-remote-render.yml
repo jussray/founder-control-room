@@ -1,6 +1,13 @@
 name: FCR Remote Video Render
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/lib/mediaFfmpegRender.ts'
+      - 'scripts/render-video.mts'
+      - 'scripts/verify-video-playback.mjs'
+      - '.github/workflows/video-remote-render.yml'
   workflow_dispatch:
     inputs:
       timeline_json:
