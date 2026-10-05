@@ -12,7 +12,7 @@ This is **not** a securities filing, charter, cap table, valuation, share author
 
 Repository membership is not corporate ownership evidence.
 
-The evaluator is **advisory only**. Its output never authorizes execution of a legal, securities, IP-transfer, or control-changing action. `executionAuthorized` is always `false`.
+The v1 evaluator is **advisory only**. Its output never authorizes execution of a legal, securities, IP-transfer, or control-changing action. `executionAuthorized` is always `false`, and v1 never returns an `ALLOW` decision because it does not independently verify the provenance of caller-supplied evidence labels.
 
 ## 5W1H
 
@@ -35,7 +35,7 @@ The architecture stays `design_only` until a legally authorized signatory and qu
 The founder wants access to capital at both the portfolio and project level while preserving deliberate control boundaries. The contract prevents software from converting that intent into false legal claims or accidental operational authority.
 
 **HOW**  
-High-impact capital actions fail closed. Securities issuance, offering publication, core-IP transfer, and founder-control modifications require a `legally_verified` architecture state plus action-specific evidence just to become review-eligible. Even when every registered claim is present, these actions stop at `RECONFIRM`; the evaluator never returns execution authority. A separate, verified founder/legal authority receipt is required before any real-world action. Project offerings additionally require proof of the project ownership boundary and continuing parent/founder control. Two actions remain hard blocked from automation: surrendering founder control and granting investors operational authority over repositories/providers.
+High-impact capital actions fail closed. Securities issuance, offering publication, core-IP transfer, and founder-control modifications require a `legally_verified` architecture state plus action-specific evidence just to become review-eligible. Even when every registered label is present, these actions stop at `RECONFIRM`; the evaluator never returns execution authority. Legal-state claims such as “parent formed” also stop at `RECONFIRM` until a separate trusted verifier proves the referenced documents and records the state transition. Project offerings additionally require proof of the project ownership boundary and continuing parent/founder control. Two actions remain hard blocked from automation: surrendering founder control and granting investors operational authority over repositories/providers.
 
 ## Control invariants
 
@@ -44,7 +44,7 @@ High-impact capital actions fail closed. Securities issuance, offering publicati
 - Share classes, voting ratios, board rights, valuation, and offering terms remain unknown until executed documents prove them.
 - A project-level raise must not silently transfer portfolio IP or another project's economic interest.
 - Founder-control surrender is never an automated capital action.
-- Capital-policy evaluation is non-authorizing; caller-supplied state or evidence labels cannot mint execution authority.
+- Capital-policy evaluation is non-authorizing; caller-supplied state or evidence labels cannot mint execution authority or verified legal-state truth.
 - A public offering cannot be represented as live before issuer identity, legal-entity status, governing documents, capitalization, security terms, compliance path, required intermediary status, disclosures, and post-change control are independently verified.
 
 ## Money path
@@ -60,11 +60,11 @@ No amount, valuation, dilution percentage, voting ratio, security type, or fundr
 Stop and return `DENY` or `RECONFIRM` when any of these are true:
 
 - the legal architecture is still `design_only` for an action that changes capitalization, control, IP ownership, or offering state;
-- the issuer or legal entity cannot be proven;
+- the issuer or legal entity cannot be proven by a trusted external evidence path;
 - project ownership cannot be proven for a project-specific raise;
 - post-transaction founder/parent control cannot be proven;
 - required securities-compliance or intermediary evidence is missing;
-- separate founder/legal execution authority is absent;
+- separate trusted evidence verification and founder/legal execution authority are absent;
 - the action would give an investor operational authority merely because they invested;
 - the action would surrender founder control through an automated path.
 
@@ -74,4 +74,4 @@ This v1 change is source-only. Revert the focused capital-control commits. No le
 
 ## Next gate
 
-Translate the design into an attorney-reviewed entity/cap-table/IP map. Only after executed documents exist should FCR move the observed architecture state from `design_only` to `legally_verified`, and that state transition must be backed by exact evidence references. Even then, a consequential capital action still requires a separate verified founder/legal execution-authority receipt; the policy evaluator itself never supplies that authority.
+Translate the design into an attorney-reviewed entity/cap-table/IP map. Then add a separate trusted evidence-receipt path that binds document identity, verifier, freshness, issuer, and founder/legal authority. Only that trusted path may record a legal-state transition. The policy evaluator itself remains non-authorizing.
