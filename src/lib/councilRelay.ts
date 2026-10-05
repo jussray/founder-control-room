@@ -27,6 +27,7 @@ export interface LiveCouncilRelayHop {
 
 export interface LiveCouncilRelayRun {
   contract: typeof LIVE_COUNCIL_RELAY_CONTRACT;
+  originRef: string | null;
   status: LiveCouncilStatus;
   participants: RelayOperatorId[];
   completedParticipants: RelayOperatorId[];
@@ -71,6 +72,11 @@ function dedupe(values: readonly string[]): string[] {
   return [...new Set(values.map((value) => value.trim()).filter(Boolean))].sort();
 }
 
+function normalizedOriginRef(value: string | null | undefined): string | null {
+  const normalized = value?.trim() ?? '';
+  return normalized || null;
+}
+
 export async function runLiveCouncilRelay(
   input: LiveCouncilRelayInput,
   adapters: OperatorRelayAdapters,
@@ -79,6 +85,7 @@ export async function runLiveCouncilRelay(
   if (participants.length === 0) throw new Error('live Council requires at least one supported participant');
 
   const hops: LiveCouncilRelayHop[] = [];
+  const originRef = normalizedOriginRef(input.sourceRef);
   let source: RelaySourceId = 'fcr';
 
   for (const seat of participants) {
@@ -90,7 +97,7 @@ export async function runLiveCouncilRelay(
         capability: input.capability ?? 'propose',
         goal: input.goal,
         contextSummary,
-        sourceRef: input.sourceRef ?? null,
+        sourceRef: originRef,
         sensitivity: input.sensitivity ?? 'internal',
       }, adapters);
 
@@ -132,6 +139,7 @@ export async function runLiveCouncilRelay(
 
   return {
     contract: LIVE_COUNCIL_RELAY_CONTRACT,
+    originRef,
     status,
     participants,
     completedParticipants: completed.map((hop) => hop.seat),
