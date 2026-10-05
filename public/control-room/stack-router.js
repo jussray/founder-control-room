@@ -1,4 +1,3 @@
-import './fcr-visual-shell.js';
 import { installMissionBoard } from './mission-board.js';
 import { installProjectShellUi } from './project-shell-ui.js';
 
