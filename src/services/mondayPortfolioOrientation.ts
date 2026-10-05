@@ -9,6 +9,7 @@ export const MONDAY_PORTFOLIO_ORIENTATION_TIMEZONE = 'America/New_York';
 export const MONDAY_PORTFOLIO_ORIENTATION_RECIPIENT = 'sekretbip@gmail.com';
 const RETRY_AFTER_MS = 10 * 60_000;
 const STALE_RUNNING_MS = 20 * 60_000;
+const EVIDENCE_FRESHNESS_MS = 7 * 24 * 60 * 60_000;
 const MAX_ITEMS = 5;
 
 export interface MondayPortfolioOrientationEnv extends SupabaseEnv {
@@ -19,7 +20,6 @@ interface LocalClock {
   weekday: string;
   localDate: string;
   hour: number;
-  minute: number;
 }
 
 interface ProjectRow {
@@ -58,7 +58,7 @@ interface OrientationRunRow {
 
 export interface OrientationItem {
   project: string;
-  state: 'BLOCKED' | 'ROUTINE' | 'VERIFIED' | 'UNKNOWN';
+  state: 'BLOCKED' | 'STALE' | 'ROUTINE' | 'VERIFIED' | 'UNKNOWN';
   reason: string;
   evidenceAt: string | null;
   nextAction: string;
@@ -69,6 +69,7 @@ export interface MondayPortfolioOrientation {
   generatedAt: string;
   verified: OrientationItem[];
   proofCriticalBlockers: OrientationItem[];
+  stale: OrientationItem[];
   routine: OrientationItem[];
   unknown: OrientationItem[];
   decisionsAndDeadlines: string[];
@@ -98,7 +99,6 @@ function localClock(now: Date): LocalClock {
     month: '2-digit',
     day: '2-digit',
     hour: '2-digit',
-    minute: '2-digit',
     hourCycle: 'h23',
   }).formatToParts(now);
   const value = (type: Intl.DateTimeFormatPartTypes): string =>
@@ -107,7 +107,6 @@ function localClock(now: Date): LocalClock {
     weekday: value('weekday'),
     localDate: `${value('year')}-${value('month')}-${value('day')}`,
     hour: Number(value('hour')),
-    minute: Number(value('minute')),
   };
 }
 
@@ -121,20 +120,29 @@ function priorityWeight(item: OrientationItem, findingSeverity?: FindingRow['sev
   if (findingSeverity === 'critical') return 500;
   if (findingSeverity === 'high') return 400;
   if (item.state === 'BLOCKED') return 300;
+  if (item.state === 'STALE') return 250;
   if (item.state === 'UNKNOWN') return 200;
   if (item.state === 'ROUTINE') return 100;
   return 0;
 }
 
-function latestByProject<T extends { project_id: string }>(rows: T[]): Map<string, T> {
-  const result = new Map<string, T>();
+function receivedAtMillis(run: VerificationRunRow): number {
+  const parsed = Date.parse(run.received_at);
+  return Number.isFinite(parsed) ? parsed : Number.NEGATIVE_INFINITY;
+}
+
+function latestVerificationByProject(rows: VerificationRunRow[]): Map<string, VerificationRunRow> {
+  const result = new Map<string, VerificationRunRow>();
   for (const row of rows) {
-    if (!result.has(row.project_id)) result.set(row.project_id, row);
+    const existing = result.get(row.project_id);
+    if (!existing || receivedAtMillis(row) > receivedAtMillis(existing)) {
+      result.set(row.project_id, row);
+    }
   }
   return result;
 }
 
-function newestFindingByProject(rows: FindingRow[]): Map<string, FindingRow> {
+function highestSeverityFindingByProject(rows: FindingRow[]): Map<string, FindingRow> {
   const result = new Map<string, FindingRow>();
   const severityWeight: Record<FindingRow['severity'], number> = {
     low: 1,
@@ -144,11 +152,25 @@ function newestFindingByProject(rows: FindingRow[]): Map<string, FindingRow> {
   };
   for (const row of rows) {
     const existing = result.get(row.project_id);
-    if (!existing || severityWeight[row.severity] > severityWeight[existing.severity]) {
+    if (
+      !existing
+      || severityWeight[row.severity] > severityWeight[existing.severity]
+      || (
+        severityWeight[row.severity] === severityWeight[existing.severity]
+        && Date.parse(row.last_seen_at) > Date.parse(existing.last_seen_at)
+      )
+    ) {
       result.set(row.project_id, row);
     }
   }
   return result;
+}
+
+function hasFreshVerification(run: VerificationRunRow, now: Date): boolean {
+  const observedAt = receivedAtMillis(run);
+  if (!Number.isFinite(observedAt)) return false;
+  const age = now.getTime() - observedAt;
+  return age >= 0 && age <= EVIDENCE_FRESHNESS_MS;
 }
 
 export function buildMondayPortfolioOrientation(input: {
@@ -158,8 +180,8 @@ export function buildMondayPortfolioOrientation(input: {
   verificationRuns: VerificationRunRow[];
   findings: FindingRow[];
 }): MondayPortfolioOrientation {
-  const latestRun = latestByProject(input.verificationRuns);
-  const topFinding = newestFindingByProject(input.findings);
+  const latestRun = latestVerificationByProject(input.verificationRuns);
+  const topFinding = highestSeverityFindingByProject(input.findings);
   const weighted: Array<{ item: OrientationItem; weight: number }> = [];
 
   for (const project of input.projects) {
@@ -175,21 +197,29 @@ export function buildMondayPortfolioOrientation(input: {
         evidenceAt: finding.last_seen_at,
         nextAction: finding.suggested_action || 'Inspect the current finding and prove or clear the blocker.',
       };
-    } else if (run?.overall_status === 'failed') {
+    } else if (!run) {
+      item = {
+        project: project.slug,
+        state: 'UNKNOWN',
+        reason: 'No repository verification receipt is available.',
+        evidenceAt: null,
+        nextAction: 'Refresh repository verification before making a release or merge claim.',
+      };
+    } else if (!hasFreshVerification(run, input.now)) {
+      item = {
+        project: project.slug,
+        state: 'STALE',
+        reason: `Latest repository verification is older than 7 days at ${run.commit_sha.slice(0, 12)}.`,
+        evidenceAt: run.received_at,
+        nextAction: 'Refresh exact-head repository verification before treating prior evidence as current.',
+      };
+    } else if (run.overall_status === 'failed') {
       item = {
         project: project.slug,
         state: 'BLOCKED',
         reason: `Latest repository verification failed at ${run.commit_sha.slice(0, 12)}.`,
         evidenceAt: run.received_at,
         nextAction: 'Open the exact failed verification receipt and repair the first load-bearing failure.',
-      };
-    } else if (!run) {
-      item = {
-        project: project.slug,
-        state: 'UNKNOWN',
-        reason: 'No current repository verification receipt is available.',
-        evidenceAt: null,
-        nextAction: 'Refresh repository verification before making a release or merge claim.',
       };
     } else if (run.overall_status === 'warning' || finding) {
       item = {
@@ -217,10 +247,11 @@ export function buildMondayPortfolioOrientation(input: {
   weighted.sort((left, right) => right.weight - left.weight || left.item.project.localeCompare(right.item.project));
   const items = weighted.map(({ item }) => item);
   const proofCriticalBlockers = items.filter((item) => item.state === 'BLOCKED');
+  const stale = items.filter((item) => item.state === 'STALE');
   const unknown = items.filter((item) => item.state === 'UNKNOWN');
   const routine = items.filter((item) => item.state === 'ROUTINE');
   const verified = items.filter((item) => item.state === 'VERIFIED');
-  const attention = [...proofCriticalBlockers, ...unknown, ...routine].slice(0, MAX_ITEMS);
+  const attention = [...proofCriticalBlockers, ...stale, ...unknown, ...routine].slice(0, MAX_ITEMS);
 
   const orderOfOperations = attention.length
     ? attention.map((item, index) => `${index + 1}. ${item.project}: ${item.nextAction}`)
@@ -231,6 +262,7 @@ export function buildMondayPortfolioOrientation(input: {
     generatedAt: input.now.toISOString(),
     verified,
     proofCriticalBlockers,
+    stale,
     routine,
     unknown,
     decisionsAndDeadlines: [
@@ -265,6 +297,8 @@ export function renderMondayPortfolioOrientation(orientation: MondayPortfolioOri
     `Juss & Co Monday founder orientation — ${orientation.weekKey}`,
     '',
     ...renderItems('PROOF-CRITICAL BLOCKERS', orientation.proofCriticalBlockers),
+    '',
+    ...renderItems('STALE / REFRESH REQUIRED', orientation.stale),
     '',
     ...renderItems('VERIFIED / NO FOUNDER ACTION', orientation.verified),
     '',
@@ -362,7 +396,7 @@ async function claimWeek(client: SupabaseClient, weekKey: string, now: Date): Pr
     : current.status === 'running' && now.getTime() - startedAt >= STALE_RUNNING_MS;
   if (!retryable) return 'duplicate';
 
-  const { error } = await client
+  const { data: claimed, error } = await client
     .from('portfolio_orientation_runs')
     .update({
       status: 'running',
@@ -371,9 +405,13 @@ async function claimWeek(client: SupabaseClient, weekKey: string, now: Date): Pr
       completed_at: null,
       error_code: null,
     })
-    .eq('week_key', weekKey);
+    .eq('week_key', weekKey)
+    .eq('status', current.status)
+    .eq('started_at', current.started_at)
+    .select('week_key')
+    .maybeSingle();
   if (error) throw new Error(`orientation_claim_retry_failed:${error.message}`);
-  return 'claimed';
+  return claimed ? 'claimed' : 'duplicate';
 }
 
 function safeErrorCode(error: unknown): string {
