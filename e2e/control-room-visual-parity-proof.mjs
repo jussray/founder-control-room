@@ -121,7 +121,7 @@ try {
     const projectGridTracks = countGridTracks(await page.locator('.project-type-grid').evaluate((node) => getComputedStyle(node).gridTemplateColumns));
     assert.equal(projectGridTracks, 2, 'mobile onboarding condenses to two premium cards per row');
 
-    const actionsPosition = await page.locator('.step-actions').evaluate((node) => getComputedStyle(node).position);
+    const actionsPosition = await page.locator('.step-actions:visible').evaluate((node) => getComputedStyle(node).position);
     assert.equal(actionsPosition, 'sticky', 'mobile actions stay reachable without breaking the compact founder-command layout');
 
     await noOverflow(page, 'mobile onboarding');
