@@ -443,3 +443,11 @@ Refreshing the StoryEngine peer pin is recovery setup only. The successor FCR st
 StoryEngine `main` advanced from `18d9ba257a69c3d1743f346d424daf31796aaeed` through the agent-contract v1 commits to independently observed `168d65ede38d2477ea00902fa1f0e76f292c583d`, so FCR's live StoryEngine peer-ref check fails closed on every FCR head, including Chief Access recovery PR #913. This refresh is a focused recovery transition for that external evidence-subject drift, not a defect in #913 or any other carrier.
 
 Pin alignment alone cannot promote the successor federation state beyond `UNKNOWN`. The successor FCR head must earn its own exact-head Playwright witness against `168d65ede38d2477ea00902fa1f0e76f292c583d`; any later movement of either repository expires that pair-specific proof again. This refresh grants no merge, deploy, production, publication, or provider-mutation authority.
+
+## Exact-head adapter and documentation-receipt freshness
+
+Project-adapter freshness must fail closed on exact repository identity. Byte-identical contract blobs at a successor external head may justify selecting that successor as the next evidence subject, but they cannot make a predecessor adapter pin current or transfer predecessor CI, runtime, browser, merge, or deploy proof to the successor.
+
+Documentation Truth must evaluate receipt novelty inside the reviewed base-to-head range. An inherited claim, punctuation-only edit, comment, formatting change, Markdown link-target change, or recombination of inherited invariant units cannot certify a newly changed truth-sensitive source path. Every such path requires a fresh meaningful path-bound invariant.
+
+The cross-repository Playwright witness must re-observe the live StoryEngine ref after the immutable peer checkout and require the live ref SHA, configured peer SHA, and actual checkout SHA to agree before federation proof proceeds. That agreement proves only the selected evidence identity; it cannot mint production, merge, deploy, publication, or provider-mutation authority.

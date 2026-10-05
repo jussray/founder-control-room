@@ -30,7 +30,7 @@ describe('Chief AI Founder OS project adapter', () => {
       id: 'chief-ai-machine',
       adapterId: 'chief-ai-machine-project-preview',
       repository: 'jussray/chief-ai-machine',
-      auditedSourceHead: '161cd3af4ffd1d64f5f65b8aed0e7108f021194a',
+      auditedSourceHead: 'af76743b3b4ce4c300524b910d067e1b1956dc66',
       authorityOwner: 'founder-control-room',
       mode: 'preview',
       executionAllowed: false,
@@ -45,6 +45,9 @@ describe('Chief AI Founder OS project adapter', () => {
       'config/founder-chief-pair.contract.json',
       'e2e/chief-capability-plan.pw.mjs',
     ]);
+    expect(ADAPTER.auditedContractBlobs).toMatchObject({
+      'src/domain/capability-registry.js': '83592043323fe08258dc93778300151e21ac70ae',
+    });
   });
 
   it('produces an exact-head read-only Chief inspection using generic project truth', () => {
