@@ -245,9 +245,8 @@ export function classifyPublicCoverage(candidate: ExternalUseCandidate): PublicC
     materiality = "UNKNOWN";
     confidence = identity === 2 ? 0.64 : 0.46;
   } else {
-    const preferred = audience !== "other";
     const highValueAudience = audience === "investor" || audience === "partner" || audience === "technical";
-    confidence = Math.min(0.98, 0.52 + identity * 0.16 + (preferred ? 0.12 : 0) + (highValueAudience ? 0.08 : 0));
+    confidence = Math.min(0.98, 0.52 + identity * 0.16 + 0.12 + (highValueAudience ? 0.08 : 0));
     materiality = identity === 2 && highValueAudience && confidence >= 0.8 ? "MATERIAL" : "WATCH";
   }
 
