@@ -53,7 +53,7 @@ For one completed relay outcome, it:
 - binds verification to that exact `owner/repo` and 40-character commit SHA;
 - re-observes repository identity and exact-head verification signals through the existing repository provider;
 - requires caller-declared check names to resolve to their newest placeable exact-head attempt and requires each selected attempt to be terminal `passed`;
-- may bind a required check to a provider-backed App issuer id, failing closed when the producer identity does not match;
+- requires every required check to bind a provider-backed App issuer id and fails closed when producer identity is absent or mismatched;
 - requires a declared browser-shaped check plus passed exact-head Playwright/browser evidence when the repair's user-facing claim requires Playwright;
 - emits verifier-owned evidence references and a non-authorizing `fcr/capability-outcome-verification@v1` receipt bound to the exact relay response hash.
 
