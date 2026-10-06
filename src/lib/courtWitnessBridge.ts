@@ -178,7 +178,11 @@ function failure(
 async function readJsonBounded(response: Response, label: string): Promise<JsonRecord> {
   const declared = Number(response.headers.get('content-length') ?? '');
   if (Number.isFinite(declared) && declared > MAX_RESPONSE_BYTES) {
-    await response.body?.cancel().catch(() => undefined);
+    try {
+      await response.body?.cancel();
+    } catch {
+      // The authoritative size rejection survives a stream that was already closed.
+    }
     throw new Error(`${label} response exceeded ${MAX_RESPONSE_BYTES} bytes`);
   }
   if (!response.body) throw new Error(`${label} returned an empty response`);
@@ -193,7 +197,11 @@ async function readJsonBounded(response: Response, label: string): Promise<JsonR
       if (done) break;
       bytes += value.byteLength;
       if (bytes > MAX_RESPONSE_BYTES) {
-        await reader.cancel().catch(() => undefined);
+        try {
+          await reader.cancel();
+        } catch {
+          // The authoritative size rejection survives a stream that was already closed.
+        }
         throw new Error(`${label} response exceeded ${MAX_RESPONSE_BYTES} bytes`);
       }
       raw += decoder.decode(value, { stream: true });
