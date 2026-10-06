@@ -26,7 +26,7 @@ The market ranks from `CapabilityObservation` records. Its intended first receip
 
 When the provider reports it, a relay response also carries optional `usage` (input, output, cache-write and cache-read token counts; Anthropic only today). Usage is included in `responseHash` only when present, so receipts without it keep their original hash. Council rounds copy it onto each hop. It is measurement, not evidence or authority, and a missing or malformed usage block is omitted rather than estimated.
 
-Today relay responses are returned to the caller and are not persisted anywhere in this repository. Persisting them is a separate gate. Until it lands, the fold has no stored population to read.
+Council rounds (`POST /missions/:missionId/council/run`, `src/lib/councilRound.ts`) persist a per-hop projection of each relay response — relay id, request/response hashes, answer, evidence refs, completion time, and usage when reported — into `council_conversations`. Standalone `fcr_relay_operator` calls are still returned to the caller and not persisted, and no full `OperatorRelayResponseV1` receipt is stored. Nothing reads `council_conversations` into the fold yet, so the fold still has no stored population. Wiring that read path is a separate gate. (Earlier text said relay responses were persisted nowhere; that was true before the council round route landed and is now superseded.)
 
 Fold rules:
 
@@ -46,7 +46,7 @@ Current state, in the repository's own capability vocabulary:
 
 ```text
 contract-capable          market ranking + relay-receipt fold exist as tested source
-configured / allowlisted  not yet — no live route calls the market; no store persists relay responses or observations; no outcome verifier exists
+configured / allowlisted  not yet — no live route calls the market; council rounds persist hop projections in `council_conversations` but nothing folds them, and no store persists observations; no outcome verifier exists
 adapter-proven            not yet
 provider-outcome-proven   not yet
 ```
