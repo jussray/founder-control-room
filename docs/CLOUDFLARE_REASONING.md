@@ -199,6 +199,14 @@ Cloudflare outbound email is a capability boundary, not a global portfolio trans
 
 Repository configuration can prove the desired binding name and sender restriction. It cannot prove Cloudflare has onboarded the sender domain, the deployed Worker currently exposes that binding, or a message was accepted/delivered. Those claims require fresh provider/runtime evidence and must remain separate from source truth.
 
+## Review-email inbound routing boundary
+
+`wrangler.email.toml` is source truth for the `founder-control-room-review-email` Worker identity, source entrypoint, Cloudflare account, public-route posture, and the private `FOUNDER_CONTROL_ROOM_API -> founder-control-room` Service Binding. It must not encode inbound Email Routing through an `addresses` field.
+
+The intended mapping `review@foundercontrolroom.org -> founder-control-room-review-email` is Cloudflare provider-side Email Routing state. A repository verifier, secret-name readback, or successful `wrangler deploy --config wrangler.email.toml` can prove only the layer it actually observed. Provider routing mutation/readback and an actual inbound-email invocation remain separate evidence planes.
+
+The reconciliation receipt therefore keeps `provider_deploy_succeeded`, `email_trigger_reconciled`, and `runtime_email_invocation_proven` independent. Worker deployment must never promote either provider-side routing or runtime invocation to green without their own evidence.
+
 ## Worker build authority membrane
 
 `wrangler.worker.toml` runs `scripts/verify-worker-build-authority.mjs` as its custom Worker build hook. The hook is a repository-side fail-closed membrane, not a provider mutation authority.

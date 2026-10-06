@@ -80,7 +80,7 @@ jobs:
         if: steps.scope.outputs.in_scope == 'true'
         run: npm run typecheck
 
-      - name: Verify email routing trigger contract
+      - name: Verify review-email Worker source contract
         if: steps.scope.outputs.in_scope == 'true'
         run: node scripts/verify-founder-review-email-routing.mjs
 

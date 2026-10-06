@@ -89,11 +89,11 @@ jobs:
           fi
 
           grep -Eq '^name = "founder-control-room-review-email"$' wrangler.email.toml
-          grep -Eq '^addresses = \["review@foundercontrolroom.org"\]$' wrangler.email.toml
           grep -Eq '^binding = "FOUNDER_CONTROL_ROOM_API"$' wrangler.email.toml
           grep -Eq '^service = "founder-control-room"$' wrangler.email.toml
+          ! grep -Eq '^addresses[[:space:]]*=' wrangler.email.toml
 
-          echo 'Review-email Worker identity, review@ routing trigger, account authority, private API binding, and dedicated deploy credential are declared.'
+          echo 'Review-email Worker identity, account authority, private API binding, and dedicated deploy credential are declared. Inbound Email Routing remains provider-side state and must be independently read back.'
 
       - name: Record bounded authority receipt
         shell: bash
@@ -105,7 +105,8 @@ jobs:
             echo "- Approval reference: \`$DEPLOYMENT_APPROVAL_ID\`"
             echo "- Reason: ${DEPLOYMENT_REASON:-not supplied}"
             echo "- Mutation scope: Cloudflare Worker \`founder-control-room-review-email\` via \`wrangler.email.toml\`"
-            echo "- Email trigger: \`review@foundercontrolroom.org -> founder-control-room-review-email\`"
+            echo "- Expected provider-side email rule: \`review@foundercontrolroom.org -> founder-control-room-review-email\`"
+            echo "- Email rule mutation/readback: absent from this workflow; retained as a separate provider receipt"
             echo "- Credential authority: dedicated \`CLOUDFLARE_REVIEW_EMAIL_DEPLOY_TOKEN\`"
             echo "- Intended private binding: \`FOUNDER_CONTROL_ROOM_API -> founder-control-room\`"
             echo "- Existing Worker secrets: preserved and validated by name before deploy"
@@ -157,11 +158,16 @@ jobs:
               scope: $scope,
               expected_sha: $expected_sha,
               worker: $worker,
-              email_routing_address: $address,
+              expected_email_routing_address: $address,
               service_binding: {binding: $binding, service: $service},
               credential_header_safe: false,
+              provider_worker_found: null,
+              provider_error_class: null,
+              provider_error_code: null,
+              provider_cli_exit_status: null,
               required_secret_names_verified: false,
               provider_deploy_succeeded: false,
+              service_binding_verified: false,
               email_trigger_reconciled: false,
               blocked_stage: "credential_header_safety",
               supabase_db_mutation: false,
@@ -199,7 +205,7 @@ jobs:
 
           receipt='test-results/fcr-review-email-worker-reconcile.json'
           tmp="${receipt}.tmp"
-          jq '.credential_header_safe = true | .blocked_stage = "secret_names"' "$receipt" > "$tmp"
+          jq '.credential_header_safe = true | .blocked_stage = "existing_worker_secret_read"' "$receipt" > "$tmp"
           mv "$tmp" "$receipt"
 
       - name: Verify existing review-email Worker secret names
@@ -209,24 +215,78 @@ jobs:
         run: |
           set -euo pipefail
           secret_receipt="$RUNNER_TEMP/review-email-secret-names.json"
+          secret_error="$RUNNER_TEMP/review-email-secret-names.err"
+
+          set +e
           ./node_modules/.bin/wrangler secret list \
             --config wrangler.email.toml \
-            --format json > "$secret_receipt"
+            --format json > "$secret_receipt" 2> "$secret_error"
+          secret_status=$?
+          set -e
+
+          receipt='test-results/fcr-review-email-worker-reconcile.json'
+          tmp="${receipt}.tmp"
+
+          if (( secret_status != 0 )); then
+            provider_error_code="$(grep -Eo '\[code: [0-9]+\]' "$secret_error" | head -n 1 | grep -Eo '[0-9]+' || true)"
+            provider_error_class='provider_read_failed'
+            provider_worker_found='null'
+            blocked_stage='existing_worker_secret_read'
+
+            if grep -F 'Worker "founder-control-room-review-email" not found.' "$secret_error" >/dev/null; then
+              provider_error_class='worker_not_found'
+              provider_worker_found='false'
+              blocked_stage='provider_worker_identity'
+            elif grep -Eiq 'authentication|invalid api token|api token[^[:alnum:]]+invalid' "$secret_error"; then
+              provider_error_class='authentication'
+            elif grep -Eiq 'unauthorized|forbidden|not authorized|permission denied|insufficient permission' "$secret_error"; then
+              provider_error_class='authorization'
+            elif grep -Eiq 'rate limit|too many requests|\b429\b' "$secret_error"; then
+              provider_error_class='rate_limit'
+            elif grep -Eiq 'internal server|service unavailable|bad gateway|gateway timeout|\b5[0-9][0-9]\b' "$secret_error"; then
+              provider_error_class='provider_service'
+            elif grep -Eiq 'invalid account|account[^[:alnum:]]+(not found|permission|scope)' "$secret_error"; then
+              provider_error_class='account_or_scope'
+            fi
+
+            rm -f "$secret_error"
+
+            jq \
+              --arg provider_error_class "$provider_error_class" \
+              --arg provider_error_code "$provider_error_code" \
+              --arg blocked_stage "$blocked_stage" \
+              --argjson provider_cli_exit_status "$secret_status" \
+              --argjson provider_worker_found "$provider_worker_found" \
+              '.provider_error_class = $provider_error_class
+               | .provider_error_code = (if $provider_error_code == "" then null else $provider_error_code end)
+               | .provider_cli_exit_status = $provider_cli_exit_status
+               | .provider_worker_found = $provider_worker_found
+               | .blocked_stage = $blocked_stage' \
+              "$receipt" > "$tmp"
+            mv "$tmp" "$receipt"
+
+            echo "::error title=Review-email Worker provider read failed::Cloudflare secret-name readback failed safely classified as ${provider_error_class}; code=${provider_error_code:-unknown}; exit=${secret_status}. Raw provider stderr was classified then deleted without emission."
+            exit "$secret_status"
+          fi
+
+          rm -f "$secret_error"
+          jq '.provider_worker_found = true' "$receipt" > "$tmp"
+          mv "$tmp" "$receipt"
 
           for required in FOUNDER_REVIEW_FOUNDER_EMAIL FOUNDER_REVIEW_EMAIL_INGRESS_SECRET; do
             if ! jq -e --arg required "$required" 'any(.[]; .name == $required)' "$secret_receipt" >/dev/null; then
+              jq '.blocked_stage = "required_worker_secret_names"' "$receipt" > "$tmp"
+              mv "$tmp" "$receipt"
               echo "::error title=Missing review-email Worker secret::$required is not installed on founder-control-room-review-email."
               exit 1
             fi
           done
 
-          receipt='test-results/fcr-review-email-worker-reconcile.json'
-          tmp="${receipt}.tmp"
           jq '.required_secret_names_verified = true | .blocked_stage = "provider_deploy"' "$receipt" > "$tmp"
           mv "$tmp" "$receipt"
           echo 'Required review-email Worker secret names are present. Values were not read.'
 
-      - name: Deploy review-email Worker and reconcile email trigger
+      - name: Deploy review-email Worker
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_REVIEW_EMAIL_DEPLOY_TOKEN }}
           EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha }}
@@ -234,24 +294,31 @@ jobs:
         run: |
           set -euo pipefail
           deploy_log="$RUNNER_TEMP/review-email-worker-deploy.log"
+          receipt='test-results/fcr-review-email-worker-reconcile.json'
 
           set +e
           npx --yes wrangler@4.129.0 deploy --config wrangler.email.toml 2>&1 | tee "$deploy_log"
           deploy_status=${PIPESTATUS[0]}
           set -e
           if (( deploy_status != 0 )); then
+            tmp="${receipt}.tmp"
+            jq '.blocked_stage = "provider_deploy_failed"' "$receipt" > "$tmp"
+            mv "$tmp" "$receipt"
             echo "::error title=Review-email Worker deployment failed::Wrangler exited with status $deploy_status."
             exit "$deploy_status"
           fi
 
+          tmp="${receipt}.tmp"
+          jq '.provider_deploy_succeeded = true | .blocked_stage = "service_binding_proof"' "$receipt" > "$tmp"
+          mv "$tmp" "$receipt"
+
           grep -F 'FOUNDER_CONTROL_ROOM_API (founder-control-room)' "$deploy_log" >/dev/null || {
-            echo '::error title=Service Binding proof missing::Wrangler deployment output did not prove FOUNDER_CONTROL_ROOM_API -> founder-control-room.'
+            echo '::error title=Service Binding proof missing::Worker deploy succeeded, but Wrangler output did not prove FOUNDER_CONTROL_ROOM_API -> founder-control-room. Provider deployment remains recorded as successful; binding proof remains false.'
             exit 1
           }
 
-          receipt='test-results/fcr-review-email-worker-reconcile.json'
           tmp="${receipt}.tmp"
-          jq '.provider_deploy_succeeded = true | .email_trigger_reconciled = true | .blocked_stage = null' "$receipt" > "$tmp"
+          jq '.service_binding_verified = true | .blocked_stage = null' "$receipt" > "$tmp"
           mv "$tmp" "$receipt"
           cat "$receipt" >> "$GITHUB_STEP_SUMMARY"
 

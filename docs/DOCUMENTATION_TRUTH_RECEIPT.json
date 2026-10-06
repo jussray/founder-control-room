@@ -167,7 +167,8 @@
         "`README.md` must keep the GitHub Actions and Cloudflare Worker copies of `OPENAI_API_KEY` as separate CI/runtime authority planes and state that the all-secret proof derives names from the canonical Worker registry without reading values.",
         "`README.md` must treat a successful successor StoryEngine Playwright witness as current only for the exact FCR/StoryEngine evidence pair recorded by the run and expire that proof when either repository moves.",
         "`README.md` must record that the StoryEngine peer refresh discovered during URLFix PR #914 merge review is a focused recovery transition handled by PR #896, not URLFix failure, and that pin alignment alone cannot promote the successor federation state beyond UNKNOWN.",
-        "`README.md` must record that the StoryEngine peer refresh after the agent-contract v1 rollout is a focused recovery transition, not a #913 failure, and that pin alignment alone cannot promote the successor federation state beyond UNKNOWN."
+        "`README.md` must record that the StoryEngine peer refresh after the agent-contract v1 rollout is a focused recovery transition, not a #913 failure, and that pin alignment alone cannot promote the successor federation state beyond UNKNOWN.",
+        "`README.md` must keep review-email Worker source/deploy truth separate from provider-side Email Routing and runtime invocation; `wrangler.email.toml` must not be treated as proof that `review@foundercontrolroom.org` currently routes to the Worker."
       ]
     },
     {
@@ -193,7 +194,8 @@
     {
       "path": "docs/CLOUDFLARE_REASONING.md",
       "claims": [
-        "`docs/CLOUDFLARE_REASONING.md` must require FCR provider-held Worker binding names to pass the canonical Deploy membrane without treating source, binding-name presence, CI, or Playwright as proof of downstream provider activation or business outcomes."
+        "`docs/CLOUDFLARE_REASONING.md` must require FCR provider-held Worker binding names to pass the canonical Deploy membrane without treating source, binding-name presence, CI, or Playwright as proof of downstream provider activation or business outcomes.",
+        "`docs/CLOUDFLARE_REASONING.md` must keep `provider_deploy_succeeded`, provider-side `email_trigger_reconciled`, and `runtime_email_invocation_proven` as independent review-email evidence planes; Worker deploy must not promote routing or invocation without their own provider/runtime evidence."
       ]
     },
     {
@@ -212,7 +214,8 @@
     {
       "path": "docs/deployment/CLOUDFLARE_WORKER_TARGETS.md",
       "claims": [
-        "`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` must keep canonical Worker runtime secret bindings provider-held while separating provider subscription, runtime delivery, production database state, and business outcomes into their own activation proof."
+        "`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` must keep canonical Worker runtime secret bindings provider-held while separating provider subscription, runtime delivery, production database state, and business outcomes into their own activation proof.",
+        "`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` must treat the review-email address-to-Worker mapping as provider-side Email Routing state, not as a Wrangler manifest field or a consequence of Worker deployment."
       ]
     },
     {
@@ -307,6 +310,12 @@
       "path": "tools/zapier/founder-content-outcome-contract.cjs",
       "claims": [
         "`tools/zapier/founder-content-outcome-contract.cjs` must bind founder-content metrics to the exact observed network, lane, account identity, connector identity, and coverage state; out-of-scope metrics must remain UNKNOWN, cross-account metric donation is forbidden, and these receipts can never grant publication, provider-write, merge, deploy, spend, or external-contact authority."
+      ]
+    },
+    {
+      "path": "wrangler.email.toml",
+      "claims": [
+        "`wrangler.email.toml` must declare only the review-email Worker source identity, account, entrypoint, and private `FOUNDER_CONTROL_ROOM_API -> founder-control-room` Service Binding; it must not use an `addresses` field to claim inbound Email Routing, because `review@foundercontrolroom.org -> founder-control-room-review-email` is provider-side state requiring independent provider readback and runtime invocation evidence."
       ]
     }
   ]

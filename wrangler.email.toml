@@ -9,10 +9,11 @@ preview_urls = false
 [observability]
 enabled = true
 
-# Canonical inbound Email Routing trigger. With Cloudflare subaddressing enabled,
-# review+<context-uuid>@foundercontrolroom.org matches this base address while
-# preserving the +<context-uuid> value in message.to for the parser.
-addresses = ["review@foundercontrolroom.org"]
+# Inbound Email Routing is provider-side state, not a Wrangler Worker binding.
+# The expected live provider rule is:
+#   review@foundercontrolroom.org -> founder-control-room-review-email
+# Keep that rule independently verified through Cloudflare provider readback.
+# Do not represent it with an unsupported `addresses` key in this Worker config.
 
 # Keep founder review-email ingestion on Cloudflare's private Worker fabric.
 # The request URL remains the canonical API route for downstream routing, but
