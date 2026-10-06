@@ -146,7 +146,21 @@ function buildSourceAccount(input, errors) {
   }
   if (connectorAccountType && !SOURCE_ACCOUNT_TYPES.has(connectorAccountType)) errors.push('source_account.connector_account_type is invalid');
   if (connectorAccountId && !SUBJECT_ID.test(connectorAccountId)) errors.push('source_account.connector_account_id is invalid');
+  if (typeof source.account_id === 'string' && source.account_id.trim().length > 160) {
+    errors.push('source_account.account_id exceeds 160 characters');
+  }
+  if (typeof source.connector_account_id === 'string' && source.connector_account_id.trim().length > 160) {
+    errors.push('source_account.connector_account_id exceeds 160 characters');
+  }
   if (!COVERAGE_STATES.has(coverageState)) errors.push('source_account.coverage_state must be observed, UNKNOWN, or OUT_OF_SCOPE');
+  if (
+    coverageState === 'observed'
+    && connectorAccountType
+    && connectorAccountId
+    && (connectorAccountType !== accountType || connectorAccountId !== accountId)
+  ) {
+    errors.push('observed source_account coverage requires connector account identity to match observed account identity');
+  }
 
   return Object.freeze({
     network,
@@ -365,7 +379,21 @@ function validateSourceAccount(input, errors) {
   if ((connectorAccountType && !connectorAccountId) || (!connectorAccountType && connectorAccountId)) errors.push('stored source_account connector identity is incomplete');
   if (connectorAccountType && !SOURCE_ACCOUNT_TYPES.has(connectorAccountType)) errors.push('stored source_account.connector_account_type is invalid');
   if (connectorAccountId && !SUBJECT_ID.test(connectorAccountId)) errors.push('stored source_account.connector_account_id is invalid');
+  if (typeof source.account_id === 'string' && source.account_id.trim().length > 160) {
+    errors.push('stored source_account.account_id exceeds 160 characters');
+  }
+  if (typeof source.connector_account_id === 'string' && source.connector_account_id.trim().length > 160) {
+    errors.push('stored source_account.connector_account_id exceeds 160 characters');
+  }
   if (!COVERAGE_STATES.has(coverageState) || source.coverage_state !== coverageState) errors.push('stored source_account.coverage_state is invalid');
+  if (
+    coverageState === 'observed'
+    && connectorAccountType
+    && connectorAccountId
+    && (connectorAccountType !== accountType || connectorAccountId !== accountId)
+  ) {
+    errors.push('stored observed source_account coverage requires connector account identity to match observed account identity');
+  }
 
   if (coverageState !== 'observed') {
     const metrics = record(input.metrics) || {};
