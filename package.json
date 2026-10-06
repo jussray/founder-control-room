@@ -65,7 +65,7 @@
     "proof:goalfix": "npm run build && node e2e/goalfix-proof.mjs && node e2e/goalfix-same-sha-proof.mjs",
     "verify:test-discovery": "node scripts/verify-test-discovery.mjs",
     "generate:worker-types": "node -e \"require('node:fs').mkdirSync('.wrangler/types',{recursive:true})\" && wrangler types .wrangler/types/worker-configuration.d.ts --config wrangler.worker.toml --env-interface FcrWorkerEnv --include-env=false",
-    "verify:action-cost-ledger": "vitest run src/economics/__tests__/actionCostLedger.test.ts src/http/routes/__tests__/actionCostReceipts.integration.test.ts"
+    "verify:action-cost-ledger": "vitest run src/economics/__tests__/actionCostLedger.test.ts src/http/routes/__tests__/actionCostReceipts.integration.test.ts && node e2e/action-cost-ledger.pw.mjs"
   },
   "dependencies": {
     "@octokit/rest": "^21.0.2",
