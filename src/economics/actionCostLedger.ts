@@ -118,7 +118,14 @@ function receiptIdentity(receipt: Omit<ActionCostReceiptV1, 'receiptHash'>): unk
     receipt.monthRuntimeCostBeforeUsd,
     receipt.monthlyRuntimeBudgetUsd,
     receipt.planNetRevenueUsd ?? null,
-    receipt.usage ?? null,
+    receipt.usage ? [
+      receipt.usage.provider ?? null,
+      receipt.usage.model ?? null,
+      receipt.usage.inputTokens ?? null,
+      receipt.usage.outputTokens ?? null,
+      receipt.usage.toolCalls ?? null,
+      [...(receipt.usage.tools ?? [])].sort(),
+    ] : null,
     receipt.costTruth,
     receipt.actionUnits,
     receipt.actionClassMaxUsd,
@@ -144,7 +151,7 @@ export function validateActionCostReceiptInput(input: ActionCostReceiptInputV1):
   if (!SAFE_IDENTIFIER.test(input.receiptId?.trim() ?? '')) errors.push('receiptId is invalid');
   if (!SAFE_IDENTIFIER.test(input.projectSlug?.trim() ?? '')) errors.push('projectSlug is invalid');
   if (!SAFE_IDENTIFIER.test(input.actionId?.trim() ?? '')) errors.push('actionId is invalid');
-  if (!(input.actionClass in ACTION_COST_CLASS_MAX_USD)) errors.push('actionClass is invalid');
+  if (!Object.prototype.hasOwnProperty.call(ACTION_COST_CLASS_MAX_USD, input.actionClass)) errors.push('actionClass is invalid');
   if (!Number.isFinite(Date.parse(input.occurredAt))) errors.push('occurredAt must be RFC3339-compatible');
   if (!SAFE_IDENTIFIER.test(input.pricingVersion?.trim() ?? '')) errors.push('pricingVersion is invalid');
   if (!SAFE_IDENTIFIER.test(input.planId?.trim() ?? '')) errors.push('planId is invalid');
