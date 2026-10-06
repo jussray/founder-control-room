@@ -28,6 +28,17 @@ describe('parseRelayIntent', () => {
     expect(parseRelayIntent('Ask DeepSeek Instructor to review this implementation.', 'codex')).toBeNull();
   });
 
+  it('routes Meta AI as a distinct governed Court/Council witness', () => {
+    expect(parseRelayIntent('Ask Meta AI to challenge this implementation.', 'codex')).toEqual({
+      target: 'meta-ai',
+      instruction: 'challenge this implementation.',
+    });
+  });
+
+  it('does not route back to Meta AI when Meta AI is already active', () => {
+    expect(parseRelayIntent('Ask Meta AI to challenge this implementation.', 'meta-ai')).toBeNull();
+  });
+
   it('routes Muse as a governed peer relay target', () => {
     expect(parseRelayIntent('Ask Muse to challenge this implementation.', 'codex')).toEqual({
       target: 'muse',
