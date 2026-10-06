@@ -1,8 +1,12 @@
 import { createHash } from 'node:crypto';
 import { getProjectEvidence, type ProjectEvidenceDependencies, type ProjectEvidenceReceipt } from './projectEvidenceAgent.js';
 import {
+  OPERATOR_RELAY_REQUEST_CONTRACT,
   OPERATOR_RELAY_RESPONSE_CONTRACT,
+  operatorRelayRequestHash,
   operatorRelayResponseHash,
+  relayContextFingerprint,
+  type OperatorRelayRequestV1,
   type OperatorRelayResponseV1,
   type RelayOperatorId,
 } from './operatorRelay.js';
@@ -63,6 +67,7 @@ export interface CapabilityOutcomeVerificationReceipt {
 }
 
 export interface RepositoryRepairVerificationInput {
+  request: OperatorRelayRequestV1;
   response: OperatorRelayResponseV1;
   repository: string;
   expectedHeadSha: string;
@@ -186,6 +191,48 @@ export function validateCapabilityOutcomeVerificationReceipt(
   if (errors.length === 0) {
     const { verificationHash: _verificationHash, ...identity } = value;
     if (capabilityOutcomeVerificationHash(identity) !== value.verificationHash) errors.push('verificationHash does not match verification content');
+  }
+  return [...new Set(errors)];
+}
+
+export function repositoryRepairSourceRef(repository: string, exactSha: string): string {
+  return `repository:${repository.trim()}@${exactSha.trim().toLowerCase()}`;
+}
+
+function relayRequestIntegrityErrors(
+  request: OperatorRelayRequestV1,
+  response: OperatorRelayResponseV1,
+  repository: string,
+  exactSha: string,
+): string[] {
+  const errors: string[] = [];
+  if (request.contract !== OPERATOR_RELAY_REQUEST_CONTRACT) errors.push('relay request contract is unsupported');
+  if (!request.relayId?.trim()) errors.push('relay request id is required');
+  if (!SHA256.test(request.requestHash ?? '')) errors.push('relay requestHash must be sha256');
+  if (request.relayId !== response.relayId) errors.push('relay request and response ids do not match');
+  if (request.requestHash !== response.requestHash) errors.push('relay response is not bound to the supplied request');
+  if (request.toOperator !== response.fromOperator || request.fromOperator !== response.toOperator) {
+    errors.push('relay request and response operator direction does not match');
+  }
+  if (request.capability !== 'implement') errors.push('repository repair verification requires implement capability');
+  if (Object.values(request.authority ?? {}).some(Boolean)) errors.push('relay request carried mutation authority');
+  if (!request.context?.summary?.trim()) errors.push('relay request context summary is required');
+  const expectedSourceRef = repositoryRepairSourceRef(repository, exactSha);
+  if (request.context?.sourceRef !== expectedSourceRef) errors.push('relay request is not bound to the exact repository repair subject');
+  if (
+    request.context?.sourceFingerprint !== relayContextFingerprint(
+      request.context?.summary ?? '',
+      request.context?.sourceRef ?? null,
+    )
+  ) errors.push('relay request context fingerprint does not match context');
+  const createdAt = Date.parse(request.createdAt ?? '');
+  const expiresAt = Date.parse(request.expiresAt ?? '');
+  if (!Number.isFinite(createdAt) || !Number.isFinite(expiresAt) || createdAt >= expiresAt) {
+    errors.push('relay request time bounds are invalid');
+  }
+  if (SHA256.test(request.requestHash ?? '')) {
+    const { requestHash: _requestHash, ...identity } = request;
+    if (operatorRelayRequestHash(identity) !== request.requestHash) errors.push('relay requestHash does not match request content');
   }
   return [...new Set(errors)];
 }
@@ -333,6 +380,12 @@ export async function verifyRepositoryRepairOutcome(
   if (input.requirePlaywright && !checks.some((check) => BROWSER_CHECK.test(check.name))) {
     blockers.push('Playwright-required repository repair must declare a browser-shaped required check');
   }
+  blockers.push(...relayRequestIntegrityErrors(
+    input.request,
+    input.response,
+    repository,
+    expectedHeadSha,
+  ));
   blockers.push(...relayResponseErrors(input.response));
 
   const staticBlockers = [...new Set(blockers)];
