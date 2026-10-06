@@ -26,7 +26,7 @@ The market ranks from `CapabilityObservation` records. Its intended first receip
 
 When the provider reports it, a relay response also carries optional `usage` (input, output, cache-write and cache-read token counts; Anthropic only today). Usage is included in `responseHash` only when present, so receipts without it keep their original hash. Council rounds copy it onto each hop. It is measurement, not evidence or authority, and a missing or malformed usage block is omitted rather than estimated.
 
-Council rounds (`POST /missions/:missionId/council/run`, `src/lib/councilRound.ts`) persist a per-hop projection of each relay response — relay id, request/response hashes, answer, evidence refs, completion time, and usage when reported — into `council_conversations`. Standalone `fcr_relay_operator` calls are still returned to the caller and not persisted, and no full `OperatorRelayResponseV1` receipt is stored. Nothing reads `council_conversations` into the fold yet, so the fold still has no stored population. Wiring that read path is a separate gate. (Earlier text said relay responses were persisted nowhere; that was true before the council round route landed and is now superseded.)
+Council rounds (`POST /missions/:missionId/council/run`, `src/lib/councilRound.ts`) now persist every field needed to reconstruct and re-hash each completed, blocked, or failed `OperatorRelayResponseV1` outcome when a provider response exists. `recoverPersistedRelayResponses()` accepts only hash-matching projections; historical Council rows written before the missing hash fields were retained are classified as legacy and excluded instead of being upgraded into synthetic receipts. Provider exceptions that produced no relay response remain absent. Standalone `fcr_relay_operator` calls are still returned to the caller and not persisted. Nothing reads recovered Council receipts into the capability fold yet, no store persists observations, and no independent outcome verifier is wired, so market routing remains advisory. (Earlier text said relay responses were persisted nowhere; that was true before the council round route landed and is superseded.)
 
 Fold rules:
 
@@ -46,7 +46,7 @@ Current state, in the repository's own capability vocabulary:
 
 ```text
 contract-capable          market ranking + relay-receipt fold exist as tested source
-configured / allowlisted  not yet — no live route calls the market; council rounds persist hop projections in `council_conversations` but nothing folds them, and no store persists observations; no outcome verifier exists
+configured / allowlisted  not yet — no live route calls the market; new council rows preserve hash-recoverable relay outcomes in `council_conversations`, but nothing folds recovered receipts, no store persists observations, and no outcome verifier exists
 adapter-proven            not yet
 provider-outcome-proven   not yet
 ```
