@@ -131,7 +131,14 @@
       "claims": [
         "`src/lib/capabilityObservationFeed.ts` may fold operator relay receipts into capability observations only for the operator that answered them, only from outcome statuses, deduplicated by response hash with the latest outcome per relay id, and only inside the caller's freshness window so stale evidence cannot renew itself.",
         "`src/lib/capabilityObservationFeed.ts` must treat a provider answering as unproven: only independently verified relay ids contribute proof or evidence references, completed-without-evidence is a false green, any non-`none` authorityRequested is an authority violation, and `blocked` never lowers success.",
-        "The fold is contract-capable tested source; relay responses are not persisted, no outcome verifier exists, no live route calls the market, and the fold grants no selection or execution authority."
+        "The fold is contract-capable tested source; new Council rows can preserve hash-recoverable relay outcomes, but recovered receipts are not yet fed into a live market route, standalone relay responses remain unpersisted, no outcome verifier or observation store exists, and the fold grants no selection or execution authority."
+      ]
+    },
+    {
+      "path": "src/lib/councilRound.ts",
+      "claims": [
+        "`src/lib/councilRound.ts` must persist every field needed to reconstruct and recompute the canonical hash for completed, blocked, and failed provider relay outcomes when a response exists; legacy partial Council projections and hash-mismatched/tampered projections must be excluded rather than synthesized into receipts.",
+        "Council persistence remains transport evidence only: recoverable relay receipts do not create independent outcome verification, model promotion, selection authority, execution authority, merge/deploy authority, or provider mutation authority."
       ]
     },
     {
