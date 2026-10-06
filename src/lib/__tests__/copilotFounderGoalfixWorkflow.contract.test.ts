@@ -15,7 +15,7 @@ describe('GitHub Copilot founder-goalfix dynamic workflow contract', () => {
   });
 
   it('keeps every workflow-owned council agent tool-less and non-inferred', () => {
-    expect(extensionSource.match(/tools: \\[\\]/g)).toHaveLength(5);
+    expect(extensionSource.match(/tools:\s*\[\]/g)).toHaveLength(5);
     expect(extensionSource.match(/infer: false/g)).toHaveLength(5);
     expect(extensionSource).not.toContain('requestedEnvironmentVariables');
   });
