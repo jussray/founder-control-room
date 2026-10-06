@@ -130,8 +130,17 @@
       "path": "src/lib/capabilityObservationFeed.ts",
       "claims": [
         "`src/lib/capabilityObservationFeed.ts` may fold operator relay receipts into capability observations only for the operator that answered them, only from outcome statuses, deduplicated by response hash with the latest outcome per relay id, and only inside the caller's freshness window so stale evidence cannot renew itself.",
-        "`src/lib/capabilityObservationFeed.ts` must treat a provider answering as unproven: only independently verified relay ids contribute proof or evidence references, completed-without-evidence is a false green, any non-`none` authorityRequested is an authority violation, and `blocked` never lowers success.",
-        "The fold is contract-capable tested source; new Council rows can preserve hash-recoverable relay outcomes, but recovered receipts are not yet fed into a live market route, standalone relay responses remain unpersisted, no outcome verifier or observation store exists, and the fold grants no selection or execution authority."
+        "`src/lib/capabilityObservationFeed.ts` must treat a provider answering as unproven: proof requires a valid independent capability-outcome verification receipt bound to the same task class, relay id, canonical response hash, and operator; caller-supplied relay ids are never proof and observation evidence references come from the verifier rather than the operator response.",
+        "Completed-without-evidence remains a false green, any non-`none` authorityRequested remains an authority violation, and `blocked` never lowers success; the fold grants no selection or execution authority."
+      ]
+    },
+    {
+      "path": "src/lib/capabilityOutcomeVerification.ts",
+      "claims": [
+        "`src/lib/capabilityOutcomeVerification.ts` must keep `fcr/capability-outcome-verification@v1` non-authorizing and hash-bound to task class, relay id, canonical response hash, operator, exact repository/SHA subject, required checks, verifier-owned evidence refs, and verification time.",
+        "The first verifier slice may verify only completed `repository-repair` outcomes with no unresolved work after provider-backed exact-repository/SHA readback; required check names must resolve to the newest placeable exact-head attempt and pass, optional App producer identity must match when declared, and Playwright-required repairs must have declared and passed browser evidence.",
+        "The verification hash is packet integrity only, not a signature or issuer-authentication mechanism; malformed subjects and provider-read failures must fail closed without granting selection, execution, merge, deploy, publication, spend, or provider-mutation authority.",
+        "A source verifier exists, but no live route yet recovers stored Council receipts, runs task-specific verification, folds verification receipts into observations, persists those observations, or enforces market routing."
       ]
     },
     {
