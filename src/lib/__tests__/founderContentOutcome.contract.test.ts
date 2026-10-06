@@ -372,6 +372,45 @@ describe('founder content outcome observation contract', () => {
     })).toThrow(/metrics\.impressions cannot be observed when source_account\.coverage_state is OUT_OF_SCOPE/);
   });
 
+  it('rejects observed coverage when connector identity belongs to a different account', () => {
+    expect(() => buildFounderContentOutcomeObservation({
+      ...base,
+      platform: 'facebook',
+      provider: 'metricool',
+      provider_state: 'published',
+      provider_receipt_id: 'metricool-page-readback-1',
+      source_account: {
+        network: 'facebook',
+        lane: 'facebook.creator',
+        account_type: 'personal_profile',
+        account_id: 'raylene-facebook-personal',
+        connector_account_type: 'brand_page',
+        connector_account_id: '235882889600658',
+        coverage_state: 'observed',
+      },
+      metrics: { impressions: 0 },
+    })).toThrow(/observed source_account coverage requires connector account identity to match observed account identity/);
+  });
+
+  it('rejects overlong source-account identity instead of truncating it into a collision', () => {
+    const overlong = 'a'.repeat(161);
+    expect(() => buildFounderContentOutcomeObservation({
+      ...base,
+      platform: 'facebook',
+      provider: 'metricool',
+      source_account: {
+        network: 'facebook',
+        lane: 'facebook.commerce',
+        account_type: 'brand_page',
+        account_id: overlong,
+        connector_account_type: 'brand_page',
+        connector_account_id: overlong,
+        coverage_state: 'observed',
+      },
+      metrics: {},
+    })).toThrow(/source_account\.account_id exceeds 160 characters/);
+  });
+
   it('allows an observed Facebook commerce Page zero without donating it to the creator lane', () => {
     const receipt = buildFounderContentOutcomeObservation({
       ...base,
