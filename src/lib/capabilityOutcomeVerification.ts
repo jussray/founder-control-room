@@ -177,8 +177,11 @@ export function validateCapabilityOutcomeVerificationReceipt(
   if (value.verifier?.independentObservation !== true) errors.push('verification must be independently observed');
   if (value.subject?.kind !== 'repository' || !REPOSITORY.test(value.subject?.repository ?? '')) errors.push('verification repository subject is invalid');
   if (!SHA40.test(value.subject?.exactSha ?? '')) errors.push('verification exactSha must be a full commit sha');
-  const checks = normalizedChecks(value.requiredChecks ?? []);
-  if (checks.length === 0 || checks.length !== value.requiredChecks.length) errors.push('verification required checks must be unique and non-empty');
+  const rawChecks = Array.isArray(value.requiredChecks) ? value.requiredChecks : [];
+  const checks = normalizedChecks(rawChecks);
+  if (!Array.isArray(value.requiredChecks) || checks.length === 0 || checks.length !== rawChecks.length) {
+    errors.push('verification required checks must be unique and non-empty');
+  }
   if (
     !Array.isArray(value.evidenceRefs)
     || value.evidenceRefs.some((ref) => typeof ref !== 'string')
