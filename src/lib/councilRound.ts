@@ -10,6 +10,7 @@ import { createHash } from 'node:crypto';
 import { relayBetweenOperators } from './operatorRelayBridge.js';
 import type { OperatorRelayAdapters } from './operatorRelayDispatch.js';
 import type {
+  OperatorRelayUsageV1,
   RelayCapability,
   RelayOperatorId,
   RelaySensitivity,
@@ -38,6 +39,8 @@ export interface CouncilHop {
   answer: string;
   evidenceRefs: string[];
   liveProviderEvidence: boolean;
+  /** Provider-reported token usage copied from the hash-bound relay response; measurement only. */
+  usage?: OperatorRelayUsageV1;
   completedAt: string;
 }
 
@@ -213,6 +216,7 @@ export async function runCouncilRound(
       evidenceRefs,
       liveProviderEvidence,
       completedAt: response.completedAt,
+      ...(response.usage ? { usage: response.usage } : {}),
     });
     context = response.answer;
     from = seat.operator;
