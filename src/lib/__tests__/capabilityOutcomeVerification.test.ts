@@ -204,6 +204,52 @@ describe('repository repair outcome verifier', () => {
     expect(result.blockers).toContain('relay outcome still reports unresolved work');
   });
 
+  it('returns blockers without touching the provider when the verification subject is malformed', async () => {
+    let providerConstructed = false;
+    const result = await verifyRepositoryRepairOutcome({
+      response: relayResponse(),
+      repository: 'not-a-repository',
+      expectedHeadSha: 'short',
+      requiredChecks: [{ name: 'CI', issuerId: '15368' }],
+    }, {
+      providerFactory: () => {
+        providerConstructed = true;
+        return fakeProvider([signal('CI')]);
+      },
+    });
+
+    expect(result.verified).toBe(false);
+    expect(result.receipt).toBeNull();
+    expect(result.evidenceReceipt).toBeNull();
+    expect(result.blockers).toEqual(expect.arrayContaining([
+      'repository must use owner/name format',
+      'expectedHeadSha must be a full commit sha',
+    ]));
+    expect(providerConstructed).toBe(false);
+  });
+
+  it('turns provider evidence read failure into a blocker without leaking provider error detail', async () => {
+    const result = await verifyRepositoryRepairOutcome({
+      response: relayResponse(),
+      repository: 'jussray/founder-control-room',
+      expectedHeadSha: HEAD,
+      requiredChecks: [{ name: 'CI', issuerId: '15368' }],
+    }, {
+      providerFactory: () => ({
+        name: 'github',
+        getRef: async () => { throw new Error('secret provider detail'); },
+        listVerificationSignals: async () => [],
+      } as unknown as RepositoryProvider),
+    });
+
+    expect(result).toMatchObject({
+      verified: false,
+      receipt: null,
+      evidenceReceipt: null,
+      blockers: ['project evidence read failed'],
+    });
+  });
+
   it('binds the receipt hash so verification content cannot be rewritten after issuance', async () => {
     const response = relayResponse();
     const result = await verifyRepositoryRepairOutcome({
