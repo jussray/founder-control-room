@@ -183,6 +183,9 @@ export function validateCapabilityOutcomeVerificationReceipt(
   if (!Array.isArray(value.requiredChecks) || checks.length === 0 || checks.length !== rawChecks.length) {
     errors.push('verification required checks must be unique and non-empty');
   }
+  if (checks.some((check) => !check.issuerId)) {
+    errors.push('verification required checks must bind trusted producer identity');
+  }
   if (
     !Array.isArray(value.evidenceRefs)
     || value.evidenceRefs.some((ref) => typeof ref !== 'string')
@@ -382,6 +385,9 @@ export async function verifyRepositoryRepairOutcome(
   if (!REPOSITORY.test(repository)) blockers.push('repository must use owner/name format');
   if (!SHA40.test(expectedHeadSha)) blockers.push('expectedHeadSha must be a full commit sha');
   if (checks.length === 0 || checks.length !== input.requiredChecks.length) blockers.push('required checks must be unique and non-empty');
+  for (const check of checks) {
+    if (!check.issuerId) blockers.push('required check producer identity is required: ' + check.name);
+  }
   if (input.requirePlaywright && !checks.some((check) => BROWSER_CHECK.test(check.name))) {
     blockers.push('Playwright-required repository repair must declare a browser-shaped required check');
   }
