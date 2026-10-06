@@ -319,7 +319,6 @@ describe('founder content outcome observation contract', () => {
       issued_at: '2026-08-19T22:00:00.000Z',
     })).toThrow(/authority must remain advisory-only and non-authorizing/);
   });
-
   it('keeps a personal Facebook profile OUT_OF_SCOPE when Metricool is connected to a brand Page', () => {
     const receipt = buildFounderContentOutcomeObservation({
       ...base,

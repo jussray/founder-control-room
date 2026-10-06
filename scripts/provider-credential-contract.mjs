@@ -41,6 +41,23 @@ export function classifyProviderToken(value, { accountId = '' } = {}) {
   };
 }
 
+export function classifyCloudflareAccountId(value, { required = false } = {}) {
+  const accountId = typeof value === 'string' ? value : '';
+  const present = accountId.length > 0;
+  let classification = 'ok';
+
+  if (!present && !required) classification = 'not-required';
+  else if (!present) classification = 'missing';
+  else if (!/^[0-9a-f]{32}$/.test(accountId)) classification = 'invalid-shape';
+
+  return {
+    required,
+    present,
+    classification,
+    structurallyValid: classification === 'ok' || classification === 'not-required',
+  };
+}
+
 export function nextCredentialAction(name, classification) {
   if (classification === 'ok') return 'credential-shape-valid';
   if (classification === 'missing') return `configure ${name} with the raw provider-issued token`;
@@ -48,10 +65,23 @@ export function nextCredentialAction(name, classification) {
   return `replace ${name} with the raw provider-issued token only; no prefix, assignment, quotes, whitespace, or Unicode punctuation`;
 }
 
-export function buildCredentialReceipt({ name, value, accountId = '', purpose = 'provider-api' }) {
+export function nextAccountAuthorityAction(classification) {
+  if (classification === 'ok' || classification === 'not-required') return 'account-authority-shape-valid';
+  if (classification === 'missing') return 'configure CLOUDFLARE_ACCOUNT_ID with the provider-issued 32-character lowercase account ID';
+  return 'replace CLOUDFLARE_ACCOUNT_ID with the provider-issued 32-character lowercase hexadecimal account ID';
+}
+
+export function buildCredentialReceipt({
+  name,
+  value,
+  accountId = '',
+  requireAccountId = false,
+  purpose = 'provider-api',
+}) {
   const shape = classifyProviderToken(value, { accountId });
+  const accountAuthority = classifyCloudflareAccountId(accountId, { required: requireAccountId });
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     provider: 'cloudflare',
     credentialName: name,
     purpose,
@@ -59,9 +89,15 @@ export function buildCredentialReceipt({ name, value, accountId = '', purpose = 
     expectedHeadSha: process.env.EXPECTED_HEAD_SHA || process.env.GITHUB_SHA || null,
     workflowRunId: process.env.GITHUB_RUN_ID || null,
     workflowRunAttempt: process.env.GITHUB_RUN_ATTEMPT || null,
-    ok: shape.headerSafe,
+    ok: shape.headerSafe && accountAuthority.structurallyValid,
     shape,
-    nextAction: nextCredentialAction(name, shape.classification),
+    accountAuthority,
+    nextAction: shape.headerSafe
+      ? nextAccountAuthorityAction(accountAuthority.classification)
+      : nextCredentialAction(name, shape.classification),
+    secretValueRead: false,
+    secretValuePrinted: false,
+    providerMutation: false,
   };
 }
 
@@ -95,12 +131,13 @@ if (invokedDirectly) {
       name: envName,
       value: process.env[envName] ?? '',
       accountId,
+      requireAccountId: args['require-account-id'] === 'true' || Boolean(args['account-id-env']),
       purpose: args.purpose || 'provider-api',
     });
     if (args.output) await writeCredentialReceipt(args.output, receipt);
     console.log(JSON.stringify(receipt, null, 2));
     if (!receipt.ok) {
-      console.error(`::error title=Malformed provider credential::${envName}: ${receipt.shape.classification}. ${receipt.nextAction}`);
+      console.error(`::error title=Malformed provider credential::${envName}: ${receipt.shape.classification}; account authority: ${receipt.accountAuthority.classification}. ${receipt.nextAction}`);
       process.exitCode = 1;
     }
   }

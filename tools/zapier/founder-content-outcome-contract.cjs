@@ -139,22 +139,14 @@ function buildSourceAccount(input, errors) {
   if (!lane || (network && !lane.startsWith(`${network}.`))) {
     errors.push('source_account.lane must be network-scoped, for example facebook.creator');
   }
-  if (!SOURCE_ACCOUNT_TYPES.has(accountType)) {
-    errors.push('source_account.account_type is invalid');
-  }
+  if (!SOURCE_ACCOUNT_TYPES.has(accountType)) errors.push('source_account.account_type is invalid');
   if (!SUBJECT_ID.test(accountId)) errors.push('source_account.account_id is invalid');
   if ((connectorAccountType && !connectorAccountId) || (!connectorAccountType && connectorAccountId)) {
     errors.push('source_account connector_account_type and connector_account_id must be provided together');
   }
-  if (connectorAccountType && !SOURCE_ACCOUNT_TYPES.has(connectorAccountType)) {
-    errors.push('source_account.connector_account_type is invalid');
-  }
-  if (connectorAccountId && !SUBJECT_ID.test(connectorAccountId)) {
-    errors.push('source_account.connector_account_id is invalid');
-  }
-  if (!COVERAGE_STATES.has(coverageState)) {
-    errors.push('source_account.coverage_state must be observed, UNKNOWN, or OUT_OF_SCOPE');
-  }
+  if (connectorAccountType && !SOURCE_ACCOUNT_TYPES.has(connectorAccountType)) errors.push('source_account.connector_account_type is invalid');
+  if (connectorAccountId && !SUBJECT_ID.test(connectorAccountId)) errors.push('source_account.connector_account_id is invalid');
+  if (!COVERAGE_STATES.has(coverageState)) errors.push('source_account.coverage_state must be observed, UNKNOWN, or OUT_OF_SCOPE');
 
   return Object.freeze({
     network,
@@ -293,9 +285,7 @@ function buildFounderContentOutcomeObservation(input = {}) {
   }
 
   const sourceAccount = buildSourceAccount(input, errors);
-  if (sourceAccount && platform && sourceAccount.network !== platform) {
-    errors.push('source_account.network must match platform');
-  }
+  if (sourceAccount && platform && sourceAccount.network !== platform) errors.push('source_account.network must match platform');
   if (sourceAccount && sourceAccount.coverage_state !== 'observed') {
     for (const key of METRIC_KEYS) {
       if (input.metrics?.[key] !== undefined && input.metrics?.[key] !== null) {
@@ -368,26 +358,14 @@ function validateSourceAccount(input, errors) {
   const connectorAccountId = asString(source.connector_account_id, 160) || null;
   const coverageState = normalizeCoverageState(source.coverage_state);
 
-  if (!network || network !== asString(input.platform, 80).toLowerCase()) {
-    errors.push('stored source_account.network must match platform');
-  }
-  if (!lane || (network && !lane.startsWith(`${network}.`))) {
-    errors.push('stored source_account.lane must remain network-scoped');
-  }
+  if (!network || network !== asString(input.platform, 80).toLowerCase()) errors.push('stored source_account.network must match platform');
+  if (!lane || (network && !lane.startsWith(`${network}.`))) errors.push('stored source_account.lane must remain network-scoped');
   if (!SOURCE_ACCOUNT_TYPES.has(accountType)) errors.push('stored source_account.account_type is invalid');
   if (!SUBJECT_ID.test(accountId)) errors.push('stored source_account.account_id is invalid');
-  if ((connectorAccountType && !connectorAccountId) || (!connectorAccountType && connectorAccountId)) {
-    errors.push('stored source_account connector identity is incomplete');
-  }
-  if (connectorAccountType && !SOURCE_ACCOUNT_TYPES.has(connectorAccountType)) {
-    errors.push('stored source_account.connector_account_type is invalid');
-  }
-  if (connectorAccountId && !SUBJECT_ID.test(connectorAccountId)) {
-    errors.push('stored source_account.connector_account_id is invalid');
-  }
-  if (!COVERAGE_STATES.has(coverageState) || source.coverage_state !== coverageState) {
-    errors.push('stored source_account.coverage_state is invalid');
-  }
+  if ((connectorAccountType && !connectorAccountId) || (!connectorAccountType && connectorAccountId)) errors.push('stored source_account connector identity is incomplete');
+  if (connectorAccountType && !SOURCE_ACCOUNT_TYPES.has(connectorAccountType)) errors.push('stored source_account.connector_account_type is invalid');
+  if (connectorAccountId && !SUBJECT_ID.test(connectorAccountId)) errors.push('stored source_account.connector_account_id is invalid');
+  if (!COVERAGE_STATES.has(coverageState) || source.coverage_state !== coverageState) errors.push('stored source_account.coverage_state is invalid');
 
   if (coverageState !== 'observed') {
     const metrics = record(input.metrics) || {};
@@ -398,7 +376,6 @@ function validateSourceAccount(input, errors) {
       }
     }
   }
-
   return true;
 }
 

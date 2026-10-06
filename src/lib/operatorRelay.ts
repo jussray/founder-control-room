@@ -1,11 +1,12 @@
 import { createHash } from 'node:crypto';
 import { agentCanOperate, agentOperatorPolicy, type AgentOperatorCapability } from './agentRegistry.js';
-import { OPERATOR_RELAY_PEERS } from './operatorRelayConstants.js';
+import { OPERATOR_RELAY_PEERS, OPERATOR_RELAY_SOURCES } from './operatorRelayConstants.js';
 
 export const OPERATOR_RELAY_REQUEST_CONTRACT = 'juss/operator-relay/request@v1' as const;
 export const OPERATOR_RELAY_RESPONSE_CONTRACT = 'juss/operator-relay/response@v1' as const;
 
 export type RelayOperatorId = (typeof OPERATOR_RELAY_PEERS)[number];
+export type RelaySourceId = (typeof OPERATOR_RELAY_SOURCES)[number];
 export type RelayCapability = Exclude<AgentOperatorCapability, 'instruct'>;
 export type RelaySensitivity = 'public' | 'internal' | 'restricted';
 export type RelayStatus = 'accepted' | 'completed' | 'blocked' | 'failed';
@@ -13,7 +14,7 @@ export type RelayStatus = 'accepted' | 'completed' | 'blocked' | 'failed';
 export interface OperatorRelayRequestV1 {
   contract: typeof OPERATOR_RELAY_REQUEST_CONTRACT;
   relayId: string;
-  fromOperator: RelayOperatorId;
+  fromOperator: RelaySourceId;
   toOperator: RelayOperatorId;
   capability: RelayCapability;
   goal: string;
@@ -40,7 +41,7 @@ export interface OperatorRelayResponseV1 {
   relayId: string;
   requestHash: string;
   fromOperator: RelayOperatorId;
-  toOperator: RelayOperatorId;
+  toOperator: RelaySourceId;
   status: RelayStatus;
   answer: string;
   evidenceRefs: string[];
@@ -52,6 +53,7 @@ export interface OperatorRelayResponseV1 {
 
 const SHA256 = /^[0-9a-f]{64}$/i;
 const RELAY_OPERATORS = new Set<RelayOperatorId>(OPERATOR_RELAY_PEERS);
+const RELAY_SOURCES = new Set<RelaySourceId>(OPERATOR_RELAY_SOURCES);
 const RELAY_CAPABILITIES = new Set<RelayCapability>(['research', 'propose', 'review', 'implement']);
 
 function normalizedList(values: string[]): string[] {
@@ -116,6 +118,10 @@ function isRelayOperator(value: unknown): value is RelayOperatorId {
   return typeof value === 'string' && RELAY_OPERATORS.has(value as RelayOperatorId);
 }
 
+function isRelaySource(value: unknown): value is RelaySourceId {
+  return typeof value === 'string' && RELAY_SOURCES.has(value as RelaySourceId);
+}
+
 function isRelayCapability(value: unknown): value is RelayCapability {
   return typeof value === 'string' && RELAY_CAPABILITIES.has(value as RelayCapability);
 }
@@ -124,7 +130,7 @@ export function validateOperatorRelayRequest(value: OperatorRelayRequestV1, nowM
   const errors: string[] = [];
   if (value.contract !== OPERATOR_RELAY_REQUEST_CONTRACT) errors.push('unsupported relay request contract');
   if (!value.relayId?.trim()) errors.push('relayId is required');
-  if (!isRelayOperator(value.fromOperator)) errors.push('fromOperator is unsupported');
+  if (!isRelaySource(value.fromOperator)) errors.push('fromOperator is unsupported');
   if (!isRelayOperator(value.toOperator)) errors.push('toOperator is unsupported');
   if (value.fromOperator === value.toOperator) errors.push('relay requires distinct operators');
   if (!isRelayCapability(value.capability)) errors.push('capability is unsupported');
