@@ -60,7 +60,7 @@
       "mayParticipateThroughSharedCouncilLayer": true,
       "mayBeInvokedFromFCR": true,
       "providerLossMustNotErasePortfolioState": true,
-      "examples": ["ChatGPT", "Claude", "Muse", "DeepSeek", "Perplexity"]
+      "examples": ["ChatGPT", "Claude", "Meta AI", "Muse", "DeepSeek", "Perplexity"]
     },
     "localProjectAdapter": {
       "required": true,
