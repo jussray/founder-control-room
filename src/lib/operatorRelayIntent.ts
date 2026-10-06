@@ -3,13 +3,13 @@ import type { RelayOperatorId } from './operatorRelay.js';
 const TARGETS: ReadonlyArray<{ id: RelayOperatorId; patterns: RegExp[] }> = [
   { id: 'gemini', patterns: [/\bgemini\b/i] },
   { id: 'perplexity', patterns: [/\bperplexity\b/i] },
-  { id: 'deepseek', patterns: [/\bdeepseek\b/i] },
+  { id: 'meta-ai', patterns: [/\bmeta\s+ai\b/i] },
   { id: 'muse', patterns: [/\bmuse\b/i] },
   { id: 'claude-code', patterns: [/\bclaude(?:\s+code)?\b/i] },
   { id: 'codex', patterns: [/\b(?:chatgpt|codex)\b/i] },
 ];
 
-const DEEPSEEK_INSTRUCTOR_PATTERN = /\bdeepseek\s+instructor\b/i;
+const DEEPSEEK_INSTRUCTOR_PATTERN = /\bdeepseek(?:\s+instructor)?\b/i;
 
 export interface RelayIntent {
   target: RelayOperatorId;
@@ -22,7 +22,7 @@ function targetPattern(target: RelayOperatorId): RegExp {
     case 'claude-code': return /\bclaude(?:\s+code)?\b/i;
     case 'codex': return /\b(?:chatgpt|codex)\b/i;
     case 'perplexity': return /\bperplexity\b/i;
-    case 'deepseek': return /\bdeepseek\b/i;
+    case 'meta-ai': return /\bmeta\s+ai\b/i;
     case 'muse': return /\bmuse\b/i;
   }
 }
@@ -30,15 +30,12 @@ function targetPattern(target: RelayOperatorId): RegExp {
 export function parseRelayIntent(input: string, activeOperator: RelayOperatorId): RelayIntent | null {
   const text = input.trim();
   if (!text) return null;
+  if (!/^(?:tell|ask|send|relay(?:\s+this)?\s+to|have)\s+/i.test(text)) return null;
 
-  const delegation = /^(?:tell|ask|send|relay(?:\s+this)?\s+to|have)\s+/i.test(text);
-  if (!delegation) return null;
-
-  // DeepSeek Instructor is a distinct adversary/instructor identity and must
-  // never be collapsed into the normal DeepSeek peer lane by shorthand parsing.
   if (DEEPSEEK_INSTRUCTOR_PATTERN.test(text)) return null;
 
-  const target = TARGETS.find(({ id, patterns }) => id !== activeOperator && patterns.some((pattern) => pattern.test(text)))?.id;
+  const target = TARGETS.find(({ id, patterns }) =>
+    id !== activeOperator && patterns.some((pattern) => pattern.test(text)))?.id;
   if (!target) return null;
 
   const instruction = text
@@ -46,6 +43,5 @@ export function parseRelayIntent(input: string, activeOperator: RelayOperatorId)
     .replace(targetPattern(target), '')
     .replace(/^\s*(?:to\s+)?/i, '')
     .trim();
-
   return instruction ? { target, instruction } : null;
 }

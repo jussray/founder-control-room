@@ -40,7 +40,7 @@ Founder auth
 -> usefulness feedback
 ```
 
-For that slice, Gemini, Claude, ChatGPT/Codex, Perplexity, and DeepSeek may help inspect, design, test, review, and verify the repository within their registered capabilities, but the live product path must not call Google AI, OpenAI, Anthropic, Perplexity, DeepSeek, or another external model.
+For that slice, Gemini, Claude, ChatGPT/Codex, Perplexity, and DeepSeek Instructor may help inspect, design, test, review, and verify the repository within their registered capabilities, but the live product path must not call Google AI, OpenAI, Anthropic, Perplexity, DeepSeek, or another external model.
 
 ## Enabled operator capabilities
 
