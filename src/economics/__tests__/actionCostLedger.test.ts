@@ -98,13 +98,22 @@ describe('action cost ledger', () => {
       .toContain('billingSubjectRef must be a sha256 opaque reference');
   });
 
-  it('hash-binds cost, plan budget, usage, and derived economics', () => {
+  it('hash-binds cost, plan budget, usage, and independently re-derived economics', () => {
     const receipt = buildActionCostReceipt(base());
     const tampered: ActionCostReceiptV1 = {
       ...receipt,
       actualCostUsd: receipt.actualCostUsd + 1,
     };
     expect(validateActionCostReceipt(tampered))
+      .toContain('receiptHash does not match canonical action-cost receipt');
+
+    const derivedTamper = { ...receipt, budgetState: 'within' as const, budgetUtilizationPct: 1 };
+    const { receiptHash: _oldHash, ...tamperedIdentity } = derivedTamper;
+    const rehashedTamper: ActionCostReceiptV1 = {
+      ...derivedTamper,
+      receiptHash: actionCostReceiptHash(tamperedIdentity),
+    };
+    expect(validateActionCostReceipt(rehashedTamper))
       .toContain('receiptHash does not match canonical action-cost receipt');
 
     const { receiptHash: _ignored, ...identity } = receipt;
