@@ -6,12 +6,11 @@ import { OPERATOR_RELAY_INSTRUCTOR, OPERATOR_RELAY_PEERS } from '../operatorRela
 const relayFacingDocs = [
   new URL('../../../docs/OPERATOR_RELAY_CONTRACT.md', import.meta.url),
   new URL('../../../docs/OPERATOR_RELAY_STATUS.md', import.meta.url),
-  new URL('../../../.ai-skills/claude-project-instructions.md', import.meta.url),
 ];
 
 describe('operator relay lanes', () => {
-  it('keeps the five governed peer operators in one canonical lane', () => {
-    expect(OPERATOR_RELAY_PEERS).toEqual(['gemini', 'codex', 'claude-code', 'perplexity', 'muse']);
+  it('keeps the six governed peer operators in one canonical lane', () => {
+    expect(OPERATOR_RELAY_PEERS).toEqual(['gemini', 'codex', 'claude-code', 'perplexity', 'meta-ai', 'muse']);
   });
 
   it('keeps every canonical peer enabled for bounded relay work', () => {
@@ -19,8 +18,15 @@ describe('operator relay lanes', () => {
       const policy = agentOperatorPolicy(peer);
       expect(policy?.enabled).toBe(true);
       expect(policy?.capabilities).toEqual(expect.arrayContaining([
-        'research', 'propose', 'review', 'implement',
+        'research', 'propose', 'review',
       ]));
+    }
+  });
+
+  it('keeps Meta AI non-implementing while established build peers retain implementation capability', () => {
+    expect(agentOperatorPolicy('meta-ai')?.capabilities).not.toContain('implement');
+    for (const peer of OPERATOR_RELAY_PEERS.filter((peer) => peer !== 'meta-ai')) {
+      expect(agentOperatorPolicy(peer)?.capabilities).toContain('implement');
     }
   });
 

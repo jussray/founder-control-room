@@ -29,6 +29,7 @@ const MULTI_AGENT = 'docs/FCR_MULTI_AGENT_ENABLEMENT_CONTRACT.md';
 const DEEPSEEK_INSTRUCTOR = 'docs/DEEPSEEK_INSTRUCTOR_CONTRACT.md';
 const MUSE_CONTROL = '.control-room/MUSE.md';
 const COUNCIL_CONTROL = '.control-room/COUNCIL.md';
+const COURT_CONTROL = '.control-room/COURT.md';
 const CHANGE_GENEALOGY = 'docs/AI_CHANGE_GENEALOGY_CONTRACT.md';
 
 export const AGENT_REGISTRY: readonly AgentDescriptor[] = [
@@ -66,6 +67,18 @@ export const AGENT_REGISTRY: readonly AgentDescriptor[] = [
       firstSliceRuntimeModel: false,
       externalWritesRequireBoundAuthority: true,
       instructionContracts: ['AGENTS.md', 'GLOBAL_AI.md', 'CHATGPT.md', 'CODEX.md', FCR_V14, MULTI_AGENT, CHANGE_GENEALOGY],
+    },
+  },
+  {
+    id: 'meta-ai',
+    label: 'Meta AI',
+    role: 'Governed external Founder AI Council and Court witness for independent challenge, research, source comparison, and synthesis. Meta AI is distinct from the Muse operator/model identity; neither may inherit the other\'s evidence or authority.',
+    operator: {
+      enabled: true,
+      capabilities: ['research', 'propose', 'review'],
+      firstSliceRuntimeModel: false,
+      externalWritesRequireBoundAuthority: true,
+      instructionContracts: [COUNCIL_CONTROL, COURT_CONTROL, FCR_V14, MULTI_AGENT, CHANGE_GENEALOGY],
     },
   },
   {
@@ -120,7 +133,7 @@ export const AGENT_REGISTRY: readonly AgentDescriptor[] = [
   {
     id: 'meta-ai-platform',
     label: 'Meta AI / Muse Platform',
-    role: 'Replaceable server-side Muse model capability behind adapters; provider availability, model capability, or Council membership never grants mutation or founder authority.',
+    role: 'Replaceable Meta provider-family capability behind adapters. Meta AI and Muse operator identities remain distinct; provider availability, model capability, Council membership, or one seat\'s receipt never grants the other seat authority or evidence.',
   },
   {
     id: 'perplexity',

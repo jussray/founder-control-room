@@ -4,13 +4,7 @@ import { createServerMuseRelayAdapter } from './operatorRelayMuseProvider.js';
 
 export type OperatorRelayAdapter = (request: OperatorRelayRequestV1) => Promise<OperatorRelayResponseV1>;
 
-export interface OperatorRelayAdapters {
-  gemini?: OperatorRelayAdapter;
-  codex?: OperatorRelayAdapter;
-  'claude-code'?: OperatorRelayAdapter;
-  perplexity?: OperatorRelayAdapter;
-  muse?: OperatorRelayAdapter;
-}
+export type OperatorRelayAdapters = Partial<Record<RelayOperatorId, OperatorRelayAdapter>>;
 
 export class OperatorRelayDispatchError extends Error {
   constructor(

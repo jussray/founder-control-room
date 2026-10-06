@@ -4,12 +4,13 @@ Current classification: PARTIAL
 
 Verified in authoritative FCR source:
 
-- canonical peer registry for `gemini`, `codex`, `claude-code`, `perplexity`, and `muse`;
+- canonical peer registry for `gemini`, `codex`, `claude-code`, `perplexity`, `meta-ai`, and `muse`;
 - explicit exclusion of plain `deepseek` and `deepseek-instructor` from the peer lane; DeepSeek remains instructor-only through the separate interop contract;
 - zero-authority relay envelope for research, propose, review, and bounded implementation work;
 - source-context fingerprinting and exact request/response hash binding;
 - fail-closed dispatch when the requested operator is unavailable;
 - source-wired Gemini, OpenAI/Codex, Anthropic/Claude, Perplexity, and Muse provider adapters, each gated by its required server-side credential/model configuration;
+- `meta-ai` is a distinct selectable research/propose/review peer, but intentionally has no implicit Muse fallback; without its own authenticated adapter it fails closed as unavailable;
 - canonical `/mcp` OAuth route mounted through the FCR MCP router with server-owned project scope, OAuth client mapping, founder allowlist checks, and redacted evidence receipts;
 - static-token compatibility clients cannot use peer relay;
 - provider responses cannot grant mutation, merge, deploy, publish, or provider-mutation authority;
@@ -21,6 +22,7 @@ The standalone `/api/operator-relay` router remains an unmounted test scaffold. 
 
 Not yet proven:
 
+- a distinct authenticated Meta AI relay adapter and successful live Meta AI invocation from the deployed FCR runtime;
 - a successful live relay against each configured provider from the deployed FCR runtime;
 - provider/runtime evidence proving which requested operator actually answered on the deployed path;
 - a real browser/Playwright round trip from founder-issued relay intent through FCR to the requested provider and back;
