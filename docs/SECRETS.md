@@ -96,7 +96,6 @@ The former `founder-control-room2` Worker was deleted and must not be recreated 
 | `FOUNDER_API_URL` | non-secret variable | `https://foundercontrolroom.org` so auth callbacks return through Pages and are proxied to the API Worker. |
 | `FCR_SHOPIFY_WEBHOOK_SECRET` | secret | Required Shopify `orders/paid` HMAC signing secret for the FCR first-party commerce ingress. Provider-held; never log or copy its value into proof. |
 | `FCR_COMMERCE_HASH_SALT` | secret | Required independent server-only salt for privacy-safe FCR Shopify order-reference HMACs. This marker creates no Shopify authority. |
-| `TINYFISH_API_KEY` | secret | Required provider-held credential for live `tinyfish-web-observation-v1` Search/Fetch. Canonical production deploy verifies only binding-name presence before mutation; the value remains in Cloudflare and never becomes a GitHub Actions secret or proof receipt. |
 | `FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON` | secret | Scoped, revocable, fail-closed automation grant. |
 | `FOUNDER_SIGNAL_ENGINE_MCP_TOKEN` | secret | Dedicated MCP bearer token. This is not an OpenAI API key. |
 | `ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL` | secret | Private approved Zapier Catch Hook URL. |
