@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { McpHub } from '../mcp/hub.js';
+import type { McpHub } from '../mcp/hub.js';
 import type { McpToolDefinition } from '../mcp/types.js';
 import type { Capability } from './workbenchRegistry.js';
 
@@ -215,9 +215,10 @@ export async function observePublicWeb(
     urls?: string[];
     continuity?: PublicWebContinuityInput;
   },
-  hub: HubLike = new McpHub(),
+  hub?: HubLike,
 ): Promise<PublicWebObservationReceipt> {
-  const capabilities = await hub.discoverCapabilities(OBSERVATION_SERVER_ID, 'founder-control-room');
+  const resolvedHub: HubLike = hub ?? new (await import('../mcp/hub.js')).McpHub();
+  const capabilities = await resolvedHub.discoverCapabilities(OBSERVATION_SERVER_ID, 'founder-control-room');
   const tool = input.operation === 'search'
     ? findTool(capabilities.tools, ['deep_search_exa', 'web_search_advanced_exa', 'web_search_exa'])
     : findTool(capabilities.tools, ['web_fetch_exa']);
@@ -252,7 +253,7 @@ export async function observePublicWeb(
 
   let invocation;
   try {
-    invocation = await hub.invoke({
+    invocation = await resolvedHub.invoke({
       serverId: OBSERVATION_SERVER_ID,
       projectId: 'founder-control-room',
       toolName: tool.name,
