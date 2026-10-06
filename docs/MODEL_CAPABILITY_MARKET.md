@@ -48,8 +48,9 @@ Fold rules:
 
 For one completed relay outcome, it:
 
-- validates the canonical relay response hash and requires no unresolved work;
-- binds verification to an exact `owner/repo` and 40-character commit SHA;
+- validates both the canonical relay request and response hashes, requires `capability=implement`, and requires no unresolved work;
+- requires the original request's hash-bound `sourceRef` to equal `repository:<owner/repo>@<exact-sha>`, preventing an unrelated successful relay from being paired with a green repository head;
+- binds verification to that exact `owner/repo` and 40-character commit SHA;
 - re-observes repository identity and exact-head verification signals through the existing repository provider;
 - requires caller-declared check names to resolve to their newest placeable exact-head attempt and requires each selected attempt to be terminal `passed`;
 - may bind a required check to a provider-backed App issuer id, failing closed when the producer identity does not match;
@@ -58,13 +59,13 @@ For one completed relay outcome, it:
 
 The `verificationHash` is a deterministic packet-integrity hash, not a signature and not issuer authentication. Independent proof comes from the verifier's provider-backed readback. The verifier cannot grant selection, execution, merge, deploy, publish, spend, or provider-mutation authority.
 
-This first slice does not verify architecture, research, business-workflow, multimodal, or other task classes. Those lanes stay unproven until they have task-specific verifiers.
+This first slice does not verify architecture, research, business-workflow, multimodal, or other task classes. Those lanes stay unproven until they have task-specific verifiers. It also does not make stored Council history directly verifiable yet: current Council persistence preserves enough response fields to recover canonical outcomes but does not preserve the complete original `OperatorRelayRequestV1` packet required by the repository-repair subject-binding check. A live market path must close that request-persistence seam before recovered Council outcomes can enter this verifier.
 
 Current state, in the repository's own capability vocabulary:
 
 ```text
 contract-capable          market ranking + relay-receipt fold exist as tested source
-configured / allowlisted  not yet — no live route calls the market; new Council rows preserve hash-recoverable relay outcomes and a repository-repair verifier exists in source, but no live path recovers stored receipts, runs the verifier, folds its receipts, or persists observations
+configured / allowlisted  not yet — no live route calls the market; new Council rows preserve hash-recoverable relay outcomes and a repository-repair verifier exists in source, but full subject-bound relay requests are not yet recoverable from Council storage and no live path verifies, folds, or persists observations
 adapter-proven            not yet
 provider-outcome-proven   not yet
 ```
