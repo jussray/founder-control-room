@@ -26,7 +26,7 @@ The market ranks from `CapabilityObservation` records. Its intended first receip
 
 When the provider reports it, a relay response also carries optional `usage` (input, output, cache-write and cache-read token counts; Anthropic only today). Usage is included in `responseHash` only when present, so receipts without it keep their original hash. Council rounds copy it onto each hop. It is measurement, not evidence or authority, and a missing or malformed usage block is omitted rather than estimated.
 
-Council rounds (`POST /missions/:missionId/council/run`, `src/lib/councilRound.ts`) now persist every field needed to reconstruct and re-hash each completed, blocked, or failed `OperatorRelayResponseV1` outcome when a provider response exists. `recoverPersistedRelayResponses()` accepts only hash-matching projections; historical Council rows written before the missing hash fields were retained are classified as legacy and excluded instead of being upgraded into synthetic receipts. Provider exceptions that produced no relay response remain absent. Standalone `fcr_relay_operator` calls are still returned to the caller and not persisted. Nothing reads recovered Council receipts into the capability fold yet, no store persists observations, and no independent outcome verifier is wired, so market routing remains advisory. (Earlier text said relay responses were persisted nowhere; that was true before the council round route landed and is superseded.)
+Council rounds (`POST /missions/:missionId/council/run`, `src/lib/councilRound.ts`) now persist every field needed to reconstruct and re-hash each completed, blocked, or failed `OperatorRelayResponseV1` outcome when a provider response exists. `recoverPersistedRelayResponses()` accepts only hash-matching projections; historical Council rows written before the missing hash fields were retained are classified as legacy and excluded instead of being upgraded into synthetic receipts. Provider exceptions that produced no relay response remain absent. Standalone `fcr_relay_operator` calls are still returned to the caller and not persisted. Nothing reads recovered Council receipts through verification and into the capability fold yet, and no store persists observations, so market routing remains advisory. (Earlier text said relay responses were persisted nowhere; that was true before the council round route landed and is superseded.)
 
 Fold rules:
 
@@ -34,7 +34,7 @@ Fold rules:
 - receipts answered by another operator are ignored, never re-attributed
 - exact duplicate receipts (same `responseHash`) count once; when one `relayId` has several outcome receipts, only the latest counts
 - with a freshness window, receipts older than the window are excluded so stale evidence cannot ride on one fresh receipt; a receipt whose `completedAt` does not parse is always excluded
-- a provider answering is not outcome proof: only receipts whose `relayId` an independent verifier confirmed contribute to `proofRate` and `evidenceRefs`; with no verifier the observation carries no evidence and the market's own gate keeps the operator in trial (adapter-proven is not provider-outcome-proven)
+- a provider answering is not outcome proof: `src/lib/capabilityObservationFeed.ts` accepts only `CapabilityOutcomeVerificationReceipt` records whose task class, relay id, canonical response hash, and operator all match the outcome; caller-supplied relay IDs are never proof, and observation evidence comes from the independent verifier rather than the operator's self-reported refs
 - a `completed` receipt with no evidence reference is a false green, even if it bypassed the relay validator
 - any runtime `authorityRequested` other than the exact string `none` — including a missing or malformed value — is an authority violation
 - `blocked` is an honest authority stop: it stays in the sample but is excluded from the success denominator, so stopping correctly never lowers a score
@@ -42,11 +42,29 @@ Fold rules:
 - task classification is upstream — the caller names the task class, the fold does not infer it
 - `evidenceRefs` inside an observation are Sauce-Guard-private routing evidence, never public content
 
+### First independent verifier slice
+
+`src/lib/capabilityOutcomeVerification.ts` implements the first bounded verifier for `repository-repair`. It is read-only and non-authorizing.
+
+For one completed relay outcome, it:
+
+- validates the canonical relay response hash and requires no unresolved work;
+- binds verification to an exact `owner/repo` and 40-character commit SHA;
+- re-observes repository identity and exact-head verification signals through the existing repository provider;
+- requires caller-declared check names to resolve to their newest placeable exact-head attempt and requires each selected attempt to be terminal `passed`;
+- may bind a required check to a provider-backed App issuer id, failing closed when the producer identity does not match;
+- requires a declared browser-shaped check plus passed exact-head Playwright/browser evidence when the repair's user-facing claim requires Playwright;
+- emits verifier-owned evidence references and a non-authorizing `fcr/capability-outcome-verification@v1` receipt bound to the exact relay response hash.
+
+The `verificationHash` is a deterministic packet-integrity hash, not a signature and not issuer authentication. Independent proof comes from the verifier's provider-backed readback. The verifier cannot grant selection, execution, merge, deploy, publish, spend, or provider-mutation authority.
+
+This first slice does not verify architecture, research, business-workflow, multimodal, or other task classes. Those lanes stay unproven until they have task-specific verifiers.
+
 Current state, in the repository's own capability vocabulary:
 
 ```text
 contract-capable          market ranking + relay-receipt fold exist as tested source
-configured / allowlisted  not yet — no live route calls the market; new council rows preserve hash-recoverable relay outcomes in `council_conversations`, but nothing folds recovered receipts, no store persists observations, and no outcome verifier exists
+configured / allowlisted  not yet — no live route calls the market; new Council rows preserve hash-recoverable relay outcomes and a repository-repair verifier exists in source, but no live path recovers stored receipts, runs the verifier, folds its receipts, or persists observations
 adapter-proven            not yet
 provider-outcome-proven   not yet
 ```
