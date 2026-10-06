@@ -1,33 +1,70 @@
-import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import type { RepositoryProvider, VerificationSignal } from '../../providers/RepositoryProvider.js';
 import {
   capabilityOutcomeVerificationHash,
   matchingCapabilityOutcomeVerification,
+  repositoryRepairSourceRef,
   validateCapabilityOutcomeVerificationReceipt,
   verifyRepositoryRepairOutcome,
 } from '../capabilityOutcomeVerification.js';
 import {
+  OPERATOR_RELAY_REQUEST_CONTRACT,
   OPERATOR_RELAY_RESPONSE_CONTRACT,
+  operatorRelayRequestHash,
   operatorRelayResponseHash,
+  relayContextFingerprint,
+  type OperatorRelayRequestV1,
   type OperatorRelayResponseV1,
 } from '../operatorRelay.js';
 
 const HEAD = 'a'.repeat(40);
+const REPOSITORY = 'jussray/founder-control-room';
 
-function sha256(value: string): string {
-  return createHash('sha256').update(value).digest('hex');
+function relayRequest(
+  exactSha = HEAD,
+  overrides: Partial<Omit<OperatorRelayRequestV1, 'requestHash' | 'context'>> & {
+    contextSummary?: string;
+    sourceRef?: string;
+  } = {},
+): OperatorRelayRequestV1 {
+  const summary = overrides.contextSummary ?? 'repair the repository';
+  const sourceRef = overrides.sourceRef ?? repositoryRepairSourceRef(REPOSITORY, exactSha);
+  const identity: Omit<OperatorRelayRequestV1, 'requestHash'> = {
+    contract: OPERATOR_RELAY_REQUEST_CONTRACT,
+    relayId: overrides.relayId ?? 'relay-1',
+    fromOperator: overrides.fromOperator ?? 'fcr',
+    toOperator: overrides.toOperator ?? 'codex',
+    capability: overrides.capability ?? 'implement',
+    goal: overrides.goal ?? 'repair exact repository head',
+    context: {
+      summary,
+      sourceRef,
+      sourceFingerprint: relayContextFingerprint(summary, sourceRef),
+    },
+    authority: overrides.authority ?? {
+      externalWrite: false,
+      merge: false,
+      deploy: false,
+      publish: false,
+      providerMutation: false,
+    },
+    sensitivity: overrides.sensitivity ?? 'internal',
+    createdAt: overrides.createdAt ?? '2026-10-06T20:00:00.000Z',
+    expiresAt: overrides.expiresAt ?? '2026-10-06T21:00:00.000Z',
+  };
+  return { ...identity, requestHash: operatorRelayRequestHash(identity) };
 }
 
 function relayResponse(
+  request: OperatorRelayRequestV1,
   overrides: Partial<Omit<OperatorRelayResponseV1, 'responseHash'>> = {},
 ): OperatorRelayResponseV1 {
   const identity: Omit<OperatorRelayResponseV1, 'responseHash'> = {
     contract: OPERATOR_RELAY_RESPONSE_CONTRACT,
-    relayId: 'relay-1',
-    requestHash: sha256('request-1'),
-    fromOperator: 'codex',
-    toOperator: 'fcr',
+    relayId: request.relayId,
+    requestHash: request.requestHash,
+    fromOperator: request.toOperator,
+    toOperator: request.fromOperator,
     status: 'completed',
     answer: 'repair complete',
     evidenceRefs: ['provider:openai:response-1'],
@@ -73,11 +110,13 @@ const requiredChecks = [
 ] as const;
 
 describe('repository repair outcome verifier', () => {
-  it('issues a non-authorizing verification receipt only from exact-head passed provider evidence', async () => {
-    const response = relayResponse();
+  it('issues a non-authorizing verification receipt only from subject-bound exact-head provider evidence', async () => {
+    const request = relayRequest();
+    const response = relayResponse(request);
     const result = await verifyRepositoryRepairOutcome({
+      request,
       response,
-      repository: 'jussray/founder-control-room',
+      repository: REPOSITORY,
       expectedHeadSha: HEAD,
       requiredChecks,
       requirePlaywright: true,
@@ -96,7 +135,7 @@ describe('repository repair outcome verifier', () => {
       responseHash: response.responseHash,
       operatorId: 'codex',
       subject: {
-        repository: 'jussray/founder-control-room',
+        repository: REPOSITORY,
         exactSha: HEAD,
       },
       outcomeVerified: true,
@@ -113,10 +152,45 @@ describe('repository repair outcome verifier', () => {
     )).toBe(true);
   });
 
-  it('fails closed when a newer same-name rerun fails after an older pass', async () => {
+  it('refuses to pair a successful relay with a different green repository subject', async () => {
+    const request = relayRequest('b'.repeat(40));
+    const response = relayResponse(request);
     const result = await verifyRepositoryRepairOutcome({
-      response: relayResponse(),
-      repository: 'jussray/founder-control-room',
+      request,
+      response,
+      repository: REPOSITORY,
+      expectedHeadSha: HEAD,
+      requiredChecks: [{ name: 'CI', issuerId: '15368' }],
+    }, {
+      providerFactory: () => fakeProvider([signal('CI')]),
+    });
+
+    expect(result.verified).toBe(false);
+    expect(result.evidenceReceipt).toBeNull();
+    expect(result.blockers).toContain('relay request is not bound to the exact repository repair subject');
+  });
+
+  it('requires implement capability for a repository repair outcome', async () => {
+    const request = relayRequest(HEAD, { capability: 'review' });
+    const result = await verifyRepositoryRepairOutcome({
+      request,
+      response: relayResponse(request),
+      repository: REPOSITORY,
+      expectedHeadSha: HEAD,
+      requiredChecks: [{ name: 'CI', issuerId: '15368' }],
+    }, { providerFactory: () => fakeProvider([signal('CI')]) });
+
+    expect(result.verified).toBe(false);
+    expect(result.evidenceReceipt).toBeNull();
+    expect(result.blockers).toContain('repository repair verification requires implement capability');
+  });
+
+  it('fails closed when a newer same-name rerun fails after an older pass', async () => {
+    const request = relayRequest();
+    const result = await verifyRepositoryRepairOutcome({
+      request,
+      response: relayResponse(request),
+      repository: REPOSITORY,
       expectedHeadSha: HEAD,
       requiredChecks: [{ name: 'CI', issuerId: '15368' }],
     }, {
@@ -140,9 +214,11 @@ describe('repository repair outcome verifier', () => {
   });
 
   it('requires the configured provider-backed producer identity', async () => {
+    const request = relayRequest();
     const result = await verifyRepositoryRepairOutcome({
-      response: relayResponse(),
-      repository: 'jussray/founder-control-room',
+      request,
+      response: relayResponse(request),
+      repository: REPOSITORY,
       expectedHeadSha: HEAD,
       requiredChecks: [{ name: 'CI', issuerId: '15368' }],
     }, {
@@ -156,9 +232,11 @@ describe('repository repair outcome verifier', () => {
   });
 
   it('refuses Playwright-required repair proof unless the policy declares a browser-shaped check', async () => {
+    const request = relayRequest();
     const result = await verifyRepositoryRepairOutcome({
-      response: relayResponse(),
-      repository: 'jussray/founder-control-room',
+      request,
+      response: relayResponse(request),
+      repository: REPOSITORY,
       expectedHeadSha: HEAD,
       requiredChecks: [{ name: 'CI', issuerId: '15368' }],
       requirePlaywright: true,
@@ -174,12 +252,14 @@ describe('repository repair outcome verifier', () => {
   });
 
   it('rejects a relay outcome whose canonical response hash was tampered after completion', async () => {
-    const response = relayResponse();
+    const request = relayRequest();
+    const response = relayResponse(request);
     const tampered = { ...response, answer: 'different answer' };
 
     const result = await verifyRepositoryRepairOutcome({
+      request,
       response: tampered,
-      repository: 'jussray/founder-control-room',
+      repository: REPOSITORY,
       expectedHeadSha: HEAD,
       requiredChecks: [{ name: 'CI', issuerId: '15368' }],
     }, {
@@ -191,9 +271,11 @@ describe('repository repair outcome verifier', () => {
   });
 
   it('does not verify a response that still declares unresolved work', async () => {
+    const request = relayRequest();
     const result = await verifyRepositoryRepairOutcome({
-      response: relayResponse({ unresolved: ['needs provider readback'] }),
-      repository: 'jussray/founder-control-room',
+      request,
+      response: relayResponse(request, { unresolved: ['needs provider readback'] }),
+      repository: REPOSITORY,
       expectedHeadSha: HEAD,
       requiredChecks: [{ name: 'CI', issuerId: '15368' }],
     }, {
@@ -206,8 +288,10 @@ describe('repository repair outcome verifier', () => {
 
   it('returns blockers without touching the provider when the verification subject is malformed', async () => {
     let providerConstructed = false;
+    const request = relayRequest();
     const result = await verifyRepositoryRepairOutcome({
-      response: relayResponse(),
+      request,
+      response: relayResponse(request),
       repository: 'not-a-repository',
       expectedHeadSha: 'short',
       requiredChecks: [{ name: 'CI', issuerId: '15368' }],
@@ -229,9 +313,11 @@ describe('repository repair outcome verifier', () => {
   });
 
   it('turns provider evidence read failure into a blocker without leaking provider error detail', async () => {
+    const request = relayRequest();
     const result = await verifyRepositoryRepairOutcome({
-      response: relayResponse(),
-      repository: 'jussray/founder-control-room',
+      request,
+      response: relayResponse(request),
+      repository: REPOSITORY,
       expectedHeadSha: HEAD,
       requiredChecks: [{ name: 'CI', issuerId: '15368' }],
     }, {
@@ -251,10 +337,12 @@ describe('repository repair outcome verifier', () => {
   });
 
   it('binds the receipt hash so verification content cannot be rewritten after issuance', async () => {
-    const response = relayResponse();
+    const request = relayRequest();
+    const response = relayResponse(request);
     const result = await verifyRepositoryRepairOutcome({
+      request,
       response,
-      repository: 'jussray/founder-control-room',
+      repository: REPOSITORY,
       expectedHeadSha: HEAD,
       requiredChecks: [{ name: 'CI', issuerId: '15368' }],
     }, {
