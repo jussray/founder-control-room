@@ -273,9 +273,17 @@ function verifyKodyResponse(packet: unknown, value: unknown): {
       || handoff.repository !== subject.repository
       || handoff.branch !== subject.branch
       || handoff.headSha !== subject.headSha
+      || handoff.observedAt !== receipt.observedAt
+      || handoff.expiresAt !== receipt.expiresAt
     ) {
-      throw new Error('Kody handoff subject does not match request');
+      throw new Error('Kody handoff subject or lease does not match verified receipt');
     }
+  }
+  if (
+    promptosHandoff.founderGoal !== receipt.founderGoal
+    || promptosHandoff.stopCondition !== receipt.stopCondition
+  ) {
+    throw new Error('PromptOS handoff goal boundary does not match verified receipt');
   }
 
   // Ensure both claimed fingerprints were actually consumed by downstream checks.
@@ -291,6 +299,15 @@ function verifySolResponse(subject: NonNullable<CourtWitnessBridgeResult['subjec
     throw new Error('Sol response identity or authority mismatch');
   }
   const marker = record(response.marker, 'Sol.marker');
+  if (marker.version !== 1 || marker.kind !== 'sol/court-continuity@v1') {
+    throw new Error('Sol continuity marker schema mismatch');
+  }
+  if (!['FRESH', 'EXPIRED'].includes(String(marker.lease_state))) {
+    throw new Error('Sol continuity lease state is unsupported');
+  }
+  if (!['FRESH', 'CHALLENGE'].includes(String(marker.continuity_state))) {
+    throw new Error('Sol continuity state is unsupported');
+  }
   if (
     marker.source_handoff_fingerprint !== handoff.handoffFingerprint
     || marker.witness_receipt_fingerprint !== handoff.witnessReceiptFingerprint
@@ -337,8 +354,14 @@ function verifyPromptOsResponse(
   fullSha(response.release_sha, 'PromptOS.release_sha');
   const result = record(response.result, 'PromptOS.result');
   if (result.schema !== 'juss/promptos-court-workflow@v1') throw new Error('PromptOS workflow schema mismatch');
-  if (result.sourceHandoffFingerprint !== handoff.handoffFingerprint) {
-    throw new Error('PromptOS workflow is bound to a different handoff');
+  if (
+    result.caseId !== subject.caseId
+    || result.sourceHandoffFingerprint !== handoff.handoffFingerprint
+    || result.witnessReceiptFingerprint !== handoff.witnessReceiptFingerprint
+    || result.observedAt !== handoff.observedAt
+    || result.expiresAt !== handoff.expiresAt
+  ) {
+    throw new Error('PromptOS workflow is bound to a different handoff or lease');
   }
   const workflowSubject = record(result.subject, 'PromptOS.result.subject');
   if (
