@@ -327,4 +327,78 @@ describe('createServerOperatorRelayAdapters', () => {
     await expect(adapters.perplexity?.(relay('restricted'))).rejects.toThrow('restricted relay context');
     expect(fetchMock).not.toHaveBeenCalled();
   });
+
+  it('adds Anthropic advisor and cache controls only for explicitly enabled implementation work', async () => {
+    const fetchMock = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
+      const headers = init?.headers as Record<string, string>;
+      expect(headers['anthropic-beta']).toContain('advisor-tool-2026-03-01');
+      const payload = JSON.parse(String(init?.body ?? '{}'));
+      expect(payload.system).toEqual([
+        expect.objectContaining({
+          type: 'text',
+          cache_control: { type: 'ephemeral', ttl: '1h' },
+        }),
+      ]);
+      expect(payload.tools).toEqual([
+        expect.objectContaining({
+          type: 'advisor_20260301',
+          name: 'advisor',
+          model: 'claude-fable-5',
+          caching: { type: 'ephemeral', ttl: '1h' },
+        }),
+      ]);
+      return new Response(JSON.stringify({
+        id: 'msg_advisor_cache_1',
+        type: 'message',
+        role: 'assistant',
+        content: [
+          { type: 'advisor_tool_result', tool_use_id: 'advisor_1', content: { type: 'advisor_result', text: 'review guidance' } },
+          { type: 'text', text: 'Implemented result' },
+        ],
+        usage: {
+          input_tokens: 12,
+          cache_creation_input_tokens: 800,
+          cache_read_input_tokens: 0,
+          output_tokens: 20,
+        },
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    }) as typeof fetch;
+
+    const adapters = createServerOperatorRelayAdapters({
+      ANTHROPIC_API_KEY: FIXTURE,
+      FCR_RELAY_ANTHROPIC_MODEL: 'claude-sonnet-5-5',
+      FCR_RELAY_ANTHROPIC_ADVISOR_ENABLED: 'true',
+      FCR_RELAY_ANTHROPIC_ADVISOR_MODEL: 'claude-fable-5',
+      FCR_RELAY_ANTHROPIC_CACHE_TTL: '1h',
+    }, fetchMock);
+
+    const response = await adapters['claude-code']?.(relay('internal', 'claude-code', 'implement'));
+    expect(response?.answer).toBe('Implemented result');
+    expect(response?.evidenceRefs).toEqual(['provider:anthropic:msg_advisor_cache_1']);
+  });
+
+  it('does not attach Anthropic advisor when runtime opt-in is absent', async () => {
+    const fetchMock = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
+      const headers = init?.headers as Record<string, string>;
+      expect(headers['anthropic-beta']).toBeUndefined();
+      const payload = JSON.parse(String(init?.body ?? '{}'));
+      expect(payload.tools).toBeUndefined();
+      expect(payload.system).toBeUndefined();
+      return new Response(JSON.stringify({
+        id: 'msg_no_advisor_1',
+        type: 'message',
+        role: 'assistant',
+        content: [{ type: 'text', text: 'Plain Claude result' }],
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    }) as typeof fetch;
+
+    const adapters = createServerOperatorRelayAdapters({
+      ANTHROPIC_API_KEY: FIXTURE,
+      FCR_RELAY_ANTHROPIC_MODEL: 'claude-sonnet-5-5',
+    }, fetchMock);
+
+    const response = await adapters['claude-code']?.(relay('internal', 'claude-code', 'implement'));
+    expect(response?.answer).toBe('Plain Claude result');
+  });
+
 });
