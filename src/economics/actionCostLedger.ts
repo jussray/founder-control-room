@@ -259,14 +259,36 @@ export function buildActionCostReceipt(input: ActionCostReceiptInputV1): ActionC
   };
 }
 
+function receiptInput(receipt: ActionCostReceiptV1): ActionCostReceiptInputV1 {
+  return {
+    receiptId: receipt.receiptId,
+    projectSlug: receipt.projectSlug,
+    actionId: receipt.actionId,
+    actionClass: receipt.actionClass,
+    occurredAt: receipt.occurredAt,
+    pricingVersion: receipt.pricingVersion,
+    planId: receipt.planId,
+    billingSubjectRef: receipt.billingSubjectRef,
+    sourceRef: receipt.sourceRef,
+    costBasis: receipt.costBasis,
+    actualCostUsd: receipt.actualCostUsd,
+    monthRuntimeCostBeforeUsd: receipt.monthRuntimeCostBeforeUsd,
+    monthlyRuntimeBudgetUsd: receipt.monthlyRuntimeBudgetUsd,
+    planNetRevenueUsd: receipt.planNetRevenueUsd,
+    usage: receipt.usage,
+  };
+}
+
 export function validateActionCostReceipt(receipt: ActionCostReceiptV1): string[] {
   const errors = validateActionCostReceiptInput(receipt);
   if (receipt.contract !== ACTION_COST_RECEIPT_CONTRACT) errors.push('unsupported action-cost receipt contract');
   if (Object.values(receipt.authority ?? {}).some(Boolean)) errors.push('action-cost receipt cannot carry mutation authority');
   if (!/^[0-9a-f]{64}$/.test(receipt.receiptHash ?? '')) errors.push('receiptHash must be sha256');
   if (errors.length === 0) {
-    const { receiptHash: _receiptHash, ...identity } = receipt;
-    if (receipt.receiptHash !== actionCostReceiptHash(identity)) errors.push('receiptHash does not match canonical action-cost receipt');
+    const expected = buildActionCostReceipt(receiptInput(receipt));
+    if (receipt.receiptHash !== expected.receiptHash) {
+      errors.push('receiptHash does not match canonical action-cost receipt');
+    }
   }
   return [...new Set(errors)];
 }
