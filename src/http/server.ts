@@ -18,6 +18,7 @@ import { terminalRouter } from './routes/terminal.js';
 import { dashboardRouter } from './routes/dashboard.js';
 import { missionsRouter } from './routes/missions.js';
 import { promptosRouter } from './routes/promptos.js';
+import { builderPromptWorkflowRouter } from './routes/builderPromptWorkflow.js';
 import { agentsRouter } from './routes/agents.js';
 import { capabilitiesRouter } from './routes/capabilities.js';
 import { authorityLevelsRouter } from './routes/authorityLevels.js';
@@ -403,6 +404,7 @@ export function createServer(options: CreateServerOptions = {}) {
   app.use('/mirror', mirrorRouter);
   app.use('/missions', missionsRouter);
   app.use('/promptos', promptosRouter);
+  app.use('/prompt-workflows', builderPromptWorkflowRouter);
   app.use('/agents', agentsRouter);
   app.use('/capabilities', capabilitiesRouter);
   app.use('/authority-levels', authorityLevelsRouter);

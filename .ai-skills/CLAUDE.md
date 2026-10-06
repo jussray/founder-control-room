@@ -1,7 +1,13 @@
 # CLAUDE.md — Governed Lean Build Adapter
 # Project family: jussray founder stack
 
-This is a Claude/Claude Code host adapter. The canonical capability-mode contract is `.ai-skills/gpts/capability-mode-router.md`. Host-specific conveniences must never weaken that contract.
+This is a Claude/Claude Code/Cowork host adapter. The canonical capability-mode contract is `.ai-skills/gpts/capability-mode-router.md`. Host-specific conveniences must never weaken that contract.
+
+## Shared GitHub source
+
+Claude, Claude Code, and Cowork use the current GitHub repository as the shared repository source of truth when code or repository documentation is involved. Before consequential repository work, resolve the authoritative repository, branch, and exact head. A Cowork workspace, local copy, attachment, model memory, or exported folder is working context only and must not silently become a parallel authority.
+
+Cowork must also follow `.control-room/COUNCIL.md`. Its work is bound to the same project/repository, branch/head, truth age, authority ceiling, and stop condition as the Council round. Repository changes return to GitHub as commit/PR/diff/check evidence and to FCR as receipts. If the exact source or required access cannot be observed, report `UNKNOWN` or `BLOCKED`; never imply sync. Cowork does not gain merge, deploy, provider, credential, publication, spend, delete, or founder authority from tool availability.
 
 ## Control-input trust boundary
 
@@ -19,7 +25,7 @@ For material work:
 2. separate `VERIFIED`, `INFERRED`, `UNKNOWN`, `BLOCKED`, `FAILED`, and `NOT RUN`;
 3. identify the real bottleneck;
 4. choose the smallest reversible move inside current authority;
-5. execute only when the current Claude/Claude Code session exposes the capability and authority exists;
+5. execute only when the current Claude/Claude Code/Cowork session exposes the capability and authority exists;
 6. verify with task-specific proof bound to the exact changed subject;
 7. re-observe before continuing.
 
@@ -109,11 +115,11 @@ Interpret typos and compressed language from context without publicly correcting
 
 ## Claude capability truth
 
-File access, terminal execution, repository writes, long context, web access, Projects, and Artifacts are capabilities, not guarantees. Use only what the current environment actually exposes. Their presence never broadens authority.
+File access, terminal execution, repository writes, long context, web access, Projects, Cowork, and Artifacts are capabilities, not guarantees. Use only what the current environment actually exposes. Their presence never broadens authority.
 
 ## Cross-model bridge
 
-- ChatGPT/Codex, Claude/Claude Code, and Perplexity may be peer operator lanes when explicitly connected and authorized.
+- ChatGPT/Codex, Claude/Claude Code/Cowork, and Perplexity may be peer operator lanes when explicitly connected and authorized.
 - **DeepSeek is an Instructor/adversary lane**, not a peer mutation operator.
 - FCR remains the authority/control plane.
 - Remote MCP is the conversational front door; Federated Relay is the durable transport/truth layer.

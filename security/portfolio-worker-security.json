@@ -2,7 +2,7 @@
   "schema": "founder-control-room/portfolio-worker-security@v1",
   "suiteVersion": "attack-20-v3",
   "repository": "jussray/founder-control-room",
-  "declaredFromMainSha": "b8e35bab8bcaf5c695ea273ac2823125d6af8fa2",
+  "declaredFromMainSha": "39d7a17c5f80343892526cf0b56abc70e04cd6ca",
   "overallState": "UNVERIFIED",
   "aggregation": {
     "passRequiresEveryProductionWorkerPass": true,
@@ -33,7 +33,9 @@
         "previewUrls": "unknown",
         "pagesDev": "unknown",
         "pagesPreviews": "unknown",
-        "customDomains": ["api.foundercontrolroom.org"],
+        "customDomains": [
+          "api.foundercontrolroom.org"
+        ],
         "legacyDns": [],
         "directOrigin": "unknown"
       },
@@ -88,7 +90,9 @@
       "sourceIntent": {
         "workersDev": "disabled",
         "previewUrls": "disabled",
-        "serviceBindings": ["FOUNDER_CONTROL_ROOM_API->founder-control-room"],
+        "serviceBindings": [
+          "FOUNDER_CONTROL_ROOM_API->founder-control-room"
+        ],
         "relatedPagesSurface": null
       },
       "alternateIngress": {
@@ -123,12 +127,24 @@
         "runtimeOutcomeClaims": true
       },
       "capabilityAbsenceEvidence": {
-        "A01": ["wrangler.email.toml declares no public route and disables workers.dev/preview URLs"],
-        "A08": ["worker has no browser/user HTTP ingress"],
-        "A10": ["worker receives Cloudflare Email Routing events rather than an HTTP provider webhook"],
-        "A11": ["worker does not expose tenant-owned object access"],
-        "A12": ["worker does not expose user-mutable object properties"],
-        "A14": ["worker does not expose Supabase data access"]
+        "A01": [
+          "wrangler.email.toml declares no public route and disables workers.dev/preview URLs"
+        ],
+        "A08": [
+          "worker has no browser/user HTTP ingress"
+        ],
+        "A10": [
+          "worker receives Cloudflare Email Routing events rather than an HTTP provider webhook"
+        ],
+        "A11": [
+          "worker does not expose tenant-owned object access"
+        ],
+        "A12": [
+          "worker does not expose user-mutable object properties"
+        ],
+        "A14": [
+          "worker does not expose Supabase data access"
+        ]
       },
       "observedProtection": {
         "observedAt": null,
@@ -193,9 +209,15 @@
         "runtimeOutcomeClaims": true
       },
       "capabilityAbsenceEvidence": {
-        "A01": ["wrangler.deletion-queue.toml declares a scheduled Worker with no public route and disables workers.dev/preview URLs"],
-        "A08": ["scheduled Worker has no browser/user HTTP ingress"],
-        "A10": ["scheduled Worker has no provider webhook route"]
+        "A01": [
+          "wrangler.deletion-queue.toml declares a scheduled Worker with no public route and disables workers.dev/preview URLs"
+        ],
+        "A08": [
+          "scheduled Worker has no browser/user HTTP ingress"
+        ],
+        "A10": [
+          "scheduled Worker has no provider webhook route"
+        ]
       },
       "observedProtection": {
         "observedAt": null,

@@ -39,7 +39,7 @@ jobs:
       DEPLOYMENT_REASON: ${{ inputs.deployment_reason }}
     steps:
       - name: Checkout exact approved commit
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ inputs.expected_head_sha }}
           fetch-depth: 0
@@ -108,30 +108,13 @@ jobs:
         run: |
           set -euo pipefail
 
-          python3 - <<'PY'
-          import os
-          import re
-          import sys
-
-          token = os.environ.get('CLOUDFLARE_API_TOKEN', '')
-          account_id = os.environ.get('CLOUDFLARE_ACCOUNT_ID', '')
-
-          try:
-              token.encode('ascii')
-          except UnicodeEncodeError:
-              print('::error title=Malformed Cloudflare API token::CLOUDFLARE_API_TOKEN contains non-ASCII characters. Re-copy the exact Cloudflare-issued token.')
-              sys.exit(1)
-
-          if any(ord(char) < 33 or ord(char) > 126 or char.isspace() for char in token):
-              print('::error title=Malformed Cloudflare API token::CLOUDFLARE_API_TOKEN contains whitespace or non-printable characters. Re-copy the exact Cloudflare-issued token.')
-              sys.exit(1)
-
-          if not re.fullmatch(r'[0-9a-f]{32}', account_id):
-              print('::error title=Invalid Cloudflare account authority::CLOUDFLARE_ACCOUNT_ID must be a 32-character lowercase hexadecimal account ID.')
-              sys.exit(1)
-
-          print('Cloudflare production credential is header-safe and account authority is structurally valid. The token value was not printed.')
-          PY
+          credential_receipt="$RUNNER_TEMP/fcr-deploy-credential-shape.json"
+          node scripts/provider-credential-contract.mjs \
+            --env CLOUDFLARE_API_TOKEN \
+            --account-id-env CLOUDFLARE_ACCOUNT_ID \
+            --require-account-id true \
+            --purpose fcr-production-deploy-authority \
+            --output "$credential_receipt"
 
           secret_receipt="$RUNNER_TEMP/fcr-worker-secret-names.json"
           npx --yes wrangler@4.110.0 secret list \
@@ -204,12 +187,12 @@ jobs:
     environment: production
     needs: authority-gate
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ inputs.expected_head_sha }}
           persist-credentials: false
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '24'
 
@@ -338,7 +321,7 @@ jobs:
 
       - name: Upload migration ledger receipts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: supabase-migration-ledger-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
@@ -356,12 +339,12 @@ jobs:
     environment: production
     needs: supabase-migrate
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ inputs.expected_head_sha }}
           persist-credentials: false
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '24'
           cache: 'npm'
@@ -402,7 +385,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: pages-release
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ inputs.expected_head_sha }}
           persist-credentials: false
@@ -528,7 +511,7 @@ jobs:
       REPOSITORY_PUBLICATION_POLICY_PATH: config/proof-of-ship-repository-policy.json
     steps:
       - name: Check out the exact deployed commit
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ inputs.expected_head_sha }}
           fetch-depth: 0
@@ -882,7 +865,7 @@ jobs:
 
       - name: Upload founder-review proof artifact
         if: steps.classify.outputs.meaningful == 'true' && env.PUBLISH_ALLOWED != 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: proof-of-ship-founder-review-${{ inputs.expected_head_sha }}
           path: proof-review.json
@@ -1119,12 +1102,12 @@ jobs:
     needs: smoke-test
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ inputs.expected_head_sha }}
           persist-credentials: false
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '24'
           cache: 'npm'

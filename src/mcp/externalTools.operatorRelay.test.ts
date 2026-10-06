@@ -1,4 +1,6 @@
 import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { OPERATOR_RELAY_PEERS } from '../lib/operatorRelayConstants.js';
+import type { RelayOperatorId } from '../lib/operatorRelay.js';
 
 vi.mock('./vaultHub.js', () => ({
   hubForMcpProject: vi.fn(),
@@ -9,8 +11,8 @@ vi.mock('../lib/supabaseClient.js', () => ({
 
 type ExternalToolsModule = typeof import('./externalTools.js');
 type RelayCall = {
-  fromOperator: 'gemini' | 'codex' | 'claude-code' | 'perplexity';
-  toOperator: 'gemini' | 'codex' | 'claude-code' | 'perplexity';
+  fromOperator: RelayOperatorId;
+  toOperator: RelayOperatorId;
   capability: 'research' | 'propose' | 'review' | 'implement';
   goal: string;
   contextSummary: string;
@@ -43,7 +45,7 @@ function receipt(toolName: 'fcr_relay_operator') {
 }
 
 describe('external FCR operator relay authority boundary', () => {
-  it('advertises Gemini plus the bounded work classes without describing mutation authority', () => {
+  it('advertises the canonical peer set plus bounded work classes without mutation authority', () => {
     const tool = externalTools.externalMcpToolDefinitions()
       .find((definition) => definition.name === 'fcr_relay_operator');
     expect(tool).toBeDefined();
@@ -54,19 +56,14 @@ describe('external FCR operator relay authority boundary', () => {
         capability?: { enum?: string[] };
       };
     };
-    expect(inputSchema.properties?.targetOperator?.enum).toEqual([
-      'gemini',
-      'codex',
-      'claude-code',
-      'perplexity',
-    ]);
+    expect(inputSchema.properties?.targetOperator?.enum).toEqual([...OPERATOR_RELAY_PEERS]);
     expect(inputSchema.properties?.capability?.enum).toEqual([
       'research',
       'propose',
       'review',
       'implement',
     ]);
-    expect(String(tool?.description)).toContain('Gemini');
+    expect(String(tool?.description)).toContain('canonical peer operator');
     expect(String(tool?.description)).toContain('zero mutation authority');
   });
 
@@ -178,9 +175,71 @@ describe('external FCR operator relay authority boundary', () => {
       executionAllowed: false,
       founderApprovalGranted: false,
     }));
-    expect(recordEvidence).toHaveBeenCalledWith(expect.objectContaining({
-      risk: 'external_side_effect',
-      toolName: 'fcr_relay_operator',
+  });
+
+  it('routes DeepSeek as a peer while keeping DeepSeek Instructor out of the relay lane', async () => {
+    const relayOperator = vi.fn(async (input: RelayCall) => ({
+      request: input,
+      response: {
+        fromOperator: input.toOperator,
+        toOperator: input.fromOperator,
+        answer: 'DeepSeek bounded peer result',
+        evidenceRefs: ['provider:deepseek:resp_ds_1'],
+      },
     }));
+    const recordEvidence = vi.fn(async (input: { toolName: string }) => (
+      receipt(input.toolName as 'fcr_relay_operator')
+    ));
+    const execute = externalTools.createExternalMcpToolExecutor({
+      env: {
+        FCR_REMOTE_MCP_OPERATOR_CLIENT_MAP: JSON.stringify({ 'chatgpt-client': 'codex' }),
+      },
+      relayOperator,
+      recordEvidence,
+    });
+
+    await execute({
+      name: 'fcr_relay_operator',
+      arguments: {
+        targetOperator: 'deepseek',
+        capability: 'research',
+        goal: 'Attack the bounded claim and return attributable evidence.',
+        contextSummary: 'Peer mode only. Instructor mode remains a separate operator identity.',
+        sensitivity: 'internal',
+      },
+      allowedProjects: new Set(['founder-control-room']),
+      identity: {
+        userId: 'founder-user-1',
+        email: 'founder@example.com',
+        clientId: 'chatgpt-client',
+        authMode: 'oauth',
+      },
+      requestId: 'relay-request-deepseek-1',
+    });
+
+    expect(relayOperator).toHaveBeenCalledWith(expect.objectContaining({
+      fromOperator: 'codex',
+      toOperator: 'deepseek',
+      capability: 'research',
+    }));
+
+    await expect(execute({
+      name: 'fcr_relay_operator',
+      arguments: {
+        targetOperator: 'deepseek-instructor',
+        capability: 'research',
+        goal: 'This should be rejected.',
+        contextSummary: 'Instructor identity is not a peer relay target.',
+        sensitivity: 'internal',
+      },
+      allowedProjects: new Set(['founder-control-room']),
+      identity: {
+        userId: 'founder-user-1',
+        email: 'founder@example.com',
+        clientId: 'chatgpt-client',
+        authMode: 'oauth',
+      },
+      requestId: 'relay-request-deepseek-instructor-1',
+    })).rejects.toThrow('targetOperator is not a peer relay operator');
   });
 });

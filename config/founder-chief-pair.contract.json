@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "contractVersion": "2026-09-13.2",
+  "contractVersion": "2026-10-05.1",
   "pair": {
     "controlRoom": "jussray/founder-control-room",
     "chiefAI": "jussray/chief-ai-machine"
@@ -43,6 +43,19 @@
     },
     "continuityBoundary": "Fingerprints and proof cookies remain separate, non-secret, non-authorizing state markers for each system. Cross-system evidence may update or invalidate the recipient's state only after recipient-side verification; it never transfers authority.",
     "cooperationBoundary": "Founder Control Room and Chief AI may call, observe, and inform one another while remaining independently valid systems. A joint claim requires distinct receipts for each participating system; one system's green or red state never silently replaces the other's."
+  },
+  "commercialPackaging": {
+    "technicalTopology": "standalone-peers",
+    "portfolioCommercialTopology": "independent-products-with-explicit-bundles",
+    "defaultPublicFounderSoftwareIdentity": "product-specific",
+    "chiefTechnicalIndependence": true,
+    "chiefCommercialIndependence": true,
+    "chiefDefaultCommercialRole": "standalone-product",
+    "chiefDefaultCommercialPackaging": "chief-owned-offer",
+    "bundleRule": "Chief may be bundled with Founder Control Room or another first-party product only as an explicit go-to-market choice. Bundling does not collapse product identity, runtime, authority, receipts, pricing truth, or evidence.",
+    "customerAcquisitionRule": "Chief may have its own customer-acquisition path, pricing, licensing, deployment, or service layer and may also participate in explicit multi-product bundles.",
+    "separateOfferGate": "Chief does not require Founder Control Room demand proof to exist as a separate offer. Pricing, product-market-fit, revenue, retention, and scaling claims still require their own economic evidence.",
+    "truthBoundary": "Standalone product identity, repository existence, runtime separation, internal usage, or successful tests do not prove deployment, product-market fit, revenue, retention, or paid demand."
   },
   "roles": {
     "controlRoom": [
