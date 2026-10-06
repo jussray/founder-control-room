@@ -165,22 +165,37 @@ export function validateCapabilityOutcomeVerificationReceipt(
   return [...new Set(errors)];
 }
 
-function relayResponseErrors(response: OperatorRelayResponseV1): string[] {
+function relayResponseIntegrityErrors(response: OperatorRelayResponseV1): string[] {
   const errors: string[] = [];
   if (response.contract !== OPERATOR_RELAY_RESPONSE_CONTRACT) errors.push('relay response contract is unsupported');
   if (!response.relayId?.trim()) errors.push('relay response id is required');
   if (!SHA256.test(response.requestHash ?? '')) errors.push('relay requestHash must be sha256');
   if (!SHA256.test(response.responseHash ?? '')) errors.push('relay responseHash must be sha256');
   if (!RELAY_OPERATORS.has(response.fromOperator)) errors.push('relay response operator is unsupported');
-  if (response.status !== 'completed') errors.push('repository repair verification requires a completed relay outcome');
+  if (!['accepted', 'completed', 'blocked', 'failed'].includes(response.status)) errors.push('relay outcome status is unsupported');
   if (response.authorityRequested !== 'none') errors.push('relay outcome requested authority');
-  if (!Array.isArray(response.evidenceRefs) || normalizedEvidenceRefs(response.evidenceRefs).length === 0) errors.push('completed relay outcome has no provider evidence');
+  if (!Array.isArray(response.evidenceRefs) || response.evidenceRefs.some((item) => typeof item !== 'string')) errors.push('relay evidenceRefs are malformed');
   if (!Array.isArray(response.unresolved) || response.unresolved.some((item) => typeof item !== 'string')) errors.push('relay unresolved list is malformed');
-  else if (response.unresolved.map((item) => item.trim()).filter(Boolean).length > 0) errors.push('relay outcome still reports unresolved work');
   if (!Number.isFinite(Date.parse(response.completedAt ?? ''))) errors.push('relay completedAt is invalid');
   if (errors.length === 0) {
     const { responseHash: _responseHash, ...identity } = response;
     if (operatorRelayResponseHash(identity) !== response.responseHash) errors.push('relay responseHash does not match response content');
+  }
+  return [...new Set(errors)];
+}
+
+function relayResponseErrors(response: OperatorRelayResponseV1): string[] {
+  const errors = relayResponseIntegrityErrors(response);
+  if (response.status !== 'completed') errors.push('repository repair verification requires a completed relay outcome');
+  if (Array.isArray(response.evidenceRefs) && normalizedEvidenceRefs(response.evidenceRefs).length === 0) {
+    errors.push('completed relay outcome has no provider evidence');
+  }
+  if (
+    Array.isArray(response.unresolved)
+    && response.unresolved.every((item) => typeof item === 'string')
+    && response.unresolved.map((item) => item.trim()).filter(Boolean).length > 0
+  ) {
+    errors.push('relay outcome still reports unresolved work');
   }
   return [...new Set(errors)];
 }
@@ -270,7 +285,7 @@ export function matchingCapabilityOutcomeVerification(
   operatorId: RelayOperatorId,
 ): boolean {
   if (validateCapabilityOutcomeVerificationReceipt(verification).length > 0) return false;
-  if (relayResponseErrors(response).length > 0) return false;
+  if (relayResponseIntegrityErrors(response).length > 0 || response.status === 'accepted') return false;
   return verification.taskClass === taskClass
     && verification.relayId === response.relayId
     && verification.responseHash === response.responseHash
