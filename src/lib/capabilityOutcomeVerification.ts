@@ -16,6 +16,17 @@ const SHA40 = /^[0-9a-f]{40}$/i;
 const REPOSITORY = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
 const BROWSER_CHECK = /playwright|browser|e2e/i;
 const RELAY_OPERATORS = new Set<string>(OPERATOR_RELAY_PEERS);
+const CAPABILITY_TASK_CLASSES: ReadonlySet<string> = new Set<CapabilityTaskClass>([
+  'repository-repair',
+  'architecture-review',
+  'business-workflow',
+  'scientific-research',
+  'public-research',
+  'cross-provider-drift',
+  'browser-runtime',
+  'founder-synthesis',
+  'multimodal-generation',
+]);
 
 export interface CapabilityVerificationRequiredCheck {
   name: string;
@@ -63,7 +74,7 @@ export interface RepositoryRepairVerificationResult {
   verified: boolean;
   receipt: CapabilityOutcomeVerificationReceipt | null;
   blockers: string[];
-  evidenceReceipt: ProjectEvidenceReceipt;
+  evidenceReceipt: ProjectEvidenceReceipt | null;
 }
 
 interface SignalRecord {
@@ -94,19 +105,28 @@ function normalizedName(value: string): string {
   return value.trim().replace(/\s+/g, ' ').toLocaleLowerCase('en-US');
 }
 
-function normalizedEvidenceRefs(values: readonly string[]): string[] {
-  return [...new Set(values.map((value) => value.trim()).filter(Boolean))].sort();
+function normalizedEvidenceRefs(values: readonly unknown[]): string[] {
+  return [...new Set(
+    values
+      .filter((value): value is string => typeof value === 'string')
+      .map((value) => value.trim())
+      .filter(Boolean),
+  )].sort();
 }
 
 function normalizedChecks(values: readonly CapabilityVerificationRequiredCheck[]): Array<{ name: string; issuerId: string | null }> {
   const seen = new Set<string>();
   const result: Array<{ name: string; issuerId: string | null }> = [];
   for (const value of values) {
+    if (!value || typeof value.name !== 'string') continue;
     const name = value.name.trim().replace(/\s+/g, ' ');
     const key = normalizedName(name);
     if (!key || seen.has(key)) continue;
     seen.add(key);
-    result.push({ name, issuerId: value.issuerId?.trim() || null });
+    result.push({
+      name,
+      issuerId: typeof value.issuerId === 'string' ? value.issuerId.trim() || null : null,
+    });
   }
   return result.sort((a, b) => normalizedName(a.name).localeCompare(normalizedName(b.name)));
 }
@@ -144,6 +164,7 @@ export function validateCapabilityOutcomeVerificationReceipt(
 ): string[] {
   const errors: string[] = [];
   if (value.contract !== CAPABILITY_OUTCOME_VERIFICATION_CONTRACT) errors.push('unsupported capability outcome verification contract');
+  if (!CAPABILITY_TASK_CLASSES.has(value.taskClass)) errors.push('verification taskClass is unsupported');
   if (!value.relayId?.trim()) errors.push('verification relayId is required');
   if (!SHA256.test(value.responseHash ?? '')) errors.push('verification responseHash must be sha256');
   if (!RELAY_OPERATORS.has(value.operatorId)) errors.push('verification operatorId is unsupported');
@@ -153,7 +174,11 @@ export function validateCapabilityOutcomeVerificationReceipt(
   if (!SHA40.test(value.subject?.exactSha ?? '')) errors.push('verification exactSha must be a full commit sha');
   const checks = normalizedChecks(value.requiredChecks ?? []);
   if (checks.length === 0 || checks.length !== value.requiredChecks.length) errors.push('verification required checks must be unique and non-empty');
-  if (!Array.isArray(value.evidenceRefs) || normalizedEvidenceRefs(value.evidenceRefs).length === 0) errors.push('verification evidenceRefs are required');
+  if (
+    !Array.isArray(value.evidenceRefs)
+    || value.evidenceRefs.some((ref) => typeof ref !== 'string')
+    || normalizedEvidenceRefs(value.evidenceRefs).length === 0
+  ) errors.push('verification evidenceRefs are required');
   if (!Number.isFinite(Date.parse(value.verifiedAt ?? ''))) errors.push('verification verifiedAt must be RFC3339-compatible');
   if (value.outcomeVerified !== true) errors.push('verification must explicitly confirm the outcome');
   if (value.selectionAuthority !== false || value.executionAuthority !== false) errors.push('verification cannot grant routing or execution authority');
@@ -310,11 +335,26 @@ export async function verifyRepositoryRepairOutcome(
   }
   blockers.push(...relayResponseErrors(input.response));
 
-  const evidenceReceipt = await getProjectEvidence({
-    repository,
-    ref: expectedHeadSha,
-    evidence_types: ['repository', 'ci', ...(input.requirePlaywright ? ['playwright' as const] : [])],
-  }, dependencies);
+  const staticBlockers = [...new Set(blockers)];
+  if (staticBlockers.length > 0) {
+    return { verified: false, receipt: null, blockers: staticBlockers, evidenceReceipt: null };
+  }
+
+  let evidenceReceipt: ProjectEvidenceReceipt;
+  try {
+    evidenceReceipt = await getProjectEvidence({
+      repository,
+      ref: expectedHeadSha,
+      evidence_types: ['repository', 'ci', ...(input.requirePlaywright ? ['playwright' as const] : [])],
+    }, dependencies);
+  } catch {
+    return {
+      verified: false,
+      receipt: null,
+      blockers: ['project evidence read failed'],
+      evidenceReceipt: null,
+    };
+  }
 
   blockers.push(...repositoryEvidenceErrors(evidenceReceipt, repository, expectedHeadSha));
 
