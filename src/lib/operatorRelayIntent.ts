@@ -3,6 +3,7 @@ import type { RelayOperatorId } from './operatorRelay.js';
 const TARGETS: ReadonlyArray<{ id: RelayOperatorId; patterns: RegExp[] }> = [
   { id: 'gemini', patterns: [/\bgemini\b/i] },
   { id: 'perplexity', patterns: [/\bperplexity\b/i] },
+  { id: 'meta-ai', patterns: [/\bmeta\s+ai\b/i] },
   { id: 'muse', patterns: [/\bmuse\b/i] },
   { id: 'claude-code', patterns: [/\bclaude(?:\s+code)?\b/i] },
   { id: 'codex', patterns: [/\b(?:chatgpt|codex)\b/i] },
@@ -21,6 +22,7 @@ function targetPattern(target: RelayOperatorId): RegExp {
     case 'claude-code': return /\bclaude(?:\s+code)?\b/i;
     case 'codex': return /\b(?:chatgpt|codex)\b/i;
     case 'perplexity': return /\bperplexity\b/i;
+    case 'meta-ai': return /\bmeta\s+ai\b/i;
     case 'muse': return /\bmuse\b/i;
   }
 }
@@ -30,8 +32,6 @@ export function parseRelayIntent(input: string, activeOperator: RelayOperatorId)
   if (!text) return null;
   if (!/^(?:tell|ask|send|relay(?:\s+this)?\s+to|have)\s+/i.test(text)) return null;
 
-  // DeepSeek is instructor/adversary only. Its conversational handoff belongs
-  // to the separate instructor interop membrane, never the peer relay parser.
   if (DEEPSEEK_INSTRUCTOR_PATTERN.test(text)) return null;
 
   const target = TARGETS.find(({ id, patterns }) =>
