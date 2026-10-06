@@ -20,17 +20,19 @@ export type CourtWitnessBridgeCode =
   | 'PROMPTOS_REJECTED'
   | 'PROMPTOS_RECEIPT_INVALID';
 
+export interface CourtWitnessBridgeSubject {
+  caseId: string;
+  repository: string;
+  branch: string;
+  headSha: string;
+}
+
 export interface CourtWitnessBridgeResult {
   ok: boolean;
   code: CourtWitnessBridgeCode;
   status: number;
   contract: typeof COURT_WITNESS_BRIDGE_CONTRACT;
-  subject: {
-    caseId: string;
-    repository: string;
-    branch: string;
-    headSha: string;
-  } | null;
+  subject: CourtWitnessBridgeSubject | null;
   kody: JsonRecord | null;
   sol: JsonRecord | null;
   promptos: JsonRecord | null;
@@ -197,7 +199,7 @@ export function courtWitnessBridgeReadiness(
   };
 }
 
-function packetSubject(packet: unknown): CourtWitnessBridgeResult['subject'] {
+function packetSubject(packet: unknown): CourtWitnessBridgeSubject {
   const input = record(packet, 'packet');
   return {
     caseId: text(input.caseId, 'packet.caseId', 160),
@@ -479,7 +481,7 @@ export async function dispatchCourtWitnessBridge(
   packet: unknown,
   options: { env?: NodeJS.ProcessEnv; fetchImpl?: FetchLike } = {},
 ): Promise<CourtWitnessBridgeResult> {
-  let subject: CourtWitnessBridgeResult['subject'];
+  let subject: CourtWitnessBridgeSubject;
   try {
     subject = packetSubject(packet);
   } catch (error) {
