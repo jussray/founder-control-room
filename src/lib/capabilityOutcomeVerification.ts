@@ -20,6 +20,7 @@ const SHA40 = /^[0-9a-f]{40}$/i;
 const REPOSITORY = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
 const BROWSER_CHECK = /playwright|browser|e2e/i;
 const RELAY_OPERATORS = new Set<string>(OPERATOR_RELAY_PEERS);
+const RUNTIME_VERIFIED_RECEIPTS = new WeakSet<object>();
 const CAPABILITY_TASK_CLASSES: ReadonlySet<string> = new Set<CapabilityTaskClass>([
   'repository-repair',
   'architecture-review',
@@ -359,6 +360,7 @@ export function matchingCapabilityOutcomeVerification(
   taskClass: CapabilityTaskClass,
   operatorId: RelayOperatorId,
 ): boolean {
+  if (!RUNTIME_VERIFIED_RECEIPTS.has(verification)) return false;
   if (validateCapabilityOutcomeVerificationReceipt(verification).length > 0) return false;
   if (relayResponseIntegrityErrors(response).length > 0 || response.status === 'accepted') return false;
   return verification.taskClass === taskClass
@@ -497,6 +499,7 @@ export async function verifyRepositoryRepairOutcome(
     ...identity,
     verificationHash: capabilityOutcomeVerificationHash(identity),
   };
+  RUNTIME_VERIFIED_RECEIPTS.add(receipt);
 
   return { verified: true, receipt, blockers: [], evidenceReceipt };
 }
