@@ -138,6 +138,7 @@ describe('repository documentation truth control', () => {
     expect(documentationVerifier).toContain('visibleOutsideHtmlComments');
     expect(documentationVerifier).toContain('meaningfulInvariant(claim, sourcePath)');
     expect(documentationVerifier).toContain('meaningful path-bound invariant');
+    expect(documentationVerifier).toContain('founder-content-outcome-contract');
   });
 
   it('keeps documentation analytics observation-only', () => {

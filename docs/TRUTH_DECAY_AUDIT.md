@@ -295,6 +295,8 @@ Do not emit:
 - chain-of-thought.
 
 **Analytics remains observation-only.** It cannot renew a Truth Lease, approve a merge, rewrite provider reality, authorize publication, or turn documentation consistency into objective truth.
+**Account/lane provenance decays independently.** A provider observation is valid only for the exact network, lane, account identity, connector account identity, and coverage state it actually observed. An out-of-scope connector response must remain `UNKNOWN`; zero is an observed metric only for the account that was actually queried. Cross-account donation cannot renew truth, authority, or analytics freshness.
+
 
 ### Analytics-authority Redteam
 
