@@ -36,7 +36,9 @@ export async function dispatchOperatorRelay(
     throw new OperatorRelayDispatchError('relay_request_invalid', requestErrors.join('; '));
   }
 
-  const adapter = adapters[request.toOperator as RelayOperatorId]
+  // Own-property lookup only: toOperator is allowlist-validated above, and this
+  // keeps inherited keys (e.g. __proto__) from ever resolving to a callable.
+  const adapter = (Object.hasOwn(adapters, request.toOperator) ? adapters[request.toOperator as RelayOperatorId] : undefined)
     ?? (request.toOperator === 'muse' ? createServerMuseRelayAdapter() : undefined);
   if (!adapter) {
     throw new OperatorRelayDispatchError(
