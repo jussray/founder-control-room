@@ -56,7 +56,7 @@ interface CouncilWitnessRouteResult {
   ok: boolean;
   code: string;
   status: number;
-  subject: CourtWitnessSubject | null;
+  subject: CouncilWitnessSubject | null;
   reasons: string[];
   kody?: Record<string, unknown> | null;
   sol?: Record<string, unknown> | null;
