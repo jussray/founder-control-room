@@ -167,7 +167,8 @@
         "`README.md` must keep the GitHub Actions and Cloudflare Worker copies of `OPENAI_API_KEY` as separate CI/runtime authority planes and state that the all-secret proof derives names from the canonical Worker registry without reading values.",
         "`README.md` must treat a successful successor StoryEngine Playwright witness as current only for the exact FCR/StoryEngine evidence pair recorded by the run and expire that proof when either repository moves.",
         "`README.md` must record that the StoryEngine peer refresh discovered during URLFix PR #914 merge review is a focused recovery transition handled by PR #896, not URLFix failure, and that pin alignment alone cannot promote the successor federation state beyond UNKNOWN.",
-        "`README.md` must record that the StoryEngine peer refresh after the agent-contract v1 rollout is a focused recovery transition, not a #913 failure, and that pin alignment alone cannot promote the successor federation state beyond UNKNOWN."
+        "`README.md` must record that the StoryEngine peer refresh after the agent-contract v1 rollout is a focused recovery transition, not a #913 failure, and that pin alignment alone cannot promote the successor federation state beyond UNKNOWN.",
+        "`README.md` must record the October 6 StoryEngine runtime-head transition as a real dependency-freshness failure on FCR main, distinguish the runtime-affecting StoryEngine delta from earlier non-runtime pin drift, and keep federation UNKNOWN until the exact successor FCR head passes the complete browser/runtime receipt loop against StoryEngine a6e6a396ed30535af2fd9b1ec2347a84e1a3fbf3."
       ]
     },
     {
@@ -206,7 +207,8 @@
         "`docs/TRUTH_DECAY_AUDIT.md` must separate observation transport failure from target-secret truth: failure before Cloudflare secret enumeration leaves provider-held runtime secret presence UNKNOWN/BLOCKED and cannot be relabeled as evidence of absence.",
         "`docs/TRUTH_DECAY_AUDIT.md` must record that FCR `c75a361cdee0a56ccd4351c48f38231429cf9e74` Playwright run `36344620958` succeeded against StoryEngine `e2473a10945b57bb7abedba6d45ea0dbacbd904a`, while explicitly refusing to convert that browser-federation proof into production or provider authority.",
         "`docs/TRUTH_DECAY_AUDIT.md` must record the October 3 URLFix merge-review peer drift as dependency freshness evidence and require PR #896's successor exact-head federation witness before any current pair claim.",
-        "`docs/TRUTH_DECAY_AUDIT.md` must record the October 3 agent-contract v1 peer drift as dependency freshness evidence and require the successor exact-head federation witness before any current pair claim."
+        "`docs/TRUTH_DECAY_AUDIT.md` must record the October 3 agent-contract v1 peer drift as dependency freshness evidence and require the successor exact-head federation witness before any current pair claim.",
+        "`docs/TRUTH_DECAY_AUDIT.md` must record FCR Playwright run 37406265514 failing only at the StoryEngine live-ref freshness gate after its local browser harness passed, bind the successor evidence subject to StoryEngine a6e6a396ed30535af2fd9b1ec2347a84e1a3fbf3, and require complete successor-specific federation proof before any current-pair claim."
       ]
     },
     {
