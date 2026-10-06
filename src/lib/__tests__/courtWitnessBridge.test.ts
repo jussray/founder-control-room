@@ -185,7 +185,7 @@ const CONFIG = {
   SOLCONTINUITY_COURT_URL: 'https://sol.example/api/court/continuity',
   SOLCONTINUITY_COURT_BRIDGE_TOKEN: 'sol-token',
   PROMPTOS_COURT_URL: 'https://promptos.example/court/compile',
-  PROMPTOS_AI_OPERATOR_KEY: 'promptos-token',
+  PROMPTOS_COURT_BRIDGE_KEY: 'promptos-token',
 } as NodeJS.ProcessEnv;
 
 describe('Court witness bridge', () => {
