@@ -139,7 +139,7 @@ export function readCourtWitnessBridgeConfig(env: NodeJS.ProcessEnv = process.en
     solUrl: safeHttpsUrl(env.SOLCONTINUITY_COURT_URL, 'SOLCONTINUITY_COURT_URL'),
     solToken: env.SOLCONTINUITY_COURT_BRIDGE_TOKEN?.trim() || null,
     promptosUrl: safeHttpsUrl(env.PROMPTOS_COURT_URL, 'PROMPTOS_COURT_URL'),
-    promptosToken: env.PROMPTOS_AI_OPERATOR_KEY?.trim() || null,
+    promptosToken: env.PROMPTOS_COURT_BRIDGE_KEY?.trim() || null,
   };
 }
 
@@ -450,7 +450,7 @@ export async function dispatchCourtWitnessBridge(
     !config.solUrl && 'SOLCONTINUITY_COURT_URL',
     !config.solToken && 'SOLCONTINUITY_COURT_BRIDGE_TOKEN',
     !config.promptosUrl && 'PROMPTOS_COURT_URL',
-    !config.promptosToken && 'PROMPTOS_AI_OPERATOR_KEY',
+    !config.promptosToken && 'PROMPTOS_COURT_BRIDGE_KEY',
   ].filter(Boolean) as string[];
   if (missing.length) {
     return failure('BRIDGE_NOT_CONFIGURED', 503, subject, [
