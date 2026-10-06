@@ -23,18 +23,17 @@ jobs:
       - name: Check out verification commit
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          fetch-depth: 2
+          fetch-depth: 3
           persist-credentials: false
 
       - name: Prove verification branch differs only by this workflow
         shell: bash
         run: |
           set -euo pipefail
-          actual_parent="$(git rev-parse HEAD^)"
-          printf 'expected_source=%s\nactual_parent=%s\nverification_head=%s\n'             "$EXPECTED_SOURCE_SHA" "$actual_parent" "$(git rev-parse HEAD)"
-          test "$actual_parent" = "$EXPECTED_SOURCE_SHA"
-          changed="$(git diff --name-only "$EXPECTED_SOURCE_SHA" HEAD)"
-          printf 'changed_files=%s\n' "$changed"
+          verification_head="$(git rev-parse HEAD)"
+          git merge-base --is-ancestor "$EXPECTED_SOURCE_SHA" "$verification_head"
+          changed="$(git diff --name-only "$EXPECTED_SOURCE_SHA" "$verification_head")"
+          printf 'expected_source=%s\nverification_head=%s\nchanged_files=%s\n' "$EXPECTED_SOURCE_SHA" "$verification_head" "$changed"
           test "$changed" = ".github/workflows/court-witness-preview-proof.yml"
 
       - name: Set up Node
@@ -42,11 +41,18 @@ jobs:
         with:
           node-version: '24'
 
-      - name: Install Playwright
-        run: npm install --no-save --package-lock=false --no-audit --no-fund playwright@1.61.1
+      - name: Install locked repository dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
 
-      - name: Install Chromium
-        run: npx playwright install --with-deps chromium
+      - name: Verify locked Playwright version
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(node -p "require('./node_modules/playwright/package.json').version")" = "1.61.1"
+          test "$(node -p "require('./node_modules/playwright-core/package.json').version")" = "1.61.1"
+
+      - name: Install matching Chromium
+        run: node ./node_modules/playwright/cli.js install --with-deps chromium
 
       - name: Prove immutable FCR preview in Playwright
         shell: bash
