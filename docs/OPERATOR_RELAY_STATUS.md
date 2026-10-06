@@ -4,12 +4,12 @@ Current classification: PARTIAL
 
 Verified in authoritative FCR source:
 
-- canonical peer registry for `gemini`, `codex`, `claude-code`, `perplexity`, `deepseek`, and `muse`;
-- explicit separation of peer `deepseek` from non-peer `deepseek-instructor`;
+- canonical peer registry for `gemini`, `codex`, `claude-code`, `perplexity`, and `muse`;
+- explicit exclusion of plain `deepseek` and `deepseek-instructor` from the peer lane; DeepSeek remains instructor-only through the separate interop contract;
 - zero-authority relay envelope for research, propose, review, and bounded implementation work;
 - source-context fingerprinting and exact request/response hash binding;
 - fail-closed dispatch when the requested operator is unavailable;
-- source-wired Gemini, OpenAI/Codex, Anthropic/Claude, Perplexity, DeepSeek, and Muse provider adapters, each gated by its required server-side credential/model configuration;
+- source-wired Gemini, OpenAI/Codex, Anthropic/Claude, Perplexity, and Muse provider adapters, each gated by its required server-side credential/model configuration;
 - canonical `/mcp` OAuth route mounted through the FCR MCP router with server-owned project scope, OAuth client mapping, founder allowlist checks, and redacted evidence receipts;
 - static-token compatibility clients cannot use peer relay;
 - provider responses cannot grant mutation, merge, deploy, publish, or provider-mutation authority;

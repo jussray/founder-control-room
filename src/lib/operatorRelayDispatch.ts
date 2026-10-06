@@ -9,7 +9,6 @@ export interface OperatorRelayAdapters {
   codex?: OperatorRelayAdapter;
   'claude-code'?: OperatorRelayAdapter;
   perplexity?: OperatorRelayAdapter;
-  deepseek?: OperatorRelayAdapter;
   muse?: OperatorRelayAdapter;
 }
 

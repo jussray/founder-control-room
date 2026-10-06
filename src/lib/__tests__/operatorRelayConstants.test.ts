@@ -10,8 +10,8 @@ const relayFacingDocs = [
 ];
 
 describe('operator relay lanes', () => {
-  it('keeps the six governed peer operators in one canonical lane', () => {
-    expect(OPERATOR_RELAY_PEERS).toEqual(['gemini', 'codex', 'claude-code', 'perplexity', 'deepseek', 'muse']);
+  it('keeps the five governed peer operators in one canonical lane', () => {
+    expect(OPERATOR_RELAY_PEERS).toEqual(['gemini', 'codex', 'claude-code', 'perplexity', 'muse']);
   });
 
   it('keeps every canonical peer enabled for bounded relay work', () => {
@@ -19,17 +19,19 @@ describe('operator relay lanes', () => {
       const policy = agentOperatorPolicy(peer);
       expect(policy?.enabled).toBe(true);
       expect(policy?.capabilities).toEqual(expect.arrayContaining([
-        'research',
-        'propose',
-        'review',
-        'implement',
+        'research', 'propose', 'review', 'implement',
       ]));
     }
   });
 
-  it('keeps the DeepSeek instructor identity outside the peer operator lane', () => {
+  it('keeps DeepSeek exclusively in the instructor lane', () => {
+    expect(OPERATOR_RELAY_PEERS).not.toContain('deepseek' as never);
     expect(OPERATOR_RELAY_PEERS).not.toContain(OPERATOR_RELAY_INSTRUCTOR as never);
-    expect(OPERATOR_RELAY_PEERS).toContain('deepseek');
+    expect(agentOperatorPolicy('deepseek')).toBeNull();
+    const instructor = agentOperatorPolicy(OPERATOR_RELAY_INSTRUCTOR);
+    expect(instructor?.enabled).toBe(true);
+    expect(instructor?.capabilities).toContain('instruct');
+    expect(instructor?.capabilities).not.toContain('implement');
   });
 
   it('keeps relay-facing governance docs aligned with the canonical peer registry', () => {
@@ -38,6 +40,7 @@ describe('operator relay lanes', () => {
       for (const peer of OPERATOR_RELAY_PEERS) {
         expect(contents, `${docUrl.pathname} is missing canonical peer ${peer}`).toContain(`\`${peer}\``);
       }
+      expect(contents).toMatch(/deepseek-instructor|DeepSeek.*Instructor/i);
     }
   });
 });

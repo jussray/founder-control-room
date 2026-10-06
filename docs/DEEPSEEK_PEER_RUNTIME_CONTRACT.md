@@ -1,82 +1,43 @@
 # DeepSeek Peer Runtime Contract
 
-Status: source-wired, runtime proof required
+**Status:** SUPERSEDED / DISABLED  
+**Historical purpose:** records the retired experiment that exposed DeepSeek as a peer relay target.
 
-## Purpose
+## Current authority law
 
-This contract binds the normal `deepseek` peer relay lane to its server-side provider configuration without changing the separate `deepseek-instructor` adversary/instructor role.
+DeepSeek is not a peer operator in Founder Control Room.
 
-The peer lane is governed by `docs/OPERATOR_RELAY_CONTRACT.md` and carries zero mutation authority.
+- `deepseek` is not a member of `OPERATOR_RELAY_PEERS`.
+- `fcr_relay_operator` must reject both `deepseek` and `deepseek-instructor` as peer targets.
+- `deepseek-instructor` is the sole active DeepSeek operator identity and is governed by `docs/DEEPSEEK_INSTRUCTOR_CONTRACT.md` plus `src/lib/agentInterop.ts`.
+- `deepseek-platform` may remain a provider identity, but provider availability never creates peer, implementation, mutation, merge, deploy, publish, spend, or founder authority.
+- Server-side DeepSeek credentials or model selectors must not cause a peer relay adapter to be advertised.
 
-## Runtime identity
+This file is retained for lineage instead of deleted. It does not authorize or describe a live peer path.
 
-Peer operator id:
+## Current handoff path
 
-- `deepseek`
-
-Separate non-peer role:
-
-- `deepseek-instructor`
-
-They are different identities. FCR must never silently substitute one for the other.
-
-## Provider configuration
-
-Server-side environment names:
-
-- `DEEPSEEK_API_KEY` — provider credential. Secret. Never browser-exposed, logged, copied into receipts, or committed.
-- `FCR_RELAY_DEEPSEEK_MODEL` — explicit model selector.
-
-Accepted model ids:
-
-- `deepseek-flash`
-- `deepseek-v4-pro`
-
-Any other model id fails closed and the `deepseek` adapter is not advertised.
-
-Provider endpoint:
-
-- `POST https://api.deepseek.com/responses`
-
-The runtime uses a bounded response size, bounded timeout, authenticated bearer transport, and the same relay prompt/authority ceiling as the other peer adapters.
-
-## Authority ceiling
-
-Provider availability never grants repository, merge, deploy, publish, billing, secret-management, or provider-mutation authority.
-
-Every relay packet remains bounded by:
-
-```json
-{
-  "externalWrite": false,
-  "merge": false,
-  "deploy": false,
-  "publish": false,
-  "providerMutation": false
-}
+```text
+verified project state
+-> ProjectStatePacket
+-> deepseek-instructor
+-> InstructionPacket
+-> FCR policy / founder authority
+-> separately authorized builder, if any
+-> independent proof
 ```
 
-## Evidence requirements
+A plain conversational request addressed to DeepSeek must route through the instructor membrane or return a precise blocked state. It must never be silently converted into peer relay.
 
-A DeepSeek relay is `VERIFIED` only when all of the following bind to the same exact FCR source head:
+## Verification
 
-1. `OPERATOR_RELAY_PEERS` contains `deepseek` while excluding `deepseek-instructor`.
-2. MCP tool schema derives its target allowlist from the canonical peer registry.
-3. `createServerOperatorRelayAdapters` exposes `deepseek` only when both `DEEPSEEK_API_KEY` and an allowed `FCR_RELAY_DEEPSEEK_MODEL` are present.
-4. Unit tests prove current-model allowlisting, endpoint/auth shape, response provenance, semantic-review spend blocking, and fail-closed provider failure handling.
-5. `/ _debug/provider` equivalent provider witness reports only boolean key presence and never a secret value. (The actual route is `/_debug/provider`.)
-6. Playwright proves a founder-issued `deepseek` relay reaches the requested provider and the validated response returns with `provider:deepseek:<response-id>` evidence.
-7. Runtime/provider evidence proves the actual provider that answered was DeepSeek.
+The instructor-only boundary is proven only when the exact candidate demonstrates:
 
-Until steps 6 and 7 pass against the deployed exact head, DeepSeek peer status remains `PARTIAL` even if source tests are green.
+1. `OPERATOR_RELAY_PEERS` excludes `deepseek` and `deepseek-instructor`;
+2. the peer intent parser does not return a DeepSeek target;
+3. peer adapter construction does not expose a `deepseek` adapter even when DeepSeek provider environment variables exist;
+4. MCP peer schema derives from the canonical peer registry;
+5. the agent registry gives `deepseek` no operator policy and keeps `deepseek-instructor` non-implementing;
+6. focused tests and Playwright contract proof are green on the same exact head.
 
-## Rollback
-
-Rollback is additive and local to the peer lane:
-
-1. remove `deepseek` from `OPERATOR_RELAY_PEERS`;
-2. remove the server-side DeepSeek adapter and provider witness fields;
-3. leave `deepseek-instructor` and its existing interop contract unchanged;
-4. rerun exact-head unit/type/lint/Playwright proof.
-
-Never roll back by weakening relay validation or by silently routing DeepSeek requests to another provider.
+No historical DeepSeek peer receipt survives this supersession as current authority or runtime proof.

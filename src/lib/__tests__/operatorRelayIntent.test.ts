@@ -23,11 +23,9 @@ describe('parseRelayIntent', () => {
     });
   });
 
-  it('routes normal DeepSeek as a peer relay target', () => {
-    expect(parseRelayIntent('Ask DeepSeek to review this implementation.', 'codex')).toEqual({
-      target: 'deepseek',
-      instruction: 'review this implementation.',
-    });
+  it('keeps DeepSeek out of the peer relay parser', () => {
+    expect(parseRelayIntent('Ask DeepSeek to review this implementation.', 'codex')).toBeNull();
+    expect(parseRelayIntent('Ask DeepSeek Instructor to review this implementation.', 'codex')).toBeNull();
   });
 
   it('routes Muse as a governed peer relay target', () => {
@@ -35,9 +33,5 @@ describe('parseRelayIntent', () => {
       target: 'muse',
       instruction: 'challenge this implementation.',
     });
-  });
-
-  it('does not treat the DeepSeek Instructor identity as a peer relay target', () => {
-    expect(parseRelayIntent('Ask DeepSeek Instructor to review this implementation.', 'codex')).toBeNull();
   });
 });
