@@ -29,10 +29,10 @@ function fingerprint(value: unknown): string {
   return createHash('sha256').update(stable(value)).digest('hex');
 }
 
-function withFingerprint<T extends JsonRecord>(value: T, key: string): T {
-  const core = { ...value };
+function withFingerprint<T extends JsonRecord>(value: T, key: string): T & JsonRecord {
+  const core: JsonRecord = { ...value };
   delete core[key];
-  return { ...core, [key]: fingerprint(core) } as T;
+  return { ...core, [key]: fingerprint(core) } as T & JsonRecord;
 }
 
 function packet() {
@@ -311,8 +311,8 @@ describe('Court witness bridge', () => {
 
   it('rejects Kody lease tampering before downstream calls', async () => {
     const kody = kodyResponse();
-    const receiptCore = { ...kody.receipt, expiresAt: '2026-10-06T09:00:00Z' };
-    delete receiptCore.receiptFingerprint;
+    const { receiptFingerprint: _oldFingerprint, ...receiptWithoutFingerprint } = kody.receipt;
+    const receiptCore = { ...receiptWithoutFingerprint, expiresAt: '2026-10-06T09:00:00Z' };
     kody.receipt = withFingerprint(receiptCore, 'receiptFingerprint');
     kody.handoffs.sourceReceiptFingerprint = kody.receipt.receiptFingerprint;
 
