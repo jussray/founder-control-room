@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import express from 'express';
 import request from 'supertest';
 import { describe, expect, it, vi } from 'vitest';
@@ -16,6 +17,17 @@ vi.mock('../../middleware/security.js', () => ({
 }));
 
 import { createPromptOSCommandIntakeRouter } from '../promptOsCommandIntake.js';
+
+function canonicalize(value: unknown): unknown {
+  if (value === null || typeof value === 'string' || typeof value === 'boolean' || typeof value === 'number') return value;
+  if (Array.isArray(value)) return value.map(canonicalize);
+  const raw = value as Record<string, unknown>;
+  return Object.fromEntries(Object.keys(raw).sort().map((key) => [key, canonicalize(raw[key])]));
+}
+
+function hash(value: unknown): string {
+  return createHash('sha256').update(JSON.stringify(canonicalize(value))).digest('hex');
+}
 
 const sourceIntent = {
   schema: 'promptos/public-command-intent@v1',
@@ -47,25 +59,27 @@ function chiefBinding() {
       promptOSCommandIntentContract: 'promptos/public-command-intent@v1',
       promptOSCommandHandoffContract: 'juss/promptos-chief-fcr-command-handoff@v1',
       releaseSha: 'a'.repeat(40),
-      result: {
-        contract: 'juss/promptos-chief-fcr-command-handoff@v1',
-        sourceIntentContract: 'promptos/public-command-intent@v1',
-        sourceIntentFingerprint: '3d9e01299f2e1653464034b50a806e013fd38960ad0785f7801f72bd19513687',
-        sourceIntent,
-        acceptedBy: 'chief-ai-machine',
-        status: 'accepted-for-capability-planning',
-        project: 'founder-control-room',
-        projectSource: 'promptos-hint',
-        capabilityId: 'repair',
-        specialistProduct: 'founder-control-room',
-        requestedOutcome: 'checkout',
-        authorityPlane: 'founder-control-room',
-        authorityResolution: 'unresolved',
-        actionAuthority: false,
-        executionAuthorized: false,
-        nextRequiredContract: 'juss-v10/capability-plan@v1',
-        handoffFingerprint: 'fd43c94b87930ea17c3ec85419c637218294be55c9c7d7d269796093b779b939',
-      },
+      result: (() => {
+        const payload = {
+          contract: 'juss/promptos-chief-fcr-command-handoff@v1',
+          sourceIntentContract: 'promptos/public-command-intent@v1',
+          sourceIntentFingerprint: hash(sourceIntent),
+          sourceIntent,
+          acceptedBy: 'chief-ai-machine',
+          status: 'accepted-for-capability-planning',
+          project: 'founder-control-room',
+          projectSource: 'promptos-hint',
+          capabilityId: 'repair',
+          specialistProduct: 'founder-control-room',
+          requestedOutcome: 'checkout',
+          authorityPlane: 'founder-control-room',
+          authorityResolution: 'unresolved',
+          actionAuthority: false,
+          executionAuthorized: false,
+          nextRequiredContract: 'juss-v10/capability-plan@v1',
+        };
+        return { ...payload, handoffFingerprint: hash(payload) };
+      })(),
     }),
   };
 }
