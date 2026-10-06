@@ -213,6 +213,23 @@ describe('repository repair outcome verifier', () => {
     expect(result.blockers).toContain('required exact-head check is not passed: CI=failed');
   });
 
+  it('refuses required checks that omit trusted producer identity', async () => {
+    const request = relayRequest();
+    const result = await verifyRepositoryRepairOutcome({
+      request,
+      response: relayResponse(request),
+      repository: REPOSITORY,
+      expectedHeadSha: HEAD,
+      requiredChecks: [{ name: 'CI' }],
+    }, {
+      providerFactory: () => fakeProvider([signal('CI')]),
+    });
+
+    expect(result.verified).toBe(false);
+    expect(result.evidenceReceipt).toBeNull();
+    expect(result.blockers).toContain('required check producer identity is required: CI');
+  });
+
   it('requires the configured provider-backed producer identity', async () => {
     const request = relayRequest();
     const result = await verifyRepositoryRepairOutcome({
