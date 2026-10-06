@@ -9,6 +9,7 @@ import { projectsRouter } from './routes/projects.js';
 import { projectShellStateRouter } from './routes/projectShellState.js';
 import { buildEventsRouter } from './routes/buildEvents.js';
 import { handleBuildEventReceiptIngest } from './routes/buildEventReceipts.js';
+import { handleActionCostReceiptIngest } from './routes/actionCostReceipts.js';
 import { reasoningRunsRouter } from './routes/reasoningRuns.js';
 import { approvalsRouter } from './routes/approvals.js';
 import { l99Router } from './routes/l99.js';
@@ -194,6 +195,12 @@ export function createServer(options: CreateServerOptions = {}) {
     rateLimitGeneral,
     express.json({ type: 'application/json', limit: '32kb' }),
     handleBuildEventReceiptIngest,
+  );
+  app.post(
+    '/ingest/action-cost-receipts/:slug',
+    rateLimitGeneral,
+    express.json({ type: 'application/json', limit: '32kb' }),
+    handleActionCostReceiptIngest,
   );
   app.post(
     '/ingest/hair-commerce-receipts',
