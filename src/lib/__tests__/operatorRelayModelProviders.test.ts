@@ -344,6 +344,8 @@ describe('createServerOperatorRelayAdapters', () => {
           type: 'advisor_20260301',
           name: 'advisor',
           model: 'claude-fable-5',
+          max_uses: 2,
+          max_tokens: 2048,
           caching: { type: 'ephemeral', ttl: '1h' },
         }),
       ]);
@@ -368,6 +370,7 @@ describe('createServerOperatorRelayAdapters', () => {
       ANTHROPIC_API_KEY: FIXTURE,
       FCR_RELAY_ANTHROPIC_MODEL: 'claude-sonnet-5-5',
       FCR_RELAY_ANTHROPIC_ADVISOR_ENABLED: 'true',
+      FCR_RELAY_ANTHROPIC_ADVISOR_CACHE_ENABLED: 'true',
       FCR_RELAY_ANTHROPIC_ADVISOR_MODEL: 'claude-fable-5',
       FCR_RELAY_ANTHROPIC_CACHE_TTL: '1h',
     }, fetchMock);
@@ -375,6 +378,35 @@ describe('createServerOperatorRelayAdapters', () => {
     const response = await adapters['claude-code']?.(relay('internal', 'claude-code', 'implement'));
     expect(response?.answer).toBe('Implemented result');
     expect(response?.evidenceRefs).toEqual(['provider:anthropic:msg_advisor_cache_1']);
+  });
+
+  it('keeps advisor-side caching off unless long-loop caching is explicitly enabled', async () => {
+    const fetchMock = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
+      const payload = JSON.parse(String(init?.body ?? '{}'));
+      expect(payload.tools).toEqual([
+        expect.objectContaining({
+          type: 'advisor_20260301',
+          name: 'advisor',
+          max_uses: 2,
+          max_tokens: 2048,
+        }),
+      ]);
+      expect(payload.tools[0].caching).toBeUndefined();
+      return new Response(JSON.stringify({
+        id: 'msg_advisor_uncached_1',
+        type: 'message',
+        role: 'assistant',
+        content: [{ type: 'text', text: 'Implemented result' }],
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    }) as typeof fetch;
+
+    const adapters = createServerOperatorRelayAdapters({
+      ANTHROPIC_API_KEY: FIXTURE,
+      FCR_RELAY_ANTHROPIC_MODEL: 'claude-sonnet-5-5',
+      FCR_RELAY_ANTHROPIC_ADVISOR_ENABLED: 'true',
+    }, fetchMock);
+
+    await adapters['claude-code']?.(relay('internal', 'claude-code', 'implement'));
   });
 
   it('does not attach Anthropic advisor when runtime opt-in is absent', async () => {
