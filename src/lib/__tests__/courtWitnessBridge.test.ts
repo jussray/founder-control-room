@@ -310,11 +310,10 @@ describe('Court witness bridge', () => {
   });
 
   it('rejects Kody lease tampering before downstream calls', async () => {
-    const kody = kodyResponse();
-    const { receiptFingerprint: _oldFingerprint, ...receiptWithoutFingerprint } = kody.receipt;
-    const receiptCore = { ...receiptWithoutFingerprint, expiresAt: '2026-10-06T09:00:00Z' };
-    kody.receipt = withFingerprint(receiptCore, 'receiptFingerprint');
-    kody.handoffs.sourceReceiptFingerprint = kody.receipt.receiptFingerprint;
+    const kody = kodyResponse({
+      ...packet(),
+      expiresAt: '2026-10-06T09:00:00Z',
+    });
 
     const fetchImpl = vi.fn(async () => (
       new Response(JSON.stringify(kody), { status: 200, headers: { 'content-type': 'application/json' } })
