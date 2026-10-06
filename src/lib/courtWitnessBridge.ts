@@ -143,6 +143,60 @@ export function readCourtWitnessBridgeConfig(env: NodeJS.ProcessEnv = process.en
   };
 }
 
+export interface CourtWitnessBridgeReadiness {
+  enabled: boolean;
+  ready: boolean;
+  missingBindings: string[];
+  reasons: string[];
+}
+
+export function courtWitnessBridgeReadiness(
+  env: NodeJS.ProcessEnv = process.env,
+): CourtWitnessBridgeReadiness {
+  const enabled = env.FCR_COURT_WITNESS_BRIDGE_ENABLED?.trim() === '1';
+  if (!enabled) {
+    return {
+      enabled: false,
+      ready: false,
+      missingBindings: [],
+      reasons: ['FCR Court witness bridge is disabled'],
+    };
+  }
+
+  let config: BridgeConfig;
+  try {
+    config = readCourtWitnessBridgeConfig(env);
+  } catch (error) {
+    return {
+      enabled: true,
+      ready: false,
+      missingBindings: [],
+      reasons: [
+        error instanceof Error
+          ? error.message
+          : 'Court witness bridge configuration is invalid',
+      ],
+    };
+  }
+
+  const missingBindings = [
+    !config.kodyUrl && 'FCR_KODY_COURT_WITNESS_URL',
+    !config.solUrl && 'SOLCONTINUITY_COURT_URL',
+    !config.solToken && 'SOLCONTINUITY_COURT_BRIDGE_TOKEN',
+    !config.promptosUrl && 'PROMPTOS_COURT_URL',
+    !config.promptosToken && 'PROMPTOS_COURT_BRIDGE_KEY',
+  ].filter(Boolean) as string[];
+
+  return {
+    enabled: true,
+    ready: missingBindings.length === 0,
+    missingBindings,
+    reasons: missingBindings.length === 0
+      ? []
+      : [`Court witness bridge requires: ${missingBindings.join(', ')}`],
+  };
+}
+
 function packetSubject(packet: unknown): CourtWitnessBridgeResult['subject'] {
   const input = record(packet, 'packet');
   return {
