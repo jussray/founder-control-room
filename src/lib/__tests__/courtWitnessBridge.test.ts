@@ -118,25 +118,28 @@ function kodyResponse(input = packet()) {
 }
 
 function solResponse(kody: ReturnType<typeof kodyResponse>) {
+  const identity = {
+    version: 1,
+    kind: 'sol/court-continuity@v1',
+    source_handoff_fingerprint: kody.handoffs.sol.handoffFingerprint,
+    witness_receipt_fingerprint: kody.handoffs.sol.witnessReceiptFingerprint,
+    repository: kody.handoffs.sol.repository,
+    branch: kody.handoffs.sol.branch,
+    head_sha: kody.handoffs.sol.headSha,
+    observed_at: kody.handoffs.sol.observedAt,
+    expires_at: kody.handoffs.sol.expiresAt,
+    lease_state: 'FRESH',
+    continuity_state: 'FRESH',
+    stale_witness_ids: [],
+    duplicate_chain_count: 0,
+    unique_evidence_chain_count: 0,
+    drift_reasons: [],
+  };
   return {
     service: 'solcontinuity-api',
     marker: {
-      version: 1,
-      kind: 'sol/court-continuity@v1',
-      source_handoff_fingerprint: kody.handoffs.sol.handoffFingerprint,
-      witness_receipt_fingerprint: kody.handoffs.sol.witnessReceiptFingerprint,
-      repository: kody.handoffs.sol.repository,
-      branch: kody.handoffs.sol.branch,
-      head_sha: kody.handoffs.sol.headSha,
-      observed_at: kody.handoffs.sol.observedAt,
-      expires_at: kody.handoffs.sol.expiresAt,
-      lease_state: 'FRESH',
-      continuity_state: 'FRESH',
-      stale_witness_ids: [],
-      duplicate_chain_count: 0,
-      unique_evidence_chain_count: 0,
-      drift_reasons: [],
-      continuity_fingerprint: 'c'.repeat(64),
+      ...identity,
+      continuity_fingerprint: fingerprint(identity),
       authority: AUTHORITY,
     },
     authority: 'none',
@@ -144,30 +147,33 @@ function solResponse(kody: ReturnType<typeof kodyResponse>) {
 }
 
 function promptosResponse(kody: ReturnType<typeof kodyResponse>) {
+  const workflowCore = {
+    version: 1,
+    schema: 'juss/promptos-court-workflow@v1',
+    caseId: kody.handoffs.promptos.caseId,
+    sourceHandoffFingerprint: kody.handoffs.promptos.handoffFingerprint,
+    witnessReceiptFingerprint: kody.handoffs.promptos.witnessReceiptFingerprint,
+    subject: {
+      repository: kody.handoffs.promptos.repository,
+      branch: kody.handoffs.promptos.branch,
+      headSha: kody.handoffs.promptos.headSha,
+    },
+    observedAt: kody.handoffs.promptos.observedAt,
+    expiresAt: kody.handoffs.promptos.expiresAt,
+    state: 'COMPILED',
+    founderGoal: kody.handoffs.promptos.founderGoal,
+    stopCondition: kody.handoffs.promptos.stopCondition,
+    sourceTask: kody.handoffs.promptos.task,
+    constraints: kody.handoffs.promptos.constraints,
+    steps: [{ id: 'return-court', action: 'return_to_court', purpose: 'return', mayMutate: false }],
+    authority: AUTHORITY,
+  };
   return {
     service: 'promptos',
     release_sha: 'd'.repeat(40),
     result: {
-      version: 1,
-      schema: 'juss/promptos-court-workflow@v1',
-      caseId: kody.handoffs.promptos.caseId,
-      sourceHandoffFingerprint: kody.handoffs.promptos.handoffFingerprint,
-      witnessReceiptFingerprint: kody.handoffs.promptos.witnessReceiptFingerprint,
-      subject: {
-        repository: kody.handoffs.promptos.repository,
-        branch: kody.handoffs.promptos.branch,
-        headSha: kody.handoffs.promptos.headSha,
-      },
-      observedAt: kody.handoffs.promptos.observedAt,
-      expiresAt: kody.handoffs.promptos.expiresAt,
-      state: 'COMPILED',
-      founderGoal: kody.handoffs.promptos.founderGoal,
-      stopCondition: kody.handoffs.promptos.stopCondition,
-      sourceTask: kody.handoffs.promptos.task,
-      constraints: kody.handoffs.promptos.constraints,
-      steps: [{ id: 'return-court', action: 'return_to_court', purpose: 'return', mayMutate: false }],
-      authority: AUTHORITY,
-      workflowFingerprint: 'e'.repeat(64),
+      ...workflowCore,
+      workflowFingerprint: fingerprint(workflowCore),
     },
     authority: 'none',
   };
@@ -302,4 +308,41 @@ describe('Court witness bridge', () => {
     expect(result.code).toBe('PROMPTOS_RECEIPT_INVALID');
     expect(fetchImpl).toHaveBeenCalledTimes(3);
   });
+
+  it('rejects Kody lease tampering before downstream calls', async () => {
+    const kody = kodyResponse();
+    const receiptCore = { ...kody.receipt, expiresAt: '2026-10-06T09:00:00Z' };
+    delete receiptCore.receiptFingerprint;
+    kody.receipt = withFingerprint(receiptCore, 'receiptFingerprint');
+    kody.handoffs.sourceReceiptFingerprint = kody.receipt.receiptFingerprint;
+
+    const fetchImpl = vi.fn(async () => (
+      new Response(JSON.stringify(kody), { status: 200, headers: { 'content-type': 'application/json' } })
+    ));
+
+    const result = await dispatchCourtWitnessBridge(packet(), {
+      env: CONFIG,
+      fetchImpl: fetchImpl as typeof fetch,
+    });
+
+    expect(result.code).toBe('KODY_RECEIPT_INVALID');
+    expect(result.reasons.join(' ')).toMatch(/expiresAt does not match request/);
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it('preserves an opaque upstream HTTP rejection instead of calling it unreachable', async () => {
+    const fetchImpl = vi.fn(async () => (
+      new Response('denied', { status: 403, headers: { 'content-type': 'text/plain' } })
+    ));
+
+    const result = await dispatchCourtWitnessBridge(packet(), {
+      env: CONFIG,
+      fetchImpl: fetchImpl as typeof fetch,
+    });
+
+    expect(result.code).toBe('KODY_REJECTED');
+    expect(result.reasons).toContain('Kody rejected Court witness with HTTP 403');
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
 });
