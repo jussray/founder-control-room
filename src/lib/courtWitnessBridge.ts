@@ -229,11 +229,16 @@ function verifyKodyResponse(packet: unknown, value: unknown): {
   if (receipt.schema !== 'juss/court-council-witness@v1') throw new Error('Kody receipt schema mismatch');
   const receiptFingerprint = verifyBoundFingerprint(receipt, 'receiptFingerprint', 'Kody.receipt');
 
+  const packetRecord = record(packet, 'packet');
   for (const [field, expected] of Object.entries({
     caseId: subject.caseId,
     repository: subject.repository,
     branch: subject.branch,
     headSha: subject.headSha,
+    observedAt: text(packetRecord.observedAt, 'packet.observedAt', 80),
+    expiresAt: text(packetRecord.expiresAt, 'packet.expiresAt', 80),
+    founderGoal: text(packetRecord.founderGoal, 'packet.founderGoal', 4_000),
+    stopCondition: text(packetRecord.stopCondition, 'packet.stopCondition', 2_000),
   })) {
     if (receipt[field] !== expected) throw new Error(`Kody receipt ${field} does not match request`);
   }
@@ -295,7 +300,27 @@ function verifySolResponse(subject: NonNullable<CourtWitnessBridgeResult['subjec
   ) {
     throw new Error('Sol continuity marker is bound to a different evidence subject');
   }
-  hash(marker.continuity_fingerprint, 'Sol.marker.continuity_fingerprint');
+  const continuityFingerprint = hash(marker.continuity_fingerprint, 'Sol.marker.continuity_fingerprint');
+  const solIdentity = {
+    version: marker.version,
+    kind: marker.kind,
+    source_handoff_fingerprint: marker.source_handoff_fingerprint,
+    witness_receipt_fingerprint: marker.witness_receipt_fingerprint,
+    repository: marker.repository,
+    branch: marker.branch,
+    head_sha: marker.head_sha,
+    observed_at: marker.observed_at,
+    expires_at: marker.expires_at,
+    lease_state: marker.lease_state,
+    continuity_state: marker.continuity_state,
+    stale_witness_ids: marker.stale_witness_ids,
+    duplicate_chain_count: marker.duplicate_chain_count,
+    unique_evidence_chain_count: marker.unique_evidence_chain_count,
+    drift_reasons: marker.drift_reasons,
+  };
+  if (stableHash(solIdentity) !== continuityFingerprint) {
+    throw new Error('Sol continuity marker fingerprint mismatch');
+  }
   exactAuthority(marker.authority, 'Sol.marker.authority');
   return response;
 }
@@ -323,7 +348,12 @@ function verifyPromptOsResponse(
   ) {
     throw new Error('PromptOS workflow is bound to a different evidence subject');
   }
-  hash(result.workflowFingerprint, 'PromptOS.result.workflowFingerprint');
+  const workflowFingerprint = hash(result.workflowFingerprint, 'PromptOS.result.workflowFingerprint');
+  const workflowCore = { ...result };
+  delete workflowCore.workflowFingerprint;
+  if (stableHash(workflowCore) !== workflowFingerprint) {
+    throw new Error('PromptOS workflow fingerprint mismatch');
+  }
   exactAuthority(result.authority, 'PromptOS.result.authority');
   if (!['COMPILED', 'BLOCKED_STALE_HANDOFF'].includes(String(result.state))) {
     throw new Error('PromptOS workflow state is unsupported');
@@ -347,6 +377,16 @@ async function postJson(
     redirect: 'error',
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   });
+  if (!response.ok) {
+    let errorBody: JsonRecord = {};
+    try {
+      errorBody = await readJsonBounded(response, label);
+    } catch {
+      // Preserve the authoritative HTTP rejection even when the provider body
+      // is empty, non-JSON, or intentionally opaque.
+    }
+    return { response, body: errorBody };
+  }
   return { response, body: await readJsonBounded(response, label) };
 }
 
