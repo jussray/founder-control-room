@@ -94,8 +94,6 @@ N8N_FOUNDER_CONTENT_EXPECTED_RUNTIME_VERSION = "2.32.6"
 # deployment preserves them rather than copying their values through Actions.
 # The deploy preflight reads this required-name registry and fails closed before
 # mutation when any provider-held binding is missing. Values are never read.
-# TINYFISH_API_KEY activates the bounded read-only TinyFish observation lane;
-# the canonical deploy reads only its binding name and never the secret value.
 [secrets]
 required = [
   "SUPABASE_SERVICE_ROLE_KEY",
@@ -107,7 +105,6 @@ required = [
   "FCR_REMOTE_MCP_READ_TOKEN",
   "FCR_SHOPIFY_WEBHOOK_SECRET",
   "FCR_COMMERCE_HASH_SALT",
-  "TINYFISH_API_KEY",
   "FCR_CLOUDFLARE_MCP_READ_TOKEN",
   "OPENAI_API_KEY",
   "ANTHROPIC_API_KEY",
