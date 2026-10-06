@@ -10,6 +10,8 @@ import {
 export interface ChiefAiEvidenceServiceBinding {
   version(): Promise<unknown>;
   ingestBipEvidence(input: unknown): Promise<unknown>;
+  /** Optional until the paired Chief runtime carrying the public-command RPC is deployed. */
+  acceptPromptOSCommandIntent?(input: unknown): Promise<unknown>;
 }
 
 export interface ControlRoomWorkerEnv {
