@@ -66,10 +66,17 @@ jobs:
 
       - name: Verify Worker already serves the exact approved SHA
         shell: bash
+        env:
+          FCR_ACCESS_CLIENT_ID: ${{ secrets.FCR_CLOUDFLARE_ACCESS_CLIENT_ID }}
+          FCR_ACCESS_CLIENT_SECRET: ${{ secrets.FCR_CLOUDFLARE_ACCESS_CLIENT_SECRET }}
         run: |
           set -euo pipefail
           DEPLOY_URL="${DEPLOY_URL%/}"
+          test -n "$FCR_ACCESS_CLIENT_ID"
+          test -n "$FCR_ACCESS_CLIENT_SECRET"
           version_body="$(curl --fail --silent --show-error \
+            -H "CF-Access-Client-Id: $FCR_ACCESS_CLIENT_ID" \
+            -H "CF-Access-Client-Secret: $FCR_ACCESS_CLIENT_SECRET" \
             --proto '=https' --proto-redir '=https' --max-redirs 0 \
             --connect-timeout 10 --max-time 20 \
             "$DEPLOY_URL/version")"

@@ -47,6 +47,8 @@ Content-Type: application/json
 
 Keep the Authorization header value hidden/secret in Jira Automation. Do not reuse the n8n bearer token, GitHub token, founder session, or any Jira API credential.
 
+**Access-managed API boundary:** `api.foundercontrolroom.org` remains behind Cloudflare Access. The exact `/ingest/jira-work-automation` machine ingress must be covered by a narrowly scoped Access bypass/exception so Cloudflare can pass the request to FCR's existing bearer-token verifier. That edge exception is transport only: it never authenticates Jira, widens the route, or replaces `FCR_JIRA_AUTOMATION_INGRESS_TOKEN`.
+
 The JSON body must contain only this observation envelope:
 
 ```json

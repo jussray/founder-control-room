@@ -22,6 +22,13 @@ on:
       - 'scripts/publish-chief-runtime-witness.node-test.mjs'
       - 'scripts/chief-proofmode-runtime-witness-contract.node-test.mjs'
       - 'scripts/fcr-cloudflare-bridge-contract.node-test.mjs'
+      - 'scripts/fcr-stranger-front-door-contract.node-test.mjs'
+      - '.github/workflows/pages-production-release.yml'
+      - '.github/workflows/deploy.yml'
+      - 'docs/JIRA_AUTOMATION.md'
+      - 'docs/MCP_STACK.md'
+      - 'docs/FOUNDER_PORTFOLIO_MCP_REGISTRY.md'
+      - 'docs/audits/2026-09-25-cloudflare-live-domain-access-boundary.md'
       - 'scripts/verify-fcr-front-door-playwright.mjs'
       - 'docs/CHIEF_PROOFMODE_ACCESS_RECOVERY.md'
   push:
@@ -45,6 +52,13 @@ on:
       - 'scripts/publish-chief-runtime-witness.node-test.mjs'
       - 'scripts/chief-proofmode-runtime-witness-contract.node-test.mjs'
       - 'scripts/fcr-cloudflare-bridge-contract.node-test.mjs'
+      - 'scripts/fcr-stranger-front-door-contract.node-test.mjs'
+      - '.github/workflows/pages-production-release.yml'
+      - '.github/workflows/deploy.yml'
+      - 'docs/JIRA_AUTOMATION.md'
+      - 'docs/MCP_STACK.md'
+      - 'docs/FOUNDER_PORTFOLIO_MCP_REGISTRY.md'
+      - 'docs/audits/2026-09-25-cloudflare-live-domain-access-boundary.md'
       - 'scripts/verify-fcr-front-door-playwright.mjs'
       - 'docs/CHIEF_PROOFMODE_ACCESS_RECOVERY.md'
 
@@ -95,3 +109,4 @@ jobs:
           node --test scripts/publish-chief-runtime-witness.node-test.mjs
           node --test scripts/chief-proofmode-runtime-witness-contract.node-test.mjs
           node --test scripts/fcr-cloudflare-bridge-contract.node-test.mjs
+          node --test scripts/fcr-stranger-front-door-contract.node-test.mjs

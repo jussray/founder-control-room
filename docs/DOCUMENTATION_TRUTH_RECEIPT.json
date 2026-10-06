@@ -1,6 +1,6 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Document current evidence-authority boundaries across cross-repository browser federation, resident Council/Muse relay activation, and provider-held runtime-secret observation: source wiring, canonical secret-name policy, configured bindings, live provider invocation, and mutation authority remain separate claims with separate proof.",
+  "purpose": "Document current evidence-authority and Cloudflare Access boundaries across FCR public discovery, app/API execution, machine service authentication, scoped machine ingress exceptions, cross-repository browser federation, and provider-held runtime-secret observation while keeping source intent, provider state, runtime proof, and mutation authority separate.",
   "domains": [
     "cloudflare-authority",
     "repository-provider",
@@ -12,6 +12,18 @@
     "truth-governance"
   ],
   "changes": [
+    {
+      "path": ".github/workflows/deploy.yml",
+      "claims": [
+        "`.github/workflows/deploy.yml` must authenticate direct `api.foundercontrolroom.org` health, version, and guardrail release probes with the dedicated FCR Cloudflare Access service-token headers and must fail closed when either protected credential is absent; those credentials cannot authorize a deploy by themselves."
+      ]
+    },
+    {
+      "path": ".github/workflows/fcr-access-front-door-recovery.yml",
+      "claims": [
+        "`.github/workflows/fcr-access-front-door-recovery.yml` must retain the schema-v2 stranger receipt fields that distinguish direct API Access protection from same-origin Worker identity proof, and it must never reduce a generic denial or omitted field to verified Cloudflare Access evidence."
+      ]
+    },
     {
       "path": ".github/workflows/openai-runtime-secret-proof.yml",
       "claims": [
@@ -67,12 +79,6 @@
         "`wrangler.worker.toml` must list `FCR_SHOPIFY_WEBHOOK_SECRET` and `FCR_COMMERCE_HASH_SALT` under `[secrets].required`, so canonical exact-main Deploy rejects a missing FCR Shopify runtime binding before Worker mutation while never reading, logging, or re-uploading either provider-held value; this source boundary cannot prove webhook registration, production migration, runtime delivery, or collected revenue.",
         "`wrangler.worker.toml` must declare `FCR_CLOUDFLARE_MCP_READ_TOKEN`, `OPENAI_API_KEY`, and Muse `MODEL_API_KEY` as provider-held required Worker secret names while keeping public-safe runtime configuration outside the secret plane; declaration proves required-name policy only, not provider presence, deployed runtime identity, or successful provider use.",
         "A separate GitHub Actions copy of `OPENAI_API_KEY` may serve CI-only OpenAI consumers such as AI Failure Repair, but it is a distinct authority plane and does not prove or replace the provider-held Worker runtime binding."
-      ]
-    },
-    {
-      "path": ".github/workflows/fcr-access-front-door-recovery.yml",
-      "claims": [
-        "`.github/workflows/fcr-access-front-door-recovery.yml` must keep FCR product authentication inside the app, may detach only browser-facing public destinations from one uniquely identified mixed Cloudflare Access application, must preserve every non-browser destination and existing policy, and must fail closed on ambiguous or public-only provider state."
       ]
     },
     {
