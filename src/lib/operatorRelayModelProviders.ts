@@ -72,12 +72,17 @@ function withAnthropicBeta(
   return { ...headers, 'anthropic-beta': [...values].join(',') };
 }
 
-function anthropicAdvisorTool(model: string, ttl: AnthropicCacheTtl): JsonRecord {
+function anthropicAdvisorTool(
+  model: string,
+  cacheTtl: AnthropicCacheTtl | null,
+): JsonRecord {
   return {
     type: 'advisor_20260301',
     name: 'advisor',
     model,
-    caching: { type: 'ephemeral', ttl },
+    max_uses: 2,
+    max_tokens: 2_048,
+    ...(cacheTtl ? { caching: { type: 'ephemeral', ttl: cacheTtl } } : {}),
   };
 }
 
@@ -301,6 +306,7 @@ export function createServerOperatorRelayAdapters(
   const anthropicMcp = anthropicPlaywrightMcpAttachment(env);
   const anthropicCache = anthropicCacheTtl(env.FCR_RELAY_ANTHROPIC_CACHE_TTL);
   const anthropicAdvisorEnabled = enabled(env.FCR_RELAY_ANTHROPIC_ADVISOR_ENABLED);
+  const anthropicAdvisorCacheEnabled = enabled(env.FCR_RELAY_ANTHROPIC_ADVISOR_CACHE_ENABLED);
   const anthropicAdvisorModel = env.FCR_RELAY_ANTHROPIC_ADVISOR_MODEL?.trim() || DEFAULT_ANTHROPIC_ADVISOR_MODEL;
   const perplexityKey = env.PERPLEXITY_API_KEY?.trim();
   const perplexityModel = env.FCR_RELAY_PERPLEXITY_MODEL?.trim();
@@ -368,11 +374,13 @@ export function createServerOperatorRelayAdapters(
         ensureRelaySpendPolicy(request);
 
         const useAdvisor = anthropicAdvisorEnabled && request.capability === 'implement';
-        const advisorTtl = anthropicCache ?? '5m';
+        const advisorCacheTtl = useAdvisor && anthropicAdvisorCacheEnabled
+          ? (anthropicCache ?? '5m')
+          : null;
         const mcpBody = anthropicMcp?.body ?? {};
         const tools = [
           ...(Array.isArray(mcpBody.tools) ? mcpBody.tools : []),
-          ...(useAdvisor ? [anthropicAdvisorTool(anthropicAdvisorModel, advisorTtl)] : []),
+          ...(useAdvisor ? [anthropicAdvisorTool(anthropicAdvisorModel, advisorCacheTtl)] : []),
         ];
         const headers = useAdvisor
           ? withAnthropicBeta(anthropicMcp?.headers ?? {}, ANTHROPIC_ADVISOR_BETA)
