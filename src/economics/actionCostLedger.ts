@@ -67,6 +67,7 @@ export interface ActionCostReceiptV1 extends ActionCostReceiptInputV1 {
 const HASHED_SUBJECT = /^sha256:[0-9a-f]{64}$/;
 const SAFE_IDENTIFIER = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/;
 const SAFE_TOOL = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,63}$/;
+const SAFE_SOURCE_REF = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,255}$/;
 
 function round(value: number, precision = 6): number {
   const scale = 10 ** precision;
@@ -158,7 +159,7 @@ export function validateActionCostReceiptInput(input: ActionCostReceiptInputV1):
   if (input.billingSubjectRef && !HASHED_SUBJECT.test(input.billingSubjectRef.trim())) {
     errors.push('billingSubjectRef must be a sha256 opaque reference');
   }
-  if (input.sourceRef && input.sourceRef.trim().length > 256) errors.push('sourceRef exceeds 256 characters');
+  if (input.sourceRef && !SAFE_SOURCE_REF.test(input.sourceRef.trim())) errors.push('sourceRef must be an opaque operational reference');
   if (!['provider-reported', 'invoice-reconciled', 'estimated'].includes(input.costBasis)) {
     errors.push('costBasis is invalid');
   }
