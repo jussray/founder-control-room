@@ -70,6 +70,8 @@ No migration, OAuth dashboard change, Worker secret/binding change, merge, or de
 
 Founder Control Room also serves a separate read-only MCP gateway at `POST https://api.foundercontrolroom.org/mcp/read`. This is the remote bridge intended for external MCP clients that need governed repository/provider reads without inheriting Founder Control Room execution authority.
 
+**Access-managed API boundary:** `api.foundercontrolroom.org` remains behind Cloudflare Access, while the exact MCP transport/metadata paths (`/mcp`, `/mcp/*`, and `/.well-known/oauth-protected-resource*`) require narrowly scoped Access bypass/exception rules so standards-based MCP clients can reach FCR's own OAuth/static bearer membrane. The edge exception grants no MCP authority by itself and must never widen to unrelated API paths.
+
 - Authentication uses the dedicated Worker secret `FCR_REMOTE_MCP_READ_TOKEN`. It must not be reused for the write-capable Founder Signal Engine MCP or any provider credential.
 - Production project scope is server-held as `FCR_REMOTE_MCP_READ_PROJECTS=sekret-bip,juss-beautiful-hair,juss-beautiful-hair-private,l99,chief-ai-machine,untold-stories,sync-party,founder-control-room,promptos`. These are the current active authority-bearing entries in `PORTFOLIO_PROJECTS`; callers cannot add or substitute a project slug in order to widen the grant.
 - External continuity-only projects (`think-tank`, `solcontinuity`, `sleepwealth-agent`, `sweats`) and quarantined repositories remain outside this operator grant unless a later explicit founder authority decision promotes them through the normal portfolio contract.

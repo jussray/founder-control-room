@@ -199,6 +199,8 @@ Never commit, log, or expose this value through a `NEXT_PUBLIC_*` variable.
 [ ] FCR_CLOUDFLARE_BUILDS_USER_TOKEN for read-only FCR Workers Builds inspection
 [ ] FCR_CLOUDFLARE_MCP_READ_TOKEN for official Cloudflare API MCP GET-only provider proof
 [ ] CLOUDFLARE_ACCOUNT_ID
+[ ] FCR_CLOUDFLARE_ACCESS_CLIENT_ID for FCR API machine/release service authentication through Cloudflare Access; identity only, never proof of provider binding
+[ ] FCR_CLOUDFLARE_ACCESS_CLIENT_SECRET for the matching FCR API Access service token; secret runtime/CI material only, never publish the value
 [ ] CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID when Chief Access recovery or the trusted Chief runtime witness is activated; name presence here does not prove configuration
 [ ] CHIEF_CLOUDFLARE_ACCESS_CLIENT_SECRET when the trusted Chief runtime witness is activated; never expose the value
 [ ] CLOUDFLARE_ACCESS_CLIENT_ID only as the documented backward-compatible client-ID alias for Chief Access recovery or runtime witness when the Chief-specific name is absent

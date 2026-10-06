@@ -384,7 +384,16 @@ jobs:
     name: Smoke Test
     runs-on: ubuntu-latest
     needs: pages-release
+    env:
+      FCR_ACCESS_CLIENT_ID: ${{ secrets.FCR_CLOUDFLARE_ACCESS_CLIENT_ID }}
+      FCR_ACCESS_CLIENT_SECRET: ${{ secrets.FCR_CLOUDFLARE_ACCESS_CLIENT_SECRET }}
     steps:
+      - name: Validate FCR API Access service credential
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$FCR_ACCESS_CLIENT_ID"
+          test -n "$FCR_ACCESS_CLIENT_SECRET"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ inputs.expected_head_sha }}
@@ -396,7 +405,10 @@ jobs:
           DEPLOY_URL="${DEPLOY_URL%/}"
           HEADERS="$(mktemp)"
           trap 'rm -f "$HEADERS"' EXIT
-          BODY=$(curl --fail --silent --show-error --dump-header "$HEADERS" "$DEPLOY_URL/health")
+          BODY=$(curl --fail --silent --show-error --dump-header "$HEADERS" \
+            -H "CF-Access-Client-Id: $FCR_ACCESS_CLIENT_ID" \
+            -H "CF-Access-Client-Secret: $FCR_ACCESS_CLIENT_SECRET" \
+            "$DEPLOY_URL/health")
           tr -d '\r' < "$HEADERS" | grep -Eiq '^x-founder-control-room-service:[[:space:]]*founder-control-room$'
           BODY="$BODY" python3 - <<'PY'
           import json
@@ -413,7 +425,10 @@ jobs:
         run: |
           set -euo pipefail
           DEPLOY_URL="${DEPLOY_URL%/}"
-          BODY=$(curl --fail --silent --show-error "$DEPLOY_URL/version")
+          BODY=$(curl --fail --silent --show-error \
+            -H "CF-Access-Client-Id: $FCR_ACCESS_CLIENT_ID" \
+            -H "CF-Access-Client-Secret: $FCR_ACCESS_CLIENT_SECRET" \
+            "$DEPLOY_URL/version")
           BODY="$BODY" EXPECTED_SHA="${{ inputs.expected_head_sha }}" python3 - <<'PY'
           import json
           import os
@@ -442,7 +457,10 @@ jobs:
         run: |
           set -euo pipefail
           DEPLOY_URL="${DEPLOY_URL%/}"
-          BODY=$(curl --fail --silent --show-error "$DEPLOY_URL/guardrails.json")
+          BODY=$(curl --fail --silent --show-error \
+            -H "CF-Access-Client-Id: $FCR_ACCESS_CLIENT_ID" \
+            -H "CF-Access-Client-Secret: $FCR_ACCESS_CLIENT_SECRET" \
+            "$DEPLOY_URL/guardrails.json")
           BODY="$BODY" python3 - <<'PY'
           import json
           import os
