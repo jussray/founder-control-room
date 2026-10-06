@@ -1,0 +1,136 @@
+name: Court Witness Preview Playwright Proof
+
+on:
+  push:
+    branches:
+      - verify/court-witness-playwright-20261006
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  EXPECTED_SOURCE_SHA: be30817755381f397b4409ff84cbdb5e4f03d347
+  PREVIEW_URL: https://5c86c8f0.founder-control-room.pages.dev
+
+jobs:
+  playwright-preview:
+    name: Playwright immutable preview witness
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out verification commit
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+
+      - name: Prove verification branch differs only by this workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual_parent="$(git rev-parse HEAD^)"
+          printf 'expected_source=%s\nactual_parent=%s\nverification_head=%s\n'             "$EXPECTED_SOURCE_SHA" "$actual_parent" "$(git rev-parse HEAD)"
+          test "$actual_parent" = "$EXPECTED_SOURCE_SHA"
+          changed="$(git diff --name-only "$EXPECTED_SOURCE_SHA" HEAD)"
+          printf 'changed_files=%s\n' "$changed"
+          test "$changed" = ".github/workflows/court-witness-preview-proof.yml"
+
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+
+      - name: Install Playwright
+        run: npm install --no-save --package-lock=false --no-audit --no-fund playwright@1.61.1
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Prove immutable FCR preview in Playwright
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/court-witness-preview
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs/promises';
+          import { chromium } from 'playwright';
+
+          const previewUrl = process.env.PREVIEW_URL;
+          const report = {
+            expectedSourceSha: process.env.EXPECTED_SOURCE_SHA,
+            previewUrl,
+            finalUrl: null,
+            status: null,
+            title: null,
+            footer: null,
+            authenticatedEntryCount: null,
+            pageErrors: [],
+            consoleErrors: [],
+          };
+
+          const browser = await chromium.launch({ headless: true });
+          try {
+            const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+            page.on('pageerror', (error) => report.pageErrors.push(String(error)));
+            page.on('console', (message) => {
+              if (message.type() === 'error') report.consoleErrors.push(message.text());
+            });
+
+            const response = await page.goto(previewUrl, {
+              waitUntil: 'domcontentloaded',
+              timeout: 30_000,
+            });
+            await page.waitForLoadState('networkidle', { timeout: 30_000 }).catch(() => {});
+
+            report.status = response?.status() ?? null;
+            report.finalUrl = page.url();
+            report.title = await page.title();
+            report.footer = await page.locator('footer').innerText();
+            report.authenticatedEntryCount = await page
+              .getByRole('link', { name: /Enter authenticated Control Room/i })
+              .count();
+
+            if (!response?.ok()) {
+              throw new Error(`preview returned HTTP ${report.status}`);
+            }
+            if (new URL(report.finalUrl).origin !== new URL(previewUrl).origin) {
+              throw new Error(`preview redirected off immutable origin: ${report.finalUrl}`);
+            }
+            if (!report.footer.includes('Founder Control Room')) {
+              throw new Error('canonical Founder Control Room footer identity is missing');
+            }
+            if (!report.footer.includes('Same truth. Higher outcomes.')) {
+              throw new Error('canonical FCR visual thesis is missing');
+            }
+            if (report.authenticatedEntryCount !== 1) {
+              throw new Error(`expected one authenticated entry link; found ${report.authenticatedEntryCount}`);
+            }
+            if (report.pageErrors.length) {
+              throw new Error(`page errors observed: ${report.pageErrors.join(' | ')}`);
+            }
+
+            await page.screenshot({
+              path: 'artifacts/court-witness-preview/preview.png',
+              fullPage: true,
+            });
+            await fs.writeFile(
+              'artifacts/court-witness-preview/report.json',
+              JSON.stringify(report, null, 2) + '\n',
+              'utf8',
+            );
+            console.log(JSON.stringify(report, null, 2));
+          } finally {
+            await browser.close();
+          }
+          NODE
+
+      - name: Upload Playwright proof
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: court-witness-preview-proof-be308177
+          path: artifacts/court-witness-preview/
+          if-no-files-found: warn
+          retention-days: 30
