@@ -79,6 +79,17 @@ describe('QuickScan opportunity projection', () => {
         score: 0,
         recommendedStage: 'new',
         nextGate: 'collect_qualification_evidence',
+        execution: {
+          contract: 'fcr/opportunity-execution-gate@v1',
+          classification: 'unknown',
+          routingDecision: 'stop_unknown',
+          nextGate: 'verify_eligibility_payment_ai_terms_and_identity_requirements',
+          authority: {
+            authorizesAutonomousExecution: false,
+            authorizesSubmission: false,
+            requiresOpportunitySpecificExecutionGrant: true,
+          },
+        },
         authority: {
           advisoryOnly: true,
           authorizesOutreach: false,

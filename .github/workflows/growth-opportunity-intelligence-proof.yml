@@ -78,6 +78,7 @@ jobs:
         run: >-
           npx vitest run
           src/growth/__tests__/opportunityIntelligence.test.ts
+          src/growth/__tests__/opportunityExecutionGate.test.ts
           src/growth/__tests__/quickScanOpportunityBridge.test.ts
           src/http/routes/__tests__/quickscan.opportunity.integration.test.ts
           src/config/__tests__/projectShells.test.ts
@@ -136,6 +137,11 @@ jobs:
                   priorityBand: 'unknown',
                   score: 0,
                   nextGate: 'verify_problem_offer_fit',
+                  execution: {
+                    classification: 'unknown',
+                    routingDecision: 'stop_unknown',
+                    economics: { profitability: 'unknown' },
+                  },
                 },
               },
               {
@@ -159,6 +165,11 @@ jobs:
                   priorityBand: 'won',
                   score: 55,
                   nextGate: 'deliver_and_verify_customer_value',
+                  execution: {
+                    classification: 'unknown',
+                    routingDecision: 'stop_unknown',
+                    economics: { profitability: 'unknown' },
+                  },
                 },
               },
             ],
@@ -194,6 +205,7 @@ jobs:
                 throw new Error(`${testCase.name} QuickScan navigation failed: ${quickScanResponse?.status() ?? 'no-response'}`);
               }
               await page.waitForFunction(() => document.querySelectorAll('.prospect').length === 2);
+              await page.locator('.prospect').first().click();
               const quickScanBody = await page.locator('body').innerText();
               for (const expected of [
                 'Manual Claim Studio',
@@ -202,6 +214,7 @@ jobs:
                 'won · 55/100',
                 'Collected\n1',
                 'Verified revenue\n$249.00',
+                'Execution gate: unknown · stop_unknown · economics unknown',
               ]) {
                 if (!quickScanBody.includes(expected)) {
                   throw new Error(`${testCase.name} QuickScan witness missing: ${expected}`);

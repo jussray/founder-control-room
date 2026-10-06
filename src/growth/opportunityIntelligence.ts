@@ -5,6 +5,11 @@ import {
   type LeadStage,
   type RevenueState,
 } from '../types/growthInbox.js';
+import {
+  evaluateOpportunityExecutionGate,
+  type OpportunityExecutionGate,
+  type OpportunityExecutionTerms,
+} from './opportunityExecutionGate.js';
 
 export const GROWTH_OPPORTUNITY_INTELLIGENCE_CONTRACT =
   'fcr/growth-opportunity-intelligence@v1' as const;
@@ -51,6 +56,7 @@ export interface GrowthOpportunityInput {
   offerId?: string;
   predecessorFingerprint?: string;
   learningOutcome?: OpportunityLearningOutcome;
+  executionTerms?: OpportunityExecutionTerms;
 }
 
 export type OpportunityPriorityBand =
@@ -89,6 +95,7 @@ export interface GrowthOpportunityAssessment {
     evidenceReferences: string[];
     reason: string;
   };
+  execution: OpportunityExecutionGate;
   continuity: {
     fingerprint: string;
     predecessorFingerprint: string | null;
@@ -464,6 +471,10 @@ export function evaluateGrowthOpportunity(
   }));
 
   const learning = learningDisposition(rawInput.learningOutcome);
+  const execution = evaluateOpportunityExecutionGate(
+    rawInput.executionTerms as OpportunityExecutionTerms | undefined,
+    evaluatedAt,
+  );
 
   return {
     contract: GROWTH_OPPORTUNITY_INTELLIGENCE_CONTRACT,
@@ -484,6 +495,7 @@ export function evaluateGrowthOpportunity(
       evidenceReferences: uniqueSorted(verified.map((item) => item.reference)),
     },
     learning,
+    execution,
     continuity: {
       fingerprint,
       predecessorFingerprint,
