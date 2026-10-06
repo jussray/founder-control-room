@@ -7,6 +7,19 @@ on:
         description: Exact deployed FCR runtime base URL
         required: true
         type: string
+      expected_release_sha:
+        description: Exact 40-character deployed release SHA
+        required: true
+        type: string
+      public_url:
+        description: Optional founder-visible URL; defaults to runtime_base_url
+        required: false
+        type: string
+      operator_target:
+        description: Bounded peer provider target for the relay proof
+        required: false
+        default: codex
+        type: string
 
 permissions:
   contents: read
@@ -17,8 +30,24 @@ jobs:
     env:
       FCR_RUNTIME_BASE_URL: ${{ inputs.runtime_base_url }}
       FCR_PLAYWRIGHT_FOUNDER_BEARER: ${{ secrets.FCR_PLAYWRIGHT_FOUNDER_BEARER }}
+      FCR_OPERATOR_RELAY_OAUTH_TOKEN: ${{ secrets.FCR_PLAYWRIGHT_FOUNDER_BEARER }}
+      FCR_OPERATOR_RELAY_WITNESS_REQUIRED: 'true'
+      FCR_OPERATOR_RELAY_TARGET: ${{ inputs.operator_target }}
+      DEPLOY_URL: ${{ inputs.runtime_base_url }}
+      PUBLIC_URL: ${{ inputs.public_url || inputs.runtime_base_url }}
+      EXPECTED_RELEASE_SHA: ${{ inputs.expected_release_sha }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Verify requested checkout identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$GITHUB_SHA"
+          test "$EXPECTED_RELEASE_SHA" = "$GITHUB_SHA"
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -27,3 +56,5 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - name: Prove deployed prompt workflow router
         run: npx playwright test e2e/builder-prompt-workflow-runtime.spec.ts --project=chromium
+      - name: Prove exact deployed operator relay and provider receipt
+        run: npx playwright test e2e/operator-relay-live.spec.ts --project=chromium
