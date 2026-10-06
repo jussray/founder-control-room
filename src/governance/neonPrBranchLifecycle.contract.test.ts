@@ -35,9 +35,9 @@ describe('Neon pull-request branch lifecycle contract', () => {
     expect(workflow.match(/- name: Classify Neon preview scope/g)).toHaveLength(1);
     expect(workflow).toContain('supabase/*)');
     expect(workflow.match(/if: steps\.neon_scope\.outputs\.needs_neon == 'true'/g)?.length ?? 0).toBeGreaterThanOrEqual(5);
-    expect(workflow.match(/if: steps\.neon_scope\.outputs\.needs_neon == 'false'/g)).toHaveLength(2);
+    expect(workflow.match(/if: steps\.neon_scope\.outputs\.needs_neon == 'false'/g)).toHaveLength(1);
     expect(workflow).toContain('Neon preview skipped because this PR does not change supabase/ against live base.');
-    expect(workflow).toContain('Neon cleanup skipped because this PR does not change supabase/.');
+    expect(workflow).not.toContain('Neon cleanup skipped because this PR does not change supabase/.');
   });
 
   it('reconciles close cleanup against the actual Neon preview branch instead of the final PR diff', () => {
