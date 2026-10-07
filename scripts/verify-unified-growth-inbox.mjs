@@ -44,6 +44,39 @@ assert(registry.channels?.google_business_messages?.status === 'retired_do_not_b
 assert(registry.revenueAccounting?.recognizedRevenueState === 'payment_collected', 'only collected payment may be recognized as revenue');
 assert(registry.forbidden?.includes('reporting_uncollected_value_as_revenue'), 'uncollected value must not be reported as revenue');
 
+
+const emailFiling = registry.emailFiling;
+assert(emailFiling?.provider === 'gmail', 'email filing provider must remain gmail');
+assert(emailFiling?.centralInbox === 'sekretbip@gmail.com', 'project mail must converge on the central founder inbox');
+assert(emailFiling?.strategy === 'original_recipient_domain', 'project filing must use the original recipient domain');
+assert(emailFiling?.defaultAction === 'leave_unfiled_in_inbox', 'unknown project mail must remain visible and unfiled');
+assert(emailFiling?.preserveInbox === true, 'project filing must not archive by default');
+assert(emailFiling?.preserveUnread === true, 'project filing must preserve unread state');
+assert(emailFiling?.crossProjectLabeling === false, 'cross-project mail labeling must remain disabled');
+assert(
+  emailFiling?.backgroundAutofilingRequires?.includes('gmail_filter_api_or_owned_google_oauth'),
+  'background autofiling must require an owned Gmail filter/OAuth execution path',
+);
+
+const filingRules = Array.isArray(emailFiling?.rules) ? emailFiling.rules : [];
+const filingByDomain = new Map(filingRules.map((rule) => [rule.recipientDomain, rule]));
+assert(filingByDomain.size === filingRules.length, 'email filing recipient domains must be unique');
+
+for (const [domain, projectId, labelName] of [
+  ['foundercontrolroom.org', 'founder-control-room', 'FCR / Mail'],
+  ['jussco.company', 'jussco', 'JussCo / Mail'],
+  ['jussbeautifulhair.com', 'juss-beautiful-hair', 'JBH / Mail'],
+  ['sekretbip.net', 'sekret-bip', "Se'kret Bip / Mail"],
+]) {
+  const rule = filingByDomain.get(domain);
+  assert(rule, `missing project email filing rule for ${domain}`);
+  assert(rule.projectId === projectId, `wrong project binding for ${domain}`);
+  assert(rule.labelName === labelName, `wrong Gmail label for ${domain}`);
+  assert(rule.matchScope === 'domain_all_aliases', `email filing must cover every alias at ${domain}`);
+}
+
+assert(!filingByDomain.has('jussbeatifulhair.com'), 'misspelled JBH domain must never become a filing authority');
+
 const requiredChecks = new Set(registry.legalPolicyGate?.requiredChecks ?? []);
 for (const check of [
   'consent_evidence_retained',
