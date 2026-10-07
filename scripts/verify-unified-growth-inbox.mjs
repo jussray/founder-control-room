@@ -28,6 +28,8 @@ const typePath = 'src/types/growthInbox.ts';
 const filingSourcePath = 'src/lib/growthInboxReply.ts';
 const workerEntryPath = 'src/worker/cf-entry.ts';
 const workerConfigPath = 'wrangler.worker.toml';
+const messagingRoutePath = 'src/http/routes/pluginCenterMessaging.ts';
+const callbackSourcePath = 'src/http/routes/onboardingAssets/callbackJs.ts';
 
 const registry = readJson(registryPath);
 const skill = normalizeProse(readText(skillPath));
@@ -35,6 +37,8 @@ const types = readText(typePath);
 const filingSource = readText(filingSourcePath);
 const workerEntry = readText(workerEntryPath);
 const workerConfig = readText(workerConfigPath);
+const messagingRoute = readText(messagingRoutePath);
+const callbackSource = readText(callbackSourcePath);
 
 assert(registry.defaultAutomationMode === 'draft_only', 'default automation mode must remain draft_only');
 assert(registry.globalRules?.coldOutreachEnabled === false, 'cold outreach must remain disabled');
@@ -62,7 +66,20 @@ assert(emailFiling?.crossProjectLabeling === false, 'cross-project mail labeling
 assert(emailFiling?.persistentMechanism === 'gmail_filter_rules', 'persistent project filing must use Gmail filter rules');
 assert(emailFiling?.runtimeEnableFlag === 'FCR_GMAIL_PROJECT_FILING_ENABLED', 'email filing runtime gate must remain explicit');
 assert(emailFiling?.enabledByDefault === false, 'persistent Gmail filing must fail closed by default');
-for (const requirement of ['owned_google_oauth', 'gmail.settings.basic', 'verified_expected_account']) {
+assert(emailFiling?.activationMode === 'one_time_founder_oauth', 'Gmail filing must activate through one-time founder OAuth');
+assert(
+  emailFiling?.oauthScope === 'https://www.googleapis.com/auth/gmail.settings.basic',
+  'Gmail filing must request only the settings.basic scope',
+);
+assert(
+  emailFiling?.providerTokenRetention === 'discard_after_filter_reconciliation',
+  'Google provider token must be discarded after filter reconciliation',
+);
+for (const requirement of [
+  'explicit_runtime_enablement',
+  'owned_google_oauth_if_drift_reconciliation_is_enabled',
+  'verified_expected_account',
+]) {
   assert(
     emailFiling?.backgroundAutofilingRequires?.includes(requirement),
     `background autofiling missing requirement: ${requirement}`,
@@ -73,31 +90,36 @@ const filingRules = Array.isArray(emailFiling?.rules) ? emailFiling.rules : [];
 const filingByDomain = new Map(filingRules.map((rule) => [rule.recipientDomain, rule]));
 assert(filingByDomain.size === filingRules.length, 'email filing recipient domains must be unique');
 
-for (const [domain, projectId, labelName] of [
-  ['foundercontrolroom.org', 'founder-control-room', 'FCR / Mail'],
-  ['jussco.company', 'jussco', 'JussCo / Mail'],
-  ['jussbeautifulhair.com', 'juss-beautiful-hair', 'JBH / Mail'],
-  ['sekretbip.net', 'sekret-bip', "Se'kret Bip / Mail"],
+for (const [domain, projectId, labelName, labelId] of [
+  ['foundercontrolroom.org', 'founder-control-room', 'FCR / Mail', 'Label_29'],
+  ['jussco.company', 'jussco', 'JussCo / Mail', 'Label_30'],
+  ['jussbeautifulhair.com', 'juss-beautiful-hair', 'JBH / Mail', 'Label_31'],
+  ['sekretbip.net', 'sekret-bip', "Se'kret Bip / Mail", 'Label_32'],
 ]) {
   const rule = filingByDomain.get(domain);
   assert(rule, `missing project email filing rule for ${domain}`);
   assert(rule.projectId === projectId, `wrong project binding for ${domain}`);
   assert(rule.labelName === labelName, `wrong Gmail label for ${domain}`);
+  assert(rule.labelId === labelId, `wrong live Gmail label ID for ${domain}`);
   assert(rule.matchScope === 'domain_all_aliases', `email filing must cover every alias at ${domain}`);
 }
 
 assert(!filingByDomain.has('jussbeatifulhair.com'), 'misspelled JBH domain must never become a filing authority');
 
 for (const rule of filingRules) {
-  for (const value of [rule.projectId, rule.recipientDomain, rule.labelName]) {
+  for (const value of [rule.projectId, rule.recipientDomain, rule.labelName, rule.labelId]) {
     assert(filingSource.includes(value), `Gmail filing runtime missing canonical value: ${value}`);
   }
 }
 assert(
-  filingSource.includes("action: { addLabelIds: [labelId] }"),
-  'Gmail filing runtime must add only the project label',
+  filingSource.includes("action: { addLabelIds: [rule.labelId] }"),
+  'Gmail filing runtime must add only the pinned project label',
 );
-assert(!filingSource.includes('removeLabelIds'), 'Gmail filing runtime must never remove Inbox, unread, or other labels');
+assert(!filingSource.includes("`${GMAIL_API}/labels`"), 'one-time Gmail filing must not require label-management API access');
+assert(
+  filingSource.includes("GMAIL_PROJECT_FILING_SCOPE = 'https://www.googleapis.com/auth/gmail.settings.basic'"),
+  'runtime must pin the least-privilege Gmail settings scope',
+);
 assert(
   filingSource.includes('GMAIL_PROJECT_FILING_FILTER_CONFLICT'),
   'Gmail filing runtime must fail closed on conflicting existing filters',
@@ -111,6 +133,20 @@ assert(
     && workerEntry.includes("name: 'gmail-project-filing'"),
   'governed Worker cron must carry the Gmail filing reconciler',
 );
+assert(
+  messagingRoute.includes("'/gmail/filing/connect'")
+    && messagingRoute.includes("'/gmail/filing/activate'"),
+  'Plugin Center must expose the founder-gated one-time Gmail filing flow',
+);
+assert(
+  messagingRoute.includes("status: 'disconnected'")
+    && messagingRoute.includes('tokenRetained: false'),
+  'Gmail connection must remain disconnected after one-time activation and retain no provider token',
+);
+const callbackScrub = callbackSource.indexOf("history.replaceState(null,'','/auth/callback')");
+const callbackActivation = callbackSource.indexOf('/plugin-center/messaging/gmail/filing/activate');
+assert(callbackScrub >= 0 && callbackActivation > callbackScrub, 'OAuth callback must scrub token-bearing URL before Gmail activation');
+assert(!callbackSource.includes('localStorage'), 'OAuth callback must not persist provider tokens in localStorage');
 
 const requiredChecks = new Set(registry.legalPolicyGate?.requiredChecks ?? []);
 for (const check of [
