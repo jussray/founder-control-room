@@ -10,6 +10,7 @@ import { controlRoomCss } from '../dist/http/routes/onboardingAssets/controlRoom
 const apiPaths = [];
 const assetPaths = [];
 const sessionBodies = [];
+const gmailActivationBodies = [];
 const pageErrors = [];
 
 function apiResponse(body, init = {}) {
@@ -80,8 +81,29 @@ const server = createServer(async (req, res) => {
       res.setHeader('cache-control', 'private, no-store');
       res.end(JSON.stringify({
         success: true,
-        data: { founder: { email: 'proof@example.com' } },
+        data: { founder: { email: 'sekretbip@gmail.com' } },
         meta: {},
+      }));
+      return;
+    }
+
+    if (req.method === 'POST' && requestUrl.pathname === '/plugin-center/messaging/gmail/filing/activate') {
+      gmailActivationBodies.push(JSON.parse(body?.toString('utf8') || '{}'));
+      res.statusCode = 200;
+      res.setHeader('content-type', 'application/json; charset=utf-8');
+      res.setHeader('cache-control', 'private, no-store');
+      res.end(JSON.stringify({
+        contract: 'fcr/gmail-project-filing@v1',
+        status: 'verified',
+        tokenRetained: false,
+        connectionStatus: 'disconnected',
+        result: {
+          status: 'reconciled',
+          account: 'sekretbip@gmail.com',
+          filtersCreated: 4,
+          filtersAlreadyPresent: 0,
+          rulesChecked: 4,
+        },
       }));
       return;
     }
@@ -149,13 +171,55 @@ try {
   }
 
   await page.screenshot({ path: 'test-results/pages-auth-callback-proof.png', fullPage: true });
+
+  const gmailPage = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  gmailPage.on('pageerror', (error) => pageErrors.push(error.message));
+  await gmailPage.goto(
+    `${baseUrl}/auth/callback?mode=gmail-project-filing#access_token=gmail-proof-access&refresh_token=gmail-proof-refresh&provider_token=ephemeral-google-provider-token`,
+    { waitUntil: 'domcontentloaded' },
+  );
+  await gmailPage.waitForURL(`${baseUrl}/`, { timeout: 10_000 });
+  await gmailPage.waitForSelector('#proof-complete', { timeout: 10_000 });
+
+  if (gmailActivationBodies.length !== 1) {
+    throw new Error(`GMAIL_FILING_BROWSER_PROOF_ACTIVATION_COUNT: expected 1, received ${gmailActivationBodies.length}`);
+  }
+  if (gmailActivationBodies[0]?.providerToken !== 'ephemeral-google-provider-token') {
+    throw new Error('GMAIL_FILING_BROWSER_PROOF_PROVIDER_TOKEN: activation did not receive the expected ephemeral token');
+  }
+  if (gmailPage.url().includes('provider_token') || gmailPage.url().includes('ephemeral-google-provider-token')) {
+    throw new Error('GMAIL_FILING_BROWSER_PROOF_URL_LEAK: provider token remained in browser URL');
+  }
+  const localStorageValues = await gmailPage.evaluate(() => Object.entries(localStorage));
+  if (JSON.stringify(localStorageValues).includes('ephemeral-google-provider-token')) {
+    throw new Error('GMAIL_FILING_BROWSER_PROOF_STORAGE_LEAK: provider token reached localStorage');
+  }
+  if (sessionBodies.length !== 2) {
+    throw new Error(`GMAIL_FILING_BROWSER_PROOF_SESSION_COUNT: expected 2 total sessions, received ${sessionBodies.length}`);
+  }
+  const gmailSession = sessionBodies[1];
+  if (gmailSession?.access_token !== 'gmail-proof-access' || gmailSession?.refresh_token !== 'gmail-proof-refresh') {
+    throw new Error('GMAIL_FILING_BROWSER_PROOF_SESSION_HANDOFF: Gmail consent callback did not establish the expected founder session');
+  }
+  if (pageErrors.length > 0) {
+    throw new Error(`GMAIL_FILING_BROWSER_PROOF_BROWSER_ERROR: ${pageErrors.join(' | ')}`);
+  }
+
+  await gmailPage.screenshot({ path: 'test-results/pages-auth-callback-gmail-proof.png', fullPage: true });
+  await gmailPage.close();
+
   console.log(JSON.stringify({
     result: 'PASS',
     finalUrl: page.url(),
     apiPaths,
     assetPaths,
     sessionHandoffCount: sessionBodies.length,
-    screenshot: 'test-results/pages-auth-callback-proof.png',
+    gmailActivationCount: gmailActivationBodies.length,
+    gmailProviderTokenRetained: false,
+    screenshots: [
+      'test-results/pages-auth-callback-proof.png',
+      'test-results/pages-auth-callback-gmail-proof.png',
+    ],
   }, null, 2));
 } finally {
   await browser.close();
