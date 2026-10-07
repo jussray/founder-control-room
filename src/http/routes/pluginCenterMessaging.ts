@@ -1,11 +1,17 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { Router } from 'express';
 import {
+  GMAIL_PROJECT_FILING_EXPECTED_ACCOUNT,
+  GMAIL_PROJECT_FILING_RULES,
+  GMAIL_PROJECT_FILING_SCOPE,
   growthInboxReplyStatus,
+  reconcileGmailProjectFilingFiltersWithAccessToken,
   sendGmailReply,
   sendWhatsAppReply,
+  verifyGoogleProviderIdentity,
   type GrowthInboxReplyChannel,
 } from '../../lib/growthInboxReply.js';
+import { supabaseAuth } from '../../lib/supabaseAuthClient.js';
 import { supabase } from '../../lib/supabaseClient.js';
 import {
   isDispatchAllowed,
@@ -13,7 +19,8 @@ import {
   type DispatchCheck,
   type DispatchDecision,
 } from '../../types/growthInbox.js';
-import { requireFounder, type FounderRequest } from '../middleware/requireFounder.js';
+import { requireFounder, requireInteractiveFounder, type FounderRequest } from '../middleware/requireFounder.js';
+import { FOUNDER_API_URL } from '../middleware/security.js';
 
 export const pluginCenterMessagingRouter = Router();
 pluginCenterMessagingRouter.use(requireFounder);
@@ -24,6 +31,9 @@ const POLICY_VERSION = 'fcr/reply-only-dispatch@v1';
 const IDEMPOTENCY_KEY = /^[A-Za-z0-9._:-]{8,128}$/;
 const SAFE_BRAND_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{1,127}$/;
 const ALLOWED_REPLY_PURPOSES = new Set<CommunicationPurpose>(['support', 'transactional', 'updates']);
+const GMAIL_FILING_PROJECT_SLUG = 'founder-control-room';
+const GMAIL_FILING_CONNECTION_LABEL = 'central-project-mail-filing';
+const GMAIL_FILING_CONTRACT = 'fcr/gmail-project-filing@v1' as const;
 
 type DbRecord = Record<string, unknown>;
 
@@ -255,6 +265,169 @@ function decisionForReply(input: {
     denialReasons,
   };
 }
+
+pluginCenterMessagingRouter.get(
+  '/gmail/filing/connect',
+  requireInteractiveFounder,
+  async (_req: FounderRequest, res) => {
+    res.set('Cache-Control', 'no-store');
+    try {
+      const { data, error } = await supabaseAuth.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${FOUNDER_API_URL}/auth/callback?mode=gmail-project-filing`,
+          scopes: GMAIL_PROJECT_FILING_SCOPE,
+          queryParams: { prompt: 'consent' },
+          skipBrowserRedirect: true,
+        },
+      });
+      if (error || !data.url) {
+        return res.status(503).json({ error: 'GMAIL_PROJECT_FILING_OAUTH_UNAVAILABLE' });
+      }
+      return res.redirect(303, data.url);
+    } catch {
+      return res.status(503).json({ error: 'GMAIL_PROJECT_FILING_OAUTH_UNAVAILABLE' });
+    }
+  },
+);
+
+pluginCenterMessagingRouter.post(
+  '/gmail/filing/activate',
+  requireInteractiveFounder,
+  async (req: FounderRequest, res) => {
+    res.set('Cache-Control', 'no-store');
+    const body = record(req.body) ?? {};
+    const providerToken = text(body.providerToken);
+    if (!providerToken || providerToken.length > 16_384) {
+      return res.status(400).json({ error: 'GOOGLE_PROVIDER_TOKEN_INVALID' });
+    }
+
+    const founderEmail = req.founder?.email?.trim().toLowerCase() ?? '';
+    if (founderEmail !== GMAIL_PROJECT_FILING_EXPECTED_ACCOUNT) {
+      return res.status(403).json({ error: 'GMAIL_FILING_FOUNDER_ACCOUNT_MISMATCH' });
+    }
+
+    try {
+      const project = await projectBySlug(GMAIL_FILING_PROJECT_SLUG);
+      const { data: connectionData, error: connectionError } = await supabase
+        .from('project_connections')
+        .select('id, config, status')
+        .eq('project_id', project.id)
+        .eq('connection_type', 'gmail')
+        .eq('label', GMAIL_FILING_CONNECTION_LABEL)
+        .maybeSingle();
+      if (connectionError) throw new Error('GMAIL_FILING_CONNECTION_LOOKUP_FAILED');
+
+      const connection = record(connectionData);
+      const connectionId = text(connection?.id);
+      if (!connectionId) {
+        return res.status(409).json({ error: 'GMAIL_FILING_CONNECTION_NOT_REGISTERED' });
+      }
+
+      const activationId = randomUUID();
+      const { error: startAuditError } = await supabase.from('project_events').insert({
+        project_id: project.id,
+        source_event_id: activationId,
+        event_type: 'gmail_project_filing_activation_started',
+        severity: 'info',
+        screen: 'plugin-center-messaging',
+        provider: 'gmail',
+        decision: 'founder_oauth_consumed_once',
+        metadata: {
+          connectionId,
+          contract: GMAIL_FILING_CONTRACT,
+          oauthScope: GMAIL_PROJECT_FILING_SCOPE,
+          tokenRetained: false,
+          intendedFilterCount: GMAIL_PROJECT_FILING_RULES.length,
+        },
+      });
+      if (startAuditError) {
+        return res.status(500).json({ error: 'GMAIL_FILING_AUDIT_RESERVATION_FAILED' });
+      }
+
+      const account = await verifyGoogleProviderIdentity(providerToken);
+      const result = await reconcileGmailProjectFilingFiltersWithAccessToken(
+        providerToken,
+        account,
+      );
+      if (
+        result.rulesChecked !== GMAIL_PROJECT_FILING_RULES.length
+        || result.filtersCreated + result.filtersAlreadyPresent !== GMAIL_PROJECT_FILING_RULES.length
+      ) {
+        throw new Error('GMAIL_PROJECT_FILING_RECEIPT_INCOMPLETE');
+      }
+
+      const verifiedAt = new Date().toISOString();
+      const currentConfig = record(connection?.config) ?? {};
+      const { data: updatedConnection, error: updateError } = await supabase
+        .from('project_connections')
+        .update({
+          status: 'disconnected',
+          last_checked_at: verifiedAt,
+          config: {
+            ...currentConfig,
+            expectedAccount: GMAIL_PROJECT_FILING_EXPECTED_ACCOUNT,
+            purpose: 'project_mail_filter_reconciliation',
+            persistentFiltersInstalled: true,
+            filingContract: GMAIL_FILING_CONTRACT,
+            oauthScope: GMAIL_PROJECT_FILING_SCOPE,
+            tokenRetained: false,
+            verifiedAt,
+          },
+        })
+        .eq('id', connectionId)
+        .eq('project_id', project.id)
+        .select('id, status, last_checked_at')
+        .maybeSingle();
+      if (updateError || !record(updatedConnection)) {
+        return res.status(500).json({
+          error: 'GMAIL_FILTERS_APPLIED_BUT_CONNECTION_RECEIPT_UNCONFIRMED',
+          providerApplied: true,
+          activationId,
+        });
+      }
+
+      const { error: successAuditError } = await supabase.from('project_events').insert({
+        project_id: project.id,
+        source_event_id: randomUUID(),
+        event_type: 'gmail_project_filing_filters_verified',
+        severity: 'info',
+        screen: 'plugin-center-messaging',
+        provider: 'gmail',
+        decision: 'persistent_filters_installed_token_discarded',
+        metadata: {
+          activationId,
+          connectionId,
+          contract: GMAIL_FILING_CONTRACT,
+          accountFingerprint: sha256(account),
+          filtersCreated: result.filtersCreated,
+          filtersAlreadyPresent: result.filtersAlreadyPresent,
+          rulesChecked: result.rulesChecked,
+          tokenRetained: false,
+        },
+      });
+      if (successAuditError) {
+        return res.status(500).json({
+          error: 'GMAIL_FILTERS_APPLIED_BUT_AUDIT_FINALIZATION_UNCONFIRMED',
+          providerApplied: true,
+          activationId,
+        });
+      }
+
+      return res.status(200).json({
+        contract: GMAIL_FILING_CONTRACT,
+        status: 'verified',
+        activationId,
+        accountFingerprint: sha256(account),
+        tokenRetained: false,
+        connectionStatus: 'disconnected',
+        result,
+      });
+    } catch (error) {
+      return res.status(502).json({ error: safeErrorCode(error) });
+    }
+  },
+);
 
 pluginCenterMessagingRouter.get('/status', (_req: FounderRequest, res) => {
   res.set('Cache-Control', 'no-store');
