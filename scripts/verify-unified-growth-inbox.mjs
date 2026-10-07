@@ -25,10 +25,16 @@ function assert(condition, message) {
 const registryPath = 'config/unified-growth-inbox.channels.json';
 const skillPath = '.ai/skills/unified-growth-inbox/SKILL.md';
 const typePath = 'src/types/growthInbox.ts';
+const filingSourcePath = 'src/lib/growthInboxReply.ts';
+const workerEntryPath = 'src/worker/cf-entry.ts';
+const workerConfigPath = 'wrangler.worker.toml';
 
 const registry = readJson(registryPath);
 const skill = normalizeProse(readText(skillPath));
 const types = readText(typePath);
+const filingSource = readText(filingSourcePath);
+const workerEntry = readText(workerEntryPath);
+const workerConfig = readText(workerConfigPath);
 
 assert(registry.defaultAutomationMode === 'draft_only', 'default automation mode must remain draft_only');
 assert(registry.globalRules?.coldOutreachEnabled === false, 'cold outreach must remain disabled');
@@ -53,10 +59,15 @@ assert(emailFiling?.defaultAction === 'leave_unfiled_in_inbox', 'unknown project
 assert(emailFiling?.preserveInbox === true, 'project filing must not archive by default');
 assert(emailFiling?.preserveUnread === true, 'project filing must preserve unread state');
 assert(emailFiling?.crossProjectLabeling === false, 'cross-project mail labeling must remain disabled');
-assert(
-  emailFiling?.backgroundAutofilingRequires?.includes('gmail_filter_api_or_owned_google_oauth'),
-  'background autofiling must require an owned Gmail filter/OAuth execution path',
-);
+assert(emailFiling?.persistentMechanism === 'gmail_filter_rules', 'persistent project filing must use Gmail filter rules');
+assert(emailFiling?.runtimeEnableFlag === 'FCR_GMAIL_PROJECT_FILING_ENABLED', 'email filing runtime gate must remain explicit');
+assert(emailFiling?.enabledByDefault === false, 'persistent Gmail filing must fail closed by default');
+for (const requirement of ['owned_google_oauth', 'gmail.settings.basic', 'verified_expected_account']) {
+  assert(
+    emailFiling?.backgroundAutofilingRequires?.includes(requirement),
+    `background autofiling missing requirement: ${requirement}`,
+  );
+}
 
 const filingRules = Array.isArray(emailFiling?.rules) ? emailFiling.rules : [];
 const filingByDomain = new Map(filingRules.map((rule) => [rule.recipientDomain, rule]));
@@ -76,6 +87,30 @@ for (const [domain, projectId, labelName] of [
 }
 
 assert(!filingByDomain.has('jussbeatifulhair.com'), 'misspelled JBH domain must never become a filing authority');
+
+for (const rule of filingRules) {
+  for (const value of [rule.projectId, rule.recipientDomain, rule.labelName]) {
+    assert(filingSource.includes(value), `Gmail filing runtime missing canonical value: ${value}`);
+  }
+}
+assert(
+  filingSource.includes("action: { addLabelIds: [labelId] }"),
+  'Gmail filing runtime must add only the project label',
+);
+assert(!filingSource.includes('removeLabelIds'), 'Gmail filing runtime must never remove Inbox, unread, or other labels');
+assert(
+  filingSource.includes('GMAIL_PROJECT_FILING_FILTER_CONFLICT'),
+  'Gmail filing runtime must fail closed on conflicting existing filters',
+);
+assert(
+  workerConfig.includes('FCR_GMAIL_PROJECT_FILING_ENABLED = "false"'),
+  'production Gmail filing flag must remain disabled until owned OAuth is ready',
+);
+assert(
+  workerEntry.includes('reconcileGmailProjectFilingFilters()')
+    && workerEntry.includes("name: 'gmail-project-filing'"),
+  'governed Worker cron must carry the Gmail filing reconciler',
+);
 
 const requiredChecks = new Set(registry.legalPolicyGate?.requiredChecks ?? []);
 for (const check of [
