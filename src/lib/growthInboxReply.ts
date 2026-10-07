@@ -39,6 +39,54 @@ export interface GmailReplyResult {
   sender: string;
 }
 
+export interface GmailProjectFilingRule {
+  projectId: string;
+  recipientDomain: string;
+  labelName: string;
+}
+
+export interface GmailProjectFilingStatus {
+  contract: 'fcr/gmail-project-filing@v1';
+  enabled: boolean;
+  configured: boolean;
+  expectedAccount: string | null;
+  missing: string[];
+  rules: readonly GmailProjectFilingRule[];
+}
+
+export interface GmailProjectFilingResult {
+  contract: 'fcr/gmail-project-filing@v1';
+  status: 'disabled' | 'reconciled';
+  account: string | null;
+  labelsCreated: number;
+  filtersCreated: number;
+  filtersAlreadyPresent: number;
+  rulesChecked: number;
+}
+
+export const GMAIL_PROJECT_FILING_RULES = Object.freeze([
+  Object.freeze({
+    projectId: 'founder-control-room',
+    recipientDomain: 'foundercontrolroom.org',
+    labelName: 'FCR / Mail',
+  }),
+  Object.freeze({
+    projectId: 'jussco',
+    recipientDomain: 'jussco.company',
+    labelName: 'JussCo / Mail',
+  }),
+  Object.freeze({
+    projectId: 'juss-beautiful-hair',
+    recipientDomain: 'jussbeautifulhair.com',
+    labelName: 'JBH / Mail',
+  }),
+  Object.freeze({
+    projectId: 'sekret-bip',
+    recipientDomain: 'sekretbip.net',
+    labelName: "Se'kret Bip / Mail",
+  }),
+] satisfies readonly GmailProjectFilingRule[]);
+
 export interface WhatsAppReplyInput {
   recipientWaId: string;
   replyToMessageId: string;
@@ -103,6 +151,21 @@ function replySubject(subject: string | null): string {
   return /^re\s*:/i.test(safe) ? safe : `Re: ${safe}`;
 }
 
+function configuredGmailAccessMissing(): string[] {
+  const missing: string[] = [];
+  if (!env('FCR_GMAIL_EXPECTED_EMAIL')) missing.push('FCR_GMAIL_EXPECTED_EMAIL');
+  const directToken = env('FCR_GMAIL_ACCESS_TOKEN');
+  const refreshReady = Boolean(
+    env('FCR_GMAIL_REFRESH_TOKEN')
+      && env('FCR_GMAIL_CLIENT_ID')
+      && env('FCR_GMAIL_CLIENT_SECRET'),
+  );
+  if (!directToken && !refreshReady) {
+    missing.push('FCR_GMAIL_ACCESS_TOKEN or refresh-token OAuth secret set');
+  }
+  return missing;
+}
+
 function configuredGmailMissing(): string[] {
   const missing: string[] = [];
   if (!env('FCR_GMAIL_EXPECTED_EMAIL')) missing.push('FCR_GMAIL_EXPECTED_EMAIL');
@@ -129,6 +192,24 @@ function configuredWhatsAppMissing(): string[] {
     'FCR_WHATSAPP_GRAPH_VERSION',
   ] as const;
   return required.filter((name) => !env(name));
+}
+
+export function gmailProjectFilingStatus(): GmailProjectFilingStatus {
+  const enabledValue = env('FCR_GMAIL_PROJECT_FILING_ENABLED');
+  const enabled = enabledValue === 'true';
+  const missing = configuredGmailAccessMissing();
+  if (enabledValue && enabledValue !== 'true' && enabledValue !== 'false') {
+    missing.push('FCR_GMAIL_PROJECT_FILING_ENABLED must be true or false');
+  }
+
+  return {
+    contract: 'fcr/gmail-project-filing@v1',
+    enabled,
+    configured: missing.length === 0,
+    expectedAccount: env('FCR_GMAIL_EXPECTED_EMAIL')?.toLowerCase() ?? null,
+    missing,
+    rules: GMAIL_PROJECT_FILING_RULES,
+  };
 }
 
 export function growthInboxReplyStatus(): GrowthInboxReplyStatus {
@@ -225,6 +306,130 @@ async function gmailJson(
   const payload = await responseJson(response);
   if (!response.ok) throw new Error(`GMAIL_PROVIDER_${response.status}`);
   return payload;
+}
+
+function stringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
+}
+
+function objectArray(value: unknown): Record<string, unknown>[] {
+  return Array.isArray(value)
+    ? value.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object' && !Array.isArray(item))
+    : [];
+}
+
+export async function reconcileGmailProjectFilingFilters(
+  fetchImpl: FetchLike = fetch,
+): Promise<GmailProjectFilingResult> {
+  const status = gmailProjectFilingStatus();
+  if (!status.enabled) {
+    return {
+      contract: status.contract,
+      status: 'disabled',
+      account: status.expectedAccount,
+      labelsCreated: 0,
+      filtersCreated: 0,
+      filtersAlreadyPresent: 0,
+      rulesChecked: 0,
+    };
+  }
+  if (!status.configured || !status.expectedAccount) {
+    throw new Error('GMAIL_PROJECT_FILING_NOT_CONFIGURED');
+  }
+
+  const token = await gmailAccessToken(fetchImpl);
+  const profile = await gmailJson(fetchImpl, token, `${GMAIL_API}/profile`);
+  const account = typeof profile.emailAddress === 'string' ? profile.emailAddress.trim().toLowerCase() : '';
+  if (!account || account !== status.expectedAccount) {
+    throw new Error('GMAIL_ACCOUNT_FINGERPRINT_MISMATCH');
+  }
+
+  const labelPayload = await gmailJson(fetchImpl, token, `${GMAIL_API}/labels`);
+  const labelIdByName = new Map<string, string>();
+  for (const label of objectArray(labelPayload.labels)) {
+    const name = typeof label.name === 'string' ? label.name : '';
+    const id = typeof label.id === 'string' ? label.id : '';
+    if (name && id) labelIdByName.set(name, id);
+  }
+
+  let labelsCreated = 0;
+  for (const rule of status.rules) {
+    if (labelIdByName.has(rule.labelName)) continue;
+    const created = await gmailJson(fetchImpl, token, `${GMAIL_API}/labels`, {
+      method: 'POST',
+      body: JSON.stringify({
+        name: rule.labelName,
+        labelListVisibility: 'labelShow',
+        messageListVisibility: 'show',
+      }),
+    });
+    const labelId = typeof created.id === 'string' ? created.id : '';
+    const labelName = typeof created.name === 'string' ? created.name : '';
+    if (!labelId || labelName !== rule.labelName) {
+      throw new Error('GMAIL_PROJECT_FILING_LABEL_RECEIPT_INVALID');
+    }
+    labelIdByName.set(rule.labelName, labelId);
+    labelsCreated += 1;
+  }
+
+  const filterPayload = await gmailJson(fetchImpl, token, `${GMAIL_API}/settings/filters`);
+  const existingFilters = objectArray(filterPayload.filter);
+  let filtersCreated = 0;
+  let filtersAlreadyPresent = 0;
+
+  for (const rule of status.rules) {
+    const labelId = labelIdByName.get(rule.labelName);
+    if (!labelId) throw new Error('GMAIL_PROJECT_FILING_LABEL_MISSING');
+
+    const query = `to:${rule.recipientDomain}`;
+    const sameQuery = existingFilters.filter((filter) => {
+      const criteria = filter.criteria;
+      return Boolean(criteria)
+        && typeof criteria === 'object'
+        && !Array.isArray(criteria)
+        && (criteria as Record<string, unknown>).query === query;
+    });
+
+    const exact = sameQuery.some((filter) => {
+      const action = filter.action;
+      if (!action || typeof action !== 'object' || Array.isArray(action)) return false;
+      return stringArray((action as Record<string, unknown>).addLabelIds).includes(labelId);
+    });
+
+    if (exact) {
+      filtersAlreadyPresent += 1;
+      continue;
+    }
+    if (sameQuery.length > 0) {
+      throw new Error(`GMAIL_PROJECT_FILING_FILTER_CONFLICT:${rule.recipientDomain}`);
+    }
+
+    const created = await gmailJson(fetchImpl, token, `${GMAIL_API}/settings/filters`, {
+      method: 'POST',
+      body: JSON.stringify({
+        criteria: { query },
+        action: { addLabelIds: [labelId] },
+      }),
+    });
+    const createdId = typeof created.id === 'string' ? created.id : '';
+    if (!createdId) throw new Error('GMAIL_PROJECT_FILING_FILTER_RECEIPT_INVALID');
+    existingFilters.push({
+      id: createdId,
+      criteria: { query },
+      action: { addLabelIds: [labelId] },
+    });
+    filtersCreated += 1;
+  }
+
+  return {
+    contract: status.contract,
+    status: 'reconciled',
+    account,
+    labelsCreated,
+    filtersCreated,
+    filtersAlreadyPresent,
+    rulesChecked: status.rules.length,
+  };
 }
 
 export async function sendGmailReply(
