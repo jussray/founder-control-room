@@ -3,7 +3,9 @@ import {
   gmailProjectFilingStatus,
   growthInboxReplyStatus,
   reconcileGmailProjectFilingFilters,
+  reconcileGmailProjectFilingFiltersWithAccessToken,
   sendGmailReply,
+  verifyGoogleProviderIdentity,
   sendWhatsAppReply,
 } from '../growthInboxReply.js';
 
@@ -73,20 +75,13 @@ describe('reconcileGmailProjectFilingFilters', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('creates only project labels and additive Gmail filters for the pinned mailbox', async () => {
+  it('creates only additive Gmail filters using the pinned live label IDs', async () => {
     process.env.FCR_GMAIL_PROJECT_FILING_ENABLED = 'true';
     process.env.FCR_GMAIL_ACCESS_TOKEN = 'test-token';
     process.env.FCR_GMAIL_EXPECTED_EMAIL = 'sekretbip@gmail.com';
 
-    const labels = [
-      { id: 'Label_29', name: 'FCR / Mail' },
-      { id: 'Label_30', name: 'JussCo / Mail' },
-      { id: 'Label_31', name: 'JBH / Mail' },
-      { id: 'Label_32', name: "Se'kret Bip / Mail" },
-    ];
     const fetchMock = vi.fn<typeof fetch>()
-      .mockResolvedValueOnce(jsonResponse({ emailAddress: 'sekretbip@gmail.com' }))
-      .mockResolvedValueOnce(jsonResponse({ labels }))
+      .mockResolvedValueOnce(jsonResponse({ email: 'sekretbip@gmail.com', email_verified: true }))
       .mockResolvedValueOnce(jsonResponse({ filter: [] }))
       .mockResolvedValueOnce(jsonResponse({ id: 'filter-fcr' }))
       .mockResolvedValueOnce(jsonResponse({ id: 'filter-jussco' }))
@@ -104,17 +99,19 @@ describe('reconcileGmailProjectFilingFilters', () => {
       rulesChecked: 4,
     });
 
+    expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith('/labels'))).toBe(false);
     const filterCalls = fetchMock.mock.calls.filter(([url]) => String(url).endsWith('/settings/filters'));
     const createCalls = filterCalls.filter(([, init]) => (init as RequestInit | undefined)?.method === 'POST');
     expect(createCalls).toHaveLength(4);
 
-    for (const [, init] of createCalls) {
+    const expectedLabelIds = ['Label_29', 'Label_30', 'Label_31', 'Label_32'];
+    for (const [index, [, init]] of createCalls.entries()) {
       const payload = JSON.parse(String((init as RequestInit).body)) as {
         criteria: { query: string };
         action: Record<string, unknown>;
       };
       expect(payload.criteria.query).toMatch(/^to:/);
-      expect(payload.action).toEqual({ addLabelIds: [expect.any(String)] });
+      expect(payload.action).toEqual({ addLabelIds: [expectedLabelIds[index]] });
       expect(payload.action).not.toHaveProperty('removeLabelIds');
     }
   });
@@ -124,15 +121,8 @@ describe('reconcileGmailProjectFilingFilters', () => {
     process.env.FCR_GMAIL_ACCESS_TOKEN = 'test-token';
     process.env.FCR_GMAIL_EXPECTED_EMAIL = 'sekretbip@gmail.com';
 
-    const labels = [
-      { id: 'Label_29', name: 'FCR / Mail' },
-      { id: 'Label_30', name: 'JussCo / Mail' },
-      { id: 'Label_31', name: 'JBH / Mail' },
-      { id: 'Label_32', name: "Se'kret Bip / Mail" },
-    ];
     const fetchMock = vi.fn<typeof fetch>()
-      .mockResolvedValueOnce(jsonResponse({ emailAddress: 'sekretbip@gmail.com' }))
-      .mockResolvedValueOnce(jsonResponse({ labels }))
+      .mockResolvedValueOnce(jsonResponse({ email: 'sekretbip@gmail.com', email_verified: true }))
       .mockResolvedValueOnce(jsonResponse({
         filter: [{
           id: 'dangerous-filter',
@@ -143,19 +133,40 @@ describe('reconcileGmailProjectFilingFilters', () => {
 
     await expect(reconcileGmailProjectFilingFilters(fetchMock))
       .rejects.toThrow('GMAIL_PROJECT_FILING_FILTER_CONFLICT:foundercontrolroom.org');
-    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
-  it('blocks on a mailbox fingerprint mismatch before reading labels or filters', async () => {
+  it('blocks on a verified Google account mismatch before reading Gmail filters', async () => {
     process.env.FCR_GMAIL_PROJECT_FILING_ENABLED = 'true';
     process.env.FCR_GMAIL_ACCESS_TOKEN = 'test-token';
     process.env.FCR_GMAIL_EXPECTED_EMAIL = 'sekretbip@gmail.com';
     const fetchMock = vi.fn<typeof fetch>()
-      .mockResolvedValueOnce(jsonResponse({ emailAddress: 'wrong@example.com' }));
+      .mockResolvedValueOnce(jsonResponse({ email: 'wrong@example.com', email_verified: true }));
 
     await expect(reconcileGmailProjectFilingFilters(fetchMock))
       .rejects.toThrow('GMAIL_ACCOUNT_FINGERPRINT_MISMATCH');
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('supports one-time founder consent without enabling background Gmail access', async () => {
+    const fetchMock = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(jsonResponse({ email: 'sekretbip@gmail.com', email_verified: true }))
+      .mockResolvedValueOnce(jsonResponse({ filter: [] }))
+      .mockResolvedValueOnce(jsonResponse({ id: 'filter-fcr' }))
+      .mockResolvedValueOnce(jsonResponse({ id: 'filter-jussco' }))
+      .mockResolvedValueOnce(jsonResponse({ id: 'filter-jbh' }))
+      .mockResolvedValueOnce(jsonResponse({ id: 'filter-bip' }));
+
+    const account = await verifyGoogleProviderIdentity('one-time-provider-token', fetchMock);
+    const result = await reconcileGmailProjectFilingFiltersWithAccessToken(
+      'one-time-provider-token',
+      account,
+      fetchMock,
+    );
+
+    expect(result.filtersCreated).toBe(4);
+    expect(result.rulesChecked).toBe(4);
+    expect(result.account).toBe('sekretbip@gmail.com');
   });
 });
 
