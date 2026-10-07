@@ -43,6 +43,7 @@ export interface GmailProjectFilingRule {
   projectId: string;
   recipientDomain: string;
   labelName: string;
+  labelId: string;
 }
 
 export interface GmailProjectFilingStatus {
@@ -64,26 +65,33 @@ export interface GmailProjectFilingResult {
   rulesChecked: number;
 }
 
+export const GMAIL_PROJECT_FILING_EXPECTED_ACCOUNT = 'sekretbip@gmail.com' as const;
+export const GMAIL_PROJECT_FILING_SCOPE = 'https://www.googleapis.com/auth/gmail.settings.basic' as const;
+
 export const GMAIL_PROJECT_FILING_RULES = Object.freeze([
   Object.freeze({
     projectId: 'founder-control-room',
     recipientDomain: 'foundercontrolroom.org',
     labelName: 'FCR / Mail',
+    labelId: 'Label_29',
   }),
   Object.freeze({
     projectId: 'jussco',
     recipientDomain: 'jussco.company',
     labelName: 'JussCo / Mail',
+    labelId: 'Label_30',
   }),
   Object.freeze({
     projectId: 'juss-beautiful-hair',
     recipientDomain: 'jussbeautifulhair.com',
     labelName: 'JBH / Mail',
+    labelId: 'Label_31',
   }),
   Object.freeze({
     projectId: 'sekret-bip',
     recipientDomain: 'sekretbip.net',
     labelName: "Se'kret Bip / Mail",
+    labelId: 'Label_32',
   }),
 ] satisfies readonly GmailProjectFilingRule[]);
 
@@ -111,6 +119,7 @@ type GmailMessage = {
 
 const GMAIL_API = 'https://gmail.googleapis.com/gmail/v1/users/me';
 const GOOGLE_TOKEN_ENDPOINT = 'https://oauth2.googleapis.com/token';
+const GOOGLE_USERINFO_ENDPOINT = 'https://www.googleapis.com/oauth2/v3/userinfo';
 const MAX_REPLY_LENGTH = 16_000;
 const MAX_WHATSAPP_TEXT_LENGTH = 4_096;
 const SAFE_GRAPH_VERSION = /^v\d+\.\d+$/;
@@ -318,6 +327,106 @@ function objectArray(value: unknown): Record<string, unknown>[] {
     : [];
 }
 
+export async function verifyGoogleProviderIdentity(
+  accessToken: string,
+  fetchImpl: FetchLike = fetch,
+): Promise<string> {
+  const token = accessToken.trim();
+  if (!token || token.length > 16_384) throw new Error('GOOGLE_PROVIDER_TOKEN_INVALID');
+
+  const response = await fetchImpl(GOOGLE_USERINFO_ENDPOINT, {
+    headers: {
+      Accept: 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  const payload = await responseJson(response);
+  if (!response.ok) throw new Error(`GOOGLE_IDENTITY_PROVIDER_${response.status}`);
+
+  const account = typeof payload.email === 'string' ? payload.email.trim().toLowerCase() : '';
+  const verified = payload.email_verified === true || payload.verified_email === true;
+  if (!verified || account !== GMAIL_PROJECT_FILING_EXPECTED_ACCOUNT) {
+    throw new Error('GMAIL_ACCOUNT_FINGERPRINT_MISMATCH');
+  }
+  return account;
+}
+
+export async function reconcileGmailProjectFilingFiltersWithAccessToken(
+  accessToken: string,
+  verifiedAccount: string,
+  fetchImpl: FetchLike = fetch,
+): Promise<GmailProjectFilingResult> {
+  const token = accessToken.trim();
+  const account = verifiedAccount.trim().toLowerCase();
+  if (!token || token.length > 16_384) throw new Error('GOOGLE_PROVIDER_TOKEN_INVALID');
+  if (account !== GMAIL_PROJECT_FILING_EXPECTED_ACCOUNT) {
+    throw new Error('GMAIL_ACCOUNT_FINGERPRINT_MISMATCH');
+  }
+
+  const filterPayload = await gmailJson(fetchImpl, token, `${GMAIL_API}/settings/filters`);
+  const existingFilters = objectArray(filterPayload.filter);
+  let filtersCreated = 0;
+  let filtersAlreadyPresent = 0;
+
+  for (const rule of GMAIL_PROJECT_FILING_RULES) {
+    const query = `to:${rule.recipientDomain}`;
+    const sameQuery = existingFilters.filter((filter) => {
+      const criteria = filter.criteria;
+      return Boolean(criteria)
+        && typeof criteria === 'object'
+        && !Array.isArray(criteria)
+        && (criteria as Record<string, unknown>).query === query;
+    });
+
+    const exactFilters = sameQuery.filter((filter) => {
+      const action = filter.action;
+      if (!action || typeof action !== 'object' || Array.isArray(action)) return false;
+      const actionRecord = action as Record<string, unknown>;
+      const addLabelIds = stringArray(actionRecord.addLabelIds);
+      const removeLabelIds = stringArray(actionRecord.removeLabelIds);
+      const forward = typeof actionRecord.forward === 'string' ? actionRecord.forward.trim() : '';
+      return addLabelIds.length === 1
+        && addLabelIds[0] === rule.labelId
+        && removeLabelIds.length === 0
+        && !forward;
+    });
+
+    if (exactFilters.length === 1 && sameQuery.length === 1) {
+      filtersAlreadyPresent += 1;
+      continue;
+    }
+    if (sameQuery.length > 0) {
+      throw new Error(`GMAIL_PROJECT_FILING_FILTER_CONFLICT:${rule.recipientDomain}`);
+    }
+
+    const created = await gmailJson(fetchImpl, token, `${GMAIL_API}/settings/filters`, {
+      method: 'POST',
+      body: JSON.stringify({
+        criteria: { query },
+        action: { addLabelIds: [rule.labelId] },
+      }),
+    });
+    const createdId = typeof created.id === 'string' ? created.id : '';
+    if (!createdId) throw new Error('GMAIL_PROJECT_FILING_FILTER_RECEIPT_INVALID');
+    existingFilters.push({
+      id: createdId,
+      criteria: { query },
+      action: { addLabelIds: [rule.labelId] },
+    });
+    filtersCreated += 1;
+  }
+
+  return {
+    contract: 'fcr/gmail-project-filing@v1',
+    status: 'reconciled',
+    account,
+    labelsCreated: 0,
+    filtersCreated,
+    filtersAlreadyPresent,
+    rulesChecked: GMAIL_PROJECT_FILING_RULES.length,
+  };
+}
+
 export async function reconcileGmailProjectFilingFilters(
   fetchImpl: FetchLike = fetch,
 ): Promise<GmailProjectFilingResult> {
@@ -338,105 +447,9 @@ export async function reconcileGmailProjectFilingFilters(
   }
 
   const token = await gmailAccessToken(fetchImpl);
-  const profile = await gmailJson(fetchImpl, token, `${GMAIL_API}/profile`);
-  const account = typeof profile.emailAddress === 'string' ? profile.emailAddress.trim().toLowerCase() : '';
-  if (!account || account !== status.expectedAccount) {
-    throw new Error('GMAIL_ACCOUNT_FINGERPRINT_MISMATCH');
-  }
-
-  const labelPayload = await gmailJson(fetchImpl, token, `${GMAIL_API}/labels`);
-  const labelIdByName = new Map<string, string>();
-  for (const label of objectArray(labelPayload.labels)) {
-    const name = typeof label.name === 'string' ? label.name : '';
-    const id = typeof label.id === 'string' ? label.id : '';
-    if (name && id) labelIdByName.set(name, id);
-  }
-
-  let labelsCreated = 0;
-  for (const rule of status.rules) {
-    if (labelIdByName.has(rule.labelName)) continue;
-    const created = await gmailJson(fetchImpl, token, `${GMAIL_API}/labels`, {
-      method: 'POST',
-      body: JSON.stringify({
-        name: rule.labelName,
-        labelListVisibility: 'labelShow',
-        messageListVisibility: 'show',
-      }),
-    });
-    const labelId = typeof created.id === 'string' ? created.id : '';
-    const labelName = typeof created.name === 'string' ? created.name : '';
-    if (!labelId || labelName !== rule.labelName) {
-      throw new Error('GMAIL_PROJECT_FILING_LABEL_RECEIPT_INVALID');
-    }
-    labelIdByName.set(rule.labelName, labelId);
-    labelsCreated += 1;
-  }
-
-  const filterPayload = await gmailJson(fetchImpl, token, `${GMAIL_API}/settings/filters`);
-  const existingFilters = objectArray(filterPayload.filter);
-  let filtersCreated = 0;
-  let filtersAlreadyPresent = 0;
-
-  for (const rule of status.rules) {
-    const labelId = labelIdByName.get(rule.labelName);
-    if (!labelId) throw new Error('GMAIL_PROJECT_FILING_LABEL_MISSING');
-
-    const query = `to:${rule.recipientDomain}`;
-    const sameQuery = existingFilters.filter((filter) => {
-      const criteria = filter.criteria;
-      return Boolean(criteria)
-        && typeof criteria === 'object'
-        && !Array.isArray(criteria)
-        && (criteria as Record<string, unknown>).query === query;
-    });
-
-    const exactFilters = sameQuery.filter((filter) => {
-      const action = filter.action;
-      if (!action || typeof action !== 'object' || Array.isArray(action)) return false;
-      const actionRecord = action as Record<string, unknown>;
-      const addLabelIds = stringArray(actionRecord.addLabelIds);
-      const removeLabelIds = stringArray(actionRecord.removeLabelIds);
-      const forward = typeof actionRecord.forward === 'string' ? actionRecord.forward.trim() : '';
-      return addLabelIds.length === 1
-        && addLabelIds[0] === labelId
-        && removeLabelIds.length === 0
-        && !forward;
-    });
-
-    if (exactFilters.length === 1 && sameQuery.length === 1) {
-      filtersAlreadyPresent += 1;
-      continue;
-    }
-    if (sameQuery.length > 0) {
-      throw new Error(`GMAIL_PROJECT_FILING_FILTER_CONFLICT:${rule.recipientDomain}`);
-    }
-
-    const created = await gmailJson(fetchImpl, token, `${GMAIL_API}/settings/filters`, {
-      method: 'POST',
-      body: JSON.stringify({
-        criteria: { query },
-        action: { addLabelIds: [labelId] },
-      }),
-    });
-    const createdId = typeof created.id === 'string' ? created.id : '';
-    if (!createdId) throw new Error('GMAIL_PROJECT_FILING_FILTER_RECEIPT_INVALID');
-    existingFilters.push({
-      id: createdId,
-      criteria: { query },
-      action: { addLabelIds: [labelId] },
-    });
-    filtersCreated += 1;
-  }
-
-  return {
-    contract: status.contract,
-    status: 'reconciled',
-    account,
-    labelsCreated,
-    filtersCreated,
-    filtersAlreadyPresent,
-    rulesChecked: status.rules.length,
-  };
+  const account = await verifyGoogleProviderIdentity(token, fetchImpl);
+  if (account !== status.expectedAccount) throw new Error('GMAIL_ACCOUNT_FINGERPRINT_MISMATCH');
+  return reconcileGmailProjectFilingFiltersWithAccessToken(token, account, fetchImpl);
 }
 
 export async function sendGmailReply(
