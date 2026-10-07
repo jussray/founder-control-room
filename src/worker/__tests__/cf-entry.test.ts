@@ -27,6 +27,7 @@ const VALID_ENV: ControlRoomWorkerEnv = {
     send: vi.fn().mockResolvedValue({ messageId: 'email-test-id' }),
   },
   FCR_EMAIL_FROM,
+  FCR_GMAIL_PROJECT_FILING_ENABLED: 'false',
   CHIEF_AI: {
     version: vi.fn().mockResolvedValue({ ok: true }),
     ingestBipEvidence: vi.fn().mockResolvedValue({ ok: true }),
@@ -79,6 +80,13 @@ describe('Cloudflare Worker binding validation', () => {
       .toThrow('Missing required Worker binding: CHIEF_AI');
     expect(() => validateWorkerEnv({ ...VALID_ENV, CHIEF_AI: { version: vi.fn() } }))
       .toThrow('Missing required Worker binding: CHIEF_AI');
+  });
+
+  it('rejects an invalid Gmail project filing gate instead of guessing intent', () => {
+    expect(() => validateWorkerEnv({
+      ...VALID_ENV,
+      FCR_GMAIL_PROJECT_FILING_ENABLED: 'maybe',
+    })).toThrow('FCR_GMAIL_PROJECT_FILING_ENABLED must be true or false');
   });
 
   it('rejects a sender identity that drifts away from the checked-in FCR identity', () => {
