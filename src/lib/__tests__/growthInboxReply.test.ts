@@ -104,7 +104,7 @@ describe('reconcileGmailProjectFilingFilters', () => {
       rulesChecked: 4,
     });
 
-    const filterCalls = fetchMock.mock.calls.filter(([url]) => String(url).endsWith('/settings/filters') && (fetchMock.mock.calls.findIndex((call) => call === undefined) === -1 || true));
+    const filterCalls = fetchMock.mock.calls.filter(([url]) => String(url).endsWith('/settings/filters'));
     const createCalls = filterCalls.filter(([, init]) => (init as RequestInit | undefined)?.method === 'POST');
     expect(createCalls).toHaveLength(4);
 
