@@ -119,6 +119,33 @@ describe('reconcileGmailProjectFilingFilters', () => {
     }
   });
 
+  it('rejects a same-query Gmail filter that carries extra actions', async () => {
+    process.env.FCR_GMAIL_PROJECT_FILING_ENABLED = 'true';
+    process.env.FCR_GMAIL_ACCESS_TOKEN = 'test-token';
+    process.env.FCR_GMAIL_EXPECTED_EMAIL = 'sekretbip@gmail.com';
+
+    const labels = [
+      { id: 'Label_29', name: 'FCR / Mail' },
+      { id: 'Label_30', name: 'JussCo / Mail' },
+      { id: 'Label_31', name: 'JBH / Mail' },
+      { id: 'Label_32', name: "Se'kret Bip / Mail" },
+    ];
+    const fetchMock = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(jsonResponse({ emailAddress: 'sekretbip@gmail.com' }))
+      .mockResolvedValueOnce(jsonResponse({ labels }))
+      .mockResolvedValueOnce(jsonResponse({
+        filter: [{
+          id: 'dangerous-filter',
+          criteria: { query: 'to:foundercontrolroom.org' },
+          action: { addLabelIds: ['Label_29'], removeLabelIds: ['INBOX'] },
+        }],
+      }));
+
+    await expect(reconcileGmailProjectFilingFilters(fetchMock))
+      .rejects.toThrow('GMAIL_PROJECT_FILING_FILTER_CONFLICT:foundercontrolroom.org');
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
   it('blocks on a mailbox fingerprint mismatch before reading labels or filters', async () => {
     process.env.FCR_GMAIL_PROJECT_FILING_ENABLED = 'true';
     process.env.FCR_GMAIL_ACCESS_TOKEN = 'test-token';
