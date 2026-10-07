@@ -67,6 +67,9 @@ SUPABASE_PROJECT_REF = "oojzfmmywbvficgybaxd"
 FOUNDER_ALLOWED_ORIGINS = "https://foundercontrolroom.org"
 FOUNDER_API_URL = "https://foundercontrolroom.org"
 FCR_EMAIL_FROM = "welcome@api.foundercontrolroom.org"
+# Persistent Gmail project filing stays inert until owned Google OAuth with
+# gmail.settings.basic is connected and this flag is deliberately enabled.
+FCR_GMAIL_PROJECT_FILING_ENABLED = "false"
 FCR_REMOTE_MCP_READ_PROJECTS = "chief-ai-machine,founder-control-room"
 FCR_RELAY_OPENAI_MODEL = "gpt-5.6-sol"
 FCR_RELAY_ANTHROPIC_MODEL = "claude-sonnet-5"
