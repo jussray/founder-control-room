@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  gmailProjectFilingStatus,
   growthInboxReplyStatus,
+  reconcileGmailProjectFilingFilters,
   sendGmailReply,
   sendWhatsAppReply,
 } from '../growthInboxReply.js';
@@ -12,6 +14,7 @@ const MANAGED_ENV = [
   'FCR_GMAIL_CLIENT_SECRET',
   'FCR_GMAIL_EXPECTED_EMAIL',
   'FCR_GMAIL_FROM_EMAIL',
+  'FCR_GMAIL_PROJECT_FILING_ENABLED',
   'FCR_WHATSAPP_ACCESS_TOKEN',
   'FCR_WHATSAPP_PHONE_NUMBER_ID',
   'FCR_WHATSAPP_WABA_ID',
@@ -54,6 +57,78 @@ describe('growthInboxReplyStatus', () => {
     const status = growthInboxReplyStatus();
     expect(status.channels.email.configured).toBe(false);
     expect(status.channels.email.missing).toContain('FCR_GMAIL_FROM_EMAIL');
+  });
+});
+
+describe('reconcileGmailProjectFilingFilters', () => {
+  it('is inert when the persistent filing flag is disabled', async () => {
+    process.env.FCR_GMAIL_PROJECT_FILING_ENABLED = 'false';
+    const fetchMock = vi.fn<typeof fetch>();
+
+    const status = gmailProjectFilingStatus();
+    const result = await reconcileGmailProjectFilingFilters(fetchMock);
+
+    expect(status.enabled).toBe(false);
+    expect(result.status).toBe('disabled');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('creates only project labels and additive Gmail filters for the pinned mailbox', async () => {
+    process.env.FCR_GMAIL_PROJECT_FILING_ENABLED = 'true';
+    process.env.FCR_GMAIL_ACCESS_TOKEN = 'test-token';
+    process.env.FCR_GMAIL_EXPECTED_EMAIL = 'sekretbip@gmail.com';
+
+    const labels = [
+      { id: 'Label_29', name: 'FCR / Mail' },
+      { id: 'Label_30', name: 'JussCo / Mail' },
+      { id: 'Label_31', name: 'JBH / Mail' },
+      { id: 'Label_32', name: "Se'kret Bip / Mail" },
+    ];
+    const fetchMock = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(jsonResponse({ emailAddress: 'sekretbip@gmail.com' }))
+      .mockResolvedValueOnce(jsonResponse({ labels }))
+      .mockResolvedValueOnce(jsonResponse({ filter: [] }))
+      .mockResolvedValueOnce(jsonResponse({ id: 'filter-fcr' }))
+      .mockResolvedValueOnce(jsonResponse({ id: 'filter-jussco' }))
+      .mockResolvedValueOnce(jsonResponse({ id: 'filter-jbh' }))
+      .mockResolvedValueOnce(jsonResponse({ id: 'filter-bip' }));
+
+    const result = await reconcileGmailProjectFilingFilters(fetchMock);
+
+    expect(result).toMatchObject({
+      status: 'reconciled',
+      account: 'sekretbip@gmail.com',
+      labelsCreated: 0,
+      filtersCreated: 4,
+      filtersAlreadyPresent: 0,
+      rulesChecked: 4,
+    });
+
+    const filterCalls = fetchMock.mock.calls.filter(([url]) => String(url).endsWith('/settings/filters') && (fetchMock.mock.calls.findIndex((call) => call === undefined) === -1 || true));
+    const createCalls = filterCalls.filter(([, init]) => (init as RequestInit | undefined)?.method === 'POST');
+    expect(createCalls).toHaveLength(4);
+
+    for (const [, init] of createCalls) {
+      const payload = JSON.parse(String((init as RequestInit).body)) as {
+        criteria: { query: string };
+        action: Record<string, unknown>;
+      };
+      expect(payload.criteria.query).toMatch(/^to:/);
+      expect(payload.action).toEqual({ addLabelIds: [expect.any(String)] });
+      expect(payload.action).not.toHaveProperty('removeLabelIds');
+    }
+  });
+
+  it('blocks on a mailbox fingerprint mismatch before reading labels or filters', async () => {
+    process.env.FCR_GMAIL_PROJECT_FILING_ENABLED = 'true';
+    process.env.FCR_GMAIL_ACCESS_TOKEN = 'test-token';
+    process.env.FCR_GMAIL_EXPECTED_EMAIL = 'sekretbip@gmail.com';
+    const fetchMock = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(jsonResponse({ emailAddress: 'wrong@example.com' }));
+
+    await expect(reconcileGmailProjectFilingFilters(fetchMock))
+      .rejects.toThrow('GMAIL_ACCOUNT_FINGERPRINT_MISMATCH');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });
 
