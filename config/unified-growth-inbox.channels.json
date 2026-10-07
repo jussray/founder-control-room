@@ -306,7 +306,9 @@
     "preserveUnread": true,
     "crossProjectLabeling": false,
     "backgroundAutofilingRequires": [
-      "gmail_filter_api_or_owned_google_oauth"
+      "owned_google_oauth",
+      "gmail.settings.basic",
+      "verified_expected_account"
     ],
     "rules": [
       {
@@ -349,6 +351,9 @@
           "hello"
         ]
       }
-    ]
+    ],
+    "persistentMechanism": "gmail_filter_rules",
+    "runtimeEnableFlag": "FCR_GMAIL_PROJECT_FILING_ENABLED",
+    "enabledByDefault": false
   }
 }
