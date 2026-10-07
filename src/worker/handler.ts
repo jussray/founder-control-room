@@ -30,6 +30,8 @@ export interface ControlRoomWorkerEnv {
   FOUNDER_API_URL: string;
   FCR_EMAIL: ProjectEmailBinding;
   FCR_EMAIL_FROM: string;
+  /** Enables idempotent Gmail filter reconciliation only after owned OAuth is connected. */
+  FCR_GMAIL_PROJECT_FILING_ENABLED: string;
   /** Private same-account RPC binding to Chief AI's evidence-only entrypoint. */
   CHIEF_AI: ChiefAiEvidenceServiceBinding;
   FCR_V10_CAPABILITY_PLAN_CONTRACT: string;
@@ -57,6 +59,7 @@ const REQUIRED_STRING_BINDINGS = [
   'FOUNDER_ALLOWED_ORIGINS',
   'FOUNDER_API_URL',
   'FCR_EMAIL_FROM',
+  'FCR_GMAIL_PROJECT_FILING_ENABLED',
   'FCR_V10_CAPABILITY_PLAN_CONTRACT',
   'FCR_V10_CONVEYOR_CONTRACT',
   'FCR_V10_MAX_RUNTIME_AUTHORITY',
@@ -122,6 +125,9 @@ export function validateWorkerEnv(
 
   if (validated.FCR_EMAIL_FROM !== FCR_EMAIL_FROM) {
     throw new Error('FCR_EMAIL_FROM must match the checked-in Founder Control Room sender identity');
+  }
+  if (!['true', 'false'].includes(validated.FCR_GMAIL_PROJECT_FILING_ENABLED)) {
+    throw new Error('FCR_GMAIL_PROJECT_FILING_ENABLED must be true or false');
   }
 
   let supabaseUrl: URL;
