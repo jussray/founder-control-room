@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-18",
+  "updatedAt": "2026-10-07",
   "reviewedAgainstPublicGuidanceAt": "2026-07-17",
   "mission": "Generate lawful, attributable revenue from permission-based conversations while preserving founder authority, brand, privacy, consent, and project separation.",
   "defaultAutomationMode": "draft_only",
@@ -296,5 +296,59 @@
     "hidden_automation_impersonation",
     "dispatch_without_audit",
     "reporting_uncollected_value_as_revenue"
-  ]
+  ],
+  "emailFiling": {
+    "provider": "gmail",
+    "centralInbox": "sekretbip@gmail.com",
+    "strategy": "original_recipient_domain",
+    "defaultAction": "leave_unfiled_in_inbox",
+    "preserveInbox": true,
+    "preserveUnread": true,
+    "crossProjectLabeling": false,
+    "backgroundAutofilingRequires": [
+      "gmail_filter_api_or_owned_google_oauth"
+    ],
+    "rules": [
+      {
+        "projectId": "founder-control-room",
+        "recipientDomain": "foundercontrolroom.org",
+        "labelName": "FCR / Mail",
+        "matchScope": "domain_all_aliases",
+        "testedAliases": [
+          "founder",
+          "support",
+          "hello"
+        ]
+      },
+      {
+        "projectId": "jussco",
+        "recipientDomain": "jussco.company",
+        "labelName": "JussCo / Mail",
+        "matchScope": "domain_all_aliases",
+        "testedAliases": [
+          "founder"
+        ]
+      },
+      {
+        "projectId": "juss-beautiful-hair",
+        "recipientDomain": "jussbeautifulhair.com",
+        "labelName": "JBH / Mail",
+        "matchScope": "domain_all_aliases",
+        "testedAliases": [
+          "founder"
+        ]
+      },
+      {
+        "projectId": "sekret-bip",
+        "recipientDomain": "sekretbip.net",
+        "labelName": "Se'kret Bip / Mail",
+        "matchScope": "domain_all_aliases",
+        "testedAliases": [
+          "founder",
+          "support",
+          "hello"
+        ]
+      }
+    ]
+  }
 }
