@@ -306,8 +306,8 @@
     "preserveUnread": true,
     "crossProjectLabeling": false,
     "backgroundAutofilingRequires": [
-      "owned_google_oauth",
-      "gmail.settings.basic",
+      "explicit_runtime_enablement",
+      "owned_google_oauth_if_drift_reconciliation_is_enabled",
       "verified_expected_account"
     ],
     "rules": [
@@ -320,7 +320,8 @@
           "founder",
           "support",
           "hello"
-        ]
+        ],
+        "labelId": "Label_29"
       },
       {
         "projectId": "jussco",
@@ -329,7 +330,8 @@
         "matchScope": "domain_all_aliases",
         "testedAliases": [
           "founder"
-        ]
+        ],
+        "labelId": "Label_30"
       },
       {
         "projectId": "juss-beautiful-hair",
@@ -338,7 +340,8 @@
         "matchScope": "domain_all_aliases",
         "testedAliases": [
           "founder"
-        ]
+        ],
+        "labelId": "Label_31"
       },
       {
         "projectId": "sekret-bip",
@@ -349,11 +352,15 @@
           "founder",
           "support",
           "hello"
-        ]
+        ],
+        "labelId": "Label_32"
       }
     ],
     "persistentMechanism": "gmail_filter_rules",
     "runtimeEnableFlag": "FCR_GMAIL_PROJECT_FILING_ENABLED",
-    "enabledByDefault": false
+    "enabledByDefault": false,
+    "activationMode": "one_time_founder_oauth",
+    "oauthScope": "https://www.googleapis.com/auth/gmail.settings.basic",
+    "providerTokenRetention": "discard_after_filter_reconciliation"
   }
 }
