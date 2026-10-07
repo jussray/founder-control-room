@@ -390,13 +390,20 @@ export async function reconcileGmailProjectFilingFilters(
         && (criteria as Record<string, unknown>).query === query;
     });
 
-    const exact = sameQuery.some((filter) => {
+    const exactFilters = sameQuery.filter((filter) => {
       const action = filter.action;
       if (!action || typeof action !== 'object' || Array.isArray(action)) return false;
-      return stringArray((action as Record<string, unknown>).addLabelIds).includes(labelId);
+      const actionRecord = action as Record<string, unknown>;
+      const addLabelIds = stringArray(actionRecord.addLabelIds);
+      const removeLabelIds = stringArray(actionRecord.removeLabelIds);
+      const forward = typeof actionRecord.forward === 'string' ? actionRecord.forward.trim() : '';
+      return addLabelIds.length === 1
+        && addLabelIds[0] === labelId
+        && removeLabelIds.length === 0
+        && !forward;
     });
 
-    if (exact) {
+    if (exactFilters.length === 1 && sameQuery.length === 1) {
       filtersAlreadyPresent += 1;
       continue;
     }
