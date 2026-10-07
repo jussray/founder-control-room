@@ -50,12 +50,14 @@ const composed = composeWorkerHandler(
       { runExternalUseHourlyCycle },
       { runPublicCoverageWatchCycle },
       { publishCloudflareRuntimeSignal },
+      { reconcileGmailProjectFilingFilters },
     ] = await Promise.all([
       import('./reconciler.js'),
       import('../services/portfolioVerificationScheduler.js'),
       import('../external-use/service.js'),
       import('../external-use/publicCoverageService.js'),
       import('./cloudflareRuntimeSignal.js'),
+      import('../lib/growthInboxReply.js'),
     ]);
 
     return {
@@ -66,17 +68,20 @@ const composed = composeWorkerHandler(
           externalUseResult,
           publicCoverageResult,
           cloudflareRuntimeSignalResult,
+          gmailProjectFilingResult,
         ] = await Promise.allSettled([
           runReconcilerCycle(),
           runExternalUseHourlyCycle(),
           runPublicCoverageWatchCycle(),
           publishCloudflareRuntimeSignal(),
+          reconcileGmailProjectFilingFilters(),
         ]);
         assertScheduledTaskResults([
           { name: 'reconciler', result: reconcilerResult },
           { name: 'external-use', result: externalUseResult },
           { name: 'public-coverage', result: publicCoverageResult },
           { name: 'cloudflare-runtime-signal', result: cloudflareRuntimeSignalResult },
+          { name: 'gmail-project-filing', result: gmailProjectFilingResult },
         ]);
       },
     };
