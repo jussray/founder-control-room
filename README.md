@@ -40,6 +40,8 @@ For a present-tense claim:
 
 Exact SHAs belong in receipts, PRs, artifacts, incidents, and provenance. The README deliberately does not freeze one SHA as permanent “current truth.”
 
+**Social identity source (source-level):** [`config/social-account-identities.json`](config/social-account-identities.json) distinguishes Juss&Co's founder-identified Facebook presence from the JBH commerce Page and names its intended Chief, SolContinuity, PromptOS, and storefront consumers. The checked-in Zapier budget verifier checks that existing Facebook draft channels retain their respective identities. This is not a claim that any external Facebook/Meta/Buffer account has been rebound, that the Juss&Co public URL is verified, or that any consumer runtime has refreshed its cache.
+
 ## What is implemented in source now
 
 ### Repository and mission control
