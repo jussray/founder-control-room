@@ -270,6 +270,46 @@ for (const [channel, field] of Object.entries(requiredChannelRoutes)) {
   if (contentContract?.channel_routes?.[channel] !== field) fail(`Buffer route ${channel} must map to ${field}`);
 }
 
+const socialIdentities = JSON.parse(await readFile(new URL('../config/social-account-identities.json', import.meta.url), 'utf8'));
+if (socialIdentities?.contract !== 'juss/social-account-identity@v1') fail('social identity contract version drift');
+if (socialIdentities?.authority_repository !== 'jussray/founder-control-room') fail('social identity authority must remain FCR');
+const companyFacebook = socialIdentities?.identities?.juss_and_co_facebook;
+const hairFacebook = socialIdentities?.identities?.juss_beautiful_hair_facebook;
+if (companyFacebook?.owner !== 'juss-and-co' || companyFacebook?.purpose !== 'parent_company') {
+  fail('Juss&Co Facebook must remain the parent-company identity');
+}
+if (hairFacebook?.owner !== 'juss-beautiful-hair' || hairFacebook?.purpose !== 'hair_store') {
+  fail('JBH Facebook must remain the commerce identity');
+}
+if (!/^\\d+$/.test(hairFacebook?.facebook_page_id ?? '')) fail('JBH Facebook must retain its observed numeric Page ID');
+if (companyFacebook?.facebook_page_id && companyFacebook.facebook_page_id === hairFacebook?.facebook_page_id) {
+  fail('cannot reuse the JBH Facebook Page ID for Juss&Co');
+}
+if (companyFacebook?.public_url && companyFacebook.public_url_status !== 'PROVIDER_VERIFIED') {
+  fail('Juss&Co public URL must not be exposed as verified without provider proof');
+}
+if (companyFacebook?.founder_attributed_share_url &&
+    companyFacebook.founder_attributed_share_url === hairFacebook?.founder_attributed_share_url) {
+  fail('cannot reuse the JBH share link for Juss&Co');
+}
+if (companyFacebook?.may_use_for_jussco_github_social_field !== false &&
+    companyFacebook?.public_url_status !== 'PROVIDER_VERIFIED') {
+  fail('unverified Juss&Co URL cannot populate GitHub organization social fields');
+}
+for (const [channel, field] of Object.entries(requiredChannelRoutes)) {
+  if (channel.endsWith('_facebook')) {
+    const binding = socialIdentities?.channel_identity_binding?.[channel];
+    if (binding?.identity !== channel || binding?.draft_field !== field) {
+      fail(`social identity binding for ${channel} must retain its own draft field`);
+    }
+  }
+}
+if (socialIdentities?.safety?.no_cross_account_metric_donation !== true ||
+    socialIdentities?.safety?.no_cross_brand_destination_substitution !== true ||
+    socialIdentities?.safety?.no_auto_publication_or_account_binding !== true) {
+  fail('social identity source must forbid cross-account evidence, destination substitution and auto-publish');
+}
+
 if (!Array.isArray(assumedPrimitives) || assumedPrimitives.length === 0) {
   fail('non-billable primitives must be listed only as assumptions when available');
 }
