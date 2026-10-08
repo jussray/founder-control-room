@@ -1,0 +1,61 @@
+{
+  "contract": "juss/fcr-portfolio-identity-continuity-receipt@v1",
+  "recorded_on": "2026-10-08",
+  "subject": "Juss&Co parent Facebook versus Juss Beautiful Hair brand Facebook correction",
+  "authority_repository": "jussray/founder-control-room",
+  "base_main_sha": "36e2620ab1526d6acb0570e43fc9e9e777bb04a9",
+  "source_registry": "config/social-account-identities.json",
+  "registry_git_blob_fingerprint": "git-blob-sha1:b717c867eb63508b9fec541d8b4ecd9d77e61d01",
+  "non_secret_proof_cookie": "jussco-fb-identity-split-2026-10-08",
+  "proof_cookie_grants_authority": false,
+  "source_claims": {
+    "juss_and_co": "FOUNDER_SCREENSHOT_IDENTITY_CONFIRMED; FACEBOOK_URL_AND_PROVIDER_ID_UNKNOWN",
+    "juss_beautiful_hair": "METRICOOL_PAGE_ID_235882889600658_OBSERVED_HISTORICALLY; FOUNDER_ATTRIBUTED_SHARE_URL_NOT_PUBLICLY_REVERIFIED",
+    "cross_brand_provider_identity_reuse": "FORBIDDEN"
+  },
+  "staged_changes": [
+    {
+      "repo": "jussray/founder-control-room",
+      "branch": "fix/facebook-identity-split-20261008",
+      "pre_receipt_head": "7ae35e5f41042c84e622b4995470c30d147495fe",
+      "state": "STAGED"
+    },
+    {
+      "repo": "jussray/chief-ai-machine",
+      "branch": "fix/social-identity-reference-20261008",
+      "head": "61ffb78a5da0a0338f0261955975a091343c267d",
+      "state": "STAGED_REFERENCE"
+    },
+    {
+      "repo": "jussray/solcontinuity",
+      "branch": "fix/social-identity-reference-20261008",
+      "head": "67a6492ee82154aa4a8231fcc9a66df3b7137c3e",
+      "state": "STAGED_REFERENCE"
+    },
+    {
+      "repo": "jussray/promptos",
+      "branch": "fix/social-identity-reference-20261008",
+      "head": "751ced71e87cce0719a5460b674c47b27eed1b24",
+      "state": "STAGED_REFERENCE"
+    },
+    {
+      "repo": "jussray/jussbeautifulhair-site",
+      "branch": "fix/social-identity-reference-20261008",
+      "head": "6fe73677dcded365b583e99c3a3235a78f1852c7",
+      "state": "STAGED_REFERENCE_AND_HISTORY_ADDENDUM"
+    }
+  ],
+  "proof": {
+    "readback": "Exact branch content and diff readbacks obtained through GitHub",
+    "contract_replay": "Six scenarios: baseline accepted; swapped Page ID, wrong share URL, invented company URL, channel mismatch, and loosened brand guard rejected",
+    "replay_limit": "In-memory rule replay, not execution of full checked-in Node verifier or CI",
+    "automation_runs_for_branches": 0,
+    "playwright": "NOT_APPLICABLE_NO_UI_OR_RUNTIME_CHANGES",
+    "main_merged": false,
+    "provider_changed": false,
+    "public_profile_changed": false
+  },
+  "risk": "No reviewed CI or deployment proof; staged account references do not establish live provider bindings. Juss&Co direct public URL unknown.",
+  "rollback": "No main/provider mutation to revert. Preserve evidence; independently review and discard/revert exact branch commits only when authorized.",
+  "next_gate": "After reviewing FCR branch exact head, use approved repo review path to run Required Gate and verify-zapier-task-budget without bypass; then integrate FCR first and reread current main before integrating dependent references."
+}
