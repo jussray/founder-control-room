@@ -1,0 +1,94 @@
+{
+  "schema_version": 1,
+  "contract": "juss/social-account-identity@v1",
+  "authority_repository": "jussray/founder-control-room",
+  "scope": "founder-social-identity-correction",
+  "evidence_observed_on": "2026-10-08",
+  "identities": {
+    "juss_and_co_facebook": {
+      "owner": "juss-and-co",
+      "display_name": "Juss&Co",
+      "purpose": "parent_company",
+      "facebook_surface": "professional_identity_type_unresolved",
+      "facebook_page_id": null,
+      "public_url": null,
+      "public_url_status": "UNKNOWN_NOT_VERIFIED",
+      "evidence": {
+        "type": "founder_provided_screenshot",
+        "observed_name": "Juss&Co",
+        "observed_followers": 10,
+        "observed_following": 4,
+        "observed_posts": 31,
+        "metrics_are_historical_snapshot": true
+      },
+      "may_use_for_jussco_github_social_field": false
+    },
+    "juss_beautiful_hair_facebook": {
+      "owner": "juss-beautiful-hair",
+      "display_name": "Juss Beautiful Hair",
+      "purpose": "hair_store",
+      "facebook_surface": "brand_page",
+      "facebook_page_id": "235882889600658",
+      "public_url": null,
+      "public_url_status": "UNKNOWN_NOT_VERIFIED",
+      "founder_attributed_share_url": "https://www.facebook.com/share/1cH3mxVRpi/",
+      "founder_attributed_share_url_status": "FOUNDER_IDENTIFIED_NOT_PUBLIC_URL_VERIFIED",
+      "evidence": {
+        "type": "metricool_connected_brand_and_2026_09_25_repo_audit",
+        "source": "jussray/jussbeautifulhair-site/.control-room/audits/2026-09-25-jbh-facebook-image-routing.md"
+      },
+      "may_use_for_jussco_github_social_field": false
+    }
+  },
+  "channel_identity_binding": {
+    "juss_and_co_facebook": {
+      "identity": "juss_and_co_facebook",
+      "draft_field": "facebook_founder_draft"
+    },
+    "juss_beautiful_hair_facebook": {
+      "identity": "juss_beautiful_hair_facebook",
+      "draft_field": "facebook_brand_draft"
+    }
+  },
+  "consuming_systems": [
+    {
+      "repository": "jussray/founder-control-room",
+      "role": "canonical portfolio social identity evidence and channel constraints"
+    },
+    {
+      "repository": "jussray/chief-ai-machine",
+      "role": "read canonical identity for founder-intent proposals; do not create independent identity authority"
+    },
+    {
+      "repository": "jussray/solcontinuity",
+      "role": "read canonical identity as provenance; non-authorizing"
+    },
+    {
+      "repository": "jussray/promptos",
+      "role": "reference canonical account identity for generated instructions; non-authorizing"
+    },
+    {
+      "repository": "jussray/jussbeautifulhair-site",
+      "role": "retain separate commerce brand Page ID and image authority"
+    }
+  ],
+  "safety": {
+    "no_cross_account_metric_donation": true,
+    "no_cross_brand_destination_substitution": true,
+    "no_auto_publication_or_account_binding": true,
+    "github_organization_social_link_requires_verified_parent_company_public_url": true,
+    "founder_screenshot_does_not_prove_provider_page_id": true
+  },
+  "continuity_proof_cookie": {
+    "kind": "non_secret_evidence_locator",
+    "value": "jussco-fb-identity-split-2026-10-08",
+    "provides_authentication": false,
+    "grants_execution_authority": false,
+    "invalidated_by": [
+      "verified_parent_company_facebook_url",
+      "provider_account_identity_change",
+      "founder_supersession"
+    ]
+  },
+  "truth_boundary": "This registry carries identity attribution and source provenance only. It is not evidence of account authentication, public URL reachability, publishing permission, live analytics, deployment or provider outcome."
+}
