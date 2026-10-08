@@ -70,6 +70,10 @@ The authenticated `fcr/youtube-growth-evaluation@v1` route may evaluate fresh fo
 
 Malformed measurements, experiments, continuity fingerprints, thresholds, targets, unknown fields, and duplicate repeatability receipts must fail closed before evaluation. A growth recommendation is not proof that a video published, a channel reached YPP eligibility, revenue was earned, a Short converted to long-form viewing, or any provider-side state changed. Those claims require fresh authoritative provider or outcome evidence at the applicable use boundary.
 
+### Cross-brand social account identity
+
+Before an account link is published, a GitHub organization social field is populated, a social campaign is scheduled, or provider analytics is attributed, resolve the exact identity from [`../config/social-account-identities.json`](../config/social-account-identities.json) and verify the destination against current provider evidence. `juss_and_co_facebook` belongs to the parent-company identity; `juss_beautiful_hair_facebook` belongs to the hair-store brand. JBH's known Page ID and founder-attributed share URL are **not** company-account evidence. Juss&Co's direct public Facebook URL remains unknown until verified. The registry and its non-secret continuity marker never authorize publishing, provider mutation, or metric reuse.
+
 ## /confess
 
 Before release, state internally and, when material to the audience, publicly:
