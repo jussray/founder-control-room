@@ -281,7 +281,7 @@ if (companyFacebook?.owner !== 'juss-and-co' || companyFacebook?.purpose !== 'pa
 if (hairFacebook?.owner !== 'juss-beautiful-hair' || hairFacebook?.purpose !== 'hair_store') {
   fail('JBH Facebook must remain the commerce identity');
 }
-if (!/^\\d+$/.test(hairFacebook?.facebook_page_id ?? '')) fail('JBH Facebook must retain its observed numeric Page ID');
+if (!/^\d+$/.test(hairFacebook?.facebook_page_id ?? '')) fail('JBH Facebook must retain its observed numeric Page ID');
 if (companyFacebook?.facebook_page_id && companyFacebook.facebook_page_id === hairFacebook?.facebook_page_id) {
   fail('cannot reuse the JBH Facebook Page ID for Juss&Co');
 }
