@@ -3,6 +3,7 @@ import {
   operatorRelayResponseHash,
   type OperatorRelayRequestV1,
   type OperatorRelayResponseV1,
+  type OperatorRelayUsageV1,
 } from './operatorRelay.js';
 
 export function buildOperatorRelayResponse(
@@ -13,6 +14,7 @@ export function buildOperatorRelayResponse(
     unresolved?: string[];
     status?: OperatorRelayResponseV1['status'];
     completedAt?: string;
+    usage?: OperatorRelayUsageV1;
   },
 ): OperatorRelayResponseV1 {
   const base: Omit<OperatorRelayResponseV1, 'responseHash'> = {
@@ -27,6 +29,7 @@ export function buildOperatorRelayResponse(
     unresolved: input.unresolved ?? [],
     authorityRequested: 'none',
     completedAt: input.completedAt ?? new Date().toISOString(),
+    ...(input.usage ? { usage: input.usage } : {}),
   };
   return { ...base, responseHash: operatorRelayResponseHash(base) };
 }
