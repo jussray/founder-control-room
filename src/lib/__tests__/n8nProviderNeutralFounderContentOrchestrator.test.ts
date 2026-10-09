@@ -101,7 +101,7 @@ function approval(proposed: Record<string, unknown>, platform: string, expiresAt
     approval_id: `approval-${platform}-current`,
     proposal_hash: proposed.proposal_hash,
     public_payload_hash: hashPublicPayload(publicPayload),
-    channels: [platform],
+    channels: platform === 'facebook' ? [platform, 'juss_and_co_facebook'] : [platform],
     approved_at: '2026-08-18T01:20:00.000Z',
     expires_at: expiresAt,
     revoked: false,
@@ -227,7 +227,7 @@ describe('provider-neutral n8n founder-content routing', () => {
 
     expect(result.provider).toBe('meta');
     expect(result.platform).toBe('facebook');
-    expect(result.channel).toBe('fcr_facebook');
+    expect(result.channel).toBe('fcr_juss_and_co_facebook');
     expect(result.text).toBe('Verified facebook founder progress without exposing private implementation details.');
     expect(result.source).toEqual({ repo: 'jussray/founder-control-room', commit_sha: SOURCE_SHA });
     expect(result.authority.authorization_mode).toBe('exact-current-you');
@@ -236,6 +236,39 @@ describe('provider-neutral n8n founder-content routing', () => {
     expect(result.provider_request.review_window_minutes).toBe(20);
     expect(result.provider_request.share_now_allowed).toBe(false);
     expect(result.source.proof_url).toBeUndefined();
+  });
+
+  it('binds each approved Facebook Page to a distinct provider destination', () => {
+    const founder = nativeInput('buffer', 'facebook');
+    const hair = nativeInput('buffer', 'facebook');
+    (hair.approval as { channels: string[] }).channels = ['facebook', 'juss_beautiful_hair_facebook'];
+
+    expect(buildProviderNeutralN8nFounderContentEnvelope(founder).channel).toBe('juss_and_co_facebook');
+    expect(buildProviderNeutralN8nFounderContentEnvelope(hair).channel).toBe('juss_beautiful_hair_facebook');
+    expect(buildProviderNeutralN8nFounderContentEnvelope({
+      ...hair,
+      n8n_provider: 'meta',
+    }).channel).toBe('fcr_juss_beautiful_hair_facebook');
+  });
+
+  it('fails closed on a generic, missing, or ambiguous Facebook Page approval', () => {
+    const generic = nativeInput('buffer', 'facebook');
+    (generic.approval as { channels: string[] }).channels = ['facebook'];
+    expect(() => buildProviderNeutralN8nFounderContentEnvelope(generic))
+      .toThrow(/PAGE_AUTHORITY_REQUIRED/);
+
+    const ambiguous = nativeInput('meta', 'facebook');
+    (ambiguous.approval as { channels: string[] }).channels = [
+      'facebook', 'juss_and_co_facebook', 'juss_beautiful_hair_facebook',
+    ];
+    expect(() => buildProviderNeutralN8nFounderContentEnvelope(ambiguous))
+      .toThrow(/PAGE_AUTHORITY_REQUIRED/);
+
+    expect(validateProviderNeutralN8nFounderContentEnvelope(envelope({
+      provider: 'meta',
+      platform: 'facebook',
+      channel: 'fcr_facebook',
+    }))).toContain('Facebook channel must name one server-recognized Page; a generic facebook destination is not sufficient');
   });
 
   it('refuses once-current claims on every deferred provider route', () => {
@@ -325,7 +358,7 @@ describe('provider-neutral n8n founder-content routing', () => {
     const viaMeta = buildProviderNeutralN8nFounderContentRequest({
       ...authorized,
       provider: 'meta',
-      channel: 'fcr_facebook',
+      channel: 'fcr_juss_and_co_facebook',
     });
 
     expect(viaMeta.providerRequest.provider).toBe('meta');
@@ -382,7 +415,7 @@ describe('provider-neutral n8n founder-content routing', () => {
     expect(validateProviderNeutralN8nFounderContentEnvelope(envelope({
       provider: 'meta',
       platform: 'facebook',
-      channel: 'fcr_facebook',
+      channel: 'fcr_juss_and_co_facebook',
     }))).toEqual([]);
     expect(validateProviderNeutralN8nFounderContentEnvelope(envelope({
       provider: 'tiktok',
