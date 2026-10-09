@@ -117,6 +117,21 @@ try {
     throw new Error(`expected self-authorizing receipt 400, got ${rejectedAuthority.status()}: ${await rejectedAuthority.text()}`);
   }
 
+  const { authority: _omittedAuthority, ...authorityFree } = canonical;
+  const rejectedMissingAuthority = await client.post(`/ingest/action-cost-receipts/${PROJECT_SLUG}`, {
+    data: authorityFree,
+  });
+  if (rejectedMissingAuthority.status() !== 400) {
+    throw new Error(`expected missing authority 400, got ${rejectedMissingAuthority.status()}`);
+  }
+
+  const rejectedMalformedUsage = await client.post(`/ingest/action-cost-receipts/${PROJECT_SLUG}`, {
+    data: { ...canonical, usage: { ...canonical.usage, tools: [12] } },
+  });
+  if (rejectedMalformedUsage.status() !== 400) {
+    throw new Error(`expected malformed usage 400, got ${rejectedMalformedUsage.status()}`);
+  }
+
   if (stored.length !== 1) {
     throw new Error(`only canonical receipt may persist; observed ${stored.length} stored receipts`);
   }
@@ -126,6 +141,8 @@ try {
     acceptedCanonical: true,
     rejectedRehashedDerivedTamper: true,
     rejectedSelfAuthorization: true,
+    rejectedMissingAuthority: true,
+    rejectedMalformedUsage: true,
     persistedReceipts: stored.length,
   }));
 } finally {
