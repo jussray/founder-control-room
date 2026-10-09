@@ -33,7 +33,9 @@ try {
         clientWidth: document.documentElement.clientWidth,
       }));
       record.pageErrors = errors;
-      record.status = record.httpStatus >= 200 && record.httpStatus < 400 &&
+      record.accessChallenge = record.httpStatus === 403 &&
+        (/just a moment/i.test(record.title) || new URL(record.finalUrl).searchParams.has('__cf_chl_rt_tk'));
+      record.status = record.accessChallenge ? 'ACCESS_BLOCKED' : record.httpStatus >= 200 && record.httpStatus < 400 &&
         new URL(record.finalUrl).origin === target.origin &&
         record.dimensions.scrollWidth <= record.dimensions.clientWidth &&
         errors.length === 0 ? 'CAPTURED' : 'REVIEW_REQUIRED';
