@@ -242,6 +242,11 @@ function providerNeutralExecutionId(request: N8nFounderContentRequest): string {
   return `fcr-n8n-social-v2:${stableHash({
     contract: PROVIDER_NEUTRAL_EXECUTION_IDENTITY,
     platform: request.platform,
+    // Buffer and native Meta use different route labels for the same approved Page.
+    // The idempotency subject is the Page identity, not the transport alias.
+    accountBinding: request.platform === 'facebook'
+      ? request.channel.replace(/^fcr_/, '')
+      : request.channel,
     source: request.source,
     authorizationHash: request.fcrAuthorization.authorizationHash,
     proposalHash: request.fcrAuthorization.proposalHash,
@@ -416,6 +421,73 @@ export function buildProviderNeutralN8nFounderContentRequest(
   return {
     ...request,
     orchestrationId: providerNeutralExecutionId(request),
+  };
+}
+
+export const FOUNDER_SOCIAL_CONTINUITY_CONTRACT = 'fcr/founder-social-page-continuity@v1' as const;
+
+export interface FounderSocialContinuityProof {
+  contract: typeof FOUNDER_SOCIAL_CONTINUITY_CONTRACT;
+  status: 'EVIDENCE_ONLY';
+  claim: 'SOURCE_DERIVED_NOT_PROVIDER_VERIFIED';
+  fingerprint: string;
+  proofCookie: string;
+  observedAt: string;
+  expiresAt: string;
+  parentFingerprint: string | null;
+  grantsAuthority: false;
+  provesPublication: false;
+}
+
+/**
+ * A non-secret continuity marker for one exact prepared social scheduling request.
+ * It is not a browser cookie, approval, credential, or evidence of provider acceptance.
+ */
+export function buildFounderSocialContinuityProof(
+  request: N8nFounderContentRequest,
+  observedAt: string,
+  parentFingerprint: string | null = null,
+): FounderSocialContinuityProof {
+  const observedMs = Date.parse(observedAt);
+  const expiresAt = request.providerRequest.reviewDeadline ?? request.providerRequest.scheduleAt;
+  const expiresMs = Date.parse(expiresAt);
+  if (!Number.isFinite(observedMs) || !Number.isFinite(expiresMs) || observedMs >= expiresMs) {
+    throw new Error('FOUNDER_SOCIAL_CONTINUITY_STALE: observation must precede the review deadline');
+  }
+  if (parentFingerprint !== null && !/^[a-f0-9]{64}$/.test(parentFingerprint)) {
+    throw new Error('FOUNDER_SOCIAL_CONTINUITY_PARENT_INVALID: parent must be a SHA-256 fingerprint');
+  }
+  const fingerprint = stableHash({
+    contract: FOUNDER_SOCIAL_CONTINUITY_CONTRACT,
+    orchestrationId: request.orchestrationId,
+    platform: request.platform,
+    channel: request.channel,
+    provider: request.providerRequest.provider,
+    source: request.source,
+    proposalHash: request.fcrAuthorization.proposalHash,
+    publicPayloadHash: request.fcrAuthorization.publicPayloadHash,
+    authorizationHash: request.fcrAuthorization.authorizationHash,
+    textHash: stableHash(request.text),
+    scheduleAt: request.providerRequest.scheduleAt,
+    reviewDeadline: expiresAt,
+  });
+  if (parentFingerprint === fingerprint) {
+    throw new Error('FOUNDER_SOCIAL_CONTINUITY_PARENT_INVALID: marker may not parent itself');
+  }
+  const canonicalObservedAt = new Date(observedMs).toISOString();
+  return {
+    contract: FOUNDER_SOCIAL_CONTINUITY_CONTRACT,
+    status: 'EVIDENCE_ONLY',
+    claim: 'SOURCE_DERIVED_NOT_PROVIDER_VERIFIED',
+    fingerprint,
+    proofCookie: `fcr-social-proof-v1:${stableHash({
+      fingerprint, observedAt: canonicalObservedAt, expiresAt, parentFingerprint,
+    })}`,
+    observedAt: canonicalObservedAt,
+    expiresAt,
+    parentFingerprint,
+    grantsAuthority: false,
+    provesPublication: false,
   };
 }
 
