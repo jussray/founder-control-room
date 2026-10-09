@@ -8,6 +8,7 @@ on:
       - '.github/workflows/buffer-provider-contract.yml'
   pull_request:
     paths:
+      - 'config/social-account-identities.json'
       - 'config/buffer-provider-contract.json'
       - 'config/zapier-task-budget.json'
       - 'docs/founder-signal-engine/day3-buffer-content-boundary.md'
