@@ -3,728 +3,423 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="description" content="Founder Control Room is the public front door for a founder operating system that connects intent, authority, execution, evidence, Chief, and PromptOS without exposing private founder state." />
+  <meta name="description" content="Founder Control Room: back founders, build a brighter tomorrow. Public user view and founder view, with proof boundaries stated plainly." />
   <meta name="robots" content="index,follow" />
   <link rel="canonical" href="https://www.foundercontrolroom.org/" />
   <title>Founder Control Room</title>
   <style>
     :root {
       color-scheme: dark;
-      --ink: #f8f7ff;
-      --muted: #a9a8bc;
-      --muted-2: #7f8198;
-      --bg: #050711;
-      --bg-2: #080b18;
-      --panel: rgba(13, 17, 36, 0.84);
-      --panel-strong: rgba(18, 22, 48, 0.94);
-      --line: rgba(154, 137, 255, 0.18);
-      --line-strong: rgba(154, 137, 255, 0.42);
-      --violet: #9d7cff;
-      --violet-2: #7658ff;
-      --blue: #5f8cff;
-      --cyan: #62dcff;
-      --green: #70e8a3;
+      --bg: #070818;
+      --panel: #0e1126;
+      --panel-2: #141a36;
+      --line: rgba(160, 140, 255, .18);
+      --ink: #f6f5ff;
+      --muted: #b4b6cc;
+      --muted-2: #8d90aa;
+      --violet: #9b6bff;
+      --violet-2: #c26bf5;
+      --blue: #55c8ff;
+      --green: #5ee6a0;
       --amber: #ffc66b;
-      --radius-xl: 1.55rem;
-      --radius-lg: 1.15rem;
-      --radius-md: 0.9rem;
-      --nav-h: 4.7rem;
-      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --red: #ff7a8a;
     }
-
     * { box-sizing: border-box; }
-    html { scroll-behavior: smooth; scroll-padding-bottom: calc(var(--nav-h) + 1rem); }
+    [hidden] { display: none !important; }
+    html, body { margin: 0; }
     body {
-      margin: 0;
       min-height: 100vh;
-      color: var(--ink);
       background:
-        radial-gradient(circle at 18% 0%, rgba(113, 74, 255, 0.28), transparent 28rem),
-        radial-gradient(circle at 92% 8%, rgba(50, 150, 255, 0.18), transparent 25rem),
-        radial-gradient(circle at 52% 62%, rgba(81, 49, 201, 0.12), transparent 34rem),
-        linear-gradient(155deg, #03050b 0%, var(--bg) 42%, #090d1d 100%);
+        radial-gradient(circle at 12% 0%, rgba(60, 120, 255, .22), transparent 28rem),
+        radial-gradient(circle at 92% 6%, rgba(170, 70, 255, .22), transparent 30rem),
+        linear-gradient(180deg, #0a0d24 0%, var(--bg) 60%, #05060f 100%);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
       overflow-x: hidden;
     }
+    a { color: inherit; text-decoration: none; }
+    button { font: inherit; }
+    :focus-visible { outline: 2px solid var(--blue); outline-offset: 3px; }
 
-    body::before {
-      content: "";
-      position: fixed;
-      inset: 0;
-      z-index: -2;
-      opacity: 0.14;
-      pointer-events: none;
-      background-image:
-        linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px);
-      background-size: 36px 36px;
-      mask-image: linear-gradient(to bottom, black 0%, transparent 92%);
-    }
+    .wrap { width: min(1240px, calc(100% - 2rem)); margin: 0 auto; }
 
-    body::after {
-      content: "";
-      position: fixed;
-      width: 34rem;
-      height: 34rem;
-      right: -15rem;
-      top: 20%;
-      z-index: -1;
-      border-radius: 999px;
-      background: rgba(98, 220, 255, 0.08);
-      filter: blur(80px);
-      pointer-events: none;
-    }
-
-    a { color: inherit; }
-    button, a { -webkit-tap-highlight-color: transparent; }
-    :focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
-
-    .shell {
-      width: min(1180px, calc(100% - 2rem));
-      margin: 0 auto;
-      padding-bottom: calc(var(--nav-h) + 2.5rem);
-    }
-
+    /* Top bars */
     .topbar {
-      position: sticky;
-      top: 0;
-      z-index: 30;
-      min-height: 4.4rem;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 1rem;
-      padding: 0.8rem 0;
-      backdrop-filter: blur(22px);
-      background: linear-gradient(to bottom, rgba(5,7,17,.9), rgba(5,7,17,.46), transparent);
+      display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+      padding: 1rem 0 .5rem; flex-wrap: wrap;
+    }
+    .logo { display: flex; align-items: center; gap: .6rem; font-weight: 800; letter-spacing: .02em; }
+    .logo-mark {
+      width: 2rem; height: 2rem; border-radius: .6rem; display: grid; place-items: center;
+      background: linear-gradient(145deg, #55c8ff, #8a6bff 55%, #c26bf5); color: #08091a; font-weight: 900;
+    }
+    .navlinks { display: flex; gap: .3rem; flex-wrap: wrap; }
+    .navlinks a, .navlinks button {
+      padding: .5rem .75rem; border-radius: .7rem; border: 1px solid transparent;
+      background: none; color: var(--muted); font-size: .86rem; cursor: pointer;
+    }
+    .navlinks a:hover, .navlinks button:hover { color: var(--ink); background: rgba(255,255,255,.04); }
+    .navlinks .on { color: #fff; background: rgba(85,200,255,.14); border-color: rgba(85,200,255,.35); }
+    .avatar {
+      width: 2rem; height: 2rem; border-radius: 50%;
+      background: linear-gradient(135deg, #55c8ff, #c26bf5); display: inline-grid; place-items: center;
+      color: #08091a; font-weight: 800; font-size: .8rem;
     }
 
-    .brand {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.75rem;
-      font-weight: 850;
-      letter-spacing: -0.025em;
-      text-decoration: none;
+    /* View switch */
+    .switch { display: flex; justify-content: center; margin: 1.1rem 0 1.4rem; }
+    .switch-track {
+      display: inline-flex; padding: .3rem; border-radius: 999px;
+      border: 1px solid var(--line); background: rgba(10,13,32,.8);
+    }
+    .switch button {
+      border: 0; background: none; color: var(--muted); padding: .55rem 1.1rem;
+      border-radius: 999px; cursor: pointer; font-weight: 700; font-size: .88rem;
+    }
+    .switch button[aria-selected="true"] { color: #08091a; background: linear-gradient(100deg, #55c8ff, #9b6bff); }
+
+    .view[hidden] { display: none; }
+
+    /* Frames */
+    .frame {
+      border: 1px solid var(--line); border-radius: 1.2rem; overflow: hidden;
+      background: linear-gradient(180deg, rgba(20,26,54,.85), rgba(10,13,30,.95));
+      box-shadow: 0 30px 90px rgba(0,0,0,.45), 0 0 60px rgba(120,90,255,.12);
+    }
+    .frame-bar {
+      display: flex; align-items: center; gap: 1rem; justify-content: space-between;
+      padding: .8rem 1rem; border-bottom: 1px solid var(--line); flex-wrap: wrap;
     }
 
-    .mark {
-      width: 2.45rem;
-      height: 2.45rem;
-      display: grid;
-      place-items: center;
-      border: 1px solid rgba(190, 178, 255, .44);
-      border-radius: 0.85rem;
-      background:
-        radial-gradient(circle at 35% 25%, rgba(255,255,255,.7), transparent 18%),
-        linear-gradient(145deg, #c0aeff, #7b5cff 54%, #29347c);
-      box-shadow: 0 0 28px rgba(126, 92, 255, 0.34);
-      color: #080711;
-      font-weight: 950;
-    }
-
-    .status {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.55rem;
-      padding: .5rem .72rem;
-      border: 1px solid rgba(112,232,163,.18);
-      border-radius: 999px;
-      background: rgba(9, 23, 22, .56);
-      color: #c3f8d7;
-      text-decoration: none;
-      font-size: 0.76rem;
-      font-weight: 760;
-    }
-
-    .status-dot {
-      width: 0.52rem;
-      height: 0.52rem;
-      border-radius: 999px;
-      background: var(--green);
-      box-shadow: 0 0 16px rgba(112,232,163,.78);
-    }
-
-    .command-shell {
-      display: grid;
-      grid-template-columns: minmax(0, 1.14fr) minmax(330px, .86fr);
-      gap: 1rem;
-      align-items: stretch;
-      margin-top: 1rem;
-    }
-
-    .glass {
-      border: 1px solid var(--line);
-      border-radius: var(--radius-xl);
-      background:
-        linear-gradient(145deg, rgba(22, 25, 53, .84), rgba(7, 10, 23, .9));
-      box-shadow:
-        0 28px 90px rgba(0,0,0,.38),
-        inset 0 1px 0 rgba(255,255,255,.055);
-      backdrop-filter: blur(18px);
-    }
-
+    /* Hero */
     .hero {
-      position: relative;
-      min-height: 34rem;
-      overflow: hidden;
-      padding: clamp(1.5rem, 4vw, 3rem);
-      display: grid;
-      align-content: space-between;
-      isolation: isolate;
-    }
-
-    .hero::before {
-      content: "";
-      position: absolute;
-      inset: 0;
-      z-index: -1;
+      position: relative; min-height: 420px; padding: 2.4rem 2rem;
+      display: grid; grid-template-columns: 1.1fr .9fr; gap: 1rem; align-items: center;
       background:
-        radial-gradient(circle at 80% 20%, rgba(98,220,255,.16), transparent 17rem),
-        radial-gradient(circle at 14% 85%, rgba(125,89,255,.25), transparent 20rem);
+        radial-gradient(circle at 78% 30%, rgba(255,170,110,.28), transparent 14rem),
+        linear-gradient(180deg, #2b3a7a 0%, #5a3f9c 45%, #1a1d3f 100%);
+    }
+    .hero-copy { position: relative; z-index: 2; }
+    .eyebrow { font-size: .72rem; letter-spacing: .2em; color: #d7d4ff; text-transform: uppercase; margin: 0 0 1rem; }
+    h1, h2, h3 { margin: 0; letter-spacing: -.02em; line-height: 1.05; }
+    .hero h1 { font-size: clamp(2.3rem, 5vw, 3.9rem); font-weight: 800; }
+    .hero h1 .grad { background: linear-gradient(90deg, #7cd8ff, #b59bff); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    .hero p.sub { margin: 1rem 0 1.4rem; color: #e6e4ff; font-size: 1rem; }
+    .btn {
+      display: inline-flex; align-items: center; gap: .5rem; padding: .85rem 1.3rem; border-radius: .9rem;
+      border: 1px solid rgba(255,255,255,.14); background: linear-gradient(100deg, #5b5cf0, #a061ff);
+      color: #fff; font-weight: 700; cursor: pointer;
+    }
+    .btn.ghost { background: rgba(255,255,255,.06); }
+    .hero-art { position: relative; min-height: 260px; }
+    .hero-art .sun {
+      position: absolute; right: 18%; top: 14%; width: 90px; height: 90px; border-radius: 50%;
+      background: radial-gradient(circle, #fff3d6 0%, #ffb27a 60%, transparent 72%);
+    }
+    .hero-art .ridge {
+      position: absolute; inset: auto 0 0; height: 62%;
+      background: linear-gradient(160deg, #3b2f6e, #22184d);
+      clip-path: polygon(0 80%, 12% 55%, 24% 68%, 40% 30%, 54% 62%, 70% 22%, 84% 58%, 100% 40%, 100% 100%, 0 100%);
+    }
+    .hero-art .ridge.front {
+      background: linear-gradient(160deg, #1a1538, #0d0a24);
+      height: 40%; clip-path: polygon(0 60%, 18% 30%, 36% 58%, 58% 18%, 80% 52%, 100% 36%, 100% 100%, 0 100%);
+    }
+    .hero-art .tag {
+      position: absolute; right: 2%; bottom: 6%; font-size: .72rem; letter-spacing: .25em; line-height: 1.6;
+      color: #e7e3ff; text-align: right; opacity: .9;
     }
 
-    .hero::after {
-      content: "";
-      position: absolute;
-      width: 18rem;
-      height: 18rem;
-      right: -5rem;
-      bottom: -8rem;
-      z-index: -1;
-      border: 1px solid rgba(157,124,255,.22);
-      border-radius: 4rem;
-      transform: rotate(27deg);
-      box-shadow: 0 0 70px rgba(91,67,255,.2);
+    /* Feature cards */
+    .cards { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: .9rem; padding: 1rem; }
+    .card {
+      position: relative; min-height: 230px; border-radius: 1rem; padding: 1rem;
+      border: 1px solid var(--line); background: linear-gradient(180deg, #1c2550, #0c0f26);
+      overflow: hidden; display: flex; flex-direction: column;
     }
+    .card h3 { font-size: 1rem; }
+    .card p { margin: .4rem 0 0; color: var(--muted); font-size: .84rem; line-height: 1.45; }
+    .card .art { margin-top: auto; height: 96px; border-radius: .7rem; background: linear-gradient(160deg, #3c2c78, #1b1c44); position: relative; overflow: hidden; }
+    .card .art::after {
+      content: ""; position: absolute; inset: auto 0 0; height: 55%;
+      background: linear-gradient(160deg, #2a2160, #100d2c);
+      clip-path: polygon(0 70%, 25% 35%, 50% 65%, 75% 30%, 100% 60%, 100% 100%, 0 100%);
+    }
+    .card .art.warm { background: linear-gradient(160deg, #ffb27a, #7a4cb0); }
+    .card .art.note { background: #f3ead8; }
+    .card .art.note::after { display: none; }
+    .card .art.note span {
+      position: absolute; inset: .6rem; color: #3a2d52; font-family: Georgia, serif; font-size: .85rem; line-height: 1.15;
+      transform: rotate(-4deg); display: flex; align-items: center; justify-content: center; text-align: center;
+    }
+    .card .more { position: absolute; top: .9rem; right: .9rem; color: var(--muted); }
 
-    .eyebrow {
-      display: inline-flex;
-      width: fit-content;
-      align-items: center;
-      gap: .45rem;
-      padding: .42rem .66rem;
-      border: 1px solid rgba(157,124,255,.28);
-      border-radius: 999px;
-      color: #ddd5ff;
-      background: rgba(93, 64, 182, .14);
-      font-size: .68rem;
-      font-weight: 850;
-      letter-spacing: .11em;
-      text-transform: uppercase;
+    .banner {
+      margin: 0 1rem 1rem; padding: 1rem 1.2rem; border-radius: 1rem; border: 1px solid var(--line);
+      display: flex; align-items: center; justify-content: space-between; gap: 1rem; background: rgba(12,15,36,.85);
     }
+    .banner strong { display: block; font-size: 1rem; }
+    .banner span { color: var(--muted); font-size: .88rem; }
+    .banner .arrow { font-size: 1.3rem; color: var(--muted); }
 
-    .hero-copy { display: grid; gap: 1rem; align-self: end; max-width: 760px; }
-    h1, h2, h3, p { margin-top: 0; }
-    h1 {
-      margin-bottom: 0;
-      max-width: 780px;
-      font-size: clamp(3.2rem, 7.8vw, 6.8rem);
-      line-height: .92;
-      letter-spacing: -.06em;
+    /* Founder view */
+    .greet { display: flex; justify-content: space-between; gap: 1rem; padding: 1.4rem 1.4rem .6rem; flex-wrap: wrap; align-items: flex-start; }
+    .greet h2 { font-size: clamp(1.6rem, 3vw, 2.2rem); }
+    .greet p { margin: .4rem 0 0; color: var(--muted); font-size: .9rem; }
+    .quote {
+      padding: .8rem 1rem; border-radius: .9rem; border: 1px solid var(--line); background: rgba(255,255,255,.03);
+      color: #e6e4ff; font-style: italic; font-size: .92rem; max-width: 260px;
     }
-    h2 {
-      margin-bottom: .55rem;
-      font-size: clamp(1.9rem, 4vw, 3.4rem);
-      line-height: 1;
-      letter-spacing: -.045em;
-    }
-    h3 { margin-bottom: .35rem; font-size: 1.05rem; letter-spacing: -.02em; }
+    .stats { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: .8rem; padding: .6rem 1.4rem 1rem; }
+    .stat { padding: .9rem 1rem; border-radius: .9rem; border: 1px solid var(--line); background: rgba(255,255,255,.03); }
+    .stat b { display: block; font-size: 1.35rem; }
+    .stat small { color: var(--muted); font-size: .78rem; }
+    .stat.muted b { font-size: 1rem; color: var(--muted-2); font-weight: 600; }
 
-    .gradient {
-      background: linear-gradient(90deg, #ffffff 0%, #c8b9ff 38%, #8f9dff 66%, #62dcff 100%);
-      -webkit-background-clip: text;
-      background-clip: text;
-      color: transparent;
+    .fgrid { display: grid; grid-template-columns: 1.15fr .85fr; gap: .9rem; padding: 0 1.4rem 1.4rem; }
+    .panel { border: 1px solid var(--line); border-radius: 1rem; padding: 1rem; background: rgba(10,13,30,.7); }
+    .panel-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: .7rem; }
+    .panel-head h3 { font-size: .98rem; }
+    .panel-head a, .panel-head small { color: var(--blue); font-size: .8rem; }
+    .panel-head small { color: var(--muted-2); }
+    .row {
+      display: grid; grid-template-columns: auto 1fr auto; gap: .7rem; align-items: center;
+      padding: .6rem .3rem; border-top: 1px solid rgba(255,255,255,.05);
     }
+    .row:first-of-type { border-top: 0; }
+    .ico {
+      width: 2rem; height: 2rem; border-radius: .6rem; display: grid; place-items: center;
+      background: rgba(155,107,255,.18); color: #d9ccff; font-weight: 800; font-size: .8rem;
+    }
+    .row strong { display: block; font-size: .9rem; }
+    .row small { color: var(--muted); font-size: .76rem; }
+    .chip { font-size: .68rem; font-weight: 800; letter-spacing: .08em; padding: .25rem .5rem; border-radius: 999px; border: 1px solid; white-space: nowrap; }
+    .chip.blocked { color: var(--red); border-color: rgba(255,122,138,.4); }
+    .chip.unknown { color: var(--amber); border-color: rgba(255,198,107,.4); }
+    .chip.ok { color: var(--green); border-color: rgba(94,230,160,.4); }
+    .empty { color: var(--muted); font-size: .85rem; padding: .8rem .3rem; line-height: 1.5; }
+    .check { display: flex; gap: .6rem; align-items: flex-start; padding: .45rem 0; font-size: .86rem; color: #e3e1f5; }
+    .check input { margin-top: .2rem; accent-color: var(--violet); }
+    .integ { display: flex; justify-content: space-between; align-items: center; padding: .5rem 0; font-size: .86rem; border-top: 1px solid rgba(255,255,255,.05); }
+    .integ:first-of-type { border-top: 0; }
+    .integ small { color: var(--muted-2); }
 
-    .lede {
-      max-width: 720px;
-      margin-bottom: 0;
-      color: #bbb9cc;
-      font-size: clamp(.98rem, 1.8vw, 1.14rem);
-      line-height: 1.62;
-    }
+    .owner-cta { display: inline-block; margin: 0 1.4rem 1.4rem; }
 
-    .thesis {
-      margin: 0;
-      color: #d7d4e8;
-      font-size: .88rem;
-      font-weight: 650;
-    }
+    .slogan { text-align: center; padding: 1.4rem 1rem 1.6rem; }
+    .slogan strong { display: block; font-size: 1.2rem; letter-spacing: .02em; }
+    .slogan span { color: var(--muted); font-size: .85rem; letter-spacing: .14em; text-transform: uppercase; }
 
-    .actions { display: flex; flex-wrap: wrap; gap: .65rem; }
-    .button {
-      min-height: 2.9rem;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      padding: .72rem 1rem;
-      border: 1px solid rgba(255,255,255,.1);
-      border-radius: .85rem;
-      color: #eceaf8;
-      background: rgba(255,255,255,.045);
-      text-decoration: none;
-      font-size: .86rem;
-      font-weight: 820;
-    }
-    .button-primary {
-      color: #080813;
-      border-color: transparent;
-      background: linear-gradient(102deg, #cfc2ff, #9f92ff 48%, #68dcff);
-      box-shadow: 0 16px 42px rgba(91, 75, 233, .25);
-    }
+    .foot { display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; padding: 1.4rem 0 2rem; color: var(--muted-2); font-size: .8rem; }
 
-    .signal-strip {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0,1fr));
-      gap: .55rem;
-      margin-top: 1.15rem;
+    /* Responsive */
+    @media (max-width: 980px) {
+      .cards { grid-template-columns: repeat(2, minmax(0,1fr)); }
+      .stats { grid-template-columns: repeat(2, minmax(0,1fr)); }
+      .fgrid { grid-template-columns: 1fr; }
+      .hero { grid-template-columns: 1fr; }
     }
-
-    .signal {
-      min-height: 5rem;
-      padding: .8rem;
-      border: 1px solid rgba(255,255,255,.07);
-      border-radius: .85rem;
-      background: rgba(255,255,255,.035);
-    }
-    .signal span { display: block; color: var(--muted-2); font-size: .64rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
-    .signal strong { display: block; margin-top: .45rem; font-size: .9rem; }
-
-    .entry-panel {
-      display: grid;
-      align-content: start;
-      gap: .75rem;
-      padding: 1.15rem;
-    }
-
-    .panel-head {
-      display: flex;
-      justify-content: space-between;
-      align-items: start;
-      gap: .75rem;
-      padding: .2rem .15rem .55rem;
-    }
-    .panel-head p { margin: .3rem 0 0; color: var(--muted); font-size: .82rem; line-height: 1.45; }
-    .mini-state { color: var(--green); font-size: .7rem; font-weight: 850; white-space: nowrap; }
-
-    .entry-card {
-      display: grid;
-      grid-template-columns: auto 1fr auto;
-      gap: .78rem;
-      align-items: center;
-      min-height: 7.2rem;
-      padding: .95rem;
-      border: 1px solid rgba(255,255,255,.08);
-      border-radius: 1rem;
-      text-decoration: none;
-      background: linear-gradient(145deg, rgba(255,255,255,.045), rgba(255,255,255,.018));
-      transition: transform 150ms ease, border-color 150ms ease, background 150ms ease;
-    }
-    .entry-card:hover, .entry-card:focus-visible {
-      transform: translateY(-2px);
-      border-color: rgba(137,121,255,.52);
-      background: rgba(113, 90, 255, .085);
-    }
-    .entry-card[data-entry-choice="user"] { box-shadow: inset 3px 0 0 rgba(98,220,255,.76); }
-    .entry-card[data-entry-choice="founder"] { box-shadow: inset 3px 0 0 rgba(157,124,255,.88); }
-
-    .entry-icon {
-      width: 2.35rem;
-      height: 2.35rem;
-      display: grid;
-      place-items: center;
-      border-radius: .8rem;
-      color: #eee9ff;
-      background: linear-gradient(145deg, rgba(157,124,255,.24), rgba(98,220,255,.1));
-      border: 1px solid rgba(255,255,255,.07);
-      font-weight: 900;
-    }
-    .entry-body { min-width: 0; }
-    .entry-kicker { color: #bfb5e8; font-size: .62rem; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; }
-    .entry-card strong { display: block; margin-top: .18rem; font-size: 1rem; }
-    .entry-card small { display: block; margin-top: .3rem; color: var(--muted); line-height: 1.4; }
-    .entry-arrow { color: #dcd8ef; font-weight: 900; }
-    .entry-truth { margin: .2rem .2rem 0; color: #85869a; font-size: .72rem; line-height: 1.5; }
-
-    .workspace {
-      display: grid;
-      grid-template-columns: repeat(12, minmax(0, 1fr));
-      gap: .8rem;
-      margin-top: .8rem;
-    }
-
-    .module {
-      position: relative;
-      overflow: hidden;
-      padding: 1.05rem;
-      border: 1px solid rgba(255,255,255,.07);
-      border-radius: var(--radius-lg);
-      background: linear-gradient(150deg, rgba(17,21,45,.76), rgba(7,10,22,.82));
-      box-shadow: inset 0 1px 0 rgba(255,255,255,.035);
-    }
-    .module::before {
-      content: "";
-      position: absolute;
-      inset: 0 auto auto 0;
-      width: 42%;
-      height: 1px;
-      background: linear-gradient(90deg, var(--violet), transparent);
-      opacity: .72;
-    }
-    .module p { margin-bottom: 0; color: var(--muted); font-size: .86rem; line-height: 1.5; }
-    .module .eyebrow { margin-bottom: .75rem; }
-
-    .discover { grid-column: span 7; }
-    .founder-start { grid-column: span 5; }
-    .control-room { grid-column: span 5; }
-    .systems { grid-column: span 7; }
-    .proof { grid-column: span 12; }
-
-    .start-grid {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: .55rem;
-      margin-top: .8rem;
-    }
-    .start-card {
-      min-height: 8.1rem;
-      display: grid;
-      align-content: start;
-      gap: .3rem;
-      padding: .85rem;
-      border: 1px solid rgba(255,255,255,.07);
-      border-radius: .9rem;
-      text-decoration: none;
-      background: rgba(255,255,255,.03);
-    }
-    .start-card:hover, .start-card:focus-visible { border-color: rgba(98,220,255,.38); background: rgba(98,220,255,.045); }
-    .start-card strong { font-size: .9rem; }
-    .start-card p { color: var(--muted); font-size: .78rem; line-height: 1.43; }
-
-    .steps { display: grid; gap: .5rem; margin-top: .8rem; counter-reset: fcr-step; }
-    .step {
-      display: grid;
-      grid-template-columns: auto 1fr;
-      gap: .65rem;
-      align-items: start;
-      padding: .65rem;
-      border: 1px solid rgba(255,255,255,.06);
-      border-radius: .8rem;
-      background: rgba(255,255,255,.026);
-    }
-    .step::before {
-      counter-increment: fcr-step;
-      content: counter(fcr-step);
-      width: 1.65rem;
-      height: 1.65rem;
-      display: grid;
-      place-items: center;
-      border-radius: .55rem;
-      color: #e9e4ff;
-      background: rgba(157,124,255,.16);
-      font-size: .72rem;
-      font-weight: 900;
-    }
-    .step strong { display: block; margin-bottom: .15rem; font-size: .82rem; }
-    .step span { color: var(--muted); font-size: .75rem; line-height: 1.4; }
-
-    .boundary-note {
-      margin: .7rem 0 0;
-      padding: .75rem .85rem;
-      border-left: 3px solid rgba(157,124,255,.72);
-      border-radius: .7rem;
-      color: #aaa8bc;
-      background: rgba(157,124,255,.055);
-      font-size: .74rem;
-      line-height: 1.5;
-    }
-
-    .command-list, .system-grid, .proof-grid { display: grid; gap: .55rem; margin-top: .8rem; }
-    .command-list { grid-template-columns: repeat(3, minmax(0,1fr)); }
-    .system-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
-    .proof-grid { grid-template-columns: repeat(3, minmax(0,1fr)); }
-
-    .micro-card {
-      min-height: 6.2rem;
-      padding: .75rem;
-      border: 1px solid rgba(255,255,255,.06);
-      border-radius: .82rem;
-      background: rgba(255,255,255,.027);
-    }
-    .micro-card .label { color: #aea4de; font-size: .6rem; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; }
-    .micro-card strong { display: block; margin-top: .42rem; font-size: .86rem; }
-    .micro-card p { margin-top: .28rem; color: var(--muted); font-size: .72rem; line-height: 1.4; }
-
-    .flow {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: .35rem;
-      margin-top: .7rem;
-      color: #d9d4ee;
-      font-size: .72rem;
-      font-weight: 760;
-    }
-    .flow span {
-      padding: .36rem .5rem;
-      border: 1px solid rgba(157,124,255,.2);
-      border-radius: .6rem;
-      background: rgba(157,124,255,.06);
-    }
-
-    footer {
-      padding: 1.5rem .2rem .4rem;
-      color: #727489;
-      font-size: .72rem;
-      text-align: center;
-    }
-
-    .bottom-nav {
-      position: fixed;
-      left: 50%;
-      bottom: max(.65rem, env(safe-area-inset-bottom));
-      z-index: 50;
-      width: min(680px, calc(100% - 1rem));
-      min-height: var(--nav-h);
-      display: grid;
-      grid-template-columns: repeat(5, 1fr);
-      gap: .3rem;
-      padding: .42rem;
-      transform: translateX(-50%);
-      border: 1px solid rgba(157,124,255,.2);
-      border-radius: 1.25rem;
-      background: rgba(6, 8, 18, .88);
-      backdrop-filter: blur(24px);
-      box-shadow: 0 18px 60px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.04);
-    }
-
-    .bottom-nav a {
-      min-width: 0;
-      display: grid;
-      place-items: center;
-      gap: .18rem;
-      padding: .45rem .2rem;
-      border-radius: .85rem;
-      color: #85879c;
-      text-decoration: none;
-      font-size: .62rem;
-      font-weight: 760;
-    }
-    .bottom-nav a:hover, .bottom-nav a:focus-visible { color: #f3f1ff; background: rgba(157,124,255,.08); }
-    .nav-glyph { color: #c1b8ef; font-size: 1rem; line-height: 1; }
-
-    @media (max-width: 920px) {
-      .command-shell { grid-template-columns: 1fr; }
-      .hero { min-height: 29rem; }
-      .discover, .founder-start, .control-room, .systems { grid-column: span 6; }
-      .proof { grid-column: span 12; }
-      .command-list, .proof-grid { grid-template-columns: 1fr; }
-    }
-
-    @media (max-width: 660px) {
-      .shell { width: min(100% - 1rem, 1180px); }
-      .topbar { min-height: 3.9rem; }
-      .brand span:last-child { font-size: .84rem; }
-      .status span:last-child { display: none; }
-      .status { padding: .48rem; }
-      .hero { min-height: 27rem; padding: 1.15rem; border-radius: 1.25rem; }
-      h1 { font-size: clamp(3rem, 16vw, 4.65rem); }
-      .command-shell { margin-top: .55rem; }
-      .entry-panel { padding: .85rem; border-radius: 1.25rem; }
-      .entry-card { min-height: 6.4rem; padding: .8rem; gap: .62rem; }
-      .workspace { grid-template-columns: repeat(2, minmax(0,1fr)); gap: .55rem; }
-      .discover, .founder-start, .control-room, .systems, .proof { grid-column: span 2; }
-      .module { padding: .85rem; border-radius: 1rem; }
-      .start-grid, .system-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
-      .start-card { min-height: 7.3rem; padding: .72rem; }
-      .signal-strip { grid-template-columns: repeat(3, minmax(0,1fr)); gap: .35rem; }
-      .signal { min-height: 4.5rem; padding: .62rem; }
-      .signal strong { font-size: .74rem; }
-      .actions { display: grid; grid-template-columns: 1fr; }
-      .button { width: 100%; }
-      .bottom-nav { gap: .12rem; padding: .35rem; }
-      .bottom-nav a { font-size: .56rem; }
-    }
-
-    @media (max-width: 390px) {
-      .entry-icon { width: 2.1rem; height: 2.1rem; }
-      .entry-card small { font-size: .72rem; }
-      .start-card p { font-size: .7rem; }
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-      html { scroll-behavior: auto; }
-      .entry-card, .start-card { transition: none; }
+    @media (max-width: 620px) {
+      .wrap { width: calc(100% - 2rem); }
+      .hero { padding: 1.6rem 1.2rem; min-height: 0; }
+      .hero-art { min-height: 200px; }
+      .cards { grid-template-columns: 1fr; }
+      .card { min-height: 0; }
+      .stats { grid-template-columns: 1fr 1fr; padding: .6rem 1rem 1rem; }
+      .greet, .fgrid { padding-left: 1rem; padding-right: 1rem; }
+      .quote { max-width: none; }
+      .navlinks a, .navlinks button { padding: .45rem .55rem; font-size: .8rem; }
+      .banner { margin: 0 .6rem .8rem; flex-direction: column; align-items: flex-start; }
     }
   </style>
 </head>
-<body data-fcr-visual="founder-os-v2">
-  <main class="shell" data-command-shell>
+<body>
+  <div class="wrap">
     <header class="topbar">
-      <a class="brand" href="#home" aria-label="Founder Control Room home">
-        <div class="mark" aria-hidden="true">F</div>
-        <span>Founder Control Room</span>
+      <a class="logo" href="#top" aria-label="Founder Control Room home">
+        <span class="logo-mark">F</span>
+        <span>FCR</span>
       </a>
-      <a class="status" href="#proof" aria-label="Open the public proof screen">
-        <span class="status-dot" aria-hidden="true"></span>
-        <span>Public proof boundary</span>
-      </a>
+      <nav class="navlinks" aria-label="Public sections" data-user-nav>
+        <a class="on" href="#discover">Discover</a>
+        <a href="#learn">Learn</a>
+        <a href="#support">Support</a>
+        <a href="#community">Community</a>
+        <a href="#messages">Messages</a>
+        <a href="/control-room/">Profile</a>
+        <span class="avatar" aria-hidden="true">J</span>
+      </nav>
+      <nav class="navlinks" aria-label="Founder sections" data-founder-nav hidden>
+        <a class="on" href="#dashboard">Dashboard</a>
+        <a href="#projects">Projects</a>
+        <a href="#proof">Proof</a>
+        <a href="#community-f">Community</a>
+        <a href="#automations">Automations</a>
+        <span class="avatar" aria-hidden="true">J</span>
+      </nav>
     </header>
 
-    <section class="command-shell" id="home" data-public-screen="home" aria-labelledby="home-title">
-      <article class="hero glass">
-        <div class="eyebrow">Public command surface</div>
+    <div class="switch" role="tablist" aria-label="Choose a view">
+      <div class="switch-track">
+        <button role="tab" id="tab-user" aria-controls="view-user" aria-selected="true" data-view="user">User View</button>
+        <button role="tab" id="tab-founder" aria-controls="view-founder" aria-selected="false" data-view="founder">Founder View</button>
+      </div>
+    </div>
+
+    <!-- USER VIEW -->
+    <section id="view-user" class="view frame" role="tabpanel" aria-labelledby="tab-user" data-view-panel="user">
+      <div class="hero" id="discover">
         <div class="hero-copy">
-          <p class="thesis">Same truth. Higher outcomes.</p>
-          <h1 id="home-title">Founder<br /><span class="gradient">Control Room.</span></h1>
-          <p class="lede">A founder operating system for seeing what is real, deciding what is authorized, and moving work forward with proof attached.</p>
-          <div class="actions">
-            <a class="button button-primary" href="#founder-start">Enter founder path</a>
-            <a class="button" href="/work.html">Explore public work</a>
-            <a class="button" href="/juss-rayy/">Meet Juss Rayy</a>
-          </div>
-          <div class="signal-strip" aria-label="FCR public signal summary">
-            <div class="signal"><span>Truth</span><strong>Evidence first</strong></div>
-            <div class="signal"><span>Authority</span><strong>Scoped actions</strong></div>
-            <div class="signal"><span>Continuity</span><strong>State preserved</strong></div>
-          </div>
+          <p class="eyebrow">People × Ideas × Impact</p>
+          <h1>Back Founders.<br /><span class="grad">Build a Brighter</span><br />Tomorrow.</h1>
+          <p class="sub">Real people. Real progress. Real impact.</p>
+          <a class="btn" href="#learn">Explore Founders →</a>
         </div>
-      </article>
-
-      <aside class="entry-panel glass" aria-labelledby="entry-title" data-fcr-entry>
-        <div class="panel-head">
-          <div>
-            <div class="eyebrow">Choose your view</div>
-            <h2 id="entry-title">Where are you entering from?</h2>
-            <p>Same system. Different access and authority.</p>
-          </div>
-          <span class="mini-state">BOUNDARY ON</span>
+        <div class="hero-art" aria-hidden="true">
+          <div class="sun"></div>
+          <div class="ridge"></div>
+          <div class="ridge front"></div>
+          <div class="tag">PEOPLE<br />IDEAS<br />PROGRESS<br />A BRIGHTER<br />TOMORROW</div>
         </div>
+      </div>
 
-        <a class="entry-card" data-entry-choice="user" href="#discover">
-          <span class="entry-icon" aria-hidden="true">◎</span>
-          <span class="entry-body">
-            <span class="entry-kicker">User view</span>
-            <strong>Explore &amp; Support</strong>
-            <small>Discover founders, products, proof, and public progress without entering private workspace state.</small>
-          </span>
-          <span class="entry-arrow" aria-hidden="true">→</span>
-        </a>
+      <div class="cards" id="learn">
+        <article class="card" id="founders">
+          <h3>Founder Stories</h3>
+          <p>Real founders. Real progress. Stories publish as they are verified.</p>
+          <span class="more" aria-hidden="true">→</span>
+          <div class="art"></div>
+        </article>
+        <article class="card">
+          <h3>Missions That Matter</h3>
+          <p>Purpose-driven projects, each with its current state shown.</p>
+          <span class="more" aria-hidden="true">→</span>
+          <div class="art warm"></div>
+        </article>
+        <article class="card">
+          <h3>Learn &amp; Grow</h3>
+          <p>Practical resources from real builders.</p>
+          <span class="more" aria-hidden="true">→</span>
+          <div class="art note"><span>Better<br />Builders.<br />A Brighter<br />Tomorrow</span></div>
+        </article>
+        <article class="card" id="community">
+          <h3>Community Highlights</h3>
+          <p>Supporter highlights appear here once real supporters exist.</p>
+          <span class="more" aria-hidden="true">→</span>
+          <div class="art"></div>
+        </article>
+      </div>
 
-        <a class="entry-card" data-entry-choice="founder" href="#founder-start">
-          <span class="entry-icon" aria-hidden="true">◇</span>
-          <span class="entry-body">
-            <span class="entry-kicker">Founder view</span>
-            <strong>Build &amp; Operate</strong>
-            <small>Move from mission to evidence, decisions, projects, and the authenticated Control Room.</small>
-          </span>
-          <span class="entry-arrow" aria-hidden="true">→</span>
-        </a>
-
-        <p class="entry-truth">Choosing a view does not grant private authority. Founder access still passes through FCR authentication.</p>
-      </aside>
+      <div class="banner" id="support">
+        <div>
+          <strong>A public front door for founders, supporters and builders.</strong>
+          <span>Real people. Real projects. A brighter tomorrow.</span>
+        </div>
+        <span class="arrow" aria-hidden="true">→</span>
+      </div>
+      <div id="messages" class="empty" style="padding: 0 1.2rem 1.2rem;">Messages open after sign-in. Nothing is sent from this public view.</div>
     </section>
 
-    <section class="workspace" aria-label="Founder Control Room public workspace preview">
-      <article class="module discover" id="discover" data-public-onboarding="user" aria-labelledby="discover-title">
-        <div class="eyebrow">User onboarding</div>
-        <h2 id="discover-title">Start with what matters.</h2>
-        <p>No account is required to explore the public FCR world. The public surface stays useful without pretending private member state exists.</p>
-        <div class="start-grid" aria-label="Public FCR starting lanes">
-          <a class="start-card" href="/work.html" data-user-start="founders">
-            <span class="entry-kicker">Discover</span>
-            <strong>Founder work</strong>
-            <p>Products, projects, proof, and work ready to be seen.</p>
-          </a>
-          <a class="start-card" href="/juss-rayy/" data-user-start="story">
-            <span class="entry-kicker">People</span>
-            <strong>Founder story</strong>
-            <p>Meet the person behind the work and why it exists.</p>
-          </a>
-          <a class="start-card" href="#chief" data-user-start="learn">
-            <span class="entry-kicker">Learn</span>
-            <strong>How FCR works</strong>
-            <p>Chief, PromptOS, authority, evidence, and controlled execution.</p>
-          </a>
-          <a class="start-card" href="#proof" data-user-start="proof">
-            <span class="entry-kicker">Trust</span>
-            <strong>Proof boundary</strong>
-            <p>See what can be public and why unknown stays unknown.</p>
-          </a>
+    <!-- FOUNDER VIEW -->
+    <section id="view-founder" class="view frame" role="tabpanel" aria-labelledby="tab-founder" data-view-panel="founder" hidden>
+      <div class="frame-bar">
+        <strong>Founder View</strong>
+        <span class="chip unknown">PREVIEW · NOT SIGNED IN</span>
+      </div>
+      <div id="dashboard" class="greet">
+        <div>
+          <h2 id="greeting">Good evening, Juss.</h2>
+          <p>Build. Prove. Grow. Move one thing forward.</p>
         </div>
-      </article>
+        <blockquote class="quote">“Progress is a series of small wins.”</blockquote>
+      </div>
 
-      <article class="module founder-start" id="founder-start" data-public-onboarding="founder" aria-labelledby="founder-start-title">
-        <div class="eyebrow">Founder onboarding</div>
-        <h2 id="founder-start-title">Build the control room around the work.</h2>
-        <p>The founder path starts with product authentication, then establishes mission, current reality, and evidence before private workspace state is shown.</p>
-        <div class="steps" aria-label="Founder onboarding steps">
-          <div class="step"><div><strong>Authenticate</strong><span>Private workspace state stays behind FCR access.</span></div></div>
-          <div class="step"><div><strong>Set reality</strong><span>Project, mission, current state, and what matters now.</span></div></div>
-          <div class="step"><div><strong>Connect evidence</strong><span>Connection never creates authority by itself.</span></div></div>
-        </div>
-        <div class="actions" style="margin-top:.8rem">
-          <a class="button button-primary" href="/control-room/" data-founder-start="authenticated">Continue as a Founder</a>
-          <a class="button" href="/control-room/founder-shell.html">Preview the experience</a>
-        </div>
-        <p class="boundary-note"><strong>Authority boundary:</strong> General member authentication and multi-tenant founder workspaces remain a separate implementation gate and are not silently simulated by this public screen.</p>
-      </article>
+      <div class="stats">
+        <div class="stat"><b>5</b><small>Tracked projects</small></div>
+        <div class="stat muted"><b>No public receipts yet</b><small>Proof items</small></div>
+        <div class="stat muted"><b>Not connected</b><small>Community supporters</small></div>
+        <div class="stat muted"><b>Not measured</b><small>Weekly growth</small></div>
+      </div>
 
-      <article class="module control-room" id="control-room" data-public-screen="control-room" aria-labelledby="control-room-title">
-        <div class="eyebrow">Control Room</div>
-        <h2 id="control-room-title">Operate from reality.</h2>
-        <p>See project state, approve bounded actions, inspect evidence, and move the next gate without confusing execution with outcome.</p>
-        <div class="command-list">
-          <div class="micro-card"><span class="label">Observe</span><strong>Portfolio reality</strong><p>Checks, runtime, deployment, blockers, evidence.</p></div>
-          <div class="micro-card"><span class="label">Decide</span><strong>Scoped authority</strong><p>Patch, merge, deploy, publish, provider actions.</p></div>
-          <div class="micro-card"><span class="label">Verify</span><strong>Proof before claims</strong><p>Exact state must match the claimed outcome.</p></div>
+      <div class="fgrid">
+        <div class="panel" id="projects">
+          <div class="panel-head"><h3>Projects</h3><small>State from repo evidence</small></div>
+          <div class="row"><span class="ico">FC</span><div><strong>Founder Control Room</strong><small>Deploy: 0 successful runs of 228+</small></div><span class="chip blocked">BLOCKED</span></div>
+          <div class="row"><span class="ico">SB</span><div><strong>Se’kret Bip</strong><small>Public signup behind Access gate</small></div><span class="chip blocked">BLOCKED</span></div>
+          <div class="row"><span class="ico">CA</span><div><strong>Chief AI / PromptOS</strong><small>Council patches awaiting push</small></div><span class="chip unknown">UNKNOWN</span></div>
+          <div class="row"><span class="ico">SE</span><div><strong>StoryEngine</strong><small>Active; no verified receipt in this view</small></div><span class="chip unknown">UNKNOWN</span></div>
+          <div class="row"><span class="ico">JB</span><div><strong>Juss Beautiful Hair</strong><small>Live storefront; receipts not in this view</small></div><span class="chip unknown">UNKNOWN</span></div>
         </div>
-        <div class="actions" style="margin-top:.8rem">
-          <a class="button button-primary" href="https://www.foundercontrolroom.org/control-room/">Enter authenticated Control Room</a>
-        </div>
-      </article>
 
-      <article class="module systems" aria-label="FCR system lenses">
-        <div class="eyebrow">System lenses</div>
-        <h2>Chief + PromptOS</h2>
-        <div class="system-grid">
-          <section id="chief" data-public-screen="chief" aria-labelledby="chief-title" class="micro-card">
-            <span class="label">Chief</span>
-            <strong id="chief-title">Governed execution</strong>
-            <p>Turns founder intent into bounded work while keeping permission, receipts, evidence, and claims separate.</p>
-            <div class="flow" aria-label="Chief authority chain"><span>Intent</span><span>Authority</span><span>Receipt</span><span>Evidence</span></div>
-          </section>
-          <section id="promptos" data-public-screen="promptos" aria-labelledby="promptos-title" class="micro-card">
-            <span class="label">PromptOS</span>
-            <strong id="promptos-title">Reusable operating assets</strong>
-            <p>Turns approved intent into prompts, commands, workflows, tests, and stop conditions that compound.</p>
-            <div class="flow" aria-label="PromptOS compiler flow"><span>Intent</span><span>Constraints</span><span>Workflow</span><span>Verify</span></div>
-          </section>
+        <div class="panel" id="proof">
+          <div class="panel-head"><h3>Recent Proof</h3><small>Receipts only</small></div>
+          <div class="empty">No public proof is published yet. A receipt appears here only after a verified deploy, test or provider readback, with its head SHA and evidence link.</div>
         </div>
-      </article>
+      </div>
 
-      <article class="module proof" id="proof" data-public-screen="proof" aria-labelledby="proof-title">
-        <div class="eyebrow">Proof boundary</div>
-        <h2 id="proof-title">Public enough to trust. Private enough to operate.</h2>
-        <p>The public surface explains the operating model without exposing founder sessions, credentials, customer data, private projects, raw internal evidence, or hidden operating instructions.</p>
-        <div class="proof-grid">
-          <div class="micro-card"><span class="label">Reality</span><strong>Unknown stays unknown</strong><p>Drafts, tool runs, deploys, runtime observations, and human outcomes are distinct.</p></div>
-          <div class="micro-card"><span class="label">Authority</span><strong>No silent carry-forward</strong><p>One approved action does not quietly authorize the next consequential action.</p></div>
-          <div class="micro-card"><span class="label">Recovery</span><strong>Reversible by design</strong><p>Focused changes, rollback, and evidence-bound claims keep the system inspectable.</p></div>
+      <div class="fgrid" style="padding-top: 0;">
+        <div class="panel">
+          <div class="panel-head"><h3>Focus This Week</h3><small>Open decisions</small></div>
+          <label class="check"><input type="checkbox" /> Decide: revert or ratify model change cd0e0fe on main</label>
+          <label class="check"><input type="checkbox" /> Decide: remove ruleset 20819094 or bypass-merge #769/#894/#895</label>
+          <label class="check"><input type="checkbox" /> Re-test the Cloudflare deploy token with a real deploy run</label>
+          <label class="check"><input type="checkbox" /> Push prepared fixes (blocked by repo access gate)</label>
         </div>
-      </article>
+        <div class="panel" id="automations">
+          <div class="panel-head"><h3>Messages &amp; Integrations</h3><small>Live reads only</small></div>
+          <div class="empty" id="community-f">No inbox is connected to this view. Messages appear here only from a live connector read.</div>
+          <div class="integ"><span>Notion</span><small>Not connected to this site</small></div>
+          <div class="integ"><span>Slack</span><small>Not connected to this site</small></div>
+          <div class="integ"><span>Zapier</span><small>Not connected to this site</small></div>
+        </div>
+      </div>
+
+      <a class="btn ghost owner-cta" href="/control-room/">Enter authenticated Control Room →</a>
     </section>
 
-    <footer>Founder Control Room · Same truth. Higher outcomes.</footer>
-  </main>
+    <div class="slogan">
+      <strong>More builders. A brighter tomorrow.</strong>
+      <span>Truth · Proof · Progress · People · Tomorrow</span>
+    </div>
 
-  <nav class="bottom-nav" aria-label="Founder Control Room public screens" data-bottom-nav="five-screen">
-    <a href="#home" data-nav-screen="home"><span class="nav-glyph" aria-hidden="true">⌂</span><span>Home</span></a>
-    <a href="#control-room" data-nav-screen="control-room"><span class="nav-glyph" aria-hidden="true">◎</span><span>Control</span></a>
-    <a href="#chief" data-nav-screen="chief"><span class="nav-glyph" aria-hidden="true">◇</span><span>Chief</span></a>
-    <a href="#promptos" data-nav-screen="promptos"><span class="nav-glyph" aria-hidden="true">⌘</span><span>PromptOS</span></a>
-    <a href="#proof" data-nav-screen="proof"><span class="nav-glyph" aria-hidden="true">✓</span><span>Proof</span></a>
-  </nav>
+    <footer class="foot">
+      <span>Founder Control Room · Same truth. Higher outcomes.</span>
+      <span>Build · Prove · Grow · Move one thing forward</span>
+    </footer>
+  </div>
+
+  <script>
+    (function () {
+      var tabs = document.querySelectorAll('[role="tab"]');
+      var userPanel = document.querySelector('[data-view-panel="user"]');
+      var founderPanel = document.querySelector('[data-view-panel="founder"]');
+      var userNav = document.querySelector('[data-user-nav]');
+      var founderNav = document.querySelector('[data-founder-nav]');
+
+      function show(view) {
+        var isFounder = view === 'founder';
+        userPanel.hidden = isFounder;
+        founderPanel.hidden = !isFounder;
+        userNav.hidden = isFounder;
+        founderNav.hidden = !isFounder;
+        tabs.forEach(function (t) {
+          t.setAttribute('aria-selected', String(t.dataset.view === view));
+        });
+        try { history.replaceState(null, '', isFounder ? '#founder' : '#user'); } catch (e) {}
+      }
+
+      tabs.forEach(function (t) {
+        t.addEventListener('click', function () { show(t.dataset.view); });
+      });
+
+      if (location.hash === '#founder') show('founder');
+
+      try {
+        var h = new Date().getHours();
+        var part = h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
+        document.getElementById('greeting').textContent = part + ', Juss.';
+      } catch (e) {}
+    })();
+  </script>
 </body>
 </html>
