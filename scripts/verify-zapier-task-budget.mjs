@@ -281,20 +281,25 @@ if (companyFacebook?.owner !== 'juss-and-co' || companyFacebook?.purpose !== 'pa
 if (hairFacebook?.owner !== 'juss-beautiful-hair' || hairFacebook?.purpose !== 'hair_store') {
   fail('JBH Facebook must remain the commerce identity');
 }
-if (!/^\d+$/.test(hairFacebook?.facebook_page_id ?? '')) fail('JBH Facebook must retain its observed numeric Page ID');
-if (companyFacebook?.facebook_page_id && companyFacebook.facebook_page_id === hairFacebook?.facebook_page_id) {
-  fail('cannot reuse the JBH Facebook Page ID for Juss&Co');
+// Provider facts in this snapshot are historical and must not be silently upgraded.
+// A new independently verified company ID/URL requires a reviewed source and guard update.
+if (hairFacebook?.facebook_page_id !== '235882889600658') {
+  fail('JBH Facebook Page ID drift requires fresh Metricool/native provider evidence');
 }
-if (companyFacebook?.public_url && companyFacebook.public_url_status !== 'PROVIDER_VERIFIED') {
-  fail('Juss&Co public URL must not be exposed as verified without provider proof');
+if (companyFacebook?.facebook_page_id !== null) {
+  fail('Juss&Co Facebook Page ID must remain UNKNOWN until independently verified');
+}
+if (companyFacebook?.public_url !== null ||
+    companyFacebook?.public_url_status !== 'UNKNOWN_NOT_VERIFIED' ||
+    companyFacebook?.may_use_for_jussco_github_social_field !== false) {
+  fail('Juss&Co public URL and GitHub social eligibility must remain unverified');
 }
 if (companyFacebook?.founder_attributed_share_url &&
     companyFacebook.founder_attributed_share_url === hairFacebook?.founder_attributed_share_url) {
   fail('cannot reuse the JBH share link for Juss&Co');
 }
-if (companyFacebook?.may_use_for_jussco_github_social_field !== false &&
-    companyFacebook?.public_url_status !== 'PROVIDER_VERIFIED') {
-  fail('unverified Juss&Co URL cannot populate GitHub organization social fields');
+if (hairFacebook?.may_use_for_jussco_github_social_field !== false) {
+  fail('JBH brand Facebook must never populate Juss&Co GitHub social metadata');
 }
 for (const [channel, field] of Object.entries(requiredChannelRoutes)) {
   if (channel.endsWith('_facebook')) {
