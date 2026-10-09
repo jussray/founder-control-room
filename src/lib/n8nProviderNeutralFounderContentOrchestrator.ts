@@ -223,10 +223,11 @@ function providerChannel(
 ): string {
   if (platform === 'facebook') {
     const pages = approvedChannels.filter((channel) => FACEBOOK_PAGE_CHANNELS.has(channel));
-    if (pages.length !== 1) {
+    const approvedPage = pages[0];
+    if (!approvedPage || pages.length !== 1) {
       throw new Error('N8N_FOUNDER_CONTENT_PAGE_AUTHORITY_REQUIRED: exact founder approval must identify one Facebook Page destination');
     }
-    return provider === DEFAULT_PROVIDER ? pages[0] : `fcr_${pages[0]}`;
+    return provider === DEFAULT_PROVIDER ? approvedPage : `fcr_${approvedPage}`;
   }
   if (provider === DEFAULT_PROVIDER) {
     const channel = BUFFER_FOUNDER_CHANNELS[platform];
