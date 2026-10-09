@@ -1,5 +1,5 @@
 import type { OperatorRelayAdapter } from './operatorRelayDispatch.js';
-import type { OperatorRelayRequestV1 } from './operatorRelay.js';
+import type { OperatorRelayRequestV1, OperatorRelayUsageV1 } from './operatorRelay.js';
 import { buildOperatorRelayResponse } from './operatorRelayProviderResult.js';
 
 export interface TextOperatorProvider {
@@ -10,6 +10,7 @@ export interface TextOperatorProvider {
   }): Promise<{
     text: string;
     evidenceRef: string;
+    usage?: OperatorRelayUsageV1;
   }>;
 }
 
@@ -23,6 +24,7 @@ export function operatorRelayAdapterFromTextProvider(provider: TextOperatorProvi
     return buildOperatorRelayResponse(request, {
       answer: result.text,
       evidenceRefs: [result.evidenceRef],
+      usage: result.usage,
     });
   };
 }
