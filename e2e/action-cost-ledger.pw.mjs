@@ -58,6 +58,8 @@ app.post(
         }
       : null,
     storeReceipt: async (_projectId, receipt) => {
+      const previous = stored.find((entry) => entry.receiptId === receipt.receiptId);
+      if (previous) return previous.receiptHash === receipt.receiptHash ? 'duplicate' : 'conflict';
       stored.push(receipt);
       return 'stored';
     },
@@ -91,6 +93,28 @@ try {
     || acceptedBody.budgetState !== 'within'
   ) {
     throw new Error(`canonical receipt response drifted: ${JSON.stringify(acceptedBody)}`);
+  }
+
+  const replay = await client.post(`/ingest/action-cost-receipts/${PROJECT_SLUG}`, { data: canonical });
+  if (replay.status() !== 200 || (await replay.json()).duplicate !== true) {
+    throw new Error('same receipt ID and fingerprint must be an idempotent replay');
+  }
+
+  const { receiptHash: _ignoredHash, contract: _ignoredContract, authority: _ignoredAuthority,
+    costTruth: _ignoredTruth, actionUnits: _ignoredUnits, actionClassMaxUsd: _ignoredMax,
+    actionClassState: _ignoredClassState, monthRuntimeCostAfterUsd: _ignoredAfter,
+    budgetRemainingUsd: _ignoredRemaining, budgetUtilizationPct: _ignoredUtilization,
+    budgetState: _ignoredBudgetState, runtimeContributionMarginPct: _ignoredMargin,
+    ...receiptInput } = canonical;
+  const conflicting = buildActionCostReceipt({ ...receiptInput, actualCostUsd: 0.09 });
+  const rejectedConflict = await client.post(`/ingest/action-cost-receipts/${PROJECT_SLUG}`, {
+    data: conflicting,
+  });
+  if (rejectedConflict.status() !== 409) {
+    throw new Error(`expected conflicting duplicate receipt 409, got ${rejectedConflict.status()}`);
+  }
+  if ((await rejectedConflict.json()).error !== 'action_cost_receipt_conflict') {
+    throw new Error('conflicting receipt must not be acknowledged as accepted');
   }
 
   const derivedTamper = { ...canonical, budgetUtilizationPct: 1 };
@@ -139,6 +163,8 @@ try {
   console.log(JSON.stringify({
     contract: 'fcr/action-cost-ledger-playwright-proof@v1',
     acceptedCanonical: true,
+    acceptedIdenticalReplay: true,
+    rejectedConflictingReplay: true,
     rejectedRehashedDerivedTamper: true,
     rejectedSelfAuthorization: true,
     rejectedMissingAuthority: true,
