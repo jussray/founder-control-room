@@ -19,6 +19,7 @@ import { terminalRouter } from './routes/terminal.js';
 import { dashboardRouter } from './routes/dashboard.js';
 import { missionsRouter } from './routes/missions.js';
 import { promptosRouter } from './routes/promptos.js';
+import { createPromptOSCommandIntakeRouter } from './routes/promptOsCommandIntake.js';
 import { builderPromptWorkflowRouter } from './routes/builderPromptWorkflow.js';
 import { agentsRouter } from './routes/agents.js';
 import { capabilitiesRouter } from './routes/capabilities.js';
@@ -82,6 +83,7 @@ import { requireV10DecisionFounderBinding } from './middleware/v10DecisionFounde
 import { requireFounderSignalEngineMcpToken } from './middleware/founderSignalEngineMcpAuth.js';
 import { requireFounderSignalReadMcpToken } from './middleware/founderSignalReadMcpAuth.js';
 import { requireFounderSignalEngineReviewOnly } from './middleware/founderSignalEngineWriteGate.js';
+import type { ChiefAiEvidenceServiceBinding } from '../worker/handler.js';
 
 const EXACT_COMMIT_SHA = /^[0-9a-f]{40}$/i;
 const SUPABASE_PROJECT_REF = /^[a-z0-9]{20}$/;
@@ -151,6 +153,8 @@ export interface CreateServerOptions {
    * separately, not this Worker's filesystem.
    */
   serveStatic?: boolean;
+  /** Private Cloudflare service binding used only for proposal-only PromptOS -> Chief intake. */
+  chiefAiBinding?: ChiefAiEvidenceServiceBinding;
 }
 
 export function createServer(options: CreateServerOptions = {}) {
@@ -410,6 +414,7 @@ export function createServer(options: CreateServerOptions = {}) {
   app.use('/founder-os', founderOsSkillsRouter);
   app.use('/mirror', mirrorRouter);
   app.use('/missions', missionsRouter);
+  app.use('/promptos', createPromptOSCommandIntakeRouter(options.chiefAiBinding));
   app.use('/promptos', promptosRouter);
   app.use('/prompt-workflows', builderPromptWorkflowRouter);
   app.use('/agents', agentsRouter);
