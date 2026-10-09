@@ -171,13 +171,17 @@
       color: #e6e4ff; font-style: italic; font-size: .92rem; max-width: 260px;
     }
     .stats { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: .8rem; padding: .6rem 1.4rem 1rem; }
-    .stat { padding: .9rem 1rem; border-radius: .9rem; border: 1px solid var(--line); background: rgba(255,255,255,.03); }
+    .stat { padding: .9rem 1rem; border-radius: .9rem; border: 1px solid var(--line); background: linear-gradient(180deg, #1c2550, #0c0f26); }
     .stat b { display: block; font-size: 1.35rem; }
     .stat small { color: var(--muted); font-size: .78rem; }
     .stat.muted b { font-size: 1rem; color: var(--muted-2); font-weight: 600; }
 
     .fgrid { display: grid; grid-template-columns: 1.15fr .85fr; gap: .9rem; padding: 0 1.4rem 1.4rem; }
-    .panel { border: 1px solid var(--line); border-radius: 1rem; padding: 1rem; background: rgba(10,13,30,.7); }
+    .panel { border: 1px solid var(--line); border-radius: 1rem; padding: 1rem; background: linear-gradient(180deg, #1c2550, #0c0f26); box-shadow: 0 18px 50px rgba(0,0,0,.3); }
+    .hero-short { min-height: 230px; padding: 1.8rem 2rem; }
+    .hero-short .sub { margin-top: .6rem; }
+    .greet-h { font-size: clamp(1.7rem, 3.2vw, 2.4rem); font-weight: 800; }
+    .hero .quote { margin: 1.1rem 0 0; max-width: 360px; background: rgba(10,13,30,.45); }
     .panel-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: .7rem; }
     .panel-head h3 { font-size: .98rem; }
     .panel-head a, .panel-head small { color: var(--blue); font-size: .8rem; }
@@ -326,12 +330,18 @@
         <strong>Founder View</strong>
         <span class="chip unknown">PREVIEW · NOT SIGNED IN</span>
       </div>
-      <div id="dashboard" class="greet">
-        <div>
-          <h2 id="greeting">Good evening, Juss.</h2>
-          <p>Build. Prove. Grow. Move one thing forward.</p>
+      <div id="dashboard" class="hero hero-short">
+        <div class="hero-copy">
+          <p class="eyebrow">Turn ideas into progress</p>
+          <h2 id="greeting" class="greet-h">Good evening, Juss.</h2>
+          <p class="sub">Build. Prove. Grow. Move one thing forward.</p>
+          <blockquote class="quote">“Progress is a series of small wins.”</blockquote>
         </div>
-        <blockquote class="quote">“Progress is a series of small wins.”</blockquote>
+        <div class="hero-art" aria-hidden="true">
+          <div class="sun"></div>
+          <div class="ridge"></div>
+          <div class="ridge front"></div>
+        </div>
       </div>
 
       <div class="stats">
