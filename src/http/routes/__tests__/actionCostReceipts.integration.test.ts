@@ -8,6 +8,7 @@ import {
   type ActionCostReceiptV1,
 } from '../../../economics/actionCostLedger.js';
 import {
+  classifyActionCostReplay,
   createActionCostReceiptIngestHandler,
   deriveActionCostReceiptToken,
   type ActionCostStoreDisposition,
@@ -129,6 +130,38 @@ describe('action-cost receipt ingress', () => {
 
     expect(response.status).toBe(200);
     expect(response.body.duplicate).toBe(true);
+    expect(harness.storeCalls()).toBe(1);
+  });
+
+  it('treats reused IDs as duplicates only when stored cost fingerprints match', () => {
+    const canonical = receipt();
+    const prior = {
+      event_type: 'action_cost_receipt',
+      metadata: {
+        contract: canonical.contract,
+        receiptId: canonical.receiptId,
+        receiptHash: canonical.receiptHash,
+      },
+    };
+    expect(classifyActionCostReplay(prior, canonical)).toBe('duplicate');
+    expect(classifyActionCostReplay({
+      ...prior,
+      metadata: { ...prior.metadata, receiptHash: 'f'.repeat(64) },
+    }, canonical)).toBe('conflict');
+    expect(classifyActionCostReplay({ ...prior, event_type: 'build_event' }, canonical)).toBe('conflict');
+    expect(classifyActionCostReplay(null, canonical)).toBe('conflict');
+  });
+
+  it('returns HTTP 409 rather than accepted for a conflicting receipt ID', async () => {
+    const harness = appWith('conflict');
+    const response = await authorized(
+      request(harness.app).post(`/ingest/action-cost-receipts/${PROJECT_SLUG}`),
+    ).send(receipt());
+    expect(response.status).toBe(409);
+    expect(response.body).toEqual({
+      error: 'action_cost_receipt_conflict',
+      receiptId: 'chief-run-001',
+    });
     expect(harness.storeCalls()).toBe(1);
   });
 
