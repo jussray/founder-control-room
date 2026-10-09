@@ -1,6 +1,7 @@
 import express from 'express';
 import request from 'supertest';
 import { describe, expect, it } from 'vitest';
+import { jsonParseErrorHandler } from '../middleware/jsonParseError.js';
 import {
   actionCostReceiptHash,
   buildActionCostReceipt,
@@ -81,6 +82,8 @@ function appWith(
       },
     }),
   );
+
+  app.use(jsonParseErrorHandler);
 
   return { app, stored, storeCalls: () => storeCalls };
 }
@@ -233,9 +236,14 @@ describe('action-cost receipt ingress', () => {
         request(harness.app)
           .post(`/ingest/action-cost-receipts/${PROJECT_SLUG}`)
           .set('Content-Type', 'application/json'),
-      ).send(body as object | undefined);
+      ).send(JSON.stringify(body));
       expect(response.status).toBe(400);
-      expect(response.body.error).toBe('invalid_action_cost_receipt');
+      if (body === null) {
+        // Express's strict JSON parser rejects top-level null before receipt validation.
+        expect(response.body.code).toBe('INVALID_JSON');
+      } else {
+        expect(response.body.error).toBe('invalid_action_cost_receipt');
+      }
     }
     expect(harness.storeCalls()).toBe(0);
   });
