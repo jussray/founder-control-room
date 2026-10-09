@@ -108,30 +108,13 @@ jobs:
         run: |
           set -euo pipefail
 
-          python3 - <<'PY'
-          import os
-          import re
-          import sys
-
-          token = os.environ.get('CLOUDFLARE_API_TOKEN', '')
-          account_id = os.environ.get('CLOUDFLARE_ACCOUNT_ID', '')
-
-          try:
-              token.encode('ascii')
-          except UnicodeEncodeError:
-              print('::error title=Malformed Cloudflare API token::CLOUDFLARE_API_TOKEN contains non-ASCII characters. Re-copy the exact Cloudflare-issued token.')
-              sys.exit(1)
-
-          if any(ord(char) < 33 or ord(char) > 126 or char.isspace() for char in token):
-              print('::error title=Malformed Cloudflare API token::CLOUDFLARE_API_TOKEN contains whitespace or non-printable characters. Re-copy the exact Cloudflare-issued token.')
-              sys.exit(1)
-
-          if not re.fullmatch(r'[0-9a-f]{32}', account_id):
-              print('::error title=Invalid Cloudflare account authority::CLOUDFLARE_ACCOUNT_ID must be a 32-character lowercase hexadecimal account ID.')
-              sys.exit(1)
-
-          print('Cloudflare production credential is header-safe and account authority is structurally valid. The token value was not printed.')
-          PY
+          credential_receipt="$RUNNER_TEMP/fcr-deploy-credential-shape.json"
+          node scripts/provider-credential-contract.mjs \
+            --env CLOUDFLARE_API_TOKEN \
+            --account-id-env CLOUDFLARE_ACCOUNT_ID \
+            --require-account-id true \
+            --purpose fcr-production-deploy-authority \
+            --output "$credential_receipt"
 
           secret_receipt="$RUNNER_TEMP/fcr-worker-secret-names.json"
           npx --yes wrangler@4.110.0 secret list \

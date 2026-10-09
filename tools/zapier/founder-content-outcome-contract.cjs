@@ -10,6 +10,15 @@ const SUBJECT_ID = /^[A-Za-z0-9._:/-]{1,160}$/;
 const PROVIDER_STATES = new Set(['unknown', 'draft', 'scheduled', 'published', 'failed']);
 const TARGET_SCOPES = new Set(['portfolio', 'product']);
 const TARGET_AUDIENCES = new Set(['investor', 'product_user']);
+const SOURCE_ACCOUNT_TYPES = new Set([
+  'personal_profile',
+  'brand_page',
+  'business_account',
+  'creator_account',
+  'channel',
+  'unknown',
+]);
+const COVERAGE_STATES = new Set(['observed', 'UNKNOWN', 'OUT_OF_SCOPE']);
 const METRIC_KEYS = Object.freeze([
   'impressions',
   'reactions',
@@ -105,6 +114,63 @@ function allowedTargetMetrics(audience) {
       ? PRODUCT_USER_TARGET_METRIC_KEYS
       : INVESTOR_TARGET_METRIC_KEYS),
   ]);
+}
+
+function normalizeCoverageState(value) {
+  const raw = asString(value, 40);
+  if (!raw) return 'UNKNOWN';
+  if (raw.toLowerCase() === 'observed') return 'observed';
+  return raw.toUpperCase();
+}
+
+function buildSourceAccount(input, errors) {
+  const source = record(input.source_account);
+  if (!source) return null;
+
+  const network = asString(source.network, 80).toLowerCase();
+  const lane = asString(source.lane, 160).toLowerCase();
+  const accountType = asString(source.account_type, 80).toLowerCase();
+  const accountId = asString(source.account_id, 160);
+  const connectorAccountType = asString(source.connector_account_type, 80).toLowerCase() || null;
+  const connectorAccountId = asString(source.connector_account_id, 160) || null;
+  const coverageState = normalizeCoverageState(source.coverage_state);
+
+  if (!network) errors.push('source_account.network is required');
+  if (!lane || (network && !lane.startsWith(`${network}.`))) {
+    errors.push('source_account.lane must be network-scoped, for example facebook.creator');
+  }
+  if (!SOURCE_ACCOUNT_TYPES.has(accountType)) errors.push('source_account.account_type is invalid');
+  if (!SUBJECT_ID.test(accountId)) errors.push('source_account.account_id is invalid');
+  if ((connectorAccountType && !connectorAccountId) || (!connectorAccountType && connectorAccountId)) {
+    errors.push('source_account connector_account_type and connector_account_id must be provided together');
+  }
+  if (connectorAccountType && !SOURCE_ACCOUNT_TYPES.has(connectorAccountType)) errors.push('source_account.connector_account_type is invalid');
+  if (connectorAccountId && !SUBJECT_ID.test(connectorAccountId)) errors.push('source_account.connector_account_id is invalid');
+  if (typeof source.account_id === 'string' && source.account_id.trim().length > 160) {
+    errors.push('source_account.account_id exceeds 160 characters');
+  }
+  if (typeof source.connector_account_id === 'string' && source.connector_account_id.trim().length > 160) {
+    errors.push('source_account.connector_account_id exceeds 160 characters');
+  }
+  if (!COVERAGE_STATES.has(coverageState)) errors.push('source_account.coverage_state must be observed, UNKNOWN, or OUT_OF_SCOPE');
+  if (
+    coverageState === 'observed'
+    && connectorAccountType
+    && connectorAccountId
+    && (connectorAccountType !== accountType || connectorAccountId !== accountId)
+  ) {
+    errors.push('observed source_account coverage requires connector account identity to match observed account identity');
+  }
+
+  return Object.freeze({
+    network,
+    lane,
+    account_type: accountType,
+    account_id: accountId,
+    connector_account_type: connectorAccountType,
+    connector_account_id: connectorAccountId,
+    coverage_state: coverageState,
+  });
 }
 
 function buildTargetExtension(input, errors) {
@@ -232,6 +298,16 @@ function buildFounderContentOutcomeObservation(input = {}) {
     metricStates[key] = 'observed';
   }
 
+  const sourceAccount = buildSourceAccount(input, errors);
+  if (sourceAccount && platform && sourceAccount.network !== platform) errors.push('source_account.network must match platform');
+  if (sourceAccount && sourceAccount.coverage_state !== 'observed') {
+    for (const key of METRIC_KEYS) {
+      if (input.metrics?.[key] !== undefined && input.metrics?.[key] !== null) {
+        errors.push(`metrics.${key} cannot be observed when source_account.coverage_state is ${sourceAccount.coverage_state}`);
+      }
+    }
+  }
+
   const targetExtension = buildTargetExtension(input, errors);
 
   if (errors.length > 0) reject(errors);
@@ -249,6 +325,7 @@ function buildFounderContentOutcomeObservation(input = {}) {
     metrics,
     metric_states: metricStates,
   };
+  if (sourceAccount) identity.source_account = sourceAccount;
   if (targetExtension) Object.assign(identity, targetExtension);
 
   const authority = {
@@ -259,6 +336,9 @@ function buildFounderContentOutcomeObservation(input = {}) {
     can_increase_authority: false,
     missing_metrics_are_unknown: true,
   };
+  if (sourceAccount) {
+    authority.cross_account_metric_donation_forbidden = true;
+  }
   if (targetExtension) {
     authority.target_attribution_only = true;
     authority.target_metrics_can_authorize_action = false;
@@ -278,6 +358,53 @@ function buildFounderContentOutcomeObservation(input = {}) {
       customer_private_data_stored: false,
     }),
   });
+}
+
+function validateSourceAccount(input, errors) {
+  const source = record(input.source_account);
+  if (!source) return false;
+
+  const network = asString(source.network, 80).toLowerCase();
+  const lane = asString(source.lane, 160).toLowerCase();
+  const accountType = asString(source.account_type, 80).toLowerCase();
+  const accountId = asString(source.account_id, 160);
+  const connectorAccountType = asString(source.connector_account_type, 80).toLowerCase() || null;
+  const connectorAccountId = asString(source.connector_account_id, 160) || null;
+  const coverageState = normalizeCoverageState(source.coverage_state);
+
+  if (!network || network !== asString(input.platform, 80).toLowerCase()) errors.push('stored source_account.network must match platform');
+  if (!lane || (network && !lane.startsWith(`${network}.`))) errors.push('stored source_account.lane must remain network-scoped');
+  if (!SOURCE_ACCOUNT_TYPES.has(accountType)) errors.push('stored source_account.account_type is invalid');
+  if (!SUBJECT_ID.test(accountId)) errors.push('stored source_account.account_id is invalid');
+  if ((connectorAccountType && !connectorAccountId) || (!connectorAccountType && connectorAccountId)) errors.push('stored source_account connector identity is incomplete');
+  if (connectorAccountType && !SOURCE_ACCOUNT_TYPES.has(connectorAccountType)) errors.push('stored source_account.connector_account_type is invalid');
+  if (connectorAccountId && !SUBJECT_ID.test(connectorAccountId)) errors.push('stored source_account.connector_account_id is invalid');
+  if (typeof source.account_id === 'string' && source.account_id.trim().length > 160) {
+    errors.push('stored source_account.account_id exceeds 160 characters');
+  }
+  if (typeof source.connector_account_id === 'string' && source.connector_account_id.trim().length > 160) {
+    errors.push('stored source_account.connector_account_id exceeds 160 characters');
+  }
+  if (!COVERAGE_STATES.has(coverageState) || source.coverage_state !== coverageState) errors.push('stored source_account.coverage_state is invalid');
+  if (
+    coverageState === 'observed'
+    && connectorAccountType
+    && connectorAccountId
+    && (connectorAccountType !== accountType || connectorAccountId !== accountId)
+  ) {
+    errors.push('stored observed source_account coverage requires connector account identity to match observed account identity');
+  }
+
+  if (coverageState !== 'observed') {
+    const metrics = record(input.metrics) || {};
+    const states = record(input.metric_states) || {};
+    for (const key of METRIC_KEYS) {
+      if (metrics[key] !== null || states[key] !== 'UNKNOWN') {
+        errors.push(`stored metrics.${key} must remain UNKNOWN when source account coverage is ${coverageState}`);
+      }
+    }
+  }
+  return true;
 }
 
 function validateTargetExtension(input, errors) {
@@ -345,6 +472,7 @@ function validateFounderContentOutcomeObservation(observation) {
   const authority = record(input.authority);
   const privacy = record(input.privacy);
   const errors = [];
+  const hasSourceAccount = validateSourceAccount(input, errors);
   const hasTarget = validateTargetExtension(input, errors);
   const identity = {
     version: input.version,
@@ -359,6 +487,7 @@ function validateFounderContentOutcomeObservation(observation) {
     metrics: input.metrics,
     metric_states: input.metric_states,
   };
+  if (hasSourceAccount) identity.source_account = input.source_account;
   if (hasTarget) {
     identity.target = input.target;
     identity.target_metrics = input.target_metrics;
@@ -379,6 +508,9 @@ function validateFounderContentOutcomeObservation(observation) {
       || authority.can_increase_authority !== false
       || authority.missing_metrics_are_unknown !== true) {
     errors.push('observation authority must remain advisory-only and non-authorizing');
+  }
+  if (hasSourceAccount && authority?.cross_account_metric_donation_forbidden !== true) {
+    errors.push('source account observations must forbid cross-account metric donation');
   }
   if (hasTarget && (
     authority?.target_attribution_only !== true
@@ -449,11 +581,13 @@ function buildFounderContentLearningRequest(observation, options = {}) {
 module.exports = {
   buildFounderContentOutcomeObservation,
   buildFounderContentLearningRequest,
+  COVERAGE_STATES,
   FCR_LEARNING_ROUTE,
   FCR_LEARNING_TRANSPORT_CONTRACT,
   INVESTOR_TARGET_METRIC_KEYS,
   MEASUREMENT_SOURCE_ROLES,
   METRIC_KEYS,
   PRODUCT_USER_TARGET_METRIC_KEYS,
+  SOURCE_ACCOUNT_TYPES,
   TARGET_METRIC_KEYS,
 };

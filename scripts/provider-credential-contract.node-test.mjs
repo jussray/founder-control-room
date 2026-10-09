@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { classifyProviderToken } from './provider-credential-contract.mjs';
+import {
+  buildCredentialReceipt,
+  classifyCloudflareAccountId,
+  classifyProviderToken,
+} from './provider-credential-contract.mjs';
 
 const ACCOUNT_ID = '9b59861bd1747cf7525571b4c51d2aa0';
 
@@ -38,4 +42,31 @@ test('rejects wrapping quotes', () => {
 
 test('rejects account id substituted for token', () => {
   assert.equal(classifyProviderToken(ACCOUNT_ID, { accountId: ACCOUNT_ID }).classification, 'account-id-substitution');
+});
+
+test('accepts the canonical 32-character lowercase Cloudflare account id shape', () => {
+  assert.equal(classifyCloudflareAccountId(ACCOUNT_ID, { required: true }).classification, 'ok');
+});
+
+test('rejects missing required account authority', () => {
+  assert.equal(classifyCloudflareAccountId('', { required: true }).classification, 'missing');
+});
+
+test('rejects malformed account authority', () => {
+  assert.equal(classifyCloudflareAccountId('ABC123', { required: true }).classification, 'invalid-shape');
+});
+
+test('builds a redacted fail-closed receipt for malformed credentials', () => {
+  const receipt = buildCredentialReceipt({
+    name: 'CLOUDFLARE_API_TOKEN',
+    value: ' Bearer bad-token ',
+    accountId: ACCOUNT_ID,
+    requireAccountId: true,
+    purpose: 'fcr-production-deploy',
+  });
+  assert.equal(receipt.ok, false);
+  assert.equal(receipt.secretValueRead, false);
+  assert.equal(receipt.secretValuePrinted, false);
+  assert.equal(receipt.providerMutation, false);
+  assert.equal(JSON.stringify(receipt).includes('bad-token'), false);
 });
