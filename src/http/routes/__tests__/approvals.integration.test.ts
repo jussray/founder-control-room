@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { COMMON_TEST_DATA, createValidEvidence } from '../../../testFixtures/createCommonMocks';
 
 const {
   mockGetUser,
@@ -48,8 +47,24 @@ import express from 'express';
 import request from 'supertest';
 import { approvalsRouter } from '../approvals.js';
 
-const { MISSION_ID, PROJECT_ID, EXECUTION_ID, FOUNDER_EMAIL, FOUNDER_USER_ID, BEARER, EXPECTED_SHA } = COMMON_TEST_DATA;
-const validEvidence = createValidEvidence();
+const MISSION_ID = 'mission-uuid-001';
+const PROJECT_ID = 'project-uuid-001';
+const EXECUTION_ID = 'execution-uuid-001';
+const FOUNDER_EMAIL = 'founder@example.com';
+const FOUNDER_USER_ID = 'user-uuid-001';
+const BEARER = 'Bearer test-token';
+const EXPECTED_SHA = 'a'.repeat(40);
+
+const validEvidence = {
+  filesChanged: ['src/example.ts'],
+  behaviorChanged: 'Exact-head verification completed.',
+  checksRun: ['typecheck', 'browser_test'],
+  failures: [],
+  securityImpact: 'none',
+  deploymentImpact: 'none',
+  rollbackPath: 'Revert the merge commit.',
+  unresolvedRisks: [],
+};
 
 function buildApp() {
   const app = express();
