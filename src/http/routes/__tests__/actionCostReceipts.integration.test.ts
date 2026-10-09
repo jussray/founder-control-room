@@ -233,7 +233,7 @@ describe('action-cost receipt ingress', () => {
         request(harness.app)
           .post(`/ingest/action-cost-receipts/${PROJECT_SLUG}`)
           .set('Content-Type', 'application/json'),
-      ).send(body);
+      ).send(body as object | undefined);
       expect(response.status).toBe(400);
       expect(response.body.error).toBe('invalid_action_cost_receipt');
     }
