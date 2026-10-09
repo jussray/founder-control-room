@@ -1,0 +1,33 @@
+name: FCR live visual witness
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'e2e/fcr-live-visual-witness.mjs'
+      - '.github/workflows/fcr-live-visual-witness.yml'
+permissions:
+  contents: read
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Capture public FCR production witness
+        env:
+          LIVE_ORIGIN: https://foundercontrolroom.org
+        run: node e2e/fcr-live-visual-witness.mjs
+      - name: Preserve evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fcr-live-visual-witness
+          path: test-results/fcr-live-visual-witness/
+          if-no-files-found: warn
+          retention-days: 14
