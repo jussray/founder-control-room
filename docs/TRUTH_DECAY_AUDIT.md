@@ -505,3 +505,9 @@ FCR `main@73399839899463d5e9db001f7397903ee1f87739` completed its direct E2E har
 
 PR #945 is reused as the focused recovery carrier and rebinds only that evidence identity. Pin equality is recovery setup, not compatibility proof: predecessor browser/federation green is historical, and the successor FCR head remains `UNKNOWN` until live-ref equality, immutable peer checkout, runtime identity, directive/receipt binding, replay protections, and the complete Playwright federation witness succeed against `6852f350304d4d6103497fd5220ac9d7a6b92765`. No merge, deploy, production, publication, billing, or provider-mutation authority transfers with the peer pin.
 
+### 2026-10-09 StoryEngine repaired successor
+
+The first October 9 successor binding to StoryEngine `6852f350304d4d6103497fd5220ac9d7a6b92765` correctly passed live-ref equality and immutable checkout, then failed closed while starting the exact peer runtime because the peer contained a duplicate workspace-guard import. StoryEngine PR #129 repaired that syntax defect and the stale authenticated chapter-route test fixtures without weakening production workspace isolation, earned terminal green across its exact-head CI, Guardrails Playwright, Control Room Test Ledger, L99 Promotion Gates, and Agent Contract v1, and merged to `main@1a4a2d9a21ec13e10784f7c13c60a56191e14899`.
+
+FCR PR #945 now treats `1a4a2d9a21ec13e10784f7c13c60a56191e14899` as a fresh StoryEngine evidence subject. The successful StoryEngine repair packet does not donate federation/browser proof to FCR: the FCR successor head must independently pass live-ref equality, immutable peer checkout, peer runtime identity, directive/receipt reconciliation, replay safety, and the complete Playwright browser witness against `1a4a2d9a21ec13e10784f7c13c60a56191e14899`. No merge, deploy, production, publication, provider-mutation, billing, or approval authority transfers with this rebind.
+
