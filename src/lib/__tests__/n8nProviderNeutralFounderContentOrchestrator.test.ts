@@ -3,6 +3,7 @@ import {
   N8N_FOUNDER_CONTENT_PROVIDER_ROUTES,
   buildProviderNeutralN8nFounderContentEnvelope,
   buildProviderNeutralN8nFounderContentRequest,
+  buildFounderSocialContinuityProof,
   providerSupportsFounderContentPlatform,
   readN8nFounderContentProviderConfig,
   resolveN8nFounderContentProvider,
@@ -269,6 +270,64 @@ describe('provider-neutral n8n founder-content routing', () => {
       platform: 'facebook',
       channel: 'fcr_facebook',
     }))).toContain('Facebook channel must name one server-recognized Page; a generic facebook destination is not sufficient');
+  });
+
+  it('fingerprints the exact Page, approved content, and source without exporting copy or authority', () => {
+    const founder = buildProviderNeutralN8nFounderContentRequest(
+      buildProviderNeutralN8nFounderContentEnvelope(nativeInput('buffer', 'facebook')),
+    );
+    const hairInput = nativeInput('buffer', 'facebook');
+    (hairInput.approval as { channels: string[] }).channels = ['facebook', 'juss_beautiful_hair_facebook'];
+    const hair = buildProviderNeutralN8nFounderContentRequest(
+      buildProviderNeutralN8nFounderContentEnvelope(hairInput),
+    );
+    const observed = '2026-08-18T01:31:00.000Z';
+    const first = buildFounderSocialContinuityProof(founder, observed);
+    const second = buildFounderSocialContinuityProof(founder, observed);
+    const otherPage = buildFounderSocialContinuityProof(hair, observed);
+
+    expect(first).toEqual(second);
+    expect(first.fingerprint).toMatch(/^[a-f0-9]{64}$/);
+    expect(first.proofCookie).toMatch(/^fcr-social-proof-v1:[a-f0-9]{64}$/);
+    expect(first.status).toBe('EVIDENCE_ONLY');
+    expect(first.grantsAuthority).toBe(false);
+    expect(first.provesPublication).toBe(false);
+    expect(first.fingerprint).not.toBe(otherPage.fingerprint);
+    expect(founder.orchestrationId).not.toBe(hair.orchestrationId);
+    expect(JSON.stringify(first)).not.toContain(founder.text);
+    expect(JSON.stringify(first)).not.toContain(founder.fcrAuthorization.authorizationHash);
+  });
+
+  it('preserves Page idempotency across transports but fingerprints actual provider routing separately', () => {
+    const approved = nativeInput('buffer', 'facebook');
+    const buffer = buildProviderNeutralN8nFounderContentRequest(
+      buildProviderNeutralN8nFounderContentEnvelope(approved),
+    );
+    const meta = buildProviderNeutralN8nFounderContentRequest(
+      buildProviderNeutralN8nFounderContentEnvelope({ ...approved, n8n_provider: 'meta' }),
+    );
+    expect(buffer.orchestrationId).toBe(meta.orchestrationId);
+    expect(buildFounderSocialContinuityProof(buffer, '2026-08-18T01:31:00.000Z').fingerprint)
+      .not.toBe(buildFounderSocialContinuityProof(meta, '2026-08-18T01:31:00.000Z').fingerprint);
+  });
+
+  it('expires proof cookies and links successors without granting authority', () => {
+    const request = buildProviderNeutralN8nFounderContentRequest(
+      buildProviderNeutralN8nFounderContentEnvelope(nativeInput('buffer', 'facebook')),
+    );
+    const initial = buildFounderSocialContinuityProof(request, '2026-08-18T01:31:00.000Z');
+    const successor = buildFounderSocialContinuityProof(request, '2026-08-18T01:35:00.000Z', initial.fingerprint);
+    expect(successor.parentFingerprint).toBe(initial.fingerprint);
+    expect(successor.proofCookie).not.toBe(initial.proofCookie);
+    expect(successor.grantsAuthority).toBe(false);
+    expect(() => buildFounderSocialContinuityProof(request, request.providerRequest.scheduleAt))
+      .toThrow(/FOUNDER_SOCIAL_CONTINUITY_STALE/);
+    expect(() => buildFounderSocialContinuityProof(request, 'invalid-time'))
+      .toThrow(/FOUNDER_SOCIAL_CONTINUITY_STALE/);
+    expect(() => buildFounderSocialContinuityProof(request, '2026-08-18T01:31:00.000Z', 'not-sha'))
+      .toThrow(/FOUNDER_SOCIAL_CONTINUITY_PARENT_INVALID/);
+    expect(() => buildFounderSocialContinuityProof(request, '2026-08-18T01:31:00.000Z', initial.fingerprint))
+      .toThrow(/marker may not parent itself/);
   });
 
   it('refuses once-current claims on every deferred provider route', () => {
