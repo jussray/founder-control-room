@@ -80,8 +80,11 @@ const PROVIDER_NEUTRAL_EXECUTION_IDENTITY = 'fcr/n8n-founder-content-execution-i
 const PROVIDER_NEUTRAL_CADENCE_PROVIDER = 'n8n' as const;
 const BUFFER_FOUNDER_CHANNELS: Readonly<Record<string, string>> = Object.freeze({
   linkedin: 'juss_rayy_linkedin',
-  facebook: 'juss_and_co_facebook',
 });
+const FACEBOOK_PAGE_CHANNELS = new Set([
+  'juss_and_co_facebook',
+  'juss_beautiful_hair_facebook',
+]);
 
 function text(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
@@ -213,7 +216,18 @@ function assertScheduleBeforeApprovalExpiry(scheduleAt: string, expiresAt: strin
   }
 }
 
-function providerChannel(provider: N8nFounderContentProvider, platform: string): string {
+function providerChannel(
+  provider: N8nFounderContentProvider,
+  platform: string,
+  approvedChannels: readonly string[],
+): string {
+  if (platform === 'facebook') {
+    const pages = approvedChannels.filter((channel) => FACEBOOK_PAGE_CHANNELS.has(channel));
+    if (pages.length !== 1) {
+      throw new Error('N8N_FOUNDER_CONTENT_PAGE_AUTHORITY_REQUIRED: exact founder approval must identify one Facebook Page destination');
+    }
+    return provider === DEFAULT_PROVIDER ? pages[0] : `fcr_${pages[0]}`;
+  }
   if (provider === DEFAULT_PROVIDER) {
     const channel = BUFFER_FOUNDER_CHANNELS[platform];
     if (!channel) {
@@ -291,6 +305,15 @@ export function validateProviderNeutralN8nFounderContentEnvelope(
   } else if (!providerSupportsFounderContentPlatform(provider, platform)) {
     reasons.push(`provider ${provider} does not support platform ${platform}`);
   }
+  if (platform === 'facebook') {
+    const channel = text(envelope.channel);
+    const approvedPage = provider === DEFAULT_PROVIDER
+      ? channel
+      : channel.startsWith('fcr_') ? channel.slice(4) : '';
+    if (!FACEBOOK_PAGE_CHANNELS.has(approvedPage)) {
+      reasons.push('Facebook channel must name one server-recognized Page; a generic facebook destination is not sufficient');
+    }
+  }
 
   return [...new Set(reasons)];
 }
@@ -332,7 +355,7 @@ export function buildProviderNeutralN8nFounderContentEnvelope(
     state: 'scheduled_review_window',
     content_id: contentId,
     platform,
-    channel: providerChannel(provider, platform),
+    channel: providerChannel(provider, platform, authorization.channels),
     text: authorization.content.text,
     source: {
       repo: authorization.source.repo,
