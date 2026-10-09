@@ -178,6 +178,7 @@
 
     .fgrid { display: grid; grid-template-columns: 1.15fr .85fr; gap: .9rem; padding: 0 1.4rem 1.4rem; }
     .panel { border: 1px solid var(--line); border-radius: 1rem; padding: 1rem; background: linear-gradient(180deg, #1c2550, #0c0f26); box-shadow: 0 18px 50px rgba(0,0,0,.3); }
+    .note-line { margin: 1rem 1.2rem 1.2rem; color: var(--muted); font-size: .84rem; line-height: 1.5; }
     .hero-short { min-height: 230px; padding: 1.8rem 2rem; }
     .hero-short .sub { margin-top: .6rem; }
     .greet-h { font-size: clamp(1.7rem, 3.2vw, 2.4rem); font-weight: 800; }
@@ -321,7 +322,7 @@
         </div>
         <span class="arrow" aria-hidden="true">→</span>
       </div>
-      <div id="messages" class="empty" style="padding: 0 1.2rem 1.2rem;">Messages open after sign-in. Nothing is sent from this public view.</div>
+      <p id="messages" class="note-line">No account is required to explore the public FCR world. Messages open after sign-in; nothing is sent from this public view.</p>
     </section>
 
     <!-- FOUNDER VIEW -->
@@ -384,6 +385,7 @@
         </div>
       </div>
 
+      <p class="note-line" style="padding: 0; margin: 0 0 1rem;">Founder access still passes through FCR authentication. General member authentication and multi-tenant founder workspaces remain a separate implementation gate. Connection never creates authority by itself.</p>
       <a class="btn ghost owner-cta" href="/control-room/">Enter authenticated Control Room →</a>
     </section>
 
