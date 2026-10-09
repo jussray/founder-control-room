@@ -44,7 +44,7 @@ interface ProjectRecord {
   repoIdentifier: string | null;
 }
 
-export type ActionCostStoreDisposition = 'stored' | 'duplicate';
+export type ActionCostStoreDisposition = 'stored' | 'duplicate' | 'conflict';
 
 export interface ActionCostReceiptDependencies {
   env?: NodeJS.ProcessEnv;
@@ -105,6 +105,23 @@ function eventSeverity(receipt: ActionCostReceiptV1): 'info' | 'warning' | 'erro
   return 'info';
 }
 
+/** A reused receipt ID is idempotent only when the persisted identity is identical. */
+export function classifyActionCostReplay(
+  stored: unknown,
+  receipt: ActionCostReceiptV1,
+): 'duplicate' | 'conflict' {
+  if (!stored || typeof stored !== 'object' || Array.isArray(stored)) return 'conflict';
+  const row = stored as Record<string, unknown>;
+  const metadata = row.metadata;
+  if (row.event_type !== 'action_cost_receipt'
+    || !metadata || typeof metadata !== 'object' || Array.isArray(metadata)) return 'conflict';
+  const prior = metadata as Record<string, unknown>;
+  return prior.contract === receipt.contract
+    && prior.receiptId === receipt.receiptId
+    && prior.receiptHash === receipt.receiptHash
+    ? 'duplicate' : 'conflict';
+}
+
 async function storeReceipt(
   projectId: string,
   receipt: ActionCostReceiptV1,
@@ -157,8 +174,19 @@ async function storeReceipt(
   });
 
   if (!error) return 'stored';
-  if ('code' in error && error.code === '23505') return 'duplicate';
-  throw new Error('action_cost_receipt_store_failed');
+  if (!('code' in error) || error.code !== '23505') {
+    throw new Error('action_cost_receipt_store_failed');
+  }
+
+  const { data: existing, error: lookupError } = await supabase
+    .from('project_events')
+    .select('event_type,metadata')
+    .eq('project_id', projectId)
+    .eq('source_event_id', `action-cost:${receipt.receiptId}`)
+    .maybeSingle();
+
+  if (lookupError) throw new Error('action_cost_receipt_duplicate_lookup_failed');
+  return classifyActionCostReplay(existing, receipt);
 }
 
 function policyError(
@@ -222,6 +250,9 @@ export function createActionCostReceiptIngestHandler(
       if (rejected) return res.status(403).json({ error: rejected });
 
       const disposition = await receiptStore(project.id, receipt);
+      if (disposition === 'conflict') {
+        return res.status(409).json({ error: 'action_cost_receipt_conflict', receiptId: receipt.receiptId });
+      }
       return res.status(disposition === 'stored' ? 201 : 200).json({
         accepted: true,
         duplicate: disposition === 'duplicate',
