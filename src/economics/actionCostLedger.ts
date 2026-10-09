@@ -280,15 +280,38 @@ function receiptInput(receipt: ActionCostReceiptV1): ActionCostReceiptInputV1 {
 }
 
 export function validateActionCostReceipt(receipt: ActionCostReceiptV1): string[] {
-  const errors = validateActionCostReceiptInput(receipt);
-  if (receipt.contract !== ACTION_COST_RECEIPT_CONTRACT) errors.push('unsupported action-cost receipt contract');
-  if (Object.values(receipt.authority ?? {}).some(Boolean)) errors.push('action-cost receipt cannot carry mutation authority');
-  if (!/^[0-9a-f]{64}$/.test(receipt.receiptHash ?? '')) errors.push('receiptHash must be sha256');
-  if (errors.length === 0) {
-    const expected = buildActionCostReceipt(receiptInput(receipt));
-    if (receipt.receiptHash !== expected.receiptHash) {
-      errors.push('receiptHash does not match canonical action-cost receipt');
-    }
+  if (!receipt || typeof receipt !== 'object' || Array.isArray(receipt)) {
+    return ['action-cost receipt must be a JSON object'];
   }
-  return [...new Set(errors)];
+
+  // Transport JSON is untrusted even when the caller supplies a TypeScript shape.
+  try {
+    const errors = validateActionCostReceiptInput(receipt);
+    if (receipt.contract !== ACTION_COST_RECEIPT_CONTRACT) errors.push('unsupported action-cost receipt contract');
+
+    const requiredAuthorityKeys: Array<keyof ActionCostReceiptV1['authority']> = [
+      'billingMutation', 'pricingMutation', 'subscriptionMutation', 'providerMutation',
+    ];
+    const authority = receipt.authority;
+    if (
+      !authority ||
+      typeof authority !== 'object' ||
+      Array.isArray(authority) ||
+      Object.keys(authority).length !== requiredAuthorityKeys.length ||
+      requiredAuthorityKeys.some((key) => authority[key] !== false)
+    ) {
+      errors.push('action-cost receipt cannot carry mutation authority');
+    }
+
+    if (!/^[0-9a-f]{64}$/.test(receipt.receiptHash ?? '')) errors.push('receiptHash must be sha256');
+    if (errors.length === 0) {
+      const expected = buildActionCostReceipt(receiptInput(receipt));
+      if (receipt.receiptHash !== expected.receiptHash) {
+        errors.push('receiptHash does not match canonical action-cost receipt');
+      }
+    }
+    return [...new Set(errors)];
+  } catch {
+    return ['action-cost receipt fields are invalid'];
+  }
 }
