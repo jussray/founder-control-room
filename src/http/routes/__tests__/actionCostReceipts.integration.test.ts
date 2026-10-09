@@ -215,6 +215,31 @@ describe('action-cost receipt ingress', () => {
     expect(harness.storeCalls()).toBe(0);
   });
 
+  it('fails closed for malformed JSON bodies and incomplete or extra authority fields', async () => {
+    const harness = appWith();
+    const canonical = receipt();
+    const malformedBodies: unknown[] = [
+      null,
+      [],
+      { ...canonical, receiptId: 10 },
+      { ...canonical, authority: undefined },
+      { ...canonical, authority: {} },
+      { ...canonical, authority: { ...canonical.authority, extraPermission: false } },
+      { ...canonical, usage: { ...canonical.usage, tools: [10] } },
+    ];
+
+    for (const body of malformedBodies) {
+      const response = await authorized(
+        request(harness.app)
+          .post(`/ingest/action-cost-receipts/${PROJECT_SLUG}`)
+          .set('Content-Type', 'application/json'),
+      ).send(body);
+      expect(response.status).toBe(400);
+      expect(response.body.error).toBe('invalid_action_cost_receipt');
+    }
+    expect(harness.storeCalls()).toBe(0);
+  });
+
   it('accepts estimates but preserves them as estimated truth', async () => {
     const harness = appWith();
     const value = receipt({ costBasis: 'estimated' });
