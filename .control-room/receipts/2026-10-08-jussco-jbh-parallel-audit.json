@@ -1,0 +1,95 @@
+{
+  "contract": "juss/fcr-social-identity-parallel-audit@v1",
+  "audit_date": "2026-10-08",
+  "authority_repo": "jussray/founder-control-room",
+  "founder_goal": "Keep parent-company Juss&Co Facebook identity separate from Juss Beautiful Hair and inherit this truth across dependent systems.",
+  "fingerprint": {
+    "registry_blob_sha1": "b717c867eb63508b9fec541d8b4ecd9d77e61d01",
+    "verifier_blob_sha1": "fd9a1a1576ab92d211acd91ac7ed735f65fe570d",
+    "workflow_blob_sha1": "8b7d406e6a2ca8dc9a635ad2c7660b0fc6440f2d",
+    "continuity_cookie": "jussco-fb-identity-split-2026-10-08/audit-v2",
+    "non_secret": true,
+    "grants_execution_authority": false
+  },
+  "evidence": [
+    {
+      "repo": "jussray/founder-control-room",
+      "base": "36e2620ab1526d6acb0570e43fc9e9e777bb04a9",
+      "candidate_head_before_audit_receipt": "bd76f7d0bd54bc7d381bedf1d882beec73f2dcfc",
+      "state": "STAGED_CI_NOT_RUN"
+    },
+    {
+      "repo": "jussray/chief-ai-machine",
+      "main": "e4fece9593e3ec9050003aa4503981d743d5f7b7",
+      "candidate": "61ffb78a5da0a0338f0261955975a091343c267d",
+      "state": "DIVERGED_FROM_CURRENT_MAIN; UNRELATED_SRC_MAIN_CHANGES"
+    },
+    {
+      "repo": "jussray/solcontinuity",
+      "main": "0c0164462f3de5e9e934a58cf5d13375b71dfc5d",
+      "candidate": "67a6492ee82154aa4a8231fcc9a66df3b7137c3e",
+      "state": "STAGED"
+    },
+    {
+      "repo": "jussray/promptos",
+      "main": "11e4a2ad525300bee39ea56a8314bf3d951bd5de",
+      "candidate": "751ced71e87cce0719a5460b674c47b27eed1b24",
+      "state": "STAGED"
+    },
+    {
+      "repo": "jussray/jussbeautifulhair-site",
+      "main": "57152458182c0232617b88b61ff7bc454121d93d",
+      "candidate": "6fe73677dcded365b583e99c3a3235a78f1852c7",
+      "state": "DIVERGED_FROM_CURRENT_MAIN; UNRELATED_SECRET_HISTORY_SCAN_MAIN_CHANGE"
+    }
+  ],
+  "audit_findings": [
+    {
+      "severity": "CORRECTED",
+      "finding": "Original FCR social identity verifier accepted arbitrary unverified company account IDs or self-declared URL status; tightened to current evidence snapshot.",
+      "source": "scripts/verify-zapier-task-budget.mjs"
+    },
+    {
+      "severity": "CORRECTED",
+      "finding": "Buffer provider PR workflow ignored changes solely to canonical social identity registry; path filter added.",
+      "source": ".github/workflows/buffer-provider-contract.yml"
+    },
+    {
+      "severity": "HOLD",
+      "finding": "No GitHub Actions workflow run exists on candidate heads. No PR/CI/check/deployment readback was available to verify final integration.",
+      "impact": "Merge proof not met."
+    },
+    {
+      "severity": "HOLD",
+      "finding": "Registry is source/evidence, not live Facebook/Buffer/n8n account binding; no provider readback or operational endpoint witness.",
+      "impact": "Cannot claim live publishing cross-brand isolation."
+    },
+    {
+      "severity": "UNKNOWN",
+      "finding": "Direct public URL and numeric provider identity for Juss&Co are still unverified.",
+      "impact": "GitHub parent company social field remains unset."
+    }
+  ],
+  "tests": {
+    "static_rule_replays": {
+      "passed": 10,
+      "total": 10,
+      "limits": "Pure in-memory replays of identity assertions; not full Node verifier, repository CI, or provider execution."
+    },
+    "github_file_readback": "VERIFIED",
+    "github_exact_branch_heads": "VERIFIED_AT_OBSERVATION",
+    "ci": "NOT_RUN",
+    "playwright": "NOT_APPLICABLE_NO_UI_OR_RUNTIME_CHANGE",
+    "provider_readback": "NOT_RUN",
+    "merge": "NOT_AUTHORIZED_AT_EXACT_CANDIDATE_HEAD"
+  },
+  "change_control": {
+    "pull_requests_created": 0,
+    "main_merges": 0,
+    "deployments": 0,
+    "provider_profile_updates": 0,
+    "live_social_publications": 0
+  },
+  "rollback": "Candidate branches can be discarded or individual commits reverted without reversing a production or main change; no destructive operation performed.",
+  "next_gate": "FCR first: use a reviewed candidate PR/CI path to obtain Required Gate + Verify test-ledger + Buffer Provider Contract on exact head without bypass, then independently approve exact-head merge. Reconcile Chief/JBH main drift and review dependent branches after FCR main identity source is confirmed."
+}
