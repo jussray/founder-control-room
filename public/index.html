@@ -238,7 +238,7 @@
     }
   </style>
 </head>
-<body>
+<body data-fcr-visual="approved-mockup-v3">
   <div class="wrap">
     <header class="topbar">
       <a class="logo" href="#top" aria-label="Founder Control Room home">
@@ -251,8 +251,7 @@
         <a href="#support">Support</a>
         <a href="#community">Community</a>
         <a href="#messages">Messages</a>
-        <a href="/control-room/">Profile</a>
-        <span class="avatar" aria-hidden="true">J</span>
+        <a href="/control-room/">Founder sign-in</a>
       </nav>
       <nav class="navlinks" aria-label="Founder sections" data-founder-nav hidden>
         <a class="on" href="#dashboard">Dashboard</a>
@@ -260,7 +259,7 @@
         <a href="#proof">Proof</a>
         <a href="#community-f">Community</a>
         <a href="#automations">Automations</a>
-        <span class="avatar" aria-hidden="true">J</span>
+        <a href="/control-room/">Founder sign-in</a>
       </nav>
     </header>
 
@@ -276,9 +275,9 @@
       <div class="hero" id="discover">
         <div class="hero-copy">
           <p class="eyebrow">People × Ideas × Impact</p>
-          <h1>Back Founders.<br /><span class="grad">Build a Brighter</span><br />Tomorrow.</h1>
+          <h1 id="home-title">Back Founders.<br /><span class="grad">Build a Brighter</span><br />Tomorrow.</h1>
           <p class="sub">Real people. Real progress. Real impact.</p>
-          <a class="btn" href="#learn">Explore Founders →</a>
+          <a class="btn" href="/work.html">Explore Founders →</a>
         </div>
         <div class="hero-art" aria-hidden="true">
           <div class="sun"></div>
@@ -329,12 +328,12 @@
     <section id="view-founder" class="view frame" role="tabpanel" aria-labelledby="tab-founder" data-view-panel="founder" hidden>
       <div class="frame-bar">
         <strong>Founder View</strong>
-        <span class="chip unknown">PREVIEW · NOT SIGNED IN</span>
+        <span class="chip unknown">SIGN-IN REQUIRED</span>
       </div>
       <div id="dashboard" class="hero hero-short">
         <div class="hero-copy">
           <p class="eyebrow">Turn ideas into progress</p>
-          <h2 id="greeting" class="greet-h">Good evening, Juss.</h2>
+          <h2 class="greet-h">Founder View</h2>
           <p class="sub">Build. Prove. Grow. Move one thing forward.</p>
           <blockquote class="quote">“Progress is a series of small wins.”</blockquote>
         </div>
@@ -346,46 +345,36 @@
       </div>
 
       <div class="stats">
-        <div class="stat"><b>5</b><small>Tracked projects</small></div>
-        <div class="stat muted"><b>No public receipts yet</b><small>Proof items</small></div>
-        <div class="stat muted"><b>Not connected</b><small>Community supporters</small></div>
-        <div class="stat muted"><b>Not measured</b><small>Weekly growth</small></div>
+        <div class="stat muted"><b>Sign in to view</b><small>Tracked projects</small></div>
+        <div class="stat muted"><b>Sign in to view</b><small>Proof items</small></div>
+        <div class="stat muted"><b>Sign in to view</b><small>Community supporters</small></div>
+        <div class="stat muted"><b>Sign in to view</b><small>Weekly growth</small></div>
       </div>
 
       <div class="fgrid">
         <div class="panel" id="projects">
-          <div class="panel-head"><h3>Projects</h3><small>State from repo evidence</small></div>
-          <div class="row"><span class="ico">FC</span><div><strong>Founder Control Room</strong><small>Deploy: 0 successful runs of 228+</small></div><span class="chip blocked">BLOCKED</span></div>
-          <div class="row"><span class="ico">SB</span><div><strong>Se’kret Bip</strong><small>Public signup behind Access gate</small></div><span class="chip blocked">BLOCKED</span></div>
-          <div class="row"><span class="ico">CA</span><div><strong>Chief AI / PromptOS</strong><small>Council patches awaiting push</small></div><span class="chip unknown">UNKNOWN</span></div>
-          <div class="row"><span class="ico">SE</span><div><strong>StoryEngine</strong><small>Active; no verified receipt in this view</small></div><span class="chip unknown">UNKNOWN</span></div>
-          <div class="row"><span class="ico">JB</span><div><strong>Juss Beautiful Hair</strong><small>Live storefront; receipts not in this view</small></div><span class="chip unknown">UNKNOWN</span></div>
+          <div class="panel-head"><h3>Projects</h3><small>Sign-in required</small></div>
+          <p class="empty">Project status is shown only after founder sign-in. Nothing from private project state is published on this page.</p>
         </div>
 
         <div class="panel" id="proof">
           <div class="panel-head"><h3>Recent Proof</h3><small>Receipts only</small></div>
-          <div class="empty">No public proof is published yet. A receipt appears here only after a verified deploy, test or provider readback, with its head SHA and evidence link.</div>
+          <div class="empty">Receipts are shown only after founder sign-in. Public proof is published separately, after verification.</div>
         </div>
       </div>
 
       <div class="fgrid" style="padding-top: 0;">
         <div class="panel">
-          <div class="panel-head"><h3>Focus This Week</h3><small>Open decisions</small></div>
-          <label class="check"><input type="checkbox" /> Decide: revert or ratify model change cd0e0fe on main</label>
-          <label class="check"><input type="checkbox" /> Decide: remove ruleset 20819094 or bypass-merge #769/#894/#895</label>
-          <label class="check"><input type="checkbox" /> Re-test the Cloudflare deploy token with a real deploy run</label>
-          <label class="check"><input type="checkbox" /> Push prepared fixes (blocked by repo access gate)</label>
+          <div class="panel-head"><h3>Focus This Week</h3><small>Sign-in required</small></div>
+          <p class="empty">Open decisions are shown only after founder sign-in.</p>
         </div>
         <div class="panel" id="automations">
           <div class="panel-head"><h3>Messages &amp; Integrations</h3><small>Live reads only</small></div>
-          <div class="empty" id="community-f">No inbox is connected to this view. Messages appear here only from a live connector read.</div>
-          <div class="integ"><span>Notion</span><small>Not connected to this site</small></div>
-          <div class="integ"><span>Slack</span><small>Not connected to this site</small></div>
-          <div class="integ"><span>Zapier</span><small>Not connected to this site</small></div>
+          <div class="empty" id="community-f">Messages and connected tools are available only after founder sign-in.</div>
         </div>
       </div>
 
-      <p class="note-line" style="padding: 0; margin: 0 0 1rem;">Founder access still passes through FCR authentication. General member authentication and multi-tenant founder workspaces remain a separate implementation gate. Connection never creates authority by itself.</p>
+      <p class="note-line">Founder access still passes through FCR authentication. General member authentication and multi-tenant founder workspaces remain a separate implementation gate. Connection never creates authority by itself.</p>
       <a class="btn ghost owner-cta" href="/control-room/">Enter authenticated Control Room →</a>
     </section>
 
@@ -426,11 +415,6 @@
 
       if (location.hash === '#founder') show('founder');
 
-      try {
-        var h = new Date().getHours();
-        var part = h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
-        document.getElementById('greeting').textContent = part + ', Juss.';
-      } catch (e) {}
     })();
   </script>
 </body>
