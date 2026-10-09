@@ -1,7 +1,7 @@
 import express from 'express';
 import request from 'supertest';
 import { describe, expect, it } from 'vitest';
-import { jsonParseErrorHandler } from '../middleware/jsonParseError.js';
+import { jsonParseErrorHandler } from '../../middleware/jsonParseError.js';
 import {
   actionCostReceiptHash,
   buildActionCostReceipt,
