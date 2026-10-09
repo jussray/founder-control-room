@@ -81,10 +81,24 @@ jobs:
           node-version: '24'
       - name: Install dependencies
         run: npm install --no-audit --no-fund
-      - name: Run tests
-        run: npm test
+      - name: Run tests and capture executed-test JSON
+        run: npm test -- --reporter=json --reporter=default --outputFile=vitest-results.json
         env:
           NODE_ENV: test
+
+      - name: Fail if any discovered Vitest test was skipped, pending, or todo
+        run: |
+          node --test test/verify-vitest-no-skips.test.mjs
+          node scripts/verify-vitest-no-skips.mjs vitest-results.json
+
+      - name: Preserve exact-head executed-test evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: vitest-results-${{ env.EXPECTED_HEAD_SHA }}
+          path: vitest-results.json
+          if-no-files-found: warn
+          retention-days: 14
 
   e2e:
     name: Playwright e2e
