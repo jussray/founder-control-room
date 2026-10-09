@@ -1,7 +1,8 @@
 # Account Deletion & Data Erasure
 
 > **Founder Control Room** — Account Deletion Proof Document  
-> Last updated: 2026-07-19
+> Last updated: 2026-10-09  
+> Verified: Content matches current architecture; no breaking changes since July 19
 
 ## 1. User-Initiated Deletion
 Users can delete their account at any time:

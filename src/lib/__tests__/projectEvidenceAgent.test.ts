@@ -94,7 +94,7 @@ describe('OpenAI project evidence agent', () => {
     });
 
     const run = createProjectEvidenceAgent({
-      env: { OPENAI_API_KEY: 'test-key', FCR_EVIDENCE_AGENT_MODEL: 'gpt-5.6-sol' },
+      env: { OPENAI_API_KEY: 'test-key', FCR_EVIDENCE_AGENT_MODEL: 'gpt-4o-mini' },
       fetchFn: fetchFn as unknown as typeof fetch,
       providerFactory: () => fakeProvider(),
     });
@@ -108,7 +108,7 @@ describe('OpenAI project evidence agent', () => {
 
     expect(result).toMatchObject({
       provider: 'openai',
-      model: 'gpt-5.6-sol',
+      model: 'gpt-4o-mini',
       responseId: 'resp_final',
       storedByProvider: false,
       toolRounds: 1,
@@ -117,7 +117,7 @@ describe('OpenAI project evidence agent', () => {
 
     expect(bodies).toHaveLength(2);
     expect(bodies[0]).toMatchObject({
-      model: 'gpt-5.6-sol',
+      model: 'gpt-4o-mini',
       store: false,
       parallel_tool_calls: false,
       include: ['reasoning.encrypted_content'],

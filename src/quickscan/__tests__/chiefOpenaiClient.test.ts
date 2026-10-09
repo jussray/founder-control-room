@@ -71,7 +71,7 @@ describe('createOpenAiQuickScanChiefRunner', () => {
       messageDraft: 'Hey Maya — do booking requests in comments ever slip through?',
       promptWorkflow: QUICKSCAN_CHIEF_WORKFLOW,
     });
-    expect(result.provenance).toMatchObject({ provider: 'openai', model: 'gpt-5-mini', responseId: 'resp_test_1' });
+    expect(result.provenance).toMatchObject({ provider: 'openai', model: 'gpt-4o-mini', responseId: 'resp_test_1' });
   });
 
   it('selects an eligible verified local runtime before the paid provider', async () => {
@@ -191,11 +191,11 @@ describe('createOpenAiQuickScanChiefRunner', () => {
         message_draft: null,
       }));
     });
-    const runner = createOpenAiQuickScanChiefRunner({ env: { OPENAI_API_KEY: 'sk-test', QUICKSCAN_CHIEF_MODEL: 'gpt-5-nano' }, fetchFn });
+    const runner = createOpenAiQuickScanChiefRunner({ env: { OPENAI_API_KEY: 'sk-test', QUICKSCAN_CHIEF_MODEL: 'gpt-4o-mini' }, fetchFn });
     const result = await runner(promptInput());
 
-    expect(result.provenance.model).toBe('gpt-5-nano');
-    expect(observedRequestBody.current?.model).toBe('gpt-5-nano');
+    expect(result.provenance.model).toBe('gpt-4o-mini');
+    expect(observedRequestBody.current?.model).toBe('gpt-4o-mini');
   });
 
   it('allows a null message_draft for a purely informational next action', async () => {
