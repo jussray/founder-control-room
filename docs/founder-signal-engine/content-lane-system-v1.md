@@ -114,6 +114,12 @@ The lane system is advisory and shaping-only. It does not authorize:
 
 Existing founder-content approval, lifecycle, provider-readback, and publication boundaries remain authoritative.
 
+## Facebook Page routing and evidence-only continuity
+
+The provider-neutral n8n scheduling builder requires one explicit Facebook Page label in the exact founder approval: `juss_and_co_facebook` or `juss_beautiful_hair_facebook`. A platform-only `facebook` approval or both Page labels is ambiguous and rejected. The request ID hashes the canonical Page identity as well as the existing authorization and exact source, avoiding cross-Page deduplication while preserving same-Page deduplication across transport aliases. A recognized label is a routing constraint, not proof that the downstream provider is mapped to the corresponding real Facebook Page ID; independently read provider configuration before external writes.
+
+`buildFounderSocialContinuityProof(request, observedAt, parentFingerprint?)` provides an exact-request fingerprint and short-lived `fcr-social-proof-v1:` cookie. The fingerprint binds the Page channel, provider, platform, source commit, authorization and proposal hashes, payload digest, text digest, and review deadline. The cookie links an observation and optional predecessor and expires at the review deadline. Both are non-secret `EVIDENCE_ONLY` markers that carry no access token, no browser-tracking state, no approved public text, no write/merge/publish authority, and no claim of provider execution. Runtime persistence, live provider readback, exact-head CI, and independent Playwright evidence are separate gates. This is source implementation and not proof of a production deployment.
+
 ## Verification
 
 The focused contract requires exactly one lane for every first-party platform, distinct North Stars, native lane shape, inherited publication capabilities, the shared content kernel, revision-memory behavior, and zero publication/scheduling/spend/scale authority.
