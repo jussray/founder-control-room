@@ -96,3 +96,27 @@ Return only:
 `ROLLBACK:` how to safely reverse the change.
 
 `NEXT GATE:` one exact founder decision or next action.
+
+## GitHub Copilot dynamic-workflow boundary
+
+The project extension `.github/extensions/founder-goalfix-gate/extension.mjs`
+registers the `founder-goalfix-gate` dynamic workflow for repeatable
+Council/Redteam review in the GitHub Copilot app and Copilot CLI.
+
+Before invoking it, the parent Copilot session must re-observe and supply the
+authoritative repository, branch, exact 40-character HEAD SHA, and the evidence
+packet. The workflow itself treats those inputs as supplied claims, not proof.
+
+All workflow-owned Council seats are custom agents with `tools: []` and
+`infer: false`. The extension requests no environment variables and does not
+receive merge, deploy, publication, billing, credential, database, auth, DNS,
+or provider-mutation authority.
+
+The existing `.claude/skills/founder-end-to-end/SKILL.md` is already in a
+GitHub-supported project-skill location. Reuse it; do not create a second copy
+solely for Copilot.
+
+Workflow completion, model agreement, or Council consensus is advisory evidence
+only. Founder Control Room plus the repository-local authority and proof
+contracts remain the source of truth for execution, merge, deploy, publication,
+spend, and provider mutation.
