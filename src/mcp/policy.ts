@@ -3,6 +3,7 @@ import type {
   McpPolicyResult,
   McpRisk,
   McpServerDefinition,
+  McpToolDefinition,
 } from "./types.js";
 
 function escapeRegExp(value: string): string {
@@ -69,15 +70,27 @@ export function inferToolRisk(toolName: string, fallback: McpRisk): McpRisk {
   return fallback;
 }
 
+export function inferAdvertisedToolRisk(
+  tool: McpToolDefinition | undefined,
+  fallback: McpRisk,
+): McpRisk {
+  if (!tool?.annotations) return fallback;
+  if (tool.annotations.destructiveHint === true) return "destructive";
+  if (tool.annotations.readOnlyHint === false && fallback === "read") return "write";
+  return fallback;
+}
+
 export function evaluateMcpPolicy(options: {
   server: McpServerDefinition;
   projectId: string;
   toolName: string;
+  tool?: McpToolDefinition;
   env?: NodeJS.ProcessEnv;
 }): McpPolicyResult {
-  const { server, projectId, toolName } = options;
+  const { server, projectId, toolName, tool } = options;
   const env = options.env ?? process.env;
-  const risk = inferToolRisk(toolName, server.defaultRisk);
+  const namedRisk = inferToolRisk(toolName, server.defaultRisk);
+  const risk = inferAdvertisedToolRisk(tool, namedRisk);
 
   if (!ACTIVE_PROJECT_SLUGS.has(projectId)) {
     return {
@@ -140,7 +153,9 @@ export function evaluateMcpPolicy(options: {
     return {
       decision: "requires_approval",
       risk,
-      reason: "Phase 1 invokes read-only tools; mutations require a separately approved mission.",
+      reason: tool?.annotations
+        ? "Provider-advertised tool safety metadata does not permit read-only invocation; mutations require a separately approved mission."
+        : "Phase 1 invokes read-only tools; mutations require a separately approved mission.",
     };
   }
 
