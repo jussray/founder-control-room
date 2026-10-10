@@ -1,9 +1,16 @@
-import { Router } from "express";
+import { Router, type RequestHandler } from "express";
 import { PORTFOLIO_PROJECTS } from "../../config/portfolio.js";
 import { requireFounder, type FounderRequest } from "../middleware/requireFounder.js";
 import { McpHub, advertisedToolNames } from "../../mcp/hub.js";
 import type { McpInvocationRequest } from "../../mcp/types.js";
 import { hubForMcpProject } from "../../mcp/vaultHub.js";
+import { decoratePairedOAuthResponse } from "../../mcp/oauthToolMetadata.js";
+import {
+  PAIRED_MCP_OAUTH_AUDIENCE,
+  PAIRED_MCP_OAUTH_SCOPE,
+  usesLegacyStaticMcpToken,
+  verifyPairedSupabaseOauthToken,
+} from "../../mcp/pairedSupabaseOAuth.js";
 import {
   buildPortfolioMcpRegistryResponse,
   PORTFOLIO_MCP_BRIDGE_PROJECTS,
@@ -20,23 +27,61 @@ const portfolioRemoteReadScope = PORTFOLIO_PROJECTS
   .join(",");
 
 // The authority-bearing portfolio registry is the single source of server-side
-// MCP project scope. Provider/runtime configuration may supply credentials,
-// origins, OAuth audience/client IDs, and other transport details, but it
-// cannot widen this project grant beyond PORTFOLIO_PROJECTS.
+// MCP project scope. Supabase OAuth performs PKCE, dynamic client registration,
+// token signing, and user consent. FCR then validates founder identity and may
+// only narrow this server-owned portfolio grant.
 const portfolioRemoteMcpEnv: NodeJS.ProcessEnv = {
   ...process.env,
   FCR_REMOTE_MCP_READ_PROJECTS: portfolioRemoteReadScope,
+  FCR_REMOTE_MCP_OAUTH_AUDIENCE: PAIRED_MCP_OAUTH_AUDIENCE,
+  FCR_REMOTE_MCP_OAUTH_REQUIRED_SCOPE: PAIRED_MCP_OAUTH_SCOPE,
 };
 
-const handlePairedRemoteMcp = createRemoteReadMcpHandler({
+function pairedOAuthMetadata(handler: RequestHandler): RequestHandler {
+  return (req, res, next) => {
+    const originalJson = res.json.bind(res);
+    res.json = ((body: unknown) => {
+      const challengeHeader = res.getHeader("WWW-Authenticate");
+      const challenge = typeof challengeHeader === "string"
+        ? challengeHeader
+        : Array.isArray(challengeHeader)
+          ? challengeHeader.join(", ")
+          : undefined;
+      const method = typeof req.body?.method === "string" ? req.body.method : undefined;
+      return originalJson(decoratePairedOAuthResponse(body, {
+        method,
+        scope: PAIRED_MCP_OAUTH_SCOPE,
+        challenge,
+      }));
+    }) as typeof res.json;
+    return handler(req, res, next);
+  };
+}
+
+const handlePairedRemoteMcp = pairedOAuthMetadata(createRemoteReadMcpHandler({
   authMode: "oauth",
   env: portfolioRemoteMcpEnv,
-});
+  authenticateOauth: verifyPairedSupabaseOauthToken,
+}));
 
-const handleRemoteReadMcp = createRemoteReadMcpHandler({
+const handleLegacyStaticRemoteReadMcp = createRemoteReadMcpHandler({
   authMode: "static",
   env: portfolioRemoteMcpEnv,
 });
+
+// Compatibility endpoint with automatic OAuth/DCR upgrade. Static auth is
+// selected only for an exact timing-safe match to the legacy server token.
+// Missing, malformed, or non-matching bearer credentials go through OAuth and
+// can never downgrade into the static authority path.
+const handleAutoDynamicRemoteReadMcp: RequestHandler = (req, res, next) => {
+  if (usesLegacyStaticMcpToken(
+    req.header("authorization"),
+    portfolioRemoteMcpEnv.FCR_REMOTE_MCP_READ_TOKEN,
+  )) {
+    return handleLegacyStaticRemoteReadMcp(req, res, next);
+  }
+  return handlePairedRemoteMcp(req, res, next);
+};
 
 function projectIdFrom(value: unknown): string {
   if (typeof value !== "string" || !value.trim()) {
@@ -66,14 +111,17 @@ function invocationFromRequest(
   };
 }
 
-// Canonical ChatGPT/Claude/Manus connector lane. Supabase OAuth, token-bound
-// project scope, narrow named tools, and evidence persistence all fail closed.
-// OAuth project claims are intersected with the server-owned portfolio scope.
+// Canonical ChatGPT/Claude/Manus connector lane. Supabase OAuth, founder
+// allowlisting, server-owned project scope, narrow named tools, and evidence
+// persistence all fail closed. DCR client IDs are accepted only after the
+// founder completes Supabase authorization; an optional exact client allowlist
+// can be enabled separately without making it a prerequisite for DCR.
 mcpRouter.post("/", handlePairedRemoteMcp);
 
-// Temporary compatibility lane for existing server-held static-token clients.
-// It exposes the same bounded catalog as /mcp and no generic nested invocation.
-mcpRouter.post("/read", handleRemoteReadMcp);
+// Backward-compatible endpoint that now auto-upgrades to the same OAuth/DCR
+// contract as /mcp. The legacy static token remains a bounded fallback only for
+// callers that already possess that exact server-held credential.
+mcpRouter.post("/read", handleAutoDynamicRemoteReadMcp);
 
 // Public metadata only. This is a read-only MCP subregistry that lets clients
 // such as Lovable discover the founder quartet without receiving credentials.
@@ -129,7 +177,7 @@ mcpRouter.get(
       const snapshot = await hub.discoverCapabilities(req.params.serverId, projectId);
       return res.json({
         serverId: snapshot.serverId,
-        projectId: snapshot.projectId,
+        projectId,
         tools: advertisedToolNames(snapshot.tools),
         discoveredAt: snapshot.discoveredAt,
         expiresAt: snapshot.expiresAt,
