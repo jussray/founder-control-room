@@ -58,7 +58,8 @@
     {
       "path": ".github/workflows/ci.yml",
       "claims": [
-        "`.github/workflows/ci.yml` must keep the existing crawler and public-work Playwright specs inside the load-bearing `Playwright e2e` job that feeds `Required Gate`; a separate advisory Pages workflow cannot substitute for required exact-head browser execution or grant merge authority."
+        "`.github/workflows/ci.yml` must keep the existing crawler and public-work Playwright specs inside the load-bearing `Playwright e2e` job that feeds `Required Gate`; a separate advisory Pages workflow cannot substitute for required exact-head browser execution or grant merge authority.",
+        "`.github/workflows/ci.yml` must retain its existing load-bearing Test job as a dependency of Required Gate while producing exact-head machine-readable Vitest execution results; a skipped, pending, todo, failed, missing, empty, or assertion-inconsistent test report fails the mandatory job. Event-scoped cleanup, authorized production release, and provider-only witness jobs keep their original guards and cannot be reclassified as passing test execution."
       ]
     },
     {
