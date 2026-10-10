@@ -7,8 +7,8 @@
 ## 1. Support Channels
 | Channel | Use Case | Response SLA |
 |---|---|---|
-| GitHub Issues (this repo) | Bug reports, feature requests | 48 hours |
-| Email (configured in Settings) | Account issues, privacy requests, account deletion | 72 hours |
+| GitHub Issues (this repo) | Bug reports, feature requests | Triaged by severity; no response time guaranteed |
+| Email (configured in Settings) | Account issues, privacy requests, account deletion | Triaged by severity; no response time guaranteed |
 | In-app feedback widget | General feedback | Best effort |
 
 ## 2. Account & Privacy Requests
@@ -28,9 +28,9 @@ This document constitutes the technical support documentation required by:
 
 ## 5. Incident Communication
 - Status updates during outages are posted to the GitHub Discussions board.
-- Affected users are notified via email within 2 hours of a confirmed incident.
+- Affected users are notified by email when a confirmed incident affects them. No notification window is guaranteed.
 
 ## 6. Escalation Path
 1. In-app feedback → auto-creates GitHub Issue with `triage` label.
-2. Founder triages within 48 hours and assigns priority.
+2. Founder triages by severity and assigns priority; no triage window is guaranteed.
 3. P0 (data loss / security breach) → prioritized founder response; remediation timing follows root `SECURITY.md`, which publishes no fixed patch-time guarantee.
