@@ -1,7 +1,7 @@
 # Support Policy
 
 > **Founder Control Room** — Support Proof Document  
-> Last updated: 2026-10-09  
+> Last updated: 2026-10-10  
 > Verified: Content matches current architecture; no breaking changes since July 19
 
 ## 1. Support Channels
@@ -17,8 +17,8 @@
 - Privacy corrections processed within 14 days.
 
 ## 3. Security Vulnerability Reporting
-- Responsible disclosure: email the security contact listed in `.security/SECURITY.md`.
-- Critical vulnerabilities acknowledged within 24 hours.
+- Responsible disclosure: follow the reporting instructions in the root `SECURITY.md`. The reporting address is held there until it is verified as configured and monitored.
+- No acknowledgement or remediation timeline is published for security reports.
 - Do **not** open public GitHub Issues for security vulnerabilities.
 
 ## 4. App Store Support URL
@@ -33,4 +33,4 @@ This document constitutes the technical support documentation required by:
 ## 6. Escalation Path
 1. In-app feedback → auto-creates GitHub Issue with `triage` label.
 2. Founder triages within 48 hours and assigns priority.
-3. P0 (data loss / security breach) → immediate founder response, patch within 4 hours.
+3. P0 (data loss / security breach) → prioritized founder response; remediation timing follows root `SECURITY.md`, which publishes no fixed patch-time guarantee.
