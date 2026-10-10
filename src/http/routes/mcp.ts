@@ -9,6 +9,7 @@ import {
   PORTFOLIO_MCP_BRIDGE_PROJECTS,
 } from "../../mcp/portfolioRegistry.js";
 import { connectionVaultRouter } from "./connectionVault.js";
+import { founderAuthorityReceiptsRouter } from "./founderAuthorityReceipts.js";
 import { founderPermissionsRouter } from "./founderPermissions.js";
 import { createRemoteReadMcpHandler } from "./remoteReadMcp.js";
 
@@ -114,6 +115,10 @@ mcpRouter.use("/vault", connectionVaultRouter);
 // separate interactive founder decision persists exact-scope decision state;
 // independent review remains outside this router.
 mcpRouter.use("/founder-permissions", founderPermissionsRouter);
+
+// Separate execution-binding layer. A broker decision stays non-authorizing
+// until the interactive founder issues an exact, expiring action receipt here.
+mcpRouter.use("/founder-authority-receipts", founderAuthorityReceiptsRouter);
 
 mcpRouter.get("/servers", requireFounder, (_req, res) => {
   return res.json({ servers: registryHub.listServers() });
