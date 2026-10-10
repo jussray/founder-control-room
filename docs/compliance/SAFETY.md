@@ -28,7 +28,7 @@ This document describes the safety controls applied to all data, processes, and 
 - SonarQube static analysis is configured in `sonar-project.properties`.
 
 ## 6. Incident Response
-- Critical security issues should be reported via the process in `.security/SECURITY.md`.
+- Security issues should be reported via the root `SECURITY.md`. The reporting address is held there until it is verified as configured and monitored.
 - Severity-1 incidents trigger automated alerts to the founder via Cloudflare Alerting webhooks.
 
 ## 7. Audit Logging
