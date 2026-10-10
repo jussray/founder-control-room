@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CouncilLineageError, runCouncilRound, sha256, type CouncilConversationRow } from '../councilRound.js';
+import { CouncilLineageError, recoverPersistedRelayResponses, runCouncilRound, sha256, type CouncilConversationRow } from '../councilRound.js';
 import { buildOperatorRelayResponse } from '../operatorRelayProviderResult.js';
 import type { OperatorRelayAdapter, OperatorRelayAdapters } from '../operatorRelayDispatch.js';
 
@@ -63,6 +63,12 @@ describe('runCouncilRound', () => {
     expect(row.participants).toEqual(['fcr', 'claude-code', 'deepseek', 'muse', 'gemini']);
     expect(row.outcome).toBe(hops[3].answer);
     expect(written).toEqual([row]);
+
+    const recovered = recoverPersistedRelayResponses(row.transcript);
+    expect(recovered.ignoredLegacyProjections).toBe(0);
+    expect(recovered.rejectedInvalidProjections).toBe(0);
+    expect(recovered.responses).toHaveLength(4);
+    expect(recovered.responses.map((response) => response.responseHash)).toEqual(hops.map((hop) => hop.responseHash));
   });
 
   it('interrupts on a failed seat and resumes from the exact checkpoint without re-calling finished seats', async () => {
@@ -115,6 +121,9 @@ describe('runCouncilRound', () => {
     expect(blocked.transcript.hops).toHaveLength(0);
     expect(blocked.transcript.nextSeatIndex).toBe(0);
     expect(blocked.transcript.interruption).toMatchObject({ seatIndex: 0, operator: 'claude-code', status: 'blocked' });
+    const blockedRecovery = recoverPersistedRelayResponses(blocked.transcript);
+    expect(blockedRecovery.responses).toHaveLength(1);
+    expect(blockedRecovery.responses[0]).toMatchObject({ fromOperator: 'claude-code', toOperator: 'fcr', status: 'blocked' });
 
     const resumed = await runCouncilRound({
       goal: 'g', initiator: 'fcr', seed: 'A', seats: [...seats], now: fixedNow, resumeFrom: blocked.transcript,
@@ -147,6 +156,29 @@ describe('runCouncilRound', () => {
     await expect(runCouncilRound({
       goal: 'g', initiator: 'fcr', sourceRef: 'founder-attested:codex', seed: 'A', seats: [...seats], now: fixedNow, resumeFrom: first.transcript,
     }, {})).rejects.toThrow('resume source reference mismatch');
+  });
+
+  it('refuses to synthesize relay receipts from legacy or tampered persisted projections', async () => {
+    const row = await runCouncilRound({
+      goal: 'g', initiator: 'fcr', seed: 'A', seats: [seats[0]], now: fixedNow,
+    }, { 'claude-code': seat('claude', {}) });
+
+    const legacy = structuredClone(row.transcript) as any;
+    delete legacy.hops[0].unresolved;
+    delete legacy.hops[0].authorityRequested;
+    expect(recoverPersistedRelayResponses(legacy)).toMatchObject({
+      responses: [],
+      ignoredLegacyProjections: 1,
+      rejectedInvalidProjections: 0,
+    });
+
+    const tampered = structuredClone(row.transcript);
+    tampered.hops[0].unresolved.push('forged-after-persistence');
+    expect(recoverPersistedRelayResponses(tampered)).toMatchObject({
+      responses: [],
+      ignoredLegacyProjections: 0,
+      rejectedInvalidProjections: 1,
+    });
   });
 
   it('labels a hop backed only by non-provider evidence as not live', async () => {
