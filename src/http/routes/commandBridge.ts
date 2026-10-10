@@ -35,7 +35,6 @@ interface MissionLookup {
 
 const FULL_SHA = /^[0-9a-f]{40}$/;
 const SECRETISH_PATTERN = /(github_pat_|gh[pousr]_[A-Za-z0-9_]{12,}|Bearer\s+[A-Za-z0-9._-]{12,}|TOKEN|SECRET|PASSWORD|SERVICE_ROLE|API_KEY|ACCESS_KEY)/i;
-const TERMINAL_FINISHED_STATUSES = new Set(['passed', 'failed', 'timed_out', 'cancelled']);
 
 function stringOrNull(value: unknown): string | null {
   return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
@@ -99,14 +98,14 @@ function normalizeRequest(row: DbRecord): CommandBridgeRequestSnapshot {
 
 function terminalRunMatchesRequest(run: DbRecord, request: CommandBridgeRequestSnapshot): boolean {
   const expectedSha = request.expectedCommitSha.toLowerCase();
-  const status = stringOrNull(run.status);
-  return stringOrNull(run.project_id) === request.projectId
+  return request.risk === 'read'
+    && stringOrNull(run.project_id) === request.projectId
     && stringOrNull(run.mission_id) === request.missionId
     && stringOrNull(run.command_id) === request.commandId
     && stringOrNull(run.expected_commit_sha)?.toLowerCase() === expectedSha
     && stringOrNull(run.observed_commit_sha)?.toLowerCase() === expectedSha
-    && status !== null
-    && TERMINAL_FINISHED_STATUSES.has(status)
+    && stringOrNull(run.status) === 'passed'
+    && run.output_truncated === false
     && stringOrNull(run.finished_at) !== null;
 }
 
@@ -399,9 +398,26 @@ commandBridgeRouter.post('/requests/:requestId/mark-executed', async (req: Found
   if (!approvedRow) return res.status(404).json({ error: 'Approved command card not found.' });
   const approved = normalizeRequest(approvedRow);
 
+  if (!approved.expiresAt || Date.parse(approved.expiresAt) <= Date.now()) {
+    await supabase
+      .from('command_bridge_requests')
+      .update({ status: 'expired', updated_at: new Date().toISOString() })
+      .eq('id', requestId)
+      .eq('status', 'approved');
+    return res.status(409).json({ error: 'Command card has expired.', code: 'COMMAND_CARD_EXPIRED' });
+  }
+
+  if (approved.risk !== 'read') {
+    return res.status(409).json({
+      error: 'Legacy terminal receipts can mark only read-risk Command Bridge cards executed. Verify/write commands require an exact L99 ApprovalReceipt-aware executor.',
+      code: 'L99_AUTHORITY_REQUIRED',
+      authorityRequired: 'L99_APPROVAL_RECEIPT',
+    });
+  }
+
   const { data: terminalData, error: terminalError } = await supabase
     .from('terminal_runs')
-    .select('id, project_id, mission_id, command_id, expected_commit_sha, observed_commit_sha, status, finished_at')
+    .select('id, project_id, mission_id, command_id, expected_commit_sha, observed_commit_sha, status, output_truncated, finished_at')
     .eq('id', terminalRunId)
     .maybeSingle();
 
@@ -409,7 +425,7 @@ commandBridgeRouter.post('/requests/:requestId/mark-executed', async (req: Found
   const terminalRun = recordOrNull(terminalData);
   if (!terminalRun || !terminalRunMatchesRequest(terminalRun, approved)) {
     return res.status(409).json({
-      error: 'terminalRunId must reference a completed terminal run bound to the approved command card and exact observed commit.',
+      error: 'terminalRunId must reference a successful, non-truncated terminal run bound to the approved read-risk card and exact observed commit.',
       code: 'TERMINAL_RUN_RECEIPT_MISMATCH',
     });
   }
