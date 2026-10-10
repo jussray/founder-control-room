@@ -76,6 +76,14 @@ The corrected rule keeps the authority planes separate. Claude, Claude Code, and
 
 Durable repository changes return through GitHub commit, pull-request, diff, check, and review evidence. The current FCR Cowork lane does **not** have a native Cowork receipt adapter, so generic Activity entries cannot be relabeled as Cowork receipts and FCR must keep that receipt state `UNKNOWN`/unwired until a separately reviewed adapter is implemented and proven. Council membership, model capability, connector availability, or Cowork tools never grant merge, deploy, provider, credential, billing, publication, deletion, or founder authority.
 
+## 2026-10 control correction: capital evidence labels versus legal authority
+
+The first capital-control v1 contract correctly kept the portfolio/project ownership model `design_only`, but its evaluator accepted caller-supplied `architectureState: legally_verified` and bare evidence-label arrays. With a complete label set, a consequential path could return `allow`, and a legal-state claim such as parent formation could also return `allow` without the evaluator independently proving the referenced documents. That was a truth-authority ambiguity even though no live securities executor consumed the result.
+
+The corrected boundary is stricter: `src/governance/capitalControlArchitecture.ts` is advisory-only and v1 has no `ALLOW` decision. Every verdict carries `executionAuthorized:false`. Missing evidence produces `RECONFIRM`; design-only consequential actions remain `DENY`; complete caller labels still produce `RECONFIRM` until a separate trusted verifier binds document provenance, issuer identity, freshness, and the applicable founder/legal authority. Founder-control surrender and investor operational authority remain hard blocked.
+
+This means source policy can describe the intended investment lanes and the evidence that would be required without laundering caller assertions into verified corporate state. A future trusted receipt path may record a legal-state transition only after independently verifying the external records. That future receipt remains separate from securities execution, offering publication, IP transfer, merge, deploy, provider mutation, spend, or publication authority.
+
 ## Root causes
 
 ### 1. Evidence lifetime was implicit
@@ -482,7 +490,7 @@ PR #896 is the focused recovery carrier for the peer transition. Rebinding `.git
 
 StoryEngine `main` advanced beyond the pinned `18d9ba257a69c3d1743f346d424daf31796aaeed` to independently observed `168d65ede38d2477ea00902fa1f0e76f292c583d` (agent-contract v1 binding, CI enforcement, and exact-PR-head verification). FCR Playwright on Chief Access recovery PR #913 then failed closed at the live StoryEngine peer-ref check. That failure is current dependency-drift evidence, not evidence that #913 is broken.
 
-Rebinding `.github/workflows/playwright.yml` to `168d65ede38d2477ea00902fa1f0e76f292c583d` selects the next federation evidence subject only. The successor FCR head stays `UNKNOWN` for federation until its own exact-head workflow proves live ref equality, immutable peer checkout, runtime identity, directive/receipt binding, replay safety, and the complete browser loop. A later move of either FCR or StoryEngine expires that proof again. No prior green, founder approval, merge, deploy, production, publication, or provider-mutation authority transfers through the pin refresh.
+Rebinding `.github/workflows/playwright.yml` to `168d65ede38d2477ea00902fa1f0e76f292c583d` selects the next federation evidence subject only. The successor FCR head stays `UNKNOWN` for federation until its own exact-head workflow proves live ref equality, immutable peer checkout, runtime identity, directive/receipt binding, replay safety, and the complete browser loop. A later move of either repository expires that proof again. No prior green, founder approval, merge, deploy, production, publication, or provider-mutation authority transfers through the pin refresh.
 
 ## 2026-10-05 StoryEngine MAKEVIDEO peer transition
 
