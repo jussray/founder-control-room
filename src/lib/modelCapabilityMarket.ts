@@ -11,7 +11,8 @@ export type CapabilityTaskClass =
   | 'public-research'
   | 'cross-provider-drift'
   | 'browser-runtime'
-  | 'founder-synthesis';
+  | 'founder-synthesis'
+  | 'multimodal-generation';
 
 export interface CapabilityCandidate {
   operatorId: string;

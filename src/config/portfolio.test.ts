@@ -36,9 +36,26 @@ describe('founder repository index', () => {
     }
   });
 
+  it('tracks current Truth Weaver product identity without expanding authority', () => {
+    expect(getKnownProject('truth-weaver')).toMatchObject({
+      name: 'Truth Weaver Counsel',
+      repository: 'jussray/truth-weaver',
+      status: 'external',
+    });
+    expect(getKnownProject('truth-weaver')?.capabilities).toEqual([
+      'legal-knowledge',
+      'decision-support',
+      'evidence',
+      'continuity',
+    ]);
+    expect(getPortfolioProject('truth-weaver')).toBeUndefined();
+  });
+
   it('indexes unverified portfolio subjects for continuity without claiming inherited challenge-stack state', () => {
     const expectedContinuityOnly = [
       ['bip-jr', 'jussray/Bip-Jr'],
+      ['exact-match-engine', 'jussray/exact-match-engine'],
+      ['ayure', 'jussray/Ayure-'],
     ] as const;
 
     for (const [slug, repository] of expectedContinuityOnly) {

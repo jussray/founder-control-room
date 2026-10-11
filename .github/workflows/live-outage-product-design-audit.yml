@@ -27,7 +27,7 @@ jobs:
 
     steps:
       - name: Check out exact audit head
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ env.EXPECTED_HEAD_SHA }}
           persist-credentials: false
@@ -42,7 +42,7 @@ jobs:
           printf 'Verified exact audit head: %s\n' "$actual"
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '24'
           cache: npm
@@ -58,7 +58,7 @@ jobs:
 
       - name: Upload screenshots, traces, and manifest
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: live-outage-product-design-audit-${{ env.EXPECTED_HEAD_SHA }}
           path: artifacts/live-outage-audit/
