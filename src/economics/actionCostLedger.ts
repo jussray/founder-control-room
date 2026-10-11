@@ -279,6 +279,21 @@ function receiptInput(receipt: ActionCostReceiptV1): ActionCostReceiptInputV1 {
   };
 }
 
+// Key-sorted JSON so two equal receipt bodies compare equal regardless of key order.
+function canonicalJson(value: unknown): string {
+  return JSON.stringify(value, (_key, v: unknown) => {
+    if (v && typeof v === 'object' && !Array.isArray(v)) {
+      return Object.fromEntries(Object.entries(v as Record<string, unknown>).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)));
+    }
+    return v;
+  });
+}
+
+function withoutReceiptHash(receipt: ActionCostReceiptV1): Omit<ActionCostReceiptV1, 'receiptHash'> {
+  const { receiptHash: _receiptHash, ...body } = receipt;
+  return body;
+}
+
 export function validateActionCostReceipt(receipt: ActionCostReceiptV1): string[] {
   if (!receipt || typeof receipt !== 'object' || Array.isArray(receipt)) {
     return ['action-cost receipt must be a JSON object'];
@@ -308,6 +323,12 @@ export function validateActionCostReceipt(receipt: ActionCostReceiptV1): string[
       const expected = buildActionCostReceipt(receiptInput(receipt));
       if (receipt.receiptHash !== expected.receiptHash) {
         errors.push('receiptHash does not match canonical action-cost receipt');
+      } else if (canonicalJson(withoutReceiptHash(receipt)) !== canonicalJson(withoutReceiptHash(expected))) {
+        // The hash covers only the input-derived identity. Stored derived fields
+        // (budgetState, costTruth, actionClassState, receiptId spelling, ...) are
+        // not in the hash, so a tampered body can keep a canonical hash. Bind the
+        // whole body to the canonical rebuild.
+        errors.push('receipt fields do not match canonical action-cost receipt');
       }
     }
     return [...new Set(errors)];
