@@ -136,6 +136,18 @@ async function guarded(action) {
 
 // ─── small utilities ─────────────────────────────────────────────────────────
 
+// Pending patch-commit intent: the payload it was minted for and its idempotency key.
+let patchCommitIntent = null;
+
+// Stable djb2 fingerprint of a payload string, used to derive idempotency keys.
+function payloadHash(str) {
+  let h = 5381;
+  for (let i = 0; i < str.length; i++) {
+    h = ((h << 5) + h) ^ str.charCodeAt(i);
+  }
+  return (h >>> 0).toString(36);
+}
+
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, (c) => (
     { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
@@ -1014,11 +1026,20 @@ function renderMissionDetail(mount) {
     const content = panel.querySelector('#mission-file-editor').value;
     const message = panel.querySelector('#mission-commit-message').value.trim() || `Edit ${path}`;
     if (!path) { setBanner('error', 'Path is required.'); render(); return; }
+    // One idempotency key per exact payload. Double-clicks and retries after a
+    // network error resend the same payload, so they reuse the same key and the
+    // server replays instead of committing twice. A changed payload mints a new key.
+    const payload = JSON.stringify({ path, message, content });
+    if (!patchCommitIntent || patchCommitIntent.payload !== payload) {
+      patchCommitIntent = { payload, key: `${mission.id}-patch-${payloadHash(payload)}` };
+    }
+    const idempotencyKey = patchCommitIntent.key;
     guarded(async () => {
       await api(`/approvals/${mission.id}/patch`, {
         method: 'POST',
-        body: JSON.stringify({ message, idempotencyKey: `${mission.id}-patch-${Date.now()}`, changes: [{ path, content }] }),
+        body: JSON.stringify({ message, idempotencyKey, changes: [{ path, content }] }),
       });
+      patchCommitIntent = null;
       setBanner('notice', `Committed ${path} to ${mission.branch_ref}.`);
     });
   });
