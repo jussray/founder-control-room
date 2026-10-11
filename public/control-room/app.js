@@ -114,7 +114,9 @@ async function api(path, opts = {}) {
   }
 
   if (!res.ok) {
-    throw new Error(body?.error ?? `Request failed (${res.status})`);
+    const err = new Error(body?.error ?? `Request failed (${res.status})`);
+    err.code = body?.code;
+    throw err;
   }
 
   return body;
@@ -136,17 +138,28 @@ async function guarded(action) {
 
 // ─── small utilities ─────────────────────────────────────────────────────────
 
-// Pending patch-commit intent: the payload it was minted for and its idempotency key.
-let patchCommitIntent = null;
+// Pending patch-commit intents, one per mission: the payload the key was minted
+// for. The key is a random UUID per payload — no hash, so two different payloads
+// can never share a key and collide on the server's ledger.
+const patchCommitIntents = new Map();
 
-// Stable djb2 fingerprint of a payload string, used to derive idempotency keys.
-function payloadHash(str) {
-  let h = 5381;
-  for (let i = 0; i < str.length; i++) {
-    h = ((h << 5) + h) ^ str.charCodeAt(i);
-  }
-  return (h >>> 0).toString(36);
+function patchIntentFor(missionId, payload) {
+  const current = patchCommitIntents.get(missionId);
+  if (current && current.payload === payload) return current;
+  const next = { payload, key: `${missionId}-patch-${crypto.randomUUID()}` };
+  patchCommitIntents.set(missionId, next);
+  return next;
 }
+
+// Server rejection codes that permanently poison an idempotency key. A retry
+// must mint a fresh key instead of looping on the dead one.
+// ACTION_ALREADY_PENDING is deliberately absent: the reservation exists, and a
+// new key would double-commit.
+const POISONED_KEY_CODES = new Set([
+  'ACTION_PREVIOUSLY_FAILED',
+  'IDEMPOTENCY_SCOPE_MISMATCH',
+  'PATCH_COMMIT_FAILED',
+]);
 
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, (c) => (
@@ -1026,20 +1039,23 @@ function renderMissionDetail(mount) {
     const content = panel.querySelector('#mission-file-editor').value;
     const message = panel.querySelector('#mission-commit-message').value.trim() || `Edit ${path}`;
     if (!path) { setBanner('error', 'Path is required.'); render(); return; }
-    // One idempotency key per exact payload. Double-clicks and retries after a
-    // network error resend the same payload, so they reuse the same key and the
-    // server replays instead of committing twice. A changed payload mints a new key.
+    // One idempotency key per exact payload, tracked per mission. Double-clicks
+    // and retries after a network error resend the same payload, so they reuse
+    // the same key and the server replays instead of committing twice.
+    // A changed payload mints a new key.
     const payload = JSON.stringify({ path, message, content });
-    if (!patchCommitIntent || patchCommitIntent.payload !== payload) {
-      patchCommitIntent = { payload, key: `${mission.id}-patch-${payloadHash(payload)}` };
-    }
-    const idempotencyKey = patchCommitIntent.key;
+    const intent = patchIntentFor(mission.id, payload);
     guarded(async () => {
-      await api(`/approvals/${mission.id}/patch`, {
-        method: 'POST',
-        body: JSON.stringify({ message, idempotencyKey, changes: [{ path, content }] }),
-      });
-      patchCommitIntent = null;
+      try {
+        await api(`/approvals/${mission.id}/patch`, {
+          method: 'POST',
+          body: JSON.stringify({ message, idempotencyKey: intent.key, changes: [{ path, content }] }),
+        });
+      } catch (err) {
+        if (POISONED_KEY_CODES.has(err.code)) patchCommitIntents.delete(mission.id);
+        throw err;
+      }
+      patchCommitIntents.delete(mission.id);
       setBanner('notice', `Committed ${path} to ${mission.branch_ref}.`);
     });
   });
