@@ -27,10 +27,10 @@ This document constitutes the technical support documentation required by:
 - **Google Play Console**: Support email + support URL fields.
 
 ## 5. Incident Communication
-- Status updates during outages are posted to the GitHub Discussions board.
+- Status updates during outages are posted to the GitHub Discussions board (intended; this repository contains no automation verifying this).
 - Affected users are notified by email when a confirmed incident affects them. No notification window is guaranteed.
 
 ## 6. Escalation Path
-1. In-app feedback → auto-creates GitHub Issue with `triage` label.
+1. In-app feedback → auto-creates GitHub Issue with `triage` label (intended; this repository contains no automation verifying this).
 2. Founder triages by severity and assigns priority; no triage window is guaranteed.
 3. P0 (data loss / security breach) → prioritized founder response; remediation timing follows root `SECURITY.md`, which publishes no fixed patch-time guarantee.
