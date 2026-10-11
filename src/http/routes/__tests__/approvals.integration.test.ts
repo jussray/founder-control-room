@@ -923,6 +923,7 @@ describe('POST /:missionId/patch — founder read/write/edit on a sandbox branch
       .set('Authorization', BEARER)
       .send({
         message: 'Fix the thing',
+        idempotencyKey: 'patch-key-1',
         changes: [{ path: 'src/example.ts', content: 'export const x = 1;' }],
       });
 
@@ -960,7 +961,7 @@ describe('POST /:missionId/patch — founder read/write/edit on a sandbox branch
     const res = await request(buildApp())
       .post(`/approvals/${MISSION_ID}/patch`)
       .set('Authorization', BEARER)
-      .send({ message: 'Fix the thing', changes: [{ path: 'src/example.ts', content: 'export const x = 1;' }] });
+      .send({ message: 'Fix the thing', idempotencyKey: 'patch-key-2', changes: [{ path: 'src/example.ts', content: 'export const x = 1;' }] });
 
     expect(res.status).toBe(201);
     expect(res.body.warning).toBeUndefined();
@@ -976,7 +977,7 @@ describe('POST /:missionId/patch — founder read/write/edit on a sandbox branch
     const res = await request(buildApp())
       .post(`/approvals/${MISSION_ID}/patch`)
       .set('Authorization', BEARER)
-      .send({ message: 'edit', changes: [{ path: 'a.txt', content: 'hi' }] });
+      .send({ message: 'edit', idempotencyKey: 'patch-key-3', changes: [{ path: 'a.txt', content: 'hi' }] });
 
     expect(res.status).toBe(201);
     expect(res.body.ok).toBe(true);
