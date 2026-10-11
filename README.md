@@ -237,7 +237,7 @@ Public discovery artifacts such as `/robots.txt`, `/sitemap.xml`, `/llms.txt`, a
 
 Source dependence on that topology is not proof the live provider is configured correctly.
 
-`wrangler.worker.toml [secrets].required` is the canonical production binding-name gate for provider-held Worker secrets. A provider-backed capability such as `tinyfish-web-observation-v1` must name `TINYFISH_API_KEY` there before canonical Worker promotion; Deploy verifies only binding-name presence in Cloudflare and never copies the secret value through GitHub Actions. Source and CI readiness therefore remain distinct from live TinyFish provider/runtime activation.
+`public-web-observation-v1` is an FCR-owned, provider-neutral product contract. FCR's governed research hub resolves a bounded read-only adapter at runtime, and adapter identity remains evidence rather than product authority. The capability itself requires no provider-specific runtime secret; provider configuration, adapter availability, source truth, and downstream outcomes remain separate proof planes.
 
 `OPENAI_API_KEY` follows the same split authority. The canonical Worker registry requires the provider-held runtime binding because live FCR OpenAI paths consume it. GitHub Actions may separately hold the same logical credential for CI-only consumers such as the bounded AI Failure Repair workflow, but the Actions copy is not runtime proof and must not be copied into the Worker during deploy. `Runtime Secret Proof` derives its complete required-name set from `wrangler.worker.toml`, asks Cloudflare only for secret names, fingerprints that registry, and never reads or prints secret values. If the Cloudflare observation credential is malformed or unusable before enumeration, every unobserved runtime-secret presence claim remains `UNKNOWN`/`BLOCKED`, not missing.
 
@@ -453,7 +453,7 @@ StoryEngine `main` advanced from the previously pinned `168d65ede38d2477ea00902f
 Rebinding `.github/workflows/playwright.yml` to `3c1689fe67142e783fe7d18b5ff610640bdc81d6` selects the successor evidence subject only. The successor FCR head must complete the live-ref check, immutable peer checkout, exact StoryEngine runtime identity, directive/receipt binding, replay protections, and full Playwright browser witness before federation may be called current. Pin alignment grants no merge, deploy, production, publication, billing, or provider-mutation authority.
 
 
-## October 6 StoryEngine runtime-head peer transition
+## Historical October 6 StoryEngine runtime-head peer transition
 
 Post-merge FCR Playwright run `37406265514` on `main@d298466545c0e4c905765d86123a70073e1aa372` passed the local/direct application browser harness, then failed closed at the separate StoryEngine freshness gate because FCR still pinned `91af998c2c7adad0792dd394735ca738b92ab26d` while StoryEngine `refs/heads/main` had advanced to independently observed `a6e6a396ed30535af2fd9b1ec2347a84e1a3fbf3`.
 

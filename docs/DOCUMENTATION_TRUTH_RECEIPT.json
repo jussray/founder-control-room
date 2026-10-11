@@ -149,7 +149,7 @@
     {
       "path": "README.md",
       "claims": [
-        "`README.md` must keep TinyFish source and CI readiness separate from provider/runtime activation and state that canonical Deploy verifies only provider-held binding-name presence before promotion.",
+        "`README.md` must describe `public-web-observation-v1` as an FCR-owned provider-neutral contract whose read-only research adapter is selected behind the governed MCP Hub; adapter availability, returned evidence, source truth, and downstream outcomes remain separate proof planes and no provider-specific observer secret is required by the capability itself.",
         "`README.md` must keep FCR Shopify runtime-secret name verification separate from webhook registration, deployed callback identity, production database migration, and collected-revenue outcome proof.",
         "`README.md` must describe Shopify child-provider observation as source-only, non-authorizing evidence and must never relabel a matching snapshot as live provider authority or mutation permission.",
         "`README.md` must document Attack 3000 content currentness as independently evaluated from bounded observation time rather than trusted from a CURRENT label, and must keep distribution, external demand, publication, provider mutation, merge, deploy, spend, and external-contact authority separate.",

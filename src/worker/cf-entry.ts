@@ -37,7 +37,7 @@ validateWorkerEnv(env);
 const { createServer: createExpressApp } = await import('../http/server.js');
 const app = express();
 mountFcrCommerceIngress(app);
-app.use(createExpressApp());
+app.use(createExpressApp({ chiefAiBinding: env.CHIEF_AI }));
 const nodeServer = createNodeHttpServer(app);
 const httpHandler = httpServerHandler(nodeServer) as ExportedHandler<ControlRoomWorkerEnv>;
 
