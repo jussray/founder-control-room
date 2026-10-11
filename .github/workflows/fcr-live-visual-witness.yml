@@ -7,12 +7,24 @@ on:
       - '.github/workflows/fcr-live-visual-witness.yml'
 permissions:
   contents: read
+env:
+  EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
 jobs:
   capture:
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          persist-credentials: false
+      - name: Verify exact witness source
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -22,6 +34,7 @@ jobs:
       - name: Capture public FCR production witness
         env:
           LIVE_ORIGIN: https://foundercontrolroom.org
+          GITHUB_SHA: ${{ env.EXPECTED_HEAD_SHA }}
         run: node e2e/fcr-live-visual-witness.mjs
       - name: Preserve evidence even on failure
         if: always()
