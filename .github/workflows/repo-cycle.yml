@@ -67,7 +67,7 @@ permissions:
 
 concurrency:
   group: founder-repo-cycle-${{ github.repository }}-${{ github.event_name }}-${{ github.event.pull_request.number || inputs.target_branch || github.ref }}-${{ inputs.operation || 'verify' }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
