@@ -24,23 +24,25 @@ describe('Founder Control Room Cloudflare topology', () => {
     expect(buildScript).toContain("'portable-founder-console/index.html'");
   });
 
-  it('provides a five-screen public front door into the founder-authenticated app', () => {
+  it('provides the founder-os-v2 five-screen public front door into the founder-authenticated app', () => {
     const landing = read('public/index.html');
     const app = read('public/control-room/index.html');
     const bootstrap = read('public/control-room/opaque-session-bootstrap.js');
 
     expect(landing).toContain('<link rel="canonical" href="https://www.foundercontrolroom.org/" />');
     expect(landing).toContain('href="https://www.foundercontrolroom.org/control-room/"');
-    expect(landing).toContain('href="https://www.foundercontrolroom.org/guardrails"');
+    expect(landing).toContain('data-fcr-visual="founder-os-v2"');
+    expect(landing).toContain('data-command-shell');
     expect(landing).toContain('href="/control-room/" data-founder-start="authenticated"');
     expect(landing).toContain('data-bottom-nav="five-screen"');
     for (const screen of ['home', 'control-room', 'chief', 'promptos', 'proof']) {
       expect(landing).toContain(`data-public-screen="${screen}"`);
       expect(landing).toContain(`data-nav-screen="${screen}"`);
     }
-    expect(landing).toContain('Chief turns founder intent into governed execution.');
-    expect(landing).toContain('PromptOS is an intention compiler.');
-    expect(landing).toContain('Private projects, approvals, credentials, and operating evidence stay behind product authentication.');
+    expect(landing).toContain('Turns founder intent into bounded work while keeping permission, receipts, evidence, and claims separate.');
+    expect(landing).toContain('Turns approved intent into prompts, commands, workflows, tests, and stop conditions that compound.');
+    expect(landing).toContain('The public surface explains the operating model without exposing founder sessions, credentials, customer data, private projects, raw internal evidence, or hidden operating instructions.');
+    expect(landing).toContain('Choosing a view does not grant private authority. Founder access still passes through FCR authentication.');
     expect(app).toContain('src="/control-room/opaque-session-bootstrap.js"');
     expect(app).not.toContain('src="/control-room/app.js"');
     expect(bootstrap).toContain("await import('/control-room/app.js')");

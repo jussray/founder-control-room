@@ -8,8 +8,9 @@
 // digits; the tab contract other proofs depend on (`.tabs button[data-tab]`,
 // `#new-project-form`, `#project-list .card`, `.founder-email`) still holds
 // without a click; the `?tab=` deep link through stack-router.js still
-// activates a tab; nothing overflows at 1440 and 390; and the signed-out
-// surface is the unchanged magic-link card.
+// activates a tab; the founder-facing visual authority renders Same Truth /
+// Higher Outcomes while ULTRATHINK stays behind the UI; nothing overflows at
+// 1440 and 390; and the signed-out surface is the unchanged magic-link card.
 //
 // What this does NOT prove: the real Express routes, Supabase, GitHub, or
 // production deployment. Those are e2e/run.mjs (npm run test:e2e) and CI.
@@ -31,8 +32,6 @@ const PUBLIC_DIR = resolve(REPO_ROOT, 'public');
 const OUT_DIR = resolve(REPO_ROOT, 'test-results');
 const FOUNDER_EMAIL = 'founder@example.com';
 
-// Serve the production CSP so an inline script, external font/image, or
-// disallowed connect surfaces here as a console error instead of only in prod.
 const CSP = readFileSync(resolve(PUBLIC_DIR, '_headers'), 'utf8')
   .split('\n')
   .map((line) => line.trim())
@@ -70,8 +69,6 @@ const FIXTURE = {
     { id: 'm-7', title: 'Old idea', status: 'rejected', risk_level: 'low', project: { slug: 'chief-ai' } },
   ],
   activity: [
-    // Read-audit rows the server writes on every GET /projects and /l99/status
-    // read — real events, but a Home load must not count itself as a signal.
     { created_at: iso(0), project: { slug: 'founder-control-room' }, severity: 'info', event_type: 'project_registry_read' },
     { created_at: iso(0), project: { slug: 'founder-control-room' }, severity: 'info', event_type: 'l99_status_read' },
     { created_at: iso(2), project: { slug: 'sekret-bip' }, severity: 'info', event_type: 'mission.in_review' },
@@ -103,7 +100,6 @@ const expectedInFlight = FIXTURE.tasks.filter((t) => IN_FLIGHT.has(t.status)).le
 const expectedInReview = FIXTURE.tasks.filter((t) => t.status === 'in_review').length;
 const expectedLanded = FIXTURE.tasks.filter((t) => t.status === 'integrated' || t.status === 'deployed').length;
 
-/** mode: 'full' | 'l99-down' | 'reads-down' | 'signed-out' */
 function startServer(mode) {
   const json = (res, status, body) => {
     res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'Content-Security-Policy': CSP });
@@ -149,14 +145,10 @@ function startServer(mode) {
     if (/^\/missions\/[^/]+\/council$/.test(path)) return json(res, 200, { conversations: [] });
     if (/^\/missions\/[^/]+\/runs$/.test(path)) return json(res, 200, { runs: [] });
     if (/^\/missions\/[^/]+\/costs$/.test(path)) return json(res, 200, { totalUsd: 0, costs: [] });
-    // Sibling scripts loaded by index.html (stack-router.js, project-shell-ui.js)
-    // poll these; they are outside this proof's subject and answered with
-    // their honest "not configured" shapes so the console stays clean.
     if (path === '/automation/conveyor/') return json(res, 200, { contract: 'founder-control-room/n8n-conveyor@v3', readiness: { state: 'not-configured' } });
     if (path === '/projects/sekret-bip/shell-state') return json(res, 404, { error: 'shell-state not stubbed' });
     if (path.startsWith('/api/')) { console.log(`  (unstubbed 404: ${path})`); return json(res, 404, { error: 'not stubbed' }); }
 
-    // static
     let filePath = normalize(join(PUBLIC_DIR, decodeURIComponent(path)));
     if (!filePath.startsWith(PUBLIC_DIR)) { res.writeHead(403); return res.end(); }
     if (existsSync(filePath) && statSync(filePath).isDirectory()) filePath = join(filePath, 'index.html');
@@ -190,8 +182,6 @@ async function withPage(browser, viewport, fn) {
   page.on('pageerror', (err) => pageErrors.push(String(err)));
   page.on('console', (msg) => {
     if (msg.type() !== 'error') return;
-    // project-shell-ui.js probes a Bip shell-state route this stub does not
-    // serve; its 404 is an expected network diagnostic, not a UI failure.
     if (/shell-state$/.test(msg.location()?.url ?? '')) { networkDiagnostics.push(msg.location().url); return; }
     consoleErrors.push(`${msg.text()} @ ${msg.location()?.url ?? ''}`);
   });
@@ -211,8 +201,6 @@ console.log('\n[1] Signed-in founder lands on the Home dashboard (desktop 1280×
 {
   const { server, baseUrl } = await startServer('full');
   const { pageErrors, consoleErrors } = await withPage(browser, { width: 1280, height: 720 }, async (page) => {
-    // Hold the API until the first paint has been inspected: before any read
-    // settles every KPI must be UNKNOWN, never an "observed" zero.
     let releaseApi;
     const apiGate = new Promise((r) => { releaseApi = r; });
     await page.route((url) => /\/(projects|dashboard\/tasks|dashboard\/activity|dashboard\/costs|l99\/status)$/.test(url.pathname), async (route) => { await apiGate; await route.continue(); });
@@ -233,10 +221,14 @@ console.log('\n[1] Signed-in founder lands on the Home dashboard (desktop 1280×
     assert((await page.locator('.sidebar .side-link').count()) >= 4, 'sidebar links the sibling Control Room surfaces');
     assert((await page.locator('[data-systems-truth="unknown"]').count()) === 1, 'systems status is rendered as not observed, not as a green light');
 
-    assert((await page.locator('.hero-title').innerText()).replace(/\s+/g, '') === 'ULTRATHINK', 'hero renders the ULTRATHINK headline');
+    const heroText = (await page.locator('.hero-title').innerText()).replace(/\s+/g, '');
+    assert(heroText === 'SAMETRUTH.HIGHEROUTCOMES.', 'hero renders the approved Same Truth / Higher Outcomes headline');
+    assert(!heroText.includes('ULTRATHINK'), 'ULTRATHINK stays behind the founder-facing UI');
     assert((await page.locator('.hero-greeting').innerText()).toLowerCase().includes('good '), 'hero greets the founder');
-    assert((await page.locator('.chief-prompt').innerText()) === 'What are you trying to move forward?', 'Chief panel asks the mockup prompt');
-    assert((await page.locator('.chief-route').count()) === 6, 'Chief panel exposes six routes');
+    assert((await page.locator('.chief-prompt').innerText()) === 'Ask the Council anything…', 'AI Council exposes the approved founder prompt');
+    assert((await page.locator('[data-council-roster]').count()) === 1, 'AI Council roster renders once');
+    assert((await page.locator('.fcr-nav-search').count()) === 1, 'founder navigation search renders once');
+    assert((await page.locator('.chief-route').count()) === 6, 'AI Council exposes six routes');
 
     const kpi = async (id) => (await page.locator(`[data-kpi="${id}"] .kpi-value`).innerText()).trim();
     assert((await kpi('projects')) === String(FIXTURE.projects.length), `Projects KPI equals served project count (${FIXTURE.projects.length})`);
@@ -263,22 +255,16 @@ console.log('\n[1] Signed-in founder lands on the Home dashboard (desktop 1280×
     await noOverflow(page, 'desktop');
     await page.screenshot({ path: join(OUT_DIR, 'founder-home-desktop.png'), fullPage: true });
 
-    // Home → project detail still works through the embedded projects module.
     await page.click('#project-list .card >> nth=0');
     await page.waitForSelector('#project-detail', { state: 'visible', timeout: 10_000 });
     assert((await page.locator('[data-home-detail] #project-detail').count()) === 1, 'selecting a project opens its detail panel full-width under the grid, still on Home');
 
-    // Today's focus → Missions tab with the mission selected.
     await page.click('[data-focus-mission="m-1"]');
     await page.waitForSelector('.tabs button[data-tab="missions"].active', { timeout: 10_000 });
     await page.waitForSelector('#mission-detail', { state: 'visible', timeout: 10_000 });
     assert((await page.locator('#mission-lanes .lane').count()) === 8, 'focus item routes to the Missions board (8 lanes)');
     assert((await page.locator('#mission-detail').innerText()).includes('Review Bip partnership proposal'), 'the clicked mission is selected in its detail panel');
 
-    // index.html pins a fixed launch dock to the bottom of the viewport. With
-    // the sidebar shifting content into the dock's x-range, the last submit
-    // button on a tab must scroll clear of it or every click on it times out
-    // (this is exactly how run.mjs failed on the first CI run of this shell).
     for (const selector of ['#log-council-form button[type=submit]', '#log-cost-form button[type=submit]']) {
       await page.locator(selector).scrollIntoViewIfNeeded();
       const box = await page.locator(selector).boundingBox();
@@ -287,7 +273,6 @@ console.log('\n[1] Signed-in founder lands on the Home dashboard (desktop 1280×
       assert(box && dock && !overlaps, `${selector} scrolls clear of the fixed launch dock (button y=${box && Math.round(box.y)}, dock top=${dock && Math.round(dock.y)})`);
     }
 
-    // Sidebar → Home again; KPI tile → Signals tab.
     await page.click('.tabs button[data-tab="home"]');
     await page.waitForSelector('[data-home-kpis]');
     await page.click('[data-kpi="signals"]');
