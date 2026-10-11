@@ -79,6 +79,7 @@ Founder Control Room also serves `POST https://api.foundercontrolroom.org/mcp/re
 - Static selection requires an exact timing-safe Bearer-token match. Missing, malformed, or non-matching credentials are routed to OAuth/DCR rather than static auth.
 - A token that fails OAuth validation is rejected. It is never retried or downgraded as a static credential.
 - Exact unauthenticated `POST /mcp/read` may reach the bearer handler only so an OAuth-capable client can receive the canonical protected-resource challenge. The CSRF exemption does not extend to `/mcp/read/*` or neighboring mutation routes.
+- The complete active-portfolio compatibility read scope is documented as `FCR_REMOTE_MCP_READ_PROJECTS=sekret-bip,juss-beautiful-hair,juss-beautiful-hair-private,l99,chief-ai-machine,untold-stories,sync-party,founder-control-room,promptos`. This is a maximum server-owned scope, not a client entitlement; founder validation and project grants still narrow each call.
 - Production project scope remains server-held. The route cannot widen beyond `PORTFOLIO_PROJECTS`; optional token project claims may only narrow the scope.
 - The compatibility alias advertises the same bounded eight-tool catalog as canonical `/mcp`; it does not expose a generic nested provider invocation surface.
 - Provider tools still have to pass the configured server allowlist/denylist. Create/update/delete/merge/write authority remains blocked by underlying FCR policy unless a separate governed execution path explicitly permits it.
