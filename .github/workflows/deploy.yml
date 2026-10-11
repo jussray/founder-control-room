@@ -1125,3 +1125,59 @@ jobs:
         run: |
           echo "Database inspection completed."
           echo "Cross-service reconciliation POSTs remain disabled until the deployed Worker has a durable ingestion consumer."
+
+  # ── 9. Rollback receipt ─────────────────────────────────────────────────────
+  # Runs only when a deploy-plane job failed. Records which job failed and the
+  # exact head that was attempted, so a failed deploy leaves a receipt instead
+  # of only a red run. Known limitation: `reconcile` is continue-on-error, so a
+  # reconcile-only failure does not appear as a failure here (recorded below).
+  rollback-receipt:
+    name: Rollback Receipt
+    runs-on: ubuntu-latest
+    needs:
+      - authority-gate
+      - supabase-migrate
+      - worker-deploy
+      - pages-release
+      - smoke-test
+      - proof-of-ship
+      - reconcile
+    if: always() && contains(needs.*.result, 'failure')
+    steps:
+      - name: Write rollback receipt
+        env:
+          EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha }}
+          RESULTS: ${{ toJSON(needs) }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/fcr-rollback-receipt.json"
+          python3 - "$receipt" <<'PY'
+          import json
+          import os
+          import sys
+
+          results = json.loads(os.environ['RESULTS'])
+          failed = sorted(name for name, meta in results.items() if meta.get('result') == 'failure')
+          receipt = {
+              'receipt': 'fcr-rollback-receipt',
+              'expected_head_sha': os.environ.get('EXPECTED_HEAD_SHA', ''),
+              'failed_jobs': failed,
+              'job_results': {name: meta.get('result') for name, meta in results.items()},
+              'known_limitation': 'reconcile is continue-on-error; a reconcile-only failure is not listed as failed here',
+              'secret_values_recorded': False,
+          }
+          with open(sys.argv[1], 'w', encoding='utf-8') as handle:
+              json.dump(receipt, handle, indent=2)
+              handle.write('\n')
+          print(json.dumps(receipt, indent=2))
+          PY
+          cat "$receipt" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload rollback receipt
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: fcr-rollback-receipt-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/fcr-rollback-receipt.json
+          if-no-files-found: error
+          retention-days: 90
