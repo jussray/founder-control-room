@@ -4,7 +4,7 @@ import {
   escalateToPagerDuty,
   type SecurityVerdict,
   emitReciprocalTelemetryWithEscalation,
-} from '../incidentEscalation';
+} from '../incidentEscalation.js';
 
 function createMockVerdict(verdict: string = 'REPAIR_REQUIRED'): SecurityVerdict {
   return {
