@@ -490,6 +490,25 @@ export function evaluateMediaRoute(input: EvaluateMediaRouteInputV1): MediaRoute
   trace.push({ gate: 'post_producible', result: 'skip', detail: post.reason });
 
   if (request.referenceAssetIds.length > 0) {
+    const availableById = new Map(availableAssets.map((asset) => [asset.assetId, asset]));
+    const unavailableReference = request.referenceAssetIds.find((assetId) => {
+      const asset = availableById.get(assetId);
+      if (!asset || asset.workspaceId !== request.workspaceId) return true;
+      if (asset.status === 'revoked' || asset.status === 'quarantined' || asset.status === 'archived') return true;
+      if (asset.projectId === request.projectId) return false;
+      return !(
+        request.referencePolicy.mayReuseCrossProject
+        && asset.rights.reusableAcrossProjects
+        && Boolean(asset.rights.reusableAcrossProjectsAuthorityRecordId)
+      );
+    });
+    if (unavailableReference) {
+      return blocked(
+        'REFERENCE_NOT_APPROVED',
+        `Reference asset ${unavailableReference} is missing, unusable, or outside the approved project boundary`,
+      );
+    }
+
     const policyById = new Map(context.assetInputs.map((asset) => [asset.assetId, asset]));
     const missingPolicy = request.referenceAssetIds.find((assetId) => !policyById.has(assetId));
     if (missingPolicy) {

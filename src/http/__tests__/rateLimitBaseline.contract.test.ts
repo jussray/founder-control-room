@@ -9,6 +9,9 @@ describe('HTTP rate-limit baseline contract', () => {
     const source = fs.readFileSync(securityPath, 'utf8');
     expect(source).toContain('rateLimitGeneral(req, res, next);');
     expect(source).toContain('const generalRateLimitCore = createRateLimiter(');
+    expect(source).toMatch(
+      /export const rateLimitGeneral: RequestHandler = \(req, res, next\): void => \{[\s\S]*?generalRateLimitCore\(req,\s*res,\s*next\);[\s\S]*?\n\};/,
+    );
   });
 
   it('sets a 120 requests/minute broad baseline while preserving stricter local limiters', () => {

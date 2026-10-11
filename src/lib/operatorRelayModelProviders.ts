@@ -1,4 +1,4 @@
-import type { OperatorRelayRequestV1 } from './operatorRelay.js';
+import type { OperatorRelayRequestV1, OperatorRelayUsageV1 } from './operatorRelay.js';
 import type { OperatorRelayAdapters } from './operatorRelayDispatch.js';
 import { anthropicPlaywrightMcpAttachment } from './operatorRelayAnthropicMcp.js';
 import { operatorRelayAdapterFromTextProvider } from './operatorRelayProvider.js';
@@ -189,6 +189,29 @@ function anthropicText(body: JsonRecord): string {
   return parts.join('\n');
 }
 
+// Token usage is measurement, not evidence: a missing or malformed usage block is omitted, never fabricated,
+// and never fails an otherwise valid relay.
+function anthropicUsage(body: JsonRecord): OperatorRelayUsageV1 | undefined {
+  const usage = record(body.usage);
+  if (!usage) return undefined;
+  const count = (value: unknown): number | null => (
+    typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : null
+  );
+  const inputTokens = count(usage.input_tokens);
+  const outputTokens = count(usage.output_tokens);
+  if (inputTokens === null || outputTokens === null) return undefined;
+  const cacheCreation = usage.cache_creation_input_tokens == null ? 0 : count(usage.cache_creation_input_tokens);
+  const cacheRead = usage.cache_read_input_tokens == null ? 0 : count(usage.cache_read_input_tokens);
+  if (cacheCreation === null || cacheRead === null) return undefined;
+  return {
+    provider: 'anthropic',
+    inputTokens,
+    outputTokens,
+    cacheCreationInputTokens: cacheCreation,
+    cacheReadInputTokens: cacheRead,
+  };
+}
+
 function geminiResponseId(body: JsonRecord): string {
   const rawId = typeof body.responseId === 'string' ? body.responseId.trim() : '';
   if (
@@ -374,7 +397,7 @@ export function createServerOperatorRelayAdapters(
           redirect: 'error',
           signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
         }, 'Anthropic relay');
-        return { text: anthropicText(body), evidenceRef: evidenceRef('anthropic', body) };
+        return { text: anthropicText(body), evidenceRef: evidenceRef('anthropic', body), usage: anthropicUsage(body) };
       },
     });
   }
