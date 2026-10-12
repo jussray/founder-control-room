@@ -1,0 +1,119 @@
+{
+  "target": "https://www.jussco.company/",
+  "capturedAt": "2026-10-12T01:25:42.563Z",
+  "viewports": {
+    "desktop": {
+      "status": 403,
+      "title": "Just a moment...",
+      "h1": [
+        "www.jussco.company"
+      ],
+      "h2": [
+        "Performing security verification",
+        "Verification successful. Waiting for www.jussco.company to respond"
+      ],
+      "navLinks": [],
+      "externalLinks": [
+        "https://www.cloudflare.com?utm_source=challenge&utm_campaign=m",
+        "https://www.cloudflare.com/privacypolicy/"
+      ],
+      "overflowX": 0,
+      "brokenImages": [
+        "https://www.jussco.company/favicon.ico"
+      ],
+      "bodyTextHead": "www.jussco.company\nPerforming security verification\n\nThis website uses a security service to protect against malicious bots. This page is displayed while the website verifies you are not a bot.\n\nRay ID: a4924fef88607bbc\nPerformance and Security by Cloudflare\nPrivacy",
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 403 ()",
+        "Failed to load resource: the server responded with a status of 404 ()",
+        "%c%d font-size:0;color:transparent NaN",
+        "%c%d font-size:0;color:transparent NaN"
+      ]
+    },
+    "tablet": {
+      "status": 403,
+      "title": "Just a moment...",
+      "h1": [
+        "www.jussco.company"
+      ],
+      "h2": [
+        "Performing security verification",
+        "Verification successful. Waiting for www.jussco.company to respond"
+      ],
+      "navLinks": [],
+      "externalLinks": [
+        "https://www.cloudflare.com?utm_source=challenge&utm_campaign=m",
+        "https://www.cloudflare.com/privacypolicy/"
+      ],
+      "overflowX": 0,
+      "brokenImages": [
+        "https://www.jussco.company/favicon.ico"
+      ],
+      "bodyTextHead": "www.jussco.company\nPerforming security verification\n\nThis website uses a security service to protect against malicious bots. This page is displayed while the website verifies you are not a bot.\n\nRay ID: a4924ffb5d2b2f89\nPerformance and Security by Cloudflare\nPrivacy",
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 403 ()",
+        "Failed to load resource: the server responded with a status of 404 ()",
+        "%c%d font-size:0;color:transparent NaN",
+        "%c%d font-size:0;color:transparent NaN"
+      ]
+    },
+    "mobile": {
+      "status": 403,
+      "title": "Just a moment...",
+      "h1": [
+        "www.jussco.company"
+      ],
+      "h2": [
+        "Performing security verification",
+        "Verification successful. Waiting for www.jussco.company to respond"
+      ],
+      "navLinks": [],
+      "externalLinks": [
+        "https://www.cloudflare.com?utm_source=challenge&utm_campaign=m",
+        "https://www.cloudflare.com/privacypolicy/"
+      ],
+      "overflowX": 0,
+      "brokenImages": [
+        "https://www.jussco.company/favicon.ico"
+      ],
+      "bodyTextHead": "www.jussco.company\nPerforming security verification\n\nThis website uses a security service to protect against malicious bots. This page is displayed while the website verifies you are not a bot.\n\nRay ID: a4925007dfc8e61d\nPerformance and Security by Cloudflare\nPrivacy",
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 403 ()",
+        "Failed to load resource: the server responded with a status of 404 ()",
+        "%c%d font-size:0;color:transparent NaN",
+        "%c%d font-size:0;color:transparent NaN"
+      ]
+    }
+  },
+  "crawler": {
+    "origin": "https://www.jussco.company",
+    "head": {
+      "canonical": null,
+      "metaDescription": null,
+      "robotsMeta": "noindex,nofollow",
+      "ogTitleCount": 0,
+      "jsonLd": {
+        "blocks": 0,
+        "types": [],
+        "parseErrors": 0
+      }
+    },
+    "files": {
+      "robots": {
+        "status": 200,
+        "bytes": 1248,
+        "firstLine": "# As a condition of accessing this website, you agree to abide by the following"
+      },
+      "sitemap": {
+        "status": 403,
+        "bytes": 5591,
+        "firstLine": "<!DOCTYPE html><html lang=\"en-US\"><head><title>Just a moment...</title><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\"><meta http-equiv=\"X-UA-Compatible\" content=\"IE=Edge\"><meta name=\"robots\" content=\"noindex,nofollow\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><meta http-equiv=\"content-security-policy\" content=\"default-src &#39;none&#39;; script-src &#39;nonce-7ngayuzB9WSL0Pzph3EdGc&#39; &#39;unsafe-eval&#39; https://challenges.cloudflare.com; script-src-attr &#39;none&#39;; style-src &#39;unsafe-inline&#39;; img-src &#39;self&#39; https://challenges.cloudflare.com; connect-src &#39;self&#39; https://challenges.cloudflare.com; frame-src &#39;self&#39; https://challenges.cloudflare.com blob:; child-src &#39;self&#39; https://challenges.cloudflare.com blob:; worker-src blob:; form-action http: https:; base-uri &#39;self&#39;\"><style>*{box-sizing:border-box;margin:0;padding:0}html{line-height:1.15;-webkit-text-size-adjust:100%;color:#313131;font-family:system-ui,-apple-system,BlinkMacSystemFont,\"Segoe UI\",Roboto,\"Helvetica Neue\",Arial,\"Noto Sans\",sans-serif,\"Apple Color Emoji\",\"Segoe UI Emoji\",\"Segoe UI Symbol\",\"Noto Color Emoji\"}body{display:flex;flex-direction:column;height:100vh;min-height:100vh}.main-content{margin:8rem auto;padding-left:1.5rem;max-width:60rem}@media (width <= 720px){.main-content{margin-top:4rem}}#challenge-error-text{background-image:url(\"data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzMiIgaGVpZ2h0PSIzMiIgZmlsbD0ibm9uZSI+PHBhdGggZmlsbD0iI0IyMEYwMyIgZD0iTTE2IDNhMTMgMTMgMCAxIDAgMTMgMTNBMTMuMDE1IDEzLjAxNSAwIDAgMCAxNiAzbTAgMjRhMTEgMTEgMCAxIDEgMTEtMTEgMTEuMDEgMTEuMDEgMCAwIDEtMTEgMTEiLz48cGF0aCBmaWxsPSIjQjIwRjAzIiBkPSJNMTcuMDM4IDE4LjYxNUgxNC44N0wxNC41NjMgOS41aDIuNzgzem0tMS4wODQgMS40MjdxLjY2IDAgMS4wNTcuMzg4LjQwNy4zODkuNDA3Ljk5NCAwIC41OTYtLjQwNy45ODQtLjM5Ny4zOS0xLjA1Ny4zODktLjY1IDAtMS4wNTYtLjM4OS0uMzk4LS4zODktLjM5OC0uOTg0IDAtLjU5Ny4zOTgtLjk4NS40MDYtLjM5NyAxLjA1Ni0uMzk3Ii8+PC9zdmc+\");background-repeat:no-repeat;background-size:contain;padding-left:34px}</style><meta http-equiv=\"refresh\" content=\"360\"></head><body><div class=\"main-wrapper\" role=\"main\"><div class=\"main-content\"><noscript><div class=\"h2\"><span id=\"challenge-error-text\">Enable JavaScript and cookies to continue</span></div></noscript></div></div><script nonce=\"7ngayuzB9WSL0Pzph3EdGc\">(function(){window._cf_chl_opt = {cFPWv: 'g',cH: 'BNjnFNahPtztXKsvZhcFhmzpQ86cxsWEDBzPn2eMNmA-1791768349-1.2.1.1-Df8XWA0fNv2OiMIU6NC5JiBMlNRq9JClwwBDD0fzpktkXBlW3WfsHdKJxYCfhluE',cITimeS: '1791768349',cN: '7ngayuzB9WSL0Pzph3EdGc',cRay: 'a4925015bc58e6ec',cTplB: '0',cTplC:0,cTplO:0,cTplV:5,cType: 'managed',cUPMDTk:\"/sitemap.xml?__cf_chl_tk=agh5loPed9a22.ylDA6gGAclmbKg3AiXMwgoGscfyEc-1791768349-1.0.1.1-28Co_Jw4wGIw2fvrhbuRAvkPTbUJUshsA9.5NMHb9xs\",cvId: '3',cZone: 'www.jussco.company',fa:\"/sitemap.xml?__cf_chl_f_tk=agh5loPed9a22.ylDA6gGAclmbKg3AiXMwgoGscfyEc-1791768349-1.0.1.1-28Co_Jw4wGIw2fvrhbuRAvkPTbUJUshsA9.5NMHb9xs\",md: '.7ulgRRjVUrjltbGmkTl3IVQzHlO95iXhj_qS6P4mAE-1791768349-1.2.1.1-1YCl4ysxS_CQvsHVilIhEJ6kdD_Kqj3nRQjWdyWMHe9ffZ9n_8NucI_5z9eB_9JtFKEN0cSw0rJBb81zK8jHXt0wU9PK2cScgVDztVBA2DtLVX6QwByLGL.YwUhKBUXDRbytlvNwET6_yOng8slSY5Z9tse3z.MgMcYMhP0T9M3xZy0DRJ.bQWXPnDnxY8Rl_kS3Hlc0jiySJuKcCzoVqfxVvJkb5aluKX2Ks.JgrrSJ8xmMXQnXfGK6icoB3kVgugo..g8mJL9Ucy38HAmzmSugictSDzMAEykW4ko3p5uQjoYt98hwzPpxEMS0E1R2yPxkOctHGBwuvD51pF.j9UnwIO2i.RgpzEGD0e5Y5ktJPqSfsxLkDS1BlJhc.3kGq0dMYz4qh.ZO0lWHfVykfykYn67EPMmTGYwHRRNt_zDBG.pDM7ZdsJUDP8pAWbSgIiaI2YyZJ3pT0NVOvnM1SyqFAQduCp67LM7HQln9yJXFYfFPe4SHmSzO6stmiwv06mka22SrSuvtBtzzjRazBhX_Y4HhHQhEi5.BDBBmTVaIRShFO8iLPJXyoU3VGg2YY3Ba1H2tq0PrYVnkFWsCX7mXX_b9qtM9dB8IIiwAzfUhqS852w7IOGQDvNefDrmaZkjsLjV34lEcKNZiI5xF.VbQP.yH4vycaXPn11iRBcOMwaiONbJYG_vdt0OaFhQkPCwqRyUnbiLoqAubvBY6GEhOW0DcEC4iFF5KhZVeKjIwZ7.28FiPR6Irf5piLPHybbmOMFjLnJV4.NFQa.w2EyDAQ6zWGZJ1smIWwE5.ywRSOCJL1SHfAv6GDBimJI5Stba4UqBeUhAwts7sVApIRafhhDA_jDZaL20mAGtLz2xLUbRRJbWdWFk4SQ2MMaMjFEoON.Em8vinOSuT5ALHBWSGwfqoRRJFTVRR3Wdryl21KrbxNZmMyZAeaJpMPuA7XdJ3zFFoyBo8Oria77BbgS2OdL.OJVNms1QreFCv2whBQr2elpP5jVOCIdjD079J9CuRxjvC_Da4DilEWLdp8MRXb2KLUf_JrCSG8No6mQo0Fl4SN5U4Ch.eAN6yykKZdsQdTaYrZ6xZ.xlybGN4Mw',mdrd: 'KOVF07NcKsYWPRnymZHHhY9bupcRusONNjZw88qUmPE-1791768349-1.2.1.1-oM6FEUxlnLeu5FLRkcSpgZFheAy60GzlVDVm_6PVhvjtKIZoPMks5i34_WLrHsiZWOkBgS5sYobgYlsIqsYeBF6fI6gXVwfvO1.3vtTQraJPP5Q7wxwN4Ofs6m6u1HoC.P2ERohTJSH.uNhMkhgTYWhu1_KNr5uwlsMr6h7yLJ_HjxEeEZkVa.5_pR_jNCrO9vTXPsyGHJ2mJrehnlT6yn2Mxg3Di0umXWRa.xiJh7bmiC2DziRhsqj9LIfyzMFC.bIA7jGy5GVWGvQfsPLkS5buZ9fyohqrEr826ZmK10pcCwOfaZNXpyOdoX6tDJysy00__MwkruieExQGpupINe7LzhQmUV7TIU7_DIBX2lIhnKuqFUHaY_DDL8Vs08kN',};var a = document.createElement('script');a.nonce = '7ngayuzB9WSL0Pzph3EdGc';a.src = '/cdn-cgi/challenge-platform/h/g/orchestrate/chl_page/v1?ray=a4925015bc58e6ec';window._cf_chl_opt.cOgUHash = location.hash === '' && location.href.indexOf('#') !== -1 ? '#' : location.hash;window._cf_chl_opt.cOgUQuery = location.search === '' && location.href.slice(0, location.href.length - window._cf_chl_opt.cOgUHash.length).indexOf('?') !== -1 ? '?' : location.search;if (window.history && window.history.replaceState) {var ogU = location.pathname + window._cf_chl_opt.cOgUQuery + window._cf_chl_opt.cOgUHash;history.replaceState(null, null,\"/sitemap.xml?__cf_chl_rt_tk=agh5loPed9a22.ylDA6gGAclmbKg3AiXMwgoGscfyEc-1791768349-1.0.1.1-28Co_Jw4wGIw2fvrhbuRAvkPTbUJUshsA9.5NMHb9xs\"+ window._cf_chl_opt.cOgUHash);a.onload = function() {history.replaceState(null, null, ogU);}}document.getElementsByTagName('head')[0].appendChild(a);}());</script></body></html>"
+      },
+      "llms": {
+        "status": 404,
+        "bytes": 0,
+        "firstLine": ""
+      }
+    },
+    "canonicalMatchesOrigin": null
+  }
+}
