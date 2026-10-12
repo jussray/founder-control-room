@@ -1,0 +1,87 @@
+{
+  "target": "https://www.jussco.company/",
+  "capturedAt": "2026-10-12T01:23:14.442Z",
+  "viewports": {
+    "desktop": {
+      "status": 403,
+      "title": "Just a moment...",
+      "h1": [
+        "www.jussco.company"
+      ],
+      "h2": [
+        "Performing security verification",
+        "Verification successful. Waiting for www.jussco.company to respond"
+      ],
+      "navLinks": [],
+      "externalLinks": [
+        "https://www.cloudflare.com?utm_source=challenge&utm_campaign=m",
+        "https://www.cloudflare.com/privacypolicy/"
+      ],
+      "overflowX": 0,
+      "brokenImages": [
+        "https://www.jussco.company/favicon.ico"
+      ],
+      "bodyTextHead": "www.jussco.company\nPerforming security verification\n\nThis website uses a security service to protect against malicious bots. This page is displayed while the website verifies you are not a bot.\n\nRay ID: a4924c502f9a30b7\nPerformance and Security by Cloudflare\nPrivacy",
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 403 ()",
+        "Failed to load resource: the server responded with a status of 404 ()",
+        "%c%d font-size:0;color:transparent NaN",
+        "%c%d font-size:0;color:transparent NaN"
+      ]
+    },
+    "tablet": {
+      "status": 403,
+      "title": "Just a moment...",
+      "h1": [
+        "www.jussco.company"
+      ],
+      "h2": [
+        "Performing security verification",
+        "Verification successful. Waiting for www.jussco.company to respond"
+      ],
+      "navLinks": [],
+      "externalLinks": [
+        "https://www.cloudflare.com?utm_source=challenge&utm_campaign=m",
+        "https://www.cloudflare.com/privacypolicy/"
+      ],
+      "overflowX": 0,
+      "brokenImages": [
+        "https://www.jussco.company/favicon.ico"
+      ],
+      "bodyTextHead": "www.jussco.company\nPerforming security verification\n\nThis website uses a security service to protect against malicious bots. This page is displayed while the website verifies you are not a bot.\n\nRay ID: a4924c5dae89eb40\nPerformance and Security by Cloudflare\nPrivacy",
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 403 ()",
+        "Failed to load resource: the server responded with a status of 404 ()",
+        "%c%d font-size:0;color:transparent NaN",
+        "%c%d font-size:0;color:transparent NaN"
+      ]
+    },
+    "mobile": {
+      "status": 403,
+      "title": "Just a moment...",
+      "h1": [
+        "www.jussco.company"
+      ],
+      "h2": [
+        "Performing security verification",
+        "Verification successful. Waiting for www.jussco.company to respond"
+      ],
+      "navLinks": [],
+      "externalLinks": [
+        "https://www.cloudflare.com?utm_source=challenge&utm_campaign=m",
+        "https://www.cloudflare.com/privacypolicy/"
+      ],
+      "overflowX": 0,
+      "brokenImages": [
+        "https://www.jussco.company/favicon.ico"
+      ],
+      "bodyTextHead": "www.jussco.company\nPerforming security verification\n\nThis website uses a security service to protect against malicious bots. This page is displayed while the website verifies you are not a bot.\n\nRay ID: a4924c6a2ba77639\nPerformance and Security by Cloudflare\nPrivacy",
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 403 ()",
+        "Failed to load resource: the server responded with a status of 404 ()",
+        "%c%d font-size:0;color:transparent NaN",
+        "%c%d font-size:0;color:transparent NaN"
+      ]
+    }
+  }
+}
