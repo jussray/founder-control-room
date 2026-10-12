@@ -308,6 +308,12 @@
       "claims": [
         "`tools/zapier/founder-content-outcome-contract.cjs` must bind founder-content metrics to the exact observed network, lane, account identity, connector identity, and coverage state; out-of-scope metrics must remain UNKNOWN, cross-account metric donation is forbidden, and these receipts can never grant publication, provider-write, merge, deploy, spend, or external-contact authority."
       ]
+    },
+    {
+      "path": "src/http/routes/approvals.ts",
+      "claims": [
+        "`src/http/routes/approvals.ts` must reject `POST /approvals/:missionId/patch` without an `idempotencyKey`, reserve each patch commit as a pending `approval_executions` row before `RepositoryProvider.commitPatch(...)`, and never re-commit a key that is pending, failed, or bound to a different mission, project, or action."
+      ]
     }
   ]
 }

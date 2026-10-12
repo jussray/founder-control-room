@@ -65,6 +65,10 @@ The envelope binds the exact mission intent, authenticated actor/approver, repos
 
 This source/runtime membrane proves only that the branch-creation path is governed when that code executes. CI or unit green does not prove a live GitHub branch was created, and successful branch creation does not grant merge, deploy, publication, secret, database, billing, or destructive authority.
 
+### Patch-commit idempotency ledger
+
+The patch route in `src/http/routes/approvals.ts` uses the same reserve-before-mutate ledger as the execute route. A `POST /approvals/:missionId/patch` request without `idempotencyKey` returns `IDEMPOTENCY_KEY_REQUIRED`. Before any provider write, the key is looked up in `approval_executions`: a `succeeded` row replays the prior result, a `pending` row returns `ACTION_ALREADY_PENDING`, a `failed` row returns `ACTION_PREVIOUSLY_FAILED`, and a key bound to a different mission, project, or action returns `IDEMPOTENCY_SCOPE_MISMATCH`. The route inserts a `pending` reservation before `RepositoryProvider.commitPatch(...)`; a unique-key collision returns 409. A provider failure marks the reservation `failed`. A successful commit marks it `succeeded`. If that finalize write fails, the row stays `pending` for reconciliation rather than being re-executed. This is source proof of the ledger only and does not prove a live GitHub commit occurred.
+
 ## Independent review + founder-final authority for Founder Control Room merges
 
 The Founder Control Room in-app merge path keeps **independent review load-bearing**, but the canonical FCR policy no longer requires a second human semantic reviewer merely because the founder authored the patch.

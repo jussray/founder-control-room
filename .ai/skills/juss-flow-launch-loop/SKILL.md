@@ -261,6 +261,8 @@ Operational branch creation is not ambient repository power. For the FCR `create
 
 The execution must be reserved before provider mutation. Immediately before `RepositoryProvider.createBranch(...)`, FCR must reacquire mission state, re-derive the execution context, and validate the original envelope through `executeAuthorizedCreateBranch()`. Any state, argument, scope, idempotency, tool-call, capability, expiry, or integrity drift must fail closed. A pending or ambiguous provider outcome requires reconciliation before another mutation attempt. Branch authority never inherits merge, deploy, publication, credential, database, spend, or destructive authority.
 
+Patch commits follow the same reserve-before-mutate rule. `POST /approvals/:missionId/patch` requires an `idempotencyKey`, checks the `approval_executions` ledger before any provider write, and reserves a `pending` row before `RepositoryProvider.commitPatch(...)`. Replay a `succeeded` key. Do not retry a `pending` key until it is reconciled. Do not reuse a `failed` key; use a new key after review. A finalize failure leaves the row `pending` for reconciliation.
+
 ## Implementation contract
 
 Before mutation record:
