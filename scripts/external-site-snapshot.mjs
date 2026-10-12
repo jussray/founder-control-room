@@ -3,6 +3,7 @@
 // No secrets, no cookies, no founder bearer. Produces screenshots + report.json.
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { parseCrawlerSurface } from './external-site-crawler-surface.mjs';
 import { fileURLToPath } from 'node:url';
 
 const PRIVATE_HOST = /^(localhost|127\.|10\.|192\.168\.|192\.0\.0\.|172\.(1[6-9]|2\d|3[01])\.|169\.254\.|100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.|198\.1[89]\.|0\.0\.0\.0|.*\.(local|internal|localdomain))/i;
@@ -42,6 +43,7 @@ async function run() {
   const { chromium } = await import('playwright');
   const browser = await chromium.launch();
   const report = { target: target.url, capturedAt: new Date().toISOString(), viewports: {} };
+  let desktopHtml = '';
   for (const vp of VIEWPORTS) {
     const context = await browser.newContext({ viewport: { width: vp.width, height: vp.height }, isMobile: vp.mobile, hasTouch: vp.mobile });
     const page = await context.newPage();
@@ -67,12 +69,28 @@ async function run() {
       overflowX: document.documentElement.scrollWidth - window.innerWidth,
       brokenImages: [...document.images].filter((i) => i.complete && i.naturalWidth === 0).map((i) => i.src).slice(0, 20),
       bodyTextHead: document.body.innerText.slice(0, 4000),
+      html: vp.name === 'desktop' ? document.documentElement.outerHTML.slice(0, 400000) : undefined,
     }));
+    if (vp.name === 'desktop') desktopHtml = facts.html ?? '';
+    delete facts.html;
     await page.screenshot({ path: join(dir, `${vp.name}-viewport.png`) });
     await page.screenshot({ path: join(dir, `${vp.name}-full.png`), fullPage: true });
     report.viewports[vp.name] = { status, ...facts, consoleErrors };
     await context.close();
   }
+  const crawlerContext = await browser.newContext();
+  const files = {};
+  const crawlerPaths = { robots: '/robots.txt', sitemap: '/sitemap.xml', llms: '/llms.txt' };
+  for (const [name, path] of Object.entries(crawlerPaths)) {
+    try {
+      const res = await crawlerContext.request.get(new URL(path, target.url).href, { timeout: 15_000 });
+      files[name] = { status: res.status(), body: (await res.text()).slice(0, 20_000) };
+    } catch (error) {
+      files[name] = { error: String(error).slice(0, 200) };
+    }
+  }
+  await crawlerContext.close();
+  report.crawler = parseCrawlerSurface({ origin: new URL(target.url).origin, html: desktopHtml, files });
   await browser.close();
   writeFileSync(join(dir, 'report.json'), JSON.stringify(report, null, 2));
   const captured = Object.values(report.viewports).filter((v) => !v.error).length;
