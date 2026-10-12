@@ -97,7 +97,7 @@ export function aggregateTestLedger(checks) {
   return {state, counts};
 }
 
-export function buildTestLedger({runtimeState, __RUNTIME_STATE_DEFAULT__,
+export function buildTestLedger({runtimeState = null,
   repository,
   sha,
   branch,
