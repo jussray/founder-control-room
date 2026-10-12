@@ -308,6 +308,54 @@
       "claims": [
         "`tools/zapier/founder-content-outcome-contract.cjs` must bind founder-content metrics to the exact observed network, lane, account identity, connector identity, and coverage state; out-of-scope metrics must remain UNKNOWN, cross-account metric donation is forbidden, and these receipts can never grant publication, provider-write, merge, deploy, spend, or external-contact authority."
       ]
+    },
+    {
+      "path": "scripts/verify-documentation-truth.mjs",
+      "claims": [
+        "scripts/verify-documentation-truth.mjs must classify scripts/fcr-access-public-worker-split*, scripts/run-fcr-access-split-recovery*, and scripts/reconcile-cloudflare-access-public-zone* as cloudflare-authority, so any change to those Access scripts requires a current documentation receipt and refreshed Cloudflare docs; this rule binds documentation only and never reads provider state."
+      ]
+    },
+    {
+      "path": "scripts/fcr-access-public-worker-split.mjs",
+      "claims": [
+        "scripts/fcr-access-public-worker-split.mjs must attach a partialSplitReceipt carrying managedApplicationId and originalDestinations to any error thrown after the public application exists, and must fail closed with reconcile-required when exact readback cannot prove the new application is run-owned."
+      ]
+    },
+    {
+      "path": "scripts/fcr-access-public-worker-split-cli.mjs",
+      "claims": [
+        "scripts/fcr-access-public-worker-split-cli.mjs must persist the apply idempotency key with any partialSplitReceipt so the rollback command accepts it, and must refuse rollback whenever the receipt expectedHeadSha differs from EXPECTED_HEAD_SHA before any provider call."
+      ]
+    },
+    {
+      "path": "scripts/run-fcr-access-public-worker-split.mjs",
+      "claims": [
+        "scripts/run-fcr-access-public-worker-split.mjs must refuse rollback when the split receipt expectedHeadSha differs from EXPECTED_HEAD_SHA before any provider call, must persist partialSplitReceipt on apply failure, and must never project a refused head mismatch as a performed rollback."
+      ]
+    },
+    {
+      "path": "scripts/fcr-access-public-worker-split.node-test.mjs",
+      "claims": [
+        "scripts/fcr-access-public-worker-split.node-test.mjs must keep the Access split tests on an in-memory provider that rejects unexpected requests, so no test may reach a live Cloudflare endpoint or pass while an unexpected write occurs."
+      ]
+    },
+    {
+      "path": "scripts/fcr-access-public-worker-split-cli.node-test.mjs",
+      "claims": [
+        "scripts/fcr-access-public-worker-split-cli.node-test.mjs must exercise the CLI apply and rollback contract through injected execute and rollback functions only, so receipt and idempotency behavior is proven without provider calls."
+      ]
+    },
+    {
+      "path": "scripts/run-fcr-access-public-worker-split.node-test.mjs",
+      "claims": [
+        "scripts/run-fcr-access-public-worker-split.node-test.mjs must keep the public front-door projection fail closed: a performed split must not be projected as repaired, and a rollback must not be projected as complete without a rolled-back split receipt."
+      ]
+    },
+    {
+      "path": "scripts/run-fcr-access-split-recovery.node-test.mjs",
+      "claims": [
+        "scripts/run-fcr-access-split-recovery.node-test.mjs must prove that rollback refuses a different expected head before any provider call, that a post-create failure persists the run-owned split receipt for rollback, and that no workflow executes the Access split scripts."
+      ]
     }
   ]
 }

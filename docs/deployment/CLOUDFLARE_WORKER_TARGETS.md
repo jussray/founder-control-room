@@ -238,3 +238,7 @@ Current executable source and authoritative provider readback outrank an older v
 - Access: roll back only an incomplete or ambiguous browser-destination detachment using the receipt-bound original destination set and unchanged application/policy identity; a later runtime/browser failure alone must not automatically reintroduce a Cloudflare Access product-login screen.
 - Credentials: remove/revoke only the affected credential; do not rotate unrelated keys to repair binding drift.
 - Preserve build logs, deployment IDs, provider readback, browser traces, and runtime receipts.
+
+## Access split rollback ownership (current source state)
+
+`scripts/run-fcr-access-public-worker-split.mjs` binds rollback to the exact split receipt: a receipt from another expected head is rejected before any Access write, and a post-create failure must persist the run-owned `managedApplicationId` and `originalDestinations` in the split receipt so `--rollback` can delete only that public application and restore the mixed destination set. Source tests do not prove that a live rollback has been executed or that the provider state matches the receipt.

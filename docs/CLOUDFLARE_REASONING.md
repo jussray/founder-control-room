@@ -263,3 +263,7 @@ npx playwright test e2e/cloudflare-reasoning.spec.ts
 ```
 
 The browser/API suite verifies the public-safe contract, founder protection, absence of credential leakage, presence of the implementation stack, and absence of an accidental deployment endpoint. Unit tests verify exact-commit reasoning, stale evidence, duplicate authority, authentication failures, runtime failure, rollback preparation, first-principles deletion/simplification output, and approval boundaries.
+
+## Access split script boundary (current source state)
+
+`scripts/fcr-access-public-worker-split.mjs` and `scripts/run-fcr-access-public-worker-split.mjs` must remain manual-only: no workflow may invoke them, and provider writes occur only when an operator runs `--apply` with an exact `EXPECTED_HEAD_SHA`. Rollback in `scripts/run-fcr-access-public-worker-split.mjs` fails closed before any provider call when the split receipt's `expectedHeadSha` differs from the current head. The regression suite `scripts/run-fcr-access-split-recovery.node-test.mjs` runs against an in-memory provider and does not prove live Access state, deployment, or browser behavior.

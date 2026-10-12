@@ -73,6 +73,8 @@ const truthSensitiveRules = [
   { domain: 'cloudflare-authority', match: /^\.github\/workflows\/(?:deploy|cloudflare-build-diagnostic|fcr-access-front-door-recovery)\.yml$/ },
   { domain: 'cloudflare-authority', match: /^config\/cloudflare-/ },
   { domain: 'cloudflare-authority', match: /^wrangler\./ },
+  { domain: 'cloudflare-authority', match: /^scripts\/(?:run-)?fcr-access-(?:public-worker-split|split-recovery)[\w.-]*\.mjs$/ },
+  { domain: 'cloudflare-authority', match: /^scripts\/reconcile-cloudflare-access-public-zone[\w.-]*\.mjs$/ },
 ];
 
 const truthSensitiveChanges = changedFiles
