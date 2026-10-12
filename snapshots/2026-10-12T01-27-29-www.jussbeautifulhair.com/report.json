@@ -1,0 +1,119 @@
+{
+  "target": "https://www.jussbeautifulhair.com/",
+  "capturedAt": "2026-10-12T01:27:29.725Z",
+  "viewports": {
+    "desktop": {
+      "status": 403,
+      "title": "Just a moment...",
+      "h1": [
+        "www.jussbeautifulhair.com"
+      ],
+      "h2": [
+        "Performing security verification",
+        "Verification successful. Waiting for www.jussbeautifulhair.com to respond"
+      ],
+      "navLinks": [],
+      "externalLinks": [
+        "https://www.cloudflare.com?utm_source=challenge&utm_campaign=m",
+        "https://www.cloudflare.com/privacypolicy/"
+      ],
+      "overflowX": 0,
+      "brokenImages": [
+        "https://www.jussbeautifulhair.com/favicon.ico"
+      ],
+      "bodyTextHead": "www.jussbeautifulhair.com\nPerforming security verification\n\nThis website uses a security service to protect against malicious bots. This page is displayed while the website verifies you are not a bot.\n\nRay ID: a492528b7aaa327e\nPerformance and Security by Cloudflare\nPrivacy",
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 403 ()",
+        "Failed to load resource: the server responded with a status of 404 ()",
+        "%c%d font-size:0;color:transparent NaN",
+        "%c%d font-size:0;color:transparent NaN"
+      ]
+    },
+    "tablet": {
+      "status": 403,
+      "title": "Just a moment...",
+      "h1": [
+        "www.jussbeautifulhair.com"
+      ],
+      "h2": [
+        "Performing security verification",
+        "Verification successful. Waiting for www.jussbeautifulhair.com to respond"
+      ],
+      "navLinks": [],
+      "externalLinks": [
+        "https://www.cloudflare.com?utm_source=challenge&utm_campaign=m",
+        "https://www.cloudflare.com/privacypolicy/"
+      ],
+      "overflowX": 0,
+      "brokenImages": [
+        "https://www.jussbeautifulhair.com/favicon.ico"
+      ],
+      "bodyTextHead": "www.jussbeautifulhair.com\nPerforming security verification\n\nThis website uses a security service to protect against malicious bots. This page is displayed while the website verifies you are not a bot.\n\nRay ID: a4925298aed6cf1f\nPerformance and Security by Cloudflare\nPrivacy",
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 403 ()",
+        "Failed to load resource: the server responded with a status of 404 ()",
+        "%c%d font-size:0;color:transparent NaN",
+        "%c%d font-size:0;color:transparent NaN"
+      ]
+    },
+    "mobile": {
+      "status": 403,
+      "title": "Just a moment...",
+      "h1": [
+        "www.jussbeautifulhair.com"
+      ],
+      "h2": [
+        "Performing security verification",
+        "Verification successful. Waiting for www.jussbeautifulhair.com to respond"
+      ],
+      "navLinks": [],
+      "externalLinks": [
+        "https://www.cloudflare.com?utm_source=challenge&utm_campaign=m",
+        "https://www.cloudflare.com/privacypolicy/"
+      ],
+      "overflowX": 0,
+      "brokenImages": [
+        "https://www.jussbeautifulhair.com/favicon.ico"
+      ],
+      "bodyTextHead": "www.jussbeautifulhair.com\nPerforming security verification\n\nThis website uses a security service to protect against malicious bots. This page is displayed while the website verifies you are not a bot.\n\nRay ID: a49252a5c81bc79e\nPerformance and Security by Cloudflare\nPrivacy",
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 403 ()",
+        "Failed to load resource: the server responded with a status of 404 ()",
+        "%c%d font-size:0;color:transparent NaN",
+        "%c%d font-size:0;color:transparent NaN"
+      ]
+    }
+  },
+  "crawler": {
+    "origin": "https://www.jussbeautifulhair.com",
+    "head": {
+      "canonical": null,
+      "metaDescription": null,
+      "robotsMeta": "noindex,nofollow",
+      "ogTitleCount": 0,
+      "jsonLd": {
+        "blocks": 0,
+        "types": [],
+        "parseErrors": 0
+      }
+    },
+    "files": {
+      "robots": {
+        "status": 200,
+        "bytes": 1248,
+        "firstLine": "# As a condition of accessing this website, you agree to abide by the following"
+      },
+      "sitemap": {
+        "status": 403,
+        "bytes": 5619,
+        "firstLine": "<!DOCTYPE html><html lang=\"en-US\"><head><title>Just a moment...</title><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\"><meta http-equiv=\"X-UA-Compatible\" content=\"IE=Edge\"><meta name=\"robots\" content=\"noindex,nofollow\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><meta http-equiv=\"content-security-policy\" content=\"default-src &#39;none&#39;; script-src &#39;nonce-aGtH7uGfTQgDbbAXApQjpc&#39; &#39;unsafe-eval&#39; https://challenges.cloudflare.com; script-src-attr &#39;none&#39;; style-src &#39;unsafe-inline&#39;; img-src &#39;self&#39; https://challenges.cloudflare.com; connect-src &#39;self&#39; https://challenges.cloudflare.com; frame-src &#39;self&#39; https://challenges.cloudflare.com blob:; child-src &#39;self&#39; https://challenges.cloudflare.com blob:; worker-src blob:; form-action http: https:; base-uri &#39;self&#39;\"><style>*{box-sizing:border-box;margin:0;padding:0}html{line-height:1.15;-webkit-text-size-adjust:100%;color:#313131;font-family:system-ui,-apple-system,BlinkMacSystemFont,\"Segoe UI\",Roboto,\"Helvetica Neue\",Arial,\"Noto Sans\",sans-serif,\"Apple Color Emoji\",\"Segoe UI Emoji\",\"Segoe UI Symbol\",\"Noto Color Emoji\"}body{display:flex;flex-direction:column;height:100vh;min-height:100vh}.main-content{margin:8rem auto;padding-left:1.5rem;max-width:60rem}@media (width <= 720px){.main-content{margin-top:4rem}}#challenge-error-text{background-image:url(\"data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzMiIgaGVpZ2h0PSIzMiIgZmlsbD0ibm9uZSI+PHBhdGggZmlsbD0iI0IyMEYwMyIgZD0iTTE2IDNhMTMgMTMgMCAxIDAgMTMgMTNBMTMuMDE1IDEzLjAxNSAwIDAgMCAxNiAzbTAgMjRhMTEgMTEgMCAxIDEgMTEtMTEgMTEuMDEgMTEuMDEgMCAwIDEtMTEgMTEiLz48cGF0aCBmaWxsPSIjQjIwRjAzIiBkPSJNMTcuMDM4IDE4LjYxNUgxNC44N0wxNC41NjMgOS41aDIuNzgzem0tMS4wODQgMS40MjdxLjY2IDAgMS4wNTcuMzg4LjQwNy4zODkuNDA3Ljk5NCAwIC41OTYtLjQwNy45ODQtLjM5Ny4zOS0xLjA1Ny4zODktLjY1IDAtMS4wNTYtLjM4OS0uMzk4LS4zODktLjM5OC0uOTg0IDAtLjU5Ny4zOTgtLjk4NS40MDYtLjM5NyAxLjA1Ni0uMzk3Ii8+PC9zdmc+\");background-repeat:no-repeat;background-size:contain;padding-left:34px}</style><meta http-equiv=\"refresh\" content=\"360\"></head><body><div class=\"main-wrapper\" role=\"main\"><div class=\"main-content\"><noscript><div class=\"h2\"><span id=\"challenge-error-text\">Enable JavaScript and cookies to continue</span></div></noscript></div></div><script nonce=\"aGtH7uGfTQgDbbAXApQjpc\">(function(){window._cf_chl_opt = {cFPWv: 'g',cH: 'vJHLN3tPU6X03DyvNq0vKSdE3NGHrQYP4D3bfyCPV4M-1791768456-1.2.1.1-qJ39o3vZ8tkUSwBAJwsgYPVhNHpLbiN3VAyGn5hgYYhmUIYmbDWhWVuej4dkp.B0',cITimeS: '1791768456',cN: 'aGtH7uGfTQgDbbAXApQjpc',cRay: 'a49252b48eebdf26',cTplB: '0',cTplC:0,cTplO:0,cTplV:5,cType: 'managed',cUPMDTk:\"/sitemap.xml?__cf_chl_tk=LjMr1wXhxVFWtQ.o3vYgYnIPfTntAYJcUF6IKyk9gms-1791768456-1.0.1.1-a_tiqTp244D3EXIof8lcNmSnp9HWkYAJQgLsvRXyP58\",cvId: '3',cZone: 'www.jussbeautifulhair.com',fa:\"/sitemap.xml?__cf_chl_f_tk=LjMr1wXhxVFWtQ.o3vYgYnIPfTntAYJcUF6IKyk9gms-1791768456-1.0.1.1-a_tiqTp244D3EXIof8lcNmSnp9HWkYAJQgLsvRXyP58\",md: '6UEws1cMBK27MGmMxQ_Pkj5a8rjhEsMuC9Sx4QqPvBE-1791768456-1.2.1.1-tnqe.6F8Un_JQ4CkEWKQL14u.DBQ9MMiZYAEh9npIL86GEhOPu8R5wOzMmz636oZI2u9NPvYNRIZNj1wor3CBk9qt03TCttk6gzeVGuA_wPOSyVKTr0.Zksi2b3NmiAm9vRd2gZeyFWb02eYTRpGT6XW5aEIw4rXNzyQk5.Zk2Eb51eBj2f6Mjm.cJ0gWxOZNEPUyvmM8lE5k5j6Ixx7J3H3yZQVBuhl1yf.QpXTnsfoEin2D_p4H6MbI18YDxT43wyyMktu825EzFsUjmZIm7np0SKOfuIjY1lR3ULOjWzdPVMCqFcWht3AddvFaCkqDvcX2JR052tSe8GRcKSzqTNY2VG847jkPR8EHLQ9bi2Schghsm1v_o53cTUU_6ju.rrha5o1qTYRT4pfy_JpUdfRcs.uw_kAT.7MbCUkjnvJ0MJQIP6Tqu.tFsEsp4.I_wo37D0IrgGSzwS4TEtxDhxA2KNq9h2HYQ25.bzCWiKWUw7xiIV9V.F8TGQBm5kpRfJVdrtvfezuLyP1gGdJ_2rpkMo9AEjDCxq_FMKZH5d_.xmBmXZlBJjST5bfsgDkdcz3IvV9VfeTcRDIbz.iuaLa8u1Mnh9MgG3C2zVr.KIgxG_TqY1QZtAMAwvV9hRHkzR5Betz6RSrGKz4AHwN2U30AMfyeEtrRTfHTpwfCU9YNk4FXYoaAvd.0BkA0A1xL6yBjQKOJ4HoH.g6o07C6TY3A39BZeurkvNppqfcBLPxEnvQfb01U21N4gBhHxdmYSJN316WJexd_bS2eMGhaDYHj05P1JpxYcKEuDYeFmiwHjZlYUNVxTOXfECmsjpTJ9VZTtk_6Am1LN8Zf.c5CPubYruFFjO3b7x5v8xLL2f6AWVhQxdOVUePq_orsur0aUh7fWDJp1XoLkeJOOXUuxua0ifr55LUbv9cYOQQ1NgaRe5LiKSA7tERcMmkCuMesBfZY0vj4UQG7Rfkj9haAh5F_aXubCowGiS1MFBd2.mte7MclUso1Qbt8pRlIfvXcOaVEGyd5te6KIChdZYRmt3Rs3btdKKArm0EyUSygd_eI612z0Oqj41PZuHFKMVAlmkEyJYyaP082jsv8m9VG3pS3zLBqyyw_4.6lu3LWdI',mdrd: 'z8E2riVJlpPrg0BTLxbl71cJLIDiRgtyQX_DXfMFg28-1791768456-1.2.1.1-TnuuNDJ810VyzRrLXdwgYyMdogEAaWz2nFiD.am.Q01Ww3Kyt.qoK2MBpeuswapYC5PE1DGGDe4nq3ZHJjnQQLMjSS5ADz5VWI3V2g7YtwrhGY_wVIkGgmBXVdF3DlS6Uj1L3GPxUbknV0NV50Zq0b_9iRzlQK1_WnD_Bt08VUM2Q8ZpaRwyKJvA7ciJOciF8RK0TV.W2Vryj3f2qC7AQZNfndQVnGxqVbCHOlUwHO9t.zcmjgrAIdjFS8Vyz_ka65Vy6EYW_FrGyIsBYByhpBWkrBuT7fDklihhberDEXCzFcG.L5BLUCKLnQG4NYGVTHWOoW_IIPqu0LygqhxLnXjvHUkks3CH.E1Zz4Vh5ksV9NdSiT4mE8Ijho8PM5Lz',};var a = document.createElement('script');a.nonce = 'aGtH7uGfTQgDbbAXApQjpc';a.src = '/cdn-cgi/challenge-platform/h/g/orchestrate/chl_page/v1?ray=a49252b48eebdf26';window._cf_chl_opt.cOgUHash = location.hash === '' && location.href.indexOf('#') !== -1 ? '#' : location.hash;window._cf_chl_opt.cOgUQuery = location.search === '' && location.href.slice(0, location.href.length - window._cf_chl_opt.cOgUHash.length).indexOf('?') !== -1 ? '?' : location.search;if (window.history && window.history.replaceState) {var ogU = location.pathname + window._cf_chl_opt.cOgUQuery + window._cf_chl_opt.cOgUHash;history.replaceState(null, null,\"/sitemap.xml?__cf_chl_rt_tk=LjMr1wXhxVFWtQ.o3vYgYnIPfTntAYJcUF6IKyk9gms-1791768456-1.0.1.1-a_tiqTp244D3EXIof8lcNmSnp9HWkYAJQgLsvRXyP58\"+ window._cf_chl_opt.cOgUHash);a.onload = function() {history.replaceState(null, null, ogU);}}document.getElementsByTagName('head')[0].appendChild(a);}());</script></body></html>"
+      },
+      "llms": {
+        "status": 404,
+        "bytes": 9,
+        "firstLine": "Not found"
+      }
+    },
+    "canonicalMatchesOrigin": null
+  }
+}
