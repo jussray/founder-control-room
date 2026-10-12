@@ -253,6 +253,10 @@ Documentation Truth proves documentation coverage/materiality. It does not indep
 
 See [`docs/TRUTH_DECAY_AUDIT.md`](docs/TRUTH_DECAY_AUDIT.md).
 
+## Goalfix bottleneck law and API-owned onboarding assets
+
+The Goalfix contract in `.ai/skills/goalfix/SKILL.md` requires every loop to classify exactly one current bottleneck before selecting an action. The browser shell proof `e2e/founder-experience-shell-proof.mjs` now runs as a named step in `.github/workflows/playwright.yml`. The Pages worker in `public/_worker.js` routes `/assets/auth-callback.js` and `/assets/control-room.css` to the API router rather than the Pages ASSETS binding. This is source and CI proof only. A deployed worker and a live Access or Supabase callback still need fresh provider and runtime readback.
+
 ## Setup
 
 ```bash

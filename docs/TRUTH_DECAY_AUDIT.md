@@ -368,6 +368,10 @@ The strongest optimization is not faster claiming. It is shortening the distance
 31. A privileged `workflow_run` witness may consume an upstream release SHA as evidence, but it cannot execute that upstream checkout or treat upstream success as executable trust.
 32. A capital decision card, recommendation, score, or HOLD state is evidence interpretation, not financing or execution authority; stale or missing capital evidence must remove derived certainty instead of preserving an earlier recommendation.
 
+## Bottleneck classification staleness
+
+A bottleneck classification is a current-state claim and can go stale. A `VERIFIED_BOTTLENECK` recorded before a proof, route, or authority change must be re-classified before it drives the next action. `HOLD` and `STOP` apply only to the dependent claim or action. Proof freshness and authority freshness are separate windows, and an old green proof must not freeze unrelated capabilities that retain current evidence.
+
 ## Rollback
 
 The Truth Lease, production-specific lease composer, temporal founder-content guards, analytics-authority guard, and Documentation Truth control are additive/fail-closed. Revert the focused contract/test/workflow/documentation change if it causes incompatibility. No database, provider credential, DNS, publication, provider ruleset, or production mutation is performed by the documentation-truth slice.

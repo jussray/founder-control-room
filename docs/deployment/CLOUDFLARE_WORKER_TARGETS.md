@@ -228,6 +228,10 @@ When Pages proxy behavior, Worker identity, deployment authority, Cloudflare Acc
 
 Current executable source and authoritative provider readback outrank an older version of this runbook. Preserve older deployment evidence as historical provenance rather than deleting it.
 
+## Pages worker API-owned asset routing
+
+The Pages worker must route the onboarding callback assets to the API before any static asset lookup. This repository change alters routing in `public/_worker.js` and adds no deployment. Deploying it, changing bindings, or any Cloudflare mutation requires separate exact authority. Live Worker readback for the callback path is required before the deployed routing can be described as current.
+
 ## Rollback
 
 - Pages: roll back to the prior verified Pages deployment.

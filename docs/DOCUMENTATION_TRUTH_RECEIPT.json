@@ -2,13 +2,46 @@
   "contract": "fcr/documentation-truth-receipt@v1",
   "purpose": "Bind the create-branch runtime authority membrane to current operator documentation without promoting source or CI evidence into a claim that a live GitHub branch mutation occurred.",
   "domains": [
-    "merge-authority"
+    "merge-authority",
+    "truth-governance",
+    "evidence-authority",
+    "cloudflare-authority"
   ],
   "changes": [
     {
       "path": "src/http/routes/approvals.ts",
       "claims": [
-        "src/http/routes/approvals.ts must allow create_branch to reach RepositoryProvider.createBranch only after fresh create_branch proof and authenticated founder intent issue a server-owned AuthorityEnvelopeV1, the execution is reserved under the same idempotency key, current mission state is re-read immediately before mutation, and the original envelope passes exact capability, scope, arguments, state, tool-call, expiry, idempotency, and integrity validation through executeAuthorizedCreateBranch; any drift must fail closed before provider mutation and an ambiguous pending outcome requires reconciliation before retry."
+        "src/http/routes/approvals.ts must allow create_branch to reach RepositoryProvider.createBranch only after fresh create_branch proof and authenticated founder intent issue a server-owned AuthorityEnvelopeV1, the execution is reserved under the same idempotency key, mission state is re-read immediately before mutation, and the envelope passes exact capability, scope, argument, state, tool-call, expiry, idempotency, and integrity validation through executeAuthorizedCreateBranch; any drift must fail closed before provider mutation and an ambiguous pending outcome must be reconciled before retry."
+      ]
+    },
+    {
+      "path": ".ai/skills/goalfix/SKILL.md",
+      "claims": [
+        ".ai/skills/goalfix/SKILL.md must require every Goalfix loop to classify exactly one current bottleneck as VERIFIED_BOTTLENECK, INFERRED_BOTTLENECK, UNKNOWN_BOTTLENECK, EXTERNAL_BLOCKER, or NO_TECHNICAL_BOTTLENECK, and HOLD or STOP must stay scoped to the dependent action rather than freezing unrelated capabilities."
+      ]
+    },
+    {
+      "path": ".claude/skills/goalfix/SKILL.md",
+      "claims": [
+        ".claude/skills/goalfix/SKILL.md must mirror the bottleneck law from the canonical goalfix contract and must never claim that the current inspect route or browser UI already emits every adaptive-kernel field."
+      ]
+    },
+    {
+      "path": ".github/workflows/playwright.yml",
+      "claims": [
+        ".github/workflows/playwright.yml must run e2e/founder-experience-shell-proof.mjs as a named step with set -euo pipefail, and its output must be teed to logs/founder-experience-shell-proof.log so any non-zero exit fails the job closed."
+      ]
+    },
+    {
+      "path": "docs/FOUNDER_ADAPTIVE_KERNEL_V0.md",
+      "claims": [
+        "docs/FOUNDER_ADAPTIVE_KERNEL_V0.md must classify the current bottleneck from current evidence and must bind HOLD and STOP only to the dependent claim or action, never to unrelated verified capabilities that retain current evidence and authority."
+      ]
+    },
+    {
+      "path": "public/_worker.js",
+      "claims": [
+        "public/_worker.js must return the API-owned onboarding callback assets /assets/auth-callback.js and /assets/control-room.css to the API router instead of the Pages ASSETS binding, and only static GET or HEAD requests outside that set may be served from Pages."
       ]
     }
   ]
