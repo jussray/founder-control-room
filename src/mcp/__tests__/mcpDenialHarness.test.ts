@@ -10,9 +10,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
  * Supabase, no credentials.
  *
  * Scope notes (do not widen without evidence):
- * - The hub does NOT read approval status, expiry, revocation or consumption.
- *   Tests that carry revoked/expired approvals therefore prove only that the
- *   tool policy denies the call; they do not prove approval-status enforcement.
+ * - The approvals table has no expiry, revocation or consumption columns
+ *   (supabase/migrations/20260711030127_init_control_room_schema.sql). The hub
+ *   enforces only decision === "approved". Expiry, revocation and one-time
+ *   consumption are NOT enforced and need a schema decision before any test
+ *   can claim them.
  */
 
 const database = vi.hoisted(() => ({
@@ -119,11 +121,11 @@ beforeEach(() => {
   );
   database.approvals.splice(0, database.approvals.length,
     // Same project, approved. Must still NOT authorize a mutation.
-    { id: APPROVAL_VALID, mission_id: MISSION_OWN, change_proposal_id: null, status: "approved" },
+    { id: APPROVAL_VALID, mission_id: MISSION_OWN, change_proposal_id: null, decision: "approved" },
     // Belongs to another project through its change proposal.
-    { id: APPROVAL_CROSS_PROJECT, mission_id: null, change_proposal_id: PROPOSAL_OTHER, status: "approved" },
-    // Same project but revoked and expired. The hub never reads these fields.
-    { id: APPROVAL_REVOKED, mission_id: MISSION_OWN, change_proposal_id: null, status: "revoked", expires_at: "2000-01-01T00:00:00Z" },
+    { id: APPROVAL_CROSS_PROJECT, mission_id: null, change_proposal_id: PROPOSAL_OTHER, decision: "approved" },
+    // Same project, explicitly denied. The schema's only non-approved decision.
+    { id: APPROVAL_REVOKED, mission_id: MISSION_OWN, change_proposal_id: null, decision: "denied" },
   );
   vi.stubGlobal("fetch", vi.fn(stubProvider));
 });
@@ -214,20 +216,20 @@ describe("MCP mutation denial harness", () => {
     expect(evidenceRows()).toHaveLength(0);
   });
 
-  it("policy denies a mutation that carries a revoked approval (policy-only; hub does not read approval status)", async () => {
+  it("rejects a denied approval at the provenance boundary, before any evidence or provider call", async () => {
     await expect(
       newHub().invoke({
         serverId: "github",
-        toolName: "create_issue",
+        toolName: "get_publish_status",
         projectId: PROJECT_SLUG,
         missionId: MISSION_OWN,
         approvalId: APPROVAL_REVOKED,
         arguments: {},
       }),
-    ).rejects.toThrow(/MCP invocation blocked/);
+    ).rejects.toThrow(/is not approved/);
 
     expect(providerMethods).toEqual([]);
-    expect(evidenceRows()[0]).toMatchObject({ status: "blocked", policy_decision: "deny" });
+    expect(evidenceRows()).toHaveLength(0);
   });
 
   it("denies a write-implying tool when the server endpoint is not configured, with zero provider calls", async () => {

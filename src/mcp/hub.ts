@@ -77,7 +77,7 @@ async function approvalForProject(
 ): Promise<void> {
   const { data: approval, error: approvalError } = await supabase
     .from("approvals")
-    .select("id, mission_id, change_proposal_id")
+    .select("id, mission_id, change_proposal_id, decision")
     .eq("id", approvalId)
     .maybeSingle();
 
@@ -86,6 +86,11 @@ async function approvalForProject(
   }
   if (!approval) {
     throw new Error(`MCP approval is not registered: ${approvalId}`);
+  }
+  // Only an explicit founder "approved" decision may bind to a call. A denied
+  // (or undecided) approval is refused before any evidence row or provider call.
+  if (approval.decision !== "approved") {
+    throw new Error(`MCP approval ${approvalId} is not approved`);
   }
 
   let approvalMissionId = approval.mission_id ?? undefined;
