@@ -60,7 +60,8 @@ async function run() {
       await context.close();
       continue;
     }
-    const facts = await page.evaluate(() => ({
+    const wantHtml = vp.name === 'desktop';
+    const facts = await page.evaluate((captureHtml) => ({
       title: document.title,
       h1: [...document.querySelectorAll('h1')].map((h) => h.textContent.trim().slice(0, 120)),
       h2: [...document.querySelectorAll('h2')].map((h) => h.textContent.trim().slice(0, 120)),
@@ -69,9 +70,9 @@ async function run() {
       overflowX: document.documentElement.scrollWidth - window.innerWidth,
       brokenImages: [...document.images].filter((i) => i.complete && i.naturalWidth === 0).map((i) => i.src).slice(0, 20),
       bodyTextHead: document.body.innerText.slice(0, 4000),
-      html: vp.name === 'desktop' ? document.documentElement.outerHTML.slice(0, 400000) : undefined,
-    }));
-    if (vp.name === 'desktop') desktopHtml = facts.html ?? '';
+      html: captureHtml ? document.documentElement.outerHTML.slice(0, 400000) : undefined,
+    }), wantHtml);
+    if (wantHtml) desktopHtml = facts.html ?? '';
     delete facts.html;
     await page.screenshot({ path: join(dir, `${vp.name}-viewport.png`) });
     await page.screenshot({ path: join(dir, `${vp.name}-full.png`), fullPage: true });
