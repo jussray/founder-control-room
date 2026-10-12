@@ -34,6 +34,7 @@ jobs:
           persist-credentials: false
           sparse-checkout: |
             scripts/external-site-snapshot.mjs
+            scripts/external-site-crawler-surface.mjs
           sparse-checkout-cone-mode: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
