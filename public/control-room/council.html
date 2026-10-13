@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Council · Founder Control Room</title>
+<meta name="description" content="A founder-approved conversational entry into governed FCR capabilities.">
+<link rel="stylesheet" href="/control-room/styles.css">
+<style>
+.council-shell{min-height:100vh;max-width:1260px;margin:auto;padding:clamp(1rem,3vw,2rem);display:grid;grid-template-rows:auto minmax(0,1fr);gap:1rem}
+.council-header{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:1rem}
+.council-header h1{margin:0;font-size:clamp(1.5rem,3vw,2.4rem);letter-spacing:-.03em}
+.council-header small,.council-note{color:var(--muted)}
+.council-header nav{display:flex;flex-wrap:wrap;gap:.8rem}
+.council-layout{display:grid;grid-template-columns:minmax(0,1.8fr) minmax(260px,.8fr);gap:1rem;min-height:650px}
+.council-chat,.council-side{border:1px solid var(--panel-border);border-radius:22px;background:rgba(9,13,35,.85);box-shadow:var(--shadow);padding:1rem;min-width:0}
+.council-chat{display:flex;flex-direction:column;min-height:660px}
+.council-log{flex:1;display:flex;flex-direction:column;gap:1rem;overflow-y:auto;min-height:260px;max-height:62vh;padding:1rem .4rem}
+.council-bubble{align-self:flex-start;max-width:min(92%,720px);border:1px solid rgba(129,140,248,.3);border-radius:17px;padding:.85rem 1rem;background:rgba(24,30,65,.78);overflow-wrap:anywhere;white-space:pre-wrap;line-height:1.55}
+.council-bubble[data-role="founder"]{align-self:flex-end;background:linear-gradient(125deg,rgba(92,51,210,.5),rgba(28,83,171,.35))}
+.council-bubble strong{display:block;font-size:.73rem;letter-spacing:.06em;text-transform:uppercase;margin-bottom:.35rem;color:#bfbdff}
+.council-controls{border-top:1px solid var(--panel-border);padding-top:1rem;display:grid;gap:.7rem}
+.council-controls textarea{min-height:95px;resize:vertical}
+.council-row{display:grid;grid-template-columns:1fr 1fr;gap:.7rem}
+.council-controls label{margin:0}
+.council-controls .approval{display:flex;align-items:flex-start;gap:.65rem;font-size:.8rem;line-height:1.45}
+.council-controls .approval input{width:auto;margin-top:.2rem}
+.council-actions{display:flex;flex-wrap:wrap;align-items:center;gap:.8rem}
+.council-side{display:flex;flex-direction:column;gap:.8rem}
+.council-side h2{font-size:1rem;margin:0}
+.council-side p{font-size:.85rem;line-height:1.5;margin:.25rem 0}
+.council-side a{overflow-wrap:anywhere}
+.council-options{display:grid;gap:.5rem}
+.council-option{border:1px solid var(--panel-border);padding:.7rem;border-radius:12px;background:rgba(37,36,84,.4);font-size:.84rem}
+.council-option strong{display:block;color:#e0d6ff;margin-bottom:.2rem}
+.council-status{min-height:1.25rem;font-size:.82rem;color:#bfd1ff}
+.council-status[data-kind="error"]{color:#ffb4bd}
+@media(max-width:850px){.council-layout{grid-template-columns:1fr}.council-chat{min-height:570px}.council-log{max-height:50vh}}
+@media(max-width:520px){.council-row{grid-template-columns:1fr}.council-header nav{gap:.5rem}.council-shell{padding:.7rem}.council-chat,.council-side{padding:.8rem}}
+</style>
+<script src="/control-room/council-ui.js" defer></script>
+</head>
+<body>
+<main class="council-shell">
+<header class="council-header">
+<div><a class="brand-mark" href="/control-room/"><span class="brand-fcr">FCR</span></a><h1>Founder Council</h1><small>Your conversation is the control surface. Actions require separate approval.</small></div>
+<nav aria-label="Workspace"><a href="/control-room/">Home</a><a href="/control-room/?tab=projects">Portfolio</a><a href="/control-room/?tab=activity">Signals inbox</a><a href="/control-room/content-manager.html">Published work</a></nav>
+</header>
+<div class="council-layout">
+<section class="council-chat" aria-label="Council conversation">
+<div id="council-log" class="council-log" role="log" aria-live="polite" aria-relevant="additions"></div>
+<form id="council-form" class="council-controls">
+<div class="council-row">
+<label>Project context<select id="council-project" name="project"><option value="">New idea or unsure</option></select></label>
+<label>Existing mission (for live Council)<select id="council-mission" name="mission"><option value="">No mission selected</option></select></label>
+</div>
+<label>Idea / project name (optional)<input id="council-name" name="name" maxlength="100" placeholder="Name it together before registering"></label>
+<label for="council-prompt">What would you like to move forward?</label>
+<textarea id="council-prompt" name="prompt" maxlength="4000" required placeholder="Tell Council what you want, what you know, what you're uncertain about, and what success looks like."></textarea>
+<label class="approval"><input type="checkbox" id="council-consent">I approve this advisory Council request for the selected mission. No build, integration, spending, merge or publication is authorized.</label>
+<div class="council-actions"><button class="primary" type="submit" id="council-send">Prepare next step</button><span id="council-status" class="council-status" role="status" aria-live="polite"></span></div>
+</form>
+</section>
+<aside class="council-side" aria-label="Founder safeguards">
+<h2>One conversation. Clear gates.</h2>
+<p>FCR can explore an idea without automatically creating a repository, project, integration, or build.</p>
+<div class="council-options" id="council-choices">
+<div class="council-option"><strong>1 · Reuse what exists</strong>Match the idea to a registered project and preserve its history.</div>
+<div class="council-option"><strong>2 · Clarify, then prepare</strong>Identify the intended outcome, owner, proof and next action.</div>
+<div class="council-option"><strong>3 · Hold the build</strong>Stop when identity, permission or evidence is uncertain.</div>
+</div>
+<h2>Proof, not decoration</h2>
+<p>After an approved build succeeds, display the actual verified output and Playwright capture here. No hypothetical screenshot is presented as shipped work.</p>
+<p class="council-note">This first conversation surface uses the existing founder-only registry and mission Council relay. Multi-tenant member accounts, community membership, independent subscriptions and published analytics require their own verified data and permissions.</p>
+</aside>
+</div>
+</main>
+</body>
+</html>
