@@ -122,6 +122,39 @@ describe('POST /projects', () => {
     expect(res.status).toBe(409);
   });
 
+  it.each([
+    ['name', { slug: 'different-slug', name: 'Existing Project' }, 'existing'],
+    ['repository', { slug: 'different-slug', name: 'Different Name', repoIdentifier: 'jussray/same-repo' }, 'existing'],
+  ])('rejects a duplicate %s before inserting', async (_identity, payload, existingSlug) => {
+    authSuccess();
+    let insertCalls = 0;
+    supabaseMock.from.mockImplementation((table: string) => {
+      if (table === 'founder_users') return founderUsersRow();
+      if (table === 'projects') {
+        return {
+          select: () => ({
+            eq: () => ({ maybeSingle: () => Promise.resolve({ data: null, error: null }) }),
+            ilike: (column: string) => ({
+              limit: () => Promise.resolve({
+                data: column === (_identity === 'name' ? 'name' : 'repo_identifier')
+                  ? [{ slug: existingSlug }]
+                  : [],
+                error: null,
+              }),
+            }),
+          }),
+          insert: () => { insertCalls++; throw new Error('Identity collision must never reach insert'); },
+        };
+      }
+      return {};
+    });
+    const res = await request(buildApp()).post('/projects').set('Authorization', BEARER).send(payload);
+    expect(res.status).toBe(409);
+    expect(res.body.code).toBe('PROJECT_IDENTITY_CONFLICT');
+    expect(res.body.existingProjectSlug).toBe(existingSlug);
+    expect(insertCalls).toBe(0);
+  });
+
   it('registers a new project and audits it', async () => {
     authSuccess();
     const insertCalls: unknown[] = [];
@@ -131,6 +164,7 @@ describe('POST /projects', () => {
         return {
           select: () => ({
             eq: () => ({ maybeSingle: () => Promise.resolve({ data: null, error: null }) }),
+            ilike: () => ({ limit: () => Promise.resolve({ data: [], error: null }) }),
           }),
           insert: () => ({
             select: () => ({
