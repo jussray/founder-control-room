@@ -62,6 +62,41 @@ projectsRouter.post("/", requireFounder, async (req: FounderRequest, res) => {
   if (existingError) return res.status(500).json({ error: existingError.message });
   if (existing) return res.status(409).json({ error: `Project "${slug}" is already registered.` });
 
+  // FCR project identity is more than a slug. Registration must stop rather
+  // than create a second record for the same name or source repository.
+  // These are advisory API checks in addition to database uniqueness rules.
+  const escapeLike = (value: string) => value.replace(/[\\%_]/g, (match) => '\\' + match);
+  const { data: sameName, error: nameError } = await supabase
+    .from("projects")
+    .select("slug")
+    .ilike("name", escapeLike(name))
+    .limit(1);
+  if (nameError) return res.status(500).json({ error: nameError.message });
+  if (sameName?.length) {
+    return res.status(409).json({
+      code: "PROJECT_IDENTITY_CONFLICT",
+      error: "A project with this name already exists. Reuse its registered identity or clarify the name in Council before proceeding.",
+      existingProjectSlug: sameName[0].slug,
+    });
+  }
+
+  if (repoIdentifier) {
+    const { data: sameRepository, error: repositoryError } = await supabase
+      .from("projects")
+      .select("slug")
+      .ilike("repo_identifier", escapeLike(repoIdentifier.trim()))
+      .limit(1);
+    if (repositoryError) return res.status(500).json({ error: repositoryError.message });
+    if (sameRepository?.length) {
+      return res.status(409).json({
+        code: "PROJECT_IDENTITY_CONFLICT",
+        error: "This repository belongs to a registered project. Confirm the existing project instead of duplicating it.",
+        existingProjectSlug: sameRepository[0].slug,
+      });
+    }
+  }
+
+
   const { data: project, error } = await supabase
     .from("projects")
     .insert({
