@@ -568,7 +568,8 @@ function renderProjectsTab(mount) {
       render();
       return;
     }
-    if (!window.confirm('Confirm registering the distinct project "' + values.name + '" (' + values.slug + ')? This does not create a GitHub repo or authorize a build.')) return;
+    // Explicit submission of the manual registry form is the approval for this
+    // registry-only action. Builds and connectors retain separate gates.
     guarded(async () => {
       await api('/projects', { method: 'POST', body: JSON.stringify(values) });
       await loadProjects();
