@@ -39,7 +39,7 @@ env:
 
 concurrency:
   group: project-adapter-freshness-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   freshness:
@@ -103,7 +103,7 @@ jobs:
                 mutationAuthorized: false,
                 providerMutationPerformed: false,
               };
-              fs.writeFileSync(process.env.PROJECT_ADAPTER_FRESHNESS_RECEIPT, JSON.stringify(receipt, null, 2) + "\\n");
+              fs.writeFileSync(process.env.PROJECT_ADAPTER_FRESHNESS_RECEIPT, JSON.stringify(receipt, null, 2) + "\n");
             '
           fi
 
