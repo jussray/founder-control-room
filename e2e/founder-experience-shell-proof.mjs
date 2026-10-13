@@ -52,10 +52,11 @@ async function assertNoHorizontalOverflow(page, label) {
 }
 
 // Internal evidence, identifiers, credentials and personal identity must never be served to the public page.
+// Public profile links may identify the public Juss Rayy brand; private identity and internal evidence remain forbidden.
 const PUBLIC_FORBIDDEN = [
   '228', 'cd0e0fe', '20819094', '#769', '#894', '#895', 'deploy token', 'Cloudflare',
   'Deploy:', 'Access gate', 'Johnstown', 'Taylor M', 'Alex R', 'Jordan K', '1.2K', '+42%',
-  'Good evening', 'Good morning', 'Juss', 'Raylene',
+  'Good evening', 'Good morning', 'Raylene',
 ];
 
 async function provePublicFrontDoor(label, viewport) {
