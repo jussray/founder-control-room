@@ -15,6 +15,7 @@
   let missions = [];
   let busy = false;
   let registryReady = false;
+  const renderedReceipts = new Set();
 
   function bubble(role, message) {
     const node = document.createElement('div');
@@ -89,7 +90,39 @@
     }
   }
   projectSelect.addEventListener('change', updateMissions);
-  missionSelect.addEventListener('change', () => { consent.checked = false; });
+  async function loadMissionHistory() {
+    const missionId = missionSelect.value;
+    const projectSlug = projectSelect.value;
+    if (!missionId) return;
+    const mission = missions.find((item) => String(item.id) === missionId);
+    if (!mission || mission.project?.slug !== projectSlug) {
+      setStatus('Cannot read Council history: mission and project identity disagree.', 'error');
+      return;
+    }
+    try {
+      const response = await api('/missions/' + encodeURIComponent(missionId) + '/council');
+      // Ignore late replies after the founder switches project or mission.
+      if (missionSelect.value !== missionId || projectSelect.value !== projectSlug) return;
+      const rounds = Array.isArray(response.conversations) ? response.conversations : [];
+      for (const round of rounds) {
+        const key = missionId + ':' + (round.id || round.round);
+        if (renderedReceipts.has(key)) continue;
+        renderedReceipts.add(key);
+        bubble('council', 'Recorded Council history for ' + projectSlug +
+          '\\nMission: ' + mission.title +
+          '\\nRound: ' + (round.round ?? 'unknown') +
+          '; receipt: ' + (round.id ?? 'unavailable') +
+          '\\nResult: ' + (round.outcome || 'No verified outcome recorded.'));
+      }
+      setStatus(rounds.length ? 'Council history loaded from the mission ledger.' : 'No prior Council rounds for this mission.');
+    } catch (error) {
+      if (missionSelect.value === missionId) setStatus('Council history unavailable: ' + (error.message || String(error)), 'error');
+    }
+  }
+  missionSelect.addEventListener('change', () => {
+    consent.checked = false;
+    void loadMissionHistory();
+  });
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     if (busy) return;
@@ -129,6 +162,7 @@
         body: JSON.stringify({ goal, seed: goal, capability: 'propose', sensitivity: 'internal', sourceRef: 'fcr-council-ui:' + selectedProject }),
       });
       const c = response.conversation;
+      if (c?.id) renderedReceipts.add(missionId + ':' + c.id);
       const summary = c?.outcome ? String(c.outcome) : 'No verified summary was returned. Inspect the persisted Council record before relying on this run.';
       bubble('council', 'Council response for ' + selectedMission.title + ':\n' + summary + '\n\nRound: ' + (c?.round ?? 'unknown') + '; receipt: ' + (c?.id ?? 'unavailable') + '.\nNo repository, connector or publication action was authorized by this advisory round.');
       setStatus('Council returned an advisory record. Execution requires a separate exact-action approval.');
