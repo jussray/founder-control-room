@@ -55,7 +55,7 @@ try {
     const errors = [];
     page.on('pageerror', (error) => errors.push(String(error)));
     await page.goto(base + '/control-room/council.html');
-    await page.locator('#council-status').getByText('Registry and missions read').waitFor();
+    await page.locator('#council-status').filter({ hasText: 'Registry and missions read' }).waitFor();
     await page.locator('#council-name').fill('StoryEngine');
     await page.locator('#council-prompt').fill('Help me improve the existing Save Beat experience');
     await page.locator('#council-send').click();
@@ -68,7 +68,7 @@ try {
     await page.locator('#council-project').selectOption('storyengine');
     await page.locator('#council-mission').selectOption('mission-1');
     await page.locator('#council-send').click();
-    await page.locator('#council-status').getByText('Approve the exact advisory').waitFor();
+    await page.locator('#council-status').filter({ hasText: 'Approve the exact advisory' }).waitFor();
     if (calls.length) throw new Error('A live Council round ran without explicit consent');
     await page.locator('#council-consent').check();
     await page.locator('#council-send').click();
