@@ -238,3 +238,10 @@ Current executable source and authoritative provider readback outrank an older v
 - Access: roll back only an incomplete or ambiguous browser-destination detachment using the receipt-bound original destination set and unchanged application/policy identity; a later runtime/browser failure alone must not automatically reintroduce a Cloudflare Access product-login screen.
 - Credentials: remove/revoke only the affected credential; do not rotate unrelated keys to repair binding drift.
 - Preserve build logs, deployment IDs, provider readback, browser traces, and runtime receipts.
+
+## Manual Deploy authority audit artifacts
+
+The production `.github/workflows/deploy.yml` remains manual-dispatch and exact-current-main-gated. After the provider credential-shape validator, the Worker secret-name preflight saves `fcr-deploy-credential-shape.json` and `fcr-worker-secret-names.json` under `RUNNER_TEMP`. The `authority-gate` then invokes pinned `actions/upload-artifact` with `if: always()`, a per-run/per-attempt artifact name, 90-day retention, and a warning if neither file was generated. This preserves available name/shape evidence on failed preflight runs while never including raw tokens, keys, or Worker secret values.
+
+Failing before a receipt is written must remain BLOCKED/UNKNOWN, not “verified absent” or “artifact uploaded.” A PR preview or YAML check cannot prove production dispatch, provider-held secret state, or retained artifact availability; verify the specific manual run and provider readback before strengthening any claim. The upload does not grant merge, production mutation, or rotation authority.
+

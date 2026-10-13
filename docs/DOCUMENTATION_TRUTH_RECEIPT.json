@@ -308,6 +308,14 @@
       "claims": [
         "`tools/zapier/founder-content-outcome-contract.cjs` must bind founder-content metrics to the exact observed network, lane, account identity, connector identity, and coverage state; out-of-scope metrics must remain UNKNOWN, cross-account metric donation is forbidden, and these receipts can never grant publication, provider-write, merge, deploy, spend, or external-contact authority."
       ]
+    },
+    {
+      "path": ".github/workflows/deploy.yml",
+      "claims": [
+        "`.github/workflows/deploy.yml` must retain any available credential-shape and names-only Worker secret audit receipts through an `if: always()` pinned upload-artifact step inside `authority-gate`, including failed preflight paths, with per-run artifact identity and 90-day retention.",
+        "The upload must warn when no files were produced rather than claiming an audit receipt exists; an early checkout or authority failure leaves provider-secret state UNKNOWN/BLOCKED, never falsely verified.",
+        "The artifact-upload source contract does not confer production dispatch, merge, Cloudflare mutation, credential access or rotation authority, and exact-run artifact readback is required before claiming live retained evidence."
+      ]
     }
   ]
 }

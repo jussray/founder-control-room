@@ -185,7 +185,7 @@ jobs:
         with:
           name: fcr-deploy-credential-audit-${{ github.run_id }}-${{ github.run_attempt }}
           retention-days: 90
-          if-no-files-found: ignore
+          if-no-files-found: warn
           path: |
             ${{ runner.temp }}/fcr-deploy-credential-shape.json
             ${{ runner.temp }}/fcr-worker-secret-names.json

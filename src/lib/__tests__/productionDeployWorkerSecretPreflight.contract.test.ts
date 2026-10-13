@@ -56,6 +56,24 @@ describe('production Worker secret preflight contract', () => {
     expect(authorityGate).not.toContain("re.fullmatch(r'[0-9a-f]{32}', account_id)");
   });
 
+  it('retains provider credential audit artifacts after preflight failure when files exist', () => {
+    const authorityStart = workflow.indexOf('  authority-gate:');
+    const deployStart = workflow.indexOf('  # ── 1.', authorityStart);
+    const authorityGate = workflow.slice(authorityStart, deployStart);
+    const preflight = authorityGate.indexOf('name: Verify provider-held Worker secret names before mutation');
+    const upload = authorityGate.indexOf('name: Upload provider credential audit receipts');
+    const uploadStep = authorityGate.slice(upload);
+
+    expect(upload).toBeGreaterThan(preflight);
+    expect(uploadStep).toContain('if: always()');
+    expect(uploadStep).toContain('actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02');
+    expect(uploadStep).toContain('${{ runner.temp }}/fcr-deploy-credential-shape.json');
+    expect(uploadStep).toContain('${{ runner.temp }}/fcr-worker-secret-names.json');
+    expect(uploadStep).toContain('retention-days: 90');
+    expect(uploadStep).toContain('if-no-files-found: warn');
+    expect(uploadStep).not.toContain('wrangler secret get');
+  });
+
   it('derives the provider-held set from the canonical Worker contract', () => {
     expect(wrangler).toMatch(/^\[secrets\]\nrequired = \[/m);
     expect(wrangler).toContain('"FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON",');
