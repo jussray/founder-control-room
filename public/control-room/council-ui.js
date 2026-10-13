@@ -14,6 +14,7 @@
   let projects = [];
   let missions = [];
   let busy = false;
+  let registryReady = false;
 
   function bubble(role, message) {
     const node = document.createElement('div');
@@ -80,6 +81,7 @@
       const [p, m] = await Promise.all([api('/projects'), api('/dashboard/tasks')]);
       projects = Array.isArray(p.projects) ? p.projects : [];
       missions = Array.isArray(m.tasks) ? m.tasks : [];
+      registryReady = true;
       for (const project of projects) option(projectSelect, project.slug, project.name + ' · ' + project.slug);
       setStatus('Registry and missions read. No writes made.');
     } catch (error) {
@@ -96,6 +98,7 @@
     const selectedProject = projectSelect.value;
     const missionId = missionSelect.value;
     if (!goal) { setStatus('Describe your goal first.', 'error'); return; }
+    if (!registryReady) { setStatus('Project identity has not been verified. Reload or sign in before Council can advise on a project.', 'error'); return; }
     const selectedMission = missions.find((m) => String(m.id) === missionId);
     if (missionId && (!selectedMission || selectedMission.project?.slug !== selectedProject)) {
       setStatus('Project and mission identity disagree. Re-select them before proceeding.', 'error');
