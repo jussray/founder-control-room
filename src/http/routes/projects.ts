@@ -111,6 +111,13 @@ projectsRouter.post("/", requireFounder, async (req: FounderRequest, res) => {
     .select()
     .single();
 
+  if (error?.code === "23505") {
+    // Database uniqueness is authoritative when two registrations race.
+    return res.status(409).json({
+      code: "PROJECT_IDENTITY_CONFLICT",
+      error: "A project with this name, slug or repository already exists. Refresh Portfolio and clarify its identity in Council.",
+    });
+  }
   if (error) return res.status(500).json({ error: error.message });
 
   await supabase.from("project_events").insert({
