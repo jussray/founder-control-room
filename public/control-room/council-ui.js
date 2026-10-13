@@ -109,10 +109,10 @@
         if (renderedReceipts.has(key)) continue;
         renderedReceipts.add(key);
         bubble('council', 'Recorded Council history for ' + projectSlug +
-          '\\nMission: ' + mission.title +
-          '\\nRound: ' + (round.round ?? 'unknown') +
+          '\nMission: ' + mission.title +
+          '\nRound: ' + (round.round ?? 'unknown') +
           '; receipt: ' + (round.id ?? 'unavailable') +
-          '\\nResult: ' + (round.outcome || 'No verified outcome recorded.'));
+          '\nResult: ' + (round.outcome || 'No verified outcome recorded.'));
       }
       setStatus(rounds.length ? 'Council history loaded from the mission ledger.' : 'No prior Council rounds for this mission.');
     } catch (error) {
