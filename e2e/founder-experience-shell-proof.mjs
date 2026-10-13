@@ -51,110 +51,97 @@ async function assertNoHorizontalOverflow(page, label) {
   }
 }
 
+// Internal evidence, identifiers, credentials and personal identity must never be served to the public page.
+const PUBLIC_FORBIDDEN = [
+  '228', 'cd0e0fe', '20819094', '#769', '#894', '#895', 'deploy token', 'Cloudflare',
+  'Deploy:', 'Access gate', 'Johnstown', 'Taylor M', 'Alex R', 'Jordan K', '1.2K', '+42%',
+  'Good evening', 'Good morning', 'Juss', 'Raylene',
+];
+
 async function provePublicFrontDoor(label, viewport) {
   const context = await browser.newContext({ viewport });
   const page = await context.newPage();
   const pageErrors = [];
   page.on('pageerror', (error) => pageErrors.push(error.message));
 
+  // Check the bytes the public server actually serves, not only the rendered DOM.
+  const served = await (await fetch(`${BASE_URL}/`)).text();
+  const leaks = PUBLIC_FORBIDDEN.filter((term) => served.includes(term));
+  if (leaks.length > 0) {
+    throw new Error(`${label}: internal or personal strings served to the public page: ${leaks.join(', ')}`);
+  }
+
   await page.goto(`${BASE_URL}/`, { waitUntil: 'networkidle' });
-  await page.locator('[data-fcr-entry]').waitFor({ state: 'visible' });
 
   const visualSignature = await page.locator('body').getAttribute('data-fcr-visual');
-  if (visualSignature !== 'founder-os-v2') {
+  if (visualSignature !== 'approved-mockup-v3') {
     throw new Error(`${label}: public FCR visual signature drifted: ${visualSignature}`);
   }
 
-  if (await page.locator('[data-command-shell]').count() !== 1) {
-    throw new Error(`${label}: public FCR must render exactly one canonical command shell`);
-  }
-
   const headline = await page.locator('#home-title').innerText();
-  if (!headline.includes('Founder') || !headline.includes('Control Room')) {
-    throw new Error(`${label}: canonical Founder Control Room headline drifted: ${headline}`);
+  if (!headline.includes('Back Founders') || !headline.includes('Build a Brighter')) {
+    throw new Error(`${label}: approved public headline drifted: ${headline}`);
   }
 
-  const commandColumns = await page.locator('.command-shell').evaluate((node) => getComputedStyle(node).gridTemplateColumns);
-  const commandTrackCount = commandColumns.split(/\s+/).filter(Boolean).length;
-  if (viewport.width >= 920 && commandTrackCount < 2) {
-    throw new Error(`${label}: desktop command shell must preserve hero + entry split; got ${commandColumns}`);
-  }
-  if (viewport.width < 920 && commandTrackCount !== 1) {
-    throw new Error(`${label}: mobile command shell must collapse to one column; got ${commandColumns}`);
+  const tabs = page.getByRole('tab');
+  if (await tabs.count() !== 2) throw new Error(`${label}: public FCR must expose exactly two view tabs`);
+  const tabLabels = await tabs.allInnerTexts();
+  if (!tabLabels[0].includes('User View') || !tabLabels[1].includes('Founder View')) {
+    throw new Error(`${label}: view tabs drifted: ${tabLabels.join(' | ')}`);
   }
 
-  const bottomNav = page.locator('[data-bottom-nav="five-screen"]');
-  if (await bottomNav.locator('a').count() !== 5) {
-    throw new Error(`${label}: canonical public FCR bottom nav must expose five screens`);
+  const userPanel = page.locator('[data-view-panel="user"]');
+  const founderPanel = page.locator('[data-view-panel="founder"]');
+  if (!(await userPanel.isVisible()) || (await founderPanel.isVisible())) {
+    throw new Error(`${label}: User View must be the default public view; Founder View must start hidden`);
   }
-  const navPosition = await bottomNav.evaluate((node) => getComputedStyle(node).position);
-  if (navPosition !== 'fixed') {
-    throw new Error(`${label}: public FCR bottom nav must remain fixed; got ${navPosition}`);
+
+  const userCopy = await userPanel.innerText();
+  if (!/No account is required to explore the public FCR world/i.test(userCopy)) {
+    throw new Error(`${label}: user view must make the no-account boundary explicit`);
   }
+  if (await page.locator('#discover a.btn').getAttribute('href') !== '/work.html') {
+    throw new Error(`${label}: public Explore action must route to the real public work directory`);
+  }
+
+  await assertNoHorizontalOverflow(page, `${label} user view`);
+  await page.screenshot({ path: join(RESULTS_ROOT, `public-fcr-user-${label}.png`), fullPage: true });
+
+  await page.getByRole('tab', { name: 'Founder View' }).click();
+  if (!(await founderPanel.isVisible()) || (await userPanel.isVisible())) {
+    throw new Error(`${label}: selecting Founder View must show only the founder panel`);
+  }
+  if (await page.getByRole('tab', { name: 'Founder View' }).getAttribute('aria-selected') !== 'true') {
+    throw new Error(`${label}: Founder View tab must report aria-selected=true`);
+  }
+
+  const founderCopy = await founderPanel.innerText();
+  if (!/Founder access still passes through FCR authentication/i.test(founderCopy)) {
+    throw new Error(`${label}: founder view must state that access passes through FCR authentication`);
+  }
+  if (!/General member authentication and multi-tenant founder workspaces remain a separate implementation gate/i.test(founderCopy)) {
+    throw new Error(`${label}: founder view must not pretend general multi-tenant founder auth is live`);
+  }
+  if (!/Connection never creates authority by itself/i.test(founderCopy)) {
+    throw new Error(`${label}: founder view must preserve the connection-is-not-authority boundary`);
+  }
+  if (!/after founder sign-in/i.test(founderCopy)) {
+    throw new Error(`${label}: founder view must gate private project, proof and decision state behind sign-in`);
+  }
+  const ownerCta = founderPanel.locator('a.owner-cta');
+  if (await ownerCta.count() !== 1 || await ownerCta.getAttribute('href') !== '/control-room/') {
+    throw new Error(`${label}: founder view must expose exactly one authenticated Control Room entry`);
+  }
+
+  await assertNoHorizontalOverflow(page, `${label} founder view`);
+  await page.screenshot({ path: join(RESULTS_ROOT, `public-fcr-founder-${label}.png`), fullPage: true });
 
   const footerCopy = await page.locator('footer').innerText();
   if (!footerCopy.includes('Same truth. Higher outcomes.')) {
     throw new Error(`${label}: canonical FCR visual thesis missing from footer`);
   }
 
-  const entryChoices = page.locator('[data-entry-choice]');
-  if (await entryChoices.count() !== 2) {
-    throw new Error(`${label}: public front door must expose exactly two role choices`);
-  }
-
-  const userChoice = page.locator('[data-entry-choice="user"]');
-  const founderChoice = page.locator('[data-entry-choice="founder"]');
-  if (await userChoice.getAttribute('href') !== '#discover') {
-    throw new Error(`${label}: user entry must route to the public user onboarding screen`);
-  }
-  if (await founderChoice.getAttribute('href') !== '#founder-start') {
-    throw new Error(`${label}: founder entry must route to founder onboarding`);
-  }
-
-  const authenticatedEntryCount = await page.getByRole('link', { name: /Enter authenticated Control Room/i }).count();
-  if (authenticatedEntryCount !== 1) {
-    throw new Error(`${label}: public site must keep exactly one explicit authenticated Control Room entry`);
-  }
-
-  await userChoice.click();
-  if (new URL(page.url()).hash !== '#discover') {
-    throw new Error(`${label}: user entry did not land on #discover`);
-  }
-  const userOnboarding = page.locator('[data-public-onboarding="user"]');
-  const userCopy = await userOnboarding.innerText();
-  if (!/No account is required to explore the public FCR world/i.test(userCopy)) {
-    throw new Error(`${label}: user onboarding must make the current public/no-account boundary explicit`);
-  }
-  if (await userOnboarding.locator('[data-user-start]').count() !== 4) {
-    throw new Error(`${label}: user onboarding must expose four real public starting lanes`);
-  }
-  if (await userOnboarding.locator('[data-user-start="founders"]').getAttribute('href') !== '/work.html') {
-    throw new Error(`${label}: founder discovery must route to the real public work directory`);
-  }
-
-  await page.goto(`${BASE_URL}/#founder-start`, { waitUntil: 'networkidle' });
-  const founderOnboarding = page.locator('[data-public-onboarding="founder"]');
-  await founderOnboarding.waitFor({ state: 'visible' });
-  const founderCopy = await founderOnboarding.innerText();
-  if (!/General member authentication and multi-tenant founder workspaces remain a separate implementation gate/i.test(founderCopy)) {
-    throw new Error(`${label}: public founder onboarding must not pretend general multi-tenant founder auth is live`);
-  }
-  if (!/Connection never creates authority by itself/i.test(founderCopy)) {
-    throw new Error(`${label}: founder onboarding must preserve the authority boundary`);
-  }
-  const founderStart = founderOnboarding.locator('[data-founder-start="authenticated"]');
-  if (await founderStart.getAttribute('href') !== '/control-room/') {
-    throw new Error(`${label}: founder onboarding must reuse the existing authenticated Control Room path`);
-  }
-
-  await assertNoHorizontalOverflow(page, `${label} public front door`);
-  await userChoice.focus().catch(() => undefined);
   if (pageErrors.length > 0) throw new Error(`${label}: public browser errors: ${pageErrors.join(' | ')}`);
-
-  await page.screenshot({
-    path: join(RESULTS_ROOT, `public-fcr-entry-${label}.png`),
-    fullPage: true,
-  });
 
   await context.close();
 }
@@ -243,7 +230,7 @@ try {
   await provePublicFrontDoor('mobile-390', { width: 390, height: 844 });
   await proveViewport('desktop-1440', { width: 1440, height: 1100 });
   await proveViewport('mobile-390', { width: 390, height: 844 });
-  console.log('PASS: public FCR founder-os-v2 command surface, responsive visual contract, honest user/founder entry, FCR cinematic signature, user/founder/owner authority classes, owner-only crown authority, Bip platform identity, responsive layout, and keyboard focus are preserved.');
+  console.log('PASS: public FCR approved-mockup-v3 tabbed User/Founder views, no internal evidence served publicly, honest sign-in boundary, FCR cinematic signature, user/founder/owner authority classes, owner-only crown authority, Bip platform identity, responsive layout, and keyboard focus are preserved.');
 } finally {
   await browser.close();
   await new Promise((resolve) => server.close(resolve));
