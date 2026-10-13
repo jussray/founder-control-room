@@ -32,6 +32,11 @@ const server = createServer(async (req, res) => {
     calls.push({ path: url.pathname, method: req.method });
     return sendJson(res, 201, { conversation: { round: 1, id: 'receipt-1', outcome: 'Advisory review completed; code not changed.' }, relay: { status: 'completed' } });
   }
+  if (url.pathname === '/missions/mission-1/council' && req.method === 'GET') {
+    return sendJson(res, 200, {
+      conversations: [{ id: 'prior-receipt', round: 0, participants: ['codex'], outcome: 'Earlier result remains recorded.' }],
+    });
+  }
   if (url.pathname.startsWith('/missions/') || (req.method !== 'GET' && req.method !== 'HEAD')) {
     calls.push({ path: url.pathname, method: req.method });
     return sendJson(res, 409, { error: 'Unexpected mutation path' });
@@ -67,6 +72,7 @@ try {
     if (calls.length) throw new Error('Prebuild intake invoked a provider or mutation');
     await page.locator('#council-project').selectOption('storyengine');
     await page.locator('#council-mission').selectOption('mission-1');
+    await page.getByText('prior-receipt', { exact: false }).waitFor();
     await page.locator('#council-send').click();
     await page.locator('#council-status').filter({ hasText: 'Approve the exact advisory' }).waitFor();
     if (calls.length) throw new Error('A live Council round ran without explicit consent');
