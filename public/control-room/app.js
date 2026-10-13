@@ -218,7 +218,7 @@ const TABS = [
   ['home', 'Home', '⌂'],
   ['projects', 'Portfolio', '◫'],
   ['missions', 'Missions', '⟁'],
-  ['activity', 'Signals', '◉'],
+  ['activity', 'Signals inbox', '◉'],
   ['l99', 'Proof · L99', '✓'],
   ['promptos', 'PromptOS', '✎'],
   ['analytics', 'Spend', '$'],
@@ -1092,23 +1092,42 @@ async function loadActivity() {
 }
 
 function renderActivityTab(mount) {
+  // The activity stream is a project-scoped signals inbox, not a social feed.
+  // No unread count is invented, and read-audit events never become messages.
+  const signals = liveSignals();
+  const projects = [...new Set(signals.map((ev) => ev.project?.slug).filter(Boolean))].sort();
   mount.appendChild(el(`
     <div class="panel">
-      <div class="toolbar"><button id="refresh-activity">Refresh</button></div>
-      <div id="activity-list"></div>
+      <h2>Signals inbox</h2>
+      <p class="muted">Verified source events by project. Unrelated community posts never appear here automatically.</p>
+      <div class="toolbar">
+        <label for="signals-project">Project</label>
+        <select id="signals-project" style="max-width:20rem">
+          <option value="">All projects</option>
+          ${projects.map((slug) => `<option value="${escapeHtml(slug)}">${escapeHtml(slug)}</option>`).join('')}
+        </select>
+        <button id="refresh-activity" type="button">Refresh</button>
+      </div>
+      <div id="activity-list" aria-live="polite"></div>
     </div>
   `));
   mount.querySelector('#refresh-activity').addEventListener('click', () => guarded(loadActivity));
-
+  const selector = mount.querySelector('#signals-project');
   const list = mount.querySelector('#activity-list');
-  list.innerHTML = state.activity.length === 0
-    ? '<p class="muted">No activity yet.</p>'
-    : state.activity.map((ev) => `
-      <div class="card">
-        <div class="meta">${escapeHtml(new Date(ev.created_at).toLocaleString())} · ${escapeHtml(ev.project?.slug ?? 'unknown')} · ${escapeHtml(ev.severity)}</div>
-        <div class="title">${escapeHtml(ev.event_type)}</div>
-      </div>
-    `).join('');
+  const paint = () => {
+    const scope = selector.value;
+    const filtered = signals.filter((ev) => !scope || ev.project?.slug === scope);
+    list.innerHTML = filtered.length === 0
+      ? '<p class="muted">No matching signals. Nothing is inferred from silence.</p>'
+      : filtered.map((ev) => `
+        <div class="card" style="cursor:default" data-project="${escapeHtml(ev.project?.slug ?? 'unknown')}">
+          <div class="meta">${escapeHtml(new Date(ev.created_at).toLocaleString())} · ${escapeHtml(ev.project?.slug ?? 'unknown')} · ${escapeHtml(ev.severity)}</div>
+          <div class="title">${escapeHtml(ev.event_type)}</div>
+        </div>
+      `).join('');
+  };
+  selector.addEventListener('change', paint);
+  paint();
 }
 
 // ─── L99 tab ─────────────────────────────────────────────────────────────────
