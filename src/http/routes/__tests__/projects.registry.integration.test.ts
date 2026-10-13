@@ -155,6 +155,42 @@ describe('POST /projects', () => {
     expect(insertCalls).toBe(0);
   });
 
+  it('returns a conflict when the database rejects a racing identity insert', async () => {
+    authSuccess();
+    const insertCalls: unknown[] = [];
+    supabaseMock.from.mockImplementation((table: string) => {
+      if (table === 'founder_users') return founderUsersRow();
+      if (table === 'projects') {
+        return {
+          select: () => ({
+            eq: () => ({ maybeSingle: () => Promise.resolve({ data: null, error: null }) }),
+            ilike: () => ({ limit: () => Promise.resolve({ data: [], error: null }) }),
+          }),
+          insert: (record: unknown) => {
+            insertCalls.push(record);
+            return {
+              select: () => ({
+                single: () => Promise.resolve({
+                  data: null,
+                  error: { code: '23505', message: 'unique violation' },
+                }),
+              }),
+            };
+          },
+        };
+      }
+      return {};
+    });
+
+    const res = await request(buildApp()).post('/projects')
+      .set('Authorization', BEARER)
+      .send({ slug: 'same-project', name: 'Same Project', repoIdentifier: 'jussray/same-project' });
+
+    expect(res.status).toBe(409);
+    expect(res.body.code).toBe('PROJECT_IDENTITY_CONFLICT');
+    expect(insertCalls).toHaveLength(1);
+  });
+
   it('registers a new project and audits it', async () => {
     authSuccess();
     const insertCalls: unknown[] = [];
