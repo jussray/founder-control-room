@@ -229,6 +229,7 @@ const TABS = [
 // they are deliberately not `.tabs button[data-tab]` so the tab router never
 // treats them as in-app tabs.
 const SURFACE_LINKS = [
+  ['Council · chat', '/control-room/council.html'],
   ['Content', '/control-room/content-manager.html'],
   ['Automation', '/control-room/command-bridge.html'],
   ['Integrations', '/control-room/plugin-center.html'],
@@ -380,6 +381,7 @@ const CHIEF_ROUTES = [
 ];
 
 const HOME_TILES = [
+  ['Council', 'Start in conversation', 'href', '/control-room/council.html'],
   ['Portfolio', 'Build what matters', 'tab', 'projects'],
   ['Missions', 'Move one thing forward', 'tab', 'missions'],
   ['Proof', 'Show what’s real', 'tab', 'l99'],
@@ -412,6 +414,7 @@ function renderHomeTab(mount) {
           <p class="hero-lede">One command space to turn ideas into products, products into proof, and proof into lasting impact.</p>
           <div class="hero-actions">
             <button type="button" class="primary hero-cta" data-go-tab="missions">Take action →</button>
+            <a class="hero-cta secondary" href="/control-room/council.html">Talk to Council</a>
             <a class="hero-cta secondary" href="#today-focus">View focus</a>
           </div>
         </div>
@@ -534,7 +537,8 @@ async function loadProjects() {
 function renderProjectsTab(mount) {
   mount.appendChild(el(`
     <div class="panel">
-      <h2>Register a project</h2>
+      <h2>Register an existing project</h2>
+      <p class="muted">For a new build, first establish the idea, project identity and approval in <a href="/control-room/council.html">Council</a>. Registration here is a separate, explicitly confirmed operation.</p>
       <form id="new-project-form">
         <div class="row">
           <div><label>Slug</label><input name="slug" placeholder="my-project" required /></div>
@@ -554,6 +558,17 @@ function renderProjectsTab(mount) {
   root.querySelector('#new-project-form').addEventListener('submit', (e) => {
     e.preventDefault();
     const values = withoutBlanks(formValues(e.target));
+    const matches = state.projects.filter((project) => (
+      project.slug === values.slug
+      || project.name.trim().toLocaleLowerCase('en-US') === String(values.name ?? '').trim().toLocaleLowerCase('en-US')
+      || (values.repoIdentifier && project.repo_identifier?.toLocaleLowerCase('en-US') === values.repoIdentifier.trim().toLocaleLowerCase('en-US'))
+    ));
+    if (matches.length) {
+      setBanner('error', 'Project identity already exists: ' + matches.map((p) => p.slug).join(', ') + '. Select it in Portfolio or clarify the identity in Council. Nothing was registered.');
+      render();
+      return;
+    }
+    if (!window.confirm('Confirm registering the distinct project "' + values.name + '" (' + values.slug + ')? This does not create a GitHub repo or authorize a build.')) return;
     guarded(async () => {
       await api('/projects', { method: 'POST', body: JSON.stringify(values) });
       await loadProjects();
