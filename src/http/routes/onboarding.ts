@@ -2,6 +2,9 @@ import { Router, type Response } from 'express';
 import { onboardingContentSecurityPolicy } from '../middleware/onboardingSecurity.js';
 import { callbackHtml } from './onboardingAssets/callbackHtml.js';
 import { callbackJs } from './onboardingAssets/callbackJs.js';
+import { oauthConsentHtml } from './onboardingAssets/oauthConsentHtml.js';
+import { oauthConsentJs } from './onboardingAssets/oauthConsentJs.js';
+import { oauthConsentCss } from './onboardingAssets/oauthConsentCss.js';
 import { controlRoomCss } from './onboardingAssets/controlRoomCss.js';
 import { controlRoomHtml } from './onboardingAssets/controlRoomHtml.js';
 import { controlRoomJs } from './onboardingAssets/controlRoomJs.js';
@@ -27,6 +30,13 @@ onboardingRouter.get('/assets/control-room.js', (_req, res) =>
   sendAsset(res, 'text/javascript; charset=utf-8', controlRoomJs));
 onboardingRouter.get('/assets/auth-callback.js', (_req, res) =>
   sendAsset(res, 'text/javascript; charset=utf-8', callbackJs));
+// Consent UI is served on the API origin alongside the host-only founder cookie.
+onboardingRouter.get('/oauth/consent', (_req, res) =>
+  sendAsset(res, 'text/html; charset=utf-8', oauthConsentHtml));
+onboardingRouter.get('/assets/oauth-consent.js', (_req, res) =>
+  sendAsset(res, 'text/javascript; charset=utf-8', oauthConsentJs));
+onboardingRouter.get('/assets/oauth-consent.css', (_req, res) =>
+  sendAsset(res, 'text/css; charset=utf-8', oauthConsentCss));
 
 export function founderCallbackHtml(): string {
   return callbackHtml;
