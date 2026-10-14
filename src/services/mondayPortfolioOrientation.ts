@@ -8,7 +8,6 @@ import {
 export const MONDAY_PORTFOLIO_ORIENTATION_TIMEZONE = 'America/New_York';
 export const MONDAY_PORTFOLIO_ORIENTATION_RECIPIENT = 'sekretbip@gmail.com';
 const RETRY_AFTER_MS = 10 * 60_000;
-const STALE_RUNNING_MS = 20 * 60_000;
 const EVIDENCE_FRESHNESS_MS = 7 * 24 * 60 * 60_000;
 const MAX_ITEMS = 5;
 
@@ -360,6 +359,16 @@ function isMissingTable(error: { code?: string } | null | undefined): boolean {
   return error?.code === '42P01' || error?.code === 'PGRST205';
 }
 
+/** Only a failure conclusively recorded before any provider send attempt is retryable. */
+export function canRetryMondayPortfolioOrientation(
+  current: Pick<OrientationRunRow, 'status' | 'started_at' | 'error_code'>,
+  now: Date,
+): boolean {
+  if (current.status !== 'failed' || !current.error_code?.startsWith('orientation_pre_send_failed:')) return false;
+  const startedAt = Date.parse(current.started_at);
+  return Number.isFinite(startedAt) && now.getTime() - startedAt >= RETRY_AFTER_MS;
+}
+
 async function claimWeek(client: SupabaseClient, weekKey: string, now: Date): Promise<'claimed' | 'duplicate' | 'blocked'> {
   const { data: existing, error: readError } = await client
     .from('portfolio_orientation_runs')
@@ -389,12 +398,9 @@ async function claimWeek(client: SupabaseClient, weekKey: string, now: Date): Pr
     throw new Error(`orientation_claim_insert_failed:${error.message}`);
   }
 
-  if (current.status === 'sent') return 'duplicate';
-  const startedAt = Date.parse(current.started_at) || 0;
-  const retryable = current.status === 'failed'
-    ? now.getTime() - startedAt >= RETRY_AFTER_MS
-    : current.status === 'running' && now.getTime() - startedAt >= STALE_RUNNING_MS;
-  if (!retryable) return 'duplicate';
+  // A stale running row might represent a delivered email whose receipt was lost.
+  // Never automatically reclaim it, and retry only explicitly pre-send failures.
+  if (!canRetryMondayPortfolioOrientation(current, now)) return 'duplicate';
 
   const { data: claimed, error } = await client
     .from('portfolio_orientation_runs')
@@ -431,39 +437,61 @@ export async function runMondayPortfolioOrientationCycle(
   if (claim === 'duplicate') return { status: 'skipped', reason: 'week_already_claimed_or_sent', weekKey };
   if (claim === 'blocked') return { status: 'blocked', reason: 'portfolio_orientation_runs_schema_unavailable', weekKey };
 
+  let sendAttempted = false;
+  let acceptedMessageId: string | null = null;
   try {
     const evidence = await loadEvidence(client);
     const orientation = buildMondayPortfolioOrientation({ now, weekKey, ...evidence });
     const text = renderMondayPortfolioOrientation(orientation);
-    const messageId = await sendFounderControlRoomEmail(workerEnv.FCR_EMAIL, {
+
+    // Once sending begins, provider acceptance may be unknowable after a timeout.
+    // Fail closed on subsequent cron ticks rather than risk a duplicate send.
+    sendAttempted = true;
+    acceptedMessageId = await sendFounderControlRoomEmail(workerEnv.FCR_EMAIL, {
       to: MONDAY_PORTFOLIO_ORIENTATION_RECIPIENT,
       subject: `Juss & Co Monday orientation — ${weekKey}`,
       text,
     });
 
-    const { error } = await client
+    const { data: completed, error } = await client
       .from('portfolio_orientation_runs')
       .update({
         status: 'sent',
         completed_at: new Date().toISOString(),
-        message_id: messageId,
+        message_id: acceptedMessageId,
         source_status: orientation.sourceStatus,
         summary: orientation,
         error_code: null,
       })
-      .eq('week_key', weekKey);
-    if (error) throw new Error(`orientation_receipt_write_failed:${error.message}`);
+      .eq('week_key', weekKey)
+      .eq('status', 'running')
+      .eq('started_at', now.toISOString())
+      .select('week_key')
+      .maybeSingle();
+    if (error || !completed) throw new Error(`orientation_receipt_write_failed:${error?.message ?? 'row_not_updated'}`);
 
-    return { status: 'sent', weekKey, messageId, orientation };
+    return { status: 'sent', weekKey, messageId: acceptedMessageId, orientation };
   } catch (error) {
-    await client
-      .from('portfolio_orientation_runs')
-      .update({
-        status: 'failed',
-        completed_at: new Date().toISOString(),
-        error_code: safeErrorCode(error),
-      })
-      .eq('week_key', weekKey);
+    const errorCode = sendAttempted
+      ? 'orientation_send_outcome_unknown_manual_reconcile'
+      : `orientation_pre_send_failed:${safeErrorCode(error)}`;
+    try {
+      const { error: receiptError } = await client
+        .from('portfolio_orientation_runs')
+        .update({
+          status: 'failed',
+          completed_at: new Date().toISOString(),
+          error_code: errorCode,
+          ...(acceptedMessageId ? { message_id: acceptedMessageId } : {}),
+        })
+        .eq('week_key', weekKey)
+        .eq('status', 'running')
+        .eq('started_at', now.toISOString());
+      if (receiptError) console.warn('orientation_failure_receipt_unavailable');
+    } catch {
+      // Keep the original failure visible. A surviving 'running' row also blocks retry.
+      console.warn('orientation_failure_receipt_unavailable');
+    }
     throw error;
   }
 }
