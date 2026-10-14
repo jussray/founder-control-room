@@ -158,6 +158,20 @@ describe('repository documentation truth control', () => {
     expect(read('skills/ultrathink-suite/README.md')).toContain('canonical `.ai/skills/goalfix/SKILL.md` first');
   });
 
+  it('keeps structured documentation-truth receipt claims within the verifier limit', () => {
+    const receipt = JSON.parse(read('docs/DOCUMENTATION_TRUTH_RECEIPT.json')) as {
+      changes: Array<{ path: string; claims: string[] }>;
+    };
+    for (const change of receipt.changes) {
+      expect(change.path.length).toBeGreaterThan(0);
+      expect(change.claims.length).toBeGreaterThan(0);
+      for (const claim of change.claims) {
+        expect(claim.length).toBeGreaterThan(0);
+        expect(claim.length).toBeLessThanOrEqual(600);
+      }
+    }
+  });
+
   it('keeps documentation analytics observation-only', () => {
     expect(truthDecay).toContain('Documentation truth gate');
     expect(truthDecay).toContain('**Analytics remains observation-only.**');
