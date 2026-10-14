@@ -170,9 +170,16 @@ export async function escalateToSlack(
   // The provider must separately bind it in the FCR runtime; Agents secrets do
   // not become Cloudflare secrets automatically.
   const credential = env.SLACK?.trim();
-  const webhookUrl =
+  const webhookCandidate = (
     env.SLACK_WEBHOOK_URL ||
-    (credential?.startsWith('https://hooks.slack.com/services/') ? credential : undefined);
+    (credential?.startsWith('https://hooks.slack.com/services/') ? credential : undefined)
+  )?.trim();
+  // Reject arbitrary endpoints: Slack incidents must not leave for a non-Slack URL.
+  const webhookUrl =
+    webhookCandidate && /^https:\/\/hooks\.slack\.com\/services\/[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+$/.test(webhookCandidate)
+      ? webhookCandidate
+      : undefined;
+  if (webhookCandidate && !webhookUrl) return false;
   const botToken =
     credential && /^xoxb-[A-Za-z0-9-]+$/.test(credential) ? credential : undefined;
   const channel = env.FCR_SLACK_CHANNEL_ID;
@@ -184,6 +191,7 @@ export async function escalateToSlack(
     const message = formatSlackMessage(verdict);
     const response = await fetch(webhookUrl ?? 'https://slack.com/api/chat.postMessage', {
       method: 'POST',
+      redirect: 'error',
       headers: {
         'Content-Type': 'application/json',
         ...(webhookUrl ? {} : { Authorization: `Bearer ${botToken}` }),
