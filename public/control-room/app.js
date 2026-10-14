@@ -1017,7 +1017,7 @@ function renderMissionDetail(mount) {
     guarded(async () => {
       await api(`/approvals/${mission.id}/patch`, {
         method: 'POST',
-        body: JSON.stringify({ message, changes: [{ path, content }] }),
+        body: JSON.stringify({ message, idempotencyKey: `${mission.id}-patch-${Date.now()}`, changes: [{ path, content }] }),
       });
       setBanner('notice', `Committed ${path} to ${mission.branch_ref}.`);
     });

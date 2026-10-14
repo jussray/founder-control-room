@@ -41,7 +41,7 @@
     "canonicalSchema": "github:jussray/founder-control-room/contracts/juss-agent-contract-v1.schema.json",
     "schemaRequiredAtRuntime": false,
     "runtimeDependencyOnPeers": false,
-    "localOverlays": ["AGENTS.md", "GLOBAL_AI.md", "docs/FCR_MULTI_AGENT_ENABLEMENT_CONTRACT.md", "docs/FOUNDER_MERGE_AUTHORITY.md"],
+    "localOverlays": ["AGENTS.md", "GLOBAL_AI.md", ".control-room/COUNCIL.md", "docs/GOALFIX_EXECUTION_WORKFLOW_V2.md", "docs/FCR_MULTI_AGENT_ENABLEMENT_CONTRACT.md", "docs/FOUNDER_MERGE_AUTHORITY.md"],
     "inheritanceRule": "This repository inherits juss/agent-contract@v1. Stricter local safety, privacy, financial, release, product, and authority rules win.",
     "authorityRule": "This binding carries no merge, deploy, publish, spend, credential, database, DNS, destructive, or user-data authority by itself."
   }
