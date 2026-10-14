@@ -123,10 +123,13 @@ describe('paired Supabase OAuth verifier', () => {
   });
 
   it('rejects a well-formed project restriction outside the server grant', async () => {
-    allowFounder();
+    mockGetUser.mockClear();
+    mockFrom.mockClear();
     await expect(verifyPairedSupabaseOauthToken(jwt(claims({
       mcp_projects: ['not-in-server'],
     })), env())).rejects.toThrow('OAuth project grant does not overlap server scope');
+    expect(mockGetUser).not.toHaveBeenCalled();
+    expect(mockFrom).not.toHaveBeenCalled();
   });
 
   it('can opt into an exact client allowlist without making it the DCR default', async () => {
