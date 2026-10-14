@@ -40,6 +40,8 @@ export interface SecurityVerdict {
 }
 
 export interface IncidentEnv extends Record<string, string | undefined> {
+  SLACK?: string;
+  FCR_SLACK_CHANNEL_ID?: string;
   SLACK_WEBHOOK_URL?: string;
   PAGERDUTY_INTEGRATION_KEY?: string;
   LINEAR_API_KEY?: string;
@@ -164,36 +166,53 @@ export async function escalateToSlack(
 ): Promise<boolean> {
   if (!shouldEscalate(verdict)) return false;
 
-  const webhookUrl = env.SLACK_WEBHOOK_URL;
-  if (!webhookUrl) return false;
+  // GitHub Agents normalizes the founder's "slack" secret name to SLACK.
+  // The provider must separately bind it in the FCR runtime; Agents secrets do
+  // not become Cloudflare secrets automatically.
+  const credential = env.SLACK?.trim();
+  const webhookUrl =
+    env.SLACK_WEBHOOK_URL ||
+    (credential?.startsWith('https://hooks.slack.com/services/') ? credential : undefined);
+  const botToken =
+    credential && /^xoxb-[A-Za-z0-9-]+$/.test(credential) ? credential : undefined;
+  const channel = env.FCR_SLACK_CHANNEL_ID;
+  if (!webhookUrl && (!botToken || !channel || !/^C[A-Z0-9]{8,}$/.test(channel))) {
+    return false;
+  }
 
   try {
     const message = formatSlackMessage(verdict);
-
-    const response = await fetch(webhookUrl, {
+    const response = await fetch(webhookUrl ?? 'https://slack.com/api/chat.postMessage', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(webhookUrl ? {} : { Authorization: `Bearer ${botToken}` }),
+      },
       body: JSON.stringify({
         text: message.text,
         blocks: message.blocks,
+        ...(webhookUrl ? {} : { channel }),
       }),
     });
 
     if (!response.ok) {
-      console.error(
-        '[incident-escalation] Slack webhook failed:',
-        response.status,
-        await response.text(),
-      );
+      // Neither Slack's response body nor the secret-bearing webhook URL may be logged.
+      console.error('[incident-escalation] Slack delivery failed:', response.status);
       return false;
+    }
+
+    if (!webhookUrl) {
+      const result = (await response.json()) as { ok?: boolean };
+      if (result?.ok !== true) {
+        console.error('[incident-escalation] Slack API rejected delivery');
+        return false;
+      }
     }
 
     return true;
   } catch (error) {
-    console.error(
-      '[incident-escalation] Slack escalation error:',
-      error instanceof Error ? error.message : String(error),
-    );
+    // Provider errors can embed credential-bearing URLs; never log them here.
+    console.error('[incident-escalation] Slack delivery error');
     return false;
   }
 }
