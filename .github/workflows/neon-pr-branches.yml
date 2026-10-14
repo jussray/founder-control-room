@@ -147,8 +147,197 @@ jobs:
             git diff --name-status --no-renames "$LIVE_BASE_SHA" "$EXPECTED_HEAD_SHA" -- 'supabase/migrations/*.sql'
           )
 
-          if (( ${#MIGRATIONS[@]} == 0 )); then
-            echo 'Supabase scope changed but no added SQL migration was found.'
+          # Added or modified catalog assertions must execute on the real
+          # preview even when no new migration was added to this PR.
+          POSTCONDITIONS=()
+          while IFS=
+
+          IFS=$'\n' MIGRATIONS=($(printf '%s\n' "${MIGRATIONS[@]}" | sort))
+          unset IFS
+
+          # The preview branch is reused across synchronize events. Keep an
+          # isolated CI-only checksum ledger so the exact same migration is
+          # skipped on rerun, while changing an already-applied migration fails
+          # closed and requires a new append-only migration instead.
+          psql "$NEON_DB_URL" -X -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE SCHEMA IF NOT EXISTS ci_preview;
+          CREATE TABLE IF NOT EXISTS ci_preview.migration_receipts (
+            filename TEXT PRIMARY KEY,
+            sha256 TEXT NOT NULL CHECK (sha256 ~ '^[0-9a-f]{64}$'),
+            applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+          );
+          SQL
+
+          for migration in "${MIGRATIONS[@]}"; do
+            if [[ ! "$migration" =~ ^supabase/migrations/[0-9]{14}_[A-Za-z0-9_]+\.sql$ ]]; then
+              echo "::error title=Invalid migration path::$migration is not a canonical append-only migration filename."
+              exit 1
+            fi
+            test -f "$migration" || { echo "Missing migration file: $migration" >&2; exit 1; }
+
+            CHECKSUM="$(sha256sum "$migration" | awk '{print $1}')"
+            # The migration path is interpolated only after the strict filename
+            # allowlist above; it therefore cannot contain a quote or SQL token.
+            EXISTING="$(psql "$NEON_DB_URL" -X -Atq \
+              -c "SELECT sha256 FROM ci_preview.migration_receipts WHERE filename = '$migration';")"
+            # A checksum is not proof of committed DDL: earlier preview
+            # contracts could roll back while leaving their receipt behind.
+            # A source-owned catalog postcondition independently proves state.
+            PREVIEW_POSTCONDITION="supabase/preview-postconditions/${migration##*/}"
+
+            if [ -n "$EXISTING" ]; then
+              if [ "$EXISTING" = "$CHECKSUM" ]; then
+                if [ -f "$PREVIEW_POSTCONDITION" ]; then
+                  echo "Verifying persisted Neon preview state: $PREVIEW_POSTCONDITION"
+                  if ! psql "$NEON_DB_URL" -X -v ON_ERROR_STOP=1 -f "$PREVIEW_POSTCONDITION"; then
+                    # Repair only the disposable preview branch using the
+                    # exact source-owned migration contract. No generic
+                    # checksum bypass, production SQL, or history rewrite.
+                    PREVIEW_CONTRACT="supabase/preview-contracts/${migration##*/}"
+                    test -f "$PREVIEW_CONTRACT" || {
+                      echo "::error title=Stale migration receipt::No bounded preview recovery contract for $migration"
+                      exit 1
+                    }
+                    echo "Repairing stale Neon preview state with: $PREVIEW_CONTRACT"
+                    psql "$NEON_DB_URL" -X -v ON_ERROR_STOP=1 -f "$PREVIEW_CONTRACT"
+                    psql "$NEON_DB_URL" -X -v ON_ERROR_STOP=1 -f "$PREVIEW_POSTCONDITION"
+                  fi
+                fi
+                echo "Preview migration already applied with matching checksum and observed state: $migration"
+                continue
+              fi
+              echo "::error title=Applied migration changed::$migration was already executed on this preview with a different checksum. Add a new migration instead of rewriting history."
+              exit 1
+            fi
+
+            PREVIEW_CONTRACT="supabase/preview-contracts/${migration##*/}"
+            if [ -f "$PREVIEW_CONTRACT" ]; then
+              echo "Running migration preview contract: $PREVIEW_CONTRACT"
+              psql "$NEON_DB_URL" -X -v ON_ERROR_STOP=1 -f "$PREVIEW_CONTRACT"
+            else
+              echo "Applying preview migration atomically: $migration"
+              psql "$NEON_DB_URL" -X -1 -v ON_ERROR_STOP=1 -f "$migration"
+            fi
+            if [ -f "$PREVIEW_POSTCONDITION" ]; then
+              echo "Verifying committed Neon preview migration: $PREVIEW_POSTCONDITION"
+              psql "$NEON_DB_URL" -X -v ON_ERROR_STOP=1 -f "$PREVIEW_POSTCONDITION"
+            fi
+            psql "$NEON_DB_URL" -X -v ON_ERROR_STOP=1 \
+              -c "INSERT INTO ci_preview.migration_receipts(filename, sha256) VALUES ('$migration', '$CHECKSUM');"
+          done
+
+          # A change to the test itself is not proof. Re-observe its live
+          # catalog claims even when the migration's receipt predates this PR.
+          for postcondition in "${POSTCONDITIONS[@]}"; do
+            test -f "$postcondition" || {
+              echo "::error title=Missing preview postcondition::$postcondition"
+              exit 1
+            }
+            echo "Verifying changed Neon preview postcondition: $postcondition"
+            psql "$NEON_DB_URL" -X -v ON_ERROR_STOP=1 -f "$postcondition"
+          done
+
+      - name: Verify FCR commerce preview schema when present
+        if: steps.neon_scope.outputs.needs_neon == 'true'
+        shell: bash
+        env:
+          NEON_DB_URL: ${{ steps.create_neon_branch.outputs.db_url }}
+        run: |
+          set -euo pipefail
+          HAS_FCR_COMMERCE="$(psql "$NEON_DB_URL" -X -Atqc "select to_regclass('public.fcr_commerce_receipts') is not null")"
+          if [ "$HAS_FCR_COMMERCE" != "t" ]; then
+            echo 'FCR commerce table is not part of this preview; generic migration execution completed.'
+            exit 0
+          fi
+
+          EVENT_COLUMN="$(psql "$NEON_DB_URL" -X -Atqc "select count(*) from information_schema.columns where table_schema='public' and table_name='fcr_commerce_receipts' and column_name='event_id' and data_type='uuid' and is_nullable='NO'")"
+          EVENT_INDEX="$(psql "$NEON_DB_URL" -X -Atqc "select count(*) from pg_indexes where schemaname='public' and tablename='fcr_commerce_receipts' and indexname='fcr_commerce_receipts_provider_event_uidx'")"
+          RLS_ENABLED="$(psql "$NEON_DB_URL" -X -Atqc "select relrowsecurity from pg_class where oid='public.fcr_commerce_receipts'::regclass")"
+          ROW_COUNT="$(psql "$NEON_DB_URL" -X -Atqc "select count(*) from public.fcr_commerce_receipts")"
+
+          test "$EVENT_COLUMN" = "1"
+          test "$EVENT_INDEX" = "1"
+          test "$RLS_ENABLED" = "t"
+          test "$ROW_COUNT" = "0"
+          echo 'FCR commerce Neon preview schema verified: event identity present, RLS enabled, zero synthetic revenue rows.'
+
+  delete_neon_branch:
+    name: Delete Neon Branch
+    if: |
+      github.event_name == 'pull_request' &&
+      github.event.action == 'closed' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Classify Neon preview scope
+        id: neon_scope
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          mapfile -t CHANGED_FILES < <(
+            gh api --paginate "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/files?per_page=100" --jq '.[].filename'
+          )
+
+          NEEDS_NEON=false
+          for path in "${CHANGED_FILES[@]}"; do
+            case "$path" in
+              supabase/*)
+                NEEDS_NEON=true
+                break
+                ;;
+            esac
+          done
+
+          echo "needs_neon=${NEEDS_NEON}" >> "$GITHUB_OUTPUT"
+          if [ "$NEEDS_NEON" = "true" ]; then
+            echo 'Supabase change detected; Neon preview cleanup is required.'
+          else
+            echo 'No supabase/ change detected; no Neon preview is expected for this PR.'
+          fi
+
+      - name: Record non-database cleanup no-op
+        if: steps.neon_scope.outputs.needs_neon == 'false'
+        shell: bash
+        run: echo 'Neon cleanup skipped because this PR does not change supabase/.'
+
+      - name: Validate Neon configuration
+        if: steps.neon_scope.outputs.needs_neon == 'true'
+        shell: bash
+        env:
+          NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID }}
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$NEON_PROJECT_ID" || { echo 'NEON_PROJECT_ID is not configured' >&2; exit 1; }
+          test -n "$NEON_API_KEY" || { echo 'NEON_API_KEY is not configured' >&2; exit 1; }
+
+      - name: Delete Neon Branch
+        if: steps.neon_scope.outputs.needs_neon == 'true'
+        uses: neondatabase/delete-branch-action@4468d825d5a88ef4012f1705a82f02ec3072f776 # v3
+        with:
+          project_id: ${{ vars.NEON_PROJECT_ID }}
+          branch: preview/pr-${{ github.event.number }}
+          api_key: ${{ secrets.NEON_API_KEY }}\t' read -r status postcondition; do
+            [ -n "$status" ] || continue
+            if [[ "$status" != "A" && "$status" != "M" ]]; then
+              echo "::error title=Preview postcondition removal is not safe::${status} ${postcondition}"
+              exit 1
+            fi
+            if [[ ! "$postcondition" =~ ^supabase/preview-postconditions/[0-9]{14}_[A-Za-z0-9_]+\.sql$ ]]; then
+              echo "::error title=Invalid preview postcondition::$postcondition"
+              exit 1
+            fi
+            POSTCONDITIONS+=("$postcondition")
+          done < <(
+            git diff --name-status --no-renames "$LIVE_BASE_SHA" "$EXPECTED_HEAD_SHA" -- 'supabase/preview-postconditions/*.sql'
+          )
+
+          if (( ${#MIGRATIONS[@]} == 0 && ${#POSTCONDITIONS[@]} == 0 )); then
+            echo 'Supabase scope changed but no new migrations or changed postconditions were found.'
             exit 0
           fi
 
