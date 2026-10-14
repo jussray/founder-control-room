@@ -59,7 +59,7 @@ describe('incident-escalation', () => {
     }) as any;
 
     const verdict = createMockVerdict('REPAIR_REQUIRED');
-    const env = { SLACK_WEBHOOK_URL: 'https://hooks.slack.com/test' };
+    const env = { SLACK_WEBHOOK_URL: 'https://hooks.slack.com/services/TEST/TEST/PLACEHOLDER' };
 
     const result = await escalateToSlack(verdict, env);
     expect(result).toBe(true);
@@ -89,7 +89,7 @@ describe('incident-escalation', () => {
 
   it('ignores non-escalatable verdicts', async () => {
     const verdict = createMockVerdict('OBSERVE');
-    const env = { SLACK_WEBHOOK_URL: 'https://hooks.slack.com/test' };
+    const env = { SLACK_WEBHOOK_URL: 'https://hooks.slack.com/services/TEST/TEST/PLACEHOLDER' };
 
     const result = await escalateToSlack(verdict, env);
     expect(result).toBe(false);
@@ -129,6 +129,31 @@ describe('incident-escalation', () => {
     const [url, options] = (global.fetch as any).mock.calls[0];
     expect(url).toBe(webhook);
     expect(options.headers.Authorization).toBeUndefined();
+  });
+
+  it('blocks arbitrary legacy webhook hosts before sending incident data', async () => {
+    global.fetch = vi.fn(async () => new Response('ok', { status: 200 })) as any;
+    const rejected = await escalateToSlack(createMockVerdict(), {
+      SLACK_WEBHOOK_URL: 'https://collector.example.net/incident',
+    });
+    expect(rejected).toBe(false);
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it('rejects lookalike Slack hostnames and prevents HTTP redirects', async () => {
+    global.fetch = vi.fn(async () => new Response('ok', { status: 200 })) as any;
+    const rejected = await escalateToSlack(createMockVerdict(), {
+      SLACK_WEBHOOK_URL: 'https://hooks.slack.com.evil.example/services/T/B/FAKE',
+    });
+    expect(rejected).toBe(false);
+    expect(global.fetch).not.toHaveBeenCalled();
+
+    const accepted = await escalateToSlack(createMockVerdict(), {
+      SLACK_WEBHOOK_URL: 'https://hooks.slack.com/services/T/B/PLACEHOLDER',
+    });
+    expect(accepted).toBe(true);
+    const [, options] = (global.fetch as any).mock.calls[0];
+    expect(options.redirect).toBe('error');
   });
 
   it('does not use SLACK bot credentials without an explicit FCR channel', async () => {
@@ -185,7 +210,7 @@ describe('incident-escalation', () => {
     global.fetch = vi.fn(async () => new Response('ok', { status: 200 })) as any;
 
     const verdict = createMockVerdict('REPAIR_REQUIRED');
-    const env = { SLACK_WEBHOOK_URL: 'https://hooks.slack.com/test' };
+    const env = { SLACK_WEBHOOK_URL: 'https://hooks.slack.com/services/TEST/TEST/PLACEHOLDER' };
 
     let waitUntilCalled = false;
     emitReciprocalTelemetryWithEscalation(verdict, env, {
@@ -207,7 +232,7 @@ describe('incident-escalation', () => {
     const verdict = createMockVerdict('OBSERVE');
     verdict.meaningful = false;
 
-    const env = { SLACK_WEBHOOK_URL: 'https://hooks.slack.com/test' };
+    const env = { SLACK_WEBHOOK_URL: 'https://hooks.slack.com/services/TEST/TEST/PLACEHOLDER' };
     emitReciprocalTelemetryWithEscalation(verdict, env);
 
     expect(logSpy).not.toHaveBeenCalled();
