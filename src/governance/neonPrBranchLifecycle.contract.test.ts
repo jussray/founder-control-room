@@ -29,6 +29,17 @@ describe('Neon pull-request branch lifecycle contract', () => {
     expect(workflow).toContain('Running migration preview contract: $PREVIEW_CONTRACT');
   });
 
+  it('fails closed on missing persisted migration state and re-verifies changed preview postconditions', () => {
+    expect(workflow).toContain('POSTCONDITIONS=()');
+    expect(workflow).toContain("'supabase/preview-postconditions/*.sql'");
+    expect(workflow).toContain('if (( ${#MIGRATIONS[@]} == 0 && ${#POSTCONDITIONS[@]} == 0 )); then');
+    expect(workflow).toContain('if ! psql "$NEON_DB_URL" -X -v ON_ERROR_STOP=1 -f "$PREVIEW_POSTCONDITION"; then');
+    expect(workflow).toContain('test -f "$PREVIEW_CONTRACT" || {');
+    expect(workflow).toContain('Repairing stale Neon preview state with: $PREVIEW_CONTRACT');
+    expect(workflow).toContain('Verifying changed Neon preview postcondition: $postcondition');
+    expect(workflow).toContain('Preview migration already applied with matching checksum and observed state');
+  });
+
   it('allocates Neon only for live-base Supabase changes while preserving the required job identity', () => {
     expect(workflow).toContain('name: Create Neon Branch');
     expect(workflow).toContain('pull-requests: read');

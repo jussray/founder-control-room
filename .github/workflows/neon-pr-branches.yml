@@ -147,8 +147,25 @@ jobs:
             git diff --name-status --no-renames "$LIVE_BASE_SHA" "$EXPECTED_HEAD_SHA" -- 'supabase/migrations/*.sql'
           )
 
-          if (( ${#MIGRATIONS[@]} == 0 )); then
-            echo 'Supabase scope changed but no added SQL migration was found.'
+          # Modified preview postconditions must run even without new SQL.
+          POSTCONDITIONS=()
+          while IFS=$'\t' read -r status postcondition; do
+            [ -n "$status" ] || continue
+            if [[ "$status" != "A" && "$status" != "M" ]]; then
+              echo "::error title=Unsafe preview postcondition change::${status} ${postcondition}"
+              exit 1
+            fi
+            if [[ ! "$postcondition" =~ ^supabase/preview-postconditions/[0-9]{14}_[A-Za-z0-9_]+[.]sql$ ]]; then
+              echo "::error title=Invalid preview postcondition path::$postcondition"
+              exit 1
+            fi
+            POSTCONDITIONS+=("$postcondition")
+          done < <(
+            git diff --name-status --no-renames "$LIVE_BASE_SHA" "$EXPECTED_HEAD_SHA" -- 'supabase/preview-postconditions/*.sql'
+          )
+
+          if (( ${#MIGRATIONS[@]} == 0 && ${#POSTCONDITIONS[@]} == 0 )); then
+            echo 'Supabase scope changed but no added migrations or updated assertions were found.'
             exit 0
           fi
 
@@ -180,10 +197,29 @@ jobs:
             # allowlist above; it therefore cannot contain a quote or SQL token.
             EXISTING="$(psql "$NEON_DB_URL" -X -Atq \
               -c "SELECT sha256 FROM ci_preview.migration_receipts WHERE filename = '$migration';")"
+            # A checksum is not proof of committed DDL: earlier preview
+            # contracts could roll back while leaving their receipt behind.
+            # A source-owned catalog postcondition independently proves state.
+            PREVIEW_POSTCONDITION="supabase/preview-postconditions/${migration##*/}"
 
             if [ -n "$EXISTING" ]; then
               if [ "$EXISTING" = "$CHECKSUM" ]; then
-                echo "Preview migration already applied with matching checksum: $migration"
+                if [ -f "$PREVIEW_POSTCONDITION" ]; then
+                  echo "Verifying persisted Neon preview state: $PREVIEW_POSTCONDITION"
+                  if ! psql "$NEON_DB_URL" -X -v ON_ERROR_STOP=1 -f "$PREVIEW_POSTCONDITION"; then
+                    # Only the bounded source-owned contract may recover an
+                    # inconsistent checksum on the disposable Neon preview.
+                    PREVIEW_CONTRACT="supabase/preview-contracts/${migration##*/}"
+                    test -f "$PREVIEW_CONTRACT" || {
+                      echo "::error title=Stale preview receipt::No bounded recovery contract for $migration"
+                      exit 1
+                    }
+                    echo "Repairing stale Neon preview state with: $PREVIEW_CONTRACT"
+                    psql "$NEON_DB_URL" -X -v ON_ERROR_STOP=1 -f "$PREVIEW_CONTRACT"
+                    psql "$NEON_DB_URL" -X -v ON_ERROR_STOP=1 -f "$PREVIEW_POSTCONDITION"
+                  fi
+                fi
+                echo "Preview migration already applied with matching checksum and observed state: $migration"
                 continue
               fi
               echo "::error title=Applied migration changed::$migration was already executed on this preview with a different checksum. Add a new migration instead of rewriting history."
@@ -198,8 +234,22 @@ jobs:
               echo "Applying preview migration atomically: $migration"
               psql "$NEON_DB_URL" -X -1 -v ON_ERROR_STOP=1 -f "$migration"
             fi
+            if [ -f "$PREVIEW_POSTCONDITION" ]; then
+              echo "Verifying committed Neon preview migration: $PREVIEW_POSTCONDITION"
+              psql "$NEON_DB_URL" -X -v ON_ERROR_STOP=1 -f "$PREVIEW_POSTCONDITION"
+            fi
             psql "$NEON_DB_URL" -X -v ON_ERROR_STOP=1 \
               -c "INSERT INTO ci_preview.migration_receipts(filename, sha256) VALUES ('$migration', '$CHECKSUM');"
+          done
+
+          # Reobserve the live catalog when a test alone changes.
+          for postcondition in "${POSTCONDITIONS[@]}"; do
+            test -f "$postcondition" || {
+              echo "::error title=Missing preview postcondition::$postcondition"
+              exit 1
+            }
+            echo "Verifying changed Neon preview postcondition: $postcondition"
+            psql "$NEON_DB_URL" -X -v ON_ERROR_STOP=1 -f "$postcondition"
           done
 
       - name: Verify FCR commerce preview schema when present

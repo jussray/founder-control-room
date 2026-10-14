@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { buildRuntimeStateReceipt, trackedConfigFingerprint } from '../scripts/control-room-runtime-state.mjs';
+import { buildRuntimeStateReceipt, trackedConfigFingerprint, writeRuntimeStateReceipt } from '../scripts/control-room-runtime-state.mjs';
 import { buildTestLedger } from '../scripts/control-room-test-ledger.mjs';
 
 const SHA = 'a'.repeat(40);
@@ -51,6 +51,17 @@ test('the ledger workflow exposes the external-state invalidation trigger', () =
   const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
   const workflow = fs.readFileSync(path.join(repositoryRoot, '.github', 'workflows', 'control-room-test-ledger.yml'), 'utf8');
   for (const expected of ['repository_dispatch:', 'types: [runtime_state_changed]', 'external_state_epoch:', 'CONTROL_ROOM_EXTERNAL_STATE_EPOCH:', 'CONTROL_ROOM_EXTERNAL_STATE_SOURCE:', 'node --test test/control-room-runtime-state.test.mjs', 'node scripts/control-room-runtime-state.mjs', 'artifacts/control-room-runtime-state.json']) assert.ok(workflow.includes(expected), `workflow missing ${expected}`);
+});
+
+test('runtime-state writer emits strict JSON with one trailing newline', () => {
+  const root = fixture();
+  const outputPath = path.join(root, 'artifacts', 'receipt.json');
+  const receipt = writeRuntimeStateReceipt(env({
+    CONTROL_ROOM_RUNTIME_STATE_PATH: outputPath,
+  }), root);
+  const content = fs.readFileSync(outputPath, 'utf8');
+  assert.ok(content.endsWith('\n'));
+  assert.deepEqual(JSON.parse(content), receipt);
 });
 
 test('the exact-head ledger binds the runtime-state receipt into its proof surface', () => {
