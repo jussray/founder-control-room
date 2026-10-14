@@ -465,3 +465,7 @@ The canonical `/goalfix` command is owned by `.ai/skills/goalfix/SKILL.md`. The 
 ## October 14 independent review: proof-skill routing
 
 The independent review of FCR PR #969 confirmed that `skills/ultrathink-attack-godmode/SKILL.md` incorrectly advertised `repair-to-proof` alongside `skills/repair-to-proof/SKILL.md`'s canonical `/repair-to-proof` trigger. The investigative ULTRATHINK companion no longer claims that activation in its frontmatter or Activation section. The companion hands completed work to the dedicated proof/release contract through the governed suite, without creating duplicate invocation authority. The source-only routing change does not establish installed runtime command registration, an independent reviewer approval, merge authorization, or deployment.
+
+## October 14 source routing and exact-base federation provenance
+
+Claude Code `/ultrathink` remains an exclusive canonical entrypoint in `.claude/skills/ultrathink/SKILL.md`. The new ULTRATHINK / ATTACK / GODMODE companion has distinct cues and cannot register that exact command or override canonical Goalfix; the suite index documents explicit handoffs. The base-to-head StoryEngine federation pin transition for current FCR `main` is `a6e6a396ed30535af2fd9b1ec2347a84e1a3fbf3` → `809d30ae2ef57dce6d4fee9a3b6afa24bfa83497`, with prior PR-only `ae7a67c119503276f5525c412a49d05989a8dd6a` retained as historical intermediate evidence, not represented as the `main` predecessor. Neither correction grants deployment or merge authority.

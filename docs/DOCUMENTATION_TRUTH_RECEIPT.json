@@ -53,7 +53,7 @@
         "The October 3, 2026 URLFix merge-review transition from the prior StoryEngine peer to independently observed `18d9ba257a69c3d1743f346d424daf31796aaeed` selects a new evidence subject only; the local FCR browser harness passing before the live-peer mismatch does not transfer federation green, and PR #896 must earn a complete exact-head Playwright witness against the successor before the pair is current.",
         "The October 3, 2026 agent-contract v1 transition from StoryEngine `18d9ba257a69c3d1743f346d424daf31796aaeed` to independently observed `168d65ede38d2477ea00902fa1f0e76f292c583d` selects a new evidence subject only; Chief Access recovery PR #913 failing the live-peer check is dependency drift, and the successor FCR head must earn a complete exact-head Playwright witness against the successor before the pair is current.",
         "The October 5, 2026 transition from StoryEngine `168d65ede38d2477ea00902fa1f0e76f292c583d` through `c9af4ea095561d0837a141e311e8977d796aaaa7` to independently observed `3c1689fe67142e783fe7d18b5ff610640bdc81d6` selects a new evidence subject only; FCR Playwright run #6969 on `897083276b6c775c49ce30be189a50bd610b5d4c` passed the local/direct browser harness but failed the peer freshness check, so `.github/workflows/playwright.yml` must bind the successor exact peer and require a complete exact-head federation rerun before the pair is current.",
-        "`.github/workflows/playwright.yml` must bind the independently observed October 13, 2026 StoryEngine `main` at `809d30ae2ef57dce6d4fee9a3b6afa24bfa83497` instead of historical `ae7a67c119503276f5525c412a49d05989a8dd6a` for this recovery. FCR run `38361687062` passed on predecessor branch head `fd7dad22df42df37d007b2b31a8de9782819b1b0`; successor FCR branch heads require their own exact-head Playwright and documentation checks, and cannot inherit merge, deploy, or production authority."
+        "The reviewed FCR `main` base SHA `2189076de1d06bb7b78cf2e36a29e995cea863d4` pins StoryEngine `a6e6a396ed30535af2fd9b1ec2347a84e1a3fbf3` in `.github/workflows/playwright.yml`; the proposed FCR PR #969 change advances that exact base pin to independently observed StoryEngine main `809d30ae2ef57dce6d4fee9a3b6afa24bfa83497`. The older `ae7a67c119503276f5525c412a49d05989a8dd6a` pin belonged to an intermediate PR branch and is not the predecessor on the reviewed main base. Passing FCR run `38361687062` on a prior PR head is historical; each successor exact FCR head must rerun federation Playwright and cannot inherit merge, production, or provider authority."
       ]
     },
     {
@@ -315,7 +315,8 @@
       "path": "skills/ultrathink-attack-godmode/SKILL.md",
       "claims": [
         "`skills/ultrathink-attack-godmode/SKILL.md` must preserve the canonical `.ai/skills/goalfix/SKILL.md` ownership of `/goalfix`, avoid duplicate activations, and never treat an operator shorthand, skill file, or green check as merge, deploy, provider, or production authority.",
-        "`skills/ultrathink-attack-godmode/SKILL.md` must not advertise `/repair-to-proof` or the unprefixed `repair-to-proof` as an activation or frontmatter trigger: `skills/repair-to-proof/SKILL.md` alone handles the proof command, with an explicit non-authorizing handoff from investigative ULTRATHINK work."
+        "`skills/ultrathink-attack-godmode/SKILL.md` must not advertise `/repair-to-proof` or the unprefixed `repair-to-proof` as an activation or frontmatter trigger: `skills/repair-to-proof/SKILL.md` alone handles the proof command, with an explicit non-authorizing handoff from investigative ULTRATHINK work.",
+        "`skills/ultrathink-attack-godmode/SKILL.md` must not register `/ultrathink`, which is owned by `.claude/skills/ultrathink/SKILL.md` in Claude Code; this companion only accepts its distinct `/godmode` or `attack/godmode` activation or an explicitly authorized canonical handoff."
       ]
     },
     {
@@ -333,7 +334,8 @@
     {
       "path": "skills/ultrathink-suite/README.md",
       "claims": [
-        "`skills/ultrathink-suite/README.md` must route `/goalfix` through `.ai/skills/goalfix/SKILL.md` as canonical owner, treat ULTRATHINK skills as optional governed companions, and never grant a second execution authority or falsely certify runtime installation."
+        "`skills/ultrathink-suite/README.md` must route `/goalfix` through `.ai/skills/goalfix/SKILL.md` as canonical owner, treat ULTRATHINK skills as optional governed companions, and never grant a second execution authority or falsely certify runtime installation.",
+        "`skills/ultrathink-suite/README.md` must route exact `/ultrathink` to the existing `.claude/skills/ultrathink/SKILL.md` entrypoint in Claude Code rather than direct activation of a second ULTRATHINK execution contract."
       ]
     }
   ]

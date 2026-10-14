@@ -150,6 +150,8 @@ describe('repository documentation truth control', () => {
     expect(activation).toContain('/godmode');
     expect(activation).not.toContain('/goalfix');
     expect(activation).not.toContain('/repair-to-proof');
+    expect(activation).not.toContain('/ultrathink');
+    expect(read('skills/ultrathink-suite/README.md')).toContain('canonical `.claude/skills/ultrathink/SKILL.md`');
     expect(activation).not.toMatch(/(^|[,\s])repair-to-proof([,\s]|$)/);
     expect(companion).toContain('The `/repair-to-proof` activation belongs exclusively');
     expect(companion).toContain('The canonical `/goalfix`');
