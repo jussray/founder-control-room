@@ -162,6 +162,8 @@ export async function escalateToSlack(
   verdict: SecurityVerdict,
   env: IncidentEnv,
 ): Promise<boolean> {
+  if (!shouldEscalate(verdict)) return false;
+
   const webhookUrl = env.SLACK_WEBHOOK_URL;
   if (!webhookUrl) return false;
 
