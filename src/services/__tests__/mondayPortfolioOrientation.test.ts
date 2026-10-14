@@ -1,4 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+// Pure scheduling/rendering tests must not initialize production Supabase credentials.
+vi.mock('../../lib/supabaseClient.js', () => ({ makeSupabaseClient: vi.fn() }));
 import {
   buildMondayPortfolioOrientation,
   mondayPortfolioOrientationWeekKey,
