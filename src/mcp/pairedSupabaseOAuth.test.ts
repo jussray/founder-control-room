@@ -183,6 +183,10 @@ describe('paired Supabase OAuth verifier', () => {
   });
 
   it('rejects a valid-looking token when Supabase reports the user revoked', async () => {
+    // Prior founder-binding rejection tests legitimately queried the allowlist;
+    // start this test with no inherited call history or queued mock results.
+    mockGetUser.mockReset();
+    mockFrom.mockReset();
     mockGetUser.mockResolvedValueOnce({ data: { user: null }, error: new Error('revoked') });
     await expect(verifyPairedSupabaseOauthToken(jwt(claims()), env())).rejects.toThrow('invalid or revoked');
     expect(mockFrom).not.toHaveBeenCalled();

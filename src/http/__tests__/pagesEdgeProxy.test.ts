@@ -57,7 +57,7 @@ describe('Cloudflare Pages edge proxy', () => {
   it('proxies consent from Pages to FCR_API while retaining the browser host and session', async () => {
     const handler = await loadHandler();
     const assets = vi.fn(async () => new Response('wrong asset'));
-    const api = vi.fn(async () => identifiedResponse('API-rendered consent', { status: 200 }));
+    const api = vi.fn(async (_request: Request) => identifiedResponse('API-rendered consent', { status: 200 }));
     const response = await handler.fetch(
       new Request('https://foundercontrolroom.org/oauth/consent?authorization_id=request_12345678', {
         headers: { Cookie: '__Host-fcr_session=synthetic-session' },
@@ -78,7 +78,7 @@ describe('Cloudflare Pages edge proxy', () => {
   it('keeps the browser Origin and founder cookie for a proxied consent decision', async () => {
     const handler = await loadHandler();
     const assets = vi.fn(async () => new Response('wrong asset'));
-    const api = vi.fn(async () => identifiedResponse('{"ok":true}', { status: 200 }));
+    const api = vi.fn(async (_request: Request) => identifiedResponse('{"ok":true}', { status: 200 }));
     const response = await handler.fetch(
       new Request('https://foundercontrolroom.org/auth/oauth/authorizations/request_12345678/consent', {
         method: 'POST',
@@ -98,6 +98,7 @@ describe('Cloudflare Pages edge proxy', () => {
     expect(forwarded?.headers.get('origin')).toBe('https://foundercontrolroom.org');
     expect(forwarded?.headers.get('cookie')).toBe('__Host-fcr_session=synthetic-session');
     expect(forwarded?.headers.get('x-forwarded-host')).toBe('foundercontrolroom.org');
+    expect(await forwarded?.text()).toBe(JSON.stringify({ action: 'approve' }));
   });
 
   it('normalizes www consent navigation to the apex founder session origin', async () => {

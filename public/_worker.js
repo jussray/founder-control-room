@@ -77,6 +77,9 @@ function createApiRequest(request) {
 
   if (!STATIC_METHODS.has(request.method) && request.body !== null) {
     init.body = request.body;
+    // A forwarded request carries a ReadableStream, not a fresh string body.
+    // Node's Request constructor and streaming fetch require half-duplex.
+    init.duplex = 'half';
   }
 
   return new Request(targetUrl, init);
