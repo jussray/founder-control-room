@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { buildRuntimeStateReceipt, trackedConfigFingerprint } from '../scripts/control-room-runtime-state.mjs';
+import { buildRuntimeStateReceipt, trackedConfigFingerprint, writeRuntimeStateReceipt } from '../scripts/control-room-runtime-state.mjs';
 import { buildTestLedger } from '../scripts/control-room-test-ledger.mjs';
 
 const SHA = 'a'.repeat(40);
@@ -30,6 +30,16 @@ test('ordinary source events stay source-bound and do not pretend to prove provi
   const receipt = buildRuntimeStateReceipt(env(), fixture(), new Date('2026-10-12T22:00:00Z'));
   assert.equal(receipt.externalState.mode, 'source-bound'); assert.equal(receipt.externalState.epoch, null);
   assert.equal(receipt.proofRule.sourceShaAloneProvesExternalState, false);
+});
+
+test('runtime-state writer emits parseable JSON without a trailing literal escape', () => {
+  const root = fixture();
+  const outputPath = path.join(root, 'runtime-state.json');
+  const receipt = writeRuntimeStateReceipt(env({ CONTROL_ROOM_RUNTIME_STATE_PATH: outputPath }), root);
+  const raw = fs.readFileSync(outputPath, 'utf8');
+  assert.ok(raw.endsWith('\n'), 'receipt must end in an actual newline');
+  assert.deepEqual(JSON.parse(raw), receipt);
+  fs.rmSync(root, { recursive: true, force: true });
 });
 
 test('external state invalidation requires a fresh queue, non-secret epoch, and source', () => {
