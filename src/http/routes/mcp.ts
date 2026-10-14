@@ -1,4 +1,5 @@
 import { Router, type RequestHandler } from "express";
+import { rateLimit } from "express-rate-limit";
 import { PORTFOLIO_PROJECTS } from "../../config/portfolio.js";
 import { requireFounder, type FounderRequest } from "../middleware/requireFounder.js";
 import { McpHub, advertisedToolNames } from "../../mcp/hub.js";
@@ -20,6 +21,19 @@ import { founderPermissionsRouter } from "./founderPermissions.js";
 import { createRemoteReadMcpHandler } from "./remoteReadMcp.js";
 
 export const mcpRouter = Router();
+
+// Route-local shared bucket for both OAuth and exact-token compatibility.
+// The global 120/min/IP baseline still applies independently; this 60/min/IP
+// bound protects expensive authorization/tool requests before bearer parsing.
+// Both paths intentionally share one store so switching aliases cannot double
+// the allowance. No identity material is added to the limiter key.
+export const rateLimitExternalMcp = rateLimit({
+  windowMs: 60 * 1_000,
+  limit: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many MCP requests. Please retry shortly." },
+});
 const registryHub = new McpHub();
 
 const portfolioRemoteReadScope = PORTFOLIO_PROJECTS
@@ -116,12 +130,12 @@ function invocationFromRequest(
 // persistence all fail closed. DCR client IDs are accepted only after the
 // founder completes Supabase authorization; an optional exact client allowlist
 // can be enabled separately without making it a prerequisite for DCR.
-mcpRouter.post("/", handlePairedRemoteMcp);
+mcpRouter.post("/", rateLimitExternalMcp, handlePairedRemoteMcp);
 
 // Backward-compatible endpoint that now auto-upgrades to the same OAuth/DCR
 // contract as /mcp. The legacy static token remains a bounded fallback only for
 // callers that already possess that exact server-held credential.
-mcpRouter.post("/read", handleAutoDynamicRemoteReadMcp);
+mcpRouter.post("/read", rateLimitExternalMcp, handleAutoDynamicRemoteReadMcp);
 
 // Public metadata only. This is a read-only MCP subregistry that lets clients
 // such as Lovable discover the founder quartet without receiving credentials.

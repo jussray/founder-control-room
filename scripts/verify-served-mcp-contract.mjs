@@ -150,10 +150,18 @@ assert(
   "x-engagement signal MCP must compare its bearer token with timingSafeEqual, not a fast-exit equality",
 );
 
+// A shared route-local limiter is required in addition to the server's global
+// request baseline: /mcp and /mcp/read must not offer separate auth budgets.
+assert(
+  /import \{ rateLimit \} from "express-rate-limit";/.test(mcpRouter) &&
+    /export const rateLimitExternalMcp = rateLimit\(\{[\s\S]{0,240}?windowMs: 60 \* 1_000,[\s\S]{0,80}?limit: 60,/.test(mcpRouter),
+  "external MCP OAuth and compatibility routes must have a shared 60/minute local rate limiter",
+);
+
 /* ---------- every served mount point still carries its middleware ---------- */
 
 assert(
-  /mcpRouter\.post\("\/", handlePairedRemoteMcp\)/.test(mcpRouter),
+  /mcpRouter\.post\("\/", rateLimitExternalMcp, handlePairedRemoteMcp\)/.test(mcpRouter),
   "the canonical OAuth lane must remain mounted at POST /mcp",
 );
 // This compatibility route must retain both security paths. Static access
@@ -162,7 +170,7 @@ const compatibilityHandler = mcpRouter.match(
   /const handleAutoDynamicRemoteReadMcp: RequestHandler = [\s\S]*?\n};/,
 );
 assert(
-  /mcpRouter\.post\("\/read", handleAutoDynamicRemoteReadMcp\)/.test(mcpRouter) &&
+  /mcpRouter\.post\("\/read", rateLimitExternalMcp, handleAutoDynamicRemoteReadMcp\)/.test(mcpRouter) &&
     /const handleLegacyStaticRemoteReadMcp = createRemoteReadMcpHandler\(\{\s*authMode: "static"/.test(mcpRouter) &&
     /const handlePairedRemoteMcp = pairedOAuthMetadata\(createRemoteReadMcpHandler\(\{\s*authMode: "oauth"/.test(mcpRouter) &&
     compatibilityHandler &&
