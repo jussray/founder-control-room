@@ -54,6 +54,39 @@ describe('Cloudflare Pages edge proxy', () => {
     expect(fcrApiFetch).not.toHaveBeenCalled();
   });
 
+  it('redirects exact OAuth consent GET to the API origin without proxy or cookie changes', async () => {
+    const handler = await loadHandler();
+    const assets = vi.fn(async () => new Response('should not serve consent'));
+    const api = vi.fn(async () => identifiedResponse('should not proxy'));
+    const response = await handler.fetch(
+      new Request('https://www.foundercontrolroom.org/oauth/consent?authorization_id=request_12345678'),
+      { ASSETS: { fetch: assets }, FCR_API: { fetch: api } },
+    );
+    expect(response.status).toBe(302);
+    expect(response.headers.get('location')).toBe('https://api.foundercontrolroom.org/oauth/consent?authorization_id=request_12345678');
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(response.headers.get('referrer-policy')).toBe('no-referrer');
+    expect(response.headers.get('set-cookie')).toBeNull();
+    expect(assets).not.toHaveBeenCalled();
+    expect(api).not.toHaveBeenCalled();
+  });
+
+  it('routes consent JavaScript/CSS assets to API even when requested through Pages', async () => {
+    const handler = await loadHandler();
+    const assets = vi.fn(async () => new Response('wrong asset'));
+    const api = vi.fn(async () => identifiedResponse('api asset', { status: 200 }));
+    for (const path of ['/assets/oauth-consent.js', '/assets/oauth-consent.css']) {
+      const response = await handler.fetch(
+        new Request(`https://foundercontrolroom.org${path}`),
+        { ASSETS: { fetch: assets }, FCR_API: { fetch: api } },
+      );
+      expect(response.status).toBe(200);
+      expect(await response.text()).toBe('api asset');
+    }
+    expect(api).toHaveBeenCalledTimes(2);
+    expect(assets).not.toHaveBeenCalled();
+  });
+
   it('serves the portable founder console directory from Pages', async () => {
     const handler = await loadHandler();
     const assetFetch = vi.fn(async (_request: Request) => new Response('portable console', { status: 200 }));

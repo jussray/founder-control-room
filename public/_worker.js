@@ -13,6 +13,8 @@ const NON_RETRYABLE_GET_PATHS = new Set(['/auth/callback']);
 const API_OWNED_ASSET_PATHS = new Set([
   '/assets/auth-callback.js',
   '/assets/control-room.css',
+  '/assets/oauth-consent.js',
+  '/assets/oauth-consent.css',
 ]);
 const STATIC_EXACT_PATHS = new Set([
   '/products/business-leak-quickscan',
@@ -299,6 +301,22 @@ export default {
     const requestUrl = new URL(request.url);
     if (requestUrl.origin === API_ORIGIN) {
       return new Response('Founder Control Room proxy loop blocked.', { status: 508 });
+    }
+
+    // The Pages origin may receive the provider's consent callback. Navigate to
+    // the API host so __Host-fcr_session remains host-only and consent stays interactive.
+    if (request.method === 'GET' && requestUrl.pathname === '/oauth/consent') {
+      const target = new URL('/oauth/consent', API_ORIGIN);
+      target.search = requestUrl.search;
+      return new Response(null, {
+        status: 302,
+        headers: {
+          Location: target.toString(),
+          'Cache-Control': 'no-store',
+          'Referrer-Policy': 'no-referrer',
+          'X-Robots-Tag': 'noindex, nofollow',
+        },
+      });
     }
 
     if (requestUrl.pathname === SYNC_CONTROL_ROUTE) {

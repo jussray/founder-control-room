@@ -462,3 +462,7 @@ Rebinding `.github/workflows/playwright.yml` to `3c1689fe67142e783fe7d18b5ff6106
 ### StoryEngine federation freshness
 
 The required FCR Playwright lane binds its StoryEngine peer to an independently observed GitHub main commit. A new peer pin is a new evidence subject, not a passing browser proof or authorization to merge. The complete same-head federation runtime and browser tests must run successfully against that peer before it is treated as current.
+
+### FCR external MCP consent candidate (not deployed)
+
+The source-owned OAuth consent UI now lives on the canonical API hostname at `/oauth/consent`. The Pages edge redirects only an exact GET to the API origin without granting authority or moving the host-only founder session. The API serves consent assets and requires an interactive, allowlisted founder before an explicit approve/deny decision. After same-tab login, the callback may resume a pending, syntax-validated authorization ID. These are candidate source behaviors, not evidence that Supabase OAuth is enabled, Cloudflare Access permits discovery, or ChatGPT can connect.

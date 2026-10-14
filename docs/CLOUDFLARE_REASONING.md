@@ -270,3 +270,7 @@ npx playwright test e2e/cloudflare-reasoning.spec.ts
 ```
 
 The browser/API suite verifies the public-safe contract, founder protection, absence of credential leakage, presence of the implementation stack, and absence of an accidental deployment endpoint. Unit tests verify exact-commit reasoning, stale evidence, duplicate authority, authentication failures, runtime failure, rollback preparation, first-principles deletion/simplification output, and approval boundaries.
+
+## OAuth consent API-origin boundary
+
+For an external connector's authorization request, the Pages edge redirects a GET for `/oauth/consent` to the canonical FCR API origin while preserving the query string. The edge does not issue cookies, approve consent, or proxy API-hosted consent assets from a static bundle. The API origin owns the host-only interactive founder cookie, no-store consent UI, and protected server-to-Supabase authorization request. Full acceptance requires current Supabase OAuth settings, Access routing readback, a real authenticated consent decision, and a subsequent scoped MCP tool receipt; source testing is not deployment proof.

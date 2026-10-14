@@ -241,3 +241,7 @@ Current executable source and authoritative provider readback outrank an older v
 - Access: roll back only an incomplete or ambiguous browser-destination detachment using the receipt-bound original destination set and unchanged application/policy identity; a later runtime/browser failure alone must not automatically reintroduce a Cloudflare Access product-login screen.
 - Credentials: remove/revoke only the affected credential; do not rotate unrelated keys to repair binding drift.
 - Preserve build logs, deployment IDs, provider readback, browser traces, and runtime receipts.
+
+### External OAuth consent routing candidate
+
+`public/_worker.js` must send only the exact Pages `GET /oauth/consent` browser navigation to `https://api.foundercontrolroom.org/oauth/consent`, retaining query state and no-store/no-referrer protection. `/assets/oauth-consent.js` and `/assets/oauth-consent.css` are API-owned, not Pages `ASSETS` content. Interactive consent API calls must stay on the API host under the existing founder cookie and same-origin mutation checks. This is source-defined until both the Pages and API deployments, Supabase authorization flow, and protected runtime are independently observed. Never weaken Cloudflare Access or founder session boundaries to make the flow pass.

@@ -35,7 +35,8 @@
     {
       "path": "public/_worker.js",
       "claims": [
-        "`public/_worker.js` must route public static discovery artifacts, including `crawlers.json`, through the Pages `ASSETS` binding while API-owned callback assets remain on `FCR_API`; this routing classification cannot authorize provider mutation or treat a static crawler policy as authentication."
+        "`public/_worker.js` must route public static discovery artifacts, including `crawlers.json`, through the Pages `ASSETS` binding while API-owned callback assets remain on `FCR_API`; this routing classification cannot authorize provider mutation or treat a static crawler policy as authentication.",
+        "`public/_worker.js` must redirect the exact GET OAuth consent navigation to the FCR API origin without rewriting founder cookies, proxying consent from static Pages assets, or treating source behavior as provider authorization; the consent JavaScript and CSS are API-owned."
       ]
     },
     {
