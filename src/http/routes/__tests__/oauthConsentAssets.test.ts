@@ -19,7 +19,7 @@ describe('API-hosted consent UI', () => {
     expect(response.text).toContain('Deny');
     expect(response.text).toContain('/assets/oauth-consent.js');
     expect(response.text).toContain('/assets/oauth-consent.css');
-    expect(response.text).toContain('href="/" id="sign-in-link"');
+    expect(response.text).toContain('href="/control-room/" id="sign-in-link"');
     expect(response.text).not.toContain('access_token');
   });
 
