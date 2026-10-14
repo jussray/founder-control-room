@@ -183,7 +183,9 @@ async function provePublicFrontDoor(label, viewport) {
   }
   await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
   await page.locator('a.logo').click();
-  if (await page.evaluate(() => window.location.hash) !== '#top' || !(await userPanel.isVisible())) {
+  await userPanel.waitFor({ state: 'visible', timeout: 5000 });
+  const homeState = await page.evaluate(() => ({ hash: window.location.hash, scrollY: window.scrollY }));
+  if (homeState.hash !== '#top' || homeState.scrollY > 3 || !(await userPanel.isVisible())) {
     throw new Error(label + ': home link must scroll to an existing top target and show public User View');
   }
 
