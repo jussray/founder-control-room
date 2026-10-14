@@ -106,6 +106,29 @@ describe('paired Supabase OAuth verifier', () => {
     })), env())).resolves.toMatchObject({ projectIds: [CHIEF] });
   });
 
+  it.each([
+    ['null', null],
+    ['string', CHIEF],
+    ['empty array', []],
+    ['invalid project slug', ['wrong project!']],
+    ['mixed non-string members', [CHIEF, 42]],
+  ])('rejects present malformed mcp_projects: %s instead of expanding server scope', async (_name, invalidClaim) => {
+    mockGetUser.mockClear();
+    mockFrom.mockClear();
+    await expect(verifyPairedSupabaseOauthToken(jwt(claims({
+      mcp_projects: invalidClaim,
+    })), env())).rejects.toThrow('OAuth project restriction is malformed');
+    expect(mockGetUser).not.toHaveBeenCalled();
+    expect(mockFrom).not.toHaveBeenCalled();
+  });
+
+  it('rejects a well-formed project restriction outside the server grant', async () => {
+    allowFounder();
+    await expect(verifyPairedSupabaseOauthToken(jwt(claims({
+      mcp_projects: ['not-in-server'],
+    })), env())).rejects.toThrow('OAuth project grant does not overlap server scope');
+  });
+
   it('can opt into an exact client allowlist without making it the DCR default', async () => {
     mockGetUser.mockClear();
     mockFrom.mockClear();

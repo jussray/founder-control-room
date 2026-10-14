@@ -78,8 +78,11 @@ function claimScopes(value: unknown): string[] {
 }
 
 function claimProjects(value: unknown): string[] {
-  if (!Array.isArray(value) || !value.every((entry) => typeof entry === 'string')) return [];
-  return [...new Set(value.map((entry) => entry.trim()).filter((entry) => PROJECT_SLUG.test(entry)))];
+  if (!Array.isArray(value) || value.length === 0
+    || !value.every((entry) => typeof entry === 'string' && PROJECT_SLUG.test(entry.trim()))) {
+    throw new Error('OAuth project restriction is malformed');
+  }
+  return [...new Set(value.map((entry: string) => entry.trim()))];
 }
 
 function configuredServerProjects(env: NodeJS.ProcessEnv): string[] {
@@ -158,10 +161,13 @@ export async function verifyPairedSupabaseOauthToken(
     throw new Error('OAuth identity is not on the founder allowlist');
   }
 
-  const tokenProjects = claimProjects(claims.mcp_projects);
-  const projectIds = tokenProjects.length > 0
-    ? tokenProjects.filter((project) => serverProjects.includes(project))
-    : serverProjects;
+  // Absence means the server-defined maximum grant. A present, malformed
+  // project restriction must never be mistaken for absence and expand access.
+  const hasProjectRestriction = Object.prototype.hasOwnProperty.call(claims, 'mcp_projects');
+  const tokenProjects = hasProjectRestriction ? claimProjects(claims.mcp_projects) : null;
+  const projectIds = tokenProjects === null
+    ? serverProjects
+    : tokenProjects.filter((project) => serverProjects.includes(project));
   if (projectIds.length === 0) throw new Error('OAuth project grant does not overlap server scope');
 
   return { userId, email, clientId, projectIds, authMode: 'oauth' };
