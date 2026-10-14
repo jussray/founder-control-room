@@ -921,6 +921,17 @@ describe('POST /:missionId/patch — founder read/write/edit on a sandbox branch
     expect(mockCommitPatch).not.toHaveBeenCalled();
   });
 
+  it('requires an idempotency key before attempting a patch provider mutation', async () => {
+    wireStandardTables();
+    const res = await request(buildApp())
+      .post(`/approvals/${MISSION_ID}/patch`)
+      .set('Authorization', BEARER)
+      .send({ message: 'edit', changes: [{ path: 'a.txt', content: 'hi' }] });
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('IDEMPOTENCY_KEY_REQUIRED');
+    expect(mockCommitPatch).not.toHaveBeenCalled();
+  });
+
   it('commits the patch to the mission branch and audits it — never touches base_ref', async () => {
     const { projectEventInsert } = wireStandardTables();
     mockCommitPatch.mockResolvedValue('deadbeef'.repeat(5));
