@@ -149,6 +149,9 @@ describe('repository documentation truth control', () => {
     const activation = companion.split('## Activation')[1]?.split(String.fromCharCode(10))[1] ?? '';
     expect(activation).toContain('/godmode');
     expect(activation).not.toContain('/goalfix');
+    expect(activation).not.toContain('/repair-to-proof');
+    expect(activation).not.toMatch(/(^|[,\s])repair-to-proof([,\s]|$)/);
+    expect(companion).toContain('The `/repair-to-proof` activation belongs exclusively');
     expect(companion).toContain('The canonical `/goalfix`');
     expect(read('skills/ultrathink-suite/README.md')).toContain('canonical `.ai/skills/goalfix/SKILL.md` first');
   });
