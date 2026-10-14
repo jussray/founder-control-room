@@ -33,4 +33,18 @@ for (const boundary of ['requireFounder', "res.set('Cache-Control', 'no-store')"
   if (!route.includes(boundary)) throw new Error(`Missing server authority boundary: ${boundary}`);
 }
 
+// Regression for the mobile CSS newline-escape defect: a literal backslash-n
+// before @media causes the browser to drop the expected responsive rules.
+const css = await readFile(new URL('../public/control-room/capabilities.css', import.meta.url), 'utf8');
+if (/\\n(?:\/\*|@media)/.test(css)) {
+  throw new Error('CSS_ESCAPE_SEQUENCE_IN_STYLESHEET: use actual newlines before responsive rules');
+}
+for (const boundary of [
+  '@media(max-width:900px){.workspace{grid-template-columns:minmax(0,1fr)}',
+  '.detail code{overflow-wrap:anywhere}',
+  '@media(max-width:560px){.contract>div{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}',
+]) {
+  if (!css.includes(boundary)) throw new Error(`Missing responsive workbench boundary: ${boundary}`);
+}
+
 console.log('Capability workbench static boundary verified');
