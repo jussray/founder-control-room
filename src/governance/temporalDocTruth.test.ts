@@ -146,7 +146,8 @@ describe('repository documentation truth control', () => {
     expect(documentationVerifier).toContain('ultrathink-suite');
     expect(documentationVerifier).toContain("file.startsWith('skills/')");
     const companion = read('skills/ultrathink-attack-godmode/SKILL.md');
-    const activation = companion.split('## Activation\\n')[1]?.split('\\n')[0] ?? '';
+    const activation = companion.split('## Activation')[1]?.split(String.fromCharCode(10))[1] ?? '';
+    expect(activation).toContain('/godmode');
     expect(activation).not.toContain('/goalfix');
     expect(companion).toContain('The canonical `/goalfix`');
     expect(read('skills/ultrathink-suite/README.md')).toContain('canonical `.ai/skills/goalfix/SKILL.md` first');
