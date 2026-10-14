@@ -10,6 +10,7 @@ This directory index adds three **companion skills** to Founder Control Room. It
 
 ## Routing
 - `/ultrathink`, `/godmode`, `attack/godmode`, `implant fixes` → **ultrathink-attack-godmode**, then **repair-to-proof** for the verification boundary.
+- `/goalfix`, `/fixfast`, `/repair-verify-merge` → **canonical `.ai/skills/goalfix/SKILL.md` first**. Invoke ULTRATHINK companions only through the canonical Goalfix workflow when its authority and scope require them; never register a second competing Goalfix handler.
 - `/repair-to-proof`, `merge review`, `exact-head gate` → **repair-to-proof**.
 - `/continuity`, `/receipt`, `fingerprints and cookies` → **continuity-proof-ledger**.
 - Cross-agent work should use the ledger after every meaningful action and preserve independent project boundaries.

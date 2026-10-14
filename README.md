@@ -455,3 +455,13 @@ Rebinding `.github/workflows/playwright.yml` to `3c1689fe67142e783fe7d18b5ff6106
 ## October 13 federation recovery and PR continuity
 
 FCR PR #969 refreshed its StoryEngine peer identity after a live-ref check proved that the historical peer SHA no longer matched StoryEngine `main`. The successor must still pass the complete exact-head federation Playwright flow: immutable peer checkout, runtime identity, directive and receipt binding, replay protections, and browser witness. The first successor branch run passed, but later branch reconciliation with `main` changed the FCR head, so that result is historical for the new head and must not be reused as current proof. Branch ancestry repair also does not repair documentation truth by itself; this documentation transition records the source and evidence limits. Neither the peer pin nor a successful CI job establishes production deployment, Shopify payments, provider mutation, or merge authority.
+
+## Governance skill Documentation Truth coverage (October 14, 2026)
+
+The mandatory ULTRATHINK companion skill sources `skills/ultrathink-attack-godmode/SKILL.md`, `skills/repair-to-proof/SKILL.md`, `skills/continuity-proof-ledger/SKILL.md`, and `skills/ultrathink-suite/README.md` are now classified as truth-governance-sensitive by `scripts/verify-documentation-truth.mjs`. Source changes to these skill paths must refresh this README, `docs/TRUTH_DECAY_AUDIT.md`, and `docs/DOCUMENTATION_TRUTH_RECEIPT.json` with meaningful path-bound invariants. Otherwise Documentation Truth must fail closed; new skill registration and green CI do not prove runtime activation or authorize merge.
+
+The canonical `/goalfix` command is owned by `.ai/skills/goalfix/SKILL.md`. The ULTRATHINK companion must not register that same activation independently: Goalfix may delegate into its companion contracts only under the canonical execution sequence and repository authority. This source correction does not claim a deployed agent skill registry or production execution.
+
+## October 14 independent review: proof-skill routing
+
+The independent review of FCR PR #969 confirmed that `skills/ultrathink-attack-godmode/SKILL.md` incorrectly advertised `repair-to-proof` alongside `skills/repair-to-proof/SKILL.md`'s canonical `/repair-to-proof` trigger. The investigative ULTRATHINK companion no longer claims that activation in its frontmatter or Activation section. The companion hands completed work to the dedicated proof/release contract through the governed suite, without creating duplicate invocation authority. The source-only routing change does not establish installed runtime command registration, an independent reviewer approval, merge authorization, or deployment.
