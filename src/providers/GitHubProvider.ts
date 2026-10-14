@@ -488,7 +488,14 @@ export class GitHubProvider implements RepositoryProvider {
     }
     // Preserve the existing error-level code quality rule during reconciliation.
     if (hardenFounderControlRoomMainReview) {
-      reviewRules.push({ type: "code_quality", parameters: { severity: FCR_CODE_QUALITY_SEVERITY } });
+      // GitHub REST supports code_quality, but pinned Octokit endpoint types lag the 2026 API.
+      // Keep the compatibility cast limited to this verified rule shape; provider readback
+      // independently rejects missing or weakened code-quality enforcement.
+      const codeQualityRule = {
+        type: "code_quality",
+        parameters: { severity: FCR_CODE_QUALITY_SEVERITY },
+      } as const;
+      reviewRules.push(codeQualityRule as unknown as RepoRule);
     }
     // For FCR main, strict status/base-freshness is deliberately moved to a
     // second no-bypass ruleset below. Other projects retain the prior single
