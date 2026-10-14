@@ -40,6 +40,13 @@ For a present-tense claim:
 
 Exact SHAs belong in receipts, PRs, artifacts, incidents, and provenance. The README deliberately does not freeze one SHA as permanent “current truth.”
 
+### External FCR MCP: ChatGPT and other authenticated clients
+
+The canonical source-defined endpoint is `POST https://api.foundercontrolroom.org/mcp`. It accepts scoped Supabase OAuth 2.1 bearer tokens after current-user and founder allowlist validation; supported clients may register dynamically through the identity provider. `POST /mcp/read` preserves legacy static-token clients **only when their existing bearer token matches exactly** and otherwise uses OAuth. The server-owned portfolio registry bounds every grant; an optional token project claim can only narrow it. Tools remain explicitly bounded and require redacted evidence receipts; no generic provider-write authority follows from being connected.
+
+The repository's OAuth handler, bootstrapping tests, and MCP metadata are **source and CI evidence**, not proof of production installation or completed ChatGPT sign-in. Before declaring a usable ChatGPT plugin, separately verify the deployed Worker version and bindings, Supabase consent, token issuance, founder authorization, tool discovery, authorized read, and a persisted evidence receipt. A merge cannot authorize deployment. See [MCP stack](docs/MCP_STACK.md) and [Cloudflare Worker targets](docs/deployment/CLOUDFLARE_WORKER_TARGETS.md).
+
+
 ## What is implemented in source now
 
 ### Repository and mission control

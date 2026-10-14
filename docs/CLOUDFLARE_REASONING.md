@@ -16,6 +16,13 @@ Goal → Reality → Redteam I → Lindy → L99 → Redteam II → OODA → Bil
 
 The engine is deterministic. It does not call a model, execute Wrangler, deploy a Worker, change DNS, rotate secrets, or roll back production.
 
+### External MCP deployment and identity proof
+
+The canonical FCR Worker is intended to serve `POST /mcp` as the Supabase OAuth-protected connector and `POST /mcp/read` as its exact-static-token compatibility alias. The repository's `wrangler.worker.toml` declares public-safe resource, issuer, audience, and scope configuration; `FCR_REMOTE_MCP_READ_TOKEN` remains a provider-held secret, never a source literal. The `founder_users` allowlist, server-owned project scope, consent, and redacted evidence persistence must remain independent of connector or browser identity.
+
+Treat a passing OAuth bootstrap or Playwright harness as candidate-source proof only. Before any production-ready claim, observe the current Cloudflare deployment and Worker bindings, confirm the OAuth provider consent and issued-token behavior, then exercise tools/list and an authorized read through the actual ChatGPT client with a durable redacted receipt. Missing or stale provider proof is `UNKNOWN/BLOCKED`, not success; publication, provider mutation, and deployment each require their separate approval gate.
+
+
 ## Why this exists
 
 A Cloudflare incident can present several facts that look contradictory:

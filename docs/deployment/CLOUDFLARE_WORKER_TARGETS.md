@@ -89,19 +89,22 @@ This binding is intentionally inert from application code in this slice: no publ
 
 Repository configuration proves only the desired Workflow class/binding contract. It does not prove that Cloudflare has accepted the binding, that an instance exists or completed, or that any release/provider action occurred. Those are separate provider/runtime evidence gates.
 
-### Remote read MCP operator boundary
+### External MCP OAuth and legacy read boundary
 
-The canonical Worker also owns the served remote read-only MCP endpoint at:
+The canonical `founder-control-room` Worker has two distinct **source-defined** MCP paths:
 
 ```text
+POST https://api.foundercontrolroom.org/mcp
 POST https://api.foundercontrolroom.org/mcp/read
 ```
 
-Repository configuration binds `FCR_REMOTE_MCP_READ_PROJECTS` to exactly `chief-ai-machine,founder-control-room` and requires the dedicated secret name `FCR_REMOTE_MCP_READ_TOKEN`. The scope is server-held; an MCP caller cannot widen it by supplying another project identifier or by reusing another FCR credential.
+`/mcp` is the canonical connector resource for eligible ChatGPT, Claude, and other admitted MCP clients. It requires a Supabase OAuth 2.1 bearer token with a valid current user, founder allowlist membership, client identity, and the supported `authenticated` audience / `email` scope. The FCR server derives project grants from its own portfolio registry; an optional `mcp_projects` token claim can **narrow**, never widen, this authority.
 
-The secret value belongs only in the canonical Worker secret store. Never place it in Wrangler source, `.env.example`, GitHub issues, PR bodies, screenshots, logs, browser code, or proof artifacts. Repository source proves the intended secret interface and project scope only; it does not prove that the secret is installed, the deployed runtime matches this source, or the live endpoint is reachable.
+`/mcp/read` is the compatibility path. Only an exact timing-safe match to the dedicated `FCR_REMOTE_MCP_READ_TOKEN` selects the legacy bounded static-token handler; every other supplied token stays on the OAuth handler. An invalid OAuth token must never fall back to static authority. Both routes retain the named-tool, project-policy, secret-rejection, and redacted-evidence-persistence boundaries defined in `src/http/routes/mcp.ts` and `src/http/routes/remoteReadMcp.ts`.
 
-The route must fail closed if the token or project scope is unavailable. Its advertised surface remains limited to `list_read_servers` and `invoke_read_tool`, and the underlying FCR MCP registry/policy remains authoritative for provider/tool reads. Expanding the scope beyond Chief AI + Founder Control Room requires a separate reviewed authority change.
+`wrangler.worker.toml` declares public-safe MCP resource, issuer, audience, scope, and bounded project configuration. Actual runtime credentials belong exclusively in the canonical Worker secret store. Do not put them in Wrangler source, public pages, sample environment files, CI logs, PR bodies, or MCP arguments. The Wrangler variable `FCR_REMOTE_MCP_READ_PROJECTS` does not grant broader runtime authority than the application-owned `PORTFOLIO_PROJECTS` registry.
+
+**Evidence gate:** source configuration, passing tests, and a deployment record are separate claims. Verify the current Cloudflare Worker version/bindings, Supabase consent and issuer, current-user/allowlist authentication, client tools/list, one authorized read, and the persisted redacted tool-call receipt before reporting that ChatGPT can actually operate FCR. A stale production Worker or missing secret binding is not a working connector. See `docs/MCP_STACK.md`.
 
 ### Worker build authority invariant
 
