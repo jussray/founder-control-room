@@ -1,7 +1,8 @@
 -- Neon preview contract for the production-recorded FCR RLS reconciliation.
 -- Neon does not inherit the Supabase schema. Run the real historical and
--- forward migrations against disposable PostgreSQL state, then ROLLBACK.
--- This verifies the migration's preconditions and effect; it does not
+-- forward migrations against disposable PostgreSQL state, then COMMIT.
+-- This verifies the migration's preconditions and effect in the real Neon
+-- preview database so the CI applied-migration receipt is truthful. It does not
 -- substitute for the separately observed production Supabase policy.
 BEGIN;
 
@@ -71,4 +72,4 @@ BEGIN
   END IF;
 END $$;
 
-ROLLBACK;
+COMMIT;
