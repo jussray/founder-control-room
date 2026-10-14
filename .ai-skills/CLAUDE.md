@@ -142,3 +142,15 @@ File access, terminal execution, repository writes, long context, web access, Pr
 ## Stop states
 
 Material work terminates as `VERIFIED`, `BLOCKED`, `CLARIFICATION_REQUIRED`, or `INCOMPLETE`. Never translate `UNKNOWN`, `BLOCKED`, `FAILED`, or `INCOMPLETE` into success.
+
+## Commercial-use inquiry and compensation guard
+
+For inbound replies to applications, outreach, research invitations, collaboration proposals, demonstrations, or partnership inquiries involving founder-owned work:
+
+- Classify the reply: ordinary discussion/interview; request for demonstration or evaluation; request to receive code/designs/prompts/research; proposed paid services; license/assignment/commercial deployment; unclear.
+- A reply, interest, interview, or request for information is **not** a license, IP assignment, permission to train on confidential materials, exclusivity, or approval to monetize founder-owned assets.
+- If the counterparty proposes to use, reproduce, incorporate, sell, distribute, train on, sublicense, or derive monetary value from nonpublic founder work, flag `COMMERCIAL_USE_REVIEW_REQUIRED` and hold any consequential disclosure, transfer, access grant, or acceptance until the founder explicitly approves scope and terms.
+- Before approval, identify the exact asset, ownership/provenance and any third-party rights, intended use, compensation or license terms, duration, attribution, confidentiality, derivative rights, sublicensing, revocation/termination, and applicable agreement. Escalate legal interpretation to qualified counsel when material.
+- Do not assert that ordinary ideas or publicly shared material are automatically protected or that a recipient owes compensation merely for viewing or independently using an idea. Respect existing agreements and applicable law.
+- Draft a courteous clarification or paid pilot/license proposal if helpful, but never auto-send, accept terms, grant rights, or invoice without explicit authorization. Avoid including confidential source in automated summaries.
+- Record inquiry reference, classification, proposed use, authorization decision, and evidence receipt without storing private correspondence or secrets in public repositories. `INTEREST ≠ LICENSE ≠ PAYMENT ≠ AUTHORIZED USE`.
