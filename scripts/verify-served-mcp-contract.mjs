@@ -47,6 +47,7 @@ const remoteReadMcp = read("src/http/routes/remoteReadMcp.ts");
 const signalEngineMcp = read("src/http/routes/founderSignalEngineMcp.ts");
 const xEngagementMcp = read("src/http/routes/xEngagementSignalMcp.ts");
 const mcpRouter = read("src/http/routes/mcp.ts");
+const mcpRateLimit = read("src/http/middleware/mcpRateLimit.ts");
 const server = read("src/http/server.ts");
 
 /* ---------- externalTools.ts: the tool catalog invoked by /mcp and /mcp/read ---------- */
@@ -153,8 +154,10 @@ assert(
 // A shared route-local limiter is required in addition to the server's global
 // request baseline: /mcp and /mcp/read must not offer separate auth budgets.
 assert(
-  /import \{ rateLimit \} from "express-rate-limit";/.test(mcpRouter) &&
-    /export const rateLimitExternalMcp = rateLimit\(\{[\s\S]{0,240}?windowMs: 60 \* 1_000,[\s\S]{0,80}?limit: 60,/.test(mcpRouter),
+  mcpRouter.includes('import { rateLimitExternalMcp } from "../middleware/mcpRateLimit.js";') &&
+    mcpRateLimit.includes("export const rateLimitExternalMcp = rateLimit({") &&
+    mcpRateLimit.includes("windowMs: 60 * 1_000,") &&
+    mcpRateLimit.includes("limit: 60,"),
   "external MCP OAuth and compatibility routes must have a shared 60/minute local rate limiter",
 );
 

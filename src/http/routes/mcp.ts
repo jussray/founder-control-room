@@ -1,5 +1,5 @@
 import { Router, type RequestHandler } from "express";
-import { rateLimit } from "express-rate-limit";
+import { rateLimitExternalMcp } from "../middleware/mcpRateLimit.js";
 import { PORTFOLIO_PROJECTS } from "../../config/portfolio.js";
 import { requireFounder, type FounderRequest } from "../middleware/requireFounder.js";
 import { McpHub, advertisedToolNames } from "../../mcp/hub.js";
@@ -22,18 +22,6 @@ import { createRemoteReadMcpHandler } from "./remoteReadMcp.js";
 
 export const mcpRouter = Router();
 
-// Route-local shared bucket for both OAuth and exact-token compatibility.
-// The global 120/min/IP baseline still applies independently; this 60/min/IP
-// bound protects expensive authorization/tool requests before bearer parsing.
-// Both paths intentionally share one store so switching aliases cannot double
-// the allowance. No identity material is added to the limiter key.
-export const rateLimitExternalMcp = rateLimit({
-  windowMs: 60 * 1_000,
-  limit: 60,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: "Too many MCP requests. Please retry shortly." },
-});
 const registryHub = new McpHub();
 
 const portfolioRemoteReadScope = PORTFOLIO_PROJECTS

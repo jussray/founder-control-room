@@ -317,6 +317,12 @@
       "claims": [
         "The canonical /mcp and legacy /mcp/read POST auth/tool routes must share one explicit 60-per-minute per-IP, per-process route-local express-rate-limit middleware before any OAuth/static-token dispatch, alongside the existing 120-per-minute global baseline; this source guard does not prove globally distributed or deployed enforcement and must not weaken the authentication/grant checks."
       ]
+    },
+    {
+      "path": "src/http/middleware/mcpRateLimit.ts",
+      "claims": [
+        "The MCP rate-limit middleware is a dependency-free unit-testable 60-request/minute per-IP and per-process express-rate-limit instance; both canonical and compatibility MCP routes must reuse this same instance before authentication, and this does not prove globally distributed Cloudflare enforcement or override OAuth/founder authorization."
+      ]
     }
   ]
 }
