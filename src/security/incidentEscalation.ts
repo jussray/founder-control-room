@@ -210,7 +210,7 @@ export async function escalateToSlack(
     }
 
     return true;
-  } catch (error) {
+  } catch {
     // Provider errors can embed credential-bearing URLs; never log them here.
     console.error('[incident-escalation] Slack delivery error');
     return false;
