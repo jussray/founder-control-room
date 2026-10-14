@@ -156,9 +156,26 @@ assert(
   /mcpRouter\.post\("\/", handlePairedRemoteMcp\)/.test(mcpRouter),
   "the canonical OAuth lane must remain mounted at POST /mcp",
 );
+// This compatibility route must retain both security paths. Static access
+// requires an exact token match; every other credential stays on OAuth.
+const compatibilityHandler = mcpRouter.match(
+  /const handleAutoDynamicRemoteReadMcp: RequestHandler = [\s\S]*?\n};/,
+);
 assert(
-  /mcpRouter\.post\("\/read", handleRemoteReadMcp\)/.test(mcpRouter),
-  "the compatibility static-token lane must remain mounted at POST /mcp/read",
+  /mcpRouter\.post\("\/read", handleAutoDynamicRemoteReadMcp\)/.test(mcpRouter) &&
+    /const handleLegacyStaticRemoteReadMcp = createRemoteReadMcpHandler\(\{\s*authMode: "static"/.test(mcpRouter) &&
+    /const handlePairedRemoteMcp = pairedOAuthMetadata\(createRemoteReadMcpHandler\(\{\s*authMode: "oauth"/.test(mcpRouter) &&
+    compatibilityHandler &&
+    compatibilityHandler[0].includes("if (usesLegacyStaticMcpToken(") &&
+    compatibilityHandler[0].includes("return handleLegacyStaticRemoteReadMcp(req, res, next);") &&
+    compatibilityHandler[0].includes("return handlePairedRemoteMcp(req, res, next);"),
+  "/mcp/read must select legacy static auth only for an exact token match and otherwise use OAuth",
+);
+const pairedOauth = read("src/mcp/pairedSupabaseOAuth.ts");
+assert(
+  /return timingSafeEqual\(actualBuffer, expectedBuffer\);/.test(pairedOauth) &&
+    /if \(!expected \|\| !authorizationHeader\?\.startsWith\('Bearer '\)\) return false;/.test(pairedOauth),
+  "legacy token selection must reject missing credentials and use timing-safe comparison",
 );
 assert(
   /app\.use\('\/mcp', mcpRouter\)/.test(server),
