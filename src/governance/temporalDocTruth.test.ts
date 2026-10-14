@@ -141,6 +141,17 @@ describe('repository documentation truth control', () => {
     expect(documentationVerifier).toContain('founder-content-outcome-contract');
   });
 
+  it('registers mandatory ULTRATHINK companions for documentation truth without overriding canonical Goalfix', () => {
+    expect(documentationVerifier).toContain('ultrathink-attack-godmode|repair-to-proof|continuity-proof-ledger');
+    expect(documentationVerifier).toContain('ultrathink-suite');
+    expect(documentationVerifier).toContain("file.startsWith('skills/')");
+    const companion = read('skills/ultrathink-attack-godmode/SKILL.md');
+    const activation = companion.split('## Activation\\n')[1]?.split('\\n')[0] ?? '';
+    expect(activation).not.toContain('/goalfix');
+    expect(companion).toContain('The canonical `/goalfix`');
+    expect(read('skills/ultrathink-suite/README.md')).toContain('canonical `.ai/skills/goalfix/SKILL.md` first');
+  });
+
   it('keeps documentation analytics observation-only', () => {
     expect(truthDecay).toContain('Documentation truth gate');
     expect(truthDecay).toContain('**Analytics remains observation-only.**');

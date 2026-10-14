@@ -301,13 +301,38 @@
       "path": "scripts/verify-documentation-truth.mjs",
       "claims": [
         "`scripts/verify-documentation-truth.mjs` must classify `src/founder-os-lab/projectAdapters.ts` as evidence-authority truth-sensitive so a Chief exact-head pin movement cannot pass Documentation Truth without substantive README, truth-decay audit, and structured receipt updates that name the changed path.",
-        "`scripts/verify-documentation-truth.mjs` must classify `tools/zapier/founder-content-outcome-contract.cjs` as evidence-authority truth-sensitive so account-provenance changes cannot pass Documentation Truth without substantive README, truth-decay audit, and path-bound receipt updates."
+        "`scripts/verify-documentation-truth.mjs` must classify `tools/zapier/founder-content-outcome-contract.cjs` as evidence-authority truth-sensitive so account-provenance changes cannot pass Documentation Truth without substantive README, truth-decay audit, and path-bound receipt updates.",
+        "`scripts/verify-documentation-truth.mjs` must classify every mandatory ULTRATHINK governance companion under `skills/` as truth-sensitive and record these Markdown paths in changed documentation, rejecting future rule changes lacking path-bound receipt claims and substantive README/truth-decay refresh."
       ]
     },
     {
       "path": "tools/zapier/founder-content-outcome-contract.cjs",
       "claims": [
         "`tools/zapier/founder-content-outcome-contract.cjs` must bind founder-content metrics to the exact observed network, lane, account identity, connector identity, and coverage state; out-of-scope metrics must remain UNKNOWN, cross-account metric donation is forbidden, and these receipts can never grant publication, provider-write, merge, deploy, spend, or external-contact authority."
+      ]
+    },
+    {
+      "path": "skills/ultrathink-attack-godmode/SKILL.md",
+      "claims": [
+        "`skills/ultrathink-attack-godmode/SKILL.md` must preserve the canonical `.ai/skills/goalfix/SKILL.md` ownership of `/goalfix`, avoid duplicate activations, and never treat an operator shorthand, skill file, or green check as merge, deploy, provider, or production authority."
+      ]
+    },
+    {
+      "path": "skills/repair-to-proof/SKILL.md",
+      "claims": [
+        "`skills/repair-to-proof/SKILL.md` must require exact-head CI evidence, independent review, founder-final candidate approval and post-action provider readback; companion skill text cannot grant a repository merge, deployment, or verified production outcome."
+      ]
+    },
+    {
+      "path": "skills/continuity-proof-ledger/SKILL.md",
+      "claims": [
+        "`skills/continuity-proof-ledger/SKILL.md` must treat fingerprints, continuity cookies, and predecessor receipts as resumable evidence pointers only; they never authenticate the founder, mint permission, or transfer verification across moved heads."
+      ]
+    },
+    {
+      "path": "skills/ultrathink-suite/README.md",
+      "claims": [
+        "`skills/ultrathink-suite/README.md` must route `/goalfix` through `.ai/skills/goalfix/SKILL.md` as canonical owner, treat ULTRATHINK skills as optional governed companions, and never grant a second execution authority or falsely certify runtime installation."
       ]
     }
   ]
