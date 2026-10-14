@@ -91,6 +91,10 @@ async function provePublicFrontDoor(label, viewport) {
     throw new Error(`${label}: approved public headline drifted: ${headline}`);
   }
 
+  if (await page.getByRole('main').count() !== 1 || await page.locator('#top').count() !== 1) {
+    throw new Error(label + ': public front door requires one main landmark and a real home target');
+  }
+
   const tabs = page.getByRole('tab');
   if (await tabs.count() !== 2) throw new Error(`${label}: public FCR must expose exactly two view tabs`);
   const tabLabels = await tabs.allInnerTexts();
@@ -166,13 +170,23 @@ async function provePublicFrontDoor(label, viewport) {
   }
 
 
-  for (const section of ['projects', 'proof', 'automations']) {
+  for (const section of ['projects', 'proof', 'automations', 'community-f']) {
     await page.goto(BASE_URL + '/#' + section, { waitUntil: 'networkidle' });
     await page.reload({ waitUntil: 'networkidle' });
     if (!(await founderPanel.isVisible()) || !(await page.locator('#' + section).isVisible())) {
       throw new Error(label + ': founder deep link must survive reload: #' + section);
     }
   }
+  await page.goto(BASE_URL + '/#community-f', { waitUntil: 'networkidle' });
+  if ((await page.locator('#community-f h3').innerText()) !== 'Founder Community') {
+    throw new Error(label + ': founder Community link must target a real community section');
+  }
+  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+  await page.locator('a.logo').click();
+  if (await page.evaluate(() => window.location.hash) !== '#top' || !(await userPanel.isVisible())) {
+    throw new Error(label + ': home link must scroll to an existing top target and show public User View');
+  }
+
   await page.goto(BASE_URL + '/#discover', { waitUntil: 'networkidle' });
   if (!(await userPanel.isVisible()) || (await founderPanel.isVisible())) {
     throw new Error(label + ': user section link must restore User View');

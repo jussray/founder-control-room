@@ -31,6 +31,10 @@ describe('Founder Control Room Cloudflare topology', () => {
 
     expect(landing).toContain('<link rel="canonical" href="https://www.foundercontrolroom.org/" />');
     expect(landing).toContain('data-fcr-visual="approved-mockup-v3"');
+    expect(landing).toContain('<div class="wrap" id="top">');
+    expect((landing.match(/<main>/g) ?? [])).toHaveLength(1);
+    expect(landing).toContain('id="community-f" aria-labelledby="founder-community-title"');
+    expect(landing).toContain('<h3 id="founder-community-title">Founder Community</h3>');
     expect(landing).toContain('<script src="/fcr-public-tabs.js" defer></script>');
     expect(landing).not.toMatch(/<script\b(?![^>]*\bsrc=)/i);
     const tabController = read('public/fcr-public-tabs.js');

@@ -177,6 +177,7 @@
     .stat.muted b { font-size: 1rem; color: var(--muted-2); font-weight: 600; }
 
     .fgrid { display: grid; grid-template-columns: 1.15fr .85fr; gap: .9rem; padding: 0 1.4rem 1.4rem; }
+    #community-f { grid-column: 1 / -1; }
     .panel { border: 1px solid var(--line); border-radius: 1rem; padding: 1rem; background: linear-gradient(180deg, #1c2550, #0c0f26); box-shadow: 0 18px 50px rgba(0,0,0,.3); }
     .note-line { margin: 1rem 1.2rem 1.2rem; color: var(--muted); font-size: .84rem; line-height: 1.5; }
     .hero-short { min-height: 230px; padding: 1.8rem 2rem; }
@@ -239,7 +240,7 @@
   </style>
 </head>
 <body data-fcr-visual="approved-mockup-v3">
-  <div class="wrap">
+  <div class="wrap" id="top">
     <header class="topbar">
       <a class="logo" href="#top" aria-label="Founder Control Room home">
         <span class="logo-mark">F</span>
@@ -263,6 +264,7 @@
       </nav>
     </header>
 
+    <main>
     <div class="switch" role="tablist" aria-label="Choose a view">
       <div class="switch-track">
         <button role="tab" id="tab-user" aria-controls="view-user" aria-selected="true" data-view="user">User View</button>
@@ -371,13 +373,18 @@
         </div>
         <div class="panel" id="automations">
           <div class="panel-head"><h3>Messages &amp; Integrations</h3><small>Live reads only</small></div>
-          <div class="empty" id="community-f">Messages and connected tools are available only after founder sign-in.</div>
+          <div class="empty">Messages and connected tools are available only after founder sign-in.</div>
+        </div>
+        <div class="panel" id="community-f" aria-labelledby="founder-community-title">
+          <div class="panel-head"><h3 id="founder-community-title">Founder Community</h3><small>Sign-in required</small></div>
+          <p class="empty">Community conversations, supporter details, and founder collaborations require sign-in. Verified public founder stories remain available in the public work directory.</p>
         </div>
       </div>
 
       <p class="note-line">Founder access still passes through FCR authentication. General member authentication and multi-tenant founder workspaces remain a separate implementation gate. Connection never creates authority by itself.</p>
       <a class="btn ghost owner-cta" href="/control-room/">Enter authenticated Control Room →</a>
     </section>
+    </main>
 
     <div class="slogan">
       <strong>More builders. A brighter tomorrow.</strong>
