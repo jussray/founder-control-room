@@ -26,7 +26,7 @@ if (!address || typeof address === 'string') {
 
 const baseURL = `http://127.0.0.1:${address.port}`;
 const client = await playwrightRequest.newContext({ baseURL });
-const bootstrapPaths = ['/mcp', '/mcp/read'];
+const bootstrapPaths = ['/mcp'];
 
 try {
   const expectedMetadata =
@@ -61,6 +61,25 @@ try {
 
     pathReceipts.push({ path, status: response.status(), oauthChallenge: true });
   }
+
+  // /mcp/read keeps the exact legacy token, but sends OAuth-capable
+  // callers to the canonical resource before metadata is advertised.
+  for (const authorization of [undefined, 'Bearer invalid-legacy-or-oauth']) {
+    const response = await client.post('/mcp/read', {
+      maxRedirects: 0,
+      headers: {
+        ...(authorization ? { authorization } : {}),
+        'content-type': 'application/json',
+        accept: 'application/json, text/event-stream',
+      },
+      data: { jsonrpc: '2.0', id: 5, method: 'tools/list' },
+    });
+    if (response.status() !== 307 ||
+        response.headers().location !== 'https://api.foundercontrolroom.org/mcp') {
+      throw new Error(`OAuth compatibility path must redirect via 307 to canonical /mcp, got ${response.status()} and ${response.headers().location}`);
+    }
+  }
+  pathReceipts.push({ path: '/mcp/read', status: 307, redirectsToCanonical: true });
 
   const legacyResponse = await client.post('/mcp/read', {
     headers: {

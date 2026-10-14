@@ -16,7 +16,7 @@ The Control Room source defines one provider-neutral external connector boundary
 - canonical auth: Supabase OAuth 2.1 access tokens using PKCE/DCR, standard audience `authenticated`, standard scope `email`, a non-empty `client_id`, current Supabase user validity, and the server-side `founder_users` allowlist;
 - project authority: the server-owned FCR portfolio registry is the maximum external project grant. An optional `mcp_projects` claim may narrow that grant when present but is never required and can never widen it;
 - client registration: dynamically registered client IDs are accepted after Supabase authorization and founder validation. Exact static client-ID allowlisting is optional hardening when `FCR_REMOTE_MCP_OAUTH_ENFORCE_CLIENT_ALLOWLIST=true`;
-- compatibility auth: `/mcp/read` is an auto-dynamic compatibility alias. An exact timing-safe match to `FCR_REMOTE_MCP_READ_TOKEN` retains the legacy bounded static path; every other credential shape uses the same OAuth/DCR verifier as `/mcp`. Failed OAuth never downgrades to static auth;
+- compatibility auth: `/mcp/read` is an auto-dynamic compatibility alias. An exact timing-safe match to `FCR_REMOTE_MCP_READ_TOKEN` retains the legacy bounded static path; every other credential shape receives a 307 POST-preserving redirect to canonical `/mcp`, where the shared OAuth/DCR verifier applies. Failed OAuth never downgrades to static auth;
 - resource identity: `/mcp` remains the canonical protected OAuth resource. `/mcp/read` is a compatibility alias, not a second authorization server or independent authority root;
 - evidence: every successful external tool call must persist a redacted `mcp_tool_calls` receipt or the call fails closed.
 
@@ -43,11 +43,11 @@ Source readiness is not production readiness. Before deployment, all of the foll
 
 - reconcile the live Supabase migration ledger so `mcp_servers`, `mcp_project_policies`, and `mcp_tool_calls` actually exist with the checked-in RLS/grant contract;
 - enable Supabase OAuth 2.1 and dynamic client registration for MCP, using the current supported standard access-token audience/scope contract (`authenticated` + `email`);
-- preserve explicit founder consent and validate every issued token against the current Supabase user plus the FCR `founder_users` allowlist;
+- preserve explicit founder consent and validate every issued token against the current Supabase user plus an FCR `founder_users` allowlist row whose immutable `user_id` exactly matches that user (email alone or NULL binding grants no authority);
 - use DCR for compatible external clients. Static client-ID allowlisting may be enabled as optional hardening but is not a prerequisite for DCR;
 - configure `FCR_REMOTE_MCP_*` and `CHIEF_AI_BASE_URL` without reusing provider/deploy credentials;
 - prove the Chief URL/binding and FCR Worker SHA, then run the Attack Ten auth/scope/replay/header/evidence/client matrix;
-- prove both compatibility branches on `/mcp/read`: OAuth/DCR bootstrap for non-legacy credentials and exact legacy-token operation without downgrade from failed OAuth;
+- prove both compatibility branches on `/mcp/read`: a 307 redirect of non-legacy credentials to the canonical OAuth resource plus exact legacy-token tool discovery without downgrade from failed OAuth;
 - connect an eligible AI client only after provider evidence proves the canonical `/mcp` resource metadata, OAuth flow, tools list, and calls from the deployed exact head.
 
 The source and provider attack matrix is maintained in `docs/PAIRED_MCP_ATTACK_TEN.md`.
@@ -73,13 +73,13 @@ No migration, OAuth dashboard change, Worker secret/binding change, merge, or de
 
 ## Served remote compatibility MCP boundary
 
-Founder Control Room also serves `POST https://api.foundercontrolroom.org/mcp/read` for backward compatibility with existing server-held-token clients. It now auto-negotiates into the same OAuth/DCR identity membrane as canonical `/mcp` for every request that does not present the exact legacy token.
+Founder Control Room also serves `POST https://api.foundercontrolroom.org/mcp/read` for backward compatibility with existing server-held-token clients. For every request that does not present the exact legacy token, it redirects with 307 to the canonical HTTPS `/mcp` resource, avoiding a resource-metadata mismatch; OAuth validation then occurs on that resource.
 
 - `FCR_REMOTE_MCP_READ_TOKEN` is legacy compatibility authority only. Keep it distinct from write-capable MCP tokens and provider credentials.
 - Static selection requires an exact timing-safe Bearer-token match. Missing, malformed, or non-matching credentials are routed to OAuth/DCR rather than static auth.
 - A token that fails OAuth validation is rejected. It is never retried or downgraded as a static credential.
 - The two public MCP POST entrypoints share one route-local `express-rate-limit` bucket of 60 requests/minute per IP/per Worker process, before static-token comparison or OAuth verification. This complements the server's existing baseline of 120 requests/minute per IP/per process. `/mcp` and `/mcp/read` must not each receive separate 60-request allowances. A rate-limit response is HTTP 429; it does not grant, revoke, or change identity authority. These process-local budgets are not claims of globally distributed Cloudflare enforcement.
-- Exact unauthenticated `POST /mcp/read` may reach the bearer handler only so an OAuth-capable client can receive the canonical protected-resource challenge. The CSRF exemption does not extend to `/mcp/read/*` or neighboring mutation routes.
+- Exact unauthenticated `POST /mcp/read` may reach only its bounded compatibility handler, which redirects to `/mcp` so an OAuth-capable client discovers the canonical protected-resource challenge at the matching resource URL. The CSRF exemption does not extend to `/mcp/read/*` or neighboring mutation routes.
 - The complete active-portfolio compatibility read scope is documented as `FCR_REMOTE_MCP_READ_PROJECTS=sekret-bip,juss-beautiful-hair,juss-beautiful-hair-private,l99,chief-ai-machine,untold-stories,sync-party,founder-control-room,promptos`. This is a maximum server-owned scope, not a client entitlement; founder validation and project grants still narrow each call.
 - Production project scope remains server-held. The route cannot widen beyond `PORTFOLIO_PROJECTS`; optional token project claims may only narrow the scope.
 - The compatibility alias advertises the same bounded eight-tool catalog as canonical `/mcp`; it does not expose a generic nested provider invocation surface.

@@ -166,7 +166,9 @@ export async function verifyPairedSupabaseOauthToken(
     .eq('email', email)
     .maybeSingle();
   if (allowError) throw new Error('Founder allowlist check failed');
-  if (!allowRow || (allowRow.user_id && allowRow.user_id !== userId)) {
+  // A matching email is only an identity lookup; it is never founder
+  // authority until the row binds the immutable Supabase user UUID.
+  if (!allowRow || !allowRow.user_id || allowRow.user_id !== userId) {
     throw new Error('OAuth identity is not on the founder allowlist');
   }
 

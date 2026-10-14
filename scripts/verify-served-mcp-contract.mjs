@@ -179,8 +179,9 @@ assert(
     compatibilityHandler &&
     compatibilityHandler[0].includes("if (usesLegacyStaticMcpToken(") &&
     compatibilityHandler[0].includes("return handleLegacyStaticRemoteReadMcp(req, res, next);") &&
-    compatibilityHandler[0].includes("return handlePairedRemoteMcp(req, res, next);"),
-  "/mcp/read must select legacy static auth only for an exact token match and otherwise use OAuth",
+    compatibilityHandler[0].includes("return res.redirect(307, CANONICAL_MCP_RESOURCE);") &&
+    mcpRouter.includes('const CANONICAL_MCP_RESOURCE = "https://api.foundercontrolroom.org/mcp";'),
+  "/mcp/read must retain exact-token legacy auth and redirect all other clients to canonical OAuth /mcp",
 );
 const pairedOauth = read("src/mcp/pairedSupabaseOAuth.ts");
 assert(

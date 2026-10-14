@@ -303,15 +303,21 @@ export default {
       return new Response('Founder Control Room proxy loop blocked.', { status: 508 });
     }
 
-    // The Pages origin may receive the provider's consent callback. Navigate to
-    // the API host so __Host-fcr_session remains host-only and consent stays interactive.
-    if (request.method === 'GET' && requestUrl.pathname === '/oauth/consent') {
-      const target = new URL('/oauth/consent', API_ORIGIN);
-      target.search = requestUrl.search;
+    // OAuth consent and its API-owned assets travel through the same Pages
+    // browser origin as the __Host-fcr_session cookie and same-origin CSRF
+    // checks. They are served by FCR_API, never by public Pages ASSETS.
+
+    // Canonical founder OAuth/session origin is the apex Pages hostname.
+    // A www entry must move to apex *before* collecting pending auth state.
+    if (request.method === 'GET' &&
+        requestUrl.pathname === '/oauth/consent' &&
+        requestUrl.origin === 'https://www.foundercontrolroom.org') {
+      const destination = new URL('/oauth/consent', 'https://foundercontrolroom.org');
+      destination.search = requestUrl.search;
       return new Response(null, {
         status: 302,
         headers: {
-          Location: target.toString(),
+          Location: destination.toString(),
           'Cache-Control': 'no-store',
           'Referrer-Policy': 'no-referrer',
           'X-Robots-Tag': 'noindex, nofollow',

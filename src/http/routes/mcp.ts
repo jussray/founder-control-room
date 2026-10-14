@@ -21,6 +21,8 @@ import { founderPermissionsRouter } from "./founderPermissions.js";
 import { createRemoteReadMcpHandler } from "./remoteReadMcp.js";
 
 export const mcpRouter = Router();
+// The public OAuth resource has one canonical identity, even for /mcp/read callers.
+const CANONICAL_MCP_RESOURCE = "https://api.foundercontrolroom.org/mcp";
 
 const registryHub = new McpHub();
 
@@ -71,10 +73,9 @@ const handleLegacyStaticRemoteReadMcp = createRemoteReadMcpHandler({
   env: portfolioRemoteMcpEnv,
 });
 
-// Compatibility endpoint with automatic OAuth/DCR upgrade. Static auth is
-// selected only for an exact timing-safe match to the legacy server token.
-// Missing, malformed, or non-matching bearer credentials go through OAuth and
-// can never downgrade into the static authority path.
+// Legacy exact-token compatibility endpoint. Only an exact timing-safe match
+// uses static auth. All other clients are redirected to the canonical OAuth
+// resource, avoiding mismatched metadata or any static-auth downgrade.
 const handleAutoDynamicRemoteReadMcp: RequestHandler = (req, res, next) => {
   if (usesLegacyStaticMcpToken(
     req.header("authorization"),
@@ -82,7 +83,12 @@ const handleAutoDynamicRemoteReadMcp: RequestHandler = (req, res, next) => {
   )) {
     return handleLegacyStaticRemoteReadMcp(req, res, next);
   }
-  return handlePairedRemoteMcp(req, res, next);
+  // OAuth-capable clients must discover the *requested* resource identity.
+  // A redirect to canonical /mcp avoids advertising /mcp metadata for a
+  // different /mcp/read URL (RFC 9728). 307 preserves POST semantics.
+  res.set("Cache-Control", "no-store");
+  res.set("Referrer-Policy", "no-referrer");
+  return res.redirect(307, CANONICAL_MCP_RESOURCE);
 };
 
 function projectIdFrom(value: unknown): string {

@@ -157,6 +157,31 @@ describe('paired Supabase OAuth verifier', () => {
     expect(mockFrom).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ['unbound', null],
+    ['different user', 'a-different-auth-user-id'],
+  ])('rejects a founder email row with %s immutable user binding', async (_label, binding) => {
+    mockGetUser.mockReset();
+    mockFrom.mockReset();
+    mockGetUser.mockResolvedValueOnce({
+      data: { user: { id: 'founder-user-1', email: 'founder@example.com' } },
+      error: null,
+    });
+    mockFrom.mockReturnValueOnce({
+      select: () => ({
+        eq: () => ({
+          maybeSingle: async () => ({
+            data: { email: 'founder@example.com', user_id: binding },
+            error: null,
+          }),
+        }),
+      }),
+    });
+
+    await expect(verifyPairedSupabaseOauthToken(jwt(claims()), env()))
+      .rejects.toThrow('OAuth identity is not on the founder allowlist');
+  });
+
   it('rejects a valid-looking token when Supabase reports the user revoked', async () => {
     mockGetUser.mockResolvedValueOnce({ data: { user: null }, error: new Error('revoked') });
     await expect(verifyPairedSupabaseOauthToken(jwt(claims()), env())).rejects.toThrow('invalid or revoked');

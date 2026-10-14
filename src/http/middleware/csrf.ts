@@ -11,10 +11,10 @@ const REMOTE_MCP_OAUTH_BOOTSTRAP_PATHS = new Set(['/mcp', '/mcp/read']);
  *
  * OAuth-capable MCP clients (including ChatGPT app/plugin and Claude connector
  * adapters) need two exact unauthenticated bootstrap paths: canonical POST /mcp
- * and the auto-dynamic compatibility POST /mcp/read. Both must reach their MCP
- * bearer handlers so they can return WWW-Authenticate and protected-resource
- * metadata. Neither endpoint uses browser cookies for authority, and both fail
- * closed before tool dispatch when bearer/OAuth authentication is absent.
+ * and the exact-token compatibility POST /mcp/read. Canonical /mcp returns
+ * the OAuth WWW-Authenticate challenge; non-legacy /mcp/read callers receive
+ * a POST-preserving 307 to that matching canonical protected resource. Neither
+ * endpoint uses browser cookies for tool authority, and both fail closed.
  *
  * The Founder Control Room UI is same-origin, so accepting a broader "same-site"
  * subdomain boundary would add risk without adding a real product capability.

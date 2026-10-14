@@ -36,7 +36,7 @@
       "path": "public/_worker.js",
       "claims": [
         "`public/_worker.js` must route public static discovery artifacts, including `crawlers.json`, through the Pages `ASSETS` binding while API-owned callback assets remain on `FCR_API`; this routing classification cannot authorize provider mutation or treat a static crawler policy as authentication.",
-        "`public/_worker.js` must redirect the exact GET OAuth consent navigation to the FCR API origin without rewriting founder cookies, proxying consent from static Pages assets, or treating source behavior as provider authorization; the consent JavaScript and CSS are API-owned."
+        "`public/_worker.js` must keep consent navigation, API-owned consent assets, and consent POST on the canonical apex Pages browser origin by forwarding to FCR_API; only the www consent GET navigates to apex. Cookie authority, same-tab authorization state, and same-origin mutation checks must not silently change host, and source behavior is not live OAuth/provider proof."
       ]
     },
     {
@@ -315,7 +315,8 @@
     {
       "path": "src/http/routes/mcp.ts",
       "claims": [
-        "The canonical /mcp and legacy /mcp/read POST auth/tool routes must share one explicit 60-per-minute per-IP, per-process route-local express-rate-limit middleware before any OAuth/static-token dispatch, alongside the existing 120-per-minute global baseline; this source guard does not prove globally distributed or deployed enforcement and must not weaken the authentication/grant checks."
+        "The canonical /mcp and legacy /mcp/read POST auth/tool routes must share one explicit 60-per-minute per-IP, per-process route-local express-rate-limit middleware before any OAuth/static-token dispatch, alongside the existing 120-per-minute global baseline; this source guard does not prove globally distributed or deployed enforcement and must not weaken the authentication/grant checks.",
+        "`src/http/routes/mcp.ts` must preserve exact-token bounded static /mcp/read auth while redirecting all non-legacy POSTs with HTTP 307 to the canonical HTTPS /mcp OAuth resource. Authentication/resource metadata cannot be advertised for a different URL, and no failed OAuth credential may downgrade into static authorization."
       ]
     },
     {

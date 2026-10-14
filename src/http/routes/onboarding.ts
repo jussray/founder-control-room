@@ -30,7 +30,8 @@ onboardingRouter.get('/assets/control-room.js', (_req, res) =>
   sendAsset(res, 'text/javascript; charset=utf-8', controlRoomJs));
 onboardingRouter.get('/assets/auth-callback.js', (_req, res) =>
   sendAsset(res, 'text/javascript; charset=utf-8', callbackJs));
-// Consent UI is served on the API origin alongside the host-only founder cookie.
+// API-owned consent UI is proxied through the canonical Pages browser origin,
+// retaining that host's founder cookie, same-tab authorization state and CSRF policy.
 onboardingRouter.get('/oauth/consent', (_req, res) =>
   sendAsset(res, 'text/html; charset=utf-8', oauthConsentHtml));
 onboardingRouter.get('/assets/oauth-consent.js', (_req, res) =>
