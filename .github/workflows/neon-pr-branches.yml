@@ -180,9 +180,17 @@ jobs:
             # allowlist above; it therefore cannot contain a quote or SQL token.
             EXISTING="$(psql "$NEON_DB_URL" -X -Atq \
               -c "SELECT sha256 FROM ci_preview.migration_receipts WHERE filename = '$migration';")"
+            # A checksum is not proof of committed DDL: earlier preview
+            # contracts could roll back while leaving their receipt behind.
+            # A source-owned catalog postcondition independently proves state.
+            PREVIEW_POSTCONDITION="supabase/preview-postconditions/${migration##*/}"
 
             if [ -n "$EXISTING" ]; then
               if [ "$EXISTING" = "$CHECKSUM" ]; then
+                if [ -f "$PREVIEW_POSTCONDITION" ]; then
+                  echo "Verifying persisted Neon preview state: $PREVIEW_POSTCONDITION"
+                  psql "$NEON_DB_URL" -X -v ON_ERROR_STOP=1 -f "$PREVIEW_POSTCONDITION"
+                fi
                 echo "Preview migration already applied with matching checksum: $migration"
                 continue
               fi
@@ -197,6 +205,10 @@ jobs:
             else
               echo "Applying preview migration atomically: $migration"
               psql "$NEON_DB_URL" -X -1 -v ON_ERROR_STOP=1 -f "$migration"
+            fi
+            if [ -f "$PREVIEW_POSTCONDITION" ]; then
+              echo "Verifying committed Neon preview migration: $PREVIEW_POSTCONDITION"
+              psql "$NEON_DB_URL" -X -v ON_ERROR_STOP=1 -f "$PREVIEW_POSTCONDITION"
             fi
             psql "$NEON_DB_URL" -X -v ON_ERROR_STOP=1 \
               -c "INSERT INTO ci_preview.migration_receipts(filename, sha256) VALUES ('$migration', '$CHECKSUM');"
