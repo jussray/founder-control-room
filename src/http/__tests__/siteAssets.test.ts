@@ -31,6 +31,12 @@ describe('Founder Control Room Cloudflare topology', () => {
 
     expect(landing).toContain('<link rel="canonical" href="https://www.foundercontrolroom.org/" />');
     expect(landing).toContain('data-fcr-visual="approved-mockup-v3"');
+    expect(landing).toContain('<script src="/fcr-public-tabs.js" defer></script>');
+    expect(landing).not.toMatch(/<script\\b(?![^>]*\\bsrc=)/i);
+    const tabController = read('public/fcr-public-tabs.js');
+    expect(tabController).toContain("addEventListener('keydown'");
+    expect(tabController).toContain("addEventListener('hashchange'");
+    expect(read('public/_headers')).toContain("script-src 'self'");
     expect(landing).not.toContain('data-fcr-visual="founder-os-v2"');
     expect(landing).toContain('Back Founders');
     expect(landing).toContain('Same truth. Higher outcomes');

@@ -8,6 +8,9 @@ const REPO_ROOT = fileURLToPath(new URL('../', import.meta.url));
 const PUBLIC_ROOT = join(REPO_ROOT, 'public');
 const RESULTS_ROOT = join(REPO_ROOT, 'test-results');
 
+const LANDING_CSP = readFileSync(join(PUBLIC_ROOT, '_headers'), 'utf8').match(/^\s*Content-Security-Policy:\s*(.+)$/m)?.[1]?.trim();
+if (!LANDING_CSP || !LANDING_CSP.includes("script-src 'self'")) throw new Error('Landing CSP fixture missing');
+
 const mime = {
   '.html': 'text/html; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
@@ -26,7 +29,7 @@ const server = createServer((req, res) => {
 
   try {
     const body = readFileSync(filePath);
-    res.writeHead(200, { 'Content-Type': mime[extname(filePath)] ?? 'application/octet-stream' });
+    res.writeHead(200, { 'Content-Type': mime[extname(filePath)] ?? 'application/octet-stream', ...(url.pathname === '/' || url.pathname === '/index.html' ? { 'Content-Security-Policy': LANDING_CSP } : {}) });
     res.end(body);
   } catch {
     res.writeHead(404).end('not found');
@@ -73,6 +76,10 @@ async function provePublicFrontDoor(label, viewport) {
   }
 
   await page.goto(`${BASE_URL}/`, { waitUntil: 'networkidle' });
+  if (!(await page.locator('script[src="/fcr-public-tabs.js"]').count())) throw new Error(label + ': external tab controller missing');
+  if (await page.locator('script:not([src])').count()) throw new Error(label + ': CSP-forbidden inline script present');
+  const csp = (await page.request.get(BASE_URL + '/')).headers()['content-security-policy'];
+  if (!csp || !csp.includes("script-src 'self'")) throw new Error(label + ': landing test must enforce deployed CSP');
 
   const visualSignature = await page.locator('body').getAttribute('data-fcr-visual');
   if (visualSignature !== 'approved-mockup-v3') {
@@ -109,6 +116,22 @@ async function provePublicFrontDoor(label, viewport) {
   await page.screenshot({ path: join(RESULTS_ROOT, `public-fcr-user-${label}.png`), fullPage: true });
 
   await page.getByRole('tab', { name: 'Founder View' }).click();
+  const founderTab = page.getByRole('tab', { name: 'Founder View' });
+  const userTab = page.getByRole('tab', { name: 'User View' });
+  await founderTab.focus();
+  await page.keyboard.press('ArrowLeft');
+  if (!(await userPanel.isVisible()) || await page.evaluate(() => document.activeElement?.id) !== 'tab-user' || await userTab.getAttribute('tabindex') !== '0') {
+    throw new Error(label + ': ArrowLeft must select and focus User View');
+  }
+  await page.keyboard.press('ArrowRight');
+  if (!(await founderPanel.isVisible()) || await page.evaluate(() => document.activeElement?.id) !== 'tab-founder') {
+    throw new Error(label + ': ArrowRight must select and focus Founder View');
+  }
+  await page.keyboard.press('Home');
+  if (!(await userPanel.isVisible())) throw new Error(label + ': Home must select User View');
+  await page.keyboard.press('End');
+  if (!(await founderPanel.isVisible())) throw new Error(label + ': End must select Founder View');
+
   if (!(await founderPanel.isVisible()) || (await userPanel.isVisible())) {
     throw new Error(`${label}: selecting Founder View must show only the founder panel`);
   }
@@ -140,6 +163,19 @@ async function provePublicFrontDoor(label, viewport) {
   const footerCopy = await page.locator('footer').innerText();
   if (!footerCopy.includes('Same truth. Higher outcomes.')) {
     throw new Error(`${label}: canonical FCR visual thesis missing from footer`);
+  }
+
+
+  for (const section of ['projects', 'proof', 'automations']) {
+    await page.goto(BASE_URL + '/#' + section, { waitUntil: 'networkidle' });
+    await page.reload({ waitUntil: 'networkidle' });
+    if (!(await founderPanel.isVisible()) || !(await page.locator('#' + section).isVisible())) {
+      throw new Error(label + ': founder deep link must survive reload: #' + section);
+    }
+  }
+  await page.goto(BASE_URL + '/#discover', { waitUntil: 'networkidle' });
+  if (!(await userPanel.isVisible()) || (await founderPanel.isVisible())) {
+    throw new Error(label + ': user section link must restore User View');
   }
 
   if (pageErrors.length > 0) throw new Error(`${label}: public browser errors: ${pageErrors.join(' | ')}`);

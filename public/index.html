@@ -390,33 +390,6 @@
     </footer>
   </div>
 
-  <script>
-    (function () {
-      var tabs = document.querySelectorAll('[role="tab"]');
-      var userPanel = document.querySelector('[data-view-panel="user"]');
-      var founderPanel = document.querySelector('[data-view-panel="founder"]');
-      var userNav = document.querySelector('[data-user-nav]');
-      var founderNav = document.querySelector('[data-founder-nav]');
-
-      function show(view) {
-        var isFounder = view === 'founder';
-        userPanel.hidden = isFounder;
-        founderPanel.hidden = !isFounder;
-        userNav.hidden = isFounder;
-        founderNav.hidden = !isFounder;
-        tabs.forEach(function (t) {
-          t.setAttribute('aria-selected', String(t.dataset.view === view));
-        });
-        try { history.replaceState(null, '', isFounder ? '#founder' : '#user'); } catch (e) {}
-      }
-
-      tabs.forEach(function (t) {
-        t.addEventListener('click', function () { show(t.dataset.view); });
-      });
-
-      if (location.hash === '#founder') show('founder');
-
-    })();
-  </script>
+  <script src="/fcr-public-tabs.js" defer></script>
 </body>
 </html>
