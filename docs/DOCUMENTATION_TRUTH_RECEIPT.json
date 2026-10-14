@@ -13,6 +13,13 @@
   ],
   "changes": [
     {
+      "path": "src/providers/GitHubProvider.ts",
+      "claims": [
+        "`src/providers/GitHubProvider.ts` must preserve the existing FCR GitHub `code_quality` ruleset floor with `severity: errors` in the founder-only review membrane during trusted two-ruleset reconciliation; its provider readback must fail closed if the error-severity quality rule is missing, duplicated, or weakened, without granting merge, GitHub ruleset mutation, or production authority.",
+        "The strict-freshness companion must remain a separate zero-bypass ruleset with exact required status checks. Updating code-quality source/fixture/audit contracts does not prove a live GitHub settings change, reviewer approval, premerge deployment completion, or runtime release."
+      ]
+    },
+    {
       "path": ".github/workflows/openai-runtime-secret-proof.yml",
       "claims": [
         "`.github/workflows/openai-runtime-secret-proof.yml` must derive the complete provider-held Worker secret-name set from canonical `wrangler.worker.toml [secrets].required`, compare names against Cloudflare, fingerprint the required-name registry, and never read or print secret values.",
