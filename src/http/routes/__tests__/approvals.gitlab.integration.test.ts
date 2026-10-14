@@ -299,7 +299,7 @@ describe("GitLab approvals routing", () => {
     const response = await request(app())
       .post(`/approvals/${MISSION_ID}/patch`)
       .set("Authorization", BEARER)
-      .send({ message: "edit via GitLab", changes: [{ path: "src/example.ts", content: "export const ok = true;" }] });
+      .send({ message: "edit via GitLab", idempotencyKey: "gitlab-patch-test-1", changes: [{ path: "src/example.ts", content: "export const ok = true;" }] });
 
     expect(response.status).toBe(201);
     expect(mockCommitPatch).toHaveBeenCalledWith(
