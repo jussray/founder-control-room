@@ -1,12 +1,19 @@
 # GitHub Actions Secrets and Cloudflare Bindings Registry
 
-This repository has three separate configuration planes:
+This repository has four separate configuration planes:
 
 1. **Cloudflare Pages build settings** for the static frontend.
 2. **GitHub Actions secrets** used by repository workflows.
 3. **Cloudflare Worker runtime bindings** used by the surviving `founder-control-room` API Worker.
+4. **GitHub Copilot Agents secrets** available to the Copilot cloud agent development environment, not automatically to ordinary Actions jobs or Cloudflare Workers.
 
 A value configured in one plane does not automatically exist in another. Never copy secret values into repository files, PRs, logs, screenshots, or chat.
+
+### Slack secret scope (candidate integration, not live)
+
+The founder-reported GitHub Agents secret name `slack` becomes environment variable `SLACK` (GitHub secret names are case-insensitive). Its **value, credential type, and repository access have not been independently verified**. Copilot's Agents secret is not a Cloudflare Worker binding and does not provide runtime notification delivery. No production Slack secret has been provisioned by this source change.
+
+`src/security/incidentEscalation.ts` accepts an explicitly provided `SLACK_WEBHOOK_URL`, or a runtime-provided `SLACK` whose content is a Slack incoming-webhook URL or `xoxb-` bot token. Bot delivery additionally requires `FCR_SLACK_CHANNEL_ID` pointing to the authorized FCR channel and checks Slack's JSON `ok` result. Unsupported credential formats, absent channels, and low-severity verdicts fail closed. An HTTP delivery response or a local test does not prove a Slack message appeared in the channel; channel readback is a separate gate. The existing production caller and the actual Cloudflare binding remain unverified. Do not add these as required deployment secrets until the existing runtime path and approved credential are independently proven.
 
 Cloudflare dashboard token **display names are operator labels, not execution bindings**. A label such as `founder-control-room build token` does not prove which GitHub secret or workflow consumes that credential. For operational truth, use the exact GitHub secret name referenced by the current workflow plus a successful provider verification/readback receipt. If either is missing, the binding is unknown.
 

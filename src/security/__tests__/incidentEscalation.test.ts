@@ -103,6 +103,83 @@ describe('incident-escalation', () => {
     expect(result).toBe(false);
   });
 
+  it('uses an explicit channel when SLACK is a bot token', async () => {
+    global.fetch = vi.fn(async () =>
+      new Response(JSON.stringify({ ok: true, ts: '123.456' }), { status: 200 }),
+    ) as any;
+
+    const ok = await escalateToSlack(createMockVerdict(), {
+      SLACK: 'xoxb-test-only',
+      FCR_SLACK_CHANNEL_ID: 'C0BQ2Q2S9B4',
+    });
+    expect(ok).toBe(true);
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    const [url, options] = (global.fetch as any).mock.calls[0];
+    expect(url).toBe('https://slack.com/api/chat.postMessage');
+    expect(options.headers.Authorization).toBe('Bearer xoxb-test-only');
+    expect(JSON.parse(options.body).channel).toBe('C0BQ2Q2S9B4');
+  });
+
+  it('accepts SLACK as a webhook URL without leaking it into headers', async () => {
+    global.fetch = vi.fn(async () => new Response('ok', { status: 200 })) as any;
+    const webhook = 'https://hooks.slack.com/services/TEST/TEST/PLACEHOLDER';
+
+    const ok = await escalateToSlack(createMockVerdict(), { SLACK: webhook });
+    expect(ok).toBe(true);
+    const [url, options] = (global.fetch as any).mock.calls[0];
+    expect(url).toBe(webhook);
+    expect(options.headers.Authorization).toBeUndefined();
+  });
+
+  it('does not use SLACK bot credentials without an explicit FCR channel', async () => {
+    global.fetch = vi.fn(async () => new Response('ok', { status: 200 })) as any;
+
+    const ok = await escalateToSlack(createMockVerdict(), { SLACK: 'xoxb-test-only' });
+    expect(ok).toBe(false);
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it('rejects unknown SLACK credential shapes without sending', async () => {
+    global.fetch = vi.fn(async () => new Response('ok', { status: 200 })) as any;
+
+    const ok = await escalateToSlack(createMockVerdict(), {
+      SLACK: 'xapp-not-a-bot-token',
+      FCR_SLACK_CHANNEL_ID: 'C0BQ2Q2S9B4',
+    });
+    expect(ok).toBe(false);
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it('does not treat an HTTP 200 Slack API error as delivered', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    global.fetch = vi.fn(async () =>
+      new Response(JSON.stringify({ ok: false, error: 'missing_scope' }), { status: 200 }),
+    ) as any;
+
+    const ok = await escalateToSlack(createMockVerdict(), {
+      SLACK: 'xoxb-test-only',
+      FCR_SLACK_CHANNEL_ID: 'C0BQ2Q2S9B4',
+    });
+    expect(ok).toBe(false);
+    expect(errorSpy).toHaveBeenCalledWith('[incident-escalation] Slack API rejected delivery');
+    errorSpy.mockRestore();
+  });
+
+  it('does not log secret-bearing Slack transport error bodies', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    global.fetch = vi.fn(async () =>
+      new Response('xoxb-SECRET-DO-NOT-LOG', { status: 403 }),
+    ) as any;
+
+    const ok = await escalateToSlack(createMockVerdict(), {
+      SLACK: 'xoxb-test-only',
+      FCR_SLACK_CHANNEL_ID: 'C0BQ2Q2S9B4',
+    });
+    expect(ok).toBe(false);
+    expect(JSON.stringify(errorSpy.mock.calls)).not.toContain('SECRET-DO-NOT-LOG');
+    errorSpy.mockRestore();
+  });
+
   it('emits telemetry with escalation', async () => {
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     global.fetch = vi.fn(async () => new Response('ok', { status: 200 })) as any;

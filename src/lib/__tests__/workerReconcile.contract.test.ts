@@ -28,6 +28,30 @@ describe('canonical Worker reconcile credential preflight contract', () => {
     expect(workflow).not.toContain('print(token)');
   });
 
+  it('fails closed on absent provider-held secrets before any Worker mutation', () => {
+    const reconcileGate = workflow.indexOf('  authority-gate:');
+    const preflight = workflow.indexOf('- name: Verify provider-held Worker secret names before reconciliation');
+    const authorityReceipt = workflow.indexOf('- name: Record bounded authority receipt');
+    const deployJob = workflow.indexOf('  worker-deploy:');
+    const firstMutation = workflow.indexOf('- name: Force publication grant disabled on canonical Worker');
+    expect(reconcileGate).toBeGreaterThanOrEqual(0);
+    expect(preflight).toBeGreaterThan(reconcileGate);
+    expect(authorityReceipt).toBeGreaterThan(preflight);
+    expect(deployJob).toBeGreaterThan(authorityReceipt);
+    expect(firstMutation).toBeGreaterThan(deployJob);
+
+    const preflightStep = workflow.slice(preflight, authorityReceipt);
+    expect(preflightStep).toContain('npx --yes wrangler@4.110.0 secret list');
+    expect(preflightStep).toContain('--config wrangler.worker.toml');
+    expect(preflightStep).toContain('--format json');
+    expect(preflightStep).toContain("config.get('secrets', {}).get('required', [])");
+    expect(preflightStep).toContain("workflow_written = {'FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON'}");
+    expect(preflightStep).toContain('missing = sorted(required - workflow_written - present)');
+    expect(preflightStep).toContain('sys.exit(1)');
+    expect(preflightStep).not.toContain('wrangler secret get');
+    expect(preflightStep).not.toContain('wrangler secret put');
+  });
+
   it('preserves exact-head authority and the existing runtime proof boundary', () => {
     expect(workflow).toContain('test "$CURRENT_MAIN_SHA" = "$EXPECTED_HEAD_SHA"');
     expect(workflow).toContain('needs: authority-gate');
