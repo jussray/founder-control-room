@@ -235,42 +235,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
-      - name: Classify Neon preview scope
-        id: neon_scope
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: |
-          set -euo pipefail
-          mapfile -t CHANGED_FILES < <(
-            gh api --paginate "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/files?per_page=100" --jq '.[].filename'
-          )
-
-          NEEDS_NEON=false
-          for path in "${CHANGED_FILES[@]}"; do
-            case "$path" in
-              supabase/*)
-                NEEDS_NEON=true
-                break
-                ;;
-            esac
-          done
-
-          echo "needs_neon=${NEEDS_NEON}" >> "$GITHUB_OUTPUT"
-          if [ "$NEEDS_NEON" = "true" ]; then
-            echo 'Supabase change detected; Neon preview cleanup is required.'
-          else
-            echo 'No supabase/ change detected; no Neon preview is expected for this PR.'
-          fi
-
-      - name: Record non-database cleanup no-op
-        if: steps.neon_scope.outputs.needs_neon == 'false'
-        shell: bash
-        run: echo 'Neon cleanup skipped because this PR does not change supabase/.'
-
       - name: Validate Neon configuration
-        if: steps.neon_scope.outputs.needs_neon == 'true'
         shell: bash
         env:
           NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID }}
@@ -280,10 +245,66 @@ jobs:
           test -n "$NEON_PROJECT_ID" || { echo 'NEON_PROJECT_ID is not configured' >&2; exit 1; }
           test -n "$NEON_API_KEY" || { echo 'NEON_API_KEY is not configured' >&2; exit 1; }
 
+      - name: Resolve exact Neon preview branch
+        id: neon_branch
+        shell: bash
+        env:
+          NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID }}
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+
+          target_name="preview/pr-${PR_NUMBER}"
+          response="$(curl --fail-with-body --silent --show-error --get \
+            "https://console.neon.tech/api/v2/projects/${NEON_PROJECT_ID}/branches" \
+            -H "Authorization: Bearer ${NEON_API_KEY}" \
+            --data-urlencode "search=${target_name}" \
+            --data "limit=100")"
+
+          matches="$(jq -c --arg target_name "$target_name" \
+            '[.branches[] | select(.name == $target_name)]' <<<"$response")"
+          match_count="$(jq 'length' <<<"$matches")"
+
+          if [ "$match_count" = "0" ]; then
+            echo "branch_found=false" >> "$GITHUB_OUTPUT"
+            echo "No exact Neon preview branch exists for ${target_name}; cleanup is an idempotent no-op."
+            exit 0
+          fi
+
+          if [ "$match_count" != "1" ]; then
+            echo "::error title=Ambiguous Neon preview identity::Expected exactly one ${target_name} branch, found ${match_count}."
+            exit 1
+          fi
+
+          branch_id="$(jq -r '.[0].id' <<<"$matches")"
+          is_default="$(jq -r '.[0].default' <<<"$matches")"
+          is_primary="$(jq -r '.[0].primary' <<<"$matches")"
+          is_protected="$(jq -r '.[0].protected' <<<"$matches")"
+
+          [[ "$branch_id" =~ ^br-[a-z0-9-]+$ ]] || {
+            echo "::error title=Unexpected Neon branch identity::Refusing cleanup for malformed branch id."
+            exit 1
+          }
+
+          if [ "$is_default" = "true" ] || [ "$is_primary" = "true" ] || [ "$is_protected" = "true" ]; then
+            echo "::error title=Unsafe Neon cleanup target::Refusing to delete default, primary, or protected branch ${target_name}."
+            exit 1
+          fi
+
+          echo "branch_found=true" >> "$GITHUB_OUTPUT"
+          echo "branch_id=${branch_id}" >> "$GITHUB_OUTPUT"
+          echo "Resolved exact non-production Neon preview branch ${target_name} for cleanup."
+
+      - name: Record absent-branch cleanup no-op
+        if: steps.neon_branch.outputs.branch_found == 'false'
+        shell: bash
+        run: echo 'No matching Neon preview branch exists; cleanup completed as a safe no-op.'
+
       - name: Delete Neon Branch
-        if: steps.neon_scope.outputs.needs_neon == 'true'
+        if: steps.neon_branch.outputs.branch_found == 'true'
         uses: neondatabase/delete-branch-action@4468d825d5a88ef4012f1705a82f02ec3072f776 # v3
         with:
           project_id: ${{ vars.NEON_PROJECT_ID }}
-          branch: preview/pr-${{ github.event.number }}
+          branch: ${{ steps.neon_branch.outputs.branch_id }}
           api_key: ${{ secrets.NEON_API_KEY }}

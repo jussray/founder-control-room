@@ -8,7 +8,7 @@ describe('Neon pull-request branch lifecycle contract', () => {
     expect(workflow).toContain('types: [opened, reopened, synchronize, closed]');
     expect(workflow).toContain('group: neon-pr-${{ github.event.pull_request.number }}');
     expect(workflow).toContain('branch_name: preview/pr-${{ github.event.number }}');
-    expect(workflow).toContain('branch: preview/pr-${{ github.event.number }}');
+    expect(workflow).toContain('branch: ${{ steps.neon_branch.outputs.branch_id }}');
     expect(workflow).toContain('github.event.pull_request.head.repo.full_name == github.repository');
     expect(workflow).toContain('neondatabase/create-branch-action@fb620d43d4c565abaf088b848a4e28e5c4ea4d9c');
     expect(workflow).toContain('neondatabase/delete-branch-action@4468d825d5a88ef4012f1705a82f02ec3072f776');
@@ -32,12 +32,25 @@ describe('Neon pull-request branch lifecycle contract', () => {
   it('allocates Neon only for live-base Supabase changes while preserving the required job identity', () => {
     expect(workflow).toContain('name: Create Neon Branch');
     expect(workflow).toContain('pull-requests: read');
-    expect(workflow.match(/- name: Classify Neon preview scope/g)).toHaveLength(2);
+    expect(workflow.match(/- name: Classify Neon preview scope/g)).toHaveLength(1);
     expect(workflow).toContain('supabase/*)');
     expect(workflow.match(/if: steps\.neon_scope\.outputs\.needs_neon == 'true'/g)?.length ?? 0).toBeGreaterThanOrEqual(5);
-    expect(workflow.match(/if: steps\.neon_scope\.outputs\.needs_neon == 'false'/g)).toHaveLength(2);
+    expect(workflow.match(/if: steps\.neon_scope\.outputs\.needs_neon == 'false'/g)).toHaveLength(1);
     expect(workflow).toContain('Neon preview skipped because this PR does not change supabase/ against live base.');
-    expect(workflow).toContain('Neon cleanup skipped because this PR does not change supabase/.');
+    expect(workflow).not.toContain('Neon cleanup skipped because this PR does not change supabase/.');
+  });
+
+  it('reconciles close cleanup against the actual Neon preview branch instead of the final PR diff', () => {
+    expect(workflow).toContain('target_name="preview/pr-${PR_NUMBER}"');
+    expect(workflow).toContain('https://console.neon.tech/api/v2/projects/${NEON_PROJECT_ID}/branches');
+    expect(workflow).toContain('--data-urlencode "search=${target_name}"');
+    expect(workflow).toContain('[.branches[] | select(.name == $target_name)]');
+    expect(workflow).toContain('branch_found=false');
+    expect(workflow).toContain('branch_found=true');
+    expect(workflow).toContain('Unsafe Neon cleanup target');
+    expect(workflow).toContain('branch: ${{ steps.neon_branch.outputs.branch_id }}');
+    expect(workflow).toContain('No matching Neon preview branch exists; cleanup completed as a safe no-op.');
+    expect(workflow).not.toContain('pulls/${PR_NUMBER}/files?per_page=100');
   });
 
   it('keeps Neon credentials and the private preview URL behind the database-scope gate without exporting it', () => {
