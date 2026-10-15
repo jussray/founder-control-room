@@ -40,6 +40,14 @@ For a present-tense claim:
 
 Exact SHAs belong in receipts, PRs, artifacts, incidents, and provenance. The README deliberately does not freeze one SHA as permanent “current truth.”
 
+## Founder orientation email: protected launch state (October 14, 2026)
+
+FCR's Monday 08:00 America/New_York founder orientation is **source implemented in PR #894, not production-active**. The candidate composes repository-verification findings, preserves unavailable Gmail, Calendar, and Chief coverage as unknown, and invokes the project-scoped Cloudflare `FCR_EMAIL` sender only through an approved Worker cron path. It requires the service-role-only `portfolio_orientation_runs` migration and the protected current Worker configuration before a scheduled message can be verified.
+
+An accepted provider send may outlive a failed database receipt. The candidate treats any attempted send with uncertain provider outcome as `orientation_send_outcome_unknown_manual_reconcile`, preserving any returned message ID and **forbidding automatic resend**. Only conclusively recorded pre-send failures are retryable after the bounded delay. Stale `running` rows remain blocked pending investigation. Source and unit tests cannot substitute for a real inbox receipt or provider-level idempotency guarantee.
+
+The candidate is carried in existing [PR #894](https://github.com/jussray/founder-control-room/pull/894); it is not merged and has no production merge, credential, migration, release, or provider-send authority. The same carrier repaired a malformed runtime-state JSON trailing-newline writer and refreshed an immutable StoryEngine Playwright peer pin after independently observing that peer's current main and successful CI. Pin refresh starts a **new** exact-pair browser proof; it does not inherit older StoryEngine federation green. Existing founder approval-path test fixtures now model patch idempotency reservation instead of bypassing it. All resulting exact-head CI, independent review, provider credential, production runtime, and browser gates remain required.
+
 ## What is implemented in source now
 
 ### Repository and mission control
