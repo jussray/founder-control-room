@@ -90,7 +90,7 @@ function formatSlackMessage(verdict: SecurityVerdict): {
 
   const text = `${emoji} ${verdict.verdict} | ${verdict.service} | Actor: ${actor} | Country: ${country}`;
 
-  const blocks = [
+  const blocks: Array<Record<string, unknown>> = [
     {
       type: 'header',
       text: {

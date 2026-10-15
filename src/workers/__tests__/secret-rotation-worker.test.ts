@@ -2,8 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   checkSecretRotationStatus,
   daysUntilExpiry,
-  runSecretRotationWorker,
-} from '../secret-rotation-worker';
+} from '../secret-rotation-worker.js';
 
 describe('secret-rotation', () => {
   it('calculates days until expiry correctly', () => {
