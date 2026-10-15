@@ -282,3 +282,8 @@ This is source policy, not provider proof. Live Access applications, path preced
 ### Public Pages proxy and Access-only API routes
 
 The public Pages Worker may continue to proxy normal same-origin FCR app/auth traffic through the private `FCR_API` Service Binding, including the canonical OAuth `/mcp` compatibility lane. It must not proxy `/mcp/founder-signal-engine` from the public apex. That write-capable route is intentionally direct-API-only so its Cloudflare Access requirement cannot be bypassed through `foundercontrolroom.org`. The separate read-only X-engagement MCP keeps an exact application-authenticated exception for portable evidence consumers.
+
+
+### Provider boundary verification
+
+`scripts/verify-fcr-cloudflare-access-boundary.mjs` is the read-only provider truth gate for this topology. It requires the public doorway to be free of Access applications, exactly one identity-protected `app.foundercontrolroom.org` application with no Everyone bypass, exactly one Access application protecting the canonical `founder-control-room` Worker with the configured FCR service-token binding, complete coverage of every declared API exception, and zero undeclared API bypass destinations. The verifier never creates or changes a provider policy.

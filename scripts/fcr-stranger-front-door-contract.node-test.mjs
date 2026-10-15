@@ -117,6 +117,16 @@ test('founder auth contract remains allowlist-first and founder-gated', () => {
   assert.doesNotMatch(authRoute, /authRouter\.(?:post|get)\('\/signup'/);
 });
 
+test('provider recovery requires complete app/API boundary readback before browser proof can count', () => {
+  assert.match(workflow, /verify-fcr-cloudflare-access-boundary\.mjs/);
+  assert.match(workflow, /FCR_CLOUDFLARE_ACCESS_CLIENT_ID/);
+  assert.match(workflow, /FCR_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID/);
+  assert.match(workflow, /ACCESS_BOUNDARY_READ_OUTCOME/);
+  assert.match(workflow, /ACCESS_BOUNDARY_APPLY_OUTCOME/);
+  assert.match(workflow, /test "\$boundary_outcome" = 'success'/);
+  assert.match(workflow, /fcr-cloudflare-access-boundary-provider/);
+});
+
 test('provider and stranger witnesses are independent and aggregate fail closed', () => {
   const inspectBlock = workflow.match(
     /- name: Inspect live browser Access ownership without mutation([\s\S]*?)- name: Detach browser-facing FCR destinations with dedicated admin authority/,

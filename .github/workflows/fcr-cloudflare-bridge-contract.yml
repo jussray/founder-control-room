@@ -23,6 +23,8 @@ on:
       - 'scripts/chief-proofmode-runtime-witness-contract.node-test.mjs'
       - 'scripts/fcr-cloudflare-bridge-contract.node-test.mjs'
       - 'scripts/fcr-access-boundary-policy.node-test.mjs'
+      - 'scripts/verify-fcr-cloudflare-access-boundary.mjs'
+      - 'scripts/verify-fcr-cloudflare-access-boundary.node-test.mjs'
       - 'config/fcr-cloudflare-access-boundary.json'
       - '.github/workflows/pages-production-release.yml'
       - '.github/workflows/deploy.yml'
@@ -58,6 +60,8 @@ on:
       - 'scripts/chief-proofmode-runtime-witness-contract.node-test.mjs'
       - 'scripts/fcr-cloudflare-bridge-contract.node-test.mjs'
       - 'scripts/fcr-access-boundary-policy.node-test.mjs'
+      - 'scripts/verify-fcr-cloudflare-access-boundary.mjs'
+      - 'scripts/verify-fcr-cloudflare-access-boundary.node-test.mjs'
       - 'config/fcr-cloudflare-access-boundary.json'
       - '.github/workflows/pages-production-release.yml'
       - '.github/workflows/deploy.yml'
@@ -121,3 +125,4 @@ jobs:
           node --test scripts/fcr-cloudflare-bridge-contract.node-test.mjs
           node --test scripts/fcr-stranger-front-door-contract.node-test.mjs
           node --test scripts/fcr-access-boundary-policy.node-test.mjs
+          node --test scripts/verify-fcr-cloudflare-access-boundary.node-test.mjs

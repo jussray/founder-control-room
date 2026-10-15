@@ -27,7 +27,7 @@
     {
       "path": ".github/workflows/fcr-access-front-door-recovery.yml",
       "claims": [
-        "`.github/workflows/fcr-access-front-door-recovery.yml` must retain the schema-v2 stranger receipt fields that distinguish direct API Access protection from same-origin Worker identity proof, and it must never reduce a generic denial, omitted field, or unrelated Cloudflare response to verified Cloudflare Access evidence."
+        "`.github/workflows/fcr-access-front-door-recovery.yml` must preserve the bounded public-doorway detachment operation while requiring independent read-only provider proof that `app.foundercontrolroom.org` is identity-protected, the canonical API Worker binds the configured FCR service token, and every declared API exception is exact with no undeclared bypass before the overall evidence gate can pass; browser evidence cannot substitute for provider topology proof."
       ]
     },
     {
