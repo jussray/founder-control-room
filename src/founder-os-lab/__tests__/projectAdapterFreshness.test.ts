@@ -20,6 +20,15 @@ function assess(overrides: Partial<Parameters<typeof assessProjectAdapterFreshne
 }
 
 describe('project adapter freshness', () => {
+  it('fails closed when an adapter has no audited contract paths', () => {
+    const result = assess({ auditedContractBlobs: {}, observedContractBlobs: {} });
+    expect(result.state).toBe('unknown');
+    expect(result.freshness).toBe('missing');
+    expect(result.blocker).toContain('no required contract blobs');
+    expect(result.promotionAllowed).toBe(false);
+    expect(result.mutationAuthorized).toBe(false);
+  });
+
   it('verifies every checked-in adapter only when current main and every required contract blob match', () => {
     for (const adapter of FOUNDER_OS_LAB_PROJECT_ADAPTERS) {
       const result = assessProjectAdapterFreshness({
@@ -47,20 +56,19 @@ describe('project adapter freshness', () => {
     }
   });
 
-  it('requires review when authoritative main advances even if required project contracts are unchanged', () => {
+  it('stays verified when authoritative main advances but required project contracts are unchanged', () => {
     const result = assess({
       currentHead: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
     });
 
-    expect(result.state).toBe('attention');
-    expect(result.freshness).toBe('stale');
-    expect(result.recommendation).toBe('review');
+    expect(result.state).toBe('verified');
+    expect(result.freshness).toBe('fresh');
     expect(result.sourceHeadMatchesAudited).toBe(false);
     expect(result.contractPathsMissing).toEqual([]);
     expect(result.contractPathsDrifted).toEqual([]);
-    expect(result.blocker).toContain('exact-head adapter provenance is stale');
+    expect(result.blocker).toBeNull();
     expect(result.reasons).toContain(
-      'Unchanged contract blobs do not prove that an adapter pinned to a predecessor SHA accepts or represents the current repository head.',
+      'Repository main advanced, but every required project contract blob still matches the audited adapter snapshot.',
     );
   });
 

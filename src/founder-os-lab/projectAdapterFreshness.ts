@@ -54,6 +54,21 @@ export function assessProjectAdapterFreshness(
   const contractPathsRequired = Object.keys(input.auditedContractBlobs);
   const shared = base(input, contractPathsRequired);
 
+  if (contractPathsRequired.length === 0) {
+    return {
+      ...shared,
+      state: 'unknown',
+      freshness: 'missing',
+      recommendation: 'hold',
+      sourceHeadMatchesAudited: false,
+      contractPathsMissing: [],
+      contractPathsDrifted: [],
+      blocker: 'The audited project adapter has no required contract blobs.',
+      nextAction: 'Define and audit at least one required project contract before claiming freshness.',
+      reasons: ['An empty contract manifest cannot prove project adapter freshness.'],
+    };
+  }
+
   if (!EXACT_GIT_OBJECT_SHA.test(input.auditedHead)) {
     return {
       ...shared,
@@ -167,15 +182,15 @@ export function assessProjectAdapterFreshness(
   if (!sourceHeadMatchesAudited) {
     return {
       ...shared,
-      state: 'attention',
-      freshness: 'stale',
-      recommendation: 'review',
+      state: 'verified',
+      freshness: 'fresh',
+      recommendation: 'hold',
       sourceHeadMatchesAudited: false,
       contractPathsMissing: [],
       contractPathsDrifted: [],
-      blocker: `Repository main advanced from audited head ${input.auditedHead} to ${input.currentHead}; exact-head adapter provenance is stale even though required contract blobs are unchanged.`,
-      nextAction: 'Perform an exact-head semantic review, then refresh the audited head and contract manifest together before treating the adapter as current.',
-      reasons: ['Unchanged contract blobs do not prove that an adapter pinned to a predecessor SHA accepts or represents the current repository head.'],
+      blocker: null,
+      nextAction: 'Keep the adapter read-only and refresh the audited head only when intentionally updating the provenance snapshot.',
+      reasons: ['Repository main advanced, but every required project contract blob still matches the audited adapter snapshot.'],
     };
   }
 

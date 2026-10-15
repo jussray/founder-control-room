@@ -72,7 +72,7 @@ This is an authority-freshness correction, not a relaxation of review or proof. 
 
 Adding Cowork to the founder stack creates a new truth-decay risk if a workspace copy, attachment, exported folder, prior model context, or generic FCR activity row is later reused as if it were current GitHub repository state or a Cowork-specific proof receipt. A Cowork session can be correctly grounded at one moment and become stale after the repository branch/head or connector authorization changes.
 
-The corrected rule keeps the authority planes separate. Claude, Claude Code, and Cowork must resolve the authoritative GitHub repository, branch, and exact current head at the use boundary and bind the Council round to that same evidence subject. Cowork workspace state is working context only until reconciled with current GitHub source. Actual GitHub access depends on the current Claude-side GitHub connector and its permissions; repository source cannot prove that connector is configured or authorized in a particular session.
+The corrected rule keeps the authority planes separate. Claude, Claude Code, and Cowork must resolve the authoritative GitHub repository, branch, and exact current head at the use boundary and bind their Council round to that same evidence subject. Cowork workspace state is working context only until reconciled with current GitHub source. Actual GitHub access depends on the current Claude-side GitHub connector and its permissions; repository source cannot prove that connector is configured or authorized in a particular session.
 
 Durable repository changes return through GitHub commit, pull-request, diff, check, and review evidence. The current FCR Cowork lane does **not** have a native Cowork receipt adapter, so generic Activity entries cannot be relabeled as Cowork receipts and FCR must keep that receipt state `UNKNOWN`/unwired until a separately reviewed adapter is implemented and proven. Council membership, model capability, connector availability, or Cowork tools never grant merge, deploy, provider, credential, billing, publication, deletion, or founder authority.
 
@@ -295,6 +295,8 @@ Do not emit:
 - chain-of-thought.
 
 **Analytics remains observation-only.** It cannot renew a Truth Lease, approve a merge, rewrite provider reality, authorize publication, or turn documentation consistency into objective truth.
+**Account/lane provenance decays independently.** A provider observation is valid only for the exact network, lane, account identity, connector account identity, and coverage state it actually observed. An out-of-scope connector response must remain `UNKNOWN`; zero is an observed metric only for the account that was actually queried. Cross-account donation cannot renew truth, authority, or analytics freshness.
+
 
 ### Analytics-authority Redteam
 
@@ -482,10 +484,26 @@ StoryEngine `main` advanced beyond the pinned `18d9ba257a69c3d1743f346d424daf317
 
 Rebinding `.github/workflows/playwright.yml` to `168d65ede38d2477ea00902fa1f0e76f292c583d` selects the next federation evidence subject only. The successor FCR head stays `UNKNOWN` for federation until its own exact-head workflow proves live ref equality, immutable peer checkout, runtime identity, directive/receipt binding, replay safety, and the complete browser loop. A later move of either FCR or StoryEngine expires that proof again. No prior green, founder approval, merge, deploy, production, publication, or provider-mutation authority transfers through the pin refresh.
 
-## 2026-10-05 control correction: exact-head rollover and receipt novelty
+## 2026-10-05 StoryEngine MAKEVIDEO peer transition
 
-PR rollover can preserve executable code while still invalidating the documentation proof that described an earlier base/head pair. After a rollover, truth-sensitive source changes must be evaluated against the new reviewed base-to-head range, not credited with receipt text inherited unchanged from the predecessor candidate.
+FCR Playwright run #6969 on `897083276b6c775c49ce30be189a50bd610b5d4c` completed the local/direct browser harness successfully, then failed closed at the separate peer freshness gate because `.github/workflows/playwright.yml` still expected StoryEngine `168d65ede38d2477ea00902fa1f0e76f292c583d` while `refs/heads/main` had advanced to independently observed `3c1689fe67142e783fe7d18b5ff610640bdc81d6`. The StoryEngine comparison showed two strictly forward commits: `c9af4ea095561d0837a141e311e8977d796aaaa7` exposing StoryEngine's own MAKEVIDEO skill and `3c1689fe67142e783fe7d18b5ff610640bdc81d6` adding its exact-head MAKEVIDEO proof workflow.
 
-The corrected rule requires `scripts/verify-documentation-truth.mjs` to recognize fresh semantic invariant units for every changed truth-sensitive path and reject punctuation, comments, formatting, link-target changes, or recombinations of inherited units as novelty. `src/lib/documentationTruthClaimFingerprint.js` must preserve meaningful logical and comparison semantics while removing presentation-only noise, so a receipt can neither false-green through cosmetic churn nor false-fail because of Markdown packaging.
+That failure is dependency-freshness evidence, not a failed FCR browser journey and not evidence that the README repair regressed runtime behavior. Rebinding the peer to `3c1689fe67142e783fe7d18b5ff610640bdc81d6` selects the next evidence subject only. The successor FCR head remains `UNKNOWN` for federation until the complete live-ref check, immutable checkout, exact peer runtime identity, directive/receipt binding, replay protections, and Playwright browser witness succeed. No predecessor green, founder approval, merge, deploy, production, publication, billing, or provider-mutation authority transfers through this pin refresh.
 
-Adapter and federation identities follow the same law. `src/founder-os-lab/projectAdapterFreshness.ts` and `src/founder-os-lab/projectAdapters.ts` must bind freshness to the exact external repository head rather than assuming byte-identical contract blobs make a predecessor pin current. The Playwright federation witness must re-observe the live StoryEngine ref after immutable checkout and require the live ref SHA, configured pin, and checked-out SHA to agree before proceeding. These checks select and validate an evidence subject only; they cannot transfer predecessor proof or grant merge, deploy, provider, production, publication, or outcome authority.
+
+## 2026-10-06 StoryEngine runtime-head-binding peer transition
+
+FCR exact-head Playwright on `ea09b7406eff2b85bde2ba1a4543e765e1f6d135` completed its local/direct browser harness, then failed closed at the separate StoryEngine peer freshness gate because the workflow still expected `91af998c2c7adad0792dd394735ca738b92ab26d` while independently observed StoryEngine `refs/heads/main` resolved to `a6e6a396ed30535af2fd9b1ec2347a84e1a3fbf3`.
+
+The successor StoryEngine head is strictly forward of the predecessor pin and has exact-head green evidence from `L99 Story Engine CI`, `Guardrails Playwright`, `L99 Promotion Gates`, `Agent Contract v1`, and `Control Room Test Ledger`. Source comparison shows the federation contract remains `juss-v10/product-build-directive@v1` / `juss-v10/product-build-receipt@v1`; the relevant change strengthens runtime identity by preferring provider-native deployment SHA in production and failing closed when production cannot prove an exact runtime head.
+
+Rebinding `.github/workflows/playwright.yml` to `a6e6a396ed30535af2fd9b1ec2347a84e1a3fbf3` selects the successor federation evidence subject only. All predecessor FCR-to-StoryEngine browser/federation green is historical. The successor FCR head remains `UNKNOWN` for current federation until the complete live-ref equality check, immutable peer checkout, runtime identity binding, directive/receipt loop, replay protections, and Playwright witness succeed against this exact peer. No founder approval, merge, deploy, production, publication, billing, or provider-mutation authority transfers with the pin.
+
+
+## 2026-10-15 control correction: rollover receipt novelty and post-checkout peer identity
+
+A branch rollover can preserve executable intent while invalidating documentation proof that belonged to an earlier reviewed range. Documentation Truth must therefore compare receipt invariants with the base revision and require fresh semantic units for truth-sensitive source paths changed in the current base-to-head range. Cosmetic churn, comments, link-target changes, formatting, or recombination of inherited units cannot renew evidence authority.
+
+The cross-repository federation witness now closes a second time-of-check/time-of-use gap: after checking out the immutable StoryEngine peer, it re-observes the live peer ref and requires the configured SHA, checkout SHA, and live ref SHA to remain equal. If the peer moves during the witness, federation stays UNKNOWN rather than borrowing predecessor green.
+
+This correction does not reintroduce head-only adapter churn. Current adapter freshness on `main` treats a successor external head with unchanged audited contract blobs as fresh, read-only provenance continuity. Contract-blob drift still requires semantic review, and neither unchanged blobs nor a refreshed pin grants merge, deploy, production, provider, publication, billing, or founder authority.
