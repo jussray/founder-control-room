@@ -154,7 +154,7 @@ describe('four-system founder operator authority boundary', () => {
     const h = harness();
     const result = await runGoal({ ...task, surface: 'ui' }, h.tools, approval);
     expect(result.status).toBe('BLOCKED');
-    expect(result.nextGate).toContain('reverify');
+    expect(result.nextGate).toContain('proof gate');
   });
 
   it('requires independent provider readback for external changes', async () => {
