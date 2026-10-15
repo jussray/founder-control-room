@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "contractVersion": "2026-10-05.2",
+  "contractVersion": "2026-10-15.1",
   "authority": {
     "repository": "jussray/founder-control-room",
     "purpose": "Portfolio-wide commercial packaging and money-path classification for FCR-governed work.",
@@ -19,6 +19,35 @@
     "everyCommercialCandidateNeedsARepeatEngine": true,
     "everyCommercialCandidateNeedsANextMoneyTest": true,
     "truthStatuses": ["VERIFIED", "INFERRED", "UNKNOWN", "BLOCKED"]
+  },
+  "introductoryPaidMonth": {
+    "contract": "juss/paid-intro-month@v1",
+    "policyStatus": "sandbox-only-no-live-checkout",
+    "offer": "$1 paid first monthly invoice; ordinary founder-approved subscription amount at the next monthly renewal",
+    "firstInvoiceCents": 100,
+    "currency": "usd",
+    "term": "one-monthly-billing-period-not-a-free-trial",
+    "stripeAccountId": "acct_1U4xNyRs4gw4sfJH",
+    "neverStripeAccountId": "acct_1TfbELRp7J40bCrl",
+    "neverProductKey": "juss-beautiful-hair",
+    "neverBrand": "Juss Beautiful Hair",
+    "neverRepositories": [
+      "jussray/jussbeautifulhair-site",
+      "jussray/jussbeautifulhair1",
+      "jussray/Juss-beautiful-hair-",
+      "jussray/jbh-private"
+    ],
+    "appliesOnlyTo": "individually registered Juss & Co. digital subscription products after founder-approved recurring prices and verified billing gates",
+    "existingSubscriptionsUnchanged": true,
+    "freeTiersPreserved": true,
+    "adultOrGuardianBillingRequired": true,
+    "regularRenewalPriceAndDateDisclosureRequired": true,
+    "selfServiceCancellationRequired": true,
+    "webhookLifecycleRequired": true,
+    "perCustomerPerProductSingleUse": true,
+    "liveCheckoutEnabled": false,
+    "serverPolicy": "src/lib/introductoryPaidMonth.ts",
+    "truthBoundary": "This is a source policy and guard, not a deployed Checkout flow, active Stripe coupon, validated tax registration, passed end-to-end payment, published price, or authority to bill. Never apply to Juss Beautiful Hair under any circumstances."
   },
   "publicPillars": [
     {
