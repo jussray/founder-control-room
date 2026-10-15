@@ -40,6 +40,8 @@ export interface SecurityVerdict {
 }
 
 export interface IncidentEnv extends Record<string, string | undefined> {
+  SLACK?: string;
+  FCR_SLACK_CHANNEL_ID?: string;
   SLACK_WEBHOOK_URL?: string;
   PAGERDUTY_INTEGRATION_KEY?: string;
   LINEAR_API_KEY?: string;
@@ -162,36 +164,63 @@ export async function escalateToSlack(
   verdict: SecurityVerdict,
   env: IncidentEnv,
 ): Promise<boolean> {
-  const webhookUrl = env.SLACK_WEBHOOK_URL;
-  if (!webhookUrl) return false;
+  if (!shouldEscalate(verdict)) return false;
+
+  // GitHub Agents normalizes the founder's "slack" secret name to SLACK.
+  // The provider must separately bind it in the FCR runtime; Agents secrets do
+  // not become Cloudflare secrets automatically.
+  const credential = env.SLACK?.trim();
+  const webhookCandidate = (
+    env.SLACK_WEBHOOK_URL ||
+    (credential?.startsWith('https://hooks.slack.com/services/') ? credential : undefined)
+  )?.trim();
+  // Reject arbitrary endpoints: Slack incidents must not leave for a non-Slack URL.
+  const webhookUrl =
+    webhookCandidate && /^https:\/\/hooks\.slack\.com\/services\/[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+$/.test(webhookCandidate)
+      ? webhookCandidate
+      : undefined;
+  if (webhookCandidate && !webhookUrl) return false;
+  const botToken =
+    credential && /^xoxb-[A-Za-z0-9-]+$/.test(credential) ? credential : undefined;
+  const channel = env.FCR_SLACK_CHANNEL_ID;
+  if (!webhookUrl && (!botToken || !channel || !/^C[A-Z0-9]{8,}$/.test(channel))) {
+    return false;
+  }
 
   try {
     const message = formatSlackMessage(verdict);
-
-    const response = await fetch(webhookUrl, {
+    const response = await fetch(webhookUrl ?? 'https://slack.com/api/chat.postMessage', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      redirect: 'error',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(webhookUrl ? {} : { Authorization: `Bearer ${botToken}` }),
+      },
       body: JSON.stringify({
         text: message.text,
         blocks: message.blocks,
+        ...(webhookUrl ? {} : { channel }),
       }),
     });
 
     if (!response.ok) {
-      console.error(
-        '[incident-escalation] Slack webhook failed:',
-        response.status,
-        await response.text(),
-      );
+      // Neither Slack's response body nor the secret-bearing webhook URL may be logged.
+      console.error('[incident-escalation] Slack delivery failed:', response.status);
       return false;
     }
 
+    if (!webhookUrl) {
+      const result = (await response.json()) as { ok?: boolean };
+      if (result?.ok !== true) {
+        console.error('[incident-escalation] Slack API rejected delivery');
+        return false;
+      }
+    }
+
     return true;
-  } catch (error) {
-    console.error(
-      '[incident-escalation] Slack escalation error:',
-      error instanceof Error ? error.message : String(error),
-    );
+  } catch {
+    // Provider errors can embed credential-bearing URLs; never log them here.
+    console.error('[incident-escalation] Slack delivery error');
     return false;
   }
 }
@@ -230,20 +259,14 @@ export async function escalateToPagerDuty(
     });
 
     if (!response.ok) {
-      console.error(
-        '[incident-escalation] PagerDuty escalation failed:',
-        response.status,
-        await response.text(),
-      );
+      // Provider response bodies are not log-safe and may echo request context.
+      console.error('[incident-escalation] PagerDuty escalation failed:', response.status);
       return false;
     }
 
     return true;
-  } catch (error) {
-    console.error(
-      '[incident-escalation] PagerDuty error:',
-      error instanceof Error ? error.message : String(error),
-    );
+  } catch {
+    console.error('[incident-escalation] PagerDuty delivery error');
     return false;
   }
 }
@@ -288,37 +311,31 @@ export async function logIncidentToLinear(
       }),
     });
 
-    const body = await response.json();
+    const body = (await response.json().catch(() => null)) as {
+      errors?: Array<{ message?: unknown }>;
+      data?: { issueCreate?: { issue?: { id?: unknown } } };
+    } | null;
 
-    // IMPLANT 4: GraphQL error detection — Linear returns 200 OK even for permission errors
-    if (body.errors && Array.isArray(body.errors) && body.errors.length > 0) {
-      console.error(
-        '[incident-escalation] Linear GraphQL error (permission/validation):',
-        body.errors[0].message,
-      );
+    // Linear may report GraphQL failure with HTTP 200. Provider-controlled
+    // response text is intentionally not written to logs.
+    if (Array.isArray(body?.errors) && body.errors.length > 0) {
+      console.error('[incident-escalation] Linear GraphQL request rejected');
       return false;
     }
 
     if (!response.ok) {
-      console.error(
-        '[incident-escalation] Linear HTTP error:',
-        response.status,
-        JSON.stringify(body),
-      );
+      console.error('[incident-escalation] Linear HTTP error:', response.status);
       return false;
     }
 
-    if (!body.data?.issueCreate?.issue?.id) {
-      console.error('[incident-escalation] Linear response missing issue ID:', body);
+    if (typeof body?.data?.issueCreate?.issue?.id !== 'string' || body.data.issueCreate.issue.id.length === 0) {
+      console.error('[incident-escalation] Linear response missing issue ID');
       return false;
     }
 
     return true;
-  } catch (error) {
-    console.error(
-      '[incident-escalation] Linear error:',
-      error instanceof Error ? error.message : String(error),
-    );
+  } catch {
+    console.error('[incident-escalation] Linear delivery error');
     return false;
   }
 }
@@ -345,19 +362,16 @@ export async function escalateIncident(
   const succeeded = results.filter((r) => r.status === 'fulfilled' && r.value).length;
   const failed = results.filter((r) => r.status === 'rejected' || !r.value).length;
 
-  // IMPLANT 5: Critical escalation failure detection — alert if all channels failed on high-severity verdict
-  const hasExternalThreat = verdict.boundaries?.externalCompromise || verdict.boundaries?.externalExploit;
-  if (failed > 0 && (verdict.verdict === 'REPAIR_REQUIRED' || hasExternalThreat)) {
-    console.error(
-      '[incident-escalation] CRITICAL: Escalation failed for high-severity verdict:',
-      {
-        verdict: verdict.verdict,
-        service: verdict.service,
-        receipt: verdict.receipt,
-        channels_failed: failed,
-        has_external_threat: hasExternalThreat,
-      },
-    );
+  const hasExternalThreat =
+    verdict.boundaries?.externalCompromise === true || verdict.boundaries?.externalExploit === true;
+  if (failed === results.length && (verdict.verdict === 'REPAIR_REQUIRED' || hasExternalThreat)) {
+    console.error('[incident-escalation] CRITICAL: Escalation failed for high-severity verdict:', {
+      verdict: verdict.verdict,
+      service: verdict.service,
+      receipt: verdict.receipt,
+      channels_failed: failed,
+      has_external_threat: hasExternalThreat,
+    });
   }
 
   console.log(`[incident-escalation] Escalation complete: ${succeeded} succeeded, ${failed} failed`);

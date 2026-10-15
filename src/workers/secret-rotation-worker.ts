@@ -29,9 +29,13 @@ interface RotationEvent {
 }
 
 const ROTATION_LEASE_DAYS = 90;
-const ROTATION_START_DAYS = 60;
-const WARNING_THRESHOLD_DAYS = 75;
-const CRITICAL_THRESHOLD_DAYS = 85;
+const ROTATION_START_AGE_DAYS = 60;
+const WARNING_AGE_DAYS = 75;
+const CRITICAL_AGE_DAYS = 85;
+
+const ROTATION_START_REMAINING_DAYS = ROTATION_LEASE_DAYS - ROTATION_START_AGE_DAYS;
+const WARNING_REMAINING_DAYS = ROTATION_LEASE_DAYS - WARNING_AGE_DAYS;
+const CRITICAL_REMAINING_DAYS = ROTATION_LEASE_DAYS - CRITICAL_AGE_DAYS;
 
 export function requireBinding(env: SecretRotationEnv, name: string): string {
   const value = env[name]?.trim();
@@ -47,16 +51,30 @@ function normalizeFailure(error: unknown): Error {
 }
 
 export function daysUntilExpiry(createdAt: string, rotatedAt: string | null): number {
-  const referenceDate = rotatedAt ? new Date(rotatedAt) : new Date(createdAt);
-
-  // IMPLANT 1: Timestamp validation — detect malformed dates before computation
-  if (isNaN(referenceDate.getTime())) {
-    throw new Error(`Invalid timestamp for secret: createdAt=${createdAt}, rotatedAt=${rotatedAt}`);
+  const createdMs = Date.parse(createdAt);
+  if (!Number.isFinite(createdMs)) {
+    throw new Error('Invalid created_at timestamp for secret rotation');
   }
 
-  const expiryDate = new Date(referenceDate.getTime() + ROTATION_LEASE_DAYS * 24 * 60 * 60 * 1000);
-  const now = new Date();
-  const diffMs = expiryDate.getTime() - now.getTime();
+  let referenceMs = createdMs;
+  if (rotatedAt !== null) {
+    const rotatedMs = Date.parse(rotatedAt);
+    if (!Number.isFinite(rotatedMs)) {
+      throw new Error('Invalid rotated_at timestamp for secret rotation');
+    }
+    if (rotatedMs < createdMs) {
+      throw new Error('rotated_at precedes created_at for secret rotation');
+    }
+    referenceMs = rotatedMs;
+  }
+
+  const nowMs = Date.now();
+  if (createdMs > nowMs || referenceMs > nowMs) {
+    throw new Error('Secret rotation timestamp is in the future');
+  }
+
+  const expiryMs = referenceMs + ROTATION_LEASE_DAYS * 24 * 60 * 60 * 1000;
+  const diffMs = expiryMs - nowMs;
   return Math.ceil(diffMs / (24 * 60 * 60 * 1000));
 }
 
@@ -69,7 +87,7 @@ export function createSupabaseAdmin(env: SecretRotationEnv): SupabaseClient {
 }
 
 // IMPLANT 2: Schema health check — verify secrets table exists before processing
-async function verifySecretsTableExists(supabaseAdmin: SupabaseClient): Promise<void> {
+export async function verifySecretsTableExists(supabaseAdmin: SupabaseClient): Promise<void> {
   const { error } = await supabaseAdmin
     .from('secrets')
     .select('id')
@@ -86,7 +104,7 @@ export async function checkSecretRotationStatus(
   const daysRemaining = daysUntilExpiry(secret.created_at, secret.rotated_at);
   const now = new Date().toISOString();
 
-  if (daysRemaining > ROTATION_START_DAYS) {
+  if (daysRemaining > ROTATION_START_REMAINING_DAYS) {
     return null;
   }
 
@@ -111,7 +129,7 @@ export async function checkSecretRotationStatus(
     };
   }
 
-  if (daysRemaining <= CRITICAL_THRESHOLD_DAYS) {
+  if (daysRemaining <= CRITICAL_REMAINING_DAYS) {
     await supabaseAdmin
       .from('secrets_audit_log')
       .insert({
@@ -132,7 +150,7 @@ export async function checkSecretRotationStatus(
     };
   }
 
-  if (daysRemaining <= WARNING_THRESHOLD_DAYS) {
+  if (daysRemaining <= WARNING_REMAINING_DAYS) {
     await supabaseAdmin
       .from('secrets_audit_log')
       .insert({
@@ -153,7 +171,7 @@ export async function checkSecretRotationStatus(
     };
   }
 
-  if (daysRemaining <= ROTATION_START_DAYS) {
+  if (daysRemaining <= ROTATION_START_REMAINING_DAYS) {
     const { error: statusUpdateError } = await supabaseAdmin
       .from('secrets')
       .update({ rotation_status: 'rotating' })

@@ -384,6 +384,8 @@ When the live StoryEngine ref advances after a previously proven FCR head, updat
 
 The exact predecessor/successor SHAs and the comparison that justified a peer refresh belong in the audit/receipt provenance, not as a durable “current SHA” in this README. Rebinding the peer selects a new evidence subject only; it never carries predecessor green forward.
 
+The October 14 StoryEngine peer advance identified during FCR draft PR #975 is a peer-freshness gate failure, not a failed local browser journey. The successor pin is recovery setup only. Independent StoryEngine checks must be examined separately, and FCR federation remains `UNKNOWN` until its own successor-head Playwright run completes; partial or unrelated provider-preview failures must be reported, never concealed.
+
 ## Resident Council and Muse relay truth
 
 The Founder Council is resident in both the founder assistant host and the project Control Room. `.control-room/council-residency.contract.json` is the machine-readable residency contract; `.control-room/COUNCIL.md` carries the human-readable project policy. Residency means Council selection, challenge, dissent, evidence binding, and project-local routing are available as standing infrastructure. It does **not** centralize project execution authority or expose Council controls to project users.
