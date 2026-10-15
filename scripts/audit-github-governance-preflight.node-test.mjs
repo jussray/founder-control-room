@@ -5,6 +5,7 @@ import {
   CANONICAL_NATIVE_APPROVAL_COUNT,
   CANONICAL_RULESET_NAME,
   CODEQL_SECURITY_FLOOR,
+  CODE_QUALITY_SEVERITY_FLOOR,
   buildBlockedReport,
   buildReport,
   bypassPolicyMatches,
@@ -49,6 +50,7 @@ function canonicalRuleset(overrides = {}) {
           }],
         },
       },
+      { type: 'code_quality', parameters: { severity: 'errors' } },
       { type: 'non_fast_forward' },
       { type: 'deletion' },
     ],
@@ -110,7 +112,7 @@ test('canonical FCR governance preserves founder-only review and zero-bypass fre
 
   assert.equal(CANONICAL_NATIVE_APPROVAL_COUNT, 0);
   assert.equal(review.targetsRequestedRef, true);
-  assert.deepEqual(review.ruleTypes, ['code_scanning', 'deletion', 'non_fast_forward', 'pull_request']);
+  assert.deepEqual(review.ruleTypes, ['code_quality', 'code_scanning', 'deletion', 'non_fast_forward', 'pull_request']);
   assert.equal(review.requiredApprovingReviewCount, 0);
   assert.equal(review.dismissStaleReviewsOnPush, true);
   assert.equal(review.requireCodeOwnerReview, false);
@@ -120,6 +122,7 @@ test('canonical FCR governance preserves founder-only review and zero-bypass fre
   assert.deepEqual(review.requiredStatusCheckNames, []);
   assert.deepEqual(review.codeScanningTools, [CODEQL_SECURITY_FLOOR]);
   assert.equal(codeQLSecurityFloorSatisfied(review), true);
+  assert.equal(review.codeQualitySeverity, CODE_QUALITY_SEVERITY_FLOOR);
   assert.equal(review.blockForcePushes, true);
   assert.equal(review.blockDeletion, true);
   assert.equal(bypassPolicyMatches(review, expectedBypass), true);
@@ -188,6 +191,14 @@ test('review membrane requires the exact phase flags and exact CodeQL security f
   const noCodeQLSnapshot = rulesetSnapshot(noCodeQL, 'main', 'main');
   assert.equal(codeQLSecurityFloorSatisfied(noCodeQLSnapshot), false);
   assert.equal(canonicalFloorSatisfied(noCodeQLSnapshot, expectedBypass), false);
+
+  const missingQuality = canonicalRuleset();
+  missingQuality.rules = missingQuality.rules.filter((rule) => rule.type !== 'code_quality');
+  assert.equal(canonicalFloorSatisfied(rulesetSnapshot(missingQuality, 'main', 'main'), expectedBypass), false);
+
+  const weakQuality = canonicalRuleset();
+  weakQuality.rules.find((rule) => rule.type === 'code_quality').parameters.severity = 'warnings';
+  assert.equal(canonicalFloorSatisfied(rulesetSnapshot(weakQuality, 'main', 'main'), expectedBypass), false);
 
   const weakCodeQL = canonicalRuleset();
   const scanning = weakCodeQL.rules.find((rule) => rule.type === 'code_scanning');

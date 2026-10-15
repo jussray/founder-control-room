@@ -1,6 +1,6 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Document current evidence-authority boundaries across cross-repository browser federation, resident Council/Muse relay activation, provider-held runtime-secret observation, and account-scoped founder-content metrics so source wiring, account identity, configured bindings, live provider invocation, and mutation authority remain separate claims with separate proof.",
+  "purpose": "Document current evidence-authority boundaries across cross-repository browser federation, resident Council/Muse relay activation, provider-held runtime-secret observation, and account-scoped founder-content metrics so source wiring, account identity, configured bindings, live provider invocation, and mutation authority remain separate claims with separate proof. This revision records the read-policy hardening and an evidence-authority peer-pin transition without presenting source selection as production browser proof.",
   "domains": [
     "cloudflare-authority",
     "repository-provider",
@@ -12,6 +12,13 @@
     "truth-governance"
   ],
   "changes": [
+    {
+      "path": "src/providers/GitHubProvider.ts",
+      "claims": [
+        "`src/providers/GitHubProvider.ts` must preserve the existing FCR GitHub `code_quality` ruleset floor with `severity: errors` in the founder-only review membrane during trusted two-ruleset reconciliation; its provider readback must fail closed if the error-severity quality rule is missing, duplicated, or weakened, without granting merge, GitHub ruleset mutation, or production authority.",
+        "The strict-freshness companion must remain a separate zero-bypass ruleset with exact required status checks. Updating code-quality source/fixture/audit contracts does not prove a live GitHub settings change, reviewer approval, premerge deployment completion, or runtime release."
+      ]
+    },
     {
       "path": ".github/workflows/openai-runtime-secret-proof.yml",
       "claims": [
@@ -52,7 +59,8 @@
         "The October 2, 2026 transition from StoryEngine `0a1d3b521967a3643daf56cf2ad60b1392bb6e0c` to independently observed `4ec29c1821de8c7bb8c381df31e3f98d0c6016f4` selects a new evidence subject after bounded review of the fail-closed Cloudflare front door, hashed API rate-limit identity, and focused Node tests; predecessor federation proof remains historical, and the successor FCR head must earn its own complete exact-head Playwright witness before the pair is current.",
         "The October 3, 2026 URLFix merge-review transition from the prior StoryEngine peer to independently observed `18d9ba257a69c3d1743f346d424daf31796aaeed` selects a new evidence subject only; the local FCR browser harness passing before the live-peer mismatch does not transfer federation green, and PR #896 must earn a complete exact-head Playwright witness against the successor before the pair is current.",
         "The October 3, 2026 agent-contract v1 transition from StoryEngine `18d9ba257a69c3d1743f346d424daf31796aaeed` to independently observed `168d65ede38d2477ea00902fa1f0e76f292c583d` selects a new evidence subject only; Chief Access recovery PR #913 failing the live-peer check is dependency drift, and the successor FCR head must earn a complete exact-head Playwright witness against the successor before the pair is current.",
-        "The October 5, 2026 transition from StoryEngine `168d65ede38d2477ea00902fa1f0e76f292c583d` through `c9af4ea095561d0837a141e311e8977d796aaaa7` to independently observed `3c1689fe67142e783fe7d18b5ff610640bdc81d6` selects a new evidence subject only; FCR Playwright run #6969 on `897083276b6c775c49ce30be189a50bd610b5d4c` passed the local/direct browser harness but failed the peer freshness check, so `.github/workflows/playwright.yml` must bind the successor exact peer and require a complete exact-head federation rerun before the pair is current."
+        "The October 5, 2026 transition from StoryEngine `168d65ede38d2477ea00902fa1f0e76f292c583d` through `c9af4ea095561d0837a141e311e8977d796aaaa7` to independently observed `3c1689fe67142e783fe7d18b5ff610640bdc81d6` selects a new evidence subject only; FCR Playwright run #6969 on `897083276b6c775c49ce30be189a50bd610b5d4c` passed the local/direct browser harness but failed the peer freshness check, so `.github/workflows/playwright.yml` must bind the successor exact peer and require a complete exact-head federation rerun before the pair is current.",
+        "`.github/workflows/playwright.yml` must bind the StoryEngine federation witness to the independently observed `refs/heads/main` commit selected by the founder's FCR branch, and it must still reject later peer-ref movement before immutable checkout and real Playwright verification; selecting SHA `809d30ae2ef57dce6d4fee9a3b6afa24bfa83497` alone cannot establish passing browser proof, deployed runtime identity, or merge/deploy authority."
       ]
     },
     {

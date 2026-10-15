@@ -20,6 +20,7 @@ import type {
 const FCR_CODE_SCANNING_TOOL = "CodeQL";
 const FCR_CODE_SCANNING_SECURITY_THRESHOLD = "high_or_higher";
 const FCR_CODE_SCANNING_ALERTS_THRESHOLD = "errors";
+const FCR_CODE_QUALITY_SEVERITY = "errors";
 
 export interface GitHubProviderConfig {
   token: string;
@@ -485,6 +486,17 @@ export class GitHubProvider implements RepositoryProvider {
         },
       });
     }
+    // Preserve the existing error-level code quality rule during reconciliation.
+    if (hardenFounderControlRoomMainReview) {
+      // GitHub REST supports code_quality, but pinned Octokit endpoint types lag the 2026 API.
+      // Keep the compatibility cast limited to this verified rule shape; provider readback
+      // independently rejects missing or weakened code-quality enforcement.
+      const codeQualityRule = {
+        type: "code_quality",
+        parameters: { severity: FCR_CODE_QUALITY_SEVERITY },
+      } as const;
+      reviewRules.push(codeQualityRule as unknown as RepoRule);
+    }
     // For FCR main, strict status/base-freshness is deliberately moved to a
     // second no-bypass ruleset below. Other projects retain the prior single
     // ruleset behavior.
@@ -783,6 +795,11 @@ function fcrMainReviewRulesetReadbackErrors(config: RulesetConfig, value: unknow
     if (!exactCodeQL) errors.push("CodeQL code-scanning thresholds do not match the constitutional floor");
   }
 
+  const qualityRules = rules.filter((rule) => rule.type === "code_quality");
+  if (qualityRules.length !== 1 || qualityRules[0]?.parameters?.severity !== FCR_CODE_QUALITY_SEVERITY) {
+    errors.push("code quality must retain exactly one errors-severity rule");
+  }
+
   if (config.blockForcePushes && !rules.some((rule) => rule.type === "non_fast_forward")) {
     errors.push("force-push protection is missing");
   }
@@ -793,6 +810,7 @@ function fcrMainReviewRulesetReadbackErrors(config: RulesetConfig, value: unknow
   const expectedRuleTypes = [
     "pull_request",
     "code_scanning",
+    "code_quality",
     ...(config.blockForcePushes ? ["non_fast_forward"] : []),
     ...(config.blockDeletion ? ["deletion"] : []),
   ].sort();
