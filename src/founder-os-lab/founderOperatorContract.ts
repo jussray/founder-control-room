@@ -191,16 +191,19 @@ function supportReceipt(context: AdvisoryContext): SupportReceipt {
 
 function canonicalFile(file: string): boolean {
   return file.length > 0 && file.length <= 300 && !file.startsWith('/') &&
-    !file.includes('\\\\') && !file.includes('\\0') && !file.includes('//') &&
-    file.split('/').every(segment => segment !== '.' && segment !== '..' && !!segment) &&
+    !file.includes(String.fromCharCode(92)) && !file.includes(String.fromCharCode(0)) &&
+    !file.includes('//') && file.split('/').every(segment => segment !== '.' && segment !== '..' && !!segment) &&
     !/^[A-Za-z]:/.test(file);
 }
 
 function requiredProof(task: Task, proposal: PatchProposal, classified: { surface: Task['surface']; providerTarget?: string; documentationTruth?: boolean }): ProofKind[] {
   const kinds = new Set<ProofKind>(['focused-check']);
-  if (task.surface === 'ui' || classified.surface === 'ui' || proposal.files.some(file => /\\.(?:tsx|jsx|css|html)$/.test(file))) kinds.add('playwright');
+  if (task.surface === 'ui' || classified.surface === 'ui' ||
+      proposal.files.some(file => ['tsx', 'jsx', 'css', 'html'].includes(file.split('.').at(-1) ?? ''))) kinds.add('playwright');
   if (task.providerChange || classified.providerTarget) kinds.add('provider-readback');
-  if (classified.documentationTruth || task.surface === 'docs' || proposal.files.some(file => /^(?:README\\.md|docs\\/|AGENTS\\.md|GLOBAL_AI\\.md)/.test(file))) kinds.add('documentation-truth');
+  if (classified.documentationTruth || task.surface === 'docs' ||
+      proposal.files.some(file => file === 'README.md' || file.startsWith('docs/') ||
+        file === 'AGENTS.md' || file === 'GLOBAL_AI.md')) kinds.add('documentation-truth');
   return [...kinds];
 }
 
