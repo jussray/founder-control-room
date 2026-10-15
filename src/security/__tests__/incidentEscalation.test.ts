@@ -229,6 +229,21 @@ describe('incident-escalation', () => {
     logSpy.mockRestore();
   });
 
+  it('does not log PagerDuty provider error bodies', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    global.fetch = vi.fn(async () =>
+      new Response('secret-looking-pagerduty-detail', { status: 403 }),
+    ) as any;
+
+    const result = await escalateToPagerDuty(createMockVerdict('CONTAIN_ESCALATE'), {
+      PAGERDUTY_INTEGRATION_KEY: 'test-only-key',
+    });
+
+    expect(result).toBe(false);
+    expect(JSON.stringify(errorSpy.mock.calls)).not.toContain('secret-looking-pagerduty-detail');
+    errorSpy.mockRestore();
+  });
+
   it('rejects Linear GraphQL errors without logging provider-controlled text', async () => {
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     global.fetch = vi.fn(async (url) => {

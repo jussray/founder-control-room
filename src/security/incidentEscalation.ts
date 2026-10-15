@@ -259,20 +259,14 @@ export async function escalateToPagerDuty(
     });
 
     if (!response.ok) {
-      console.error(
-        '[incident-escalation] PagerDuty escalation failed:',
-        response.status,
-        await response.text(),
-      );
+      // Provider response bodies are not log-safe and may echo request context.
+      console.error('[incident-escalation] PagerDuty escalation failed:', response.status);
       return false;
     }
 
     return true;
-  } catch (error) {
-    console.error(
-      '[incident-escalation] PagerDuty error:',
-      error instanceof Error ? error.message : String(error),
-    );
+  } catch {
+    console.error('[incident-escalation] PagerDuty delivery error');
     return false;
   }
 }
@@ -340,11 +334,8 @@ export async function logIncidentToLinear(
     }
 
     return true;
-  } catch (error) {
-    console.error(
-      '[incident-escalation] Linear error:',
-      error instanceof Error ? error.message : String(error),
-    );
+  } catch {
+    console.error('[incident-escalation] Linear delivery error');
     return false;
   }
 }
