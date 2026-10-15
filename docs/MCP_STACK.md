@@ -10,7 +10,7 @@ The Control Room is a private, repository-agnostic governance service. Its stand
 
 The Control Room source defines an external connector boundary for eligible OAuth/static clients, including governed ChatGPT/Codex, Claude, Gemini, Muse, Perplexity, and other clients admitted by the current server policy. Client/model identity never grants mutation authority by itself.
 
-- canonical resource: `https://api.foundercontrolroom.org/mcp`;
+- canonical resource: `https://foundercontrolroom.org/mcp`;
 - protected-resource metadata: `/.well-known/oauth-protected-resource` and `/.well-known/oauth-protected-resource/mcp`;
 - transport: stateless Streamable HTTP with MCP `2026-07-28`, plus initialization-based `2025-11-25`, `2025-06-18`, and `2025-03-26` compatibility;
 - canonical auth: Supabase OAuth access tokens validated for issuer, audience, expiry/not-before, `client_id`, `mcp:read`, `mcp_projects`, current Supabase user validity, and the server-side `founder_users` allowlist;
@@ -68,7 +68,9 @@ No migration, OAuth dashboard change, Worker secret/binding change, merge, or de
 
 ## Served remote read MCP boundary
 
-Founder Control Room also serves a separate read-only MCP gateway at `POST https://api.foundercontrolroom.org/mcp/read`. This is the remote bridge intended for external MCP clients that need governed repository/provider reads without inheriting Founder Control Room execution authority.
+Founder Control Room also serves a separate read-only MCP gateway at `POST https://foundercontrolroom.org/mcp/read`. This is the remote bridge intended for external MCP clients that need governed repository/provider reads without inheriting Founder Control Room execution authority.
+
+**Access-managed API boundary:** `api.foundercontrolroom.org` is Access-required by default. Standards-based external MCP discovery/read paths that cannot carry a second Cloudflare credential use only the exact application-authenticated exceptions declared in `config/fcr-cloudflare-access-boundary.json`; no `/mcp/*` wildcard is permitted. In particular, write-capable `/mcp/founder-signal-engine` and tokenized `/mcp/founder-signal-x-engagement` remain behind Access and require the dedicated FCR Access service token in addition to their existing application middleware.
 
 - Authentication uses the dedicated Worker secret `FCR_REMOTE_MCP_READ_TOKEN`. It must not be reused for the write-capable Founder Signal Engine MCP or any provider credential.
 - Production project scope is server-held as `FCR_REMOTE_MCP_READ_PROJECTS=sekret-bip,juss-beautiful-hair,juss-beautiful-hair-private,l99,chief-ai-machine,untold-stories,sync-party,founder-control-room,promptos`. These are the current active authority-bearing entries in `PORTFOLIO_PROJECTS`; callers cannot add or substitute a project slug in order to widen the grant.
@@ -145,3 +147,9 @@ npm run build
 ```
 
 See `docs/REPO_STACK_POLICY.md` for the cross-repository OODA and red-team decision framework.
+
+### Public MCP transport vs protected direct API
+
+External OAuth/static read clients use the public Pages origin at `https://foundercontrolroom.org/mcp` and its exact read/registry/portfolio descendants. Pages reaches the canonical Worker through the private `FCR_API` Service Binding, so no Cloudflare Access bypass application is required on `api.foundercontrolroom.org/mcp`.
+
+Direct `api.foundercontrolroom.org` remains Access-required for the complete MCP tree. In particular, Cloudflare must not install a root `/mcp` bypass whose path inheritance could cover privileged descendants such as Connection Vault, Founder Permissions, or generic server/tool invocation routes.

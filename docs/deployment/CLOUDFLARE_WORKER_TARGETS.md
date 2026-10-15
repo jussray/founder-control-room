@@ -94,7 +94,7 @@ Repository configuration proves only the desired Workflow class/binding contract
 The canonical Worker also owns the served remote read-only MCP endpoint at:
 
 ```text
-POST https://api.foundercontrolroom.org/mcp/read
+POST https://foundercontrolroom.org/mcp/read
 ```
 
 Repository configuration binds `FCR_REMOTE_MCP_READ_PROJECTS` to exactly `chief-ai-machine,founder-control-room` and requires the dedicated secret name `FCR_REMOTE_MCP_READ_TOKEN`. The scope is server-held; an MCP caller cannot widen it by supplying another project identifier or by reusing another FCR credential.
@@ -195,7 +195,7 @@ Those deployment-plane values do not become Worker runtime bindings. Conversely,
 
 The only runtime secret canonical Deploy deliberately writes is `FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON`, and the checked-in value is fail-closed with `enabled:false`. This lets the release actively preserve the broad automation kill switch while leaving unrelated provider-held runtime secrets untouched.
 
-`https://api.foundercontrolroom.org` is the canonical public API origin and therefore is source configuration, not a GitHub secret. Smoke proof, proof-of-ship runtime readback, and the post-Deploy production Playwright witness use that explicit origin. The witness still requires a successful canonical Deploy and binds direct Worker plus public Pages/proxy `/version` reads to the exact Deploy run SHA before and after the browser journey.
+`https://api.foundercontrolroom.org` is the canonical API origin and source configuration, but it is Access-managed rather than anonymously public. Smoke proof, Worker reconciliation, review-only machine probes, and the post-Deploy production Playwright witness must use the dedicated FCR Cloudflare Access service-token headers for direct API reads. Public Pages/proxy `/version` remains independently observable through `https://foundercontrolroom.org/version` over the `FCR_API` Service Binding. The witness still requires a successful canonical Deploy and binds both authenticated direct-Worker evidence and public service-bound evidence to the exact Deploy run SHA before and after the browser journey.
 
 Trusted deterministic-review or other bounded workflows that actually need GitHub App execution credentials may continue to use their separately scoped Actions-facing `APP_ID` / `APP_PRIVATE_KEY` inputs. That does not make canonical Deploy responsible for re-uploading the Worker's provider-held `GITHUB_APP_ID` / `GITHUB_PRIVATE_KEY` pair.
 
@@ -238,3 +238,25 @@ Current executable source and authoritative provider readback outrank an older v
 - Access: roll back only an incomplete or ambiguous browser-destination detachment using the receipt-bound original destination set and unchanged application/policy identity; a later runtime/browser failure alone must not automatically reintroduce a Cloudflare Access product-login screen.
 - Credentials: remove/revoke only the affected credential; do not rotate unrelated keys to repair binding drift.
 - Preserve build logs, deployment IDs, provider readback, browser traces, and runtime receipts.
+
+
+### Access-managed product hosts
+
+The intended host split is:
+
+- `foundercontrolroom.org`, `www.foundercontrolroom.org`: public discovery/front door;
+- `app.foundercontrolroom.org`: Cloudflare Access required;
+- `api.foundercontrolroom.org`: Cloudflare Access required by default.
+
+The exact machine exception set is `config/fcr-cloudflare-access-boundary.json`. Exceptions are path-scoped and retain their application-level cryptographic/OAuth/OIDC/HMAC/bearer membrane. `/mcp/*` must never be used as an Access bypass wildcard. Direct release and write-capable MCP lanes remain service-token protected.
+
+Provider/DNS/runtime evidence is required before claiming that either `app.` or `api.` currently satisfies this source policy.
+
+
+The Pages Service Binding is not an alternate Access tunnel for write-capable MCP. `public/_worker.js` must fail closed for `/mcp/founder-signal-engine` on the public apex while preserving the canonical OAuth `/mcp` lane, the exact read-only X-engagement MCP exception, and normal founder-authenticated same-origin application traffic.
+
+
+Runtime proof for the protected product hosts is two-sided: a random stranger must receive Access-specific Cloudflare evidence from both `https://app.foundercontrolroom.org/` and direct `https://api.foundercontrolroom.org/version`. Public same-origin `/version` remains a separate Service Binding identity witness and cannot substitute for either protected-host check.
+
+
+External governed MCP transport is served through the public Pages origin (`https://foundercontrolroom.org/mcp` and exact read/registry/portfolio paths) over the private `FCR_API` Service Binding. Do not create a direct-API `/mcp` Access bypass: Cloudflare path inheritance would broaden that exception to privileged MCP descendants.

@@ -101,7 +101,7 @@ test('browser receipt must pass one-document bounded schema before public projec
   );
   assert.equal((returnStep.match(/jq -e -s/g) ?? []).length, 2);
   assert.equal((returnStep.match(/length == 1/g) ?? []).length, 2);
-  assert.match(returnStep, /\.schemaVersion == 1/);
+  assert.match(returnStep, /\.schemaVersion == 2/);
   assert.match(returnStep, /\.scope == "fcr-access-front-door-browser-proof"/);
   assert.match(returnStep, /\.expectedHeadSha == \$expectedHeadSha/);
   assert.match(returnStep, /\.audience == "random-stranger"/);

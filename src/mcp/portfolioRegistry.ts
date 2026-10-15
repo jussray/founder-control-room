@@ -2,7 +2,7 @@ import { getKnownProject } from "../config/portfolio.js";
 
 const SERVER_SCHEMA = "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json";
 const REGISTRY_VERSION = "1.0.0";
-const FCR_API_ORIGIN = "https://api.foundercontrolroom.org";
+const FCR_PUBLIC_ORIGIN = "https://foundercontrolroom.org";
 
 export const PORTFOLIO_MCP_REGISTRY_PROJECTS = [
   "founder-control-room",
@@ -44,7 +44,7 @@ const registryDescriptions: Record<PortfolioMcpRegistryProjectSlug, string> = {
 function bridgeRemote(slug: (typeof PORTFOLIO_MCP_BRIDGE_PROJECTS)[number]) {
   return {
     type: "streamable-http" as const,
-    url: `${FCR_API_ORIGIN}/mcp/portfolio/${slug}`,
+    url: `${FCR_PUBLIC_ORIGIN}/mcp/portfolio/${slug}`,
     headers: [
       {
         name: "Authorization",

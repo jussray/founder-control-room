@@ -27,12 +27,15 @@ permissions:
 jobs:
   playwright-runtime-proof:
     runs-on: ubuntu-latest
+    environment: production
     env:
       FCR_RUNTIME_BASE_URL: ${{ inputs.runtime_base_url }}
       FCR_PLAYWRIGHT_FOUNDER_BEARER: ${{ secrets.FCR_PLAYWRIGHT_FOUNDER_BEARER }}
       FCR_OPERATOR_RELAY_OAUTH_TOKEN: ${{ secrets.FCR_PLAYWRIGHT_FOUNDER_BEARER }}
       FCR_OPERATOR_RELAY_WITNESS_REQUIRED: 'true'
       FCR_OPERATOR_RELAY_TARGET: ${{ inputs.operator_target }}
+      FCR_ACCESS_CLIENT_ID: ${{ secrets.FCR_CLOUDFLARE_ACCESS_CLIENT_ID }}
+      FCR_ACCESS_CLIENT_SECRET: ${{ secrets.FCR_CLOUDFLARE_ACCESS_CLIENT_SECRET }}
       DEPLOY_URL: ${{ inputs.runtime_base_url }}
       PUBLIC_URL: ${{ inputs.public_url || inputs.runtime_base_url }}
       EXPECTED_RELEASE_SHA: ${{ inputs.expected_release_sha }}

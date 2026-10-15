@@ -190,9 +190,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     needs: worker-deploy
+    environment: production
     env:
       EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha }}
       API_ORIGIN: https://api.foundercontrolroom.org
+      FCR_ACCESS_CLIENT_ID: ${{ secrets.FCR_CLOUDFLARE_ACCESS_CLIENT_ID }}
+      FCR_ACCESS_CLIENT_SECRET: ${{ secrets.FCR_CLOUDFLARE_ACCESS_CLIENT_SECRET }}
     steps:
       - name: Verify health, service identity, and exact deployed SHA
         shell: bash
@@ -202,6 +205,8 @@ jobs:
 
           headers="$(mktemp)"
           trap 'rm -f "$headers"' EXIT
+          test -n "$FCR_ACCESS_CLIENT_ID"
+          test -n "$FCR_ACCESS_CLIENT_SECRET"
 
           health_body=''
           version_body=''
@@ -211,10 +216,14 @@ jobs:
               --proto '=https' --proto-redir '=https' --max-redirs 0 \
               --connect-timeout 10 --max-time 20 \
               --dump-header "$headers" \
+              -H "CF-Access-Client-Id: $FCR_ACCESS_CLIENT_ID" \
+              -H "CF-Access-Client-Secret: $FCR_ACCESS_CLIENT_SECRET" \
               "$API_ORIGIN/health" 2>/dev/null || true)"
             candidate_version="$(curl --silent --show-error --fail \
               --proto '=https' --proto-redir '=https' --max-redirs 0 \
               --connect-timeout 10 --max-time 20 \
+              -H "CF-Access-Client-Id: $FCR_ACCESS_CLIENT_ID" \
+              -H "CF-Access-Client-Secret: $FCR_ACCESS_CLIENT_SECRET" \
               "$API_ORIGIN/version" 2>/dev/null || true)"
 
             if tr -d '\r' < "$headers" | grep -Eiq '^x-founder-control-room-service:[[:space:]]*founder-control-room$' \

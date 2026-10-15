@@ -19,7 +19,7 @@ const SUPPORTED_PROTOCOL_VERSIONS = [
 ] as const;
 const SERVER_NAME = 'founder-control-room-paired';
 const SERVER_VERSION = '0.2.0';
-const DEFAULT_RESOURCE = 'https://api.foundercontrolroom.org/mcp';
+const DEFAULT_RESOURCE = 'https://foundercontrolroom.org/mcp';
 const PROJECT_SLUG = /^[a-z0-9][a-z0-9-]{0,119}$/;
 const MAX_BODY_BYTES = 64 * 1024;
 const PROTOCOL_META = 'io.modelcontextprotocol/protocolVersion';

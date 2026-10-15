@@ -29,10 +29,14 @@ The OpenAI key authenticates the caller's OpenAI request. It is never accepted a
 ## Endpoint
 
 ```text
-POST {FOUNDER_API_URL}/mcp/founder-signal-engine
+POST https://api.foundercontrolroom.org/mcp/founder-signal-engine
+CF-Access-Client-Id: {FCR_CLOUDFLARE_ACCESS_CLIENT_ID}
+CF-Access-Client-Secret: {FCR_CLOUDFLARE_ACCESS_CLIENT_SECRET}
 Authorization: Bearer {FOUNDER_SIGNAL_ENGINE_MCP_TOKEN}
 Content-Type: application/json
 ```
+
+The Cloudflare Access service token authenticates the trusted machine to the direct API edge; the Founder Signal MCP bearer remains the application-level capability gate. Neither credential substitutes for the other. `FOUNDER_API_URL` remains the public Pages callback origin for founder browser authentication and must not be reused as a tunnel to this write-capable MCP route.
 
 The endpoint implements stateless MCP JSON-RPC and exposes one tool:
 

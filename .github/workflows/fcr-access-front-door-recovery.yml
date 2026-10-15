@@ -106,6 +106,7 @@ jobs:
         run: |
           node --test scripts/provider-credential-contract.node-test.mjs
           node --test scripts/reconcile-cloudflare-access-public-zone.node-test.mjs
+          node --test scripts/verify-fcr-cloudflare-access-boundary.node-test.mjs
           node --test scripts/fcr-cloudflare-bridge-contract.node-test.mjs
           node --test scripts/fcr-stranger-front-door-contract.node-test.mjs
 
@@ -133,6 +134,26 @@ jobs:
           CLOUDFLARE_ACCESS_ADMIN_API_TOKEN: ${{ secrets.CLOUDFLARE_ACCESS_ADMIN_API_TOKEN }}
         run: node scripts/reconcile-cloudflare-access-public-zone.mjs --rollback >/dev/null 2>&1
 
+      - name: Verify complete Access boundary with read-only authority
+        id: access_boundary_read
+        if: inputs.apply != true && steps.access_inspect.outcome == 'success'
+        continue-on-error: true
+        env:
+          CLOUDFLARE_ACCESS_API_TOKEN: ${{ secrets.CLOUDFLARE_ACCESS_API_TOKEN }}
+          FCR_CLOUDFLARE_ACCESS_CLIENT_ID: ${{ secrets.FCR_CLOUDFLARE_ACCESS_CLIENT_ID }}
+          FCR_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID: ${{ vars.FCR_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID }}
+        run: node scripts/verify-fcr-cloudflare-access-boundary.mjs >/dev/null 2>&1
+
+      - name: Re-read complete Access boundary after approved provider apply
+        id: access_boundary_apply
+        if: inputs.apply == true && steps.access_apply.outcome == 'success'
+        continue-on-error: true
+        env:
+          CLOUDFLARE_ACCESS_API_TOKEN: ${{ secrets.CLOUDFLARE_ACCESS_ADMIN_API_TOKEN }}
+          FCR_CLOUDFLARE_ACCESS_CLIENT_ID: ${{ secrets.FCR_CLOUDFLARE_ACCESS_CLIENT_ID }}
+          FCR_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID: ${{ vars.FCR_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID }}
+        run: node scripts/verify-fcr-cloudflare-access-boundary.mjs >/dev/null 2>&1
+
       - name: Install Chromium for stranger front-door proof
         id: chromium
         if: always() && steps.contracts.outcome == 'success'
@@ -157,6 +178,8 @@ jobs:
           CHROMIUM_OUTCOME: ${{ steps.chromium.outcome }}
           STRANGER_BROWSER_OUTCOME: ${{ steps.stranger_browser.outcome }}
           ROLLBACK_OUTCOME: ${{ steps.rollback.outcome }}
+          ACCESS_BOUNDARY_READ_OUTCOME: ${{ steps.access_boundary_read.outcome }}
+          ACCESS_BOUNDARY_APPLY_OUTCOME: ${{ steps.access_boundary_apply.outcome }}
         shell: bash
         run: |
           set -euo pipefail
@@ -165,15 +188,22 @@ jobs:
             provider_outcome="$ACCESS_APPLY_OUTCOME"
           fi
 
-          printf 'contracts=%s\nprovider=%s\nchromium=%s\nstranger_browser=%s\nrollback=%s\n' \
+          boundary_outcome="$ACCESS_BOUNDARY_READ_OUTCOME"
+          if [[ "$APPLY" == 'true' ]]; then
+            boundary_outcome="$ACCESS_BOUNDARY_APPLY_OUTCOME"
+          fi
+
+          printf 'contracts=%s\nprovider=%s\naccess_boundary=%s\nchromium=%s\nstranger_browser=%s\nrollback=%s\n' \
             "$CONTRACTS_OUTCOME" \
             "$provider_outcome" \
+            "$boundary_outcome" \
             "$CHROMIUM_OUTCOME" \
             "$STRANGER_BROWSER_OUTCOME" \
             "$ROLLBACK_OUTCOME"
 
           test "$CONTRACTS_OUTCOME" = 'success'
           test "$provider_outcome" = 'success'
+          test "$boundary_outcome" = 'success'
           test "$CHROMIUM_OUTCOME" = 'success'
           test "$STRANGER_BROWSER_OUTCOME" = 'success'
 
@@ -193,6 +223,7 @@ jobs:
         run: |
           set -euo pipefail
           access_receipt='test-results/fcr-access-front-door-recovery.json'
+          boundary_receipt='test-results/fcr-cloudflare-access-boundary-provider.json'
           browser_receipt='test-results/fcr-access-front-door-browser-proof.json'
           public_receipt='test-results/fcr-access-front-door-public-receipt.md'
           mkdir -p test-results
@@ -279,6 +310,48 @@ jobs:
               echo '```'
             fi
 
+            if [[ ! -f "$boundary_receipt" ]]; then
+              echo
+              echo '- Protected app/API boundary receipt: `missing`'
+            elif ! jq -e '
+              .schemaVersion == 1
+              and .scope == "fcr-cloudflare-access-boundary-provider"
+              and (.state == "ready" or .state == "blocked")
+              and (.publicDoorwayClear | type == "boolean")
+              and (.appHostProtected | type == "boolean")
+              and (.apiWorkerProtected | type == "boolean")
+              and (.apiServiceAuthVerified | type == "boolean")
+              and (.expectedExceptionCount == null or (.expectedExceptionCount | type == "number"))
+              and (.verifiedExceptionCount == null or (.verifiedExceptionCount | type == "number"))
+              and (.unexpectedApiBypassCount == null or (.unexpectedApiBypassCount | type == "number"))
+              and (.serviceTokenIdFingerprint == null or (.serviceTokenIdFingerprint | type == "string" and test("^[0-9a-f]{64}$")))
+            ' "$boundary_receipt" >/dev/null 2>&1; then
+              echo
+              echo '- Protected app/API boundary receipt: `malformed`'
+            else
+              echo
+              echo '- Protected app/API boundary receipt: `present`'
+              echo
+              echo '```json'
+              jq '{
+                schemaVersion,
+                scope,
+                observedAt,
+                expectedHeadSha,
+                state,
+                classification,
+                publicDoorwayClear,
+                appHostProtected,
+                apiWorkerProtected,
+                apiServiceAuthVerified,
+                serviceTokenIdFingerprint,
+                expectedExceptionCount,
+                verifiedExceptionCount,
+                unexpectedApiBypassCount
+              }' "$boundary_receipt"
+              echo '```'
+            fi
+
             if [[ ! -f "$browser_receipt" ]]; then
               echo
               echo '- Browser proof receipt: `missing` (stranger-path)'
@@ -295,7 +368,7 @@ jobs:
                 and (
                   .[0]
                   | type == "object"
-                  and .schemaVersion == 1
+                  and .schemaVersion == 2
                   and .scope == "fcr-access-front-door-browser-proof"
                   and (.observedAt | iso8601)
                   and .expectedHeadSha == $expectedHeadSha
@@ -309,7 +382,12 @@ jobs:
                   and (.founderShellVisible | type == "boolean")
                   and (.authMeStatus | status_or_null)
                   and (.founderAuthorityContained | type == "boolean")
+                  and (.directAppStatus | status_or_null)
+                  and (.directAppAccessProtected | type == "boolean")
+                  and (.directApiVersionStatus | status_or_null)
+                  and (.directApiAccessProtected | type == "boolean")
                   and (.apiVersionStatus | status_or_null)
+                  and (.apiVersionServiceIdentity == null or (.apiVersionServiceIdentity | type == "string" and length <= 120))
                   and (.apiVersionMatchesExpectedSha | type == "boolean")
                   and (.state == "unknown" or .state == "proven" or .state == "failed")
                   and ((has("error") | not) or .error == null or (.error | type == "string" and length <= 2000))
@@ -337,8 +415,13 @@ jobs:
                 founderShellVisible,
                 authMeStatus,
                 founderAuthorityContained,
+                directAppStatus,
+                directAppAccessProtected,
+                directApiVersionStatus,
+                directApiAccessProtected,
                 apiVersionStatus,
                 apiVersionMatchesExpectedSha,
+                apiVersionServiceIdentity,
                 state,
                 errorPresent: (((.error // "") | length) > 0)
               }' "$browser_receipt"

@@ -1,0 +1,54 @@
+{
+  "contract": "fcr/cloudflare-access-boundary@v1",
+  "publicHosts": [
+    "foundercontrolroom.org",
+    "www.foundercontrolroom.org"
+  ],
+  "accessRequiredHosts": [
+    "app.foundercontrolroom.org",
+    "api.foundercontrolroom.org"
+  ],
+  "apiDefault": "access_required",
+  "serviceTokenCredentials": {
+    "clientId": "FCR_CLOUDFLARE_ACCESS_CLIENT_ID",
+    "clientSecret": "FCR_CLOUDFLARE_ACCESS_CLIENT_SECRET"
+  },
+  "serviceTokenProtectedPaths": [
+    "/health",
+    "/version",
+    "/guardrails",
+    "/guardrails.json",
+    "/mcp/founder-signal-engine",
+    "/prompt-workflows/execution-spine",
+    "/prompt-workflows/select"
+  ],
+  "applicationAuthenticatedBypassPaths": [
+    "/webhooks/github",
+    "/webhooks/stripe-quickscan",
+    "/ingest/repository-verification",
+    "/ingest/build-events/*",
+    "/ingest/hair-commerce-receipts",
+    "/ingest/proof-of-ship-receipts",
+    "/ingest/proof-of-ship-receipts/by-commit/*",
+    "/ingest/proof-of-ship-receipts/*",
+    "/ingest/founder-review-contexts",
+    "/ingest/jira-work-automation",
+    "/ingest/product-build-receipts/storyengine",
+    "/ingest/bip-control-room-proof",
+    "/api/federated-relay/v3"
+  ],
+  "serviceBindingOnlyPaths": [
+    "/ingest/founder-review-email"
+  ],
+  "publicServiceBindingProtocolPaths": [
+    "/mcp",
+    "/mcp/read",
+    "/mcp/founder-signal-x-engagement",
+    "/mcp/registry/v0.1/servers",
+    "/mcp/portfolio/founder-control-room",
+    "/mcp/portfolio/solcontinuity",
+    "/mcp/portfolio/promptos",
+    "/.well-known/oauth-protected-resource",
+    "/.well-known/oauth-protected-resource/mcp"
+  ]
+}

@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const root = process.cwd();
-const REMOTE_ENDPOINT = 'POST https://api.foundercontrolroom.org/mcp/read';
+const REMOTE_ENDPOINT = 'POST https://foundercontrolroom.org/mcp/read';
 
 function read(relativePath) {
   return fs.readFileSync(path.join(root, relativePath), 'utf8');

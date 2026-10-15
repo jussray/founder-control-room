@@ -187,7 +187,7 @@ The receipt preserves `requestSimulation: true`, `runtimeShaVerified: false`, an
 
 ## Served remote read MCP boundary
 
-The canonical `founder-control-room` Worker serves a bounded remote read-only MCP endpoint at `POST https://api.foundercontrolroom.org/mcp/read`. Repository configuration binds its project scope to exactly `chief-ai-machine,founder-control-room` through `FCR_REMOTE_MCP_READ_PROJECTS` and names `FCR_REMOTE_MCP_READ_TOKEN` as the dedicated bearer-secret interface.
+The canonical `founder-control-room` Worker serves a bounded remote read-only MCP endpoint at `POST https://foundercontrolroom.org/mcp/read`. Repository configuration binds its project scope to exactly `chief-ai-machine,founder-control-room` through `FCR_REMOTE_MCP_READ_PROJECTS` and names `FCR_REMOTE_MCP_READ_TOKEN` as the dedicated bearer-secret interface.
 
 This source configuration is deliberately non-authorizing: it cannot prove that the secret has been installed, that the deployed Worker is running this exact source, or that the endpoint is reachable. The route must fail closed when its required token or server-held project scope is unavailable, and its two exported tools remain read-only (`list_read_servers` and `invoke_read_tool`) behind the existing MCP registry/policy boundary. A secret value must never be committed to Wrangler, documentation, logs, screenshots, issues, or retained proof.
 
@@ -215,7 +215,7 @@ The FCR Shopify money path uses the same provider-held runtime-secret membrane: 
 
 The only runtime secret canonical Deploy actively writes is the checked-in fail-closed `FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON` with `enabled:false`. This preserves the automation kill switch while leaving unrelated runtime secret values untouched. Other trusted workflows that actually need GitHub App execution credentials may still use their separately scoped `APP_ID` / `APP_PRIVATE_KEY` Actions inputs, but canonical Deploy does not re-upload the Worker's `GITHUB_APP_ID` / `GITHUB_PRIVATE_KEY` pair.
 
-`https://api.foundercontrolroom.org` is public release configuration, not secret material. The canonical smoke checks, proof-of-ship runtime readback, and post-Deploy Playwright witness use that explicit API origin. The Playwright witness derives `EXPECTED_RELEASE_SHA` from the successful Deploy run, proves direct Worker and public Pages/proxy identity before the browser journey, reruns both identity reads afterward, and fails if any observation differs from that same SHA.
+`https://api.foundercontrolroom.org` is canonical release configuration but is **not** an anonymous public diagnostic surface. The API hostname is Access-managed by default. Canonical direct smoke/reconcile/post-Deploy witnesses keep the explicit origin and authenticate with the dedicated FCR Cloudflare Access service-token pair, while public Pages/proxy identity remains independently observable through `foundercontrolroom.org` and its `FCR_API` Service Binding. The Playwright witness still derives `EXPECTED_RELEASE_SHA` from the successful Deploy run and must bind every direct authenticated API read plus public Pages/proxy read to that same SHA.
 
 This source membrane does not prove the current Cloudflare required-secret set, values, Workers Builds dashboard configuration, custom-domain routing, active deployment, or runtime SHA. Those remain separate provider/runtime readback gates.
 
@@ -263,3 +263,35 @@ npx playwright test e2e/cloudflare-reasoning.spec.ts
 ```
 
 The browser/API suite verifies the public-safe contract, founder protection, absence of credential leakage, presence of the implementation stack, and absence of an accidental deployment endpoint. Unit tests verify exact-commit reasoning, stale evidence, duplicate authority, authentication failures, runtime failure, rollback preparation, first-principles deletion/simplification output, and approval boundaries.
+
+
+## FCR app/API Access boundary
+
+The current desired product boundary is machine-readable in `config/fcr-cloudflare-access-boundary.json`:
+
+- apex and `www` remain public discovery/front-door hosts;
+- `app.foundercontrolroom.org` and `api.foundercontrolroom.org` are Access-required product hosts;
+- direct release/diagnostic/write-capable machine paths require the dedicated FCR Access service-token pair;
+- only exact application-authenticated external protocol/webhook/receipt paths may receive separately reviewed path-scoped exceptions;
+- `/mcp/*` is forbidden as a bypass wildcard; the write-capable Founder Signal Engine MCP remains behind Access, while the dedicated read-only X-engagement MCP may use its own exact path exception and least-privilege bearer;
+- review-email ingress remains private to the Worker Service Binding and needs no public exception.
+
+This is source policy, not provider proof. Live Access applications, path precedence, service-token binding, DNS, and runtime behavior require fresh provider/runtime readback.
+
+
+### Public Pages proxy and Access-only API routes
+
+The public Pages Worker may continue to proxy normal same-origin FCR app/auth traffic through the private `FCR_API` Service Binding, including the canonical OAuth `/mcp` compatibility lane. It must not proxy `/mcp/founder-signal-engine` from the public apex. That write-capable route is intentionally direct-API-only so its Cloudflare Access requirement cannot be bypassed through `foundercontrolroom.org`. The separate read-only X-engagement MCP keeps an exact application-authenticated exception for portable evidence consumers.
+
+
+### Provider boundary verification
+
+`scripts/verify-fcr-cloudflare-access-boundary.mjs` is the read-only provider truth gate for this topology. It requires the public doorway to be free of Access applications, exactly one identity-protected `app.foundercontrolroom.org` application with no Everyone bypass, exactly one Access application protecting the canonical `founder-control-room` Worker with the configured FCR service-token binding, complete coverage of every declared API exception, and zero undeclared API bypass destinations. The verifier never creates or changes a provider policy.
+
+
+Runtime evidence for this boundary must challenge both protected hosts anonymously. `app.foundercontrolroom.org` and direct `api.foundercontrolroom.org/version` must each present an Access-specific Cloudflare redirect/path marker; a generic 401/403 is insufficient. The public apex `/version` witness proves Worker identity separately through `FCR_API`.
+
+
+### MCP transport does not weaken direct API Access
+
+The external connector resource is `https://foundercontrolroom.org/mcp`, not a Cloudflare Access bypass on `api.foundercontrolroom.org/mcp`. Exact public MCP/read/registry/portfolio protocol traffic reaches the Worker through Pages `FCR_API`. The direct API hostname remains Access-required for the entire MCP prefix, avoiding Cloudflare child-path inheritance from a root `/mcp` bypass.

@@ -43,6 +43,8 @@ jobs:
         shell: bash
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          FCR_ACCESS_CLIENT_ID: ${{ secrets.FCR_CLOUDFLARE_ACCESS_CLIENT_ID }}
+          FCR_ACCESS_CLIENT_SECRET: ${{ secrets.FCR_CLOUDFLARE_ACCESS_CLIENT_SECRET }}
         run: |
           set -euo pipefail
 
@@ -90,6 +92,9 @@ jobs:
               }' > founder-signal-engine-receipt.json
           }
 
+          test -n "$FCR_ACCESS_CLIENT_ID"
+          test -n "$FCR_ACCESS_CLIENT_SECRET"
+
           main_sha="$(curl --silent --show-error --fail \
             --proto '=https' --proto-redir '=https' --max-redirs 0 \
             --connect-timeout 10 --max-time 20 \
@@ -106,6 +111,8 @@ jobs:
             --dump-header version.headers \
             --output version.body \
             --write-out '%{http_code}' \
+            -H "CF-Access-Client-Id: $FCR_ACCESS_CLIENT_ID" \
+            -H "CF-Access-Client-Secret: $FCR_ACCESS_CLIENT_SECRET" \
             "$APPROVED_API_ORIGIN/version" \
             2>version-curl-error.txt)" || version_curl_exit=$?
           version_status="${version_status:-000}"
@@ -185,6 +192,8 @@ jobs:
         shell: bash
         env:
           MCP_TOKEN: ${{ secrets.FOUNDER_SIGNAL_ENGINE_MCP_TOKEN }}
+          FCR_ACCESS_CLIENT_ID: ${{ secrets.FCR_CLOUDFLARE_ACCESS_CLIENT_ID }}
+          FCR_ACCESS_CLIENT_SECRET: ${{ secrets.FCR_CLOUDFLARE_ACCESS_CLIENT_SECRET }}
         run: |
           set -euo pipefail
 
@@ -257,6 +266,8 @@ jobs:
             --output response.body \
             --write-out '%{http_code}' \
             --request POST \
+            -H "CF-Access-Client-Id: $FCR_ACCESS_CLIENT_ID" \
+            -H "CF-Access-Client-Secret: $FCR_ACCESS_CLIENT_SECRET" \
             --url "$APPROVED_API_ORIGIN/mcp/founder-signal-engine" \
             --header 'content-type: application/json' \
             --header "authorization: Bearer $MCP_TOKEN" \

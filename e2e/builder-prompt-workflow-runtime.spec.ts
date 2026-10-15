@@ -2,22 +2,39 @@ import { expect, test } from '@playwright/test';
 
 const baseURL = process.env.FCR_RUNTIME_BASE_URL;
 const founderBearer = process.env.FCR_PLAYWRIGHT_FOUNDER_BEARER;
+const accessClientId = process.env.FCR_ACCESS_CLIENT_ID?.trim() ?? '';
+const accessClientSecret = process.env.FCR_ACCESS_CLIENT_SECRET?.trim() ?? '';
+
+function directAccessHeaders(): Record<string, string> {
+  if (!baseURL) return {};
+  const directApi = new URL(baseURL).hostname === 'api.foundercontrolroom.org';
+  if (!directApi) return {};
+  expect(accessClientId, 'FCR_ACCESS_CLIENT_ID is required for direct API runtime proof').not.toBe('');
+  expect(accessClientSecret, 'FCR_ACCESS_CLIENT_SECRET is required for direct API runtime proof').not.toBe('');
+  return {
+    'CF-Access-Client-Id': accessClientId,
+    'CF-Access-Client-Secret': accessClientSecret,
+  };
+}
 
 test.describe('builder prompt workflow runtime proof', () => {
   test.skip(!baseURL || !founderBearer, 'requires deployed FCR runtime and founder Playwright bearer');
 
   test('exact runtime exposes bounded n8n execution spine and selects workflows without widening authority', async ({ request }) => {
-    const version = await request.get(`${baseURL}/version`);
+    const accessHeaders = directAccessHeaders();
+    const version = await request.get(`${baseURL}/version`, { headers: accessHeaders });
     expect(version.ok()).toBeTruthy();
     const versionBody = await version.json();
     expect(versionBody.service).toBe('founder-control-room');
     expect(versionBody.gitSha).toMatch(/^[0-9a-f]{40}$/);
 
-    const unauthSpine = await request.get(`${baseURL}/prompt-workflows/execution-spine`);
+    const unauthSpine = await request.get(`${baseURL}/prompt-workflows/execution-spine`, {
+      headers: accessHeaders,
+    });
     expect(unauthSpine.status()).toBe(401);
 
     const spine = await request.get(`${baseURL}/prompt-workflows/execution-spine`, {
-      headers: { Authorization: `Bearer ${founderBearer}` },
+      headers: { ...accessHeaders, Authorization: `Bearer ${founderBearer}` },
     });
     expect(spine.ok()).toBeTruthy();
     expect(await spine.json()).toMatchObject({
@@ -52,12 +69,13 @@ test.describe('builder prompt workflow runtime proof', () => {
     });
 
     const unauth = await request.post(`${baseURL}/prompt-workflows/select`, {
+      headers: accessHeaders,
       data: { intent: 'investment-business' },
     });
     expect(unauth.status()).toBe(401);
 
     const selected = await request.post(`${baseURL}/prompt-workflows/select`, {
-      headers: { Authorization: `Bearer ${founderBearer}` },
+      headers: { ...accessHeaders, Authorization: `Bearer ${founderBearer}` },
       data: { intent: 'investment-business' },
     });
     expect(selected.ok()).toBeTruthy();
@@ -72,7 +90,7 @@ test.describe('builder prompt workflow runtime proof', () => {
     });
 
     const unsupported = await request.post(`${baseURL}/prompt-workflows/select`, {
-      headers: { Authorization: `Bearer ${founderBearer}` },
+      headers: { ...accessHeaders, Authorization: `Bearer ${founderBearer}` },
       data: { intent: 'do-whatever' },
     });
     expect(unsupported.status()).toBe(400);

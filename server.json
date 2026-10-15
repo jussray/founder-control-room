@@ -11,7 +11,7 @@
   "remotes": [
     {
       "type": "streamable-http",
-      "url": "https://api.foundercontrolroom.org/mcp"
+      "url": "https://foundercontrolroom.org/mcp"
     }
   ]
 }

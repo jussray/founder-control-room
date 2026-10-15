@@ -6,6 +6,19 @@ const deployUrl = (process.env.DEPLOY_URL ?? publicUrl).replace(/\/$/, '');
 const expectedReleaseSha = (process.env.EXPECTED_RELEASE_SHA ?? '').trim().toLowerCase();
 const oauthToken = (process.env.FCR_OPERATOR_RELAY_OAUTH_TOKEN ?? '').trim();
 const targetOperator = (process.env.FCR_OPERATOR_RELAY_TARGET ?? 'codex').trim();
+const accessClientId = (process.env.FCR_ACCESS_CLIENT_ID ?? '').trim();
+const accessClientSecret = (process.env.FCR_ACCESS_CLIENT_SECRET ?? '').trim();
+
+function directAccessHeaders(origin: string): Record<string, string> {
+  const directApi = new URL(origin).hostname === 'api.foundercontrolroom.org';
+  if (!directApi) return {};
+  expect(accessClientId, 'FCR_ACCESS_CLIENT_ID is required for direct API relay proof').not.toBe('');
+  expect(accessClientSecret, 'FCR_ACCESS_CLIENT_SECRET is required for direct API relay proof').not.toBe('');
+  return {
+    'CF-Access-Client-Id': accessClientId,
+    'CF-Access-Client-Secret': accessClientSecret,
+  };
+}
 
 const PROTOCOL_VERSION = '2026-07-28';
 const PROVIDER_EVIDENCE = /^provider:[a-z0-9._-]+:[A-Za-z0-9._:-]+$/;
@@ -63,7 +76,11 @@ test.describe('FCR live operator relay proof', () => {
     const readIdentity = async (origin: string, phase: string) => {
       const nonce = `${Date.now()}-${testInfo.retry}-${phase}`;
       const response = await request.get(`${origin}/version?relay_witness=${nonce}`, {
-        headers: { 'cache-control': 'no-cache', pragma: 'no-cache' },
+        headers: {
+          'cache-control': 'no-cache',
+          pragma: 'no-cache',
+          ...directAccessHeaders(origin),
+        },
       });
       expect(response.status()).toBe(200);
       expect(response.headers()['x-founder-control-room-service']).toBe('founder-control-room');
