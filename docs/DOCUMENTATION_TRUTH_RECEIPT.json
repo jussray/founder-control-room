@@ -52,7 +52,8 @@
         "The October 2, 2026 transition from StoryEngine `0a1d3b521967a3643daf56cf2ad60b1392bb6e0c` to independently observed `4ec29c1821de8c7bb8c381df31e3f98d0c6016f4` selects a new evidence subject after bounded review of the fail-closed Cloudflare front door, hashed API rate-limit identity, and focused Node tests; predecessor federation proof remains historical, and the successor FCR head must earn its own complete exact-head Playwright witness before the pair is current.",
         "The October 3, 2026 URLFix merge-review transition from the prior StoryEngine peer to independently observed `18d9ba257a69c3d1743f346d424daf31796aaeed` selects a new evidence subject only; the local FCR browser harness passing before the live-peer mismatch does not transfer federation green, and PR #896 must earn a complete exact-head Playwright witness against the successor before the pair is current.",
         "The October 3, 2026 agent-contract v1 transition from StoryEngine `18d9ba257a69c3d1743f346d424daf31796aaeed` to independently observed `168d65ede38d2477ea00902fa1f0e76f292c583d` selects a new evidence subject only; Chief Access recovery PR #913 failing the live-peer check is dependency drift, and the successor FCR head must earn a complete exact-head Playwright witness against the successor before the pair is current.",
-        "The October 5, 2026 transition from StoryEngine `168d65ede38d2477ea00902fa1f0e76f292c583d` through `c9af4ea095561d0837a141e311e8977d796aaaa7` to independently observed `3c1689fe67142e783fe7d18b5ff610640bdc81d6` selects a new evidence subject only; FCR Playwright run #6969 on `897083276b6c775c49ce30be189a50bd610b5d4c` passed the local/direct browser harness but failed the peer freshness check, so `.github/workflows/playwright.yml` must bind the successor exact peer and require a complete exact-head federation rerun before the pair is current."
+        "The October 5, 2026 transition from StoryEngine `168d65ede38d2477ea00902fa1f0e76f292c583d` through `c9af4ea095561d0837a141e311e8977d796aaaa7` to independently observed `3c1689fe67142e783fe7d18b5ff610640bdc81d6` selects a new evidence subject only; FCR Playwright run #6969 on `897083276b6c775c49ce30be189a50bd610b5d4c` passed the local/direct browser harness but failed the peer freshness check, so `.github/workflows/playwright.yml` must bind the successor exact peer and require a complete exact-head federation rerun before the pair is current.",
+        "`.github/workflows/playwright.yml` must re-observe the live StoryEngine peer ref after immutable checkout and require the live ref SHA, configured peer SHA, and actual checkout SHA to agree before federation proof proceeds; this equality validates evidence identity only and cannot grant merge, deploy, production, publication, billing, or provider-mutation authority."
       ]
     },
     {
@@ -300,13 +301,20 @@
       "path": "scripts/verify-documentation-truth.mjs",
       "claims": [
         "`scripts/verify-documentation-truth.mjs` must classify `src/founder-os-lab/projectAdapters.ts` as evidence-authority truth-sensitive so a Chief exact-head pin movement cannot pass Documentation Truth without substantive README, truth-decay audit, and structured receipt updates that name the changed path.",
-        "`scripts/verify-documentation-truth.mjs` must classify `tools/zapier/founder-content-outcome-contract.cjs` as evidence-authority truth-sensitive so account-provenance changes cannot pass Documentation Truth without substantive README, truth-decay audit, and path-bound receipt updates."
+        "`scripts/verify-documentation-truth.mjs` must classify `tools/zapier/founder-content-outcome-contract.cjs` as evidence-authority truth-sensitive so account-provenance changes cannot pass Documentation Truth without substantive README, truth-decay audit, and path-bound receipt updates.",
+        "`scripts/verify-documentation-truth.mjs` must compare receipt claims against the reviewed base revision and require at least one fresh meaningful path-bound invariant for every changed truth-sensitive source path; inherited text, cosmetic edits, comments, formatting, link-target changes, and recombinations of inherited invariant units cannot satisfy current-range novelty."
       ]
     },
     {
       "path": "tools/zapier/founder-content-outcome-contract.cjs",
       "claims": [
         "`tools/zapier/founder-content-outcome-contract.cjs` must bind founder-content metrics to the exact observed network, lane, account identity, connector identity, and coverage state; out-of-scope metrics must remain UNKNOWN, cross-account metric donation is forbidden, and these receipts can never grant publication, provider-write, merge, deploy, spend, or external-contact authority."
+      ]
+    },
+    {
+      "path": "src/lib/documentationTruthClaimFingerprint.js",
+      "claims": [
+        "`src/lib/documentationTruthClaimFingerprint.js` must fingerprint meaningful documentation invariant units while discarding non-semantic comments, Markdown link destinations, and presentation-only formatting without erasing logical or comparison operators, so inherited receipt wording cannot be repackaged into false novelty."
       ]
     }
   ]

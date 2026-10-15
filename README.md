@@ -451,3 +451,12 @@ Pin alignment alone cannot promote the successor federation state beyond `UNKNOW
 StoryEngine `main` advanced from the previously pinned `168d65ede38d2477ea00902fa1f0e76f292c583d` through `c9af4ea095561d0837a141e311e8977d796aaaa7` (`feat(video): expose StoryEngine MAKEVIDEO skill`) to independently observed `3c1689fe67142e783fe7d18b5ff610640bdc81d6` (`ci(video): prove StoryEngine MAKEVIDEO skill path`). FCR Playwright run #6969 on `897083276b6c775c49ce30be189a50bd610b5d4c` passed its local/direct browser harness but failed the separate live peer-ref freshness check, so that run is historical browser evidence for the predecessor peer rather than current federation proof.
 
 Rebinding `.github/workflows/playwright.yml` to `3c1689fe67142e783fe7d18b5ff610640bdc81d6` selects the successor evidence subject only. The successor FCR head must complete the live-ref check, immutable peer checkout, exact StoryEngine runtime identity, directive/receipt binding, replay protections, and full Playwright browser witness before federation may be called current. Pin alignment grants no merge, deploy, production, publication, billing, or provider-mutation authority.
+
+
+## 2026-10-15 exact-head receipt novelty and peer re-observation
+
+Documentation Truth evaluates receipt novelty inside the reviewed base-to-head range. Inherited claim text, punctuation-only edits, comments, formatting changes, Markdown link-target changes, or recombinations of inherited invariant units cannot certify a newly changed truth-sensitive source path; each changed path must contribute a fresh meaningful path-bound invariant.
+
+The cross-repository Playwright witness re-observes the live StoryEngine ref after the immutable peer checkout and requires the live ref SHA, configured peer SHA, and actual checkout SHA to agree before federation proof proceeds. That equality validates only the selected evidence identity. It does not grant merge, deploy, production, publication, billing, or provider-mutation authority.
+
+Project-adapter freshness follows the current contract-blob model on `main`: a successor repository head with unchanged audited contract blobs may remain fresh and non-blocking while the adapter stays read-only. Head movement alone is not a reason to churn the audited pin or transfer any unrelated predecessor proof.

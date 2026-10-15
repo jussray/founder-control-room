@@ -498,3 +498,12 @@ FCR exact-head Playwright on `ea09b7406eff2b85bde2ba1a4543e765e1f6d135` complete
 The successor StoryEngine head is strictly forward of the predecessor pin and has exact-head green evidence from `L99 Story Engine CI`, `Guardrails Playwright`, `L99 Promotion Gates`, `Agent Contract v1`, and `Control Room Test Ledger`. Source comparison shows the federation contract remains `juss-v10/product-build-directive@v1` / `juss-v10/product-build-receipt@v1`; the relevant change strengthens runtime identity by preferring provider-native deployment SHA in production and failing closed when production cannot prove an exact runtime head.
 
 Rebinding `.github/workflows/playwright.yml` to `a6e6a396ed30535af2fd9b1ec2347a84e1a3fbf3` selects the successor federation evidence subject only. All predecessor FCR-to-StoryEngine browser/federation green is historical. The successor FCR head remains `UNKNOWN` for current federation until the complete live-ref equality check, immutable peer checkout, runtime identity binding, directive/receipt loop, replay protections, and Playwright witness succeed against this exact peer. No founder approval, merge, deploy, production, publication, billing, or provider-mutation authority transfers with the pin.
+
+
+## 2026-10-15 control correction: rollover receipt novelty and post-checkout peer identity
+
+A branch rollover can preserve executable intent while invalidating documentation proof that belonged to an earlier reviewed range. Documentation Truth must therefore compare receipt invariants with the base revision and require fresh semantic units for truth-sensitive source paths changed in the current base-to-head range. Cosmetic churn, comments, link-target changes, formatting, or recombination of inherited units cannot renew evidence authority.
+
+The cross-repository federation witness now closes a second time-of-check/time-of-use gap: after checking out the immutable StoryEngine peer, it re-observes the live peer ref and requires the configured SHA, checkout SHA, and live ref SHA to remain equal. If the peer moves during the witness, federation stays UNKNOWN rather than borrowing predecessor green.
+
+This correction does not reintroduce head-only adapter churn. Current adapter freshness on `main` treats a successor external head with unchanged audited contract blobs as fresh, read-only provenance continuity. Contract-blob drift still requires semantic review, and neither unchanged blobs nor a refreshed pin grants merge, deploy, production, provider, publication, billing, or founder authority.
