@@ -18,9 +18,8 @@ on:
 permissions:
   contents: write
 
-concurrency:
-  group: external-site-snapshot
-  cancel-in-progress: false
+# No concurrency group: each run publishes to its own run-scoped tag, and a shared group
+# silently cancels every queued dispatch but the newest (2026-10-01: 2 of 4 runs dropped).
 
 jobs:
   snapshot:
@@ -45,11 +44,15 @@ jobs:
           SNAPSHOT_OUT_DIR: ${{ runner.temp }}/snapshots
         run: node scripts/external-site-snapshot.mjs
       - name: Publish snapshot as an orphan tag
+        # Publish even when capture failed: report.json carries the per-viewport error, which is
+        # the only failure evidence readable from sessions that cannot fetch Actions logs.
+        if: ${{ !cancelled() }}
         env:
           GH_TOKEN: ${{ github.token }}
           SNAPSHOT_OUT_DIR: ${{ runner.temp }}/snapshots
         run: |
           set -euo pipefail
+          if ! ls "$SNAPSHOT_OUT_DIR"/*/report.json >/dev/null 2>&1; then echo "no report.json to publish"; exit 0; fi
           work="$RUNNER_TEMP/snaptag"
           rm -rf "$work" && mkdir -p "$work/snapshots"
           cp -R "$SNAPSHOT_OUT_DIR"/. "$work/snapshots/"
