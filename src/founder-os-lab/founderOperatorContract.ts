@@ -240,7 +240,7 @@ export async function runGoal(
     rollback: 'No change to reverse.',
     nextGate: 'Inspect exact repository state.',
   };
-  let lastKnown: Receipt = basis;
+  let lastKnown = basis;
   async function finish(receipt: Receipt): Promise<Receipt> {
     try {
       await tools.record(receipt);
@@ -249,96 +249,137 @@ export async function runGoal(
       return {
         ...receipt,
         status: 'BLOCKED',
-        reality: `${receipt.reality} Receipt persistence failed.`,
-        risk: 'The evidence trail is not durable.',
-        nextGate: 'Repair receipt storage, then re-read state before continuing.',
+        reality: 'Receipt finalization failed; inspect reserved execution before retry.',
+        risk: 'The final evidence trail is not durable; a pending reservation may exist.',
+        nextGate: 'Repair receipt storage and reconcile VCS state before any retry.',
       };
     }
   }
-
   try {
-    if (!task.repo || !task.branch || !task.expectedHead || !task.goal ||
-        task.focusFiles.length === 0) {
-      return finish({ ...basis, nextGate: 'Supply a specific repo, branch, SHA, goal and focus files.' });
+    if (!task.repo || !task.branch || !/^[0-9a-f]{40}$/.test(task.expectedHead) ||
+        !task.goal.trim() || !task.focusFiles.length ||
+        task.focusFiles.some(f => !canonicalFile(f)) ||
+        new Set(task.focusFiles).size !== task.focusFiles.length) {
+      return finish({ ...basis, nextGate: 'Supply a canonical repository-relative scope and exact SHA.' });
     }
-    const observed = await tools.getHead(task);
-    if (observed !== task.expectedHead) {
-      return finish({ ...basis, reality: `Branch head is ${observed}, not approved SHA ${task.expectedHead}.`,
-        nextGate: 'Reconcile the head change before requesting a new scoped approval.' });
+    if (task.branch === 'main' || task.branch === 'master' || await tools.isProtectedBranch(task)) {
+      return finish({ ...basis, reality: 'Protected branches require the existing PR merge membrane.',
+        nextGate: 'Use a permitted review branch. No direct write was attempted.' });
+    }
+    if (await tools.getHead(task) !== task.expectedHead) {
+      return finish({ ...basis, reality: 'The source branch has moved.',
+        nextGate: 'Re-inspect the head and obtain fresh approval.' });
     }
 
     const context = await loadSupport(task, tools);
-    // Sol and PromptOS do not confer write authority. They may only inform diagnosis.
     lastKnown = { ...basis, support: supportReceipt(context) };
     const proposal = await tools.diagnose(task, context);
     if (!proposal || !proposal.diff.trim() || !within(proposal.files, task.focusFiles)) {
       return finish({ ...lastKnown, nextGate: 'Find one supported cause and an in-scope patch.' });
     }
+    if (context.promptos && !within(proposal.files, context.promptos.applicableFiles)) {
+      lastKnown = {
+        ...lastKnown,
+        support: supportReceipt({ ...context, promptos: undefined,
+          warnings: [...context.warnings, 'PromptOS method not applicable to final proposal; ignored.'] }),
+      };
+    }
+    const proposalHash = proposalDigest(task, proposal);
+    lastKnown = { ...lastKnown, proposalHash, cause: proposal.cause };
+    const classified = await tools.classify(task, proposal);
+    if (!classified || (classified.surface !== 'ui' && classified.surface !== 'backend' && classified.surface !== 'docs')) {
+      return finish({ ...lastKnown, nextGate: 'Trusted change classification unavailable; mutation denied.' });
+    }
+    if ((task.providerChange || classified.providerTarget) &&
+        (!classified.providerTarget || (task.providerTarget && task.providerTarget !== classified.providerTarget))) {
+      return finish({ ...lastKnown, nextGate: 'Exact provider target was not independently confirmed.' });
+    }
     if (!approved(task, proposal, authority)) {
-      return finish({ ...lastKnown, status: 'NEEDS_APPROVAL', cause: proposal.cause,
+      return finish({ ...lastKnown, status: 'NEEDS_APPROVAL',
         reality: 'Exact-head diagnosis available; no write performed.',
-        nextGate: 'Obtain narrowly scoped authorization for this patch and SHA.' });
+        nextGate: 'Obtain approval bound to the exact proposal digest and source head.' });
     }
-    // Independent FCR readback rejects fabricated, revoked or mismatched approvals.
     if (!await tools.verifyApproval(task, proposal, authority!)) {
-      return finish({ ...lastKnown, status: 'NEEDS_APPROVAL', cause: proposal.cause,
-        reality: 'FCR did not verify an active exact-scope approval; no write performed.',
-        nextGate: 'Verify or renew founder approval in the FCR authority ledger.' });
+      return finish({ ...lastKnown, status: 'NEEDS_APPROVAL',
+        reality: 'FCR authority ledger did not verify approval; no write performed.',
+        nextGate: 'Verify founder approval in the existing FCR ledger.' });
     }
-    // Avoid using stale authorization if branch advanced during diagnosis.
     if (await tools.getHead(task) !== task.expectedHead) {
-      return finish({ ...lastKnown, cause: proposal.cause,
-        nextGate: 'Branch changed during diagnosis. Re-inspect and reapprove.' });
+      return finish({ ...lastKnown, nextGate: 'Source branch moved after approval. Reapprove.' });
     }
-
-    // An adapter may fail after a partial write: preserve uncertainty in the receipt.
-    lastKnown = { ...lastKnown, cause: proposal.cause,
-      reality: 'Patch execution started; write outcome has not been read back.',
-      risk: 'Mutation may have partially completed.',
-      nextGate: 'Read repo and provider state before any retry.' };
-    const written = await tools.applyPatch(task, proposal, authority!.files, task.expectedHead);
+    // A durable pending reservation must exist before the external mutation starts.
+    const reservationId = await tools.reserve(task, proposal, authority!);
+    if (!reservationId || !reservationId.trim()) {
+      return finish({ ...lastKnown, nextGate: 'Execution reservation failed; no mutation permitted.' });
+    }
+    lastKnown = { ...lastKnown, reservationId,
+      reality: 'Execution was durably reserved. Mutation outcome is not yet known.',
+      risk: 'A reserved action may be partially completed if the adapter fails.',
+      nextGate: 'Read the reserved action and repository before any retry.' };
+    // The trusted FCR adapter must atomically consume current exact approval and
+    // compare-and-swap the branch ref. Proposal files, never broader approval files,
+    // constrain what the patch executor is permitted to write.
+    const written = await tools.applyPatch(
+      task, proposal, proposal.files, task.expectedHead, authority!, reservationId,
+    );
     const mutated: Receipt = {
       ...lastKnown,
-      cause: proposal.cause,
       changedFiles: written.changedFiles,
       resultHead: written.sha,
-      rollback: `Revert the focused commit ${written.sha} after checking current branch state.`,
-      reality: `Patch applied at ${written.sha}; external outcome not yet verified.`,
-      nextGate: 'Gather independent test and runtime evidence.',
+      rollback: `Revert the focused commit ${written.sha} only after inspecting the current branch.`,
+      reality: 'Write returned a commit. Independent immutable readback is required.',
+      nextGate: 'Read the exact commit, then gather trusted proof.',
     };
     lastKnown = mutated;
-    if (!within(written.changedFiles, proposal.files) ||
-        !within(written.changedFiles, authority!.files)) {
-      return finish({ ...mutated, risk: 'Unexpected file scope changed; do not proceed.',
-        nextGate: 'Review unintended changes and revert safely.' });
+    if (!/^[0-9a-f]{40}$/.test(written.sha) || written.sha === task.expectedHead ||
+        !within(written.changedFiles, proposal.files)) {
+      return finish({ ...mutated, risk: 'Invalid SHA or modified files outside the proposal.',
+        nextGate: 'Inspect and safely reconcile the uncertain mutation.' });
+    }
+    const immutableCommit = await tools.inspectCommit(task, written.sha);
+    if (immutableCommit.parentSha !== task.expectedHead ||
+        !within(immutableCommit.changedFiles, proposal.files) ||
+        [...written.changedFiles].sort().join('\n') !== [...immutableCommit.changedFiles].sort().join('\n')) {
+      return finish({ ...mutated, risk: 'Immutable commit ancestry or changed-file readback did not match.',
+        nextGate: 'Investigate the commit before any further mutation.' });
     }
     if (await tools.getHead(task) !== written.sha) {
-      return finish({ ...mutated, risk: 'Branch moved again; evidence would not be attributable.',
-        nextGate: 'Reconcile exact head and patch ownership.' });
+      return finish({ ...mutated, risk: 'Branch moved before verification.',
+        nextGate: 'Reconcile the changed branch.' });
     }
 
-    const evidence = await tools.prove(task, written.sha);
-    const admissible = evidence.filter(e => e.sha === written.sha && !!e.reference.trim());
-    const kinds = requiredProof(task);
-    const passed = kinds.every(k => admissible.some(e => e.kind === k && e.passed));
-    const failed = admissible.some(e => !e.passed && kinds.includes(e.kind));
-    if (!passed || failed) {
-      return finish({ ...mutated, status: failed ? 'FAILED' : 'BLOCKED', evidence,
-        risk: 'One or more mandatory evidence gates are missing or failed.',
-        nextGate: 'Repair only the failing gate, then reverify exact-head runtime.' });
+    const raw = await tools.prove(task, written.sha);
+    const now = Date.now();
+    const admissible = raw.filter(e => {
+      const observed = Date.parse(e.observedAt);
+      return e.sha === written.sha && !!e.reference.trim() &&
+        e.reference.startsWith('https://') &&
+        Number.isFinite(observed) && observed <= now &&
+        now - observed <= 10 * 60 * 1000 &&
+        (e.kind !== 'provider-readback' ||
+          (e.target === classified.providerTarget && !!e.revision?.trim()));
+    });
+    const kinds = requiredProof(task, proposal, classified);
+    const failed = admissible.some(e => kinds.includes(e.kind) && !e.passed);
+    if (failed || !kinds.every(k => admissible.some(e => e.kind === k && e.passed))) {
+      return finish({ ...mutated, status: failed ? 'FAILED' : 'BLOCKED', evidence: admissible,
+        risk: 'Mandatory exact-head or time-bound evidence is missing or failed.',
+        nextGate: 'Repair the failing proof gate without skipping or suppressing it.' });
     }
-    // Protect against a concurrent change between tests and claiming success.
     if (await tools.getHead(task) !== written.sha) {
-      return finish({ ...mutated, evidence, risk: 'Head changed after tests.',
-        nextGate: 'Reverify the current head before claiming success.' });
+      return finish({ ...mutated, evidence: admissible, risk: 'Head changed after proof.',
+        nextGate: 'Revalidate exact head before considering release.' });
     }
-    return finish({ ...mutated, status: 'VERIFIED', evidence,
-      reality: `Required independent checks passed for exact head ${written.sha}.`,
-      risk: 'Verification covers only the scoped goal and recorded paths.',
-      nextGate: 'Founder decides whether to merge or deploy, under separate authority.' });
-  } catch (error) {
-    return finish({ ...lastKnown, reality: `${lastKnown.reality} Execution stopped: ${error instanceof Error ? error.message : String(error)}.`,
-      risk: 'An operation may have partly completed. Read provider and repo state before retry.',
-      nextGate: 'Inspect current state and reconcile any partial action.' });
+    return finish({ ...mutated, status: 'VERIFIED', evidence: admissible,
+      reality: `Bound and independently checked scoped commit ${written.sha}.`,
+      risk: 'This is source verification, not merge or deployment authority.',
+      nextGate: 'Independent review, CI and exact-candidate founder merge approval remain separate.' });
+  } catch {
+    // Adapter exceptions may contain credentials and personal data: never persist
+    // a raw exception body in a founder-visible continuity receipt.
+    return finish({ ...lastKnown, status: 'BLOCKED',
+      reality: 'A trusted adapter operation failed; its raw diagnostic was withheld.',
+      risk: 'A reserved action may have partially executed. Reconcile before retry.',
+      nextGate: 'Inspect the trusted diagnostic channel and durable reservation.' });
   }
 }
