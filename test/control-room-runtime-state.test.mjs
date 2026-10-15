@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { buildRuntimeStateReceipt, trackedConfigFingerprint } from '../scripts/control-room-runtime-state.mjs';
+import { buildRuntimeStateReceipt, trackedConfigFingerprint, writeRuntimeStateReceipt } from '../scripts/control-room-runtime-state.mjs';
 import { buildTestLedger } from '../scripts/control-room-test-ledger.mjs';
 
 const SHA = 'a'.repeat(40);
@@ -68,4 +68,16 @@ test('the exact-head ledger binds the runtime-state receipt into its proof surfa
     runtimeState,
   });
   assert.deepEqual(ledger.runtimeState, runtimeState);
+});
+
+test('persisted runtime-state receipt is one parseable JSON document with a real trailing newline', () => {
+  const root = fixture();
+  const outputPath = path.join(root, 'artifacts', 'control-room-runtime-state.json');
+  const receipt = writeRuntimeStateReceipt(env({ CONTROL_ROOM_RUNTIME_STATE_PATH: outputPath }), root);
+  const written = fs.readFileSync(outputPath, 'utf8');
+  assert.equal(written.endsWith('\n'), true, 'receipt should end with a newline');
+  assert.equal(written.endsWith('\\n'), false, 'receipt must not contain a literal backslash-n suffix');
+  const parsed = JSON.parse(written);
+  assert.deepEqual(parsed, receipt);
+  assert.equal(parsed.proofRule.sourceShaAloneProvesExternalState, false);
 });
