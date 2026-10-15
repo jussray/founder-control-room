@@ -84,3 +84,11 @@ The Firewall v10 and Attack-20 V3 workflows must execute this Attack Ten against
 ## Provider boundary
 
 Cloudflare remains a separate provider truth surface. Before any production firewall activation or stricter bot/WAF enforcement, require current provider readback, machine-client compatibility proof, controlled observation, rollback, and exact runtime/browser verification. Repository green is not provider green.
+
+## Protect Me Models: external identities, no automatic FCR enforcement
+
+The portfolio identity registry separately tracks Juss Protect Me (Model One) at `protect.jussco.company` and Juss Protect Me 2 (Model Two) at `protect2.jussco.company`. Both domains and the corresponding Workers have been observed publicly reachable. Model One remains a development preview, not verified live personal-device protection. Model Two's Shield protects its **own Worker only**, and its status response indicates that no other systems are covered.
+
+**FCR's `api.foundercontrolroom.org` is not protected by Model Two solely because these identities are now tracked.** The FCR repository's desired production configuration is not proof that the current Cloudflare Worker has the declared bindings or release version. Do not route FCR API traffic through Model Two, forward authenticated request bodies, or enable stronger blocking until the provider state is reconciled and existing Access, webhook, and reconciliation flows have passed exact-head tests and production-readback checks.
+
+This registration provides identity and dependency truth only. It does not authorize deployment, merge, publication, or provider mutation and does not change `productionBlockModeAuthorized: false`.
