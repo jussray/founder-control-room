@@ -20,6 +20,10 @@ Read these before changing code, configuration, schemas, providers, verification
 - [`.ai/skills/chatgpt-openai-developers-zapier-bridge/SKILL.md`](./.ai/skills/chatgpt-openai-developers-zapier-bridge/SKILL.md) before ChatGPT or another agent without a native Zapier connector invokes the Founder Signal Engine bridge
 - [`skills/sales/SKILL.md`](./skills/sales/SKILL.md) for qualification, offers, proof, conversion quality, retention, and revenue operations
 - [`skills/devil/SKILL.md`](./skills/devil/SKILL.md) for the premise attack and selected-plan attack
+- [`skills/ultrathink-suite/README.md`](./skills/ultrathink-suite/README.md) for the governed ULTRATHINK / ATTACK / GODMODE companion routing
+- [`skills/ultrathink-attack-godmode/SKILL.md`](./skills/ultrathink-attack-godmode/SKILL.md) for authorized adversarial repair execution
+- [`skills/repair-to-proof/SKILL.md`](./skills/repair-to-proof/SKILL.md) for exact-head proof and release review
+- [`skills/continuity-proof-ledger/SKILL.md`](./skills/continuity-proof-ledger/SKILL.md) for durable fingerprints, receipts, and cross-agent continuity
 
 For Se'kret Bip splash, founding-preview, waiting-list, sponsor, or social launch work, also read [`docs/private/JUSS_PRIVATE_OPERATING_PLAN.md`](docs/private/JUSS_PRIVATE_OPERATING_PLAN.md).
 
