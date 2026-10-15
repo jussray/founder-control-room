@@ -288,7 +288,15 @@ export async function logIncidentToLinear(
       }),
     });
 
-    const body = await response.json();
+    const rawBody: unknown = await response.json();
+    if (!rawBody || typeof rawBody !== 'object' || Array.isArray(rawBody)) {
+      console.error('[incident-escalation] Linear response is not a JSON object');
+      return false;
+    }
+    const body = rawBody as {
+      errors?: Array<{ message?: string }>;
+      data?: { issueCreate?: { issue?: { id?: string } } };
+    };
 
     // IMPLANT 4: GraphQL error detection — Linear returns 200 OK even for permission errors
     if (body.errors && Array.isArray(body.errors) && body.errors.length > 0) {
