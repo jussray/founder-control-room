@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   checkSecretRotationStatus,
   daysUntilExpiry,
+  verifySecretsTableExists,
 } from '../secret-rotation-worker.js';
 
 describe('secret-rotation', () => {
@@ -79,5 +80,28 @@ describe('secret-rotation', () => {
 
     const result = await checkSecretRotationStatus(secret, mockSupabase as any);
     expect(result).toBeNull();
+  });
+
+  // IMPLANT 1 TEST: Timestamp validation
+  it('throws on invalid created_at timestamp', () => {
+    expect(() => daysUntilExpiry('invalid-date', null)).toThrow('Invalid timestamp');
+    expect(() => daysUntilExpiry('', null)).toThrow('Invalid timestamp');
+    expect(() => daysUntilExpiry('not-a-date', 'also-not-a-date')).toThrow('Invalid timestamp');
+  });
+
+  // IMPLANT 2 TEST: exercise the real schema-health helper, not the mock in isolation.
+  it('fails closed when the secrets table is missing on worker init', async () => {
+    const mockSupabaseNoTable = {
+      from: (_table: string) => ({
+        select: (_columns: string) => ({
+          limit: (_count: number) => Promise.resolve({
+            error: { message: 'Relation "public.secrets" does not exist' },
+          }),
+        }),
+      }),
+    };
+
+    await expect(verifySecretsTableExists(mockSupabaseNoTable as any))
+      .rejects.toThrow('CRITICAL: secrets table is missing or inaccessible');
   });
 });

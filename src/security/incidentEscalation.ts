@@ -317,12 +317,25 @@ export async function logIncidentToLinear(
       }),
     });
 
+    const body = (await response.json().catch(() => null)) as {
+      errors?: Array<{ message?: unknown }>;
+      data?: { issueCreate?: { issue?: { id?: unknown } } };
+    } | null;
+
+    // Linear may report GraphQL failure with HTTP 200. Provider-controlled
+    // response text is intentionally not written to logs.
+    if (Array.isArray(body?.errors) && body.errors.length > 0) {
+      console.error('[incident-escalation] Linear GraphQL request rejected');
+      return false;
+    }
+
     if (!response.ok) {
-      console.error(
-        '[incident-escalation] Linear creation failed:',
-        response.status,
-        await response.text(),
-      );
+      console.error('[incident-escalation] Linear HTTP error:', response.status);
+      return false;
+    }
+
+    if (typeof body?.data?.issueCreate?.issue?.id !== 'string' || body.data.issueCreate.issue.id.length === 0) {
+      console.error('[incident-escalation] Linear response missing issue ID');
       return false;
     }
 
@@ -357,6 +370,18 @@ export async function escalateIncident(
 
   const succeeded = results.filter((r) => r.status === 'fulfilled' && r.value).length;
   const failed = results.filter((r) => r.status === 'rejected' || !r.value).length;
+
+  const hasExternalThreat =
+    verdict.boundaries?.externalCompromise === true || verdict.boundaries?.externalExploit === true;
+  if (failed === results.length && (verdict.verdict === 'REPAIR_REQUIRED' || hasExternalThreat)) {
+    console.error('[incident-escalation] CRITICAL: Escalation failed for high-severity verdict:', {
+      verdict: verdict.verdict,
+      service: verdict.service,
+      receipt: verdict.receipt,
+      channels_failed: failed,
+      has_external_threat: hasExternalThreat,
+    });
+  }
 
   console.log(`[incident-escalation] Escalation complete: ${succeeded} succeeded, ${failed} failed`);
 }

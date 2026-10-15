@@ -2,6 +2,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   escalateToSlack,
   escalateToPagerDuty,
+  logIncidentToLinear,
+  escalateIncident,
   type SecurityVerdict,
   emitReciprocalTelemetryWithEscalation,
 } from '../incidentEscalation.js';
@@ -225,6 +227,39 @@ describe('incident-escalation', () => {
 
     expect(waitUntilCalled).toBe(true);
     logSpy.mockRestore();
+  });
+
+  it('rejects Linear GraphQL errors without logging provider-controlled text', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    global.fetch = vi.fn(async (url) => {
+      if (typeof url === 'string' && url.includes('linear')) {
+        return new Response(
+          JSON.stringify({ errors: [{ message: 'secret-looking-provider-detail' }], data: null }),
+          { status: 200 },
+        );
+      }
+      return new Response('error', { status: 404 });
+    }) as any;
+
+    const result = await logIncidentToLinear(createMockVerdict('REPAIR_REQUIRED'), {
+      LINEAR_API_KEY: 'test-only-key',
+    });
+
+    expect(result).toBe(false);
+    expect(JSON.stringify(errorSpy.mock.calls)).not.toContain('secret-looking-provider-detail');
+    errorSpy.mockRestore();
+  });
+
+  it('reports a critical failure only when all escalation channels fail', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    global.fetch = vi.fn(async () => new Response('error', { status: 500 })) as any;
+
+    await escalateIncident(createMockVerdict('REPAIR_REQUIRED'), {});
+
+    expect(errorSpy.mock.calls.some((call) =>
+      typeof call[0] === 'string' && call[0].includes('CRITICAL: Escalation failed'),
+    )).toBe(true);
+    errorSpy.mockRestore();
   });
 
   it('ignores non-meaningful verdicts', () => {

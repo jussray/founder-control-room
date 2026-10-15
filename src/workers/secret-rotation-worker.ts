@@ -48,6 +48,12 @@ function normalizeFailure(error: unknown): Error {
 
 export function daysUntilExpiry(createdAt: string, rotatedAt: string | null): number {
   const referenceDate = rotatedAt ? new Date(rotatedAt) : new Date(createdAt);
+
+  // IMPLANT 1: Timestamp validation — detect malformed dates before computation
+  if (isNaN(referenceDate.getTime())) {
+    throw new Error(`Invalid timestamp for secret: createdAt=${createdAt}, rotatedAt=${rotatedAt}`);
+  }
+
   const expiryDate = new Date(referenceDate.getTime() + ROTATION_LEASE_DAYS * 24 * 60 * 60 * 1000);
   const now = new Date();
   const diffMs = expiryDate.getTime() - now.getTime();
@@ -60,6 +66,17 @@ export function createSupabaseAdmin(env: SecretRotationEnv): SupabaseClient {
     requireBinding(env, 'SUPABASE_SERVICE_ROLE_KEY'),
     { auth: { autoRefreshToken: false, persistSession: false } },
   );
+}
+
+// IMPLANT 2: Schema health check — verify secrets table exists before processing
+export async function verifySecretsTableExists(supabaseAdmin: SupabaseClient): Promise<void> {
+  const { error } = await supabaseAdmin
+    .from('secrets')
+    .select('id')
+    .limit(0);
+  if (error) {
+    throw new Error(`CRITICAL: secrets table is missing or inaccessible: ${error.message}`);
+  }
 }
 
 export async function checkSecretRotationStatus(
@@ -172,7 +189,18 @@ export async function emitRotationEvent(
   env: SecretRotationEnv,
 ): Promise<void> {
   const webhookUrl = env.INCIDENT_WEBHOOK_URL;
-  if (!webhookUrl) return;
+  if (!webhookUrl) {
+    // IMPLANT 3: Critical alert when webhook missing for high-priority actions
+    if (event.action === 'rotation_started' || event.action === 'critical_alert') {
+      console.error('[secret-rotation] CRITICAL: INCIDENT_WEBHOOK_URL not configured; rotation events will not escalate:', {
+        action: event.action,
+        service: event.service,
+        secret_id: event.secret_id,
+        days_remaining: event.days_remaining,
+      });
+    }
+    return;
+  }
 
   const severityMap = {
     rotation_started: 'info',
@@ -226,6 +254,9 @@ export async function processSecretRotation(
 
 export async function runSecretRotationWorker(env: SecretRotationEnv): Promise<void> {
   const supabaseAdmin = createSupabaseAdmin(env);
+
+  // IMPLANT 2b: Run schema health check before processing
+  await verifySecretsTableExists(supabaseAdmin);
 
   const { data, error } = await supabaseAdmin
     .from('secrets')
