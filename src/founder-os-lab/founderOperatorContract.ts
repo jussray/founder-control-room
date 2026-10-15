@@ -5,7 +5,9 @@
  * No merge, deployment, or new PR creation occurs in this module.
  */
 
-export type ProofKind = 'focused-check' | 'playwright' | 'provider-readback';
+import { createHash } from 'node:crypto';
+
+export type ProofKind = 'focused-check' | 'playwright' | 'provider-readback' | 'documentation-truth';
 export type Status = 'BLOCKED' | 'NEEDS_APPROVAL' | 'FAILED' | 'VERIFIED';
 
 export interface Task {
@@ -16,6 +18,8 @@ export interface Task {
   focusFiles: readonly string[];
   surface: 'ui' | 'backend' | 'docs';
   providerChange: boolean;
+  /** Exact external destination, when requesting a provider mutation. */
+  providerTarget?: string;
 }
 
 export interface PatchProposal {
@@ -30,6 +34,8 @@ export interface Approval {
   branch: string;
   head: string;
   files: readonly string[];
+  approvalId: string;
+  proposalHash: string;
 }
 
 /** SolContinuity is a read-only source of project history, not a source of authority. */
@@ -66,6 +72,7 @@ export interface SupportReceipt {
   promptId?: string;
   promptVersion?: string;
   promptRegistryRef?: string;
+  promptIntegrityDigest?: string;
   warnings: readonly string[];
 }
 
@@ -75,6 +82,9 @@ export interface Evidence {
   passed: boolean;
   reference: string; // CI run URL, trace path, provider response reference, etc.
   observation: string;
+  observedAt: string;
+  target?: string;
+  revision?: string;
 }
 
 export interface Receipt {
@@ -83,6 +93,8 @@ export interface Receipt {
   goal: string;
   sourceHead: string;
   resultHead?: string;
+  proposalHash?: string;
+  reservationId?: string;
   status: Status;
   cause?: string;
   changedFiles: readonly string[];
@@ -103,6 +115,14 @@ export interface TrustedTools {
   readSol?(task: Task): Promise<SolSnapshot | null>;
   /** Optional approved method selection; metadata is evidence, not authority. */
   selectPrompt?(task: Task, sol?: SolSnapshot): Promise<PromptOSSelection | null>;
+  /** Trusted repository protection lookup. Fail closed on an unreadable ref. */
+  isProtectedBranch(task: Task): Promise<boolean>;
+  /** A trusted classification of the actual patch, independent of caller labels. */
+  classify(task: Task, proposal: PatchProposal): Promise<{ surface: Task['surface']; providerTarget?: string; documentationTruth?: boolean }>;
+  /** Persist an idempotent PENDING execution receipt BEFORE any write. */
+  reserve(task: Task, proposal: PatchProposal, approval: Approval): Promise<string>;
+  /** Read immutable Git commit identity after applying the patch. */
+  inspectCommit(task: Task, sha: string): Promise<{ parentSha: string; changedFiles: readonly string[] }>;
   /** FCR must verify approval against its trusted ledger/identity, NOT input text. */
   verifyApproval(task: Task, proposal: PatchProposal, approval: Approval): Promise<boolean>;
   /** Atomically reject any diff that touches files outside `allowedFiles`. */
@@ -110,7 +130,11 @@ export interface TrustedTools {
     task: Task,
     proposal: PatchProposal,
     allowedFiles: readonly string[],
-    expectedHead: string // Adapter must atomically compare-and-swap the branch ref before writing.
+    expectedHead: string,
+    approval: Approval,
+    reservationId: string
+    // The trusted FCR adapter MUST atomically revalidate/consume active approval,
+    // match the proposal digest, and compare-and-swap the expected ref before commit.
   ): Promise<{ sha: string; changedFiles: readonly string[] }>;
   /** Run real tools and return their observed artifacts, never fabricated evidence. */
   prove(task: Task, sha: string): Promise<readonly Evidence[]>;
@@ -160,25 +184,39 @@ function supportReceipt(context: AdvisoryContext): SupportReceipt {
     promptId: context.promptos?.id,
     promptVersion: context.promptos?.version,
     promptRegistryRef: context.promptos?.registryRef,
+    promptIntegrityDigest: context.promptos?.integrityDigest,
     warnings: context.warnings,
   };
 }
 
-function requiredProof(task: Task): ProofKind[] {
-  const kinds: ProofKind[] = ['focused-check'];
-  if (task.surface === 'ui') kinds.push('playwright');
-  if (task.providerChange) kinds.push('provider-readback');
-  return kinds;
+function canonicalFile(file: string): boolean {
+  return file.length > 0 && file.length <= 300 && !file.startsWith('/') &&
+    !file.includes('\\\\') && !file.includes('\\0') && !file.includes('//') &&
+    file.split('/').every(segment => segment !== '.' && segment !== '..' && !!segment) &&
+    !/^[A-Za-z]:/.test(file);
+}
+
+function requiredProof(task: Task, proposal: PatchProposal, classified: { surface: Task['surface']; providerTarget?: string; documentationTruth?: boolean }): ProofKind[] {
+  const kinds = new Set<ProofKind>(['focused-check']);
+  if (task.surface === 'ui' || classified.surface === 'ui' || proposal.files.some(file => /\\.(?:tsx|jsx|css|html)$/.test(file))) kinds.add('playwright');
+  if (task.providerChange || classified.providerTarget) kinds.add('provider-readback');
+  if (classified.documentationTruth || task.surface === 'docs' || proposal.files.some(file => /^(?:README\\.md|docs\\/|AGENTS\\.md|GLOBAL_AI\\.md)/.test(file))) kinds.add('documentation-truth');
+  return [...kinds];
 }
 
 function within(changed: readonly string[], allowed: readonly string[]): boolean {
-  return changed.length > 0 && changed.every(file => allowed.includes(file));
+  return changed.length > 0 && new Set(changed).size === changed.length && changed.every(file => canonicalFile(file) && allowed.includes(file));
+}
+
+export function proposalDigest(task: Task, proposal: PatchProposal): string {
+  return createHash('sha256').update(JSON.stringify([task.repo, task.branch, task.expectedHead, [...proposal.files].sort(), proposal.diff])).digest('hex');
 }
 
 function approved(task: Task, proposal: PatchProposal, authority?: Approval): boolean {
   return !!authority && authority.operation === 'patch' &&
     authority.repo === task.repo && authority.branch === task.branch &&
     authority.head === task.expectedHead &&
+    authority.approvalId.trim().length > 0 && authority.proposalHash === proposalDigest(task, proposal) &&
     within(proposal.files, task.focusFiles) &&
     within(proposal.files, authority.files);
 }
