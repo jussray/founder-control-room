@@ -273,7 +273,7 @@ The current desired product boundary is machine-readable in `config/fcr-cloudfla
 - `app.foundercontrolroom.org` and `api.foundercontrolroom.org` are Access-required product hosts;
 - direct release/diagnostic/write-capable machine paths require the dedicated FCR Access service-token pair;
 - only exact application-authenticated external protocol/webhook/receipt paths may receive separately reviewed path-scoped exceptions;
-- `/mcp/*` is forbidden as a bypass wildcard, so write-capable Founder Signal MCP remains behind Access;
+- `/mcp/*` is forbidden as a bypass wildcard; the write-capable Founder Signal Engine MCP remains behind Access, while the dedicated read-only X-engagement MCP may use its own exact path exception and least-privilege bearer;
 - review-email ingress remains private to the Worker Service Binding and needs no public exception.
 
 This is source policy, not provider proof. Live Access applications, path precedence, service-token binding, DNS, and runtime behavior require fresh provider/runtime readback.
@@ -281,4 +281,4 @@ This is source policy, not provider proof. Live Access applications, path preced
 
 ### Public Pages proxy and Access-only API routes
 
-The public Pages Worker may continue to proxy normal same-origin FCR app/auth traffic through the private `FCR_API` Service Binding, including the canonical OAuth `/mcp` compatibility lane. It must not proxy `/mcp/founder-signal-engine` or `/mcp/founder-signal-x-engagement` from the public apex. Those two routes are intentionally direct-API-only so their Cloudflare Access requirement cannot be bypassed through `foundercontrolroom.org`.
+The public Pages Worker may continue to proxy normal same-origin FCR app/auth traffic through the private `FCR_API` Service Binding, including the canonical OAuth `/mcp` compatibility lane. It must not proxy `/mcp/founder-signal-engine` from the public apex. That write-capable route is intentionally direct-API-only so its Cloudflare Access requirement cannot be bypassed through `foundercontrolroom.org`. The separate read-only X-engagement MCP keeps an exact application-authenticated exception for portable evidence consumers.

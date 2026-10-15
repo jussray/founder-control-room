@@ -128,7 +128,6 @@ describe('Founder Control Room Cloudflare topology', () => {
     expect(proxy).toContain("'/control-room'");
     expect(proxy).toContain("'/portable-founder-console'");
     expect(proxy).toContain("'/mcp/founder-signal-engine'");
-    expect(proxy).toContain("'/mcp/founder-signal-x-engagement'");
     expect(proxy).toContain('DIRECT_API_ACCESS_REQUIRED');
     expect(proxy).toContain('if (DIRECT_ACCESS_ONLY_PATHS.has(requestUrl.pathname))');
     expect(proxy).toContain('if (shouldServeFromPages(request))');

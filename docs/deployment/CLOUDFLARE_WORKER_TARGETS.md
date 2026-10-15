@@ -253,4 +253,4 @@ The exact machine exception set is `config/fcr-cloudflare-access-boundary.json`.
 Provider/DNS/runtime evidence is required before claiming that either `app.` or `api.` currently satisfies this source policy.
 
 
-The Pages Service Binding is not an alternate Access tunnel. `public/_worker.js` must fail closed for `/mcp/founder-signal-engine` and `/mcp/founder-signal-x-engagement` on the public apex while preserving the canonical OAuth `/mcp` lane and normal founder-authenticated same-origin application traffic.
+The Pages Service Binding is not an alternate Access tunnel for write-capable MCP. `public/_worker.js` must fail closed for `/mcp/founder-signal-engine` on the public apex while preserving the canonical OAuth `/mcp` lane, the exact read-only X-engagement MCP exception, and normal founder-authenticated same-origin application traffic.

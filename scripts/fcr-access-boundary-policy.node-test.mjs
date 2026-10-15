@@ -28,7 +28,8 @@ test('bypass policy is exact and never exempts the write-capable MCP surface', (
   assert.ok(!bypass.has('/mcp/*'));
   assert.ok(!bypass.has('/*'));
   assert.ok(!bypass.has('/mcp/founder-signal-engine'));
-  assert.ok(!bypass.has('/mcp/founder-signal-x-engagement'));
+  assert.ok(bypass.has('/mcp/founder-signal-x-engagement'));
+  assert.ok(!policy.serviceTokenProtectedPaths.includes('/mcp/founder-signal-x-engagement'));
 });
 
 test('every declared public machine exception maps to a real server surface', () => {

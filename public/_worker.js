@@ -16,7 +16,6 @@ const API_OWNED_ASSET_PATHS = new Set([
 ]);
 const DIRECT_ACCESS_ONLY_PATHS = new Set([
   '/mcp/founder-signal-engine',
-  '/mcp/founder-signal-x-engagement',
 ]);
 const STATIC_EXACT_PATHS = new Set([
   '/products/business-leak-quickscan',

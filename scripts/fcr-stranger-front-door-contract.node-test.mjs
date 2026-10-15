@@ -97,7 +97,8 @@ test('API exception policy is exact and excludes write-capable MCP from bypass',
   assert.ok(accessPolicy.applicationAuthenticatedBypassPaths.includes('/ingest/bip-control-room-proof'));
   assert.ok(!accessPolicy.applicationAuthenticatedBypassPaths.includes('/mcp/*'));
   assert.ok(!accessPolicy.applicationAuthenticatedBypassPaths.includes('/mcp/founder-signal-engine'));
-  assert.ok(!accessPolicy.applicationAuthenticatedBypassPaths.includes('/mcp/founder-signal-x-engagement'));
+  assert.ok(accessPolicy.applicationAuthenticatedBypassPaths.includes('/mcp/founder-signal-x-engagement'));
+  assert.ok(!accessPolicy.serviceTokenProtectedPaths.includes('/mcp/founder-signal-x-engagement'));
 });
 
 test('founder auth contract remains allowlist-first and founder-gated', () => {

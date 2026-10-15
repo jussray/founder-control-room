@@ -143,25 +143,46 @@ describe('Cloudflare Pages edge proxy', () => {
     const assetFetch = vi.fn(async (_request: Request) => new Response('unexpected', { status: 500 }));
     const fcrApiFetch = vi.fn(async (_request: Request) => identifiedResponse('{"ok":true}', { status: 200 }));
 
-    for (const route of ['/mcp/founder-signal-engine', '/mcp/founder-signal-x-engagement']) {
-      const response = await handler.fetch(
-        new Request(`https://foundercontrolroom.org${route}`, {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: '{}',
-        }),
-        { ASSETS: { fetch: assetFetch }, FCR_API: { fetch: fcrApiFetch } },
-      );
+    const response = await handler.fetch(
+      new Request('https://foundercontrolroom.org/mcp/founder-signal-engine', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: '{}',
+      }),
+      { ASSETS: { fetch: assetFetch }, FCR_API: { fetch: fcrApiFetch } },
+    );
 
-      expect(response.status).toBe(403);
-      await expect(response.json()).resolves.toMatchObject({
-        ok: false,
-        code: 'DIRECT_API_ACCESS_REQUIRED',
-      });
-    }
-
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toMatchObject({
+      ok: false,
+      code: 'DIRECT_API_ACCESS_REQUIRED',
+    });
     expect(assetFetch).not.toHaveBeenCalled();
     expect(fcrApiFetch).not.toHaveBeenCalled();
+  });
+
+  it('continues to proxy the read-only X engagement MCP exception through the public service binding', async () => {
+    const handler = await loadHandler();
+    const assetFetch = vi.fn(async (_request: Request) => new Response('unexpected', { status: 500 }));
+    const fcrApiFetch = vi.fn(async (_request: Request) => identifiedResponse('{"ok":true}', { status: 200 }));
+
+    const response = await handler.fetch(
+      new Request('https://foundercontrolroom.org/mcp/founder-signal-x-engagement', {
+        method: 'POST',
+        headers: {
+          authorization: 'Bearer synthetic-read-token',
+          'content-type': 'application/json',
+        },
+        body: '{}',
+      }),
+      { ASSETS: { fetch: assetFetch }, FCR_API: { fetch: fcrApiFetch } },
+    );
+
+    expect(response.status).toBe(200);
+    expect(fcrApiFetch).toHaveBeenCalledOnce();
+    const forwarded = fcrApiFetch.mock.calls[0]?.[0];
+    expect(forwarded?.url).toBe('https://api.foundercontrolroom.org/mcp/founder-signal-x-engagement');
+    expect(forwarded?.headers.get('authorization')).toBe('Bearer synthetic-read-token');
   });
 
   it('continues to proxy the canonical OAuth MCP route through the public service binding', async () => {

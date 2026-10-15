@@ -15,7 +15,7 @@
     {
       "path": "public/_worker.js",
       "claims": [
-        "`public/_worker.js` must keep public static discovery artifacts on the Pages `ASSETS` binding and route normal same-origin app/API traffic through `FCR_API`, but it must refuse to tunnel `/mcp/founder-signal-engine` or `/mcp/founder-signal-x-engagement` from the public apex because those routes require the direct Access-managed API origin; the Pages proxy cannot become an alternate bypass around Cloudflare Access."
+        "`public/_worker.js` must keep public static discovery artifacts on the Pages `ASSETS` binding and route normal same-origin app/API traffic through `FCR_API`, but it must refuse to tunnel the write-capable `/mcp/founder-signal-engine` route from the public apex because that route requires the direct Access-managed API origin; the separate read-only `/mcp/founder-signal-x-engagement` route may remain on its exact application-authenticated exception and least-privilege bearer."
       ]
     },
     {
