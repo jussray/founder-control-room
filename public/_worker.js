@@ -14,6 +14,10 @@ const API_OWNED_ASSET_PATHS = new Set([
   '/assets/auth-callback.js',
   '/assets/control-room.css',
 ]);
+const DIRECT_ACCESS_ONLY_PATHS = new Set([
+  '/mcp/founder-signal-engine',
+  '/mcp/founder-signal-x-engagement',
+]);
 const STATIC_EXACT_PATHS = new Set([
   '/products/business-leak-quickscan',
   '/products/business-leak-quickscan/',
@@ -55,6 +59,23 @@ function shouldServeFromPages(request) {
       (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
     )
     || STATIC_FILE_PATTERN.test(pathname);
+}
+
+function directAccessOnlyResponse() {
+  return new Response(JSON.stringify({
+    ok: false,
+    error: 'This route requires the Access-managed API origin.',
+    code: 'DIRECT_API_ACCESS_REQUIRED',
+  }), {
+    status: 403,
+    headers: {
+      'Content-Type': 'application/json; charset=utf-8',
+      'Cache-Control': 'no-store',
+      'Referrer-Policy': 'no-referrer',
+      'X-Content-Type-Options': 'nosniff',
+      'X-Robots-Tag': 'noindex, nofollow',
+    },
+  });
 }
 
 function createApiRequest(request) {
@@ -303,6 +324,10 @@ export default {
 
     if (requestUrl.pathname === SYNC_CONTROL_ROUTE) {
       return relaySyncControl(request, env);
+    }
+
+    if (DIRECT_ACCESS_ONLY_PATHS.has(requestUrl.pathname)) {
+      return directAccessOnlyResponse();
     }
 
     if (shouldServeFromPages(request)) {

@@ -13,6 +13,12 @@
   ],
   "changes": [
     {
+      "path": "public/_worker.js",
+      "claims": [
+        "`public/_worker.js` must keep public static discovery artifacts on the Pages `ASSETS` binding and route normal same-origin app/API traffic through `FCR_API`, but it must refuse to tunnel `/mcp/founder-signal-engine` or `/mcp/founder-signal-x-engagement` from the public apex because those routes require the direct Access-managed API origin; the Pages proxy cannot become an alternate bypass around Cloudflare Access."
+      ]
+    },
+    {
       "path": ".github/workflows/deploy.yml",
       "claims": [
         "`.github/workflows/deploy.yml` must authenticate every direct production request to `api.foundercontrolroom.org` with the dedicated FCR Cloudflare Access service-token headers and must fail closed when either protected credential is absent; those credentials cannot authorize a deployment or replace the existing exact-main founder deployment gate."
@@ -54,12 +60,6 @@
       "path": ".control-room/council-residency.contract.json",
       "claims": [
         "`.control-room/council-residency.contract.json` defines one logical Founder Council resident in the assistant host and this project Control Room while preserving project-local execution authority, behind-the-scenes user benefit, smallest-useful-seat routing, provider-proof requirements, and founder consequential authority."
-      ]
-    },
-    {
-      "path": "public/_worker.js",
-      "claims": [
-        "`public/_worker.js` must route public static discovery artifacts, including `crawlers.json`, through the Pages `ASSETS` binding while API-owned callback assets remain on `FCR_API`; this routing classification cannot authorize provider mutation or treat a static crawler policy as authentication."
       ]
     },
     {

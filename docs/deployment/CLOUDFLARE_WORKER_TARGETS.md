@@ -251,3 +251,6 @@ The intended host split is:
 The exact machine exception set is `config/fcr-cloudflare-access-boundary.json`. Exceptions are path-scoped and retain their application-level cryptographic/OAuth/OIDC/HMAC/bearer membrane. `/mcp/*` must never be used as an Access bypass wildcard. Direct release and write-capable MCP lanes remain service-token protected.
 
 Provider/DNS/runtime evidence is required before claiming that either `app.` or `api.` currently satisfies this source policy.
+
+
+The Pages Service Binding is not an alternate Access tunnel. `public/_worker.js` must fail closed for `/mcp/founder-signal-engine` and `/mcp/founder-signal-x-engagement` on the public apex while preserving the canonical OAuth `/mcp` lane and normal founder-authenticated same-origin application traffic.

@@ -277,3 +277,8 @@ The current desired product boundary is machine-readable in `config/fcr-cloudfla
 - review-email ingress remains private to the Worker Service Binding and needs no public exception.
 
 This is source policy, not provider proof. Live Access applications, path precedence, service-token binding, DNS, and runtime behavior require fresh provider/runtime readback.
+
+
+### Public Pages proxy and Access-only API routes
+
+The public Pages Worker may continue to proxy normal same-origin FCR app/auth traffic through the private `FCR_API` Service Binding, including the canonical OAuth `/mcp` compatibility lane. It must not proxy `/mcp/founder-signal-engine` or `/mcp/founder-signal-x-engagement` from the public apex. Those two routes are intentionally direct-API-only so their Cloudflare Access requirement cannot be bypassed through `foundercontrolroom.org`.
