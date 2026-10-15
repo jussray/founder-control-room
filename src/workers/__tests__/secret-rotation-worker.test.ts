@@ -29,22 +29,21 @@ describe('secret-rotation', () => {
       from: () => ({
         select: () => Promise.resolve({ data: [secret], error: null }),
         insert: () => Promise.resolve({ error: null }),
-        update: () => Promise.resolve({ error: null }),
+        update: () => ({ eq: () => Promise.resolve({ error: null }) }),
       }),
       rpc: () => Promise.resolve({ data: [], error: null }),
     };
 
     const result = await checkSecretRotationStatus(secret, mockSupabase as any);
-    expect(result).toBeDefined();
-    expect(['rotation_started', 'warning_issued', 'critical_alert']).toContain(result?.action);
+    expect(result?.action).toBe('rotation_started');
   });
 
-  it('warns when threshold approaches', async () => {
+  it('warns after the 75-day age threshold', async () => {
     const secret = {
       id: 'test-secret-warning',
       service: 'github-app',
       secret_type: 'oauth-token',
-      created_at: new Date(Date.now() - 73 * 24 * 60 * 60 * 1000).toISOString(),
+      created_at: new Date(Date.now() - 76 * 24 * 60 * 60 * 1000).toISOString(),
       rotated_at: null,
       expires_at: null,
       rotation_status: 'active' as const,
@@ -57,8 +56,28 @@ describe('secret-rotation', () => {
     };
 
     const result = await checkSecretRotationStatus(secret, mockSupabase as any);
-    expect(result).toBeDefined();
-    expect(['warning_issued', 'critical_alert']).toContain(result?.action);
+    expect(result?.action).toBe('warning_issued');
+  });
+
+  it('raises critical after the 85-day age threshold', async () => {
+    const secret = {
+      id: 'test-secret-critical',
+      service: 'github-app',
+      secret_type: 'oauth-token',
+      created_at: new Date(Date.now() - 86 * 24 * 60 * 60 * 1000).toISOString(),
+      rotated_at: null,
+      expires_at: null,
+      rotation_status: 'active' as const,
+    };
+
+    const mockSupabase = {
+      from: () => ({
+        insert: () => Promise.resolve({ error: null }),
+      }),
+    };
+
+    const result = await checkSecretRotationStatus(secret, mockSupabase as any);
+    expect(result?.action).toBe('critical_alert');
   });
 
   it('ignores secrets within safe window', async () => {

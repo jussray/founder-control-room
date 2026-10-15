@@ -29,9 +29,13 @@ interface RotationEvent {
 }
 
 const ROTATION_LEASE_DAYS = 90;
-const ROTATION_START_DAYS = 60;
-const WARNING_THRESHOLD_DAYS = 75;
-const CRITICAL_THRESHOLD_DAYS = 85;
+const ROTATION_START_AGE_DAYS = 60;
+const WARNING_AGE_DAYS = 75;
+const CRITICAL_AGE_DAYS = 85;
+
+const ROTATION_START_REMAINING_DAYS = ROTATION_LEASE_DAYS - ROTATION_START_AGE_DAYS;
+const WARNING_REMAINING_DAYS = ROTATION_LEASE_DAYS - WARNING_AGE_DAYS;
+const CRITICAL_REMAINING_DAYS = ROTATION_LEASE_DAYS - CRITICAL_AGE_DAYS;
 
 export function requireBinding(env: SecretRotationEnv, name: string): string {
   const value = env[name]?.trim();
@@ -86,7 +90,7 @@ export async function checkSecretRotationStatus(
   const daysRemaining = daysUntilExpiry(secret.created_at, secret.rotated_at);
   const now = new Date().toISOString();
 
-  if (daysRemaining > ROTATION_START_DAYS) {
+  if (daysRemaining > ROTATION_START_REMAINING_DAYS) {
     return null;
   }
 
@@ -111,7 +115,7 @@ export async function checkSecretRotationStatus(
     };
   }
 
-  if (daysRemaining <= CRITICAL_THRESHOLD_DAYS) {
+  if (daysRemaining <= CRITICAL_REMAINING_DAYS) {
     await supabaseAdmin
       .from('secrets_audit_log')
       .insert({
@@ -132,7 +136,7 @@ export async function checkSecretRotationStatus(
     };
   }
 
-  if (daysRemaining <= WARNING_THRESHOLD_DAYS) {
+  if (daysRemaining <= WARNING_REMAINING_DAYS) {
     await supabaseAdmin
       .from('secrets_audit_log')
       .insert({
@@ -153,7 +157,7 @@ export async function checkSecretRotationStatus(
     };
   }
 
-  if (daysRemaining <= ROTATION_START_DAYS) {
+  if (daysRemaining <= ROTATION_START_REMAINING_DAYS) {
     const { error: statusUpdateError } = await supabaseAdmin
       .from('secrets')
       .update({ rotation_status: 'rotating' })
