@@ -212,3 +212,97 @@ describe('four-system founder operator authority boundary', () => {
     expect(result.status).toBe('BLOCKED');
   });
 });
+
+describe('adversarial operator execution gates', () => {
+  it('rejects protected main and remote-protected branches', async () => {
+    const direct = harness();
+    expect((await runGoal({ ...task, branch: 'main' }, direct.tools,
+      { ...approval, branch: 'main' })).status).toBe('BLOCKED');
+    expect(direct.writes).toBe(0);
+    const protectedBranch = harness({ isProtectedBranch: async () => true });
+    expect((await runGoal(task, protectedBranch.tools, approval)).status).toBe('BLOCKED');
+    expect(protectedBranch.writes).toBe(0);
+  });
+
+  it('rejects path traversal before a repository mutation', async () => {
+    for (const path of ['../secret.txt', '/etc/hosts', 'src/../secret.ts', 'C:/secret.txt']) {
+      const h = harness();
+      expect((await runGoal({ ...task, focusFiles: [path] }, h.tools, approval)).status).toBe('BLOCKED');
+      expect(h.writes).toBe(0);
+    }
+  });
+
+  it('does not allow an approval to authorize another diff on identical files', async () => {
+    const h = harness({ diagnose: async () => ({
+      cause: 'Different proposal', files: ['src/guard.ts'], diff: 'new unauthorized diff',
+    }) });
+    expect((await runGoal(task, h.tools, approval)).status).toBe('NEEDS_APPROVAL');
+    expect(h.writes).toBe(0);
+  });
+
+  it('prevents writes when the pending receipt cannot be reserved', async () => {
+    const h = harness({ reserve: async () => { throw new Error('sensitive_token_in_provider_error'); } });
+    const result = await runGoal(task, h.tools, approval);
+    expect(result.status).toBe('BLOCKED');
+    expect(result.reality).not.toContain('sensitive_token_in_provider_error');
+    expect(h.writes).toBe(0);
+  });
+
+  it('passes proposal files rather than wider approval files to execution', async () => {
+    let allowlist: readonly string[] = [];
+    const h = harness({ applyPatch: async (_task, _proposal, files) => {
+      allowlist = files;
+      return { sha: NEXT_HEAD, changedFiles: ['src/guard.ts'] };
+    } });
+    const result = await runGoal(task, h.tools, { ...approval, files: ['src/guard.ts', 'src/other.ts'] });
+    expect(result.status).toBe('BLOCKED');
+    expect(allowlist).toEqual(['src/guard.ts']);
+  });
+
+  it('denies fake unchanged-head patches and wrong parent commit ancestry', async () => {
+    const same = harness({ applyPatch: async () => ({ sha: HEAD, changedFiles: ['src/guard.ts'] }) });
+    expect((await runGoal(task, same.tools, approval)).status).toBe('BLOCKED');
+    const wrongParent = harness({ inspectCommit: async () => ({
+      parentSha: 'c'.repeat(40), changedFiles: ['src/guard.ts'],
+    }) });
+    expect((await runGoal(task, wrongParent.tools, approval)).status).toBe('BLOCKED');
+  });
+
+  it('requires real UI and Documentation Truth checks based on trusted classification', async () => {
+    const ui = harness({ classify: async () => ({ surface: 'ui' }) });
+    expect((await runGoal(task, ui.tools, approval)).status).toBe('BLOCKED');
+    const docs = harness({ classify: async () => ({ surface: 'docs', documentationTruth: true }) });
+    expect((await runGoal(task, docs.tools, approval)).status).toBe('BLOCKED');
+  });
+
+  it('rejects a provider readback from the wrong environment', async () => {
+    const h = harness({
+      classify: async () => ({ surface: 'backend', providerTarget: 'production:worker/fcr' }),
+      prove: async (_task, sha) => [
+        { kind: 'focused-check', sha, passed: true, reference: 'https://example.org/ci',
+          observation: 'CI', observedAt: new Date().toISOString() },
+        { kind: 'provider-readback', sha, passed: true, reference: 'https://example.org/readback',
+          observation: 'readback', observedAt: new Date().toISOString(), target: 'staging:worker/fcr',
+          revision: 'rev-1' },
+      ],
+    });
+    expect((await runGoal(task, h.tools, approval)).status).toBe('BLOCKED');
+  });
+
+  it('excludes stale, unrelated evidence from verified receipts', async () => {
+    const h = harness({ prove: async (_task, sha) => [
+      { kind: 'focused-check', sha, passed: true, reference: 'https://example.org/ci',
+        observation: 'valid', observedAt: new Date().toISOString() },
+      { kind: 'focused-check', sha: HEAD, passed: true, reference: 'https://example.org/old',
+        observation: 'old', observedAt: new Date(Date.now() - 86400000).toISOString() },
+    ] });
+    const result = await runGoal(task, h.tools, approval);
+    expect(result.status).toBe('VERIFIED');
+    expect(result.evidence).toHaveLength(1);
+  });
+
+  it('persists the PromptOS method integrity digest in support receipts', async () => {
+    const h = harness();
+    expect((await runGoal(task, h.tools, approval)).support.promptIntegrityDigest).toBe('sha256:approved');
+  });
+});
