@@ -288,12 +288,28 @@ export async function logIncidentToLinear(
       }),
     });
 
+    const body = await response.json();
+
+    // IMPLANT 4: GraphQL error detection — Linear returns 200 OK even for permission errors
+    if (body.errors && Array.isArray(body.errors) && body.errors.length > 0) {
+      console.error(
+        '[incident-escalation] Linear GraphQL error (permission/validation):',
+        body.errors[0].message,
+      );
+      return false;
+    }
+
     if (!response.ok) {
       console.error(
-        '[incident-escalation] Linear creation failed:',
+        '[incident-escalation] Linear HTTP error:',
         response.status,
-        await response.text(),
+        JSON.stringify(body),
       );
+      return false;
+    }
+
+    if (!body.data?.issueCreate?.issue?.id) {
+      console.error('[incident-escalation] Linear response missing issue ID:', body);
       return false;
     }
 
@@ -328,6 +344,21 @@ export async function escalateIncident(
 
   const succeeded = results.filter((r) => r.status === 'fulfilled' && r.value).length;
   const failed = results.filter((r) => r.status === 'rejected' || !r.value).length;
+
+  // IMPLANT 5: Critical escalation failure detection — alert if all channels failed on high-severity verdict
+  const hasExternalThreat = verdict.boundaries?.externalCompromise || verdict.boundaries?.externalExploit;
+  if (failed > 0 && (verdict.verdict === 'REPAIR_REQUIRED' || hasExternalThreat)) {
+    console.error(
+      '[incident-escalation] CRITICAL: Escalation failed for high-severity verdict:',
+      {
+        verdict: verdict.verdict,
+        service: verdict.service,
+        receipt: verdict.receipt,
+        channels_failed: failed,
+        has_external_threat: hasExternalThreat,
+      },
+    );
+  }
 
   console.log(`[incident-escalation] Escalation complete: ${succeeded} succeeded, ${failed} failed`);
 }
