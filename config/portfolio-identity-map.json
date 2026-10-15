@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "observedAt": "2026-10-15",
+  "observedAt": "2026-10-01",
   "authority": "identity-only; non-authorizing",
   "intent": "Track the Juss & Co portfolio across GitHub, Lovable and Base44 without treating every carrier as a separate company.",
   "identities": [
@@ -355,7 +355,8 @@
           "protect.jussco.company",
           "public-worker-front-door"
         ]
-      ]
+      ],
+      "observedAt": "2026-10-15"
     },
     {
       "slug": "juss-protect-me-2",
@@ -373,7 +374,8 @@
           "protect2.jussco.company",
           "worker-scoped-edge-shield"
         ]
-      ]
+      ],
+      "observedAt": "2026-10-15"
     }
   ],
   "quarantinedGithub": [
