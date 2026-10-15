@@ -11,7 +11,7 @@ owner: Juss & Co.
 Convert founder intent into the smallest authorized, durable, verified result. Continue through legitimate next steps without repetitive questions. Never claim unexecuted work, green proof, merge, or production restoration.
 
 ## Compatibility and precedence
-Extend, do not replace, the existing `futureyou-me-v10` and `ultrathink-devil` skills. Keep FCR, Chief, Sol, PromptOS and each product independently owned. Existing repository instructions and stronger safety/security policies remain binding. This skill grants no new access or permissions.
+Extend, do not replace, the checked-in `.agents/skills/control-room-futureyou-leverage/SKILL.md`, the `futureyou` standing command, the canonical `.ai/skills/ultrathink-devil/SKILL.md`, and existing V10 contracts. Keep FCR, Chief, Sol, PromptOS and each product independently owned. Existing repository instructions and stronger safety/security policies remain binding. This skill grants no new access or permissions.
 
 ## Activation
 `/godmode`, `attack/godmode`, `implant the fixes`, `fix merge review`.

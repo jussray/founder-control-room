@@ -230,7 +230,7 @@ Record the exact candidate SHA for every proof claim.
 
 ## Phase 6: VERIFY THE SAME FAILURE PATH
 
-The original failing reproduction is the regression witness.
+The original failing reproduction is the regression witness. The same failing browser path must be rerun after the repair.
 
 If baseline evidence was:
 

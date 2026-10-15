@@ -182,6 +182,8 @@ export function routeFcrSkills(input: RouteFcrSkillsInput): FcrSkillRoutingDecis
   const policyRequiredCapabilityIds = explicitSkillsFromGoal(goal);
   if (/\bgodmode\b/.test(goal)) pushUnique(policyRequiredCapabilityIds, 'ultrathink-attack-godmode');
   const designCommandIds = explicitDesignCommandsFromGoal(goal);
+  const standingCommands = routeFcrStandingCommands(input.goal, input.action);
+  if (standingCommands.standingCommandIds.includes('urlfix')) pushUnique(policyRequiredCapabilityIds, 'urlfix');
   const automaticCouncilLenses = [...FCR_AUTOMATIC_COUNCIL_LENSES];
   const requiredParallelLenses = [...FCR_REQUIRED_PARALLEL_LENSES];
   const mutationRequested = MUTATING_ACTIONS.has(input.action);
@@ -192,7 +194,6 @@ export function routeFcrSkills(input: RouteFcrSkillsInput): FcrSkillRoutingDecis
   const commercialGoal = isCommercialGoal(goal);
   const mergeReviewGoal = repositoryGoal && (input.action === 'merge' || input.action === 'review');
   const contentFoundry = routeContentFoundryCouncil(input.goal, input.action);
-  const standingCommands = routeFcrStandingCommands(input.goal, input.action);
 
   pushUnique(requiredProof, 'Founder Council is applied automatically in code; slash commands are optional foreground aliases and never create authority');
   pushUnique(requiredProof, 'Standing command routing is inferred from founder intent and action; manual slash invocation is emphasis or override, not an activation requirement');

@@ -337,6 +337,12 @@
         "`skills/ultrathink-suite/README.md` must route `/goalfix` through `.ai/skills/goalfix/SKILL.md` as canonical owner, treat ULTRATHINK skills as optional governed companions, and never grant a second execution authority or falsely certify runtime installation.",
         "`skills/ultrathink-suite/README.md` must route exact `/ultrathink` to the existing `.claude/skills/ultrathink/SKILL.md` entrypoint in Claude Code rather than direct activation of a second ULTRATHINK execution contract."
       ]
+    },
+    {
+      "path": "skills/urlfix/SKILL.md",
+      "claims": [
+        "`skills/urlfix/SKILL.md` must keep live-site repair evidence-bound: ownership and runtime identity are prerequisites to source mutation, external or unowned URLs remain observation-only, the same failing browser path must be rerun after a repair, and URLFIX itself never grants merge, deploy, provider-write, payment, publication, credential, or production-mutation authority."
+      ]
     }
   ]
 }
