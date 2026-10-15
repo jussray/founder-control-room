@@ -139,7 +139,7 @@ if (auditStart < 0 || auditEnd <= auditStart) {
   const auditCode = security.slice(auditStart, auditEnd);
   requireContains('requestAudit authenticated state', auditCode, 'founderAuthenticated: Boolean(founder)');
   requireContains('requestAudit rate limiter', auditCode, 'rateLimitGeneral(req, res, next);');
-  if (/ip:\\s*req\\.ip|founder:\\s*founder\\.email|founder\\.email/.test(auditCode)) {
+  if (/ip:\s*req\.ip|founder:\s*founder\.email|founder\.email/.test(auditCode)) {
     failures.push('requestAudit must not persist raw IP or founder email');
   }
 }
