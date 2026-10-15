@@ -20,6 +20,7 @@ Read these before changing code, configuration, schemas, providers, verification
 - [`.ai/skills/chatgpt-openai-developers-zapier-bridge/SKILL.md`](./.ai/skills/chatgpt-openai-developers-zapier-bridge/SKILL.md) before ChatGPT or another agent without a native Zapier connector invokes the Founder Signal Engine bridge
 - [`skills/sales/SKILL.md`](./skills/sales/SKILL.md) for qualification, offers, proof, conversion quality, retention, and revenue operations
 - [`skills/devil/SKILL.md`](./skills/devil/SKILL.md) for the premise attack and selected-plan attack
+- [`.claude/skills/confidentiality-gate/SKILL.md`](./.claude/skills/confidentiality-gate/SKILL.md) before outbound operator relays, cross-project disclosure, public artifact release, or NDA-related handling. It never replaces deterministic dispatch authorization.
 
 For Se'kret Bip splash, founding-preview, waiting-list, sponsor, or social launch work, also read [`docs/private/JUSS_PRIVATE_OPERATING_PLAN.md`](docs/private/JUSS_PRIVATE_OPERATING_PLAN.md).
 

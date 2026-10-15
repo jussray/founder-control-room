@@ -20,7 +20,8 @@ export function createOperatorRelayRouter(adapters: OperatorRelayAdapters): Rout
       return res.status(200).set('Cache-Control', 'no-store').json(response);
     } catch (error) {
       if (error instanceof OperatorRelayDispatchError) {
-        const status = error.code === 'relay_target_unavailable' ? 503 : 400;
+        const status = error.code === 'relay_target_unavailable' ? 503
+          : error.code === 'relay_disclosure_denied' ? 403 : 400;
         return res.status(status).set('Cache-Control', 'no-store').json({
           error: error.message,
           code: error.code,
