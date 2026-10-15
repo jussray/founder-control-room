@@ -35,7 +35,12 @@
     "/ingest/jira-work-automation",
     "/ingest/product-build-receipts/storyengine",
     "/ingest/bip-control-room-proof",
-    "/api/federated-relay/v3",
+    "/api/federated-relay/v3"
+  ],
+  "serviceBindingOnlyPaths": [
+    "/ingest/founder-review-email"
+  ],
+  "publicServiceBindingProtocolPaths": [
     "/mcp",
     "/mcp/read",
     "/mcp/founder-signal-x-engagement",
@@ -45,8 +50,5 @@
     "/mcp/portfolio/promptos",
     "/.well-known/oauth-protected-resource",
     "/.well-known/oauth-protected-resource/mcp"
-  ],
-  "serviceBindingOnlyPaths": [
-    "/ingest/founder-review-email"
   ]
 }

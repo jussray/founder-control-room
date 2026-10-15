@@ -157,16 +157,16 @@ test.describe('Founder quartet MCP registry', () => {
 
     const byName = new Map(servers.map((entry) => [entry.name, entry]));
     expect(byName.get('org.foundercontrolroom/fcr')?.remotes[0].url).toBe(
-      'https://api.foundercontrolroom.org/mcp/portfolio/founder-control-room',
+      'https://foundercontrolroom.org/mcp/portfolio/founder-control-room',
     );
     expect(byName.get('org.foundercontrolroom/chief')?.remotes[0].url).toBe(
       'https://chief-ai.mcgill-raylene.workers.dev/mcp',
     );
     expect(byName.get('org.foundercontrolroom/sol')?.remotes[0].url).toBe(
-      'https://api.foundercontrolroom.org/mcp/portfolio/solcontinuity',
+      'https://foundercontrolroom.org/mcp/portfolio/solcontinuity',
     );
     expect(byName.get('org.foundercontrolroom/promptos')?.remotes[0].url).toBe(
-      'https://api.foundercontrolroom.org/mcp/portfolio/promptos',
+      'https://foundercontrolroom.org/mcp/portfolio/promptos',
     );
 
     for (const name of [

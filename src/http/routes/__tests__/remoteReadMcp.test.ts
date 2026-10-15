@@ -31,7 +31,7 @@ const ENDPOINT = '/mcp';
 const TOKEN = 'test-fcr-read-token';
 const CHIEF = 'chief-ai-machine';
 const FCR = 'founder-control-room';
-const RESOURCE = 'https://api.foundercontrolroom.org/mcp';
+const RESOURCE = 'https://foundercontrolroom.org/mcp';
 
 function rpc(method: string, params?: unknown, id: string | number = 1) {
   return { jsonrpc: '2.0', id, method, ...(params === undefined ? {} : { params }) };
@@ -219,7 +219,7 @@ describe('Founder Control Room paired remote MCP', () => {
     const response = await request(buildApp()).post(ENDPOINT).send(rpc('tools/list'));
     expect(response.status).toBe(401);
     expect(response.headers['www-authenticate']).toContain(
-      'resource_metadata="https://api.foundercontrolroom.org/.well-known/oauth-protected-resource/mcp"',
+      'resource_metadata="https://foundercontrolroom.org/.well-known/oauth-protected-resource/mcp"',
     );
     expect(response.body.error.message).toBe('Unauthorized');
   });
