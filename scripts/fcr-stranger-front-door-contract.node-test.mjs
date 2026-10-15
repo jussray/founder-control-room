@@ -20,9 +20,11 @@ test('stranger proof tests reachability and founder containment rather than publ
   assert.match(browserProof, /audience:\s*'random-stranger'/);
   assert.match(browserProof, /https:\/\/foundercontrolroom\.org/);
   assert.match(browserProof, /https:\/\/www\.foundercontrolroom\.org/);
+  assert.match(browserProof, /DIRECT_APP_URL\s*=\s*'https:\/\/app\.foundercontrolroom\.org\/'/);
   assert.match(browserProof, /DIRECT_API_VERSION_URL\s*=\s*'https:\/\/api\.foundercontrolroom\.org\/version'/);
   assert.match(browserProof, /SAME_ORIGIN_VERSION_URL\s*=\s*`\$\{APEX_ORIGIN\}\/version`/);
   assert.match(browserProof, /maxRedirects:\s*0/);
+  assert.match(browserProof, /directAppAccessProtected/);
   assert.match(browserProof, /directApiAccessProtected/);
   assert.match(browserProof, /apiVersionServiceIdentity/);
   assert.match(browserProof, /CONTROL_ROOM_URL/);
@@ -158,6 +160,8 @@ test('sanitized stranger receipt publishes only bounded containment evidence', (
   assert.match(workflow, /\.founderShellVisible \| type == "boolean"/);
   assert.match(workflow, /\.authMeStatus \| status_or_null/);
   assert.match(workflow, /\.founderAuthorityContained \| type == "boolean"/);
+  assert.match(workflow, /\.directAppStatus \| status_or_null/);
+  assert.match(workflow, /\.directAppAccessProtected \| type == "boolean"/);
   assert.match(workflow, /\.directApiVersionStatus \| status_or_null/);
   assert.match(workflow, /\.directApiAccessProtected \| type == "boolean"/);
   assert.match(workflow, /\.apiVersionServiceIdentity/);

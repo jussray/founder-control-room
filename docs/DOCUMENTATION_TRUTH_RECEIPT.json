@@ -27,7 +27,7 @@
     {
       "path": ".github/workflows/fcr-access-front-door-recovery.yml",
       "claims": [
-        "`.github/workflows/fcr-access-front-door-recovery.yml` must preserve the bounded public-doorway detachment operation while requiring independent read-only provider proof that `app.foundercontrolroom.org` is identity-protected, the canonical API Worker binds the configured FCR service token, and every declared API exception is exact with no undeclared bypass before the overall evidence gate can pass; browser evidence cannot substitute for provider topology proof."
+        "`.github/workflows/fcr-access-front-door-recovery.yml` must preserve the bounded public-doorway detachment operation while requiring independent provider proof of the complete app/API topology and a schema-v2 anonymous runtime receipt showing Access-specific protection for both `app.foundercontrolroom.org` and direct `api.foundercontrolroom.org`, with same-origin Worker identity retained as a separate Service Binding witness."
       ]
     },
     {

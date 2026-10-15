@@ -382,6 +382,8 @@ jobs:
                   and (.founderShellVisible | type == "boolean")
                   and (.authMeStatus | status_or_null)
                   and (.founderAuthorityContained | type == "boolean")
+                  and (.directAppStatus | status_or_null)
+                  and (.directAppAccessProtected | type == "boolean")
                   and (.directApiVersionStatus | status_or_null)
                   and (.directApiAccessProtected | type == "boolean")
                   and (.apiVersionStatus | status_or_null)
@@ -413,6 +415,8 @@ jobs:
                 founderShellVisible,
                 authMeStatus,
                 founderAuthorityContained,
+                directAppStatus,
+                directAppAccessProtected,
                 directApiVersionStatus,
                 directApiAccessProtected,
                 apiVersionStatus,

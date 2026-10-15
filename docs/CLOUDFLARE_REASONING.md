@@ -287,3 +287,6 @@ The public Pages Worker may continue to proxy normal same-origin FCR app/auth tr
 ### Provider boundary verification
 
 `scripts/verify-fcr-cloudflare-access-boundary.mjs` is the read-only provider truth gate for this topology. It requires the public doorway to be free of Access applications, exactly one identity-protected `app.foundercontrolroom.org` application with no Everyone bypass, exactly one Access application protecting the canonical `founder-control-room` Worker with the configured FCR service-token binding, complete coverage of every declared API exception, and zero undeclared API bypass destinations. The verifier never creates or changes a provider policy.
+
+
+Runtime evidence for this boundary must challenge both protected hosts anonymously. `app.foundercontrolroom.org` and direct `api.foundercontrolroom.org/version` must each present an Access-specific Cloudflare redirect/path marker; a generic 401/403 is insufficient. The public apex `/version` witness proves Worker identity separately through `FCR_API`.

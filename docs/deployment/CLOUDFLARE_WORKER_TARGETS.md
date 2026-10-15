@@ -254,3 +254,6 @@ Provider/DNS/runtime evidence is required before claiming that either `app.` or 
 
 
 The Pages Service Binding is not an alternate Access tunnel for write-capable MCP. `public/_worker.js` must fail closed for `/mcp/founder-signal-engine` on the public apex while preserving the canonical OAuth `/mcp` lane, the exact read-only X-engagement MCP exception, and normal founder-authenticated same-origin application traffic.
+
+
+Runtime proof for the protected product hosts is two-sided: a random stranger must receive Access-specific Cloudflare evidence from both `https://app.foundercontrolroom.org/` and direct `https://api.foundercontrolroom.org/version`. Public same-origin `/version` remains a separate Service Binding identity witness and cannot substitute for either protected-host check.

@@ -5,6 +5,7 @@ const APEX_ORIGIN = 'https://foundercontrolroom.org';
 const PUBLIC_ORIGIN = 'https://www.foundercontrolroom.org';
 const CONTROL_ROOM_URL = `${PUBLIC_ORIGIN}/control-room/`;
 const AUTH_ME_URL = `${PUBLIC_ORIGIN}/auth/me`;
+const DIRECT_APP_URL = 'https://app.foundercontrolroom.org/';
 const DIRECT_API_VERSION_URL = 'https://api.foundercontrolroom.org/version';
 const SAME_ORIGIN_VERSION_URL = `${APEX_ORIGIN}/version`;
 const RECEIPT_PATH = 'test-results/fcr-access-front-door-browser-proof.json';
@@ -35,6 +36,8 @@ const receipt = {
   founderShellVisible: false,
   authMeStatus: null,
   founderAuthorityContained: false,
+  directAppStatus: null,
+  directAppAccessProtected: false,
   directApiVersionStatus: null,
   directApiAccessProtected: false,
   apiVersionStatus: null,
@@ -175,6 +178,26 @@ try {
   );
   if (!receipt.founderAuthorityContained) {
     fail('Founder authority containment was not proven for a random stranger.');
+  }
+
+  // The app host is also an Access-managed product surface. The public apex
+  // remains discoverable, but a random stranger must not reach app execution.
+  try {
+    const directAppResponse = await context.request.get(DIRECT_APP_URL, {
+      timeout: 20_000,
+      maxRedirects: 0,
+    });
+    receipt.directAppStatus = directAppResponse.status();
+    const directAppLocation = directAppResponse.headers()['location'] ?? null;
+    receipt.directAppAccessProtected = cloudflareAccessGateDetected({
+      url: directAppResponse.url(),
+      location: directAppLocation,
+    });
+    if (!receipt.directAppAccessProtected) {
+      fail('app.foundercontrolroom.org did not present an Access-specific Cloudflare boundary to a random stranger.');
+    }
+  } catch (error) {
+    fail(error instanceof Error ? error.message : String(error));
   }
 
   // Direct API is an Access-managed product surface. A random stranger must
