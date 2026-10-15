@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   runGoal,
+  proposalDigest,
   type AdvisoryContext,
   type Approval,
   type Task,
@@ -11,7 +12,7 @@ const HEAD = 'a'.repeat(40);
 const NEXT_HEAD = 'b'.repeat(40);
 const task: Task = {
   repo: 'jussray/founder-control-room',
-  branch: 'main',
+  branch: 'review/operator-narrow-fix',
   expectedHead: HEAD,
   goal: 'Repair the existing operator flow',
   focusFiles: ['src/guard.ts'],
@@ -24,6 +25,8 @@ const approval: Approval = {
   branch: task.branch,
   head: HEAD,
   files: ['src/guard.ts'],
+  approvalId: 'fcr-approval-1',
+  proposalHash: proposalDigest(task, { cause: 'Verified narrow blocker', files: ['src/guard.ts'], diff: 'focused-change' }),
 };
 
 function harness(overrides: Partial<TrustedTools> = {}) {
@@ -54,7 +57,11 @@ function harness(overrides: Partial<TrustedTools> = {}) {
       approved: true,
       applicableFiles: ['src/guard.ts'],
     }),
+    isProtectedBranch: async () => false,
+    classify: async () => ({ surface: 'backend' }),
     verifyApproval: async () => true,
+    reserve: async () => 'fcr-reservation-1',
+    inspectCommit: async () => ({ parentSha: HEAD, changedFiles: ['src/guard.ts'] }),
     applyPatch: async (_task, _proposal, _files, expectedHead) => {
       if (observedHead !== expectedHead) throw new Error('stale branch: atomic compare-and-swap rejected');
       writes += 1;
@@ -67,6 +74,7 @@ function harness(overrides: Partial<TrustedTools> = {}) {
       passed: true,
       reference: 'https://github.com/jussray/founder-control-room/actions/runs/123',
       observation: 'focused test executed',
+      observedAt: new Date().toISOString(),
     }],
     record: async receipt => { receipts.push(receipt); },
     ...overrides,
@@ -197,6 +205,7 @@ describe('four-system founder operator authority boundary', () => {
       prove: async () => [{
         kind: 'focused-check', sha: HEAD, passed: true,
         reference: 'https://example.org/old-proof', observation: 'old head',
+        observedAt: new Date().toISOString(),
       }],
     });
     const result = await runGoal(task, h.tools, approval);
