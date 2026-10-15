@@ -130,6 +130,19 @@ requireContains('csrf same-origin enforcement', csrf, "fetchSite !== 'same-origi
 requireContains('runtime referrer policy', security, "res.setHeader('Referrer-Policy', 'no-referrer');");
 requireContains('runtime frame policy', security, "res.setHeader('X-Frame-Options', 'SAMEORIGIN');");
 requireContains('runtime hsts', security, "res.setHeader('Strict-Transport-Security', 'max-age=15552000; includeSubDomains');");
+// Request logs must keep operational counts without leaking founder email or raw IP.
+const auditStart = security.indexOf('export function requestAudit(');
+const auditEnd = security.indexOf('// Centralized error handler', auditStart);
+if (auditStart < 0 || auditEnd <= auditStart) {
+  failures.push('requestAudit middleware boundary must remain inspectable');
+} else {
+  const auditCode = security.slice(auditStart, auditEnd);
+  requireContains('requestAudit authenticated state', auditCode, 'founderAuthenticated: Boolean(founder)');
+  requireContains('requestAudit rate limiter', auditCode, 'rateLimitGeneral(req, res, next);');
+  if (/ip:\\s*req\\.ip|founder:\\s*founder\\.email|founder\\.email/.test(auditCode)) {
+    failures.push('requestAudit must not persist raw IP or founder email');
+  }
+}
 if (!/const generalRateLimitCore = createRateLimiter\(\s*60 \* 1_000,\s*120,/s.test(security)) failures.push('application general rate limiter drifted from 120 requests per 60 seconds');
 if (!/export const rateLimitGeneral: RequestHandler = \(req, res, next\): void => \{[\s\S]*?generalRateLimitCore\(req,\s*res,\s*next\);[\s\S]*?\n\};/.test(security)) failures.push('exported general rate limiter must invoke the verified generalRateLimitCore');
 if (!/export const rateLimitMagicLink = createRateLimiter\(\s*15 \* 60 \* 1_000,\s*5,/s.test(security)) failures.push('application magic-link limiter drifted from 5 requests per 15 minutes');
