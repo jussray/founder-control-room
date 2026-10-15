@@ -215,7 +215,7 @@ The FCR Shopify money path uses the same provider-held runtime-secret membrane: 
 
 The only runtime secret canonical Deploy actively writes is the checked-in fail-closed `FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON` with `enabled:false`. This preserves the automation kill switch while leaving unrelated runtime secret values untouched. Other trusted workflows that actually need GitHub App execution credentials may still use their separately scoped `APP_ID` / `APP_PRIVATE_KEY` Actions inputs, but canonical Deploy does not re-upload the Worker's `GITHUB_APP_ID` / `GITHUB_PRIVATE_KEY` pair.
 
-`https://api.foundercontrolroom.org` is public release configuration, not secret material. The canonical smoke checks, proof-of-ship runtime readback, and post-Deploy Playwright witness use that explicit API origin. The Playwright witness derives `EXPECTED_RELEASE_SHA` from the successful Deploy run, proves direct Worker and public Pages/proxy identity before the browser journey, reruns both identity reads afterward, and fails if any observation differs from that same SHA.
+`https://api.foundercontrolroom.org` is canonical release configuration but is **not** an anonymous public diagnostic surface. The API hostname is Access-managed by default. Canonical direct smoke/reconcile/post-Deploy witnesses keep the explicit origin and authenticate with the dedicated FCR Cloudflare Access service-token pair, while public Pages/proxy identity remains independently observable through `foundercontrolroom.org` and its `FCR_API` Service Binding. The Playwright witness still derives `EXPECTED_RELEASE_SHA` from the successful Deploy run and must bind every direct authenticated API read plus public Pages/proxy read to that same SHA.
 
 This source membrane does not prove the current Cloudflare required-secret set, values, Workers Builds dashboard configuration, custom-domain routing, active deployment, or runtime SHA. Those remain separate provider/runtime readback gates.
 
@@ -263,3 +263,17 @@ npx playwright test e2e/cloudflare-reasoning.spec.ts
 ```
 
 The browser/API suite verifies the public-safe contract, founder protection, absence of credential leakage, presence of the implementation stack, and absence of an accidental deployment endpoint. Unit tests verify exact-commit reasoning, stale evidence, duplicate authority, authentication failures, runtime failure, rollback preparation, first-principles deletion/simplification output, and approval boundaries.
+
+
+## FCR app/API Access boundary
+
+The current desired product boundary is machine-readable in `config/fcr-cloudflare-access-boundary.json`:
+
+- apex and `www` remain public discovery/front-door hosts;
+- `app.foundercontrolroom.org` and `api.foundercontrolroom.org` are Access-required product hosts;
+- direct release/diagnostic/write-capable machine paths require the dedicated FCR Access service-token pair;
+- only exact application-authenticated external protocol/webhook/receipt paths may receive separately reviewed path-scoped exceptions;
+- `/mcp/*` is forbidden as a bypass wildcard, so write-capable Founder Signal MCP remains behind Access;
+- review-email ingress remains private to the Worker Service Binding and needs no public exception.
+
+This is source policy, not provider proof. Live Access applications, path precedence, service-token binding, DNS, and runtime behavior require fresh provider/runtime readback.

@@ -19,6 +19,8 @@ https://api.foundercontrolroom.org/mcp/registry/v0.1/servers
 
 The registry catalog itself is public metadata and does not require a bearer token. It contains no MCP credential values.
 
+The API hostname itself remains Access-managed. The exact registry and FCR-hosted read-only transport paths are listed as application-authenticated exceptions in `config/fcr-cloudflare-access-boundary.json` so compatible MCP clients can reach the FCR application-level bearer/OAuth membrane. Those edge exceptions grant no project, merge, deploy, database, provider-write, publication, billing, deletion, or arbitrary execution authority.
+
 For Lovable, the intended fields are:
 
 ```text

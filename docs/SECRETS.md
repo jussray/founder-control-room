@@ -65,6 +65,8 @@ The GitHub App **Client ID is not used** by the current installation-token witne
 | `FCR_CLOUDFLARE_MCP_READ_TOKEN` | `cloudflare-mcp-read-diagnostic.yml` | Dedicated least-privilege API token for the official Cloudflare API MCP bearer-auth proof. The standing probe performs only a fixed `GET /accounts/{account_id}` request. Do not grant Edit/Write permissions and do not reuse the deploy token. |
 | `FCR_REMOTE_MCP_READ_TOKEN` | temporary `/mcp/read` compatibility lane | Dedicated static bearer used only while existing clients migrate to the canonical Supabase OAuth `/mcp` lane. It grants only the server-held project allowlist and six narrow read/preview tools. Do not reuse a deploy token, provider credential, Supabase service-role key, or founder browser session. Remove this secret after all clients use OAuth. |
 | `CLOUDFLARE_ACCOUNT_ID` | deploy and diagnostic workflows | Cloudflare account ID. |
+| `FCR_CLOUDFLARE_ACCESS_CLIENT_ID` | production direct-API release/reconcile/browser witnesses and founder-signal review probe | Cloudflare Access service-token client ID for trusted FCR machine callers. Identity material only; source presence does not prove the token exists or is bound to the live API Access policy. |
+| `FCR_CLOUDFLARE_ACCESS_CLIENT_SECRET` | same direct-API machine lanes | Matching Cloudflare Access service-token secret. Keep only in protected GitHub environments that need it; never print, commit, attach, or reuse it as an FCR application bearer token. |
 | `CF_SESSIONS_KV_NAMESPACE_ID` | Worker deployment where enabled | KV namespace identifier for sessions. |
 | `CF_FEATURE_FLAGS_KV_NAMESPACE_ID` | Worker deployment where enabled | KV namespace identifier for feature flags. |
 

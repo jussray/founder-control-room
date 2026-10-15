@@ -4,6 +4,8 @@ const productionWitnessRequired = process.env.PRODUCTION_RELEASE_WITNESS_REQUIRE
 const deployUrl = process.env.DEPLOY_URL?.replace(/\/$/, '') ?? '';
 const publicUrl = process.env.PUBLIC_URL?.replace(/\/$/, '') ?? 'https://foundercontrolroom.org';
 const expectedReleaseSha = process.env.EXPECTED_RELEASE_SHA?.trim().toLowerCase() ?? '';
+const accessClientId = process.env.FCR_ACCESS_CLIENT_ID?.trim() ?? '';
+const accessClientSecret = process.env.FCR_ACCESS_CLIENT_SECRET?.trim() ?? '';
 
 test.describe('production exact-SHA release witness', () => {
   test.skip(!productionWitnessRequired, 'production release witness only runs inside the deploy proof chain');
@@ -16,6 +18,8 @@ test.describe('production exact-SHA release witness', () => {
     expect(expectedReleaseSha, 'EXPECTED_RELEASE_SHA must be the exact approved commit').toMatch(
       /^[0-9a-f]{40}$/,
     );
+    expect(accessClientId, 'FCR_ACCESS_CLIENT_ID must be configured for direct API proof').not.toBe('');
+    expect(accessClientSecret, 'FCR_ACCESS_CLIENT_SECRET must be configured for direct API proof').not.toBe('');
 
     const readDirectIdentity = async (phase: string) => {
       const nonce = `${Date.now()}-${testInfo.retry}-${phase}`;
@@ -23,6 +27,8 @@ test.describe('production exact-SHA release witness', () => {
         headers: {
           'cache-control': 'no-cache',
           pragma: 'no-cache',
+          'CF-Access-Client-Id': accessClientId,
+          'CF-Access-Client-Secret': accessClientSecret,
         },
       });
       expect(response.status()).toBe(200);
