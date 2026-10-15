@@ -11,6 +11,9 @@ const workerReconcileWorkflow = readFileSync('.github/workflows/worker-reconcile
 const productionPlaywrightWorkflow = readFileSync('.github/workflows/playwright.yml', 'utf8');
 const reviewProbeWorkflow = readFileSync('.github/workflows/founder-signal-engine-review-probe.yml', 'utf8');
 const productionWitness = readFileSync('e2e/production-release-sha.spec.ts', 'utf8');
+const promptRuntimeWorkflow = readFileSync('.github/workflows/prompt-workflow-router-runtime-proof.yml', 'utf8');
+const promptRuntimeSpec = readFileSync('e2e/builder-prompt-workflow-runtime.spec.ts', 'utf8');
+const operatorRelaySpec = readFileSync('e2e/operator-relay-live.spec.ts', 'utf8');
 const accessPolicy = JSON.parse(readFileSync('config/fcr-cloudflare-access-boundary.json', 'utf8'));
 
 test('stranger proof tests reachability and founder containment rather than public membership', () => {
@@ -66,6 +69,20 @@ test('proof-of-ship exact-SHA readback remains Access-authenticated', () => {
   assert.match(proofBlock, /FCR_ACCESS_CLIENT_SECRET/);
   assert.match(proofBlock, /CF-Access-Client-Id/);
   assert.match(proofBlock, /CF-Access-Client-Secret/);
+});
+
+test('deployed prompt/operator runtime proof adds Access only to the direct API origin', () => {
+  assert.match(promptRuntimeWorkflow, /environment:\s*production/);
+  assert.match(promptRuntimeWorkflow, /FCR_CLOUDFLARE_ACCESS_CLIENT_ID/);
+  assert.match(promptRuntimeWorkflow, /FCR_CLOUDFLARE_ACCESS_CLIENT_SECRET/);
+  assert.match(promptRuntimeSpec, /hostname === 'api\.foundercontrolroom\.org'/);
+  assert.match(promptRuntimeSpec, /CF-Access-Client-Id/);
+  assert.match(promptRuntimeSpec, /CF-Access-Client-Secret/);
+  assert.match(operatorRelaySpec, /hostname === 'api\.foundercontrolroom\.org'/);
+  assert.match(operatorRelaySpec, /CF-Access-Client-Id/);
+  assert.match(operatorRelaySpec, /CF-Access-Client-Secret/);
+  assert.ok(accessPolicy.serviceTokenProtectedPaths.includes('/prompt-workflows/execution-spine'));
+  assert.ok(accessPolicy.serviceTokenProtectedPaths.includes('/prompt-workflows/select'));
 });
 
 test('API exception policy is exact and excludes write-capable MCP from bypass', () => {

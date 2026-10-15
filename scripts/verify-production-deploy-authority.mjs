@@ -417,7 +417,27 @@ assert.doesNotMatch(
 assert.match(
   workflow,
   /DEPLOY_URL: https:\/\/api\.foundercontrolroom\.org/,
-  'canonical API origin is public configuration and must be explicit in release proof',
+  'canonical API origin is source configuration and must be explicit in release proof',
+);
+assert.match(
+  workflow,
+  /FCR_CLOUDFLARE_ACCESS_CLIENT_ID/,
+  'direct production API proof must carry the dedicated Cloudflare Access client ID',
+);
+assert.match(
+  workflow,
+  /FCR_CLOUDFLARE_ACCESS_CLIENT_SECRET/,
+  'direct production API proof must carry the dedicated Cloudflare Access client secret',
+);
+assert.match(
+  workflow,
+  /CF-Access-Client-Id/,
+  'direct production API curls must present the Access service-token client ID header',
+);
+assert.match(
+  workflow,
+  /CF-Access-Client-Secret/,
+  'direct production API curls must present the Access service-token client secret header',
 );
 assert.doesNotMatch(
   workflow,

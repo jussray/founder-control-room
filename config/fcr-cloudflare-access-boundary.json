@@ -19,7 +19,9 @@
     "/guardrails",
     "/guardrails.json",
     "/mcp/founder-signal-engine",
-    "/mcp/founder-signal-x-engagement"
+    "/mcp/founder-signal-x-engagement",
+    "/prompt-workflows/execution-spine",
+    "/prompt-workflows/select"
   ],
   "applicationAuthenticatedBypassPaths": [
     "/webhooks/github",
