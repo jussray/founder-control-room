@@ -17,7 +17,7 @@
 - Privacy corrections processed within 14 days.
 
 ## 3. Security Vulnerability Reporting
-- Responsible disclosure: email the security contact listed in `.security/SECURITY.md`.
+- Responsible disclosure: email the security contact listed in `SECURITY.md`.
 - Critical vulnerabilities acknowledged within 24 hours.
 - Do **not** open public GitHub Issues for security vulnerabilities.
 
