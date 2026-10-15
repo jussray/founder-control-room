@@ -125,6 +125,10 @@ Source wiring and unit tests do **not** prove the current peer runtime is reacha
 
 The StoryEngine peer pin is an evidence identity, not a durable alias for “current StoryEngine.” If the separately versioned StoryEngine carrier moves, earlier FCR Playwright green remains historical for its pinned peer. FCR must bind a separately exact-head-proven StoryEngine successor and rerun the complete FCR → StoryEngine → receipt → FCR browser/runtime witness before making a current federation claim.
 
+The federation compatibility gate may retain the immutable peer while live StoryEngine moves strictly forward through paths outside the local federation runtime, including top-level documentation, Cloudflare front-door/deployment configuration, test harnesses, and artifacts. It records both identities, rejects divergent ancestry and other `story-engine/` source changes, and still requires the complete browser/runtime witness against the checked-out pin. This bounded source comparison proves compatibility for that local harness only; it does not prove the live peer deployment or carry predecessor green to a successor FCR head.
+
+Because `.github/workflows/playwright.yml` carries that peer evidence identity, changing `STORYENGINE_PEER_SHA` is itself a truth-sensitive transition. Review the successor peer's source and executed checks before updating the pin and structured documentation-truth receipt; the successor FCR/StoryEngine pair remains unproved until the complete exact-head federation witness passes.
+
 See [`docs/REPOSITORY_FEDERATION.md`](docs/REPOSITORY_FEDERATION.md).
 
 ### Jira work automation
