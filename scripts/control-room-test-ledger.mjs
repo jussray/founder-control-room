@@ -92,7 +92,8 @@ export function aggregateTestLedger(checks) {
   if (counts.total === 0) state = 'unknown';
   else if (counts.failed > 0) state = 'failed';
   else if (counts.queued > 0 || counts.running > 0) state = 'pending';
-  else if (counts.skipped > 0 || counts.unknown > 0) state = 'warning';
+  else if (counts.skipped > 0) state = 'failed';
+  else if (counts.unknown > 0) state = 'warning';
 
   return {state, counts};
 }
@@ -232,6 +233,11 @@ export async function observeExactHeadChecks(env = process.env) {
   }
 
   console.log(JSON.stringify(ledger, null, 2));
+  if (ledger.aggregate.counts.skipped > 0) {
+    const skipped = ledger.checks.filter((check) => check.state === 'skipped')
+      .map((check) => `${check.app}:${check.name}`).slice(0, 10);
+    throw new Error(`ZERO_SKIPPED_CHECKS_REQUIRED (${ledger.aggregate.counts.skipped}): ${skipped.join(', ')}. Evidence: ${outputPath}`);
+  }
   return ledger;
 }
 
