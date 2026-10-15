@@ -1,21 +1,15 @@
-# Security Policy
+# Security Policy — Founder Control Room (FCR)
 
-## Supported Versions
+## Report a vulnerability privately
 
-Use this section to tell people about which versions of your project are
-currently being supported with security updates.
+Email **founder@jussco.company** with a subject beginning `[Security][Founder Control Room (FCR)]`. Include the affected URL or repository, observed behavior, possible impact, and minimal safe reproduction steps. Do not post exploitable details in public GitHub issues.
 
-| Version | Supported          |
-| ------- | ------------------ |
-| 5.1.x   | :white_check_mark: |
-| 5.0.x   | :x:                |
-| 4.0.x   | :white_check_mark: |
-| < 4.0   | :x:                |
+Do not send passwords, access tokens, private keys, children's personal information, customer records, or other sensitive data as proof. Redact examples and coordinate privately before sharing any further evidence.
 
-## Reporting a Vulnerability
+## Scope and coordination
 
-Use this section to tell people how to report a vulnerability.
+The disclosure contact is for security issues affecting Juss & Co.-operated services and source code. Publication of this policy is not permission for disruptive testing, social engineering, unauthorized access, extracting user data, or testing third-party services.
 
-Tell them where to go, how often they can expect to get an update on a
-reported vulnerability, what to expect if the vulnerability is accepted or
-declined, etc.
+Reports will be reviewed and triaged; a response time or bounty is not guaranteed. Please allow time for a safe fix before any public disclosure. Supported releases and remediation timing depend on the affected component and verified impact.
+
+For deployed web services, also see the site-specific `/.well-known/security.txt` discovery file when available.
