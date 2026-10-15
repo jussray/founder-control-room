@@ -382,8 +382,18 @@ async function main() {
 
   console.log('\n[3] Follow the real /auth/callback redirect (simulating clicking the emailed link)');
   await page.goto(`${BASE_URL}/auth/callback?token_hash=${bridge.tokenHash}`);
-  await page.waitForSelector('.topbar', { timeout: 5000 });
-  assert(await page.locator('.founder-email').innerText() === FOUNDER_EMAIL, 'landed on the app shell signed in as the founder');
+  // The opaque-session callback lands on the newer root shell, whose identity
+  // label can initially be a placeholder. Verify the real authenticated
+  // legacy cockpit that the rest of this browser journey operates on.
+  await page.waitForURL(`${BASE_URL}/`, { timeout: 5000 });
+  // Let the root shell finish its authenticated /auth/me and state fetches
+  // before navigating away. Otherwise an in-flight fetch can be aborted by
+  // navigation and surface as a real uncaught "Failed to fetch" page error.
+  await waitForText(page, '#founder-email', FOUNDER_EMAIL, 10_000);
+  await page.waitForLoadState('networkidle', { timeout: 10_000 });
+  await page.goto(`${BASE_URL}/control-room/`);
+  const observedFounderEmail = await waitForText(page, '.topbar .founder-email', FOUNDER_EMAIL, 10_000);
+  assert(observedFounderEmail.trim() === FOUNDER_EMAIL, 'landed on the app shell signed in as the founder');
 
   if (E2E_SCENARIO === 'capability-workbench') {
     // Run the workbench browser journey in an isolated server process. The full
