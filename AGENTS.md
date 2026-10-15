@@ -24,6 +24,7 @@ Read these before changing code, configuration, schemas, providers, verification
 - [`skills/ultrathink-attack-godmode/SKILL.md`](./skills/ultrathink-attack-godmode/SKILL.md) for authorized adversarial repair execution
 - [`skills/repair-to-proof/SKILL.md`](./skills/repair-to-proof/SKILL.md) for exact-head proof and release review
 - [`skills/continuity-proof-ledger/SKILL.md`](./skills/continuity-proof-ledger/SKILL.md) for durable fingerprints, receipts, and cross-agent continuity
+- [`skills/urlfix/SKILL.md`](./skills/urlfix/SKILL.md) for URL → Playwright diagnosis → smallest owned-source repair → same-path browser verification
 
 For Se'kret Bip splash, founding-preview, waiting-list, sponsor, or social launch work, also read [`docs/private/JUSS_PRIVATE_OPERATING_PLAN.md`](docs/private/JUSS_PRIVATE_OPERATING_PLAN.md).
 
