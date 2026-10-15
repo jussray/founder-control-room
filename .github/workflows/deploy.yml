@@ -521,6 +521,8 @@ jobs:
     env:
       EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha }}
       DEPLOY_URL: https://api.foundercontrolroom.org
+      FCR_ACCESS_CLIENT_ID: ${{ secrets.FCR_CLOUDFLARE_ACCESS_CLIENT_ID }}
+      FCR_ACCESS_CLIENT_SECRET: ${{ secrets.FCR_CLOUDFLARE_ACCESS_CLIENT_SECRET }}
       SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
       ZAPIER_CATCH_HOOK_URL: ${{ secrets.ZAPIER_CATCH_HOOK_URL }}
       PROOF_OF_SHIP_STEERING_GRANT_ID: ${{ secrets.PROOF_OF_SHIP_STEERING_GRANT_ID }}
@@ -803,11 +805,16 @@ jobs:
             exit 1
           fi
 
+          test -n "$FCR_ACCESS_CLIENT_ID"
+          test -n "$FCR_ACCESS_CLIENT_SECRET"
+
           version_body=''
           for attempt in 1 2 3 4 5 6; do
             candidate="$(curl --silent --show-error \
               --proto '=https' --proto-redir '=https' --max-redirs 0 \
               --connect-timeout 10 --max-time 20 \
+              -H "CF-Access-Client-Id: $FCR_ACCESS_CLIENT_ID" \
+              -H "CF-Access-Client-Secret: $FCR_ACCESS_CLIENT_SECRET" \
               "$DEPLOY_URL/version" 2>/dev/null || true)"
             if [[ -n "$candidate" ]] && jq -e --arg expected "$EXPECTED_HEAD_SHA" \
               '.service == "founder-control-room" and .gitSha == $expected' \

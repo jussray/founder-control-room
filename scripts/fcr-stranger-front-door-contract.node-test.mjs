@@ -58,6 +58,16 @@ test('direct production API callers use the dedicated FCR Access service token',
   assert.match(productionWitness, /CF-Access-Client-Secret/);
 });
 
+test('proof-of-ship exact-SHA readback remains Access-authenticated', () => {
+  const proofBlock = deployWorkflow.match(
+    /proof-of-ship:[\s\S]*?- name: Verify the live Worker still reports the deployed SHA([\s\S]*?)- name: Retain verified proof for founder review/,
+  )?.[1] ?? '';
+  assert.match(proofBlock, /FCR_ACCESS_CLIENT_ID/);
+  assert.match(proofBlock, /FCR_ACCESS_CLIENT_SECRET/);
+  assert.match(proofBlock, /CF-Access-Client-Id/);
+  assert.match(proofBlock, /CF-Access-Client-Secret/);
+});
+
 test('API exception policy is exact and excludes write-capable MCP from bypass', () => {
   assert.deepEqual(accessPolicy.accessRequiredHosts, [
     'app.foundercontrolroom.org',
