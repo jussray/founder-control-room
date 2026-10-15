@@ -850,6 +850,23 @@ describe('POST /:missionId/patch — founder read/write/edit on a sandbox branch
       if (table === 'missions') return missionRow(missionOverrides, missionRowOptions);
       if (table === 'projects') return projectRow();
       if (table === 'project_events') return { insert: projectEventInsert };
+      if (table === 'approval_executions') {
+        return {
+          // Production checks idempotency before write and atomically reserves the key.
+          select: () => ({
+            eq: () => ({ maybeSingle: () => Promise.resolve({ data: null, error: null }) }),
+          }),
+          insert: (reservation: Record<string, unknown>) => ({
+            select: () => ({
+              single: () => Promise.resolve({
+                data: { id: EXECUTION_ID, ...reservation },
+                error: null,
+              }),
+            }),
+          }),
+          update: () => twoEqUpdate(),
+        };
+      }
       return {};
     });
     return { projectEventInsert };
@@ -928,6 +945,8 @@ describe('POST /:missionId/patch — founder read/write/edit on a sandbox branch
       });
 
     expect(res.status).toBe(201);
+    // The provider write is reachable only through a completed idempotency reservation.
+    expect(supabaseMock.from).toHaveBeenCalledWith('approval_executions');
     expect(mockCommitPatch).toHaveBeenCalledWith(
       'test-project',
       'mission/test',
@@ -947,7 +966,7 @@ describe('POST /:missionId/patch — founder read/write/edit on a sandbox branch
     const res = await request(buildApp())
       .post(`/approvals/${MISSION_ID}/patch`)
       .set('Authorization', BEARER)
-      .send({ message: 'edit', changes: [{ path: 'a.txt', content: 'hi' }] });
+      .send({ message: 'edit', idempotencyKey: 'patch-provider-fails', changes: [{ path: 'a.txt', content: 'hi' }] });
 
     expect(res.status).toBe(502);
   });

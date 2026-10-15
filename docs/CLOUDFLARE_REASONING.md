@@ -263,3 +263,10 @@ npx playwright test e2e/cloudflare-reasoning.spec.ts
 ```
 
 The browser/API suite verifies the public-safe contract, founder protection, absence of credential leakage, presence of the implementation stack, and absence of an accidental deployment endpoint. Unit tests verify exact-commit reasoning, stale evidence, duplicate authority, authentication failures, runtime failure, rollback preparation, first-principles deletion/simplification output, and approval boundaries.
+
+## Deploy authority credential-shape and secret-name receipts
+
+The canonical manual `Deploy` workflow has one `authority-gate`. Its bounded preflight writes a credential-shape classification to `$RUNNER_TEMP/fcr-deploy-credential-shape.json` before attempting a provider-held Worker secret-name readback at `$RUNNER_TEMP/fcr-worker-secret-names.json`. The latter is a Cloudflare-provided list of names only; neither artifact should include credential values. The gate's unconditional artifact-upload step retains files that exist for 90 days, including when preflight exits unsuccessfully. If there are no files because execution stopped earlier, GitHub emits a missing-file warning rather than claiming successful evidence capture.
+
+A credential-transport failure is not proof that a provider secret is absent. Names-only readback, workflow YAML validity, preview deployment, and exact-head CI each establish different evidence. Only a separately authorized manual production dispatch and observed artifact readback can prove this upload occurred in a real authority run. This observability change does not add a second deploy path, mutate Cloudflare configuration, or authorize secret rotation.
+

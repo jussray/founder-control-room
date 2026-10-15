@@ -125,6 +125,68 @@ jobs:
           echo "Cloudflare Worker deploy token is present and header-safe."
           echo "Cloudflare account authority is declared in wrangler.worker.toml."
 
+      - name: Verify required Worker secret names before reconcile
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          provider_receipt="$RUNNER_TEMP/fcr-reconcile-provider-secret-names.json"
+          npx --yes wrangler@4.110.0 secret list \
+            --config wrangler.worker.toml \
+            --format json > "$provider_receipt"
+
+          python3 - "$provider_receipt" "$RUNNER_TEMP/fcr-reconcile-secret-preflight.json" <<'PY'
+          import json
+          import sys
+          import tomllib
+
+          provider_receipt_path, output_path = sys.argv[1:]
+          with open('wrangler.worker.toml', 'rb') as handle:
+              required = set(tomllib.load(handle).get('secrets', {}).get('required', []))
+          workflow_written = {'FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON'}
+          if not required or not workflow_written <= required:
+              print('::error title=Invalid Worker secret contract::Canonical required-name declaration is absent or inconsistent.')
+              sys.exit(1)
+
+          with open(provider_receipt_path, encoding='utf-8') as handle:
+              provider_receipt = json.load(handle)
+          if not isinstance(provider_receipt, list):
+              print('::error title=Invalid Worker secret readback::Expected a name-only list from Cloudflare.')
+              sys.exit(1)
+
+          present = {
+              entry.get('name')
+              for entry in provider_receipt
+              if isinstance(entry, dict) and isinstance(entry.get('name'), str)
+          }
+          provider_required = required - workflow_written
+          missing = sorted(provider_required - present)
+          with open(output_path, 'w', encoding='utf-8') as handle:
+              json.dump({
+                  'contract': 'fcr/worker-reconcile-secret-preflight@v1',
+                  'required_count': len(provider_required),
+                  'present_count': len(provider_required & present),
+                  'missing_count': len(missing),
+                  'verified': not missing,
+                  'values_read': False,
+              }, handle, indent=2)
+              handle.write('\n')
+          if missing:
+              print(f'::error title=Missing Worker secrets::{len(missing)} required provider-held secret binding(s) absent; reconciliation blocked before mutation.')
+              sys.exit(1)
+          print(f'Worker preflight verified: {len(provider_required)} provider-held names present; no secret values read.')
+          PY
+
+      - name: Upload redacted Worker secret-name preflight receipt
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: fcr-worker-secret-preflight-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/fcr-reconcile-secret-preflight.json
+          if-no-files-found: warn
+          retention-days: 30
+
       - name: Record bounded authority receipt
         shell: bash
         run: |

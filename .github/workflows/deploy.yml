@@ -179,6 +179,17 @@ jobs:
             echo "- Proof-of-ship scheduled publication: enabled with 20-minute founder review"
           } >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Upload provider credential audit receipts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: fcr-deploy-credential-audit-${{ github.run_id }}-${{ github.run_attempt }}
+          retention-days: 90
+          if-no-files-found: warn
+          path: |
+            ${{ runner.temp }}/fcr-deploy-credential-shape.json
+            ${{ runner.temp }}/fcr-worker-secret-names.json
+
   # ── 1. Supabase migrations ──────────────────────────────────────────────────────
   supabase-migrate:
     name: Supabase DB Push

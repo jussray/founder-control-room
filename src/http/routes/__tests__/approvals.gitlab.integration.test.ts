@@ -293,6 +293,22 @@ describe("GitLab approvals routing", () => {
       if (table === "project_events") {
         return { insert: () => Promise.resolve({ error: null }) };
       }
+      if (table === "approval_executions") {
+        return {
+          select: () => ({
+            eq: () => ({ maybeSingle: () => Promise.resolve({ data: null, error: null }) }),
+          }),
+          insert: (reservation: Record<string, unknown>) => ({
+            select: () => ({
+              single: () => Promise.resolve({
+                data: { id: EXECUTION_ID, ...reservation },
+                error: null,
+              }),
+            }),
+          }),
+          update: () => twoEqUpdate(),
+        };
+      }
       return {};
     });
 
@@ -302,6 +318,7 @@ describe("GitLab approvals routing", () => {
       .send({ message: "edit via GitLab", idempotencyKey: "gitlab-patch-test-1", changes: [{ path: "src/example.ts", content: "export const ok = true;" }] });
 
     expect(response.status).toBe(201);
+    expect(supabaseMock.from).toHaveBeenCalledWith("approval_executions");
     expect(mockCommitPatch).toHaveBeenCalledWith(
       "gitlab-project",
       "mission/gitlab",
