@@ -850,6 +850,11 @@ describe('POST /:missionId/patch — founder read/write/edit on a sandbox branch
       if (table === 'missions') return missionRow(missionOverrides, missionRowOptions);
       if (table === 'projects') return projectRow();
       if (table === 'project_events') return { insert: projectEventInsert };
+      if (table === 'approval_executions') return {
+        select: () => ({ eq: () => ({ maybeSingle: () => Promise.resolve({ data: null, error: null }) }) }),
+        insert: () => ({ select: () => ({ single: () => Promise.resolve({ data: { id: EXECUTION_ID }, error: null }) }) }),
+        update: () => ({ eq: () => ({ eq: () => Promise.resolve({ error: null }) }) }),
+      };
       return {};
     });
     return { projectEventInsert };
@@ -899,7 +904,7 @@ describe('POST /:missionId/patch — founder read/write/edit on a sandbox branch
     const res = await request(buildApp())
       .post(`/approvals/${MISSION_ID}/patch`)
       .set('Authorization', BEARER)
-      .send({ message: 'edit', changes: [{ path: 'a.txt', content: 'hi' }] });
+      .send({ message: 'edit', idempotencyKey: 'patch-test-key', changes: [{ path: 'a.txt', content: 'hi' }] });
     expect(res.status).toBe(409);
     expect(mockCommitPatch).not.toHaveBeenCalled();
   });
@@ -909,7 +914,7 @@ describe('POST /:missionId/patch — founder read/write/edit on a sandbox branch
     const res = await request(buildApp())
       .post(`/approvals/${MISSION_ID}/patch`)
       .set('Authorization', BEARER)
-      .send({ message: 'edit', changes: [{ path: 'a.txt', content: 'hi' }] });
+      .send({ message: 'edit', idempotencyKey: 'patch-test-key', changes: [{ path: 'a.txt', content: 'hi' }] });
     expect(res.status).toBe(409);
     expect(mockCommitPatch).not.toHaveBeenCalled();
   });
@@ -947,7 +952,7 @@ describe('POST /:missionId/patch — founder read/write/edit on a sandbox branch
     const res = await request(buildApp())
       .post(`/approvals/${MISSION_ID}/patch`)
       .set('Authorization', BEARER)
-      .send({ message: 'edit', changes: [{ path: 'a.txt', content: 'hi' }] });
+      .send({ message: 'edit', idempotencyKey: 'patch-test-key', changes: [{ path: 'a.txt', content: 'hi' }] });
 
     expect(res.status).toBe(502);
   });
