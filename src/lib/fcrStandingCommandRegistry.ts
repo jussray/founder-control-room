@@ -112,6 +112,8 @@ export const FCR_STANDING_COMMAND_REGISTRY: readonly FcrStandingCommandDescripto
   { id: 'ooda', aliases: ['/ooda', 'ooda'], owningOs: 'preflight-os', kind: 'workflow', autoTrigger: 'iterative observe-orient-decide-act-verify loops', mayExecute: false },
   { id: 'l99', aliases: ['/l99', 'l99'], owningOs: 'preflight-os', kind: 'mode', autoTrigger: 'authority, state, evidence, rollback, and compounding-value review', mayExecute: false },
   { id: 'goalfix', aliases: ['/goalfix', '/fixfast', '/repair-verify-merge', '/goal', 'goalfix'], owningOs: 'founder-control-room', kind: 'workflow', autoTrigger: 'focused repair, bug, regression, broken runtime, or failing proof', mayExecute: false },
+  { id: 'godmode', aliases: ['/godmode', 'godmode', 'attack/godmode'], owningOs: 'founder-control-room', kind: 'workflow', autoTrigger: 'explicit godmode or attack/godmode request for bounded adversarial engineering execution', mayExecute: false },
+  { id: 'urlfix', aliases: ['/urlfix', 'urlfix'], owningOs: 'founder-control-room', kind: 'workflow', autoTrigger: 'live URL, website, or browser-path testing that should diagnose and repair verified owned defects', mayExecute: false },
   { id: 'attack', aliases: ['/attack', 'attack ten', 'attack against itself ten times', 'attack n'], owningOs: 'council-os', kind: 'mode', autoTrigger: 'explicit attack depth or adversarial stress-testing request', mayExecute: false },
   { id: 'makevideo', aliases: ['/makevideo', 'makevideo'], owningOs: 'video-production-os', dependentOsIds: ['media-router-os'], kind: 'entrypoint', autoTrigger: 'clear video, movie, reel, cinematic, shot, or video-generation intent', mayExecute: false },
   { id: 'leevize', aliases: ['/leevize', 'leevize'], owningOs: 'video-production-os', dependentOsIds: ['media-router-os'], kind: 'workflow', autoTrigger: 'cinematic direction, world direction, shot continuity, or visual-story production', mayExecute: false },
@@ -206,7 +208,7 @@ function explicitCommandIdsFromGoal(goal: string): string[] {
     if (commandId) pushUnique(ids, commandId);
   }
 
-  for (const marker of ['ultrathink', 'truthmode', 'confess', 'redteam', 'lindymode', 'ooda', 'l99', 'goalfix', 'makevideo', 'leevize']) {
+  for (const marker of ['ultrathink', 'truthmode', 'confess', 'redteam', 'lindymode', 'ooda', 'l99', 'goalfix', 'godmode', 'urlfix', 'makevideo', 'leevize']) {
     if (new RegExp(`\\b${marker}\\b`).test(goal)) pushUnique(ids, marker);
   }
   if (/\battack\s+(?:\d+|ten)\b/.test(goal) || goal.includes('attack against itself ten times')) pushUnique(ids, 'attack');
@@ -214,9 +216,9 @@ function explicitCommandIdsFromGoal(goal: string): string[] {
 }
 
 function parsedAttackIntensity(goal: string): number | null {
-  const numeric = goal.match(/\battack\s+(\d{1,6})\b/);
+  const numeric = goal.match(/\battack(?:\/godmode)?\s+(\d{1,6})\b/);
   if (numeric) return Number.parseInt(numeric[1], 10);
-  if (/\battack\s+ten\b/.test(goal) || goal.includes('attack against itself ten times')) return 10;
+  if (/\battack(?:\/godmode)?\s+ten\b/.test(goal) || goal.includes('attack against itself ten times')) return 10;
   return null;
 }
 
@@ -235,6 +237,9 @@ export function routeFcrStandingCommands(rawGoal: string, action: FcrStandingCom
   if (['write', 'merge', 'deploy', 'migrate', 'rollback'].includes(action)
     && /\b(fix|repair|bug|regression|broken|failure|failing|error|blocker)\b/.test(goal)) {
     pushUnique(autoRoutedCommandIds, 'goalfix');
+  }
+  if (/\b(url|website|site|browser)\b/.test(goal) && /\b(test|audit|fix|repair|issue|broken|verify)\b/.test(goal)) {
+    pushUnique(autoRoutedCommandIds, 'urlfix');
   }
   if (/\b(video|movie|reel|cinematic|shot|storyboard|image-to-video|lip-sync)\b/.test(goal)) {
     pushUnique(autoRoutedCommandIds, 'makevideo');
