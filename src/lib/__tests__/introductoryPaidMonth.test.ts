@@ -68,6 +68,16 @@ describe('portfolio $1 paid introductory month', () => {
       .toContain('product_repository_mismatch');
   });
 
+  it.each([['constructor'], ['__proto__']])(
+    'denies the inherited object key %s as unregistered without throwing',
+    (productKey) => {
+      const outcome = assessIntroductoryPaidMonth(eligible({ productKey }));
+      expect(outcome.blockers).toContain('product_not_registered');
+      expect(outcome.readyForSandboxVerification).toBe(false);
+      expect(outcome.allowLiveCheckout).toBe(false);
+    },
+  );
+
   it('keeps all currently registered software projects sandbox-only', () => {
     expect(INTRO_MONTH_REGISTERED_PRODUCTS).toEqual(expect.arrayContaining([
       'founder-control-room', 'chief-ai-machine', 'promptos',

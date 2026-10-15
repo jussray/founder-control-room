@@ -111,7 +111,11 @@ export function assessIntroductoryPaidMonth(
   const blockers: string[] = [];
   const productKey = normalize(input.productKey);
   const actualRepo = normalize(input.repositoryFullName);
-  const registeredRepo = ELIGIBLE_PRODUCT_REPOSITORIES[productKey];
+  // Own-key lookup only: inherited keys such as 'constructor' or '__proto__'
+  // must deny as unregistered instead of throwing from the policy guard.
+  const registeredRepo = Object.hasOwn(ELIGIBLE_PRODUCT_REPOSITORIES, productKey)
+    ? ELIGIBLE_PRODUCT_REPOSITORIES[productKey]
+    : undefined;
 
   // Deny hair store first, even if the caller spoofs another product key.
   if (isHairStoreIdentity(input)) blockers.push('hair_store_permanently_excluded');
