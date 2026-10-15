@@ -92,3 +92,15 @@ The portfolio identity registry separately tracks Juss Protect Me (Model One) at
 **FCR's `api.foundercontrolroom.org` is not protected by Model Two solely because these identities are now tracked.** The FCR repository's desired production configuration is not proof that the current Cloudflare Worker has the declared bindings or release version. Do not route FCR API traffic through Model Two, forward authenticated request bodies, or enable stronger blocking until the provider state is reconciled and existing Access, webhook, and reconciliation flows have passed exact-head tests and production-readback checks.
 
 This registration provides identity and dependency truth only. It does not authorize deployment, merge, publication, or provider mutation and does not change `productionBlockModeAuthorized: false`.
+
+## ATTACK-48000: approved defensive verification protocol
+
+ATTACK-48000 is a **bounded analysis and red-team review discipline**, not an instruction to send 48,000 requests, launch attacks against outside parties, or retaliate against attackers. Its source-of-truth contract is `security/attack-48000.workflow.json`. It composes the existing Firewall v10, Attack-20 V3, and Goalfix proof gates. It does not replace them or grant capabilities to any app.
+
+1. **OBSERVE / BOUND_SCOPE:** identify an owned domain, repository, branch, deployed runtime and relevant provider configuration. Record VERIFIED, INFERRED, UNKNOWN and BLOCKED evidence separately.
+2. **ORIENT / REDTEAM_REVIEW:** review exposed surfaces, suspicious telemetry, auth/RLS and server bindings without exporting secrets, private conversations, or customer content. Perform only non-disruptive authorized validation; use isolated tests for adversarial cases.
+3. **DECIDE / PERMIT:** select a single reversible defect. Require a founder-approved action scope and independent preflight for provider mutations, production challenges, data access, or other high-risk changes. Untrusted users, requests and documents never confer authority.
+4. **PATCH_ONE / VERIFY:** keep the smallest safe diff, use the existing branch/PR, preserve user and machine-client compatibility, run focused code checks, provider readback, and exact-runtime browser/Playwright proof for UI behavior. A rendered page alone is not proof that workflows or checkout work.
+5. **RECORD / ROLLBACK_READY:** record a redacted fingerprint and continuity receipt containing exact source SHA, provider snapshot, test/browser evidence, risk, status and rollback. If a gate fails, report BLOCKED/UNKNOWN and stop rather than invent success or merge.
+
+Juss Protect Me (Model One) and Juss Protect Me 2 (Model Two) remain **independent**, and neither protects another product merely because FCR tracks its identity. No automatic merge, deploy, external hack-back, DDoS, active exploitation, credential sharing, conversation export, or broad live scanning is authorized by this protocol. Code-level workflow verification is not provider activation. Production protections must be observed at their actual provider and runtime and may be enabled only after the normal human-authorized release gates.
