@@ -94,7 +94,7 @@ Repository configuration proves only the desired Workflow class/binding contract
 The canonical Worker also owns the served remote read-only MCP endpoint at:
 
 ```text
-POST https://api.foundercontrolroom.org/mcp/read
+POST https://foundercontrolroom.org/mcp/read
 ```
 
 Repository configuration binds `FCR_REMOTE_MCP_READ_PROJECTS` to exactly `chief-ai-machine,founder-control-room` and requires the dedicated secret name `FCR_REMOTE_MCP_READ_TOKEN`. The scope is server-held; an MCP caller cannot widen it by supplying another project identifier or by reusing another FCR credential.
@@ -257,3 +257,6 @@ The Pages Service Binding is not an alternate Access tunnel for write-capable MC
 
 
 Runtime proof for the protected product hosts is two-sided: a random stranger must receive Access-specific Cloudflare evidence from both `https://app.foundercontrolroom.org/` and direct `https://api.foundercontrolroom.org/version`. Public same-origin `/version` remains a separate Service Binding identity witness and cannot substitute for either protected-host check.
+
+
+External governed MCP transport is served through the public Pages origin (`https://foundercontrolroom.org/mcp` and exact read/registry/portfolio paths) over the private `FCR_API` Service Binding. Do not create a direct-API `/mcp` Access bypass: Cloudflare path inheritance would broaden that exception to privileged MCP descendants.

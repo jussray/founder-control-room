@@ -14,7 +14,7 @@ Founder Control Room exposes a small read-only MCP subregistry for the four syst
 Use this URL in MCP clients that accept a registry endpoint:
 
 ```text
-https://api.foundercontrolroom.org/mcp/registry/v0.1/servers
+https://foundercontrolroom.org/mcp/registry/v0.1/servers
 ```
 
 The registry catalog itself is public metadata and does not require a bearer token. It contains no MCP credential values.
@@ -24,7 +24,7 @@ The API hostname itself remains Access-managed. The exact registry and FCR-hoste
 For Lovable, the intended fields are:
 
 ```text
-Registry URL: https://api.foundercontrolroom.org/mcp/registry/v0.1/servers
+Registry URL: https://foundercontrolroom.org/mcp/registry/v0.1/servers
 Display name: Juss Founder Portfolio
 Bearer token: leave blank for registry discovery
 ```
@@ -33,10 +33,10 @@ Bearer token: leave blank for registry discovery
 
 | Logical server | Remote transport | Authentication |
 | --- | --- | --- |
-| Founder Control Room | `https://api.foundercontrolroom.org/mcp/portfolio/founder-control-room` | Required secret `Authorization` header using the dedicated FCR remote-read bearer credential |
+| Founder Control Room | `https://foundercontrolroom.org/mcp/portfolio/founder-control-room` | Required secret `Authorization` header using the dedicated FCR remote-read bearer credential |
 | Chief AI Machine | `https://chief-ai.mcgill-raylene.workers.dev/mcp` | Native public read-only ProofMode MCP |
-| SolContinuity | `https://api.foundercontrolroom.org/mcp/portfolio/solcontinuity` | Required secret `Authorization` header using the dedicated FCR remote-read bearer credential |
-| PromptOS | `https://api.foundercontrolroom.org/mcp/portfolio/promptos` | Required secret `Authorization` header using the dedicated FCR remote-read bearer credential |
+| SolContinuity | `https://foundercontrolroom.org/mcp/portfolio/solcontinuity` | Required secret `Authorization` header using the dedicated FCR remote-read bearer credential |
+| PromptOS | `https://foundercontrolroom.org/mcp/portfolio/promptos` | Required secret `Authorization` header using the dedicated FCR remote-read bearer credential |
 
 Registry remote metadata marks the `Authorization` value as required and secret so a compatible client can request it at connection time rather than storing a credential in the public catalog. Enter the value in standard `Bearer <token>` form only in the MCP client's secret field. Never commit or paste the raw token into source, docs, screenshots, issues, logs, or chat.
 
@@ -64,3 +64,6 @@ npm run test:e2e
 ```
 
 Source wiring is not deployment proof. The registry is live only after the exact source commit is deployed to the canonical FCR Worker and the public registry URL plus each selected remote transport is observed from that deployed runtime.
+
+
+The public registry and FCR-hosted read transports intentionally use the apex Pages origin. They are proxied to the canonical Worker through the private Service Binding. The direct API hostname stays Access-required and therefore has no broad `/mcp` bypass application.

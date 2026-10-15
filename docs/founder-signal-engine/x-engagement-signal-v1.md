@@ -45,10 +45,10 @@ Product repositories are consumers of a normalized aggregate signal. They do not
 FCR exposes the aggregate through a separate read-only companion MCP endpoint:
 
 ```text
-POST https://api.foundercontrolroom.org/mcp/founder-signal-x-engagement
+POST https://foundercontrolroom.org/mcp/founder-signal-x-engagement
 ```
 
-This exact read-only path is eligible for the application-authenticated Cloudflare Access exception declared in `config/fcr-cloudflare-access-boundary.json`; there is no `/mcp/*` wildcard bypass. The route still requires its dedicated least-privilege bearer credential:
+This exact read-only path is served through the public Pages Service Binding and its dedicated application bearer. The direct API hostname remains Cloudflare Access-protected for the complete `/mcp` prefix, so no root or wildcard MCP Access bypass exists. The route still requires its dedicated least-privilege bearer credential:
 
 ```text
 FOUNDER_SIGNAL_READ_MCP_TOKEN

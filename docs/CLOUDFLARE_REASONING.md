@@ -187,7 +187,7 @@ The receipt preserves `requestSimulation: true`, `runtimeShaVerified: false`, an
 
 ## Served remote read MCP boundary
 
-The canonical `founder-control-room` Worker serves a bounded remote read-only MCP endpoint at `POST https://api.foundercontrolroom.org/mcp/read`. Repository configuration binds its project scope to exactly `chief-ai-machine,founder-control-room` through `FCR_REMOTE_MCP_READ_PROJECTS` and names `FCR_REMOTE_MCP_READ_TOKEN` as the dedicated bearer-secret interface.
+The canonical `founder-control-room` Worker serves a bounded remote read-only MCP endpoint at `POST https://foundercontrolroom.org/mcp/read`. Repository configuration binds its project scope to exactly `chief-ai-machine,founder-control-room` through `FCR_REMOTE_MCP_READ_PROJECTS` and names `FCR_REMOTE_MCP_READ_TOKEN` as the dedicated bearer-secret interface.
 
 This source configuration is deliberately non-authorizing: it cannot prove that the secret has been installed, that the deployed Worker is running this exact source, or that the endpoint is reachable. The route must fail closed when its required token or server-held project scope is unavailable, and its two exported tools remain read-only (`list_read_servers` and `invoke_read_tool`) behind the existing MCP registry/policy boundary. A secret value must never be committed to Wrangler, documentation, logs, screenshots, issues, or retained proof.
 
@@ -290,3 +290,8 @@ The public Pages Worker may continue to proxy normal same-origin FCR app/auth tr
 
 
 Runtime evidence for this boundary must challenge both protected hosts anonymously. `app.foundercontrolroom.org` and direct `api.foundercontrolroom.org/version` must each present an Access-specific Cloudflare redirect/path marker; a generic 401/403 is insufficient. The public apex `/version` witness proves Worker identity separately through `FCR_API`.
+
+
+### MCP transport does not weaken direct API Access
+
+The external connector resource is `https://foundercontrolroom.org/mcp`, not a Cloudflare Access bypass on `api.foundercontrolroom.org/mcp`. Exact public MCP/read/registry/portfolio protocol traffic reaches the Worker through Pages `FCR_API`. The direct API hostname remains Access-required for the entire MCP prefix, avoiding Cloudflare child-path inheritance from a root `/mcp` bypass.

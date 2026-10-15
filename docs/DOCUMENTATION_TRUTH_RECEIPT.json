@@ -13,6 +13,12 @@
   ],
   "changes": [
     {
+      "path": "config/fcr-cloudflare-access-boundary.json",
+      "claims": [
+        "`config/fcr-cloudflare-access-boundary.json` must keep apex/WWW public, require Access for `app.foundercontrolroom.org` and `api.foundercontrolroom.org` by default, forbid direct-API `/mcp` and `/mcp/*` bypass applications, and classify external OAuth/read MCP as public Service Binding protocol paths instead; the file cannot prove any provider policy is installed."
+      ]
+    },
+    {
       "path": "public/_worker.js",
       "claims": [
         "`public/_worker.js` must keep public static discovery artifacts on the Pages `ASSETS` binding and route normal same-origin app/API traffic through `FCR_API`, but it must refuse to tunnel the write-capable `/mcp/founder-signal-engine` route from the public apex because that route requires the direct Access-managed API origin; the separate read-only `/mcp/founder-signal-x-engagement` route may remain on its exact application-authenticated exception and least-privilege bearer."
@@ -34,12 +40,6 @@
       "path": ".github/workflows/playwright.yml",
       "claims": [
         "`.github/workflows/playwright.yml` must keep the post-Deploy direct API witness behind Cloudflare Access by sourcing the dedicated FCR Access service-token pair from the protected production environment, while the public Pages/browser witness remains separate; production proof cannot require making the direct API anonymously readable."
-      ]
-    },
-    {
-      "path": "config/fcr-cloudflare-access-boundary.json",
-      "claims": [
-        "`config/fcr-cloudflare-access-boundary.json` must keep apex/WWW public, require Access for `app.foundercontrolroom.org` and `api.foundercontrolroom.org` by default, forbid a `/mcp/*` bypass wildcard, and enumerate only exact application-authenticated machine exceptions; the file cannot prove those provider policies are installed."
       ]
     },
     {
