@@ -106,6 +106,8 @@ const DESIGN_COMMAND_ALIASES: Readonly<Record<string, string>> = Object.fromEntr
 
 const EXPLICIT_SKILL_ALIASES: Readonly<Record<string, string>> = {
   goalfix: 'goalfix',
+  godmode: 'ultrathink-attack-godmode',
+  'attack-godmode': 'ultrathink-attack-godmode',
   urlfix: 'urlfix',
   fixfast: 'goalfix',
   'repair-verify-merge': 'goalfix',
@@ -178,6 +180,7 @@ export function routeFcrSkills(input: RouteFcrSkillsInput): FcrSkillRoutingDecis
   const requiredTools: string[] = [];
   const requiredProof: string[] = [];
   const policyRequiredCapabilityIds = explicitSkillsFromGoal(goal);
+  if (/\bgodmode\b/.test(goal)) pushUnique(policyRequiredCapabilityIds, 'ultrathink-attack-godmode');
   const designCommandIds = explicitDesignCommandsFromGoal(goal);
   const automaticCouncilLenses = [...FCR_AUTOMATIC_COUNCIL_LENSES];
   const requiredParallelLenses = [...FCR_REQUIRED_PARALLEL_LENSES];

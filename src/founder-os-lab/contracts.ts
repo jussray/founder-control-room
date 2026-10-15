@@ -17,6 +17,7 @@ export type FounderOsLabAction =
 export type FounderOsLabSkillId =
   | 'juss-chief-ai'
   | 'goalfix'
+  | 'ultrathink-attack-godmode'
   | 'urlfix'
   | 'repo-truth'
   | 'truth-decay-audit'

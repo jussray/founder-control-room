@@ -241,6 +241,23 @@ describe('FCR skill router trust gate', () => {
     expect(decision.requiredTools).toContain('github');
   });
 
+
+  it('binds explicit Attack/godmode to the non-authorizing companion skill', () => {
+    const goal = 'Attack/godmode repair this repository and prove the exact result.';
+    const repository = { projectId: 'founder-control-room', provider: 'github' };
+
+    const blocked = route(goal, 'write', ['goalfix'], { repository });
+    expect(blocked.policyRequiredCapabilityIds).toContain('ultrathink-attack-godmode');
+    expect(blocked.missingPolicyCapabilityIds).toContain('ultrathink-attack-godmode');
+    expect(blocked.status).toBe('blocked');
+
+    const ready = route(goal, 'write', ['ultrathink-attack-godmode'], { repository });
+    expect(ready.status).toBe('ready_for_runtime_discovery');
+    expect(ready.policyRequiredCapabilityIds).toContain('ultrathink-attack-godmode');
+    expect(ready.requiredProof).toContain('action-specific authority, approval, rollback, and execution receipt');
+    expect(ready.executionAllowed).toBe(false);
+  });
+
   it('routes /urlfix through Playwright, ownership proof, and same-path regression proof', () => {
     const goal = '/urlfix https://foundercontrolroom.org repair verified browser defects.';
     const repository = { projectId: 'founder-control-room', provider: 'github' };
