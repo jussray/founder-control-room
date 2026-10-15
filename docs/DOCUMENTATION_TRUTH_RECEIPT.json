@@ -52,7 +52,8 @@
         "The October 2, 2026 transition from StoryEngine `0a1d3b521967a3643daf56cf2ad60b1392bb6e0c` to independently observed `4ec29c1821de8c7bb8c381df31e3f98d0c6016f4` selects a new evidence subject after bounded review of the fail-closed Cloudflare front door, hashed API rate-limit identity, and focused Node tests; predecessor federation proof remains historical, and the successor FCR head must earn its own complete exact-head Playwright witness before the pair is current.",
         "The October 3, 2026 URLFix merge-review transition from the prior StoryEngine peer to independently observed `18d9ba257a69c3d1743f346d424daf31796aaeed` selects a new evidence subject only; the local FCR browser harness passing before the live-peer mismatch does not transfer federation green, and PR #896 must earn a complete exact-head Playwright witness against the successor before the pair is current.",
         "The October 3, 2026 agent-contract v1 transition from StoryEngine `18d9ba257a69c3d1743f346d424daf31796aaeed` to independently observed `168d65ede38d2477ea00902fa1f0e76f292c583d` selects a new evidence subject only; Chief Access recovery PR #913 failing the live-peer check is dependency drift, and the successor FCR head must earn a complete exact-head Playwright witness against the successor before the pair is current.",
-        "The October 5, 2026 transition from StoryEngine `168d65ede38d2477ea00902fa1f0e76f292c583d` through `c9af4ea095561d0837a141e311e8977d796aaaa7` to independently observed `3c1689fe67142e783fe7d18b5ff610640bdc81d6` selects a new evidence subject only; FCR Playwright run #6969 on `897083276b6c775c49ce30be189a50bd610b5d4c` passed the local/direct browser harness but failed the peer freshness check, so `.github/workflows/playwright.yml` must bind the successor exact peer and require a complete exact-head federation rerun before the pair is current."
+        "The October 5, 2026 transition from StoryEngine `168d65ede38d2477ea00902fa1f0e76f292c583d` through `c9af4ea095561d0837a141e311e8977d796aaaa7` to independently observed `3c1689fe67142e783fe7d18b5ff610640bdc81d6` selects a new evidence subject only; FCR Playwright run #6969 on `897083276b6c775c49ce30be189a50bd610b5d4c` passed the local/direct browser harness but failed the peer freshness check, so `.github/workflows/playwright.yml` must bind the successor exact peer and require a complete exact-head federation rerun before the pair is current.",
+        "The October 15, 2026 exact-peer pin transition from StoryEngine a6e6a396ed30535af2fd9b1ec2347a84e1a3fbf3 to independently observed main 809d30ae2ef57dce6d4fee9a3b6afa24bfa83497 selects a successor test subject only. A matching SHA is not a passing FCR federation witness; require the entire exact-head live-ref, peer runtime, directive/receipt, replay, and browser suite with no skipped test steps before declaring current compatibility."
       ]
     },
     {
@@ -167,7 +168,8 @@
         "`README.md` must keep the GitHub Actions and Cloudflare Worker copies of `OPENAI_API_KEY` as separate CI/runtime authority planes and state that the all-secret proof derives names from the canonical Worker registry without reading values.",
         "`README.md` must treat a successful successor StoryEngine Playwright witness as current only for the exact FCR/StoryEngine evidence pair recorded by the run and expire that proof when either repository moves.",
         "`README.md` must record that the StoryEngine peer refresh discovered during URLFix PR #914 merge review is a focused recovery transition handled by PR #896, not URLFix failure, and that pin alignment alone cannot promote the successor federation state beyond UNKNOWN.",
-        "`README.md` must record that the StoryEngine peer refresh after the agent-contract v1 rollout is a focused recovery transition, not a #913 failure, and that pin alignment alone cannot promote the successor federation state beyond UNKNOWN."
+        "`README.md` must record that the StoryEngine peer refresh after the agent-contract v1 rollout is a focused recovery transition, not a #913 failure, and that pin alignment alone cannot promote the successor federation state beyond UNKNOWN.",
+        "The October 15, 2026 FCR README must explain the exact StoryEngine peer transition and that the fixed root-to-cockpit authentication harness does not authorize production or prove federation until full exact-head browser tests execute."
       ]
     },
     {
@@ -206,7 +208,8 @@
         "`docs/TRUTH_DECAY_AUDIT.md` must separate observation transport failure from target-secret truth: failure before Cloudflare secret enumeration leaves provider-held runtime secret presence UNKNOWN/BLOCKED and cannot be relabeled as evidence of absence.",
         "`docs/TRUTH_DECAY_AUDIT.md` must record that FCR `c75a361cdee0a56ccd4351c48f38231429cf9e74` Playwright run `36344620958` succeeded against StoryEngine `e2473a10945b57bb7abedba6d45ea0dbacbd904a`, while explicitly refusing to convert that browser-federation proof into production or provider authority.",
         "`docs/TRUTH_DECAY_AUDIT.md` must record the October 3 URLFix merge-review peer drift as dependency freshness evidence and require PR #896's successor exact-head federation witness before any current pair claim.",
-        "`docs/TRUTH_DECAY_AUDIT.md` must record the October 3 agent-contract v1 peer drift as dependency freshness evidence and require the successor exact-head federation witness before any current pair claim."
+        "`docs/TRUTH_DECAY_AUDIT.md` must record the October 3 agent-contract v1 peer drift as dependency freshness evidence and require the successor exact-head federation witness before any current pair claim.",
+        "The October 15, 2026 truth-decay audit must preserve the previous browser-auth false negative and later fetch-abort regression as separate historical evidence, bind the successor StoryEngine main SHA to the exact observed snapshot, and expire that proof whenever either dependency head changes."
       ]
     },
     {
@@ -307,6 +310,12 @@
       "path": "tools/zapier/founder-content-outcome-contract.cjs",
       "claims": [
         "`tools/zapier/founder-content-outcome-contract.cjs` must bind founder-content metrics to the exact observed network, lane, account identity, connector identity, and coverage state; out-of-scope metrics must remain UNKNOWN, cross-account metric donation is forbidden, and these receipts can never grant publication, provider-write, merge, deploy, spend, or external-contact authority."
+      ]
+    },
+    {
+      "path": "e2e/run.mjs",
+      "claims": [
+        "The October 15, 2026 direct Chromium harness must verify real authenticated founder identity on the legacy cockpit after the root callback, allow authenticated root requests to complete before navigation, and never suppress an uncaught browser error or bypass the opaque HttpOnly session."
       ]
     }
   ]
