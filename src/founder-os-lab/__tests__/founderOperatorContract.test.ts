@@ -55,7 +55,8 @@ function harness(overrides: Partial<TrustedTools> = {}) {
       applicableFiles: ['src/guard.ts'],
     }),
     verifyApproval: async () => true,
-    applyPatch: async () => {
+    applyPatch: async (_task, _proposal, _files, expectedHead) => {
+      if (observedHead !== expectedHead) throw new Error('stale branch: atomic compare-and-swap rejected');
       writes += 1;
       observedHead = NEXT_HEAD;
       return { sha: NEXT_HEAD, changedFiles: ['src/guard.ts'] };
@@ -108,6 +109,23 @@ describe('four-system founder operator authority boundary', () => {
     const result = await runGoal(task, h.tools, approval);
     expect(result.status).toBe('NEEDS_APPROVAL');
     expect(h.writes).toBe(0);
+  });
+
+  it('passes expected head to the atomic patch adapter and rejects a write-time race', async () => {
+    let currentHead = HEAD;
+    let writes = 0;
+    const h = harness({
+      getHead: async () => currentHead,
+      verifyApproval: async () => { currentHead = NEXT_HEAD; return true; },
+      applyPatch: async (_task, _proposal, _files, expectedHead) => {
+        if (currentHead !== expectedHead) throw new Error('atomic compare-and-swap rejected');
+        writes++;
+        return { sha: NEXT_HEAD, changedFiles: ['src/guard.ts'] };
+      },
+    });
+    const result = await runGoal(task, h.tools, approval);
+    expect(result.status).toBe('BLOCKED');
+    expect(writes).toBe(0);
   });
 
   it('passes a narrow backend repair with matching exact-head focused evidence', async () => {
