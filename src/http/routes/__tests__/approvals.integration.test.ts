@@ -849,6 +849,16 @@ describe('POST /:missionId/patch — founder read/write/edit on a sandbox branch
       if (table === 'founder_users') return founderUsersRow();
       if (table === 'missions') return missionRow(missionOverrides, missionRowOptions);
       if (table === 'projects') return projectRow();
+      if (table === 'approval_executions') {
+        // Patch actions require a ledger reservation before a provider write.
+        return {
+          select: () => ({ eq: () => ({ maybeSingle: () => Promise.resolve({ data: null, error: null }) }) }),
+          insert: () => ({
+            select: () => ({ single: () => Promise.resolve({ data: { id: EXECUTION_ID }, error: null }) }),
+          }),
+          update: () => twoEqUpdate(),
+        };
+      }
       if (table === 'project_events') return { insert: projectEventInsert };
       return {};
     });
@@ -947,7 +957,7 @@ describe('POST /:missionId/patch — founder read/write/edit on a sandbox branch
     const res = await request(buildApp())
       .post(`/approvals/${MISSION_ID}/patch`)
       .set('Authorization', BEARER)
-      .send({ message: 'edit', changes: [{ path: 'a.txt', content: 'hi' }] });
+      .send({ message: 'edit', idempotencyKey: 'patch-provider-failure', changes: [{ path: 'a.txt', content: 'hi' }] });
 
     expect(res.status).toBe(502);
   });
