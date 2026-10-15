@@ -5,6 +5,8 @@ import test from 'node:test';
 const policy = JSON.parse(readFileSync('config/fcr-cloudflare-access-boundary.json', 'utf8'));
 const server = readFileSync('src/http/server.ts', 'utf8');
 const reviewEmailWorker = readFileSync('src/worker/founderSignalReviewEmail.ts', 'utf8');
+const workerEntry = readFileSync('src/worker/cf-entry.ts', 'utf8');
+const bipIngress = readFileSync('src/worker/bipChiefEvidenceIngress.ts', 'utf8');
 
 test('public discovery and Access-managed product hosts are explicit', () => {
   assert.deepEqual(policy.publicHosts, ['foundercontrolroom.org', 'www.foundercontrolroom.org']);
@@ -47,6 +49,13 @@ test('every declared public machine exception maps to a real server surface', ()
     "'/.well-known/oauth-protected-resource/mcp'",
   ];
   for (const marker of requiredMarkers) assert.match(server, new RegExp(marker.replace(/[.*+?^$(){}|[\]\\]/g, '\\$&')));
+});
+
+test('Bip proof exception is bound to the Worker OIDC ingress rather than an unverified path string', () => {
+  assert.match(bipIngress, /BIP_PROOF_INGRESS_PATH\s*=\s*'\/ingest\/bip-control-room-proof'/);
+  assert.match(bipIngress, /verifyGitHubActionsOidc/);
+  assert.match(workerEntry, /url\.pathname === BIP_PROOF_INGRESS_PATH/);
+  assert.match(workerEntry, /handleBipControlRoomProofIngress/);
 });
 
 test('review-email ingress stays private to the Worker service binding', () => {
