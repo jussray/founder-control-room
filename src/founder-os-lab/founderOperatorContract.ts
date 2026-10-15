@@ -115,6 +115,8 @@ export interface TrustedTools {
   readSol?(task: Task): Promise<SolSnapshot | null>;
   /** Optional approved method selection; metadata is evidence, not authority. */
   selectPrompt?(task: Task, sol?: SolSnapshot): Promise<PromptOSSelection | null>;
+  /** Trusted timestamp source: model text and ambient lab wall clock are never authoritative. */
+  getTrustedTime(task: Task): Promise<string>;
   /** Trusted repository protection lookup. Fail closed on an unreadable ref. */
   isProtectedBranch(task: Task): Promise<boolean>;
   /** A trusted classification of the actual patch, independent of caller labels. */
@@ -352,7 +354,11 @@ export async function runGoal(
     }
 
     const raw = await tools.prove(task, written.sha);
-    const now = Date.now();
+    const now = Date.parse(await tools.getTrustedTime(task));
+    if (!Number.isFinite(now)) {
+      return finish({ ...mutated, risk: 'Trusted evidence clock unavailable or invalid.',
+        nextGate: 'Restore the trusted time adapter and reverify the exact head.' });
+    }
     const admissible = raw.filter(e => {
       const observed = Date.parse(e.observedAt);
       return e.sha === written.sha && !!e.reference.trim() &&
