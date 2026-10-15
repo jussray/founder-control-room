@@ -7,6 +7,8 @@ const conveyor = readFileSync('src/http/routes/n8nConveyor.ts', 'utf8');
 const founderAuth = readFileSync('src/http/middleware/requireFounder.ts', 'utf8');
 const csrf = readFileSync('src/http/middleware/csrf.ts', 'utf8');
 const security = readFileSync('src/http/middleware/security.ts', 'utf8');
+const attack48000 = JSON.parse(readFileSync('security/attack-48000.workflow.json', 'utf8'));
+const firewallDocs = readFileSync('docs/FIREWALL_V10.md', 'utf8');
 const failures = [];
 
 function requireTruthy(path, value) {
@@ -137,6 +139,43 @@ const conveyorMountIndex = server.indexOf("app.use('/automation/conveyor', n8nCo
 if (csrfIndex < 0 || conveyorMountIndex < 0 || csrfIndex >= conveyorMountIndex) {
   failures.push('same-origin browser mutation gate must remain before conveyor mount');
 }
+
+// Attack-48000 is a fail-closed source contract, never a provider enforcement claim.
+requireEqual('attack48000.schema', attack48000.schema, 'juss/attack-48000-security-workflow@v1');
+requireEqual('attack48000.name', attack48000.name, 'ATTACK-48000');
+requireEqual('attack48000.status', attack48000.status, 'POLICY_ONLY_UNVERIFIED');
+requireEqual('attack48000.owner', attack48000.owner, 'founder-control-room');
+requireEqual('attack48000.pressureLabel', attack48000.pressureLabel, '48000');
+requireContains('attack48000.pressureMeaning', attack48000.pressureMeaning ?? '', 'not 48000 requests');
+requireEqual('attack48000.lineage.firewall', attack48000.lineage?.firewall, 'security/firewall-v10.policy.json');
+requireEqual('attack48000.lineage.attackSuite', attack48000.lineage?.attackSuite, 'security/attack-20-v3.policy.json');
+requireEqual('attack48000.lineage.personalPrivacy', attack48000.lineage?.personalPrivacy, 'juss-protect-me');
+requireEqual('attack48000.lineage.infrastructureShield', attack48000.lineage?.infrastructureShield, 'juss-protect-me-2');
+requireEqual('attack48000.phases', JSON.stringify(attack48000.phases), JSON.stringify([
+  'OBSERVE', 'BOUND_SCOPE', 'ORIENT', 'REDTEAM_REVIEW', 'DECIDE',
+  'PERMIT', 'PATCH_ONE', 'VERIFY', 'RECORD', 'ROLLBACK_READY',
+]));
+for (const key of [
+  'authorizedAssetsOnly', 'noExternalHackBack', 'noProductionStressOrFloodTests',
+  'noUnapprovedCredentialUse', 'noSecretsOrPrivateConversationExports',
+  'noAutomaticProviderMutation', 'noAutomaticMergeOrDeploy',
+  'dryRunAndCompatibilityBeforeEnforcement', 'perProductOwnershipPreserved',
+  'protectModelsRemainSeparate', 'providerReadbackBeforeLiveClaims',
+  'independentBrowserEvidenceForUiClaims', 'noStaleProofInheritance',
+  'failClosedOnMissingAuthority', 'reversibleSingleCauseFixes',
+]) {
+  requireEqual(`attack48000.controls.${key}`, attack48000.controls?.[key], true);
+}
+requireEqual('attack48000.deploymentAuthorized', attack48000.deploymentAuthorized, false);
+requireEqual('attack48000.mergesAuthorized', attack48000.mergesAuthorized, false);
+requireArray('attack48000.productionGate', attack48000.productionGate, 6);
+requireArray('attack48000.receiptFields', attack48000.receiptFields, 10);
+for (const prohibited of ['raw_secrets', 'chat_transcripts', 'retaliatory_actions']) {
+  requireTruthy(`attack48000.excludes.${prohibited}`, attack48000.excludes?.includes(prohibited));
+}
+requireContains('attack48000.docs.heading', firewallDocs, '## ATTACK-48000: approved defensive verification protocol');
+requireContains('attack48000.docs.truth', firewallDocs, 'Code-level workflow verification is not provider activation.');
+requireContains('attack48000.docs.playwright', firewallDocs, 'Playwright');
 
 if (failures.length) {
   console.error('Firewall v10 policy failed verification:');
