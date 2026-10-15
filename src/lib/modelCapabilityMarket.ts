@@ -193,17 +193,25 @@ export function rankCapabilityCandidates(input: {
     .filter((candidate) => candidate.taskClasses.includes(input.taskClass))
     .map((candidate): RankedCapabilityCandidate => {
       const reasons: string[] = [];
-      const local = input.observations.filter(
+      // Authority violations are safety signals even when an outcome has no
+      // independently verified evidence refs. Do not erase them with the
+      // stricter primary-routing eligibility filter below.
+      const fresh = input.observations.filter(
         (observation) => observation.operatorId === candidate.operatorId
           && observation.taskClass === input.taskClass
+          && Number.isSafeInteger(observation.sampleSize)
           && observation.sampleSize > 0
-          && observation.evidenceRefs.length > 0
           && isFresh(observation.observedAt, now, maxObservationAgeMs),
       );
+      const local = fresh.filter((observation) => observation.evidenceRefs.length > 0);
       const localSamples = local.reduce((sum, observation) => sum + observation.sampleSize, 0);
       const benchmark = benchmarkScore(freshPriors, candidate.operatorId);
       const canOperate = agentCanOperate(candidate.operatorId, candidate.capability);
-      const hasAuthorityViolation = local.some((observation) => observation.authorityViolationRate > 0);
+      const hasAuthorityViolation = fresh.some(
+        (observation) => !Number.isFinite(observation.authorityViolationRate)
+          || observation.authorityViolationRate < 0
+          || observation.authorityViolationRate > 0,
+      );
 
       let status: CapabilityMarketStatus;
       let score = 0;

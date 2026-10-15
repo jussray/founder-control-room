@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { buildRuntimeStateReceipt, trackedConfigFingerprint } from '../scripts/control-room-runtime-state.mjs';
+import { buildRuntimeStateReceipt, trackedConfigFingerprint, writeRuntimeStateReceipt } from '../scripts/control-room-runtime-state.mjs';
 import { buildTestLedger } from '../scripts/control-room-test-ledger.mjs';
 
 const SHA = 'a'.repeat(40);
@@ -17,6 +17,23 @@ function fixture() {
   return root;
 }
 function env(overrides = {}) { return { GITHUB_EVENT_NAME: 'push', GITHUB_RUN_ATTEMPT: '1', GITHUB_REPOSITORY: 'jussray/example', EXPECTED_HEAD_SHA: SHA, CONTROL_ROOM_RUNTIME_STATE_PATH: 'artifacts/control-room-runtime-state.json', ...overrides }; }
+
+
+test('writes a parseable runtime-state JSON receipt with a real trailing newline', (t) => {
+  const root = fixture();
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const receiptPath = path.join(root, 'artifacts', 'control-room-runtime-state.json');
+  const receipt = writeRuntimeStateReceipt(
+    env({ CONTROL_ROOM_RUNTIME_STATE_PATH: receiptPath }),
+    root,
+  );
+  const raw = fs.readFileSync(receiptPath, 'utf8');
+  assert.ok(raw.endsWith('\n'), 'receipt must terminate with a newline character');
+  assert.equal(raw.endsWith('\\n'), false, 'literal backslash-n after JSON is invalid');
+  assert.deepEqual(JSON.parse(raw), receipt);
+  assert.equal(receipt.repository, 'jussray/example');
+  assert.equal(receipt.sourceSha, SHA);
+});
 
 test('tracked configuration movement changes the receipt fingerprint', () => {
   const root = fixture(); const before = trackedConfigFingerprint(root);

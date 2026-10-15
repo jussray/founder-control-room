@@ -1,3 +1,7 @@
+import {
+  matchingCapabilityOutcomeVerification,
+  type CapabilityOutcomeVerificationReceipt,
+} from './capabilityOutcomeVerification.js';
 import type { OperatorRelayResponseV1, RelayOperatorId, RelayStatus } from './operatorRelay.js';
 import type { CapabilityObservation, CapabilityTaskClass } from './modelCapabilityMarket.js';
 
@@ -20,11 +24,11 @@ import type { CapabilityObservation, CapabilityTaskClass } from './modelCapabili
  * - Freshness: with a `window`, receipts completed before `now - maxAgeMs` are excluded so stale
  *   evidence cannot ride on one fresh receipt. A receipt whose `completedAt` does not parse is
  *   always excluded as stale; it cannot be placed in time.
- * - Proof: a provider answering is not outcome proof. Only receipts whose `relayId` is in
- *   `verifiedRelayIds` (confirmed by an independent verifier) contribute to `proofRate` and to
- *   `evidenceRefs`. With no verifier the observation carries no evidence references, and the market's
- *   own eligibility gate keeps the operator in trial. This is deliberate: adapter-proven is not
- *   provider-outcome-proven.
+ * - Proof: a provider answering is not outcome proof. Only relay outcomes with a valid independent
+ *   `CapabilityOutcomeVerificationReceipt` bound to the same relay id, canonical response hash,
+ *   operator, and task class contribute to `proofRate`. Observation evidence comes from the verifier,
+ *   not from the operator's self-reported relay evidence. With no matching verifier receipt the market
+ *   keeps the operator in trial. This is deliberate: adapter-proven is not provider-outcome-proven.
  * - False green is a contract violation, not merely unverified: a `completed` receipt with zero
  *   evidence references, even if it bypassed the relay validator.
  * - Any runtime `authorityRequested` other than the exact string `'none'` (including a missing or
@@ -48,8 +52,8 @@ export interface RelayReceiptFoldInput {
   operatorId: RelayOperatorId;
   taskClass: CapabilityTaskClass;
   receipts: readonly OperatorRelayResponseV1[];
-  /** Relay ids whose outcome an independent verifier confirmed. Only these contribute proof. */
-  verifiedRelayIds?: ReadonlySet<string>;
+  /** Independent, hash-bound outcome verifications. Caller-supplied relay ids are never proof. */
+  verificationReceipts?: readonly CapabilityOutcomeVerificationReceipt[];
   /** Receipts completed before `now - maxAgeMs` are excluded as stale. */
   window?: RelayReceiptFoldWindow;
 }
@@ -137,13 +141,22 @@ export function foldRelayReceiptsIntoCapabilityObservation(input: RelayReceiptFo
     return { observation: null, ...summaryBase };
   }
 
-  const verifiedIds = input.verifiedRelayIds ?? new Set<string>();
+  const verificationReceipts = input.verificationReceipts ?? [];
+  const matchingVerifications = new Map<string, CapabilityOutcomeVerificationReceipt[]>();
+  for (const receipt of outcomes) {
+    const matches = verificationReceipts.filter((verification) =>
+      matchingCapabilityOutcomeVerification(verification, receipt, input.taskClass, input.operatorId));
+    if (matches.length > 0) matchingVerifications.set(receipt.responseHash, matches);
+  }
+
   const completed = outcomes.filter((receipt) => receipt.status === 'completed');
   const failed = outcomes.filter((receipt) => receipt.status === 'failed');
-  const verified = outcomes.filter((receipt) => verifiedIds.has(receipt.relayId) && hasEvidence(receipt));
+  const verified = outcomes.filter((receipt) => matchingVerifications.has(receipt.responseHash));
   const falseGreen = completed.filter((receipt) => !hasEvidence(receipt));
   const authorityViolations = outcomes.filter(requestsAuthority);
-  const evidenceRefs = [...new Set(verified.flatMap(normalizedEvidenceRefs))].sort();
+  const evidenceRefs = [...new Set(verified.flatMap((receipt) =>
+    (matchingVerifications.get(receipt.responseHash) ?? []).flatMap((verification) => verification.evidenceRefs)
+  ).map((ref) => ref.trim()).filter(Boolean))].sort();
   const latest = outcomes[outcomes.length - 1]!;
 
   const observation: CapabilityObservation = {

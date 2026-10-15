@@ -65,6 +65,54 @@ describe('proof-weighted model capability market', () => {
     expect(claude?.executionAuthority).toBe(false);
   });
 
+  it('blocks fresh authority violations without verifier evidence rather than treating them as ordinary trials', () => {
+    const ranked = rankCapabilityCandidates({
+      taskClass: 'repository-repair', candidates,
+      observations: [
+        observation('claude-code', { evidenceRefs: [], proofRate: 0, authorityViolationRate: 0.2 }),
+        observation('codex'),
+      ],
+      benchmarkPriors: [benchmark('claude-code', 1)],
+      options: { now },
+    });
+    const claude = ranked.find((candidate) => candidate.operatorId === 'claude-code');
+    expect(claude?.status).toBe('blocked');
+    expect(claude?.localSamples).toBe(0);
+    expect(claude?.localEvidenceRefs).toEqual([]);
+    expect(claude?.reasons).toContain('fresh local evidence contains an authority-boundary violation');
+    expect(ranked[0]?.operatorId).toBe('codex');
+    expect(claude?.selectionAuthority).toBe(false);
+    expect(claude?.executionAuthority).toBe(false);
+  });
+
+  it('keeps earlier verified success blocked when a newer unverified violation arrives', () => {
+    const ranked = rankCapabilityCandidates({
+      taskClass: 'repository-repair', candidates,
+      observations: [
+        observation('claude-code', { sampleSize: 10, successRate: 1 }),
+        observation('claude-code', { evidenceRefs: [], proofRate: 0, authorityViolationRate: 0.2 }),
+      ],
+      options: { now },
+    });
+    const claude = ranked.find((candidate) => candidate.operatorId === 'claude-code');
+    expect(claude?.localSamples).toBe(10);
+    expect(claude?.status).toBe('blocked');
+  });
+
+  it('fails closed on malformed authority-violation rates and ignores nonfinite sample sizes', () => {
+    const ranked = rankCapabilityCandidates({
+      taskClass: 'repository-repair', candidates,
+      observations: [
+        observation('claude-code', { authorityViolationRate: Number.NaN }),
+        observation('codex', { sampleSize: Number.POSITIVE_INFINITY }),
+      ],
+      options: { now },
+    });
+    expect(ranked.find((candidate) => candidate.operatorId === 'claude-code')?.status).toBe('blocked');
+    expect(ranked.find((candidate) => candidate.operatorId === 'codex')?.status).toBe('trial');
+    expect(ranked.find((candidate) => candidate.operatorId === 'codex')?.localSamples).toBe(0);
+  });
+
   it('penalizes false-green behavior even when raw success looks high', () => {
     const ranked = rankCapabilityCandidates({
       taskClass: 'repository-repair', candidates,
