@@ -1,0 +1,4 @@
+Contact: mailto:support@jussco.company
+Expires: 2027-04-09T00:00:00Z
+Preferred-Languages: en
+Policy: https://github.com/jussray/founder-control-room/blob/main/SECURITY.md
