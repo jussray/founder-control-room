@@ -52,9 +52,29 @@ test('keeps every latest exact-head check lane and excludes the observer', () =>
 test('aggregates failed, pending, warning, unknown, and passed distinctly', () => {
   assert.equal(aggregateTestLedger([]).state, 'unknown');
   assert.equal(aggregateTestLedger([{state: 'passed'}]).state, 'passed');
-  assert.equal(aggregateTestLedger([{state: 'passed'}, {state: 'skipped'}]).state, 'warning');
+  assert.equal(aggregateTestLedger([{state: 'passed'}, {state: 'skipped'}]).state, 'failed');
+  assert.equal(aggregateTestLedger([{state: 'unknown'}]).state, 'warning');
   assert.equal(aggregateTestLedger([{state: 'running'}]).state, 'pending');
   assert.equal(aggregateTestLedger([{state: 'failed'}, {state: 'passed'}]).state, 'failed');
+});
+
+test('neutral and skipped exact-head checks block full verification without rewriting conclusions', () => {
+  const checks = selectLatestChecks([
+    check({id: 2, name: 'Security Scan', conclusion: 'neutral'}),
+    check({id: 3, name: 'Provider Preview', conclusion: 'skipped'}),
+    check({id: 4, name: 'Unit Tests'}),
+  ], SHA);
+  const ledger = buildTestLedger({
+    repository: 'jussray/founder-control-room',
+    sha: SHA,
+    branch: 'ci/no-skips',
+    runId: '30950000005',
+    checks,
+    observerState: 'stable',
+  });
+  assert.equal(ledger.aggregate.counts.skipped, 2);
+  assert.equal(ledger.aggregate.state, 'failed');
+  assert.deepEqual(ledger.checks.filter((x) => x.state === 'skipped').map((x) => x.conclusion), ['skipped', 'neutral']);
 });
 
 test('builds a sanitized exact-SHA control-room ledger', () => {
