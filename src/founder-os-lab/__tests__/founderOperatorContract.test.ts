@@ -10,6 +10,8 @@ import {
 
 const HEAD = 'a'.repeat(40);
 const NEXT_HEAD = 'b'.repeat(40);
+const NOW = '2026-10-15T05:00:00.000Z';
+const OLD = '2026-10-14T05:00:00.000Z';
 const task: Task = {
   repo: 'jussray/founder-control-room',
   branch: 'review/operator-narrow-fix',
@@ -57,6 +59,7 @@ function harness(overrides: Partial<TrustedTools> = {}) {
       approved: true,
       applicableFiles: ['src/guard.ts'],
     }),
+    getTrustedTime: async () => NOW,
     isProtectedBranch: async () => false,
     classify: async () => ({ surface: 'backend' }),
     verifyApproval: async () => true,
@@ -74,7 +77,7 @@ function harness(overrides: Partial<TrustedTools> = {}) {
       passed: true,
       reference: 'https://github.com/jussray/founder-control-room/actions/runs/123',
       observation: 'focused test executed',
-      observedAt: new Date().toISOString(),
+      observedAt: NOW,
     }],
     record: async receipt => { receipts.push(receipt); },
     ...overrides,
@@ -205,7 +208,7 @@ describe('four-system founder operator authority boundary', () => {
       prove: async () => [{
         kind: 'focused-check', sha: HEAD, passed: true,
         reference: 'https://example.org/old-proof', observation: 'old head',
-        observedAt: new Date().toISOString(),
+        observedAt: NOW,
       }],
     });
     const result = await runGoal(task, h.tools, approval);
@@ -280,9 +283,9 @@ describe('adversarial operator execution gates', () => {
       classify: async () => ({ surface: 'backend', providerTarget: 'production:worker/fcr' }),
       prove: async (_task, sha) => [
         { kind: 'focused-check', sha, passed: true, reference: 'https://example.org/ci',
-          observation: 'CI', observedAt: new Date().toISOString() },
+          observation: 'CI', observedAt: NOW },
         { kind: 'provider-readback', sha, passed: true, reference: 'https://example.org/readback',
-          observation: 'readback', observedAt: new Date().toISOString(), target: 'staging:worker/fcr',
+          observation: 'readback', observedAt: NOW, target: 'staging:worker/fcr',
           revision: 'rev-1' },
       ],
     });
@@ -292,9 +295,9 @@ describe('adversarial operator execution gates', () => {
   it('excludes stale, unrelated evidence from verified receipts', async () => {
     const h = harness({ prove: async (_task, sha) => [
       { kind: 'focused-check', sha, passed: true, reference: 'https://example.org/ci',
-        observation: 'valid', observedAt: new Date().toISOString() },
+        observation: 'valid', observedAt: NOW },
       { kind: 'focused-check', sha: HEAD, passed: true, reference: 'https://example.org/old',
-        observation: 'old', observedAt: new Date(Date.now() - 86400000).toISOString() },
+        observation: 'old', observedAt: OLD },
     ] });
     const result = await runGoal(task, h.tools, approval);
     expect(result.status).toBe('VERIFIED');
