@@ -1,12 +1,13 @@
 # ULTRATHINK / ATTACK / GODMODE skill suite
 
-This directory index adds three **companion skills** to Founder Control Room. It does not replace the existing Juss Founder OS, `juss-flow-launch-loop`, `devil`, TypeScript audit skills, or founder merge authority.
+This directory index adds four **companion skills** to Founder Control Room. It does not replace the existing Juss Founder OS, `juss-flow-launch-loop`, `devil`, TypeScript audit skills, or founder merge authority.
 
 | Skill | Responsibility |
 | --- | --- |
 | [ultrathink-attack-godmode](../ultrathink-attack-godmode/SKILL.md) | Observe, attack assumptions, implement minimal authorized repairs, test |
 | [repair-to-proof](../repair-to-proof/SKILL.md) | Exact-head CI/security review, proof matrix, release gate |
 | [continuity-proof-ledger](../continuity-proof-ledger/SKILL.md) | Durable provenance, fingerprints, cookies, supersession and cross-agent handoffs |
+| [urlfix](../urlfix/SKILL.md) | URL → browser test → issue ledger → authoritative root-cause repair → same-path proof |
 
 ## Routing
 - `/ultrathink` in Claude Code → **canonical `.claude/skills/ultrathink/SKILL.md`**, then canonical ULTRATHINK/DEVIL and `/goalfix` on authorized repair; a distinct companion may be used only through explicit handoff.
@@ -14,6 +15,7 @@ This directory index adds three **companion skills** to Founder Control Room. It
 - `/goalfix`, `/fixfast`, `/repair-verify-merge` → **canonical `.ai/skills/goalfix/SKILL.md` first**. Invoke ULTRATHINK companions only through the canonical Goalfix workflow when its authority and scope require them; never register a second competing Goalfix handler.
 - `/repair-to-proof`, `merge review`, `exact-head gate` → **repair-to-proof**.
 - `/continuity`, `/receipt`, `fingerprints and cookies` → **continuity-proof-ledger**.
+- `/urlfix <url>` or a bounded live-site repair request → **urlfix**, then **ultrathink-attack-godmode** + **goalfix** semantics for repair and **repair-to-proof** for release truth.
 - Cross-agent work should use the ledger after every meaningful action and preserve independent project boundaries.
 
 ## Authority and precedence
