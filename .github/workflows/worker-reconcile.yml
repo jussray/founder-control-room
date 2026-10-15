@@ -125,6 +125,54 @@ jobs:
           echo "Cloudflare Worker deploy token is present and header-safe."
           echo "Cloudflare account authority is declared in wrangler.worker.toml."
 
+      - name: Verify provider-held Worker secret names before reconciliation
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # This step must run in authority-gate, before the worker-deploy job
+          # writes the disabled Founder Signal grant or modifies production.
+          secret_receipt="$RUNNER_TEMP/fcr-worker-reconcile-secret-names.json"
+          npx --yes wrangler@4.110.0 secret list \
+            --config wrangler.worker.toml \
+            --format json > "$secret_receipt"
+
+          SECRET_RECEIPT="$secret_receipt" python3 - <<'PY'
+          import json
+          import os
+          import sys
+          import tomllib
+
+          with open('wrangler.worker.toml', 'rb') as handle:
+              config = tomllib.load(handle)
+
+          required = set(config.get('secrets', {}).get('required', []))
+          workflow_written = {'FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON'}
+          if not required or not workflow_written <= required:
+              print('::error title=Invalid Worker secret contract::The required provider-held names and workflow-written grant must be declared.')
+              sys.exit(1)
+
+          with open(os.environ['SECRET_RECEIPT'], encoding='utf-8') as handle:
+              receipt = json.load(handle)
+          if not isinstance(receipt, list):
+              print('::error title=Invalid Cloudflare secret receipt::Expected name-only secret list.')
+              sys.exit(1)
+
+          present = {
+              entry.get('name')
+              for entry in receipt
+              if isinstance(entry, dict) and isinstance(entry.get('name'), str)
+          }
+          missing = sorted(required - workflow_written - present)
+          if missing:
+              for name in missing:
+                  print(f'::error title=Missing provider-held Worker secret::{name} is not installed on founder-control-room.')
+              sys.exit(1)
+
+          print(f'Worker reconciliation preflight: {len(required - workflow_written)} required secret names present; values not read.')
+          PY
+
       - name: Record bounded authority receipt
         shell: bash
         run: |
