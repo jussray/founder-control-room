@@ -241,6 +241,24 @@ describe('FCR skill router trust gate', () => {
     expect(decision.requiredTools).toContain('github');
   });
 
+  it('routes /urlfix through Playwright, ownership proof, and same-path regression proof', () => {
+    const goal = '/urlfix https://foundercontrolroom.org repair verified browser defects.';
+    const repository = { projectId: 'founder-control-room', provider: 'github' };
+
+    const blocked = route(goal, 'write', ['goalfix'], { repository });
+    expect(blocked.policyRequiredCapabilityIds).toContain('urlfix');
+    expect(blocked.missingPolicyCapabilityIds).toContain('urlfix');
+    expect(blocked.requiredTools).toEqual(expect.arrayContaining(['github', 'playwright']));
+    expect(blocked.status).toBe('blocked');
+
+    const ready = route(goal, 'write', ['urlfix'], { repository });
+    expect(ready.status).toBe('ready_for_runtime_discovery');
+    expect(ready.requiredTools).toEqual(expect.arrayContaining(['github', 'playwright']));
+    expect(ready.requiredProof.join(' ')).toMatch(/ownership and live runtime identity/);
+    expect(ready.requiredProof.join(' ')).toMatch(/same failing browser path/);
+    expect(ready.executionAllowed).toBe(false);
+  });
+
   it('requires explicitly named skills to be present in the Chief AI plan', () => {
     const goal = '/goalfix repair this regression.';
     const decision = route(goal, 'write', ['juss-chief-ai']);

@@ -106,6 +106,7 @@ const DESIGN_COMMAND_ALIASES: Readonly<Record<string, string>> = Object.fromEntr
 
 const EXPLICIT_SKILL_ALIASES: Readonly<Record<string, string>> = {
   goalfix: 'goalfix',
+  urlfix: 'urlfix',
   fixfast: 'goalfix',
   'repair-verify-merge': 'goalfix',
   goal: 'goalfix',
@@ -181,7 +182,8 @@ export function routeFcrSkills(input: RouteFcrSkillsInput): FcrSkillRoutingDecis
   const automaticCouncilLenses = [...FCR_AUTOMATIC_COUNCIL_LENSES];
   const requiredParallelLenses = [...FCR_REQUIRED_PARALLEL_LENSES];
   const mutationRequested = MUTATING_ACTIONS.has(input.action);
-  const repositoryGoal = isRepositoryGoal(goal) || Boolean(input.repository);
+  const urlfixGoal = policyRequiredCapabilityIds.includes('urlfix');
+  const repositoryGoal = isRepositoryGoal(goal) || Boolean(input.repository) || (urlfixGoal && mutationRequested);
   const uiGoal = isUiGoal(goal) || designCommandIds.length > 0;
   const messagingGoal = isMessagingGoal(goal);
   const commercialGoal = isCommercialGoal(goal);
@@ -243,6 +245,12 @@ export function routeFcrSkills(input: RouteFcrSkillsInput): FcrSkillRoutingDecis
   if (uiGoal) {
     pushUnique(requiredTools, 'playwright');
     pushUnique(requiredProof, 'exact-head Playwright evidence for UI/runtime claims');
+  }
+
+  if (urlfixGoal) {
+    pushUnique(requiredTools, 'playwright');
+    pushUnique(requiredProof, 'URLFIX ownership and live runtime identity must be resolved before source mutation');
+    pushUnique(requiredProof, 'URLFIX repair proof must rerun the same failing browser path after the patch');
   }
 
   if (mutationRequested) {
