@@ -109,7 +109,8 @@ export interface TrustedTools {
   applyPatch(
     task: Task,
     proposal: PatchProposal,
-    allowedFiles: readonly string[]
+    allowedFiles: readonly string[],
+    expectedHead: string // Adapter must atomically compare-and-swap the branch ref before writing.
   ): Promise<{ sha: string; changedFiles: readonly string[] }>;
   /** Run real tools and return their observed artifacts, never fabricated evidence. */
   prove(task: Task, sha: string): Promise<readonly Evidence[]>;
@@ -257,7 +258,7 @@ export async function runGoal(
       reality: 'Patch execution started; write outcome has not been read back.',
       risk: 'Mutation may have partially completed.',
       nextGate: 'Read repo and provider state before any retry.' };
-    const written = await tools.applyPatch(task, proposal, authority!.files);
+    const written = await tools.applyPatch(task, proposal, authority!.files, task.expectedHead);
     const mutated: Receipt = {
       ...lastKnown,
       cause: proposal.cause,
