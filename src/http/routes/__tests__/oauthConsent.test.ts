@@ -175,7 +175,7 @@ describe('OAuth consent proxy', () => {
     expect(read.status).toBe(403);
     expect(decision.status).toBe(403);
     expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(fetchMock.mock.calls.every(([url])=>!String(url).endsWith('/consent'))).toBe(true);
+    expect(fetchMock.mock.calls.every(call => !String((call as unknown[])[0]).endsWith('/consent'))).toBe(true);
   });
 
   it('rejects authorization substitution before forwarding an approval', async()=>{
