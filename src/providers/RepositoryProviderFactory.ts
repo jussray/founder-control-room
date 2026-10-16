@@ -169,6 +169,10 @@ export async function createCapabilityAwareAppRepositoryProvider(
   if (connection.provider !== "github") {
     throw new Error("Capability-aware App authority is only implemented for github");
   }
+  const permissionEntries = Object.entries(requiredPermissions);
+  if (permissionEntries.length === 0 || permissionEntries.some(([, level]) => level !== "read" && level !== "write")) {
+    throw new Error("Capability-aware GitHub App authority requires a non-empty read/write permission declaration");
+  }
   const appId = env.GITHUB_APP_ID?.trim();
   const privateKey = env.GITHUB_PRIVATE_KEY?.trim();
   if (!appId || !privateKey) {
@@ -193,6 +197,7 @@ export async function createCapabilityAwareAppRepositoryProvider(
     projectMap: { [connection.projectId]: connection.repository },
     baseUrl: env.GITHUB_API_BASE_URL,
     env,
+    useProvidedGenealogyToken: true,
   });
   return { provider, authority };
 }
