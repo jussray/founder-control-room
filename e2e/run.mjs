@@ -370,7 +370,7 @@ async function runGuardedTerminalProof(page) {
   // Exercise the *same page's* editor, mission branch patch ledger, and
   // idempotent retry. GitHub is the isolated local REST fixture here.
   const proofPath = 'docs/fcr-workspace-browser-proof.txt';
-  const proofContent = 'FCR editor-to-terminal integration proof\\n';
+  const proofContent = 'FCR editor-to-terminal integration proof\n';
   await page.fill('#file-path', proofPath);
   await page.fill('#file-content', proofContent);
   await page.fill('#mission-id', terminalMissionId);
