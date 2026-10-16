@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
 import test from 'node:test';
 import {
   aggregateTestLedger,
@@ -96,4 +97,27 @@ test('reports failed native checks without becoming a duplicate merge authority'
   assert.equal(ledger.aggregate.state, 'failed');
   assert.equal(ledger.aggregate.counts.failed, 1);
   assert.equal(ledger.runner.authoritativeForMerge, false);
+});
+
+// These event-gated jobs appear as skipped on unrelated PR checks.
+// Verify the exact trigger gates without triggering production or cleanup.
+test('workflow skip guards preserve PR audit, release witness, and cleanup authority', () => {
+  const cases = [
+    ['pr-continuity.yml', 'exact-head-audit', ["if: github.event_name == 'pull_request'"]],
+    ['pr-continuity.yml', 'metadata-receipt', ["if: github.event_name == 'pull_request_target'"]],
+    ['pr-continuity.yml', 'rollover', ["if: github.ref == 'refs/heads/main'", "github.event_name == 'workflow_dispatch' || github.event_name == 'push'"]],
+    ['main-release-provenance.yml', 'provenance', ["if: ${{ github.event_name != 'pull_request' }}"]],
+    ['neon-pr-branches.yml', 'delete_neon_branch', ["github.event.action == 'closed'", 'github.event.pull_request.head.repo.full_name == github.repository']],
+    ['playwright.yml', 'production-release-witness', ["github.event_name == 'workflow_run'", "github.event.workflow_run.event == 'workflow_dispatch'", "github.event.workflow_run.head_branch == 'main'", "github.event.workflow_run.conclusion == 'success'", 'environment: production']],
+  ];
+  for (const [workflow, jobName, guards] of cases) {
+    const source = readFileSync(new URL('../.github/workflows/' + workflow, import.meta.url), 'utf8');
+    const marker = '\n  ' + jobName + ':\n';
+    const start = source.indexOf(marker);
+    assert.notEqual(start, -1, 'Missing ' + workflow + ' job ' + jobName);
+    const jobIntro = source.slice(start + marker.length, start + marker.length + 750);
+    for (const guard of guards) {
+      assert.ok(jobIntro.includes(guard), workflow + ' / ' + jobName + ' missing trigger guard: ' + guard);
+    }
+  }
 });

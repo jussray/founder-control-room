@@ -155,13 +155,26 @@ describe('incident-escalation', () => {
       return new Response('error', { status: 404 });
     }) as any;
 
-    const { logIncidentToLinear } = await import('../incidentEscalation');
+    const { logIncidentToLinear } = await import('../incidentEscalation.js');
     const verdict = createMockVerdict('REPAIR_REQUIRED');
     const env = { LINEAR_API_KEY: 'read-only-key' };
 
     const result = await logIncidentToLinear(verdict, env);
     expect(linearCalled).toBe(true);
     expect(result).toBe(false); // Should detect the error and return false
+  });
+
+  it('rejects malformed Linear JSON without claiming incident delivery', async () => {
+    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue(
+      new Response('null', { status: 200, headers: { 'content-type': 'application/json' } }),
+    );
+    const { logIncidentToLinear } = await import('../incidentEscalation.js');
+    const result = await logIncidentToLinear(createMockVerdict('REPAIR_REQUIRED'), {
+      LINEAR_API_KEY: 'not-a-real-key',
+    });
+    expect(result).toBe(false);
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    fetchSpy.mockRestore();
   });
 
   // IMPLANT 5 TEST: Critical escalation failure detection
@@ -171,7 +184,7 @@ describe('incident-escalation', () => {
     // All channels fail
     global.fetch = vi.fn(async () => new Response('error', { status: 500 })) as any;
 
-    const { escalateIncident } = await import('../incidentEscalation');
+    const { escalateIncident } = await import('../incidentEscalation.js');
     const verdict = createMockVerdict('REPAIR_REQUIRED');
     const env = {}; // No webhooks
 

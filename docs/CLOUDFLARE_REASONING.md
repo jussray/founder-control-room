@@ -203,7 +203,7 @@ Repository configuration can prove the desired binding name and sender restricti
 
 `wrangler.worker.toml` runs `scripts/verify-worker-build-authority.mjs` as its custom Worker build hook. The hook is a repository-side fail-closed membrane, not a provider mutation authority.
 
-For native Cloudflare Workers Builds, the membrane requires the provider-reported commit SHA to equal the checked-out Git source, requires branch/build UUID evidence, and permits only the non-promoting `wrangler versions upload --config wrangler.worker.toml` lane. A native `wrangler deploy` is rejected before promotion with `NATIVE_WORKER_GIT_PROMOTION_BLOCKED`.
+For native Cloudflare Workers Builds, the membrane requires the provider-reported commit SHA to equal the checked-out Git source, requires branch/build UUID evidence, and permits non-promoting `wrangler types` verification and `wrangler versions upload --config wrangler.worker.toml`. Both remain non-promoting; `wrangler types` is not a deployment attempt. A native `wrangler deploy` remains rejected before promotion with `NATIVE_WORKER_GIT_PROMOTION_BLOCKED`.
 
 For GitHub Actions, production promotion is recognized only for the manual `Deploy` or `FCR Worker Reconcile` workflow-dispatch lanes when the checked-out SHA equals the exact GitHub workflow SHA. Ordinary CI remains verification-only. The emitted `fcr/worker-build-authority-receipt@v1` is redacted build evidence and explicitly cannot authorize provider mutation.
 
