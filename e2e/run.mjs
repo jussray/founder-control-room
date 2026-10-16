@@ -338,6 +338,33 @@ async function runGuardedTerminalProof(page) {
     terminalResultText.toLowerCase().includes(REAL_REPO_HEAD_SHA) && terminalResultText.toLowerCase().includes('"status": "passed"'),
     'the guarded terminal spawned a real `git rev-parse HEAD` against this real checkout and returned its real, correct output through the real UI',
   );
+
+  console.log('\\n[workspace] Exercise GitHub Workspace and guarded Git read on the real served Control Room');
+  await page.goto(`${BASE_URL}/control-room/github-workspace.html?project=${TERMINAL_PROOF_REPO}`);
+  await page.waitForSelector('#project-slug');
+  assert(
+    await page.locator('#project-slug').inputValue() === TERMINAL_PROOF_REPO,
+    'project-specific deep link opened the correct workspace without granting any authority',
+  );
+  await page.click('#load-project');
+  const workspaceLoaded = await waitForText(page, '#result', TERMINAL_PROOF_REPO);
+  assert(workspaceLoaded.includes(TERMINAL_PROOF_REPO), 'workspace fetched the registered project through the actual FCR route');
+
+  await page.click('#load-terminal-commands');
+  await page.waitForSelector('#terminal-command:not([disabled])');
+  await page.selectOption('#terminal-command', 'git.head');
+  await page.fill('#terminal-mission-id', terminalMissionId);
+  await page.fill('#terminal-head', REAL_REPO_HEAD_SHA);
+  await page.click('#run-terminal-read');
+  const workspaceReceipt = await waitForText(page, '#terminal-output', REAL_REPO_HEAD_SHA);
+  assert(
+    workspaceReceipt.toLowerCase().includes(REAL_REPO_HEAD_SHA) && workspaceReceipt.includes('"status": "passed"'),
+    'FCR GitHub Workspace executed the same real read-only Git command under the same exact-head mission gate',
+  );
+  assert(
+    !workspaceReceipt.includes('providerAccepted'),
+    'Git status is a repository observation, never claimed as external provider acceptance',
+  );
 }
 
 async function main() {
