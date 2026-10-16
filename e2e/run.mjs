@@ -195,12 +195,16 @@ const { branches: fakeGitHubBranches, trees: fakeGitHubTrees } = demoRepo;
 // returns exactly the sha the real local `git rev-parse HEAD` will also
 // return, letting the terminal's exact-head check pass for real.
 const TERMINAL_PROOF_REPO = 'founder-control-room';
-addRepo({
+const TERMINAL_PROOF_PROJECT_ID = 'ca4f2035-e2cb-4a17-b3a6-77e249568617';
+const TERMINAL_PROOF_MISSION_ID = 'da2f84ca-c0db-4d34-b4a7-e2d7017d66c9';
+// Isolated fake GitHub branch only, not an authorized provider mutation.
+const terminalFixtureRepo = addRepo({
   owner: GITHUB_OWNER,
   repo: TERMINAL_PROOF_REPO,
   defaultBranch: 'main',
   rootCommitSha: REAL_REPO_HEAD_SHA,
 });
+terminalFixtureRepo.branches.set('terminal-proof', { ...terminalFixtureRepo.branches.get('main') });
 const fakeGitHubServer = fakeGitHubApp.listen(0);
 const fakeGitHubPort = await new Promise((resolve) => fakeGitHubServer.once('listening', () => resolve(fakeGitHubServer.address().port)));
 const fakeGitHubUrl = `http://127.0.0.1:${fakeGitHubPort}`;
@@ -218,6 +222,10 @@ const server = spawn(
       FOUNDER_EMAIL,
       E2E_SEED_FOUNDER_EMAIL: FOUNDER_EMAIL,
       E2E_AUTH_BRIDGE_FILE: BRIDGE_FILE,
+      // Test-only fixture. Never accepted as a production approval receipt.
+      E2E_SEED_GITHUB_WORKSPACE_PROJECT_ID: TERMINAL_PROOF_PROJECT_ID,
+      E2E_SEED_GITHUB_WORKSPACE_MISSION_ID: TERMINAL_PROOF_MISSION_ID,
+      E2E_SEED_GITHUB_WORKSPACE_SHA: REAL_REPO_HEAD_SHA,
       // Generate a fresh test-only session secret; never emit it as evidence.
       FOUNDER_SESSION_ENCRYPTION_KEY: randomBytes(32).toString('base64url'),
       PORT: String(PORT),
@@ -266,64 +274,29 @@ async function runGuardedTerminalProof(page) {
   // The terminal runs a real `git` process in this checkout. The fake GitHub
   // server is used only to establish the exact-head proof prerequisite through
   // the same real approval routes; it does not stand in for terminal execution.
-  // Browser requests must use the actual HttpOnly founder session. The
-  // obsolete sessionStorage bearer lane is intentionally not supported.
-  async function founderPost(path, payload) {
-    return page.evaluate(async ({ path, payload }) => {
-      const response = await fetch(path, {
-        method: 'POST',
-        credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      return { ok: response.ok, status: response.status, body: await response.json() };
-    }, { path, payload });
-  }
+  // Negative authority proof: a mission ID alone cannot create a Git branch.
+  const denied = await page.evaluate(async (missionId) => {
+    const response = await fetch(`/approvals/${missionId}/execute`, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        actionType: 'create_branch',
+        idempotencyKey: `e2e-rejected-branch-${missionId}`,
+        payload: { branchName: 'should-not-exist', baseRef: 'main' },
+      }),
+    });
+    return { status: response.status, body: await response.json() };
+  }, TERMINAL_PROOF_MISSION_ID);
+  assert(denied.status === 400 && denied.body.code === 'V10_CAPABILITY_PLAN_REQUIRED',
+    'FCR privileged branch creation remains blocked without the approved V10 plan');
+  assert(!terminalFixtureRepo.branches.has('should-not-exist'),
+    'denied privileged request did not mutate GitHub');
 
-  const projectRes = await founderPost('/projects', {
-    slug: TERMINAL_PROOF_REPO,
-    name: 'Founder Control Room (self)',
-    repoIdentifier: `${GITHUB_OWNER}/${TERMINAL_PROOF_REPO}`,
-  });
-  assert(projectRes.ok, `registered the ${TERMINAL_PROOF_REPO} project so the terminal's command registry (keyed on this exact slug) has somewhere real to run (status ${projectRes.status})`);
-
-  const missionRes = await founderPost(`/projects/${TERMINAL_PROOF_REPO}/missions`, {
-    title: 'Prove the guarded terminal end to end',
-  });
-  const missionBody = missionRes.body;
-  assert(missionRes.ok, `created a mission on ${TERMINAL_PROOF_REPO} (status ${missionRes.status})`);
-  const terminalMissionId = missionBody.mission.id;
-
-  const gateRes = await founderPost(`/approvals/${terminalMissionId}/run-proof-gate`, {
-    gateId: 'create_branch',
-    evidence: {
-      filesChanged: ['mission-plan'],
-      behaviorChanged: 'No behavior change yet — opening the sandbox.',
-      checksRun: ['plan_reviewed'],
-      failures: [],
-      securityImpact: 'none',
-      deploymentImpact: 'none',
-      rollbackPath: 'Delete the sandbox branch.',
-      unresolvedRisks: [],
-    },
-  });
-  assert(gateRes.ok, `create_branch proof gate passed for the terminal mission (status ${gateRes.status}): ${JSON.stringify(gateRes.body)}`);
-
-  const executeRes = await founderPost(`/approvals/${terminalMissionId}/execute`, {
-    actionType: 'create_branch',
-    idempotencyKey: `terminal-proof-branch-${terminalMissionId}`,
-    payload: { branchName: 'terminal-proof', baseRef: 'main' },
-  });
-  const executeBody = executeRes.body;
-  if (!executeRes.ok) throw new Error(`E2E sandbox creation blocked: HTTP ${executeRes.status} ${JSON.stringify(executeBody)}`);
-  assert(
-    executeRes.ok && executeBody.result?.expectedHeadSha === REAL_REPO_HEAD_SHA,
-    `branch creation pinned policy_snapshot.expectedHeadSha to this real repo's actual HEAD (${REAL_REPO_HEAD_SHA}), not just a fake sha — this is the fix for bug #7 below (expectedHeadSha was previously only ever written at merge time, which the guarded terminal's own sandboxed/in_review precondition can never reach)`,
-  );
-  assert(
-    getRepo(GITHUB_OWNER, TERMINAL_PROOF_REPO)?.branches.get('terminal-proof')?.sha === REAL_REPO_HEAD_SHA,
-    "the fake repo's new branch head really does equal this checkout's real git HEAD",
-  );
+  // This pre-seeded mission exists only in the isolated fake Supabase.
+  // Exercise real FCR UI/routes/read-only git and patch ledger, but do NOT
+  // claim this test proves the production V10 approval issuance path.
+  const terminalMissionId = TERMINAL_PROOF_MISSION_ID;
 
   await page.goto(`${BASE_URL}/control-room/github-workspace.html?project=${TERMINAL_PROOF_REPO}`);
   await page.waitForSelector('#project-slug');
