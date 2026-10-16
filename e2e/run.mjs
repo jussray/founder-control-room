@@ -367,6 +367,34 @@ async function runGuardedTerminalProof(page) {
     !workspaceReceipt.includes('providerAccepted'),
     'Git status is a repository observation, never claimed as external provider acceptance',
   );
+  // Exercise the *same page's* editor, mission branch patch ledger, and
+  // idempotent retry. GitHub is the isolated local REST fixture here.
+  const proofPath = 'docs/fcr-workspace-browser-proof.txt';
+  const proofContent = 'FCR editor-to-terminal integration proof\\n';
+  await page.fill('#file-path', proofPath);
+  await page.fill('#file-content', proofContent);
+  await page.fill('#mission-id', terminalMissionId);
+  await page.fill('#commit-message', 'E2E: prove FCR GitHub Workspace patch route');
+  await page.click('#commit-patch');
+  const firstReceiptText = await waitForText(page, '#result', '"commitSha"');
+  const firstReceipt = JSON.parse(firstReceiptText);
+  assert(firstReceipt.ok === true && /^[a-f0-9]{40}$/.test(firstReceipt.commitSha), 'workspace committed a patch with a real idempotency key');
+  const repoAfterPatch = getRepo(GITHUB_OWNER, TERMINAL_PROOF_REPO);
+  const patchedHead = repoAfterPatch?.branches.get('terminal-proof')?.sha;
+  const changedTree = repoAfterPatch?.branches.get('terminal-proof')?.treeSha;
+  assert(patchedHead === firstReceipt.commitSha, 'provider fixture branch HEAD matches patch receipt');
+  assert(repoAfterPatch?.trees.get(changedTree)?.get(proofPath) === proofContent,
+    'workspace patch changed the sandbox branch content and did not touch main');
+  assert(repoAfterPatch?.branches.get('main')?.sha === REAL_REPO_HEAD_SHA,
+    'workspace patch left GitHub main at the original exact SHA');
+
+  await page.click('#commit-patch');
+  const retryReceiptText = await waitForText(page, '#result', '"idempotent": true');
+  const retryReceipt = JSON.parse(retryReceiptText);
+  assert(retryReceipt.idempotent === true && retryReceipt.result?.commitSha === patchedHead,
+    'same browser proposal reused its idempotency key and returned the first commit receipt');
+  assert(repoAfterPatch?.branches.get('terminal-proof')?.sha === patchedHead,
+    'replayed patch did not create another Git commit');
 }
 
 async function main() {
