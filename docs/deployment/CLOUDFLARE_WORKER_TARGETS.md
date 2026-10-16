@@ -115,7 +115,7 @@ That hook makes the repository's production-authority boundary executable before
 
 - native Cloudflare Workers Builds must report an exact `WORKERS_CI_COMMIT_SHA` that equals the checked-out Git HEAD;
 - native builds must retain branch and build UUID evidence;
-- native Workers Builds may run only the non-promoting `wrangler versions upload` lane;
+- native Workers Builds may run non-promoting `wrangler types` generation and `wrangler versions upload` with exact-source evidence;
 - native `wrangler deploy` fails closed before production promotion;
 - GitHub production promotion is recognized only in the manual `Deploy` or `FCR Worker Reconcile` workflow-dispatch contexts when GitHub's exact workflow SHA equals the checked-out source SHA; and
 - ordinary CI/local verification does not become production authority.

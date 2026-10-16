@@ -75,6 +75,50 @@ describe('Worker build authority membrane', () => {
     });
   });
 
+  it('allows Wrangler types during native builds without allowing production promotion', async () => {
+    const { result, receipt } = await runAuthority({
+      WORKERS_CI: '1',
+      WORKERS_CI_COMMIT_SHA: HEAD,
+      WORKERS_CI_BRANCH: 'feature/test',
+      WORKERS_CI_BUILD_UUID: 'types-build-123',
+      WRANGLER_COMMAND: 'types',
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.stderr).not.toContain('NATIVE_WORKER_GIT_PROMOTION_BLOCKED');
+    expect(receipt).toMatchObject({
+      ok: true,
+      wranglerCommand: 'types',
+      executionContext: 'cloudflare-workers-builds',
+      sourceSha: HEAD,
+      checkedOutSha: HEAD,
+      authorityDecision: 'allow',
+      productionPromotionAuthorized: false,
+      nativeWorkerGitPromotionAllowed: false,
+      canAuthorizeProviderMutation: false,
+    });
+  });
+
+  it('rejects Wrangler types when native build source identity does not match', async () => {
+    const { result, receipt } = await runAuthority({
+      WORKERS_CI: '1',
+      WORKERS_CI_COMMIT_SHA: 'a'.repeat(40),
+      WORKERS_CI_BRANCH: 'feature/test',
+      WORKERS_CI_BUILD_UUID: 'types-build-stale',
+      WRANGLER_COMMAND: 'types',
+    });
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('does not match checked-out source');
+    expect(receipt).toMatchObject({
+      ok: false,
+      wranglerCommand: 'types',
+      authorityDecision: 'block',
+      productionPromotionAuthorized: false,
+      nativeWorkerGitPromotionAllowed: false,
+    });
+  });
+
   it('blocks Workers Builds when provider commit identity differs from checked-out source', async () => {
     const { result, receipt } = await runAuthority({
       WORKERS_CI: '1',
