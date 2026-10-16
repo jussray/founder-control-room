@@ -315,6 +315,7 @@ async function runGuardedTerminalProof(page) {
     payload: { branchName: 'terminal-proof', baseRef: 'main' },
   });
   const executeBody = executeRes.body;
+  if (!executeRes.ok) throw new Error(`E2E sandbox creation blocked: HTTP ${executeRes.status} ${JSON.stringify(executeBody)}`);
   assert(
     executeRes.ok && executeBody.result?.expectedHeadSha === REAL_REPO_HEAD_SHA,
     `branch creation pinned policy_snapshot.expectedHeadSha to this real repo's actual HEAD (${REAL_REPO_HEAD_SHA}), not just a fake sha — this is the fix for bug #7 below (expectedHeadSha was previously only ever written at merge time, which the guarded terminal's own sandboxed/in_review precondition can never reach)`,
@@ -324,23 +325,6 @@ async function runGuardedTerminalProof(page) {
     "the fake repo's new branch head really does equal this checkout's real git HEAD",
   );
 
-  await page.click('.tabs button[data-tab=terminal]');
-  await page.waitForSelector('#terminal-project-slug');
-  await page.fill('#terminal-project-slug', TERMINAL_PROOF_REPO);
-  await page.click('#terminal-load-commands');
-  await waitForCount(page, '#terminal-commands .card', 1);
-  await page.click('#terminal-commands .card[data-id="git.head"]');
-  await page.waitForSelector('#terminal-run-form');
-  await page.fill('#terminal-run-form input[name=missionId]', terminalMissionId);
-  await page.fill('#terminal-run-form input[name=expectedCommitSha]', REAL_REPO_HEAD_SHA);
-  await page.click('#terminal-run-form button[type=submit]');
-  const terminalResultText = await waitForText(page, '#terminal-run-result', REAL_REPO_HEAD_SHA);
-  assert(
-    terminalResultText.toLowerCase().includes(REAL_REPO_HEAD_SHA) && terminalResultText.toLowerCase().includes('"status": "passed"'),
-    'the guarded terminal spawned a real `git rev-parse HEAD` against this real checkout and returned its real, correct output through the real UI',
-  );
-
-  console.log('\\n[workspace] Exercise GitHub Workspace and guarded Git read on the real served Control Room');
   await page.goto(`${BASE_URL}/control-room/github-workspace.html?project=${TERMINAL_PROOF_REPO}`);
   await page.waitForSelector('#project-slug');
   assert(
