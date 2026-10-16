@@ -30,6 +30,14 @@ Perplexity does not know private repository, Supabase, provider, or production s
 
 ## GitHub
 
+
+### GitHub App installation and FCR MCP separation (October 16)
+
+The verified installation Setup URL is the existing Plugin Center UI at `https://foundercontrolroom.org/control-room/plugin-center.html`, and a signed GitHub webhook is addressed separately at `https://api.foundercontrolroom.org/webhooks/github`. The GitHub user OAuth Redirect URI must not point to `https://api.foundercontrolroom.org/mcp`. The MCP endpoint is a separately OAuth-protected client protocol, not a GitHub App installation callback. GitHub-supplied `installation_id` is an untrusted browser claim: the founder-authenticated FCR status endpoint must compare it with server-side GitHub App readback for the exact intended repository, refusing to mark the installation verified if they disagree or the provider is unreachable.
+
+App-provided capabilities must be observed from GitHub and constrained to declared repository permissions before token minting; the repository-scoped token never grants founder-final, merge, deployment, publication, credential rotation, or arbitrary user-account authority. The current `GitHubGenealogyProvider` read-only adapter is preserved rather than reverting to a deprecated broad GitHub mutation provider. Source changes and green tests do not prove the GitHub App has been created, installed, or accepted production credentials. See `docs/GITHUB_APP_AUTHORITY.md`.
+
+
 Current repository provider and evidence layer. Branches, commits, PRs, checks, merges, deployments, and runtime health are separate states. Preserve the `RepositoryProvider` boundary so GitHub can be replaced.
 
 Repository supersession is governed by **obligations, not branch age or container similarity**. Provider compare plus PR readback supplies the inventory evidence for candidate work, but a matching file, cherry-picked commit, or stale branch is not closure proof. Before a superseded lane can be called safe to close, every provider-discovered unique commit/file and every required residue class must receive one explicit disposition, the replacement relation must be provider-read and acyclic, unresolved required residue/review findings must be zero, historical evidence must remain recoverable, and runtime-sensitive outcomes require proof bound to the current authoritative head. If a replacement chain later loses the obligation, the obligation becomes orphaned and must surface back into the active control plane.

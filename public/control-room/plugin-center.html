@@ -24,6 +24,7 @@
     .warn { color:var(--warn); }
     .danger { color:var(--danger); }
     .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+    #github-app-setup .mono { overflow-wrap: anywhere; word-break: break-word; }
     .stack { display:flex; flex-direction:column; gap:1rem; }
     .toolbar { display:flex; gap:0.75rem; flex-wrap:wrap; align-items:center; }
     .error { color:var(--danger); white-space:pre-wrap; }
@@ -55,6 +56,13 @@
       </div>
     </header>
 
+    <section class="panel" id="github-app-setup" aria-labelledby="github-app-title" style="margin-bottom:1rem">
+      <h2 id="github-app-title">GitHub App connection</h2>
+      <p class="muted">GitHub App installation and FCR MCP OAuth are two separate connections.</p>
+      <p id="github-app-status" role="status" aria-live="polite">Checking GitHub installation…</p>
+      <p>MCP endpoint: <code class="mono">https://api.foundercontrolroom.org/mcp</code></p>
+      <p class="muted">Authorize your MCP client separately. An App installation does not grant MCP, merge, or deployment authority.</p>
+    </section>
     <section class="grid summary" id="summary"></section>
     <section class="panel" style="margin-top:1rem" id="contract"></section>
 
@@ -104,6 +112,7 @@
       grants: document.getElementById('grants'),
       catalog: document.getElementById('catalog'),
       refresh: document.getElementById('refresh'),
+      githubStatus: document.getElementById('github-app-status'),
     };
 
     function escapeHtml(value) {
@@ -181,7 +190,25 @@
       `).join('');
     }
 
+    async function loadGithubInstallation() {
+      const params = new URLSearchParams();
+      const installationId = new URLSearchParams(location.search).get('installation_id');
+      if (installationId !== null) params.set('installation_id', installationId);
+      try {
+        nodes.githubStatus.textContent = 'Checking GitHub installation…';
+        const result = await api('/plugin-center/github-installation' + (params.size ? '?' + params.toString() : ''));
+        if (!result.verified || result.authorizesMcpAccess !== false) throw new Error('Installation proof failed');
+        nodes.githubStatus.textContent = 'GitHub verified for ' + result.installation.repository +
+          '. Connect your MCP client with separate OAuth.';
+        nodes.githubStatus.className = 'ok';
+      } catch (error) {
+        nodes.githubStatus.textContent = error instanceof Error ? error.message : 'GitHub verification unavailable';
+        nodes.githubStatus.className = 'warn';
+      }
+    }
+
     async function load() {
+      void loadGithubInstallation();
       try {
         nodes.contract.innerHTML = '<p class="muted">Loading Plugin Center…</p>';
         const data = await api('/plugin-center');

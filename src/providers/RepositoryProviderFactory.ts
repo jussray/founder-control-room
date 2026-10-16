@@ -1,5 +1,16 @@
 import { GitHubGenealogyProvider } from "./GitHubGenealogyProvider.js";
-import { getGitHubInstallationToken } from "./githubAppAuth.js";
+import {
+  getGitHubInstallationToken,
+  observeGitHubRepositoryInstallation,
+  type GitHubRepositoryInstallationEvidence,
+  type GitHubInstallationTokenPermissions,
+} from "./githubAppAuth.js";
+import {
+  deriveGitHubAppRepositoryCapabilities,
+  requireGitHubAppRepositoryPermissions,
+  type GitHubAppRepositoryCapabilityContract,
+  type GitHubAppRequiredPermissionLevel,
+} from "./githubAppCapabilities.js";
 import type { RepositoryProvider } from "./RepositoryProvider.js";
 
 export interface RepositoryConnectionInput {
@@ -85,7 +96,13 @@ export interface AppAwareRepositoryProviderDependencies {
     appId: string,
     privateKey: string,
     repositoryIdentifier: string,
+    requiredPermissions?: GitHubInstallationTokenPermissions,
   ) => Promise<string>;
+  observeInstallation?: (
+    appId: string,
+    privateKey: string,
+    repositoryIdentifier: string,
+  ) => Promise<GitHubRepositoryInstallationEvidence>;
 }
 
 /**
@@ -130,4 +147,57 @@ export async function createAppAwareRepositoryProvider(
   throw new Error(
     `No RepositoryProvider implementation for "${connection.provider}" yet`,
   );
+}
+
+export interface CapabilityAwareAppRepositoryProviderResult {
+  /** Current repository-scoped genealogy adapter; capability does not grant mutation. */
+  provider: RepositoryProvider;
+  authority: GitHubAppRepositoryCapabilityContract;
+}
+
+/**
+ * Demand provider-observed App installation permissions before token minting.
+ * Preserve the existing read-only genealogy provider on current main.
+ */
+export async function createCapabilityAwareAppRepositoryProvider(
+  input: RepositoryConnectionInput,
+  requiredPermissions: Readonly<Record<string, GitHubAppRequiredPermissionLevel>>,
+  env: NodeJS.ProcessEnv = process.env,
+  dependencies: AppAwareRepositoryProviderDependencies = {},
+): Promise<CapabilityAwareAppRepositoryProviderResult> {
+  const connection = normalizeRepositoryConnection(input);
+  if (connection.provider !== "github") {
+    throw new Error("Capability-aware App authority is only implemented for github");
+  }
+  const permissionEntries = Object.entries(requiredPermissions);
+  if (permissionEntries.length === 0 || permissionEntries.some(([, level]) => level !== "read" && level !== "write")) {
+    throw new Error("Capability-aware GitHub App authority requires a non-empty read/write permission declaration");
+  }
+  const appId = env.GITHUB_APP_ID?.trim();
+  const privateKey = env.GITHUB_PRIVATE_KEY?.trim();
+  if (!appId || !privateKey) {
+    throw new Error("Capability-aware GitHub App authority requires GITHUB_APP_ID and GITHUB_PRIVATE_KEY");
+  }
+  const evidence = await (dependencies.observeInstallation ?? observeGitHubRepositoryInstallation)(
+    appId, privateKey, connection.repository,
+  );
+  if (evidence.suspendedAt !== null) {
+    throw new Error("GitHub App installation is suspended or its active state is unverified");
+  }
+  const authority = deriveGitHubAppRepositoryCapabilities(evidence);
+  if (authority.appId !== appId || authority.repository.toLowerCase() !== connection.repository.toLowerCase()) {
+    throw new Error("GitHub App installation identity does not match the configured repository");
+  }
+  requireGitHubAppRepositoryPermissions(authority, requiredPermissions);
+  const token = await (dependencies.getInstallationToken ?? getGitHubInstallationToken)(
+    appId, privateKey, connection.repository, requiredPermissions,
+  );
+  const provider = new GitHubGenealogyProvider({
+    token,
+    projectMap: { [connection.projectId]: connection.repository },
+    baseUrl: env.GITHUB_API_BASE_URL,
+    env,
+    useProvidedGenealogyToken: true,
+  });
+  return { provider, authority };
 }

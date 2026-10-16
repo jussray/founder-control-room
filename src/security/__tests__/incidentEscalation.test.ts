@@ -155,7 +155,7 @@ describe('incident-escalation', () => {
       return new Response('error', { status: 404 });
     }) as any;
 
-    const { logIncidentToLinear } = await import('../incidentEscalation');
+    const { logIncidentToLinear } = await import('../incidentEscalation.js');
     const verdict = createMockVerdict('REPAIR_REQUIRED');
     const env = { LINEAR_API_KEY: 'read-only-key' };
 
@@ -171,7 +171,7 @@ describe('incident-escalation', () => {
     // All channels fail
     global.fetch = vi.fn(async () => new Response('error', { status: 500 })) as any;
 
-    const { escalateIncident } = await import('../incidentEscalation');
+    const { escalateIncident } = await import('../incidentEscalation.js');
     const verdict = createMockVerdict('REPAIR_REQUIRED');
     const env = {}; // No webhooks
 

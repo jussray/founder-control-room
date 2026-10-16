@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { randomUUID } from 'node:crypto';
+import { observeGitHubRepositoryInstallation } from '../../providers/githubAppAuth.js';
 import { AUTHORITY_LEVELS } from '../../lib/authorityLevels.js';
 import {
   PLUGIN_CATALOG,
@@ -165,6 +166,52 @@ async function connectionBelongsToProject(connectionId: string, projectId: strin
   if (error) return { ok: false, error: error.message };
   return { ok: Boolean(data), error: null };
 }
+
+/**
+ * Post-installation setup readback. The untrusted installation_id from GitHub's
+ * browser redirect is never a grant, and this does not issue MCP credentials.
+ */
+pluginCenterRouter.get('/github-installation', async (req: FounderRequest, res) => {
+  res.set('Cache-Control', 'no-store');
+  const reported = req.query.installation_id;
+  if (reported !== undefined && (typeof reported !== 'string' || !/^\d{1,20}$/.test(reported))) {
+    return res.status(400).json({ error: 'Invalid installation identifier' });
+  }
+  const appId = process.env.GITHUB_APP_ID?.trim();
+  const privateKey = process.env.GITHUB_PRIVATE_KEY?.trim();
+  if (!appId || !privateKey || !/^\d+$/.test(appId)) {
+    return res.status(503).json({ error: 'FCR GitHub App credentials are not configured' });
+  }
+  try {
+    const evidence = await observeGitHubRepositoryInstallation(
+      appId, privateKey, 'jussray/founder-control-room',
+    );
+    if (evidence.suspendedAt !== null) {
+      return res.status(409).json({ error: 'GitHub App installation is suspended or its active state is unverified' });
+    }
+    if (evidence.repository.toLowerCase() !== 'jussray/founder-control-room'
+        || evidence.appId !== appId
+        || (reported && evidence.installationId !== reported)) {
+      return res.status(409).json({ error: 'GitHub installation identity does not match FCR' });
+    }
+    return res.status(200).json({
+      verified: true,
+      installation: {
+        repository: evidence.repository,
+        appId: evidence.appId,
+        installationId: evidence.installationId,
+        repositorySelection: evidence.repositorySelection,
+        suspendedAt: evidence.suspendedAt,
+        permissions: evidence.permissions,
+      },
+      mcp: { endpoint: 'https://api.foundercontrolroom.org/mcp', auth: 'separate_oauth' },
+      authorizesMcpAccess: false,
+      authorizesMerge: false,
+    });
+  } catch {
+    return res.status(503).json({ error: 'Unable to verify GitHub App installation with GitHub' });
+  }
+});
 
 pluginCenterRouter.get('/', async (_req: FounderRequest, res) => {
   res.set('Cache-Control', 'no-store');

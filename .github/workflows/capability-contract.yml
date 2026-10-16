@@ -27,6 +27,8 @@ on:
       - 'public/assets/plugins/ultrathink.svg'
       - 'docs/PLUGIN_CENTER.md'
       - 'e2e/plugin-center-ultrathink-proof.mjs'
+      - 'e2e/github-app-installation-handoff-proof.mjs'
+      - 'src/http/routes/__tests__/pluginCenter.githubInstallation.integration.test.ts'
       - 'e2e/ultrathink-shared-runtime-proof.mjs'
       - 'package.json'
       - '.github/workflows/capability-contract.yml'
@@ -61,6 +63,7 @@ jobs:
           src/capabilities/__tests__/ultrathinkSharedReasoning.test.ts
           src/lib/__tests__/growthInboxReply.test.ts
           src/http/routes/__tests__/pluginCenter.integration.test.ts
+          src/http/routes/__tests__/pluginCenter.githubInstallation.integration.test.ts
           src/http/routes/__tests__/pluginCenterRevocation.integration.test.ts
           src/http/routes/__tests__/pluginCenterMessaging.integration.test.ts
           src/http/routes/__tests__/publicWebObservation.integration.test.ts
@@ -72,6 +75,8 @@ jobs:
         run: FCR_E2E_SCENARIO=capability-workbench node e2e/direct-browser-run.mjs
       - name: Plugin Center Playwright
         run: node e2e/plugin-center-ultrathink-proof.mjs
+      - name: GitHub App Installation Handoff Playwright
+        run: node e2e/github-app-installation-handoff-proof.mjs
       - name: ULTRATHINK Shared Runtime Playwright
         run: node e2e/ultrathink-shared-runtime-proof.mjs
       - name: Upload capability browser proof
@@ -96,4 +101,11 @@ jobs:
           path: |
             test-results/ultrathink-shared-runtime-receipt.json
             test-results/ultrathink-shared-runtime-mobile.png
+          if-no-files-found: error
+      - name: Upload GitHub App handoff browser proof
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: github-app-handoff-${{ github.sha }}
+          path: test-results/github-app-installation-handoff-mobile.png
           if-no-files-found: error

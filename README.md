@@ -451,3 +451,16 @@ Pin alignment alone cannot promote the successor federation state beyond `UNKNOW
 StoryEngine `main` advanced from the previously pinned `168d65ede38d2477ea00902fa1f0e76f292c583d` through `c9af4ea095561d0837a141e311e8977d796aaaa7` (`feat(video): expose StoryEngine MAKEVIDEO skill`) to independently observed `3c1689fe67142e783fe7d18b5ff610640bdc81d6` (`ci(video): prove StoryEngine MAKEVIDEO skill path`). FCR Playwright run #6969 on `897083276b6c775c49ce30be189a50bd610b5d4c` passed its local/direct browser harness but failed the separate live peer-ref freshness check, so that run is historical browser evidence for the predecessor peer rather than current federation proof.
 
 Rebinding `.github/workflows/playwright.yml` to `3c1689fe67142e783fe7d18b5ff610640bdc81d6` selects the successor evidence subject only. The successor FCR head must complete the live-ref check, immutable peer checkout, exact StoryEngine runtime identity, directive/receipt binding, replay protections, and full Playwright browser witness before federation may be called current. Pin alignment grants no merge, deploy, production, publication, billing, or provider-mutation authority.
+
+
+## October 16 GitHub App installation and MCP handoff
+
+The current FCR GitHub App setup uses `/control-room/plugin-center.html` as its human-facing post-installation Setup URL, not the FCR MCP protocol endpoint. The founder-authenticated Plugin Center asks GitHub to read back the exact `jussray/founder-control-room` App installation, checks any GitHub-provided installation identifier against that readback, and leaves the connection unverified when the App is missing, unavailable, or identity-mismatched. `https://api.foundercontrolroom.org/mcp` remains a separate Supabase OAuth-protected, bounded MCP client connection. This code is a candidate awaiting current CI, provider installation and live browser proof; it is **not** evidence of live installation or MCP activation.
+
+GitHub App permission observation and permission-scoped token minting do not create founder approval, a merge or deployment grant, publication authority, or a broader provider capability. The current read-only genealogy provider remains the implementation behind the newly capability-aware constructor. See `docs/GITHUB_APP_AUTHORITY.md`.
+
+## October 16 GitHub App handoff proof successor
+
+The dedicated GitHub App installation handoff check now has founder-gated readback integration tests and Playwright browser states for verified, mismatched, unauthenticated and malformed GitHub installation callbacks. The Capability Contract workflow executes those checks on the exact PR head and retains a mobile screenshot artifact. This is test evidence of the source and locally served browser, **not** a production GitHub installation, an authenticated live MCP connection or a founder approval.
+
+The FCR-to-StoryEngine Playwright peer was refreshed to independently observed `jussray/StoryEngine main@26b1c34ae7c97c5d1b66a23d6345b3965cfcdc1f` after comparing the former pin and verifying the successor is 22 forward commits with zero behind. A pin update only changes the exact peer subject; complete current-head live-ref, runtime identity and Playwright proof must pass before this federation can be described as verified.

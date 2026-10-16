@@ -288,37 +288,31 @@ export async function logIncidentToLinear(
       }),
     });
 
-    const body = await response.json();
+    const body = (await response.json().catch(() => null)) as {
+      errors?: Array<{ message?: unknown }>;
+      data?: { issueCreate?: { issue?: { id?: unknown } } };
+    } | null;
 
-    // IMPLANT 4: GraphQL error detection — Linear returns 200 OK even for permission errors
-    if (body.errors && Array.isArray(body.errors) && body.errors.length > 0) {
-      console.error(
-        '[incident-escalation] Linear GraphQL error (permission/validation):',
-        body.errors[0].message,
-      );
+    // Linear may report GraphQL failure with HTTP 200. Provider-controlled
+    // response text is intentionally not written to logs.
+    if (Array.isArray(body?.errors) && body.errors.length > 0) {
+      console.error('[incident-escalation] Linear GraphQL request rejected');
       return false;
     }
 
     if (!response.ok) {
-      console.error(
-        '[incident-escalation] Linear HTTP error:',
-        response.status,
-        JSON.stringify(body),
-      );
+      console.error('[incident-escalation] Linear HTTP error:', response.status);
       return false;
     }
 
-    if (!body.data?.issueCreate?.issue?.id) {
-      console.error('[incident-escalation] Linear response missing issue ID:', body);
+    if (typeof body?.data?.issueCreate?.issue?.id !== 'string' || body.data.issueCreate.issue.id.length === 0) {
+      console.error('[incident-escalation] Linear response missing issue ID');
       return false;
     }
 
     return true;
-  } catch (error) {
-    console.error(
-      '[incident-escalation] Linear error:',
-      error instanceof Error ? error.message : String(error),
-    );
+  } catch {
+    console.error('[incident-escalation] Linear delivery error');
     return false;
   }
 }

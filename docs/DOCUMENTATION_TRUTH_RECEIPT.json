@@ -52,7 +52,8 @@
         "The October 2, 2026 transition from StoryEngine `0a1d3b521967a3643daf56cf2ad60b1392bb6e0c` to independently observed `4ec29c1821de8c7bb8c381df31e3f98d0c6016f4` selects a new evidence subject after bounded review of the fail-closed Cloudflare front door, hashed API rate-limit identity, and focused Node tests; predecessor federation proof remains historical, and the successor FCR head must earn its own complete exact-head Playwright witness before the pair is current.",
         "The October 3, 2026 URLFix merge-review transition from the prior StoryEngine peer to independently observed `18d9ba257a69c3d1743f346d424daf31796aaeed` selects a new evidence subject only; the local FCR browser harness passing before the live-peer mismatch does not transfer federation green, and PR #896 must earn a complete exact-head Playwright witness against the successor before the pair is current.",
         "The October 3, 2026 agent-contract v1 transition from StoryEngine `18d9ba257a69c3d1743f346d424daf31796aaeed` to independently observed `168d65ede38d2477ea00902fa1f0e76f292c583d` selects a new evidence subject only; Chief Access recovery PR #913 failing the live-peer check is dependency drift, and the successor FCR head must earn a complete exact-head Playwright witness against the successor before the pair is current.",
-        "The October 5, 2026 transition from StoryEngine `168d65ede38d2477ea00902fa1f0e76f292c583d` through `c9af4ea095561d0837a141e311e8977d796aaaa7` to independently observed `3c1689fe67142e783fe7d18b5ff610640bdc81d6` selects a new evidence subject only; FCR Playwright run #6969 on `897083276b6c775c49ce30be189a50bd610b5d4c` passed the local/direct browser harness but failed the peer freshness check, so `.github/workflows/playwright.yml` must bind the successor exact peer and require a complete exact-head federation rerun before the pair is current."
+        "The October 5, 2026 transition from StoryEngine `168d65ede38d2477ea00902fa1f0e76f292c583d` through `c9af4ea095561d0837a141e311e8977d796aaaa7` to independently observed `3c1689fe67142e783fe7d18b5ff610640bdc81d6` selects a new evidence subject only; FCR Playwright run #6969 on `897083276b6c775c49ce30be189a50bd610b5d4c` passed the local/direct browser harness but failed the peer freshness check, so `.github/workflows/playwright.yml` must bind the successor exact peer and require a complete exact-head federation rerun before the pair is current.",
+        "`.github/workflows/playwright.yml` must pin the independently observed current StoryEngine peer 26b1c34ae7c97c5d1b66a23d6345b3965cfcdc1f and require a fresh exact FCR head plus live peer-ref identity verification before asserting the complete Playwright federation witness; pin alignment alone cannot grant merge or production authority."
       ]
     },
     {
@@ -307,6 +308,101 @@
       "path": "tools/zapier/founder-content-outcome-contract.cjs",
       "claims": [
         "`tools/zapier/founder-content-outcome-contract.cjs` must bind founder-content metrics to the exact observed network, lane, account identity, connector identity, and coverage state; out-of-scope metrics must remain UNKNOWN, cross-account metric donation is forbidden, and these receipts can never grant publication, provider-write, merge, deploy, spend, or external-contact authority."
+      ]
+    },
+    {
+      "path": "src/providers/RepositoryProviderFactory.ts",
+      "claims": [
+        "`src/providers/RepositoryProviderFactory.ts` must continue returning the existing read-only GitHubGenealogyProvider and cannot construct a capability-aware repository provider from a personal token or mint a token before verified exact App/repository identity and required permission readback.",
+        "`src/providers/RepositoryProviderFactory.ts` must reject empty or malformed capability-aware permission declarations before observation or minting and must pass the exact scoped token into genealogy reads rather than independently requesting a broader token."
+      ]
+    },
+    {
+      "path": "src/providers/githubAppAuth.ts",
+      "claims": [
+        "`src/providers/githubAppAuth.ts` must bind short-lived installation-token cache entries to App, repository, and required permission scope, and cannot reuse a cached credential for newly declared permissions without provider readback of the minted token grant.",
+        "`src/providers/githubAppAuth.ts` must require a provider-observed known installation suspension status before claiming App evidence and cannot mint a new token when the installation is suspended; credential scope and cache identity remain bounded to the repository and declared permissions."
+      ]
+    },
+    {
+      "path": "src/providers/githubAppCapabilities.ts",
+      "claims": [
+        "`src/providers/githubAppCapabilities.ts` must derive capabilities only from provider-observed installation permissions and reject missing read/write grants before any downstream token minting, without converting installed capability into founder or merge authority.",
+        "`src/providers/githubAppCapabilities.ts` must reject suspended or unknown installation state and cannot advertise workflows write without a matching contents write grant and explicit request for both token permission scopes."
+      ]
+    },
+    {
+      "path": "src/providers/trustedGithubGovernanceObserver.ts",
+      "claims": [
+        "`src/providers/trustedGithubGovernanceObserver.ts` must verify the Chief repository installation has administration read permission before minting an administration-scoped token to inspect GitHub rulesets, and cannot infer mutation authority from inspection."
+      ]
+    },
+    {
+      "path": "src/security/incidentEscalation.ts",
+      "claims": [
+        "`src/security/incidentEscalation.ts` must normalize unknown Linear HTTP JSON into a bounded response shape, fail closed on invalid provider data, and must never print untrusted provider error payloads or secret-bearing transport text into application logs."
+      ]
+    },
+    {
+      "path": "src/security/__tests__/incidentEscalation.test.ts",
+      "claims": [
+        "`src/security/__tests__/incidentEscalation.test.ts` must use explicit NodeNext-compatible module extensions in dynamic imports so TypeScript compilation and the incident-escalation test discovery remain effective instead of silently omitted."
+      ]
+    },
+    {
+      "path": "src/workers/__tests__/secret-rotation-worker.test.ts",
+      "claims": [
+        "`src/workers/__tests__/secret-rotation-worker.test.ts` must model expected Supabase mock query arguments with typed signatures; test-only signature repairs must not alter secret rotation thresholds or production behavior."
+      ]
+    },
+    {
+      "path": "src/http/routes/__tests__/approvals.gitlab.integration.test.ts",
+      "claims": [
+        "`src/http/routes/__tests__/approvals.gitlab.integration.test.ts` must model the existing idempotency lookup, reservation, and finalization so GitLab patch authority is tested without performing real provider mutation."
+      ]
+    },
+    {
+      "path": "src/http/routes/__tests__/approvals.integration.test.ts",
+      "claims": [
+        "`src/http/routes/__tests__/approvals.integration.test.ts` must preserve patch idempotency key enforcement, including explicit rejection of missing keys and reservation lookup before a sandbox patch mutation."
+      ]
+    },
+    {
+      "path": ".github/workflows/capability-contract.yml",
+      "claims": [
+        "`.github/workflows/capability-contract.yml` must execute the GitHub installation handoff's targeted founder-authentication contract tests and mobile Playwright states on the exact PR head, retain the screenshot artifact and never substitute mocked frontend results for provider installation readback."
+      ]
+    },
+    {
+      "path": "src/http/routes/pluginCenter.ts",
+      "claims": [
+        "`src/http/routes/pluginCenter.ts` must require founder authentication and provider-backed identity matching for installation readback and cannot treat querystring installation ids, an installed App, or a GitHub permission grant as MCP, merge, or deployment authority.",
+        "`src/http/routes/pluginCenter.ts` must withhold the GitHub installation verified status when the provider reports suspension or omits active-state evidence, even if the supplied installation id and App identifier otherwise match."
+      ]
+    },
+    {
+      "path": "e2e/github-app-installation-handoff-proof.mjs",
+      "claims": [
+        "`e2e/github-app-installation-handoff-proof.mjs` must exercise browser verified, mismatched, unauthenticated, malformed, and mobile states for the GitHub App handoff while identifying its API responses as local test fixtures instead of production installation evidence.",
+        "`e2e/github-app-installation-handoff-proof.mjs` must validate the MCP endpoint by exact parsed URL origin, pathname, and absence of extra query/fragment instead of substring matching an arbitrary host."
+      ]
+    },
+    {
+      "path": "scripts/control-room-runtime-state.mjs",
+      "claims": [
+        "`scripts/control-room-runtime-state.mjs` must serialize a single valid JSON document ending with a real newline, not an escaped backslash-n suffix that causes the exact-head Test Ledger job to fail JSON parsing."
+      ]
+    },
+    {
+      "path": "test/control-room-runtime-state.test.mjs",
+      "claims": [
+        "`test/control-room-runtime-state.test.mjs` must exercise the production receipt writer and parse the persisted bytes, proving that a real newline and valid JSON are emitted rather than relying on a mock receipt."
+      ]
+    },
+    {
+      "path": "src/providers/GitHubGenealogyProvider.ts",
+      "claims": [
+        "`src/providers/GitHubGenealogyProvider.ts` must reuse the exact permission-scoped installation token supplied by the capability-aware factory for genealogy reads, and cannot silently remint broader GitHub App credentials when that explicit scoped-token mode is selected."
       ]
     }
   ]
