@@ -90,12 +90,16 @@ for (const project of [
   'sekret-bip',
   'l99',
   'chief-ai-machine',
+  'signal-loop',
   'juss-beautiful-hair-private',
   'juss-beautiful-hair',
   'untold-stories',
 ]) {
   requireText('Terminal registry portfolio coverage', files.registry, `'${project}'`);
 }
+requireText('SignalLoop exact-head read commands', files.registry, "...gitReadCommands('signal-loop', 'signal-loop')");
+forbidText('SignalLoop non-read execution', files.registry, "spec('signal-loop'");
+forbidText('SignalLoop unverified script execution', files.registry, "...playwrightSetupCommands('signal-loop'");
 forbidText('Terminal registry', files.registry, "'bash'");
 forbidText('Terminal registry', files.registry, "'sh'");
 forbidText('Terminal registry', files.registry, "'powershell'");
