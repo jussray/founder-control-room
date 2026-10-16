@@ -308,6 +308,30 @@
       "claims": [
         "`tools/zapier/founder-content-outcome-contract.cjs` must bind founder-content metrics to the exact observed network, lane, account identity, connector identity, and coverage state; out-of-scope metrics must remain UNKNOWN, cross-account metric donation is forbidden, and these receipts can never grant publication, provider-write, merge, deploy, spend, or external-contact authority."
       ]
+    },
+    {
+      "path": "src/providers/RepositoryProviderFactory.ts",
+      "claims": [
+        "`src/providers/RepositoryProviderFactory.ts` must continue returning the existing read-only GitHubGenealogyProvider and cannot construct a capability-aware repository provider from a personal token or mint a token before verified exact App/repository identity and required permission readback."
+      ]
+    },
+    {
+      "path": "src/providers/githubAppAuth.ts",
+      "claims": [
+        "`src/providers/githubAppAuth.ts` must bind short-lived installation-token cache entries to App, repository, and required permission scope, and cannot reuse a cached credential for newly declared permissions without provider readback of the minted token grant."
+      ]
+    },
+    {
+      "path": "src/providers/githubAppCapabilities.ts",
+      "claims": [
+        "`src/providers/githubAppCapabilities.ts` must derive capabilities only from provider-observed installation permissions and reject missing read/write grants before any downstream token minting, without converting installed capability into founder or merge authority."
+      ]
+    },
+    {
+      "path": "src/providers/trustedGithubGovernanceObserver.ts",
+      "claims": [
+        "`src/providers/trustedGithubGovernanceObserver.ts` must verify the Chief repository installation has administration read permission before minting an administration-scoped token to inspect GitHub rulesets, and cannot infer mutation authority from inspection."
+      ]
     }
   ]
 }
