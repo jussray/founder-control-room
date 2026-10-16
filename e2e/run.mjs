@@ -222,10 +222,17 @@ const server = spawn(
       FOUNDER_EMAIL,
       E2E_SEED_FOUNDER_EMAIL: FOUNDER_EMAIL,
       E2E_AUTH_BRIDGE_FILE: BRIDGE_FILE,
-      // Test-only fixture. Never accepted as a production approval receipt.
-      E2E_SEED_GITHUB_WORKSPACE_PROJECT_ID: TERMINAL_PROOF_PROJECT_ID,
-      E2E_SEED_GITHUB_WORKSPACE_MISSION_ID: TERMINAL_PROOF_MISSION_ID,
-      E2E_SEED_GITHUB_WORKSPACE_SHA: REAL_REPO_HEAD_SHA,
+      // Seed only the guarded-terminal scenario. Seeding the full journey
+      // pre-populates the project list and makes its first project/mission
+      // assertions target the wrong fixture instead of a new UI-created row.
+      // These values remain test-only, never a V10 authorization receipt.
+      ...(E2E_SCENARIO === 'guarded-terminal'
+        ? {
+          E2E_SEED_GITHUB_WORKSPACE_PROJECT_ID: TERMINAL_PROOF_PROJECT_ID,
+          E2E_SEED_GITHUB_WORKSPACE_MISSION_ID: TERMINAL_PROOF_MISSION_ID,
+          E2E_SEED_GITHUB_WORKSPACE_SHA: REAL_REPO_HEAD_SHA,
+        }
+        : {}),
       // Generate a fresh test-only session secret; never emit it as evidence.
       FOUNDER_SESSION_ENCRYPTION_KEY: randomBytes(32).toString('base64url'),
       PORT: String(PORT),
