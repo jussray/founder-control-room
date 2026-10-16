@@ -10,6 +10,8 @@ const ultrathinkPluginProofUrl = new URL('../e2e/plugin-center-ultrathink-proof.
 const ultrathinkPluginProof = fs.readFileSync(ultrathinkPluginProofUrl, 'utf8');
 const composerProofUrl = new URL('../e2e/control-room-composer-proof.mjs', import.meta.url);
 const composerProof = fs.readFileSync(composerProofUrl, 'utf8');
+const visualParityProofUrl = new URL('../e2e/control-room-visual-parity-proof.mjs', import.meta.url);
+const visualParityProof = fs.readFileSync(visualParityProofUrl, 'utf8');
 const pkg = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
 
 assert.match(bootstrap, /--no-proxy-server/);
@@ -32,6 +34,10 @@ assert.match(composerProof, /composer-desktop/);
 assert.match(composerProof, /composer-mobile/);
 assert.match(composerProof, /submittedPayload\.controlRoom/);
 assert.match(composerProof, /test-results\/control-room-composer/);
+assert.match(visualParityProof, /from 'playwright'/);
+assert.match(visualParityProof, /controlRoomVisualBridge/);
+assert.match(visualParityProof, /desktop project choices use the canonical four-column card rhythm/);
+assert.match(visualParityProof, /mobile onboarding condenses to two premium cards per row/);
 
 execFileSync(process.execPath, [fileURLToPath(localPlaywrightProofUrl)], {
   stdio: 'inherit',
@@ -48,4 +54,9 @@ execFileSync(process.execPath, [fileURLToPath(composerProofUrl)], {
   env: process.env,
 });
 
-console.log('direct browser contract verified with local, ULTRATHINK Plugin Center, and Control Room Composer Playwright proofs');
+execFileSync(process.execPath, [fileURLToPath(visualParityProofUrl)], {
+  stdio: 'inherit',
+  env: process.env,
+});
+
+console.log('direct browser contract verified with local, ULTRATHINK Plugin Center, Control Room Composer, and FCR visual parity Playwright proofs');

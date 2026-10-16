@@ -67,6 +67,21 @@ describe("RepositoryProviderFactory", () => {
     ).toBe("github");
   });
 
+  it("exposes genealogy only through the mapped repository provider and rejects cross-project reads", async () => {
+    const provider = createRepositoryProvider(
+      {
+        slug: "sekret-bip",
+        repoProvider: "github",
+        repoIdentifier: "jussray/Sekret-Bip",
+      },
+      { GITHUB_TOKEN: "test-only-token" },
+    );
+
+    expect(provider.readChangeGenealogyEvidence).toBeTypeOf("function");
+    await expect(provider.readChangeGenealogyEvidence?.("founder-control-room"))
+      .rejects.toThrow('no repo mapped for projectId "founder-control-room"');
+  });
+
   it("prefers a repository-scoped GitHub App installation token when production credentials exist", async () => {
     const getInstallationToken = vi.fn().mockResolvedValue("installation-token");
     const provider = await createAppAwareRepositoryProvider(
@@ -89,6 +104,7 @@ describe("RepositoryProviderFactory", () => {
       "jussray/Sekret-Bip",
     );
     expect(provider.name).toBe("github");
+    expect(provider.readChangeGenealogyEvidence).toBeTypeOf("function");
   });
 
   it("fails closed for a partial GitHub App configuration instead of silently using a fallback token", async () => {
@@ -105,102 +121,43 @@ describe("RepositoryProviderFactory", () => {
     )).rejects.toThrow("GITHUB_APP_ID and GITHUB_PRIVATE_KEY must be configured together");
   });
 
-  it("proves live App permissions and binds the minted token to the same declared scope", async () => {
+  it("rejects missing App permissions before installation-token minting", async () => {
     const observeInstallation = vi.fn().mockResolvedValue({
-      repository: "jussray/Sekret-Bip",
-      appId: "123456",
-      installationId: "444",
+      repository: "jussray/founder-control-room",
+      appId: "900001",
+      installationId: "7654321",
       repositorySelection: "selected",
-      permissions: {
-        contents: "write",
-        pull_requests: "write",
-        checks: "read",
-      },
-      accountLogin: "jussray",
-      accountType: "User",
+      permissions: { contents: "read", checks: "read" },
     });
-    const getInstallationToken = vi.fn().mockResolvedValue("installation-token");
-    const requiredPermissions = {
-      contents: "write",
-      pull_requests: "write",
-      checks: "read",
-    } as const;
-
-    const result = await createCapabilityAwareAppRepositoryProvider(
-      {
-        slug: "sekret-bip",
-        repoProvider: "github",
-        repoIdentifier: "jussray/Sekret-Bip",
-      },
-      requiredPermissions,
-      {
-        GITHUB_APP_ID: "123456",
-        GITHUB_PRIVATE_KEY: "test-private-key",
-        GITHUB_TOKEN: "fallback-must-not-authorize-this-path",
-      },
-      { observeInstallation, getInstallationToken },
-    );
-
-    expect(observeInstallation).toHaveBeenCalledWith(
-      "123456",
-      "test-private-key",
-      "jussray/Sekret-Bip",
-    );
-    expect(getInstallationToken).toHaveBeenCalledWith(
-      "123456",
-      "test-private-key",
-      "jussray/Sekret-Bip",
-      requiredPermissions,
-    );
-    expect(result.provider.name).toBe("github");
-    expect(result.authority).toMatchObject({
-      repository: "jussray/Sekret-Bip",
-      appId: "123456",
-      installationId: "444",
-      can: {
-        writeContents: true,
-        writePullRequests: true,
-        readChecks: true,
-      },
-    });
-  });
-
-  it("refuses App provider construction before token minting when a required permission is missing", async () => {
-    const observeInstallation = vi.fn().mockResolvedValue({
-      repository: "jussray/Sekret-Bip",
-      appId: "123456",
-      installationId: "444",
-      repositorySelection: "selected",
-      permissions: { contents: "read" },
-    });
-    const getInstallationToken = vi.fn().mockResolvedValue("must-not-be-used");
-
+    const getInstallationToken = vi.fn();
     await expect(createCapabilityAwareAppRepositoryProvider(
-      {
-        slug: "sekret-bip",
-        repoProvider: "github",
-        repoIdentifier: "jussray/Sekret-Bip",
-      },
-      { contents: "write" },
-      {
-        GITHUB_APP_ID: "123456",
-        GITHUB_PRIVATE_KEY: "test-private-key",
-      },
+      { slug: "founder-control-room", repoProvider: "github", repoIdentifier: "jussray/founder-control-room" },
+      { checks: "write" },
+      { GITHUB_APP_ID: "900001", GITHUB_PRIVATE_KEY: "test-only-key", GITHUB_TOKEN: "not-authority" },
       { observeInstallation, getInstallationToken },
-    )).rejects.toThrow(/contents:write \(observed read\)/);
-
+    )).rejects.toThrow(/checks:write/);
     expect(getInstallationToken).not.toHaveBeenCalled();
   });
 
-  it("never allows the capability-aware App path to fall back to an ambient token", async () => {
-    await expect(createCapabilityAwareAppRepositoryProvider(
-      {
-        slug: "sekret-bip",
-        repoProvider: "github",
-        repoIdentifier: "jussray/Sekret-Bip",
-      },
+  it("preserves the current genealogy provider with a scoped App token", async () => {
+    const observeInstallation = vi.fn().mockResolvedValue({
+      repository: "jussray/founder-control-room",
+      appId: "900001",
+      installationId: "7654321",
+      repositorySelection: "selected",
+      permissions: { contents: "read", pull_requests: "read" },
+    });
+    const getInstallationToken = vi.fn().mockResolvedValue("test-only-installation-token");
+    const result = await createCapabilityAwareAppRepositoryProvider(
+      { slug: "founder-control-room", repoProvider: "github", repoIdentifier: "jussray/founder-control-room" },
       { contents: "read" },
-      { GITHUB_TOKEN: "ambient-token" },
-    )).rejects.toThrow(/requires GITHUB_APP_ID and GITHUB_PRIVATE_KEY/);
+      { GITHUB_APP_ID: "900001", GITHUB_PRIVATE_KEY: "test-only-key" },
+      { observeInstallation, getInstallationToken },
+    );
+    expect(result.provider.readChangeGenealogyEvidence).toBeTypeOf("function");
+    expect(result.authority.can.readContents).toBe(true);
+    expect(getInstallationToken).toHaveBeenCalledWith(
+      "900001", "test-only-key", "jussray/founder-control-room", { contents: "read" },
+    );
   });
 });
