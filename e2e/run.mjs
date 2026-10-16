@@ -27,7 +27,7 @@
 // have authority nobody granted.
 
 import { spawn, execFileSync } from 'node:child_process';
-import { createHmac, randomUUID } from 'node:crypto';
+import { createHmac, randomBytes, randomUUID } from 'node:crypto';
 import { mkdirSync, readFileSync, existsSync, unlinkSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -218,6 +218,8 @@ const server = spawn(
       FOUNDER_EMAIL,
       E2E_SEED_FOUNDER_EMAIL: FOUNDER_EMAIL,
       E2E_AUTH_BRIDGE_FILE: BRIDGE_FILE,
+      // Generate a fresh test-only session secret; never emit it as evidence.
+      FOUNDER_SESSION_ENCRYPTION_KEY: randomBytes(32).toString('base64url'),
       PORT: String(PORT),
       NODE_ENV: 'development',
       CONTROL_ROOM_TERMINAL_ENABLED: 'true',
