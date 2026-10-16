@@ -110,9 +110,9 @@ function authorizationIssuer(env: NodeJS.ProcessEnv): string | null {
  * narrow that scope when present, but it is never required and can never widen
  * the server grant.
  *
- * Dynamic clients are accepted by default after Supabase registration and
- * founder consent. Operators may opt into a static client allowlist by setting
- * FCR_REMOTE_MCP_OAUTH_ENFORCE_CLIENT_ALLOWLIST=true.
+ * Registration and consent never grant FCR MCP access on their own.
+ * Only exact server-approved OAuth client IDs may reach this resource.
+ * Dynamic registration remains a provider capability, not FCR authorization.
  */
 export async function verifyPairedSupabaseOauthToken(
   token: string,
@@ -136,11 +136,10 @@ export async function verifyPairedSupabaseOauthToken(
   if (typeof claims.nbf === 'number' && claims.nbf > now + 30) throw new Error('OAuth access token is not active');
   if (!claimScopes(claims.scope).includes(requiredScope)) throw new Error('OAuth scope is insufficient');
 
-  if (env.FCR_REMOTE_MCP_OAUTH_ENFORCE_CLIENT_ALLOWLIST?.trim() === 'true') {
-    const allowedClients = new Set(commaList(env.FCR_REMOTE_MCP_OAUTH_CLIENT_IDS));
-    if (allowedClients.size === 0 || !allowedClients.has(clientId)) {
-      throw new Error('OAuth client is not allowed');
-    }
+  // Fail closed without an explicit list, irrespective of dynamic registration.
+  const allowedClients = new Set(commaList(env.FCR_REMOTE_MCP_OAUTH_CLIENT_IDS));
+  if (allowedClients.size === 0 || !allowedClients.has(clientId)) {
+    throw new Error('OAuth client is not allowed');
   }
 
   // Absence means the server-defined maximum grant. A present, malformed
