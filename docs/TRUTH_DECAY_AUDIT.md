@@ -1,5 +1,11 @@
 # Truth Decay Audit: When a True Claim Becomes Unsafe to Reuse
 
+## October 16, 2026: FCR development workspace evidence
+
+The updated FCR GitHub Workspace exposes repository editing and read-only terminal controls together and links selected Portfolio projects to the same authenticated workbench. The browser test in `.github/workflows/playwright.yml` exercises the real served FCR application at a selected exact source commit, using test-only external GitHub and Supabase substitutes. A passing test must not imply production browser availability, provider account writes, unrestricted terminal execution, or release authority. A failed or skipped test keeps application integration unverified.
+
+The browser proof expires when the FCR candidate commit changes. Bip remains an independent application and control room; no evidence from FCR tests can establish a Bip runtime outcome. The project-selector URL is a read-context convenience and never authorizes repository mutation.
+
 ## Incident class
 
 A claim can be truthful when observed and still become false, stale, superseded, or unknown before it is used.
