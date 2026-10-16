@@ -34,7 +34,7 @@ test('written runtime state receipt is one valid JSON document with a newline', 
     const contents = fs.readFileSync(receiptPath, 'utf8');
     assert.deepEqual(JSON.parse(contents), receipt);
     assert.equal(contents.endsWith(String.fromCharCode(10)), true);
-    assert.equal(contents.endsWith(String.raw`\\n`), false);
+    assert.equal(contents.endsWith(String.fromCharCode(92, 110)), false);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
