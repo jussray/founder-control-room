@@ -381,6 +381,18 @@
       "claims": [
         "`e2e/github-app-installation-handoff-proof.mjs` must exercise browser verified, mismatched, unauthenticated, malformed, and mobile states for the GitHub App handoff while identifying its API responses as local test fixtures instead of production installation evidence."
       ]
+    },
+    {
+      "path": "scripts/control-room-runtime-state.mjs",
+      "claims": [
+        "`scripts/control-room-runtime-state.mjs` must serialize a single valid JSON document ending with a real newline, not an escaped backslash-n suffix that causes the exact-head Test Ledger job to fail JSON parsing."
+      ]
+    },
+    {
+      "path": "test/control-room-runtime-state.test.mjs",
+      "claims": [
+        "`test/control-room-runtime-state.test.mjs` must exercise the production receipt writer and parse the persisted bytes, proving that a real newline and valid JSON are emitted rather than relying on a mock receipt."
+      ]
     }
   ]
 }
