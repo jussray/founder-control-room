@@ -201,6 +201,7 @@ pluginCenterRouter.get('/github-installation', async (req: FounderRequest, res) 
         appId: evidence.appId,
         installationId: evidence.installationId,
         repositorySelection: evidence.repositorySelection,
+        suspendedAt: evidence.suspendedAt,
         permissions: evidence.permissions,
       },
       mcp: { endpoint: 'https://api.foundercontrolroom.org/mcp', auth: 'separate_oauth' },
