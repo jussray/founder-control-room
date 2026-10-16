@@ -223,20 +223,46 @@
       nodes.result.textContent = `Loaded ${data.path}@${data.ref}`;
     }
 
+    // One stable key per proposal. A network retry must never create a second
+    // GitHub commit because an HTTP response was lost. Content is held in RAM
+    // only; no source code, mission key, or approval is persisted in storage.
+    let pendingPatch = null;
+    let patchInFlight = false;
+
     async function commitPatch() {
+      if (patchInFlight) return;
       const missionId = nodes.missionId.value.trim();
       const path = nodes.filePath.value.trim();
       const message = nodes.commitMessage.value.trim();
       if (!missionId || !path || !message) throw new Error('missionId, file path, and commit message are required.');
-      const data = await api(`/approvals/${encodeURIComponent(missionId)}/patch`, {
-        method: 'POST',
-        body: JSON.stringify({ message, changes: [{ path, content: nodes.fileContent.value }] }),
-      });
-      nodes.result.textContent = JSON.stringify(data, null, 2);
-      if (data.commitSha) {
-        nodes.readRef.value = data.branch || nodes.readRef.value;
-        if (/^[0-9a-f]{40}$/i.test(data.commitSha)) nodes.terminalHead.value = data.commitSha.toLowerCase();
-        resetTerminalRead();
+      const changes = [{ path, content: nodes.fileContent.value }];
+      const signature = JSON.stringify({ projectSlug: nodes.projectSlug.value.trim(), missionId, message, changes });
+      if (pendingPatch?.signature !== signature) {
+        if (!globalThis.crypto?.randomUUID) throw new Error('Secure browser UUID generation is unavailable. No patch was submitted.');
+        pendingPatch = { signature, idempotencyKey: crypto.randomUUID() };
+      }
+      const idempotencyKey = pendingPatch.idempotencyKey;
+      const button = document.getElementById('commit-patch');
+      patchInFlight = true;
+      button.disabled = true;
+      nodes.result.textContent = 'Requesting a mission-branch commit. Do not resubmit until its receipt is known.';
+      try {
+        const data = await api(`/approvals/${encodeURIComponent(missionId)}/patch`, {
+          method: 'POST',
+          body: JSON.stringify({ idempotencyKey, message, changes }),
+        });
+        nodes.result.textContent = JSON.stringify(data, null, 2);
+        const receipt = data.result && typeof data.result === 'object' ? data.result : data;
+        if (typeof receipt.commitSha === 'string' && /^[0-9a-f]{40}$/i.test(receipt.commitSha)) {
+          nodes.readRef.value = receipt.branch || nodes.readRef.value;
+          nodes.terminalHead.value = receipt.commitSha.toLowerCase();
+          resetTerminalRead();
+        }
+        // Retain the key for an identical subsequent click; backend replay
+        // will return the prior result, not create a duplicate commit.
+      } finally {
+        patchInFlight = false;
+        button.disabled = false;
       }
     }
 
