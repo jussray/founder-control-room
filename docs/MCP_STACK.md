@@ -15,7 +15,7 @@ The Control Room source defines one provider-neutral external connector boundary
 - transport: stateless Streamable HTTP with MCP `2026-07-28`, plus initialization-based `2025-11-25`, `2025-06-18`, and `2025-03-26` compatibility;
 - canonical auth: Supabase OAuth 2.1 access tokens using PKCE/DCR, standard audience `authenticated`, standard scope `email`, a non-empty `client_id`, current Supabase user validity, and the server-side `founder_users` allowlist;
 - project authority: the server-owned FCR portfolio registry is the maximum external project grant. An optional `mcp_projects` claim may narrow that grant when present but is never required and can never widen it;
-- client registration: dynamically registered client IDs are accepted after Supabase authorization and founder validation. Exact static client-ID allowlisting is optional hardening when `FCR_REMOTE_MCP_OAUTH_ENFORCE_CLIENT_ALLOWLIST=true`;
+- client registration: OAuth 2.1 dynamic registration may create a client identity at the provider, but a registered client receives no MCP authority until its exact client ID is independently admitted to both the consent and external-tool server-held allowlists;
 - compatibility auth: `/mcp/read` is an auto-dynamic compatibility alias. An exact timing-safe match to `FCR_REMOTE_MCP_READ_TOKEN` retains the legacy bounded static path; every other credential shape receives a 307 POST-preserving redirect to canonical `/mcp`, where the shared OAuth/DCR verifier applies. Failed OAuth never downgrades to static auth;
 - resource identity: `/mcp` remains the canonical protected OAuth resource. `/mcp/read` is a compatibility alias, not a second authorization server or independent authority root;
 - evidence: every successful external tool call must persist a redacted `mcp_tool_calls` receipt or the call fails closed.
@@ -44,7 +44,7 @@ Source readiness is not production readiness. Before deployment, all of the foll
 - reconcile the live Supabase migration ledger so `mcp_servers`, `mcp_project_policies`, and `mcp_tool_calls` actually exist with the checked-in RLS/grant contract;
 - enable Supabase OAuth 2.1 and dynamic client registration for MCP, using the current supported standard access-token audience/scope contract (`authenticated` + `email`);
 - preserve explicit founder consent and validate every issued token against the current Supabase user plus an FCR `founder_users` allowlist row whose immutable `user_id` exactly matches that user (email alone or NULL binding grants no authority);
-- use DCR for compatible external clients. Static client-ID allowlisting may be enabled as optional hardening but is not a prerequisite for DCR;
+- use DCR only where the OAuth provider and client actually support it; after any registration, verify the exact callback URI and explicitly allowlist the resulting client ID before enabling consent or MCP tools. Unlisted clients fail closed;
 - configure `FCR_REMOTE_MCP_*` and `CHIEF_AI_BASE_URL` without reusing provider/deploy credentials;
 - prove the Chief URL/binding and FCR Worker SHA, then run the Attack Ten auth/scope/replay/header/evidence/client matrix;
 - prove both compatibility branches on `/mcp/read`: a 307 redirect of non-legacy credentials to the canonical OAuth resource plus exact legacy-token tool discovery without downgrade from failed OAuth;
