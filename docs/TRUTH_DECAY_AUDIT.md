@@ -1,5 +1,11 @@
 # Truth Decay Audit: When a True Claim Becomes Unsafe to Reuse
 
+## October 16, 2026: StoryEngine peer-identity renewal, without inherited proof
+
+FCR's new actual-server GitHub Workspace/browser test, full founder UI journey, capability workbench, and guarded terminal scenarios passed on the predecessor candidate while the separate FCR-to-StoryEngine test failed at the live peer-ref gate. The workflow expected StoryEngine `a6e6a396ed30535af2fd9b1ec2347a84e1a3fbf3` while independently observed `refs/heads/main` resolved to `26b1c34ae7c97c5d1b66a23d6345b3965cfcdc1f`. The former is not a current federation subject.
+
+GitHub comparison classified the successor as strictly ahead by 22 commits, with changes across StoryEngine route, browser, video, and proof surfaces. The successor had 15 of 15 check runs successful at observation, including the Control Room federation contract, but those checks belong only to StoryEngine. Rebinding FCR's immutable peer SHA selects the newer evidence subject and unblocks the fresh witness; it neither verifies pair compatibility nor carries old Playwright results forward. Only completed exact-head FCR-to-StoryEngine runtime, directive/receipt, replay, and browser checks can renew that narrow integration claim. No merge, deploy, release, publisher, or production authority transfers by changing the pin.
+
 ## October 16, 2026: FCR development workspace evidence
 
 The updated FCR GitHub Workspace exposes repository editing and read-only terminal controls together and links selected Portfolio projects to the same authenticated workbench. The browser test in `.github/workflows/playwright.yml` exercises the real served FCR application at a selected exact source commit, using test-only external GitHub and Supabase substitutes. A passing test must not imply production browser availability, provider account writes, unrestricted terminal execution, or release authority. A failed or skipped test keeps application integration unverified.
