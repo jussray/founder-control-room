@@ -127,6 +127,7 @@ describe("RepositoryProviderFactory", () => {
       appId: "900001",
       installationId: "7654321",
       repositorySelection: "selected",
+      suspendedAt: null,
       permissions: { contents: "read", checks: "read" },
     });
     const getInstallationToken = vi.fn();
@@ -145,6 +146,7 @@ describe("RepositoryProviderFactory", () => {
       appId: "900001",
       installationId: "7654321",
       repositorySelection: "selected",
+      suspendedAt: null,
       permissions: { contents: "read", pull_requests: "read" },
     });
     const getInstallationToken = vi.fn().mockResolvedValue("test-only-installation-token");
@@ -159,5 +161,67 @@ describe("RepositoryProviderFactory", () => {
     expect(getInstallationToken).toHaveBeenCalledWith(
       "900001", "test-only-key", "jussray/founder-control-room", { contents: "read" },
     );
+  });
+
+  it("rejects an empty permission declaration without observing or minting a token", async () => {
+    const observeInstallation = vi.fn();
+    const getInstallationToken = vi.fn();
+    await expect(createCapabilityAwareAppRepositoryProvider(
+      { slug: "founder-control-room", repoProvider: "github", repoIdentifier: "jussray/founder-control-room" },
+      {},
+      { GITHUB_APP_ID: "900001", GITHUB_PRIVATE_KEY: "test-only-key" },
+      { observeInstallation, getInstallationToken },
+    )).rejects.toThrow(/non-empty read\/write permission declaration/);
+    expect(observeInstallation).not.toHaveBeenCalled();
+    expect(getInstallationToken).not.toHaveBeenCalled();
+  });
+
+  it("uses the declared token for genealogy reads instead of re-minting with wider permissions", async () => {
+    const observeInstallation = vi.fn().mockResolvedValue({
+      repository: "jussray/founder-control-room",
+      appId: "900001",
+      installationId: "7654321",
+      repositorySelection: "selected",
+      suspendedAt: null,
+      permissions: { contents: "read" },
+    });
+    const getInstallationToken = vi.fn().mockResolvedValue("test-only-scoped-installation-token");
+    const previousFetch = global.fetch;
+    const fetchMock = vi.fn(async (_url: string | URL | Request, _init?: RequestInit) =>
+      new Response("denied", { status: 403 }));
+    global.fetch = fetchMock as typeof fetch;
+    try {
+      const result = await createCapabilityAwareAppRepositoryProvider(
+        { slug: "founder-control-room", repoProvider: "github", repoIdentifier: "jussray/founder-control-room" },
+        { contents: "read" },
+        { GITHUB_APP_ID: "900001", GITHUB_PRIVATE_KEY: "test-only-key" },
+        { observeInstallation, getInstallationToken },
+      );
+      await expect(result.provider.readChangeGenealogyEvidence?.("founder-control-room"))
+        .rejects.toThrow(/denied/);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(fetchMock.mock.calls[0]?.[0]).toContain("/repos/jussray/founder-control-room");
+      expect(fetchMock.mock.calls[0]?.[1]?.headers).toMatchObject({
+        Authorization: "Bearer test-only-scoped-installation-token",
+      });
+      expect(getInstallationToken).toHaveBeenCalledTimes(1);
+    } finally {
+      global.fetch = previousFetch;
+    }
+  });
+
+  it("rejects suspended installations before token minting", async () => {
+    const getInstallationToken = vi.fn();
+    await expect(createCapabilityAwareAppRepositoryProvider(
+      { slug: "founder-control-room", repoProvider: "github", repoIdentifier: "jussray/founder-control-room" },
+      { contents: "read" },
+      { GITHUB_APP_ID: "900001", GITHUB_PRIVATE_KEY: "test-only-key" },
+      { observeInstallation: vi.fn().mockResolvedValue({
+        repository: "jussray/founder-control-room", appId: "900001",
+        installationId: "7654321", repositorySelection: "selected",
+        suspendedAt: "2026-10-16T11:00:00Z", permissions: { contents: "read" },
+      }), getInstallationToken },
+    )).rejects.toThrow(/suspended/);
+    expect(getInstallationToken).not.toHaveBeenCalled();
   });
 });

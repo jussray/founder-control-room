@@ -17,6 +17,7 @@ export interface GitHubRepositoryInstallationEvidence {
   appId: string;
   installationId: string;
   repositorySelection: string;
+  suspendedAt: string | null;
   permissions: Readonly<Record<string, string>>;
   accountLogin?: string;
   accountType?: string;
@@ -183,7 +184,11 @@ async function resolveGitHubRepositoryInstallation(
     );
   }
 
-  return { appClient, installation, repository, installationId, observedAppId };
+  const suspendedAt = installation.suspended_at;
+  if (suspendedAt !== null && (typeof suspendedAt !== "string" || !suspendedAt.trim())) {
+    throw new Error("GitHub App installation did not report a valid suspension state");
+  }
+  return { appClient, installation, repository, installationId, observedAppId, suspendedAt };
 }
 
 /** Creates the short-lived RS256 JWT GitHub requires for App authentication. */
@@ -223,6 +228,7 @@ export async function observeGitHubRepositoryInstallation(
     repository,
     installationId,
     observedAppId,
+    suspendedAt,
   } = await resolveGitHubRepositoryInstallation(appId, privateKey, repositoryIdentifier);
 
   const repositorySelection = String(installation.repository_selection ?? "");
@@ -242,6 +248,7 @@ export async function observeGitHubRepositoryInstallation(
     appId: observedAppId,
     installationId,
     repositorySelection,
+    suspendedAt,
     permissions: Object.freeze(permissions),
     ...(accountLogin ? { accountLogin } : {}),
     ...(account?.type ? { accountType: account.type } : {}),
@@ -275,11 +282,14 @@ export async function getGitHubInstallationToken(
     return cached.token;
   }
 
-  const { appClient, installation } = await resolveGitHubRepositoryInstallation(
+  const { appClient, installation, suspendedAt } = await resolveGitHubRepositoryInstallation(
     normalizedAppId,
     privateKey,
     repository.canonical,
   );
+  if (suspendedAt !== null) {
+    throw new Error("GitHub App installation is suspended");
+  }
   const { data: access } = await appClient.apps.createInstallationAccessToken({
     installation_id: installation.id,
     repositories: [repository.repo],

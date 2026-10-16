@@ -177,6 +177,9 @@ export async function createCapabilityAwareAppRepositoryProvider(
   const evidence = await (dependencies.observeInstallation ?? observeGitHubRepositoryInstallation)(
     appId, privateKey, connection.repository,
   );
+  if (evidence.suspendedAt !== null) {
+    throw new Error("GitHub App installation is suspended or its active state is unverified");
+  }
   const authority = deriveGitHubAppRepositoryCapabilities(evidence);
   if (authority.appId !== appId || authority.repository.toLowerCase() !== connection.repository.toLowerCase()) {
     throw new Error("GitHub App installation identity does not match the configured repository");

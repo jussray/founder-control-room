@@ -186,6 +186,9 @@ pluginCenterRouter.get('/github-installation', async (req: FounderRequest, res) 
     const evidence = await observeGitHubRepositoryInstallation(
       appId, privateKey, 'jussray/founder-control-room',
     );
+    if (evidence.suspendedAt !== null) {
+      return res.status(409).json({ error: 'GitHub App installation is suspended or its active state is unverified' });
+    }
     if (evidence.repository.toLowerCase() !== 'jussray/founder-control-room'
         || evidence.appId !== appId
         || (reported && evidence.installationId !== reported)) {

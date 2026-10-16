@@ -60,6 +60,9 @@ function sortedPermissionNames(
 export function deriveGitHubAppRepositoryCapabilities(
   evidence: GitHubRepositoryInstallationEvidence,
 ): GitHubAppRepositoryCapabilityContract {
+  if (evidence.suspendedAt !== null) {
+    throw new Error("GitHub App installation is suspended or its active state is unverified");
+  }
   const permissions = evidence.permissions;
 
   return {
@@ -87,7 +90,7 @@ export function deriveGitHubAppRepositoryCapabilities(
       writeDeployments: permissionAllowsWrite(permissions.deployments),
       readAdministration: permissionAllowsRead(permissions.administration),
       writeAdministration: permissionAllowsWrite(permissions.administration),
-      writeWorkflows: permissionAllowsWrite(permissions.workflows),
+      writeWorkflows: permissionAllowsWrite(permissions.workflows) && permissionAllowsWrite(permissions.contents),
     }),
   };
 }
@@ -101,6 +104,11 @@ export function requireGitHubAppRepositoryPermissions(
   required: Readonly<Record<string, GitHubAppRequiredPermissionLevel>>,
 ): void {
   const missing: string[] = [];
+  // GitHub workflow-file writes require BOTH permissions, and token scope
+  // must declare both, even when the installation owns broader grants.
+  if (required.workflows === "write" && required.contents !== "write") {
+    missing.push("contents:write (must be declared with workflows:write)");
+  }
 
   for (const [name, requiredLevel] of Object.entries(required)) {
     const observedLevel = contract.permissions[name];

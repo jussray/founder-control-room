@@ -7,6 +7,8 @@ import type { ChangeGenealogyReadInput } from './RepositoryProvider.js';
 
 export interface GitHubGenealogyProviderConfig extends GitHubProviderConfig {
   env?: NodeJS.ProcessEnv;
+  /** Use the exact scoped token already minted by the authority-aware factory. */
+  useProvidedGenealogyToken?: boolean;
 }
 
 /**
@@ -21,12 +23,14 @@ export class GitHubGenealogyProvider extends GitHubProvider {
   private readonly genealogyProjectMap: Record<string, string>;
   private readonly genealogyToken: string;
   private readonly genealogyEnv: NodeJS.ProcessEnv;
+  private readonly useProvidedGenealogyToken: boolean;
 
   constructor(config: GitHubGenealogyProviderConfig) {
     super(config);
     this.genealogyProjectMap = { ...config.projectMap };
     this.genealogyToken = config.token;
     this.genealogyEnv = config.env ?? process.env;
+    this.useProvidedGenealogyToken = config.useProvidedGenealogyToken === true;
   }
 
   async readChangeGenealogyEvidence(
@@ -44,7 +48,7 @@ export class GitHubGenealogyProvider extends GitHubProvider {
     const reader = new GitHubChangeGenealogyReader(
       repository,
       this.genealogyEnv,
-      hasAppCredentials
+      hasAppCredentials && !this.useProvidedGenealogyToken
         ? {}
         : { tokenFactory: async () => this.genealogyToken },
     );

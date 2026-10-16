@@ -69,6 +69,7 @@ describe("trusted Chief governance GitHub App observer", () => {
       appId: TEST_FCR_APP_ID,
       installationId: "7654321",
       repositorySelection: "selected",
+      suspendedAt: null,
       permissions: { administration: "read", checks: "write", contents: "read" },
     });
     mockGetRepoRuleset
@@ -130,6 +131,7 @@ describe("trusted Chief governance GitHub App observer", () => {
       appId: TEST_FCR_APP_ID,
       installationId: "7654321",
       repositorySelection: "selected",
+      suspendedAt: null,
       permissions: { checks: "write", contents: "read" },
     });
 
@@ -174,6 +176,7 @@ describe("trusted Chief governance GitHub App observer", () => {
       appId: TEST_FCR_APP_ID,
       installationId: "7654321",
       repositorySelection: "selected",
+      suspendedAt: null,
       permissions: { administration: "read", checks: "read", contents: "read" },
     });
 

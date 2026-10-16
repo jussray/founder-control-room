@@ -10,6 +10,7 @@ const evidence = {
   appId: "900001",
   installationId: "7654321",
   repositorySelection: "selected",
+  suspendedAt: null,
   permissions: {
     actions: "read",
     administration: "read",
@@ -96,5 +97,26 @@ describe("GitHub App repository capability contract", () => {
     expect(() => requireGitHubAppRepositoryPermissions(contract, {
       security_events: "read",
     })).toThrow(/security_events:read \(observed none\)/);
+  });
+
+  it("does not claim workflow mutation without contents write", () => {
+    const restricted = deriveGitHubAppRepositoryCapabilities({
+      ...evidence,
+      permissions: { workflows: "write", contents: "read" },
+    });
+    expect(restricted.can.writeWorkflows).toBe(false);
+    expect(() => requireGitHubAppRepositoryPermissions(restricted, {
+      workflows: "write",
+    })).toThrow(/contents:write/);
+  });
+
+  it("does not derive capabilities from a suspended or unknown installation", () => {
+    expect(() => deriveGitHubAppRepositoryCapabilities({
+      ...evidence, suspendedAt: "2026-10-16T11:00:00Z",
+    })).toThrow(/suspended/);
+    const untrusted = { ...evidence, suspendedAt: undefined } as unknown as Parameters<
+      typeof deriveGitHubAppRepositoryCapabilities
+    >[0];
+    expect(() => deriveGitHubAppRepositoryCapabilities(untrusted)).toThrow(/unverified/);
   });
 });

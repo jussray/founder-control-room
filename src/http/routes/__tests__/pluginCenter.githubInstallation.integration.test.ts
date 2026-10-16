@@ -39,6 +39,7 @@ const evidence = {
   appId: '900001',
   installationId: '42',
   repositorySelection: 'selected',
+  suspendedAt: null,
   permissions: { contents: 'read', checks: 'write' },
 };
 
@@ -106,5 +107,24 @@ describe('GitHub App installation / MCP handoff', () => {
       .get(url + '?installation_id=42').set('Authorization', 'Bearer test-only-founder');
     expect(unavailable.status).toBe(503);
     expect(JSON.stringify(unavailable.body)).not.toContain('provider test failure');
+  });
+
+  it('keeps a suspended or unknown installation unverified', async () => {
+    founder();
+    observeInstallation.mockResolvedValueOnce({
+      ...evidence, suspendedAt: '2026-10-16T11:00:00Z',
+    });
+    const suspended = await request(app())
+      .get(url + '?installation_id=42').set('Authorization', 'Bearer test-only-founder');
+    expect(suspended.status).toBe(409);
+    expect(suspended.body.verified).not.toBe(true);
+
+    observeInstallation.mockResolvedValueOnce({
+      ...evidence, suspendedAt: undefined,
+    });
+    const unknown = await request(app())
+      .get(url + '?installation_id=42').set('Authorization', 'Bearer test-only-founder');
+    expect(unknown.status).toBe(409);
+    expect(unknown.body.verified).not.toBe(true);
   });
 });

@@ -313,19 +313,22 @@
     {
       "path": "src/providers/RepositoryProviderFactory.ts",
       "claims": [
-        "`src/providers/RepositoryProviderFactory.ts` must continue returning the existing read-only GitHubGenealogyProvider and cannot construct a capability-aware repository provider from a personal token or mint a token before verified exact App/repository identity and required permission readback."
+        "`src/providers/RepositoryProviderFactory.ts` must continue returning the existing read-only GitHubGenealogyProvider and cannot construct a capability-aware repository provider from a personal token or mint a token before verified exact App/repository identity and required permission readback.",
+        "`src/providers/RepositoryProviderFactory.ts` must reject empty or malformed capability-aware permission declarations before observation or minting and must pass the exact scoped token into genealogy reads rather than independently requesting a broader token."
       ]
     },
     {
       "path": "src/providers/githubAppAuth.ts",
       "claims": [
-        "`src/providers/githubAppAuth.ts` must bind short-lived installation-token cache entries to App, repository, and required permission scope, and cannot reuse a cached credential for newly declared permissions without provider readback of the minted token grant."
+        "`src/providers/githubAppAuth.ts` must bind short-lived installation-token cache entries to App, repository, and required permission scope, and cannot reuse a cached credential for newly declared permissions without provider readback of the minted token grant.",
+        "`src/providers/githubAppAuth.ts` must require a provider-observed known installation suspension status before claiming App evidence and cannot mint a new token when the installation is suspended; credential scope and cache identity remain bounded to the repository and declared permissions."
       ]
     },
     {
       "path": "src/providers/githubAppCapabilities.ts",
       "claims": [
-        "`src/providers/githubAppCapabilities.ts` must derive capabilities only from provider-observed installation permissions and reject missing read/write grants before any downstream token minting, without converting installed capability into founder or merge authority."
+        "`src/providers/githubAppCapabilities.ts` must derive capabilities only from provider-observed installation permissions and reject missing read/write grants before any downstream token minting, without converting installed capability into founder or merge authority.",
+        "`src/providers/githubAppCapabilities.ts` must reject suspended or unknown installation state and cannot advertise workflows write without a matching contents write grant and explicit request for both token permission scopes."
       ]
     },
     {
@@ -373,13 +376,15 @@
     {
       "path": "src/http/routes/pluginCenter.ts",
       "claims": [
-        "`src/http/routes/pluginCenter.ts` must require founder authentication and provider-backed identity matching for installation readback and cannot treat querystring installation ids, an installed App, or a GitHub permission grant as MCP, merge, or deployment authority."
+        "`src/http/routes/pluginCenter.ts` must require founder authentication and provider-backed identity matching for installation readback and cannot treat querystring installation ids, an installed App, or a GitHub permission grant as MCP, merge, or deployment authority.",
+        "`src/http/routes/pluginCenter.ts` must withhold the GitHub installation verified status when the provider reports suspension or omits active-state evidence, even if the supplied installation id and App identifier otherwise match."
       ]
     },
     {
       "path": "e2e/github-app-installation-handoff-proof.mjs",
       "claims": [
-        "`e2e/github-app-installation-handoff-proof.mjs` must exercise browser verified, mismatched, unauthenticated, malformed, and mobile states for the GitHub App handoff while identifying its API responses as local test fixtures instead of production installation evidence."
+        "`e2e/github-app-installation-handoff-proof.mjs` must exercise browser verified, mismatched, unauthenticated, malformed, and mobile states for the GitHub App handoff while identifying its API responses as local test fixtures instead of production installation evidence.",
+        "`e2e/github-app-installation-handoff-proof.mjs` must validate the MCP endpoint by exact parsed URL origin, pathname, and absence of extra query/fragment instead of substring matching an arbitrary host."
       ]
     },
     {
@@ -392,6 +397,12 @@
       "path": "test/control-room-runtime-state.test.mjs",
       "claims": [
         "`test/control-room-runtime-state.test.mjs` must exercise the production receipt writer and parse the persisted bytes, proving that a real newline and valid JSON are emitted rather than relying on a mock receipt."
+      ]
+    },
+    {
+      "path": "src/providers/GitHubGenealogyProvider.ts",
+      "claims": [
+        "`src/providers/GitHubGenealogyProvider.ts` must reuse the exact permission-scoped installation token supplied by the capability-aware factory for genealogy reads, and cannot silently remint broader GitHub App credentials when that explicit scoped-token mode is selected."
       ]
     }
   ]

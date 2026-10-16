@@ -63,8 +63,13 @@ try {
       + encodeURIComponent(scenario.id), { waitUntil: 'networkidle' });
     await page.waitForFunction(expected => document.querySelector('#github-app-status')?.textContent?.includes(expected), scenario.expected);
     const text = await page.locator('#github-app-setup').innerText();
-    if (!text.includes('https://api.foundercontrolroom.org/mcp')) {
-      throw new Error('Separate MCP URL missing from GitHub setup UI');
+    const endpoint = await page.locator('#github-app-setup code.mono').innerText();
+    const expectedEndpoint = new URL('https://api.foundercontrolroom.org/mcp');
+    const actualEndpoint = new URL(endpoint);
+    if (actualEndpoint.origin !== expectedEndpoint.origin ||
+        actualEndpoint.pathname !== expectedEndpoint.pathname ||
+        actualEndpoint.search || actualEndpoint.hash) {
+      throw new Error('GitHub setup UI points to an unexpected MCP endpoint');
     }
     if (text.includes('MCP connected') || text.includes('Merge approved')) {
       throw new Error('Installation setup claimed unauthorized capabilities');

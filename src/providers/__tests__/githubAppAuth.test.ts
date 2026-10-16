@@ -36,6 +36,7 @@ function installation(appId: number, id = 321) {
       id,
       app_id: appId,
       repository_selection: "selected",
+      suspended_at: null as string | null,
       permissions: { checks: "write", contents: "read" },
       account: { login: "jussray", type: "User" },
     },
@@ -129,6 +130,7 @@ describe("GitHub App authentication", () => {
       appId: "900001",
       installationId: "321",
       repositorySelection: "selected",
+      suspendedAt: null,
       permissions: { checks: "write", contents: "read" },
       accountLogin: "jussray",
       accountType: "User",
@@ -256,5 +258,23 @@ describe("GitHub App authentication", () => {
       "jussray/chief-ai-machine",
       { contents: "write" },
     )).rejects.toThrow(/minted a token with insufficient repository permissions/);
+  });
+
+  it("rejects unknown suspension status and never treats a suspended installation as active", async () => {
+    const key = generatePrivatePem();
+    const suspended = installation(900701, 701);
+    suspended.data.suspended_at = "2026-10-16T11:00:00Z";
+    mockGetRepoInstallation.mockResolvedValueOnce(suspended);
+    await expect(getGitHubInstallationToken(
+      "900701", key, "jussray/chief-ai-machine", { contents: "read" },
+    )).rejects.toThrow(/installation is suspended/);
+    expect(mockCreateInstallationAccessToken).not.toHaveBeenCalled();
+
+    const unknown = installation(900702, 702);
+    delete (unknown.data as { suspended_at?: string | null }).suspended_at;
+    mockGetRepoInstallation.mockResolvedValueOnce(unknown);
+    await expect(observeGitHubRepositoryInstallation(
+      "900702", key, "jussray/chief-ai-machine",
+    )).rejects.toThrow(/valid suspension state/);
   });
 });
