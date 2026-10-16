@@ -332,6 +332,36 @@
       "claims": [
         "`src/providers/trustedGithubGovernanceObserver.ts` must verify the Chief repository installation has administration read permission before minting an administration-scoped token to inspect GitHub rulesets, and cannot infer mutation authority from inspection."
       ]
+    },
+    {
+      "path": "src/security/incidentEscalation.ts",
+      "claims": [
+        "`src/security/incidentEscalation.ts` must normalize unknown Linear HTTP JSON into a bounded response shape, fail closed on invalid provider data, and must never print untrusted provider error payloads or secret-bearing transport text into application logs."
+      ]
+    },
+    {
+      "path": "src/security/__tests__/incidentEscalation.test.ts",
+      "claims": [
+        "`src/security/__tests__/incidentEscalation.test.ts` must use explicit NodeNext-compatible module extensions in dynamic imports so TypeScript compilation and the incident-escalation test discovery remain effective instead of silently omitted."
+      ]
+    },
+    {
+      "path": "src/workers/__tests__/secret-rotation-worker.test.ts",
+      "claims": [
+        "`src/workers/__tests__/secret-rotation-worker.test.ts` must model expected Supabase mock query arguments with typed signatures; test-only signature repairs must not alter secret rotation thresholds or production behavior."
+      ]
+    },
+    {
+      "path": "src/http/routes/__tests__/approvals.gitlab.integration.test.ts",
+      "claims": [
+        "`src/http/routes/__tests__/approvals.gitlab.integration.test.ts` must model the existing idempotency lookup, reservation, and finalization so GitLab patch authority is tested without performing real provider mutation."
+      ]
+    },
+    {
+      "path": "src/http/routes/__tests__/approvals.integration.test.ts",
+      "claims": [
+        "`src/http/routes/__tests__/approvals.integration.test.ts` must preserve patch idempotency key enforcement, including explicit rejection of missing keys and reservation lookup before a sandbox patch mutation."
+      ]
     }
   ]
 }
