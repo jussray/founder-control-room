@@ -18,6 +18,21 @@ type JsonRecord = Record<string, unknown>;
 
 type ConsentAction = 'approve' | 'deny';
 
+// Separate from client registration: the server must authorize every client.
+function consentClientIds(): Set<string> {
+  if (process.env.FCR_OAUTH_CONSENT_ENABLED !== 'true') return new Set();
+  const items=(process.env.FCR_OAUTH_CONSENT_CLIENT_IDS ?? '')
+    .split(',').map(x=>x.trim()).filter(Boolean);
+  if (!items.length || items.length>16 ||
+      items.some(x=>!(/^[A-Za-z0-9_-]{6,128}$/).test(x))) return new Set();
+  return new Set(items);
+}
+function authorizedClient(body: unknown, authorizationIdValue: string): boolean {
+  if (!isRecord(body) || body.authorization_id !== authorizationIdValue ||
+      !isRecord(body.client) || typeof body.client.id !== 'string') return false;
+  return consentClientIds().has(body.client.id);
+}
+
 function isRecord(value: unknown): value is JsonRecord {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
@@ -64,7 +79,12 @@ async function callSupabaseConsentApi(
     return { status: 401, body: { error: 'Interactive founder session required' } };
   }
 
-  const url = `${supabaseAuthBase()}/oauth/authorizations/${encodeURIComponent(authorizationIdValue)}${action ? '/consent' : ''}`;
+  // Fail closed before any outbound Supabase request if the consent gate has
+  // not been activated with a specific server-held client allowlist.
+  if (!consentClientIds().size) {
+    return { status: 503, body: { error: 'OAuth consent is not configured.' } };
+  }
+  const url = `${supabaseAuthBase()}/oauth/authorizations/${encodeURIComponent(authorizationIdValue)}`;
   const response = await fetch(url, {
     method: action ? 'POST' : 'GET',
     headers: {
@@ -77,7 +97,25 @@ async function callSupabaseConsentApi(
   });
 
   const body = await response.json().catch(() => null);
-  return { status: response.status, body };
+  if (!response.ok) return {status: response.status, body};
+  if (!authorizedClient(body, authorizationIdValue)) {
+    return { status: 403, body: { error: 'OAuth client is not allowed for this connection.' } };
+  }
+  if (!action) return {status: response.status, body};
+
+  // Re-read the live provider authorization before every consequential consent
+  // decision. The request body may choose approve/deny only, not client identity.
+  const decision = await fetch(url + '/consent', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${founderSession.accessToken}`,
+      apikey: publishableKey(),
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ action }),
+  });
+  return { status: decision.status, body: await decision.json().catch(() => null) };
 }
 
 function sendUpstream(res: Response, status: number, body: unknown): Response {
