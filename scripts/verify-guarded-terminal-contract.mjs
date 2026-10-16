@@ -1,5 +1,6 @@
 import {readFile} from 'node:fs/promises';
 import { Script } from 'node:vm';
+import { extractSingleInlineScript } from './extract-single-inline-script.mjs';
 
 const files = {
   mission: await readFile(new URL('../src/controllers/MissionController.ts', import.meta.url), 'utf8'),
@@ -84,7 +85,7 @@ requireText('Workspace command bridge link', files.workspaceUi, '/control-room/c
 requireText('Workspace L99 scope note', files.workspaceUi, 'separately approved L99 sandbox');
 forbidText('Workspace unsafe shell', files.workspaceUi, 'shell: true');
 forbidText('Workspace unsafe evaluation', files.workspaceUi, 'eval(');
-const inlineScript = files.workspaceUi.match(/<script>([\s\S]*?)<\/script>/)?.[1];
+const inlineScript = extractSingleInlineScript(files.workspaceUi);
 if (!inlineScript) failures.push('GitHub workspace: missing inline interaction script');
 else {
   try { new Script(inlineScript, { filename: 'public/control-room/github-workspace.html' }); }
