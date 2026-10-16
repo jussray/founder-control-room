@@ -266,56 +266,55 @@ async function runGuardedTerminalProof(page) {
   // The terminal runs a real `git` process in this checkout. The fake GitHub
   // server is used only to establish the exact-head proof prerequisite through
   // the same real approval routes; it does not stand in for terminal execution.
-  const founderToken = await page.evaluate(() => JSON.parse(sessionStorage.getItem('fcr_session')).access_token);
-  const projectRes = await fetch(`${BASE_URL}/projects`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${founderToken}` },
-    body: JSON.stringify({
-      slug: TERMINAL_PROOF_REPO,
-      name: 'Founder Control Room (self)',
-      repoIdentifier: `${GITHUB_OWNER}/${TERMINAL_PROOF_REPO}`,
-    }),
+  // Browser requests must use the actual HttpOnly founder session. The
+  // obsolete sessionStorage bearer lane is intentionally not supported.
+  async function founderPost(path, payload) {
+    return page.evaluate(async ({ path, payload }) => {
+      const response = await fetch(path, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      return { ok: response.ok, status: response.status, body: await response.json() };
+    }, { path, payload });
+  }
+
+  const projectRes = await founderPost('/projects', {
+    slug: TERMINAL_PROOF_REPO,
+    name: 'Founder Control Room (self)',
+    repoIdentifier: `${GITHUB_OWNER}/${TERMINAL_PROOF_REPO}`,
   });
   assert(projectRes.ok, `registered the ${TERMINAL_PROOF_REPO} project so the terminal's command registry (keyed on this exact slug) has somewhere real to run (status ${projectRes.status})`);
 
-  const missionRes = await fetch(`${BASE_URL}/projects/${TERMINAL_PROOF_REPO}/missions`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${founderToken}` },
-    body: JSON.stringify({ title: 'Prove the guarded terminal end to end' }),
+  const missionRes = await founderPost(`/projects/${TERMINAL_PROOF_REPO}/missions`, {
+    title: 'Prove the guarded terminal end to end',
   });
-  const missionBody = await missionRes.json();
+  const missionBody = missionRes.body;
   assert(missionRes.ok, `created a mission on ${TERMINAL_PROOF_REPO} (status ${missionRes.status})`);
   const terminalMissionId = missionBody.mission.id;
 
-  const gateRes = await fetch(`${BASE_URL}/approvals/${terminalMissionId}/run-proof-gate`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${founderToken}` },
-    body: JSON.stringify({
-      gateId: 'create_branch',
-      evidence: {
-        filesChanged: ['mission-plan'],
-        behaviorChanged: 'No behavior change yet — opening the sandbox.',
-        checksRun: ['plan_reviewed'],
-        failures: [],
-        securityImpact: 'none',
-        deploymentImpact: 'none',
-        rollbackPath: 'Delete the sandbox branch.',
-        unresolvedRisks: [],
-      },
-    }),
+  const gateRes = await founderPost(`/approvals/${terminalMissionId}/run-proof-gate`, {
+    gateId: 'create_branch',
+    evidence: {
+      filesChanged: ['mission-plan'],
+      behaviorChanged: 'No behavior change yet — opening the sandbox.',
+      checksRun: ['plan_reviewed'],
+      failures: [],
+      securityImpact: 'none',
+      deploymentImpact: 'none',
+      rollbackPath: 'Delete the sandbox branch.',
+      unresolvedRisks: [],
+    },
   });
-  assert(gateRes.ok, `create_branch proof gate passed for the terminal mission (status ${gateRes.status})`);
+  assert(gateRes.ok, `create_branch proof gate passed for the terminal mission (status ${gateRes.status}): ${JSON.stringify(gateRes.body)}`);
 
-  const executeRes = await fetch(`${BASE_URL}/approvals/${terminalMissionId}/execute`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${founderToken}` },
-    body: JSON.stringify({
-      actionType: 'create_branch',
-      idempotencyKey: `terminal-proof-branch-${terminalMissionId}`,
-      payload: { branchName: 'terminal-proof', baseRef: 'main' },
-    }),
+  const executeRes = await founderPost(`/approvals/${terminalMissionId}/execute`, {
+    actionType: 'create_branch',
+    idempotencyKey: `terminal-proof-branch-${terminalMissionId}`,
+    payload: { branchName: 'terminal-proof', baseRef: 'main' },
   });
-  const executeBody = await executeRes.json();
+  const executeBody = executeRes.body;
   assert(
     executeRes.ok && executeBody.result?.expectedHeadSha === REAL_REPO_HEAD_SHA,
     `branch creation pinned policy_snapshot.expectedHeadSha to this real repo's actual HEAD (${REAL_REPO_HEAD_SHA}), not just a fake sha — this is the fix for bug #7 below (expectedHeadSha was previously only ever written at merge time, which the guarded terminal's own sandboxed/in_review precondition can never reach)`,
