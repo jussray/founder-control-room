@@ -34,6 +34,7 @@ function env(overrides: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
     FCR_REMOTE_MCP_READ_PROJECTS: `${CHIEF},${FCR}`,
     FCR_REMOTE_MCP_OAUTH_AUDIENCE: PAIRED_MCP_OAUTH_AUDIENCE,
     FCR_REMOTE_MCP_OAUTH_REQUIRED_SCOPE: PAIRED_MCP_OAUTH_SCOPE,
+    FCR_REMOTE_MCP_OAUTH_CLIENT_IDS: 'dcr-client-generated-by-supabase',
     ...overrides,
   };
 }
@@ -86,7 +87,7 @@ describe('auto-dynamic compatibility token selection', () => {
 });
 
 describe('paired Supabase OAuth verifier', () => {
-  it('accepts a dynamically registered client after current-user and founder checks', async () => {
+  it('accepts only an explicitly allowlisted client after current-user and founder checks', async () => {
     allowFounder();
 
     await expect(verifyPairedSupabaseOauthToken(jwt(claims()), env())).resolves.toEqual({
@@ -132,12 +133,22 @@ describe('paired Supabase OAuth verifier', () => {
     expect(mockFrom).not.toHaveBeenCalled();
   });
 
-  it('can opt into an exact client allowlist without making it the DCR default', async () => {
+  it('rejects non-allowlisted clients even if the provider issued their tokens', async () => {
     mockGetUser.mockClear();
     mockFrom.mockClear();
     await expect(verifyPairedSupabaseOauthToken(jwt(claims()), env({
-      FCR_REMOTE_MCP_OAUTH_ENFORCE_CLIENT_ALLOWLIST: 'true',
       FCR_REMOTE_MCP_OAUTH_CLIENT_IDS: 'other-client',
+    }))).rejects.toThrow('OAuth client is not allowed');
+    expect(mockGetUser).not.toHaveBeenCalled();
+    expect(mockFrom).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when no OAuth client identity has been approved by the server', async () => {
+    mockGetUser.mockClear();
+    mockFrom.mockClear();
+    await expect(verifyPairedSupabaseOauthToken(jwt(claims()), env({
+      FCR_REMOTE_MCP_OAUTH_CLIENT_IDS: '',
+      FCR_REMOTE_MCP_OAUTH_ENFORCE_CLIENT_ALLOWLIST: 'false',
     }))).rejects.toThrow('OAuth client is not allowed');
     expect(mockGetUser).not.toHaveBeenCalled();
     expect(mockFrom).not.toHaveBeenCalled();
