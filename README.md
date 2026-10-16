@@ -40,6 +40,13 @@ For a present-tense claim:
 
 Exact SHAs belong in receipts, PRs, artifacts, incidents, and provenance. The README deliberately does not freeze one SHA as permanent “current truth.”
 
+### External FCR MCP: ChatGPT and other authenticated clients
+
+The canonical source-defined endpoint is `POST https://api.foundercontrolroom.org/mcp`. It accepts scoped Supabase OAuth 2.1 bearer tokens after current-user and founder allowlist validation; supported clients may register dynamically through the identity provider. `POST /mcp/read` preserves legacy static-token clients **only when their existing bearer token matches exactly** and otherwise redirects with HTTP 307 to the canonical OAuth `/mcp` resource, avoiding a mismatched protected-resource challenge. The server-owned portfolio registry bounds every grant; an optional token project claim can only narrow it. Tools remain explicitly bounded and require redacted evidence receipts; no generic provider-write authority follows from being connected.
+
+The repository's OAuth handler, bootstrapping tests, and MCP metadata are **source and CI evidence**, not proof of production installation or completed ChatGPT sign-in. Before declaring a usable ChatGPT plugin, separately verify the deployed Worker version and bindings, Supabase consent, token issuance, founder authorization, tool discovery, authorized read, and a persisted evidence receipt. A merge cannot authorize deployment. See [MCP stack](docs/MCP_STACK.md) and [Cloudflare Worker targets](docs/deployment/CLOUDFLARE_WORKER_TARGETS.md).
+
+
 ## What is implemented in source now
 
 ### Repository and mission control
@@ -451,3 +458,11 @@ Pin alignment alone cannot promote the successor federation state beyond `UNKNOW
 StoryEngine `main` advanced from the previously pinned `168d65ede38d2477ea00902fa1f0e76f292c583d` through `c9af4ea095561d0837a141e311e8977d796aaaa7` (`feat(video): expose StoryEngine MAKEVIDEO skill`) to independently observed `3c1689fe67142e783fe7d18b5ff610640bdc81d6` (`ci(video): prove StoryEngine MAKEVIDEO skill path`). FCR Playwright run #6969 on `897083276b6c775c49ce30be189a50bd610b5d4c` passed its local/direct browser harness but failed the separate live peer-ref freshness check, so that run is historical browser evidence for the predecessor peer rather than current federation proof.
 
 Rebinding `.github/workflows/playwright.yml` to `3c1689fe67142e783fe7d18b5ff610640bdc81d6` selects the successor evidence subject only. The successor FCR head must complete the live-ref check, immutable peer checkout, exact StoryEngine runtime identity, directive/receipt binding, replay protections, and full Playwright browser witness before federation may be called current. Pin alignment grants no merge, deploy, production, publication, billing, or provider-mutation authority.
+
+### StoryEngine federation freshness
+
+The required FCR Playwright lane binds its StoryEngine peer to an independently observed GitHub main commit. A new peer pin is a new evidence subject, not a passing browser proof or authorization to merge. The complete same-head federation runtime and browser tests must run successfully against that peer before it is treated as current.
+
+### FCR external MCP consent candidate (not deployed)
+
+The OAuth consent UI is served by the FCR API service **through the same-origin Pages proxy** at `https://foundercontrolroom.org/oauth/consent`, matching the configured founder callback, CSRF origin, host-only session cookie, and same-tab `sessionStorage`. An exact www consent GET navigates to the canonical apex before login. The API serves the consent UI and assets behind the Pages proxy and requires an interactive, explicitly UUID-bound founder before approve/deny. The OAuth callback resumes a pending, syntax-validated authorization ID on the same apex origin. These are candidate source behaviors, not evidence that Supabase OAuth is enabled, Cloudflare Access permits discovery, or ChatGPT can connect.
