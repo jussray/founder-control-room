@@ -9,6 +9,7 @@ import {
 describe('capital control architecture', () => {
   it('keeps the legal structure honest until external documents prove it', () => {
     expect(CAPITAL_CONTROL_ARCHITECTURE.state).toBe('design_only');
+    expect(CAPITAL_CONTROL_ARCHITECTURE.authorityBoundary).toBe('advisory_only');
     expect(CAPITAL_CONTROL_ARCHITECTURE.legalReality).toEqual({
       parentEntity: 'UNKNOWN',
       projectSubsidiaries: 'UNKNOWN',
@@ -27,16 +28,24 @@ describe('capital control architecture', () => {
   });
 
   it('denies securities issuance and public offering while architecture is design-only', () => {
-    expect(evaluateCapitalAction({ action: 'issue-security' }).decision).toBe('deny');
-    expect(evaluateCapitalAction({ action: 'publish-offering' }).decision).toBe('deny');
+    expect(evaluateCapitalAction({ action: 'issue-security' })).toMatchObject({
+      decision: 'deny',
+      executionAuthorized: false,
+    });
+    expect(evaluateCapitalAction({ action: 'publish-offering' })).toMatchObject({
+      decision: 'deny',
+      executionAuthorized: false,
+    });
   });
 
-  it('requires project ownership and parent/founder control proof for a project offering', () => {
+  it('requires legal entity, project ownership, and parent/founder control proof for a project offering', () => {
     const projectClaims = capitalRequiredClaims('publish-offering', 'project');
+    expect(projectClaims).toContain('legal_entity_verified');
     expect(projectClaims).toContain('project_ownership_boundary_verified');
     expect(projectClaims).toContain('parent_or_founder_control_verified');
 
     const portfolioClaims = capitalRequiredClaims('publish-offering', 'portfolio');
+    expect(portfolioClaims).toContain('legal_entity_verified');
     expect(portfolioClaims).not.toContain('project_ownership_boundary_verified');
   });
 
@@ -44,11 +53,11 @@ describe('capital control architecture', () => {
     expect(evaluateCapitalAction({
       action: 'surrender-founder-control',
       architectureState: 'legally_verified',
-    }).decision).toBe('deny');
+    })).toMatchObject({ decision: 'deny', executionAuthorized: false });
     expect(evaluateCapitalAction({
       action: 'grant-investor-operational-authority',
       architectureState: 'legally_verified',
-    }).decision).toBe('deny');
+    })).toMatchObject({ decision: 'deny', executionAuthorized: false });
   });
 
   it('fails closed on a project offering until every registered proof is present', () => {
@@ -63,10 +72,11 @@ describe('capital control architecture', () => {
     });
 
     expect(verdict.decision).toBe('reconfirm');
+    expect(verdict.executionAuthorized).toBe(false);
     expect(verdict.missingClaims).toEqual(['post_change_control_verified']);
   });
 
-  it('permits the modeled project offering path only after legal verification and complete evidence', () => {
+  it('never turns complete capital evidence labels into execution authority', () => {
     const verifiedClaims = capitalRequiredClaims('publish-offering', 'project') as CapitalEvidenceClaim[];
     const verdict = evaluateCapitalAction({
       action: 'publish-offering',
@@ -76,9 +86,28 @@ describe('capital control architecture', () => {
     });
 
     expect(verdict).toEqual({
-      decision: 'allow',
+      decision: 'reconfirm',
+      executionAuthorized: false,
       missingClaims: [],
-      reasons: ['all registered capital-control evidence requirements are satisfied'],
+      reasons: [
+        'capital policy evidence labels are complete, but this evaluator is advisory only; separate trusted evidence verification and founder/legal execution authority are still required',
+      ],
+    });
+  });
+
+  it('never turns bare evidence labels into a verified legal-state claim', () => {
+    const verdict = evaluateCapitalAction({
+      action: 'claim-parent-formed',
+      verifiedClaims: ['legal_entity_verified', 'governing_documents_verified'],
+    });
+
+    expect(verdict).toEqual({
+      decision: 'reconfirm',
+      executionAuthorized: false,
+      missingClaims: [],
+      reasons: [
+        'capital evidence labels are complete, but this v1 evaluator does not verify their provenance; independent trusted evidence verification is required before recording the legal-state claim',
+      ],
     });
   });
 });
