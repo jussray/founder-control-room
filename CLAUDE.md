@@ -12,6 +12,7 @@ Before nontrivial work Claude must also read:
 - [`docs/FOUNDER_MERGE_AUTHORITY.md`](docs/FOUNDER_MERGE_AUTHORITY.md) — current repository integration authority.
 - [`docs/TRUTH_DECAY_AUDIT.md`](docs/TRUTH_DECAY_AUDIT.md) — once-true/current-truth failure model.
 - [`docs/PUBLIC_COMMUNICATION_TRUTH_CONTRACT.md`](docs/PUBLIC_COMMUNICATION_TRUTH_CONTRACT.md) — publication and Sauce Guard boundary.
+- [`.claude/skills/founder-end-to-end/SKILL.md`](.claude/skills/founder-end-to-end/SKILL.md) — the end-to-end founder loop (observe → labeled council → smallest exact fix on a fix branch → proof → commit, never merge → memory → REALITY/FIX/PROOF/RISK/ROLLBACK/NEXT GATE).
 
 Repository/provider/runtime evidence inspected now outranks old PR bodies, older provider-routing prose, prior model context, and chat memory. Preserve old evidence as history, but never promote it back into present-tense authority without re-observation.
 
