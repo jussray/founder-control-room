@@ -164,6 +164,17 @@ jobs:
           )
           PY
 
+      - name: Upload credential audit receipt
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: fcr-deploy-credential-audit-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/fcr-deploy-credential-shape.json
+            ${{ runner.temp }}/fcr-worker-secret-names.json
+          if-no-files-found: warn
+          retention-days: 90
+
       - name: Record authority receipt
         shell: bash
         run: |
