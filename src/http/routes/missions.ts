@@ -10,6 +10,7 @@
 
 import { Router } from 'express';
 import { runCouncilRound, type CouncilConversationRow } from '../../lib/councilRound.js';
+import { validateVoiceCouncilIntent, type VoiceCouncilIntent } from '../../lib/voiceCouncilIntent.js';
 import { OPERATOR_RELAY_PEERS } from '../../lib/operatorRelayConstants.js';
 import { createServerOperatorRelayAdapters } from '../../lib/operatorRelayModelProviders.js';
 import type { RelayCapability, RelayOperatorId, RelaySensitivity } from '../../lib/operatorRelay.js';
@@ -139,8 +140,18 @@ missionsRouter.post('/:missionId/council/run', async (req: FounderRequest, res) 
   const { missionId } = req.params;
   const body = req.body as Record<string, unknown>;
 
-  const goal = typeof body['goal'] === 'string' ? body['goal'].trim() : '';
-  const seed = typeof body['seed'] === 'string' ? body['seed'].trim() : goal;
+  // Voice is untrusted intent, never an approval or execution grant.
+  const voiceResult = body['voiceIntent'] === undefined ? null : validateVoiceCouncilIntent(body['voiceIntent']);
+  if (voiceResult && !voiceResult.valid) {
+    return res.status(400).json({ error: 'invalid voice council intent', details: voiceResult.errors });
+  }
+  const voiceIntent = voiceResult?.valid ? body['voiceIntent'] as VoiceCouncilIntent : null;
+  if (voiceIntent && (body['seed'] !== undefined || body['goal'] !== undefined && body['goal'] !== voiceIntent.goal ||
+      body['capability'] !== undefined && body['capability'] !== 'propose')) {
+    return res.status(400).json({ error: 'voice intent cannot override its bound goal, seed, or advisory capability' });
+  }
+  const goal = voiceIntent?.goal ?? (typeof body['goal'] === 'string' ? body['goal'].trim() : '');
+  const seed = voiceIntent?.councilQuestion ?? (typeof body['seed'] === 'string' ? body['seed'].trim() : goal);
   if (!goal || goal.length > 4_000) return res.status(400).json({ error: 'goal must be 1..4000 characters' });
   if (!seed || seed.length > 12_000) return res.status(400).json({ error: 'seed must be 1..12000 characters' });
 
@@ -159,7 +170,7 @@ missionsRouter.post('/:missionId/council/run', async (req: FounderRequest, res) 
     return res.status(400).json({ error: 'participants cannot contain duplicates' });
   }
 
-  const capability = body['capability'] === undefined ? 'propose' : body['capability'];
+  const capability = voiceIntent ? 'propose' : body['capability'] === undefined ? 'propose' : body['capability'];
   if (typeof capability !== 'string' || !RELAY_CAPABILITIES.has(capability as RelayCapability)) {
     return res.status(400).json({ error: 'capability is unsupported' });
   }
