@@ -1,6 +1,8 @@
 export const L99_PROJECT_SLUG = "l99";
 export const L99_REPOSITORY_PROVIDER = "github";
 export const L99_REPOSITORY_IDENTIFIER = "jussray/StoryEngine";
+export const L99_GIT_CONNECTION_TYPE = "git";
+export const L99_GIT_CONNECTION_LABEL = "primary";
 
 export interface L99RepositoryRecord {
   repo_provider?: string | null;
@@ -25,5 +27,21 @@ export function buildL99RepositoryFields(updatedAt: string): {
     repo_provider: L99_REPOSITORY_PROVIDER,
     repo_identifier: L99_REPOSITORY_IDENTIFIER,
     updated_at: updatedAt,
+  };
+}
+
+function connectionConfigRecord(config: unknown): Record<string, unknown> {
+  if (!config || typeof config !== "object" || Array.isArray(config)) return {};
+  return config as Record<string, unknown>;
+}
+
+export function needsL99GitConnectionReconciliation(config: unknown): boolean {
+  return connectionConfigRecord(config).repository !== L99_REPOSITORY_IDENTIFIER;
+}
+
+export function buildL99GitConnectionConfig(config: unknown): Record<string, unknown> {
+  return {
+    ...connectionConfigRecord(config),
+    repository: L99_REPOSITORY_IDENTIFIER,
   };
 }
