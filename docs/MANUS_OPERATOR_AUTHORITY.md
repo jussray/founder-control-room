@@ -1,6 +1,6 @@
 # Manus Operator Authority
 
-Last reviewed: 2026-08-29
+Last reviewed: 2026-09-27
 
 ## Founder decision
 
@@ -16,10 +16,11 @@ The served remote MCP read boundary may inspect the complete active FCR portfoli
 
 - `sekret-bip`
 - `juss-beautiful-hair`
-- `jbh-private`
+- `juss-beautiful-hair-private`
 - `l99`
 - `chief-ai-machine`
 - `untold-stories`
+- `sync-party`
 - `founder-control-room`
 - `promptos`
 
