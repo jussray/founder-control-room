@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { DEFAULT_MCP_SERVERS } from "../defaultRegistry.js";
 import {
   evaluateMcpPolicy,
+  inferAdvertisedToolRisk,
   inferToolRisk,
   matchesToolPattern,
 } from "../policy.js";
@@ -25,6 +26,27 @@ describe("MCP Phase 1 policy", () => {
     expect(inferToolRisk("generate_typescript_types", "read")).toBe("read");
   });
 
+  it("uses advertised MCP annotations only to raise risk", () => {
+    expect(
+      inferAdvertisedToolRisk(
+        { name: "lookup", annotations: { readOnlyHint: false } },
+        "read",
+      ),
+    ).toBe("write");
+    expect(
+      inferAdvertisedToolRisk(
+        { name: "lookup", annotations: { destructiveHint: true } },
+        "read",
+      ),
+    ).toBe("destructive");
+    expect(
+      inferAdvertisedToolRisk(
+        { name: "create_issue", annotations: { readOnlyHint: true } },
+        "write",
+      ),
+    ).toBe("write");
+  });
+
   it("allows an allowlisted read tool for an active project", () => {
     expect(
       evaluateMcpPolicy({
@@ -34,6 +56,36 @@ describe("MCP Phase 1 policy", () => {
         env: configuredEnv,
       }),
     ).toMatchObject({ decision: "allow", risk: "read" });
+  });
+
+  it("blocks a safe-looking allowlisted tool when provider metadata marks it mutating", () => {
+    expect(
+      evaluateMcpPolicy({
+        server: github,
+        projectId: "sekret-bip",
+        toolName: "search_code",
+        tool: {
+          name: "search_code",
+          annotations: { readOnlyHint: false },
+        },
+        env: configuredEnv,
+      }),
+    ).toMatchObject({ decision: "requires_approval", risk: "write" });
+  });
+
+  it("blocks a safe-looking allowlisted tool when provider metadata marks it destructive", () => {
+    expect(
+      evaluateMcpPolicy({
+        server: github,
+        projectId: "sekret-bip",
+        toolName: "search_code",
+        tool: {
+          name: "search_code",
+          annotations: { destructiveHint: true },
+        },
+        env: configuredEnv,
+      }),
+    ).toMatchObject({ decision: "requires_approval", risk: "destructive" });
   });
 
   it("keeps ProofMode as a second read-only MCP instead of replacing GitHub", () => {
