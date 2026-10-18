@@ -7,45 +7,90 @@
 <meta name="description" content="Founder Control Room sign-in. Access is by invitation.">
 <meta name="robots" content="noindex">
 <style>
-  :root{--bg:#0b0d12;--bg2:#12151d;--ink:#f3f1ea;--ink2:#a9a79e;--line:#262a35;--accent:#e9c46a;--accent-ink:#1a1405;--danger:#ff7a6b;--ok:#7bd88f;--radius:14px;--gutter:16px;color-scheme:dark light}
-  @media (prefers-color-scheme: light){:root:not([data-theme="dark"]){--bg:#f6f3ec;--bg2:#fff;--ink:#15171c;--ink2:#5d5f66;--line:#e2ddd0;--accent:#8a5a00;--accent-ink:#fff;--danger:#b3261e;--ok:#1e7a3c}}
+  /* Brand tokens copied from the live FCR homepage (public/index.html, origin/main e075e24). Dark only, like the live site. */
+  :root{
+    color-scheme:dark;
+    --ink:#f8f7ff;--muted:#a9a8bc;--muted-2:#7f8198;
+    --bg:#050711;--bg-2:#080b18;
+    --line:rgba(154,137,255,.18);--line-strong:rgba(154,137,255,.42);
+    --violet:#9d7cff;--violet-2:#7658ff;--blue:#5f8cff;--cyan:#62dcff;
+    --green:#70e8a3;--amber:#ffc66b;--error:#ff9fb0;
+    --radius-lg:1.15rem;--radius-md:.9rem;--gutter:16px;
+    font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  }
   *{box-sizing:border-box}
   html,body{margin:0;min-height:100%}
-  body{background:var(--bg);color:var(--ink);font:16px/1.5 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Inter,sans-serif;display:grid;place-items:center;padding:var(--gutter);overflow-x:hidden}
+  body{
+    color:var(--ink);
+    background:
+      radial-gradient(circle at 18% 0%,rgba(113,74,255,.28),transparent 28rem),
+      radial-gradient(circle at 92% 8%,rgba(50,150,255,.18),transparent 25rem),
+      radial-gradient(circle at 52% 62%,rgba(81,49,201,.12),transparent 34rem),
+      linear-gradient(155deg,#03050b 0%,var(--bg) 42%,#090d1d 100%);
+    display:grid;place-items:center;padding:var(--gutter);overflow-x:hidden;
+  }
+  body::before{
+    content:"";position:fixed;inset:0;z-index:-2;opacity:.14;pointer-events:none;
+    background-image:linear-gradient(rgba(255,255,255,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.04) 1px,transparent 1px);
+    background-size:36px 36px;mask-image:linear-gradient(to bottom,black 0%,transparent 92%);
+  }
   [hidden]{display:none !important}
-  .ambient{position:fixed;inset:-20vmax;z-index:0;pointer-events:none;background:radial-gradient(40vmax 40vmax at 30% 30%,color-mix(in oklab,var(--accent) 20%,transparent),transparent 70%),radial-gradient(35vmax 35vmax at 70% 70%,color-mix(in oklab,var(--accent) 10%,transparent),transparent 70%);filter:blur(20px)}
+  .ambient{position:fixed;inset:-20vmax;z-index:0;pointer-events:none;filter:blur(20px);
+    background:radial-gradient(40vmax 40vmax at 30% 30%,rgba(157,124,255,.16),transparent 70%),radial-gradient(35vmax 35vmax at 70% 70%,rgba(98,220,255,.08),transparent 70%)}
   @media (prefers-reduced-motion: no-preference){.ambient{animation:drift 14s ease-in-out infinite alternate}.card{animation:enter 480ms cubic-bezier(.2,.7,.2,1) both}}
   @keyframes drift{from{transform:translate3d(-2%,-1%,0)}to{transform:translate3d(2%,1%,0)}}
   @keyframes enter{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
-  .card{position:relative;z-index:1;width:min(100%,440px);background:var(--bg2);border:1px solid var(--line);border-radius:var(--radius);padding:28px 24px;box-shadow:0 24px 60px rgba(0,0,0,.25)}
-  .eyebrow{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink2);margin:0 0 10px}
-  h1{font-size:clamp(24px,5vw,32px);line-height:1.15;margin:0 0 8px;letter-spacing:-.01em}
-  .lede{color:var(--ink2);margin:0 0 20px}
-  form{display:grid;gap:10px}
-  label{font-size:13px;color:var(--ink2)}
-  input[type=email]{width:100%;padding:12px 14px;border-radius:10px;border:1px solid var(--line);background:transparent;color:var(--ink);font:inherit}
-  input[type=email]:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-  .btn{appearance:none;border:0;border-radius:10px;padding:13px 16px;font:inherit;font-weight:600;background:var(--accent);color:var(--accent-ink);cursor:pointer;min-height:44px}
+
+  .card{position:relative;z-index:1;width:min(100%,440px);padding:1.5rem 1.35rem;
+    border:1px solid rgba(255,255,255,.07);border-radius:var(--radius-lg);
+    background:linear-gradient(150deg,rgba(17,21,45,.76),rgba(7,10,22,.82));
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.035),0 24px 60px rgba(0,0,0,.35)}
+
+  .brand{display:inline-flex;align-items:center;gap:.75rem;margin:0 0 1.2rem;font-weight:850;letter-spacing:-.025em;color:var(--ink);text-decoration:none}
+  .mark{width:2.45rem;height:2.45rem;display:grid;place-items:center;border:1px solid rgba(190,178,255,.44);border-radius:.85rem;
+    background:radial-gradient(circle at 35% 25%,rgba(255,255,255,.7),transparent 18%),linear-gradient(145deg,#c0aeff,#7b5cff 54%,#29347c);
+    box-shadow:0 0 28px rgba(126,92,255,.34);color:#080711;font-weight:950}
+
+  .eyebrow{display:inline-flex;width:fit-content;align-items:center;gap:.45rem;margin:0 0 .9rem;padding:.42rem .66rem;
+    border:1px solid rgba(157,124,255,.28);border-radius:999px;color:#ddd5ff;background:rgba(93,64,182,.14);
+    font-size:.68rem;font-weight:850;letter-spacing:.11em;text-transform:uppercase}
+
+  h1{margin:0 0 .6rem;font-size:clamp(2.1rem,7vw,2.8rem);line-height:1;letter-spacing:-.045em}
+  .gradient{background:linear-gradient(90deg,#ffffff 0%,#c8b9ff 38%,#8f9dff 66%,#62dcff 100%);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .lede{margin:0 0 1.2rem;color:#bbb9cc;font-size:.98rem;line-height:1.6}
+  form{display:grid;gap:.65rem}
+  label{font-size:.8rem;color:var(--muted)}
+  input[type=email]{width:100%;min-height:2.9rem;padding:.72rem .9rem;border-radius:var(--radius-md);
+    border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.035);color:var(--ink);font:inherit;font-size:.95rem}
+  input[type=email]::placeholder{color:var(--muted-2)}
+  input[type=email]:focus-visible{outline:2px solid var(--violet);outline-offset:2px}
+
+  .btn{appearance:none;min-height:2.9rem;display:inline-flex;align-items:center;justify-content:center;padding:.72rem 1rem;
+    border:1px solid transparent;border-radius:var(--radius-md);font:inherit;font-size:.86rem;font-weight:820;cursor:pointer;
+    color:#080813;background:linear-gradient(102deg,#cfc2ff,#9f92ff 48%,#68dcff);box-shadow:0 16px 42px rgba(91,75,233,.25)}
   .btn:disabled{opacity:.6;cursor:default}
-  .btn:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
-  .btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
-  .note{margin:18px 0 0;padding:12px 14px;border:1px dashed var(--line);border-radius:10px;font-size:14px;color:var(--ink2)}
-  .err{color:var(--danger);font-size:14px;margin:0}
-  .status{display:flex;gap:8px;align-items:center;font-size:13px;color:var(--ink2);margin-top:16px}
-  .dot{width:8px;height:8px;border-radius:50%;background:var(--ink2)}
-  [data-state="degraded"] .dot{background:var(--danger)}
-  [data-state="signed_out"] .dot{background:var(--ok)}
-  .foot{font-size:12px;color:var(--ink2);margin:18px 0 0}
+  .btn:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+  .btn.ghost{color:#eceaf8;background:rgba(255,255,255,.045);border-color:rgba(255,255,255,.1);box-shadow:none}
+
+  .note{margin:1.1rem 0 0;padding:.8rem .9rem;border:1px dashed var(--line-strong);border-radius:var(--radius-md);font-size:.86rem;color:var(--muted)}
+  .err{margin:0;color:var(--error);font-size:.86rem}
+  .status{display:flex;gap:.5rem;align-items:center;margin-top:1.1rem;font-size:.8rem;color:var(--muted)}
+  .dot{width:.52rem;height:.52rem;border-radius:999px;background:var(--muted-2)}
+  [data-state="signed_out"] .dot{background:var(--green)}
+  [data-state="degraded"] .dot{background:var(--amber)}
+  .foot{margin:.9rem 0 0;font-size:.74rem;color:var(--muted-2)}
+  .card a:focus-visible{outline:2px solid var(--cyan);outline-offset:3px;border-radius:.5rem}
 </style>
 </head>
 <body data-session-url="/auth/me" data-magic-url="/auth/magic-link" data-enter-url="/control-room/" data-enabled="true">
 <div class="ambient" aria-hidden="true"></div>
 
 <main class="card" id="door" data-state="checking" aria-live="polite">
-  <p class="eyebrow">Founder Control Room</p>
+  <a class="brand" href="/" aria-label="Founder Control Room home"><span class="mark" aria-hidden="true">F</span><span>Founder Control Room</span></a>
+  <p class="eyebrow">Invitation only</p>
 
   <section data-for="signed_out">
-    <h1>Founder sign-in</h1>
+    <h1><span class="gradient">Founder sign-in</span></h1>
     <p class="lede">Enter your founder email. If it's on the allowlist, a one-time sign-in link is sent. No password.</p>
     <form id="magic" novalidate>
       <label for="email">Email</label>
@@ -57,7 +102,7 @@
   </section>
 
   <section data-for="degraded" hidden>
-    <h1>Sign-in isn't available right now.</h1>
+    <h1><span class="gradient">Sign-in isn't available right now.</span></h1>
     <p class="lede">The sign-in service didn't answer. Nothing was sent. Try again shortly.</p>
     <p style="margin:0"><button class="btn ghost" id="retry" type="button">Check again</button></p>
   </section>
