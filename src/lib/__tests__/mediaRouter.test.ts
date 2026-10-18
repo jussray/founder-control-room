@@ -219,6 +219,58 @@ describe('deterministic post predicate', () => {
       reason: 'POST_INPUTS_MISSING',
     });
   });
+
+  it('does not bypass cross-project reuse authority on the deterministic path', () => {
+    const req = request({
+      type: 'post',
+      intent: 'assemble',
+      projectId: 'project-1',
+      referenceAssetIds: ['asset-1'],
+      referencePolicy: {
+        maySendToExternalProvider: false,
+        mayStoreInLibrary: true,
+        mayReuseCrossProject: false,
+      },
+    });
+    const foreign = asset({
+      projectId: 'project-2',
+      rights: {
+        commercialUseStatus: 'unknown',
+        reusableAcrossProjects: true,
+        reusableAcrossProjectsAuthorityRecordId: 'reuse-grant-1',
+        domainAuthorityGranted: true,
+        domainAuthorityRecordId: 'reuse-grant-1',
+      },
+    });
+    expect(canCompleteWithPostProduction(req, [foreign], context({
+      assetInputs: [{
+        assetId: 'asset-1',
+        role: 'source_footage',
+        maySendToExternalProvider: false,
+        domainApprovalSourceRecordId: 'reuse-grant-1',
+      }],
+    }))).toEqual({ ok: false, reason: 'POST_INPUTS_MISSING' });
+  });
+
+  it('requires explicit domain identity-reference context instead of registry tags', () => {
+    const req = request({
+      type: 'post',
+      intent: 'assemble',
+      referenceAssetIds: ['asset-1'],
+      constraints: { needsIdentityConsistency: true },
+    });
+    expect(canCompleteWithPostProduction(req, [asset({ tags: ['identity_reference'] })], context())).toEqual({
+      ok: false,
+      reason: 'IDENTITY_SOURCE_MISSING',
+    });
+    expect(canCompleteWithPostProduction(req, [asset()], context({
+      assetInputs: [{
+        assetId: 'asset-1',
+        role: 'identity_reference',
+        maySendToExternalProvider: false,
+      }],
+    }))).toEqual({ ok: true });
+  });
 });
 
 describe('route evaluator', () => {
@@ -328,10 +380,21 @@ describe('fingerprints', () => {
 });
 
 describe('budget reservation and revocation', () => {
-  it('reserves atomically against the configured cap', async () => {
+  it('reserves atomically against the configured cap and is retry-idempotent by request', async () => {
     const service = new InMemoryMediaBudgetReservationService({ dailyCapUsd: 1, monthlyCapUsd: 2 });
-    expect((await service.reserve({ requestId: 'r1', amountUsd: 0.8 })).ok).toBe(true);
+    const first = await service.reserve({ requestId: 'r1', amountUsd: 0.8 });
+    expect(first.ok).toBe(true);
+    expect(await service.reserve({ requestId: 'r1', amountUsd: 0.8 })).toEqual(first);
+    expect(await service.reserve({ requestId: 'r1', amountUsd: 0.7 })).toEqual({ ok: false, reason: 'LEDGER_ERROR' });
     expect(await service.reserve({ requestId: 'r2', amountUsd: 0.3 })).toEqual({ ok: false, reason: 'EXCEEDS_DAILY' });
+  });
+
+  it('refuses invalid or over-reservation settlement amounts', async () => {
+    const service = new InMemoryMediaBudgetReservationService({ dailyCapUsd: 1, monthlyCapUsd: 2 });
+    const reservation = await service.reserve({ requestId: 'r1', amountUsd: 0.5 });
+    if (!reservation.ok) throw new Error('reservation should succeed');
+    await expect(service.commit({ reservationId: reservation.reservationId, actualUsd: 0.6 })).rejects.toThrow(/reserved amount/);
+    expect(await service.reserve({ requestId: 'bad', amountUsd: Number.NaN })).toEqual({ ok: false, reason: 'LEDGER_ERROR' });
   });
 
   it('appends revocation evidence and makes revoked status terminal', async () => {

@@ -372,25 +372,35 @@ const POST_PRODUCIBLE_INTENTS = new Set<MediaIntentV1>([
 export function canCompleteWithPostProduction(
   request: MediaRoutingRequestV1,
   availableAssets: AssetRegistryEntryV1[],
+  context?: MediaRouterDomainContextV1,
 ): { ok: true } | { ok: false; reason: 'INTENT_NOT_POST_PRODUCIBLE' | 'POST_INPUTS_MISSING' | 'IDENTITY_SOURCE_MISSING' | 'REFERENCE_SOURCE_MISSING' } {
   if (!POST_PRODUCIBLE_INTENTS.has(request.intent)) return { ok: false, reason: 'INTENT_NOT_POST_PRODUCIBLE' };
   if (request.referenceAssetIds.length === 0) return { ok: false, reason: 'POST_INPUTS_MISSING' };
 
+  const approvedInputById = new Map((context?.assetInputs ?? []).map((asset) => [asset.assetId, asset]));
   const usable = availableAssets.filter((asset) =>
     asset.workspaceId === request.workspaceId
     && asset.status !== 'revoked'
     && asset.status !== 'quarantined'
+    && asset.status !== 'archived'
     && (
       asset.projectId === request.projectId
-      || (asset.rights.reusableAcrossProjects && Boolean(asset.rights.reusableAcrossProjectsAuthorityRecordId))
+      || (
+        request.referencePolicy.mayReuseCrossProject
+        && asset.rights.reusableAcrossProjects
+        && Boolean(asset.rights.reusableAcrossProjectsAuthorityRecordId)
+        && Boolean(approvedInputById.get(asset.assetId)?.domainApprovalSourceRecordId)
+      )
     ),
   );
   const byId = new Map(usable.map((asset) => [asset.assetId, asset]));
   if (request.referenceAssetIds.some((assetId) => !byId.has(assetId))) {
     return { ok: false, reason: 'POST_INPUTS_MISSING' };
   }
-  const selected = request.referenceAssetIds.map((assetId) => byId.get(assetId)!);
-  if (request.constraints.needsIdentityConsistency && !selected.some((asset) => asset.tags.includes('identity_reference'))) {
+  if (
+    request.constraints.needsIdentityConsistency
+    && !request.referenceAssetIds.some((assetId) => approvedInputById.get(assetId)?.role === 'identity_reference')
+  ) {
     return { ok: false, reason: 'IDENTITY_SOURCE_MISSING' };
   }
   if (request.constraints.needsReferenceFidelity && request.referenceAssetIds.length === 0) {
@@ -478,7 +488,7 @@ export function evaluateMediaRoute(input: EvaluateMediaRouteInputV1): MediaRoute
   }
   trace.push({ gate: 'domain_authority', result: 'pass' });
 
-  const post = canCompleteWithPostProduction(request, availableAssets);
+  const post = canCompleteWithPostProduction(request, availableAssets, context);
   if (post.ok) {
     trace.push({ gate: 'post_producible', result: 'select', detail: 'ffmpeg' });
     const deterministicComputeUsd = (request.output.durationSeconds ?? 30) * 1.5 * 0.0005;
@@ -614,6 +624,7 @@ export type ReservationResultV1 =
 
 export class InMemoryMediaBudgetReservationService {
   private readonly reservations = new Map<string, { requestId: string; amountUsd: number; state: 'active' | 'released' | 'committed' }>();
+  private readonly reservationByRequestId = new Map<string, string>();
   private spentTodayUsd = 0;
   private spentThisMonthUsd = 0;
   private sequence = 0;
@@ -621,6 +632,16 @@ export class InMemoryMediaBudgetReservationService {
   constructor(private readonly caps: { dailyCapUsd: number; monthlyCapUsd: number }) {}
 
   async reserve(args: { requestId: string; amountUsd: number }): Promise<ReservationResultV1> {
+    if (!args.requestId.trim() || !Number.isFinite(args.amountUsd) || args.amountUsd < 0) {
+      return { ok: false, reason: 'LEDGER_ERROR' };
+    }
+    const priorId = this.reservationByRequestId.get(args.requestId);
+    if (priorId) {
+      const prior = this.reservations.get(priorId);
+      if (!prior || prior.amountUsd !== args.amountUsd) return { ok: false, reason: 'LEDGER_ERROR' };
+      return { ok: true, reservationId: priorId };
+    }
+
     const active = [...this.reservations.values()]
       .filter((reservation) => reservation.state === 'active')
       .reduce((sum, reservation) => sum + reservation.amountUsd, 0);
@@ -628,6 +649,7 @@ export class InMemoryMediaBudgetReservationService {
     if (this.spentThisMonthUsd + active + args.amountUsd > this.caps.monthlyCapUsd) return { ok: false, reason: 'EXCEEDS_MONTHLY' };
     const reservationId = `media_res_${++this.sequence}`;
     this.reservations.set(reservationId, { ...args, state: 'active' });
+    this.reservationByRequestId.set(args.requestId, reservationId);
     return { ok: true, reservationId };
   }
 
@@ -639,6 +661,9 @@ export class InMemoryMediaBudgetReservationService {
   async commit(args: { reservationId: string; actualUsd: number }): Promise<void> {
     const reservation = this.reservations.get(args.reservationId);
     if (!reservation || reservation.state !== 'active') return;
+    if (!Number.isFinite(args.actualUsd) || args.actualUsd < 0 || args.actualUsd > reservation.amountUsd) {
+      throw new Error('actualUsd must be finite, nonnegative, and no greater than the reserved amount');
+    }
     reservation.state = 'committed';
     this.spentTodayUsd += args.actualUsd;
     this.spentThisMonthUsd += args.actualUsd;
