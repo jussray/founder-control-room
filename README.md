@@ -8,6 +8,16 @@ Founder Control Room is the provider-independent founder operating plane for gov
 
 GitHub, Cloudflare, Supabase, n8n, Zapier, HubSpot, Shopify, and other providers may supply execution or evidence. None of them becomes the product constitution.
 
+## October 16, 2026 StoryEngine peer refresh for FCR browser federation
+
+The FCR Playwright workflow's StoryEngine peer identity was changed from `a6e6a396ed30535af2fd9b1ec2347a84e1a3fbf3` to the separately observed StoryEngine `main` SHA `26b1c34ae7c97c5d1b66a23d6345b3965cfcdc1f`. GitHub comparison showed a forward, 22-commit peer transition, and the successor had 15 passing checks at observation time, including the Control Room federation contract. This pin refresh is a prerequisite for running the FCR-to-StoryEngine browser test, **not** a passing FCR peer witness or an authorization to deploy.
+
+The former FCR browser run passed all local Control Room journeys before deliberately stopping on the stale peer-ref check. All predecessor FCR/StoryEngine federation evidence remains historical. Only an exact FCR head which independently checks StoryEngine's live ref, checks out the pinned commit, proves the peer runtime identity, and completes the full Playwright directive/receipt loop can claim current federation integration at this pair. Any movement of either head expires that claim again.
+
+## GitHub Workspace integration candidate
+
+FCR includes a project-linked repository editor and an integrated guarded terminal panel. The terminal operates only through existing mission-bound read-only Git commands and exact commit checks. CI runs a browser integration journey against the real FCR server using test substitutes for external providers. The candidate is not verified as a production release. Product control rooms, including Bip, retain separate product ownership and capabilities.
+
 ## Read this README as a truth surface
 
 Founder Control Room separates four states that are easy to blur together:
