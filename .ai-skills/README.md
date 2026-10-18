@@ -30,14 +30,13 @@ The same five skills, rewritten as standalone GPT instruction templates. Where G
 
 Tool-dependent rules inside these templates are capability-aware: web search, Code Interpreter & Data Analysis, file tools, apps, actions, repository tools, and external execution must only be used when they are actually enabled for the current account/workspace/session.
 
-### Cross-Platform Adapters (`cross-platform/`)
+### Cross-Platform Adapters (top level of `.ai-skills/`)
 
 | File | For | How to Use |
 |------|-----|-----------|
 | `claude-project-instructions.md` | Claude (claude.ai) | Paste into Projects → Project Instructions where that feature is available |
 | `chatgpt-custom-instructions.md` | ChatGPT | Use as reusable custom/project instruction text where supported |
 | `universal-commands.md` | All three | Reference for command behaviors |
-| `minimal-token-operating-protocol.md` | All three | Token economy strategy when usage is constrained |
 | `HUMAN_SAFE_BUILD.md` | All three | Required human-facing state and recovery doctrine |
 
 ## Quick Start
