@@ -321,6 +321,12 @@
       "claims": [
         "`tools/zapier/founder-content-outcome-contract.cjs` must bind founder-content metrics to the exact observed network, lane, account identity, connector identity, and coverage state; out-of-scope metrics must remain UNKNOWN, cross-account metric donation is forbidden, and these receipts can never grant publication, provider-write, merge, deploy, spend, or external-contact authority."
       ]
+    },
+    {
+      "path": ".github/workflows/deploy.yml",
+      "claims": [
+        "`.github/workflows/deploy.yml` must upload the credential-shape and Worker secret-name receipts from `RUNNER_TEMP` with `if: always()` immediately after the provider-held Worker secret-name preflight, so a failed preflight still preserves the names-only receipt; the artifact must never contain secret values, is retained for 90 days, and grants no authority and no runtime proof."
+      ]
     }
   ]
 }

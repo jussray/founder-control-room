@@ -61,6 +61,7 @@ The reasoner accepts sanitized, timestamped observations such as:
 - deployment authority (`native_git`, `token_upload`, or `manual`);
 - route and DNS state;
 - credential error codes without secret values;
+- names-only credential-shape and Worker secret-name receipts uploaded by the deploy authority gate, which never record secret values and are not provider proof;
 - desired commit and project identifiers.
 
 Raw provider payloads, tokens, private keys, service-role values, user content, and founder identity are outside the reasoning contract.
