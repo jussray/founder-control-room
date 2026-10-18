@@ -321,6 +321,12 @@
       "claims": [
         "`tools/zapier/founder-content-outcome-contract.cjs` must bind founder-content metrics to the exact observed network, lane, account identity, connector identity, and coverage state; out-of-scope metrics must remain UNKNOWN, cross-account metric donation is forbidden, and these receipts can never grant publication, provider-write, merge, deploy, spend, or external-contact authority."
       ]
+    },
+    {
+      "path": ".github/workflows/deploy.yml",
+      "claims": [
+        "`.github/workflows/deploy.yml` `rollback-receipt` must run only when at least one deploy-plane job fails (`always() && contains(needs.*.result, 'failure')`), must record failed job names, per-job results and the expected head SHA in a names-only `fcr-rollback-receipt.json`, must set `secret_values_recorded: false`, and must never perform a rollback or provider mutation; its artifact is retained for 90 days and is non-authorizing evidence."
+      ]
     }
   ]
 }
