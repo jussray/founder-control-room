@@ -86,14 +86,12 @@ async function callSupabaseConsentApi(
   }
   const url = `${supabaseAuthBase()}/oauth/authorizations/${encodeURIComponent(authorizationIdValue)}`;
   const response = await fetch(url, {
-    method: action ? 'POST' : 'GET',
+    method: 'GET',
     headers: {
       Authorization: `Bearer ${founderSession.accessToken}`,
       apikey: publishableKey(),
       Accept: 'application/json',
-      ...(action ? { 'Content-Type': 'application/json' } : {}),
     },
-    ...(action ? { body: JSON.stringify({ action }) } : {}),
   });
 
   const body = await response.json().catch(() => null);
