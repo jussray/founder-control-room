@@ -124,7 +124,13 @@ describe('OAuth consent proxy', () => {
     expect(response.status).toBe(200);
     expect(response.body.redirect_url).toContain('https://chatgpt.com/');
     expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(fetchMock).toHaveBeenCalledWith(
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      `${SUPABASE_URL}/auth/v1/oauth/authorizations/${AUTHORIZATION_ID}`,
+      expect.objectContaining({ method: 'GET' }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
       `${SUPABASE_URL}/auth/v1/oauth/authorizations/${AUTHORIZATION_ID}/consent`,
       expect.objectContaining({
         method: 'POST',
