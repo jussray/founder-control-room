@@ -286,7 +286,7 @@ describe('route evaluator', () => {
 
   it('uses a verified API free allowance before paid cost', () => {
     const input = routeInput(request({
-      budget: { mode: 'free', maxCostUsd: 0, allowWrapper: false, requireDirectProviderWhenAvailable: true },
+      budget: { mode: 'free', maxCostUsd: 0.01, allowWrapper: false, requireDirectProviderWhenAvailable: true },
     }));
     input.allowance = snapshotAllowance({
       entries: [{ providerId: 'google', modelId: 'nano-banana-test', balance: 1, source: 'api' }],
@@ -299,7 +299,7 @@ describe('route evaluator', () => {
 
   it('blocks free mode when the allowance is not verified by API', () => {
     const input = routeInput(request({
-      budget: { mode: 'free', maxCostUsd: 0, allowWrapper: false, requireDirectProviderWhenAvailable: true },
+      budget: { mode: 'free', maxCostUsd: 0.01, allowWrapper: false, requireDirectProviderWhenAvailable: true },
     }));
     input.allowance = snapshotAllowance({
       entries: [{ providerId: 'google', modelId: 'nano-banana-test', balance: 10, source: 'manual' }],
@@ -364,6 +364,29 @@ describe('route evaluator', () => {
       spentTodayUsd: 0,
       spentThisMonthUsd: 0,
       activeReservationsUsd: 0,
+    });
+    expect(evaluateMediaRoute(input).outcome).toMatchObject({ kind: 'BLOCKED', reason: 'OVER_BUDGET' });
+  });
+
+  it('enforces the ceiling against deterministic compute and storage, not only provider spend', () => {
+    const req = request({
+      type: 'post',
+      intent: 'compose',
+      referenceAssetIds: ['asset-1'],
+      budget: { mode: 'cheap', maxCostUsd: 0.005, allowWrapper: false, requireDirectProviderWhenAvailable: true },
+    });
+    const input = routeInput(req);
+    input.availableAssets = [asset()];
+    expect(evaluateMediaRoute(input).outcome).toMatchObject({ kind: 'BLOCKED', reason: 'OVER_BUDGET' });
+  });
+
+  it('does not call a provider route free when non-provider estimated cost exceeds the ceiling', () => {
+    const req = request({
+      budget: { mode: 'free', maxCostUsd: 0, allowWrapper: false, requireDirectProviderWhenAvailable: true },
+    });
+    const input = routeInput(req);
+    input.allowance = snapshotAllowance({
+      entries: [{ providerId: 'google', modelId: 'nano-banana-test', balance: 1, source: 'api' }],
     });
     expect(evaluateMediaRoute(input).outcome).toMatchObject({ kind: 'BLOCKED', reason: 'OVER_BUDGET' });
   });

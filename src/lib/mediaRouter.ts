@@ -488,13 +488,25 @@ export function evaluateMediaRoute(input: EvaluateMediaRouteInputV1): MediaRoute
   }
   trace.push({ gate: 'domain_authority', result: 'pass' });
 
+  if (!Number.isFinite(request.budget.maxCostUsd) || request.budget.maxCostUsd < 0) {
+    return blocked('POLICY_DENIED', 'request budget must be a finite nonnegative amount');
+  }
+  const dailyHeadroom = Math.max(0, budget.dailyCapUsd - budget.spentTodayUsd - budget.activeReservationsUsd);
+  const monthlyHeadroom = Math.max(0, budget.monthlyCapUsd - budget.spentThisMonthUsd - budget.activeReservationsUsd);
+  const budgetCeiling = Math.min(request.budget.maxCostUsd, dailyHeadroom, monthlyHeadroom);
+  const storageAndEgressUsd = 0.01;
+
   const post = canCompleteWithPostProduction(request, availableAssets, context);
   if (post.ok) {
     trace.push({ gate: 'post_producible', result: 'select', detail: 'ffmpeg' });
     const deterministicComputeUsd = (request.output.durationSeconds ?? 30) * 1.5 * 0.0005;
+    const deterministicTotalUsd = deterministicComputeUsd + storageAndEgressUsd;
+    if (deterministicTotalUsd > budgetCeiling) {
+      return blocked('OVER_BUDGET', `Deterministic route exceeds available budget headroom (${budgetCeiling.toFixed(4)} USD)`);
+    }
     return terminal(
       { kind: 'DETERMINISTIC_POST', tool: 'ffmpeg', requiredInputAssetIds: [...request.referenceAssetIds] },
-      { generativeProviderUsd: 0, deterministicComputeUsd, storageAndEgressUsd: 0.01 },
+      { generativeProviderUsd: 0, deterministicComputeUsd, storageAndEgressUsd },
     );
   }
   trace.push({ gate: 'post_producible', result: 'skip', detail: post.reason });
@@ -553,10 +565,13 @@ export function evaluateMediaRoute(input: EvaluateMediaRouteInputV1): MediaRoute
       && entry.balance > 0,
     ));
     if (!freeOffer) return blocked('NO_ELIGIBLE_FREE_ROUTE', 'No verified API allowance satisfies this request');
+    if (storageAndEgressUsd > budgetCeiling) {
+      return blocked('OVER_BUDGET', `Free provider route still exceeds non-provider budget headroom (${budgetCeiling.toFixed(4)} USD)`);
+    }
     trace.push({ gate: 'free_allowance', result: 'select', detail: `${freeOffer.providerId}/${freeOffer.modelId}` });
     return terminal(
       { kind: 'DIRECT_PROVIDER', providerId: freeOffer.providerId, modelId: freeOffer.modelId, providerOfferFingerprint: providerOfferFingerprint(freeOffer) },
-      { generativeProviderUsd: 0, deterministicComputeUsd: 0, storageAndEgressUsd: 0.01 },
+      { generativeProviderUsd: 0, deterministicComputeUsd: 0, storageAndEgressUsd },
       { freeAllowanceUsed: true, qualityFit: freeOffer.constraints.qualityRank ?? 0.5, speedFit: freeOffer.constraints.speedRank ?? 0.5 },
     );
   }
@@ -564,11 +579,8 @@ export function evaluateMediaRoute(input: EvaluateMediaRouteInputV1): MediaRoute
   const costKnown = rightsEligible.filter((offer) => estimateOfferCost(offer, request) !== null);
   if (costKnown.length === 0) return blocked('UNKNOWN_COST', 'No matching direct provider has verifiable cost');
 
-  const dailyHeadroom = Math.max(0, budget.dailyCapUsd - budget.spentTodayUsd - budget.activeReservationsUsd);
-  const monthlyHeadroom = Math.max(0, budget.monthlyCapUsd - budget.spentThisMonthUsd - budget.activeReservationsUsd);
-  const ceiling = Math.min(request.budget.maxCostUsd, dailyHeadroom, monthlyHeadroom);
-  const underBudget = costKnown.filter((offer) => estimateOfferCost(offer, request)! <= ceiling);
-  if (underBudget.length === 0) return blocked('OVER_BUDGET', `No candidate route fits available budget headroom (${ceiling.toFixed(4)} USD)`);
+  const underBudget = costKnown.filter((offer) => estimateOfferCost(offer, request)! + storageAndEgressUsd <= budgetCeiling);
+  if (underBudget.length === 0) return blocked('OVER_BUDGET', `No candidate route fits available all-in budget headroom (${budgetCeiling.toFixed(4)} USD)`);
 
   const sorted = [...underBudget].sort((left, right) => {
     const leftCost = estimateOfferCost(left, request)!;
@@ -587,7 +599,7 @@ export function evaluateMediaRoute(input: EvaluateMediaRouteInputV1): MediaRoute
   trace.push({ gate: 'select', result: 'select', detail: `${chosen.providerId}/${chosen.modelId}` });
   return terminal(
     { kind: 'DIRECT_PROVIDER', providerId: chosen.providerId, modelId: chosen.modelId, providerOfferFingerprint: providerOfferFingerprint(chosen) },
-    { generativeProviderUsd: estimateOfferCost(chosen, request)!, deterministicComputeUsd: 0, storageAndEgressUsd: 0.01 },
+    { generativeProviderUsd: estimateOfferCost(chosen, request)!, deterministicComputeUsd: 0, storageAndEgressUsd },
     { qualityFit: chosen.constraints.qualityRank ?? 0.5, speedFit: chosen.constraints.speedRank ?? 0.5 },
   );
 }
