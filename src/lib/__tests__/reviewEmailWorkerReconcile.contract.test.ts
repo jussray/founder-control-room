@@ -155,7 +155,7 @@ describe('review-email Worker reconciliation authority contract', () => {
     expect(workflow).toContain('service_binding_verified: false');
     expect(workflow).toContain('.provider_deploy_succeeded = true | .blocked_stage = "service_binding_proof"');
     expect(workflow).toContain('Worker deploy succeeded, but Wrangler output did not prove FOUNDER_CONTROL_ROOM_API -> founder-control-room. Provider deployment remains recorded as successful; binding proof remains false.');
-    expect(workflow).toContain('.service_binding_verified = true | .blocked_stage = null');
+    expect(workflow).toContain('.service_binding_verified = true | .blocked_stage = "provider_email_routing_readback"');
     expect(workflow).toContain('email_trigger_reconciled: false');
     expect(workflow).not.toContain('.email_trigger_reconciled = true');
     expect(workflow).toContain('Email rule desired-state reconciliation: included in Wrangler deploy');
