@@ -18,8 +18,8 @@ if (!/^main\s*=\s*"src\/worker\/founderSignalReviewEmail\.ts"\s*$/m.test(manifes
   fail('email Worker must use the canonical founder review email entrypoint');
 }
 
-if (/^\s*addresses\s*=/m.test(manifest)) {
-  fail('wrangler.email.toml must not claim inbound Email Routing with an unsupported addresses field');
+if (!/^\s*addresses\s*=\s*\[\s*"review@foundercontrolroom\.org"\s*\]\s*$/m.test(manifest)) {
+  fail('wrangler.email.toml must declare exactly the literal review@foundercontrolroom.org Email Routing address');
 }
 
 if (/\[\[routes\]\]/.test(manifest)) {
@@ -55,5 +55,5 @@ if (failures.length > 0) {
 }
 
 console.log(
-  'Founder review email Worker source contract verified: canonical identity, no HTTP exposure, private FCR service binding, and review+context parsing retained. Provider-side review@ routing remains external evidence and is not claimed by Wrangler config.',
+  'Founder review email Worker source contract verified: canonical identity, literal review@ routing desired state, no HTTP exposure, private FCR service binding, and review+context parsing retained. Provider readback and runtime invocation remain separate evidence.',
 );

@@ -170,7 +170,7 @@
         "`README.md` must treat a successful successor StoryEngine Playwright witness as current only for the exact FCR/StoryEngine evidence pair recorded by the run and expire that proof when either repository moves.",
         "`README.md` must record that the StoryEngine peer refresh discovered during URLFix PR #914 merge review is a focused recovery transition handled by PR #896, not URLFix failure, and that pin alignment alone cannot promote the successor federation state beyond UNKNOWN.",
         "`README.md` must record that the StoryEngine peer refresh after the agent-contract v1 rollout is a focused recovery transition, not a #913 failure, and that pin alignment alone cannot promote the successor federation state beyond UNKNOWN.",
-        "`README.md` must keep review-email Worker source/deploy truth separate from provider-side Email Routing and runtime invocation; `wrangler.email.toml` must not be treated as proof that `review@foundercontrolroom.org` currently routes to the Worker."
+        "`README.md` must describe review-email routing as one bounded Wrangler-managed desired-state address plus independent Cloudflare provider readback, subaddressing state, and runtime invocation proof; deploy success alone cannot mint `email_trigger_reconciled=true` or runtime truth."
       ]
     },
     {
@@ -197,7 +197,7 @@
       "path": "docs/CLOUDFLARE_REASONING.md",
       "claims": [
         "`docs/CLOUDFLARE_REASONING.md` must require FCR provider-held Worker binding names to pass the canonical Deploy membrane without treating source, binding-name presence, CI, or Playwright as proof of downstream provider activation or business outcomes.",
-        "`docs/CLOUDFLARE_REASONING.md` must keep `provider_deploy_succeeded`, provider-side `email_trigger_reconciled`, and `runtime_email_invocation_proven` as independent review-email evidence planes; Worker deploy must not promote routing or invocation without their own provider/runtime evidence."
+        "`docs/CLOUDFLARE_REASONING.md` must keep review-email Worker/managed-route deployment, provider route readback, zone subaddressing state, and runtime email invocation as distinct evidence planes; Wrangler 4.113+ may reconcile the literal `review@foundercontrolroom.org` Worker route without making provider readback or runtime proof implicit."
       ]
     },
     {
@@ -217,7 +217,7 @@
       "path": "docs/deployment/CLOUDFLARE_WORKER_TARGETS.md",
       "claims": [
         "`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` must keep canonical Worker runtime secret bindings provider-held while separating provider subscription, runtime delivery, production database state, and business outcomes into their own activation proof.",
-        "`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` must treat the review-email address-to-Worker mapping as provider-side Email Routing state, not as a Wrangler manifest field or a consequence of Worker deployment."
+        "`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` must declare exactly one Wrangler-managed review-email route, `review@foundercontrolroom.org -> founder-control-room-review-email`, while requiring independent provider readback, subaddressing verification for `review+<context-uuid>@...`, and runtime invocation proof before calling ingress live."
       ]
     },
     {
@@ -317,7 +317,7 @@
     {
       "path": "wrangler.email.toml",
       "claims": [
-        "`wrangler.email.toml` must declare only the review-email Worker source identity, account, entrypoint, and private `FOUNDER_CONTROL_ROOM_API -> founder-control-room` Service Binding; it must not use an `addresses` field to claim inbound Email Routing, because `review@foundercontrolroom.org -> founder-control-room-review-email` is provider-side state requiring independent provider readback and runtime invocation evidence."
+        "`wrangler.email.toml` must declare the review-email Worker identity, account, entrypoint, private `FOUNDER_CONTROL_ROOM_API -> founder-control-room` Service Binding, and exactly one top-level `addresses` value `review@foundercontrolroom.org`; this is desired state for Wrangler reconciliation, not proof of provider readback or runtime invocation."
       ]
     }
   ]
