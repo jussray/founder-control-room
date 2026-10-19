@@ -231,7 +231,7 @@ export function routeFcrStandingCommands(rawGoal: string, action: FcrStandingCom
   if (action === 'review') pushUnique(autoRoutedCommandIds, 'review');
   if (action === 'merge') pushUnique(autoRoutedCommandIds, 'merge');
   if (['deploy', 'publish'].includes(action)) pushUnique(autoRoutedCommandIds, 'ship');
-  if (['inspect', 'review'].includes(action) || /\b(audit|verify|proof|status|reality|truth|exact-head|runtime)\b/.test(goal)) {
+  if (['inspect', 'review'].includes(action) || /\b(audit|verify|prove|proof|status|reality|truth|exact-head|runtime)\b/.test(goal)) {
     pushUnique(autoRoutedCommandIds, 'prove');
   }
   if (['write', 'merge', 'deploy', 'migrate', 'rollback'].includes(action)
