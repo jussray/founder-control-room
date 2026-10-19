@@ -105,6 +105,12 @@ describe('FCR standing command and OS registry', () => {
     expect(decision.standingCommandIds).not.toContain('urlfix');
   });
 
+  it('auto-routes website repair intent without a URL or browser keyword', () => {
+    const decision = routeFcrStandingCommands('Test this website and fix the broken checkout', 'write');
+
+    expect(decision.standingCommandIds).toContain('urlfix');
+  });
+
   it('auto-routes video intent through Video Production OS plus Media Router OS', () => {
     const decision = routeFcrStandingCommands(
       'Continue the cinematic YouTube video and preserve shot continuity.',

@@ -238,7 +238,11 @@ export function routeFcrStandingCommands(rawGoal: string, action: FcrStandingCom
     && /\b(fix|repair|bug|regression|broken|failure|failing|error|blocker)\b/.test(goal)) {
     pushUnique(autoRoutedCommandIds, 'goalfix');
   }
-  if ((/\b(url|browser)\b/.test(goal) || /https?:\/\//.test(goal)) && /\b(test|audit|fix|repair|issue|broken|verify)\b/.test(goal)) {
+  const urlTarget = /\b(url|browser)\b/.test(goal) || /https?:\/\//.test(goal);
+  const liveSiteTarget = /\b(website|live[- ]site)\b/.test(goal);
+  const verificationOrRepair = /\b(test|audit|fix|repair|issue|broken|verify)\b/.test(goal);
+  const liveSiteRepair = /\b(test|fix|repair|issue|broken|verify)\b/.test(goal);
+  if ((urlTarget && verificationOrRepair) || (liveSiteTarget && liveSiteRepair)) {
     pushUnique(autoRoutedCommandIds, 'urlfix');
   }
   if (/\b(video|movie|reel|cinematic|shot|storyboard|image-to-video|lip-sync)\b/.test(goal)) {
