@@ -46,12 +46,13 @@ describe('review-email Worker reconciliation authority contract', () => {
 
     expect(emailConfig).toMatch(/^name = "founder-control-room-review-email"$/m);
     expect(emailConfig).toMatch(/^account_id = "[0-9a-f]{32}"$/m);
-    expect(emailConfig).not.toMatch(/^addresses\s*=/m);
+    expect(emailConfig).not.toMatch(/^\s*addresses\s*=/m);
     expect(emailConfig).not.toContain('[[routes]]');
     expect(emailConfig).toMatch(/^binding = "FOUNDER_CONTROL_ROOM_API"$/m);
     expect(emailConfig).toMatch(/^service = "founder-control-room"$/m);
     expect(emailConfig).toContain('Inbound Email Routing is provider-side state');
     expect(workflow).toContain('Inbound Email Routing remains provider-side state and must be independently read back.');
+    expect(workflow).toContain("! grep -Eq '^[[:space:]]*addresses[[:space:]]*=' wrangler.email.toml");
   });
 
   it('does not label a source-only check as live routing proof', () => {

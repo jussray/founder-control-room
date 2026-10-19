@@ -91,7 +91,7 @@ jobs:
           grep -Eq '^name = "founder-control-room-review-email"$' wrangler.email.toml
           grep -Eq '^binding = "FOUNDER_CONTROL_ROOM_API"$' wrangler.email.toml
           grep -Eq '^service = "founder-control-room"$' wrangler.email.toml
-          ! grep -Eq '^addresses[[:space:]]*=' wrangler.email.toml
+          ! grep -Eq '^[[:space:]]*addresses[[:space:]]*=' wrangler.email.toml
 
           echo 'Review-email Worker identity, account authority, private API binding, and dedicated deploy credential are declared. Inbound Email Routing remains provider-side state and must be independently read back.'
 

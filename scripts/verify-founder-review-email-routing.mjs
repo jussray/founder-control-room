@@ -18,7 +18,7 @@ if (!/^main\s*=\s*"src\/worker\/founderSignalReviewEmail\.ts"\s*$/m.test(manifes
   fail('email Worker must use the canonical founder review email entrypoint');
 }
 
-if (/^addresses\s*=/m.test(manifest)) {
+if (/^\s*addresses\s*=/m.test(manifest)) {
   fail('wrangler.email.toml must not claim inbound Email Routing with an unsupported addresses field');
 }
 
