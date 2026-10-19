@@ -187,6 +187,12 @@ STATUS: VERIFIED | INFERRED | UNKNOWN | BLOCKED | STALE
 
 Do not convert a suspicion into a defect merely because a console warning exists. Require user-visible or contract-relevant impact, a failing assertion, or another concrete violated expectation.
 
+## Browser state and artifact handling
+
+- Use only synthetic or test identities for authenticated flows. Never reuse a real user's or a privileged account's browser state, storage state, cookies or tokens, and never sign in with a founder or operator credential.
+- Before any screenshot, trace, console or network capture is stored, or copied into a continuity receipt, redact cookies, authorization and other secret headers, request bodies, and private page content. Restrict captures to the minimum needed to show the defect.
+- Rejecting credentials in the URL does not protect browser state or response data. Keep artifacts out of committed files and receipts unless they pass this redaction step.
+
 ## Phase 3: TRACE
 
 For each highest-severity independent issue, map:

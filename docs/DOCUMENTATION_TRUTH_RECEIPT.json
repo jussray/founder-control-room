@@ -355,19 +355,19 @@
     {
       "path": "src/lib/fcrStandingCommandRegistry.ts",
       "claims": [
-        "`src/lib/fcrStandingCommandRegistry.ts` must route URLFIX only for explicit URL, browser or https targets with repair or verification intent; a repository audit that merely mentions a site cannot promote URLFIX into a policy-required browser capability."
+        "`src/lib/fcrStandingCommandRegistry.ts` must route URLFIX only for explicit URL, browser or https targets with repair or verification intent, or for live website or live-site repair intent; a repository audit that merely mentions a site cannot promote URLFIX into a policy-required browser capability."
       ]
     },
     {
       "path": "src/founder-os-lab/registry.ts",
       "claims": [
-        "`src/founder-os-lab/registry.ts` must register the GODMODE companion as a founder-control-room workflow with mayExecute false; registration cannot widen execution, merge, deploy or provider authority."
+        "`src/founder-os-lab/registry.ts` must register the GODMODE, repair-to-proof and continuity-proof-ledger companions as founder-control-room workflows with mayExecute false; registration cannot widen execution, merge, deploy or provider authority."
       ]
     },
     {
       "path": "src/founder-os-lab/contracts.ts",
       "claims": [
-        "`src/founder-os-lab/contracts.ts` must keep the GODMODE companion identifier within the governed companion contract; the identifier cannot widen execution, merge, deploy or provider authority."
+        "`src/founder-os-lab/contracts.ts` must keep the GODMODE, repair-to-proof and continuity-proof-ledger companion identifiers within the governed skill contract; the identifiers cannot widen execution, merge, deploy or provider authority."
       ]
     }
   ]

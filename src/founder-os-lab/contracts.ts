@@ -19,6 +19,8 @@ export type FounderOsLabSkillId =
   | 'goalfix'
   | 'ultrathink-attack-godmode'
   | 'urlfix'
+  | 'repair-to-proof'
+  | 'continuity-proof-ledger'
   | 'repo-truth'
   | 'truth-decay-audit'
   | 'proof-led-publishing'

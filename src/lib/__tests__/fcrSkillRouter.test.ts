@@ -306,6 +306,19 @@ describe('FCR skill router trust gate', () => {
     expect(ready.executionAllowed).toBe(false);
   });
 
+  it('requires the proof and continuity companions when they are explicitly named', () => {
+    for (const [goal, skill] of [
+      ['/repair-to-proof confirm the exact head.', 'repair-to-proof'],
+      ['/continuity record the handoff state.', 'continuity-proof-ledger'],
+      ['/receipt record the handoff state.', 'continuity-proof-ledger'],
+    ] as const) {
+      const decision = route(goal, 'write', ['juss-chief-ai']);
+      expect(decision.policyRequiredCapabilityIds).toContain(skill);
+      expect(decision.missingPolicyCapabilityIds).toContain(skill);
+      expect(decision.status).toBe('blocked');
+    }
+  });
+
   it('requires explicitly named skills to be present in the Chief AI plan', () => {
     const goal = '/goalfix repair this regression.';
     const decision = route(goal, 'write', ['juss-chief-ai']);
