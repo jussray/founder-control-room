@@ -8,6 +8,16 @@ Founder Control Room is the provider-independent founder operating plane for gov
 
 GitHub, Cloudflare, Supabase, n8n, Zapier, HubSpot, Shopify, and other providers may supply execution or evidence. None of them becomes the product constitution.
 
+## October 16, 2026 StoryEngine peer refresh for FCR browser federation
+
+The FCR Playwright workflow's StoryEngine peer identity was changed from `a6e6a396ed30535af2fd9b1ec2347a84e1a3fbf3` to the separately observed StoryEngine `main` SHA `26b1c34ae7c97c5d1b66a23d6345b3965cfcdc1f`. GitHub comparison showed a forward, 22-commit peer transition, and the successor had 15 passing checks at observation time, including the Control Room federation contract. This pin refresh is a prerequisite for running the FCR-to-StoryEngine browser test, **not** a passing FCR peer witness or an authorization to deploy.
+
+The former FCR browser run passed all local Control Room journeys before deliberately stopping on the stale peer-ref check. All predecessor FCR/StoryEngine federation evidence remains historical. Only an exact FCR head which independently checks StoryEngine's live ref, checks out the pinned commit, proves the peer runtime identity, and completes the full Playwright directive/receipt loop can claim current federation integration at this pair. Any movement of either head expires that claim again.
+
+## GitHub Workspace integration candidate
+
+FCR includes a project-linked repository editor and an integrated guarded terminal panel. The terminal operates only through existing mission-bound read-only Git commands and exact commit checks. CI runs a browser integration journey against the real FCR server using test substitutes for external providers. The candidate is not verified as a production release. Product control rooms, including Bip, retain separate product ownership and capabilities.
+
 ## Read this README as a truth surface
 
 Founder Control Room separates four states that are easy to blur together:
@@ -207,6 +217,8 @@ Investor email is a separate authority class and must not auto-send without the 
 ### Content evidence and Trend Radar
 
 FCR's `content-outcome-learning@v1` Attack 3000 adapter and `evaluateContentTrendRadar` are source-level observation and recommendation capabilities inside the existing ULTRATHINK content lane. They do not create a separate publishing system and do not make analytics or trends authoritative merely because a caller labels them `CURRENT`, `VERIFIED`, or `EMERGING_SIGNAL`.
+Founder-content outcome metrics are account-bound evidence. When a connector is scoped to one account type or lane, such as a Facebook brand Page, FCR must not donate that observation to a different account identity such as a personal profile. Out-of-scope account metrics remain `UNKNOWN` rather than becoming synthetic zero, and account/lane identity participates in the observation hash. This remains observation-only evidence and grants no publication, provider-write, merge, deploy, spend, or external-contact authority.
+
 
 Attack 3000 content evidence must bind publication and metrics to one observation identity, content fingerprint, provider, comparable window, completed measurement state, and explicit evaluation time. The adapter independently checks observation/window timestamps, bounded future skew, and an explicit freshness expiry; `CURRENT` alone is insufficient. Distribution evidence such as publication, impressions, reactions, comments, and profile views is not business demand by itself. Supporting external-demand evidence must retain its own evidence references plus a downstream attributed signal. Metric stop floors are evaluated only from their relevant current observation and cannot fire before verified publication and a completed measurement window.
 
@@ -237,7 +249,7 @@ Source dependence on that topology is not proof the live provider is configured 
 
 The dedicated review-email Worker uses the same truth separation. `wrangler.email.toml` may declare the `founder-control-room-review-email` Worker identity, source entrypoint, Cloudflare account, and private `FOUNDER_CONTROL_ROOM_API -> founder-control-room` Service Binding, but it must not use an `addresses` field to claim inbound routing. The mapping `review@foundercontrolroom.org -> founder-control-room-review-email` is Cloudflare provider-side Email Routing state. Source verification, required-secret-name readback, or a successful Worker deploy cannot prove that provider rule exists, cannot set `email_trigger_reconciled=true`, and cannot prove that an inbound email actually invoked the Worker; provider routing readback and runtime email evidence remain separate receipts.
 
-`wrangler.worker.toml [secrets].required` is the canonical production binding-name gate for provider-held Worker secrets. A provider-backed capability such as `tinyfish-web-observation-v1` must name `TINYFISH_API_KEY` there before canonical Worker promotion; Deploy verifies only binding-name presence in Cloudflare and never copies the secret value through GitHub Actions. Source and CI readiness therefore remain distinct from live TinyFish provider/runtime activation.
+`public-web-observation-v1` is an FCR-owned, provider-neutral product contract. FCR's governed research hub resolves a bounded read-only adapter at runtime, and adapter identity remains evidence rather than product authority. The capability itself requires no provider-specific runtime secret; provider configuration, adapter availability, source truth, and downstream outcomes remain separate proof planes.
 
 `OPENAI_API_KEY` follows the same split authority. The canonical Worker registry requires the provider-held runtime binding because live FCR OpenAI paths consume it. GitHub Actions may separately hold the same logical credential for CI-only consumers such as the bounded AI Failure Repair workflow, but the Actions copy is not runtime proof and must not be copied into the Worker during deploy. `Runtime Secret Proof` derives its complete required-name set from `wrangler.worker.toml`, asks Cloudflare only for secret names, fingerprints that registry, and never reads or prints secret values. If the Cloudflare observation credential is malformed or unusable before enumeration, every unobserved runtime-secret presence claim remains `UNKNOWN`/`BLOCKED`, not missing.
 
