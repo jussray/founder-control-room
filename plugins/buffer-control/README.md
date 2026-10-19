@@ -54,3 +54,8 @@ Source implementation alone is not runtime proof. Before calling this plugin liv
 8. only then enable queue/schedule writes for the campaign.
 
 Do not treat a request being sent as proof that Buffer accepted, scheduled, or published it.
+
+
+## Buffer CLI (additional operator transport)
+
+Buffer's official `@bufferapp/cli` can inspect account/channel connectivity with `npm run buffer:preflight` from the repository root. Its implementation is in `tools/buffer/buffer-cli-preflight.mjs`. Only four fixed read-only commands are allowed; output is reduced to pass/fail state to avoid leaking tokens or channel identifiers. Do **not** use its general `posts create` terminal command as a shortcut around FCR's publication authority, idempotency, content firewall, or provider evidence flow. The existing FCR governed publisher remains responsible for actual provider mutations. See `docs/founder-signal-engine/buffer-cli-signal-loop-integration.md`.

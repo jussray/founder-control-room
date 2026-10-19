@@ -461,3 +461,8 @@ Pin alignment alone cannot promote the successor federation state beyond `UNKNOW
 StoryEngine `main` advanced from the previously pinned `168d65ede38d2477ea00902fa1f0e76f292c583d` through `c9af4ea095561d0837a141e311e8977d796aaaa7` (`feat(video): expose StoryEngine MAKEVIDEO skill`) to independently observed `3c1689fe67142e783fe7d18b5ff610640bdc81d6` (`ci(video): prove StoryEngine MAKEVIDEO skill path`). FCR Playwright run #6969 on `897083276b6c775c49ce30be189a50bd610b5d4c` passed its local/direct browser harness but failed the separate live peer-ref freshness check, so that run is historical browser evidence for the predecessor peer rather than current federation proof.
 
 Rebinding `.github/workflows/playwright.yml` to `3c1689fe67142e783fe7d18b5ff610640bdc81d6` selects the successor evidence subject only. The successor FCR head must complete the live-ref check, immutable peer checkout, exact StoryEngine runtime identity, directive/receipt binding, replay protections, and full Playwright browser witness before federation may be called current. Pin alignment grants no merge, deploy, production, publication, billing, or provider-mutation authority.
+
+
+### Buffer CLI preflight (operator-only)
+
+FCR can independently publish social content through its existing governed provider adapters. Buffer CLI is now available for **read-only operator preflight**, not as a second publication authority. Use `npm run buffer:preflight` and `npm run verify:buffer-cli` on trusted Node machines. SignalLoop remains an independent content-intelligence product. See [Buffer CLI / SignalLoop integration](docs/founder-signal-engine/buffer-cli-signal-loop-integration.md). No publication or production activation is claimed by these commands.

@@ -40,7 +40,7 @@
     "verify:production-authority": "node scripts/verify-production-deploy-authority.mjs",
     "verify:ai-skills": "npm run verify:v10-capability-kernel && node scripts/verify-ai-skill-contract.mjs && node scripts/verify-mirror-and-fact-check-contract.mjs && node scripts/verify-founder-intelligence-inheritance.mjs && node scripts/verify-agent-fleet-skills.mjs && node scripts/verify-zapier-task-budget.mjs && node tools/zapier/test-buffer-content-firewall.cjs && node tools/zapier/test-buffer-review-window.cjs && node tools/zapier/test-buffer-provider-contract.cjs && node tools/zapier/test-social-distribution-contract.cjs",
     "verify:zapier-budget": "node scripts/verify-zapier-task-budget.mjs && node tools/zapier/test-buffer-content-firewall.cjs && node tools/zapier/test-buffer-review-window.cjs && node tools/zapier/test-buffer-provider-contract.cjs && node tools/zapier/test-social-distribution-contract.cjs",
-    "verify:buffer-content": "node tools/zapier/test-buffer-content-firewall.cjs && node tools/zapier/test-buffer-review-window.cjs && node tools/zapier/test-buffer-provider-contract.cjs && node tools/zapier/test-social-distribution-contract.cjs",
+    "verify:buffer-content": "node tools/zapier/test-buffer-content-firewall.cjs && node tools/zapier/test-buffer-review-window.cjs && node tools/zapier/test-buffer-provider-contract.cjs && node tools/zapier/test-social-distribution-contract.cjs && npm run verify:buffer-cli",
     "verify:social-distribution": "node tools/zapier/test-social-distribution-contract.cjs",
     "verify:buffer-review": "node tools/zapier/test-buffer-review-window.cjs",
     "verify:buffer-provider": "node tools/zapier/test-buffer-provider-contract.cjs",
@@ -64,7 +64,9 @@
     "verify:mirror-contract": "node scripts/verify-mirror-and-fact-check-contract.mjs",
     "proof:goalfix": "npm run build && node e2e/goalfix-proof.mjs && node e2e/goalfix-same-sha-proof.mjs",
     "verify:test-discovery": "node scripts/verify-test-discovery.mjs",
-    "generate:worker-types": "node -e \"require('node:fs').mkdirSync('.wrangler/types',{recursive:true})\" && wrangler types .wrangler/types/worker-configuration.d.ts --config wrangler.worker.toml --env-interface FcrWorkerEnv --include-env=false"
+    "generate:worker-types": "node -e \"require('node:fs').mkdirSync('.wrangler/types',{recursive:true})\" && wrangler types .wrangler/types/worker-configuration.d.ts --config wrangler.worker.toml --env-interface FcrWorkerEnv --include-env=false",
+    "buffer:preflight": "node tools/buffer/buffer-cli-preflight.mjs",
+    "verify:buffer-cli": "node --test tools/buffer/buffer-cli-preflight.test.mjs"
   },
   "dependencies": {
     "@octokit/rest": "^21.0.2",
