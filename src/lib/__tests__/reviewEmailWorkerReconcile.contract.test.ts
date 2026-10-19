@@ -52,7 +52,9 @@ describe('review-email Worker reconciliation authority contract', () => {
     expect(emailConfig).toMatch(/^service = "founder-control-room"$/m);
     expect(emailConfig).toContain('Canonical inbound Email Routing desired state');
     expect(workflow).toContain('Wrangler may reconcile the route during deploy; provider readback and runtime invocation remain separate evidence.');
-    expect(workflow).toContain("grep -Eq '^[[:space:]]*addresses[[:space:]]*=[[:space:]]*\\[[[:space:]]*\"review@foundercontrolroom\\.org\"[[:space:]]*\\][[:space:]]*  });
+    expect(workflow).toContain("grep -Eq '^[[:space:]]*addresses");
+    expect(workflow).toContain('review@foundercontrolroom\\.org');
+  });
 
   it('does not label a source-only check as live routing proof', () => {
     expect(ingressWorkflow).toContain('- name: Verify review-email Worker source contract');
@@ -158,118 +160,6 @@ describe('review-email Worker reconciliation authority contract', () => {
     expect(workflow).not.toContain('.email_trigger_reconciled = true');
     expect(workflow).toContain('Email rule desired-state reconciliation: included in Wrangler deploy');
     expect(workflow).toContain('Email rule provider readback and runtime invocation: retained as separate receipts');
-    expect(workflow).toContain('required_secret_names_verified: false');
-    expect(workflow).toContain('.required_secret_names_verified = true');
-    expect(workflow).toContain('runtime_email_invocation_proven: false');
-    expect(workflow).toContain('fcr-review-email-worker-reconcile-${{ github.run_id }}-${{ github.run_attempt }}');
-  });
-});
- wrangler.email.toml");
-  });
-
-  it('does not label a source-only check as live routing proof', () => {
-    expect(ingressWorkflow).toContain('- name: Verify review-email Worker source contract');
-    expect(ingressWorkflow).not.toContain('- name: Verify email routing trigger contract');
-    expect(ingressWorkflow).toContain('node scripts/verify-founder-review-email-routing.mjs');
-  });
-
-  it('separates Cloudflare credential authority by operation class', () => {
-    const canonicalSecret = '${{ secrets.CLOUDFLARE_API_TOKEN }}';
-    const reviewEmailSecret = '${{ secrets.CLOUDFLARE_REVIEW_EMAIL_DEPLOY_TOKEN }}';
-    const buildsSecret = '${{ secrets.FCR_CLOUDFLARE_BUILDS_USER_TOKEN }}';
-    const legacyBuildsSecret = '${{ secrets.CLOUDFLARE_BUILDS_API_TOKEN }}';
-
-    expect(canonicalDeployWorkflow).toContain(canonicalSecret);
-    expect(canonicalReconcileWorkflow).toContain(canonicalSecret);
-    expect(canonicalDeployWorkflow).not.toContain(reviewEmailSecret);
-    expect(canonicalReconcileWorkflow).not.toContain(reviewEmailSecret);
-
-    expect(workflow).toContain(reviewEmailSecret);
-    expect(workflow).not.toContain(canonicalSecret);
-    expect(workflow).not.toContain(buildsSecret);
-
-    expect(buildDiagnosticWorkflow).toContain(buildsSecret);
-    expect(buildDiagnosticWorkflow).not.toContain(legacyBuildsSecret);
-    expect(buildDiagnosticWorkflow).not.toContain(reviewEmailSecret);
-    expect(buildDiagnosticWorkflow).not.toContain(canonicalSecret);
-  });
-
-  it('preserves existing secrets and verifies only their names before deploy', () => {
-    expect(workflow).toContain('wrangler secret list');
-    expect(workflow).toContain('--format json');
-    expect(workflow).toContain('FOUNDER_REVIEW_FOUNDER_EMAIL');
-    expect(workflow).toContain('FOUNDER_REVIEW_EMAIL_INGRESS_SECRET');
-    expect(workflow).not.toContain('wrangler secret put');
-    expect(workflow).not.toContain('wrangler secret delete');
-    expect(workflow).not.toContain('wrangler secret bulk');
-  });
-
-  it('rejects malformed dedicated review-email Cloudflare token values without printing them', () => {
-    expect(workflow).toContain('Validate dedicated review-email Cloudflare token header safety');
-    expect(workflow).toContain("token = os.environ.get('CLOUDFLARE_REVIEW_EMAIL_DEPLOY_TOKEN', '')");
-    expect(workflow).toContain("token.encode('ascii')");
-    expect(workflow).toContain('contains non-ASCII characters and cannot be used as an HTTP Authorization value');
-    expect(workflow).toContain('contains whitespace or non-printable characters');
-    expect(workflow).toContain('The token value was not printed.');
-    expect(workflow).not.toContain('echo "$CLOUDFLARE_REVIEW_EMAIL_DEPLOY_TOKEN"');
-    expect(workflow).not.toContain("print(token)");
-  });
-
-  it('retains distinct secret-safe receipts for provider identity, error class, secret-name, deploy, and binding failures', () => {
-    expect(workflow).toContain('Initialize redacted reconciliation receipt');
-    expect(workflow).toContain('expected_email_routing_address: $address');
-    expect(workflow).toContain('credential_header_safe: false');
-    expect(workflow).toContain('provider_worker_found: null');
-    expect(workflow).toContain('provider_error_class: null');
-    expect(workflow).toContain('provider_error_code: null');
-    expect(workflow).toContain('provider_cli_exit_status: null');
-    expect(workflow).toContain('required_secret_names_verified: false');
-    expect(workflow).toContain('provider_deploy_succeeded: false');
-    expect(workflow).toContain('service_binding_verified: false');
-    expect(workflow).toContain('email_trigger_reconciled: false');
-    expect(workflow).toContain('blocked_stage: "credential_header_safety"');
-    expect(workflow).toContain('.credential_header_safe = true | .blocked_stage = "existing_worker_secret_read"');
-    expect(workflow).toContain("provider_error_class='worker_not_found'");
-    expect(workflow).toContain("provider_error_class='authentication'");
-    expect(workflow).toContain("provider_error_class='authorization'");
-    expect(workflow).toContain("provider_error_class='rate_limit'");
-    expect(workflow).toContain("provider_error_class='provider_service'");
-    expect(workflow).toContain("provider_error_class='account_or_scope'");
-    expect(workflow).toContain("invalid account|account[^[:alnum:]]+(not found|permission|scope)");
-    expect(workflow).toContain('.provider_cli_exit_status = $provider_cli_exit_status');
-    expect(workflow).toContain('rm -f "$secret_error"');
-    expect(workflow).toContain('.provider_worker_found = true');
-    expect(workflow).toContain('.blocked_stage = "required_worker_secret_names"');
-    expect(workflow).toContain('.required_secret_names_verified = true | .blocked_stage = "provider_deploy"');
-    expect(workflow).toContain('.blocked_stage = "provider_deploy_failed"');
-    expect(workflow).toContain('.provider_deploy_succeeded = true | .blocked_stage = "service_binding_proof"');
-    expect(workflow).toContain('.service_binding_verified = true | .blocked_stage = null');
-    expect(workflow).not.toContain('.provider_deploy_succeeded = true | .blocked_stage = null');
-    expect(workflow).toContain('Raw provider stderr was classified then deleted without emission.');
-    expect(workflow).not.toContain('cat "$secret_error"');
-    expect(workflow).toContain('if-no-files-found: error');
-  });
-
-  it('does not smuggle database, Access, publication, or broad Worker mutations into the lane', () => {
-    expect(workflow).not.toContain('supabase db push');
-    expect(workflow).not.toContain('SUPABASE_DB_URL');
-    expect(workflow).not.toContain('/access/apps');
-    expect(workflow).not.toContain('proof-of-ship');
-    expect(workflow).not.toContain('PUBLISH_ALLOWED');
-    expect(workflow).not.toContain('ZAPIER_CATCH_HOOK_URL');
-    expect(workflow).toContain('supabase_db_mutation: false');
-    expect(workflow).toContain('access_policy_mutation: false');
-  });
-
-  it('records provider deploy success before binding proof and keeps routing/runtime proof separate', () => {
-    expect(workflow).toContain('provider_deploy_succeeded: false');
-    expect(workflow).toContain('service_binding_verified: false');
-    expect(workflow).toContain('.provider_deploy_succeeded = true | .blocked_stage = "service_binding_proof"');
-    expect(workflow).toContain('Worker deploy succeeded, but Wrangler output did not prove FOUNDER_CONTROL_ROOM_API -> founder-control-room. Provider deployment remains recorded as successful; binding proof remains false.');
-    expect(workflow).toContain('.service_binding_verified = true | .blocked_stage = null');
-    expect(workflow).toContain('email_trigger_reconciled: false');
-    expect(workflow).not.toContain('.email_trigger_reconciled = true');
-    expect(workflow).toContain('Email rule mutation/readback: absent from this workflow; retained as a separate provider receipt');
     expect(workflow).toContain('required_secret_names_verified: false');
     expect(workflow).toContain('.required_secret_names_verified = true');
     expect(workflow).toContain('runtime_email_invocation_proven: false');
