@@ -9,7 +9,8 @@
     "publishing",
     "merge-authority",
     "workflow-authority",
-    "truth-governance"
+    "truth-governance",
+    "capability-authority"
   ],
   "changes": [
     {
@@ -343,6 +344,30 @@
       "path": "skills/urlfix/SKILL.md",
       "claims": [
         "`skills/urlfix/SKILL.md` must keep live-site repair evidence-bound: ownership and runtime identity are prerequisites to source mutation, external or unowned URLs remain observation-only, the same failing browser path must be rerun after a repair, and URLFIX itself never grants merge, deploy, provider-write, payment, publication, credential, or production-mutation authority."
+      ]
+    },
+    {
+      "path": "src/lib/fcrSkillRouter.ts",
+      "claims": [
+        "`src/lib/fcrSkillRouter.ts` must require repository context before any mutating URLFIX or GODMODE repair can reach runtime discovery; the GODMODE branch fails closed without repository proof and grants no execution, merge, deploy or provider authority."
+      ]
+    },
+    {
+      "path": "src/lib/fcrStandingCommandRegistry.ts",
+      "claims": [
+        "`src/lib/fcrStandingCommandRegistry.ts` must route URLFIX only for explicit URL, browser or https targets with repair or verification intent; a repository audit that merely mentions a site cannot promote URLFIX into a policy-required browser capability."
+      ]
+    },
+    {
+      "path": "src/founder-os-lab/registry.ts",
+      "claims": [
+        "`src/founder-os-lab/registry.ts` must register the GODMODE companion as a founder-control-room workflow with mayExecute false; registration cannot widen execution, merge, deploy or provider authority."
+      ]
+    },
+    {
+      "path": "src/founder-os-lab/contracts.ts",
+      "claims": [
+        "`src/founder-os-lab/contracts.ts` must keep the GODMODE companion identifier within the governed companion contract; the identifier cannot widen execution, merge, deploy or provider authority."
       ]
     }
   ]

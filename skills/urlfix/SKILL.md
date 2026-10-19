@@ -99,6 +99,12 @@ STOP CONDITION:
 
 For a Juss-owned URL, resolve project and repository through current FCR portfolio/control-plane evidence or another authoritative project registry. A hostname resemblance, repo name, chat memory, page metadata, or generated claim is not sufficient ownership proof.
 
+Destination guard (applies to every ownership class, before any browser navigation):
+
+- Allow only `https:` URLs to public hostnames. Reject loopback, private, link-local, unique-local and other non-public addresses, IP literals, credentials in the URL, and bare hostnames.
+- The literal-URL check in `validateTargetUrl` (`scripts/external-site-snapshot.mjs`) is necessary but not sufficient. It does not resolve DNS and does not follow redirects. Resolve the hostname and reject any non-public address. Re-apply the same checks to every redirect hop and to the final URL.
+- If any check fails, stop with `BLOCKED`, name the rejected destination class, and do not load, capture, screenshot or persist responses from that destination.
+
 If ownership is `EXTERNAL` or `UNKNOWN`:
 
 ```text

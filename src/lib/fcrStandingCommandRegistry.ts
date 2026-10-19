@@ -238,7 +238,7 @@ export function routeFcrStandingCommands(rawGoal: string, action: FcrStandingCom
     && /\b(fix|repair|bug|regression|broken|failure|failing|error|blocker)\b/.test(goal)) {
     pushUnique(autoRoutedCommandIds, 'goalfix');
   }
-  if (/\b(url|website|site|browser)\b/.test(goal) && /\b(test|audit|fix|repair|issue|broken|verify)\b/.test(goal)) {
+  if ((/\b(url|browser)\b/.test(goal) || /https?:\/\//.test(goal)) && /\b(test|audit|fix|repair|issue|broken|verify)\b/.test(goal)) {
     pushUnique(autoRoutedCommandIds, 'urlfix');
   }
   if (/\b(video|movie|reel|cinematic|shot|storyboard|image-to-video|lip-sync)\b/.test(goal)) {

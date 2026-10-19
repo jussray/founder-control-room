@@ -8,7 +8,7 @@ owner: Juss & Co.
 # REPAIR TO PROOF
 
 ## Role
-Companion skill to `ultrathink-attack-godmode`, `futureyou-me-v10`, and `ultrathink-devil`. Do not duplicate or replace their investigative and repair authority. This skill controls the proof and release boundary.
+Companion skill to `ultrathink-attack-godmode`, `futureyou` standing command (`control-room-futureyou-leverage`), and `ultrathink-devil`. Do not duplicate or replace their investigative and repair authority. This skill controls the proof and release boundary.
 
 ## Triggers
 `/repair-to-proof`, `proof mode`, `verify merge`, `merge review`, `exact-head gate`, `release proof`, `continue to proof`.

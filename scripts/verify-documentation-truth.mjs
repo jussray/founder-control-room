@@ -70,6 +70,8 @@ const truthSensitiveRules = [
   { domain: 'evidence-authority', match: /^src\/founder-os-lab\/projectAdapters\.ts$/ },
   { domain: 'evidence-authority', match: /^tools\/zapier\/founder-content-outcome-contract\.cjs$/ },
   { domain: 'capability-authority', match: /^\.control\/capability\.(?:json|yaml)$/ },
+  { domain: 'capability-authority', match: /^src\/lib\/(?:fcrSkillRouter|fcrStandingCommandRegistry)\.ts$/ },
+  { domain: 'capability-authority', match: /^src\/founder-os-lab\/(?:contracts|registry)\.ts$/ },
   { domain: 'workflow-authority', match: /^\.github\/workflows\/(?:ci|quality-gate|pr-recovery-exact-head|founder-repo-cycle|documentation-truth)\.yml$/ },
   { domain: 'cloudflare-authority', match: /^public\/_worker\.js$/ },
   { domain: 'cloudflare-authority', match: /^\.github\/workflows\/(?:deploy|cloudflare-build-diagnostic|fcr-access-front-door-recovery)\.yml$/ },

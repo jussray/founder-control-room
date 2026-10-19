@@ -99,6 +99,12 @@ describe('FCR standing command and OS registry', () => {
     expect(descriptor).toMatchObject({ owningOs: 'founder-control-room', kind: 'workflow', mayExecute: false });
   });
 
+  it('does not auto-route URLFIX for a repository audit that merely mentions a site', () => {
+    const decision = routeFcrStandingCommands('audit the site deployment configuration', 'inspect');
+
+    expect(decision.standingCommandIds).not.toContain('urlfix');
+  });
+
   it('auto-routes video intent through Video Production OS plus Media Router OS', () => {
     const decision = routeFcrStandingCommands(
       'Continue the cinematic YouTube video and preserve shot continuity.',

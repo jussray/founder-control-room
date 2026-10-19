@@ -188,7 +188,8 @@ export function routeFcrSkills(input: RouteFcrSkillsInput): FcrSkillRoutingDecis
   const requiredParallelLenses = [...FCR_REQUIRED_PARALLEL_LENSES];
   const mutationRequested = MUTATING_ACTIONS.has(input.action);
   const urlfixGoal = policyRequiredCapabilityIds.includes('urlfix');
-  const repositoryGoal = isRepositoryGoal(goal) || Boolean(input.repository) || (urlfixGoal && mutationRequested);
+  const godmodeGoal = policyRequiredCapabilityIds.includes('ultrathink-attack-godmode');
+  const repositoryGoal = isRepositoryGoal(goal) || Boolean(input.repository) || ((urlfixGoal || godmodeGoal) && mutationRequested);
   const uiGoal = isUiGoal(goal) || designCommandIds.length > 0;
   const messagingGoal = isMessagingGoal(goal);
   const commercialGoal = isCommercialGoal(goal);
