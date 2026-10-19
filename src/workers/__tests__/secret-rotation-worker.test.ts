@@ -91,9 +91,9 @@ describe('secret-rotation', () => {
   // IMPLANT 2 TEST: Schema health check
   it('would fail if secrets table missing on worker init', async () => {
     const mockSupabaseNoTable = {
-      from: () => ({
-        select: () => ({
-          limit: () => Promise.resolve({ error: { message: 'Relation "public.secrets" does not exist' } }),
+      from: (_table: string) => ({
+        select: (_columns: string) => ({
+          limit: (_count: number) => Promise.resolve({ error: { message: 'Relation "public.secrets" does not exist' } }),
         }),
       }),
     };
