@@ -199,7 +199,8 @@
       "claims": [
         "`docs/CLOUDFLARE_REASONING.md` must require FCR provider-held Worker binding names to pass the canonical Deploy membrane without treating source, binding-name presence, CI, or Playwright as proof of downstream provider activation or business outcomes.",
         "`docs/CLOUDFLARE_REASONING.md` must keep review-email Worker/managed-route deployment, provider route readback, zone subaddressing state, and runtime email invocation as distinct evidence planes; Wrangler 4.113+ may reconcile the literal `review@foundercontrolroom.org` Worker route without making provider readback or runtime proof implicit.",
-        "`docs/CLOUDFLARE_REASONING.md` must preserve the two-phase first-deploy boundary: no-route Worker bootstrap first, required-secret provisioning second, canonical route reconciliation only on a later authorized run."
+        "`docs/CLOUDFLARE_REASONING.md` must preserve the two-phase first-deploy boundary: no-route Worker bootstrap first, required-secret provisioning second, canonical route reconciliation only on a later authorized run.",
+        "`docs/CLOUDFLARE_REASONING.md` must require structured Wrangler deploy telemetry to preserve completed Worker mutation truth when a later Email Routing reconciliation step exits nonzero; post-deploy failure must never be collapsed into provider_deploy_succeeded=false."
       ]
     },
     {

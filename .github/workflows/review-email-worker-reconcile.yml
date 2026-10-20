@@ -168,6 +168,7 @@ jobs:
               provider_cli_exit_status: null,
               required_secret_names_verified: false,
               provider_deploy_succeeded: false,
+              structured_deploy_event_observed: false,
               service_binding_verified: false,
               email_trigger_reconciled: false,
               blocked_stage: "credential_header_safety",
@@ -385,17 +386,74 @@ jobs:
         run: |
           set -euo pipefail
           deploy_log="$RUNNER_TEMP/review-email-worker-deploy.log"
+          wrangler_output="$RUNNER_TEMP/review-email-worker-deploy.ndjson"
           receipt='test-results/fcr-review-email-worker-reconcile.json'
+          rm -f "$wrangler_output"
+          export WRANGLER_OUTPUT_FILE_PATH="$wrangler_output"
 
           set +e
           npx --yes wrangler@4.129.0 deploy --config wrangler.email.toml 2>&1 | tee "$deploy_log"
           deploy_status=${PIPESTATUS[0]}
           set -e
+
+          deploy_event_observed=false
+          if [[ -f "$wrangler_output" ]]; then
+            deploy_event_observed="$(node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+
+          const file = process.env.WRANGLER_OUTPUT_FILE_PATH;
+          let observed = false;
+          if (file && fs.existsSync(file)) {
+            for (const line of fs.readFileSync(file, 'utf8').split(/\r?\n/)) {
+              if (!line.trim()) continue;
+              try {
+                const event = JSON.parse(line);
+                if (
+                  event?.type === 'deploy'
+                  && event?.worker_name === 'founder-control-room-review-email'
+                  && typeof event?.version_id === 'string'
+                  && event.version_id.length > 0
+                ) {
+                  observed = true;
+                }
+              } catch {
+                // Ignore malformed non-secret telemetry lines; absence remains false.
+              }
+            }
+          }
+          process.stdout.write(observed ? 'true' : 'false');
+          NODE
+          )"
+          fi
+          rm -f "$wrangler_output"
+
+          tmp="${receipt}.tmp"
+          jq --argjson observed "$deploy_event_observed"             '.structured_deploy_event_observed = $observed' "$receipt" > "$tmp"
+          mv "$tmp" "$receipt"
+
           if (( deploy_status != 0 )); then
             tmp="${receipt}.tmp"
-            jq '.blocked_stage = "provider_deploy_failed"' "$receipt" > "$tmp"
+            if [[ "$deploy_event_observed" == "true" ]]; then
+              service_binding_verified=false
+              if grep -F 'FOUNDER_CONTROL_ROOM_API (founder-control-room)' "$deploy_log" >/dev/null; then
+                service_binding_verified=true
+              fi
+
+              jq                 --argjson status "$deploy_status"                 --argjson binding "$service_binding_verified"                 '.provider_deploy_succeeded = true
+                 | .provider_cli_exit_status = $status
+                 | .provider_error_class = "post_deploy_failure"
+                 | .service_binding_verified = $binding
+                 | .blocked_stage = "provider_post_deploy_failure"'                 "$receipt" > "$tmp"
+              mv "$tmp" "$receipt"
+              cat "$receipt" >> "$GITHUB_STEP_SUMMARY"
+              echo "::error title=Review-email post-deploy reconciliation failed::Wrangler recorded a completed Worker deployment, then exited with status $deploy_status. The receipt preserves provider_deploy_succeeded=true; do not retry blindly. Provider routing and runtime proof remain false until independent readback."
+              exit "$deploy_status"
+            fi
+
+            jq               --argjson status "$deploy_status"               '.provider_cli_exit_status = $status
+               | .blocked_stage = "provider_deploy_failed"'               "$receipt" > "$tmp"
             mv "$tmp" "$receipt"
-            echo "::error title=Review-email Worker deployment failed::Wrangler exited with status $deploy_status."
+            echo "::error title=Review-email Worker deployment failed::Wrangler exited with status $deploy_status and emitted no structured deploy event."
             exit "$deploy_status"
           fi
 

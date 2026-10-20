@@ -136,6 +136,7 @@ describe('review-email Worker reconciliation authority contract', () => {
     expect(workflow).toContain('provider_cli_exit_status: null');
     expect(workflow).toContain('required_secret_names_verified: false');
     expect(workflow).toContain('provider_deploy_succeeded: false');
+    expect(workflow).toContain('structured_deploy_event_observed: false');
     expect(workflow).toContain('service_binding_verified: false');
     expect(workflow).toContain('email_trigger_reconciled: false');
     expect(workflow).toContain('blocked_stage: "credential_header_safety"');
@@ -153,6 +154,13 @@ describe('review-email Worker reconciliation authority contract', () => {
     expect(workflow).toContain('.blocked_stage = "required_worker_secret_names"');
     expect(workflow).toContain('.required_secret_names_verified = true | .blocked_stage = "provider_deploy"');
     expect(workflow).toContain('.blocked_stage = "provider_deploy_failed"');
+    expect(workflow).toContain('WRANGLER_OUTPUT_FILE_PATH');
+    expect(workflow).toContain("event?.type === 'deploy'");
+    expect(workflow).toContain("event?.worker_name === 'founder-control-room-review-email'");
+    expect(workflow).toContain('.structured_deploy_event_observed = $observed');
+    expect(workflow).toContain('.provider_error_class = "post_deploy_failure"');
+    expect(workflow).toContain('.blocked_stage = "provider_post_deploy_failure"');
+    expect(workflow).toContain('The receipt preserves provider_deploy_succeeded=true; do not retry blindly.');
     expect(workflow).toContain('.provider_deploy_succeeded = true | .blocked_stage = "service_binding_proof"');
     expect(workflow).toContain('.service_binding_verified = true | .blocked_stage = "provider_email_routing_readback"');
     expect(workflow).not.toContain('.provider_deploy_succeeded = true | .blocked_stage = null');
