@@ -67,8 +67,12 @@ function normalizePrivateKey(secret) {
   const trimmed = String(secret ?? '').trim().replace(/^\uFEFF/, '');
   let transportClass = 'unknown';
   let normalized = trimmed;
-
-  if (!trimmed) {
+  
+  const recognizedWrapper = decodeRecognizedKeyWrapper(trimmed);
+  if (recognizedWrapper) {
+    normalized = recognizedWrapper.value;
+    transportClass = recognizedWrapper.transportClass;
+  } else if (!trimmed) {
     transportClass = 'empty';
   } else if (trimmed.startsWith('"') && trimmed.endsWith('"')) {
     normalized = decodeJsonQuotedString(trimmed);
@@ -88,13 +92,6 @@ function normalizePrivateKey(secret) {
     }
   }
 
-  if (transportClass === 'unknown') {
-    const wrapped = decodeRecognizedKeyWrapper(normalized);
-    if (wrapped) {
-      normalized = wrapped.value;
-      transportClass = wrapped.transportClass;
-    }
-  }
   normalized = unwrapMatchingSingleQuotes(decodeJsonQuotedString(normalized))
     .replace(/\\r\\n/g, '\n')
     .replace(/\\n/g, '\n')
