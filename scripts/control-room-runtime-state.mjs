@@ -94,7 +94,7 @@ export function buildRuntimeStateReceipt(env = process.env, root = process.cwd()
       || providerReadback?.repository !== repository
       || providerReadback?.worker !== 'founder-control-room'
       || providerReadback?.accountId !== '9b59861bd1747cf7525571b4c51d2aa0'
-      || providerReadback?.scope !== 'worker-bindings-and-crons-only'
+      || providerReadback?.scope !== 'worker-bindings-crons-and-active-handler'
       || providerReadback?.status !== 'aligned'
       || !EPOCH_RE.test(providerReadback?.observedStateDigest ?? '')
       || !Number.isFinite(age) || age < -30_000 || age > 5 * 60_000
