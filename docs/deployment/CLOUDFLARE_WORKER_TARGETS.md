@@ -15,7 +15,7 @@ The former `founder-control-room2` Worker was retired. Its identity and `wrangle
 
 ### Review-email Worker and Email Routing
 
-`wrangler.email.toml` defines the `founder-control-room-review-email` Worker source identity, entrypoint, account, public-route posture, private `FOUNDER_CONTROL_ROOM_API -> founder-control-room` Service Binding, and exactly one Wrangler-managed Email Routing desired state: `addresses = ["review@foundercontrolroom.org"]`.
+`wrangler.email.toml` defines the `founder-control-room-review-email` Worker source identity, entrypoint, account, public-route posture, private `FOUNDER_CONTROL_ROOM_API -> founder-control-room` Service Binding, and exactly one Wrangler-managed Email Routing desired state: `addresses = ["review@foundercontrolroom.org"]`. If the Worker is missing, the bounded reconciliation workflow bootstraps it with a temporary no-`addresses` config and stops for secret provisioning; that bootstrap must not create or take over an Email Routing rule.
 
 With the pinned Wrangler 4.129.0, deploy may reconcile that literal address-to-Worker rule. Required-secret-name readback, Worker deploy success, managed-route intent, provider route readback, the zone-level subaddressing setting required for `review+<context-uuid>@...`, and a real inbound invocation are still distinct proof layers. `email_trigger_reconciled:true` requires provider readback of the live rule; runtime invocation requires a separate inbound-email execution receipt.
 

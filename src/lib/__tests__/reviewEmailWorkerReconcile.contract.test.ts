@@ -102,6 +102,19 @@ describe('review-email Worker reconciliation authority contract', () => {
     expect(workflow).not.toContain('wrangler secret bulk');
   });
 
+  it('bootstraps a missing Worker without attaching Email Routing', () => {
+    expect(workflow).toContain('id: secret_state');
+    expect(workflow).toContain("echo 'bootstrap_required=true' >> \"$GITHUB_OUTPUT\"");
+    expect(workflow).toContain("if: steps.secret_state.outputs.bootstrap_required == 'true'");
+    expect(workflow).toContain("bootstrap_config='wrangler.email.bootstrap.toml'");
+    expect(workflow).toContain("parsed.get('addresses') != expected");
+    expect(workflow).toContain("if 'addresses' in parsed_bootstrap");
+    expect(workflow).toContain('npx --yes wrangler@4.129.0 deploy --config "$bootstrap_config"');
+    expect(workflow).toContain('.blocked_stage = "provider_secret_bootstrap"');
+    expect(workflow).toContain("if: steps.secret_state.outputs.bootstrap_required != 'true'");
+    expect(workflow).toContain('No review@ rule was declared by the bootstrap config.');
+  });
+
   it('rejects malformed dedicated review-email Cloudflare token values without printing them', () => {
     expect(workflow).toContain('Validate dedicated review-email Cloudflare token header safety');
     expect(workflow).toContain("token = os.environ.get('CLOUDFLARE_REVIEW_EMAIL_DEPLOY_TOKEN', '')");

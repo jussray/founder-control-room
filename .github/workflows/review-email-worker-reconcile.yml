@@ -210,6 +210,7 @@ jobs:
           mv "$tmp" "$receipt"
 
       - name: Verify existing review-email Worker secret names
+        id: secret_state
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_REVIEW_EMAIL_DEPLOY_TOKEN }}
         shell: bash
@@ -266,6 +267,12 @@ jobs:
               "$receipt" > "$tmp"
             mv "$tmp" "$receipt"
 
+            if [[ "$provider_error_class" == "worker_not_found" ]]; then
+              echo 'bootstrap_required=true' >> "$GITHUB_OUTPUT"
+              echo '::notice title=Review-email Worker bootstrap required::Worker is absent. The workflow may create the Worker without Email Routing, then stop for secret provisioning.'
+              exit 0
+            fi
+
             echo "::error title=Review-email Worker provider read failed::Cloudflare secret-name readback failed safely classified as ${provider_error_class}; code=${provider_error_code:-unknown}; exit=${secret_status}. Raw provider stderr was classified then deleted without emission."
             exit "$secret_status"
           fi
@@ -285,9 +292,92 @@ jobs:
 
           jq '.required_secret_names_verified = true | .blocked_stage = "provider_deploy"' "$receipt" > "$tmp"
           mv "$tmp" "$receipt"
+          echo 'bootstrap_required=false' >> "$GITHUB_OUTPUT"
           echo 'Required review-email Worker secret names are present. Values were not read.'
 
+      - name: Bootstrap missing review-email Worker without routing
+        if: steps.secret_state.outputs.bootstrap_required == 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_REVIEW_EMAIL_DEPLOY_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          receipt='test-results/fcr-review-email-worker-reconcile.json'
+          bootstrap_config='wrangler.email.bootstrap.toml'
+          deploy_log="$RUNNER_TEMP/review-email-worker-bootstrap.log"
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          import tomllib
+
+          source_path = Path('wrangler.email.toml')
+          source = source_path.read_text(encoding='utf-8')
+          parsed = tomllib.loads(source)
+          expected = ['review@foundercontrolroom.org']
+          if parsed.get('addresses') != expected:
+              raise SystemExit('canonical review-email config must contain exactly one top-level review@ address before bootstrap')
+
+          kept = []
+          removed = 0
+          for line in source.splitlines():
+              if re.fullmatch(r'\s*addresses\s*=\s*\[\s*"review@foundercontrolroom\.org"\s*\]\s*', line):
+                  removed += 1
+                  continue
+              kept.append(line)
+
+          if removed != 1:
+              raise SystemExit('bootstrap config must remove exactly one canonical addresses declaration')
+
+          bootstrap = '\n'.join(kept) + '\n'
+          Path('wrangler.email.bootstrap.toml').write_text(bootstrap, encoding='utf-8')
+          parsed_bootstrap = tomllib.loads(bootstrap)
+          if 'addresses' in parsed_bootstrap:
+              raise SystemExit('bootstrap config must not contain Email Routing addresses')
+          PY
+
+          set +e
+          npx --yes wrangler@4.129.0 deploy --config "$bootstrap_config" 2>&1 | tee "$deploy_log"
+          deploy_status=${PIPESTATUS[0]}
+          set -e
+
+          if (( deploy_status != 0 )); then
+            tmp="${receipt}.tmp"
+            jq '.blocked_stage = "provider_bootstrap_deploy_failed"' "$receipt" > "$tmp"
+            mv "$tmp" "$receipt"
+            rm -f "$bootstrap_config"
+            echo "::error title=Review-email Worker bootstrap failed::Wrangler exited with status $deploy_status before any Email Routing rule was declared."
+            exit "$deploy_status"
+          fi
+
+          tmp="${receipt}.tmp"
+          jq '.provider_worker_found = true
+              | .provider_deploy_succeeded = true
+              | .blocked_stage = "service_binding_proof"' "$receipt" > "$tmp"
+          mv "$tmp" "$receipt"
+
+          grep -F 'FOUNDER_CONTROL_ROOM_API (founder-control-room)' "$deploy_log" >/dev/null || {
+            rm -f "$bootstrap_config"
+            echo '::error title=Service Binding proof missing::Bootstrap Worker deploy succeeded without routing, but Wrangler output did not prove FOUNDER_CONTROL_ROOM_API -> founder-control-room.'
+            exit 1
+          }
+
+          jq '.service_binding_verified = true
+              | .blocked_stage = "provider_secret_bootstrap"' "$receipt" > "$tmp"
+          mv "$tmp" "$receipt"
+          rm -f "$bootstrap_config"
+
+          {
+            echo '## Review-email Worker bootstrap receipt'
+            echo
+            echo '- Worker created/updated without Email Routing addresses.'
+            echo '- No review@ rule was declared by the bootstrap config.'
+            echo '- Private FOUNDER_CONTROL_ROOM_API -> founder-control-room binding was observed in Wrangler output.'
+            echo '- Next gate: provision required Worker secret names, then rerun canonical reconciliation.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Deploy review-email Worker
+        if: steps.secret_state.outputs.bootstrap_required != 'true'
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_REVIEW_EMAIL_DEPLOY_TOKEN }}
           EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha }}
