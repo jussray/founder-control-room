@@ -105,6 +105,12 @@ describe('FCR standing command and OS registry', () => {
     expect(decision.standingCommandIds).not.toContain('urlfix');
   });
 
+  it('does not promote a repository browser-test fix to URLFIX without a live site', () => {
+    const decision = routeFcrStandingCommands('fix the failing browser test in this repository', 'write');
+
+    expect(decision.standingCommandIds).not.toContain('urlfix');
+  });
+
   it('auto-routes website repair intent without a URL or browser keyword', () => {
     const decision = routeFcrStandingCommands('Test this website and fix the broken checkout', 'write');
 

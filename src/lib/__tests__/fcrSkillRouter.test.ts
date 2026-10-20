@@ -320,6 +320,12 @@ describe('FCR skill router trust gate', () => {
     expect(decision.policyRequiredCapabilityIds).not.toContain('ultrathink-attack-godmode');
   });
 
+  it('requires repository context for GODMODE regardless of action', () => {
+    const review = route('/godmode audit this implementation.', 'review', ['ultrathink-attack-godmode']);
+    expect(review.status).not.toBe('ready_for_runtime_discovery');
+    expect(review.executionAllowed).toBe(false);
+  });
+
   it('requires repository context for repair-to-proof regardless of action', () => {
     const review = route('/repair-to-proof release proof.', 'review', ['repair-to-proof']);
     expect(review.status).not.toBe('ready_for_runtime_discovery');

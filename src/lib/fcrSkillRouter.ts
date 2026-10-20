@@ -200,7 +200,7 @@ export function routeFcrSkills(input: RouteFcrSkillsInput): FcrSkillRoutingDecis
   const urlfixGoal = policyRequiredCapabilityIds.includes('urlfix');
   const godmodeGoal = policyRequiredCapabilityIds.includes('ultrathink-attack-godmode');
   const repairToProofGoal = policyRequiredCapabilityIds.includes('repair-to-proof');
-  const repositoryGoal = isRepositoryGoal(goal) || Boolean(input.repository) || repairToProofGoal || ((urlfixGoal || godmodeGoal) && mutationRequested);
+  const repositoryGoal = isRepositoryGoal(goal) || Boolean(input.repository) || repairToProofGoal || godmodeGoal || (urlfixGoal && mutationRequested);
   const uiGoal = isUiGoal(goal) || designCommandIds.length > 0;
   const messagingGoal = isMessagingGoal(goal);
   const commercialGoal = isCommercialGoal(goal);
