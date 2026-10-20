@@ -92,6 +92,9 @@ jobs:
       - name: Verify runtime-state invalidation contract
         run: node --test test/control-room-runtime-state.test.mjs
 
+      - name: Verify independent Cloudflare readback contract
+        run: node --test test/cloudflare-provider-readback.test.mjs
+
   publish-ledger:
     name: Publish exact-head test ledger
     needs: ledger-contract
