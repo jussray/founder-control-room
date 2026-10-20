@@ -25,7 +25,7 @@ function writeReadback(root, overrides = {}) {
     repository: 'jussray/example',
     worker: 'founder-control-room',
     accountId: '9b59861bd1747cf7525571b4c51d2aa0',
-    scope: 'worker-bindings-and-crons-only',
+    scope: 'worker-bindings-crons-and-active-handler',
     status: 'aligned',
     observedAt: new Date().toISOString(),
     observedStateDigest: EPOCH,
@@ -88,7 +88,7 @@ test('external state invalidation requires a fresh queue, non-secret epoch, and 
   const valid = env({ GITHUB_EVENT_NAME: 'repository_dispatch', CONTROL_ROOM_EXTERNAL_STATE_ACTION: 'runtime_state_changed', CONTROL_ROOM_EXTERNAL_STATE_EPOCH: EPOCH, CONTROL_ROOM_EXTERNAL_STATE_SOURCE: 'cloudflare:worker:founder-control-room', CONTROL_ROOM_PROVIDER_READBACK_PATH: observed.path });
   const receipt = buildRuntimeStateReceipt(valid, root);
   assert.equal(receipt.externalState.mode, 'independently-read-back'); assert.equal(receipt.externalState.epoch, EPOCH); assert.equal(receipt.event.freshQueue, true);
-  assert.deepEqual(receipt.externalState.providerObservation, { digest: EPOCH, observedAt: observed.readback.observedAt, scope: 'worker-bindings-and-crons-only', status: 'aligned' });
+  assert.deepEqual(receipt.externalState.providerObservation, { digest: EPOCH, observedAt: observed.readback.observedAt, scope: 'worker-bindings-crons-and-active-handler', status: 'aligned' });
   assert.equal(receipt.proofRule.externalEventEpochAloneProvesExternalState, false);
   assert.throws(() => buildRuntimeStateReceipt({ ...valid, GITHUB_RUN_ATTEMPT: '2' }, root), /newly queued/u);
   assert.throws(() => buildRuntimeStateReceipt({ ...valid, CONTROL_ROOM_EXTERNAL_STATE_EPOCH: '' }, root), /state epoch/u);
