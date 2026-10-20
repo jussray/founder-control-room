@@ -1,4 +1,5 @@
-import { generateKeyPairSync } from 'node:crypto';
+import { createPrivateKey, generateKeyPairSync } from 'node:crypto';
+import { runInNewContext } from 'node:vm';
 import { readFileSync } from 'node:fs';
 import { beforeAll, describe, expect, it } from 'vitest';
 
@@ -163,5 +164,79 @@ describe('shape diagnostic workflow agrees with minting without importing it', (
     expect(workflow).toContain('reconstructableSecretMetadataLogged: false');
     expect(workflow).not.toContain('normalized.length');
     expect(workflow).not.toContain('createHash');
+  });
+});
+
+describe('isolated workflow classifier matches minting across generated keys', () => {
+  it('executes both implementations against accepted and rejected transports', () => {
+    const workflow = readFileSync(
+      '.github/workflows/github-app-secret-shape-diagnostic.yml',
+      'utf8',
+    );
+    const startMarker = 'function decodeJsonQuotedString(value) {';
+    const endMarker = "const appIdNumeric = /^\\d+$/.test(appId);";
+    const start = workflow.indexOf(startMarker);
+    const end = workflow.indexOf(endMarker, start);
+    expect(start).toBeGreaterThan(-1);
+    expect(end).toBeGreaterThan(start);
+
+    // Execute only the pure classifier segment. The sandbox has no process,
+    // network, GitHub token, or real secret and never runs the workflow entry point.
+    const classifierSource = workflow.slice(start, end);
+    const classifyDiagnostic = (secret: string) =>
+      runInNewContext(
+        `${classifierSource}\\n({ present, recognizedTransport, transportClass, pemBoundary, rsaParse })`,
+        { secret, Buffer, createPrivateKey },
+        { timeout: 2000 },
+      ) as Pick<
+        Classification,
+        'present' | 'recognizedTransport' | 'transportClass' | 'pemBoundary' | 'rsaParse'
+      >;
+
+    const inputs: Array<[string, string]> = [
+      ['pkcs8 PEM', pkcs8],
+      ['pkcs1 PEM', pkcs1],
+      ['CRLF PEM', pkcs8.replace(/\\n/g, '\\r\\n')],
+      ['escaped newline PEM', pkcs8.replace(/\\n/g, '\\\\n')],
+      ['JSON-quoted PEM', JSON.stringify(pkcs8)],
+      ['single-quoted PEM', `'${pkcs8}'`],
+      ['base64 PEM', Buffer.from(pkcs8).toString('base64')],
+      ['base64url PEM', Buffer.from(pkcs8).toString('base64url')],
+      ['base64 PKCS8 DER', derPkcs8.toString('base64')],
+      ['base64 PKCS1 DER', derPkcs1.toString('base64')],
+      ['headerless PEM', pkcs8.split('\\n').slice(1, -1).join('\\n')],
+      ['collapsed PEM', pkcs8.replace(/\\n/g, ' ')],
+      ['empty', ''],
+      ['garbage', 'not a key at all'],
+      ['truncated PEM', pkcs8.slice(0, 80)],
+      ['non-key base64', Buffer.from('x'.repeat(200)).toString('base64')],
+      [
+        'non-RSA',
+        generateKeyPairSync('ec', { namedCurve: 'P-256' })
+          .privateKey.export({ type: 'pkcs8', format: 'pem' })
+          .toString()
+          .trim(),
+      ],
+    ];
+    for (const [label, input] of inputs) {
+      const mint = classifyPrivateKey(input);
+      const diagnostic = classifyDiagnostic(input);
+      expect(
+        {
+          present: diagnostic.present,
+          recognizedTransport: diagnostic.recognizedTransport,
+          transportClass: diagnostic.transportClass,
+          pemBoundary: diagnostic.pemBoundary,
+          rsaParse: diagnostic.rsaParse,
+        },
+        `classifier disagreement on ${label}`,
+      ).toEqual({
+        present: mint.present,
+        recognizedTransport: mint.recognizedTransport,
+        transportClass: mint.transportClass,
+        pemBoundary: mint.pemBoundary,
+        rsaParse: mint.rsaParse,
+      });
+    }
   });
 });
