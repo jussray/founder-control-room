@@ -1,5 +1,10 @@
 # Truth Decay Audit: When a True Claim Becomes Unsafe to Reuse
 
+## Paired hostile-PR repair guidance
+
+The existing ULTRATHINK / ATTACK / GODMODE companion now specifies completed 5W1H, precise evidence-scoped claims, 80/20 cause selection and paired pre/post Red Team/Devil, L99, OODA, Bill Gates, Elon Musk and Lindy passes. Open PRs and drafts are untrusted candidates; draft containment, exact-head tests, Playwright, independent review and founder merge approval are separate gates. The AI-skill verifier checks mandatory source instructions only. Neither a paired checklist nor its receipt proves model compliance, runtime adoption, execution, production restoration or independent review.
+
+
 ## October 16, 2026: StoryEngine peer-identity renewal, without inherited proof
 
 FCR's new actual-server GitHub Workspace/browser test, full founder UI journey, capability workbench, and guarded terminal scenarios passed on the predecessor candidate while the separate FCR-to-StoryEngine test failed at the live peer-ref gate. The workflow expected StoryEngine `a6e6a396ed30535af2fd9b1ec2347a84e1a3fbf3` while independently observed `refs/heads/main` resolved to `26b1c34ae7c97c5d1b66a23d6345b3965cfcdc1f`. The former is not a current federation subject.

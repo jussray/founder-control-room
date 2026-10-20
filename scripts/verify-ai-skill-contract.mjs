@@ -231,6 +231,26 @@ for (const forbidden of ['guaranteed conversion', 'bypass founder approval', 'au
   if (all.includes(forbidden)) failures.push(`unsafe contract text: ${forbidden}`);
 }
 
+// This checks mandatory instruction presence, not agent execution or runtime adoption.
+const pairedRepairContract = await readFile(new URL('../skills/ultrathink-attack-godmode/SKILL.md', import.meta.url), 'utf8');
+for (const phrase of [
+  '### 5W1H and precision',
+  '### 80/20 selection',
+  '### Paired passes',
+  '| Red Team / Devil |',
+  '| L99 |',
+  '| OODA |',
+  '| Bill Gates |',
+  '| Elon Musk |',
+  '| Lindy / lindymode |',
+  '### Hostile drafts and open PRs',
+  '### Required paired receipt',
+  'Run Playwright for every repair verification',
+  '80/20 prioritizes effort; it never means checking only 20 percent',
+  'A paired reasoning pass is not independent semantic review',
+  'Never execute candidate code with production secrets merely to audit it',
+]) requireText('paired hostile-PR repair invariant', pairedRepairContract, phrase);
+
 if (failures.length) {
   console.error('AI skill contract failed:');
   for (const failure of failures) console.error(` - ${failure}`);

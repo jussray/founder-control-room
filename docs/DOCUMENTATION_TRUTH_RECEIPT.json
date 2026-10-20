@@ -318,7 +318,8 @@
       "claims": [
         "`skills/ultrathink-attack-godmode/SKILL.md` must preserve the canonical `.ai/skills/goalfix/SKILL.md` ownership of `/goalfix`, avoid duplicate activations, and never treat an operator shorthand, skill file, or green check as merge, deploy, provider, or production authority.",
         "`skills/ultrathink-attack-godmode/SKILL.md` must not advertise `/repair-to-proof` or the unprefixed `repair-to-proof` as an activation or frontmatter trigger: `skills/repair-to-proof/SKILL.md` alone handles the proof command, with an explicit non-authorizing handoff from investigative ULTRATHINK work.",
-        "`skills/ultrathink-attack-godmode/SKILL.md` must not register `/ultrathink`, which is owned by `.claude/skills/ultrathink/SKILL.md` in Claude Code; this companion only accepts its distinct `/godmode` or `attack/godmode` activation or an explicitly authorized canonical handoff."
+        "`skills/ultrathink-attack-godmode/SKILL.md` must not register `/ultrathink`, which is owned by `.claude/skills/ultrathink/SKILL.md` in Claude Code; this companion only accepts its distinct `/godmode` or `attack/godmode` activation or an explicitly authorized canonical handoff.",
+        "The existing repair companion requires 5W1H, evidence-scoped accuracy, 80/20 cause selection, paired pre/post Red Team/Devil, L99, OODA, Bill Gates, Elon Musk and Lindy passes, hostile candidate handling and exact-head Playwright; none grants effect, review, merge, deploy or provider authority."
       ]
     },
     {
@@ -337,7 +338,8 @@
       "path": "skills/ultrathink-suite/README.md",
       "claims": [
         "`skills/ultrathink-suite/README.md` must route `/goalfix` through `.ai/skills/goalfix/SKILL.md` as canonical owner, treat ULTRATHINK skills as optional governed companions, and never grant a second execution authority or falsely certify runtime installation.",
-        "`skills/ultrathink-suite/README.md` must route exact `/ultrathink` to the existing `.claude/skills/ultrathink/SKILL.md` entrypoint in Claude Code rather than direct activation of a second ULTRATHINK execution contract."
+        "`skills/ultrathink-suite/README.md` must route exact `/ultrathink` to the existing `.claude/skills/ultrathink/SKILL.md` entrypoint in Claude Code rather than direct activation of a second ULTRATHINK execution contract.",
+        "The existing repair companion requires 5W1H, evidence-scoped accuracy, 80/20 cause selection, paired pre/post Red Team/Devil, L99, OODA, Bill Gates, Elon Musk and Lindy passes, hostile candidate handling and exact-head Playwright; none grants effect, review, merge, deploy or provider authority."
       ]
     },
     {
@@ -368,6 +370,12 @@
       "path": "src/founder-os-lab/contracts.ts",
       "claims": [
         "`src/founder-os-lab/contracts.ts` must keep the GODMODE, repair-to-proof and continuity-proof-ledger companion identifiers within the governed skill contract; the identifiers cannot widen execution, merge, deploy or provider authority."
+      ]
+    },
+    {
+      "path": "scripts/verify-ai-skill-contract.mjs",
+      "claims": [
+        "The AI-skill verifier must reject missing paired hostile-PR workflow instructions; this static instruction-presence gate cannot prove agent compliance, runtime adoption, independent review, tests, Playwright or production outcome."
       ]
     }
   ]

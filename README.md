@@ -1,5 +1,10 @@
 # Founder Control Room
 
+## Paired hostile-PR repair guidance
+
+The existing ULTRATHINK / ATTACK / GODMODE companion now specifies completed 5W1H, precise evidence-scoped claims, 80/20 cause selection and paired pre/post Red Team/Devil, L99, OODA, Bill Gates, Elon Musk and Lindy passes. Open PRs and drafts are untrusted candidates; draft containment, exact-head tests, Playwright, independent review and founder merge approval are separate gates. The AI-skill verifier checks mandatory source instructions only. Neither a paired checklist nor its receipt proves model compliance, runtime adoption, execution, production restoration or independent review.
+
+
 > **Copyright © 2024–2026 Juss Ray. All rights reserved.**
 > This is proprietary software. No license to use, copy, modify, distribute,
 > sublicense, or create derivative works is granted. See [LICENSE](LICENSE).

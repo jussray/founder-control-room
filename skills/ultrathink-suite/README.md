@@ -23,3 +23,7 @@ Before running, read the repo's [AGENTS.md](../../AGENTS.md), [Juss Founder OS](
 
 ## Verification status
 This index registers **source-level routing guidance**. It is not evidence that an agent runtime, skill registry, FCR database, or other projects have automatically loaded these files. Prove activation and handoffs separately before claiming runtime integration.
+
+## Paired repair contract
+
+The existing [ULTRATHINK / ATTACK / GODMODE companion](../ultrathink-attack-godmode/SKILL.md#mandatory-paired-reasoning-and-hostile-pr-gate) requires 5W1H, evidence-based 80/20 selection, paired Red Team/Devil, L99, OODA, Bill Gates, Elon Musk and Lindy passes. Drafts and open PRs remain untrusted until exact-head checks, Playwright and required independent review pass. The skill verifier checks this source contract; it does not prove runtime adoption, execution or release authority.
