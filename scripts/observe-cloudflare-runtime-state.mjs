@@ -35,10 +35,12 @@ function validName(value) {
   return typeof value === 'string' && /^[A-Z][A-Z0-9_]{0,127}$/.test(value);
 }
 
-export function summarizeProviderState(desired, settings, schedules, observedAt = new Date()) {
+export function summarizeProviderState(desired, settings, schedules, observedAt = new Date(), activeVersion) {
   const bindings = settings?.bindings;
+  const activeHandlers = activeVersion?.resources?.script?.handlers;
   const observedSchedules = schedules?.schedules;
-  if (!Array.isArray(bindings) || !Array.isArray(observedSchedules)) {
+  if (!Array.isArray(bindings) || !Array.isArray(observedSchedules) || !Array.isArray(activeHandlers)
+    || !activeHandlers.every((handler) => typeof handler === 'string')) {
     throw new Error('CLOUDFLARE_PROVIDER_RESPONSE_INVALID');
   }
   if (!Number.isFinite(observedAt.getTime())) throw new Error('CLOUDFLARE_OBSERVATION_TIME_INVALID');
@@ -60,13 +62,15 @@ export function summarizeProviderState(desired, settings, schedules, observedAt 
   const missingSecrets = desired.requiredSecrets.filter((name) => !secretNames.has(name));
   const missingCrons = desired.crons.filter((cron) => !crons.includes(cron));
   const plaintextApiToken = sanitized.some((entry) => entry.name === 'CF_API_TOKEN' && entry.type === 'plain_text');
+  const hasScheduledHandler = activeHandlers.includes('scheduled');
   const mismatches = [
     ...(missingSecrets.length ? ['missing_required_secret_bindings'] : []),
     ...(missingCrons.length ? ['missing_reconciliation_cron'] : []),
+    ...(!hasScheduledHandler ? ['missing_deployed_scheduled_handler'] : []),
     ...(plaintextApiToken ? ['plaintext_api_token_binding'] : []),
   ];
   const stateDigest = 'sha256:' + createHash('sha256').update(JSON.stringify({
-    worker: desired.worker, bindings: sanitized, crons,
+    worker: desired.worker, bindings: sanitized, crons, hasScheduledHandler,
   })).digest('hex');
   return {
     schema: CLOUDFLARE_READBACK_CONTRACT,
@@ -74,10 +78,11 @@ export function summarizeProviderState(desired, settings, schedules, observedAt 
     worker: desired.worker,
     accountId: ACCOUNT,
     observedAt: observedAt.toISOString(),
-    scope: 'worker-bindings-and-crons-only',
+    scope: 'worker-bindings-crons-and-active-handler',
     status: mismatches.length ? 'drift_detected' : 'aligned',
     observedStateDigest: stateDigest,
     observedCronSchedules: crons,
+    deployedScheduledHandlerPresent: hasScheduledHandler,
     missingRequiredSecretNames: missingSecrets,
     mismatchKinds: mismatches,
     secretValuesRecorded: false,
@@ -105,11 +110,21 @@ export async function observeCloudflareWorker({ token, fetcher = fetch, root = p
   }
   const desired = parseDesiredWorkerConfig(fs.readFileSync(path.join(root, CONFIG), 'utf8'));
   const endpoint = '/accounts/' + ACCOUNT + '/workers/scripts/' + WORKER;
-  const [settings, schedules] = await Promise.all([
+  const [settings, schedules, deployments] = await Promise.all([
     readCloudflareJson(token, endpoint + '/settings', fetcher),
     readCloudflareJson(token, endpoint + '/schedules', fetcher),
+    readCloudflareJson(token, endpoint + '/deployments', fetcher),
   ]);
-  return summarizeProviderState(desired, settings, schedules, observedAt);
+  // Inspect the actually deployed version, not the newest uploaded candidate.
+  // A traffic split is not proof that every active version has the cron handler.
+  const versions = deployments?.deployments?.[0]?.versions;
+  if (!Array.isArray(versions) || versions.length !== 1
+    || versions[0]?.percentage !== 100
+    || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(versions[0]?.version_id ?? '')) {
+    throw new Error('CLOUDFLARE_DEPLOYMENT_VERSION_INVALID');
+  }
+  const activeVersion = await readCloudflareJson(token, endpoint + '/versions/' + versions[0].version_id, fetcher);
+  return summarizeProviderState(desired, settings, schedules, observedAt, activeVersion);
 }
 
 export async function writeCloudflareReadback(env = process.env, root = process.cwd()) {
