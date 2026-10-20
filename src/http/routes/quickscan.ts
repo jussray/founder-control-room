@@ -314,10 +314,24 @@ quickScanRouter.post('/prospects/:id/chief-recommendation', async (req: FounderR
   } catch (error) {
     return fail(res, 502, 'QUICKSCAN_CHIEF_PROVENANCE_MISMATCH', error instanceof Error ? error.message : 'Chief recommendation provenance mismatch');
   }
+  // Free-first capability routing (src/quickscan/chiefOpenaiClient.ts) can
+  // silently fall back from a free/local provider to a paid one. That
+  // fallback decision — and why cheaper candidates were rejected — has no
+  // other durable record: setChiefRecommendation only stores the
+  // recommendation, not provenance. Without it here, a local-runtime outage
+  // that quietly starts costing money per recommendation would be invisible
+  // to the founder even though the routing policy computed the evidence.
+  const rejectedCandidates = (result.provenance.decisionTrace ?? [])
+    .filter((entry) => !entry.eligible)
+    .map((entry) => `${entry.providerId}:${entry.reasons.join(',')}`)
+    .join(';');
   prospect.audit.push({
     id: `audit_${Date.now()}`,
     type: 'chief.recommendation.provenance',
-    message: `provider=${result.provenance.provider} model=${result.provenance.model} response=${result.provenance.responseId ?? 'none'} promptVersion=${result.provenance.promptVersion}`,
+    message: `provider=${result.provenance.provider} model=${result.provenance.model} response=${result.provenance.responseId ?? 'none'} promptVersion=${result.provenance.promptVersion}`
+      + (result.provenance.selection ? ` costClass=${result.provenance.selection.costClass}` : '')
+      + (result.provenance.fallbackReason ? ` fallbackReason=${result.provenance.fallbackReason}` : '')
+      + (rejectedCandidates ? ` rejected=${rejectedCandidates}` : ''),
     actor: 'chief',
     createdAt: new Date().toISOString(),
   });

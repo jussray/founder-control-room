@@ -27,6 +27,8 @@ Current merged source uses this contract:
 6. require the upstream response to identify the canonical API service as `founder-control-room`; and
 7. fail closed with a bounded 503 recovery response when the service binding is absent, unreachable, returns Cloudflare upstream failure status, or fails service identity verification.
 
+Public discovery artifacts including `/robots.txt`, `/sitemap.xml`, `/llms.txt`, and `/crawlers.json` are static Pages assets and must remain on `env.ASSETS`; API-owned callback assets remain on `env.FCR_API`. This path classification is not authentication and cannot create crawler write authority, provider mutation authority, deployment authority, or publication authority.
+
 `API_ORIGIN = https://api.foundercontrolroom.org` remains part of request construction/loop protection in source. Dynamic network execution is performed through `FCR_API.fetch(...)`, not a direct public-origin `fetch()` call.
 
 ### Required Pages provider configuration
@@ -175,7 +177,9 @@ A failing or unavailable enrichment read is `UNKNOWN`/blocked evidence in that e
 
 The canonical Worker runtime secret values belong in the Cloudflare Worker secret store. Canonical `.github/workflows/deploy.yml` preserves those provider-held values instead of copying them through GitHub Actions. The required runtime secret names are declared by `wrangler.worker.toml [secrets].required`, including `FOUNDER_SESSION_ENCRYPTION_KEY`; Wrangler must fail closed when a required binding name is absent before the Worker promotion can be treated as successful.
 
-`TINYFISH_API_KEY` is one of those required canonical Worker binding names. Its value must remain only in the Cloudflare Worker secret plane; canonical Deploy may verify the provider-held name but never read, log, or re-upload the value. That binding-name receipt still does not prove TinyFish accepted a request, so live activation requires a separately observed key-backed Search or Fetch receipt.
+FCR's `public-web-observation-v1` contract does not require a dedicated provider-held Worker secret. Public-web adapter selection occurs behind FCR's governed read-only research hub, so changing or losing an adapter cannot silently change product authority or become proof of an observed outcome.
+
+`FCR_SHOPIFY_WEBHOOK_SECRET` and `FCR_COMMERCE_HASH_SALT` are also required canonical Worker binding names for FCR's first-party Shopify paid-order ingress. The first authenticates Shopify's exact webhook body and the second creates a privacy-safe order reference; neither is authority by itself. Source and binding-name verification cannot prove the provider subscription, deployed callback, production database ledger, or a paid outcome, so those layers must remain separately evidenced before the money path is called active or proven.
 
 For the governed Founder Content n8n production-source lane, the same canonical Worker additionally requires the provider-held binding names `N8N_FOUNDER_CONTENT_WEBHOOK_URL`, `N8N_FOUNDER_CONTENT_BEARER_TOKEN`, `N8N_FOUNDER_CONTENT_EXPECTED_WORKFLOW_FINGERPRINT`, and `N8N_FOUNDER_CONTENT_IDENTITY_HMAC_SECRET`. Public-safe source may declare `N8N_FOUNDER_CONTENT_ENABLED=true`, Buffer-only provider selection, workflow ID `fcrFounderContentV1`, and runtime `2.32.6`, but those declarations do not prove any of the four secret values exist or that production n8n is active. Canonical exact-main Deploy must verify required binding-name presence before Worker mutation, and production truth still requires exact deployed Worker identity, production n8n workflow/fingerprint/runtime readback, and provider-native Buffer outcome evidence.
 
@@ -215,6 +219,8 @@ At minimum verify:
 10. required Playwright/browser proof runs against the deployed path; and
 11. founder-content/provider claims use their own exact authorization and provider-readback gates.
 
+For the FCR Shopify money path specifically, production proof additionally requires the exact production database migration, a deployed Worker whose runtime identity matches the authorized release, provider readback that Shopify's `orders/paid` subscription targets the deployed callback, and a genuine provider-confirmed paid-order receipt before `payment_collected` can be presented as a live outcome. No test charge is implied by source or CI proof.
+
 Provider build/deploy comments, preview URLs, and successful uploads are useful evidence for the artifact they name. They do not substitute for runtime binding identity, auth, browser, publication, or fleet-wide proof.
 
 ## Documentation truth
@@ -232,3 +238,7 @@ Current executable source and authoritative provider readback outrank an older v
 - Access: roll back only an incomplete or ambiguous browser-destination detachment using the receipt-bound original destination set and unchanged application/policy identity; a later runtime/browser failure alone must not automatically reintroduce a Cloudflare Access product-login screen.
 - Credentials: remove/revoke only the affected credential; do not rotate unrelated keys to repair binding drift.
 - Preserve build logs, deployment IDs, provider readback, browser traces, and runtime receipts.
+
+## Governed execution carrier candidate
+
+`wrangler.worker.toml` declares `GOVERNED_EXECUTION_WORKFLOW` / `fcr-governed-execution-v1`, exported from `src/workflows/governedExecutionWorkflow.ts`. The candidate carrier waits for a broker-owned world, a separately authorized execution receipt, and an independent witness; event delivery and Workflow persistence never authenticate founder authority or authorize provider effects. Source declarations and generated types do not establish a configured Workflow, instance, deployed identity, D1/R2 binding, or production outcome. The separate staged `governedExecutionWorkflowV1.ts` module is not exported by this candidate binding and must not be mistaken for its runtime implementation. Activation remains a separate authority and provider-proof gate.

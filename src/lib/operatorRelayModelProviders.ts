@@ -1,13 +1,20 @@
-import type { OperatorRelayRequestV1 } from './operatorRelay.js';
+import type { OperatorRelayRequestV1, OperatorRelayUsageV1 } from './operatorRelay.js';
 import type { OperatorRelayAdapters } from './operatorRelayDispatch.js';
+import { anthropicPlaywrightMcpAttachment } from './operatorRelayAnthropicMcp.js';
 import { operatorRelayAdapterFromTextProvider } from './operatorRelayProvider.js';
 
 type FetchLike = typeof fetch;
 type JsonRecord = Record<string, unknown>;
 
-export const OPERATOR_RELAY_PROVIDER_TIMEOUT_MS = 60_000;
-export const OPERATOR_RELAY_MAX_RESPONSE_BYTES = 512 * 1024;
-export const OPERATOR_RELAY_MAX_ERROR_CHARS = 1_000;
+const MAX_PROVIDER_RESPONSE_BYTES = 64 * 1024;
+const PROVIDER_TIMEOUT_MS = 60_000;
+const ANTHROPIC_API_VERSION = '2023-06-01';
+const MAX_PROVIDER_RESPONSE_ID_LENGTH = 200;
+const SAFE_GEMINI_MODEL = /^[A-Za-z0-9._-]{1,160}$/;
+const SAFE_PERPLEXITY_AGENT_MODEL = /^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/;
+const SAFE_DEEPSEEK_MODEL = /^(?:deepseek-flash|deepseek-v4-pro)$/;
+
+export const SEMANTIC_PEER_REVIEW_SPEND_MODE = 'paused' as const;
 
 function record(value: unknown): JsonRecord | null {
   return value && typeof value === 'object' && !Array.isArray(value)
@@ -33,122 +40,91 @@ function ensureRelaySensitivity(request: OperatorRelayRequestV1): void {
   }
 }
 
-function redactSecrets(value: string, secrets: readonly string[]): string {
-  let redacted = value;
-  for (const secret of secrets) {
-    const exact = secret.trim();
-    if (exact) redacted = redacted.split(exact).join('[REDACTED]');
+function ensureRelaySpendPolicy(request: OperatorRelayRequestV1): void {
+  if (request.capability === 'review') {
+    throw new Error('semantic peer review is paused by founder cost-control policy');
   }
-  return redacted
-    .replace(/\bsk-ant-[A-Za-z0-9_-]{8,}\b/g, '[REDACTED]')
-    .replace(/\bsk-(?:proj-)?[A-Za-z0-9_-]{8,}\b/g, '[REDACTED]')
-    .replace(/\bpplx-[A-Za-z0-9_-]{8,}\b/g, '[REDACTED]');
 }
 
-function safeProviderErrorMessage(
-  parsed: JsonRecord,
-  label: string,
-  status: number,
-  secrets: readonly string[],
-): string {
-  const error = record(parsed.error);
-  const candidate = typeof error?.message === 'string'
-    ? error.message
-    : typeof parsed.error === 'string'
-      ? parsed.error
-      : `${label} failed with HTTP ${status}`;
-  const normalized = redactSecrets(candidate.replace(/[\r\n\t]+/g, ' ').trim(), secrets)
-    .slice(0, OPERATOR_RELAY_MAX_ERROR_CHARS);
-  return normalized || `${label} failed with HTTP ${status}`;
-}
-
-async function readBoundedResponseText(response: Response, label: string): Promise<string> {
-  const declaredLength = Number.parseInt(response.headers.get('content-length') ?? '', 10);
-  if (Number.isFinite(declaredLength) && declaredLength > OPERATOR_RELAY_MAX_RESPONSE_BYTES) {
-    throw new Error(`${label} response exceeded the bounded response size`);
-  }
-
-  if (!response.body) {
-    const raw = await response.text();
-    if (Buffer.byteLength(raw, 'utf8') > OPERATOR_RELAY_MAX_RESPONSE_BYTES) {
-      throw new Error(`${label} response exceeded the bounded response size`);
+async function boundedResponseText(response: Response, label: string): Promise<string> {
+  const contentLength = response.headers.get('content-length');
+  if (contentLength) {
+    const declaredBytes = Number(contentLength);
+    if (Number.isFinite(declaredBytes) && declaredBytes > MAX_PROVIDER_RESPONSE_BYTES) {
+      try {
+        await response.body?.cancel();
+      } catch {
+        // The size receipt remains valid even if an already-closed stream cannot be cancelled.
+      }
+      throw new Error(`${label} response exceeded ${MAX_PROVIDER_RESPONSE_BYTES} bytes`);
     }
-    return raw;
   }
+
+  if (!response.body) return '';
 
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
-  const chunks: string[] = [];
-  let total = 0;
+  let bytesRead = 0;
+  let text = '';
+
   try {
     while (true) {
-      const { value, done } = await reader.read();
+      const { done, value } = await reader.read();
       if (done) break;
-      total += value.byteLength;
-      if (total > OPERATOR_RELAY_MAX_RESPONSE_BYTES) {
-        await reader.cancel().catch(() => undefined);
-        throw new Error(`${label} response exceeded the bounded response size`);
+      bytesRead += value.byteLength;
+      if (bytesRead > MAX_PROVIDER_RESPONSE_BYTES) {
+        await reader.cancel();
+        throw new Error(`${label} response exceeded ${MAX_PROVIDER_RESPONSE_BYTES} bytes`);
       }
-      chunks.push(decoder.decode(value, { stream: true }));
+      text += decoder.decode(value, { stream: true });
     }
-    chunks.push(decoder.decode());
-    return chunks.join('');
+    text += decoder.decode();
+    return text;
   } finally {
     reader.releaseLock();
   }
 }
 
-async function jsonResponse(
-  response: Response,
-  label: string,
-  secrets: readonly string[] = [],
-): Promise<JsonRecord> {
-  let raw: string;
-  try {
-    raw = await readBoundedResponseText(response, label);
-  } catch (error) {
-    if (error instanceof Error && error.message.includes('bounded response size')) throw error;
-    throw new Error(`${label} response body could not be read`);
+async function jsonResponse(response: Response, label: string): Promise<JsonRecord> {
+  if (!response.ok) {
+    // Provider error bodies are intentionally never promoted into FCR errors.
+    // They are untrusted, can be arbitrarily large, and can echo credentials or
+    // submitted context. Status is sufficient for the bounded failure receipt.
+    try {
+      await response.body?.cancel();
+    } catch {
+      // Failure to cancel an already-closed body does not change provider truth.
+    }
+    throw new Error(`${label} failed with HTTP ${response.status}`);
   }
 
+  const text = await boundedResponseText(response, label);
   let body: unknown;
   try {
-    body = JSON.parse(raw);
+    body = JSON.parse(text);
   } catch {
     throw new Error(`${label} returned non-JSON output`);
   }
-
   const parsed = record(body);
   if (!parsed) throw new Error(`${label} returned an invalid response object`);
-  if (!response.ok) {
-    throw new Error(safeProviderErrorMessage(parsed, label, response.status, secrets));
-  }
   return parsed;
 }
 
-async function fetchProviderJson(
+async function invokeJsonProvider(
   fetchImpl: FetchLike,
-  input: string,
+  url: string,
   init: RequestInit,
   label: string,
-  secrets: readonly string[],
 ): Promise<JsonRecord> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), OPERATOR_RELAY_PROVIDER_TIMEOUT_MS);
+  let response: Response;
   try {
-    const response = await fetchImpl(input, { ...init, signal: controller.signal });
-    return await jsonResponse(response, label, secrets);
-  } catch (error) {
-    if (controller.signal.aborted) {
-      throw new Error(`${label} timed out after ${OPERATOR_RELAY_PROVIDER_TIMEOUT_MS}ms`);
-    }
-    if (error instanceof Error) {
-      throw new Error(redactSecrets(error.message, secrets).slice(0, OPERATOR_RELAY_MAX_ERROR_CHARS));
-    }
-    throw new Error(`${label} failed without a safe error receipt`);
-  } finally {
-    clearTimeout(timer);
+    response = await fetchImpl(url, init);
+  } catch {
+    // Do not serialize the provider/fetch exception. A transport exception can
+    // contain request metadata, URLs, proxies, or secret-bearing diagnostics.
+    throw new Error(`${label} request failed`);
   }
+  return jsonResponse(response, label);
 }
 
 function openAiText(body: JsonRecord): string {
@@ -167,7 +143,41 @@ function openAiText(body: JsonRecord): string {
   return parts.join('\n');
 }
 
+function deepSeekText(body: JsonRecord): string {
+  if (body.status !== 'completed') {
+    throw new Error('DeepSeek relay returned a non-completed response');
+  }
+  if (typeof body.output_text === 'string' && body.output_text.trim()) return body.output_text.trim();
+  const output = Array.isArray(body.output) ? body.output : [];
+  const parts: string[] = [];
+  for (const item of output) {
+    const message = record(item);
+    if (message?.type !== 'message') continue;
+    const content = Array.isArray(message.content) ? message.content : [];
+    for (const entry of content) {
+      const block = record(entry);
+      if (block?.type === 'output_text' && typeof block.text === 'string' && block.text.trim()) {
+        parts.push(block.text.trim());
+      }
+    }
+  }
+  if (parts.length === 0) throw new Error('DeepSeek relay response contained no text');
+  return parts.join('\n');
+}
+
 function anthropicText(body: JsonRecord): string {
+  const rawId = typeof body.id === 'string' ? body.id.trim() : '';
+  if (
+    !rawId
+    || rawId.length > MAX_PROVIDER_RESPONSE_ID_LENGTH
+    || !/^[A-Za-z0-9._:-]+$/.test(rawId)
+  ) {
+    throw new Error('Anthropic relay returned invalid response identity');
+  }
+  if (body.type !== 'message' || body.role !== 'assistant') {
+    throw new Error('Anthropic relay returned invalid message envelope');
+  }
+
   const content = Array.isArray(body.content) ? body.content : [];
   const parts = content.flatMap((entry) => {
     const block = record(entry);
@@ -179,19 +189,117 @@ function anthropicText(body: JsonRecord): string {
   return parts.join('\n');
 }
 
-function perplexityText(body: JsonRecord): string {
-  const choices = Array.isArray(body.choices) ? body.choices : [];
-  const first = record(choices[0]);
-  const message = record(first?.message);
-  if (typeof message?.content !== 'string' || !message.content.trim()) {
-    throw new Error('Perplexity relay response contained no text');
-  }
-  return message.content.trim();
+// Token usage is measurement, not evidence: a missing or malformed usage block is omitted, never fabricated,
+// and never fails an otherwise valid relay.
+function anthropicUsage(body: JsonRecord): OperatorRelayUsageV1 | undefined {
+  const usage = record(body.usage);
+  if (!usage) return undefined;
+  const count = (value: unknown): number | null => (
+    typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : null
+  );
+  const inputTokens = count(usage.input_tokens);
+  const outputTokens = count(usage.output_tokens);
+  if (inputTokens === null || outputTokens === null) return undefined;
+  const cacheCreation = usage.cache_creation_input_tokens == null ? 0 : count(usage.cache_creation_input_tokens);
+  const cacheRead = usage.cache_read_input_tokens == null ? 0 : count(usage.cache_read_input_tokens);
+  if (cacheCreation === null || cacheRead === null) return undefined;
+  return {
+    provider: 'anthropic',
+    inputTokens,
+    outputTokens,
+    cacheCreationInputTokens: cacheCreation,
+    cacheReadInputTokens: cacheRead,
+  };
 }
 
-function evidenceRef(provider: string, body: JsonRecord): string {
-  const id = typeof body.id === 'string' && body.id.trim() ? body.id.trim() : 'unidentified-response';
-  return `provider:${provider}:${id}`;
+function geminiResponseId(body: JsonRecord): string {
+  const rawId = typeof body.responseId === 'string' ? body.responseId.trim() : '';
+  if (
+    !rawId
+    || rawId.length > MAX_PROVIDER_RESPONSE_ID_LENGTH
+    || !/^[A-Za-z0-9._:-]+$/.test(rawId)
+  ) {
+    throw new Error('Gemini relay returned invalid response identity');
+  }
+  return rawId;
+}
+
+function geminiText(body: JsonRecord): string {
+  geminiResponseId(body);
+  const promptFeedback = record(body.promptFeedback);
+  if (
+    typeof promptFeedback?.blockReason === 'string'
+    && promptFeedback.blockReason
+    && promptFeedback.blockReason !== 'BLOCK_REASON_UNSPECIFIED'
+  ) {
+    throw new Error('Gemini relay response was blocked');
+  }
+
+  const candidates = Array.isArray(body.candidates) ? body.candidates : [];
+  const first = record(candidates[0]);
+  const content = record(first?.content);
+  if (!content || (content.role !== undefined && content.role !== 'model')) {
+    throw new Error('Gemini relay returned invalid content envelope');
+  }
+  const parts = Array.isArray(content.parts) ? content.parts : [];
+  const textParts = parts.flatMap((entry) => {
+    const block = record(entry);
+    return typeof block?.text === 'string' && block.text.trim() ? [block.text.trim()] : [];
+  });
+  if (textParts.length === 0) throw new Error('Gemini relay response contained no text');
+  return textParts.join('\n');
+}
+
+function perplexityText(body: JsonRecord): string {
+  if (body.status !== 'completed') {
+    throw new Error('Perplexity Agent relay returned a non-completed response');
+  }
+  const output = Array.isArray(body.output) ? body.output : [];
+  const parts: string[] = [];
+  for (const item of output) {
+    const message = record(item);
+    if (message?.type !== 'message') continue;
+    const content = Array.isArray(message.content) ? message.content : [];
+    for (const entry of content) {
+      const block = record(entry);
+      if (block?.type === 'output_text' && typeof block.text === 'string' && block.text.trim()) {
+        parts.push(block.text.trim());
+      }
+    }
+  }
+  if (parts.length === 0) throw new Error('Perplexity Agent relay response contained no text');
+  return parts.join('\n');
+}
+
+function responseIdentity(body: JsonRecord, field: 'id' | 'responseId' = 'id'): string {
+  const rawId = typeof body[field] === 'string' ? body[field].trim() : '';
+  return rawId
+    && rawId.length <= MAX_PROVIDER_RESPONSE_ID_LENGTH
+    && /^[A-Za-z0-9._:-]+$/.test(rawId)
+    ? rawId
+    : 'unidentified-response';
+}
+
+function evidenceRef(provider: string, body: JsonRecord, field: 'id' | 'responseId' = 'id'): string {
+  return `provider:${provider}:${responseIdentity(body, field)}`;
+}
+
+function geminiModelId(value: string): string | null {
+  const normalized = value.trim().replace(/^models\//, '');
+  return SAFE_GEMINI_MODEL.test(normalized) ? normalized : null;
+}
+
+function perplexityAgentModelId(value: string): string | null {
+  const normalized = value.trim();
+  if (normalized === 'sonar') return 'perplexity/sonar';
+  return normalized.length <= 160 && SAFE_PERPLEXITY_AGENT_MODEL.test(normalized)
+    ? normalized
+    : null;
+}
+
+function deepSeekModelId(value: string): string | null {
+  const normalized = value.trim();
+  return SAFE_DEEPSEEK_MODEL.test(normalized) ? normalized : null;
 }
 
 export function createServerOperatorRelayAdapters(
@@ -199,19 +307,56 @@ export function createServerOperatorRelayAdapters(
   fetchImpl: FetchLike = fetch,
 ): OperatorRelayAdapters {
   const adapters: OperatorRelayAdapters = {};
+  const geminiKey = env.GEMINI_API_KEY?.trim() || env.GOOGLE_API_KEY?.trim();
+  const geminiModel = env.FCR_RELAY_GEMINI_MODEL?.trim();
   const openAiKey = env.OPENAI_API_KEY?.trim();
   const openAiModel = env.FCR_RELAY_OPENAI_MODEL?.trim();
   const anthropicKey = env.ANTHROPIC_API_KEY?.trim();
   const anthropicModel = env.FCR_RELAY_ANTHROPIC_MODEL?.trim();
+  const anthropicMcp = anthropicPlaywrightMcpAttachment(env);
   const anthropicWorkspaceId = env.FCR_RELAY_ANTHROPIC_WORKSPACE_ID?.trim();
   const perplexityKey = env.PERPLEXITY_API_KEY?.trim();
   const perplexityModel = env.FCR_RELAY_PERPLEXITY_MODEL?.trim();
+  const deepSeekKey = env.DEEPSEEK_API_KEY?.trim();
+  const deepSeekModel = env.FCR_RELAY_DEEPSEEK_MODEL?.trim();
+
+  if (geminiKey && geminiModel) {
+    const modelId = geminiModelId(geminiModel);
+    if (modelId) {
+      adapters.gemini = operatorRelayAdapterFromTextProvider({
+        invoke: async ({ request }) => {
+          ensureRelaySensitivity(request);
+          ensureRelaySpendPolicy(request);
+          const body = await invokeJsonProvider(
+            fetchImpl,
+            `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(modelId)}:generateContent`,
+            {
+              method: 'POST',
+              headers: {
+                'x-goog-api-key': geminiKey,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                contents: [{ role: 'user', parts: [{ text: relayPrompt(request) }] }],
+                generationConfig: { maxOutputTokens: 2_000 },
+              }),
+              redirect: 'error',
+              signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
+            },
+            'Gemini relay',
+          );
+          return { text: geminiText(body), evidenceRef: evidenceRef('gemini', body, 'responseId') };
+        },
+      });
+    }
+  }
 
   if (openAiKey && openAiModel) {
     adapters.codex = operatorRelayAdapterFromTextProvider({
       invoke: async ({ request }) => {
         ensureRelaySensitivity(request);
-        const body = await fetchProviderJson(fetchImpl, 'https://api.openai.com/v1/responses', {
+        ensureRelaySpendPolicy(request);
+        const body = await invokeJsonProvider(fetchImpl, 'https://api.openai.com/v1/responses', {
           method: 'POST',
           headers: {
             Authorization: `Bearer ${openAiKey}`,
@@ -224,7 +369,8 @@ export function createServerOperatorRelayAdapters(
             max_output_tokens: 2_000,
           }),
           redirect: 'error',
-        }, 'OpenAI relay', [openAiKey]);
+          signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
+        }, 'OpenAI relay');
         return { text: openAiText(body), evidenceRef: evidenceRef('openai', body) };
       },
     });
@@ -234,47 +380,84 @@ export function createServerOperatorRelayAdapters(
     adapters['claude-code'] = operatorRelayAdapterFromTextProvider({
       invoke: async ({ request }) => {
         ensureRelaySensitivity(request);
-        const headers: Record<string, string> = {
-          'x-api-key': anthropicKey,
-          'anthropic-version': '2023-06-01',
-          'Content-Type': 'application/json',
-        };
-        if (anthropicWorkspaceId) headers['anthropic-workspace-id'] = anthropicWorkspaceId;
-
-        const body = await fetchProviderJson(fetchImpl, 'https://api.anthropic.com/v1/messages', {
+        ensureRelaySpendPolicy(request);
+        const body = await invokeJsonProvider(fetchImpl, 'https://api.anthropic.com/v1/messages', {
           method: 'POST',
-          headers,
+          headers: {
+            'x-api-key': anthropicKey,
+            'anthropic-version': ANTHROPIC_API_VERSION,
+            'Content-Type': 'application/json',
+            ...(anthropicMcp?.headers ?? {}),
+            ...(anthropicWorkspaceId ? { 'anthropic-workspace-id': anthropicWorkspaceId } : {}),
+          },
           body: JSON.stringify({
             model: anthropicModel,
             max_tokens: 2_000,
             messages: [{ role: 'user', content: relayPrompt(request) }],
+            ...(anthropicMcp?.body ?? {}),
           }),
           redirect: 'error',
-        }, 'Anthropic relay', [anthropicKey]);
-        return { text: anthropicText(body), evidenceRef: evidenceRef('anthropic', body) };
+          signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
+        }, 'Anthropic relay');
+        return { text: anthropicText(body), evidenceRef: evidenceRef('anthropic', body), usage: anthropicUsage(body) };
       },
     });
   }
 
   if (perplexityKey && perplexityModel) {
-    adapters.perplexity = operatorRelayAdapterFromTextProvider({
-      invoke: async ({ request }) => {
-        ensureRelaySensitivity(request);
-        const body = await fetchProviderJson(fetchImpl, 'https://api.perplexity.ai/v1/sonar', {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${perplexityKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: perplexityModel,
-            messages: [{ role: 'user', content: relayPrompt(request) }],
-          }),
-          redirect: 'error',
-        }, 'Perplexity relay', [perplexityKey]);
-        return { text: perplexityText(body), evidenceRef: evidenceRef('perplexity', body) };
-      },
-    });
+    const modelId = perplexityAgentModelId(perplexityModel);
+    if (modelId) {
+      adapters.perplexity = operatorRelayAdapterFromTextProvider({
+        invoke: async ({ request }) => {
+          ensureRelaySensitivity(request);
+          ensureRelaySpendPolicy(request);
+          const body = await invokeJsonProvider(fetchImpl, 'https://api.perplexity.ai/v1/agent', {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${perplexityKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: modelId,
+              input: relayPrompt(request),
+              tools: [{ type: 'web_search' }],
+              store: false,
+              max_output_tokens: 2_000,
+            }),
+            redirect: 'error',
+            signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
+          }, 'Perplexity Agent relay');
+          return { text: perplexityText(body), evidenceRef: evidenceRef('perplexity', body) };
+        },
+      });
+    }
+  }
+
+  if (deepSeekKey && deepSeekModel) {
+    const modelId = deepSeekModelId(deepSeekModel);
+    if (modelId) {
+      adapters.deepseek = operatorRelayAdapterFromTextProvider({
+        invoke: async ({ request }) => {
+          ensureRelaySensitivity(request);
+          ensureRelaySpendPolicy(request);
+          const body = await invokeJsonProvider(fetchImpl, 'https://api.deepseek.com/responses', {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${deepSeekKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: modelId,
+              input: relayPrompt(request),
+              max_output_tokens: 2_000,
+            }),
+            redirect: 'error',
+            signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
+          }, 'DeepSeek relay');
+          return { text: deepSeekText(body), evidenceRef: evidenceRef('deepseek', body) };
+        },
+      });
+    }
   }
 
   return adapters;

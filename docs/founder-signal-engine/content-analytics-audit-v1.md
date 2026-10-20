@@ -21,7 +21,9 @@ Raw post text, DMs, comments, provider payloads, customer data, and private note
 
 The artifact answers one bounded question:
 
-> What changed in distribution, engagement, follower movement, post concentration, and audience composition between comparable observed windows for one identified account?
+> What changed in distribution, engagement, post concentration, and audience composition between comparable observed windows for one identified account?
+
+Follower counts are retained as nullable input provenance, but follower totals, deltas, and follower-comparison completeness are not implemented in this version. A comparison marked `COMPLETE` covers the implemented impression/engagement metrics only; follower movement remains unverified until separately implemented and tested.
 
 It does **not** infer revenue, customer intent, causal lift, or publication success unless a separate evidence source proves those claims.
 

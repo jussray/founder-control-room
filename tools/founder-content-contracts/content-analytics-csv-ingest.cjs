@@ -42,6 +42,9 @@ function parseIsoTimestamp(value, field) {
   if (typeof value !== 'string' || !ISO_UTC.test(value) || Number.isNaN(Date.parse(value))) {
     fail(`${field} must be an ISO UTC timestamp`);
   }
+  const canonical = new Date(value).toISOString();
+  const expected = value.includes('.') ? canonical : canonical.replace('.000Z', 'Z');
+  if (expected !== value) fail(`${field} must be a real calendar UTC timestamp`);
   return value;
 }
 

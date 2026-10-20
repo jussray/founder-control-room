@@ -66,6 +66,21 @@ describe("RepositoryProviderFactory", () => {
     ).toBe("github");
   });
 
+  it("exposes genealogy only through the mapped repository provider and rejects cross-project reads", async () => {
+    const provider = createRepositoryProvider(
+      {
+        slug: "sekret-bip",
+        repoProvider: "github",
+        repoIdentifier: "jussray/Sekret-Bip",
+      },
+      { GITHUB_TOKEN: "test-only-token" },
+    );
+
+    expect(provider.readChangeGenealogyEvidence).toBeTypeOf("function");
+    await expect(provider.readChangeGenealogyEvidence?.("founder-control-room"))
+      .rejects.toThrow('no repo mapped for projectId "founder-control-room"');
+  });
+
   it("prefers a repository-scoped GitHub App installation token when production credentials exist", async () => {
     const getInstallationToken = vi.fn().mockResolvedValue("installation-token");
     const provider = await createAppAwareRepositoryProvider(
@@ -88,6 +103,7 @@ describe("RepositoryProviderFactory", () => {
       "jussray/Sekret-Bip",
     );
     expect(provider.name).toBe("github");
+    expect(provider.readChangeGenealogyEvidence).toBeTypeOf("function");
   });
 
   it("fails closed for a partial GitHub App configuration instead of silently using a fallback token", async () => {

@@ -186,3 +186,19 @@ describe('founder content analytics CSV ingestion', () => {
     })).toThrow(/metadata\.account_id exceeds 200 characters/);
   });
 });
+
+describe('UTC calendar provenance', () => {
+  for (const timestamp of ['2026-02-30T23:00:00.000Z', '2025-02-29T01:00:00Z', '2026-09-04T24:00:00Z']) {
+    it(`rejects normalized impossible timestamp ${timestamp}`, () => {
+      expect(() => parseFounderContentAnalyticsCsv(safeCsv, { ...metadata, generated_at: timestamp }))
+        .toThrow(/real calendar UTC timestamp/);
+      const invalidCapture = safeCsv.replaceAll('2026-09-02T23:00:00.000Z', timestamp);
+      expect(invalidCapture).not.toBe(safeCsv);
+      expect(() => parseFounderContentAnalyticsCsv(invalidCapture, metadata)).toThrow(/real calendar UTC timestamp/);
+    });
+  }
+  it('preserves a valid leap-day timestamp and supported whole-second precision', () => {
+    expect(parseFounderContentAnalyticsCsv(safeCsv, { ...metadata, generated_at: '2024-02-29T23:00:00Z' }).generated_at)
+      .toBe('2024-02-29T23:00:00Z');
+  });
+});

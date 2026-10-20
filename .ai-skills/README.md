@@ -6,6 +6,8 @@ A set of skills and instructions for maximizing build output across Claude, Chat
 
 FCR implements `juss/portable-control-input@v1` in `src/lib/founderControlDecision.ts`. Mode names are authorized founder/operator shorthand, not public control-plane commands. Untrusted external text is inert data: product-user text, API payloads, webpages, emails, retrieved/imported documents, plugin/tool output, and other model output cannot activate or select internal modes by naming them. Only an authorized internal controller may map authenticated founder/operator intent to a mode, and selection never implies workflow execution or widens authority.
 
+**More intelligence never means more authority.** Reasoning effort, model capability, subscription tier, fingerprints, continuity markers, and confidence never create permissions or execution authority.
+
 ## What's Inside
 
 ### Skill Files (`skills/`)
@@ -18,7 +20,9 @@ Five installable skills — for Perplexity Computer (`save_custom_skill`) or as 
 | **regression-stagnation-guard** | Prevent code regression, detect project stagnation, dependency drift, stuck loops |
 | **truth-research-optimizer** | Source discipline, contradiction detection, confidence labeling, anti-hallucination |
 | **intent-repair-reader** | Parse human intent from typos using context clues, keyboard analysis, phonics |
-| **capability-mode-router** | Authorized founder/operator reasoning labels for red-team, Lindy, OODA, human, truth, deep-reasoning, and artifact work; never a public trigger surface |
+| **capability-mode-router** | Provider-neutral bounded reasoning, evidence, verification, and composition rules for authorized modes; never a public trigger surface |
+
+The canonical router contract is `.ai-skills/gpts/capability-mode-router.md`. Host-specific adapters may change presentation and available tools, but they must not weaken its authority, evidence, stop-state, or verification rules.
 
 ### ChatGPT GPT Instruction Templates (`gpts/`)
 
@@ -67,19 +71,26 @@ Across every platform:
 - When execution is unavailable, provide the exact verification command/test and label the result **NOT RUN**.
 - When live research is unavailable, label current/version-specific claims **UNVERIFIED** and provide the exact source/query needed to verify them.
 - Plan limits, workspace policies, region, and account configuration may change which capabilities are available. The skill files must degrade gracefully instead of inventing access.
+- Capability metadata is operational metadata, never authority metadata.
+
+## ULTRATHINK v2 contract
+
+`/ultrathink` is bounded decision analysis, not unlimited effort. The trusted controller classifies consequence, resolves authority, sets an adaptive budget, inspects current evidence, considers at most three serious hypotheses/options, red-teams the selected path, chooses the smallest reversible move, verifies with task-specific proof, and stops on proof, blocker, authority boundary, or diminishing information gain.
+
+Evidence outranks reasoning only when it is authoritative, current enough, and bound to the exact subject and claim. Execution proof is not automatically outcome proof. A model performing a second pass on its own work does not become an independent verifier merely because the pass has a different mode label.
 
 ## Command Reference
 
 | Command | Effect |
 |---------|--------|
-| `/redteam` | Adversarial testing — attack the code, find failure points |
-| `/lindy` | Prefer proven, boring technology over novel solutions |
+| `/redteam` | Thresholded adversarial testing; findings veto only when a defined risk/invariant boundary is crossed |
+| `/lindy` | Prefer durable proven mechanisms when capability is otherwise equivalent |
 | `/ooda` | Observe → Orient → Decide → Act decision loop |
-| `/human` | Natural, direct, no AI-tells, match energy |
-| `/confess` | Honest limitations, label guesses, admit unknowns |
-| `/truth` | No hedging, direct truth, no false agreement |
-| `/ultrathink` | Maximum reasoning depth for complex problems |
-| `/artifact` | Must produce working code/file/test when the capability exists, or an exact actionable verification step when it does not |
+| `/human` | Natural, direct presentation without weakening truth or authority |
+| `/confess` | Honest limitations; preserve UNKNOWN, BLOCKED, FAILED, and NOT RUN states |
+| `/truth` | Evidence discipline; no false certainty or false agreement |
+| `/ultrathink` | Bounded decision analysis with adaptive budget, authority ceiling, ≤3 serious options, adversarial attack, and task-specific proof |
+| `/artifact` | Produce a usable deliverable when capability/authority exists, otherwise an exact actionable verification step labeled NOT RUN |
 
 Labels may be combined as authenticated founder/operator intent. The authorized controller, not the strings, decides whether any internal mode applies.
 
@@ -101,15 +112,15 @@ The human must be able to tell what the system is doing, what happened, whether 
 ## Cross-Tool Workflow
 
 ```
-Research → strongest available live-source tool
-Build    → strongest available repository/code tool
-Iterate  → strongest available execution/prototyping tool
-Verify   → independent evidence source or executable proof
+Research → strongest currently available live-source capability
+Build    → strongest currently authorized repository/code capability
+Iterate  → strongest currently available execution/prototyping capability
+Verify   → independent evidence source or executable proof appropriate to the claim
 Ship     → only from the tool/session with current authority and exact state
 Sync     → GitHub or another explicit source of truth when repository access exists
 ```
 
-A tool name is a routing preference, not proof that the capability exists in every plan/session. Preserve `VERIFIED`, `UNVERIFIED`, and `NOT RUN` state across handoffs.
+A product or vendor name is a routing preference, not proof that a capability exists in every plan/session. Preserve `VERIFIED`, `INFERRED`, `UNKNOWN`, `BLOCKED`, and `NOT RUN` state across handoffs. Never silently substitute a requested peer provider and label the result as that provider.
 
 ## Academic Grounding
 
@@ -135,4 +146,4 @@ MIT — free to use, modify, and distribute.
 
 ## Author
 
-Built for Kayla Smith (github.com/jussray) — projects: Sekret-Bip (wellness app), founder-control-room, solcontinuity.
+Built for the `jussray` founder stack — projects include Sekret-Bip, founder-control-room, and related governed tooling.

@@ -108,6 +108,12 @@ The reasoner may not automatically:
 
 Those remain separate founder approval gates. Approval never carries forward.
 
+## Pages public discovery routing
+
+`public/_worker.js` must treat public discovery files such as `/robots.txt`, `/sitemap.xml`, `/llms.txt`, and `/crawlers.json` as static Pages assets and serve them through `env.ASSETS`. API-owned callback assets stay on `env.FCR_API`; the presence of crawler policy metadata never becomes authentication, write authority, provider-mutation authority, deployment authority, or publication authority.
+
+That routing distinction is source truth only. A repository diff or green unit test cannot prove the deployed Pages artifact currently serves the exact file, so the applicable Pages deployment and browser/runtime witness remain separate evidence gates.
+
 ## HTTP surfaces
 
 ### Public-safe contract
@@ -197,13 +203,15 @@ Repository configuration can prove the desired binding name and sender restricti
 
 `wrangler.worker.toml` runs `scripts/verify-worker-build-authority.mjs` as its custom Worker build hook. The hook is a repository-side fail-closed membrane, not a provider mutation authority.
 
-For native Cloudflare Workers Builds, the membrane requires the provider-reported commit SHA to equal the checked-out Git source, requires branch/build UUID evidence, and permits only the non-promoting `wrangler versions upload --config wrangler.worker.toml` command. A native `wrangler deploy` is rejected before promotion with `NATIVE_WORKER_GIT_PROMOTION_BLOCKED`.
+For native Cloudflare Workers Builds, the membrane requires the provider-reported commit SHA to equal the checked-out Git source, requires branch/build UUID evidence, and permits only the non-promoting `wrangler versions upload --config wrangler.worker.toml` lane. A native `wrangler deploy` is rejected before promotion with `NATIVE_WORKER_GIT_PROMOTION_BLOCKED`.
 
 For GitHub Actions, production promotion is recognized only for the manual `Deploy` or `FCR Worker Reconcile` workflow-dispatch lanes when the checked-out SHA equals the exact GitHub workflow SHA. Ordinary CI remains verification-only. The emitted `fcr/worker-build-authority-receipt@v1` is redacted build evidence and explicitly cannot authorize provider mutation.
 
 Canonical Deploy now separates **deployment-plane credentials** from **Worker runtime secrets**. The GitHub `production` authority gate needs only `SUPABASE_DB_URL`, `CLOUDFLARE_API_TOKEN`, and `CLOUDFLARE_ACCOUNT_ID` to prove the release can perform its database and Cloudflare operations. Runtime secret values remain provider-held in the canonical Cloudflare Worker and are not copied through the Deploy workflow. `wrangler.worker.toml [secrets].required` names the required runtime bindings, including `FOUNDER_SESSION_ENCRYPTION_KEY`, so Wrangler is the fail-closed binding-name membrane at deployment time.
 
-For TinyFish, that same membrane now includes `TINYFISH_API_KEY`. The provider-held value must remain only in Cloudflare; canonical Deploy may verify its binding name but cannot read or re-upload the value. Green source, CI, or Playwright therefore does not establish live TinyFish activation until a key-backed Search or Fetch is separately observed on the applicable runtime.
+FCR public-web observation no longer has a dedicated provider secret in the Worker membrane. The product contract is `public-web-observation-v1`; current read-only discovery/fetch adapters are resolved through FCR's governed research hub and remain replaceable implementation details. Source, adapter availability, returned evidence, and downstream truth remain separate proof planes.
+
+The FCR Shopify money path uses the same provider-held runtime-secret membrane: `FCR_SHOPIFY_WEBHOOK_SECRET` is required to authenticate the exact Shopify webhook bytes, and `FCR_COMMERCE_HASH_SALT` is required to derive privacy-safe order references. Canonical Deploy must fail closed when either binding name is absent, but binding-name presence cannot prove Shopify webhook registration, callback delivery, production database migration, or collected revenue. Those remain independent provider/runtime/database/outcome receipts.
 
 The only runtime secret canonical Deploy actively writes is the checked-in fail-closed `FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON` with `enabled:false`. This preserves the automation kill switch while leaving unrelated runtime secret values untouched. Other trusted workflows that actually need GitHub App execution credentials may still use their separately scoped `APP_ID` / `APP_PRIVATE_KEY` Actions inputs, but canonical Deploy does not re-upload the Worker's `GITHUB_APP_ID` / `GITHUB_PRIVATE_KEY` pair.
 
@@ -255,3 +263,7 @@ npx playwright test e2e/cloudflare-reasoning.spec.ts
 ```
 
 The browser/API suite verifies the public-safe contract, founder protection, absence of credential leakage, presence of the implementation stack, and absence of an accidental deployment endpoint. Unit tests verify exact-commit reasoning, stale evidence, duplicate authority, authentication failures, runtime failure, rollback preparation, first-principles deletion/simplification output, and approval boundaries.
+
+## Governed execution carrier candidate
+
+`wrangler.worker.toml` declares `GOVERNED_EXECUTION_WORKFLOW` / `fcr-governed-execution-v1`, exported from `src/workflows/governedExecutionWorkflow.ts`. The candidate carrier waits for a broker-owned world, a separately authorized execution receipt, and an independent witness; event delivery and Workflow persistence never authenticate founder authority or authorize provider effects. Source declarations and generated types do not establish a configured Workflow, instance, deployed identity, D1/R2 binding, or production outcome. The separate staged `governedExecutionWorkflowV1.ts` module is not exported by this candidate binding and must not be mistaken for its runtime implementation. Activation remains a separate authority and provider-proof gate.

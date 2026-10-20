@@ -24,6 +24,12 @@ CELL_RE = re.compile(r"([A-Z]+)(\d+)")
 POST_URL_ID_RE = re.compile(r"(?:^|[_-])(share|ugcpost)-(\d+)(?:-|$)", re.IGNORECASE)
 POST_URN_RE = re.compile(r"^urn:li:(share|ugcPost):(\d+)$", re.IGNORECASE)
 EMBEDDED_POST_URN_RE = re.compile(r"urn:li:(share|ugcPost):(\d+)", re.IGNORECASE)
+METRIC_DEFINITIONS = {
+    "verified_visible_posts": {"unit": "count", "scope": "provider_visible_top_posts"},
+    "activity_impressions": {"unit": "count", "scope": "provider_daily_activity"},
+    "activity_engagements": {"unit": "count", "scope": "provider_daily_activity"},
+    "post_impressions": {"unit": "count", "scope": "exact_visible_post"},
+}
 
 
 def _col_index(ref: str) -> int:
@@ -152,6 +158,19 @@ def _declared_binding(value: str, field: str) -> str:
     return raw
 
 
+def _file_sha256(path: str | Path) -> str:
+    digest = hashlib.sha256()
+    with Path(path).open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _observation_id(export_sha256: str, start: date, end: date, export_limit: int) -> str:
+    material = f"linkedin|{export_sha256}|{start.isoformat()}|{end.isoformat()}|{export_limit}"
+    return hashlib.sha256(material.encode()).hexdigest()
+
+
 def post_fingerprint(publish_date: date, url: str) -> str:
     canonical = f"linkedin|{publish_date.isoformat()}|{_normalize_url(url)}"
     return hashlib.sha256(canonical.encode()).hexdigest()[:16]
@@ -166,6 +185,8 @@ def day_cookie(day: date, fingerprints: list[str]) -> str:
 def _extract_posts(top_rows: list[list[str]], start: date, end: date) -> tuple[list[dict[str, Any]], int]:
     posts: list[dict[str, Any]] = []
     provider_rows = 0
+    seen_fingerprints: set[str] = set()
+    seen_urns: set[str] = set()
     # LinkedIn's export places the impression-ranked list in columns E:G; row 3 is header.
     for row in top_rows[3:]:
         if len(row) < 7:
@@ -184,13 +205,20 @@ def _extract_posts(top_rows: list[list[str]], start: date, end: date) -> tuple[l
         match = POST_URL_ID_RE.search(normalized)
         kind = _canonical_post_kind(match.group(1)) if match else None
         post_id = match.group(2) if match else None
+        urn = f"urn:li:{kind}:{post_id}" if kind and post_id else None
+        fingerprint = post_fingerprint(publish_day, normalized)
+        if fingerprint in seen_fingerprints or (urn and urn in seen_urns):
+            raise ValueError(f"duplicate TOP POSTS identity in export: {urn or fingerprint}")
+        seen_fingerprints.add(fingerprint)
+        if urn:
+            seen_urns.add(urn)
         posts.append({
             "publish_date": publish_day.isoformat(),
             "linkedin_post_id": post_id,
-            "linkedin_post_urn": f"urn:li:{kind}:{post_id}" if kind and post_id else None,
+            "linkedin_post_urn": urn,
             "post_url": normalized,
             "impressions": int(float(raw_impressions)) if raw_impressions else None,
-            "fingerprint": post_fingerprint(publish_day, normalized),
+            "fingerprint": fingerprint,
             "evidence_state": "VERIFIED_VISIBLE",
         })
     posts.sort(key=lambda item: (item["publish_date"], item["post_url"]))
@@ -206,6 +234,8 @@ def _extract_activity(rows: list[list[str]]) -> dict[str, dict[str, int]]:
             day = _parse_date(row[0]).isoformat()
         except ValueError:
             continue
+        if day in activity:
+            raise ValueError(f"duplicate ENGAGEMENT date in export: {day}")
         activity[day] = {
             "impressions": int(float(row[1] or 0)),
             "engagements": int(float(row[2] or 0)),
@@ -216,6 +246,9 @@ def _extract_activity(rows: list[list[str]]) -> dict[str, dict[str, int]]:
 def analyze_export(path: str | Path, start: date, end: date, export_limit: int = 50) -> dict[str, Any]:
     if end < start:
         raise ValueError("end must not predate start")
+    if export_limit <= 0:
+        raise ValueError("export_limit must be positive")
+    export_sha256 = _file_sha256(path)
     sheets = read_export(path)
     posts, provider_rows = _extract_posts(sheets["TOP POSTS"], start, end)
     activity = _extract_activity(sheets["ENGAGEMENT"])
@@ -275,7 +308,15 @@ def analyze_export(path: str | Path, start: date, end: date, export_limit: int =
     return {
         "contract": "linkedin-analytics-continuity@v1",
         "authority": "observation_only",
-        "source": {"filename": Path(path).name, "top_posts_rows_visible": provider_rows, "provider_export_limit": export_limit},
+        "source": {
+            "kind": "linkedin_native_xlsx_export",
+            "filename": Path(path).name,
+            "export_sha256": export_sha256,
+            "observation_id": _observation_id(export_sha256, start, end, export_limit),
+            "top_posts_rows_visible": provider_rows,
+            "provider_export_limit": export_limit,
+        },
+        "metric_definitions": METRIC_DEFINITIONS,
         "window": {"start": start.isoformat(), "end": end.isoformat(), "calendar_days": len(days)},
         "summary": {
             "evidence_state": evidence_state,
@@ -339,8 +380,10 @@ def exact_post_measurement(
         },
         "evidence_state": evidence_state,
         "source": {
-            "kind": "linkedin_native_export",
+            "kind": "linkedin_native_xlsx_export",
             "filename": report.get("source", {}).get("filename"),
+            "export_sha256": report.get("source", {}).get("export_sha256"),
+            "observation_id": report.get("source", {}).get("observation_id"),
             "export_capped": export_capped,
             "window": report.get("window"),
             "freshness_state": "NOT_ESTABLISHED_BY_THIS_RECEIPT",
@@ -348,6 +391,10 @@ def exact_post_measurement(
         "metrics": {
             "impressions": post.get("impressions") if post else None,
             "engagements": None,
+        },
+        "metric_units": {
+            "impressions": "count",
+            "engagements": "count",
         },
         "metric_provenance": {
             "impressions": "TOP_POSTS_EXACT_POST" if post else "UNKNOWN_NO_EVIDENCE",
