@@ -117,6 +117,18 @@
       "claims": [
         "`docs/founder-signal-engine/linkedin-analytics-continuity.md` must document independently evaluated content freshness, direct demand evidence, current trend provenance, fingerprint comparison, deterministic approval retry identity, and observation-only authority without rewriting historical evidence when currentness expires."
       ]
+    },
+    {
+      "path": "src/ultrathink-core/governedActionAuthorization.ts",
+      "claims": [
+        "Per-action authorization must deny blank or whitespace-only targets and capabilities in either grant or attempt, even with matching approval receipts; no unbound consequential action may execute."
+      ]
+    },
+    {
+      "path": "src/ultrathink-core/governedExecution.ts",
+      "claims": [
+        "Governed execution must enforce project-shell, mission, credential, provider, founder-receipt and egress boundaries; bracketed private/local IPv6 literals are denied even on the allowlist, without claiming DNS, redirect, transport or production proof."
+      ]
     }
   ]
 }

@@ -484,3 +484,30 @@ describe('FCR governed execution membrane', () => {
     });
   });
 });
+
+describe('IPv6 private-network egress', () => {
+  for (const host of ['[::]', '[::1]', '[fc00::1]', '[fdff::1]', '[fe80::1]', '[febf::1]', '[fec0::1]', '[ff02::1]', '[::ffff:7f00:1]']) {
+    it(`denies allowlisted private or local literal ${host}`, () => {
+      const ipv6Lease = {
+        ...lease,
+        boundary: { ...lease.boundary, network: { ...lease.boundary.network, allowedHosts: [host] } },
+      };
+      const result = evaluateGovernedExecution(ipv6Lease, world({
+        boundary: { ...world().boundary, requestedEgressHosts: [host] },
+      }));
+      expect(result.disposition).toBe('DENY');
+      expect(result.reasons).toContain(`private_network_egress_denied:${host}`);
+    });
+  }
+
+  it('preserves allowlisted public IPv6 egress', () => {
+    const host = '[2606:4700:4700::1111]';
+    const ipv6Lease = {
+      ...lease,
+      boundary: { ...lease.boundary, network: { ...lease.boundary.network, allowedHosts: [host] } },
+    };
+    expect(evaluateGovernedExecution(ipv6Lease, world({
+      boundary: { ...world().boundary, requestedEgressHosts: [host] },
+    }))).toEqual({ disposition: 'EXECUTE', reasons: [] });
+  });
+});

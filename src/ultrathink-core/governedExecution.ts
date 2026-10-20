@@ -155,6 +155,16 @@ function normalizedHost(value: string): string | undefined {
 }
 
 function isPrivateOrLocalHost(host: string): boolean {
+  // WHATWG URL.hostname retains brackets around canonical IPv6 literals.
+  const address = host.startsWith('[') && host.endsWith(']') ? host.slice(1, -1) : host;
+  if (address.includes(':')) {
+    // Deny unspecified/loopback, mapped/compatible IPv4, unique-local,
+    // link-local, deprecated site-local, and multicast literal destinations.
+    return address.startsWith('::')
+      || /^(?:fc|fd)/i.test(address)
+      || /^fe[89a-f]/i.test(address)
+      || /^ff/i.test(address);
+  }
   if (host === 'localhost' || host === '::1' || host.endsWith('.localhost') || host.endsWith('.local')) return true;
   if (/^127\./.test(host) || /^10\./.test(host) || /^192\.168\./.test(host)) return true;
   const match = host.match(/^172\.(\d{1,3})\./);

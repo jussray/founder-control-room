@@ -81,8 +81,12 @@ export function evaluateGovernedActionAuthorization(
 
   const grant = matches[0];
   if (grant.actionClass !== attempt.actionClass) reasons.add('action_class_drift');
-  if (!same(grant.target, attempt.target)) reasons.add('action_target_drift');
-  if (!same(grant.capability, attempt.capability)) reasons.add('action_capability_drift');
+  if (!normalized(grant.target) || !normalized(attempt.target) || !same(grant.target, attempt.target)) {
+    reasons.add('action_target_drift');
+  }
+  if (!normalized(grant.capability) || !normalized(attempt.capability) || !same(grant.capability, attempt.capability)) {
+    reasons.add('action_capability_drift');
+  }
 
   const consequential = CONSEQUENTIAL_ACTIONS.has(attempt.actionClass);
   if (consequential && grant.requiresApproval !== true) {

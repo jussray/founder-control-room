@@ -107,3 +107,18 @@ describe('per-action authorization membrane', () => {
     });
   });
 });
+
+describe('concrete action binding', () => {
+  for (const field of ['target', 'capability'] as const) {
+    for (const value of ['', ' ', '\t\n']) {
+      it(`denies matching blank ${field}: ${JSON.stringify(value)}`, () => {
+        const unboundGrant = { ...grant, [field]: value };
+        const result = evaluateGovernedActionAuthorization(
+          [unboundGrant], attempt({ [field]: value }),
+        );
+        expect(result.disposition).toBe('DENY');
+        expect(result.reasons).toContain(`action_${field}_drift`);
+      });
+    }
+  }
+});
