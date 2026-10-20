@@ -300,6 +300,18 @@
       "claims": [
         "`scripts/verify-documentation-truth.mjs` must classify `src/founder-os-lab/projectAdapters.ts` as evidence-authority truth-sensitive so a Chief exact-head pin movement cannot pass Documentation Truth without substantive README, truth-decay audit, and structured receipt updates that name the changed path."
       ]
+    },
+    {
+      "path": "src/mcp/policy.ts",
+      "claims": [
+        "Read-only advertised annotations make destructiveHint inapplicable without reducing tool-name or policy risk; metadata cannot authorize mutation."
+      ]
+    },
+    {
+      "path": "src/mcp/hub.ts",
+      "claims": [
+        "The MCP invocation boundary must bypass the discovery cache and fail closed on fresh discovery failure, tool removal or mutating metadata before tools/call; fresh hints are not provider-behavior proof or an atomic remote execution binding."
+      ]
     }
   ]
 }

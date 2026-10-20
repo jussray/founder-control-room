@@ -75,6 +75,7 @@ export function inferAdvertisedToolRisk(
   fallback: McpRisk,
 ): McpRisk {
   if (!tool?.annotations) return fallback;
+  if (tool.annotations.readOnlyHint === true) return fallback;
   if (tool.annotations.destructiveHint === true) return "destructive";
   if (tool.annotations.readOnlyHint === false && fallback === "read") return "write";
   return fallback;

@@ -343,9 +343,11 @@ export class McpHub {
 
     const started = Date.now();
     try {
+      // Re-read advertised safety metadata at the effect boundary, bypassing discovery cache.
       const capabilities = await this.discoverCapabilities(
         request.serverId,
         request.projectId,
+        true,
       );
       const tool = capabilities.tools.find(
         (candidate) => candidate.name === request.toolName,

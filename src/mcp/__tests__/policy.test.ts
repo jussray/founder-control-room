@@ -260,3 +260,14 @@ describe("MCP Phase 1 policy", () => {
     ).toMatchObject({ decision: "deny" });
   });
 });
+
+describe("annotation precedence never lowers named risk", () => {
+  for (const fallback of ["read", "write", "destructive"] as const) {
+    it(`ignores destructiveHint for readOnlyHint=true while preserving ${fallback}`, () => {
+      expect(inferAdvertisedToolRisk(
+        { name: "lookup", annotations: { readOnlyHint: true, destructiveHint: true } },
+        fallback,
+      )).toBe(fallback);
+    });
+  }
+});
