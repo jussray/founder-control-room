@@ -45,10 +45,11 @@ The GitHub App **Client ID is not used** by the current installation-token witne
 #### Accepted `APP_PRIVATE_KEY` transport shapes
 
 Secret input fields damage PEM text in predictable ways, so the private key is
-normalized before use. `scripts/mint-portfolio-github-app-token.mjs` owns that
-classification, and `github-app-secret-shape-diagnostic.yml` imports the same
-function, so the read-only diagnostic cannot report a shape that minting would
-reject, or reject one minting accepts.
+normalized before use. `scripts/mint-portfolio-github-app-token.mjs` owns the
+minting classifier. `github-app-secret-shape-diagnostic.yml` intentionally embeds
+an isolated duplicate rather than importing repository code into its secret-bearing
+step. Both implementations must be kept in sync; marker-string contract tests do
+not prove behavioral equivalence, so disagreement remains possible.
 
 Accepted shapes, with the `transport_class` each reports:
 
@@ -65,9 +66,9 @@ Accepted shapes, with the `transport_class` each reports:
 
 An empty, non-key, truncated, or non-RSA value still fails closed. A rejected
 value raises `APP_PRIVATE_KEY_SHAPE_INVALID:<transport_class>` followed by
-shape facts only — value length, whether `-----BEGIN`/`-----END` markers were
+boolean shape facts only — whether `-----BEGIN`/`-----END` markers were
 seen, whether the character set looked base64, whether literal `\n` escapes
-were present, and the line count. No substring, hash, or other derivation of
+were present, and whether the value was multiline. Length and line counts are not emitted. No substring, hash, or other derivation of
 the key material is ever emitted.
 
 A recognized transport proves local parsing only. It is not provider proof: the
