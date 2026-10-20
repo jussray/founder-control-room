@@ -187,8 +187,11 @@ describe('isolated workflow classifier matches minting across generated keys', (
       '({ present, recognizedTransport, transportClass, pemBoundary, rsaParse })';
     const program = [classifierSource, expression].join(String.fromCharCode(10));
     const classifyDiagnostic = (secret: string) =>
-      runInNewContext(program, { secret, Buffer, createPrivateKey }, { timeout: 2000 })
-        as Pick<
+      runInNewContext(
+        program,
+        { secret, Buffer, createPrivateKey },
+        { timeout: 2000 },
+      ) as Pick<
           Classification,
           'present' | 'recognizedTransport' | 'transportClass' | 'pemBoundary' | 'rsaParse'
         >;
