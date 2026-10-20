@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  executeSharedReadOnlyToolCall,
   finalizeSharedReadOnlyCapabilityRun,
+  sharedReadOnlyToolFailure,
   prepareSharedReadOnlyCapabilityRun,
   SharedCapabilityRuntimeError,
   type SharedReadOnlyObservation,
@@ -127,5 +129,83 @@ describe('shared read-only capability runtime', () => {
       prepared(),
       escalated as unknown as SharedReadOnlyObservation,
     )).toThrow('Read-only provider evidence cannot change shared runtime authority.');
+  });
+});
+
+
+describe('voice tool handoff evidence', () => {
+  it('actually invokes the provider once after live founder identity validation', async () => {
+    let invoked = 0;
+    const result = await executeSharedReadOnlyToolCall({
+      executionId: 'voice:read:1',
+      capabilityId: 'public-web-observation-v1',
+      surface: 'voice',
+      intent: 'Look for the requested updates.',
+      founder: { userId: 'founder-1', email: 'founder@example.com' },
+    }, async () => {
+      invoked += 1;
+      return observation();
+    });
+
+    expect(invoked).toBe(1);
+    expect(result.execution).toMatchObject({
+      contract: 'fcr/shared-tool-call-attempt@v1',
+      executionId: 'voice:read:1',
+      surface: 'voice',
+      providerCallReturned: true,
+      state: 'PROVIDER_ACCEPTED',
+      verifiedOutcome: false,
+      evidenceFingerprint: HASH_B,
+    });
+    expect(result.receipt.completionClaim.allowed).toBe(false);
+    expect(result.presentation.channel).toBe('speech_and_text');
+    expect(result.observation.provider).toBe('fcr-research-hub');
+  });
+
+  it('never starts a provider action without current authenticated founder identity', async () => {
+    let invoked = 0;
+    await expect(executeSharedReadOnlyToolCall({
+      executionId: 'voice:no-authority',
+      capabilityId: 'public-web-observation-v1',
+      surface: 'voice',
+      intent: 'Check the inbox.',
+    }, async () => {
+      invoked += 1;
+      return observation();
+    })).rejects.toThrow('server-authenticated founder identity');
+    expect(invoked).toBe(0);
+  });
+
+  it('does not manufacture a success receipt when the provider fails', async () => {
+    let invoked = 0;
+    await expect(executeSharedReadOnlyToolCall({
+      executionId: 'voice:fail',
+      capabilityId: 'public-web-observation-v1',
+      surface: 'voice',
+      intent: 'Check public evidence.',
+      founder: { userId: 'founder-1', email: 'founder@example.com' },
+    }, async () => {
+      invoked += 1;
+      throw new Error('provider unavailable');
+    })).rejects.toThrow('provider unavailable');
+    expect(invoked).toBe(1);
+  });
+
+  it('speaks explicit failure states without retry authorization or false completion', () => {
+    const unavailable = sharedReadOnlyToolFailure('voice', 'unavailable');
+    expect(unavailable.execution).toMatchObject({
+      state: 'NOT_STARTED',
+      providerCallReturned: false,
+      verifiedOutcome: false,
+      retryAuthorized: false,
+    });
+    expect(unavailable.presentation.channel).toBe('speech_and_text');
+    expect(unavailable.presentation.summary).toContain('not callable');
+
+    const ambiguous = sharedReadOnlyToolFailure('voice', 'upstream_failure');
+    expect(ambiguous.execution.state).toBe('UNCONFIRMED');
+    expect(ambiguous.execution.retryAuthorized).toBe(false);
+    expect(ambiguous.presentation.summary).toContain('could not be confirmed');
+    expect(sharedReadOnlyToolFailure('text', 'invalid_request').presentation.channel).toBe('text');
   });
 });
