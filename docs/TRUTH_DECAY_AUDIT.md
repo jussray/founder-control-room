@@ -1,5 +1,10 @@
 # Truth Decay Audit: When a True Claim Becomes Unsafe to Reuse
 
+## Shared GitHub App key transport boundary
+
+The shared GitHub App authentication normalizer accepts the same bounded fenced-PEM, APP_PRIVATE_KEY assignment and single-candidate JSON-object wrappers as the portfolio minter candidate, including CR-only line endings. Ambiguous JSON key objects, malformed input and non-RSA keys still fail closed without echoing credential values. The shape diagnostic retains an isolated implementation; source similarity does not guarantee behavioral equivalence. Synthetic signing tests establish local parsing only when executed; App issuer, installation permissions, trusted review publication, governance reconciliation and production credentials require separate provider evidence. No secret value is read or changed by this source repair.
+
+
 ## October 16, 2026: StoryEngine peer-identity renewal, without inherited proof
 
 FCR's new actual-server GitHub Workspace/browser test, full founder UI journey, capability workbench, and guarded terminal scenarios passed on the predecessor candidate while the separate FCR-to-StoryEngine test failed at the live peer-ref gate. The workflow expected StoryEngine `a6e6a396ed30535af2fd9b1ec2347a84e1a3fbf3` while independently observed `refs/heads/main` resolved to `26b1c34ae7c97c5d1b66a23d6345b3965cfcdc1f`. The former is not a current federation subject.

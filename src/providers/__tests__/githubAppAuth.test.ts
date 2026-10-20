@@ -172,3 +172,47 @@ describe("GitHub App authentication", () => {
     expect(mockCreateInstallationAccessToken).toHaveBeenCalledTimes(2);
   });
 });
+
+describe("shared GitHub App wrapper transports", () => {
+  it("signs the same payload with the same key across all bounded wrappers", () => {
+    const pem = generatePrivatePem();
+    const fence = String.fromCharCode(96).repeat(3);
+    const now = Date.parse("2026-10-20T12:00:00Z");
+    const expected = createGitHubAppJwt("99", pem, now);
+    const wrappers = [
+      fence + "pem\n" + pem.trim() + "\n" + fence,
+      "APP_PRIVATE_KEY=" + pem.trim(),
+      "APP_PRIVATE_KEY=" + JSON.stringify(pem),
+      JSON.stringify({ APP_PRIVATE_KEY: pem }),
+      JSON.stringify({ private_key: pem }),
+      JSON.stringify({ privateKey: pem }),
+      pem.replace(/\n/g, "\r"),
+    ];
+    for (const wrapper of wrappers) {
+      expect(createGitHubAppJwt("99", wrapper, now)).toBe(expected);
+    }
+  });
+
+  it("rejects ambiguous objects and malformed wrappers without echoing values", () => {
+    const pem = generatePrivatePem();
+    for (const value of [
+      JSON.stringify({ APP_PRIVATE_KEY: pem, private_key: pem }),
+      JSON.stringify({ private_key: 42 }),
+      "APP_PRIVATE_KEY=invalid-secret-marker",
+      "{invalid-secret-marker",
+    ]) {
+      let caught: unknown;
+      try { createGitHubAppJwt("99", value); } catch (error) { caught = error; }
+      expect(caught).toBeInstanceOf(Error);
+      expect((caught as Error).message).not.toContain(value);
+      expect((caught as Error).message).not.toContain("invalid-secret-marker");
+    }
+  });
+
+  it("preserves RSA-only rejection inside accepted JSON wrappers", () => {
+    const ec = generateKeyPairSync("ec", { namedCurve: "P-256" }).privateKey
+      .export({ type: "pkcs8", format: "pem" }).toString();
+    expect(() => createGitHubAppJwt("99", JSON.stringify({ private_key: ec })))
+      .toThrow(/must be an RSA private key/);
+  });
+});
