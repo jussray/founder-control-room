@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { Router, type Response } from 'express';
 import {
-  finalizeSharedReadOnlyCapabilityRun,
-  prepareSharedReadOnlyCapabilityRun,
+  executeSharedReadOnlyToolCall,
+  sharedReadOnlyToolFailure,
   SharedCapabilityRuntimeError,
 } from '../../capabilities/sharedCapabilityRuntime.js';
 import {
@@ -118,27 +118,24 @@ async function runPublicWebObservation(
     }
 
     const executionId = `public-web-observation:${randomUUID()}`;
-    const sharedInvocation = prepareSharedReadOnlyCapabilityRun({
+    const continuity: PublicWebContinuityInput = {
+      priorEvidenceFingerprint: continuityValue(body.priorEvidenceFingerprint),
+      priorProofCookie: continuityValue(body.priorProofCookie),
+    };
+    const sharedResult = await executeSharedReadOnlyToolCall({
       executionId,
       capabilityId: PUBLIC_WEB_OBSERVATION_CAPABILITY_ID,
       surface: body.surface,
       intent: boundedIntent(body, operation),
       founder: req.founder,
-    });
-
-    const continuity: PublicWebContinuityInput = {
-      priorEvidenceFingerprint: continuityValue(body.priorEvidenceFingerprint),
-      priorProofCookie: continuityValue(body.priorProofCookie),
-    };
-    const observation = await observePublicWeb({
+    }, () => observePublicWeb({
       operation,
       query: typeof body.query === 'string' ? body.query : undefined,
       urls: Array.isArray(body.urls)
         ? body.urls.map((value) => typeof value === 'string' ? value : '')
         : undefined,
       continuity,
-    });
-    const sharedResult = finalizeSharedReadOnlyCapabilityRun(sharedInvocation, observation);
+    }));
 
     return res.status(200).set('Cache-Control', 'no-store').json({
       run: {
@@ -149,26 +146,39 @@ async function runPublicWebObservation(
         consequence: 'READ',
         mutationAllowed: false,
         sharedRuntime: sharedResult.receipt,
+        execution: sharedResult.execution,
         presentation: sharedResult.presentation,
-        observation,
+        observation: sharedResult.observation,
       },
     });
   } catch (error) {
+    // Failure is observable on speech and text. Never say "done" without a
+    // returned provider observation, and do not auto-retry an uncertain call.
+    const voiceFailure = (kind: 'invalid_request' | 'unavailable' | 'upstream_failure') =>
+      body.surface === 'voice' ? sharedReadOnlyToolFailure(body.surface, kind) : {};
     if (error instanceof SharedCapabilityRuntimeError) {
       return res.status(sharedRuntimeErrorStatus(error)).set('Cache-Control', 'no-store').json({
         error: error.message,
         code: error.code,
+        ...voiceFailure('invalid_request'),
       });
     }
     if (error instanceof PublicWebObservationError) {
+      const kind = error.code === 'public_web_invalid_request'
+        ? 'invalid_request'
+        : error.code === 'public_web_unavailable'
+          ? 'unavailable'
+          : 'upstream_failure';
       return res.status(publicWebErrorStatus(error)).set('Cache-Control', 'no-store').json({
         error: error.message,
         code: error.code,
+        ...voiceFailure(kind),
       });
     }
     return res.status(502).set('Cache-Control', 'no-store').json({
       error: 'Public-web observation failed.',
       code: 'public_web_upstream_failure',
+      ...voiceFailure('upstream_failure'),
     });
   }
 }
