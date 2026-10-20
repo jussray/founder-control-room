@@ -48,7 +48,7 @@ export function summarizeProviderState(desired, settings, schedules, observedAt 
       throw new Error('CLOUDFLARE_PROVIDER_BINDING_INVALID');
     }
     return { name: entry.name, type: entry.type };
-  }).sort((a, b) => a.name.localeCompare(b.name));
+  }).sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
   if (new Set(sanitized.map((entry) => entry.name)).size !== sanitized.length) {
     throw new Error('CLOUDFLARE_PROVIDER_BINDING_DUPLICATE');
   }
@@ -80,7 +80,7 @@ export function summarizeProviderState(desired, settings, schedules, observedAt 
     observedCronSchedules: crons,
     missingRequiredSecretNames: missingSecrets,
     mismatchKinds: mismatches,
-    secretValuesRead: false,
+    secretValuesRecorded: false,
     exactDeploymentShaVerified: false,
     canAuthorizeProviderMutation: false,
   };
