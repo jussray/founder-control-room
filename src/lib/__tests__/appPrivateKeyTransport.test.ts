@@ -174,38 +174,41 @@ describe('isolated workflow classifier matches minting across generated keys', (
       'utf8',
     );
     const startMarker = 'function decodeJsonQuotedString(value) {';
-    const endMarker = "const appIdNumeric = /^\\d+$/.test(appId);";
+    const endMarker = 'const appIdNumeric = /^' + String.fromCharCode(92) + 'd+$/.test(appId);';
     const start = workflow.indexOf(startMarker);
     const end = workflow.indexOf(endMarker, start);
     expect(start).toBeGreaterThan(-1);
     expect(end).toBeGreaterThan(start);
 
-    // Execute only the pure classifier segment. The sandbox has no process,
-    // network, GitHub token, or real secret and never runs the workflow entry point.
+    // Isolate the classifier before execution; never run the provider, secret
+    // or receipt steps. Only generated private keys enter this sandbox.
     const classifierSource = workflow.slice(start, end);
+    const expression =
+      '({ present, recognizedTransport, transportClass, pemBoundary, rsaParse })';
+    const program = [classifierSource, expression].join(String.fromCharCode(10));
     const classifyDiagnostic = (secret: string) =>
-      runInNewContext(
-        `${classifierSource}\\n({ present, recognizedTransport, transportClass, pemBoundary, rsaParse })`,
-        { secret, Buffer, createPrivateKey },
-        { timeout: 2000 },
-      ) as Pick<
-        Classification,
-        'present' | 'recognizedTransport' | 'transportClass' | 'pemBoundary' | 'rsaParse'
-      >;
+      runInNewContext(program, { secret, Buffer, createPrivateKey }, { timeout: 2000 })
+        as Pick<
+          Classification,
+          'present' | 'recognizedTransport' | 'transportClass' | 'pemBoundary' | 'rsaParse'
+        >;
 
+    const lf = String.fromCharCode(10);
+    const cr = String.fromCharCode(13);
+    const escapedLf = String.fromCharCode(92) + 'n';
     const inputs: Array<[string, string]> = [
       ['pkcs8 PEM', pkcs8],
       ['pkcs1 PEM', pkcs1],
-      ['CRLF PEM', pkcs8.replace(/\\n/g, '\\r\\n')],
-      ['escaped newline PEM', pkcs8.replace(/\\n/g, '\\\\n')],
+      ['CRLF PEM', pkcs8.split(lf).join(cr + lf)],
+      ['escaped newline PEM', pkcs8.split(lf).join(escapedLf)],
       ['JSON-quoted PEM', JSON.stringify(pkcs8)],
-      ['single-quoted PEM', `'${pkcs8}'`],
+      ['single-quoted PEM', "'" + pkcs8 + "'"],
       ['base64 PEM', Buffer.from(pkcs8).toString('base64')],
       ['base64url PEM', Buffer.from(pkcs8).toString('base64url')],
       ['base64 PKCS8 DER', derPkcs8.toString('base64')],
       ['base64 PKCS1 DER', derPkcs1.toString('base64')],
-      ['headerless PEM', pkcs8.split('\\n').slice(1, -1).join('\\n')],
-      ['collapsed PEM', pkcs8.replace(/\\n/g, ' ')],
+      ['headerless PEM', pkcs8.split(lf).slice(1, -1).join(lf)],
+      ['collapsed PEM', pkcs8.split(lf).join(' ')],
       ['empty', ''],
       ['garbage', 'not a key at all'],
       ['truncated PEM', pkcs8.slice(0, 80)],
@@ -229,7 +232,7 @@ describe('isolated workflow classifier matches minting across generated keys', (
           pemBoundary: diagnostic.pemBoundary,
           rsaParse: diagnostic.rsaParse,
         },
-        `classifier disagreement on ${label}`,
+        'classifier disagreement on ' + label,
       ).toEqual({
         present: mint.present,
         recognizedTransport: mint.recognizedTransport,
