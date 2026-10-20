@@ -29,7 +29,7 @@ function writeReadback(root, overrides = {}) {
     status: 'aligned',
     observedAt: new Date().toISOString(),
     observedStateDigest: EPOCH,
-    secretValuesRead: false,
+    secretValuesRecorded: false,
     canAuthorizeProviderMutation: false,
     ...overrides,
   };
@@ -103,7 +103,7 @@ test('wrong provider, stale time, and forged identity fail closed', () => {
     { repository: 'attacker/repo' },
     { accountId: 'untrusted-account' },
     { observedAt: new Date(Date.now() - 3600_000).toISOString() },
-    { secretValuesRead: true },
+    { secretValuesRecorded: true },
     { scope: 'any-provider' },
     { observedStateDigest: 'not-a-hash' },
   ]) {
