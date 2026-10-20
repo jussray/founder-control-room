@@ -64,6 +64,7 @@ jobs:
           src/http/routes/__tests__/pluginCenterRevocation.integration.test.ts
           src/http/routes/__tests__/pluginCenterMessaging.integration.test.ts
           src/http/routes/__tests__/publicWebObservation.integration.test.ts
+          src/http/routes/__tests__/voiceCapability.integration.test.ts
           src/http/routes/__tests__/ultrathinkSharedReasoning.integration.test.ts
       - run: npm run typecheck
       - run: npm run build
