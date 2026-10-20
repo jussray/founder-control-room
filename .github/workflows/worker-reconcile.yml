@@ -177,6 +177,28 @@ jobs:
                   f'{len(missing)} required provider-held Worker secrets are missing; '
                   'no mutation allowed. Restore only through approved secret custody.'
               )
+          settings_request = urllib.request.Request(
+              f'https://api.cloudflare.com/client/v4/accounts/{account_id}/workers/scripts/founder-control-room/settings',
+              headers={'Authorization': 'Bearer ' + os.environ['CLOUDFLARE_API_TOKEN'],
+                       'Accept': 'application/json'},
+              method='GET',
+          )
+          try:
+              with urllib.request.urlopen(settings_request, timeout=15) as response:
+                  settings = json.load(response)
+          except Exception:
+              raise SystemExit('Cloudflare Worker binding readback unavailable; no mutation allowed.')
+
+          bindings = settings.get('result', {}).get('bindings') if settings.get('success') is True else None
+          if not isinstance(bindings, list):
+              raise SystemExit('Cloudflare Worker binding receipt invalid; no mutation allowed.')
+          if any(isinstance(item, dict) and item.get('name') == 'CF_API_TOKEN'
+                 and item.get('type') == 'plain_text' for item in bindings):
+              raise SystemExit(
+                  'Cloudflare CF_API_TOKEN is stored as a plaintext Worker binding; '
+                  'rotate/remove it through authorized secret custody before deployment.'
+              )
+
           print(f'Provider-held Worker secret names verified: {len(required - workflow_written)} required; values unread.')
           PY
 
