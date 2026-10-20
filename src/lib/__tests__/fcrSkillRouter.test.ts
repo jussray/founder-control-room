@@ -313,6 +313,19 @@ describe('FCR skill router trust gate', () => {
     expect(decision.policyRequiredCapabilityIds).not.toContain('continuity-proof-ledger');
   });
 
+  it('ignores GODMODE and other markers that appear only inside URLs', () => {
+    const decision = route('Test https://example.com/godmode and repair the issue in the browser.', 'write', ['urlfix'], {
+      repository: { projectId: 'founder-control-room', provider: 'github' },
+    });
+    expect(decision.policyRequiredCapabilityIds).not.toContain('ultrathink-attack-godmode');
+  });
+
+  it('requires repository context for repair-to-proof regardless of action', () => {
+    const review = route('/repair-to-proof release proof.', 'review', ['repair-to-proof']);
+    expect(review.status).not.toBe('ready_for_runtime_discovery');
+    expect(review.executionAllowed).toBe(false);
+  });
+
   it('requires repository context before a mutating repair-to-proof route is accepted', () => {
     const ready = route('repair-to-proof confirm the exact head.', 'write', ['repair-to-proof']);
     expect(ready.status).not.toBe('ready_for_runtime_discovery');

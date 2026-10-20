@@ -217,7 +217,7 @@ function explicitCommandIdsFromGoal(goal: string): string[] {
   if (/^repair-to-proof\b/.test(goal.trim())) pushUnique(ids, 'repair-to-proof');
 
   for (const marker of ['ultrathink', 'truthmode', 'confess', 'redteam', 'lindymode', 'ooda', 'l99', 'goalfix', 'godmode', 'urlfix', 'makevideo', 'leevize']) {
-    if (new RegExp(`\\b${marker}\\b`).test(goal)) pushUnique(ids, marker);
+    if (new RegExp(`\\b${marker}\\b`).test(withoutUrls(goal))) pushUnique(ids, marker);
   }
   if (/\battack\s+(?:\d+|ten)\b/.test(goal) || goal.includes('attack against itself ten times')) pushUnique(ids, 'attack');
   return ids;

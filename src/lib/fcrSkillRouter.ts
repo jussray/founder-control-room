@@ -190,7 +190,7 @@ export function routeFcrSkills(input: RouteFcrSkillsInput): FcrSkillRoutingDecis
   const requiredTools: string[] = [];
   const requiredProof: string[] = [];
   const policyRequiredCapabilityIds = explicitSkillsFromGoal(goal);
-  if (/\bgodmode\b/.test(goal)) pushUnique(policyRequiredCapabilityIds, 'ultrathink-attack-godmode');
+  if (/\bgodmode\b/.test(withoutUrls(goal))) pushUnique(policyRequiredCapabilityIds, 'ultrathink-attack-godmode');
   const designCommandIds = explicitDesignCommandsFromGoal(goal);
   const standingCommands = routeFcrStandingCommands(input.goal, input.action);
   if (standingCommands.standingCommandIds.includes('urlfix')) pushUnique(policyRequiredCapabilityIds, 'urlfix');
@@ -200,7 +200,7 @@ export function routeFcrSkills(input: RouteFcrSkillsInput): FcrSkillRoutingDecis
   const urlfixGoal = policyRequiredCapabilityIds.includes('urlfix');
   const godmodeGoal = policyRequiredCapabilityIds.includes('ultrathink-attack-godmode');
   const repairToProofGoal = policyRequiredCapabilityIds.includes('repair-to-proof');
-  const repositoryGoal = isRepositoryGoal(goal) || Boolean(input.repository) || ((urlfixGoal || godmodeGoal || repairToProofGoal) && mutationRequested);
+  const repositoryGoal = isRepositoryGoal(goal) || Boolean(input.repository) || repairToProofGoal || ((urlfixGoal || godmodeGoal) && mutationRequested);
   const uiGoal = isUiGoal(goal) || designCommandIds.length > 0;
   const messagingGoal = isMessagingGoal(goal);
   const commercialGoal = isCommercialGoal(goal);
