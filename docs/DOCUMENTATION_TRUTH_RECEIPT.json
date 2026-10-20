@@ -314,7 +314,7 @@
     {
       "path": "src/providers/githubAppAuth.ts",
       "claims": [
-        "Shared App-key consumers must accept the bounded fenced, assignment and unambiguous JSON wrapper transports consistently while retaining RSA parsing and secret-safe failure; the isolated diagnostic is not imported shared code, and parsing/source tests cannot prove issuer, installation, review publication, credentials or production outcomes."
+        "`src/providers/githubAppAuth.ts` must accept bounded fenced, APP_PRIVATE_KEY assignment and unambiguous JSON key-object transports while retaining RSA-only private-key parsing and secret-safe failure. Parsing/source tests cannot prove App issuer, installation permissions, trusted review publication, production credentials or runtime outcomes."
       ]
     },
     {
