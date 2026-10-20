@@ -112,10 +112,31 @@ test('wrong provider, stale time, and forged identity fail closed', () => {
   }
 });
 
+test('scheduled revalidation obtains its provider fingerprint without a Git change or supplied epoch', () => {
+  const root = fixture();
+  const observed = writeReadback(root);
+  const receipt = buildRuntimeStateReceipt(env({
+    GITHUB_EVENT_NAME: 'schedule',
+    CONTROL_ROOM_PROVIDER_READBACK_PATH: observed.path,
+  }), root);
+  assert.equal(receipt.externalState.mode, 'independently-read-back');
+  assert.equal(receipt.externalState.source, 'cloudflare:worker:founder-control-room');
+  assert.equal(receipt.externalState.epoch, EPOCH);
+  assert.equal(receipt.externalState.providerObservation.digest, EPOCH);
+});
+
+test('scheduled revalidation fails closed if provider proof is missing or drifted', () => {
+  const root = fixture();
+  const missing = env({ GITHUB_EVENT_NAME: 'schedule', CONTROL_ROOM_PROVIDER_READBACK_PATH: path.join(root, 'missing.json') });
+  assert.throws(() => buildRuntimeStateReceipt(missing, root), /readback is missing/u);
+  const observed = writeReadback(root, { status: 'drift_detected' });
+  assert.throws(() => buildRuntimeStateReceipt({ ...missing, CONTROL_ROOM_PROVIDER_READBACK_PATH: observed.path }, root), /stale, drifted, or untrusted/u);
+});
+
 test('the ledger workflow exposes the external-state invalidation trigger', () => {
   const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
   const workflow = fs.readFileSync(path.join(repositoryRoot, '.github', 'workflows', 'control-room-test-ledger.yml'), 'utf8');
-  for (const expected of ['repository_dispatch:', 'types: [runtime_state_changed]', 'external_state_epoch:', 'CONTROL_ROOM_EXTERNAL_STATE_EPOCH:', 'CONTROL_ROOM_EXTERNAL_STATE_SOURCE:', 'node --test test/control-room-runtime-state.test.mjs', 'node scripts/control-room-runtime-state.mjs', 'node scripts/observe-cloudflare-runtime-state.mjs', 'artifacts/control-room-runtime-state.json', 'artifacts/cloudflare-provider-readback.json']) assert.ok(workflow.includes(expected), `workflow missing ${expected}`);
+  for (const expected of ['schedule:', "- cron: '19 */6 * * *'", 'repository_dispatch:', 'types: [runtime_state_changed]', 'external_state_epoch:', 'CONTROL_ROOM_EXTERNAL_STATE_EPOCH:', 'CONTROL_ROOM_EXTERNAL_STATE_SOURCE:', 'node --test test/control-room-runtime-state.test.mjs', 'node scripts/control-room-runtime-state.mjs', 'node scripts/observe-cloudflare-runtime-state.mjs', 'artifacts/control-room-runtime-state.json', 'artifacts/cloudflare-provider-readback.json']) assert.ok(workflow.includes(expected), `workflow missing ${expected}`);
 });
 
 test('the exact-head ledger binds the runtime-state receipt into its proof surface', () => {
