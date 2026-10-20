@@ -14,7 +14,7 @@ describe('portfolio evidence sync authority contract', () => {
     expect(workflow).not.toContain('${{ github.token }}');
     expect(workflow).not.toMatch(/\bGITHUB_TOKEN\b/);
     expect(workflow).not.toContain('Fallback to GITHUB_TOKEN');
-    expect(workflow).toMatch(/^permissions:\\n  contents: read$/m);
+    expect(workflow).toMatch(/^permissions:\n  contents: read$/m);
   });
 
   it('keeps the minted token file as the only workflow credential handoff', () => {
