@@ -20,7 +20,7 @@ if (!/^main\s*=\s*"src\/worker\/founderSignalReviewEmail\.ts"\s*$/m.test(manifes
 
 const manifestLines = manifest.split(/\r?\n/);
 const addressLineIndexes = manifestLines
-  .map((line, index) => (/^\s*addresses\s*=\s*\[\s*"review@foundercontrolroom\\.org"\s*\]\s*$/.test(line) ? index : -1))
+  .map((line, index) => (/^\s*addresses\s*=\s*\[\s*"review@foundercontrolroom\.org"\s*\]\s*$/.test(line) ? index : -1))
   .filter(index => index >= 0);
 const firstTableIndex = manifestLines.findIndex(line => /^\s*\[/.test(line));
 

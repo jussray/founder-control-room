@@ -62,7 +62,7 @@ describe('review-email Worker reconciliation authority contract', () => {
     expect(workflow).toContain('Wrangler may reconcile the route during deploy; provider readback and runtime invocation remain separate evidence.');
     expect(workflow).toContain('node scripts/verify-founder-review-email-routing.mjs');
     expect(packageJson.scripts?.['cf:dry-run:email']).toContain('npx --yes wrangler@4.129.0 deploy --dry-run');
-    expect(workflow).toContain('review@foundercontrolroom\\.org');
+    expect(workflow).toContain('review@foundercontrolroom.org');
   });
 
   it('does not label a source-only check as live routing proof', () => {
