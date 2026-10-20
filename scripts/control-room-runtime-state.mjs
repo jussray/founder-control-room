@@ -73,14 +73,45 @@ export function buildRuntimeStateReceipt(env = process.env, root = process.cwd()
   if (requiresExternalState && !SOURCE_RE.test(externalStateSource)) throw new Error('CONTROL_ROOM_EXTERNAL_STATE_SOURCE must identify the provider or authority that observed the state change.');
   if (!repository || !sourceSha) throw new Error('GITHUB_REPOSITORY and EXPECTED_HEAD_SHA/GITHUB_SHA are required.');
 
+  // A repository_dispatch payload is an invalidation signal, not provider proof.
+  // The readback sidecar is freshly collected from Cloudflare by this same job.
+  let providerReadback = null;
+  if (requiresExternalState) {
+    if (!externalStateSource.startsWith('cloudflare:')) {
+      throw new Error('External state source requires an implemented independent provider observer.');
+    }
+    const readbackPath = clean(env.CONTROL_ROOM_PROVIDER_READBACK_PATH) || 'artifacts/cloudflare-provider-readback.json';
+    try {
+      providerReadback = JSON.parse(fs.readFileSync(readbackPath, 'utf8'));
+    } catch {
+      throw new Error('Independent Cloudflare provider readback is missing or unreadable.');
+    }
+    const readAt = Date.parse(providerReadback?.observedAt ?? '');
+    const age = observedAt.getTime() - readAt;
+    if (
+      providerReadback?.schema !== 'fcr/cloudflare-worker-readback@v1'
+      || providerReadback?.repository !== repository
+      || providerReadback?.worker !== 'founder-control-room'
+      || providerReadback?.accountId !== '9b59861bd1747cf7525571b4c51d2aa0'
+      || providerReadback?.scope !== 'worker-bindings-and-crons-only'
+      || providerReadback?.status !== 'aligned'
+      || !EPOCH_RE.test(providerReadback?.observedStateDigest ?? '')
+      || !Number.isFinite(age) || age < -30_000 || age > 5 * 60_000
+      || providerReadback?.secretValuesRead !== false
+      || providerReadback?.canAuthorizeProviderMutation !== false
+    ) {
+      throw new Error('Independent Cloudflare provider readback is stale, drifted, or untrusted.');
+    }
+  }
+
   const tracked = trackedConfigFingerprint(root);
   return {
     schemaVersion: CONTROL_ROOM_RUNTIME_STATE_SCHEMA_VERSION,
     repository, sourceSha, observedAt: observedAt.toISOString(),
     event: { name: eventName || null, action: eventAction || null, runAttempt, freshQueue: runAttempt === 1 },
     trackedConfig: { sha256: tracked.sha256, paths: tracked.files },
-    externalState: { mode: requiresExternalState ? 'fresh-revalidation' : 'source-bound', epoch: requiresExternalState ? externalStateEpoch : null, source: requiresExternalState ? externalStateSource : null, rawSecretMaterialRecorded: false },
-    proofRule: { rerunCountsAsFreshExternalStateProof: false, sourceShaAloneProvesExternalState: false, trackedConfigFingerprintRequired: true },
+    externalState: { mode: requiresExternalState ? 'independently-read-back' : 'source-bound', epoch: requiresExternalState ? externalStateEpoch : null, source: requiresExternalState ? externalStateSource : null, providerObservation: providerReadback ? { digest: providerReadback.observedStateDigest, observedAt: providerReadback.observedAt, scope: providerReadback.scope, status: providerReadback.status } : null, rawSecretMaterialRecorded: false },
+    proofRule: { rerunCountsAsFreshExternalStateProof: false, sourceShaAloneProvesExternalState: false, externalEventEpochAloneProvesExternalState: false, providerReadbackIsExecutionApproval: false, trackedConfigFingerprintRequired: true },
     outputPath,
   };
 }
