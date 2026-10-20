@@ -5,6 +5,9 @@ on:
     branches: [main]
   push:
     branches: [main]
+  schedule:
+    # Read-only drift detection even when no Git event occurs.
+    - cron: '19 */6 * * *'
   repository_dispatch:
     types: [runtime_state_changed]
   workflow_dispatch:
@@ -121,7 +124,7 @@ jobs:
           node-version: '24'
 
       - name: Independently read Cloudflare before claiming external-state revalidation
-        if: github.event_name == 'repository_dispatch' || (github.event_name == 'workflow_dispatch' && (inputs.external_state_epoch != '' || inputs.external_state_source != ''))
+        if: github.event_name == 'schedule' || github.event_name == 'repository_dispatch' || (github.event_name == 'workflow_dispatch' && (inputs.external_state_epoch != '' || inputs.external_state_source != ''))
         env:
           CF_RUNTIME_READ_TOKEN: ${{ secrets.FCR_CLOUDFLARE_BUILDS_USER_TOKEN }}
         run: node scripts/observe-cloudflare-runtime-state.mjs
