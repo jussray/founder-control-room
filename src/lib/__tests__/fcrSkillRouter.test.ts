@@ -319,6 +319,15 @@ describe('FCR skill router trust gate', () => {
     }
   });
 
+  it('honors a leading unprefixed repair-to-proof but not prose mentions', () => {
+    const blocked = route('repair-to-proof confirm the exact head.', 'write', ['juss-chief-ai']);
+    expect(blocked.policyRequiredCapabilityIds).toContain('repair-to-proof');
+    expect(blocked.status).toBe('blocked');
+
+    const prose = route('Yesterday the repair-to-proof run was discussed in the review notes.', 'write', ['juss-chief-ai']);
+    expect(prose.policyRequiredCapabilityIds).not.toContain('repair-to-proof');
+  });
+
   it('requires explicitly named skills to be present in the Chief AI plan', () => {
     const goal = '/goalfix repair this regression.';
     const decision = route(goal, 'write', ['juss-chief-ai']);

@@ -150,6 +150,8 @@ function explicitSkillsFromGoal(goal: string): string[] {
     const skill = EXPLICIT_SKILL_ALIASES[match[1]];
     if (skill) pushUnique(required, skill);
   }
+  // Unprefixed invocation is honored only when the request starts with it; prose mentions do not bind a companion.
+  if (/^repair-to-proof\b/.test(goal.trim())) pushUnique(required, 'repair-to-proof');
   return required;
 }
 

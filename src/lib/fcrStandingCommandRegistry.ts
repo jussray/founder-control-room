@@ -115,7 +115,7 @@ export const FCR_STANDING_COMMAND_REGISTRY: readonly FcrStandingCommandDescripto
   { id: 'godmode', aliases: ['/godmode', 'godmode', 'attack/godmode'], owningOs: 'founder-control-room', kind: 'workflow', autoTrigger: 'explicit godmode or attack/godmode request for bounded adversarial engineering execution', mayExecute: false },
   { id: 'urlfix', aliases: ['/urlfix', 'urlfix'], owningOs: 'founder-control-room', kind: 'workflow', autoTrigger: 'live URL, website, or browser-path testing that should diagnose and repair verified owned defects', mayExecute: false },
   { id: 'repair-to-proof', aliases: ['/repair-to-proof', 'repair-to-proof'], owningOs: 'founder-control-room', kind: 'workflow', autoTrigger: 'explicit proof-mode, exact-head gate or release-proof request', mayExecute: false },
-  { id: 'continuity', aliases: ['/continuity', 'continuity', '/receipt', 'receipt'], owningOs: 'founder-control-room', kind: 'workflow', autoTrigger: 'explicit continuity, handoff or proof-ledger request', mayExecute: false },
+  { id: 'continuity', aliases: ['/continuity', '/receipt'], owningOs: 'founder-control-room', kind: 'workflow', autoTrigger: 'explicit continuity, handoff or proof-ledger request', mayExecute: false },
   { id: 'attack', aliases: ['/attack', 'attack ten', 'attack against itself ten times', 'attack n'], owningOs: 'council-os', kind: 'mode', autoTrigger: 'explicit attack depth or adversarial stress-testing request', mayExecute: false },
   { id: 'makevideo', aliases: ['/makevideo', 'makevideo'], owningOs: 'video-production-os', dependentOsIds: ['media-router-os'], kind: 'entrypoint', autoTrigger: 'clear video, movie, reel, cinematic, shot, or video-generation intent', mayExecute: false },
   { id: 'leevize', aliases: ['/leevize', 'leevize'], owningOs: 'video-production-os', dependentOsIds: ['media-router-os'], kind: 'workflow', autoTrigger: 'cinematic direction, world direction, shot continuity, or visual-story production', mayExecute: false },
@@ -209,6 +209,7 @@ function explicitCommandIdsFromGoal(goal: string): string[] {
     const commandId = ALIAS_TO_COMMAND.get(match[1]);
     if (commandId) pushUnique(ids, commandId);
   }
+  if (/^repair-to-proof\b/.test(goal.trim())) pushUnique(ids, 'repair-to-proof');
 
   for (const marker of ['ultrathink', 'truthmode', 'confess', 'redteam', 'lindymode', 'ooda', 'l99', 'goalfix', 'godmode', 'urlfix', 'makevideo', 'leevize']) {
     if (new RegExp(`\\b${marker}\\b`).test(goal)) pushUnique(ids, marker);
