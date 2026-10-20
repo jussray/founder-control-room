@@ -464,4 +464,6 @@ Rebinding `.github/workflows/playwright.yml` to `3c1689fe67142e783fe7d18b5ff6106
 
 ## Cloudflare external-state readback gate
 
+The same workflow now runs a read-only Cloudflare metadata recheck every six hours, including when no Git commit changes, and rejects drift rather than refreshing a false-green source receipt. It is still not a substitute for fresh readback at consequential execution time.
+
 The existing Control Room Test Ledger accepts `runtime_state_changed` invalidations, but an incoming event or caller-provided hash is not evidence of current provider configuration. On Cloudflare external-state revalidation, the workflow now requires a fresh, read-only Cloudflare Worker settings and cron readback before recording `independently-read-back`. The source-declared required secret **names** and cron schedules are compared with provider metadata; provider values are not retained in receipts. Missing provider access, missing bindings, missing cron, a plain-text `CF_API_TOKEN` binding, or stale readback fails closed. This is a scoped source/CI gate, not proof that live provider credentials work, that production matches the current commit, or that every consequential action has a provider recheck. Those remain separate at-use and deployment gates.
