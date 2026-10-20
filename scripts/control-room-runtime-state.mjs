@@ -97,7 +97,7 @@ export function buildRuntimeStateReceipt(env = process.env, root = process.cwd()
       || providerReadback?.status !== 'aligned'
       || !EPOCH_RE.test(providerReadback?.observedStateDigest ?? '')
       || !Number.isFinite(age) || age < -30_000 || age > 5 * 60_000
-      || providerReadback?.secretValuesRead !== false
+      || providerReadback?.secretValuesRecorded !== false
       || providerReadback?.canAuthorizeProviderMutation !== false
     ) {
       throw new Error('Independent Cloudflare provider readback is stale, drifted, or untrusted.');
