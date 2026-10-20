@@ -12,7 +12,7 @@ const ROOT_FILES = [
   '.env.example', 'app.config.js', 'app.config.ts', 'app.json', 'control-room.manifest.json',
   'package-lock.json', 'package.json', 'playwright.config.js', 'playwright.config.mjs',
   'playwright.config.ts', 'pnpm-lock.yaml', 'tsconfig.json', 'vite.config.js', 'vite.config.mjs',
-  'vite.config.ts', 'wrangler.json', 'wrangler.jsonc', 'wrangler.toml', 'yarn.lock',
+  'vite.config.ts', 'wrangler.json', 'wrangler.jsonc', 'wrangler.toml', 'wrangler.worker.toml', 'yarn.lock',
 ];
 const TREE_ROOTS = ['.control-room', '.github/workflows', 'config'];
 

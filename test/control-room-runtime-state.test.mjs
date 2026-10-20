@@ -46,6 +46,22 @@ test('tracked configuration movement changes the receipt fingerprint', () => {
   assert.deepEqual(before.files, ['.github/workflows/ci.yml', 'package.json']);
 });
 
+test('worker Wrangler declaration is byte-bound into the tracked configuration digest', () => {
+  const root = fixture();
+  try {
+    const configPath = path.join(root, 'wrangler.worker.toml');
+    fs.writeFileSync(configPath, 'name = "founder-control-room"\n', 'utf8');
+    const original = trackedConfigFingerprint(root);
+    assert.ok(original.files.includes('wrangler.worker.toml'));
+    fs.appendFileSync(configPath, '[triggers]\ncrons = ["19 */6 * * *"]\n', 'utf8');
+    const modified = trackedConfigFingerprint(root);
+    assert.notEqual(modified.sha256, original.sha256, 'changing the Worker declaration must invalidate the digest');
+    assert.deepEqual(modified.files, original.files);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test('written runtime state receipt is one valid JSON document with a newline', () => {
   const root = fixture();
   try {
