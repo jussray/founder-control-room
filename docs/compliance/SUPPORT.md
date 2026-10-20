@@ -1,7 +1,8 @@
 # Support Policy
 
 > **Founder Control Room** — Support Proof Document  
-> Last updated: 2026-07-19
+> Last updated: 2026-10-09  
+> Verified: Content matches current architecture; no breaking changes since July 19
 
 ## 1. Support Channels
 | Channel | Use Case | Response SLA |

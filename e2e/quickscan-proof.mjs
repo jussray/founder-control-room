@@ -7,12 +7,13 @@ import { chromium } from 'playwright';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const publicDir = resolve(here, '../public/control-room');
+const discoveryFirstDraft = 'Maya — I noticed customers asking about availability in comments. When you are with clients, who handles those requests now?';
 const prospect = {
   id: 'prospect_demo', businessName: 'Glow Studio', ownerName: 'Maya', segment: 'salon_studio_team_owner', lifecycleState: 'draft_ready',
   evidence: [{ id: 'e1', category: 'visible_friction', note: 'Customers ask about availability in comments.', observedAt: new Date().toISOString() }],
   score: { total: 8 }, qualification: undefined,
-  chiefRecommendation: { nextAction: 'approve_outreach', messageDraft: 'Hey Maya — when you are busy with clients, does keeping up with booking requests ever become difficult?', promptWorkflow: { workflowId: 'quickscan-outreach-v1' } },
-  approvals: [{ id: 'approval_1', action: 'outreach', proposedAction: 'Send question-first Instagram opener', reason: 'Observable pain', evidenceIds: ['e1'], recommendedBy: 'chief', decision: 'PENDING' }],
+  chiefRecommendation: { nextAction: 'approve_outreach', messageDraft: discoveryFirstDraft, promptWorkflow: { workflowId: 'quickscan-outreach-v1' } },
+  approvals: [{ id: 'approval_1', action: 'outreach', proposedAction: 'Send discovery-first Instagram opener', reason: 'Observable friction; decision path remains unknown', evidenceIds: ['e1'], recommendedBy: 'chief', decision: 'PENDING' }],
   overrideReceipts: [], payment: { status: 'unpaid', amountCents: 24900 }, audit: [], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
 };
 let decisions = [];
@@ -43,6 +44,8 @@ try {
   const detailText = await page.locator('#detail').innerText();
   assert.match(detailText, /Prompt provenance: quickscan-outreach-v1/);
   assert.match(detailText, /Chief-proposed/);
+  assert.match(detailText, /who handles those requests now\?/i);
+  assert.match(detailText, /unknown · 0\/100 · next proof gate: collect_qualification_evidence/i);
   assert.equal(await page.locator('#chiefButton').isDisabled(), true);
   assert.equal(await page.locator('[data-decision="APPROVE"]').count(), 1);
   assert.equal(await page.locator('[data-decision="EDIT"]').count(), 1);
@@ -52,7 +55,7 @@ try {
   assert.equal(decisions.length, 1);
   assert.equal(decisions[0].decision, 'APPROVE');
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth), true);
-  console.log(JSON.stringify({ ok:true, route:'/control-room/quickscan.html', approvalDecision:decisions[0], externalSend:false, n8nExecution:false }, null, 2));
+  console.log(JSON.stringify({ ok:true, route:'/control-room/quickscan.html', negotiationDraftRendered:true, approvalDecision:decisions[0], externalSend:false, n8nExecution:false }, null, 2));
 } finally {
   await browser.close(); server.close();
 }
