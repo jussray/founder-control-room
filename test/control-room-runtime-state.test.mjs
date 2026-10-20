@@ -18,6 +18,26 @@ function fixture() {
 }
 function env(overrides = {}) { return { GITHUB_EVENT_NAME: 'push', GITHUB_RUN_ATTEMPT: '1', GITHUB_REPOSITORY: 'jussray/example', EXPECTED_HEAD_SHA: SHA, CONTROL_ROOM_RUNTIME_STATE_PATH: 'artifacts/control-room-runtime-state.json', ...overrides }; }
 
+function writeReadback(root, overrides = {}) {
+  const readbackPath = path.join(root, 'provider-readback.json');
+  const readback = {
+    schema: 'fcr/cloudflare-worker-readback@v1',
+    repository: 'jussray/example',
+    worker: 'founder-control-room',
+    accountId: '9b59861bd1747cf7525571b4c51d2aa0',
+    scope: 'worker-bindings-and-crons-only',
+    status: 'aligned',
+    observedAt: new Date().toISOString(),
+    observedStateDigest: EPOCH,
+    secretValuesRead: false,
+    canAuthorizeProviderMutation: false,
+    ...overrides,
+  };
+  fs.writeFileSync(readbackPath, JSON.stringify(readback), 'utf8');
+  return { path: readbackPath, readback };
+}
+
+
 test('tracked configuration movement changes the receipt fingerprint', () => {
   const root = fixture(); const before = trackedConfigFingerprint(root);
   fs.appendFileSync(path.join(root, '.github', 'workflows', 'ci.yml'), 'on: push\\n', 'utf8');
@@ -48,23 +68,54 @@ test('ordinary source events stay source-bound and do not pretend to prove provi
 
 test('external state invalidation requires a fresh queue, non-secret epoch, and source', () => {
   const root = fixture();
-  const valid = env({ GITHUB_EVENT_NAME: 'repository_dispatch', CONTROL_ROOM_EXTERNAL_STATE_ACTION: 'runtime_state_changed', CONTROL_ROOM_EXTERNAL_STATE_EPOCH: EPOCH, CONTROL_ROOM_EXTERNAL_STATE_SOURCE: 'cloudflare:project' });
+  const observed = writeReadback(root);
+  const valid = env({ GITHUB_EVENT_NAME: 'repository_dispatch', CONTROL_ROOM_EXTERNAL_STATE_ACTION: 'runtime_state_changed', CONTROL_ROOM_EXTERNAL_STATE_EPOCH: EPOCH, CONTROL_ROOM_EXTERNAL_STATE_SOURCE: 'cloudflare:worker:founder-control-room', CONTROL_ROOM_PROVIDER_READBACK_PATH: observed.path });
   const receipt = buildRuntimeStateReceipt(valid, root);
-  assert.equal(receipt.externalState.mode, 'fresh-revalidation'); assert.equal(receipt.externalState.epoch, EPOCH); assert.equal(receipt.event.freshQueue, true);
+  assert.equal(receipt.externalState.mode, 'independently-read-back'); assert.equal(receipt.externalState.epoch, EPOCH); assert.equal(receipt.event.freshQueue, true);
+  assert.deepEqual(receipt.externalState.providerObservation, { digest: EPOCH, observedAt: observed.readback.observedAt, scope: 'worker-bindings-and-crons-only', status: 'aligned' });
+  assert.equal(receipt.proofRule.externalEventEpochAloneProvesExternalState, false);
   assert.throws(() => buildRuntimeStateReceipt({ ...valid, GITHUB_RUN_ATTEMPT: '2' }, root), /newly queued/u);
   assert.throws(() => buildRuntimeStateReceipt({ ...valid, CONTROL_ROOM_EXTERNAL_STATE_EPOCH: '' }, root), /state epoch/u);
   assert.throws(() => buildRuntimeStateReceipt({ ...valid, CONTROL_ROOM_EXTERNAL_STATE_SOURCE: '' }, root), /SOURCE/u);
 });
 
-test('manual external revalidation follows the same fresh-run contract', () => {
-  const receipt = buildRuntimeStateReceipt(env({ GITHUB_EVENT_NAME: 'workflow_dispatch', CONTROL_ROOM_EXTERNAL_STATE_EPOCH: EPOCH, CONTROL_ROOM_EXTERNAL_STATE_SOURCE: 'github:environment' }), fixture());
-  assert.equal(receipt.externalState.mode, 'fresh-revalidation');
+test('manual Cloudflare revalidation requires the same provider observer', () => {
+  const root = fixture();
+  const observed = writeReadback(root);
+  const receipt = buildRuntimeStateReceipt(env({ GITHUB_EVENT_NAME: 'workflow_dispatch', CONTROL_ROOM_EXTERNAL_STATE_EPOCH: EPOCH, CONTROL_ROOM_EXTERNAL_STATE_SOURCE: 'cloudflare:worker:founder-control-room', CONTROL_ROOM_PROVIDER_READBACK_PATH: observed.path }), root);
+  assert.equal(receipt.externalState.mode, 'independently-read-back');
+});
+
+test('dispatch cannot promote self-reported provider epoch into proof without readback', () => {
+  const root = fixture();
+  const request = env({ GITHUB_EVENT_NAME: 'repository_dispatch', CONTROL_ROOM_EXTERNAL_STATE_ACTION: 'runtime_state_changed', CONTROL_ROOM_EXTERNAL_STATE_EPOCH: EPOCH, CONTROL_ROOM_EXTERNAL_STATE_SOURCE: 'cloudflare:worker:founder-control-room', CONTROL_ROOM_PROVIDER_READBACK_PATH: path.join(root, 'missing.json') });
+  assert.throws(() => buildRuntimeStateReceipt(request, root), /readback is missing/u);
+  const observed = writeReadback(root, { status: 'drift_detected' });
+  assert.throws(() => buildRuntimeStateReceipt({ ...request, CONTROL_ROOM_PROVIDER_READBACK_PATH: observed.path }, root), /stale, drifted, or untrusted/u);
+});
+
+test('wrong provider, stale time, and forged identity fail closed', () => {
+  const root = fixture();
+  const observed = writeReadback(root);
+  const request = env({ GITHUB_EVENT_NAME: 'workflow_dispatch', CONTROL_ROOM_EXTERNAL_STATE_EPOCH: EPOCH, CONTROL_ROOM_EXTERNAL_STATE_SOURCE: 'cloudflare:worker:founder-control-room', CONTROL_ROOM_PROVIDER_READBACK_PATH: observed.path });
+  assert.throws(() => buildRuntimeStateReceipt({ ...request, CONTROL_ROOM_EXTERNAL_STATE_SOURCE: 'github:environment' }, root), /implemented independent provider observer/u);
+  for (const poison of [
+    { repository: 'attacker/repo' },
+    { accountId: 'untrusted-account' },
+    { observedAt: new Date(Date.now() - 3600_000).toISOString() },
+    { secretValuesRead: true },
+    { scope: 'any-provider' },
+    { observedStateDigest: 'not-a-hash' },
+  ]) {
+    writeReadback(root, poison);
+    assert.throws(() => buildRuntimeStateReceipt(request, root), /stale, drifted, or untrusted/u);
+  }
 });
 
 test('the ledger workflow exposes the external-state invalidation trigger', () => {
   const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
   const workflow = fs.readFileSync(path.join(repositoryRoot, '.github', 'workflows', 'control-room-test-ledger.yml'), 'utf8');
-  for (const expected of ['repository_dispatch:', 'types: [runtime_state_changed]', 'external_state_epoch:', 'CONTROL_ROOM_EXTERNAL_STATE_EPOCH:', 'CONTROL_ROOM_EXTERNAL_STATE_SOURCE:', 'node --test test/control-room-runtime-state.test.mjs', 'node scripts/control-room-runtime-state.mjs', 'artifacts/control-room-runtime-state.json']) assert.ok(workflow.includes(expected), `workflow missing ${expected}`);
+  for (const expected of ['repository_dispatch:', 'types: [runtime_state_changed]', 'external_state_epoch:', 'CONTROL_ROOM_EXTERNAL_STATE_EPOCH:', 'CONTROL_ROOM_EXTERNAL_STATE_SOURCE:', 'node --test test/control-room-runtime-state.test.mjs', 'node scripts/control-room-runtime-state.mjs', 'node scripts/observe-cloudflare-runtime-state.mjs', 'artifacts/control-room-runtime-state.json', 'artifacts/cloudflare-provider-readback.json']) assert.ok(workflow.includes(expected), `workflow missing ${expected}`);
 });
 
 test('the exact-head ledger binds the runtime-state receipt into its proof surface', () => {
