@@ -12,9 +12,11 @@ export const runtime = 'edge';
 
 export async function DELETE(request: NextRequest) {
   const supabase = createRouteHandlerClient({ cookies });
-  const { data: { session }, error } = await supabase.auth.getSession();
-  if (error || !session) {
+  // The user embedded in a cookie-backed session has not been verified.
+  // Account deletion requires an identity fetched from the Auth server.
+  const { data: { user }, error } = await supabase.auth.getUser();
+  if (error || !user?.id) {
     return Response.json({ success: false, error: 'Unauthorized' }, { status: 401 });
   }
-  return handleDeleteAccountRequest(request, session.user.id);
+  return handleDeleteAccountRequest(request, user.id);
 }
