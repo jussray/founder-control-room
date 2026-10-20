@@ -21,6 +21,9 @@ const buildDiagnosticWorkflow = readFileSync(
   new URL('../../../.github/workflows/cloudflare-build-diagnostic.yml', import.meta.url),
   'utf8',
 );
+const packageJson = JSON.parse(
+  readFileSync(new URL('../../../package.json', import.meta.url), 'utf8'),
+) as { scripts?: Record<string, string> };
 const emailConfig = readFileSync(
   new URL('../../../wrangler.email.toml', import.meta.url),
   'utf8',
@@ -47,12 +50,18 @@ describe('review-email Worker reconciliation authority contract', () => {
     expect(emailConfig).toMatch(/^name = "founder-control-room-review-email"$/m);
     expect(emailConfig).toMatch(/^account_id = "[0-9a-f]{32}"$/m);
     expect(emailConfig).toMatch(/^\s*addresses\s*=\s*\[\s*"review@foundercontrolroom\.org"\s*\]\s*$/m);
+    const addressIndex = emailConfig.indexOf('addresses = ["review@foundercontrolroom.org"]');
+    const firstTableIndex = emailConfig.search(/^\s*\[/m);
+    expect(addressIndex).toBeGreaterThan(-1);
+    expect(firstTableIndex).toBeGreaterThan(-1);
+    expect(addressIndex).toBeLessThan(firstTableIndex);
     expect(emailConfig).not.toContain('[[routes]]');
     expect(emailConfig).toMatch(/^binding = "FOUNDER_CONTROL_ROOM_API"$/m);
     expect(emailConfig).toMatch(/^service = "founder-control-room"$/m);
     expect(emailConfig).toContain('Canonical inbound Email Routing desired state');
     expect(workflow).toContain('Wrangler may reconcile the route during deploy; provider readback and runtime invocation remain separate evidence.');
-    expect(workflow).toContain("grep -Eq '^[[:space:]]*addresses");
+    expect(workflow).toContain('node scripts/verify-founder-review-email-routing.mjs');
+    expect(packageJson.scripts?.['cf:dry-run:email']).toContain('npx --yes wrangler@4.129.0 deploy --dry-run');
     expect(workflow).toContain('review@foundercontrolroom\\.org');
   });
 

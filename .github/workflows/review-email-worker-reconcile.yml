@@ -91,9 +91,9 @@ jobs:
           grep -Eq '^name = "founder-control-room-review-email"$' wrangler.email.toml
           grep -Eq '^binding = "FOUNDER_CONTROL_ROOM_API"$' wrangler.email.toml
           grep -Eq '^service = "founder-control-room"$' wrangler.email.toml
-          grep -Eq '^[[:space:]]*addresses[[:space:]]*=[[:space:]]*\[[[:space:]]*"review@foundercontrolroom\.org"[[:space:]]*\][[:space:]]*$' wrangler.email.toml
+          node scripts/verify-founder-review-email-routing.mjs
 
-          echo 'Review-email Worker identity, account authority, literal review@ routing desired state, private API binding, and dedicated deploy credential are declared. Wrangler may reconcile the route during deploy; provider readback and runtime invocation remain separate evidence.'
+          echo 'Review-email Worker identity, account authority, top-level literal review@ routing desired state, private API binding, and dedicated deploy credential are declared. Wrangler may reconcile the route during deploy; provider readback and runtime invocation remain separate evidence.'
 
       - name: Record bounded authority receipt
         shell: bash

@@ -18,8 +18,16 @@ if (!/^main\s*=\s*"src\/worker\/founderSignalReviewEmail\.ts"\s*$/m.test(manifes
   fail('email Worker must use the canonical founder review email entrypoint');
 }
 
-if (!/^\s*addresses\s*=\s*\[\s*"review@foundercontrolroom\.org"\s*\]\s*$/m.test(manifest)) {
-  fail('wrangler.email.toml must declare exactly the literal review@foundercontrolroom.org Email Routing address');
+const manifestLines = manifest.split(/\r?\n/);
+const addressLineIndexes = manifestLines
+  .map((line, index) => (/^\s*addresses\s*=\s*\[\s*"review@foundercontrolroom\\.org"\s*\]\s*$/.test(line) ? index : -1))
+  .filter(index => index >= 0);
+const firstTableIndex = manifestLines.findIndex(line => /^\s*\[/.test(line));
+
+if (addressLineIndexes.length !== 1) {
+  fail('wrangler.email.toml must declare exactly one literal review@foundercontrolroom.org Email Routing address');
+} else if (firstTableIndex >= 0 && addressLineIndexes[0] > firstTableIndex) {
+  fail('wrangler.email.toml addresses must remain top-level before the first TOML table');
 }
 
 if (/\[\[routes\]\]/.test(manifest)) {
