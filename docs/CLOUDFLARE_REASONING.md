@@ -263,3 +263,11 @@ npx playwright test e2e/cloudflare-reasoning.spec.ts
 ```
 
 The browser/API suite verifies the public-safe contract, founder protection, absence of credential leakage, presence of the implementation stack, and absence of an accidental deployment endpoint. Unit tests verify exact-commit reasoning, stale evidence, duplicate authority, authentication failures, runtime failure, rollback preparation, first-principles deletion/simplification output, and approval boundaries.
+
+## External-state invalidation versus independent Worker readback
+
+The existing ledger also runs on a six-hour schedule independent of Git changes. Scheduled runs derive the observation epoch directly from freshly fetched Cloudflare metadata, not from a source commit or caller's event. GitHub Actions timing is best effort, so each consequential operation still needs at-use validation.
+
+`Control Room Test Ledger` receives `runtime_state_changed` notifications as **invalidation signals only**. The Cloudflare path invokes `scripts/observe-cloudflare-runtime-state.mjs` in the same workflow run, using a scoped read-only credential, to fetch Worker settings and cron schedules. The observer compares the provider's binding name/type inventory and registered crons to `wrangler.worker.toml` without retaining binding values, and emits a bounded structural SHA-256 digest and timestamp. `scripts/control-room-runtime-state.mjs` rejects a missing, drifted, stale, wrong-subject, or unsupported-provider readback. A caller's external epoch remains an event identifier, not proof.
+
+This evidence concerns **Worker binding names/types and schedules only**. It cannot prove secret values, Cloudflare Workers Builds authority, deployed source SHA, downstream runtime health, or approval for a merge, deployment, secret rotation, or other mutation. A missing or unusable read-only token leaves the external revalidation blocked rather than green. Consequential operations still require their own independent at-use provider and approval checks. The provider evidence artifact is retained even when configuration drift makes the job fail; remediation is a separate founder-authorized deployment or credential gate.

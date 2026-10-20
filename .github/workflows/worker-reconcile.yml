@@ -125,6 +125,83 @@ jobs:
           echo "Cloudflare Worker deploy token is present and header-safe."
           echo "Cloudflare account authority is declared in wrangler.worker.toml."
 
+      - name: Verify provider-held Worker secrets before mutation
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Observe names only. Never read or print provider-held secret values.
+          python3 - <<'PY'
+          import json
+          import os
+          import tomllib
+          import urllib.request
+
+          with open('wrangler.worker.toml', 'rb') as handle:
+              config = tomllib.load(handle)
+
+          if config.get('name') != 'founder-control-room':
+              raise SystemExit('Canonical Worker identity mismatch; no mutation allowed.')
+
+          required = set(config.get('secrets', {}).get('required', []))
+          workflow_written = {'FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON'}
+          if not required or not workflow_written <= required:
+              raise SystemExit('Canonical Worker required-secret contract is invalid.')
+
+          account_id = config.get('account_id', '')
+          url = f'https://api.cloudflare.com/client/v4/accounts/{account_id}/workers/scripts/founder-control-room/secrets'
+          request = urllib.request.Request(
+              url,
+              headers={'Authorization': 'Bearer ' + os.environ['CLOUDFLARE_API_TOKEN'],
+                       'Accept': 'application/json'},
+              method='GET',
+          )
+          try:
+              with urllib.request.urlopen(request, timeout=15) as response:
+                  data = json.load(response)
+          except Exception:
+              raise SystemExit('Cloudflare Worker secret-name readback unavailable; no mutation allowed.')
+
+          if data.get('success') is not True or not isinstance(data.get('result'), list):
+              raise SystemExit('Cloudflare Worker secret-name receipt invalid; no mutation allowed.')
+
+          installed = {
+              entry.get('name')
+              for entry in data['result']
+              if isinstance(entry, dict) and entry.get('type') == 'secret_text'
+          }
+          missing = sorted(required - workflow_written - installed)
+          if missing:
+              raise SystemExit(
+                  f'{len(missing)} required provider-held Worker secrets are missing; '
+                  'no mutation allowed. Restore only through approved secret custody.'
+              )
+          settings_request = urllib.request.Request(
+              f'https://api.cloudflare.com/client/v4/accounts/{account_id}/workers/scripts/founder-control-room/settings',
+              headers={'Authorization': 'Bearer ' + os.environ['CLOUDFLARE_API_TOKEN'],
+                       'Accept': 'application/json'},
+              method='GET',
+          )
+          try:
+              with urllib.request.urlopen(settings_request, timeout=15) as response:
+                  settings = json.load(response)
+          except Exception:
+              raise SystemExit('Cloudflare Worker binding readback unavailable; no mutation allowed.')
+
+          bindings = settings.get('result', {}).get('bindings') if settings.get('success') is True else None
+          if not isinstance(bindings, list):
+              raise SystemExit('Cloudflare Worker binding receipt invalid; no mutation allowed.')
+          if any(isinstance(item, dict) and item.get('name') == 'CF_API_TOKEN'
+                 and item.get('type') == 'plain_text' for item in bindings):
+              raise SystemExit(
+                  'Cloudflare CF_API_TOKEN is stored as a plaintext Worker binding; '
+                  'rotate/remove it through authorized secret custody before deployment.'
+              )
+
+          print(f'Provider-held Worker secret names verified: {len(required - workflow_written)} required; values unread.')
+          PY
+
       - name: Record bounded authority receipt
         shell: bash
         run: |

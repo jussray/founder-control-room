@@ -28,6 +28,21 @@ describe('canonical Worker reconcile credential preflight contract', () => {
     expect(workflow).not.toContain('print(token)');
   });
 
+  it('refuses production mutation when required provider-held secrets have not been independently read back', () => {
+    expect(workflow).toContain('Verify provider-held Worker secrets before mutation');
+    expect(workflow).toContain("with open('wrangler.worker.toml', 'rb') as handle:");
+    expect(workflow).toContain("data.get('success') is not True");
+    expect(workflow).toContain('required - workflow_written - installed');
+    expect(workflow).toContain("item.get('name') == 'CF_API_TOKEN'");
+    expect(workflow).toContain("item.get('type') == 'plain_text'");
+    expect(workflow).toContain('rotate/remove it through authorized secret custody before deployment.');
+    expect(workflow).toContain('no mutation allowed. Restore only through approved secret custody.');
+    expect(workflow.indexOf('Verify provider-held Worker secrets before mutation'))
+      .toBeLessThan(workflow.indexOf('Record bounded authority receipt'));
+    expect(workflow.indexOf('Verify provider-held Worker secrets before mutation'))
+      .toBeLessThan(workflow.indexOf('wrangler secret put FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON'));
+  });
+
   it('preserves exact-head authority and the existing runtime proof boundary', () => {
     expect(workflow).toContain('test "$CURRENT_MAIN_SHA" = "$EXPECTED_HEAD_SHA"');
     expect(workflow).toContain('needs: authority-gate');
