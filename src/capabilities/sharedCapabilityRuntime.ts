@@ -255,3 +255,84 @@ export function finalizeSharedReadOnlyCapabilityRun(
 
   return { receipt, presentation };
 }
+
+
+/**
+ * One shared execution boundary for voice and text read-only actions.
+ * A spoken promise, capability listing, or cached continuity cookie is never
+ * evidence that a real provider action ran. The adapter MUST perform live
+ * discovery/policy checks and return a bounded provider observation.
+ */
+export async function executeSharedReadOnlyToolCall(
+  input: SharedReadOnlyInvocationInput,
+  invokeProvider: () => Promise<SharedReadOnlyObservation>,
+): Promise<{
+  receipt: SharedCapabilityRuntimeReceipt;
+  presentation: SharedCapabilityPresentation;
+  execution: {
+    contract: 'fcr/shared-tool-call-attempt@v1';
+    executionId: string;
+    capabilityId: string;
+    surface: InteractionSurface;
+    providerCallReturned: true;
+    state: 'PROVIDER_ACCEPTED';
+    verifiedOutcome: false;
+    evidenceFingerprint: string;
+  };
+}> {
+  // Check live founder identity and read-only policy BEFORE invoking an adapter.
+  const prepared = prepareSharedReadOnlyCapabilityRun(input);
+  const observation = await invokeProvider();
+  const result = finalizeSharedReadOnlyCapabilityRun(prepared, observation);
+  return {
+    ...result,
+    execution: {
+      contract: 'fcr/shared-tool-call-attempt@v1',
+      executionId: prepared.executionId,
+      capabilityId: prepared.capabilityId,
+      surface: prepared.surface,
+      providerCallReturned: true,
+      state: 'PROVIDER_ACCEPTED',
+      verifiedOutcome: false,
+      evidenceFingerprint: result.receipt.evidence.evidenceFingerprint,
+    },
+  };
+}
+
+/** Voice/text failure reporting never converts a missing tool into success. */
+export function sharedReadOnlyToolFailure(
+  surface: unknown,
+  code: 'invalid_request' | 'unavailable' | 'upstream_failure',
+): {
+  execution: {
+    contract: 'fcr/shared-tool-call-attempt@v1';
+    state: 'NOT_STARTED' | 'UNCONFIRMED';
+    providerCallReturned: false;
+    verifiedOutcome: false;
+    retryAuthorized: false;
+  };
+  presentation: {
+    channel: 'speech_and_text' | 'text';
+    summary: string;
+  };
+} {
+  const state = code === 'upstream_failure' ? 'UNCONFIRMED' : 'NOT_STARTED';
+  const summary = code === 'unavailable'
+    ? 'The requested tool is not callable in this session. No provider result was obtained.'
+    : code === 'invalid_request'
+      ? 'The request was not accepted. No provider action was started.'
+      : 'The provider result could not be confirmed. Check provider evidence before retrying.';
+  return {
+    execution: {
+      contract: 'fcr/shared-tool-call-attempt@v1',
+      state,
+      providerCallReturned: false,
+      verifiedOutcome: false,
+      retryAuthorized: false,
+    },
+    presentation: {
+      channel: surface === 'voice' ? 'speech_and_text' : 'text',
+      summary,
+    },
+  };
+}
