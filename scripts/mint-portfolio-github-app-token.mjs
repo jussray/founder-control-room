@@ -42,6 +42,27 @@ function decodeBase64Pem(value) {
   }
 }
 
+function decodeRecognizedKeyWrapper(value) {
+  // Accommodate common safe PEM transport wrappers. RSA parsing remains mandatory.
+  // Never log, digest, forward, or cache the original credential.
+  const fenced = /^```(?:pem|text|plaintext)?[ \t]*\r?\n([\s\S]*?)\r?\n```$/i.exec(value);
+  if (fenced) return { value: fenced[1].trim(), transportClass: 'fenced-pem' };
+  const assigned = /^APP_PRIVATE_KEY\s*=\s*([\s\S]+)$/.exec(value);
+  if (assigned) return { value: assigned[1].trim(), transportClass: 'env-assignment-pem' };
+  if (value.startsWith('{') && value.endsWith('}')) {
+    try {
+      const parsed = JSON.parse(value);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        const candidates = [parsed.APP_PRIVATE_KEY, parsed.private_key, parsed.privateKey]
+          .filter((candidate) => typeof candidate === 'string' && candidate.trim());
+        if (candidates.length === 1) return { value: candidates[0].trim(), transportClass: 'json-object-pem' };
+      }
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
 function normalizePrivateKey(secret) {
   const trimmed = String(secret ?? '').trim().replace(/^\uFEFF/, '');
   let transportClass = 'unknown';
@@ -67,10 +88,18 @@ function normalizePrivateKey(secret) {
     }
   }
 
+  if (transportClass === 'unknown') {
+    const wrapped = decodeRecognizedKeyWrapper(normalized);
+    if (wrapped) {
+      normalized = wrapped.value;
+      transportClass = wrapped.transportClass;
+    }
+  }
   normalized = unwrapMatchingSingleQuotes(decodeJsonQuotedString(normalized))
     .replace(/\\r\\n/g, '\n')
     .replace(/\\n/g, '\n')
     .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
     .trim();
 
   if (!normalized.includes('-----BEGIN')) {
