@@ -195,6 +195,11 @@ for (const command of FCR_STANDING_COMMAND_REGISTRY) {
   }
 }
 
+// URL path segments are not commands; composed commands such as /truthmode/confess stay parseable.
+function withoutUrls(goal: string): string {
+  return goal.replace(/https?:\/\/\S+/gi, ' ');
+}
+
 function pushUnique<T>(values: T[], value: T): void {
   if (!values.includes(value)) values.push(value);
 }
@@ -205,7 +210,7 @@ function normalizedGoal(goal: string): string {
 
 function explicitCommandIdsFromGoal(goal: string): string[] {
   const ids: string[] = [];
-  for (const match of goal.matchAll(/\/([a-z0-9-]+)/g)) {
+  for (const match of withoutUrls(goal).matchAll(/\/([a-z0-9-]+)/g)) {
     const commandId = ALIAS_TO_COMMAND.get(match[1]);
     if (commandId) pushUnique(ids, commandId);
   }

@@ -306,6 +306,19 @@ describe('FCR skill router trust gate', () => {
     expect(ready.executionAllowed).toBe(false);
   });
 
+  it('does not read command aliases inside URL path segments', () => {
+    const decision = route('Test https://example.com/receipt in the browser and repair verified defects.', 'write', ['urlfix'], {
+      repository: { projectId: 'founder-control-room', provider: 'github' },
+    });
+    expect(decision.policyRequiredCapabilityIds).not.toContain('continuity-proof-ledger');
+  });
+
+  it('requires repository context before a mutating repair-to-proof route is accepted', () => {
+    const ready = route('repair-to-proof confirm the exact head.', 'write', ['repair-to-proof']);
+    expect(ready.status).not.toBe('ready_for_runtime_discovery');
+    expect(ready.executionAllowed).toBe(false);
+  });
+
   it('requires the proof and continuity companions when they are explicitly named', () => {
     for (const [goal, skill] of [
       ['/repair-to-proof confirm the exact head.', 'repair-to-proof'],

@@ -132,6 +132,11 @@ const EXPLICIT_SKILL_ALIASES: Readonly<Record<string, string>> = {
   ...DESIGN_COMMAND_ALIASES,
 };
 
+// URL path segments are not commands; composed commands such as /truthmode/confess stay parseable.
+function withoutUrls(goal: string): string {
+  return goal.replace(/https?:\/\/\S+/gi, ' ');
+}
+
 function normalize(value: string): string {
   return value.trim().replace(/\s+/g, ' ').toLocaleLowerCase('en-US');
 }
@@ -146,7 +151,7 @@ function canonicalCapabilityId(value: string): string {
 
 function explicitSkillsFromGoal(goal: string): string[] {
   const required: string[] = [];
-  for (const match of goal.matchAll(/\/([a-z0-9-]+)/g)) {
+  for (const match of withoutUrls(goal).matchAll(/\/([a-z0-9-]+)/g)) {
     const skill = EXPLICIT_SKILL_ALIASES[match[1]];
     if (skill) pushUnique(required, skill);
   }
@@ -157,7 +162,7 @@ function explicitSkillsFromGoal(goal: string): string[] {
 
 function explicitDesignCommandsFromGoal(goal: string): string[] {
   const commands: string[] = [];
-  for (const match of goal.matchAll(/\/([a-z0-9-]+)/g)) {
+  for (const match of withoutUrls(goal).matchAll(/\/([a-z0-9-]+)/g)) {
     if (DESIGN_COMMAND_IDS.has(match[1])) pushUnique(commands, match[1]);
   }
   return commands;
@@ -194,7 +199,8 @@ export function routeFcrSkills(input: RouteFcrSkillsInput): FcrSkillRoutingDecis
   const mutationRequested = MUTATING_ACTIONS.has(input.action);
   const urlfixGoal = policyRequiredCapabilityIds.includes('urlfix');
   const godmodeGoal = policyRequiredCapabilityIds.includes('ultrathink-attack-godmode');
-  const repositoryGoal = isRepositoryGoal(goal) || Boolean(input.repository) || ((urlfixGoal || godmodeGoal) && mutationRequested);
+  const repairToProofGoal = policyRequiredCapabilityIds.includes('repair-to-proof');
+  const repositoryGoal = isRepositoryGoal(goal) || Boolean(input.repository) || ((urlfixGoal || godmodeGoal || repairToProofGoal) && mutationRequested);
   const uiGoal = isUiGoal(goal) || designCommandIds.length > 0;
   const messagingGoal = isMessagingGoal(goal);
   const commercialGoal = isCommercialGoal(goal);
