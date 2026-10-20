@@ -269,6 +269,7 @@ export async function executeSharedReadOnlyToolCall(
 ): Promise<{
   receipt: SharedCapabilityRuntimeReceipt;
   presentation: SharedCapabilityPresentation;
+  observation: SharedReadOnlyObservation;
   execution: {
     contract: 'fcr/shared-tool-call-attempt@v1';
     executionId: string;
@@ -286,6 +287,7 @@ export async function executeSharedReadOnlyToolCall(
   const result = finalizeSharedReadOnlyCapabilityRun(prepared, observation);
   return {
     ...result,
+    observation,
     execution: {
       contract: 'fcr/shared-tool-call-attempt@v1',
       executionId: prepared.executionId,
