@@ -57,19 +57,19 @@ export function buildRuntimeStateReceipt(env = process.env, root = process.cwd()
   const eventName = clean(env.GITHUB_EVENT_NAME);
   const eventAction = clean(env.CONTROL_ROOM_EXTERNAL_STATE_ACTION);
   const runAttempt = Number.parseInt(clean(env.GITHUB_RUN_ATTEMPT) || '1', 10);
-  const externalStateEpoch = clean(env.CONTROL_ROOM_EXTERNAL_STATE_EPOCH).toLowerCase();
-  const externalStateSource = clean(env.CONTROL_ROOM_EXTERNAL_STATE_SOURCE).toLowerCase();
+  let externalStateEpoch = clean(env.CONTROL_ROOM_EXTERNAL_STATE_EPOCH).toLowerCase();
+  const externalStateSource = eventName === 'schedule' ? 'cloudflare:worker:founder-control-room' : clean(env.CONTROL_ROOM_EXTERNAL_STATE_SOURCE).toLowerCase();
   const repository = clean(env.GITHUB_REPOSITORY);
   const sourceSha = normalizeSha(env.EXPECTED_HEAD_SHA || env.GITHUB_SHA);
   const outputPath = clean(env.CONTROL_ROOM_RUNTIME_STATE_PATH) || 'artifacts/control-room-runtime-state.json';
   const isExternalDispatch = eventName === 'repository_dispatch' && eventAction === EXTERNAL_STATE_EVENT;
   const isManualExternalRevalidation = eventName === 'workflow_dispatch' && Boolean(externalStateEpoch || externalStateSource);
-  const requiresExternalState = isExternalDispatch || isManualExternalRevalidation;
+  const requiresExternalState = isExternalDispatch || isManualExternalRevalidation || eventName === 'schedule';
 
   if (!Number.isSafeInteger(runAttempt) || runAttempt < 1) throw new Error('GITHUB_RUN_ATTEMPT must be a positive integer.');
   if (eventName === 'repository_dispatch' && eventAction !== EXTERNAL_STATE_EVENT) throw new Error(`Unsupported repository_dispatch action: ${eventAction || 'missing'}.`);
   if (requiresExternalState && runAttempt !== 1) throw new Error('External-state revalidation must be a newly queued workflow run; reruns are not accepted as fresh proof.');
-  if (requiresExternalState && !EPOCH_RE.test(externalStateEpoch)) throw new Error('CONTROL_ROOM_EXTERNAL_STATE_EPOCH must be a non-secret sha256 state epoch. Never hash raw secret values.');
+  if (requiresExternalState && eventName !== 'schedule' && !EPOCH_RE.test(externalStateEpoch)) throw new Error('CONTROL_ROOM_EXTERNAL_STATE_EPOCH must be a non-secret sha256 state epoch. Never hash raw secret values.');
   if (requiresExternalState && !SOURCE_RE.test(externalStateSource)) throw new Error('CONTROL_ROOM_EXTERNAL_STATE_SOURCE must identify the provider or authority that observed the state change.');
   if (!repository || !sourceSha) throw new Error('GITHUB_REPOSITORY and EXPECTED_HEAD_SHA/GITHUB_SHA are required.');
 
@@ -88,6 +88,7 @@ export function buildRuntimeStateReceipt(env = process.env, root = process.cwd()
     }
     const readAt = Date.parse(providerReadback?.observedAt ?? '');
     const age = observedAt.getTime() - readAt;
+    if (eventName === 'schedule') externalStateEpoch = providerReadback?.observedStateDigest ?? '';
     if (
       providerReadback?.schema !== 'fcr/cloudflare-worker-readback@v1'
       || providerReadback?.repository !== repository
