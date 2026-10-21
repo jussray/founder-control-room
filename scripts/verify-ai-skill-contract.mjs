@@ -226,13 +226,14 @@ for (const [label, source, phrase] of [
   ['billgates artifact', files.billgates, 'Bill Gates Artifact'],
 ]) requireText(label, source, phrase);
 
-const all = Object.values(files).join('\n').toLowerCase();
+// This checks mandatory instruction presence, not agent execution or runtime adoption.
+const pairedRepairContract = await readFile(new URL('../skills/ultrathink-attack-godmode/SKILL.md', import.meta.url), 'utf8');
+
+const all = [...Object.values(files), pairedRepairContract].join('\n').toLowerCase();
 for (const forbidden of ['guaranteed conversion', 'bypass founder approval', 'automatic outreach without approval']) {
   if (all.includes(forbidden)) failures.push(`unsafe contract text: ${forbidden}`);
 }
 
-// This checks mandatory instruction presence, not agent execution or runtime adoption.
-const pairedRepairContract = await readFile(new URL('../skills/ultrathink-attack-godmode/SKILL.md', import.meta.url), 'utf8');
 for (const phrase of [
   '### 5W1H and precision',
   '### 80/20 selection',
@@ -245,7 +246,7 @@ for (const phrase of [
   '| Lindy / lindymode |',
   '### Hostile drafts and open PRs',
   '### Required paired receipt',
-  'Run Playwright for every repair verification',
+  'Run Playwright for every repair that changes a user-facing browser path',
   '80/20 prioritizes effort; it never means checking only 20 percent',
   'A paired reasoning pass is not independent semantic review',
   'Never execute candidate code with production secrets merely to audit it',
