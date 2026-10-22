@@ -23,5 +23,23 @@
     "Do not infer this contract alone proves current provider state",
     "Treat all future private routes as protected until independently verified"
   ],
-  "crossProductRule": "FCR, PromptOS, SOL, Chief and Think Tank are independent app products even if shared skills, API contracts or infrastructure exist."
+  "crossProductRule": "FCR, PromptOS, SOL, Chief and Think Tank are independent app products even if shared skills, API contracts or infrastructure exist.",
+  "protectedHostnames": [
+    "foundercontrolroom.org",
+    "app.foundercontrolroom.org",
+    "checkout.foundercontrolroom.org",
+    "founder-control-room.pages.dev",
+    "*.founder-control-room.pages.dev"
+  ],
+  "accessApplicationNames": [
+    "FCR protected owner paths — public front door remains open",
+    "FCR protected alternate app and checkout paths",
+    "FCR Pages default and preview owner paths"
+  ],
+  "publicHostnames": [
+    "foundercontrolroom.org",
+    "app.foundercontrolroom.org",
+    "checkout.foundercontrolroom.org",
+    "founder-control-room.pages.dev"
+  ]
 }
