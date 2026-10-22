@@ -1,4 +1,4 @@
-import type { OperatorRelayResponseV1, RelayOperatorId, RelayStatus } from './operatorRelay.js';
+import { operatorRelayResponseHash, type OperatorRelayResponseV1, type RelayOperatorId, type RelayStatus } from './operatorRelay.js';
 import type { CapabilityObservation, CapabilityTaskClass } from './modelCapabilityMarket.js';
 
 /**
@@ -78,6 +78,17 @@ function hasEvidence(receipt: OperatorRelayResponseV1): boolean {
   return normalizedEvidenceRefs(receipt).length > 0;
 }
 
+/** Independently trusted hashes cannot prove mutated or malformed receipt content. */
+function matchesCanonicalResponseHash(receipt: OperatorRelayResponseV1): boolean {
+  if (typeof receipt.responseHash !== 'string' || !/^[0-9a-f]{64}$/.test(receipt.responseHash)) return false;
+  try {
+    const { responseHash, ...identity } = receipt;
+    return operatorRelayResponseHash(identity) === responseHash;
+  } catch {
+    return false;
+  }
+}
+
 function requestsAuthority(receipt: OperatorRelayResponseV1): boolean {
   // The contract types this field as the literal 'none'. Compare the runtime value strictly so a
   // hand-built, forged, or malformed receipt that bypassed validation is counted, never trusted.
@@ -140,7 +151,8 @@ export function foldRelayReceiptsIntoCapabilityObservation(input: RelayReceiptFo
   const verifiedHashes = input.verifiedResponseHashes ?? new Set<string>();
   const completed = outcomes.filter((receipt) => receipt.status === 'completed');
   const failed = outcomes.filter((receipt) => receipt.status === 'failed');
-  const verified = outcomes.filter((receipt) => verifiedHashes.has(receipt.responseHash) && hasEvidence(receipt));
+  const verified = outcomes.filter((receipt) => verifiedHashes.has(receipt.responseHash)
+    && hasEvidence(receipt) && matchesCanonicalResponseHash(receipt));
   const falseGreen = completed.filter((receipt) => !hasEvidence(receipt));
   const authorityViolations = outcomes.filter(requestsAuthority);
   const evidenceRefs = [...new Set(verified.flatMap(normalizedEvidenceRefs))].sort();
