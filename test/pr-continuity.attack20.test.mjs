@@ -133,8 +133,8 @@ test('AT30 rollover aggregate preserves per-state and per-failure receipt fields
 test('schema remains stable', () => assert.equal(SCHEMA, 'juss/pr-continuity@v1'));
 
 
-// Skipped jobs must stay scoped to their actual events. These tests are
-// adversarial guardrails, not evidence that a skipped production job executed.
+// Fail closed if a privileged event guard is broadened.
+// Static contract tests do not execute production, cleanup, or rollover jobs.
 function skipPolicyJob(source, name) {
   const marker = '\n  ' + name + ':\n';
   const start = source.indexOf(marker);
@@ -146,31 +146,39 @@ function skipPolicyJob(source, name) {
 function skipPolicyWorkflow(name) {
   return readFileSync(new URL('../.github/workflows/' + name, import.meta.url), 'utf8');
 }
-test('CI-SKIP FCR01 PR audit and privileged metadata remain event-separated', () => {
+function assertExactJobSkipGuard(source, name, expected) {
+  const job = skipPolicyJob(source, name);
+  const conditions = job.split('\n').filter((line) => /^    if:/.test(line));
+  assert.deepEqual(conditions, ['    if: ' + expected], 'Unsafe or missing job-level if on ' + name);
+  return job;
+}
+test('CI-SKIP FCR01 exact-head and privileged metadata retain separated events', () => {
   const source = skipPolicyWorkflow('pr-continuity.yml');
-  const audit = skipPolicyJob(source, 'exact-head-audit');
-  const metadata = skipPolicyJob(source, 'metadata-receipt');
-  assert.match(audit, /if: github\.event_name == 'pull_request'/);
+  const audit = assertExactJobSkipGuard(source, 'exact-head-audit', "github.event_name == 'pull_request'");
+  const metadata = assertExactJobSkipGuard(source, 'metadata-receipt', "github.event_name == 'pull_request_target'");
   assert.match(audit, /ref:.*github\.event\.pull_request\.head\.sha/);
-  assert.match(metadata, /if: github\.event_name == 'pull_request_target'/);
   assert.match(metadata, /ref:.*github\.sha/);
   assert.doesNotMatch(metadata, /ref:.*github\.event\.pull_request\.head\.sha/);
+  assert.match(metadata, /^    permissions:\n      contents: read\n      pull-requests: write$/m);
 });
-test('CI-SKIP FCR02 rollover remains restricted to main push or dispatch', () => {
-  const rollover = skipPolicyJob(skipPolicyWorkflow('pr-continuity.yml'), 'rollover');
-  assert.match(rollover, /if: github\.ref == 'refs\/heads\/main' && \(github\.event_name == 'workflow_dispatch' \|\| github\.event_name == 'push'\)/);
+test('CI-SKIP FCR02 rollover remains restricted to main events', () => {
+  assertExactJobSkipGuard(
+    skipPolicyWorkflow('pr-continuity.yml'),
+    'rollover',
+    "github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || github.event_name == 'push')",
+  );
 });
-test('CI-SKIP FCR03 production Playwright is triggered only after approved main deploy', () => {
+test('CI-SKIP FCR03 production witness needs successful main deploy event', () => {
   const workflow = skipPolicyWorkflow('playwright.yml');
-  assert.match(skipPolicyJob(workflow, 'playwright'), /if: github\.event_name != 'workflow_run'/);
-  const production = skipPolicyJob(workflow, 'production-release-witness');
-  assert.match(production, /github\.event_name == 'workflow_run'/);
-  assert.match(production, /github\.event\.workflow_run\.event == 'workflow_dispatch'/);
-  assert.match(production, /github\.event\.workflow_run\.head_branch == 'main'/);
-  assert.match(production, /github\.event\.workflow_run\.conclusion == 'success'/);
-  assert.match(production, /environment: production/);
+  assertExactJobSkipGuard(workflow, 'playwright', "github.event_name != 'workflow_run'");
+  const production = assertExactJobSkipGuard(
+    workflow,
+    'production-release-witness',
+    "github.event_name == 'workflow_run' && github.event.workflow_run.event == 'workflow_dispatch' && github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.conclusion == 'success'",
+  );
+  assert.match(production, /^    environment: production$/m);
 });
-test('CI-SKIP FCR04 Neon cleanup is close-only and limited to same-repo PRs', () => {
+test('CI-SKIP FCR04 Neon cleanup requires closed same-repo PR', () => {
   const workflow = skipPolicyWorkflow('neon-pr-branches.yml');
   const create = skipPolicyJob(workflow, 'create_neon_branch');
   const cleanup = skipPolicyJob(workflow, 'delete_neon_branch');
@@ -178,17 +186,29 @@ test('CI-SKIP FCR04 Neon cleanup is close-only and limited to same-repo PRs', ()
   assert.match(create, /github\.event\.action == 'synchronize'/);
   assert.match(cleanup, /github\.event\.action == 'closed'/);
   assert.match(cleanup, /github\.event\.pull_request\.head\.repo\.full_name == github\.repository/);
+  assert.match(cleanup, /^    if: \|$/m);
+  assert.doesNotMatch(cleanup, /if: always\(\)/);
 });
-test('CI-SKIP FCR05 release contract runs on PR and provenance is restricted', () => {
+test('CI-SKIP FCR05 release contract is PR-tested, provenance is gated', () => {
   const workflow = skipPolicyWorkflow('main-release-provenance.yml');
   assert.match(skipPolicyJob(workflow, 'contract'), /node --test scripts\/verify-main-release-provenance\.node-test\.mjs/);
-  const provenance = skipPolicyJob(workflow, 'provenance');
-  assert.match(provenance, /github\.event_name != 'pull_request'/);
-  assert.match(provenance, /needs: contract/);
+  const provenance = assertExactJobSkipGuard(workflow, 'provenance', '${{ github.event_name != 'pull_request' }}');
+  assert.match(provenance, /^    needs: contract$/m);
 });
-test('CI-SKIP FCR06 unsafe metadata broadening is detected', () => {
+test('CI-SKIP FCR06 reject unconditional and widened metadata expressions', () => {
   const source = skipPolicyWorkflow('pr-continuity.yml');
-  const tampered = source.replace("if: github.event_name == 'pull_request_target'", 'if: always()');
-  assert.notEqual(tampered, source);
-  assert.doesNotMatch(skipPolicyJob(tampered, 'metadata-receipt'), /if: github\.event_name == 'pull_request_target'/);
+  const original = "if: github.event_name == 'pull_request_target'";
+  for (const replacement of [
+    'if: always()',
+    original + ' || true',
+    original + " || github.event_name == 'pull_request'",
+    'if: >',
+  ]) {
+    const mutant = source.replace(original, replacement);
+    assert.notEqual(mutant, source);
+    assert.throws(
+      () => assertExactJobSkipGuard(mutant, 'metadata-receipt', "github.event_name == 'pull_request_target'"),
+      /Unsafe or missing job-level if/,
+    );
+  }
 });
