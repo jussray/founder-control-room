@@ -65,6 +65,7 @@ describe('capability observation feed from operator relay receipts', () => {
       sampleSize: 5,
       successRate: 0.75,
       proofRate: 0.8,
+      verifiedCompletedCount: 3,
       falseGreenRate: 0,
       authorityViolationRate: 0,
       evidenceRefs: ['ci:run/1', 'ci:run/2', 'ci:run/4', 'playwright:trace/3'],
@@ -105,6 +106,7 @@ describe('capability observation feed from operator relay receipts', () => {
       operatorId: 'gemini', taskClass: 'multimodal-generation', receipts, verifiedResponseHashes: new Set(receipts.map((entry) => entry.responseHash)),
     });
     expect(verified.observation?.proofRate).toBe(1);
+    expect(verified.observation?.verifiedCompletedCount).toBe(5);
     expect(verified.observation?.evidenceRefs.length).toBe(5);
     const rankedVerified = rankCapabilityCandidates({
       taskClass: 'multimodal-generation', candidates, observations: [verified.observation!], benchmarkPriors, options: { now: NOW },
@@ -128,7 +130,7 @@ describe('capability observation feed from operator relay receipts', () => {
     expect(windowed.ignoredStale).toBe(51);
     expect(windowed.observation).toEqual({
       operatorId: 'codex', taskClass: 'repository-repair', observedAt: '2026-09-29T14:00:00.000Z',
-      sampleSize: 1, successRate: 0, proofRate: 1, falseGreenRate: 0, authorityViolationRate: 0, evidenceRefs: ['ci:run/fresh'],
+      sampleSize: 1, successRate: 0, proofRate: 1, verifiedCompletedCount: 0, falseGreenRate: 0, authorityViolationRate: 0, evidenceRefs: ['ci:run/fresh'],
     });
     const candidates: CapabilityCandidate[] = [{ operatorId: 'codex', providerFamily: 'openai', taskClasses: ['repository-repair'], capability: 'implement' }];
     const ranked = rankCapabilityCandidates({
@@ -187,6 +189,7 @@ describe('capability observation feed from operator relay receipts', () => {
       receipts: [first, replacement], verifiedResponseHashes: new Set([replacement.responseHash]),
     });
     expect(reverified.observation?.proofRate).toBe(1);
+    expect(reverified.observation?.verifiedCompletedCount).toBe(1);
     expect(reverified.observation?.evidenceRefs).toEqual(['ci:unverified']);
   });
 
