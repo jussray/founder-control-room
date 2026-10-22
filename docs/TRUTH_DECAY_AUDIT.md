@@ -1,5 +1,11 @@
 # Truth Decay Audit: When a True Claim Becomes Unsafe to Reuse
 
+## October 22, 2026: Council PR #996 — StoryEngine peer identity moved
+
+The FCR Council receipt candidate passed its scoped Council and most CI gates but its Playwright E2E job stopped at the live StoryEngine peer-ref equality gate. The workflow pinned `26b1c34ae7c97c5d1b66a23d6345b3965cfcdc1f`; the independently observed StoryEngine `refs/heads/main` resolved to `1669d920f28bc81ddd04fea6d0bdb5ee41c29ec9`. GitHub comparison reports a strictly forward, three-commit transition across 24 files, adding tenant authorization safeguards and security tests. The successor had 15 completed successful commit check runs at the observation time. Those check runs verify StoryEngine's head, not FCR-to-StoryEngine compatibility.
+
+Updating `.github/workflows/playwright.yml` to the newer exact SHA selects the successor for a fresh immutable checkout and complete FCR browser federation witness; it **must not** inherit predecessor green, imply Council production execution, or waive founder authentication, review-spend controls, privacy, merge, deployment, or publication gates. An unsuccessful, skipped, cancelled, or incomplete successor Playwright run leaves the FCR federation claim UNKNOWN/BLOCKED, and subsequent peer or FCR head movement expires the evidence again.
+
 ## October 16, 2026: StoryEngine peer-identity renewal, without inherited proof
 
 FCR's new actual-server GitHub Workspace/browser test, full founder UI journey, capability workbench, and guarded terminal scenarios passed on the predecessor candidate while the separate FCR-to-StoryEngine test failed at the live peer-ref gate. The workflow expected StoryEngine `a6e6a396ed30535af2fd9b1ec2347a84e1a3fbf3` while independently observed `refs/heads/main` resolved to `26b1c34ae7c97c5d1b66a23d6345b3965cfcdc1f`. The former is not a current federation subject.
