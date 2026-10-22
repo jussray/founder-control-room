@@ -406,6 +406,12 @@ Muse is a governed Council peer in source. `FCR_RELAY_MUSE_MODEL` is public-safe
 
 `FCR_CLOUDFLARE_MCP_READ_TOKEN` is a separate provider-held credential for the bounded Cloudflare MCP observation lane. The Cloudflare deployment/read credential used to enumerate Worker secret names is itself only an observation prerequisite. If that credential is malformed or unusable and `wrangler secret list` cannot run, the correct state for `MODEL_API_KEY` presence is `UNKNOWN`/`BLOCKED`, not “missing.” A failed observation transport may block proof; it cannot manufacture a negative fact about an unobserved target secret.
 
+### Mission Council execution receipt truth
+
+`POST /missions/:missionId/council/run` requires a founder session and an existing mission. Its source-level HTTP contract returns **201 only for a completed provider relay round**; an interrupted round is persisted for readback and returns **424** with `code: "council_round_interrupted"` and `executionState: "interrupted"`. The response includes the stored `conversation` and relay transcript so an interruption cannot be mistaken for an agent verdict. A 201 still proves only that the application's round completed, not independent provider attestation, content accuracy, or founder approval.
+
+The `review` capability remains paused at the provider adapter's founder cost-control policy. Do not substitute `propose` for `review`, interpret a locally mocked test as a live Council answer, or bypass `POST /projects/:slug/missions` authentication with a direct database insert. Source and tests do not establish that this route is deployed; a live readback and exact runtime identity are separate evidence gates.
+
 ### StoryEngine federation proof boundary
 
 The StoryEngine SHA pinned by the Playwright workflow is an exact evidence identity, not a durable alias for current StoryEngine. Any peer-head movement expires predecessor federation proof; a live ref match only selects the next subject and never grants merge, deploy, production, publication, or provider-mutation authority. The successor FCR head must rerun the complete runtime, directive, receipt, and browser witness before the federation path is current.
