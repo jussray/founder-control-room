@@ -132,7 +132,7 @@
       "path": "src/lib/modelCapabilityMarket.ts",
       "claims": [
         "`src/lib/modelCapabilityMarket.ts` may rank Council operators only from task-specific evidence with external benchmarks treated as bounded priors; a benchmark win cannot by itself establish local eligibility, outcome proof, selection authority, or execution authority.",
-        "Fresh authority-boundary violations must block promotion regardless of proof-reference presence, the sample gate must count only independently proven outcomes, false-green behavior must reduce ranking, stale local evidence must expire, and challenger selection should preserve provider-family independence when available without granting mutation authority.",
+        "Fresh authority-boundary violations must block promotion regardless of proof-reference presence, the sample gate must count only independently proven outcomes and must require enough verified completed outcomes, never promoting from failure-only, blocked-only, or count-missing legacy observations, false-green behavior must reduce ranking, stale local evidence must expire, and challenger selection should preserve provider-family independence when available without granting mutation authority.",
         "`src/lib/modelCapabilityMarket.ts` names `multimodal-generation` as a task class so provider-dependent generation work is ranked from local receipts like every other class; adding a task class grants no operator eligibility, selection authority, or execution authority."
       ]
     },
