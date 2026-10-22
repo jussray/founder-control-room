@@ -123,6 +123,16 @@ describe('proof-weighted model capability market', () => {
     });
     expect(ranked.find((candidate) => candidate.operatorId === 'codex')?.status).toBe('blocked');
 
+    const negativeMetric = rankCapabilityCandidates({
+      taskClass: 'repository-repair', candidates,
+      observations: [
+        observation('codex', { sampleSize: 5, proofRate: 1 }),
+        observation('codex', { sampleSize: 1, proofRate: 0, evidenceRefs: [], authorityViolationRate: -0.1 }),
+      ],
+      options: { now },
+    });
+    expect(negativeMetric.find((candidate) => candidate.operatorId === 'codex')?.status).toBe('blocked');
+
     const staleViolation = rankCapabilityCandidates({
       taskClass: 'repository-repair', candidates,
       observations: [
