@@ -70,7 +70,9 @@ A public benchmark cannot by itself make an operator eligible for primary routin
 The market deliberately scores failure modes that common benchmark tables usually omit:
 
 - false-green claims are penalized
-- any fresh authority-boundary violation blocks the candidate from primary routing
+- any fresh authority-boundary violation blocks the candidate from primary routing, even if that observation has no proof references or its authority metric is malformed
+- primary eligibility counts only the proven share of each fresh observation (the floor of sample size times independently verified proof rate); raw/unverified responses cannot satisfy the minimum local-sample gate
+- the score uses the same proof-weighted samples; aggregate success rates still cannot substitute for independently verified outcome-quality measures
 - stale local evidence expires instead of self-renewing
 - cost and time are measured alongside correctness
 - external benchmark influence is capped
