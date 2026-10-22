@@ -23,6 +23,7 @@ function observation(operatorId: string, overrides: Partial<CapabilityObservatio
     sampleSize: 5,
     successRate: 0.9,
     proofRate: 0.9,
+    verifiedCompletedCount: 5,
     falseGreenRate: 0,
     authorityViolationRate: 0,
     rootCauseAccuracy: 0.9,
@@ -146,6 +147,38 @@ describe('proof-weighted model capability market', () => {
       options: { now },
     });
     expect(staleViolation.find((candidate) => candidate.operatorId === 'codex')?.status).toBe('eligible');
+  });
+
+  it('never promotes an operator whose only independently verified outcomes are failures or blocked stops', () => {
+    const failedOnly = rankCapabilityCandidates({
+      taskClass: 'repository-repair', candidates,
+      observations: [observation('codex', {
+        sampleSize: 50, proofRate: 0.1, verifiedCompletedCount: 0,
+        successRate: 0.9, evidenceRefs: ['ci:independently-verified-failure'],
+      })],
+      options: { now },
+    });
+    const candidate = failedOnly.find((entry) => entry.operatorId === 'codex');
+    expect(candidate?.status).toBe('trial');
+    expect(candidate?.localSamples).toBe(5);
+    expect(candidate?.reasons).toContain('insufficient independently verified successful completions for primary routing');
+    const blockedOnly = rankCapabilityCandidates({
+      taskClass: 'repository-repair', candidates,
+      observations: [observation('codex', {
+        sampleSize: 5, proofRate: 1, verifiedCompletedCount: 0, successRate: 0,
+        evidenceRefs: ['audit:verified-block'],
+      })], options: { now },
+    });
+    expect(blockedOnly.find((entry) => entry.operatorId === 'codex')?.status).toBe('trial');
+  });
+
+  it('does not promote a legacy observation without a verified-success count', () => {
+    const ranked = rankCapabilityCandidates({
+      taskClass: 'repository-repair', candidates,
+      observations: [observation('codex', { verifiedCompletedCount: undefined })],
+      options: { now },
+    });
+    expect(ranked.find((entry) => entry.operatorId === 'codex')?.status).toBe('trial');
   });
 
   it('selects a cross-provider challenger and keeps new contenders in shadow trials', () => {
