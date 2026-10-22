@@ -146,7 +146,7 @@ describe('Founder deploy command authority contract', () => {
   it('fails closed on missing provider-held Worker bindings before any reconciliation mutation', () => {
     const preflight = reconcileWorkflow.indexOf('Verify provider-held Worker secret names before reconciliation');
     const receipt = reconcileWorkflow.indexOf('Record bounded authority receipt');
-    const workerJob = reconcileWorkflow.indexOf('\\n  worker-deploy:');
+    const workerJob = reconcileWorkflow.indexOf('  worker-deploy:');
     const firstMutation = reconcileWorkflow.indexOf('wrangler secret put FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON');
     const deploy = reconcileWorkflow.indexOf('command: deploy --config wrangler.worker.toml');
 
