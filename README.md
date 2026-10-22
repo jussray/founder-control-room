@@ -8,6 +8,14 @@ Founder Control Room is the provider-independent founder operating plane for gov
 
 GitHub, Cloudflare, Supabase, n8n, Zapier, HubSpot, Shopify, and other providers may supply execution or evidence. None of them becomes the product constitution.
 
+## October 22, 2026 FCR review-branch cinematic entrance and StoryEngine federation refresh
+
+The draft FCR visual-review branch adds `public/cinematic-direction.css` to the public homepage, while the authenticated Control Room continues through its existing access-controlled routes. These styles are an **unmerged visual candidate**, not proof that the public hostname serves them, that private functionality is exposed, or that the final design matches the founder's reference in a real browser.
+
+StoryEngine `main` advanced from the October 16 peer identity `26b1c34ae7c97c5d1b66a23d6345b3965cfcdc1f` to `1669d920f28bc81ddd04fea6d0bdb5ee41c29ec9` through a later security reconciliation and additional workspace authorization tests. The prior pin failed the FCR Playwright live-ref equality gate as designed; the new exact SHA in `.github/workflows/playwright.yml` **does not disable that gate**. The new FCR draft head `06abccf6af5e90b50c8ded187b4a5d0f70e704b1` completed the separate Playwright E2E workflow successfully, while the documentation-truth and aggregate CI gates initially failed because this accompanying path-bound documentation was not yet refreshed. That E2E receipt belongs only to the stated exact FCR/StoryEngine source pair; subsequent FCR commits must earn fresh proof.
+
+The old October 16 pin instruction below remains as historical evidence, not the active StoryEngine peer identity. Neither the repin, passing peer tests, source-only aesthetic change, nor an eventual green documentation gate grants merge, deployment, public publication, production runtime, user-data access, or provider-mutation authority. Review the final exact-head checks, independently inspect mobile and desktop visuals, and verify protected routes before any authorized production change.
+
 ## October 16, 2026 StoryEngine peer refresh for FCR browser federation
 
 The FCR Playwright workflow's StoryEngine peer identity was changed from `a6e6a396ed30535af2fd9b1ec2347a84e1a3fbf3` to the separately observed StoryEngine `main` SHA `26b1c34ae7c97c5d1b66a23d6345b3965cfcdc1f`. GitHub comparison showed a forward, 22-commit peer transition, and the successor had 15 passing checks at observation time, including the Control Room federation contract. This pin refresh is a prerequisite for running the FCR-to-StoryEngine browser test, **not** a passing FCR peer witness or an authorization to deploy.
