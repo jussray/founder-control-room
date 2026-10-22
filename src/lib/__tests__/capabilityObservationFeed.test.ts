@@ -45,7 +45,7 @@ describe('capability observation feed from operator relay receipts', () => {
       operatorId: 'codex',
       taskClass: 'repository-repair',
       receipts,
-      verifiedRelayIds: new Set(['r1', 'r2', 'r3', 'r4']),
+      verifiedResponseHashes: new Set(receipts.filter((entry) => ['r1', 'r2', 'r3', 'r4'].includes(entry.relayId)).map((entry) => entry.responseHash)),
     });
 
     expect(summary.consideredReceipts).toBe(5);
@@ -69,7 +69,7 @@ describe('capability observation feed from operator relay receipts', () => {
     expect(summary.observation).not.toHaveProperty('medianDurationMs');
 
     const reordered = foldRelayReceiptsIntoCapabilityObservation({
-      operatorId: 'codex', taskClass: 'repository-repair', receipts: [...receipts].reverse(), verifiedRelayIds: new Set(['r1', 'r2', 'r3', 'r4']),
+      operatorId: 'codex', taskClass: 'repository-repair', receipts: [...receipts].reverse(), verifiedResponseHashes: new Set(receipts.filter((entry) => ['r1', 'r2', 'r3', 'r4'].includes(entry.relayId)).map((entry) => entry.responseHash)),
     });
     expect(reordered.observation).toEqual(summary.observation);
   });
@@ -98,7 +98,7 @@ describe('capability observation feed from operator relay receipts', () => {
     expect(rankedUnverified.find((candidate) => candidate.operatorId === 'gemini')?.localSamples).toBe(0);
 
     const verified = foldRelayReceiptsIntoCapabilityObservation({
-      operatorId: 'gemini', taskClass: 'multimodal-generation', receipts, verifiedRelayIds: new Set(['g0', 'g1', 'g2', 'g3', 'g4']),
+      operatorId: 'gemini', taskClass: 'multimodal-generation', receipts, verifiedResponseHashes: new Set(receipts.map((entry) => entry.responseHash)),
     });
     expect(verified.observation?.proofRate).toBe(1);
     expect(verified.observation?.evidenceRefs.length).toBe(5);
@@ -116,10 +116,10 @@ describe('capability observation feed from operator relay receipts', () => {
       receipt('codex', 'completed', { relayId: `old-${index}`, evidenceRefs: ['ci:run/old'], completedAt: '2026-03-01T00:00:00.000Z' }));
     const fresh = receipt('codex', 'failed', { relayId: 'fresh', evidenceRefs: ['ci:run/fresh'], completedAt: '2026-09-29T14:00:00.000Z' });
     const unplaceable = receipt('codex', 'completed', { relayId: 'nowhen', evidenceRefs: ['ci:run/x'], completedAt: 'not-a-date' });
-    const verifiedRelayIds = new Set([...stale.map((entry) => entry.relayId), 'fresh', 'nowhen']);
+    const verifiedResponseHashes = new Set([...stale, fresh, unplaceable].map((entry) => entry.responseHash));
 
     const windowed = foldRelayReceiptsIntoCapabilityObservation({
-      operatorId: 'codex', taskClass: 'repository-repair', receipts: [...stale, fresh, unplaceable], verifiedRelayIds, window: { now: NOW, maxAgeMs: THIRTY_DAYS },
+      operatorId: 'codex', taskClass: 'repository-repair', receipts: [...stale, fresh, unplaceable], verifiedResponseHashes, window: { now: NOW, maxAgeMs: THIRTY_DAYS },
     });
     expect(windowed.ignoredStale).toBe(51);
     expect(windowed.observation).toEqual({
@@ -133,7 +133,7 @@ describe('capability observation feed from operator relay receipts', () => {
     expect(ranked[0]?.status).toBe('trial');
 
     const unwindowed = foldRelayReceiptsIntoCapabilityObservation({
-      operatorId: 'codex', taskClass: 'repository-repair', receipts: [...stale, fresh, unplaceable], verifiedRelayIds,
+      operatorId: 'codex', taskClass: 'repository-repair', receipts: [...stale, fresh, unplaceable], verifiedResponseHashes,
     });
     expect(unwindowed.ignoredStale).toBe(1);
     expect(unwindowed.observation?.sampleSize).toBe(51);
@@ -143,7 +143,7 @@ describe('capability observation feed from operator relay receipts', () => {
     const first = receipt('muse', 'completed', { relayId: 'same', responseHash: 'sha256:a', evidenceRefs: ['drift:diff/1'], completedAt: '2026-09-29T10:00:00.000Z' });
     const correction = receipt('muse', 'failed', { relayId: 'same', responseHash: 'sha256:b', evidenceRefs: ['drift:diff/1'], completedAt: '2026-09-29T11:00:00.000Z' });
     const summary = foldRelayReceiptsIntoCapabilityObservation({
-      operatorId: 'muse', taskClass: 'cross-provider-drift', receipts: [first, first, first, correction], verifiedRelayIds: new Set(['same']),
+      operatorId: 'muse', taskClass: 'cross-provider-drift', receipts: [first, first, first, correction], verifiedResponseHashes: new Set([correction.responseHash]),
     });
     expect(summary.ignoredDuplicate).toBe(2);
     expect(summary.supersededByLaterOutcome).toBe(1);
@@ -151,6 +151,39 @@ describe('capability observation feed from operator relay receipts', () => {
     expect(summary.observation?.sampleSize).toBe(1);
     expect(summary.observation?.successRate).toBe(0);
     expect(summary.observation?.observedAt).toBe('2026-09-29T11:00:00.000Z');
+  });
+
+  it('does not transfer proof to a later response that reuses an independently verified relay ID', () => {
+    const first = receipt('codex', 'completed', {
+      relayId: 'reused', responseHash: 'sha256:verified-original',
+      evidenceRefs: ['ci:original'], completedAt: '2026-09-29T10:00:00.000Z',
+    });
+    const replacement = receipt('codex', 'completed', {
+      relayId: 'reused', responseHash: 'sha256:unverified-revision',
+      evidenceRefs: ['ci:unverified'], completedAt: '2026-09-29T11:00:00.000Z',
+    });
+    const summary = foldRelayReceiptsIntoCapabilityObservation({
+      operatorId: 'codex', taskClass: 'repository-repair',
+      receipts: [first, replacement],
+      verifiedResponseHashes: new Set([first.responseHash]),
+    });
+    expect(summary.consideredReceipts).toBe(1);
+    expect(summary.supersededByLaterOutcome).toBe(1);
+    expect(summary.observation?.proofRate).toBe(0);
+    expect(summary.observation?.evidenceRefs).toEqual([]);
+    const ranked = rankCapabilityCandidates({
+      taskClass: 'repository-repair',
+      candidates: [{ operatorId: 'codex', providerFamily: 'openai', taskClasses: ['repository-repair'], capability: 'implement' }],
+      observations: [summary.observation!], options: { now: NOW, minLocalSamples: 1 },
+    });
+    expect(ranked[0]?.status).toBe('trial');
+    // Only independent verification of the exact replacement hash can confer proof.
+    const reverified = foldRelayReceiptsIntoCapabilityObservation({
+      operatorId: 'codex', taskClass: 'repository-repair',
+      receipts: [first, replacement], verifiedResponseHashes: new Set([replacement.responseHash]),
+    });
+    expect(reverified.observation?.proofRate).toBe(1);
+    expect(reverified.observation?.evidenceRefs).toEqual(['ci:unverified']);
   });
 
   it('counts a completed receipt without evidence as a false green even when it bypassed the relay validator', () => {
