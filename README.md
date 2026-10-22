@@ -465,3 +465,8 @@ Pin alignment alone cannot promote the successor federation state beyond `UNKNOW
 StoryEngine `main` advanced from the previously pinned `168d65ede38d2477ea00902fa1f0e76f292c583d` through `c9af4ea095561d0837a141e311e8977d796aaaa7` (`feat(video): expose StoryEngine MAKEVIDEO skill`) to independently observed `3c1689fe67142e783fe7d18b5ff610640bdc81d6` (`ci(video): prove StoryEngine MAKEVIDEO skill path`). FCR Playwright run #6969 on `897083276b6c775c49ce30be189a50bd610b5d4c` passed its local/direct browser harness but failed the separate live peer-ref freshness check, so that run is historical browser evidence for the predecessor peer rather than current federation proof.
 
 Rebinding `.github/workflows/playwright.yml` to `3c1689fe67142e783fe7d18b5ff610640bdc81d6` selects the successor evidence subject only. The successor FCR head must complete the live-ref check, immutable peer checkout, exact StoryEngine runtime identity, directive/receipt binding, replay protections, and full Playwright browser witness before federation may be called current. Pin alignment grants no merge, deploy, production, publication, billing, or provider-mutation authority.
+
+
+### Portfolio conversion tracking contract
+
+FCR now carries the source contract for a privacy-minimal portfolio conversion collector at [`docs/PORTFOLIO_CONVERSION_TRACKING.md`](docs/PORTFOLIO_CONVERSION_TRACKING.md). The collector recognizes `call_click`, `whatsapp_click`, `pickup_request`, and `directions_click`, and the source contract forbids customer identity/device fields from the conversion table. Provider configuration, site wiring, observed clicks, and commercial outcomes remain separate truth layers; a deployed collector alone is not evidence that a live site is sending conversions.
