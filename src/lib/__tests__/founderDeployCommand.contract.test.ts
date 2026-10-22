@@ -143,6 +143,32 @@ describe('Founder deploy command authority contract', () => {
     expect(reconcileWorkflow).not.toContain('PUBLISH_ALLOWED');
   });
 
+  it('fails closed on missing provider-held Worker bindings before any reconciliation mutation', () => {
+    const preflight = reconcileWorkflow.indexOf('Verify provider-held Worker secret names before reconciliation');
+    const receipt = reconcileWorkflow.indexOf('Record bounded authority receipt');
+    const workerJob = reconcileWorkflow.indexOf('\\n  worker-deploy:');
+    const firstMutation = reconcileWorkflow.indexOf('wrangler secret put FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON');
+    const deploy = reconcileWorkflow.indexOf('command: deploy --config wrangler.worker.toml');
+
+    expect(preflight).toBeGreaterThan(0);
+    expect(preflight).toBeLessThan(receipt);
+    expect(receipt).toBeLessThan(workerJob);
+    expect(workerJob).toBeLessThan(firstMutation);
+    expect(firstMutation).toBeLessThan(deploy);
+
+    const authorityGate = reconcileWorkflow.slice(0, workerJob);
+    expect(authorityGate).toContain('npx --yes wrangler@4.110.0 secret list');
+    expect(authorityGate).toContain('--config wrangler.worker.toml');
+    expect(authorityGate).toContain("config.get('secrets', {}).get('required')");
+    expect(authorityGate).toContain("workflow_written = {'FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON'}");
+    expect(authorityGate).toContain('missing = sorted(required - present)');
+    expect(authorityGate).toContain('sys.exit(1)');
+    expect(authorityGate).toContain('trap \'rm -f "$secret_receipt"\' EXIT');
+    expect(authorityGate).not.toContain('wrangler secret put');
+    expect(authorityGate).not.toContain('wrangler deploy');
+    expect(authorityGate).not.toContain('supabase db push');
+  });
+
   it('preserves every declared Worker secret name while forcing the publication grant disabled through the canonical config', () => {
     expect(reconcileWorkflow).toContain('Existing Worker runtime secrets: preserved except \\`FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON\\`, which this workflow forces disabled');
     expect(reconcileWorkflow).toContain('CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}');
