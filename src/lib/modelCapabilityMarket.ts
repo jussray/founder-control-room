@@ -28,6 +28,8 @@ export interface CapabilityObservation {
   sampleSize: number;
   successRate: number;
   proofRate: number;
+  /** Independently verified completed outcomes, excluding verified failures and blocked stops. */
+  verifiedCompletedCount?: number;
   falseGreenRate: number;
   authorityViolationRate: number;
   rootCauseAccuracy?: number;
@@ -222,6 +224,14 @@ export function rankCapabilityCandidates(input: {
         }))
         .filter((observation) => observation.sampleSize > 0);
       const localSamples = local.reduce((sum, observation) => sum + observation.sampleSize, 0);
+      // Verified failures/authority stops are evidence, not successful model capability.
+      // Missing or malformed counts from legacy sources never establish promotion.
+      const verifiedCompletedSamples = local.reduce((sum, observation) => {
+        const count = observation.verifiedCompletedCount;
+        return sum + (typeof count === 'number' && Number.isSafeInteger(count) && count >= 0
+          ? Math.min(count, observation.sampleSize)
+          : 0);
+      }, 0);
       const benchmark = benchmarkScore(freshPriors, candidate.operatorId);
       const canOperate = agentCanOperate(candidate.operatorId, candidate.capability);
 
@@ -234,9 +244,9 @@ export function rankCapabilityCandidates(input: {
       } else if (hasAuthorityViolation) {
         status = 'blocked';
         reasons.push('fresh local evidence contains an authority-boundary violation');
-      } else if (localSamples < minLocalSamples) {
+      } else if (localSamples < minLocalSamples || verifiedCompletedSamples < minLocalSamples) {
         status = 'trial';
-        reasons.push('insufficient fresh local samples for primary routing');
+        reasons.push('insufficient independently verified successful completions for primary routing');
         score = benchmark.score === null ? 0 : benchmark.score * benchmarkPriorWeight;
       } else {
         status = 'eligible';
