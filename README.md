@@ -8,6 +8,16 @@ Founder Control Room is the provider-independent founder operating plane for gov
 
 GitHub, Cloudflare, Supabase, n8n, Zapier, HubSpot, Shopify, and other providers may supply execution or evidence. None of them becomes the product constitution.
 
+## October 16, 2026 StoryEngine peer refresh for FCR browser federation
+
+The FCR Playwright workflow's StoryEngine peer identity was changed from `a6e6a396ed30535af2fd9b1ec2347a84e1a3fbf3` to the separately observed StoryEngine `main` SHA `26b1c34ae7c97c5d1b66a23d6345b3965cfcdc1f`. GitHub comparison showed a forward, 22-commit peer transition, and the successor had 15 passing checks at observation time, including the Control Room federation contract. This pin refresh is a prerequisite for running the FCR-to-StoryEngine browser test, **not** a passing FCR peer witness or an authorization to deploy.
+
+The former FCR browser run passed all local Control Room journeys before deliberately stopping on the stale peer-ref check. All predecessor FCR/StoryEngine federation evidence remains historical. Only an exact FCR head which independently checks StoryEngine's live ref, checks out the pinned commit, proves the peer runtime identity, and completes the full Playwright directive/receipt loop can claim current federation integration at this pair. Any movement of either head expires that claim again.
+
+## GitHub Workspace integration candidate
+
+FCR includes a project-linked repository editor and an integrated guarded terminal panel. The terminal operates only through existing mission-bound read-only Git commands and exact commit checks. CI runs a browser integration journey against the real FCR server using test substitutes for external providers. The candidate is not verified as a production release. Product control rooms, including Bip, retain separate product ownership and capabilities.
+
 ## Read this README as a truth surface
 
 Founder Control Room separates four states that are easy to blur together:
@@ -240,6 +250,10 @@ Source dependence on that topology is not proof the live provider is configured 
 `public-web-observation-v1` is an FCR-owned, provider-neutral product contract. FCR's governed research hub resolves a bounded read-only adapter at runtime, and adapter identity remains evidence rather than product authority. The capability itself requires no provider-specific runtime secret; provider configuration, adapter availability, source truth, and downstream outcomes remain separate proof planes.
 
 `OPENAI_API_KEY` follows the same split authority. The canonical Worker registry requires the provider-held runtime binding because live FCR OpenAI paths consume it. GitHub Actions may separately hold the same logical credential for CI-only consumers such as the bounded AI Failure Repair workflow, but the Actions copy is not runtime proof and must not be copied into the Worker during deploy. `Runtime Secret Proof` derives its complete required-name set from `wrangler.worker.toml`, asks Cloudflare only for secret names, fingerprints that registry, and never reads or prints secret values. If the Cloudflare observation credential is malformed or unusable before enumeration, every unobserved runtime-secret presence claim remains `UNKNOWN`/`BLOCKED`, not missing.
+
+The Worker-only reconciliation workflow must run the same canonical Cloudflare runtime-secret **name** check inside its authority gate, before its first secret write or deployment. It derives requirements from `wrangler.worker.toml [secrets].required` and may exclude only the fail-closed `FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON` that it itself writes afterward. A missing name or unavailable Cloudflare enumeration blocks reconciliation; source declarations or historical runtime receipts never satisfy the live gate. No values are read, and passing the gate does not prove credential validity, API identity, or permission to deploy.
+
+Worker-only production reconciliation now has a second, separately verifiable release gate: direct `api.foundercontrolroom.org/version` and public `foundercontrolroom.org/version` must both return the canonical Worker service header and exact approved source SHA. The Pages `FCR_API` service binding, API Worker custom-domain assignment, Cloudflare request-tracer simulation, and a successful GitHub build are configuration or test evidence, **not** substitutes for these live response receipts. Missing public identity evidence fails the workflow closed rather than weakening Pages' identity check.
 
 The first-party FCR Shopify paid-order ingress follows the same boundary. `FCR_SHOPIFY_WEBHOOK_SECRET` and `FCR_COMMERCE_HASH_SALT` must remain provider-held required Worker secrets before promotion, while source merely declares their names. Their presence cannot prove that Shopify registered the `orders/paid` callback, that the deployed Worker serves the exact commerce head, that the production Supabase migration exists, or that any payment was collected; those claims require separate provider, deployment, database, runtime, and revenue receipts.
 
