@@ -165,6 +165,7 @@ export function foldRelayReceiptsIntoCapabilityObservation(input: RelayReceiptFo
     sampleSize: outcomes.length,
     successRate: rate(completed.length, completed.length + failed.length),
     proofRate: rate(verified.length, outcomes.length),
+    verifiedCompletedCount: verified.filter((receipt) => receipt.status === 'completed').length,
     falseGreenRate: rate(falseGreen.length, outcomes.length),
     authorityViolationRate: rate(authorityViolations.length, outcomes.length),
     evidenceRefs,
