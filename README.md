@@ -181,7 +181,7 @@ canonical capability declaration
 
 ### Proof-weighted model capability market
 
-`src/lib/modelCapabilityMarket.ts` adds a task-specific routing layer for Council operators. Public launch benchmarks and provider claims are discovery signals only: they enter as bounded priors and cannot by themselves make a model primary, prove an outcome, or grant execution authority. Promotion requires fresh local receipts for the same task class; stale observations expire, false-green behavior is penalized, and a fresh authority-boundary violation blocks promotion.
+`src/lib/modelCapabilityMarket.ts` adds a task-specific routing layer for Council operators. Public launch benchmarks and provider claims are discovery signals only: they enter as bounded priors and cannot by themselves make a model primary, prove an outcome, or grant execution authority. Promotion requires fresh local receipts for the same task class; the primary-eligibility gate now counts only independently proven samples, not raw provider responses. Stale observations expire, false-green behavior is penalized, and any fresh authority-boundary violation (including an unproven or malformed violation observation) blocks promotion.
 
 The market may recommend a primary, an independent challenger from another provider family, and shadow trials for promising unproven models. Every route remains explicitly non-authorizing (`selectionAuthority: false`, `executionAuthority: false`). Founder approval, repository/provider gates, provider readback, Playwright for load-bearing browser claims, and outcome verification remain separate. See [`docs/MODEL_CAPABILITY_MARKET.md`](docs/MODEL_CAPABILITY_MARKET.md).
 
