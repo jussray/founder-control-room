@@ -125,6 +125,56 @@ jobs:
           echo "Cloudflare Worker deploy token is present and header-safe."
           echo "Cloudflare account authority is declared in wrangler.worker.toml."
 
+      - name: Verify provider-held Worker secret names before reconciliation
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Must finish in authority-gate before secret put or deploy can run.
+          secret_receipt="$(mktemp)"
+          trap 'rm -f "$secret_receipt"' EXIT
+
+          npx --yes wrangler@4.110.0 secret list \
+            --config wrangler.worker.toml \
+            --format json > "$secret_receipt"
+
+          SECRET_RECEIPT="$secret_receipt" python3 - <<'PY'
+          import json
+          import os
+          import sys
+          import tomllib
+
+          with open('wrangler.worker.toml', 'rb') as handle:
+              config = tomllib.load(handle)
+          names = config.get('secrets', {}).get('required')
+          workflow_written = {'FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON'}
+          if not isinstance(names, list) or not names or any(
+              not isinstance(name, str) or not name for name in names
+          ) or len(set(names)) != len(names) or not workflow_written <= set(names):
+              print('::error title=Invalid Worker secret registry::Required names must be unique nonempty strings and include the workflow-written grant.')
+              sys.exit(1)
+
+          with open(os.environ['SECRET_RECEIPT'], encoding='utf-8') as handle:
+              observed = json.load(handle)
+          if not isinstance(observed, list) or any(
+              not isinstance(entry, dict) or not isinstance(entry.get('name'), str)
+              for entry in observed
+          ):
+              print('::error title=Invalid Cloudflare secret receipt::Provider list must contain name-bearing entries.')
+              sys.exit(1)
+
+          present = {entry['name'] for entry in observed}
+          required = set(names) - workflow_written
+          missing = sorted(required - present)
+          if missing:
+              for name in missing:
+                  print(f'::error title=Missing provider-held Worker secret::{name} is not installed on the canonical Worker.')
+              sys.exit(1)
+
+          print(f'Canonical Worker secret-name preflight passed: {len(required)} provider-held names present; no values read.')
+          PY
+
       - name: Record bounded authority receipt
         shell: bash
         run: |
