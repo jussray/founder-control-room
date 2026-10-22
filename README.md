@@ -8,6 +8,10 @@ Founder Control Room is the provider-independent founder operating plane for gov
 
 GitHub, Cloudflare, Supabase, n8n, Zapier, HubSpot, Shopify, and other providers may supply execution or evidence. None of them becomes the product constitution.
 
+## October 22, 2026 StoryEngine peer-pin recovery for Council PR #996
+
+PR #996's Council-scoped tests completed, but the broader Playwright workflow stopped at the stale peer-ref guard. Independently observed StoryEngine `main` moved forward from `26b1c34ae7c97c5d1b66a23d6345b3965cfcdc1f` to `1669d920f28bc81ddd04fea6d0bdb5ee41c29ec9` in three commits changing 24 files. All 15 StoryEngine commit checks passed at observation; that evidence is *not* an FCR browser-integration proof. The reviewed pin refresh retains the live-ref-equality guard, immutable checkout and complete FCR-to-StoryEngine Playwright witness. Only the exact successor FCR commit and peer pair may earn new federation evidence. Council cost controls and authenticated founder mission creation remain unchanged; no new live Council verdict is established by CI.
+
 ## October 16, 2026 StoryEngine peer refresh for FCR browser federation
 
 The FCR Playwright workflow's StoryEngine peer identity was changed from `a6e6a396ed30535af2fd9b1ec2347a84e1a3fbf3` to the separately observed StoryEngine `main` SHA `26b1c34ae7c97c5d1b66a23d6345b3965cfcdc1f`. GitHub comparison showed a forward, 22-commit peer transition, and the successor had 15 passing checks at observation time, including the Control Room federation contract. This pin refresh is a prerequisite for running the FCR-to-StoryEngine browser test, **not** a passing FCR peer witness or an authorization to deploy.
