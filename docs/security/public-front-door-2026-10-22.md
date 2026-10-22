@@ -38,3 +38,10 @@ SOL is an independent product at `jussray/solcontinuity`; its public frontend is
 - Before deployment changes, verify provider policy, route, and current repo state again; a repo snapshot is not current Cloudflare truth.
 
 Canonical issue: https://github.com/jussray/founder-control-room/issues/1001.
+
+## Oct 22 peer-ref CI remediation: separate from Access implementation
+
+Exact-head Playwright E2E failed at 'Verify live StoryEngine peer ref still pinned'; previous Workflow expected StoryEngine SHA 26b1c34ae7c97c5d1b66a23d6345b3965cfcdc1f but GitHub StoryEngine main was independently observed as 1669d920f28bc81ddd04fea6d0bdb5ee41c29ec9. GitHub compare classified that new SHA as a forward, 3-commit successor with no behind commits.
+
+The CI workflow pin has been updated to this exact successor for a fresh FCR-to-StoryEngine witness. This selects the new evidence subject only: previous peer federation proof remains historical. Run the entire exact-head workflow against the new pin, and do not call the integration green unless that new workflow passes. External StoryEngine release authority does not transfer.
+
