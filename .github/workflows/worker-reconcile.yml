@@ -270,7 +270,10 @@ jobs:
               --dump-header "$version_headers" \
               "$API_ORIGIN/version" 2>/dev/null || true)"
 
-            if tr -d '\r' < "$headers" | grep -Eiq '^x-founder-control-room-service:[[:space:]]*founder-control-room              && jq -e --arg expected "$EXPECTED_HEAD_SHA" '.service == "founder-control-room" and .gitSha == $expected and .founderSignalAutomationGrant.configured == true and .founderSignalAutomationGrant.enabled == false' <<<"$candidate_version" >/dev/null 2>&1; then
+            if tr -d '\r' < "$headers" | grep -Eiq '^x-founder-control-room-service:[[:space:]]*founder-control-room$' \
+              && tr -d '\r' < "$version_headers" | grep -Eiq '^x-founder-control-room-service:[[:space:]]*founder-control-room$' \
+              && jq -e '.ok == true' <<<"$candidate_health" >/dev/null 2>&1 \
+              && jq -e --arg expected "$EXPECTED_HEAD_SHA" '.service == "founder-control-room" and .gitSha == $expected and .founderSignalAutomationGrant.configured == true and .founderSignalAutomationGrant.enabled == false' <<<"$candidate_version" >/dev/null 2>&1; then
               health_body="$candidate_health"
               version_body="$candidate_version"
               break
@@ -322,101 +325,7 @@ jobs:
               --connect-timeout 8 --max-time 15 \
               --dump-header "$pages_headers" \
               "$PAGES_ORIGIN/version" 2>/dev/null || true)"
-            if tr -d '\r' < "$pages_headers" | grep -Eiq '^x-founder-control-room-service:[[:space:]]*founder-control-room        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: fcr-worker-reconcile-${{ github.run_id }}-${{ github.run_attempt }}
-          path: |
-            test-results/fcr-worker-reconcile.json
-            test-results/fcr-pages-proxy-proof.json
-          if-no-files-found: warn
-          retention-days: 30
- \
-              && tr -d '\r' < "$version_headers" | grep -Eiq '^x-founder-control-room-service:[[:space:]]*founder-control-room              && jq -e --arg expected "$EXPECTED_HEAD_SHA" '.service == "founder-control-room" and .gitSha == $expected and .founderSignalAutomationGrant.configured == true and .founderSignalAutomationGrant.enabled == false' <<<"$candidate_version" >/dev/null 2>&1; then
-              health_body="$candidate_health"
-              version_body="$candidate_version"
-              break
-            fi
-            sleep 10
-          done
-
-          if [[ -z "$health_body" || -z "$version_body" ]]; then
-            echo '::error title=Worker reconciliation proof failed::api.foundercontrolroom.org did not prove canonical service identity and exact deployed SHA.'
-            exit 1
-          fi
-
-          jq -n \
-            --arg scope "worker_reconcile" \
-            --arg api_origin "$API_ORIGIN" \
-            --arg expected_sha "$EXPECTED_HEAD_SHA" \
-            --arg service "$(jq -r '.service' <<<"$version_body")" \
-            --arg live_sha "$(jq -r '.gitSha' <<<"$version_body")" \
-            --argjson health "$health_body" \
-            '{
-              scope: $scope,
-              api_origin: $api_origin,
-              expected_sha: $expected_sha,
-              service: $service,
-              live_sha: $live_sha,
-              health: $health,
-              supabase_db_mutation: false,
-              proof_of_ship: false
-            }' > test-results/fcr-worker-reconcile.json
-
-          cat test-results/fcr-worker-reconcile.json >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Upload redacted reconciliation receipt
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: fcr-worker-reconcile-${{ github.run_id }}-${{ github.run_attempt }}
-          path: test-results/fcr-worker-reconcile.json
-          if-no-files-found: warn
-          retention-days: 30
- \
-              && jq -e '.ok == true' <<<"$candidate_health" >/dev/null 2>&1 \
-              && jq -e --arg expected "$EXPECTED_HEAD_SHA" '.service == "founder-control-room" and .gitSha == $expected and .founderSignalAutomationGrant.configured == true and .founderSignalAutomationGrant.enabled == false' <<<"$candidate_version" >/dev/null 2>&1; then
-              health_body="$candidate_health"
-              version_body="$candidate_version"
-              break
-            fi
-            sleep 10
-          done
-
-          if [[ -z "$health_body" || -z "$version_body" ]]; then
-            echo '::error title=Worker reconciliation proof failed::api.foundercontrolroom.org did not prove canonical service identity and exact deployed SHA.'
-            exit 1
-          fi
-
-          jq -n \
-            --arg scope "worker_reconcile" \
-            --arg api_origin "$API_ORIGIN" \
-            --arg expected_sha "$EXPECTED_HEAD_SHA" \
-            --arg service "$(jq -r '.service' <<<"$version_body")" \
-            --arg live_sha "$(jq -r '.gitSha' <<<"$version_body")" \
-            --argjson health "$health_body" \
-            '{
-              scope: $scope,
-              api_origin: $api_origin,
-              expected_sha: $expected_sha,
-              service: $service,
-              live_sha: $live_sha,
-              health: $health,
-              supabase_db_mutation: false,
-              proof_of_ship: false
-            }' > test-results/fcr-worker-reconcile.json
-
-          cat test-results/fcr-worker-reconcile.json >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Upload redacted reconciliation receipt
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: fcr-worker-reconcile-${{ github.run_id }}-${{ github.run_attempt }}
-          path: test-results/fcr-worker-reconcile.json
-          if-no-files-found: warn
-          retention-days: 30
- \
+            if tr -d '\r' < "$pages_headers" | grep -Eiq '^x-founder-control-room-service:[[:space:]]*founder-control-room$' \
               && jq -e --arg expected "$EXPECTED_HEAD_SHA" '.service == "founder-control-room" and .gitSha == $expected and .founderSignalAutomationGrant.configured == true and .founderSignalAutomationGrant.enabled == false' <<<"$candidate_pages_version" >/dev/null 2>&1; then
               pages_verified=true
               break
@@ -440,91 +349,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: fcr-worker-reconcile-${{ github.run_id }}-${{ github.run_attempt }}
-          path: test-results/fcr-worker-reconcile.json
-          if-no-files-found: warn
-          retention-days: 30
- \
-              && tr -d '\r' < "$version_headers" | grep -Eiq '^x-founder-control-room-service:[[:space:]]*founder-control-room              && jq -e --arg expected "$EXPECTED_HEAD_SHA" '.service == "founder-control-room" and .gitSha == $expected and .founderSignalAutomationGrant.configured == true and .founderSignalAutomationGrant.enabled == false' <<<"$candidate_version" >/dev/null 2>&1; then
-              health_body="$candidate_health"
-              version_body="$candidate_version"
-              break
-            fi
-            sleep 10
-          done
-
-          if [[ -z "$health_body" || -z "$version_body" ]]; then
-            echo '::error title=Worker reconciliation proof failed::api.foundercontrolroom.org did not prove canonical service identity and exact deployed SHA.'
-            exit 1
-          fi
-
-          jq -n \
-            --arg scope "worker_reconcile" \
-            --arg api_origin "$API_ORIGIN" \
-            --arg expected_sha "$EXPECTED_HEAD_SHA" \
-            --arg service "$(jq -r '.service' <<<"$version_body")" \
-            --arg live_sha "$(jq -r '.gitSha' <<<"$version_body")" \
-            --argjson health "$health_body" \
-            '{
-              scope: $scope,
-              api_origin: $api_origin,
-              expected_sha: $expected_sha,
-              service: $service,
-              live_sha: $live_sha,
-              health: $health,
-              supabase_db_mutation: false,
-              proof_of_ship: false
-            }' > test-results/fcr-worker-reconcile.json
-
-          cat test-results/fcr-worker-reconcile.json >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Upload redacted reconciliation receipt
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: fcr-worker-reconcile-${{ github.run_id }}-${{ github.run_attempt }}
-          path: test-results/fcr-worker-reconcile.json
-          if-no-files-found: warn
-          retention-days: 30
- \
-              && jq -e '.ok == true' <<<"$candidate_health" >/dev/null 2>&1 \
-              && jq -e --arg expected "$EXPECTED_HEAD_SHA" '.service == "founder-control-room" and .gitSha == $expected and .founderSignalAutomationGrant.configured == true and .founderSignalAutomationGrant.enabled == false' <<<"$candidate_version" >/dev/null 2>&1; then
-              health_body="$candidate_health"
-              version_body="$candidate_version"
-              break
-            fi
-            sleep 10
-          done
-
-          if [[ -z "$health_body" || -z "$version_body" ]]; then
-            echo '::error title=Worker reconciliation proof failed::api.foundercontrolroom.org did not prove canonical service identity and exact deployed SHA.'
-            exit 1
-          fi
-
-          jq -n \
-            --arg scope "worker_reconcile" \
-            --arg api_origin "$API_ORIGIN" \
-            --arg expected_sha "$EXPECTED_HEAD_SHA" \
-            --arg service "$(jq -r '.service' <<<"$version_body")" \
-            --arg live_sha "$(jq -r '.gitSha' <<<"$version_body")" \
-            --argjson health "$health_body" \
-            '{
-              scope: $scope,
-              api_origin: $api_origin,
-              expected_sha: $expected_sha,
-              service: $service,
-              live_sha: $live_sha,
-              health: $health,
-              supabase_db_mutation: false,
-              proof_of_ship: false
-            }' > test-results/fcr-worker-reconcile.json
-
-          cat test-results/fcr-worker-reconcile.json >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Upload redacted reconciliation receipt
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: fcr-worker-reconcile-${{ github.run_id }}-${{ github.run_attempt }}
-          path: test-results/fcr-worker-reconcile.json
+          path: |
+            test-results/fcr-worker-reconcile.json
+            test-results/fcr-pages-proxy-proof.json
           if-no-files-found: warn
           retention-days: 30
