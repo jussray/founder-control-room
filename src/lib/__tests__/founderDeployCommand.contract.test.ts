@@ -143,6 +143,23 @@ describe('Founder deploy command authority contract', () => {
     expect(reconcileWorkflow).not.toContain('PUBLISH_ALLOWED');
   });
 
+  it('proves direct API and public Pages version headers and bodies against the exact release SHA', () => {
+    const runtimeProof = reconcileWorkflow.slice(reconcileWorkflow.indexOf('  runtime-proof:'));
+    expect(runtimeProof).toContain('API_ORIGIN: https://api.foundercontrolroom.org');
+    expect(runtimeProof).toContain('PAGES_ORIGIN: https://foundercontrolroom.org');
+    expect(runtimeProof).toContain('--dump-header "$version_headers"');
+    expect(runtimeProof).toContain('--dump-header "$pages_headers"');
+    expect(runtimeProof).toContain('"$API_ORIGIN/version"');
+    expect(runtimeProof).toContain('"$PAGES_ORIGIN/version"');
+    expect(runtimeProof).toContain('tr -d \\'\\r\\' < "$version_headers"');
+    expect(runtimeProof).toContain('tr -d \\'\\r\\' < "$pages_headers"');
+    expect(runtimeProof).toContain('.gitSha == $expected');
+    expect(runtimeProof).toContain('public_proxy_version_verified: true');
+    expect(runtimeProof).toContain('test-results/fcr-pages-proxy-proof.json');
+    expect(runtimeProof).not.toContain('wrangler secret put');
+    expect(runtimeProof).not.toContain('wrangler deploy');
+  });
+
   it('fails closed on missing provider-held Worker bindings before any reconciliation mutation', () => {
     const preflight = reconcileWorkflow.indexOf('Verify provider-held Worker secret names before reconciliation');
     const receipt = reconcileWorkflow.indexOf('Record bounded authority receipt');
