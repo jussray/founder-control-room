@@ -1,5 +1,11 @@
 # Truth Decay Audit: When a True Claim Becomes Unsafe to Reuse
 
+## October 22, 2026: StoryEngine peer-identity renewal after PR #130
+
+FCR exact-head Playwright on conversion-tracking candidate `95247a53fb981bf4fa1aa5c30ec7e9e3bd446682` passed its local browser journeys and then deliberately stopped at the live peer-ref gate because the workflow still expected StoryEngine `26b1c34ae7c97c5d1b66a23d6345b3965cfcdc1f`. Independent GitHub observation resolved StoryEngine `refs/heads/main` to `1669d920f28bc81ddd04fea6d0bdb5ee41c29ec9`, the merge head of StoryEngine PR #130.
+
+The successor StoryEngine identity had 15 successful check-runs at observation, including Node tests, capability/runtime gates, test-ledger proof, Supabase Preview, and Cloudflare Workers build evidence. Those checks establish only StoryEngine-side evidence for that exact SHA. Updating FCR's `STORYENGINE_PEER_SHA` to `1669d920f28bc81ddd04fea6d0bdb5ee41c29ec9` resets FCR federation proof to UNKNOWN until the complete exact-head runtime identity, directive, receipt, replay-safety, and Playwright browser witness succeeds against the new pair. No predecessor browser green, founder approval, merge authority, deploy authority, or provider-mutation authority carries across the transition.
+
 ## October 16, 2026: StoryEngine peer-identity renewal, without inherited proof
 
 FCR's new actual-server GitHub Workspace/browser test, full founder UI journey, capability workbench, and guarded terminal scenarios passed on the predecessor candidate while the separate FCR-to-StoryEngine test failed at the live peer-ref gate. The workflow expected StoryEngine `a6e6a396ed30535af2fd9b1ec2347a84e1a3fbf3` while independently observed `refs/heads/main` resolved to `26b1c34ae7c97c5d1b66a23d6345b3965cfcdc1f`. The former is not a current federation subject.
