@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { foldRelayReceiptsIntoCapabilityObservation } from '../capabilityObservationFeed.js';
 import { rankCapabilityCandidates, type CapabilityCandidate, type ExternalBenchmarkPrior } from '../modelCapabilityMarket.js';
-import { OPERATOR_RELAY_RESPONSE_CONTRACT, type OperatorRelayResponseV1, type RelayOperatorId, type RelayStatus } from '../operatorRelay.js';
+import { OPERATOR_RELAY_RESPONSE_CONTRACT, operatorRelayResponseHash, type OperatorRelayResponseV1, type RelayOperatorId, type RelayStatus } from '../operatorRelay.js';
 
 let seq = 0;
 
@@ -11,7 +11,7 @@ function receipt(
   overrides: Partial<Pick<OperatorRelayResponseV1, 'relayId' | 'responseHash' | 'evidenceRefs' | 'completedAt' | 'unresolved'>> & { authorityRequested?: unknown } = {},
 ): OperatorRelayResponseV1 {
   seq += 1;
-  return {
+  const base: Omit<OperatorRelayResponseV1, 'responseHash'> = {
     contract: OPERATOR_RELAY_RESPONSE_CONTRACT,
     relayId: overrides.relayId ?? `relay-${seq}`,
     requestHash: `sha256:req-${seq}`,
@@ -24,8 +24,12 @@ function receipt(
     // Out-of-contract fixtures are built on purpose: the fold must count what the validator would reject.
     authorityRequested: ('authorityRequested' in overrides ? overrides.authorityRequested : 'none') as 'none',
     completedAt: overrides.completedAt ?? `2026-09-29T1${seq % 10}:00:00.000Z`,
-    responseHash: overrides.responseHash ?? `sha256:res-${seq}`,
   };
+  // Only intentionally malformed fixtures lack a canonical response hash.
+  let computedHash: string;
+  try { computedHash = operatorRelayResponseHash(base); }
+  catch { computedHash = `sha256:malformed-${seq}`; }
+  return { ...base, responseHash: overrides.responseHash ?? computedHash };
 }
 
 const NOW = new Date('2026-09-29T15:00:00.000Z');
@@ -140,8 +144,8 @@ describe('capability observation feed from operator relay receipts', () => {
   });
 
   it('counts exact duplicates once and lets a later outcome for the same relayId supersede an earlier one', () => {
-    const first = receipt('muse', 'completed', { relayId: 'same', responseHash: 'sha256:a', evidenceRefs: ['drift:diff/1'], completedAt: '2026-09-29T10:00:00.000Z' });
-    const correction = receipt('muse', 'failed', { relayId: 'same', responseHash: 'sha256:b', evidenceRefs: ['drift:diff/1'], completedAt: '2026-09-29T11:00:00.000Z' });
+    const first = receipt('muse', 'completed', { relayId: 'same', evidenceRefs: ['drift:diff/1'], completedAt: '2026-09-29T10:00:00.000Z' });
+    const correction = receipt('muse', 'failed', { relayId: 'same', evidenceRefs: ['drift:diff/1'], completedAt: '2026-09-29T11:00:00.000Z' });
     const summary = foldRelayReceiptsIntoCapabilityObservation({
       operatorId: 'muse', taskClass: 'cross-provider-drift', receipts: [first, first, first, correction], verifiedResponseHashes: new Set([correction.responseHash]),
     });
@@ -155,11 +159,11 @@ describe('capability observation feed from operator relay receipts', () => {
 
   it('does not transfer proof to a later response that reuses an independently verified relay ID', () => {
     const first = receipt('codex', 'completed', {
-      relayId: 'reused', responseHash: 'sha256:verified-original',
+      relayId: 'reused',
       evidenceRefs: ['ci:original'], completedAt: '2026-09-29T10:00:00.000Z',
     });
     const replacement = receipt('codex', 'completed', {
-      relayId: 'reused', responseHash: 'sha256:unverified-revision',
+      relayId: 'reused',
       evidenceRefs: ['ci:unverified'], completedAt: '2026-09-29T11:00:00.000Z',
     });
     const summary = foldRelayReceiptsIntoCapabilityObservation({
@@ -184,6 +188,20 @@ describe('capability observation feed from operator relay receipts', () => {
     });
     expect(reverified.observation?.proofRate).toBe(1);
     expect(reverified.observation?.evidenceRefs).toEqual(['ci:unverified']);
+  });
+
+  it('rejects forged content retaining an originally verified response hash', () => {
+    const original = receipt('codex', 'completed', {
+      relayId: 'tampered', evidenceRefs: ['ci:original'], completedAt: '2026-09-29T12:00:00.000Z',
+    });
+    const mutated = { ...original, evidenceRefs: ['ci:made-up-proof'] };
+    const summary = foldRelayReceiptsIntoCapabilityObservation({
+      operatorId: 'codex', taskClass: 'repository-repair',
+      receipts: [mutated], verifiedResponseHashes: new Set([original.responseHash]),
+    });
+    expect(summary.observation?.proofRate).toBe(0);
+    expect(summary.observation?.evidenceRefs).toEqual([]);
+    expect(summary.observation?.sampleSize).toBe(1);
   });
 
   it('counts a completed receipt without evidence as a false green even when it bypassed the relay validator', () => {
