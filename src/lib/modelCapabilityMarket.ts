@@ -193,17 +193,36 @@ export function rankCapabilityCandidates(input: {
     .filter((candidate) => candidate.taskClasses.includes(input.taskClass))
     .map((candidate): RankedCapabilityCandidate => {
       const reasons: string[] = [];
-      const local = input.observations.filter(
+      // Inspect every fresh observation for authority violations, including unproven
+      // observations that cannot contribute to primary-routing eligibility.
+      const fresh = input.observations.filter(
         (observation) => observation.operatorId === candidate.operatorId
           && observation.taskClass === input.taskClass
-          && observation.sampleSize > 0
-          && observation.evidenceRefs.length > 0
           && isFresh(observation.observedAt, now, maxObservationAgeMs),
       );
+      const hasAuthorityViolation = fresh.some(
+        (observation) => !Number.isFinite(observation.authorityViolationRate)
+          || observation.authorityViolationRate > 0,
+      );
+      // A provider response is not an independently proven outcome. Count only
+      // the proven share of each well-formed observation toward the sample gate
+      // and score; never promote from a large pool of unverified responses.
+      const local = fresh
+        .filter((observation) => Number.isSafeInteger(observation.sampleSize)
+          && observation.sampleSize > 0
+          && Number.isFinite(observation.proofRate)
+          && observation.proofRate > 0
+          && observation.proofRate <= 1
+          && Array.isArray(observation.evidenceRefs)
+          && observation.evidenceRefs.length > 0)
+        .map((observation) => ({
+          ...observation,
+          sampleSize: Math.floor(observation.sampleSize * observation.proofRate),
+        }))
+        .filter((observation) => observation.sampleSize > 0);
       const localSamples = local.reduce((sum, observation) => sum + observation.sampleSize, 0);
       const benchmark = benchmarkScore(freshPriors, candidate.operatorId);
       const canOperate = agentCanOperate(candidate.operatorId, candidate.capability);
-      const hasAuthorityViolation = local.some((observation) => observation.authorityViolationRate > 0);
 
       let status: CapabilityMarketStatus;
       let score = 0;
