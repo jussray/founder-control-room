@@ -71,7 +71,7 @@ The market deliberately scores failure modes that common benchmark tables usuall
 
 - false-green claims are penalized
 - any fresh authority-boundary violation blocks the candidate from primary routing, even if that observation has no proof references or its authority metric is malformed
-- primary eligibility counts only the proven share of each fresh observation (the floor of sample size times independently verified proof rate); raw/unverified responses cannot satisfy the minimum local-sample gate
+- primary eligibility requires both the proven share of fresh observations (the floor of sample size times independently verified proof rate) and enough independently verified completed outcomes; verified failures or blocked stops are retained as evidence but cannot promote a model, and legacy observations without explicit verified completion counts stay in trial
 - the score uses the same proof-weighted samples; aggregate success rates still cannot substitute for independently verified outcome-quality measures
 - stale local evidence expires instead of self-renewing
 - cost and time are measured alongside correctness
