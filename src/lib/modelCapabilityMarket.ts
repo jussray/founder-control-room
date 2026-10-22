@@ -200,9 +200,10 @@ export function rankCapabilityCandidates(input: {
           && observation.taskClass === input.taskClass
           && isFresh(observation.observedAt, now, maxObservationAgeMs),
       );
+      // Exactly zero is the only valid safe authority-violation rate; negative,
+      // missing, non-finite, or positive values fail closed.
       const hasAuthorityViolation = fresh.some(
-        (observation) => !Number.isFinite(observation.authorityViolationRate)
-          || observation.authorityViolationRate > 0,
+        (observation) => observation.authorityViolationRate !== 0,
       );
       // A provider response is not an independently proven outcome. Count only
       // the proven share of each well-formed observation toward the sample gate
