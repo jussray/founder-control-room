@@ -17,3 +17,19 @@ test('no product ownership confusion in boundary contract',()=>{
  assert.match(cfg.crossProductRule,/PromptOS/);
  assert.match(cfg.crossProductRule,/SOL/);
 });
+
+test('public-facing Pages hosts all have protected owner path policy scopes', () => {
+  const expectHosts = [
+    'foundercontrolroom.org',
+    'app.foundercontrolroom.org',
+    'checkout.foundercontrolroom.org',
+    'founder-control-room.pages.dev',
+    '*.founder-control-room.pages.dev',
+  ];
+  for (const host of expectHosts) {
+    assert.ok(cfg.protectedHostnames.includes(host), host);
+  }
+  assert.equal(cfg.accessApplicationNames.length, 3);
+  assert.ok(cfg.publicHostnames.includes('app.foundercontrolroom.org'));
+  assert.ok(cfg.publicHostnames.includes('founder-control-room.pages.dev'));
+});
