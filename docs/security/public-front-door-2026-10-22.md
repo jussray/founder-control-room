@@ -11,6 +11,21 @@ It explicitly protects `foundercontrolroom.org/control-room`, `/control-room/*`,
 
 This is limited anonymous-route proof, not a claim that owner sign-in succeeded or that every API/database route is fully authorized. The `/*` public exception still exists on the base FCR hostname Access policy: audit every new feature path and apply appropriate specific Access protections AND origin-side authentication. Cloudflare login alone does not implement application authorization.
 
+## Additional host protections: prevent alternate-origin exposure
+
+The first apex-domain fix was not sufficient: anonymous tests found the Control Room workspace shell accessible on alternate app, checkout, and default Pages hostnames, including previews.
+
+Two more Cloudflare Access applications reuse the existing FCR email-allow policy:
+
+- FCR protected alternate app and checkout paths: protects the same six owner paths on app.foundercontrolroom.org and checkout.foundercontrolroom.org.
+- FCR Pages default and preview owner paths: protects the same six owner paths on founder-control-room.pages.dev and *.founder-control-room.pages.dev.
+
+The six scope patterns are /control-room, /control-room/*, /admin, /admin/*, /api/founder, and /api/founder/*.
+
+Anonymous Cloudflare Browser Rendering confirmed the public homepages remain visible while owner paths show Cloudflare Access sign-in on both alternate domains, the Pages default hostname, and tested deployment-specific and branch preview URLs. Newly created Access configurations briefly returned Access error pages during propagation; later tests returned regular sign-in pages.
+
+Do not remove the existing FCR Pages project, DNS records, Worker scripts or public landing pages. The base FCR hostname still has a broad /* public override; its specifically protected owner paths have more-specific access rules. Every future private route requires separate provider and origin authorization tests. Cloudflare Access is defense-in-depth, not a substitute for application authorization.
+
 ## Product identity boundaries
 SOL is an independent product at `jussray/solcontinuity`; its public frontend is served by `solcontinuity-public-site`. PromptOS is independent at `jussray/promptos`; its public frontend is `promptos-public-front-door`. Chief and Think Tank likewise have separate public-front-door Workers. No one app's public entry can inherit another app's private authority.
 
