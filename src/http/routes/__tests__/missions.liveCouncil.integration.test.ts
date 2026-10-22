@@ -173,7 +173,7 @@ describe('POST /missions/:missionId/council/run', () => {
       .post(`/missions/${MISSION_ID}/council/run`)
       .set('Authorization', 'Bearer test-token')
       .send({
-        goal: 'Review Cloud Tiny-Win Receipt.',
+        goal: 'Review the synthetic storyboard fixture.',
         seed: 'Private review input stays behind founder authentication.',
         capability: 'review',
         participants: ['codex'],
