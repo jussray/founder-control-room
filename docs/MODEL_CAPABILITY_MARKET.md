@@ -34,7 +34,7 @@ Fold rules:
 - receipts answered by another operator are ignored, never re-attributed
 - exact duplicate receipts (same `responseHash`) count once; when one `relayId` has several outcome receipts, only the latest counts
 - with a freshness window, receipts older than the window are excluded so stale evidence cannot ride on one fresh receipt; a receipt whose `completedAt` does not parse is always excluded
-- a provider answering is not outcome proof: only exact `responseHash` values confirmed by an independent verifier contribute to `proofRate` and `evidenceRefs`; a later response using the same relay ID cannot borrow earlier proof; with no verifier the observation carries no evidence and the market's own gate keeps the operator in trial (adapter-proven is not provider-outcome-proven)
+- a provider answering is not outcome proof: only exact `responseHash` values confirmed by an independent verifier contribute to `proofRate` and `evidenceRefs`; a later response using the same relay ID cannot borrow earlier proof; the fold additionally recomputes each independently verified receipt's canonical response hash and denies proof if its contents were changed; with no verifier the observation carries no evidence and the market's own gate keeps the operator in trial (adapter-proven is not provider-outcome-proven)
 - a `completed` receipt with no evidence reference is a false green, even if it bypassed the relay validator
 - any runtime `authorityRequested` other than the exact string `none` — including a missing or malformed value — is an authority violation
 - `blocked` is an honest authority stop: it stays in the sample but is excluded from the success denominator, so stopping correctly never lowers a score
