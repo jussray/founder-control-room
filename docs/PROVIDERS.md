@@ -1,5 +1,10 @@
 # Founder Control Room Provider Guide
 
+## Shared GitHub App key transport boundary
+
+The shared GitHub App authentication normalizer accepts the same bounded fenced-PEM, APP_PRIVATE_KEY assignment and single-candidate JSON-object wrappers as the portfolio minter candidate, including CR-only line endings. Ambiguous JSON key objects, malformed input and non-RSA keys still fail closed without echoing credential values. The shape diagnostic retains an isolated implementation; source similarity does not guarantee behavioral equivalence. Synthetic signing tests establish local parsing only when executed; App issuer, installation permissions, trusted review publication, governance reconciliation and production credentials require separate provider evidence. No secret value is read or changed by this source repair.
+
+
 The Control Room uses providers as replaceable capabilities. Product authority, approvals, event history, and recovery remain owned by the Control Room.
 
 Provider-specific instructions may become stricter, but they do not replace the canonical product contract in `docs/FOUNDER_CONTROL_ROOM_AND_CHIEF_AI_MASTER_BUILD_SPEC.md` or the repository entry contract in `AGENTS.md`.

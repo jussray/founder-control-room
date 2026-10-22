@@ -1,5 +1,10 @@
 # Founder Control Room
 
+## Shared GitHub App key transport boundary
+
+The shared GitHub App authentication normalizer accepts the same bounded fenced-PEM, APP_PRIVATE_KEY assignment and single-candidate JSON-object wrappers as the portfolio minter candidate, including CR-only line endings. Ambiguous JSON key objects, malformed input and non-RSA keys still fail closed without echoing credential values. The shape diagnostic retains an isolated implementation; source similarity does not guarantee behavioral equivalence. Synthetic signing tests establish local parsing only when executed; App issuer, installation permissions, trusted review publication, governance reconciliation and production credentials require separate provider evidence. No secret value is read or changed by this source repair.
+
+
 > **Copyright © 2024–2026 Juss Ray. All rights reserved.**
 > This is proprietary software. No license to use, copy, modify, distribute,
 > sublicense, or create derivative works is granted. See [LICENSE](LICENSE).

@@ -67,12 +67,35 @@ function decodeBase64Pem(value: string): string {
   }
 }
 
+function decodeRecognizedKeyWrapper(value: string): string {
+  const fenced = /^```(?:pem|text|plaintext)?[ \t]*\r?\n([\s\S]*?)\r?\n```$/i.exec(value);
+  if (fenced) return fenced[1].trim();
+  const assigned = /^APP_PRIVATE_KEY\s*=\s*([\s\S]+)$/.exec(value);
+  if (assigned) return assigned[1].trim();
+  if (value.startsWith("{") && value.endsWith("}")) {
+    try {
+      const parsed = JSON.parse(value) as unknown;
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        const record = parsed as Record<string, unknown>;
+        const candidates = [record.APP_PRIVATE_KEY, record.private_key, record.privateKey]
+          .filter((candidate): candidate is string => typeof candidate === "string" && candidate.trim().length > 0);
+        if (candidates.length === 1) return candidates[0].trim();
+      }
+    } catch {
+      return value;
+    }
+  }
+  return value;
+}
+
 function normalizePrivateKey(value: string): string {
   let normalized = value.trim().replace(/^\uFEFF/, "");
+  normalized = decodeRecognizedKeyWrapper(normalized);
   normalized = unwrapMatchingSingleQuotes(decodeJsonQuotedString(normalized))
     .replace(/\\r\\n/g, "\n")
     .replace(/\\n/g, "\n")
     .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
     .trim();
 
   if (!normalized.includes("-----BEGIN")) {
@@ -86,7 +109,7 @@ function parseGitHubAppPrivateKey(value: string): KeyObject {
   const normalized = normalizePrivateKey(value);
   if (!/^-----BEGIN (?:RSA )?PRIVATE KEY-----\n/.test(normalized)) {
     throw new Error(
-      "GITHUB_PRIVATE_KEY must contain the complete GitHub App RSA private-key PEM (raw PEM, escaped-newline PEM, JSON-quoted PEM, base64/base64url-encoded PEM, or a matching single-quoted transport wrapper)",
+      "GITHUB_PRIVATE_KEY must contain the complete GitHub App RSA private-key PEM (raw PEM, escaped-newline PEM, JSON-quoted PEM, base64/base64url-encoded PEM, a matching single-quoted wrapper, a fenced PEM, an APP_PRIVATE_KEY assignment, or an unambiguous JSON key object)",
     );
   }
 
