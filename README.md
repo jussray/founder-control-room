@@ -8,6 +8,11 @@ Founder Control Room is the provider-independent founder operating plane for gov
 
 GitHub, Cloudflare, Supabase, n8n, Zapier, HubSpot, Shopify, and other providers may supply execution or evidence. None of them becomes the product constitution.
 
+## October 22, 2026: StoryEngine peer ref renewal (reverification required)
+
+FCR's Cloudflare/public-front-door security branch later observed that the live StoryEngine main ref advanced from `26b1c34ae7c97c5d1b66a23d6345b3965cfcdc1f` to `1669d920f28bc81ddd04fea6d0bdb5ee41c29ec9`. GitHub commit comparison classified the successor as exactly three commits ahead, zero behind. The prior exact-head FCR Playwright job stopped at the live StoryEngine identity check after completing its local UI harness.
+
+The FCR Playwright workflow's `STORYENGINE_PEER_SHA` was updated to the independently observed successor solely to select a fresh federation evidence subject. The previous peer's successes are now historical, not transferable. Only a completely successful exact-FCR-head browser federation job against the new exact StoryEngine SHA can renew the integration claim; branch review or a successful peer-only workflow does not prove production integration, merge authority, publication or authenticated founder signoff.
 ## October 16, 2026 StoryEngine peer refresh for FCR browser federation
 
 The FCR Playwright workflow's StoryEngine peer identity was changed from `a6e6a396ed30535af2fd9b1ec2347a84e1a3fbf3` to the separately observed StoryEngine `main` SHA `26b1c34ae7c97c5d1b66a23d6345b3965cfcdc1f`. GitHub comparison showed a forward, 22-commit peer transition, and the successor had 15 passing checks at observation time, including the Control Room federation contract. This pin refresh is a prerequisite for running the FCR-to-StoryEngine browser test, **not** a passing FCR peer witness or an authorization to deploy.
