@@ -238,7 +238,7 @@ jobs:
   runtime-proof:
     name: Prove Canonical API Origin and Exact SHA
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     needs: worker-deploy
     env:
       EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha }}
