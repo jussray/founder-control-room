@@ -192,7 +192,7 @@ test('CI-SKIP FCR04 Neon cleanup requires closed same-repo PR', () => {
 test('CI-SKIP FCR05 release contract is PR-tested, provenance is gated', () => {
   const workflow = skipPolicyWorkflow('main-release-provenance.yml');
   assert.match(skipPolicyJob(workflow, 'contract'), /node --test scripts\/verify-main-release-provenance\.node-test\.mjs/);
-  const provenance = assertExactJobSkipGuard(workflow, 'provenance', '${{ github.event_name != 'pull_request' }}');
+  const provenance = assertExactJobSkipGuard(workflow, 'provenance', "${{ github.event_name != 'pull_request' }}");
   assert.match(provenance, /^    needs: contract$/m);
 });
 test('CI-SKIP FCR06 reject unconditional and widened metadata expressions', () => {
