@@ -151,8 +151,8 @@ describe('Founder deploy command authority contract', () => {
     expect(runtimeProof).toContain('--dump-header "$pages_headers"');
     expect(runtimeProof).toContain('"$API_ORIGIN/version"');
     expect(runtimeProof).toContain('"$PAGES_ORIGIN/version"');
-    expect(runtimeProof).toContain('tr -d \\'\\r\\' < "$version_headers"');
-    expect(runtimeProof).toContain('tr -d \\'\\r\\' < "$pages_headers"');
+    expect(runtimeProof).toContain('< "$version_headers" | grep -Eiq');
+    expect(runtimeProof).toContain('< "$pages_headers" | grep -Eiq');
     expect(runtimeProof).toContain('.gitSha == $expected');
     expect(runtimeProof).toContain('public_proxy_version_verified: true');
     expect(runtimeProof).toContain('test-results/fcr-pages-proxy-proof.json');
