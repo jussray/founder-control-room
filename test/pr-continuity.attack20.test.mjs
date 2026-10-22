@@ -131,3 +131,64 @@ test('AT30 rollover aggregate preserves per-state and per-failure receipt fields
   assert.match(continuitySource, /receiptId: `pr-\$\{number\}:\$\{receipt\.code\}`/);
 });
 test('schema remains stable', () => assert.equal(SCHEMA, 'juss/pr-continuity@v1'));
+
+
+// Skipped jobs must stay scoped to their actual events. These tests are
+// adversarial guardrails, not evidence that a skipped production job executed.
+function skipPolicyJob(source, name) {
+  const marker = '\n  ' + name + ':\n';
+  const start = source.indexOf(marker);
+  assert.notEqual(start, -1, 'Missing job ' + name);
+  const tail = source.slice(start + marker.length);
+  const next = tail.search(/\n  [a-zA-Z_][a-zA-Z0-9_-]*:\s*\n/);
+  return next === -1 ? tail : tail.slice(0, next);
+}
+function skipPolicyWorkflow(name) {
+  return readFileSync(new URL('../.github/workflows/' + name, import.meta.url), 'utf8');
+}
+test('CI-SKIP FCR01 PR audit and privileged metadata remain event-separated', () => {
+  const source = skipPolicyWorkflow('pr-continuity.yml');
+  const audit = skipPolicyJob(source, 'exact-head-audit');
+  const metadata = skipPolicyJob(source, 'metadata-receipt');
+  assert.match(audit, /if: github\.event_name == 'pull_request'/);
+  assert.match(audit, /ref:.*github\.event\.pull_request\.head\.sha/);
+  assert.match(metadata, /if: github\.event_name == 'pull_request_target'/);
+  assert.match(metadata, /ref:.*github\.sha/);
+  assert.doesNotMatch(metadata, /ref:.*github\.event\.pull_request\.head\.sha/);
+});
+test('CI-SKIP FCR02 rollover remains restricted to main push or dispatch', () => {
+  const rollover = skipPolicyJob(skipPolicyWorkflow('pr-continuity.yml'), 'rollover');
+  assert.match(rollover, /if: github\.ref == 'refs\/heads\/main' && \(github\.event_name == 'workflow_dispatch' \|\| github\.event_name == 'push'\)/);
+});
+test('CI-SKIP FCR03 production Playwright is triggered only after approved main deploy', () => {
+  const workflow = skipPolicyWorkflow('playwright.yml');
+  assert.match(skipPolicyJob(workflow, 'playwright'), /if: github\.event_name != 'workflow_run'/);
+  const production = skipPolicyJob(workflow, 'production-release-witness');
+  assert.match(production, /github\.event_name == 'workflow_run'/);
+  assert.match(production, /github\.event\.workflow_run\.event == 'workflow_dispatch'/);
+  assert.match(production, /github\.event\.workflow_run\.head_branch == 'main'/);
+  assert.match(production, /github\.event\.workflow_run\.conclusion == 'success'/);
+  assert.match(production, /environment: production/);
+});
+test('CI-SKIP FCR04 Neon cleanup is close-only and limited to same-repo PRs', () => {
+  const workflow = skipPolicyWorkflow('neon-pr-branches.yml');
+  const create = skipPolicyJob(workflow, 'create_neon_branch');
+  const cleanup = skipPolicyJob(workflow, 'delete_neon_branch');
+  assert.match(create, /github\.event\.action == 'opened'/);
+  assert.match(create, /github\.event\.action == 'synchronize'/);
+  assert.match(cleanup, /github\.event\.action == 'closed'/);
+  assert.match(cleanup, /github\.event\.pull_request\.head\.repo\.full_name == github\.repository/);
+});
+test('CI-SKIP FCR05 release contract runs on PR and provenance is restricted', () => {
+  const workflow = skipPolicyWorkflow('main-release-provenance.yml');
+  assert.match(skipPolicyJob(workflow, 'contract'), /node --test scripts\/verify-main-release-provenance\.node-test\.mjs/);
+  const provenance = skipPolicyJob(workflow, 'provenance');
+  assert.match(provenance, /github\.event_name != 'pull_request'/);
+  assert.match(provenance, /needs: contract/);
+});
+test('CI-SKIP FCR06 unsafe metadata broadening is detected', () => {
+  const source = skipPolicyWorkflow('pr-continuity.yml');
+  const tampered = source.replace("if: github.event_name == 'pull_request_target'", 'if: always()');
+  assert.notEqual(tampered, source);
+  assert.doesNotMatch(skipPolicyJob(tampered, 'metadata-receipt'), /if: github\.event_name == 'pull_request_target'/);
+});
