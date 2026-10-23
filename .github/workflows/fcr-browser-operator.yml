@@ -6,8 +6,10 @@ on:
   pull_request:
     paths:
       - 'scripts/fcr-browser-journey.mjs'
+      - 'scripts/fcr-browser-plan.mjs'
       - 'config/browser-journeys/**'
       - 'test/fcr-browser-journey.test.mjs'
+      - 'test/fcr-browser-plan.test.mjs'
       - 'docs/FCR_BROWSER_OPERATOR.md'
       - '.github/workflows/fcr-browser-operator.yml'
   workflow_dispatch:
@@ -45,8 +47,10 @@ jobs:
       - name: Validate browser operator source and approved manifests
         run: |
           node --check scripts/fcr-browser-journey.mjs
-          node --test test/fcr-browser-journey.test.mjs
+          node --check scripts/fcr-browser-plan.mjs
+          node --test test/fcr-browser-journey.test.mjs test/fcr-browser-plan.test.mjs
           node scripts/fcr-browser-journey.mjs config/browser-journeys/sync-party.json --dry-run
+          node scripts/fcr-browser-plan.mjs --request 'Test the complete Sync Party new user journey on https://games.jussco.company'
 
   synthetic-live-journey:
     if: github.event_name == 'workflow_dispatch' && inputs.execute == true
@@ -70,7 +74,7 @@ jobs:
         env:
           FCR_BROWSER_OUT_DIR: ${{ runner.temp }}/fcr-browser-operator
         run: |
-          node --test test/fcr-browser-journey.test.mjs
+          node --test test/fcr-browser-journey.test.mjs test/fcr-browser-plan.test.mjs
           node scripts/fcr-browser-journey.mjs config/browser-journeys/sync-party.json --run
       - name: Retain private-session-free failure evidence
         if: always()
