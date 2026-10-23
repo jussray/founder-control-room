@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "release": "portfolio-v0.1.0",
+  "decision": "candidate-selection-authorized",
+  "decisionDate": "2026-10-23",
+  "decisionTime": null,
+  "decisionSource": "Founder statement in ChatGPT conversation; time not supplied",
+  "scope": "Select and evaluate this exact tuple only; does not authorize merge, promotion, or deployment.",
+  "repositories": {
+    "storyengine": {
+      "repository": "jussray/StoryEngine",
+      "commit": "cd0b9be794d7b1a1b682e1c457aa632f27a2112a"
+    },
+    "chiefAi": {
+      "repository": "jussray/chief-ai-machine",
+      "commit": "68f5cdb5c63a81531d8c877add50735cfbb389ff"
+    },
+    "sekretBip": {
+      "repository": "jussray/Sekret-Bip",
+      "commit": "9c7c91ecb408e6a694e9a2549d1b9f0950010798"
+    }
+  },
+  "releaseStatus": "CANDIDATE",
+  "notReleaseEvidence": true
+}
