@@ -13,6 +13,7 @@ on:
       - 'scripts/portfolio_matrix_contract.py'
       - 'tests/test_portfolio_candidate_decision.py'
       - 'tests/test_portfolio_matrix_contract.py'
+      - 'tests/test_portfolio_hotfix.py'
       - '.github/workflows/portfolio-compatibility.yml'
 permissions:
   contents: read
@@ -37,8 +38,7 @@ jobs:
       - name: Check candidate decision tests
         run: |
           python -m pip install 'jsonschema>=4.23,<5'
-          python -m unittest discover -s tests -p 'test_portfolio_candidate_decision.py' -v
-          python -m unittest discover -s tests -p 'test_portfolio_matrix_contract.py' -v
+          python -m unittest discover -s tests -p 'test_portfolio_*.py' -v
       - name: Validate structure only (not a release pass)
         run: python scripts/validate_portfolio_release.py --structure-only
       - name: Record exact manifest hash
