@@ -1,0 +1,353 @@
+{
+  "contract": "fcr/browser-journey@v1",
+  "project": "sync-party-game",
+  "target": "https://games.jussco.company/",
+  "syntheticOnly": true,
+  "approvedSyntheticActions": true,
+  "actors": {
+    "host": {
+      "width": 1280,
+      "height": 800,
+      "mobile": false
+    },
+    "guest": {
+      "width": 390,
+      "height": 844,
+      "mobile": true
+    }
+  },
+  "steps": [
+    {
+      "actor": "host",
+      "action": "goto",
+      "label": "Open Sync Party public homepage",
+      "path": "/"
+    },
+    {
+      "actor": "host",
+      "action": "expectVisible",
+      "label": "Verify Sync landing screen",
+      "selector": ".party-home"
+    },
+    {
+      "actor": "host",
+      "action": "expectVisible",
+      "label": "Verify create game button",
+      "selector": "#create"
+    },
+    {
+      "actor": "host",
+      "action": "click",
+      "label": "Open game creation form",
+      "selector": "#create"
+    },
+    {
+      "actor": "host",
+      "action": "fill",
+      "label": "Enter synthetic host nickname",
+      "selector": "#createName",
+      "value": "FCRBotHost"
+    },
+    {
+      "actor": "host",
+      "action": "click",
+      "label": "Create synthetic multiplayer room",
+      "selector": "#createForm button[type=submit]"
+    },
+    {
+      "actor": "host",
+      "action": "captureText",
+      "label": "Capture synthetic room invite code",
+      "selector": ".room-code",
+      "variable": "roomCode",
+      "pattern": "^[A-Z0-9]{5}$"
+    },
+    {
+      "actor": "guest",
+      "action": "goto",
+      "label": "Open second synthetic player session",
+      "path": "/"
+    },
+    {
+      "actor": "guest",
+      "action": "expectVisible",
+      "label": "Verify mobile public entrance",
+      "selector": ".party-home"
+    },
+    {
+      "actor": "guest",
+      "action": "expectNoOverflow",
+      "label": "Verify mobile landing without horizontal scrolling"
+    },
+    {
+      "actor": "guest",
+      "action": "click",
+      "label": "Open join room form",
+      "selector": "#join"
+    },
+    {
+      "actor": "guest",
+      "action": "fill",
+      "label": "Enter generated room code",
+      "selector": "#joinCode",
+      "value": "{{roomCode}}"
+    },
+    {
+      "actor": "guest",
+      "action": "fill",
+      "label": "Enter synthetic guest nickname",
+      "selector": "#joinName",
+      "value": "FCRBotGuest"
+    },
+    {
+      "actor": "guest",
+      "action": "click",
+      "label": "Join the host room",
+      "selector": "#joinForm button[type=submit]"
+    },
+    {
+      "actor": "host",
+      "action": "expectText",
+      "label": "Confirm guest appears in host lobby",
+      "selector": ".lobby-players",
+      "value": "FCRBotGuest"
+    },
+    {
+      "actor": "host",
+      "action": "expectVisible",
+      "label": "Confirm host can start with two players",
+      "selector": "#startBtn"
+    },
+    {
+      "actor": "host",
+      "action": "click",
+      "label": "Start authoritative multiplayer game",
+      "selector": "#startBtn"
+    },
+    {
+      "actor": "guest",
+      "action": "expectVisible",
+      "label": "Verify guest receives first round",
+      "selector": ".choices"
+    },
+    {
+      "actor": "host",
+      "action": "click",
+      "label": "Lock host choice in round 1",
+      "selector": ".choice:first-child"
+    },
+    {
+      "actor": "guest",
+      "action": "click",
+      "label": "Lock guest choice in round 1",
+      "selector": ".choice:first-child"
+    },
+    {
+      "actor": "host",
+      "action": "expectText",
+      "label": "Verify host sees synchronized score in round 1",
+      "selector": ".sync-readout",
+      "value": "100%"
+    },
+    {
+      "actor": "guest",
+      "action": "expectText",
+      "label": "Verify guest sees synchronized score in round 1",
+      "selector": ".sync-readout",
+      "value": "100%"
+    },
+    {
+      "actor": "host",
+      "action": "click",
+      "label": "Advance to round 2",
+      "selector": "#nextBtn"
+    },
+    {
+      "actor": "guest",
+      "action": "expectVisible",
+      "label": "Verify guest sees choices in round 2",
+      "selector": ".choice:first-child"
+    },
+    {
+      "actor": "host",
+      "action": "click",
+      "label": "Lock host choice in round 2",
+      "selector": ".choice:first-child"
+    },
+    {
+      "actor": "guest",
+      "action": "click",
+      "label": "Lock guest choice in round 2",
+      "selector": ".choice:first-child"
+    },
+    {
+      "actor": "host",
+      "action": "expectText",
+      "label": "Verify host sees synchronized score in round 2",
+      "selector": ".sync-readout",
+      "value": "100%"
+    },
+    {
+      "actor": "guest",
+      "action": "expectText",
+      "label": "Verify guest sees synchronized score in round 2",
+      "selector": ".sync-readout",
+      "value": "100%"
+    },
+    {
+      "actor": "host",
+      "action": "click",
+      "label": "Advance to round 3",
+      "selector": "#nextBtn"
+    },
+    {
+      "actor": "guest",
+      "action": "expectVisible",
+      "label": "Verify guest sees choices in round 3",
+      "selector": ".choice:first-child"
+    },
+    {
+      "actor": "host",
+      "action": "click",
+      "label": "Lock host choice in round 3",
+      "selector": ".choice:first-child"
+    },
+    {
+      "actor": "guest",
+      "action": "click",
+      "label": "Lock guest choice in round 3",
+      "selector": ".choice:first-child"
+    },
+    {
+      "actor": "host",
+      "action": "expectText",
+      "label": "Verify host sees synchronized score in round 3",
+      "selector": ".sync-readout",
+      "value": "100%"
+    },
+    {
+      "actor": "guest",
+      "action": "expectText",
+      "label": "Verify guest sees synchronized score in round 3",
+      "selector": ".sync-readout",
+      "value": "100%"
+    },
+    {
+      "actor": "host",
+      "action": "click",
+      "label": "Advance to round 4",
+      "selector": "#nextBtn"
+    },
+    {
+      "actor": "guest",
+      "action": "expectVisible",
+      "label": "Verify guest sees choices in round 4",
+      "selector": ".choice:first-child"
+    },
+    {
+      "actor": "host",
+      "action": "click",
+      "label": "Lock host choice in round 4",
+      "selector": ".choice:first-child"
+    },
+    {
+      "actor": "guest",
+      "action": "click",
+      "label": "Lock guest choice in round 4",
+      "selector": ".choice:first-child"
+    },
+    {
+      "actor": "host",
+      "action": "expectText",
+      "label": "Verify host sees synchronized score in round 4",
+      "selector": ".sync-readout",
+      "value": "100%"
+    },
+    {
+      "actor": "guest",
+      "action": "expectText",
+      "label": "Verify guest sees synchronized score in round 4",
+      "selector": ".sync-readout",
+      "value": "100%"
+    },
+    {
+      "actor": "host",
+      "action": "click",
+      "label": "Advance to round 5",
+      "selector": "#nextBtn"
+    },
+    {
+      "actor": "guest",
+      "action": "expectVisible",
+      "label": "Verify guest sees choices in round 5",
+      "selector": ".choice:first-child"
+    },
+    {
+      "actor": "host",
+      "action": "click",
+      "label": "Lock host choice in round 5",
+      "selector": ".choice:first-child"
+    },
+    {
+      "actor": "guest",
+      "action": "click",
+      "label": "Lock guest choice in round 5",
+      "selector": ".choice:first-child"
+    },
+    {
+      "actor": "host",
+      "action": "expectText",
+      "label": "Verify host sees synchronized score in round 5",
+      "selector": ".sync-readout",
+      "value": "100%"
+    },
+    {
+      "actor": "guest",
+      "action": "expectText",
+      "label": "Verify guest sees synchronized score in round 5",
+      "selector": ".sync-readout",
+      "value": "100%"
+    },
+    {
+      "actor": "host",
+      "action": "click",
+      "label": "Open final scores after five rounds",
+      "selector": "#nextBtn"
+    },
+    {
+      "actor": "host",
+      "action": "expectVisible",
+      "label": "Verify final leaderboard",
+      "selector": ".scoreboard"
+    },
+    {
+      "actor": "guest",
+      "action": "expectVisible",
+      "label": "Verify guest sees final leaderboard",
+      "selector": ".scoreboard"
+    },
+    {
+      "actor": "guest",
+      "action": "expectNoOverflow",
+      "label": "Verify mobile final scores fit viewport"
+    },
+    {
+      "actor": "host",
+      "action": "click",
+      "label": "Replay the same room",
+      "selector": "#rematchBtn"
+    },
+    {
+      "actor": "host",
+      "action": "expectVisible",
+      "label": "Verify host gets fresh round after replay",
+      "selector": ".choices"
+    },
+    {
+      "actor": "guest",
+      "action": "expectVisible",
+      "label": "Verify guest gets fresh round after replay",
+      "selector": ".choices"
+    }
+  ]
+}
