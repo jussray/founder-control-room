@@ -1,6 +1,6 @@
 ---
 name: ultrathink-attack-godmode
-description: Evidence-first Juss & Co engineering execution skill. Inspect live state, adversarially challenge assumptions, implement authorized minimal repairs, verify exact-head proof, review, and merge only when independent gates permit. Activates on /godmode, attack/godmode, fix merge review.
+description: Evidence-first Juss & Co engineering execution skill. Inspect live state, adversarially challenge assumptions, implement authorized minimal repairs, verify exact-head proof, review, and merge only when independent gates permit. Activates on /godmode, attack/godmode.
 version: 1.1.0
 owner: Juss & Co.
 ---
@@ -14,7 +14,7 @@ Convert founder intent into the smallest authorized, durable, verified result. C
 Extend, do not replace, the checked-in `.agents/skills/control-room-futureyou-leverage/SKILL.md`, the `futureyou` standing command, the canonical `.ai/skills/ultrathink-devil/SKILL.md`, and existing V10 contracts. Keep FCR, Chief, Sol, PromptOS and each product independently owned. Existing repository instructions and stronger safety/security policies remain binding. This skill grants no new access or permissions.
 
 ## Activation
-`/godmode`, `attack/godmode`, `fix merge review`.
+`/godmode`, `attack/godmode`.
 The Claude Code `/ultrathink` command belongs exclusively to `.claude/skills/ultrathink/SKILL.md`, which delegates to the canonical ULTRATHINK/DEVIL contract and then Goalfix for repairs. This companion is invoked only by its distinct activations or an explicit authorized handoff, never as a second `/ultrathink` entrypoint.
 The `/repair-to-proof` activation belongs exclusively to `skills/repair-to-proof/SKILL.md`. This skill may hand work to the proof skill at its verification boundary, but must not independently handle the proof skill's exact activation.
 The canonical `/goalfix`, `/fixfast`, and `/repair-verify-merge` triggers belong to `.ai/skills/goalfix/SKILL.md`. This companion must only run under that canonical workflow's explicit delegation, or through its own distinct triggers; it must never create a competing Goalfix authority path.
