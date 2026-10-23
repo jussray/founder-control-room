@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Fail-closed release preflight: structural checks only; never authorizes publication."""
+import argparse
 import hashlib
 import json
 import re
@@ -57,6 +58,10 @@ def validate_candidate_decision(manifest, record):
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--structure-only", action="store_true",
+        help="Validate candidate data without claiming any release evidence")
+    args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
     manifest, digest = load_unique(root / "releases/portfolio-v0.1.0.json")
     schema, _ = load_unique(root / "schemas/portfolio-release.schema.json")
@@ -85,6 +90,8 @@ def main():
         "compatibilityTested": False,
         "releasePromotionAuthorized": False,
     }, indent=2), flush=True)
+    if args.structure_only:
+        return  # STRUCTURE ONLY: never grants promotion or compatibility proof
     suites = policy.get("testCommands", {})
     required = (
         "storyengine", "chiefAi", "sekretBip",
