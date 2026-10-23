@@ -7,6 +7,14 @@ on:
     paths:
       - 'scripts/fcr-browser-journey.mjs'
       - 'scripts/fcr-browser-plan.mjs'
+      - 'src/lib/browserOperatorPlan.ts'
+      - 'src/http/routes/browserOperator.ts'
+      - 'src/http/server.ts'
+      - 'src/http/routes/__tests__/browserOperator.integration.test.ts'
+      - 'public/control-room/browser-operator.html'
+      - 'public/control-room/browser-operator.js'
+      - 'public/control-room/index.html'
+      - 'e2e/browser-operator-preview-proof.mjs'
       - 'config/browser-journeys/**'
       - 'test/fcr-browser-journey.test.mjs'
       - 'test/fcr-browser-plan.test.mjs'
@@ -34,7 +42,7 @@ jobs:
   manifest-contract:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 20
     steps:
       - name: Checkout exact pull request head
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -51,6 +59,15 @@ jobs:
           node --test test/fcr-browser-journey.test.mjs test/fcr-browser-plan.test.mjs
           node scripts/fcr-browser-journey.mjs config/browser-journeys/sync-party.json --dry-run
           node scripts/fcr-browser-plan.mjs --request 'Test the complete Sync Party new user journey on https://games.jussco.company'
+      - name: Install dependencies and sandboxed Chromium
+        run: |
+          npm ci --ignore-scripts
+          npx playwright install chromium --with-deps
+      - name: Test founder-only plan API and UI at exact candidate head
+        run: |
+          npx vitest run src/http/routes/__tests__/browserOperator.integration.test.ts
+          node --check public/control-room/browser-operator.js
+          node e2e/browser-operator-preview-proof.mjs
 
   synthetic-live-journey:
     if: github.event_name == 'workflow_dispatch' && inputs.execute == true
