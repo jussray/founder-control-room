@@ -35,7 +35,15 @@ FCR now includes `scripts/fcr-browser-plan.mjs`, a **bounded plain-language rout
 
 The command returns a manifest identifier, the two-player/step counts, exact manifest SHA-256 fingerprint, target origin, and `REQUIRES_FOUNDER_RUN_APPROVAL`. It executes **zero** browser or provider operations. Only the source-controlled Sync Party route is currently supported; other projects must receive their own reviewed manifest and route. Unsupported, multiple-project, mixed or sensitive-action requests are rejected rather than interpreted expansively. It does not import AI model outputs or page instructions into browser authority.
 
-Before adding a future interactive FCR dashboard, a founder-authenticated plan API must check plan identity, expiry, a specific approval, execution status, and caller-to-project scope. The task preview itself is not a run approval, and no new browser execution UI or remote execution API has been added in this PR.
+### Founder UI/API candidate (review branch only)
+
+The standalone FCR screen at /control-room/browser-operator.html checks /auth/me before revealing its form, then submits the request to POST /browser-operator/preview. The new Express router is protected by the existing requireFounder middleware and the server's same-origin browser-mutation gate. The API only selects the supported Sync Party manifest and returns scope metadata plus REQUIRES_FOUNDER_RUN_APPROVAL. The response is no-store and deliberately never includes founder email, raw request text, credentials, or browser session state.
+
+The JavaScript and the server's Worker-compatible TypeScript policy reject unsupported/mixed/private requests and do not run Playwright. The page's Execute control is disabled. This is an honest PREVIEW capability, not active TinyFish-style autonomous execution, and source/UI tests do not prove production reachability. The TypeScript server policy's static 53-step/two-actor metadata is compared to the authoritative manifest by a focused integration test.
+
+Focused verification: npx vitest run src/http/routes/__tests__/browserOperator.integration.test.ts and node e2e/browser-operator-preview-proof.mjs (with Playwright Chromium installed). The latter uses synthetic route fixtures with no live user account, production application, external website, or real provider. The full suite and browser checks remain separately subject to exact-head review.
+
+Future browser execution needs a founder-authenticated plan API that binds manifest SHA, identity, expiry, caller-to-project scope, approval and execution status at use time. The preview API is not an execution approval, and no browser-run endpoint or merge/deploy capability has been added.
 ## Boundaries
 
 - Only source-reviewed manifests directly in config/browser-journeys can be executed by the CLI. No free-form instructions from the visited page are trusted.
