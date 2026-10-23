@@ -12,7 +12,7 @@ import re
 import subprocess
 import sys
 
-from validate_portfolio_release import load_unique
+from portfolio_manifest_io import load_unique
 
 KEYS = ("storyengine", "chiefAi", "sekretBip")
 SOURCE_NAMES = {"storyengine": "StoryEngine", "chiefAi": "chief-ai-machine", "sekretBip": "Sekret-Bip"}
