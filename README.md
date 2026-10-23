@@ -8,6 +8,12 @@ Founder Control Room is the provider-independent founder operating plane for gov
 
 GitHub, Cloudflare, Supabase, n8n, Zapier, HubSpot, Shopify, and other providers may supply execution or evidence. None of them becomes the product constitution.
 
+## October 22, 2026 ET: FCR PR #1005 StoryEngine evidence-subject refresh
+
+PR #1005's FCR Playwright check at `071e040759108318a7502c32eee1a4c88dda7d6b` correctly stopped because `STORYENGINE_PEER_SHA` named StoryEngine `main@26b1c34ae7c97c5d1b66a23d6345b3965cfcdc1f` while the independently observed current `refs/heads/main` resolved to `6b97b78370fbc25d4b4bb88bfeab136eb4c7dc2f`. The workflow now selects that exact successor peer (`11d8023c494b104171701f170879b205dbf480fb` is the FCR source commit which changed the pin). The StoryEngine federation route, directive/receipt library, federation test, and package manifest retain identical blob hashes across the two peer commits; the server's `/runtime-identity` handler remains present, but the server source itself changed and requires executed peer proof.
+
+This updates the **candidate evidence identity only**. It does not inherit historical Playwright green, prove the newly pinned peer's behavior, fix the separate Chief adapter contract drift, authorize FCR/StoryEngine production publication, approve a merge, or permit any provider mutation. A complete exact-FCR-head browser and federation receipt witness must pass against the new peer, and either repo's subsequent head movement expires this evidence. Documentation Truth and the independent founder/review gates remain mandatory.
+
 ## October 16, 2026 StoryEngine peer refresh for FCR browser federation
 
 The FCR Playwright workflow's StoryEngine peer identity was changed from `a6e6a396ed30535af2fd9b1ec2347a84e1a3fbf3` to the separately observed StoryEngine `main` SHA `26b1c34ae7c97c5d1b66a23d6345b3965cfcdc1f`. GitHub comparison showed a forward, 22-commit peer transition, and the successor had 15 passing checks at observation time, including the Control Room federation contract. This pin refresh is a prerequisite for running the FCR-to-StoryEngine browser test, **not** a passing FCR peer witness or an authorization to deploy.
