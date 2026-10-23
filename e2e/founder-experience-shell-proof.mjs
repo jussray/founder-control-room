@@ -115,6 +115,20 @@ async function provePublicFrontDoor(label, viewport) {
   if (await page.locator('#discover a.btn').getAttribute('href') !== '/work.html') {
     throw new Error(`${label}: public Explore action must route to the real public work directory`);
   }
+  // Visual cards must preserve real keyboard-accessible public destinations.
+  for (const [kind, expectedHref] of [
+    ['story', '/juss-rayy/'],
+    ['missions', '/work.html'],
+    ['learn', '/control-room/founder-shell.html'],
+  ]) {
+    const cardLink = page.locator(`a[data-public-card-link="${kind}"]`);
+    if (await cardLink.count() !== 1 || !(await cardLink.isVisible()) || await cardLink.getAttribute('href') !== expectedHref) {
+      throw new Error(`${label}: public ${kind} card lost its real route to ${expectedHref}`);
+    }
+  }
+  if (await page.locator('#community a').count() !== 0) {
+    throw new Error(`${label}: community preview must not advertise a not-yet-live destination`);
+  }
 
   await assertNoHorizontalOverflow(page, `${label} user view`);
   await page.screenshot({ path: join(RESULTS_ROOT, `public-fcr-user-${label}.png`), fullPage: true });
