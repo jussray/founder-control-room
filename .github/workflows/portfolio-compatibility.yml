@@ -1,0 +1,286 @@
+name: Portfolio Compatibility Candidate
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'schemas/portfolio-release.schema.json'
+      - 'release-policy/**'
+      - 'releases/**'
+      - 'scripts/validate_portfolio_release.py'
+      - 'scripts/find_release_commit.py'
+      - 'scripts/validate_portfolio_hotfix.py'
+      - 'scripts/checkout_portfolio_sources.py'
+      - 'scripts/portfolio_manifest_io.py'
+      - 'scripts/portfolio_job_receipt.py'
+      - 'scripts/portfolio_evidence_gate.py'
+      - 'scripts/portfolio_matrix_contract.py'
+      - 'tests/test_portfolio_candidate_decision.py'
+      - 'tests/test_portfolio_matrix_contract.py'
+      - 'tests/test_portfolio_hotfix.py'
+      - '.github/workflows/portfolio-compatibility.yml'
+permissions:
+  contents: read
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+  EXPECTED_COORDINATOR_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  manifest-preflight:
+    name: Candidate manifest integrity
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      digest: ${{ steps.digest.outputs.value }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Check candidate decision tests
+        run: |
+          python -m pip install 'jsonschema>=4.23,<5'
+          python -m unittest discover -s tests -p 'test_portfolio_*.py' -v
+      - name: Validate structure only (not a release pass)
+        run: python scripts/validate_portfolio_release.py --structure-only
+      - name: Record exact manifest hash
+        id: digest
+        run: echo "value=$(sha256sum releases/portfolio-v0.1.0.json | cut -d ' ' -f1)" >> "$GITHUB_OUTPUT"
+
+  exact-sources-and-peers:
+    name: Exact SHAs, recovered ancestry and peer contract
+    needs: manifest-preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      EXPECTED_MANIFEST_SHA256: ${{ needs.manifest-preflight.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Fetch all public sources without credentials
+        run: python scripts/checkout_portfolio_sources.py --only all --sources sources
+      - name: Prove exact SHAs, ancestry and restored commits
+        run: python scripts/portfolio_matrix_contract.py --mode sources --sources sources --evidence evidence/sources.json
+      - name: Enforce declared exact peer revisions
+        run: python scripts/portfolio_matrix_contract.py --mode peers --sources sources --evidence evidence/peers.json
+      - name: Check private/public federation boundaries
+        if: always()
+        run: python scripts/portfolio_matrix_contract.py --mode federation --sources sources --evidence evidence/federation.json
+      - name: Preserve sanitized exact-tuple evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: portfolio-contract-evidence-${{ github.run_id }}
+          path: evidence/*.json
+          if-no-files-found: warn
+          retention-days: 14
+
+  storyengine-tests:
+    name: StoryEngine exact-commit and tenant-security tests
+    needs: manifest-preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      EXPECTED_MANIFEST_SHA256: ${{ needs.manifest-preflight.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Fetch pinned StoryEngine
+        run: python scripts/checkout_portfolio_sources.py --only storyengine --sources sources
+      - name: Install locked dependencies
+        working-directory: sources/StoryEngine/story-engine
+        run: npm ci --no-audit --no-fund
+      - name: Install deterministic media test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ffmpeg
+          command -v ffmpeg
+          command -v ffprobe
+      - name: Repository tests
+        working-directory: sources/StoryEngine/story-engine
+        run: npm test
+      - name: Tenant and security regression
+        working-directory: sources/StoryEngine/story-engine
+        run: node --test test/tenantRouteGuards.test.js test/tenantHttpBoundary.test.js test/securityHardening.test.js
+
+      - name: Write sanitized storyengine suite receipt
+        if: always()
+        env:
+          JOB_RESULT: ${{ job.status }}
+        run: python scripts/portfolio_job_receipt.py --repo storyengine --status "$JOB_RESULT" --output evidence/storyengine-suite.json
+      - name: Preserve sanitized storyengine suite receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: portfolio-suite-storyengine-${{ github.run_id }}
+          path: evidence/storyengine-suite.json
+          if-no-files-found: error
+          retention-days: 14
+
+  chiefai-tests:
+    name: Chief AI exact-commit, governance and security tests
+    needs: manifest-preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      EXPECTED_MANIFEST_SHA256: ${{ needs.manifest-preflight.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Fetch pinned Chief AI
+        run: python scripts/checkout_portfolio_sources.py --only chiefAi --sources sources
+      - name: Install locked dependencies
+        working-directory: sources/chief-ai-machine
+        run: npm ci --no-audit --no-fund
+      - name: Typecheck
+        working-directory: sources/chief-ai-machine
+        run: npm run typecheck
+      - name: Lint
+        working-directory: sources/chief-ai-machine
+        run: npm run lint
+      - name: Unit tests
+        working-directory: sources/chief-ai-machine
+        run: npm test
+      - name: Governance regressions
+        working-directory: sources/chief-ai-machine
+        run: npx vitest run src/domain/merge-intent.test.js src/domain/evidence-decision-loop.test.js src/domain/capability-security.test.js
+      - name: Cookie security contract
+        working-directory: sources/chief-ai-machine
+        run: npm run verify:cookies
+
+      - name: Write sanitized chiefAi suite receipt
+        if: always()
+        env:
+          JOB_RESULT: ${{ job.status }}
+        run: python scripts/portfolio_job_receipt.py --repo chiefAi --status "$JOB_RESULT" --output evidence/chiefAi-suite.json
+      - name: Preserve sanitized chiefAi suite receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: portfolio-suite-chiefAi-${{ github.run_id }}
+          path: evidence/chiefAi-suite.json
+          if-no-files-found: error
+          retention-days: 14
+
+  sekretbip-tests:
+    name: Se'kret Bip exact-commit, privacy and safety tests
+    needs: manifest-preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      EXPECTED_MANIFEST_SHA256: ${{ needs.manifest-preflight.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Fetch pinned Se'kret Bip
+        run: python scripts/checkout_portfolio_sources.py --only sekretBip --sources sources
+      - name: Install locked dependencies
+        working-directory: sources/Sekret-Bip
+        run: npm ci --no-audit --no-fund
+      - name: Typecheck
+        working-directory: sources/Sekret-Bip
+        run: npm run type-check
+      - name: Repository regression suite
+        working-directory: sources/Sekret-Bip
+        run: npm test
+      - name: Privacy and parent-bridge regression
+        working-directory: sources/Sekret-Bip
+        run: node --test test/age-gate.test.mjs test/bridge-privacy-validator.test.mjs test/parent-route-guard.test.mjs test/privacy-boundaries.test.mjs
+
+      - name: Write sanitized sekretBip suite receipt
+        if: always()
+        env:
+          JOB_RESULT: ${{ job.status }}
+        run: python scripts/portfolio_job_receipt.py --repo sekretBip --status "$JOB_RESULT" --output evidence/sekretBip-suite.json
+      - name: Preserve sanitized sekretBip suite receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: portfolio-suite-sekretBip-${{ github.run_id }}
+          path: evidence/sekretBip-suite.json
+          if-no-files-found: error
+          retention-days: 14
+
+  portfolio-release-gate:
+    name: Promotion gate — all evidence required
+    needs:
+      - manifest-preflight
+      - exact-sources-and-peers
+      - storyengine-tests
+      - chiefai-tests
+      - sekretbip-tests
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Reject failed, skipped, or missing mandatory jobs
+        env:
+          PREFLIGHT: ${{ needs.manifest-preflight.result }}
+          SOURCES: ${{ needs.exact-sources-and-peers.result }}
+          STORY: ${{ needs.storyengine-tests.result }}
+          CHIEF: ${{ needs.chiefai-tests.result }}
+          BIP: ${{ needs.sekretbip-tests.result }}
+        run: |
+          for result in "$PREFLIGHT" "$SOURCES" "$STORY" "$CHIEF" "$BIP"; do
+            if [ "$result" != success ]; then
+              echo "PROMOTION BLOCKED: mandatory job result=$result" >&2
+              exit 1
+            fi
+          done
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Download exact-run contract evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: portfolio-contract-evidence-${{ github.run_id }}
+          path: evidence
+      - name: Download exact-run suite receipts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: portfolio-suite-*-${{ github.run_id }}
+          merge-multiple: true
+          path: evidence
+      - name: Reject incomplete or mismatched evidence
+        env:
+          EXPECTED_MANIFEST_SHA256: ${{ needs.manifest-preflight.outputs.digest }}
+        run: python scripts/portfolio_evidence_gate.py --evidence evidence
+      - name: Require complete runtime integration and verified release evidence
+        run: |
+          python -m pip install 'jsonschema>=4.23,<5'
+          python scripts/validate_portfolio_release.py

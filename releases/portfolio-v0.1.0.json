@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "release": "portfolio-v0.1.0",
+  "description": "Founder-authorized candidate tuple (2026-10-23). NOT validated, promoted, or deployed; all release gates remain mandatory.",
+  "repositories": {
+    "storyengine": {
+      "repository": "jussray/StoryEngine",
+      "commit": "cd0b9be794d7b1a1b682e1c457aa632f27a2112a"
+    },
+    "chiefAi": {
+      "repository": "jussray/chief-ai-machine",
+      "commit": "68f5cdb5c63a81531d8c877add50735cfbb389ff"
+    },
+    "sekretBip": {
+      "repository": "jussray/Sekret-Bip",
+      "commit": "9c7c91ecb408e6a694e9a2549d1b9f0950010798"
+    }
+  }
+}

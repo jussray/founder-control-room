@@ -1,5 +1,13 @@
 # Truth Decay Audit: When a True Claim Becomes Unsafe to Reuse
 
+## October 23, 2026: Separate moving-main federation proof from fixed portfolio release proof
+
+FCR Playwright at candidate `8ed0916d31bbbc516b8f2ed589f7722737c26d60` failed the live StoryEngine peer-identity guard: the exact expected `26b1c34ae7c97c5d1b66a23d6345b3965cfcdc1f` did not equal the independently observed `refs/heads/main` head `be4fe1a006fcecdad077d5c3878cd76443274c65`. The application/browser steps preceding the guard did not certify the FCR-to-StoryEngine federation. This is a verified **stale federation proof subject**, not a reason to disable freshness or erase the failed receipt.
+
+The focused repair refreshes only the FCR browser federation pin to the observed StoryEngine main head and preserves the exact-live-main guard. Independent StoryEngine commit history confirmed the previous pin is ten commits behind the observed main at inspection. A fresh exact-head FCR Playwright run, peer runtime SHA readback, and directive/receipt/browser loop must succeed before a present-tense integration claim. A later StoryEngine main movement expires the moving-main witness and must be reconciled explicitly.
+
+Separately, `releases/portfolio-v0.1.0.json` selects the fixed StoryEngine SHA `cd0b9be794d7b1a1b682e1c457aa632f27a2112a`. Its frozen selection is correct for candidate-testing semantics even when main advances. The live federation check and the fixed release manifest are separate evidence planes; neither can replace the other's check. Candidate-level release promotion is still blocked by declared peer-version conflicts and the unwired behavioral three-product runtime integration suite. The historical October 16 observations below are preserved without renewing them.
+
 ## October 16, 2026: StoryEngine peer-identity renewal, without inherited proof
 
 FCR's new actual-server GitHub Workspace/browser test, full founder UI journey, capability workbench, and guarded terminal scenarios passed on the predecessor candidate while the separate FCR-to-StoryEngine test failed at the live peer-ref gate. The workflow expected StoryEngine `a6e6a396ed30535af2fd9b1ec2347a84e1a3fbf3` while independently observed `refs/heads/main` resolved to `26b1c34ae7c97c5d1b66a23d6345b3965cfcdc1f`. The former is not a current federation subject.

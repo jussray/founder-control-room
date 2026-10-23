@@ -1,5 +1,11 @@
 # Founder Control Room
 
+## October 23, 2026 federation peer revalidation (historical observation)
+
+The FCR Playwright live-federation check was stopped on October 23 by a stale StoryEngine `main` pin: it expected `26b1c34ae7c97c5d1b66a23d6345b3965cfcdc1f` but independently observed `be4fe1a006fcecdad077d5c3878cd76443274c65`. The workflow's live-federation pin was refreshed to that observed main SHA. The existing exact-live-ref equality, pinned checkout, immutable runtime identity, and real browser/directive-receipt checks remain mandatory. This is a **source-pin repair only**; passing integration must be re-proven on the updated FCR head and becomes historical after either peer changes.
+
+The separately founder-selected **`portfolio-v0.1.0` release candidate** intentionally freezes StoryEngine at `cd0b9be794d7b1a1b682e1c457aa632f27a2112a`, Chief AI at `68f5cdb5c63a81531d8c877add50735cfbb389ff`, and Se’kret Bip at `9c7c91ecb408e6a694e9a2549d1b9f0950010798`. FCR's live-federation `main` pin is a **different proof subject** and does not upgrade, rewrite, or certify the frozen release tuple. The portfolio candidate remains blocked on peer-manifest conflicts and missing end-to-end cross-application runtime verification; no merge, promotion, deployment, or publication follows from pin renewal.
+
 > **Copyright © 2024–2026 Juss Ray. All rights reserved.**
 > This is proprietary software. No license to use, copy, modify, distribute,
 > sublicense, or create derivative works is granted. See [LICENSE](LICENSE).
