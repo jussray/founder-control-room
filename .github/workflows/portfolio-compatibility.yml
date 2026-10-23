@@ -105,6 +105,12 @@ jobs:
       - name: Install locked dependencies
         working-directory: sources/StoryEngine/story-engine
         run: npm ci --no-audit --no-fund
+      - name: Install deterministic media test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ffmpeg
+          command -v ffmpeg
+          command -v ffprobe
       - name: Repository tests
         working-directory: sources/StoryEngine/story-engine
         run: npm test
