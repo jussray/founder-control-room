@@ -15,11 +15,11 @@
   },
   "candidatePolicy": "approved-history",
   "testCommands": {
-    "storyengine": null,
-    "chiefAi": null,
-    "sekretBip": null,
-    "peerContracts": null,
-    "portfolioIntegration": null,
-    "securityRegression": null
+    "storyengine": "cd ../StoryEngine && python -m pytest story-engine/test/ --strict-markers -v",
+    "chiefAi": "cd ../chief-ai-machine && npm test -- --run",
+    "sekretBip": "cd ../Sekret-Bip && npm test -- --run",
+    "peerContracts": "node release-policy/verify-peer-constraints.js",
+    "portfolioIntegration": "node release-policy/test-portfolio-integration.js",
+    "securityRegression": "node release-policy/test-security-regression.js"
   }
 }
