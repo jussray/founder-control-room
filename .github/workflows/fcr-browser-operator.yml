@@ -1,0 +1,82 @@
+name: FCR Browser Operator
+
+# The live job is manual only: it creates synthetic gameplay rooms.
+# PR checks validate the executable policy/manifest but do not browse production.
+on:
+  pull_request:
+    paths:
+      - 'scripts/fcr-browser-journey.mjs'
+      - 'config/browser-journeys/**'
+      - 'test/fcr-browser-journey.test.mjs'
+      - 'docs/FCR_BROWSER_OPERATOR.md'
+      - '.github/workflows/fcr-browser-operator.yml'
+  workflow_dispatch:
+    inputs:
+      journey:
+        description: 'Reviewed FCR-owned synthetic browser journey'
+        required: true
+        default: sync-party
+        type: choice
+        options:
+          - sync-party
+      execute:
+        description: 'I authorize creation of synthetic temporary rooms and test events on the selected public site'
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  manifest-contract:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout exact pull request head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+      - name: Validate browser operator source and approved manifests
+        run: |
+          node --check scripts/fcr-browser-journey.mjs
+          node --test test/fcr-browser-journey.test.mjs
+          node scripts/fcr-browser-journey.mjs config/browser-journeys/sync-party.json --dry-run
+
+  synthetic-live-journey:
+    if: github.event_name == 'workflow_dispatch' && inputs.execute == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact requested revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install locked dependencies and Chromium
+        run: |
+          npm ci --ignore-scripts
+          npx playwright install chromium --with-deps
+      - name: Run reviewed FCR synthetic journey
+        env:
+          FCR_BROWSER_OUT_DIR: ${{ runner.temp }}/fcr-browser-operator
+        run: |
+          node --test test/fcr-browser-journey.test.mjs
+          node scripts/fcr-browser-journey.mjs config/browser-journeys/sync-party.json --run
+      - name: Retain private-session-free failure evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: fcr-browser-operator-receipt
+          path: ${{ runner.temp }}/fcr-browser-operator
+          if-no-files-found: ignore
+          retention-days: 3
