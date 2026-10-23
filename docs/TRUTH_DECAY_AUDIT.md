@@ -1,5 +1,13 @@
 # Truth Decay Audit: When a True Claim Becomes Unsafe to Reuse
 
+## October 22, 2026: FCR StoryEngine security-peer movement requires fresh paired proof
+
+The FCR cinematic review PR originally carried an unchanged StoryEngine peer SHA `26b1c34ae7c97c5d1b66a23d6345b3965cfcdc1f`. Its separate `Playwright E2E` workflow passed the standalone founder UI harness, but correctly stopped on the live StoryEngine `main` equality check: that ref had moved forward to `1669d920f28bc81ddd04fea6d0bdb5ee41c29ec9` through security/authorization changes. This is an evidence-subject drift, not proof that the user interface itself broke.
+
+On the draft-only FCR review branch, `.github/workflows/playwright.yml` now pins that exact successor commit while retaining immutable peer checkout, live-ref comparison, runtime identity check, and federation Playwright. The first successor FCR head `06abccf6af5e90b50c8ded187b4a5d0f70e704b1` passed the federation Playwright E2E workflow; its Documentation Truth and aggregate CI initially failed because the path-specific truth docs and receipt had not yet been refreshed. These source-pair checks cannot certify production availability or current Cloudflare deployment. Re-running checks on later commits is mandatory; do not inherit earlier greens.
+
+The October 16 assertion that the old peer SHA was current is a historical snapshot. After the new SHA, any upstream StoryEngine ref movement or FCR branch movement expires pair-specific test evidence. The public FCR visual changes must remain separate from private Control Room access. No source checks, Playwright run, pin alignment, provider upload, or PR approval alone authorizes merge, deployment, public publishing, privileged actions, or user-data access.
+
 ## October 16, 2026: StoryEngine peer-identity renewal, without inherited proof
 
 FCR's new actual-server GitHub Workspace/browser test, full founder UI journey, capability workbench, and guarded terminal scenarios passed on the predecessor candidate while the separate FCR-to-StoryEngine test failed at the live peer-ref gate. The workflow expected StoryEngine `a6e6a396ed30535af2fd9b1ec2347a84e1a3fbf3` while independently observed `refs/heads/main` resolved to `26b1c34ae7c97c5d1b66a23d6345b3965cfcdc1f`. The former is not a current federation subject.
