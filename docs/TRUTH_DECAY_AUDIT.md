@@ -1,5 +1,12 @@
 # Truth Decay Audit: When a True Claim Becomes Unsafe to Reuse
 
+## October 23, 2026: StoryEngine exact peer-ref repair is not Playwright proof
+
+FCR Browser Operator review PR #1006 initially passed its isolated six browser-policy tests but the existing FCR Playwright E2E job stopped at the independent StoryEngine ref-freshness check. The FCR workflow expected the historical `26b1c34ae7c97c5d1b66a23d6345b3965cfcdc1f`; live StoryEngine `refs/heads/main` resolved to `6b97b78370fbc25d4b4bb88bfeab136eb4c7dc2f`. The GitHub comparison proved the successor was exactly four commits ahead, zero behind, and its observed exact-head checks were 15 of 15 successful. StoryEngine's passing checks do not prove the FCR pair.
+
+The review-branch workflow now selects that verified successor SHA and continues to require the live ref to equal the pin **before** an immutable peer checkout and full end-to-end FCR browser federation witness. The previous FCR Playwright failure is an accurate stale-evidence signal, not a code defect in the new browser operator. A matching pin is an identity prerequisite only; a failed, skipped or pending successor FCR E2E job remains UNKNOWN, not green. Future StoryEngine `main` movement expires the pin again. No merge, deployment, publication, provider-write or production access authority transfers through this change.
+
+FCR's new declarative browser operator is independently source-implemented and its dry-run manifest validation proves only validation. A live public synthetic game run, FCR application UI integration and arbitrary natural-language browser planning require their own distinct evidence and approval gates.
 ## October 16, 2026: StoryEngine peer-identity renewal, without inherited proof
 
 FCR's new actual-server GitHub Workspace/browser test, full founder UI journey, capability workbench, and guarded terminal scenarios passed on the predecessor candidate while the separate FCR-to-StoryEngine test failed at the live peer-ref gate. The workflow expected StoryEngine `a6e6a396ed30535af2fd9b1ec2347a84e1a3fbf3` while independently observed `refs/heads/main` resolved to `26b1c34ae7c97c5d1b66a23d6345b3965cfcdc1f`. The former is not a current federation subject.
