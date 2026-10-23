@@ -27,6 +27,15 @@ After merging the workflow into the default branch under exact-head approval, a 
 
 Report path: test-results/fcr-browser-operator/report.json by default, or FCR_BROWSER_OUT_DIR/report.json. Failure-only screenshots may show page content; review before sharing. The JSON report intentionally excludes captured room codes, user input values, cookies, query parameters, and page text.
 
+## Natural-language request preview (review-branch candidate)
+
+FCR now includes `scripts/fcr-browser-plan.mjs`, a **bounded plain-language routing preview**. It is not an open-ended autonomous browser agent. For known, reviewed projects it can recognize a request such as:
+
+    node scripts/fcr-browser-plan.mjs --request 'Test the complete Sync Party new user journey on https://games.jussco.company'
+
+The command returns a manifest identifier, the two-player/step counts, exact manifest SHA-256 fingerprint, target origin, and `REQUIRES_FOUNDER_RUN_APPROVAL`. It executes **zero** browser or provider operations. Only the source-controlled Sync Party route is currently supported; other projects must receive their own reviewed manifest and route. Unsupported, multiple-project, mixed or sensitive-action requests are rejected rather than interpreted expansively. It does not import AI model outputs or page instructions into browser authority.
+
+Before adding a future interactive FCR dashboard, a founder-authenticated plan API must check plan identity, expiry, a specific approval, execution status, and caller-to-project scope. The task preview itself is not a run approval, and no new browser execution UI or remote execution API has been added in this PR.
 ## Boundaries
 
 - Only source-reviewed manifests directly in config/browser-journeys can be executed by the CLI. No free-form instructions from the visited page are trusted.
