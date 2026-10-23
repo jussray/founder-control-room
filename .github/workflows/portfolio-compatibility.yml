@@ -4,14 +4,17 @@ on:
   pull_request:
     paths:
       - 'schemas/portfolio-release.schema.json'
-      - 'release-policy/repositories.json'
-      - 'releases/portfolio-v0.1.0.json'
+      - 'release-policy/**'
+      - 'releases/**'
       - 'scripts/validate_portfolio_release.py'
+      - 'scripts/find_release_commit.py'
+      - 'scripts/validate_portfolio_hotfix.py'
+      - 'tests/test_portfolio_candidate_decision.py'
       - '.github/workflows/portfolio-compatibility.yml'
 permissions:
   contents: read
 jobs:
-  manifest-preflight:
+  candidate-decision-unit-tests:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -22,5 +25,25 @@ jobs:
         with:
           python-version: '3.12'
       - run: python -m pip install 'jsonschema>=4.23,<5'
-      - name: Fail-closed release preflight
+      - name: Verify candidate decision cannot authorize changed tuple
+        run: python -m unittest discover -s tests -p 'test_portfolio_candidate_decision.py' -v
+
+  manifest-preflight:
+    needs: candidate-decision-unit-tests
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Require unit tests green
+        env:
+          UNIT_RESULT: ${{ needs.candidate-decision-unit-tests.result }}
+        run: test "$UNIT_RESULT" = success
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install 'jsonschema>=4.23,<5'
+      - name: Validate exact tuple and block unevidenced release
         run: python scripts/validate_portfolio_release.py
