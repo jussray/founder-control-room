@@ -24,6 +24,8 @@ The implementation lives in `src/lib/modelCapabilityMarket.ts`.
 
 The market ranks from `CapabilityObservation` records. Its intended first receipt source is the operator relay: every relay response records which operator answered, the outcome status, the evidence references, whether authority was requested, and when it completed. `src/lib/capabilityObservationFeed.ts` folds those receipts into one observation per operator and task class, deterministically, so the observation can itself be receipted.
 
+When the provider reports it, a relay response also carries optional `usage` (input, output, cache-write and cache-read token counts; Anthropic only today). Usage is included in `responseHash` only when present, so receipts without it keep their original hash. Council rounds copy it onto each hop. It is measurement, not evidence or authority, and a missing or malformed usage block is omitted rather than estimated.
+
 Today relay responses are returned to the caller and are not persisted anywhere in this repository. Persisting them is a separate gate. Until it lands, the fold has no stored population to read.
 
 Fold rules:

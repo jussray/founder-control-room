@@ -1,5 +1,17 @@
 # Truth Decay Audit: When a True Claim Becomes Unsafe to Reuse
 
+## October 16, 2026: StoryEngine peer-identity renewal, without inherited proof
+
+FCR's new actual-server GitHub Workspace/browser test, full founder UI journey, capability workbench, and guarded terminal scenarios passed on the predecessor candidate while the separate FCR-to-StoryEngine test failed at the live peer-ref gate. The workflow expected StoryEngine `a6e6a396ed30535af2fd9b1ec2347a84e1a3fbf3` while independently observed `refs/heads/main` resolved to `26b1c34ae7c97c5d1b66a23d6345b3965cfcdc1f`. The former is not a current federation subject.
+
+GitHub comparison classified the successor as strictly ahead by 22 commits, with changes across StoryEngine route, browser, video, and proof surfaces. The successor had 15 of 15 check runs successful at observation, including the Control Room federation contract, but those checks belong only to StoryEngine. Rebinding FCR's immutable peer SHA selects the newer evidence subject and unblocks the fresh witness; it neither verifies pair compatibility nor carries old Playwright results forward. Only completed exact-head FCR-to-StoryEngine runtime, directive/receipt, replay, and browser checks can renew that narrow integration claim. No merge, deploy, release, publisher, or production authority transfers by changing the pin.
+
+## October 16, 2026: FCR development workspace evidence
+
+The updated FCR GitHub Workspace exposes repository editing and read-only terminal controls together and links selected Portfolio projects to the same authenticated workbench. The browser test in `.github/workflows/playwright.yml` exercises the real served FCR application at a selected exact source commit, using test-only external GitHub and Supabase substitutes. A passing test must not imply production browser availability, provider account writes, unrestricted terminal execution, or release authority. A failed or skipped test keeps application integration unverified.
+
+The browser proof expires when the FCR candidate commit changes. Bip remains an independent application and control room; no evidence from FCR tests can establish a Bip runtime outcome. The project-selector URL is a read-context convenience and never authorizes repository mutation.
+
 ## Incident class
 
 A claim can be truthful when observed and still become false, stale, superseded, or unknown before it is used.
@@ -295,6 +307,8 @@ Do not emit:
 - chain-of-thought.
 
 **Analytics remains observation-only.** It cannot renew a Truth Lease, approve a merge, rewrite provider reality, authorize publication, or turn documentation consistency into objective truth.
+**Account/lane provenance decays independently.** A provider observation is valid only for the exact network, lane, account identity, connector account identity, and coverage state it actually observed. An out-of-scope connector response must remain `UNKNOWN`; zero is an observed metric only for the account that was actually queried. Cross-account donation cannot renew truth, authority, or analytics freshness.
+
 
 ### Analytics-authority Redteam
 
@@ -487,3 +501,12 @@ Rebinding `.github/workflows/playwright.yml` to `168d65ede38d2477ea00902fa1f0e76
 FCR Playwright run #6969 on `897083276b6c775c49ce30be189a50bd610b5d4c` completed the local/direct browser harness successfully, then failed closed at the separate peer freshness gate because `.github/workflows/playwright.yml` still expected StoryEngine `168d65ede38d2477ea00902fa1f0e76f292c583d` while `refs/heads/main` had advanced to independently observed `3c1689fe67142e783fe7d18b5ff610640bdc81d6`. The StoryEngine comparison showed two strictly forward commits: `c9af4ea095561d0837a141e311e8977d796aaaa7` exposing StoryEngine's own MAKEVIDEO skill and `3c1689fe67142e783fe7d18b5ff610640bdc81d6` adding its exact-head MAKEVIDEO proof workflow.
 
 That failure is dependency-freshness evidence, not a failed FCR browser journey and not evidence that the README repair regressed runtime behavior. Rebinding the peer to `3c1689fe67142e783fe7d18b5ff610640bdc81d6` selects the next evidence subject only. The successor FCR head remains `UNKNOWN` for federation until the complete live-ref check, immutable checkout, exact peer runtime identity, directive/receipt binding, replay protections, and Playwright browser witness succeed. No predecessor green, founder approval, merge, deploy, production, publication, billing, or provider-mutation authority transfers through this pin refresh.
+
+
+## 2026-10-06 StoryEngine runtime-head-binding peer transition
+
+FCR exact-head Playwright on `ea09b7406eff2b85bde2ba1a4543e765e1f6d135` completed its local/direct browser harness, then failed closed at the separate StoryEngine peer freshness gate because the workflow still expected `91af998c2c7adad0792dd394735ca738b92ab26d` while independently observed StoryEngine `refs/heads/main` resolved to `a6e6a396ed30535af2fd9b1ec2347a84e1a3fbf3`.
+
+The successor StoryEngine head is strictly forward of the predecessor pin and has exact-head green evidence from `L99 Story Engine CI`, `Guardrails Playwright`, `L99 Promotion Gates`, `Agent Contract v1`, and `Control Room Test Ledger`. Source comparison shows the federation contract remains `juss-v10/product-build-directive@v1` / `juss-v10/product-build-receipt@v1`; the relevant change strengthens runtime identity by preferring provider-native deployment SHA in production and failing closed when production cannot prove an exact runtime head.
+
+Rebinding `.github/workflows/playwright.yml` to `a6e6a396ed30535af2fd9b1ec2347a84e1a3fbf3` selects the successor federation evidence subject only. All predecessor FCR-to-StoryEngine browser/federation green is historical. The successor FCR head remains `UNKNOWN` for current federation until the complete live-ref equality check, immutable peer checkout, runtime identity binding, directive/receipt loop, replay protections, and Playwright witness succeed against this exact peer. No founder approval, merge, deploy, production, publication, billing, or provider-mutation authority transfers with the pin.
