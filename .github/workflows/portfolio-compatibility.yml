@@ -12,6 +12,7 @@ on:
       - 'scripts/checkout_portfolio_sources.py'
       - 'scripts/portfolio_manifest_io.py'
       - 'scripts/portfolio_job_receipt.py'
+      - 'scripts/portfolio_evidence_gate.py'
       - 'scripts/portfolio_matrix_contract.py'
       - 'tests/test_portfolio_candidate_decision.py'
       - 'tests/test_portfolio_matrix_contract.py'
@@ -258,6 +259,21 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Download exact-run contract evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: portfolio-contract-evidence-${{ github.run_id }}
+          path: evidence
+      - name: Download exact-run suite receipts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: portfolio-suite-*-${{ github.run_id }}
+          merge-multiple: true
+          path: evidence
+      - name: Reject incomplete or mismatched evidence
+        env:
+          EXPECTED_MANIFEST_SHA256: ${{ needs.manifest-preflight.outputs.digest }}
+        run: python scripts/portfolio_evidence_gate.py --evidence evidence
       - name: Require complete runtime integration and verified release evidence
         run: |
           python -m pip install 'jsonschema>=4.23,<5'
