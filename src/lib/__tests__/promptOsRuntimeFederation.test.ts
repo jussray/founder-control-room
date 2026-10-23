@@ -39,6 +39,36 @@ function reply(status: number, body: unknown): Reply {
   return { ok: status >= 200 && status < 300, status, text: async () => text };
 }
 
+function streamingReply(
+  status: number,
+  chunks: readonly string[],
+  onPull?: (index: number) => void,
+  onCancel?: () => void,
+): Reply {
+  const encoder = new TextEncoder();
+  let index = 0;
+  const body = new ReadableStream<Uint8Array>({
+    pull(controller) {
+      onPull?.(index);
+      if (index >= chunks.length) {
+        controller.close();
+        return;
+      }
+      controller.enqueue(encoder.encode(chunks[index]));
+      index += 1;
+    },
+    cancel() {
+      onCancel?.();
+    },
+  });
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    body,
+    text: async () => chunks.join(''),
+  };
+}
+
 function recordingFetch(respond: (url: string) => Reply | Promise<Reply>): { fetchImpl: FetchLike; calls: Recorded[] } {
   const calls: Recorded[] = [];
   const fetchImpl: FetchLike = async (input, init) => {
@@ -332,6 +362,25 @@ describe('PromptOS runtime identity probe', () => {
     const oversized = await probePromptOsRuntime(probeOptions({ fetchImpl: big.fetchImpl }));
     expect(oversized.state).toBe('reachable');
     expect(oversized.reasons).toEqual(['identity_unreadable_or_too_large']);
+  });
+
+  it('cancels an oversized streamed identity before consuming the full untrusted body', async () => {
+    let pulls = 0;
+    let cancelled = false;
+    const chunks = ['x'.repeat(9 * 1024), 'y'.repeat(9 * 1024), 'z'.repeat(9 * 1024)];
+    const { fetchImpl } = recordingFetch(() => streamingReply(
+      200,
+      chunks,
+      () => { pulls += 1; },
+      () => { cancelled = true; },
+    ));
+
+    const status = await probePromptOsRuntime(probeOptions({ fetchImpl }));
+
+    expect(status.state).toBe('reachable');
+    expect(status.reasons).toEqual(['identity_unreadable_or_too_large']);
+    expect(cancelled).toBe(true);
+    expect(pulls).toBeLessThan(chunks.length + 1);
   });
 
   it('never echoes the operator credential into a status, whatever the outcome', async () => {
