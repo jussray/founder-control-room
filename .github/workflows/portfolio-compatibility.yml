@@ -10,6 +10,8 @@ on:
       - 'scripts/find_release_commit.py'
       - 'scripts/validate_portfolio_hotfix.py'
       - 'scripts/checkout_portfolio_sources.py'
+      - 'scripts/portfolio_manifest_io.py'
+      - 'scripts/portfolio_job_receipt.py'
       - 'scripts/portfolio_matrix_contract.py'
       - 'tests/test_portfolio_candidate_decision.py'
       - 'tests/test_portfolio_matrix_contract.py'
@@ -19,6 +21,7 @@ permissions:
   contents: read
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+  EXPECTED_COORDINATOR_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
 
 jobs:
   manifest-preflight:
@@ -108,6 +111,20 @@ jobs:
         working-directory: sources/StoryEngine/story-engine
         run: node --test test/tenantRouteGuards.test.js test/tenantHttpBoundary.test.js test/securityHardening.test.js
 
+      - name: Write sanitized storyengine suite receipt
+        if: always()
+        env:
+          JOB_RESULT: ${{ job.status }}
+        run: python scripts/portfolio_job_receipt.py --repo storyengine --status "$JOB_RESULT" --output evidence/storyengine-suite.json
+      - name: Preserve sanitized storyengine suite receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: portfolio-suite-storyengine-${{ github.run_id }}
+          path: evidence/storyengine-suite.json
+          if-no-files-found: error
+          retention-days: 14
+
   chiefai-tests:
     name: Chief AI exact-commit, governance and security tests
     needs: manifest-preflight
@@ -147,6 +164,20 @@ jobs:
         working-directory: sources/chief-ai-machine
         run: npm run verify:cookies
 
+      - name: Write sanitized chiefAi suite receipt
+        if: always()
+        env:
+          JOB_RESULT: ${{ job.status }}
+        run: python scripts/portfolio_job_receipt.py --repo chiefAi --status "$JOB_RESULT" --output evidence/chiefAi-suite.json
+      - name: Preserve sanitized chiefAi suite receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: portfolio-suite-chiefAi-${{ github.run_id }}
+          path: evidence/chiefAi-suite.json
+          if-no-files-found: error
+          retention-days: 14
+
   sekretbip-tests:
     name: Se'kret Bip exact-commit, privacy and safety tests
     needs: manifest-preflight
@@ -179,6 +210,20 @@ jobs:
       - name: Privacy and parent-bridge regression
         working-directory: sources/Sekret-Bip
         run: node --test test/age-gate.test.mjs test/bridge-privacy-validator.test.mjs test/parent-route-guard.test.mjs test/privacy-boundaries.test.mjs
+
+      - name: Write sanitized sekretBip suite receipt
+        if: always()
+        env:
+          JOB_RESULT: ${{ job.status }}
+        run: python scripts/portfolio_job_receipt.py --repo sekretBip --status "$JOB_RESULT" --output evidence/sekretBip-suite.json
+      - name: Preserve sanitized sekretBip suite receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: portfolio-suite-sekretBip-${{ github.run_id }}
+          path: evidence/sekretBip-suite.json
+          if-no-files-found: error
+          retention-days: 14
 
   portfolio-release-gate:
     name: Promotion gate — all evidence required
