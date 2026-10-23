@@ -17,6 +17,8 @@ GitHub, Cloudflare, Supabase, n8n, Zapier, HubSpot, Shopify, and other providers
 
 The FCR Playwright workflow's StoryEngine peer identity was changed from `a6e6a396ed30535af2fd9b1ec2347a84e1a3fbf3` to the separately observed StoryEngine `main` SHA `26b1c34ae7c97c5d1b66a23d6345b3965cfcdc1f`. GitHub comparison showed a forward, 22-commit peer transition, and the successor had 15 passing checks at observation time, including the Control Room federation contract. This pin refresh is a prerequisite for running the FCR-to-StoryEngine browser test, **not** a passing FCR peer witness or an authorization to deploy.
 
+On 2026-10-23 the live StoryEngine `main` was independently observed at `6b97b78370fbc25d4b4bb88bfeab136eb4c7dc2f` and the workflow pin was refreshed to it. The previous `26b1c34…` pin failed the live-ref equality check on the exact head `30c095f5`. This refresh is recovery setup only: federation readiness stays withheld until the exact successor FCR head passes the full witness against the new pin.
+
 The former FCR browser run passed all local Control Room journeys before deliberately stopping on the stale peer-ref check. All predecessor FCR/StoryEngine federation evidence remains historical. Only an exact FCR head which independently checks StoryEngine's live ref, checks out the pinned commit, proves the peer runtime identity, and completes the full Playwright directive/receipt loop can claim current federation integration at this pair. Any movement of either head expires that claim again.
 
 ## GitHub Workspace integration candidate
