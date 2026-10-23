@@ -1,6 +1,6 @@
 ---
 name: ultrathink-attack-godmode
-description: Evidence-first Juss & Co engineering execution skill. Inspect live state, adversarially challenge assumptions, implement authorized minimal repairs, verify exact-head proof, review, and merge only when independent gates permit. Activates on /godmode, attack/godmode, implant fixes, fix merge review.
+description: Evidence-first Juss & Co engineering execution skill. Inspect live state, adversarially challenge assumptions, implement authorized minimal repairs, verify exact-head proof, review, and merge only when independent gates permit. Activates on /godmode, attack/godmode, fix merge review.
 version: 1.1.0
 owner: Juss & Co.
 ---

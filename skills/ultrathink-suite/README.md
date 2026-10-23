@@ -11,7 +11,7 @@ This directory index adds four **companion skills** to Founder Control Room. It 
 
 ## Routing
 - `/ultrathink` in Claude Code → **canonical `.claude/skills/ultrathink/SKILL.md`**, then canonical ULTRATHINK/DEVIL and `/goalfix` on authorized repair; a distinct companion may be used only through explicit handoff.
-- `/godmode`, `attack/godmode`, `implant fixes` → **ultrathink-attack-godmode**, then **repair-to-proof** for the verification boundary.
+- `/godmode`, `attack/godmode` → **ultrathink-attack-godmode**, then **repair-to-proof** for the verification boundary.
 - `/goalfix`, `/fixfast`, `/repair-verify-merge` → **canonical `.ai/skills/goalfix/SKILL.md` first**. Invoke ULTRATHINK companions only through the canonical Goalfix workflow when its authority and scope require them; never register a second competing Goalfix handler.
 - `/repair-to-proof`, `merge review`, `exact-head gate` → **repair-to-proof**.
 - `/continuity`, `/receipt`, `fingerprints and cookies` → **continuity-proof-ledger**.
