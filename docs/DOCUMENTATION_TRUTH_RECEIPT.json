@@ -177,7 +177,9 @@
         "`README.md` must keep the GitHub Actions and Cloudflare Worker copies of `OPENAI_API_KEY` as separate CI/runtime authority planes and state that the all-secret proof derives names from the canonical Worker registry without reading values.",
         "`README.md` must treat a successful successor StoryEngine Playwright witness as current only for the exact FCR/StoryEngine evidence pair recorded by the run and expire that proof when either repository moves.",
         "`README.md` must record that the StoryEngine peer refresh discovered during URLFix PR #914 merge review is a focused recovery transition handled by PR #896, not URLFix failure, and that pin alignment alone cannot promote the successor federation state beyond UNKNOWN.",
-        "`README.md` must record that the StoryEngine peer refresh after the agent-contract v1 rollout is a focused recovery transition, not a #913 failure, and that pin alignment alone cannot promote the successor federation state beyond UNKNOWN."
+        "`README.md` must record that the StoryEngine peer refresh after the agent-contract v1 rollout is a focused recovery transition, not a #913 failure, and that pin alignment alone cannot promote the successor federation state beyond UNKNOWN.",
+        "`README.md` must describe review-email routing as one bounded Wrangler-managed desired-state address plus independent Cloudflare provider readback, subaddressing state, and runtime invocation proof; deploy success alone cannot mint `email_trigger_reconciled=true` or runtime truth.",
+        "`README.md` must state that first deployment of a missing review-email Worker uses a temporary no-`addresses` bootstrap config and stops at secret provisioning before any Email Routing rule can move mail."
       ]
     },
     {
@@ -203,7 +205,10 @@
     {
       "path": "docs/CLOUDFLARE_REASONING.md",
       "claims": [
-        "`docs/CLOUDFLARE_REASONING.md` must require FCR provider-held Worker binding names to pass the canonical Deploy membrane without treating source, binding-name presence, CI, or Playwright as proof of downstream provider activation or business outcomes."
+        "`docs/CLOUDFLARE_REASONING.md` must require FCR provider-held Worker binding names to pass the canonical Deploy membrane without treating source, binding-name presence, CI, or Playwright as proof of downstream provider activation or business outcomes.",
+        "`docs/CLOUDFLARE_REASONING.md` must keep review-email Worker/managed-route deployment, provider route readback, zone subaddressing state, and runtime email invocation as distinct evidence planes; Wrangler 4.113+ may reconcile the literal `review@foundercontrolroom.org` Worker route without making provider readback or runtime proof implicit.",
+        "`docs/CLOUDFLARE_REASONING.md` must preserve the two-phase first-deploy boundary: no-route Worker bootstrap first, required-secret provisioning second, canonical route reconciliation only on a later authorized run.",
+        "`docs/CLOUDFLARE_REASONING.md` must require structured Wrangler deploy telemetry to preserve completed Worker mutation truth when a later Email Routing reconciliation step exits nonzero; post-deploy failure must never be collapsed into provider_deploy_succeeded=false."
       ]
     },
     {
@@ -222,7 +227,9 @@
     {
       "path": "docs/deployment/CLOUDFLARE_WORKER_TARGETS.md",
       "claims": [
-        "`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` must keep canonical Worker runtime secret bindings provider-held while separating provider subscription, runtime delivery, production database state, and business outcomes into their own activation proof."
+        "`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` must keep canonical Worker runtime secret bindings provider-held while separating provider subscription, runtime delivery, production database state, and business outcomes into their own activation proof.",
+        "`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` must declare exactly one Wrangler-managed review-email route, `review@foundercontrolroom.org -> founder-control-room-review-email`, while requiring independent provider readback, subaddressing verification for `review+<context-uuid>@...`, and runtime invocation proof before calling ingress live.",
+        "`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` must state that a missing review-email Worker is bootstrapped without `addresses`, so first creation cannot implicitly reroute `review@` before secrets exist."
       ]
     },
     {
@@ -317,6 +324,12 @@
       "path": "tools/zapier/founder-content-outcome-contract.cjs",
       "claims": [
         "`tools/zapier/founder-content-outcome-contract.cjs` must bind founder-content metrics to the exact observed network, lane, account identity, connector identity, and coverage state; out-of-scope metrics must remain UNKNOWN, cross-account metric donation is forbidden, and these receipts can never grant publication, provider-write, merge, deploy, spend, or external-contact authority."
+      ]
+    },
+    {
+      "path": "wrangler.email.toml",
+      "claims": [
+        "`wrangler.email.toml` must declare the review-email Worker identity, account, entrypoint, private `FOUNDER_CONTROL_ROOM_API -> founder-control-room` Service Binding, and exactly one top-level `addresses` value `review@foundercontrolroom.org`; this is desired state for Wrangler reconciliation, not proof of provider readback or runtime invocation."
       ]
     }
   ]
