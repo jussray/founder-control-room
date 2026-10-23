@@ -81,13 +81,19 @@ test('FCR drives workflow-pinned exact StoryEngine peer, proves replay safety, a
   expect(browserIdentity.release_sha).toBe(peerSha);
 
   const buildDirective = directive();
+  const actionAuthorization = {
+    approvalReceiptId: buildDirective.founderDecisionHash,
+    approvalValid: true,
+  };
   const reconciliation = await dispatchStoryEngineProductBuildDirective(buildDirective, {
     baseUrl: peerUrl,
     apiKey: peerApiKey,
+    actionAuthorization,
   });
   const replay = await dispatchStoryEngineProductBuildDirective(buildDirective, {
     baseUrl: peerUrl,
     apiKey: peerApiKey,
+    actionAuthorization,
   });
 
   expect(reconciliation.state).toBe('execution_reconciled');

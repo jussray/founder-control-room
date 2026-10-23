@@ -263,3 +263,7 @@ npx playwright test e2e/cloudflare-reasoning.spec.ts
 ```
 
 The browser/API suite verifies the public-safe contract, founder protection, absence of credential leakage, presence of the implementation stack, and absence of an accidental deployment endpoint. Unit tests verify exact-commit reasoning, stale evidence, duplicate authority, authentication failures, runtime failure, rollback preparation, first-principles deletion/simplification output, and approval boundaries.
+
+## Governed execution carrier candidate
+
+`wrangler.worker.toml` declares `GOVERNED_EXECUTION_WORKFLOW` / `fcr-governed-execution-v1`, exported from `src/workflows/governedExecutionWorkflow.ts`. The candidate carrier waits for a broker-owned world, a separately authorized execution receipt, and an independent witness; event delivery and Workflow persistence never authenticate founder authority or authorize provider effects. Source declarations and generated types do not establish a configured Workflow, instance, deployed identity, D1/R2 binding, or production outcome. The separate staged `governedExecutionWorkflowV1.ts` module is not exported by this candidate binding and must not be mistaken for its runtime implementation. Activation remains a separate authority and provider-proof gate.

@@ -1,5 +1,9 @@
 # Truth Decay Audit: When a True Claim Becomes Unsafe to Reuse
 
+## Governed execution candidate boundaries
+
+The governed-execution candidate binds every attempt to its project shell, mission, credential lane, provider, egress policy, and founder receipt. Matching blank targets or capabilities are denied; capability suitability cannot authorize an unbound effect. Private and local IPv6 literals remain denied even when listed as allowed hosts. Public literal allowlisting does not prove DNS resolution, redirect validation, or transport-level isolation; those require executor-side checks and separate runtime evidence. Source guards and unit tests never grant merge, deployment, provider mutation, or a verified production outcome.
+
 ## October 16, 2026: StoryEngine peer-identity renewal, without inherited proof
 
 FCR's new actual-server GitHub Workspace/browser test, full founder UI journey, capability workbench, and guarded terminal scenarios passed on the predecessor candidate while the separate FCR-to-StoryEngine test failed at the live peer-ref gate. The workflow expected StoryEngine `a6e6a396ed30535af2fd9b1ec2347a84e1a3fbf3` while independently observed `refs/heads/main` resolved to `26b1c34ae7c97c5d1b66a23d6345b3965cfcdc1f`. The former is not a current federation subject.
@@ -510,3 +514,7 @@ FCR exact-head Playwright on `ea09b7406eff2b85bde2ba1a4543e765e1f6d135` complete
 The successor StoryEngine head is strictly forward of the predecessor pin and has exact-head green evidence from `L99 Story Engine CI`, `Guardrails Playwright`, `L99 Promotion Gates`, `Agent Contract v1`, and `Control Room Test Ledger`. Source comparison shows the federation contract remains `juss-v10/product-build-directive@v1` / `juss-v10/product-build-receipt@v1`; the relevant change strengthens runtime identity by preferring provider-native deployment SHA in production and failing closed when production cannot prove an exact runtime head.
 
 Rebinding `.github/workflows/playwright.yml` to `a6e6a396ed30535af2fd9b1ec2347a84e1a3fbf3` selects the successor federation evidence subject only. All predecessor FCR-to-StoryEngine browser/federation green is historical. The successor FCR head remains `UNKNOWN` for current federation until the complete live-ref equality check, immutable peer checkout, runtime identity binding, directive/receipt loop, replay protections, and Playwright witness succeed against this exact peer. No founder approval, merge, deploy, production, publication, billing, or provider-mutation authority transfers with the pin.
+
+## Current-main reconciliation of the project-shell carrier
+
+The carrier preserves current-main provider adapters, semantic-review spending pause, 64 KiB response ceiling, and suppression of provider/transport error details. The earlier 512 KiB/redacted-error variants are superseded by these stricter controls, not restored. Existing main tests cover identity, error suppression, body-size and restricted-context behavior; retained carrier cases add workspace-header and timeout coverage, attaching rejection assertions before advancing fake time. The portable capability router carries the same strategic-lens and per-action authority restrictions as its canonical contract. CSV provenance now rejects calendar-invalid timestamps; follower aggregation remains explicitly unimplemented rather than claimed as a complete observed result. None of these source changes proves production activation.

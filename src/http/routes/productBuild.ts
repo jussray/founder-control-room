@@ -207,7 +207,12 @@ productBuildRouter.post(
     if (!prepared.ok) return res.status(prepared.status).json(prepared.body);
 
     try {
-      const reconciliation = await dispatchStoryEngineProductBuildDirective(prepared.directive);
+      const reconciliation = await dispatchStoryEngineProductBuildDirective(prepared.directive, {
+        actionAuthorization: {
+          approvalReceiptId: prepared.directive.founderDecisionHash,
+          approvalValid: true,
+        },
+      });
       res.setHeader('Cache-Control', 'no-store');
       return res.status(200).json({
         ok: true,
@@ -224,7 +229,8 @@ productBuildRouter.post(
           || error.code === 'PRODUCT_BUILD_FEDERATION_URL_INVALID'
           || error.code === 'PRODUCT_BUILD_FEDERATION_URL_INSECURE';
         const stale = error.code === 'PRODUCT_BUILD_STALE_RUNTIME';
-        return res.status(notConfigured ? 503 : stale ? 409 : 502).json({
+        const unauthorized = error.code === 'PRODUCT_BUILD_ACTION_UNAUTHORIZED';
+        return res.status(notConfigured ? 503 : stale || unauthorized ? 409 : 502).json({
           ok: false,
           code: error.code,
           reasons: [error.message],

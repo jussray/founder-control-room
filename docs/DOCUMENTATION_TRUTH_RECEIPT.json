@@ -76,7 +76,9 @@
       "claims": [
         "`wrangler.worker.toml` must list `FCR_SHOPIFY_WEBHOOK_SECRET` and `FCR_COMMERCE_HASH_SALT` under `[secrets].required`, so canonical exact-main Deploy rejects a missing FCR Shopify runtime binding before Worker mutation while never reading, logging, or re-uploading either provider-held value; this source boundary cannot prove webhook registration, production migration, runtime delivery, or collected revenue.",
         "`wrangler.worker.toml` must declare `FCR_CLOUDFLARE_MCP_READ_TOKEN`, `OPENAI_API_KEY`, and Muse `MODEL_API_KEY` as provider-held required Worker secret names while keeping public-safe runtime configuration outside the secret plane; declaration proves required-name policy only, not provider presence, deployed runtime identity, or successful provider use.",
-        "A separate GitHub Actions copy of `OPENAI_API_KEY` may serve CI-only OpenAI consumers such as AI Failure Repair, but it is a distinct authority plane and does not prove or replace the provider-held Worker runtime binding."
+        "A separate GitHub Actions copy of `OPENAI_API_KEY` may serve CI-only OpenAI consumers such as AI Failure Repair, but it is a distinct authority plane and does not prove or replace the provider-held Worker runtime binding.",
+        "`wrangler.worker.toml` must list `TINYFISH_API_KEY` under `[secrets].required`, so canonical exact-main Deploy rejects missing provider-held TinyFish activation before Worker mutation while never copying the secret value through GitHub Actions.",
+        "`wrangler.worker.toml` declares only the staged governed-execution carrier binding; source presence and generated types never prove provider configuration, instance creation, authenticated authority, execution, deployment, or production outcomes."
       ]
     },
     {
@@ -177,7 +179,8 @@
         "`README.md` must keep the GitHub Actions and Cloudflare Worker copies of `OPENAI_API_KEY` as separate CI/runtime authority planes and state that the all-secret proof derives names from the canonical Worker registry without reading values.",
         "`README.md` must treat a successful successor StoryEngine Playwright witness as current only for the exact FCR/StoryEngine evidence pair recorded by the run and expire that proof when either repository moves.",
         "`README.md` must record that the StoryEngine peer refresh discovered during URLFix PR #914 merge review is a focused recovery transition handled by PR #896, not URLFix failure, and that pin alignment alone cannot promote the successor federation state beyond UNKNOWN.",
-        "`README.md` must record that the StoryEngine peer refresh after the agent-contract v1 rollout is a focused recovery transition, not a #913 failure, and that pin alignment alone cannot promote the successor federation state beyond UNKNOWN."
+        "`README.md` must record that the StoryEngine peer refresh after the agent-contract v1 rollout is a focused recovery transition, not a #913 failure, and that pin alignment alone cannot promote the successor federation state beyond UNKNOWN.",
+        "`README.md` must keep TinyFish source and CI readiness separate from provider/runtime activation and state that canonical Deploy verifies only provider-held binding-name presence before promotion."
       ]
     },
     {
@@ -203,7 +206,8 @@
     {
       "path": "docs/CLOUDFLARE_REASONING.md",
       "claims": [
-        "`docs/CLOUDFLARE_REASONING.md` must require FCR provider-held Worker binding names to pass the canonical Deploy membrane without treating source, binding-name presence, CI, or Playwright as proof of downstream provider activation or business outcomes."
+        "`docs/CLOUDFLARE_REASONING.md` must require FCR provider-held Worker binding names to pass the canonical Deploy membrane without treating source, binding-name presence, CI, or Playwright as proof of downstream provider activation or business outcomes.",
+        "`docs/CLOUDFLARE_REASONING.md` must treat `TINYFISH_API_KEY` as a provider-held Worker binding and require canonical Deploy to fail closed on a missing binding name without exposing or re-uploading its value."
       ]
     },
     {
@@ -222,13 +226,15 @@
     {
       "path": "docs/deployment/CLOUDFLARE_WORKER_TARGETS.md",
       "claims": [
-        "`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` must keep canonical Worker runtime secret bindings provider-held while separating provider subscription, runtime delivery, production database state, and business outcomes into their own activation proof."
+        "`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` must keep canonical Worker runtime secret bindings provider-held while separating provider subscription, runtime delivery, production database state, and business outcomes into their own activation proof.",
+        "`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` must name `TINYFISH_API_KEY` as a required canonical Worker secret while preserving live provider observation and real TinyFish Search/Fetch as separate activation proof."
       ]
     },
     {
       "path": "docs/SECRETS.md",
       "claims": [
-        "`docs/SECRETS.md` must keep provider-held Worker secrets in the Cloudflare runtime secret plane and never recast secret values as public proof artifacts."
+        "`docs/SECRETS.md` must keep provider-held Worker secrets in the Cloudflare runtime secret plane and never recast secret values as public proof artifacts.",
+        "`docs/SECRETS.md` must keep the TinyFish key in the Cloudflare Worker secret plane and never recast the provider-held value as a GitHub Actions secret or proof artifact."
       ]
     },
     {
@@ -272,7 +278,8 @@
     {
       "path": "src/ultrathink-core/index.ts",
       "claims": [
-        "`src/ultrathink-core/index.ts` may export the Attack 3000 content, Trend Radar, and YouTube growth evidence contracts only as source capabilities and must not imply provider activation, publication, merge, deploy, spend, or execution authority."
+        "`src/ultrathink-core/index.ts` may export the Attack 3000 content, Trend Radar, and YouTube growth evidence contracts only as source capabilities and must not imply provider activation, publication, merge, deploy, spend, or execution authority.",
+        "`src/ultrathink-core/index.ts` may export the Attack 3000 content and Trend Radar evidence contracts, including the evaluation context, only as source capabilities and must not imply provider activation, publication, merge, deploy, spend, or execution authority."
       ]
     },
     {
@@ -317,6 +324,36 @@
       "path": "tools/zapier/founder-content-outcome-contract.cjs",
       "claims": [
         "`tools/zapier/founder-content-outcome-contract.cjs` must bind founder-content metrics to the exact observed network, lane, account identity, connector identity, and coverage state; out-of-scope metrics must remain UNKNOWN, cross-account metric donation is forbidden, and these receipts can never grant publication, provider-write, merge, deploy, spend, or external-contact authority."
+      ]
+    },
+    {
+      "path": "src/ultrathink-core/governedActionAuthorization.ts",
+      "claims": [
+        "Per-action authorization must deny blank or whitespace-only targets and capabilities in either grant or attempt, even with matching approval receipts; no unbound consequential action may execute."
+      ]
+    },
+    {
+      "path": "src/ultrathink-core/governedExecution.ts",
+      "claims": [
+        "Governed execution must enforce project-shell, mission, credential, provider, founder-receipt and egress boundaries; bracketed private/local IPv6 literals are denied even on the allowlist, without claiming DNS, redirect, transport or production proof."
+      ]
+    },
+    {
+      "path": "src/lib/operatorRelayModelProviders.ts",
+      "claims": [
+        "`src/lib/operatorRelayModelProviders.ts` must preserve current-main semantic-review spending controls, provider adapters, a 64 KiB bound and suppression of provider/transport errors while retaining the explicit Anthropic workspace header."
+      ]
+    },
+    {
+      "path": ".ai-skills/skills/capability-mode-router.md",
+      "claims": [
+        "`.ai-skills/skills/capability-mode-router.md` must preserve the canonical strategic-lens and per-action authority restrictions; neither model capability, a reasoning mode nor approval of a high-level goal authorizes an unbound child effect."
+      ]
+    },
+    {
+      "path": "tools/founder-content-contracts/content-analytics-csv-ingest.cjs",
+      "claims": [
+        "`tools/founder-content-contracts/content-analytics-csv-ingest.cjs` must reject calendar-invalid UTC provenance rather than accept Date.parse normalization; input follower counts do not establish implemented follower aggregation or completeness."
       ]
     }
   ]

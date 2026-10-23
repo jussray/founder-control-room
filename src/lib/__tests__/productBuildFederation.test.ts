@@ -6,6 +6,7 @@ import {
 import {
   createProductBuildDirective,
   productBuildReceiptHash,
+  type ProductBuildDirective,
   type ProductBuildReceipt,
 } from '../productBuildDirective.js';
 import {
@@ -39,6 +40,13 @@ function directive(requiredProof = ['node-test', 'playwright']) {
     stopConditions: ['one-successful-receipt', 'any-authority-drift'],
     rollback: 'Delete the single product-build audit event and revert the focused product-control-room adapter commit.',
   });
+}
+
+function actionAuthorization(buildDirective: ProductBuildDirective) {
+  return {
+    approvalReceiptId: buildDirective.founderDecisionHash,
+    approvalValid: true,
+  };
 }
 
 function receiptFor(directiveHash: string): ProductBuildReceipt {
@@ -91,6 +99,7 @@ describe('StoryEngine product-build federation', () => {
     const reconciled = await dispatchStoryEngineProductBuildDirective(buildDirective, {
       baseUrl: 'http://127.0.0.1:3901',
       apiKey: 'scoped-fcr-key',
+      actionAuthorization: actionAuthorization(buildDirective),
       fetchImpl,
     });
 
@@ -109,14 +118,16 @@ describe('StoryEngine product-build federation', () => {
 
   it('rejects StoryEngine proof-contract drift before any network call', async () => {
     let called = false;
+    const buildDirective = directive(['playwright']);
     const fetchImpl = async () => {
       called = true;
       throw new Error('network should not be reached');
     };
 
-    await expect(dispatchStoryEngineProductBuildDirective(directive(['playwright']), {
+    await expect(dispatchStoryEngineProductBuildDirective(buildDirective, {
       baseUrl: 'http://127.0.0.1:3901',
       apiKey: 'scoped-fcr-key',
+      actionAuthorization: actionAuthorization(buildDirective),
       fetchImpl,
     })).rejects.toMatchObject({
       code: 'PRODUCT_BUILD_DIRECTIVE_INVALID',
@@ -128,6 +139,7 @@ describe('StoryEngine product-build federation', () => {
 
   it('blocks before the actuator when StoryEngine runtime identity is stale', async () => {
     const calls: string[] = [];
+    const buildDirective = directive();
     const fetchImpl = async (url: string) => {
       calls.push(url);
       return response({
@@ -140,14 +152,65 @@ describe('StoryEngine product-build federation', () => {
       });
     };
 
-    await expect(dispatchStoryEngineProductBuildDirective(directive(), {
+    await expect(dispatchStoryEngineProductBuildDirective(buildDirective, {
       baseUrl: 'http://127.0.0.1:3901',
       apiKey: 'scoped-fcr-key',
+      actionAuthorization: actionAuthorization(buildDirective),
       fetchImpl,
     })).rejects.toMatchObject({
       code: 'PRODUCT_BUILD_STALE_RUNTIME',
       mayHaveExecuted: false,
     } satisfies Pick<ProductBuildFederationError, 'code' | 'mayHaveExecuted'>);
+    expect(calls).toHaveLength(1);
+  });
+
+  it('requires exact founder approval again immediately before the external write', async () => {
+    const buildDirective = directive();
+    const calls: string[] = [];
+    const fetchImpl = async (url: string) => {
+      calls.push(url);
+      return response({
+        service: 'l99-story-engine', release_sha: HEAD, runtime_mode: 'test', state_backend: 'sqlite',
+        persistence_contract: 'repo-local', started_at: STARTED_AT,
+      });
+    };
+
+    await expect(dispatchStoryEngineProductBuildDirective(buildDirective, {
+      baseUrl: 'http://127.0.0.1:3901',
+      apiKey: 'scoped-fcr-key',
+      actionAuthorization: {
+        approvalReceiptId: 'stale-founder-decision',
+        approvalValid: false,
+      },
+      fetchImpl,
+    })).rejects.toMatchObject({
+      code: 'PRODUCT_BUILD_ACTION_UNAUTHORIZED',
+      mayHaveExecuted: false,
+      message: expect.stringContaining('approval_receipt_drift'),
+    } satisfies Partial<ProductBuildFederationError>);
+    expect(calls).toHaveLength(1);
+  });
+
+  it('fails closed when the effect boundary receives no approval context', async () => {
+    const buildDirective = directive();
+    const calls: string[] = [];
+    const fetchImpl = async (url: string) => {
+      calls.push(url);
+      return response({
+        service: 'l99-story-engine', release_sha: HEAD, runtime_mode: 'test', state_backend: 'sqlite',
+        persistence_contract: 'repo-local', started_at: STARTED_AT,
+      });
+    };
+
+    await expect(dispatchStoryEngineProductBuildDirective(buildDirective, {
+      baseUrl: 'http://127.0.0.1:3901',
+      apiKey: 'scoped-fcr-key',
+      fetchImpl,
+    })).rejects.toMatchObject({
+      code: 'PRODUCT_BUILD_ACTION_UNAUTHORIZED',
+      mayHaveExecuted: false,
+      message: expect.stringContaining('approval_invalid'),
+    } satisfies Partial<ProductBuildFederationError>);
     expect(calls).toHaveLength(1);
   });
 
@@ -168,6 +231,7 @@ describe('StoryEngine product-build federation', () => {
     await expect(dispatchStoryEngineProductBuildDirective(buildDirective, {
       baseUrl: 'http://127.0.0.1:3901',
       apiKey: 'scoped-fcr-key',
+      actionAuthorization: actionAuthorization(buildDirective),
       fetchImpl,
     })).rejects.toMatchObject({
       code: 'PRODUCT_BUILD_EXECUTION_UNKNOWN',
@@ -176,6 +240,7 @@ describe('StoryEngine product-build federation', () => {
   });
 
   it('treats a server error after dispatch as ambiguous execution', async () => {
+    const buildDirective = directive();
     let call = 0;
     const fetchImpl = async () => {
       call += 1;
@@ -188,9 +253,10 @@ describe('StoryEngine product-build federation', () => {
       return response({ error: 'internal failure after actuator boundary' }, 500);
     };
 
-    await expect(dispatchStoryEngineProductBuildDirective(directive(), {
+    await expect(dispatchStoryEngineProductBuildDirective(buildDirective, {
       baseUrl: 'http://127.0.0.1:3901',
       apiKey: 'scoped-fcr-key',
+      actionAuthorization: actionAuthorization(buildDirective),
       fetchImpl,
     })).rejects.toMatchObject({
       code: 'PRODUCT_BUILD_EXECUTION_UNKNOWN',
@@ -200,6 +266,7 @@ describe('StoryEngine product-build federation', () => {
   });
 
   it('keeps explicit client rejection distinct from ambiguous execution', async () => {
+    const buildDirective = directive();
     let call = 0;
     const fetchImpl = async () => {
       call += 1;
@@ -212,9 +279,10 @@ describe('StoryEngine product-build federation', () => {
       return response({ error: 'directive rejected before actuator' }, 409);
     };
 
-    await expect(dispatchStoryEngineProductBuildDirective(directive(), {
+    await expect(dispatchStoryEngineProductBuildDirective(buildDirective, {
       baseUrl: 'http://127.0.0.1:3901',
       apiKey: 'scoped-fcr-key',
+      actionAuthorization: actionAuthorization(buildDirective),
       fetchImpl,
     })).rejects.toMatchObject({
       code: 'PRODUCT_BUILD_EXECUTION_REJECTED',

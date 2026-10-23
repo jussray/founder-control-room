@@ -242,3 +242,7 @@ Current executable source and authoritative provider readback outrank an older v
 - Access: roll back only an incomplete or ambiguous browser-destination detachment using the receipt-bound original destination set and unchanged application/policy identity; a later runtime/browser failure alone must not automatically reintroduce a Cloudflare Access product-login screen.
 - Credentials: remove/revoke only the affected credential; do not rotate unrelated keys to repair binding drift.
 - Preserve build logs, deployment IDs, provider readback, browser traces, and runtime receipts.
+
+## Governed execution carrier candidate
+
+`wrangler.worker.toml` declares `GOVERNED_EXECUTION_WORKFLOW` / `fcr-governed-execution-v1`, exported from `src/workflows/governedExecutionWorkflow.ts`. The candidate carrier waits for a broker-owned world, a separately authorized execution receipt, and an independent witness; event delivery and Workflow persistence never authenticate founder authority or authorize provider effects. Source declarations and generated types do not establish a configured Workflow, instance, deployed identity, D1/R2 binding, or production outcome. The separate staged `governedExecutionWorkflowV1.ts` module is not exported by this candidate binding and must not be mistaken for its runtime implementation. Activation remains a separate authority and provider-proof gate.

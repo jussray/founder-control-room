@@ -1,5 +1,10 @@
 # Founder Control Room
 
+## Governed execution candidate boundaries
+
+The governed-execution candidate binds every attempt to its project shell, mission, credential lane, provider, egress policy, and founder receipt. Matching blank targets or capabilities are denied; capability suitability cannot authorize an unbound effect. Private and local IPv6 literals remain denied even when listed as allowed hosts. Public literal allowlisting does not prove DNS resolution, redirect validation, or transport-level isolation; those require executor-side checks and separate runtime evidence. Source guards and unit tests never grant merge, deployment, provider mutation, or a verified production outcome.
+
+
 > **Copyright © 2024–2026 Juss Ray. All rights reserved.**
 > This is proprietary software. No license to use, copy, modify, distribute,
 > sublicense, or create derivative works is granted. See [LICENSE](LICENSE).
@@ -465,3 +470,7 @@ Pin alignment alone cannot promote the successor federation state beyond `UNKNOW
 StoryEngine `main` advanced from the previously pinned `168d65ede38d2477ea00902fa1f0e76f292c583d` through `c9af4ea095561d0837a141e311e8977d796aaaa7` (`feat(video): expose StoryEngine MAKEVIDEO skill`) to independently observed `3c1689fe67142e783fe7d18b5ff610640bdc81d6` (`ci(video): prove StoryEngine MAKEVIDEO skill path`). FCR Playwright run #6969 on `897083276b6c775c49ce30be189a50bd610b5d4c` passed its local/direct browser harness but failed the separate live peer-ref freshness check, so that run is historical browser evidence for the predecessor peer rather than current federation proof.
 
 Rebinding `.github/workflows/playwright.yml` to `3c1689fe67142e783fe7d18b5ff610640bdc81d6` selects the successor evidence subject only. The successor FCR head must complete the live-ref check, immutable peer checkout, exact StoryEngine runtime identity, directive/receipt binding, replay protections, and full Playwright browser witness before federation may be called current. Pin alignment grants no merge, deploy, production, publication, billing, or provider-mutation authority.
+
+## Current-main reconciliation of the project-shell carrier
+
+The carrier preserves current-main provider adapters, semantic-review spending pause, 64 KiB response ceiling, and suppression of provider/transport error details. The earlier 512 KiB/redacted-error variants are superseded by these stricter controls, not restored. Existing main tests cover identity, error suppression, body-size and restricted-context behavior; retained carrier cases add workspace-header and timeout coverage, attaching rejection assertions before advancing fake time. The portable capability router carries the same strategic-lens and per-action authority restrictions as its canonical contract. CSV provenance now rejects calendar-invalid timestamps; follower aggregation remains explicitly unimplemented rather than claimed as a complete observed result. None of these source changes proves production activation.
