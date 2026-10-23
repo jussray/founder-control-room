@@ -126,7 +126,7 @@ async function runStep(page, step, origin, vars, expect) {
 
 export async function runJourney(manifest, outDirectory = 'artifacts/browser/operator') {
   const summary = validateJourney(manifest);
-  const { chromium, expect } = await import('@playwright/test');
+  const [{ chromium }, { expect }] = await Promise.all([import('playwright'), import('@playwright/test')]);
   await mkdir(outDirectory, { recursive: true });
   const report = {
     contract: CONTRACT,
