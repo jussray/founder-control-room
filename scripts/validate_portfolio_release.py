@@ -1,28 +1,13 @@
 #!/usr/bin/env python3
 """Fail-closed release preflight: structural checks only; never authorizes publication."""
 import argparse
-import hashlib
 import json
 import re
 import sys
 from pathlib import Path
 
 from jsonschema import Draft202012Validator
-
-
-def load_unique(path):
-    def no_duplicate_keys(pairs):
-        result = {}
-        for key, value in pairs:
-            if key in result:
-                raise ValueError("duplicate JSON key: " + key)
-            result[key] = value
-        return result
-
-    raw = Path(path).read_bytes()
-    if len(raw) > 65536:
-        raise ValueError("input too large: " + str(path))
-    return json.loads(raw, object_pairs_hook=no_duplicate_keys), hashlib.sha256(raw).hexdigest()
+from portfolio_manifest_io import load_unique
 
 
 def validate_candidate_decision(manifest, record):
