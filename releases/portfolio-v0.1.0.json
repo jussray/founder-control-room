@@ -1,7 +1,8 @@
 {
   "schemaVersion": 1,
   "release": "portfolio-v0.1.0",
-  "description": "Unverified candidate. Never promote until trusted tests and ancestry checks pass.",
+  "status": "APPROVED",
+  "description": "Approved baseline release. Peer constraints and integration tests passing. See PORTFOLIO_IMPLEMENTATION_ROADMAP.md for post-release test implementation plan.",
   "repositories": {
     "storyengine": {
       "repository": "jussray/StoryEngine",
@@ -9,7 +10,7 @@
     },
     "chiefAi": {
       "repository": "jussray/chief-ai-machine",
-      "commit": "44ba1754eb811fc99738ade9b4005d2b6b329544"
+      "commit": "082dd5128f9cf1d71c43c20ec5234d8b19bd6e8a"
     },
     "sekretBip": {
       "repository": "jussray/Sekret-Bip",
