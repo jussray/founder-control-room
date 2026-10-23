@@ -25,7 +25,7 @@ Run the synthetic live journey using locally installed Playwright Chromium:
 
 After merging the workflow into the default branch under exact-head approval, a founder can manually dispatch FCR Browser Operator with journey=sync-party and execute=true. Live runs can create temporary rooms and synthetic analytics events. **They are not read-only.**
 
-Report path: artifacts/browser/operator/report.json by default, or FCR_BROWSER_OUT_DIR/report.json. Failure-only screenshots may show page content; review before sharing. The JSON report intentionally excludes captured room codes, user input values, cookies, query parameters, and page text.
+Report path: test-results/fcr-browser-operator/report.json by default, or FCR_BROWSER_OUT_DIR/report.json. Failure-only screenshots may show page content; review before sharing. The JSON report intentionally excludes captured room codes, user input values, cookies, query parameters, and page text.
 
 ## Boundaries
 
