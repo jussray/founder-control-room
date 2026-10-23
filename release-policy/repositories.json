@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "repositories": {
+    "storyengine": "jussray/StoryEngine",
+    "chiefAi": "jussray/chief-ai-machine",
+    "sekretBip": "jussray/Sekret-Bip"
+  },
+  "requiredRecoveryAncestors": {
+    "storyengine": [
+      "7dbfecd",
+      "645d929",
+      "85e325d",
+      "87f519d"
+    ]
+  },
+  "candidatePolicy": "approved-history",
+  "testCommands": {
+    "storyengine": null,
+    "chiefAi": null,
+    "sekretBip": null,
+    "peerContracts": null,
+    "portfolioIntegration": null,
+    "securityRegression": null
+  }
+}
