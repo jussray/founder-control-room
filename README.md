@@ -1,5 +1,10 @@
 # Founder Control Room
 
+## MCP invocation evidence boundary
+
+The advertised-risk candidate refreshes tools/list immediately before each invocation instead of reusing the five-minute discovery cache. A removed tool or fresh discovery failure prevents tools/call; current mutating annotations require separate approval. readOnlyHint=true makes destructiveHint inapplicable while preserving any risk already inferred from the tool name. Metadata remains an untrusted hint, not proof that a remote provider performs no mutation; fresh discovery narrows the cache race but cannot atomically bind a separate remote tools/call. Exact-head behavior tests and independent review remain required before integration, with production activation and outcomes separately unverified.
+
+
 > **Copyright © 2024–2026 Juss Ray. All rights reserved.**
 > This is proprietary software. No license to use, copy, modify, distribute,
 > sublicense, or create derivative works is granted. See [LICENSE](LICENSE).

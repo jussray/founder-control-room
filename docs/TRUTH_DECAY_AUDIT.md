@@ -1,5 +1,9 @@
 # Truth Decay Audit: When a True Claim Becomes Unsafe to Reuse
 
+## MCP invocation evidence boundary
+
+The advertised-risk candidate refreshes tools/list immediately before each invocation instead of reusing the five-minute discovery cache. A removed tool or fresh discovery failure prevents tools/call; current mutating annotations require separate approval. readOnlyHint=true makes destructiveHint inapplicable while preserving any risk already inferred from the tool name. Metadata remains an untrusted hint, not proof that a remote provider performs no mutation; fresh discovery narrows the cache race but cannot atomically bind a separate remote tools/call. Exact-head behavior tests and independent review remain required before integration, with production activation and outcomes separately unverified.
+
 ## October 16, 2026: StoryEngine peer-identity renewal, without inherited proof
 
 FCR's new actual-server GitHub Workspace/browser test, full founder UI journey, capability workbench, and guarded terminal scenarios passed on the predecessor candidate while the separate FCR-to-StoryEngine test failed at the live peer-ref gate. The workflow expected StoryEngine `a6e6a396ed30535af2fd9b1ec2347a84e1a3fbf3` while independently observed `refs/heads/main` resolved to `26b1c34ae7c97c5d1b66a23d6345b3965cfcdc1f`. The former is not a current federation subject.

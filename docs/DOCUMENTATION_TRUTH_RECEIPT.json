@@ -318,6 +318,18 @@
       "claims": [
         "`tools/zapier/founder-content-outcome-contract.cjs` must bind founder-content metrics to the exact observed network, lane, account identity, connector identity, and coverage state; out-of-scope metrics must remain UNKNOWN, cross-account metric donation is forbidden, and these receipts can never grant publication, provider-write, merge, deploy, spend, or external-contact authority."
       ]
+    },
+    {
+      "path": "src/mcp/policy.ts",
+      "claims": [
+        "Read-only advertised annotations make destructiveHint inapplicable without reducing tool-name or policy risk; metadata cannot authorize mutation."
+      ]
+    },
+    {
+      "path": "src/mcp/hub.ts",
+      "claims": [
+        "The MCP invocation boundary must bypass the discovery cache and fail closed on fresh discovery failure, tool removal or mutating metadata before tools/call; fresh hints are not provider-behavior proof or an atomic remote execution binding."
+      ]
     }
   ]
 }
