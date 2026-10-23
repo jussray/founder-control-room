@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 REPOS = ("storyengine", "chiefAi", "sekretBip")
-VERSION = re.compile(r"^portfolio-v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$")
+VERSION = re.compile(r"^portfolio-v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$")
 
 def unique_pairs(pairs):
     result = {}
