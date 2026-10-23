@@ -1,5 +1,10 @@
 # Truth Decay Audit: When a True Claim Becomes Unsafe to Reuse
 
+## October 22, 2026: StoryEngine peer identity advances again
+
+At the FCR exact-head Playwright run associated with the public-front-door Access review, the previous peer pin was `26b1c34ae7c97c5d1b66a23d6345b3965cfcdc1f` while GitHub's current `refs/heads/main` for StoryEngine independently resolved to `1669d920f28bc81ddd04fea6d0bdb5ee41c29ec9`. The forward comparison reports three commits ahead and zero behind, affecting StoryEngine security and route sources. The workflow failed closed at the live-peer-ref equality gate after finishing its own local browser tests. The older FCR-to-StoryEngine federation proof is historical, not evidence for the new pair.
+
+Updating `.github/workflows/playwright.yml` to pin this exact successor is a bounded recovery prerequisite only. FCR's own exact-head CI, the new StoryEngine runtime receipt, the directive/receipt/replay browser path, and its own release authorization must all be proven anew. A successful git comparison, a source branch update, or a provider deployment cannot grant cross-project execution rights or substitute for complete federation browser verification.
 ## October 16, 2026: StoryEngine peer-identity renewal, without inherited proof
 
 FCR's new actual-server GitHub Workspace/browser test, full founder UI journey, capability workbench, and guarded terminal scenarios passed on the predecessor candidate while the separate FCR-to-StoryEngine test failed at the live peer-ref gate. The workflow expected StoryEngine `a6e6a396ed30535af2fd9b1ec2347a84e1a3fbf3` while independently observed `refs/heads/main` resolved to `26b1c34ae7c97c5d1b66a23d6345b3965cfcdc1f`. The former is not a current federation subject.
