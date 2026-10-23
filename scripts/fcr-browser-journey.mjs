@@ -224,7 +224,7 @@ async function cli() {
     console.log(JSON.stringify({ status: 'VALIDATED_ONLY', ...validated, browserExecuted: false }));
     return;
   }
-  const report = await runJourney(manifest, process.env.FCR_BROWSER_OUT_DIR || 'artifacts/browser/operator');
+  const report = await runJourney(manifest, process.env.FCR_BROWSER_OUT_DIR || 'test-results/fcr-browser-operator');
   console.log(JSON.stringify({ project: report.project, status: report.status, completed: report.completed, total: report.total, failure: report.failure || null }));
   if (report.status !== 'PASS') process.exitCode = 1;
 }
