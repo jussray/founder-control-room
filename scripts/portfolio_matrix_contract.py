@@ -128,6 +128,11 @@ def main():
     env_digest = os.environ.get("EXPECTED_MANIFEST_SHA256")
     if env_digest and digest != env_digest:
         raise ValueError("manifest digest changed between jobs")
+    expected_coordinator = os.environ.get("EXPECTED_COORDINATOR_HEAD_SHA")
+    if expected_coordinator:
+        actual_coordinator = run_git(root, "rev-parse", "HEAD").stdout.strip()
+        if actual_coordinator != expected_coordinator:
+            raise ValueError("coordinator checkout changed")
     if args.mode == "sources":
         details = checkout_checks(manifest, policy, args.sources)
     elif args.mode == "peers":
@@ -137,7 +142,7 @@ def main():
     evidence = {"contract": "juss/portfolio-candidate-evidence@v1",
         "release": manifest["release"], "manifestSha256": digest,
         "mode": args.mode, "status": "pass", "workflowRunId": os.environ.get("GITHUB_RUN_ID"),
-        "validatorCommit": os.environ.get("GITHUB_SHA"),
+        "validatorCommit": expected_coordinator,
         **details}
     if args.evidence:
         args.evidence.parent.mkdir(parents=True, exist_ok=True)
