@@ -38,6 +38,7 @@ export type FetchLike = (
 ) => Promise<{
   ok: boolean;
   status: number;
+  body?: ReadableStream<Uint8Array> | null;
   text(): Promise<string>;
 }>;
 
