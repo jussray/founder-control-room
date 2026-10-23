@@ -129,9 +129,35 @@ async function withDeadline<T>(timeoutMs: number, operation: (signal: AbortSigna
   }
 }
 
-async function readBounded(response: { text(): Promise<string> }): Promise<string | null> {
-  const raw = await response.text();
-  return Buffer.byteLength(raw, 'utf8') > MAX_JSON_BYTES ? null : raw;
+async function readBounded(response: {
+  body?: ReadableStream<Uint8Array> | null;
+  text(): Promise<string>;
+}): Promise<string | null> {
+  if (!response.body) {
+    const raw = await response.text();
+    return Buffer.byteLength(raw, 'utf8') > MAX_JSON_BYTES ? null : raw;
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let bytesRead = 0;
+  let raw = '';
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      bytesRead += value.byteLength;
+      if (bytesRead > MAX_JSON_BYTES) {
+        await reader.cancel('response_body_too_large').catch(() => undefined);
+        return null;
+      }
+      raw += decoder.decode(value, { stream: true });
+    }
+    raw += decoder.decode();
+    return raw;
+  } finally {
+    reader.releaseLock();
+  }
 }
 
 function asRecord(value: unknown): JsonRecord | null {
