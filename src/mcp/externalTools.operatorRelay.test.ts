@@ -1,6 +1,7 @@
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { OPERATOR_RELAY_PEERS } from '../lib/operatorRelayConstants.js';
 import type { RelayOperatorId } from '../lib/operatorRelay.js';
+import { OperatorRelayProviderBoundaryError } from '../lib/operatorRelayModelProviders.js';
 
 vi.mock('./vaultHub.js', () => ({
   hubForMcpProject: vi.fn(),
@@ -242,4 +243,98 @@ describe('external FCR operator relay authority boundary', () => {
       requestId: 'relay-request-deepseek-instructor-1',
     })).rejects.toThrow('targetOperator is not a peer relay operator');
   });
+  it('records provider-attempt failures without serializing provider error detail', async () => {
+    const recordEvidence = vi.fn(async (input: { toolName: string }) => (
+      receipt(input.toolName as 'fcr_relay_operator')
+    ));
+    const relayOperator = vi.fn(async () => {
+      throw new OperatorRelayProviderBoundaryError(
+        'anthropic',
+        'Anthropic relay failed with HTTP 500',
+      );
+    });
+    const execute = externalTools.createExternalMcpToolExecutor({
+      env: {
+        FCR_REMOTE_MCP_OPERATOR_CLIENT_MAP: JSON.stringify({ 'chatgpt-client': 'codex' }),
+      },
+      relayOperator,
+      recordEvidence,
+    });
+
+    await expect(execute({
+      name: 'fcr_relay_operator',
+      arguments: {
+        targetOperator: 'claude-code',
+        capability: 'implement',
+        goal: 'Produce bounded implementation evidence.',
+        contextSummary: 'No mutation authority is granted.',
+        sensitivity: 'internal',
+      },
+      allowedProjects: new Set(['founder-control-room']),
+      identity: {
+        userId: 'founder-user-1',
+        email: 'founder@example.com',
+        clientId: 'chatgpt-client',
+        authMode: 'oauth',
+      },
+      requestId: 'relay-provider-failure-1',
+    })).rejects.toThrow('Anthropic relay failed with HTTP 500');
+
+    expect(recordEvidence).toHaveBeenCalledWith(expect.objectContaining({
+      risk: 'external_side_effect',
+      result: {
+        contract: 'fcr/operator-relay-failure@v1',
+        outcome: 'failed',
+        targetOperator: 'claude-code',
+        provider: 'anthropic',
+        externalProviderCall: true,
+        safeCode: 'provider_call_failed',
+      },
+    }));
+  });
+
+  it('records pre-dispatch relay blocks as non-external read-risk evidence', async () => {
+    const recordEvidence = vi.fn(async (input: { toolName: string }) => (
+      receipt(input.toolName as 'fcr_relay_operator')
+    ));
+    const relayOperator = vi.fn(async () => {
+      throw new Error('semantic peer review is paused by founder cost-control policy');
+    });
+    const execute = externalTools.createExternalMcpToolExecutor({
+      env: {
+        FCR_REMOTE_MCP_OPERATOR_CLIENT_MAP: JSON.stringify({ 'chatgpt-client': 'codex' }),
+      },
+      relayOperator,
+      recordEvidence,
+    });
+
+    await expect(execute({
+      name: 'fcr_relay_operator',
+      arguments: {
+        targetOperator: 'claude-code',
+        capability: 'review',
+        goal: 'Review without provider spend.',
+        contextSummary: 'Cost policy should block before provider dispatch.',
+        sensitivity: 'internal',
+      },
+      allowedProjects: new Set(['founder-control-room']),
+      identity: {
+        userId: 'founder-user-1',
+        email: 'founder@example.com',
+        clientId: 'chatgpt-client',
+        authMode: 'oauth',
+      },
+      requestId: 'relay-policy-block-1',
+    })).rejects.toThrow('semantic peer review is paused');
+
+    expect(recordEvidence).toHaveBeenCalledWith(expect.objectContaining({
+      risk: 'read',
+      result: expect.objectContaining({
+        externalProviderCall: false,
+        provider: null,
+        safeCode: 'relay_blocked_before_provider',
+      }),
+    }));
+  });
+
 });

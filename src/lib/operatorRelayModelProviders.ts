@@ -16,6 +16,48 @@ const SAFE_DEEPSEEK_MODEL = /^(?:deepseek-flash|deepseek-v4-pro)$/;
 
 export const SEMANTIC_PEER_REVIEW_SPEND_MODE = 'paused' as const;
 
+export type OperatorRelayExternalProvider =
+  | 'gemini'
+  | 'openai'
+  | 'anthropic'
+  | 'perplexity'
+  | 'deepseek';
+
+export class OperatorRelayProviderBoundaryError extends Error {
+  readonly provider: OperatorRelayExternalProvider;
+  readonly externalProviderCall = true as const;
+
+  constructor(provider: OperatorRelayExternalProvider, message: string) {
+    super(message);
+    this.name = 'OperatorRelayProviderBoundaryError';
+    this.provider = provider;
+  }
+}
+
+function providerBoundaryError(
+  providerId: OperatorRelayExternalProvider,
+  label: string,
+  error: unknown,
+): OperatorRelayProviderBoundaryError {
+  if (error instanceof OperatorRelayProviderBoundaryError) return error;
+  const message = error instanceof Error && error.message.startsWith(label)
+    ? error.message
+    : `${label} returned an invalid response`;
+  return new OperatorRelayProviderBoundaryError(providerId, message);
+}
+
+function providerParsedResult<T>(
+  providerId: OperatorRelayExternalProvider,
+  label: string,
+  build: () => T,
+): T {
+  try {
+    return build();
+  } catch (error) {
+    throw providerBoundaryError(providerId, label, error);
+  }
+}
+
 function record(value: unknown): JsonRecord | null {
   return value && typeof value === 'object' && !Array.isArray(value)
     ? value as JsonRecord
@@ -115,6 +157,7 @@ async function invokeJsonProvider(
   url: string,
   init: RequestInit,
   label: string,
+  providerId: OperatorRelayExternalProvider,
 ): Promise<JsonRecord> {
   let response: Response;
   try {
@@ -122,9 +165,13 @@ async function invokeJsonProvider(
   } catch {
     // Do not serialize the provider/fetch exception. A transport exception can
     // contain request metadata, URLs, proxies, or secret-bearing diagnostics.
-    throw new Error(`${label} request failed`);
+    throw new OperatorRelayProviderBoundaryError(providerId, `${label} request failed`);
   }
-  return jsonResponse(response, label);
+  try {
+    return await jsonResponse(response, label);
+  } catch (error) {
+    throw providerBoundaryError(providerId, label, error);
+  }
 }
 
 function openAiText(body: JsonRecord): string {
@@ -343,8 +390,12 @@ export function createServerOperatorRelayAdapters(
               signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
             },
             'Gemini relay',
+            'gemini',
           );
-          return { text: geminiText(body), evidenceRef: evidenceRef('gemini', body, 'responseId') };
+          return providerParsedResult('gemini', 'Gemini relay', () => ({
+            text: geminiText(body),
+            evidenceRef: evidenceRef('gemini', body, 'responseId'),
+          }));
         },
       });
     }
@@ -369,8 +420,11 @@ export function createServerOperatorRelayAdapters(
           }),
           redirect: 'error',
           signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
-        }, 'OpenAI relay');
-        return { text: openAiText(body), evidenceRef: evidenceRef('openai', body) };
+        }, 'OpenAI relay', 'openai');
+        return providerParsedResult('openai', 'OpenAI relay', () => ({
+          text: openAiText(body),
+          evidenceRef: evidenceRef('openai', body),
+        }));
       },
     });
   }
@@ -396,8 +450,12 @@ export function createServerOperatorRelayAdapters(
           }),
           redirect: 'error',
           signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
-        }, 'Anthropic relay');
-        return { text: anthropicText(body), evidenceRef: evidenceRef('anthropic', body), usage: anthropicUsage(body) };
+        }, 'Anthropic relay', 'anthropic');
+        return providerParsedResult('anthropic', 'Anthropic relay', () => ({
+          text: anthropicText(body),
+          evidenceRef: evidenceRef('anthropic', body),
+          usage: anthropicUsage(body),
+        }));
       },
     });
   }
@@ -424,8 +482,11 @@ export function createServerOperatorRelayAdapters(
             }),
             redirect: 'error',
             signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
-          }, 'Perplexity Agent relay');
-          return { text: perplexityText(body), evidenceRef: evidenceRef('perplexity', body) };
+          }, 'Perplexity Agent relay', 'perplexity');
+          return providerParsedResult('perplexity', 'Perplexity Agent relay', () => ({
+            text: perplexityText(body),
+            evidenceRef: evidenceRef('perplexity', body),
+          }));
         },
       });
     }
@@ -451,8 +512,11 @@ export function createServerOperatorRelayAdapters(
             }),
             redirect: 'error',
             signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
-          }, 'DeepSeek relay');
-          return { text: deepSeekText(body), evidenceRef: evidenceRef('deepseek', body) };
+          }, 'DeepSeek relay', 'deepseek');
+          return providerParsedResult('deepseek', 'DeepSeek relay', () => ({
+            text: deepSeekText(body),
+            evidenceRef: evidenceRef('deepseek', body),
+          }));
         },
       });
     }

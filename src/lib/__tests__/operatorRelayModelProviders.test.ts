@@ -6,6 +6,7 @@ import {
   type OperatorRelayRequestV1,
 } from '../operatorRelay.js';
 import {
+  OperatorRelayProviderBoundaryError,
   SEMANTIC_PEER_REVIEW_SPEND_MODE,
   createServerOperatorRelayAdapters,
 } from '../operatorRelayModelProviders.js';
@@ -316,6 +317,30 @@ describe('createServerOperatorRelayAdapters', () => {
     const call = adapters['claude-code']?.(relay('internal', 'claude-code'));
     await expect(call).rejects.toThrow('Anthropic relay request failed');
     await expect(call).rejects.not.toThrow(marker);
+  });
+
+  it('marks a completed HTTP attempt as a structured provider-boundary failure without leaking provider detail', async () => {
+    const marker = 'provider-secret-detail-marker';
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+      error: { message: marker },
+    }), { status: 500, headers: { 'Content-Type': 'application/json' } })) as typeof fetch;
+    const adapters = createServerOperatorRelayAdapters({
+      ANTHROPIC_API_KEY: FIXTURE,
+      FCR_RELAY_ANTHROPIC_MODEL: 'claude-test-model',
+    }, fetchMock);
+
+    try {
+      await adapters['claude-code']?.(relay('internal', 'claude-code'));
+      throw new Error('expected Anthropic failure');
+    } catch (error) {
+      expect(error).toBeInstanceOf(OperatorRelayProviderBoundaryError);
+      expect(error).toMatchObject({
+        provider: 'anthropic',
+        externalProviderCall: true,
+      });
+      expect(String(error)).toContain('Anthropic relay failed with HTTP 500');
+      expect(String(error)).not.toContain(marker);
+    }
   });
 
   it('fails closed before provider dispatch for restricted context', async () => {
