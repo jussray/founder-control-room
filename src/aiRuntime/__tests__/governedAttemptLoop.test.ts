@@ -394,7 +394,85 @@ describe('runGovernedReadOnlyAttempt', () => {
     });
 
     expect(result.state).toBe('EXECUTED_UNVERIFIED');
-    expect(result.reason).toContain('caller-supplied witness evidence cannot promote');
+    expect(result.reason).toContain('caller-supplied witness evidence cannot promote or contradict');
     expect(witnessFn).toHaveBeenCalledTimes(1);
   });
+
+  it('does not accept a caller-supplied contradiction as independent verification evidence', async () => {
+    const activeLease = lease();
+    const activeAdapter = adapter(activeLease);
+    const witnessFn = vi.fn(async (value: GovernedExecutionReceipt): Promise<GovernedExecutionWitness> => ({
+      ...witness(value),
+      status: 'contradicted',
+      strength: 'W4',
+    }));
+
+    const result = await runGovernedReadOnlyAttempt({
+      lease: activeLease,
+      world: world(),
+      proposal: {
+        toolName: activeAdapter.name,
+        requestedCapabilities: ['provider.observation.read'],
+      },
+      adapter: activeAdapter,
+      witness: witnessFn,
+    });
+
+    expect(result.state).toBe('EXECUTED_UNVERIFIED');
+    expect(result.reason).toContain('cannot promote or contradict execution truth');
+    expect(activeAdapter.invoke).toHaveBeenCalledTimes(1);
+    expect(witnessFn).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns the receipt-derived outcome when witness collection fails', async () => {
+    const activeLease = lease();
+    const activeAdapter = adapter(activeLease);
+    const witnessFn = vi.fn(async (): Promise<GovernedExecutionWitness> => {
+      throw new Error('witness temporarily unavailable');
+    });
+
+    const result = await runGovernedReadOnlyAttempt({
+      lease: activeLease,
+      world: world(),
+      proposal: {
+        toolName: activeAdapter.name,
+        requestedCapabilities: ['provider.observation.read'],
+      },
+      adapter: activeAdapter,
+      witness: witnessFn,
+    });
+
+    expect(result.state).toBe('EXECUTED_UNVERIFIED');
+    expect(result.reason).toContain('Witness collection failed');
+    expect(result.receipt).toEqual(receipt(activeLease));
+    expect(activeAdapter.invoke).toHaveBeenCalledTimes(1);
+    expect(witnessFn).toHaveBeenCalledTimes(1);
+  });
+
+  it('preserves the failed receipt outcome despite an untrusted verified witness', async () => {
+    const activeLease = lease();
+    const activeAdapter = adapter(activeLease, {
+      invoke: vi.fn(async () => ({
+        ...receipt(activeLease),
+        status: 'failed' as const,
+      })),
+    });
+    const witnessFn = vi.fn(async (value: GovernedExecutionReceipt) => witness(value));
+
+    const result = await runGovernedReadOnlyAttempt({
+      lease: activeLease,
+      world: world(),
+      proposal: {
+        toolName: activeAdapter.name,
+        requestedCapabilities: ['provider.observation.read'],
+      },
+      adapter: activeAdapter,
+      witness: witnessFn,
+    });
+
+    expect(result.state).toBe('FAILED');
+    expect(result.receipt?.status).toBe('failed');
+    expect(activeAdapter.invoke).toHaveBeenCalledTimes(1);
+  });
+
 });
