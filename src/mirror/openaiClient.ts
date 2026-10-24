@@ -1,4 +1,11 @@
 import {
+  runStructuredJson,
+  StructuredProviderError,
+  type StructuredJsonResult,
+  type StructuredProviderConfig,
+  type StructuredProviderName,
+} from '../aiRuntime/structuredProvider.js';
+import {
   MIRROR_OUTPUT_SCHEMA,
   MIRROR_PROMPT_VERSION,
   MIRROR_SYSTEM_PROMPT,
@@ -157,11 +164,111 @@ function baseUrl(env: NodeJS.ProcessEnv): string {
   return (env.OPENAI_API_BASE_URL?.trim() || DEFAULT_OPENAI_BASE_URL).replace(/\/$/, '');
 }
 
+function providerName(value: string | undefined, fallback: StructuredProviderName): StructuredProviderName {
+  const normalized = value?.trim().toLowerCase();
+  if (!normalized) return fallback;
+  if (normalized === 'openai' || normalized === 'anthropic') return normalized;
+  throw new MirrorProviderError(`Unsupported Mirror Engine provider: ${normalized}`, 'MODEL_PROVIDER_INVALID');
+}
+
+function providerConfig(
+  env: NodeJS.ProcessEnv,
+  provider: StructuredProviderName,
+  required: boolean,
+): StructuredProviderConfig | null {
+  if (provider === 'openai') {
+    const apiKey = env.OPENAI_API_KEY?.trim();
+    if (!apiKey) {
+      if (required) {
+        throw new MirrorProviderError('OPENAI_API_KEY is not configured for Mirror Engine', 'OPENAI_NOT_CONFIGURED');
+      }
+      return null;
+    }
+    return {
+      provider,
+      apiKey,
+      model: env.MIRROR_ENGINE_MODEL?.trim() || DEFAULT_MODEL,
+      baseUrl: env.OPENAI_API_BASE_URL?.trim(),
+    };
+  }
+
+  const apiKey = env.ANTHROPIC_API_KEY?.trim();
+  const model = env.MIRROR_ENGINE_ANTHROPIC_MODEL?.trim();
+  if (!apiKey || !model) {
+    if (required) {
+      throw new MirrorProviderError(
+        'ANTHROPIC_API_KEY and MIRROR_ENGINE_ANTHROPIC_MODEL are required for Anthropic Mirror Engine',
+        'ANTHROPIC_NOT_CONFIGURED',
+      );
+    }
+    return null;
+  }
+  return {
+    provider,
+    apiKey,
+    model,
+    baseUrl: env.ANTHROPIC_API_BASE_URL?.trim(),
+  };
+}
+
+function providerChain(env: NodeJS.ProcessEnv): StructuredProviderConfig[] {
+  const primaryName = providerName(env.MIRROR_ENGINE_PROVIDER, 'openai');
+  const primary = providerConfig(env, primaryName, true);
+  if (!primary) return [];
+
+  const fallbackRaw = env.MIRROR_ENGINE_FALLBACK_PROVIDER?.trim();
+  if (!fallbackRaw) return [primary];
+  const fallbackName = providerName(fallbackRaw, primaryName);
+  if (fallbackName === primaryName) return [primary];
+  const fallback = providerConfig(env, fallbackName, false);
+  return fallback ? [primary, fallback] : [primary];
+}
+
 export function createOpenAiMirrorRunner(dependencies: OpenAiMirrorDependencies = {}) {
   const env = dependencies.env ?? process.env;
   const fetchFn = dependencies.fetchFn ?? fetch;
 
   return async function runMirror(input: MirrorRunInput): Promise<MirrorModelResult> {
+    // The existing OpenAI request contract remains the default until a
+    // provider selector or explicit failover is configured.
+    if (env.MIRROR_ENGINE_PROVIDER?.trim() || env.MIRROR_ENGINE_FALLBACK_PROVIDER?.trim()) {
+      let result: StructuredJsonResult;
+      try {
+        result = await runStructuredJson(
+          providerChain(env),
+          {
+            schemaName: 'mirror_engine_output',
+            schema: MIRROR_OUTPUT_SCHEMA,
+            systemPrompt: MIRROR_SYSTEM_PROMPT,
+            userPrompt: mirrorUserPrompt(input),
+            maxOutputTokens: 1_600,
+          },
+          {
+            fetchFn,
+            timeoutMs: timeoutMs(env),
+            maxResponseBytes: MAX_RESPONSE_BYTES,
+          },
+        );
+      } catch (error) {
+        if (error instanceof MirrorProviderError) throw error;
+        if (error instanceof StructuredProviderError) {
+          throw new MirrorProviderError(error.message, error.code, error.status);
+        }
+        throw error;
+      }
+
+      return {
+        output: modelOutput(result.output),
+        provenance: {
+          provider: result.provider,
+          model: result.model,
+          responseId: result.responseId,
+          promptVersion: MIRROR_PROMPT_VERSION,
+          storedByProvider: result.provider === 'openai' ? false : null,
+        },
+      };
+    }
+
     const apiKey = env.OPENAI_API_KEY?.trim();
     if (!apiKey) {
       throw new MirrorProviderError('OPENAI_API_KEY is not configured for Mirror Engine', 'OPENAI_NOT_CONFIGURED');
