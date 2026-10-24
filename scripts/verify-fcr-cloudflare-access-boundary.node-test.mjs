@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import {
   FCR_ACCESS_ACCOUNT_ID,
@@ -10,12 +11,26 @@ const CLIENT_ID = 'fcr-client.access';
 const TOKEN_ID = 'fcr-service-token-1';
 const NOW = Date.parse('2026-10-15T06:00:00Z');
 
-const boundary = {
-  publicHosts: ['foundercontrolroom.org', 'www.foundercontrolroom.org'],
-  accessRequiredHosts: ['app.foundercontrolroom.org', 'api.foundercontrolroom.org'],
-  apiDefault: 'access_required',
-  applicationAuthenticatedBypassPaths: ['/mcp', '/mcp/read', '/mcp/founder-signal-x-engagement'],
-};
+// Read the audited policy itself; a hand-written bypass fixture can otherwise
+// give a false green even after the canonical Access exception list changes.
+const boundary = JSON.parse(readFileSync(
+  new URL('../config/fcr-cloudflare-access-boundary.json', import.meta.url),
+  'utf8',
+));
+
+test('MCP protocol routes use the public binding, not a direct API Access bypass', () => {
+  assert.equal(boundary.apiDefault, 'access_required');
+  assert.deepEqual(boundary.accessRequiredHosts, [
+    'app.foundercontrolroom.org',
+    'api.foundercontrolroom.org',
+  ]);
+  for (const path of ['/mcp', '/mcp/read', '/mcp/founder-signal-x-engagement']) {
+    assert.ok(boundary.publicServiceBindingProtocolPaths.includes(path));
+    assert.ok(!boundary.applicationAuthenticatedBypassPaths.includes(path));
+  }
+  assert.ok(boundary.serviceTokenProtectedPaths.includes('/mcp/founder-signal-engine'));
+  assert.ok(!boundary.applicationAuthenticatedBypassPaths.includes('/mcp/*'));
+});
 
 function response(result, status = 200) {
   return {
