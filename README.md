@@ -482,6 +482,15 @@ FCR carries a privacy-minimal portfolio conversion contract in [`docs/PORTFOLIO_
 
 Provider configuration, site wiring, observed clicks, and commercial outcomes remain separate truth layers. The Cloudflare `jussco-conversions` Worker/D1 configuration is provider evidence only; it is not proof that a live portfolio site is sending events or that a sale occurred.
 
+
+## Sauce Guard + Source Guard — bounded source checks
+
+**Sauce Guard** is the existing founder-content protection workflow: evidence is reduced to a public-safe story, private implementation is withheld, claims receive temporal classification, and exact founder approval plus fresh provider readback remain separate requirements. Its governing source is [the Sauce Guard skill](.agents/skills/sauce-guard/SKILL.md); see [Sauce Guard documentation](docs/SAUCE_GUARD.md).
+
+**Source Guard** adds read-only repository checks for the documented guard boundaries and the portfolio conversion-tracking data contract. See [Source Guard documentation](docs/SOURCE_GUARD.md), scripts/verify-sauce-source-guard.mjs, the Node regression tests, and the separate GitHub Actions workflow. Source Guard complements, but does not replace, [Documentation Truth](.github/workflows/documentation-truth.yml).
+
+**Truth boundary:** checked-in policy and tests are source evidence only. A passing workflow does **not** establish that public content was approved or published, that the collector receives real site traffic, or that live security/runtime controls operate correctly. No new deploy, merge, publication, provider-mutation or deletion authority is granted.
+
 ## Sauce Guard agent and logging egress (candidate governance)
 
 Founder Control Room owns the canonical `.agents/skills/sauce-guard/SKILL.md` for all founder-product outward communication. The skill requires verified, temporally current public-safe claims, exact Current You approval, FCR execution-time revalidation and destination-provider readback. CI's `scripts/verify-sauce-guard-egress.mjs` is a separate, changed-line source check that rejects newly introduced dynamic logger sinks and unsafe logging of raw provider/user content in covered code areas. It cannot certify older logs, external agents, security scanning, or publication. The PR must pass exact-head checks, independent review and founder-final merge authorization before this policy is integrated.
