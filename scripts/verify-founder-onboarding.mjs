@@ -54,6 +54,14 @@ requireText('auth', 'opaque callback redirect', "return res.redirect(303, '/')")
 requireText('ui', 'Google login control', 'Continue with Google');
 requireText('ui', 'Google login route', 'href="/auth/google"');
 requireText('ui', 'workspace form', 'id="workspace-form"');
+requireText('ui', 'Control Room Composer first-run surface', 'Control Room Composer');
+requireText('ui', 'project-type choice', 'name="projectType"');
+requireText('ui', 'mission choice', 'name="mission"');
+requireText('ui', 'current-state choice', 'name="currentState"');
+requireText('ui', 'project-first prompt', 'What are you working on?');
+requireText('ui', 'mission-first prompt', 'What do you need FCR to do?');
+requireText('ui', 'profile render target', 'id="control-room-profile"');
+requireText('ui', 'secondary account controls deferred', 'id="account-secondary" hidden');
 requireText('ui', 'GitHub workspace handoff', '/control-room/github-workspace.html');
 requireText('ui', 'Command Bridge handoff', '/control-room/command-bridge.html');
 requireText('ui', 'Plugin Center handoff', '/control-room/plugin-center.html');
@@ -61,6 +69,7 @@ requireText('ui', 'HubSpot onboarding slot', 'value="hubspot"');
 requireText('ui', 'Playwright onboarding slot', 'value="playwright"');
 requireText('ui', 'workspace bootstrap endpoint', "api('/onboarding/bootstrap'");
 requireText('ui', 'workspace state endpoint', "api('/onboarding/state')");
+requireText('ui', 'composer payload', 'controlRoom:{projectType:');
 requireText('ui', 'password form', 'id="password-form"');
 requireText('ui', 'password confirmation', 'name="confirmPassword"');
 requireText('ui', 'password endpoint fetch', "api('/auth/password'");
@@ -69,6 +78,13 @@ requireText('ui', 'scoped onboarding CSP', 'onboardingRouter.use(onboardingConte
 requireText('workspace', 'founder auth gate', 'founderOnboardingRouter.use(requireFounder)');
 requireText('workspace', 'resumable state route', "founderOnboardingRouter.get('/state'");
 requireText('workspace', 'idempotent bootstrap route', "founderOnboardingRouter.post('/bootstrap'");
+requireText('workspace', 'composer project-type allowlist', 'const PROJECT_TYPES = [');
+requireText('workspace', 'composer mission allowlist', 'const MISSIONS = [');
+requireText('workspace', 'composer state allowlist', 'const PROJECT_STATES = [');
+requireText('workspace', 'composer profile normalization', 'normalizeControlRoomProfile');
+requireText('workspace', 'composer profile audit receipt', 'controlRoomProfile: suppliedProfile');
+requireText('workspace', 'composer profile state restoration', 'controlRoomProfile: profileByProject.get(projectId) ?? null');
+requireText('workspace', 'composer option discovery', 'composerOptions: {');
 requireText('workspace', 'HubSpot provider declaration', "'hubspot'");
 requireText('workspace', 'disconnected-by-default providers', "status: 'disconnected'");
 requireText('workspace', 'no secret persistence', 'secret_ref: null');
@@ -135,6 +151,9 @@ if (/secret_ref:\s*['"`][^'"`]+/.test(files.workspace)) {
 if (/secret_ref:\s*null[\s\S]{0,240}status:\s*'active'/.test(files.workspace)) {
   errors.push('truth boundary: onboarding provider slots must not be labeled active before verification');
 }
+if (files.workspace.includes('controlRoomProfile: suppliedProfile') && files.workspace.includes('authorityGranted: true')) {
+  errors.push('composer authority: project/mission/state selection must never grant execution authority');
+}
 if (files.worker.includes('Object.assign(request')) {
   errors.push('Worker bridge: hand-built Request duck typing must not return');
 }
@@ -150,6 +169,8 @@ if (errors.length) {
 
 console.log('Founder onboarding contract verified.');
 console.log('Google OAuth: Supabase redirect + private founder allowlist');
+console.log('First authenticated experience: Control Room Composer');
+console.log('Composer state: project type + mission + current reality restored from audit evidence');
 console.log('Workspace bootstrap: project registry + disconnected provider slots');
 console.log('Opaque browser cookie: HttpOnly + Strict + server-side revocation');
 console.log('Founder callback handoff: opaque cookie only; no Supabase credential fragment');

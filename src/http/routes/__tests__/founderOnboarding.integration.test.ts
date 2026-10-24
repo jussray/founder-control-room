@@ -46,7 +46,7 @@ beforeEach(() => {
 });
 
 describe('GET /onboarding/state', () => {
-  it('returns real project and connection state plus the founder authority boundary', async () => {
+  it('returns project, composer profile, connection state, and the founder authority boundary', async () => {
     supabaseMock.from.mockImplementation((table: string) => {
       if (table === 'founder_users') return founderUsersRow();
       if (table === 'projects') {
@@ -87,6 +87,29 @@ describe('GET /onboarding/state', () => {
           }),
         };
       }
+      if (table === 'project_events') {
+        return {
+          select: () => ({
+            in: () => ({
+              order: () => Promise.resolve({
+                data: [{
+                  project_id: 'project-1',
+                  event_type: 'founder_onboarding_bootstrapped',
+                  created_at: '2026-09-14T22:00:00.000Z',
+                  metadata: {
+                    controlRoomProfile: {
+                      projectType: 'ai-agent',
+                      mission: 'fix',
+                      currentState: 'live',
+                    },
+                  },
+                }],
+                error: null,
+              }),
+            }),
+          }),
+        };
+      }
       return {};
     });
 
@@ -96,11 +119,21 @@ describe('GET /onboarding/state', () => {
 
     expect(response.status).toBe(200);
     expect(response.body.complete).toBe(true);
+    expect(response.body.projects[0].controlRoomProfile).toEqual({
+      projectType: 'ai-agent',
+      mission: 'fix',
+      currentState: 'live',
+    });
     expect(response.body.projects[0].connections[0]).toMatchObject({
       type: 'github',
       status: 'disconnected',
       authorityLevel: 'L5',
     });
+    expect(response.body.composerOptions).toEqual(expect.objectContaining({
+      projectTypes: expect.arrayContaining(['product-app', 'ai-agent', 'store-commerce']),
+      missions: expect.arrayContaining(['build', 'fix', 'prove']),
+      currentStates: expect.arrayContaining(['idea', 'live', 'broken']),
+    }));
     expect(response.body.recommendedProviders.map((provider: { type: string }) => provider.type))
       .toContain('hubspot');
     expect(response.body.authorityBoundary).toEqual(expect.objectContaining({
@@ -113,7 +146,7 @@ describe('GET /onboarding/state', () => {
 });
 
 describe('POST /onboarding/bootstrap', () => {
-  it('creates an idempotent project foundation and disconnected provider slots without credentials or execution authority', async () => {
+  it('creates an idempotent project foundation, composer receipt, and disconnected provider slots without execution authority', async () => {
     const insertedConnections: Record<string, unknown>[] = [];
     let eventRow: Record<string, unknown> | null = null;
 
@@ -179,10 +212,20 @@ describe('POST /onboarding/bootstrap', () => {
           stack: 'Cloudflare + Supabase',
           riskLevel: 'high',
         },
+        controlRoom: {
+          projectType: 'ai-agent',
+          mission: 'fix',
+          currentState: 'live',
+        },
         providers: ['github', 'openai', 'hubspot', 'playwright'],
       });
 
     expect(response.status).toBe(201);
+    expect(response.body.controlRoomProfile).toEqual({
+      projectType: 'ai-agent',
+      mission: 'fix',
+      currentState: 'live',
+    });
     expect(insertedConnections.map((row) => row.connection_type)).toEqual([
       'github',
       'openai',
@@ -201,10 +244,38 @@ describe('POST /onboarding/bootstrap', () => {
     expect(eventRow).toMatchObject({
       event_type: 'founder_onboarding_bootstrapped',
       metadata: expect.objectContaining({
+        controlRoomProfile: {
+          projectType: 'ai-agent',
+          mission: 'fix',
+          currentState: 'live',
+        },
         authorityGranted: false,
         credentialsStored: false,
       }),
     });
+  });
+
+  it('rejects an invalid composer profile before attempting a workspace mutation', async () => {
+    supabaseMock.from.mockImplementation((table: string) => {
+      if (table === 'founder_users') return founderUsersRow();
+      return {};
+    });
+
+    const response = await request(app())
+      .post('/onboarding/bootstrap')
+      .set('Authorization', BEARER)
+      .send({
+        project: { slug: 'test-project', name: 'Test Project' },
+        controlRoom: {
+          projectType: 'product-app',
+          mission: 'delete-everything',
+          currentState: 'building',
+        },
+        providers: [],
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toMatch(/supported projectType, mission, and currentState/);
   });
 
   it('rejects undeclared providers before attempting a workspace mutation', async () => {

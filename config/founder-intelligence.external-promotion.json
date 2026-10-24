@@ -1,0 +1,70 @@
+{
+  "schemaVersion": 1,
+  "owner": "Juss",
+  "inspectedOn": "2026-09-26",
+  "authorityBoundary": "External continuity evidence only. This receipt grants no FCR portfolio, MCP, decision, merge, deployment, provider, publication, payment, mutation, or execution authority.",
+  "promotions": [
+    {
+      "slug": "truth-compass",
+      "repository": "jussray/truth-compass",
+      "observedMainSha": "fc80ad039770e6aeac161104ff201eccd83a8d27",
+      "challengeStackStatus": "on-main",
+      "challengeStackCarrier": "AGENTS_FOUNDER_INTELLIGENCE.md",
+      "verificationRunId": 36264923916,
+      "verificationResult": "success",
+      "proof": [
+        "verify:founder-intelligence",
+        "semantic lint",
+        "typecheck",
+        "tests",
+        "build",
+        "playwright"
+      ],
+      "nextGate": "Any future main movement expires this receipt until the successor head is re-observed and its verify workflow is green."
+    },
+    {
+      "slug": "truth-weaver",
+      "repository": "jussray/truth-weaver",
+      "observedMainSha": "6110c06de43806867799c5db2d81941468d4be17",
+      "challengeStackStatus": "on-main",
+      "challengeStackCarrier": "AGENTS_FOUNDER_INTELLIGENCE.md",
+      "verificationRunId": 36208161032,
+      "verificationResult": "success",
+      "proof": [
+        "verify:founder-intelligence",
+        "semantic lint",
+        "typecheck",
+        "tests",
+        "build",
+        "playwright"
+      ],
+      "nextGate": "Any future main movement expires this receipt until the successor head is re-observed and its verify workflow is green."
+    },
+    {
+      "slug": "alexa-commerce-engine",
+      "repository": "jussray/alexa-commerce-engine-",
+      "observedMainSha": "68b27042c0e50dc8b5dcc6b7d236aabd380a0a95",
+      "challengeStackStatus": "on-main",
+      "challengeStackCarrier": "AGENTS_FOUNDER_INTELLIGENCE.md",
+      "verificationRunId": 36208071058,
+      "verificationResult": "success",
+      "proof": [
+        "verify:founder-intelligence",
+        "source/unit/MCP tests",
+        "production dependency audit",
+        "playwright judge flow",
+        "lambda package inspection",
+        "fresh-unzip lambda smoke"
+      ],
+      "nextGate": "Any future main movement expires this receipt until the successor head is re-observed and its verify workflow is green."
+    }
+  ],
+  "blocked": [
+    {
+      "slug": "bip-jr",
+      "repository": "jussray/Bip-Jr",
+      "status": "continuity-only",
+      "reason": "The repository-local agent contract redirects active implementation and AI-agent rule changes to canonical jussray/Sekret-Bip; preserving that boundary is the verified action."
+    }
+  ]
+}

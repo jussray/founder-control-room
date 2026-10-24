@@ -6,6 +6,12 @@ import {
   type CryptographicReviewRequired,
 } from './cryptographicInventory.js';
 import {
+  PROVIDER_PQC_CAPABILITIES,
+  auditProviderPqcCapabilities,
+  providerPqcCapabilitiesAsOf,
+  type ProviderPqcCapabilityEntry,
+} from './providerPqcCapability.js';
+import {
   DEFAULT_LANTERN_POLICY,
   STRATEGIC_SECURITY_INVARIANTS,
   STRATEGIC_SECURITY_STAGES,
@@ -44,6 +50,11 @@ export interface SecurityPostureSummary {
   cryptographicInventoryEntries: number;
   cryptographicReviewRequiredProjects: number;
   publicKeyMigrationEntries: number;
+  providerPqcEvidenceEntries: number;
+  providerPqcCurrentEntries: number;
+  providerPqcPlannedEntries: number;
+  providerPqcUnsupportedEntries: number;
+  providerPqcUnknownEntries: number;
   provenProjects: 0;
 }
 
@@ -57,6 +68,10 @@ export interface SecurityPostureSnapshot {
     inventory: readonly CryptographicInventoryEntry[];
     reviewRequired: readonly CryptographicReviewRequired[];
     coverage: ReturnType<typeof auditCryptographicInventoryCoverage>;
+    providerPqcEvidence: {
+      entries: readonly ProviderPqcCapabilityEntry[];
+      summary: ReturnType<typeof auditProviderPqcCapabilities>;
+    };
   };
   lantern: {
     policy: typeof DEFAULT_LANTERN_POLICY;
@@ -67,6 +82,7 @@ export interface SecurityPostureSnapshot {
     targetVersionIsNotCurrentMaturity: true;
     frameworkMappingIsNotCertification: true;
     providerClaimsRequireRuntimeEvidence: true;
+    providerRoadmapIsNotRuntimeProof: true;
     cryptographicInventoryIsObservationNotQuantumSafety: true;
     securityPostureIsReadOnly: true;
     analyticsAreAggregateAndPrivacySafe: true;
@@ -78,7 +94,7 @@ function unique(values: readonly string[]): string[] {
   return [...new Set(values)].sort();
 }
 
-export function buildSecurityPostureSnapshot(): SecurityPostureSnapshot {
+export function buildSecurityPostureSnapshot(asOf: Date = new Date()): SecurityPostureSnapshot {
   const audits = auditPortfolioStrategicSecurity();
   const projects: SecurityPostureProject[] = audits.map((audit) => ({
     slug: audit.projectSlug,
@@ -98,6 +114,8 @@ export function buildSecurityPostureSnapshot(): SecurityPostureSnapshot {
   const frameworkSignals = unique(STRATEGIC_SECURITY_STAGES.flatMap((stage) => stage.frameworkSignals));
   const lanternErrors = validateLanternPolicy({ ...DEFAULT_LANTERN_POLICY });
   const cryptoCoverage = auditCryptographicInventoryCoverage();
+  const providerPqcEntries = providerPqcCapabilitiesAsOf(PROVIDER_PQC_CAPABILITIES, asOf);
+  const providerPqcSummary = auditProviderPqcCapabilities(providerPqcEntries);
 
   return {
     contract: SECURITY_POSTURE_CONTRACT,
@@ -113,6 +131,11 @@ export function buildSecurityPostureSnapshot(): SecurityPostureSnapshot {
       cryptographicInventoryEntries: cryptoCoverage.inventoryEntryCount,
       cryptographicReviewRequiredProjects: cryptoCoverage.reviewRequiredProjectCount,
       publicKeyMigrationEntries: cryptoCoverage.publicKeyMigrationEntryCount,
+      providerPqcEvidenceEntries: providerPqcSummary.entryCount,
+      providerPqcCurrentEntries: providerPqcSummary.currentCount,
+      providerPqcPlannedEntries: providerPqcSummary.plannedCount,
+      providerPqcUnsupportedEntries: providerPqcSummary.unsupportedCount,
+      providerPqcUnknownEntries: providerPqcSummary.unknownCount,
       provenProjects: 0,
     },
     stages: STRATEGIC_SECURITY_STAGES,
@@ -122,6 +145,10 @@ export function buildSecurityPostureSnapshot(): SecurityPostureSnapshot {
       inventory: CRYPTOGRAPHIC_INVENTORY,
       reviewRequired: CRYPTOGRAPHIC_REVIEW_REQUIRED,
       coverage: cryptoCoverage,
+      providerPqcEvidence: {
+        entries: providerPqcEntries,
+        summary: providerPqcSummary,
+      },
     },
     lantern: {
       policy: DEFAULT_LANTERN_POLICY,
@@ -132,6 +159,7 @@ export function buildSecurityPostureSnapshot(): SecurityPostureSnapshot {
       targetVersionIsNotCurrentMaturity: true,
       frameworkMappingIsNotCertification: true,
       providerClaimsRequireRuntimeEvidence: true,
+      providerRoadmapIsNotRuntimeProof: true,
       cryptographicInventoryIsObservationNotQuantumSafety: true,
       securityPostureIsReadOnly: true,
       analyticsAreAggregateAndPrivacySafe: true,

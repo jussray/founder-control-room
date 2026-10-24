@@ -90,7 +90,7 @@ The API never writes raw transcript or memory text into `project_events`. Audit 
   },
   "provenance": {
     "provider": "openai",
-    "model": "gpt-5-mini",
+    "model": "gpt-4o-mini",
     "responseId": "resp_...",
     "promptVersion": "mirror-engine-v1-2026-07-30",
     "storedByProvider": false
@@ -129,7 +129,7 @@ MIRROR_ENGINE_FALLBACK_PROVIDER=anthropic
 
 The fallback is attempted only for retryable provider-availability failures such as timeout/network, HTTP 408/409/429, or 5xx. Authentication failure, invalid schema/configuration, refusal, incomplete output, and local semantic validation failures do not trigger provider failover.
 
-QuickScan Chief uses the same shared runtime with its own selectors:
+QuickScan Chief retains the current free-first default routing (eligible local model, OpenAI, then deterministic kernel). Its Anthropic path is explicitly opt-in through `QUICKSCAN_CHIEF_PROVIDER=anthropic`; that path uses the shared structured runtime and can fail over to OpenAI only when explicitly configured:
 
 ```env
 QUICKSCAN_CHIEF_PROVIDER=openai
@@ -230,3 +230,7 @@ This remains an API/runtime-only slice; no browser UI behavior changes in these 
 ## Rollback
 
 Before merge, revert the focused feature-branch commits or abandon the branch. After merge, revert the focused provider-runtime commits in reverse order. Do not delete audit history, approval receipts, provider receipts, or existing idempotency state.
+
+## 2026-10 integration boundary
+
+This document describes code proposed on a pull-request branch, not a production deployment or verified provider configuration. The existing default OpenAI Mirror path and QuickScan free-first policy remain intact. Anthropic provider access requires explicit configuration and founder-directed consent before sensitive business evidence is sent to any provider. Provider-runtime, unit-test, and release claims require fresh exact-head evidence.

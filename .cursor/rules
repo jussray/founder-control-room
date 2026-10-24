@@ -47,6 +47,8 @@ A valid MCP config is not runtime proof. Keep changes focused and reversible. Ne
 
 ## Merge and Approval Gates
 
-Repository merges follow `docs/FOUNDER_MERGE_AUTHORITY.md` and may proceed under its standing evidence-based conditions when the exact PR/head is verified and required proof is green.
+Repository merges follow `docs/FOUNDER_MERGE_AUTHORITY.md`. `merge_authority: true` means the merge capability is available; it is not approval for a specific candidate.
 
-Merge authority does not silently authorize production deployment, migrations, new provider/data-source scope, credential changes, auth/RLS changes, DNS, billing, destructive writes, publication, sending, external communication, or other separately gated actions.
+Before every merge, require fresh explicit founder approval bound to the exact repository, PR number, current base SHA, and current head SHA. If that approval is absent, ambiguous, or stale, ask and stop. Review requests, `merge review`, `approved`, `cont`, successful checks, mergeability, or standing authority do not silently substitute for exact-candidate merge approval. Any base/head movement expires the approval.
+
+Merge authority and merge approval do not silently authorize production deployment, migrations, new provider/data-source scope, credential changes, auth/RLS changes, DNS, billing, destructive writes, publication, sending, external communication, or other separately gated actions.

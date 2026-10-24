@@ -64,17 +64,17 @@ function providerErrorCode(error: unknown): string {
   return error instanceof QuickScanChiefProviderError ? error.code : 'QUICKSCAN_CHIEF_FAILED';
 }
 
-function providerConfigurationMissing(code: string): boolean {
-  return code === 'MODEL_PROVIDER_NOT_CONFIGURED' || code.endsWith('_NOT_CONFIGURED');
-}
-
 function quickScanChiefConfigured(env: NodeJS.ProcessEnv = process.env): boolean {
   const provider = env.QUICKSCAN_CHIEF_PROVIDER?.trim().toLowerCase() || 'openai';
-  if (provider === 'openai') return Boolean(env.OPENAI_API_KEY?.trim());
   if (provider === 'anthropic') {
     return Boolean(env.ANTHROPIC_API_KEY?.trim() && env.QUICKSCAN_CHIEF_ANTHROPIC_MODEL?.trim());
   }
-  return false;
+  if (provider !== 'openai') return false;
+  return Boolean(env.OPENAI_API_KEY?.trim());
+}
+
+function providerConfigurationMissing(code: string): boolean {
+  return code === 'MODEL_PROVIDER_NOT_CONFIGURED' || code.endsWith('_NOT_CONFIGURED');
 }
 
 export function createQuickScanRouter(dependencies: QuickScanRouteDependencies = {}) {
@@ -252,12 +252,11 @@ quickScanRouter.post('/prospects/:id/delivery', (req: FounderRequest, res) => {
  * still has to APPROVE/EDIT/SKIP through the existing approval routes;
  * Chief never sends anything itself.
  *
- * Sending this prospect's evidence notes and qualification text to the
- * configured model provider is a real trust-boundary crossing
- * ("founder-observed" is not by itself a privacy classification), so the
- * request must explicitly acknowledge it via `acknowledgeDataSharing: true`
- * — a UI confirm() alone is bypassable by any direct caller and proves
- * nothing; this makes the gate structural.
+ * Sending this prospect's evidence notes and qualification text to the configured model provider
+ * is a real trust-boundary crossing ("founder-observed" is not by itself a
+ * privacy classification), so the request must explicitly acknowledge it
+ * via `acknowledgeDataSharing: true` — a UI confirm() alone is bypassable
+ * by any direct caller and proves nothing; this makes the gate structural.
  *
  * Refuses (409 QUICKSCAN_CHIEF_INPUT_CHANGED) rather than applying the
  * recommendation if evidence, qualification, or lifecycle state changed
@@ -292,12 +291,11 @@ quickScanRouter.post('/prospects/:id/chief-recommendation', async (req: FounderR
     });
   } catch (error) {
     const code = providerErrorCode(error);
-    const configurationMissing = providerConfigurationMissing(code);
     return fail(
       res,
-      configurationMissing ? 503 : 502,
+      providerConfigurationMissing(code) ? 503 : 502,
       code,
-      configurationMissing ? 'QuickScan Chief model provider is not configured' : 'QuickScan Chief model provider failed',
+      providerConfigurationMissing(code) ? 'QuickScan Chief model provider is not configured' : 'QuickScan Chief model provider failed',
     );
   }
 
@@ -329,10 +327,24 @@ quickScanRouter.post('/prospects/:id/chief-recommendation', async (req: FounderR
   } catch (error) {
     return fail(res, 502, 'QUICKSCAN_CHIEF_PROVENANCE_MISMATCH', error instanceof Error ? error.message : 'Chief recommendation provenance mismatch');
   }
+  // Free-first capability routing (src/quickscan/chiefOpenaiClient.ts) can
+  // silently fall back from a free/local provider to a paid one. That
+  // fallback decision — and why cheaper candidates were rejected — has no
+  // other durable record: setChiefRecommendation only stores the
+  // recommendation, not provenance. Without it here, a local-runtime outage
+  // that quietly starts costing money per recommendation would be invisible
+  // to the founder even though the routing policy computed the evidence.
+  const rejectedCandidates = (result.provenance.decisionTrace ?? [])
+    .filter((entry) => !entry.eligible)
+    .map((entry) => `${entry.providerId}:${entry.reasons.join(',')}`)
+    .join(';');
   prospect.audit.push({
     id: `audit_${Date.now()}`,
     type: 'chief.recommendation.provenance',
-    message: `provider=${result.provenance.provider} model=${result.provenance.model} response=${result.provenance.responseId ?? 'none'} promptVersion=${result.provenance.promptVersion}`,
+    message: `provider=${result.provenance.provider} model=${result.provenance.model} response=${result.provenance.responseId ?? 'none'} promptVersion=${result.provenance.promptVersion}`
+      + (result.provenance.selection ? ` costClass=${result.provenance.selection.costClass}` : '')
+      + (result.provenance.fallbackReason ? ` fallbackReason=${result.provenance.fallbackReason}` : '')
+      + (rejectedCandidates ? ` rejected=${rejectedCandidates}` : ''),
     actor: 'chief',
     createdAt: new Date().toISOString(),
   });

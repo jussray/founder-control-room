@@ -8,6 +8,9 @@ const REPO_ROOT = fileURLToPath(new URL('../', import.meta.url));
 const PUBLIC_ROOT = join(REPO_ROOT, 'public');
 const RESULTS_ROOT = join(REPO_ROOT, 'test-results');
 
+const LANDING_CSP = readFileSync(join(PUBLIC_ROOT, '_headers'), 'utf8').match(/^\s*Content-Security-Policy:\s*(.+)$/m)?.[1]?.trim();
+if (!LANDING_CSP || !LANDING_CSP.includes("script-src 'self'")) throw new Error('Landing CSP fixture missing');
+
 const mime = {
   '.html': 'text/html; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
@@ -26,7 +29,7 @@ const server = createServer((req, res) => {
 
   try {
     const body = readFileSync(filePath);
-    res.writeHead(200, { 'Content-Type': mime[extname(filePath)] ?? 'application/octet-stream' });
+    res.writeHead(200, { 'Content-Type': mime[extname(filePath)] ?? 'application/octet-stream', ...(url.pathname === '/' || url.pathname === '/index.html' ? { 'Content-Security-Policy': LANDING_CSP } : {}) });
     res.end(body);
   } catch {
     res.writeHead(404).end('not found');
@@ -41,6 +44,175 @@ mkdirSync(RESULTS_ROOT, { recursive: true });
 
 const browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
 
+async function assertNoHorizontalOverflow(page, label) {
+  const overflow = await page.evaluate(() => ({
+    scrollWidth: document.documentElement.scrollWidth,
+    clientWidth: document.documentElement.clientWidth,
+  }));
+  if (overflow.scrollWidth > overflow.clientWidth + 1) {
+    throw new Error(`${label}: horizontal overflow detected ${JSON.stringify(overflow)}`);
+  }
+}
+
+// Internal evidence, identifiers, credentials and personal identity must never be served to the public page.
+// Public profile links may identify the public Juss Rayy brand; private identity and internal evidence remain forbidden.
+const PUBLIC_FORBIDDEN = [
+  '228', 'cd0e0fe', '20819094', '#769', '#894', '#895', 'deploy token', 'Cloudflare',
+  'Deploy:', 'Access gate', 'Johnstown', 'Taylor M', 'Alex R', 'Jordan K', '1.2K', '+42%',
+  'Good evening', 'Good morning', 'Raylene',
+];
+
+async function provePublicFrontDoor(label, viewport) {
+  const context = await browser.newContext({ viewport });
+  const page = await context.newPage();
+  const pageErrors = [];
+  page.on('pageerror', (error) => pageErrors.push(error.message));
+
+  // Check the bytes the public server actually serves, not only the rendered DOM.
+  const served = await (await fetch(`${BASE_URL}/`)).text();
+  const leaks = PUBLIC_FORBIDDEN.filter((term) => served.includes(term));
+  if (leaks.length > 0) {
+    throw new Error(`${label}: internal or personal strings served to the public page: ${leaks.join(', ')}`);
+  }
+
+  await page.goto(`${BASE_URL}/`, { waitUntil: 'networkidle' });
+  if (!(await page.locator('script[src="/fcr-public-tabs.js"]').count())) throw new Error(label + ': external tab controller missing');
+  if (await page.locator('script:not([src])').count()) throw new Error(label + ': CSP-forbidden inline script present');
+  const csp = (await page.request.get(BASE_URL + '/')).headers()['content-security-policy'];
+  if (!csp || !csp.includes("script-src 'self'")) throw new Error(label + ': landing test must enforce deployed CSP');
+
+  const visualSignature = await page.locator('body').getAttribute('data-fcr-visual');
+  if (visualSignature !== 'approved-mockup-v3') {
+    throw new Error(`${label}: public FCR visual signature drifted: ${visualSignature}`);
+  }
+
+  const headline = await page.locator('#home-title').innerText();
+  if (!headline.includes('Back Founders') || !headline.includes('Build a Brighter')) {
+    throw new Error(`${label}: approved public headline drifted: ${headline}`);
+  }
+
+  if (await page.getByRole('main').count() !== 1 || await page.locator('#top').count() !== 1) {
+    throw new Error(label + ': public front door requires one main landmark and a real home target');
+  }
+
+  const tabs = page.getByRole('tab');
+  if (await tabs.count() !== 2) throw new Error(`${label}: public FCR must expose exactly two view tabs`);
+  const tabLabels = await tabs.allInnerTexts();
+  if (!tabLabels[0].includes('User View') || !tabLabels[1].includes('Founder View')) {
+    throw new Error(`${label}: view tabs drifted: ${tabLabels.join(' | ')}`);
+  }
+
+  const userPanel = page.locator('[data-view-panel="user"]');
+  const founderPanel = page.locator('[data-view-panel="founder"]');
+  if (!(await userPanel.isVisible()) || (await founderPanel.isVisible())) {
+    throw new Error(`${label}: User View must be the default public view; Founder View must start hidden`);
+  }
+
+  const userCopy = await userPanel.innerText();
+  if (!/No account is required to explore the public FCR world/i.test(userCopy)) {
+    throw new Error(`${label}: user view must make the no-account boundary explicit`);
+  }
+  if (await page.locator('#discover a.btn').getAttribute('href') !== '/work.html') {
+    throw new Error(`${label}: public Explore action must route to the real public work directory`);
+  }
+  // Visual cards must preserve real keyboard-accessible public destinations.
+  for (const [kind, expectedHref] of [
+    ['story', '/juss-rayy/'],
+    ['missions', '/work.html'],
+    ['learn', '/control-room/founder-shell.html'],
+  ]) {
+    const cardLink = page.locator(`a[data-public-card-link="${kind}"]`);
+    if (await cardLink.count() !== 1 || !(await cardLink.isVisible()) || await cardLink.getAttribute('href') !== expectedHref) {
+      throw new Error(`${label}: public ${kind} card lost its real route to ${expectedHref}`);
+    }
+  }
+  if (await page.locator('#community a').count() !== 0) {
+    throw new Error(`${label}: community preview must not advertise a not-yet-live destination`);
+  }
+
+  await assertNoHorizontalOverflow(page, `${label} user view`);
+  await page.screenshot({ path: join(RESULTS_ROOT, `public-fcr-user-${label}.png`), fullPage: true });
+
+  await page.getByRole('tab', { name: 'Founder View' }).click();
+  const founderTab = page.getByRole('tab', { name: 'Founder View' });
+  const userTab = page.getByRole('tab', { name: 'User View' });
+  await founderTab.focus();
+  await page.keyboard.press('ArrowLeft');
+  if (!(await userPanel.isVisible()) || await page.evaluate(() => document.activeElement?.id) !== 'tab-user' || await userTab.getAttribute('tabindex') !== '0') {
+    throw new Error(label + ': ArrowLeft must select and focus User View');
+  }
+  await page.keyboard.press('ArrowRight');
+  if (!(await founderPanel.isVisible()) || await page.evaluate(() => document.activeElement?.id) !== 'tab-founder') {
+    throw new Error(label + ': ArrowRight must select and focus Founder View');
+  }
+  await page.keyboard.press('Home');
+  if (!(await userPanel.isVisible())) throw new Error(label + ': Home must select User View');
+  await page.keyboard.press('End');
+  if (!(await founderPanel.isVisible())) throw new Error(label + ': End must select Founder View');
+
+  if (!(await founderPanel.isVisible()) || (await userPanel.isVisible())) {
+    throw new Error(`${label}: selecting Founder View must show only the founder panel`);
+  }
+  if (await page.getByRole('tab', { name: 'Founder View' }).getAttribute('aria-selected') !== 'true') {
+    throw new Error(`${label}: Founder View tab must report aria-selected=true`);
+  }
+
+  const founderCopy = await founderPanel.innerText();
+  if (!/Founder access still passes through FCR authentication/i.test(founderCopy)) {
+    throw new Error(`${label}: founder view must state that access passes through FCR authentication`);
+  }
+  if (!/General member authentication and multi-tenant founder workspaces remain a separate implementation gate/i.test(founderCopy)) {
+    throw new Error(`${label}: founder view must not pretend general multi-tenant founder auth is live`);
+  }
+  if (!/Connection never creates authority by itself/i.test(founderCopy)) {
+    throw new Error(`${label}: founder view must preserve the connection-is-not-authority boundary`);
+  }
+  if (!/after founder sign-in/i.test(founderCopy)) {
+    throw new Error(`${label}: founder view must gate private project, proof and decision state behind sign-in`);
+  }
+  const ownerCta = founderPanel.locator('a.owner-cta');
+  if (await ownerCta.count() !== 1 || await ownerCta.getAttribute('href') !== '/control-room/') {
+    throw new Error(`${label}: founder view must expose exactly one authenticated Control Room entry`);
+  }
+
+  await assertNoHorizontalOverflow(page, `${label} founder view`);
+  await page.screenshot({ path: join(RESULTS_ROOT, `public-fcr-founder-${label}.png`), fullPage: true });
+
+  const footerCopy = await page.locator('footer').innerText();
+  if (!footerCopy.includes('Same truth. Higher outcomes.')) {
+    throw new Error(`${label}: canonical FCR visual thesis missing from footer`);
+  }
+
+
+  for (const section of ['projects', 'proof', 'automations', 'community-f']) {
+    await page.goto(BASE_URL + '/#' + section, { waitUntil: 'networkidle' });
+    await page.reload({ waitUntil: 'networkidle' });
+    if (!(await founderPanel.isVisible()) || !(await page.locator('#' + section).isVisible())) {
+      throw new Error(label + ': founder deep link must survive reload: #' + section);
+    }
+  }
+  await page.goto(BASE_URL + '/#community-f', { waitUntil: 'networkidle' });
+  if ((await page.locator('#community-f h3').innerText()) !== 'Founder Community') {
+    throw new Error(label + ': founder Community link must target a real community section');
+  }
+  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+  await page.locator('a.logo').click();
+  await userPanel.waitFor({ state: 'visible', timeout: 5000 });
+  const homeState = await page.evaluate(() => ({ hash: window.location.hash, scrollY: window.scrollY }));
+  if (homeState.hash !== '#top' || homeState.scrollY > 3 || !(await userPanel.isVisible())) {
+    throw new Error(label + ': home link must scroll to an existing top target and show public User View');
+  }
+
+  await page.goto(BASE_URL + '/#discover', { waitUntil: 'networkidle' });
+  if (!(await userPanel.isVisible()) || (await founderPanel.isVisible())) {
+    throw new Error(label + ': user section link must restore User View');
+  }
+
+  if (pageErrors.length > 0) throw new Error(`${label}: public browser errors: ${pageErrors.join(' | ')}`);
+
+  await context.close();
+}
+
 async function proveViewport(label, viewport) {
   const context = await browser.newContext({ viewport });
   const page = await context.newPage();
@@ -49,6 +221,16 @@ async function proveViewport(label, viewport) {
 
   await page.goto(`${BASE_URL}/control-room/founder-shell.html`, { waitUntil: 'networkidle' });
   await page.locator('[data-fcr-experience]').waitFor({ state: 'visible' });
+
+  const signatureRootCount = await page.locator('[data-fcr-signature="cinematic-proof-v1"]').count();
+  if (signatureRootCount !== 1) {
+    throw new Error(`${label}: FCR cinematic-proof visual signature missing or duplicated`);
+  }
+
+  const signatureCopy = await page.locator('[data-signature-strip]').innerText();
+  if (!signatureCopy.includes('Same mission. Bigger impact.') || !signatureCopy.includes('A brighter tomorrow.')) {
+    throw new Error(`${label}: FCR signature phrases drifted: ${signatureCopy}`);
+  }
 
   const viewCount = await page.locator('[data-account-view]').count();
   if (viewCount !== 3) throw new Error(`${label}: expected exactly 3 experience views, got ${viewCount}`);
@@ -62,6 +244,11 @@ async function proveViewport(label, viewport) {
   for (const view of ['user', 'founder', 'fcr-owner']) {
     const count = await page.locator(`[data-account-view="${view}"]`).count();
     if (count !== 1) throw new Error(`${label}: missing unique ${view} view`);
+  }
+
+  const crownCount = await page.locator('.view-brand.crown').count();
+  if (crownCount !== 1) {
+    throw new Error(`${label}: crown must remain owner-only visual authority; found ${crownCount}`);
   }
 
   const bipCard = page.locator('[data-account-view="user"] .platform-strip').getByText('Se’kret Bip').locator('..');
@@ -89,13 +276,7 @@ async function proveViewport(label, viewport) {
     throw new Error(`${label}: visual shell must not pretend member auth is already live`);
   }
 
-  const overflow = await page.evaluate(() => ({
-    scrollWidth: document.documentElement.scrollWidth,
-    clientWidth: document.documentElement.clientWidth,
-  }));
-  if (overflow.scrollWidth > overflow.clientWidth + 1) {
-    throw new Error(`${label}: horizontal overflow detected ${JSON.stringify(overflow)}`);
-  }
+  await assertNoHorizontalOverflow(page, label);
 
   await page.locator('.brand').focus();
   const focusOutline = await page.locator('.brand').evaluate((node) => getComputedStyle(node).outlineStyle);
@@ -112,9 +293,11 @@ async function proveViewport(label, viewport) {
 }
 
 try {
+  await provePublicFrontDoor('desktop-1440', { width: 1440, height: 1100 });
+  await provePublicFrontDoor('mobile-390', { width: 390, height: 844 });
   await proveViewport('desktop-1440', { width: 1440, height: 1100 });
   await proveViewport('mobile-390', { width: 390, height: 844 });
-  console.log('PASS: FCR user, founder, and owner views preserve two account classes, Bip platform identity, owner authority separation, responsive layout, and keyboard focus.');
+  console.log('PASS: public FCR approved-mockup-v3 tabbed User/Founder views, no internal evidence served publicly, honest sign-in boundary, FCR cinematic signature, user/founder/owner authority classes, owner-only crown authority, Bip platform identity, responsive layout, and keyboard focus are preserved.');
 } finally {
   await browser.close();
   await new Promise((resolve) => server.close(resolve));

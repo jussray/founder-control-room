@@ -47,7 +47,30 @@
     "publishAuthorityMustBeCheckedAtExecutionTime": true,
     "providerAcceptanceMustProduceReceipt": true,
     "publishedOutcomeRequiresYouTubeEvidence": true,
-    "workflow": ["series-idea","episode-concept","script-or-storyboard","generate-or-edit-video","review-final-asset","approve-publish-payload","publish-or-schedule","capture-provider-receipt","verify-youtube-outcome","measure-and-learn"]
+    "workflow": ["series-idea","episode-concept","script-or-storyboard","generate-or-edit-video","review-final-asset","approve-publish-payload","publish-or-schedule","capture-provider-receipt","verify-youtube-outcome","measure-and-learn"],
+    "leevize": {
+      "workflow": "LEEVIZE",
+      "shotContract": "shot-dna@v1",
+      "productionWorkflow": ["intent-and-proof","director-brief","model-neutral-shot-spec","renderer-adapter","generate-or-capture","deterministic-post","final-audio","caption-from-final-audio","media-probe","playwright-product-proof-if-applicable","attack6000","review-final-asset"],
+      "openSourceFirst": true,
+      "deterministicPostTools": ["ffmpeg","ffprobe"],
+      "optionalOpenSourceCandidates": ["remotion","comfyui","whisper-compatible"],
+      "candidateAvailabilityIsRuntimeFact": true,
+      "openSourceLabelDoesNotProveLicenseOrCommercialUse": true,
+      "unknownLicenseClassifyAs": "BLOCKED_LICENSE_REVIEW",
+      "rendererAdaptersReplaceable": true,
+      "generatedUiMayProveProductBehavior": false,
+      "realProductCaptureRequiresPlaywright": true,
+      "finalAudioPrecedesCaptionTiming": true,
+      "attack6000": {
+        "reasoningPressureBudget": 6000,
+        "externalTestCountClaimed": false,
+        "deduplicateFailureClasses": true,
+        "families": ["story","open","generic-ai-look","continuity","camera","physics","product-truth","evidence","pacing","audio","voice","lip-sync","captions","brand","accessibility","platform","model-fit","cost","provenance","release"]
+      },
+      "releaseGate": ["story","continuity","product-truth","audio","captions","brand","platform","provenance","evidence"],
+      "authorityRule": "Open-source-first is a routing preference, never production authority. Runtime availability, license/commercial-use status, privacy, cost/resource preflight, product evidence, and release authority remain separately verified."
+    }
   },
   "connectorBridgeTruth": {
     "evidencePlanes": ["connector-surface","live-session","provider-page"],
@@ -56,7 +79,26 @@
     "repeatProviderSetupWithoutProviderEvidence": false,
     "blockedStateInvalidatedBy": ["live-session-exposed","stronger-contradictory-bridge-evidence"],
     "continuityMarkersAreNonAuthorizing": true,
-    "recoveryRule": "When the connector surface exists but the runtime reports Browser not connected and exposes no tabs, classify the connector bridge as blocked. Preserve separately observed or founder-reported provider-page state; do not blame or reset the page and do not repeat login/setup instructions without provider-level evidence. Re-probe the connector bridge and clear the blocked state only when fresh bridge evidence exposes a live session or stronger contradictory bridge evidence supersedes it."
+    "currentObservationSource": "chatgpt-runtime",
+    "historicalReceiptSource": "evidence-receipts",
+    "historicalEvidenceIsAppendOnly": true,
+    "currentAbsenceDoesNotEraseHistoricalPresence": true,
+    "currentAndHistoricalMayCoexist": true,
+    "unknownDoesNotMeanNo": true,
+    "staleDoesNotMeanFalse": true,
+    "contradictoryCurrentSignalsClassifyAs": "CONNECTOR_STATE_CONFLICT",
+    "currentUnavailableClassifyAs": "CURRENTLY_UNAVAILABLE",
+    "historicallyVerifiedClassifyAs": "HISTORICALLY_VERIFIED",
+    "observationRequiresTimestamp": true,
+    "capabilityDimensions": ["catalog-visible","installed","authenticated","callable","readable","writable","execution-success"],
+    "installedOrToolSurfacedDoesNotProveLiveSession": true,
+    "connectedClaimRequiresLiveProbe": true,
+    "retryClaimRequiresProbeExecution": true,
+    "canonicalReadOnlyProbeByConnector": {
+      "Opera Browser Connector": "list-tabs"
+    },
+    "resolutionRule": "A current runtime observation may update current capability state but must never rewrite or delete a verified historical receipt. Current absence may classify the present state as CURRENTLY_UNAVAILABLE while historical successful use remains HISTORICALLY_VERIFIED. Contradictory current signals remain CONNECTOR_STATE_CONFLICT until reconciled. UNKNOWN stays UNKNOWN. Continuity fingerprints and proof cookies may correlate predecessor and successor evidence but never create installation, authentication, authority, capability, or successful execution.",
+    "recoveryRule": "When the connector surface exists but the runtime reports Browser not connected and exposes no tabs, classify the connector bridge as blocked. Installed, enabled, or tool-surfaced state alone does not prove a live browser session. Claim a retry only when the live read-only probe actually executes. Preserve separately observed or founder-reported provider-page state; do not blame or reset the page and do not repeat login/setup instructions without provider-level evidence. Re-probe the connector bridge and clear the blocked state only when fresh bridge evidence exposes a live session or stronger contradictory bridge evidence supersedes it."
   },
   "evidenceSourceTruth": {
     "providerReadFailureClassifyAs": "BLOCKED_SOURCE_ACCESS",
@@ -78,6 +120,13 @@
     "sourcePrecedence": ["native-platform","native-platform-export","official-api-partner","aggregator","inference"],
     "nativePlatformWinsOnConflict": true,
     "emptyProviderRowsClassifyAs": "UNKNOWN_NO_EVIDENCE",
+    "measurementIdentityRequiredForLearning": true,
+    "measurementIdentityFields": ["platform","account","post","experiment"],
+    "wrongAccountEvidenceClassifyAs": "BLOCKED_IDENTITY_MISMATCH",
+    "exactPostIdentityRequiredForPostVerdict": true,
+    "accountLevelAggregateMayScorePostExperiment": false,
+    "publishingReceiptMayScorePerformance": false,
+    "providerZerosWithoutAnalyticsAuthorityMayScoreAsZero": false,
     "causalClaimsRequirePlatformAttributableEvidence": true,
     "forbiddenUngroundedClaims": ["ranking_suppression","distribution_restriction","post_to_follower_conversion","delayed_follower_attribution","algorithmic_cause"],
     "linkedinNative": {"role":"Primary authority for current post facts and native exports used for historical or account analytics.","authority":"primary","runtimeDiscoveryRequired":true},

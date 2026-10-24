@@ -62,6 +62,12 @@ This preserves separate membranes instead of weakening either one: the current f
 
 The signed GitHub webhook surface uses `GITHUB_WEBHOOK_SECRET` to verify `X-Hub-Signature-256` before accepting provider events. Private keys and webhook secrets never belong in source, PR bodies, issue comments, logs, screenshots, browser bundles, or chat-visible documentation.
 
+### Repository base-health gate
+
+`src/providers/SecurityPreservingGitHubProvider.ts` now makes exact-head health a prerequisite for repository patching. Current verification signals are reduced to one latest signal per name for the exact 40-character head SHA and classified as `VERIFIED_CLEAN`, `KNOWN_BAD`, or `UNVERIFIED`. An exact-head failure/cancellation is `KNOWN_BAD`; queued/running/unknown evidence or no passing exact-head signal is `UNVERIFIED`.
+
+Ordinary forward patches must be rejected unless the exact head is `VERIFIED_CLEAN`. A `KNOWN_BAD` head may accept only a repair whose message begins `repair-base:<exact-head-sha>`, binding the corrective write to the failed state being repaired. Stale repair markers and repair markers on clean/unverified heads must be rejected. The marker is repair intent only: it does not grant merge, deploy, publication, provider-policy, or founder authority, and normal work must remain blocked until the repair successor receives fresh exact-head clean verification.
+
 ## Supabase
 
 Owns Control Room authentication and operational storage inside this project's separate trust boundary. Service-role credentials stay server-side. Founder access requires session validation plus allowlist authorization.
@@ -86,3 +92,11 @@ Every handoff should state:
 - sensitive information intentionally excluded.
 
 Convenience is not ownership. Providers may help operate the Control Room; they do not inherit the founder's authority through proximity.
+
+## Shopify child-provider observation
+
+Shopify commerce is a provider boundary, not inherited founder authority. `src/providers/ShopifyReadOnlyProvider.ts` is a source-only read-only preflight bound to the exact Founder Control Room store identity: permanent Shopify domain `vercel-store-93a908b0-wcrkkq76.myshopify.com` plus branded primary domain `foundercontrolroom.org`. Another portfolio store, matching display name, app title, or developer identity cannot satisfy that boundary.
+
+Child apps are reconciled by provider-account identity, installation identity, app identity, complete scope inventory, observation freshness, and founder-approved declaration evidence. Installation alone is never approval. A reinstall under a different installation ID surfaces as `IDENTITY_DRIFT`; added or removed scopes surface as `SCOPE_DRIFT`; missing declaration surfaces as `UNDECLARED`; incomplete provider evidence is `UNKNOWN`; expired provider evidence is `STALE`. Even `CURRENT` is evidence-only and retains `authorityGranted: false`.
+
+The current source module accepts an already authenticated, sanitized provider snapshot. It performs no Shopify network request, persists no provider inventory as current truth, creates no `project_connections` row, exposes no credential, and provides no order, checkout, product, price, refund, app-installation, scope-change, or customer mutation path. A future runtime observer must re-read Shopify at the use boundary, exhaust pagination, keep credentials server-side/provider-held, and fail closed when provider state is unavailable, partial, stale, or identity-mismatched.

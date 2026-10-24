@@ -20,7 +20,8 @@ import {
   type MirrorRunInput,
 } from './types.js';
 
-const DEFAULT_MODEL = 'gpt-5-mini';
+const DEFAULT_OPENAI_BASE_URL = 'https://api.openai.com/v1';
+const DEFAULT_MODEL = 'gpt-4o-mini';
 const DEFAULT_TIMEOUT_MS = 25_000;
 const MAX_RESPONSE_BYTES = 128 * 1024;
 
@@ -136,9 +137,31 @@ function modelOutput(value: unknown): MirrorModelOutput {
   };
 }
 
+function responseText(payload: JsonRecord): string | null {
+  if (typeof payload.output_text === 'string' && payload.output_text.trim()) {
+    return payload.output_text.trim();
+  }
+  if (!Array.isArray(payload.output)) return null;
+
+  for (const item of payload.output) {
+    if (!isRecord(item) || !Array.isArray(item.content)) continue;
+    for (const content of item.content) {
+      if (!isRecord(content)) continue;
+      if (content.type === 'output_text' && typeof content.text === 'string' && content.text.trim()) {
+        return content.text.trim();
+      }
+    }
+  }
+  return null;
+}
+
 function timeoutMs(env: NodeJS.ProcessEnv): number {
   const raw = Number(env.MIRROR_ENGINE_TIMEOUT_MS ?? DEFAULT_TIMEOUT_MS);
   return Number.isFinite(raw) && raw >= 1_000 && raw <= 60_000 ? raw : DEFAULT_TIMEOUT_MS;
+}
+
+function baseUrl(env: NodeJS.ProcessEnv): string {
+  return (env.OPENAI_API_BASE_URL?.trim() || DEFAULT_OPENAI_BASE_URL).replace(/\/$/, '');
 }
 
 function providerName(value: string | undefined, fallback: StructuredProviderName): StructuredProviderName {
@@ -206,39 +229,148 @@ export function createOpenAiMirrorRunner(dependencies: OpenAiMirrorDependencies 
   const fetchFn = dependencies.fetchFn ?? fetch;
 
   return async function runMirror(input: MirrorRunInput): Promise<MirrorModelResult> {
-    let result: StructuredJsonResult;
-    try {
-      result = await runStructuredJson(
-        providerChain(env),
-        {
-          schemaName: 'mirror_engine_output',
-          schema: MIRROR_OUTPUT_SCHEMA,
-          systemPrompt: MIRROR_SYSTEM_PROMPT,
-          userPrompt: mirrorUserPrompt(input),
-          maxOutputTokens: 1_600,
-        },
-        {
-          fetchFn,
-          timeoutMs: timeoutMs(env),
-          maxResponseBytes: MAX_RESPONSE_BYTES,
-        },
-      );
-    } catch (error) {
-      if (error instanceof MirrorProviderError) throw error;
-      if (error instanceof StructuredProviderError) {
-        throw new MirrorProviderError(error.message, error.code, error.status);
+    // The existing OpenAI request contract remains the default until a
+    // provider selector or explicit failover is configured.
+    if (env.MIRROR_ENGINE_PROVIDER?.trim() || env.MIRROR_ENGINE_FALLBACK_PROVIDER?.trim()) {
+      let structured: StructuredJsonResult;
+      try {
+        structured = await runStructuredJson(
+          providerChain(env),
+          {
+            schemaName: 'mirror_engine_output',
+            schema: MIRROR_OUTPUT_SCHEMA,
+            systemPrompt: MIRROR_SYSTEM_PROMPT,
+            userPrompt: mirrorUserPrompt(input),
+            maxOutputTokens: 1_600,
+          },
+          {
+            fetchFn,
+            timeoutMs: timeoutMs(env),
+            maxResponseBytes: MAX_RESPONSE_BYTES,
+          },
+        );
+      } catch (error) {
+        if (error instanceof MirrorProviderError) throw error;
+        if (error instanceof StructuredProviderError) {
+          throw new MirrorProviderError(error.message, error.code, error.status);
+        }
+        throw error;
       }
-      throw error;
+
+      return {
+        output: modelOutput(structured.output),
+        provenance: {
+          provider: structured.provider,
+          model: structured.model,
+          responseId: structured.responseId,
+          promptVersion: MIRROR_PROMPT_VERSION,
+          storedByProvider: structured.provider === 'openai' ? false : null,
+        },
+      };
+    }
+
+    const apiKey = env.OPENAI_API_KEY?.trim();
+    if (!apiKey) {
+      throw new MirrorProviderError('OPENAI_API_KEY is not configured for Mirror Engine', 'OPENAI_NOT_CONFIGURED');
+    }
+
+    const model = env.MIRROR_ENGINE_MODEL?.trim() || DEFAULT_MODEL;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs(env));
+
+    let response: globalThis.Response;
+    try {
+      response = await fetchFn(`${baseUrl(env)}/responses`, {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${apiKey}`,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          model,
+          store: false,
+          max_output_tokens: 1_600,
+          input: [
+            {
+              role: 'system',
+              content: [{ type: 'input_text', text: MIRROR_SYSTEM_PROMPT }],
+            },
+            {
+              role: 'user',
+              content: [{ type: 'input_text', text: mirrorUserPrompt(input) }],
+            },
+          ],
+          text: {
+            format: {
+              type: 'json_schema',
+              name: 'mirror_engine_output',
+              strict: true,
+              schema: MIRROR_OUTPUT_SCHEMA,
+            },
+          },
+        }),
+        signal: controller.signal,
+      });
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new MirrorProviderError('OpenAI Mirror Engine request timed out', 'OPENAI_TIMEOUT');
+      }
+      throw new MirrorProviderError(
+        error instanceof Error ? error.message : 'OpenAI Mirror Engine request failed',
+        'OPENAI_REQUEST_FAILED',
+      );
+    } finally {
+      clearTimeout(timer);
+    }
+
+    const declaredLength = Number(response.headers.get('content-length'));
+    if (Number.isFinite(declaredLength) && declaredLength > MAX_RESPONSE_BYTES) {
+      throw new MirrorProviderError('OpenAI response exceeded the allowed size', 'OPENAI_RESPONSE_TOO_LARGE', response.status);
+    }
+
+    const raw = await response.text();
+    if (Buffer.byteLength(raw, 'utf8') > MAX_RESPONSE_BYTES) {
+      throw new MirrorProviderError('OpenAI response exceeded the allowed size', 'OPENAI_RESPONSE_TOO_LARGE', response.status);
+    }
+
+    let payload: unknown;
+    try {
+      payload = raw ? JSON.parse(raw) : null;
+    } catch {
+      throw new MirrorProviderError('OpenAI returned invalid JSON', 'OPENAI_INVALID_RESPONSE', response.status);
+    }
+
+    if (!response.ok) {
+      const errorRecord = isRecord(payload) && isRecord(payload.error) ? payload.error : null;
+      const providerMessage = errorRecord && typeof errorRecord.message === 'string'
+        ? errorRecord.message
+        : `OpenAI request failed with status ${response.status}`;
+      throw new MirrorProviderError(providerMessage, 'OPENAI_HTTP_ERROR', response.status);
+    }
+    if (!isRecord(payload)) {
+      throw new MirrorProviderError('OpenAI response body was empty or malformed', 'OPENAI_INVALID_RESPONSE', response.status);
+    }
+
+    const outputText = responseText(payload);
+    if (!outputText) {
+      throw new MirrorProviderError('OpenAI response did not contain structured output text', 'OPENAI_MISSING_OUTPUT', response.status);
+    }
+
+    let parsedOutput: unknown;
+    try {
+      parsedOutput = JSON.parse(outputText);
+    } catch {
+      throw new MirrorProviderError('OpenAI structured output was not valid JSON', 'OPENAI_INVALID_OUTPUT_JSON', response.status);
     }
 
     return {
-      output: modelOutput(result.output),
+      output: modelOutput(parsedOutput),
       provenance: {
-        provider: result.provider,
-        model: result.model,
-        responseId: result.responseId,
+        provider: 'openai',
+        model,
+        responseId: typeof payload.id === 'string' ? payload.id : null,
         promptVersion: MIRROR_PROMPT_VERSION,
-        storedByProvider: result.provider === 'openai' ? false : null,
+        storedByProvider: false,
       },
     };
   };

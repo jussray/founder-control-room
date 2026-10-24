@@ -23,6 +23,8 @@ export type ExternalApplicationProviderReadiness = {
   browserReady: boolean;
   authenticated: boolean;
   executionReady: boolean;
+  browserExecutor: string;
+  costClass: 'LOCAL_NO_PROVIDER_FEE' | 'HOSTED_FREE_ALLOWANCE' | 'PAID' | 'UNKNOWN';
   blocker?: string | null;
 };
 
@@ -55,6 +57,8 @@ export type ExternalApplicationConfirmationReceipt = {
 };
 
 const SHA256 = /^sha256:[0-9a-f]{64}$/i;
+const REQUIRED_BROWSER_EXECUTOR = 'local-playwright';
+const REQUIRED_BROWSER_COST_CLASS = 'LOCAL_NO_PROVIDER_FEE';
 
 function hasValue(value: unknown): boolean {
   if (value === null || value === undefined) return false;
@@ -102,7 +106,13 @@ export function validateExternalApplicationSubmission(
     blockers.push('approval_artifact_mismatch');
   }
 
-  if (!bundle.providerReadiness.browserReady) blockers.push('provider_browser_unavailable');
+  if (bundle.providerReadiness.browserExecutor !== REQUIRED_BROWSER_EXECUTOR) {
+    blockers.push('unsupported_browser_executor');
+  }
+  if (bundle.providerReadiness.costClass !== REQUIRED_BROWSER_COST_CLASS) {
+    blockers.push('paid_or_remote_browser_executor_forbidden');
+  }
+  if (!bundle.providerReadiness.browserReady) blockers.push('local_playwright_unavailable');
   if (!bundle.providerReadiness.authenticated) blockers.push('provider_not_authenticated');
   if (!bundle.providerReadiness.executionReady) {
     blockers.push(bundle.providerReadiness.blocker?.trim() || 'provider_execution_not_ready');

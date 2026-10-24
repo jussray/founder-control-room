@@ -38,13 +38,13 @@ test('founder auth contract remains allowlist-first and founder-gated', () => {
 
 test('provider and stranger witnesses are independent and aggregate fail closed', () => {
   const inspectBlock = workflow.match(
-    /- name: Inspect live Access state without mutation([\s\S]*?)- name: Apply exact public destination/,
+    /- name: Inspect live browser Access ownership without mutation([\s\S]*?)- name: Detach browser-facing FCR destinations with dedicated admin authority/,
   )?.[1] ?? '';
   const browserBlock = workflow.match(
-    /- name: Verify stranger reachability and founder containment with Playwright([\s\S]*?)- name: Roll back/,
+    /- name: Verify FCR-owned sign-in and no Cloudflare Access screen([\s\S]*?)- name: Evaluate provider detachment and stranger evidence/,
   )?.[1] ?? '';
   const gateBlock = workflow.match(
-    /- name: Evaluate independent provider and stranger evidence([\s\S]*?)- name: Return sanitized recovery receipt/,
+    /- name: Evaluate provider detachment and stranger evidence([\s\S]*?)- name: Return sanitized recovery receipt/,
   )?.[1] ?? '';
 
   assert.match(inspectBlock, /id:\s*access_inspect/);
@@ -56,7 +56,7 @@ test('provider and stranger witnesses are independent and aggregate fail closed'
   assert.match(gateBlock, /STRANGER_BROWSER_OUTCOME/);
   assert.match(gateBlock, /test "\$provider_outcome" = 'success'/);
   assert.match(gateBlock, /test "\$STRANGER_BROWSER_OUTCOME" = 'success'/);
-  assert.match(workflow, /Fail closed after retaining independent provider and stranger evidence/);
+  assert.match(workflow, /Fail closed after retaining provider and stranger evidence/);
 });
 
 test('sanitized stranger receipt publishes only bounded containment evidence', () => {
