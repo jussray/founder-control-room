@@ -13,7 +13,7 @@ test('current repository evidence satisfies the bounded source contract', () => 
 });
 
 test('missing README documentation links fail closed', () => {
-  const changed = { ...sources, 'README.md': sources['README.md'].replace('(docs/SOURCE_GUARD.md)', '(docs/missing.md)') };
+  const changed = { ...sources, 'README.md': sources['README.md'].replaceAll('(docs/SOURCE_GUARD.md)', '(docs/missing.md)') };
   assert.ok(evaluateRepositorySources(changed).some((error) => error.includes('docs/SOURCE_GUARD.md')));
 });
 
