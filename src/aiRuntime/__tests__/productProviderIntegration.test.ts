@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { createOpenAiMirrorRunner } from '../../mirror/openaiClient.js';
 import type { MirrorRunInput } from '../../mirror/types.js';
 import { createOpenAiQuickScanChiefRunner } from '../../quickscan/chiefOpenaiClient.js';
-import type { QuickScanChiefPromptInput } from '../../quickscan/chiefPrompts.js';
+import { QUICKSCAN_CHIEF_WORKFLOW, type QuickScanChiefPromptInput } from '../../quickscan/chiefPrompts.js';
 
 function fakeResponse(body: unknown, status = 200): Response {
   return {
@@ -164,12 +164,7 @@ describe('product provider integration', () => {
     });
     expect(result.recommendation).toMatchObject({
       nextAction: 'capture_more_evidence',
-      promptWorkflow: {
-        workflowId: 'quickscan-outreach-v1',
-        workflowVersion: '1',
-        promptId: 'quickscan-next-action-v1',
-        promptVersion: '1',
-      },
+      promptWorkflow: QUICKSCAN_CHIEF_WORKFLOW,
     });
   });
 });
