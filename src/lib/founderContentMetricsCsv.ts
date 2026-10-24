@@ -11,7 +11,7 @@ import {
 // content-metrics-csv@v1 contract is the public-safe content-evidence import
 // boundary used by the existing analytics/Attack-3000 lane.
 const MAX_CSV_BYTES = 1_000_000;
-const MAX_CSV_ROWS = 10_000;
+const MAX_CSV_ROWS = 5_000;
 const MAX_COLUMNS = 20;
 const MAX_CELL_CHARS = 4_000;
 
@@ -114,6 +114,9 @@ function parseMetricValue(raw: string): number | null {
   if (!raw) return null;
   const parsed = Number(raw);
   if (!Number.isFinite(parsed)) reject(`metric_value ${JSON.stringify(raw)} is not finite`);
+  if (Number.isInteger(parsed) && !Number.isSafeInteger(parsed)) {
+    reject(`metric_value ${JSON.stringify(raw)} exceeds the exact integer range`);
+  }
   return parsed;
 }
 

@@ -186,6 +186,23 @@ describe('founder content metric observations', () => {
     expect(() => parseFounderContentMetricsCsv(offsetless)).toThrow(/offset-aware ISO timestamp/);
   });
 
+  it('rejects integer metric values outside the exact JavaScript range', () => {
+    const unsafe = [
+      'provider,platform,source,account_id,page_id,metric_name,metric_unit,metric_value,observed_at',
+      'linkedin,linkedin,native_platform_export,acct-1,page-1,impressions,count,9007199254740993,2026-09-15T12:00:00Z',
+    ].join('\n');
+    expect(() => parseFounderContentMetricsCsv(unsafe)).toThrow(/exceeds the exact integer range/);
+  });
+
+  it('caps historical CSV at the same 5,000-row transaction ceiling as persistence', () => {
+    const header = 'provider,platform,source,source_metric_id,account_id,page_id,metric_name,metric_unit,metric_value,observed_at';
+    const rows = Array.from({ length: 5_001 }, (_, index) =>
+      `linkedin,linkedin,native_platform_export,metric-${index},acct-1,page-1,impressions,count,${index},2026-09-15T12:00:00Z`
+    );
+    expect(() => parseFounderContentMetricsCsv([header, ...rows].join('\n')))
+      .toThrow(/CSV exceeds 5000 data rows/);
+  });
+
   it('rejects trailing data after a quoted CSV field instead of silently changing the field', () => {
     const malformed = [
       'provider,platform,source,account_id,page_id,metric_name,metric_unit,metric_value,observed_at',
