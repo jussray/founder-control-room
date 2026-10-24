@@ -44,19 +44,25 @@ function readinessCopy(readiness) {
   }
   return READINESS_COPY[readiness?.state] ?? null;
 }
+let readinessRequestId = 0;
 async function refreshConveyorReadiness() {
+  const requestId = ++readinessRequestId;
   setConveyorReadiness('checking', 'Checking n8n readiness…');
   try {
     const response = await fetch('/automation/conveyor/', { method: 'GET', cache: 'no-store', credentials: 'same-origin', headers: { Accept: 'application/json' } });
+    if (requestId !== readinessRequestId) return;
     if (response.status === 401) { setConveyorReadiness('signed-out', 'Sign in to check n8n readiness'); return; }
     if (!response.ok) throw new Error(`readiness request failed with HTTP ${response.status}`);
     const body = await response.json();
+    if (requestId !== readinessRequestId) return;
     if (body?.contract !== CONVEYOR_CONTRACT) { setConveyorReadiness('error', 'n8n contract mismatch'); return; }
     const state = body?.readiness?.state;
     const label = readinessCopy(body?.readiness);
     if (!label) { setConveyorReadiness('error', 'n8n readiness unavailable'); return; }
     setConveyorReadiness(state, label);
-  } catch { setConveyorReadiness('error', 'n8n readiness unavailable'); }
+  } catch {
+    if (requestId === readinessRequestId) setConveyorReadiness('error', 'n8n readiness unavailable');
+  }
 }
 
 function installCoworkLane() {
