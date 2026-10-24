@@ -79,6 +79,13 @@ describe('founder content metric observations', () => {
     })).toThrow(/provider/i);
   });
 
+  it('rejects empty successful metrics envelopes', () => {
+    expect(() => normalizeFounderContentMetricsEnvelope({
+      contract: FOUNDER_CONTENT_METRICS_CONTRACT,
+      observations: [],
+    })).toThrow(/at least one observation/);
+  });
+
   it('requires explicit page identity and offset-aware timestamps', () => {
     expect(() => normalizeFounderContentMetricObservation({
       ...observation(),
