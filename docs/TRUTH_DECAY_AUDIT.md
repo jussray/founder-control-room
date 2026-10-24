@@ -1,5 +1,12 @@
 # Truth Decay Audit: When a True Claim Becomes Unsafe to Reuse
 
+## October 23, 2026: founder-dock boundary and renewed StoryEngine federation subject
+
+Source-level FCR Control Room navigation was visible outside the authenticated app root even when signed out. The candidate protects the navigation dock at first paint and derives visibility from the rendered authenticated shell, while retaining the public site and independent server authorization. Structural Design OS/Cowork tests can use explicitly labeled synthetic authenticated shell DOM; **only** the separate opaque-HttpOnly-cookie browser proof is relevant to authenticating real sessions. No source change is itself evidence of live production privacy.
+
+A later Playwright run failed because `.github/workflows/playwright.yml` still expected StoryEngine `26b1c34ae7c97c5d1b66a23d6345b3965cfcdc1f` while the separately observed StoryEngine `main` resolved to `be4fe1a006fcecdad077d5c3878cd76443274c65`. GitHub classified that change as ten commits strictly ahead. The candidate updates the immutable peer pin to the observed descendant but **must not** treat ancestor Playwright, StoryEngine checks, or Cloudflare build results as passing successor federation evidence. Exact-head CI and the full pinned peer runtime proof remain mandatory. This selection does not grant merge, deploy, publication, or provider-write authority.
+
+
 ## October 23, 2026: PR #1004 peer-ref failure was dependency drift
 
 A fresh GitHub ref read resolves StoryEngine `refs/heads/main` to `6b97b78370fbc25d4b4bb88bfeab136eb4c7dc2f`; this commit had 15/15 successful check runs at the latest observed completion time, `2026-10-22T23:55:59Z`. FCR PR #1004 head `607ec05be0bce5639bab36b75c3661a8af751be6` expected `26b1c34ae7c97c5d1b66a23d6345b3965cfcdc1f` and failed its live-ref equality step before checkout, runtime, and browser federation ([failed job](https://github.com/jussray/founder-control-room/actions/runs/39875447018/job/120159809873)). The failure is verified external peer drift, not a failure of the PR's support-claims content. Refreshing the pin selects the successor peer only; PR #1004 must earn its own exact-head runtime and receipt/browser witness, and PR #1003's separate evidence cannot transfer. Movement of either repository expires pair-specific proof.
