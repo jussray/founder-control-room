@@ -469,6 +469,10 @@ The current-main CI repair cycle added an exact StoryEngine peer-pin transition 
 
 Truth boundary: peer-pin and repair-artifact changes must refresh the README, this truth-decay audit, and `docs/DOCUMENTATION_TRUTH_RECEIPT.json` in the same exact-head range. A successor head must earn its own CI and Playwright proof; predecessor green runs do not transfer.
 
+## October 24 Se’kret Bip front-door evidence refresh
+
+FCR PR #1015 updates the read-only Se’kret Bip adapter source pin from `be6db16b248ec32048d8ff71c46dd2052d021443` to independently confirmed Se’kret Bip `main` `e3b6a3a36737f3c1d24c37fd2842ee6d7bf97150` after review of all seven audited contract blobs. Six blobs are unchanged. The sole changed required blob is `screens/WebWelcomeScreen.tsx` (`b66acdb7b2f733c78ab53a50db194439b8629c4f` → `9d3a1128d09d47f3e9b4eb5d8f3da5f3dbe2709c`). The source change adds staged audience reveals after image-load readback; preserved guarantees include reduced-motion behavior, existing Teen/Bip Jr audience-to-account-side routing, composite family artwork and established character canon. Supporting `src/motion/frontDoorMotion.ts` and `test/front-door-motion-contract.test.mjs` were reviewed but are not silently added to the seven required adapter paths. This refresh supersedes prior adapter source evidence only and does not assert production runtime/browser truth. The PR remains a draft pending exact-head checks and independent review.
+
 ## Chief adapter exact-head decay
 
 The Chief SHA in `src/founder-os-lab/projectAdapters.ts` is an audited evidence identity, not a durable alias for current Chief. Any Chief-head or FCR-head movement expires predecessor adapter, pair-contract, CI, runtime, and browser proof according to the witness actually affected. A blob comparison can justify selecting a successor evidence subject when the audited contract paths are unchanged, but it cannot donate predecessor green or establish Chief deployment, served-MCP reachability, or production behavior.
