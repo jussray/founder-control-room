@@ -20,6 +20,10 @@ import {
   type ProofSignal,
   type ProofStatus,
 } from '../../proof-engine/readiness.js';
+import {
+  readSyncPartyGrowthOutcome,
+  resolveSyncPartyGrowthRuntimeConfig,
+} from '../../lib/syncPartyGrowthOutcome.js';
 
 export const dashboardRouter = Router();
 dashboardRouter.use(requireFounder);
@@ -166,6 +170,34 @@ dashboardRouter.get('/proof-engine', async (req: FounderRequest, res) => {
     project: { slug: project.slug, name: project.name },
     snapshot: buildProofEngineSnapshot(project.slug, [...newest.values()]),
   });
+});
+
+// ─── GET /dashboard/sync-party-growth ───────────────────────────────────────
+/**
+ * Founder-only, observation-only read of SYNC's first-party growth ledger.
+ *
+ * The read key remains provider-held. Each successful snapshot is bracketed by
+ * two SYNC /api/version reads so a stable URL cannot silently donate identity
+ * across a moving runtime. Product-native event counts are returned as-is;
+ * this route does not manufacture signups, returning users, referrals, or
+ * revenue semantics from room/rematch events.
+ */
+dashboardRouter.get('/sync-party-growth', async (req: FounderRequest, res) => {
+  const campaign = typeof req.query.campaign === 'string' ? req.query.campaign.trim() : '';
+  if (!campaign) return res.status(400).json({ error: 'campaign is required' });
+
+  const outcome = await readSyncPartyGrowthOutcome({
+    campaignId: campaign,
+    config: resolveSyncPartyGrowthRuntimeConfig(process.env),
+  });
+
+  res.setHeader('Cache-Control', 'no-store');
+  if (outcome.status === 'UNKNOWN') {
+    const status = outcome.reason === 'INVALID_CAMPAIGN' ? 400 : 503;
+    return res.status(status).json({ project: 'sync-party-game', outcome });
+  }
+
+  return res.status(200).json({ project: 'sync-party-game', outcome });
 });
 
 const COSTS_LIMIT = 1000;
