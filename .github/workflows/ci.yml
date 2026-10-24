@@ -16,6 +16,31 @@ env:
   TEST_DISCOVERY_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
 
 jobs:
+  production-dependencies:
+    name: Production dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          persist-credentials: false
+      - name: Record and verify exact head
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install locked dependency graph without package scripts
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Block high or critical production advisories
+        run: npm audit --omit=dev --audit-level=high
+
   typecheck:
     name: Type check
     runs-on: ubuntu-latest
@@ -280,6 +305,7 @@ jobs:
     name: Required Gate
     if: ${{ always() }}
     needs:
+      - production-dependencies
       - typecheck
       - lint
       - test
@@ -294,6 +320,7 @@ jobs:
       - name: Enforce load-bearing CI results
         shell: bash
         env:
+          PRODUCTION_DEPENDENCIES_RESULT: ${{ needs.production-dependencies.result }}
           TYPECHECK_RESULT: ${{ needs.typecheck.result }}
           LINT_RESULT: ${{ needs.lint.result }}
           TEST_RESULT: ${{ needs.test.result }}
@@ -305,7 +332,8 @@ jobs:
           CLOUDFLARE_AUTHORITY_RESULT: ${{ needs.cloudflare-bridge-authority.result }}
         run: |
           set -euo pipefail
-          printf 'typecheck=%s\nlint=%s\ntest=%s\ne2e=%s\npython=%s\nrls=%s\ndiscovery=%s\ndocumentation_truth=%s\ncloudflare_authority=%s\n' \
+          printf 'production_dependencies=%s\ntypecheck=%s\nlint=%s\ntest=%s\ne2e=%s\npython=%s\nrls=%s\ndiscovery=%s\ndocumentation_truth=%s\ncloudflare_authority=%s\n' \
+            "$PRODUCTION_DEPENDENCIES_RESULT" \
             "$TYPECHECK_RESULT" \
             "$LINT_RESULT" \
             "$TEST_RESULT" \
@@ -317,6 +345,7 @@ jobs:
             "$CLOUDFLARE_AUTHORITY_RESULT"
 
           for result in \
+            "$PRODUCTION_DEPENDENCIES_RESULT" \
             "$TYPECHECK_RESULT" \
             "$LINT_RESULT" \
             "$TEST_RESULT" \
