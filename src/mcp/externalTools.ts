@@ -13,7 +13,10 @@ import {
 } from '../lib/fcrSkillRouter.js';
 import type { V10CapabilityPlan } from '../founder-os-lab/capabilityKernel.js';
 import { relayBetweenOperators } from '../lib/operatorRelayBridge.js';
-import { createServerOperatorRelayAdapters } from '../lib/operatorRelayModelProviders.js';
+import {
+  OperatorRelayProviderBoundaryError,
+  createServerOperatorRelayAdapters,
+} from '../lib/operatorRelayModelProviders.js';
 import { OPERATOR_RELAY_PEERS } from '../lib/operatorRelayConstants.js';
 import type {
   RelayCapability,
@@ -812,8 +815,7 @@ export function createExternalMcpToolExecutor(
       const fromOperator = sourceOperatorForIdentity(input.identity, env);
       const toOperator = relayOperator(input.arguments.targetOperator, 'targetOperator');
       if (fromOperator === toOperator) throw new Error('operator relay requires a distinct target operator');
-      evidenceRisk = 'external_side_effect';
-      result = await relayOperatorCall({
+      const relayInput = {
         fromOperator,
         toOperator,
         capability: relayCapability(input.arguments.capability),
@@ -821,7 +823,33 @@ export function createExternalMcpToolExecutor(
         contextSummary: text(input.arguments.contextSummary, 'contextSummary', 12000),
         sourceRef: optionalText(input.arguments.sourceRef, 'sourceRef', 500) ?? null,
         sensitivity: relaySensitivity(input.arguments.sensitivity),
-      });
+      };
+      try {
+        result = await relayOperatorCall(relayInput);
+        evidenceRisk = 'external_side_effect';
+      } catch (error) {
+        const providerFailure = error instanceof OperatorRelayProviderBoundaryError;
+        await recordEvidence({
+          identity: input.identity,
+          requestId: input.requestId,
+          projectSlug: receiptProject,
+          toolName: input.name,
+          arguments: input.arguments,
+          result: {
+            contract: 'fcr/operator-relay-failure@v1',
+            outcome: 'failed',
+            targetOperator: toOperator,
+            provider: providerFailure ? error.provider : null,
+            externalProviderCall: providerFailure,
+            safeCode: providerFailure
+              ? 'provider_call_failed'
+              : 'relay_blocked_before_provider',
+          },
+          durationMs: Math.max(0, Date.now() - startedAt),
+          risk: providerFailure ? 'external_side_effect' : 'read',
+        });
+        throw error;
+      }
     } else {
       noUnexpectedKeys(
         input.arguments,

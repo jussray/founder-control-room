@@ -30,6 +30,9 @@ import {
   syncStoredFounderContentPublicationResult,
 } from '../../lib/founderContentPublicationSync.js';
 import {
+  importFounderContentMetricsCsv,
+} from '../../lib/founderContentMetricsStore.js';
+import {
   readCurrentFounderContentApproval,
 } from '../../lib/founderContentApprovalStore.js';
 import {
@@ -50,6 +53,7 @@ type LifecycleDependencies = {
   readApproval: typeof readCurrentFounderContentApproval;
   publishNow: typeof dispatchAuthoritativeFounderContentPublishNow;
   syncPublication: typeof syncStoredFounderContentPublicationResult;
+  importMetricsCsv: typeof importFounderContentMetricsCsv;
   providerAdapters: Readonly<Record<string, FounderContentProviderLifecycleAdapter>>;
 };
 
@@ -64,6 +68,7 @@ const DEFAULT_DEPENDENCIES: LifecycleDependencies = {
   readApproval: readCurrentFounderContentApproval,
   publishNow: dispatchAuthoritativeFounderContentPublishNow,
   syncPublication: syncStoredFounderContentPublicationResult,
+  importMetricsCsv: importFounderContentMetricsCsv,
   providerAdapters: Object.freeze({}),
 };
 
@@ -666,6 +671,26 @@ export function createFounderContentLifecycleRouter(
         lifecycleSyncReason,
         doNotRetryBecauseLifecycleSyncFailed: result.published === true,
       });
+    } catch (error) {
+      return lifecycleError(res, error);
+    }
+  });
+
+  router.post('/metrics/import-csv', async (req: FounderRequest, res) => {
+    const identity = founder(req);
+    if (!identity) return res.status(401).json({ ok: false, code: 'FOUNDER_SESSION_REQUIRED' });
+    const body = record(req.body);
+    if (typeof body.csv !== 'string' || !body.csv.trim()) {
+      return res.status(400).json({ ok: false, code: 'METRICS_CSV_REQUIRED' });
+    }
+    try {
+      const receipt = await deps.importMetricsCsv({
+        founderUserId: identity.userId,
+        csv: body.csv,
+        postId: text(body.postId) || null,
+        actor: identity.email,
+      });
+      return res.status(201).json({ ok: true, receipt });
     } catch (error) {
       return lifecycleError(res, error);
     }
