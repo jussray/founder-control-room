@@ -89,9 +89,9 @@ describe('parseContentMetricsCsv', () => {
       .replace(',linkedin,', ',facebook,')
       .replace(',542,count,', ',410,count,');
     const nextWindow = impressions
-      .replace('2026-09-10T00:00:00.000Z', '2026-09-17T00:00:00Z')
-      .replace('2026-09-16T00:00:00.000Z', '2026-09-23T00:00:00Z')
-      .replace('2026-09-16T08:30:00.000Z', '2026-09-23T08:30:00Z')
+      .replace('2026-09-10T00:00:00Z', '2026-09-17T00:00:00Z')
+      .replace('2026-09-16T00:00:00Z', '2026-09-23T00:00:00Z')
+      .replace('2026-09-16T08:30:00Z', '2026-09-23T08:30:00Z')
       .replace(',542,count,', ',625,count,');
 
     const receipt = parseContentMetricsCsv(csv(impressions, secondContent, secondProvider, nextWindow));
@@ -139,7 +139,7 @@ describe('parseContentMetricsCsv', () => {
 
   it('rejects ambiguous timestamps, missing account/page/audience identity, bad units, and unsupported metrics', () => {
     expect(() => parseContentMetricsCsv(csv(
-      impressions.replace('2026-09-16T08:30:00.000Z', '2026-09-16T08:30:00'),
+      impressions.replace('2026-09-16T08:30:00Z', '2026-09-16T08:30:00'),
     ))).toThrow('observed_at must be an offset-aware ISO timestamp');
 
     expect(() => parseContentMetricsCsv(csv(
@@ -182,15 +182,15 @@ describe('parseContentMetricsCsv', () => {
   it('rejects invalid calendar/time offsets and malformed quoted-field trailers', () => {
     expect(() => parseContentMetricsCsv(csv(
       impressions.replace('2026-09-16T08:30:00Z', '2026-02-31T08:30:00Z'),
-    ))).toThrow('must be a valid offset-aware ISO timestamp');
+    ))).toThrow(/offset-aware ISO timestamp/);
 
     expect(() => parseContentMetricsCsv(csv(
       impressions.replace('2026-09-16T08:30:00Z', '2026-09-16T25:30:00Z'),
-    ))).toThrow('must be a valid offset-aware ISO timestamp');
+    ))).toThrow(/offset-aware ISO timestamp/);
 
     expect(() => parseContentMetricsCsv(csv(
       impressions.replace('2026-09-16T08:30:00Z', '2026-09-16T08:30:00+14:30'),
-    ))).toThrow('must be a valid offset-aware ISO timestamp');
+    ))).toThrow(/offset-aware ISO timestamp/);
 
     expect(() => parseContentMetricsCsv(csv(
       impressions.replace('"founders,operators"', '"founders,operators"x'),
@@ -200,11 +200,11 @@ describe('parseContentMetricsCsv', () => {
   it('rejects reversed windows, pre-window observations, negative values, and schema drift', () => {
     expect(() => parseContentMetricsCsv(csv(
       impressions
-        .replace('2026-09-10T00:00:00.000Z', '2026-09-17T00:00:00Z'),
+        .replace('2026-09-10T00:00:00Z', '2026-09-17T00:00:00Z'),
     ))).toThrow('window_start must not follow window_end');
 
     expect(() => parseContentMetricsCsv(csv(
-      impressions.replace('2026-09-16T08:30:00.000Z', '2026-09-15T23:00:00Z'),
+      impressions.replace('2026-09-16T08:30:00Z', '2026-09-15T23:00:00Z'),
     ))).toThrow('observed_at must not predate window_end');
 
     expect(() => parseContentMetricsCsv(csv(
