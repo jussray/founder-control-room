@@ -112,8 +112,8 @@ async function provePublicFrontDoor(label, viewport) {
   if (!/No account is required to explore the public FCR world/i.test(userCopy)) {
     throw new Error(`${label}: user view must make the no-account boundary explicit`);
   }
-  if (await page.locator('#discover a.btn').getAttribute('href') !== '/work.html') {
-    throw new Error(`${label}: public Explore action must route to the real public work directory`);
+  if (await page.locator('#discover a.btn').getAttribute('href') !== '/control-room/founder-shell.html') {
+    throw new Error(`${label}: product CTA must route to the public FCR experience shell`);
   }
   // Visual cards must preserve real keyboard-accessible public destinations.
   for (const [kind, expectedHref] of [
