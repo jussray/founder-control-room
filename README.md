@@ -1,5 +1,12 @@
 # Founder Control Room
 
+## October 23, 2026 candidate: authenticated founder dock and refreshed StoryEngine peer
+
+The public FCR entrance remains available without a session; the internal `/control-room/` founder navigation dock starts hidden and is shown only when the existing authenticated `#root .shell` renders. The signed-out, authenticated, and signed-out-again transitions are tested in the bounded browser fixtures. Hiding links is a user-interface safeguard, **not** a replacement for server-side authorization.
+
+The FCR browser federation workflow `.github/workflows/playwright.yml` now selects StoryEngine `be4fe1a006fcecdad077d5c3878cd76443274c65`, independently observed on StoryEngine `main` on October 23, 2026. GitHub showed a forward ten-commit transition from `26b1c34ae7c97c5d1b66a23d6345b3965cfcdc1f`. The old peer CI is historical: the new exact FCR candidate **must** pass live-ref equality, immutable checkout, service identity, runtime directive/receipt, replay safety, and Playwright checks before claiming federation works. This candidate grants no merge or deployment approval.
+
+
 > **Copyright © 2024–2026 Juss Ray. All rights reserved.**
 > This is proprietary software. No license to use, copy, modify, distribute,
 > sublicense, or create derivative works is granted. See [LICENSE](LICENSE).
