@@ -95,6 +95,10 @@ function createApiRequest(request) {
 
   if (!STATIC_METHODS.has(request.method) && request.body !== null) {
     init.body = request.body;
+    // Preserve the incoming streaming body when forwarding POST requests.
+    // Undici requires duplex for ReadableStream bodies; without it, the
+    // binding throws before dispatch and incorrectly returns a degraded 503.
+    init.duplex = 'half';
   }
 
   return new Request(targetUrl, init);
