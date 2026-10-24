@@ -481,3 +481,7 @@ Rebinding `.github/workflows/playwright.yml` to `3c1689fe67142e783fe7d18b5ff6106
 FCR carries a privacy-minimal portfolio conversion contract in [`docs/PORTFOLIO_CONVERSION_TRACKING.md`](docs/PORTFOLIO_CONVERSION_TRACKING.md). The first approved event set is `call_click`, `whatsapp_click`, `pickup_request`, and `directions_click`. The source contract forbids customer identity/device fields from the conversion table and keeps automatic deletion disabled unless the founder separately approves a retention policy.
 
 Provider configuration, site wiring, observed clicks, and commercial outcomes remain separate truth layers. The Cloudflare `jussco-conversions` Worker/D1 configuration is provider evidence only; it is not proof that a live portfolio site is sending events or that a sale occurred.
+
+## Sauce Guard agent and logging egress (candidate governance)
+
+Founder Control Room owns the canonical `.agents/skills/sauce-guard/SKILL.md` for all founder-product outward communication. The skill requires verified, temporally current public-safe claims, exact Current You approval, FCR execution-time revalidation and destination-provider readback. CI's `scripts/verify-sauce-guard-egress.mjs` is a separate, changed-line source check that rejects newly introduced dynamic logger sinks and unsafe logging of raw provider/user content in covered code areas. It cannot certify older logs, external agents, security scanning, or publication. The PR must pass exact-head checks, independent review and founder-final merge authorization before this policy is integrated.
