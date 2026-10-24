@@ -133,7 +133,7 @@ async function withDeadline<T>(timeoutMs: number, operation: (signal: AbortSigna
 async function readBounded(response: {
   body?: ReadableStream<Uint8Array> | null;
   text(): Promise<string>;
-}): Promise<string | null> {
+}, timeoutMs: number): Promise<string | null> {
   if (!response.body) {
     const raw = await response.text();
     return Buffer.byteLength(raw, 'utf8') > MAX_JSON_BYTES ? null : raw;
@@ -143,9 +143,16 @@ async function readBounded(response: {
   const decoder = new TextDecoder();
   let bytesRead = 0;
   let raw = '';
+  // The request deadline is disarmed once headers arrive, so the body needs its own bound.
+  let expired = false;
+  const timer = setTimeout(() => {
+    expired = true;
+    reader.cancel('response_body_deadline').catch(() => undefined);
+  }, timeoutMs);
   try {
     while (true) {
       const { done, value } = await reader.read();
+      if (expired) throw new Error('response_body_deadline');
       if (done) break;
       bytesRead += value.byteLength;
       if (bytesRead > MAX_JSON_BYTES) {
@@ -157,6 +164,7 @@ async function readBounded(response: {
     raw += decoder.decode();
     return raw;
   } finally {
+    clearTimeout(timer);
     reader.releaseLock();
   }
 }
@@ -278,7 +286,7 @@ export async function probePromptOsRuntime(options: PromptOsProbeOptions): Promi
   }
 
   // From here the endpoint responded with 200. That is reachable, never verified on its own.
-  const raw = await readBounded(response).catch(() => null);
+  const raw = await readBounded(response, options.timeoutMs ?? DEFAULT_TIMEOUT_MS).catch(() => null);
   if (raw === null) {
     return { ...base, ...empty, state: 'reachable', reasons: ['identity_unreadable_or_too_large'] };
   }
@@ -361,7 +369,7 @@ export async function probePromptOsProof(options: PromptOsProofOptions): Promise
   if (response.status === 401 || response.status === 403) return fail(['credential_rejected']);
   if (!response.ok) return fail(['unexpected_status']);
 
-  const raw = await readBounded(response).catch(() => null);
+  const raw = await readBounded(response, options.timeoutMs ?? DEFAULT_TIMEOUT_MS).catch(() => null);
   if (raw === null) return fail(['proof_unreadable_or_too_large']);
   let body: JsonRecord | null;
   try {
