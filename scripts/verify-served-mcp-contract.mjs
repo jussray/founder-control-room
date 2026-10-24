@@ -47,7 +47,9 @@ const remoteReadMcp = read("src/http/routes/remoteReadMcp.ts");
 const signalEngineMcp = read("src/http/routes/founderSignalEngineMcp.ts");
 const xEngagementMcp = read("src/http/routes/xEngagementSignalMcp.ts");
 const mcpRouter = read("src/http/routes/mcp.ts");
-const server = read("src/http/server.ts");\nconst runtimeProof = read(".github/workflows/prompt-workflow-router-runtime-proof.yml");\nconst secretsDoc = read("docs/SECRETS.md");
+const server = read("src/http/server.ts");
+const runtimeProof = read(".github/workflows/prompt-workflow-router-runtime-proof.yml");
+const secretsDoc = read("docs/SECRETS.md");
 
 /* ---------- externalTools.ts: the tool catalog invoked by /mcp and /mcp/read ---------- */
 
