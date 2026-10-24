@@ -1,0 +1,19 @@
+{
+  "schema": "juss/openai-completion-repair@v1",
+  "repository": "jussray/founder-control-room",
+  "implementationParent": "ff685351aa579f6580e8a501b68c4b144837d47f",
+  "targetBranch": "fix/openai-completion-boundary-current-main-20261005",
+  "source": "src/lib/operatorRelayModelProviders.ts",
+  "sourceBlobSha": "50d1b7a4bc301e8a5f324e13fb25937ca55d2f11",
+  "goal": "Reject non-completed OpenAI Responses output before partial text is promoted to a successful relay result",
+  "repairClass": "CODE_DEFECT",
+  "scope": "Current-main completion boundary only; no rollover of stale PR #821 history",
+  "automaticRetryAdded": false,
+  "modelDefaultsChanged": false,
+  "providerAuthorityChanged": false,
+  "deploymentVerified": false,
+  "liveProviderVerified": false,
+  "authority": "none",
+  "rollback": "Revert only this focused current-main completion-boundary patch",
+  "nextGate": "Exact-head unit/type/lint/Playwright proof and fresh exact-candidate founder approval"
+}
