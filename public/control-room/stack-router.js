@@ -127,8 +127,24 @@ if (pendingTab && ALLOWED_TABS.has(pendingTab) && !activateTab(pendingTab)) {
   }
 }
 const launchDock = document.querySelector('.launch-dock');
+function syncLaunchDockVisibility() {
+  if (!(launchDock instanceof HTMLDetailsElement)) return;
+  const authenticated = document.querySelector('#root .shell') instanceof HTMLElement;
+  if (!authenticated && launchDock.open) launchDock.open = false;
+  launchDock.hidden = !authenticated;
+  launchDock.setAttribute('aria-hidden', authenticated ? 'false' : 'true');
+}
+
 if (launchDock instanceof HTMLDetailsElement) {
-  launchDock.addEventListener('toggle', () => { if (launchDock.open) void refreshConveyorReadiness(); });
+  syncLaunchDockVisibility();
+  const root = document.getElementById('root');
+  if (root) {
+    const authVisibilityObserver = new MutationObserver(syncLaunchDockVisibility);
+    authVisibilityObserver.observe(root, { childList: true, subtree: true });
+  }
+  launchDock.addEventListener('toggle', () => {
+    if (launchDock.open && !launchDock.hidden) void refreshConveyorReadiness();
+  });
 }
 installCoworkLane();
 installMissionBoard();
