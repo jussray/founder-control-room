@@ -310,7 +310,7 @@
       "path": "src/founder-os-lab/projectAdapters.ts",
       "claims": [
         "`src/founder-os-lab/projectAdapters.ts` must bind Chief integration evidence to one audited exact Chief head; moving that head expires predecessor adapter and pair-contract proof, requires the focused assertion and path-bound documentation receipt to move together, and grants no Chief runtime, merge, deploy, publication, or provider authority.",
-        "`src/founder-os-lab/projectAdapters.ts` must pin the staged Chief PR #242 candidate `f4f9ba43f0015d33f4ae71c941487717dba52658` to five exact contract blobs; FCR PR #1015 and Chief PR #242 remain draft and unmerged. The live freshness gate must fail closed until Chief main carries the corrected pairing blob `dd008420e1a91e78516b45d9e27de89344abf432`. This staging cannot transfer preceding CI/browser proof or grant founder, publishing, runtime, provider, merge, or deploy authority."
+        "`src/founder-os-lab/projectAdapters.ts` must bind Chief PR #242 exact candidate `0d1106424802fa21d37c6a05fc3e6f6422cc989a` to five observed contract blobs, the restored `necessary-fix-policy.json`, and pair blob `dd008420e1a91e78516b45d9e27de89344abf432`. FCR PR #1015 and Chief PR #242 remain draft. Live freshness must fail closed while Chief main still carries stale pair content; no preceding CI proof grants merge, founder, publishing, provider-write, or deploy authority."
       ]
     },
     {
