@@ -1,0 +1,164 @@
+name: Cloudflare Deploy Token Shape Diagnostic
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  issues: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  diagnose-fcr-cloudflare-deploy-token:
+    if: >-
+      github.event.issue.number == 247 &&
+      github.event.comment.user.id == 286642846 &&
+      github.event.comment.user.login == 'jussray' &&
+      startsWith(github.event.comment.body, '/diagnose-fcr-cloudflare-deploy-token ')
+    name: Diagnose canonical Cloudflare deploy-token shape
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: production
+    concurrency:
+      group: fcr-cloudflare-deploy-token-shape-diagnostic
+      cancel-in-progress: false
+    steps:
+      - name: Parse founder diagnostic command
+        id: command
+        env:
+          COMMAND_BODY: ${{ github.event.comment.body }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os
+          import re
+
+          body = os.environ.get('COMMAND_BODY', '').strip()
+          parts = body.split()
+          if len(parts) != 3 or parts[0] != '/diagnose-fcr-cloudflare-deploy-token':
+              raise SystemExit(
+                  'Expected exactly: /diagnose-fcr-cloudflare-deploy-token <40-char-current-main-sha> <approval-reference>'
+              )
+
+          main_sha = parts[1]
+          approval = parts[2]
+          if not re.fullmatch(r'[0-9a-f]{40}', main_sha):
+              raise SystemExit('Current main SHA must be a lowercase 40-character commit SHA.')
+          if not re.fullmatch(r'[A-Za-z0-9._:-]{8,200}', approval):
+              raise SystemExit('Approval reference must use 8-200 auditable characters: A-Z a-z 0-9 . _ : -')
+
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
+              output.write(f'expected_main_sha={main_sha}\n')
+              output.write(f'approval_reference={approval}\n')
+          PY
+
+      - name: Fail closed unless command targets exact current main
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_MAIN_SHA: ${{ steps.command.outputs.expected_main_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          current_main="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/main" --jq .object.sha)"
+          printf 'requested_main=%s\ncurrent_main=%s\n' "$EXPECTED_MAIN_SHA" "$current_main"
+          test "$current_main" = "$EXPECTED_MAIN_SHA"
+
+      - name: Classify deploy-token shape without exposing secret material
+        id: shape
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          EXPECTED_MAIN_SHA: ${{ steps.command.outputs.expected_main_sha }}
+          APPROVAL_REFERENCE: ${{ steps.command.outputs.approval_reference }}
+          COMMAND_COMMENT_ID: ${{ github.event.comment.id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs/promises';
+
+          const token = String(process.env.CLOUDFLARE_API_TOKEN ?? '');
+          const expectedMainSha = String(process.env.EXPECTED_MAIN_SHA ?? '').trim().toLowerCase();
+          const approvalReference = String(process.env.APPROVAL_REFERENCE ?? '').trim();
+          const commandCommentId = String(process.env.COMMAND_COMMENT_ID ?? '').trim();
+
+          const present = token.length > 0;
+          const credentialType = token.startsWith('cfut_')
+            ? 'user-token'
+            : token.startsWith('cfat_')
+              ? 'account-token'
+              : token.startsWith('cfk_')
+                ? 'global-key'
+                : /^[A-Za-z0-9]{40}$/.test(token)
+                  ? 'legacy-40-alnum'
+                  : 'legacy-or-unknown';
+          const hasBearerPrefix = /^Bearer\s+/i.test(token);
+          const hasWhitespace = /\s/.test(token);
+          const hasLeadingOrTrailingWhitespace = token !== token.trim();
+          const hasNonAscii = /[^\x20-\x7E]/.test(token);
+          const hasWrappingQuote = /^(?:"(?:.|\n)*"|'(?:.|\n)*')$/.test(token);
+          const looksLikeAssignment = /^[A-Za-z_][A-Za-z0-9_]*=/.test(token);
+          const headerSafe =
+            present &&
+            !hasBearerPrefix &&
+            !hasWhitespace &&
+            !hasNonAscii &&
+            !hasWrappingQuote &&
+            !looksLikeAssignment;
+
+          const receipt = {
+            schema: 'fcr/cloudflare-deploy-token-shape@v1',
+            expectedMainSha,
+            approvalReference,
+            commandCommentId,
+            generatedAt: new Date().toISOString(),
+            credentialType,
+            present,
+            hasBearerPrefix,
+            hasWhitespace,
+            hasLeadingOrTrailingWhitespace,
+            hasNonAscii,
+            hasWrappingQuote,
+            looksLikeAssignment,
+            headerSafe,
+            providerAuthenticationAttempted: false,
+            providerMutationAttempted: false,
+            repositoryCodeExecutedWithSecret: false,
+            secretMaterialLogged: false,
+            reconstructableSecretMetadataLogged: false,
+          };
+
+          await fs.mkdir('artifacts', { recursive: true });
+          await fs.writeFile(
+            'artifacts/cloudflare-deploy-token-shape.json',
+            `${JSON.stringify(receipt, null, 2)}\n`,
+            'utf8',
+          );
+
+          console.log(`credential_type=${credentialType}`);
+          console.log(`present=${present}`);
+          console.log(`has_bearer_prefix=${hasBearerPrefix}`);
+          console.log(`has_whitespace=${hasWhitespace}`);
+          console.log(`has_leading_or_trailing_whitespace=${hasLeadingOrTrailingWhitespace}`);
+          console.log(`has_non_ascii=${hasNonAscii}`);
+          console.log(`has_wrapping_quote=${hasWrappingQuote}`);
+          console.log(`looks_like_assignment=${looksLikeAssignment}`);
+          console.log(`header_safe=${headerSafe}`);
+          console.log('provider_authentication_attempted=false');
+          console.log('provider_mutation_attempted=false');
+          console.log('repository_code_executed_with_secret=false');
+
+          if (!headerSafe) process.exitCode = 1;
+          NODE
+
+      - name: Retain secret-safe diagnostic receipt
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: cloudflare-deploy-token-shape-${{ steps.command.outputs.expected_main_sha }}-${{ github.run_id }}
+          path: artifacts/cloudflare-deploy-token-shape.json
+          if-no-files-found: error
+          retention-days: 30
