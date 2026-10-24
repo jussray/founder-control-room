@@ -28,8 +28,8 @@ This document describes the safety controls applied to all data, processes, and 
 - SonarQube static analysis is configured in `sonar-project.properties`.
 
 ## 6. Incident Response
-- Critical security issues should be reported via the process in `SECURITY.md`.
-- Severity-1 incidents trigger automated alerts to the founder via Cloudflare Alerting webhooks.
+- Security issues should be reported via the root `SECURITY.md`. The reporting address is held there until it is verified as configured and monitored.
+- Severity-1 incidents are intended to alert the founder through Cloudflare Alerting webhooks. The repository contains no configuration verifying this; it is unconfirmed until checked against the live account.
 
 ## 7. Audit Logging
 - All mutating API calls are logged to the `audit_logs` Supabase table with actor, action, timestamp, and IP.
