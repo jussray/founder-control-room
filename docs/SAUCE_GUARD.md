@@ -19,7 +19,7 @@ The source flow is: verified evidence → proposal → removal of sensitive impl
 
 The read-only verification script at scripts/verify-sauce-source-guard.mjs checks for these existing source boundaries. Its structured public-draft validator checks evidence classification, dates, evidence references, and obvious credential markers. Its tests do not connect to any publishing provider.
 
-These source checks **do not prove** that the runtime publishing pipeline enforces every step, that a draft has human approval, or that a destination contains a published artifact. Those claims require independent runtime evidence.
+These source checks do not prove that the runtime publishing pipeline enforces every step, that a draft has human approval, or that a destination contains a published artifact. Those claims require independent runtime evidence.
 
 ## Status
 
