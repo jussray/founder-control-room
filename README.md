@@ -490,3 +490,8 @@ Provider configuration, site wiring, observed clicks, and commercial outcomes re
 **Source Guard** adds read-only repository checks for the documented guard boundaries and the portfolio conversion-tracking data contract. See [Source Guard documentation](docs/SOURCE_GUARD.md), scripts/verify-sauce-source-guard.mjs, the Node regression tests, and the separate GitHub Actions workflow. Source Guard complements, but does not replace, [Documentation Truth](.github/workflows/documentation-truth.yml).
 
 **Truth boundary:** checked-in policy and tests are source evidence only. A passing workflow does **not** establish that public content was approved or published, that the collector receives real site traffic, or that live security/runtime controls operate correctly. No new deploy, merge, publication, provider-mutation or deletion authority is granted.
+
+
+### Supabase source-observation receipts (bounded)
+
+On October 24, 2026, Supabase project `oojzfmmywbvficgybaxd` accepted migration `20261024231659_sauce_source_guard_minimal_evidence_boundary`. Post-migration catalog readback verified an empty, RLS-enabled `public.guard_source_verification_receipts` table, accessible only to `service_role` for SELECT and INSERT. It stores limited source/catalog check metadata, **not** founder approval or live publication proof. No app writer is claimed. See [Source Guard](docs/SOURCE_GUARD.md) for the evidence limits and a separately tracked pre-existing migration-history discrepancy.
