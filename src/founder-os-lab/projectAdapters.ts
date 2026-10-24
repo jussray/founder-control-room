@@ -61,13 +61,13 @@ const SEKRET_BIP_AUDITED_CONTRACT_BLOBS = {
   'test/dual-front-door-contract.test.mjs': '459ccf28ffe785e725c20a72542a3b18780c28c8',
 } as const;
 const CHIEF_AI_REPOSITORY = 'jussray/chief-ai-machine';
-const CHIEF_AI_AUDITED_HEAD = '4c126a442522b006d499170a812fcd5b80355bf0';
+const CHIEF_AI_AUDITED_HEAD = 'f4f9ba43f0015d33f4ae71c941487717dba52658';
 const CHIEF_AI_AUDITED_CONTRACT_BLOBS = {
   'src/domain/capability-plan.js': '7b0c2e8d2bbbfce6a0b053134cc79ee3e0a17ec5',
-  'src/domain/capability-registry.js': '83592043323fe08258dc93778300151e21ac70ae',
-  'src/domain/merge-intent.js': '16c1d3380f8471097709b8d247ca0f1f33207857',
+  'src/domain/capability-registry.js': 'abb2daf0ee7ce85442cd4b04588b4881cc4b9b53',
+  'src/domain/merge-intent.js': 'ba7b3d1ff4dbc846d79489ec9ffb0c346597b559',
   'config/founder-chief-pair.contract.json': 'dd008420e1a91e78516b45d9e27de89344abf432',
-  'e2e/chief-capability-plan.pw.mjs': 'a2d42aeb4cdf6d7a69235bfa6a61b2194a8f20c4',
+  'e2e/chief-capability-plan.pw.mjs': 'ad41d9f614dc94df7d5ebde3d9b3a8cefd96e39b',
 } as const;
 
 export const FOUNDER_OS_LAB_PROJECT_ADAPTERS: readonly FounderOsLabProjectAdapterDescriptor[] = [
