@@ -112,6 +112,10 @@ export const FCR_STANDING_COMMAND_REGISTRY: readonly FcrStandingCommandDescripto
   { id: 'ooda', aliases: ['/ooda', 'ooda'], owningOs: 'preflight-os', kind: 'workflow', autoTrigger: 'iterative observe-orient-decide-act-verify loops', mayExecute: false },
   { id: 'l99', aliases: ['/l99', 'l99'], owningOs: 'preflight-os', kind: 'mode', autoTrigger: 'authority, state, evidence, rollback, and compounding-value review', mayExecute: false },
   { id: 'goalfix', aliases: ['/goalfix', '/fixfast', '/repair-verify-merge', '/goal', 'goalfix'], owningOs: 'founder-control-room', kind: 'workflow', autoTrigger: 'focused repair, bug, regression, broken runtime, or failing proof', mayExecute: false },
+  { id: 'godmode', aliases: ['/godmode', 'godmode', 'attack/godmode'], owningOs: 'founder-control-room', kind: 'workflow', autoTrigger: 'explicit godmode or attack/godmode request for bounded adversarial engineering execution', mayExecute: false },
+  { id: 'urlfix', aliases: ['/urlfix', 'urlfix'], owningOs: 'founder-control-room', kind: 'workflow', autoTrigger: 'live URL, website, or browser-path testing that should diagnose and repair verified owned defects', mayExecute: false },
+  { id: 'repair-to-proof', aliases: ['/repair-to-proof', 'repair-to-proof'], owningOs: 'founder-control-room', kind: 'workflow', autoTrigger: 'explicit proof-mode, exact-head gate or release-proof request', mayExecute: false },
+  { id: 'continuity', aliases: ['/continuity', '/receipt'], owningOs: 'founder-control-room', kind: 'workflow', autoTrigger: 'explicit continuity, handoff or proof-ledger request', mayExecute: false },
   { id: 'attack', aliases: ['/attack', 'attack ten', 'attack against itself ten times', 'attack n'], owningOs: 'council-os', kind: 'mode', autoTrigger: 'explicit attack depth or adversarial stress-testing request', mayExecute: false },
   { id: 'makevideo', aliases: ['/makevideo', 'makevideo'], owningOs: 'video-production-os', dependentOsIds: ['media-router-os'], kind: 'entrypoint', autoTrigger: 'clear video, movie, reel, cinematic, shot, or video-generation intent', mayExecute: false },
   { id: 'leevize', aliases: ['/leevize', 'leevize'], owningOs: 'video-production-os', dependentOsIds: ['media-router-os'], kind: 'workflow', autoTrigger: 'cinematic direction, world direction, shot continuity, or visual-story production', mayExecute: false },
@@ -191,6 +195,11 @@ for (const command of FCR_STANDING_COMMAND_REGISTRY) {
   }
 }
 
+// URL path segments are not commands; composed commands such as /truthmode/confess stay parseable.
+function withoutUrls(goal: string): string {
+  return goal.replace(/https?:\/\/\S+/gi, ' ');
+}
+
 function pushUnique<T>(values: T[], value: T): void {
   if (!values.includes(value)) values.push(value);
 }
@@ -201,22 +210,23 @@ function normalizedGoal(goal: string): string {
 
 function explicitCommandIdsFromGoal(goal: string): string[] {
   const ids: string[] = [];
-  for (const match of goal.matchAll(/\/([a-z0-9-]+)/g)) {
+  for (const match of withoutUrls(goal).matchAll(/\/([a-z0-9-]+)/g)) {
     const commandId = ALIAS_TO_COMMAND.get(match[1]);
     if (commandId) pushUnique(ids, commandId);
   }
+  if (/^repair-to-proof\b/.test(goal.trim())) pushUnique(ids, 'repair-to-proof');
 
-  for (const marker of ['ultrathink', 'truthmode', 'confess', 'redteam', 'lindymode', 'ooda', 'l99', 'goalfix', 'makevideo', 'leevize']) {
-    if (new RegExp(`\\b${marker}\\b`).test(goal)) pushUnique(ids, marker);
+  for (const marker of ['ultrathink', 'truthmode', 'confess', 'redteam', 'lindymode', 'ooda', 'l99', 'goalfix', 'godmode', 'urlfix', 'makevideo', 'leevize']) {
+    if (new RegExp(`\\b${marker}\\b`).test(withoutUrls(goal))) pushUnique(ids, marker);
   }
   if (/\battack\s+(?:\d+|ten)\b/.test(goal) || goal.includes('attack against itself ten times')) pushUnique(ids, 'attack');
   return ids;
 }
 
 function parsedAttackIntensity(goal: string): number | null {
-  const numeric = goal.match(/\battack\s+(\d{1,6})\b/);
+  const numeric = goal.match(/\battack(?:\/godmode)?\s+(\d{1,6})\b/);
   if (numeric) return Number.parseInt(numeric[1], 10);
-  if (/\battack\s+ten\b/.test(goal) || goal.includes('attack against itself ten times')) return 10;
+  if (/\battack(?:\/godmode)?\s+ten\b/.test(goal) || goal.includes('attack against itself ten times')) return 10;
   return null;
 }
 
@@ -229,12 +239,19 @@ export function routeFcrStandingCommands(rawGoal: string, action: FcrStandingCom
   if (action === 'review') pushUnique(autoRoutedCommandIds, 'review');
   if (action === 'merge') pushUnique(autoRoutedCommandIds, 'merge');
   if (['deploy', 'publish'].includes(action)) pushUnique(autoRoutedCommandIds, 'ship');
-  if (['inspect', 'review'].includes(action) || /\b(audit|verify|proof|status|reality|truth|exact-head|runtime)\b/.test(goal)) {
+  if (['inspect', 'review'].includes(action) || /\b(audit|verify|prove|proof|status|reality|truth|exact-head|runtime)\b/.test(goal)) {
     pushUnique(autoRoutedCommandIds, 'prove');
   }
   if (['write', 'merge', 'deploy', 'migrate', 'rollback'].includes(action)
     && /\b(fix|repair|bug|regression|broken|failure|failing|error|blocker)\b/.test(goal)) {
     pushUnique(autoRoutedCommandIds, 'goalfix');
+  }
+  const urlTarget = /https?:\/\//.test(goal);
+  const liveSiteTarget = /\b(website|live[- ]site|site url|deployed url)\b/.test(goal);
+  const verificationOrRepair = /\b(test|audit|fix|repair|issue|broken|verify)\b/.test(goal);
+  const liveSiteRepair = /\b(test|fix|repair|issue|broken|verify)\b/.test(goal);
+  if ((urlTarget && verificationOrRepair) || (liveSiteTarget && liveSiteRepair)) {
+    pushUnique(autoRoutedCommandIds, 'urlfix');
   }
   if (/\b(video|movie|reel|cinematic|shot|storyboard|image-to-video|lip-sync)\b/.test(goal)) {
     pushUnique(autoRoutedCommandIds, 'makevideo');

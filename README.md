@@ -1,5 +1,10 @@
 # Founder Control Room
 
+## Paired hostile-PR repair guidance
+
+The existing ULTRATHINK / ATTACK / GODMODE companion now specifies completed 5W1H, precise evidence-scoped claims, 80/20 cause selection and paired pre/post Red Team/Devil, L99, OODA, Bill Gates, Elon Musk and Lindy passes. Open PRs and drafts are untrusted candidates; draft containment, exact-head tests, Playwright where a user-facing browser path changed, independent review and founder merge approval are separate gates. The AI-skill verifier checks mandatory source instructions only. Neither a paired checklist nor its receipt proves model compliance, runtime adoption, execution, production restoration or independent review. Activation is limited to `/godmode` and `attack/godmode`; the unrouted phrases `implant fixes` and `fix merge review` were removed from the companion, while merge review remains owned by `repair-to-proof`.
+
+
 > **Copyright © 2024–2026 Juss Ray. All rights reserved.**
 > This is proprietary software. No license to use, copy, modify, distribute,
 > sublicense, or create derivative works is granted. See [LICENSE](LICENSE).
@@ -11,6 +16,8 @@ GitHub, Cloudflare, Supabase, n8n, Zapier, HubSpot, Shopify, and other providers
 ## October 16, 2026 StoryEngine peer refresh for FCR browser federation
 
 The FCR Playwright workflow's StoryEngine peer identity was changed from `a6e6a396ed30535af2fd9b1ec2347a84e1a3fbf3` to the separately observed StoryEngine `main` SHA `26b1c34ae7c97c5d1b66a23d6345b3965cfcdc1f`. GitHub comparison showed a forward, 22-commit peer transition, and the successor had 15 passing checks at observation time, including the Control Room federation contract. This pin refresh is a prerequisite for running the FCR-to-StoryEngine browser test, **not** a passing FCR peer witness or an authorization to deploy.
+
+On 2026-10-23 the live StoryEngine `main` was independently observed at `6b97b78370fbc25d4b4bb88bfeab136eb4c7dc2f` and the workflow pin was refreshed to it. The previous `26b1c34…` pin failed the live-ref equality check on the exact head `30c095f5`. This refresh is recovery setup only: federation readiness stays withheld until the exact successor FCR head passes the full witness against the new pin.
 
 The former FCR browser run passed all local Control Room journeys before deliberately stopping on the stale peer-ref check. All predecessor FCR/StoryEngine federation evidence remains historical. Only an exact FCR head which independently checks StoryEngine's live ref, checks out the pinned commit, proves the peer runtime identity, and completes the full Playwright directive/receipt loop can claim current federation integration at this pair. Any movement of either head expires that claim again.
 
@@ -465,3 +472,21 @@ Pin alignment alone cannot promote the successor federation state beyond `UNKNOW
 StoryEngine `main` advanced from the previously pinned `168d65ede38d2477ea00902fa1f0e76f292c583d` through `c9af4ea095561d0837a141e311e8977d796aaaa7` (`feat(video): expose StoryEngine MAKEVIDEO skill`) to independently observed `3c1689fe67142e783fe7d18b5ff610640bdc81d6` (`ci(video): prove StoryEngine MAKEVIDEO skill path`). FCR Playwright run #6969 on `897083276b6c775c49ce30be189a50bd610b5d4c` passed its local/direct browser harness but failed the separate live peer-ref freshness check, so that run is historical browser evidence for the predecessor peer rather than current federation proof.
 
 Rebinding `.github/workflows/playwright.yml` to `3c1689fe67142e783fe7d18b5ff610640bdc81d6` selects the successor evidence subject only. The successor FCR head must complete the live-ref check, immutable peer checkout, exact StoryEngine runtime identity, directive/receipt binding, replay protections, and full Playwright browser witness before federation may be called current. Pin alignment grants no merge, deploy, production, publication, billing, or provider-mutation authority.
+
+## October 13 federation recovery and PR continuity
+
+FCR PR #969 refreshed its StoryEngine peer identity after a live-ref check proved that the historical peer SHA no longer matched StoryEngine `main`. The successor must still pass the complete exact-head federation Playwright flow: immutable peer checkout, runtime identity, directive and receipt binding, replay protections, and browser witness. The first successor branch run passed, but later branch reconciliation with `main` changed the FCR head, so that result is historical for the new head and must not be reused as current proof. Branch ancestry repair also does not repair documentation truth by itself; this documentation transition records the source and evidence limits. Neither the peer pin nor a successful CI job establishes production deployment, Shopify payments, provider mutation, or merge authority.
+
+## Governance skill Documentation Truth coverage (October 14, 2026)
+
+The mandatory ULTRATHINK companion skill sources `skills/ultrathink-attack-godmode/SKILL.md`, `skills/repair-to-proof/SKILL.md`, `skills/continuity-proof-ledger/SKILL.md`, and `skills/ultrathink-suite/README.md` are now classified as truth-governance-sensitive by `scripts/verify-documentation-truth.mjs`. Source changes to these skill paths must refresh this README, `docs/TRUTH_DECAY_AUDIT.md`, and `docs/DOCUMENTATION_TRUTH_RECEIPT.json` with meaningful path-bound invariants. Otherwise Documentation Truth must fail closed; new skill registration and green CI do not prove runtime activation or authorize merge.
+
+The canonical `/goalfix` command is owned by `.ai/skills/goalfix/SKILL.md`. The ULTRATHINK companion must not register that same activation independently: Goalfix may delegate into its companion contracts only under the canonical execution sequence and repository authority. This source correction does not claim a deployed agent skill registry or production execution.
+
+## October 14 independent review: proof-skill routing
+
+The independent review of FCR PR #969 confirmed that `skills/ultrathink-attack-godmode/SKILL.md` incorrectly advertised `repair-to-proof` alongside `skills/repair-to-proof/SKILL.md`'s canonical `/repair-to-proof` trigger. The investigative ULTRATHINK companion no longer claims that activation in its frontmatter or Activation section. The companion hands completed work to the dedicated proof/release contract through the governed suite, without creating duplicate invocation authority. The source-only routing change does not establish installed runtime command registration, an independent reviewer approval, merge authorization, or deployment.
+
+## October 14 source routing and exact-base federation provenance
+
+Claude Code `/ultrathink` remains an exclusive canonical entrypoint in `.claude/skills/ultrathink/SKILL.md`. The new ULTRATHINK / ATTACK / GODMODE companion has distinct cues and cannot register that exact command or override canonical Goalfix; the suite index documents explicit handoffs. The StoryEngine federation pin transition recorded for this review range (`a6e6a396ed30535af2fd9b1ec2347a84e1a3fbf3` → `809d30ae2ef57dce6d4fee9a3b6afa24bfa83497`) is historical evidence. Current FCR `main` pins StoryEngine in `.github/workflows/playwright.yml`, which is the source of truth for the live pin. Prior PR-only `ae7a67c119503276f5525c412a49d05989a8dd6a` retained as historical intermediate evidence, not represented as the `main` predecessor. Neither correction grants deployment or merge authority.

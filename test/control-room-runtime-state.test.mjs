@@ -83,3 +83,12 @@ test('the exact-head ledger binds the runtime-state receipt into its proof surfa
   });
   assert.deepEqual(ledger.runtimeState, runtimeState);
 });
+
+test('persisted runtime-state receipt is valid JSON for the ledger consumer', () => {
+  const root = fixture();
+  const output = path.join(root, 'artifacts', 'receipt.json');
+  const receipt = writeRuntimeStateReceipt(env({ CONTROL_ROOM_RUNTIME_STATE_PATH: output }), root);
+  const stored = fs.readFileSync(output, 'utf8');
+  assert.deepEqual(JSON.parse(stored), receipt);
+  assert.ok(stored.endsWith('\n'));
+});

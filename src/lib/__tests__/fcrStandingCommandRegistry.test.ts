@@ -27,7 +27,7 @@ describe('FCR standing command and OS registry', () => {
     const ids = new Set(FCR_STANDING_COMMAND_REGISTRY.map((entry) => entry.id));
     for (const id of [
       'ultrathink', 'truthmode', 'confess', 'redteam', 'lindymode', 'ooda', 'l99',
-      'goalfix', 'attack', 'makevideo', 'leevize', 'garyvee', 'billgates', 'elonmusk',
+      'goalfix', 'godmode', 'urlfix', 'attack', 'makevideo', 'leevize', 'garyvee', 'billgates', 'elonmusk',
       'devil', 'steelman', 'human', 'ghost', 'futureyou', 'steal', 'hormozi',
       'firstprinciples', 'socrates', 'antiadvice', 'unlearn', 'visualize', 'artifact',
       'compact', 'btw', 'effort', 'caveman', 'v10', 'insights', 'sales', 'expert',
@@ -66,6 +66,55 @@ describe('FCR standing command and OS registry', () => {
       'council-os',
       'preflight-os',
     ]));
+  });
+
+
+  it('routes explicit Attack/godmode through the bounded companion without granting execution', () => {
+    const decision = routeFcrStandingCommands(
+      'Attack/godmode 6000 repair this repository and prove the result.',
+      'write',
+    );
+
+    expect(decision.explicitCommandIds).toContain('godmode');
+    expect(decision.standingCommandIds).toEqual(expect.arrayContaining([
+      'godmode',
+      'attack',
+      'devil',
+      'goalfix',
+      'prove',
+    ]));
+    expect(decision.attackIntensity).toBe(6000);
+    const descriptor = FCR_STANDING_COMMAND_REGISTRY.find((entry) => entry.id === 'godmode');
+    expect(descriptor).toMatchObject({ owningOs: 'founder-control-room', kind: 'workflow', mayExecute: false });
+  });
+
+  it('auto-routes live-site repair intent through URLFIX without granting execution', () => {
+    const decision = routeFcrStandingCommands(
+      'Test this website URL in the browser, find issues, and repair verified defects.',
+      'write',
+    );
+
+    expect(decision.standingCommandIds).toContain('urlfix');
+    const descriptor = FCR_STANDING_COMMAND_REGISTRY.find((entry) => entry.id === 'urlfix');
+    expect(descriptor).toMatchObject({ owningOs: 'founder-control-room', kind: 'workflow', mayExecute: false });
+  });
+
+  it('does not auto-route URLFIX for a repository audit that merely mentions a site', () => {
+    const decision = routeFcrStandingCommands('audit the site deployment configuration', 'inspect');
+
+    expect(decision.standingCommandIds).not.toContain('urlfix');
+  });
+
+  it('does not promote a repository browser-test fix to URLFIX without a live site', () => {
+    const decision = routeFcrStandingCommands('fix the failing browser test in this repository', 'write');
+
+    expect(decision.standingCommandIds).not.toContain('urlfix');
+  });
+
+  it('auto-routes website repair intent without a URL or browser keyword', () => {
+    const decision = routeFcrStandingCommands('Test this website and fix the broken checkout', 'write');
+
+    expect(decision.standingCommandIds).toContain('urlfix');
   });
 
   it('auto-routes video intent through Video Production OS plus Media Router OS', () => {

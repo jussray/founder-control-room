@@ -61,6 +61,8 @@ const truthSensitiveRules = [
   { domain: 'truth-governance', match: /^scripts\/verify-documentation-truth\.mjs$/ },
   { domain: 'truth-governance', match: /^\.ai\/skills\/goalfix\/SKILL\.md$/ },
   { domain: 'truth-governance', match: /^\.claude\/skills\/goalfix\/SKILL\.md$/ },
+  { domain: 'truth-governance', match: /^skills\/(?:ultrathink-attack-godmode|repair-to-proof|continuity-proof-ledger|urlfix)\/SKILL\.md$/ },
+  { domain: 'truth-governance', match: /^skills\/ultrathink-suite\/README\.md$/ },
   { domain: 'truth-governance', match: /^docs\/(?:FOUNDER_ADAPTIVE_KERNEL_V0|GOALFIX_EXECUTION_WORKFLOW_V2|CLAUDE_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC|PERPLEXITY_MCP_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC)\.md$/ },
   { domain: 'evidence-authority', match: /^src\/evidence\/(?!__tests__\/)(?!.*\.test\.ts$)/ },
   { domain: 'evidence-authority', match: /^public\/control-room\/evidence-trust\.html$/ },
@@ -68,6 +70,8 @@ const truthSensitiveRules = [
   { domain: 'evidence-authority', match: /^src\/founder-os-lab\/projectAdapters\.ts$/ },
   { domain: 'evidence-authority', match: /^tools\/zapier\/founder-content-outcome-contract\.cjs$/ },
   { domain: 'capability-authority', match: /^\.control\/capability\.(?:json|yaml)$/ },
+  { domain: 'capability-authority', match: /^src\/lib\/(?:fcrSkillRouter|fcrStandingCommandRegistry)\.ts$/ },
+  { domain: 'capability-authority', match: /^src\/founder-os-lab\/(?:contracts|registry)\.ts$/ },
   { domain: 'workflow-authority', match: /^\.github\/workflows\/(?:ci|quality-gate|pr-recovery-exact-head|founder-repo-cycle|documentation-truth)\.yml$/ },
   { domain: 'cloudflare-authority', match: /^public\/_worker\.js$/ },
   { domain: 'cloudflare-authority', match: /^\.github\/workflows\/(?:deploy|cloudflare-build-diagnostic|fcr-access-front-door-recovery)\.yml$/ },
@@ -330,7 +334,7 @@ const changedDocs = changedFiles.filter((file) =>
   || file === 'CLAUDE.md'
   || file === 'PERPLEXITY.md'
   || file === DOCUMENTATION_RECEIPT_PATH
-  || file.endsWith('.md') && (file.startsWith('docs/') || file.startsWith('.ai/skills/') || file.startsWith('.claude/skills/')),
+  || file.endsWith('.md') && (file.startsWith('docs/') || file.startsWith('.ai/skills/') || file.startsWith('.claude/skills/') || file.startsWith('skills/')),
 );
 
 const report = {
