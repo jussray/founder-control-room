@@ -46,6 +46,16 @@ test('ordinary source events stay source-bound and do not pretend to prove provi
   assert.equal(receipt.proofRule.sourceShaAloneProvesExternalState, false);
 });
 
+test('runtime-state writer emits parseable JSON without a trailing literal escape', () => {
+  const root = fixture();
+  const outputPath = path.join(root, 'runtime-state.json');
+  const receipt = writeRuntimeStateReceipt(env({ CONTROL_ROOM_RUNTIME_STATE_PATH: outputPath }), root);
+  const raw = fs.readFileSync(outputPath, 'utf8');
+  assert.ok(raw.endsWith('\n'), 'receipt must end in an actual newline');
+  assert.deepEqual(JSON.parse(raw), receipt);
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
 test('external state invalidation requires a fresh queue, non-secret epoch, and source', () => {
   const root = fixture();
   const valid = env({ GITHUB_EVENT_NAME: 'repository_dispatch', CONTROL_ROOM_EXTERNAL_STATE_ACTION: 'runtime_state_changed', CONTROL_ROOM_EXTERNAL_STATE_EPOCH: EPOCH, CONTROL_ROOM_EXTERNAL_STATE_SOURCE: 'cloudflare:project' });

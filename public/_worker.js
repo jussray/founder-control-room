@@ -13,6 +13,8 @@ const NON_RETRYABLE_GET_PATHS = new Set(['/auth/callback']);
 const API_OWNED_ASSET_PATHS = new Set([
   '/assets/auth-callback.js',
   '/assets/control-room.css',
+  '/assets/oauth-consent.js',
+  '/assets/oauth-consent.css',
 ]);
 const STATIC_EXACT_PATHS = new Set([
   '/products/business-leak-quickscan',
@@ -75,6 +77,9 @@ function createApiRequest(request) {
 
   if (!STATIC_METHODS.has(request.method) && request.body !== null) {
     init.body = request.body;
+    // A forwarded request carries a ReadableStream, not a fresh string body.
+    // Node's Request constructor and streaming fetch require half-duplex.
+    init.duplex = 'half';
   }
 
   return new Request(targetUrl, init);
@@ -299,6 +304,28 @@ export default {
     const requestUrl = new URL(request.url);
     if (requestUrl.origin === API_ORIGIN) {
       return new Response('Founder Control Room proxy loop blocked.', { status: 508 });
+    }
+
+    // OAuth consent and its API-owned assets travel through the same Pages
+    // browser origin as the __Host-fcr_session cookie and same-origin CSRF
+    // checks. They are served by FCR_API, never by public Pages ASSETS.
+
+    // Canonical founder OAuth/session origin is the apex Pages hostname.
+    // A www entry must move to apex *before* collecting pending auth state.
+    if (request.method === 'GET' &&
+        requestUrl.pathname === '/oauth/consent' &&
+        requestUrl.origin === 'https://www.foundercontrolroom.org') {
+      const destination = new URL('/oauth/consent', 'https://foundercontrolroom.org');
+      destination.search = requestUrl.search;
+      return new Response(null, {
+        status: 302,
+        headers: {
+          Location: destination.toString(),
+          'Cache-Control': 'no-store',
+          'Referrer-Policy': 'no-referrer',
+          'X-Robots-Tag': 'noindex, nofollow',
+        },
+      });
     }
 
     if (requestUrl.pathname === SYNC_CONTROL_ROUTE) {

@@ -54,6 +54,88 @@ describe('Cloudflare Pages edge proxy', () => {
     expect(fcrApiFetch).not.toHaveBeenCalled();
   });
 
+  it('proxies consent from Pages to FCR_API while retaining the browser host and session', async () => {
+    const handler = await loadHandler();
+    const assets = vi.fn(async () => new Response('wrong asset'));
+    const api = vi.fn(async (_request: Request) => identifiedResponse('API-rendered consent', { status: 200 }));
+    const response = await handler.fetch(
+      new Request('https://foundercontrolroom.org/oauth/consent?authorization_id=request_12345678', {
+        headers: { Cookie: '__Host-fcr_session=synthetic-session' },
+      }),
+      { ASSETS: { fetch: assets }, FCR_API: { fetch: api } },
+    );
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe('API-rendered consent');
+    expect(response.headers.get('location')).toBeNull();
+    expect(assets).not.toHaveBeenCalled();
+    expect(api).toHaveBeenCalledOnce();
+    const forwarded = api.mock.calls[0]?.[0];
+    expect(forwarded?.url).toBe('https://api.foundercontrolroom.org/oauth/consent?authorization_id=request_12345678');
+    expect(forwarded?.headers.get('cookie')).toBe('__Host-fcr_session=synthetic-session');
+    expect(forwarded?.headers.get('x-forwarded-host')).toBe('foundercontrolroom.org');
+  });
+
+  it('keeps the browser Origin and founder cookie for a proxied consent decision', async () => {
+    const handler = await loadHandler();
+    const assets = vi.fn(async () => new Response('wrong asset'));
+    const api = vi.fn(async (_request: Request) => identifiedResponse('{"ok":true}', { status: 200 }));
+    const response = await handler.fetch(
+      new Request('https://foundercontrolroom.org/auth/oauth/authorizations/request_12345678/consent', {
+        method: 'POST',
+        headers: {
+          Origin: 'https://foundercontrolroom.org',
+          Cookie: '__Host-fcr_session=synthetic-session',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ action: 'approve' }),
+      }),
+      { ASSETS: { fetch: assets }, FCR_API: { fetch: api } },
+    );
+    expect(response.status).toBe(200);
+    expect(assets).not.toHaveBeenCalled();
+    expect(api).toHaveBeenCalledOnce();
+    const forwarded = api.mock.calls[0]?.[0];
+    expect(forwarded?.headers.get('origin')).toBe('https://foundercontrolroom.org');
+    expect(forwarded?.headers.get('cookie')).toBe('__Host-fcr_session=synthetic-session');
+    expect(forwarded?.headers.get('x-forwarded-host')).toBe('foundercontrolroom.org');
+    expect(await forwarded?.text()).toBe(JSON.stringify({ action: 'approve' }));
+  });
+
+  it('normalizes www consent navigation to the apex founder session origin', async () => {
+    const handler = await loadHandler();
+    const assets = vi.fn(async () => new Response('unreachable'));
+    const api = vi.fn(async () => identifiedResponse('unreachable'));
+    const response = await handler.fetch(
+      new Request('https://www.foundercontrolroom.org/oauth/consent?authorization_id=request_12345678'),
+      { ASSETS: { fetch: assets }, FCR_API: { fetch: api } },
+    );
+    expect(response.status).toBe(302);
+    expect(response.headers.get('location')).toBe(
+      'https://foundercontrolroom.org/oauth/consent?authorization_id=request_12345678',
+    );
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(response.headers.get('referrer-policy')).toBe('no-referrer');
+    expect(response.headers.get('set-cookie')).toBeNull();
+    expect(assets).not.toHaveBeenCalled();
+    expect(api).not.toHaveBeenCalled();
+  });
+
+  it('routes consent JavaScript/CSS assets to API even when requested through Pages', async () => {
+    const handler = await loadHandler();
+    const assets = vi.fn(async () => new Response('wrong asset'));
+    const api = vi.fn(async () => identifiedResponse('api asset', { status: 200 }));
+    for (const path of ['/assets/oauth-consent.js', '/assets/oauth-consent.css']) {
+      const response = await handler.fetch(
+        new Request(`https://foundercontrolroom.org${path}`),
+        { ASSETS: { fetch: assets }, FCR_API: { fetch: api } },
+      );
+      expect(response.status).toBe(200);
+      expect(await response.text()).toBe('api asset');
+    }
+    expect(api).toHaveBeenCalledTimes(2);
+    expect(assets).not.toHaveBeenCalled();
+  });
+
   it('serves the portable founder console directory from Pages', async () => {
     const handler = await loadHandler();
     const assetFetch = vi.fn(async (_request: Request) => new Response('portable console', { status: 200 }));

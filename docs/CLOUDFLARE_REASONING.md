@@ -16,6 +16,13 @@ Goal → Reality → Redteam I → Lindy → L99 → Redteam II → OODA → Bil
 
 The engine is deterministic. It does not call a model, execute Wrangler, deploy a Worker, change DNS, rotate secrets, or roll back production.
 
+### External MCP deployment and identity proof
+
+The canonical FCR Worker is intended to serve `POST /mcp` as the Supabase OAuth-protected connector and `POST /mcp/read` as its exact-static-token compatibility alias. The repository's `wrangler.worker.toml` declares public-safe resource, issuer, audience, and scope configuration; `FCR_REMOTE_MCP_READ_TOKEN` remains a provider-held secret, never a source literal. The `founder_users` allowlist, server-owned project scope, consent, and redacted evidence persistence must remain independent of connector or browser identity.
+
+Treat a passing OAuth bootstrap or Playwright harness as candidate-source proof only. Before any production-ready claim, observe the current Cloudflare deployment and Worker bindings, confirm the OAuth provider consent and issued-token behavior, then exercise tools/list and an authorized read through the actual ChatGPT client with a durable redacted receipt. Missing or stale provider proof is `UNKNOWN/BLOCKED`, not success; publication, provider mutation, and deployment each require their separate approval gate.
+
+
 ## Why this exists
 
 A Cloudflare incident can present several facts that look contradictory:
@@ -263,3 +270,7 @@ npx playwright test e2e/cloudflare-reasoning.spec.ts
 ```
 
 The browser/API suite verifies the public-safe contract, founder protection, absence of credential leakage, presence of the implementation stack, and absence of an accidental deployment endpoint. Unit tests verify exact-commit reasoning, stale evidence, duplicate authority, authentication failures, runtime failure, rollback preparation, first-principles deletion/simplification output, and approval boundaries.
+
+## OAuth consent browser-origin boundary
+
+For an external connector's authorization request, the Pages edge redirects only www consent GET navigation to canonical `https://foundercontrolroom.org/oauth/consent`, preserving the query string. On the apex, Pages forwards the consent GET, API-owned assets, and protected consent POST through its existing `FCR_API` service binding without changing the browser origin. The browser's host-only founder cookie and same-tab authorization ID therefore remain on the configured Pages origin; the API service still performs authentication, CSRF enforcement, and the server-to-Supabase consent request. Pages must never serve the consent assets from public `ASSETS` or mint its own founder authority. Full acceptance requires current Supabase OAuth settings, Access routing readback, a real authenticated consent decision, and a subsequent scoped MCP tool receipt; source testing is not deployment proof.
