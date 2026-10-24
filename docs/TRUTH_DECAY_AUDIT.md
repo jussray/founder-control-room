@@ -1,5 +1,12 @@
 # Truth Decay Audit: When a True Claim Becomes Unsafe to Reuse
 
+## October 23, 2026: founder-dock boundary and renewed StoryEngine federation subject
+
+Source-level FCR Control Room navigation was visible outside the authenticated app root even when signed out. The candidate protects the navigation dock at first paint and derives visibility from the rendered authenticated shell, while retaining the public site and independent server authorization. Structural Design OS/Cowork tests can use explicitly labeled synthetic authenticated shell DOM; **only** the separate opaque-HttpOnly-cookie browser proof is relevant to authenticating real sessions. No source change is itself evidence of live production privacy.
+
+A later Playwright run failed because `.github/workflows/playwright.yml` still expected StoryEngine `26b1c34ae7c97c5d1b66a23d6345b3965cfcdc1f` while the separately observed StoryEngine `main` resolved to `be4fe1a006fcecdad077d5c3878cd76443274c65`. GitHub classified that change as ten commits strictly ahead. The candidate updates the immutable peer pin to the observed descendant but **must not** treat ancestor Playwright, StoryEngine checks, or Cloudflare build results as passing successor federation evidence. Exact-head CI and the full pinned peer runtime proof remain mandatory. This selection does not grant merge, deploy, publication, or provider-write authority.
+
+
 ## October 16, 2026: StoryEngine peer-identity renewal, without inherited proof
 
 FCR's new actual-server GitHub Workspace/browser test, full founder UI journey, capability workbench, and guarded terminal scenarios passed on the predecessor candidate while the separate FCR-to-StoryEngine test failed at the live peer-ref gate. The workflow expected StoryEngine `a6e6a396ed30535af2fd9b1ec2347a84e1a3fbf3` while independently observed `refs/heads/main` resolved to `26b1c34ae7c97c5d1b66a23d6345b3965cfcdc1f`. The former is not a current federation subject.
