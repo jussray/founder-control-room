@@ -20,6 +20,10 @@ const provenanceHardeningMigration = readFileSync(
   resolve(repositoryRoot, 'supabase/migrations/20260921052000_harden_founder_content_metric_provenance.sql'),
   'utf8',
 );
+const truthHardeningMigration = readFileSync(
+  resolve(repositoryRoot, 'supabase/migrations/20261024052500_harden_founder_content_metric_truth.sql'),
+  'utf8',
+);
 
 describe('founder content metrics migration contract', () => {
   it('keeps metrics persistence atomic with the metrics_synced lifecycle event', () => {
@@ -64,5 +68,24 @@ describe('founder content metrics migration contract', () => {
     expect(provenanceHardeningMigration).toContain("pg_catalog.length(provenance_entry.value #>> '{}') > 240");
     expect(provenanceHardeningMigration).toContain('pg_catalog.octet_length(p_provenance::text) <= 32768');
     expect(provenanceHardeningMigration).toMatch(/add constraint founder_content_metric_provenance_safe_check[\s\S]*check \(public\.founder_content_metric_provenance_is_safe\(provenance\)\)/i);
+  });
+
+  it('rejects empty database envelopes and canonicalizes founder identity', () => {
+    expect(truthHardeningMigration).toContain("jsonb_array_length(p_envelope->'observations') = 0");
+    expect(truthHardeningMigration).toContain('v_founder_user_id := btrim(p_founder_user_id)');
+    expect(truthHardeningMigration).toContain('founder_user_id = v_founder_user_id');
+  });
+
+  it('uses one canonical JSON serialization for database hashes', () => {
+    expect(truthHardeningMigration).toContain('public.founder_content_metric_canonical_jsonb');
+    expect(truthHardeningMigration).toContain('order by key collate "C"');
+    expect(truthHardeningMigration).toMatch(/extensions\.digest\(public\.founder_content_metric_canonical_jsonb\(jsonb_build_object\(/);
+  });
+
+  it('preserves actor audit for postless historical imports', () => {
+    expect(truthHardeningMigration).toContain('public.founder_content_metric_import_receipts');
+    expect(truthHardeningMigration).toContain('v_actor := coalesce');
+    expect(truthHardeningMigration).toContain('inserted_observations');
+    expect(truthHardeningMigration).toContain('envelope_sha256');
   });
 });
