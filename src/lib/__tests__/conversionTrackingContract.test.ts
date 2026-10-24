@@ -47,6 +47,22 @@ describe('portfolio conversion tracking contract', () => {
     }
   });
 
+  it('locks privacy normalization and business-action reliability', () => {
+    expect(contract.inputPolicy).toEqual({
+      rejectUnknownProjects: true,
+      stripPageQueryAndFragment: true,
+      rejectUnknownPagePaths: true,
+      ctaLocationServerBoundByEvent: true,
+      serviceContextServerBoundByProject: true,
+      apiOriginBoundByProject: true,
+    });
+    expect(contract.reliability.businessRedirectsSurviveStorageFailure).toBe(true);
+    expect(contract.reliability.apiStorageFailureStatus).toBe(503);
+    expect(worker).toContain('normalizePagePath');
+    expect(worker).toContain('storage_unavailable');
+    expect(worker).toContain('Analytics must never block the underlying customer business action');
+  });
+
   it('does not silently delete conversion history', () => {
     expect(contract.retention.automaticDeletionEnabled).toBe(false);
     expect(contract.retention.deletionRequiresExplicitFounderApproval).toBe(true);

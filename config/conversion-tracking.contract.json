@@ -50,7 +50,32 @@
         "whatsapp_click": "/pappa/whatsapp",
         "pickup_request": "/pappa/pickup",
         "directions_click": "/pappa/directions"
+      },
+      "allowedPagePaths": [
+        "/",
+        "/contact",
+        "/services",
+        "/pickup",
+        "/directions"
+      ],
+      "eventCtaLocations": {
+        "call_click": "primary_call",
+        "whatsapp_click": "primary_whatsapp",
+        "pickup_request": "pickup_cta",
+        "directions_click": "find_us"
       }
     }
+  },
+  "inputPolicy": {
+    "rejectUnknownProjects": true,
+    "stripPageQueryAndFragment": true,
+    "rejectUnknownPagePaths": true,
+    "ctaLocationServerBoundByEvent": true,
+    "serviceContextServerBoundByProject": true,
+    "apiOriginBoundByProject": true
+  },
+  "reliability": {
+    "businessRedirectsSurviveStorageFailure": true,
+    "apiStorageFailureStatus": 503
   }
 }

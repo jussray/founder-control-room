@@ -28,6 +28,8 @@ The collector intentionally does not store customer phone numbers, WhatsApp mess
 
 The Cloudflare runtime may necessarily receive network metadata while serving the request, but this contract does not persist those values into the conversion database.
 
+For the generic event API, project identity is allowlisted, Origin is bound to that project, page context is reduced to an allowlisted pathname with query/fragment removed, CTA location is server-bound to the event, and service context is server-bound to the project. Unknown routes or caller-selected metadata labels fail closed instead of being persisted.
+
 ## Provider implementation
 
 The bounded provider implementation is:
@@ -48,7 +50,7 @@ Pappa Razzy also has redirect helpers:
 - `/pappa/pickup`
 - `/pappa/directions`
 
-Those routes record the matching event and then redirect to the existing business action.
+Those routes attempt to record the matching event and then redirect to the existing business action. Analytics failure is non-blocking for the customer: a D1 outage must never prevent Call, WhatsApp, Pickup, or Directions from opening. The generic API still reports storage failure as HTTP 503 rather than pretending the event was accepted.
 
 ## Pappa Razzy site wiring
 
