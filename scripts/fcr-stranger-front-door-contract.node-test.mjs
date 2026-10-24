@@ -93,13 +93,28 @@ test('API exception policy is exact and excludes write-capable MCP from bypass',
     'api.foundercontrolroom.org',
   ]);
   assert.equal(accessPolicy.apiDefault, 'access_required');
-  assert.ok(accessPolicy.applicationAuthenticatedBypassPaths.includes('/mcp'));
-  assert.ok(accessPolicy.applicationAuthenticatedBypassPaths.includes('/mcp/read'));
+  // MCP protocol paths are reachable only through the public Pages service binding;
+  // they must not become direct API Cloudflare Access bypass destinations.
+  for (const protocolPath of [
+    '/mcp',
+    '/mcp/read',
+    '/mcp/founder-signal-x-engagement',
+    '/mcp/registry/v0.1/servers',
+    '/.well-known/oauth-protected-resource',
+    '/.well-known/oauth-protected-resource/mcp',
+  ]) {
+    assert.ok(accessPolicy.publicServiceBindingProtocolPaths.includes(protocolPath));
+    assert.ok(!accessPolicy.applicationAuthenticatedBypassPaths.includes(protocolPath));
+  }
+  assert.ok(
+    accessPolicy.applicationAuthenticatedBypassPaths.every(
+      (path) => !path.startsWith('/mcp') && !path.startsWith('/.well-known/oauth-protected-resource'),
+    ),
+  );
   assert.ok(accessPolicy.applicationAuthenticatedBypassPaths.includes('/ingest/jira-work-automation'));
   assert.ok(accessPolicy.applicationAuthenticatedBypassPaths.includes('/ingest/bip-control-room-proof'));
   assert.ok(!accessPolicy.applicationAuthenticatedBypassPaths.includes('/mcp/*'));
-  assert.ok(!accessPolicy.applicationAuthenticatedBypassPaths.includes('/mcp/founder-signal-engine'));
-  assert.ok(accessPolicy.applicationAuthenticatedBypassPaths.includes('/mcp/founder-signal-x-engagement'));
+  assert.ok(accessPolicy.serviceTokenProtectedPaths.includes('/mcp/founder-signal-engine'));
   assert.ok(!accessPolicy.serviceTokenProtectedPaths.includes('/mcp/founder-signal-x-engagement'));
 });
 
