@@ -240,6 +240,7 @@ export function normalizeFounderContentMetricsEnvelope(value: unknown): readonly
   const candidate = value as Record<string, unknown>;
   if (candidate.contract !== FOUNDER_CONTENT_METRICS_CONTRACT) reject(`provider data contract must equal ${FOUNDER_CONTENT_METRICS_CONTRACT}`);
   if (!Array.isArray(candidate.observations)) reject('provider data observations must be an array');
+  if (candidate.observations.length === 0) reject('provider data observations must contain at least one observation');
   if (candidate.observations.length > MAX_OBSERVATIONS) reject(`observations exceed ${MAX_OBSERVATIONS}`);
   const observations = candidate.observations.map((observation) => {
     if (!observation || typeof observation !== 'object' || Array.isArray(observation)) reject('each observation must be an object');
