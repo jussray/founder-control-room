@@ -61,6 +61,7 @@ The reasoner accepts sanitized, timestamped observations such as:
 - deployment authority (`native_git`, `token_upload`, or `manual`);
 - route and DNS state;
 - credential error codes without secret values;
+- a rollback-receipt artifact naming failed deploy-plane jobs and the expected head SHA, which never records secret values and neither performs nor proves a rollback;
 - desired commit and project identifiers.
 
 Raw provider payloads, tokens, private keys, service-role values, user content, and founder identity are outside the reasoning contract.
