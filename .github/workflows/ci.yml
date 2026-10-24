@@ -276,6 +276,32 @@ jobs:
         run: supabase db lint --local
         continue-on-error: true
 
+  production-dependencies:
+    name: Production dependencies
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          persist-credentials: false
+      - name: Verify exact head
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install exact lockfile
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Enforce shipped dependency graph
+        run: npm audit --omit=dev --audit-level=high
+
   required-gate:
     name: Required Gate
     if: ${{ always() }}
@@ -289,6 +315,7 @@ jobs:
       - test-discovery
       - documentation-truth
       - cloudflare-bridge-authority
+      - production-dependencies
     runs-on: ubuntu-latest
     steps:
       - name: Enforce load-bearing CI results
@@ -303,9 +330,10 @@ jobs:
           DISCOVERY_RESULT: ${{ needs.test-discovery.result }}
           DOCUMENTATION_TRUTH_RESULT: ${{ needs.documentation-truth.result }}
           CLOUDFLARE_AUTHORITY_RESULT: ${{ needs.cloudflare-bridge-authority.result }}
+          PRODUCTION_DEPENDENCIES_RESULT: ${{ needs.production-dependencies.result }}
         run: |
           set -euo pipefail
-          printf 'typecheck=%s\nlint=%s\ntest=%s\ne2e=%s\npython=%s\nrls=%s\ndiscovery=%s\ndocumentation_truth=%s\ncloudflare_authority=%s\n' \
+          printf 'typecheck=%s\nlint=%s\ntest=%s\ne2e=%s\npython=%s\nrls=%s\ndiscovery=%s\ndocumentation_truth=%s\ncloudflare_authority=%s\nproduction_dependencies=%s\n' \
             "$TYPECHECK_RESULT" \
             "$LINT_RESULT" \
             "$TEST_RESULT" \
@@ -325,7 +353,7 @@ jobs:
             "$RLS_RESULT" \
             "$DISCOVERY_RESULT" \
             "$DOCUMENTATION_TRUTH_RESULT" \
-            "$CLOUDFLARE_AUTHORITY_RESULT"; do
+            "$CLOUDFLARE_AUTHORITY_RESULT" \\\n            "$PRODUCTION_DEPENDENCIES_RESULT"; do
             if [ "$result" != "success" ]; then
               echo "Required Gate blocked: at least one load-bearing CI job is not successful."
               exit 1
