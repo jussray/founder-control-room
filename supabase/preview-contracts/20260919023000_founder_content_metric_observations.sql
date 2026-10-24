@@ -102,6 +102,16 @@ BEGIN
 END
 $$;
 
+-- The Neon preview branch is intentionally reusable across synchronize events.
+-- Clean only this contract's reserved fixture identity so a prior failed proof
+-- cannot create a false red or donate state to the successor proof.
+DELETE FROM public.founder_content_metric_observations
+ WHERE post_id = '11111111-1111-4111-8111-111111111111';
+DELETE FROM public.founder_content_post_events
+ WHERE post_id = '11111111-1111-4111-8111-111111111111';
+DELETE FROM public.founder_content_posts
+ WHERE post_id = '11111111-1111-4111-8111-111111111111';
+
 INSERT INTO public.founder_content_posts (
   post_id, founder_user_id, provider, account_id, content_hash
 ) VALUES (
