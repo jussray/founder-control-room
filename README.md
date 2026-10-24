@@ -481,3 +481,12 @@ Rebinding `.github/workflows/playwright.yml` to `3c1689fe67142e783fe7d18b5ff6106
 FCR carries a privacy-minimal portfolio conversion contract in [`docs/PORTFOLIO_CONVERSION_TRACKING.md`](docs/PORTFOLIO_CONVERSION_TRACKING.md). The first approved event set is `call_click`, `whatsapp_click`, `pickup_request`, and `directions_click`. The source contract forbids customer identity/device fields from the conversion table and keeps automatic deletion disabled unless the founder separately approves a retention policy.
 
 Provider configuration, site wiring, observed clicks, and commercial outcomes remain separate truth layers. The Cloudflare `jussco-conversions` Worker/D1 configuration is provider evidence only; it is not proof that a live portfolio site is sending events or that a sale occurred.
+
+
+## Sauce Guard + Source Guard — bounded source checks
+
+**Sauce Guard** is the existing founder-content protection workflow: evidence is reduced to a public-safe story, private implementation is withheld, claims receive temporal classification, and exact founder approval plus fresh provider readback remain separate requirements. Its governing source is [the Sauce Guard skill](.agents/skills/sauce-guard/SKILL.md); see [Sauce Guard documentation](docs/SAUCE_GUARD.md).
+
+**Source Guard** adds read-only repository checks for the documented guard boundaries and the portfolio conversion-tracking data contract. See [Source Guard documentation](docs/SOURCE_GUARD.md), scripts/verify-sauce-source-guard.mjs, the Node regression tests, and the separate GitHub Actions workflow. Source Guard complements, but does not replace, [Documentation Truth](.github/workflows/documentation-truth.yml).
+
+**Truth boundary:** checked-in policy and tests are source evidence only. A passing workflow does **not** establish that public content was approved or published, that the collector receives real site traffic, or that live security/runtime controls operate correctly. No new deploy, merge, publication, provider-mutation or deletion authority is granted.
