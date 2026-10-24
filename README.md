@@ -435,6 +435,10 @@ An exact StoryEngine ref/pin match renews only the peer-identity prerequisite; a
 
 The AI Failure Repair workflow stores its bounded evidence under `.repair/`, a hidden directory. Every `actions/upload-artifact` step that uploads that evidence must explicitly include hidden files; otherwise the upload can fail even when evidence capture succeeded. Artifact transport is part of repair evidence integrity and does not grant merge, deploy, publication, provider, or production authority.
 
+## Se’kret Bip front-door adapter refresh — October 24, 2026
+
+The read-only Se’kret Bip project adapter now stages an audit against independently observed Se’kret Bip `main` at exact source `e3b6a3a36737f3c1d24c37fd2842ee6d7bf97150`. Comparing all seven required contract paths against the previous audited head `be6db16b248ec32048d8ff71c46dd2052d021443` showed exactly one changed blob: `screens/WebWelcomeScreen.tsx` now `9d3a1128d09d47f3e9b4eb5d8f3da5f3dbe2709c`. The screen stages Teen and Bip Jr artwork after image readiness and respects reduced-motion preferences while preserving Night, Suhana, Sy, and Cloud in the existing composite, the two audience-to-account-side mappings, and non-executing preview-only authority. The original seven-path contract still binds this adapter; motion implementation/tests are separately inspected supporting context, not an expansion of authority. This source audit does not prove live browser delivery, deployment, or any provider write. Any movement of Se’kret Bip `main` requires a fresh blob readback before accepting FCR freshness.
+
 ## Chief adapter exact-head truth
 
 `src/founder-os-lab/projectAdapters.ts` binds Chief integration evidence to one audited exact Chief head. Moving that pin is an evidence-authority transition: the same change must refresh this README, `docs/TRUTH_DECAY_AUDIT.md`, and `docs/DOCUMENTATION_TRUTH_RECEIPT.json`, and the successor FCR head must earn its own adapter, pair-contract, CI, and applicable runtime/browser proof. Pin alignment selects the next evidence subject only; it does not prove Chief deployment, served-MCP reachability, production behavior, merge authority, or deploy authority.
