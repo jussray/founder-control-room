@@ -5,7 +5,8 @@
   const founderPanel = document.querySelector('[data-view-panel="founder"]');
   const userNav = document.querySelector('[data-user-nav]');
   const founderNav = document.querySelector('[data-founder-nav]');
-  if (tabs.length !== 2 || !userPanel || !founderPanel || !userNav || !founderNav) return;
+  const publicIntro = document.querySelector('[data-public-intro]');
+  if (tabs.length !== 2 || !userPanel || !founderPanel || !userNav || !founderNav || !publicIntro) return;
 
   const founderHashes = new Set(['#founder', '#dashboard', '#projects', '#proof', '#community-f', '#automations']);
   const viewForHash = () => founderHashes.has(window.location.hash.toLowerCase()) ? 'founder' : 'user';
@@ -14,6 +15,7 @@
     const isFounder = view === 'founder';
     userPanel.hidden = isFounder;
     founderPanel.hidden = !isFounder;
+    publicIntro.hidden = isFounder;
     userNav.hidden = isFounder;
     founderNav.hidden = !isFounder;
     for (const tab of tabs) {
