@@ -6,8 +6,11 @@
  * that the constraint declarations do not conflict with the release tuple.
  */
 
-const fs = require('fs');
-const path = require('path');
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const manifest = JSON.parse(fs.readFileSync(path.join(__dirname, '../releases/portfolio-v0.1.0.json'), 'utf8'));
 
@@ -23,7 +26,8 @@ for (const [logicalName, repoPath] of Object.entries(repos)) {
   const peerFile = path.join(repoPath, '.peer-dependencies.json');
 
   if (!fs.existsSync(peerFile)) {
-    console.warn(`⚠ ${logicalName}: no .peer-dependencies.json found at ${peerFile}`);
+    console.error(`✗ ${logicalName}: missing required peer contract`);
+    passed = false;
     continue;
   }
 
