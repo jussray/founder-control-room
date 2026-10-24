@@ -155,19 +155,30 @@ export async function runGovernedReadOnlyAttempt(
     };
   }
 
-  const witness = input.witness ? await input.witness(receipt) : undefined;
+  let witness: GovernedExecutionWitness | undefined;
+  try {
+    witness = input.witness ? await input.witness(receipt) : undefined;
+  } catch {
+    return {
+      state: evaluateGovernedExecutionOutcome(receipt),
+      decision,
+      receipt,
+      reason: 'Witness collection failed; without FCR-owned witness authority, execution truth remains bound to the receipt only.',
+    };
+  }
+
   const outcome = evaluateGovernedExecutionOutcome(
     receipt,
     witness,
     input.minimumWitnessStrength ?? 'W1',
   );
 
-  if (outcome === 'VERIFIED') {
+  if (outcome === 'VERIFIED' || outcome === 'CONTRADICTED') {
     return {
-      state: 'EXECUTED_UNVERIFIED',
+      state: evaluateGovernedExecutionOutcome(receipt),
       decision,
       receipt,
-      reason: 'Witness independence is not yet structurally bound to an FCR-owned authority source in this donor-runtime seam; caller-supplied witness evidence cannot promote execution truth to VERIFIED.',
+      reason: 'Witness independence is not yet structurally bound to an FCR-owned authority source in this donor-runtime seam; caller-supplied witness evidence cannot promote or contradict execution truth.',
     };
   }
 
