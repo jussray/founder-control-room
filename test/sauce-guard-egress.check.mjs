@@ -45,3 +45,31 @@ test('established PR/push CI job executes Sauce Guard tests and blocks dynamic l
   assert.ok(workflow.includes('node scripts/verify-sauce-guard-egress.mjs --base='));
   assert.ok(workflow.includes('SAUCE_GUARD_BASE_SHA'));
 });
+
+test('detects split sink names, multiline arguments and changes within a logger call', () => {
+  for (const text of [
+    'console\n  .log(customerId);',
+    'console.log(\n  providerResponse\n);',
+    'logger.error(\n  privateInput\n);',
+  ]) {
+    const diff = '+++ b/src/route.ts\n@@ -1,0 +2,1 @@\n+' + text.split('\n')[1] + '\n';
+    assert.equal(scanAddedLines(diff, { 'src/route.ts': text }).length, 1, text);
+  }
+});
+
+test('accepts fixed events in inline conditionals or with comments', () => {
+  for (const src of [
+    "if (!ready) console.warn('SAUCE_GUARD_BLOCKED'); // fixed",
+    "console.error(\n 'SAUCE_GUARD_BLOCKED'\n);",
+  ]) {
+    const diff = '+++ b/src/status.ts\n@@ -1,0 +1,1 @@\n+' + src.split('\n')[0] + '\n';
+    assert.deepEqual(scanAddedLines(diff, { 'src/status.ts': src }), []);
+  }
+});
+
+test('checks deployed plugin logging, but ignores commented logger text', () => {
+  const p = 'plugins/proofmode/src/github-client.js';
+  const diff = '+++ b/' + p + '\n@@ -1,0 +1,1 @@\n+console.error(providerBody);\n';
+  assert.equal(scanAddedLines(diff, { [p]: 'console.error(providerBody);' }).length, 1);
+  assert.deepEqual(scanAddedLines('+++ b/src/feature.ts\n@@ -1,0 +1,1 @@\n+// console.log(secret);\n'), []);
+});
