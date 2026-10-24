@@ -48,7 +48,14 @@ async function serveControlRoomAsset(req, res, pathname) {
 
   if (relative === 'control-room/app.js') {
     res.writeHead(200, { 'Content-Type': 'text/javascript; charset=utf-8' });
-    res.end('// Focused readiness proof: SPA bootstrap intentionally omitted.');
+    res.end(`
+      const root = document.getElementById('root');
+      let founder = null;
+      try { founder = JSON.parse(sessionStorage.getItem('fcr_session') || 'null'); } catch {}
+      root.innerHTML = founder?.email
+        ? '<div class="shell" data-focused-proof-shell>Authenticated founder shell</div>'
+        : '<div class="sign-in-wrap" data-focused-proof-sign-in>Founder sign in</div>';
+    `);
     return;
   }
 
@@ -136,13 +143,6 @@ const context = await browser.newContext({
   isMobile: true,
   hasTouch: true,
 });
-await context.addCookies([{
-  name: SESSION_COOKIE,
-  value: SESSION_VALUE,
-  url: baseUrl,
-  httpOnly: true,
-  sameSite: 'Strict',
-}]);
 const page = await context.newPage();
 
 async function expectReadiness(state, label) {
@@ -166,8 +166,40 @@ async function refreshDock() {
   await dock.click();
 }
 
+async function expectDockVisibility(expectedVisible) {
+  const dock = page.locator('.launch-dock');
+  await page.waitForFunction(
+    (visible) => {
+      const element = document.querySelector('.launch-dock');
+      return element instanceof HTMLDetailsElement
+        && element.hidden === !visible
+        && element.getAttribute('aria-hidden') === (visible ? 'false' : 'true');
+    },
+    expectedVisible,
+  );
+  assert.equal(await dock.isVisible(), expectedVisible);
+}
+
 try {
   await page.goto(`${baseUrl}/control-room/`, { waitUntil: 'domcontentloaded' });
+  await page.locator('[data-focused-proof-sign-in]').waitFor({ state: 'visible' });
+  await expectDockVisibility(false);
+  assert.equal(
+    await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+    true,
+    'signed-out mobile Control Room must not gain horizontal overflow from the founder dock',
+  );
+
+  await context.addCookies([{
+    name: SESSION_COOKIE,
+    value: SESSION_VALUE,
+    url: baseUrl,
+    httpOnly: true,
+    sameSite: 'Strict',
+  }]);
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.locator('[data-focused-proof-shell]').waitFor({ state: 'visible' });
+  await expectDockVisibility(true);
 
   // The readiness badge intentionally lives inside the closed founder-stack dock.
   // Open the real dock first, which also triggers a fresh authenticated readiness read.
@@ -244,18 +276,26 @@ try {
   await page.locator('[data-testid="genesis-demo"]').waitFor({ state: 'visible' });
   assert.match(await page.locator('[data-testid="authority-boundary"]').innerText(), /demo provenance only/i);
 
+  await context.clearCookies();
+  await page.goto(`${baseUrl}/control-room/`, { waitUntil: 'domcontentloaded' });
+  await page.locator('[data-focused-proof-sign-in]').waitFor({ state: 'visible' });
+  await expectDockVisibility(false);
+
   console.log(JSON.stringify({
     ok: true,
     route: '/control-room/',
     viewport: '390x844',
     contract: CONTRACT,
     provedStates: [
+      'signed-out:dock-hidden',
+      'authenticated:dock-visible',
       'ready-for-probe',
       'enabled-awaiting-proof:not-observed',
       'enabled-awaiting-proof:stale-head',
       'enabled-awaiting-proof:readback-unavailable',
       'enabled-live-verified',
       'not-configured',
+      'signed-out-again:dock-hidden',
     ],
     browserAuthority: 'opaque-http-only-cookie',
     bearerAuthorizationObserved: false,
