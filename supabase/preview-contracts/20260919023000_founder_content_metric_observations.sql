@@ -192,8 +192,8 @@ BEGIN
    WHERE post_id = '11111111-1111-4111-8111-111111111111'
      AND event_type = 'metrics_csv_imported';
 
-  IF event_count <> 2 THEN
-    RAISE EXCEPTION 'each accepted import attempt must retain its lifecycle receipt; event_count=%', event_count;
+  IF event_count <> 1 THEN
+    RAISE EXCEPTION 'exact retry must not duplicate the lifecycle receipt; event_count=%', event_count;
   END IF;
 
   BEGIN

@@ -141,6 +141,12 @@ begin
     raise exception 'FOUNDER_CONTENT_POST_NOT_FOUND';
   end if;
 
+  -- Serialize all metric imports for the same post. This keeps exact retries
+  -- and conflicting evidence deterministic even when two backend workers race.
+  perform pg_catalog.pg_advisory_xact_lock(
+    pg_catalog.hashtextextended(p_post_id::text, 0)
+  );
+
   for item in select value from jsonb_array_elements(p_observations)
   loop
     observation_count := observation_count + 1;
@@ -317,29 +323,38 @@ begin
     end if;
   end loop;
 
-  insert into public.founder_content_post_events (
-    post_id,
-    founder_user_id,
-    event_type,
-    actor,
-    payload,
-    observed_at
-  ) values (
-    p_post_id,
-    post_row.founder_user_id,
-    'metrics_csv_imported',
-    'fcr:metrics-csv-import',
-    jsonb_build_object(
-      'contract', 'content-metrics-csv@v1',
-      'authority', 'observation_only',
-      'import_fingerprint', btrim(p_import_fingerprint),
-      'normalized_row_count', observation_count,
-      'inserted_row_count', inserted_count,
-      'existing_row_count', existing_count,
-      'latest_observed_at', latest_observed_at
-    ),
-    p_imported_at
-  );
+  if not exists (
+    select 1
+      from public.founder_content_post_events e
+     where e.post_id = p_post_id
+       and e.founder_user_id = post_row.founder_user_id
+       and e.event_type = 'metrics_csv_imported'
+       and e.payload->>'import_fingerprint' = btrim(p_import_fingerprint)
+  ) then
+    insert into public.founder_content_post_events (
+      post_id,
+      founder_user_id,
+      event_type,
+      actor,
+      payload,
+      observed_at
+    ) values (
+      p_post_id,
+      post_row.founder_user_id,
+      'metrics_csv_imported',
+      'fcr:metrics-csv-import',
+      jsonb_build_object(
+        'contract', 'content-metrics-csv@v1',
+        'authority', 'observation_only',
+        'import_fingerprint', btrim(p_import_fingerprint),
+        'normalized_row_count', observation_count,
+        'inserted_row_count', inserted_count,
+        'existing_row_count', existing_count,
+        'latest_observed_at', latest_observed_at
+      ),
+      p_imported_at
+    );
+  end if;
 
   return jsonb_build_object(
     'contract', 'fcr/founder-content-metric-observation-store@v1',

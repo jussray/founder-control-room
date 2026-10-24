@@ -134,6 +134,8 @@ describe('founder content metric observation store', () => {
     expect(sql).toContain('grant execute on function public.ingest_founder_content_metric_observations');
     expect(sql).toContain('FOUNDER_CONTENT_METRICS_POST_IDENTITY_MISMATCH');
     expect(sql).toContain('FOUNDER_CONTENT_METRICS_CONFLICT');
+    expect(sql).toContain('pg_catalog.pg_advisory_xact_lock');
+    expect(sql).toContain("e.payload->>'import_fingerprint' = btrim(p_import_fingerprint)");
     expect(sql).toContain("'metrics_csv_imported'");
     expect(sql).not.toContain('raw_csv');
     expect(sql).not.toContain('p_csv');
