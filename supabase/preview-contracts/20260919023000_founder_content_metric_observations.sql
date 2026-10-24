@@ -122,6 +122,7 @@ INSERT INTO public.founder_content_posts (
   'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
 );
 
+GRANT service_role TO CURRENT_USER;
 SET ROLE service_role;
 
 SELECT public.ingest_founder_content_metric_observations(
@@ -179,8 +180,9 @@ SELECT public.ingest_founder_content_metric_observations(
 ) AS retry_receipt;
 
 RESET ROLE;
+REVOKE service_role FROM CURRENT_USER;
 
-DO $$
+DO $
 DECLARE
   metric_count integer;
   event_count integer;
