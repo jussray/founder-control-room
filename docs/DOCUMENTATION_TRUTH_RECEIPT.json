@@ -324,6 +324,19 @@
       "claims": [
         "`tools/zapier/founder-content-outcome-contract.cjs` must bind founder-content metrics to the exact observed network, lane, account identity, connector identity, and coverage state; out-of-scope metrics must remain UNKNOWN, cross-account metric donation is forbidden, and these receipts can never grant publication, provider-write, merge, deploy, spend, or external-contact authority."
       ]
+    },
+    {
+      "path": ".github/workflows/pr-continuity.yml",
+      "claims": [
+        "`.github/workflows/pr-continuity.yml` must trigger read-only exact-head continuity audit and trusted metadata refresh on `auto_merge_enabled` and `auto_merge_disabled` events without enabling, merging, deploying, or widening authority. GitHub native Auto-merge may integrate only after the live provider's configured required checks, tests, reviews and protections succeed; optional checks require explicit provider required-check configuration to block.",
+        "`.github/workflows/pr-continuity.yml` must keep the metadata reader on default-branch trusted code and preserve the existing event-permission floor. Queue observation is not exact-candidate founder-final approval; conflicts, stale refs, missing authority, or unverified provider rules must never be represented as merge-authorized."
+      ]
+    },
+    {
+      "path": "scripts/pr-continuity.mjs",
+      "claims": [
+        "`scripts/pr-continuity.mjs` must classify provider-observed auto_merge as QUEUED, NOT_QUEUED, or UNKNOWN, include it in non-authorizing continuity receipts, and never infer merge_approved or authorizes_merge from a native auto-merge click. GitHub must remain the only actor performing the eventual merge after configured live required gates, and FCR's exact-candidate founder-final contract must remain separate."
+      ]
     }
   ]
 }
