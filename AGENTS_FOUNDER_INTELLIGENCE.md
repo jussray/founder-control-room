@@ -1,5 +1,14 @@
 # Founder Intelligence Agent Entry Point
 
+## Mandatory founder Sauce Guard (all contributors and agents)
+
+**Always read and apply the canonical founder-owned skill** `jussray/founder-control-room/.agents/skills/sauce-guard/SKILL.md` before any externally visible update, publication, outreach, progress claim, shared screenshot, link, evidence summary, or outgoing content derived from internal product work. This repository owns the skill; keep its source canonical. All humans, coding agents, reviewers, and automated contributors inherit this rule, including delegated subagents.
+
+**Public egress:** verify proof for CURRENT claims; mark historical evidence accurately; hold STALE / UNKNOWN assertions; omit proprietary prompts, internal mechanics, unapproved metrics, private user/teen/customer data, secrets, raw diffs, and provider payloads. **Current You** must approve the exact executable copy; FCR revalidates and **provider readback** is required before claiming it was published. Missing skill, approval, or evidence means HOLD.
+
+**Log egress:** use fixed uppercase event codes rather than untrusted exception messages, user IDs, credentials, raw response bodies or payloads at logger sinks. `scripts/verify-sauce-guard-egress.mjs` rejects newly added dynamic logs in CI. This changed-line scanner does not certify all inherited logs or replace Sauce Guard publication approval; do not bypass either gate to turn CI green.
+
+
 Every AI agent working in this repository must read and apply [`docs/FOUNDER_INTELLIGENCE_CONSTITUTION.md`](docs/FOUNDER_INTELLIGENCE_CONSTITUTION.md) before material planning, implementation, review, automation, publishing, deployment, migration, or cross-repository coordination.
 
 For portfolio or cross-repository work, also read [`config/founder-intelligence.inheritance.json`](config/founder-intelligence.inheritance.json) and [`docs/FCR_SINGLE_OS_COHESION_AUDIT.md`](docs/FCR_SINGLE_OS_COHESION_AUDIT.md). The registry records which active repositories fully load this constitution, which are only partially linked, and the exact focused repair still needed. The cohesion audit enforces Founder Control Room as the single founder operating system: internal subsystems and future add-ons must extend the shared founder-intent, authority, evidence, outcome, and next-gate loop rather than creating a competing operating system. Registry and cohesion classifications are instruction evidence only, not runtime or outcome proof.
