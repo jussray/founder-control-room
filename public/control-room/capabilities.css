@@ -6,3 +6,6 @@
 /* Keep mobile content intrinsically shrinkable: long code identifiers and implementation snippets must not expand the page. */
 @media(max-width:900px){.workspace{grid-template-columns:minmax(0,1fr)}.results,.detail,.detail-head>div,.implementation{min-width:0;max-width:100%}.detail code{overflow-wrap:anywhere}.contract>div{min-width:0}pre{max-width:100%}}
 @media(max-width:560px){.contract>div{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}}
+
+/* Mobile proof copy may contain long opaque provider identifiers; shrink the flex child and wrap without clipping evidence. */
+@media(max-width:560px){.proof>div{width:100%;min-width:0;max-width:100%}.proof h2,.proof p{max-width:100%;overflow-wrap:anywhere;word-break:break-word}}
