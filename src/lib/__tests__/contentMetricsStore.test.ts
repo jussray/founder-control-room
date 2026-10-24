@@ -125,8 +125,13 @@ describe('founder content metric observation store', () => {
     expect(sql).toContain('create table if not exists public.founder_content_metric_observations');
     expect(sql).toContain('references public.founder_content_posts(post_id) on delete cascade');
     expect(sql).toContain('enable row level security');
-    expect(sql).toContain('grant select, insert on table public.founder_content_metric_observations to service_role');
-    expect(sql).toContain('revoke update, delete on table public.founder_content_metric_observations from service_role');
+    expect(sql).toContain('revoke all on table public.founder_content_metric_observations from public, anon, authenticated, service_role');
+    expect(sql).toContain('grant select on table public.founder_content_metric_observations to service_role');
+    expect(sql).not.toContain("auth.role()");
+    expect(sql).toContain('security definer');
+    expect(sql).toContain('set search_path = pg_catalog');
+    expect(sql).toContain('from public, anon, authenticated, service_role');
+    expect(sql).toContain('grant execute on function public.ingest_founder_content_metric_observations');
     expect(sql).toContain('FOUNDER_CONTENT_METRICS_POST_IDENTITY_MISMATCH');
     expect(sql).toContain('FOUNDER_CONTENT_METRICS_CONFLICT');
     expect(sql).toContain("'metrics_csv_imported'");

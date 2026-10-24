@@ -67,15 +67,12 @@ create index if not exists founder_content_metric_observations_founder_metric_id
 alter table public.founder_content_metric_observations enable row level security;
 drop policy if exists founder_content_metric_observations_service_role_only
   on public.founder_content_metric_observations;
-create policy founder_content_metric_observations_service_role_only
-  on public.founder_content_metric_observations
-  for all
-  using (auth.role() = 'service_role')
-  with check (auth.role() = 'service_role');
 
-revoke all on table public.founder_content_metric_observations from public, anon, authenticated;
-grant select, insert on table public.founder_content_metric_observations to service_role;
-revoke update, delete on table public.founder_content_metric_observations from service_role;
+-- No browser/client policy is installed. The service role bypasses RLS in the
+-- trusted backend, but direct mutation remains revoked so the atomic intake RPC
+-- is the only write boundary.
+revoke all on table public.founder_content_metric_observations from public, anon, authenticated, service_role;
+grant select on table public.founder_content_metric_observations to service_role;
 
 comment on table public.founder_content_metric_observations is
   'Append-only normalized founder-content metric observations. Observation evidence only; never publication, scheduling, strategy, provider-write, merge, deploy, or freshness authority.';
@@ -361,7 +358,7 @@ $function$;
 
 revoke all on function public.ingest_founder_content_metric_observations(
   text, uuid, jsonb, text, timestamptz
-) from public, anon, authenticated;
+) from public, anon, authenticated, service_role;
 grant execute on function public.ingest_founder_content_metric_observations(
   text, uuid, jsonb, text, timestamptz
 ) to service_role;

@@ -142,6 +142,20 @@ export {
 } from './contentTrendRadar.js';
 
 export {
+  evaluateYouTubeGrowthLoop,
+  type YouTubeDiagnosticThresholds,
+  type YouTubeGrowthDiagnosis,
+  type YouTubeGrowthExperiment,
+  type YouTubeGrowthLoopInput,
+  type YouTubeGrowthLoopReason,
+  type YouTubeGrowthLoopResult,
+  type YouTubeGrowthPhase,
+  type YouTubeMeasurement,
+  type YouTubeMetricKey,
+  type YouTubeSuccessCriterion,
+} from './youtubeGrowthLoop.js';
+
+export {
   evaluateAuthorityLease,
   type AuthorityBinding,
   type AuthorityConsequence,

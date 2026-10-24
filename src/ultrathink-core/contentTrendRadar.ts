@@ -140,7 +140,10 @@ function evidenceProvenanceReasons(
     context.maxEvidenceAgeMs,
     DEFAULT_MAX_EVIDENCE_AGE_MS,
   );
-  const futureSkewMs = positiveFinite(context.futureSkewMs, DEFAULT_FUTURE_SKEW_MS);
+  const futureSkewMs = Math.min(
+    positiveFinite(context.futureSkewMs, DEFAULT_FUTURE_SKEW_MS),
+    DEFAULT_FUTURE_SKEW_MS,
+  );
   const reasons = new Set<TrendRadarReason>();
   let hasCurrentProvenance = false;
 

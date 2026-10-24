@@ -23,6 +23,7 @@ main moves -> trusted main reacquires open PR graph -> same-repo branches roll f
 11. Write authority runs only from trusted `main`; PR-head code receives read-only continuity verification.
 12. Moving the managed block to the top is a truth-ordering operation only. It never converts source ancestry into runtime, provider, review, Playwright, merge-approval, or deploy proof.
 13. Rollover receipts must expose `blockedByState` plus individual `failureReceipts`. When one GitHub response contains multiple repository-rule violations, each material condition gets its own receipt entry so one blocker cannot hide or stand in for another.
+14. A push-level rollover observer may report successful execution after it has durably recorded a known blocked open-PR graph. That operational success means only that the observation and receipt succeeded. The aggregate receipt remains `BLOCKED_PR_DEBT`, and every affected PR remains fail-closed until its own current-head continuity and exact-head proof gates pass. Unknown errors, GitHub API failures, missing/malformed receipts, and unclassified rollover failures still fail the observer.
 
 ## Machine current truth precedence
 
@@ -59,7 +60,7 @@ This removes the ambiguity where stale prose could visually outrank a fresh mach
 - `BLOCKED_PROVIDER_FORBIDDEN` for other 403 provider refusals; and
 - `BLOCKED_PROVIDER_REJECTED` for otherwise unclassified 422 validation/update rejections.
 
-The aggregate rollover remains blocked while any of those states exist. More precise receipts do not turn a blocker green, weaken repository rules, grant branch-update authority, or erase the provider's original message.
+The aggregate rollover remains blocked while any of those states exist. More precise receipts do not turn a blocker green, weaken repository rules, grant branch-update authority, or erase the provider's original message. On trusted `main`, the push-level observer may still complete successfully after recording that blocked aggregate as `BLOCKED_PR_DEBT`; this distinguishes a truthful blocked PR graph from a broken observer. Individual PR continuity gates remain strict and do not inherit that operational success.
 
 ## Founder Control Room boundary
 
@@ -67,4 +68,4 @@ Founder Control Room remains the authority/evidence boundary. Continuity may rol
 
 ## Attack 20
 
-`test/pr-continuity.attack20.test.mjs` attacks ancestry, divergence, unknown state, TOCTOU, forks, machine-truth ordering, human-body preservation, malformed markers, proof-subject binding, authority/approval separation, stacked propagation, unrelated stacks, cycles, and provider-failure separation before any write step.
+`test/pr-continuity.attack20.test.mjs` attacks ancestry, divergence, unknown state, TOCTOU, forks, machine-truth ordering, human-body preservation, malformed markers, proof-subject binding, authority/approval separation, stacked propagation, unrelated stacks, cycles, and provider-failure separation before any write step. `test/pr-continuity.rollover-observation.test.mjs` separately verifies that known, receipted PR debt can be reported without disguising operational failures or weakening strict per-PR continuity.

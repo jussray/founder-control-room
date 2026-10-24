@@ -22,6 +22,217 @@ jobs:
        github.event.action == 'reopened' ||
        github.event.action == 'synchronize')
     runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Check out exact PR head for scope and migration proof
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Classify Neon preview scope
+        id: neon_scope
+        shell: bash
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
+
+          live_base_sha="$(git ls-remote --heads origin "refs/heads/${BASE_REF}" | awk 'NR == 1 {print $1}')"
+          if [[ ! "$live_base_sha" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error title=Live base resolution failed::Could not resolve a 40-character SHA for ${BASE_REF}."
+            exit 1
+          fi
+
+          git fetch --no-tags origin "$live_base_sha"
+          if ! git merge-base --is-ancestor "$live_base_sha" "$EXPECTED_HEAD_SHA"; then
+            echo "::error title=Stale PR ancestry::Exact PR head has not incorporated live ${BASE_REF}@${live_base_sha}."
+            exit 1
+          fi
+
+          mapfile -t CHANGED_FILES < <(
+            git diff --name-only "$live_base_sha" "$EXPECTED_HEAD_SHA"
+          )
+
+          NEEDS_NEON=false
+          for path in "${CHANGED_FILES[@]}"; do
+            case "$path" in
+              supabase/*)
+                NEEDS_NEON=true
+                break
+                ;;
+            esac
+          done
+
+          echo "live_base_sha=${live_base_sha}" >> "$GITHUB_OUTPUT"
+          echo "needs_neon=${NEEDS_NEON}" >> "$GITHUB_OUTPUT"
+          if [ "$NEEDS_NEON" = "true" ]; then
+            echo 'Supabase change detected against live base; Neon preview branch is required.'
+          else
+            echo 'No supabase/ change detected against live base; Neon preview branch is not required.'
+          fi
+
+      - name: Record non-database no-op
+        if: steps.neon_scope.outputs.needs_neon == 'false'
+        shell: bash
+        run: echo 'Neon preview skipped because this PR does not change supabase/ against live base.'
+
+      - name: Validate Neon configuration
+        if: steps.neon_scope.outputs.needs_neon == 'true'
+        shell: bash
+        env:
+          NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID }}
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$NEON_PROJECT_ID" || { echo 'NEON_PROJECT_ID is not configured' >&2; exit 1; }
+          test -n "$NEON_API_KEY" || { echo 'NEON_API_KEY is not configured' >&2; exit 1; }
+
+      - name: Set branch expiration
+        if: steps.neon_scope.outputs.needs_neon == 'true'
+        shell: bash
+        run: echo "EXPIRES_AT=$(date -u --date '+14 days' +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_ENV"
+
+      - name: Create Neon Branch
+        if: steps.neon_scope.outputs.needs_neon == 'true'
+        id: create_neon_branch
+        uses: neondatabase/create-branch-action@fb620d43d4c565abaf088b848a4e28e5c4ea4d9c # v6
+        with:
+          project_id: ${{ vars.NEON_PROJECT_ID }}
+          branch_name: preview/pr-${{ github.event.number }}
+          api_key: ${{ secrets.NEON_API_KEY }}
+          expires_at: ${{ env.EXPIRES_AT }}
+
+      - name: Verify branch creation result
+        if: steps.neon_scope.outputs.needs_neon == 'true'
+        shell: bash
+        env:
+          NEON_BRANCH_ID: ${{ steps.create_neon_branch.outputs.branch_id }}
+          NEON_DB_URL: ${{ steps.create_neon_branch.outputs.db_url }}
+        run: |
+          set -euo pipefail
+          test -n "$NEON_BRANCH_ID" || { echo 'Neon create action returned no branch_id' >&2; exit 1; }
+          test -n "$NEON_DB_URL" || { echo 'Neon create action returned no database URL' >&2; exit 1; }
+          echo 'Neon branch identity and private database URL output are present. URL value was not printed.'
+
+      - name: Verify exact PR head
+        if: steps.neon_scope.outputs.needs_neon == 'true'
+        shell: bash
+        env:
+          EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
+
+      - name: Execute added migrations on Neon preview
+        if: steps.neon_scope.outputs.needs_neon == 'true'
+        shell: bash
+        env:
+          LIVE_BASE_SHA: ${{ steps.neon_scope.outputs.live_base_sha }}
+          EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          NEON_DB_URL: ${{ steps.create_neon_branch.outputs.db_url }}
+        run: |
+          set -euo pipefail
+
+          MIGRATIONS=()
+          while IFS=$'\t' read -r status migration; do
+            [ -n "$status" ] || continue
+            if [ "$status" != "A" ]; then
+              echo "::error title=Migration history rewrite is not preview-safe::${status} ${migration}"
+              exit 1
+            fi
+            MIGRATIONS+=("$migration")
+          done < <(
+            git diff --name-status --no-renames "$LIVE_BASE_SHA" "$EXPECTED_HEAD_SHA" -- 'supabase/migrations/*.sql'
+          )
+
+          if (( ${#MIGRATIONS[@]} == 0 )); then
+            echo 'Supabase scope changed but no added SQL migration was found.'
+            exit 0
+          fi
+
+          IFS=$'\n' MIGRATIONS=($(printf '%s\n' "${MIGRATIONS[@]}" | sort))
+          unset IFS
+
+          # The preview branch is reused across synchronize events. Keep an
+          # isolated CI-only checksum ledger so the exact same migration is
+          # skipped on rerun, while changing an already-applied migration fails
+          # closed and requires a new append-only migration instead.
+          psql "$NEON_DB_URL" -X -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE SCHEMA IF NOT EXISTS ci_preview;
+          CREATE TABLE IF NOT EXISTS ci_preview.migration_receipts (
+            filename TEXT PRIMARY KEY,
+            sha256 TEXT NOT NULL CHECK (sha256 ~ '^[0-9a-f]{64}$'),
+            applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+          );
+          SQL
+
+          for migration in "${MIGRATIONS[@]}"; do
+            if [[ ! "$migration" =~ ^supabase/migrations/[0-9]{14}_[A-Za-z0-9_]+\.sql$ ]]; then
+              echo "::error title=Invalid migration path::$migration is not a canonical append-only migration filename."
+              exit 1
+            fi
+            test -f "$migration" || { echo "Missing migration file: $migration" >&2; exit 1; }
+
+            CHECKSUM="$(sha256sum "$migration" | awk '{print $1}')"
+            # The migration path is interpolated only after the strict filename
+            # allowlist above; it therefore cannot contain a quote or SQL token.
+            EXISTING="$(psql "$NEON_DB_URL" -X -Atq \
+              -c "SELECT sha256 FROM ci_preview.migration_receipts WHERE filename = '$migration';")"
+
+            if [ -n "$EXISTING" ]; then
+              if [ "$EXISTING" = "$CHECKSUM" ]; then
+                echo "Preview migration already applied with matching checksum: $migration"
+                continue
+              fi
+              echo "::error title=Applied migration changed::$migration was already executed on this preview with a different checksum. Add a new migration instead of rewriting history."
+              exit 1
+            fi
+
+            PREVIEW_CONTRACT="supabase/preview-contracts/${migration##*/}"
+            if [ -f "$PREVIEW_CONTRACT" ]; then
+              echo "Running migration preview contract: $PREVIEW_CONTRACT"
+              psql "$NEON_DB_URL" -X -v ON_ERROR_STOP=1 -f "$PREVIEW_CONTRACT"
+            else
+              echo "Applying preview migration atomically: $migration"
+              psql "$NEON_DB_URL" -X -1 -v ON_ERROR_STOP=1 -f "$migration"
+            fi
+            psql "$NEON_DB_URL" -X -v ON_ERROR_STOP=1 \
+              -c "INSERT INTO ci_preview.migration_receipts(filename, sha256) VALUES ('$migration', '$CHECKSUM');"
+          done
+
+      - name: Verify FCR commerce preview schema when present
+        if: steps.neon_scope.outputs.needs_neon == 'true'
+        shell: bash
+        env:
+          NEON_DB_URL: ${{ steps.create_neon_branch.outputs.db_url }}
+        run: |
+          set -euo pipefail
+          HAS_FCR_COMMERCE="$(psql "$NEON_DB_URL" -X -Atqc "select to_regclass('public.fcr_commerce_receipts') is not null")"
+          if [ "$HAS_FCR_COMMERCE" != "t" ]; then
+            echo 'FCR commerce table is not part of this preview; generic migration execution completed.'
+            exit 0
+          fi
+
+          EVENT_COLUMN="$(psql "$NEON_DB_URL" -X -Atqc "select count(*) from information_schema.columns where table_schema='public' and table_name='fcr_commerce_receipts' and column_name='event_id' and data_type='uuid' and is_nullable='NO'")"
+          EVENT_INDEX="$(psql "$NEON_DB_URL" -X -Atqc "select count(*) from pg_indexes where schemaname='public' and tablename='fcr_commerce_receipts' and indexname='fcr_commerce_receipts_provider_event_uidx'")"
+          RLS_ENABLED="$(psql "$NEON_DB_URL" -X -Atqc "select relrowsecurity from pg_class where oid='public.fcr_commerce_receipts'::regclass")"
+          ROW_COUNT="$(psql "$NEON_DB_URL" -X -Atqc "select count(*) from public.fcr_commerce_receipts")"
+
+          test "$EVENT_COLUMN" = "1"
+          test "$EVENT_INDEX" = "1"
+          test "$RLS_ENABLED" = "t"
+          test "$ROW_COUNT" = "0"
+          echo 'FCR commerce Neon preview schema verified: event identity present, RLS enabled, zero synthetic revenue rows.'
+
+  delete_neon_branch:
+    name: Delete Neon Branch
+    if: |
+      github.event_name == 'pull_request' &&
+      github.event.action == 'closed' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - name: Classify Neon preview scope
@@ -48,15 +259,15 @@ jobs:
 
           echo "needs_neon=${NEEDS_NEON}" >> "$GITHUB_OUTPUT"
           if [ "$NEEDS_NEON" = "true" ]; then
-            echo 'Supabase change detected; Neon preview branch is required.'
+            echo 'Supabase change detected; Neon preview cleanup is required.'
           else
-            echo 'No supabase/ change detected; Neon preview branch is not required.'
+            echo 'No supabase/ change detected; no Neon preview is expected for this PR.'
           fi
 
-      - name: Record non-database no-op
+      - name: Record non-database cleanup no-op
         if: steps.neon_scope.outputs.needs_neon == 'false'
         shell: bash
-        run: echo 'Neon preview skipped because this PR does not change supabase/.'
+        run: echo 'Neon cleanup skipped because this PR does not change supabase/.'
 
       - name: Validate Neon configuration
         if: steps.neon_scope.outputs.needs_neon == 'true'
@@ -68,135 +279,11 @@ jobs:
           set -euo pipefail
           test -n "$NEON_PROJECT_ID" || { echo 'NEON_PROJECT_ID is not configured' >&2; exit 1; }
           test -n "$NEON_API_KEY" || { echo 'NEON_API_KEY is not configured' >&2; exit 1; }
-
-      - name: Detect existing Neon branch
-        id: neon_branch
-        if: steps.neon_scope.outputs.needs_neon == 'true'
-        shell: bash
-        env:
-          NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID }}
-          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
-          NEON_BRANCH_NAME: preview/pr-${{ github.event.number }}
-        run: |
-          set -euo pipefail
-          response="$(
-            curl --fail-with-body --silent --show-error \
-              --header "Authorization: Bearer ${NEON_API_KEY}" \
-              "https://console.neon.tech/api/v2/projects/${NEON_PROJECT_ID}/branches"
-          )"
-          branch_id="$(jq -r --arg name "$NEON_BRANCH_NAME" 'first(.branches[]? | select(.name == $name) | .id) // ""' <<<"$response")"
-          branch_state="$(jq -r --arg name "$NEON_BRANCH_NAME" 'first(.branches[]? | select(.name == $name) | .current_state) // ""' <<<"$response")"
-          if [ -n "$branch_id" ]; then
-            echo 'exists=true' >> "$GITHUB_OUTPUT"
-            echo "branch_id=$branch_id" >> "$GITHUB_OUTPUT"
-            echo "branch_state=$branch_state" >> "$GITHUB_OUTPUT"
-          else
-            echo 'exists=false' >> "$GITHUB_OUTPUT"
-            echo 'branch_id=' >> "$GITHUB_OUTPUT"
-            echo 'branch_state=' >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Set branch expiration
-        if: steps.neon_scope.outputs.needs_neon == 'true' && steps.neon_branch.outputs.exists != 'true'
-        shell: bash
-        run: echo "EXPIRES_AT=$(date -u --date '+14 days' +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_ENV"
-
-      - name: Create Neon Branch
-        id: create_neon_branch
-        if: steps.neon_scope.outputs.needs_neon == 'true' && steps.neon_branch.outputs.exists != 'true'
-        uses: neondatabase/create-branch-action@fb620d43d4c565abaf088b848a4e28e5c4ea4d9c # v6
-        with:
-          project_id: ${{ vars.NEON_PROJECT_ID }}
-          branch_name: preview/pr-${{ github.event.number }}
-          api_key: ${{ secrets.NEON_API_KEY }}
-          expires_at: ${{ env.EXPIRES_AT }}
-
-      - name: Verify branch creation result
-        if: steps.neon_scope.outputs.needs_neon == 'true'
-        shell: bash
-        env:
-          NEON_EXISTING_BRANCH_ID: ${{ steps.neon_branch.outputs.branch_id }}
-          NEON_EXISTING_BRANCH_STATE: ${{ steps.neon_branch.outputs.branch_state }}
-          NEON_CREATED_BRANCH_ID: ${{ steps.create_neon_branch.outputs.branch_id }}
-        run: |
-          set -euo pipefail
-          if [ -n "${NEON_EXISTING_BRANCH_ID:-}" ]; then
-            test "$NEON_EXISTING_BRANCH_STATE" = 'ready' || {
-              echo "Existing Neon PR branch is not ready: ${NEON_EXISTING_BRANCH_STATE:-unknown}" >&2
-              exit 1
-            }
-            exit 0
-          fi
-          test -n "${NEON_CREATED_BRANCH_ID:-}" || { echo 'Neon create action returned no branch_id' >&2; exit 1; }
-
-  delete_neon_branch:
-    name: Delete Neon Branch
-    if: |
-      github.event_name == 'pull_request' &&
-      github.event.action == 'closed' &&
-      github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ubuntu-24.04
-    timeout-minutes: 5
-    steps:
-      - name: Validate Neon configuration
-        shell: bash
-        env:
-          NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID }}
-          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
-        run: |
-          set -euo pipefail
-          test -n "$NEON_PROJECT_ID" || { echo 'NEON_PROJECT_ID is not configured' >&2; exit 1; }
-          test -n "$NEON_API_KEY" || { echo 'NEON_API_KEY is not configured' >&2; exit 1; }
-
-      - name: Detect Neon branch for cleanup
-        id: cleanup_branch
-        shell: bash
-        env:
-          NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID }}
-          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
-          NEON_BRANCH_NAME: preview/pr-${{ github.event.number }}
-        run: |
-          set -euo pipefail
-          response="$(
-            curl --fail-with-body --silent --show-error \
-              --header "Authorization: Bearer ${NEON_API_KEY}" \
-              "https://console.neon.tech/api/v2/projects/${NEON_PROJECT_ID}/branches"
-          )"
-          branch_id="$(jq -r --arg name "$NEON_BRANCH_NAME" 'first(.branches[]? | select(.name == $name) | .id) // ""' <<<"$response")"
-          if [ -n "$branch_id" ]; then
-            echo 'exists=true' >> "$GITHUB_OUTPUT"
-            echo "branch_id=$branch_id" >> "$GITHUB_OUTPUT"
-          else
-            echo 'exists=false' >> "$GITHUB_OUTPUT"
-            echo 'branch_id=' >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Record cleanup no-op
-        if: steps.cleanup_branch.outputs.exists != 'true'
-        shell: bash
-        run: echo 'No Neon preview branch exists for this closed PR.'
 
       - name: Delete Neon Branch
-        if: steps.cleanup_branch.outputs.exists == 'true'
+        if: steps.neon_scope.outputs.needs_neon == 'true'
         uses: neondatabase/delete-branch-action@4468d825d5a88ef4012f1705a82f02ec3072f776 # v3
         with:
           project_id: ${{ vars.NEON_PROJECT_ID }}
-          branch: ${{ steps.cleanup_branch.outputs.branch_id }}
+          branch: preview/pr-${{ github.event.number }}
           api_key: ${{ secrets.NEON_API_KEY }}
-
-      - name: Verify branch cleanup result
-        if: steps.cleanup_branch.outputs.exists == 'true'
-        shell: bash
-        env:
-          NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID }}
-          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
-          NEON_BRANCH_NAME: preview/pr-${{ github.event.number }}
-        run: |
-          set -euo pipefail
-          response="$(
-            curl --fail-with-body --silent --show-error \
-              --header "Authorization: Bearer ${NEON_API_KEY}" \
-              "https://console.neon.tech/api/v2/projects/${NEON_PROJECT_ID}/branches"
-          )"
-          branch_id="$(jq -r --arg name "$NEON_BRANCH_NAME" 'first(.branches[]? | select(.name == $name) | .id) // ""' <<<"$response")"
-          test -z "$branch_id" || { echo 'Neon preview branch still exists after cleanup' >&2; exit 1; }

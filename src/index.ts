@@ -1,4 +1,6 @@
 import 'dotenv/config';
+import express from 'express';
+import { mountFcrCommerceIngress } from './http/fcrCommerceIngress.js';
 import { createServer } from './http/server.js';
 import { startScheduler } from './worker/scheduler.js';
 import { startReconciliationConsumer } from './reconciliation/consumer.js';
@@ -7,7 +9,9 @@ import { getOutbox } from './events/outbox.js';
 import { getDb } from './lib/db.js';
 
 const port = Number(process.env.PORT ?? 8787);
-const app = createServer({ serveStatic: true });
+const app = express();
+mountFcrCommerceIngress(app);
+app.use(createServer({ serveStatic: true }));
 
 app.listen(port, () => {
   console.log(`founder-control-room API listening on :${port}`);
@@ -26,6 +30,7 @@ app.listen(port, () => {
   console.log(`  POST /projects/:slug/connections`);
   console.log(`  POST /projects/:slug/connections/:connectionId/check`);
   console.log(`  POST /webhooks/github`);
+  console.log(`  POST /webhooks/shopify/fcr/orders-paid`);
   console.log(`  POST /approvals/:missionId/execute`);
   console.log(`  POST /approvals/:missionId/patch`);
   console.log(`  PATCH /missions/:missionId          (assign builder/reviewer agent)`);
