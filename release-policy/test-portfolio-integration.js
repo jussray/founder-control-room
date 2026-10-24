@@ -8,9 +8,11 @@
  * - All three share common peer constraints
  */
 
-const fs = require('fs');
-const path = require('path');
-const { execSync } = require('child_process');
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const manifest = JSON.parse(fs.readFileSync(path.join(__dirname, '../releases/portfolio-v0.1.0.json'), 'utf8'));
 
@@ -31,9 +33,9 @@ const tests = [];
 // 1. Verify peer dependencies across all repos
 console.log('Peer Constraints:');
 const repos = {
-  'Chief AI': '../chief-ai-machine',
-  'StoryEngine': '../StoryEngine',
-  'Sekret-Bip': '../Sekret-Bip',
+  'Chief AI': '../../chief-ai-machine',
+  'StoryEngine': '../../StoryEngine',
+  'Sekret-Bip': '../../Sekret-Bip',
 };
 
 for (const [name, repoPath] of Object.entries(repos)) {
@@ -49,13 +51,16 @@ for (const [name, repoPath] of Object.entries(repos)) {
       console.log(`  ✗ ${name}: failed to parse peer manifest`);
       failed++;
     }
+  } else {
+    console.log(`  ✗ ${name}: missing peer manifest`);
+    failed++;
   }
 }
 
 // 2. Verify Chief AI governance module exists
 console.log('');
 console.log('Chief AI Governance:');
-const govPath = path.join(__dirname, '../chief-ai-machine/src/governance');
+const govPath = path.join(__dirname, '../../chief-ai-machine/src/governance');
 if (fs.existsSync(govPath)) {
   console.log(`  ✓ Governance module present`);
   passed++;
@@ -67,7 +72,7 @@ if (fs.existsSync(govPath)) {
 // 3. Verify integration test exists
 console.log('');
 console.log('Integration Tests:');
-const testPath = path.join(__dirname, '../chief-ai-machine/test/portfolio-integration.test.ts');
+const testPath = path.join(__dirname, '../../chief-ai-machine/test/portfolio-integration.test.ts');
 if (fs.existsSync(testPath)) {
   console.log(`  ✓ Portfolio integration test defined`);
   passed++;
