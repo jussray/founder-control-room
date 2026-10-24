@@ -440,8 +440,29 @@ async function main() {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.reload({ waitUntil: 'networkidle' });
     await page.waitForSelector('.workbench');
+    const mobileOverflow = await page.evaluate(() => {
+      const viewport = window.innerWidth;
+      const documentWidth = document.documentElement.scrollWidth;
+      const offenders = Array.from(document.body.querySelectorAll('*'))
+        .map((element) => {
+          const rect = element.getBoundingClientRect();
+          return {
+            tag: element.tagName.toLowerCase(),
+            className: typeof element.className === 'string' ? element.className.slice(0, 80) : '',
+            left: Math.round(rect.left),
+            right: Math.round(rect.right),
+          };
+        })
+        .filter(({ left, right }) => left < -1 || right > viewport + 1)
+        .sort((a, b) => b.right - a.right)
+        .slice(0, 8);
+      return { viewport, documentWidth, offenders };
+    });
+    if (mobileOverflow.documentWidth > mobileOverflow.viewport) {
+      console.error('Mobile workbench overflow diagnostic:', JSON.stringify(mobileOverflow));
+    }
     assert(
-      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+      mobileOverflow.documentWidth <= mobileOverflow.viewport,
       'mobile workbench avoids document-level horizontal overflow',
     );
     assert(
