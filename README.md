@@ -109,6 +109,10 @@ Actual Cowork access to GitHub depends on the user's Claude-side GitHub connecto
 
 The current FCR Cowork lane intentionally labels its native receipt integration as **not wired**. Generic Activity entries are not promoted to Cowork receipts, and FCR does not claim Cowork-specific receipt ingestion until a separately reviewed adapter exists and is proven. Council participation, connector availability, or Cowork tool access grants no merge, deploy, provider, credential, billing, publication, deletion, or founder authority.
 
+### Founder-selected GitHub Auto-merge
+
+When the founder enables GitHub's native Auto-merge on an individual PR, GitHub queues that PR until all **configured required** reviews, checks, tests, and branch-protection or merge-queue conditions pass; no second manual merge click is required after those gates clear. Checks that are merely optional are not automatically merge blockers, so intended load-bearing checks must be configured as required in the live ruleset. The PR Continuity workflow now observes `auto_merge_enabled` and `auto_merge_disabled` and records `auto_merge_intent` from provider PR readback as `QUEUED`, `NOT_QUEUED`, or `UNKNOWN`. This is queue metadata, **not** exact-candidate founder-final approval, deterministic independent review, production proof, or merge/deploy authority. Merge conflicts, draft PRs, stale exact heads, missing required gates, or missing applicable founder approval remain blocked. Verify GitHub's current ruleset before claiming native enforcement; no source workflow can silently change that provider setting.
+
 ### PR continuity
 
 The repository has machine-enforced PR continuity. Eligible same-repository branches may roll forward when their live base moves, but every head movement creates a new proof subject.
