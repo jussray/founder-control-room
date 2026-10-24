@@ -95,6 +95,15 @@ async function provePublicFrontDoor(label, viewport) {
     throw new Error(label + ': public front door requires one main landmark and a real home target');
   }
 
+  const introPrecedesSwitch = await page.evaluate(() => {
+    const intro = document.querySelector('[data-public-intro]');
+    const switcher = document.querySelector('.switch');
+    return Boolean(intro && switcher && (intro.compareDocumentPosition(switcher) & Node.DOCUMENT_POSITION_FOLLOWING));
+  });
+  if (!introPrecedesSwitch) {
+    throw new Error(`${label}: product promise must appear before the view selector`);
+  }
+
   const tabs = page.getByRole('tab');
   if (await tabs.count() !== 2) throw new Error(`${label}: public FCR must expose exactly two view tabs`);
   const tabLabels = await tabs.allInnerTexts();
@@ -152,6 +161,9 @@ async function provePublicFrontDoor(label, viewport) {
 
   if (!(await founderPanel.isVisible()) || (await userPanel.isVisible())) {
     throw new Error(`${label}: selecting Founder View must show only the founder panel`);
+  }
+  if (await page.locator('[data-public-intro]').isVisible()) {
+    throw new Error(`${label}: public product intro must hide when Founder View is selected`);
   }
   if (await page.getByRole('tab', { name: 'Founder View' }).getAttribute('aria-selected') !== 'true') {
     throw new Error(`${label}: Founder View tab must report aria-selected=true`);
