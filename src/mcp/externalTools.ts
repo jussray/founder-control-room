@@ -726,15 +726,37 @@ export function createExternalMcpToolExecutor(
       const fromOperator = sourceOperatorForIdentity(input.identity, env);
       const toOperator = relayOperator(input.arguments.targetOperator, 'targetOperator');
       if (fromOperator === toOperator) throw new Error('operator relay requires a distinct target operator');
-      result = await relayOperatorCall({
-        fromOperator,
-        toOperator,
-        capability: relayCapability(input.arguments.capability),
-        goal: text(input.arguments.goal, 'goal', 4000),
-        contextSummary: text(input.arguments.contextSummary, 'contextSummary', 12000),
-        sourceRef: optionalText(input.arguments.sourceRef, 'sourceRef', 500) ?? null,
-        sensitivity: relaySensitivity(input.arguments.sensitivity),
-      });
+      try {
+        result = await relayOperatorCall({
+          fromOperator,
+          toOperator,
+          capability: relayCapability(input.arguments.capability),
+          goal: text(input.arguments.goal, 'goal', 4000),
+          contextSummary: text(input.arguments.contextSummary, 'contextSummary', 12000),
+          sourceRef: optionalText(input.arguments.sourceRef, 'sourceRef', 500) ?? null,
+          sensitivity: relaySensitivity(input.arguments.sensitivity),
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : '';
+        const crossedProviderBoundary = /^(?:OpenAI|Anthropic|Gemini|Perplexity|DeepSeek) relay /.test(message);
+        if (crossedProviderBoundary) {
+          await recordEvidence({
+            identity: input.identity,
+            requestId: input.requestId,
+            projectSlug: receiptProject,
+            toolName: input.name,
+            arguments: input.arguments,
+            result: {
+              status: 'failed',
+              externalProviderCall: true,
+              errorCode: 'external_provider_call_failed',
+            },
+            durationMs: Math.max(0, Date.now() - startedAt),
+            risk: 'external_side_effect',
+          });
+        }
+        throw error;
+      }
     } else {
       noUnexpectedKeys(
         input.arguments,
