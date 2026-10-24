@@ -43,9 +43,12 @@ for (const [name, repoPath] of Object.entries(repos)) {
   if (fs.existsSync(peerFile)) {
     try {
       const peers = JSON.parse(fs.readFileSync(peerFile, 'utf8'));
-      if (peers.peers && Array.isArray(peers.peers)) {
-        console.log(`  ✓ ${name}: valid peer manifest (${peers.peers.length} peer(s))`);
+      if (Array.isArray(peers.peers)) {
+        console.log(`  ✓ ${name}: well-formed peer manifest (${peers.peers.length} peer(s)); exact revision proof is separate`);
         passed++;
+      } else {
+        console.log(`  ✗ ${name}: malformed peer manifest (peers must be an array)`);
+        failed++;
       }
     } catch (e) {
       console.log(`  ✗ ${name}: failed to parse peer manifest`);
