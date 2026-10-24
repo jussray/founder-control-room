@@ -1,5 +1,11 @@
 import { requestHash } from './safety.js';
 import { hubForMcpProject } from './vaultHub.js';
+import { auditGitHubChangeGenealogy } from './github-truth/changeGenealogy.js';
+import type {
+  GitHubChangeGenealogyEvidence,
+  GitHubChangeGenealogyReaderLike,
+} from '../providers/GitHubChangeGenealogyReader.js';
+import { createAppAwareRepositoryProvider } from '../providers/RepositoryProviderFactory.js';
 import { supabase } from '../lib/supabaseClient.js';
 import {
   routeFcrSkills,
@@ -8,6 +14,7 @@ import {
 import type { V10CapabilityPlan } from '../founder-os-lab/capabilityKernel.js';
 import { relayBetweenOperators } from '../lib/operatorRelayBridge.js';
 import { createServerOperatorRelayAdapters } from '../lib/operatorRelayModelProviders.js';
+import { OPERATOR_RELAY_PEERS } from '../lib/operatorRelayConstants.js';
 import type {
   RelayCapability,
   RelayOperatorId,
@@ -20,6 +27,7 @@ export const EXTERNAL_MCP_TOOL_NAMES = [
   'chief_preview_capability_plan',
   'fcr_list_projects',
   'fcr_get_current_truth',
+  'fcr_audit_change_genealogy',
   'fcr_preview_skill_route',
   'fcr_relay_operator',
 ] as const;
@@ -72,6 +80,12 @@ export interface ExternalMcpToolDependencies {
   listProjects?: (allowedProjects: ReadonlySet<string>) => Promise<unknown>;
   listCapabilities?: (projectSlug: string) => Promise<unknown>;
   getCurrentTruth?: (projectSlug: string) => Promise<unknown>;
+  auditChangeGenealogy?: (input: {
+    projectSlug: string;
+    limit: number;
+    includeComments: boolean;
+    includeDiff: boolean;
+  }) => Promise<unknown>;
   previewCapabilityPlan?: (proposal: Record<string, unknown>) => Promise<unknown>;
   previewSkillRoute?: (input: {
     goal: string;
@@ -103,7 +117,7 @@ const READ_ONLY_ROUTE_ACTIONS = new Set<FcrSkillRouterAction>([
   'review',
   'draft',
 ]);
-const RELAY_OPERATORS = new Set<RelayOperatorId>(['gemini', 'codex', 'claude-code', 'perplexity']);
+const RELAY_OPERATORS = new Set<RelayOperatorId>(OPERATOR_RELAY_PEERS);
 const RELAY_CAPABILITIES = new Set<RelayCapability>(['research', 'propose', 'review', 'implement']);
 const RELAY_SENSITIVITIES = new Set<RelaySensitivity>(['public', 'internal']);
 const FULL_SHA = /^[0-9a-f]{40}$/i;
@@ -112,13 +126,6 @@ const PROJECT_SLUG = /^[a-z0-9][a-z0-9-]{0,119}$/;
 
 function isRecord(value: unknown): value is JsonRecord {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-}
-
-function relayUsedExternalProvider(value: unknown): boolean {
-  if (!isRecord(value) || !isRecord(value.response)) return false;
-  const evidenceRefs = value.response.evidenceRefs;
-  return Array.isArray(evidenceRefs)
-    && evidenceRefs.some((entry) => typeof entry === 'string' && entry.startsWith('provider:'));
 }
 
 function text(value: unknown, field: string, maxLength = 200): string {
@@ -147,6 +154,20 @@ function projectSlug(value: unknown): string {
   const slug = text(value, 'projectId', 120);
   if (!PROJECT_SLUG.test(slug)) throw new Error('projectId is not a valid project slug');
   return slug;
+}
+
+function boundedInteger(value: unknown, field: string, min: number, max: number, fallback: number): number {
+  if (value === undefined) return fallback;
+  if (!Number.isInteger(value) || (value as number) < min || (value as number) > max) {
+    throw new Error(`${field} must be an integer between ${min} and ${max}`);
+  }
+  return value as number;
+}
+
+function optionalBoolean(value: unknown, field: string, fallback: boolean): boolean {
+  if (value === undefined) return fallback;
+  if (typeof value !== 'boolean') throw new Error(`${field} must be a boolean`);
+  return value;
 }
 
 function allowedProject(slug: string, allowedProjects: ReadonlySet<string>): string {
@@ -237,6 +258,42 @@ async function projectRow(slug: string) {
     risk_level: string;
     updated_at: string;
   };
+}
+
+async function defaultAuditChangeGenealogy(
+  input: {
+    projectSlug: string;
+    limit: number;
+    includeComments: boolean;
+    includeDiff: boolean;
+  },
+  env: NodeJS.ProcessEnv,
+) {
+  const project = await projectRow(input.projectSlug);
+  if (project.repo_provider.trim().toLowerCase() !== 'github' || !project.repo_identifier?.trim()) {
+    throw new Error('Project does not have a registered GitHub repository');
+  }
+  const repository = project.repo_identifier.trim();
+  const provider = await createAppAwareRepositoryProvider({
+    slug: project.slug,
+    repoProvider: project.repo_provider,
+    repoIdentifier: repository,
+  }, env);
+  if (!provider.readChangeGenealogyEvidence) {
+    throw new Error('Configured repository provider does not expose change-genealogy evidence');
+  }
+  const reader: GitHubChangeGenealogyReaderLike = {
+    readGenealogyEvidence: async (options) => {
+      const evidence = await provider.readChangeGenealogyEvidence!(project.slug, options);
+      return evidence as GitHubChangeGenealogyEvidence;
+    },
+  };
+  return auditGitHubChangeGenealogy(reader, {
+    repository,
+    limit: input.limit,
+    includeComments: input.includeComments,
+    includeDiff: input.includeDiff,
+  });
 }
 
 async function defaultListProjects(allowedProjects: ReadonlySet<string>) {
@@ -584,6 +641,24 @@ export function externalMcpToolDefinitions(): JsonRecord[] {
       annotations: readAnnotations,
     },
     {
+      name: 'fcr_audit_change_genealogy',
+      title: 'Audit recent GitHub change genealogy',
+      description:
+        'Read a granted project’s registered GitHub repository and reconstruct a bounded recent-change genealogy: ten PRs by default, every PR commit identity, bounded comments/reviews and file-level diff evidence, recent default-branch commits, and provider-proven commit-to-PR associations. Returns separate failure receipts and never returns raw patch bodies or grants mutation authority.',
+      inputSchema: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['projectId'],
+        properties: {
+          projectId: { type: 'string', minLength: 1, maxLength: 120 },
+          limit: { type: 'integer', minimum: 1, maximum: 20, default: 10 },
+          includeComments: { type: 'boolean', default: true },
+          includeDiff: { type: 'boolean', default: true },
+        },
+      },
+      annotations: { ...readAnnotations, openWorldHint: true },
+    },
+    {
       name: 'fcr_preview_skill_route',
       title: 'Preview a fail-closed skill route',
       description:
@@ -615,13 +690,13 @@ export function externalMcpToolDefinitions(): JsonRecord[] {
       name: 'fcr_relay_operator',
       title: 'Relay a bounded task to a peer AI operator',
       description:
-        'Send a bounded research, proposal, review, or implementation-work task to exactly one named peer operator (Gemini, ChatGPT/Codex, Claude, or Perplexity) and return its provider-bound response. Requires OAuth client identity, carries zero mutation authority, never targets DeepSeek Instructor, and never substitutes another provider when the requested operator is unavailable.',
+        'Send a bounded research, proposal, review, or implementation-work task to exactly one named canonical peer operator and return its provider-bound response. Requires OAuth client identity, carries zero mutation authority, never targets DeepSeek Instructor, and never substitutes another provider when the requested operator is unavailable.',
       inputSchema: {
         type: 'object',
         additionalProperties: false,
         required: ['targetOperator', 'capability', 'goal', 'contextSummary'],
         properties: {
-          targetOperator: { type: 'string', enum: ['gemini', 'codex', 'claude-code', 'perplexity'] },
+          targetOperator: { type: 'string', enum: [...OPERATOR_RELAY_PEERS] },
           capability: { type: 'string', enum: ['research', 'propose', 'review', 'implement'] },
           goal: { type: 'string', minLength: 1, maxLength: 4000 },
           contextSummary: { type: 'string', minLength: 1, maxLength: 12000 },
@@ -652,6 +727,8 @@ export function createExternalMcpToolExecutor(
   const listProjects = overrides.listProjects ?? defaultListProjects;
   const listCapabilities = overrides.listCapabilities ?? defaultListCapabilities;
   const getCurrentTruth = overrides.getCurrentTruth ?? defaultGetCurrentTruth;
+  const auditChangeGenealogy = overrides.auditChangeGenealogy
+    ?? ((input) => defaultAuditChangeGenealogy(input, env));
   const previewCapabilityPlan = overrides.previewCapabilityPlan
     ?? ((proposal: Record<string, unknown>) => defaultPreviewCapabilityPlan(proposal, env));
   const previewSkillRoute = overrides.previewSkillRoute ?? defaultPreviewSkillRoute;
@@ -716,6 +793,15 @@ export function createExternalMcpToolExecutor(
       noUnexpectedKeys(input.arguments, ['projectId'], input.name);
       receiptProject = allowedProject(projectSlug(input.arguments.projectId), input.allowedProjects);
       result = await getCurrentTruth(receiptProject);
+    } else if (input.name === 'fcr_audit_change_genealogy') {
+      noUnexpectedKeys(input.arguments, ['projectId', 'limit', 'includeComments', 'includeDiff'], input.name);
+      receiptProject = allowedProject(projectSlug(input.arguments.projectId), input.allowedProjects);
+      result = await auditChangeGenealogy({
+        projectSlug: receiptProject,
+        limit: boundedInteger(input.arguments.limit, 'limit', 1, 20, 10),
+        includeComments: optionalBoolean(input.arguments.includeComments, 'includeComments', true),
+        includeDiff: optionalBoolean(input.arguments.includeDiff, 'includeDiff', true),
+      });
     } else if (input.name === 'fcr_relay_operator') {
       receiptProject = allowedProject('founder-control-room', input.allowedProjects);
       noUnexpectedKeys(
@@ -726,37 +812,16 @@ export function createExternalMcpToolExecutor(
       const fromOperator = sourceOperatorForIdentity(input.identity, env);
       const toOperator = relayOperator(input.arguments.targetOperator, 'targetOperator');
       if (fromOperator === toOperator) throw new Error('operator relay requires a distinct target operator');
-      try {
-        result = await relayOperatorCall({
-          fromOperator,
-          toOperator,
-          capability: relayCapability(input.arguments.capability),
-          goal: text(input.arguments.goal, 'goal', 4000),
-          contextSummary: text(input.arguments.contextSummary, 'contextSummary', 12000),
-          sourceRef: optionalText(input.arguments.sourceRef, 'sourceRef', 500) ?? null,
-          sensitivity: relaySensitivity(input.arguments.sensitivity),
-        });
-      } catch (error) {
-        const message = error instanceof Error ? error.message : '';
-        const crossedProviderBoundary = /^(?:OpenAI|Anthropic|Gemini|Perplexity|DeepSeek) relay /.test(message);
-        if (crossedProviderBoundary) {
-          await recordEvidence({
-            identity: input.identity,
-            requestId: input.requestId,
-            projectSlug: receiptProject,
-            toolName: input.name,
-            arguments: input.arguments,
-            result: {
-              status: 'failed',
-              externalProviderCall: true,
-              errorCode: 'external_provider_call_failed',
-            },
-            durationMs: Math.max(0, Date.now() - startedAt),
-            risk: 'external_side_effect',
-          });
-        }
-        throw error;
-      }
+      evidenceRisk = 'external_side_effect';
+      result = await relayOperatorCall({
+        fromOperator,
+        toOperator,
+        capability: relayCapability(input.arguments.capability),
+        goal: text(input.arguments.goal, 'goal', 4000),
+        contextSummary: text(input.arguments.contextSummary, 'contextSummary', 12000),
+        sourceRef: optionalText(input.arguments.sourceRef, 'sourceRef', 500) ?? null,
+        sensitivity: relaySensitivity(input.arguments.sensitivity),
+      });
     } else {
       noUnexpectedKeys(
         input.arguments,
@@ -796,10 +861,6 @@ export function createExternalMcpToolExecutor(
       });
     }
 
-    const relay = input.name === 'fcr_relay_operator';
-    const externalProviderCall = relay && relayUsedExternalProvider(result);
-    if (relay) evidenceRisk = externalProviderCall ? 'external_side_effect' : 'read';
-
     const receipt = await recordEvidence({
       identity: input.identity,
       requestId: input.requestId,
@@ -811,12 +872,13 @@ export function createExternalMcpToolExecutor(
       risk: evidenceRisk,
     });
 
+    const relay = input.name === 'fcr_relay_operator';
     return {
       data: result,
       receipt,
       governanceBoundary: {
-        readOrPreviewOnly: !externalProviderCall,
-        externalProviderCall,
+        readOrPreviewOnly: !relay,
+        externalProviderCall: relay,
         mutationAuthority: false,
         executionAllowed: false,
         founderApprovalGranted: false,
