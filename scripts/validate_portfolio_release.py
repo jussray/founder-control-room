@@ -35,6 +35,12 @@ def main():
     missing = [key for key, value in policy["testCommands"].items() if not value]
     if missing:
         raise ValueError("PROMOTION BLOCKED: unconfigured mandatory suites: " + ", ".join(missing))
+    # Reject shell success fallbacks: a failing mandatory test must remain a failure.
+    import re
+    masked = [key for key, command in policy["testCommands"].items()
+              if re.search(r"(?:\|\|\s*(?:true|:)|;\s*(?:true|:)\s*$)", command)]
+    if masked:
+        raise ValueError("PROMOTION BLOCKED: masked mandatory test failures: " + ", ".join(masked))
     raise ValueError("PROMOTION BLOCKED: executable cross-repository test runner not yet wired")
 
 if __name__ == "__main__":
