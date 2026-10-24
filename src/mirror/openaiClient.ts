@@ -232,9 +232,9 @@ export function createOpenAiMirrorRunner(dependencies: OpenAiMirrorDependencies 
     // The existing OpenAI request contract remains the default until a
     // provider selector or explicit failover is configured.
     if (env.MIRROR_ENGINE_PROVIDER?.trim() || env.MIRROR_ENGINE_FALLBACK_PROVIDER?.trim()) {
-      let structured: StructuredJsonResult;
+      let result: StructuredJsonResult;
       try {
-        structured = await runStructuredJson(
+        result = await runStructuredJson(
           providerChain(env),
           {
             schemaName: 'mirror_engine_output',
@@ -258,13 +258,13 @@ export function createOpenAiMirrorRunner(dependencies: OpenAiMirrorDependencies 
       }
 
       return {
-        output: modelOutput(structured.output),
+        output: modelOutput(result.output),
         provenance: {
-          provider: structured.provider,
-          model: structured.model,
-          responseId: structured.responseId,
+          provider: result.provider,
+          model: result.model,
+          responseId: result.responseId,
           promptVersion: MIRROR_PROMPT_VERSION,
-          storedByProvider: structured.provider === 'openai' ? false : null,
+          storedByProvider: result.provider === 'openai' ? false : null,
         },
       };
     }
