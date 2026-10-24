@@ -11,8 +11,11 @@
  * This source-only diagnostic must fail closed until executable security suites are wired.
  */
 
-const fs = require('fs');
-const path = require('path');
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const manifest = JSON.parse(fs.readFileSync(path.join(__dirname, '../releases/portfolio-v0.1.0.json'), 'utf8'));
 const policy = JSON.parse(fs.readFileSync(path.join(__dirname, './repositories.json'), 'utf8'));
