@@ -2,6 +2,32 @@
 
 Purpose: make future founder shorthand resolvable without guessing, while preserving current repository and provider evidence as authority.
 
+## Mandatory agent session continuity gate
+
+This applies to **every material founder conversation, coding or research task, read-only audit, agent run, or delegated handoff**, even when no code changes. The agent that performs work must leave an evidence-bound handoff receipt before it finishes. This is an operating requirement, not a claim that a chat platform automatically writes to the repository.
+
+**On entry:** resolve the authoritative project, repo, branch/head, existing task owner, current evidence, and latest applicable receipt *before* starting overlapping work. Search existing continuity/accuracy records first; if the same goal and exact scope are already active, reuse that lineage and coordinate with its owner instead of launching another agent or PR. A prior cookie is a retrieval hint, never current proof.
+
+**On exit:** append or update the existing governed continuity ledger through an authorized capability. Never silently overwrite another agent's state, move a message, export a private conversation, or create a new PR merely to store a receipt. If persistent writing is unavailable or unauthorized, include the receipt in the final handoff and mark `persistence: BLOCKED`, not `SAVED`.
+
+Minimum portable receipt schema, `juss/agent-handoff@v1`:
+
+- `taskKey`: stable normalized project + goal + scoped subject, used for overlap detection.
+- `subject`: repository, branch, exact commit SHA or provider/runtime identity, and evidence observation time.
+- `fingerprint`: deterministic SHA-256 of canonical, sorted, non-secret subject + goal/scope + evidence references; `NOT_MINTED` when computation or inputs are unavailable.
+- `continuityCookie`: a non-secret, bounded `EVIDENCE_ONLY` marker with predecessor link, freshness/invalidating conditions, and expiry when applicable. Not a browser cookie or tracking identifier.
+- `ownerAndAuthority`: next accountable agent or human, observed permissions, explicit approval scope, and actions **not** authorized.
+- `reality`: distinct `VERIFIED`, `INFERRED`, `UNKNOWN`, `STALE`, and `BLOCKED` findings with exact references; never promote an email notification or previous memory to live runtime proof.
+- `work`: changes attempted, exact files/commits, checks run and results, actions not run, and outcome.
+- `handoff`: unfinished work, highest-value next verification, stop/restart condition, risks, and rollback or no-change statement.
+- `persistence`: `SAVED` with verified location and reference, or `BLOCKED` with reason. Include `supersedes` when refreshing an earlier receipt.
+
+**Overlap and freshness:** check the task key and predecessor before acting. Changed heads, provider state, evidence, authority, or task scope require a successor receipt and fresh verification. Never erase prior receipts or claim old work has been completed by a different agent without evidence. The newest verified, appropriately scoped receipt guides continuation, but primary provider/repository truth always outranks it.
+
+**Privacy and authority:** fingerprints/cookies must not contain email bodies, personal identifiers, secrets, credentials, teen or health data, or raw private chat. Hashing private data does not automatically make it safe to publish. Cross-agent sharing is restricted to the minimum authorized non-sensitive metadata; project-specific privacy, consent, permission, and data-retention policies remain stronger. Neither a cookie nor an agent's memory grants mutation authority.
+
+**Mandatory close-out check:** before reporting `DONE`, the agent must know where its receipt lives and that it can be read by the next authorized agent. If it cannot verify this, report `WORK DONE / HANDOFF NOT PERSISTED` with the complete portable receipt and precise next gate.
+
 ## Resolution rule
 
 Use shorthand as a retrieval signal, never as proof.
