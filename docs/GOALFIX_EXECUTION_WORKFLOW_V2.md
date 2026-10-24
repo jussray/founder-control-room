@@ -191,6 +191,19 @@ After merge:
 
 STOP or HOLD if the next step would expose or publish credentials, tokens, private prompts, raw private diffs, proprietary business logic, unreleased roadmap detail, internal evidence references, security-sensitive mechanics, private metrics, customer/family/user data, or other sauce-bearing material without an explicit public-safe contract.
 
+
+## Bounded execution and continuation (ULTRATHINK / GODMODE V1.1)
+
+Approved engineering intent activates inspection, smallest safe implementation, focused verification, independent review, and the existing exact-head authority gate. It does not itself authorize protected merges, provider mutations, production releases, or bypass of current authenticated authority.
+
+Resume from the latest **verified** repository/provider receipt rather than repeating plans or treating historical summaries as current. Reacquire the exact target, base/head, diff, CI/reviews, and runtime identity whenever load-bearing state may have changed. Distinguish source readiness, provider configuration, deployment, and browser-observed behavior; one is not evidence for the others.
+
+Default to **at most three implementation/review cycles per activation**, unless the founder specifies another budget. Stop sooner on completion, a material blocker, missing authority, repeated non-progress, or insufficient verification capability. A cycle is a bounded fix → test → adversarial review → evidence/decision pass, not an unlimited retry loop. Do not create work merely to exhaust the budget.
+
+Classify the outcome explicitly as `COMPLETE`, `PARTIALLY_COMPLETE`, `BLOCKED`, or `AWAITING_APPROVAL`. Under `PROOF`, name the exact checks run, results, and checks not run; `NOT_RUN` and `QUEUED` are never `PASSED`. Under `NEXT GATE`, give exactly one highest-value executable continuation or the exact authority decision needed. Continue automatically only if that action remains inside the approved objective and existing permissions.
+
+Keep the canonical independent verifier, independent Red Team, strict exact-head merge protection, founder final, and post-merge runtime proof intact. Do not substitute self-review, machine green, broad approval, or a provider-success response for those separate gates.
+
 ## Report contract
 
 ```text
@@ -217,6 +230,9 @@ ROLLBACK:
 
 ADAPTIVE SIGNAL:
 - surprise signal + adaptive action when material
+
+OUTCOME:
+- COMPLETE / PARTIALLY_COMPLETE / BLOCKED / AWAITING_APPROVAL
 
 NEXT GATE:
 - one exact founder decision, authority gate, or next action
