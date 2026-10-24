@@ -1,5 +1,10 @@
 # Founder Control Room
 
+## October 24, 2026 StoryEngine model-capability peer refresh
+
+A fresh GitHub observation resolves StoryEngine `refs/heads/main` to `3c46b3649088ac4c6e1775102ba49abf5c779abf` after the additive `.control-room/model-capabilities.v1.json` profile commit. StoryEngine's exact successor head completed Agent Contract v1, CodeQL, L99 Promotion Gates, and Control Room Test Ledger successfully. FCR exact-head Playwright run `40071010317` passed the local E2E harness, then correctly failed its live peer-ref equality gate because it still expected `6b97b78370fbc25d4b4bb88bfeab136eb4c7dc2f`. This repair advances only the pinned evidence subject to `3c46b3649088ac4c6e1775102ba49abf5c779abf`; it does not activate any model runtime, inherit predecessor federation proof, or grant merge, deploy, provider-mutation, publication, or production authority. The successor FCR head must earn its own complete federation/browser witness.
+
+
 > **Copyright © 2024–2026 Juss Ray. All rights reserved.**
 > This is proprietary software. No license to use, copy, modify, distribute,
 > sublicense, or create derivative works is granted. See [LICENSE](LICENSE).
