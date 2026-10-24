@@ -352,6 +352,18 @@ describe('PromptOS runtime identity probe', () => {
     expect(slow.reasons).toEqual(['timeout']);
   });
 
+  it('bounds a 200 whose body stalls after headers, so the probe cannot hang on an endless body', async () => {
+    const stalled: FetchLike = async () => ({
+      ok: true,
+      status: 200,
+      body: new ReadableStream<Uint8Array>({ start() {} }),
+      text: () => new Promise<string>(() => {}),
+    });
+    const result = await probePromptOsRuntime(probeOptions({ fetchImpl: stalled, timeoutMs: 20 }));
+    expect(result.state).toBe('reachable');
+    expect(result.reasons).toEqual(['identity_unreadable_or_too_large']);
+  });
+
   it('refuses a non-JSON or oversized 200 without verifying it', async () => {
     const html = recordingFetch(() => reply(200, '<html>PromptOS</html>'));
     const notJson = await probePromptOsRuntime(probeOptions({ fetchImpl: html.fetchImpl }));
