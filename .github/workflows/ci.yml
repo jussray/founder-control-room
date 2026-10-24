@@ -342,7 +342,8 @@ jobs:
             "$RLS_RESULT" \
             "$DISCOVERY_RESULT" \
             "$DOCUMENTATION_TRUTH_RESULT" \
-            "$CLOUDFLARE_AUTHORITY_RESULT"
+            "$CLOUDFLARE_AUTHORITY_RESULT" \
+            "$PRODUCTION_DEPENDENCIES_RESULT"
 
           for result in \
             "$TYPECHECK_RESULT" \
@@ -353,7 +354,8 @@ jobs:
             "$RLS_RESULT" \
             "$DISCOVERY_RESULT" \
             "$DOCUMENTATION_TRUTH_RESULT" \
-            "$CLOUDFLARE_AUTHORITY_RESULT" \\\n            "$PRODUCTION_DEPENDENCIES_RESULT"; do
+            "$CLOUDFLARE_AUTHORITY_RESULT" \
+            "$PRODUCTION_DEPENDENCIES_RESULT"; do
             if [ "$result" != "success" ]; then
               echo "Required Gate blocked: at least one load-bearing CI job is not successful."
               exit 1
