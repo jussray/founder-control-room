@@ -151,4 +151,47 @@ describe('external FCR operator relay handoff truth', () => {
       toolName: 'fcr_relay_operator',
     }));
   });
+
+  it('records a sanitized receipt when a dispatched provider call fails', async () => {
+    const relayOperator = vi.fn(async () => {
+      throw new Error('OpenAI relay returned a non-completed response');
+    });
+    const recordEvidence = vi.fn(async () => receipt());
+    const execute = externalTools.createExternalMcpToolExecutor({
+      env: {
+        FCR_REMOTE_MCP_OPERATOR_CLIENT_MAP: JSON.stringify({ 'chatgpt-client': 'codex' }),
+      },
+      relayOperator,
+      recordEvidence,
+    });
+
+    await expect(execute({
+      name: 'fcr_relay_operator',
+      arguments: {
+        targetOperator: 'claude-code',
+        capability: 'implement',
+        goal: 'Execute the bounded provider request.',
+        contextSummary: 'Safe non-secret context.',
+        sensitivity: 'internal',
+      },
+      allowedProjects: new Set(['founder-control-room']),
+      identity: {
+        userId: 'founder-user-1',
+        email: 'founder@example.com',
+        clientId: 'chatgpt-client',
+        authMode: 'oauth',
+      },
+      requestId: 'relay-provider-failed-1',
+    })).rejects.toThrow(/non-completed/);
+
+    expect(recordEvidence).toHaveBeenCalledTimes(1);
+    expect(recordEvidence).toHaveBeenCalledWith(expect.objectContaining({
+      risk: 'external_side_effect',
+      result: {
+        status: 'failed',
+        externalProviderCall: true,
+        errorCode: 'external_provider_call_failed',
+      },
+    }));
+  });
 });
