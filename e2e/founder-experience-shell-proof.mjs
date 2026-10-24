@@ -87,7 +87,7 @@ async function provePublicFrontDoor(label, viewport) {
   }
 
   const headline = await page.locator('#home-title').innerText();
-  if (!headline.includes('Back Founders') || !headline.includes('Build a Brighter')) {
+  if (!headline.includes('Run founder work') || !headline.includes('Keep proof attached')) {
     throw new Error(`${label}: approved public headline drifted: ${headline}`);
   }
 
