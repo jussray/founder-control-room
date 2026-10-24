@@ -69,6 +69,7 @@ describe('QuickScan model provider configuration truth', () => {
       process.env.QUICKSCAN_CHIEF_ANTHROPIC_MODEL = 'claude-test';
       response = await request(buildApp()).get('/quickscan').set('Authorization', BEARER);
       expect(response.body.authority.chiefConfigured).toBe(true);
+      expect(response.body.authority.chiefDataRecipients).toContain('anthropic');
       expect(JSON.stringify(response.body)).not.toContain('anthropic-test-secret');
       expect(JSON.stringify(response.body)).not.toContain('claude-test');
     } finally {

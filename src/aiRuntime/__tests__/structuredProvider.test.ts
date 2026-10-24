@@ -108,6 +108,25 @@ describe('runStructuredJson', () => {
     });
   });
 
+  it.each([502, 503])('fails over when HTTP %i contains a non-JSON gateway body', async (status) => {
+    const fetchFn = vi.fn()
+      .mockResolvedValueOnce(fakeResponse('<html>upstream unavailable</html>', status))
+      .mockResolvedValueOnce(fakeResponse({
+        id: 'msg_recovered',
+        content: [{ type: 'text', text: JSON.stringify({ answer: 'ok' }) }],
+      }));
+    const result = await runStructuredJson([openAiConfig(), anthropicConfig()], REQUEST, { fetchFn });
+    expect(fetchFn).toHaveBeenCalledTimes(2);
+    expect(result.provider).toBe('anthropic');
+  });
+
+  it('preserves non-retryable HTTP status for a non-JSON error page', async () => {
+    const fetchFn = vi.fn(async () => fakeResponse('<html>unauthorized</html>', 401));
+    await expect(runStructuredJson([openAiConfig(), anthropicConfig()], REQUEST, { fetchFn }))
+      .rejects.toMatchObject({ code: 'OPENAI_HTTP_ERROR', status: 401, retryable: false });
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+  });
+
   it('does not fail over after a permanent authentication failure', async () => {
     const fetchFn = vi.fn(async () => fakeResponse({ error: { message: 'bad key' } }, 401));
 

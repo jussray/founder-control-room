@@ -270,6 +270,25 @@ describe('runGovernedRepositoryRead', () => {
     expect(providerForProjectMock).not.toHaveBeenCalled();
   });
 
+  it('blocks readFile when the lease expires during asynchronous resolveRef', async () => {
+    const resolveRef = vi.fn(async () => {
+      vi.setSystemTime(new Date('2026-09-07T21:00:00.000Z'));
+      return SHA;
+    });
+    const readFile = vi.fn(async () => '# Must never be read');
+    providerForProjectMock.mockReturnValueOnce({
+      name: 'github',
+      resolveRef,
+      readFile,
+    } as unknown as RepositoryProvider);
+
+    const result = await runGovernedRepositoryRead(input());
+    expect(result.state).toBe('DENIED');
+    expect(result.decision.disposition).toBe('DENY');
+    expect(result.decision.reasons.some(reason => reason.startsWith('authority:'))).toBe(true);
+    expect(readFile).not.toHaveBeenCalled();
+  });
+
   it('denies a ref that no longer matches the exact commit bound into the lease before reading content', async () => {
     const executionProvider = fakeProvider({ sha: MOVED_SHA, content: '# Moved\n' });
     providerForProjectMock.mockReturnValueOnce(executionProvider);

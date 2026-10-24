@@ -102,6 +102,40 @@ describe('compileAnthropicStructuredSchema', () => {
     });
   });
 
+  it('preserves schema property and definition names that match unsupported keywords', () => {
+    const compiled = compileAnthropicStructuredSchema({
+      type: 'object',
+      properties: {
+        maximum: { type: 'integer', minimum: 0 },
+        maxLength: { $ref: '#/$defs/minimum' },
+      },
+      required: ['maximum', 'maxLength'],
+      $defs: { minimum: { type: 'string', maxLength: 50 } },
+    });
+    expect(compiled).toEqual({
+      type: 'object',
+      properties: {
+        maximum: { type: 'integer' },
+        maxLength: { $ref: '#/$defs/minimum' },
+      },
+      required: ['maximum', 'maxLength'],
+      $defs: { minimum: { type: 'string' } },
+      additionalProperties: false,
+    });
+  });
+
+  it('preserves literal objects inside const and default and does not mistake them for schema references', () => {
+    const literal = { maximum: 99, metadata: { $ref: 'https://example.com/not-a-schema' } };
+    expect(compileAnthropicStructuredSchema({
+      type: 'object',
+      properties: {
+        constValue: { const: literal, default: literal, type: 'object' },
+      },
+    })).toMatchObject({
+      properties: { constValue: { const: literal, default: literal } },
+    });
+  });
+
   it('rejects external references before provider dispatch', () => {
     expect(() => compileAnthropicStructuredSchema({
       $ref: 'https://example.com/schema.json',

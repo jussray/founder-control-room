@@ -1,3 +1,4 @@
+import hashlib
 import json
 import tempfile
 import unittest
@@ -60,6 +61,30 @@ class MarkItDownLocalTests(unittest.TestCase):
             observed_at="2026-09-13T00:30:00+00:00",
         )[1]
         self.assertEqual(first["receiptDigest"], second["receiptDigest"])
+
+    def test_mutated_source_during_conversion_cannot_change_hash_bound_snapshot(self) -> None:
+        with tempfile.TemporaryDirectory() as root:
+            approved = Path(root)
+            source = approved / "mutable.html"
+            original = b"<p>Original evidence</p>"
+            source.write_bytes(original)
+
+            class MutatingConverter:
+                def convert_local(self, path: Path) -> _Result:
+                    # A concurrent source change does not modify the snapshot.
+                    source.write_bytes(b"<p>New evidence</p>")
+                    self.assert_snapshot = path.read_bytes()
+                    return _Result(path.read_text(encoding="utf-8"))
+
+            converter = MutatingConverter()
+            markdown, receipt = convert_local_document(
+                approved, "mutable.html", converter=converter,
+                engine_version="test",
+            )
+            self.assertEqual(converter.assert_snapshot, original)
+            self.assertEqual(markdown, original.decode("utf-8"))
+            self.assertEqual(receipt["source"]["sha256"], hashlib.sha256(original).hexdigest())
+            self.assertEqual(receipt["source"]["bytes"], len(original))
 
     def test_rejects_uri_input(self) -> None:
         with self.assertRaisesRegex(ConversionError, "local relative paths"):

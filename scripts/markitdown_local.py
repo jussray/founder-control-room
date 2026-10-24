@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import importlib.metadata
 import json
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Protocol
@@ -83,11 +84,18 @@ def convert_local_document(
     if source_size > MAX_SOURCE_BYTES:
         raise ConversionError("input file exceeds the 50 MiB local conversion limit")
     source_bytes = source.read_bytes()
+    if len(source_bytes) > MAX_SOURCE_BYTES:
+        raise ConversionError("input file exceeds the 50 MiB local conversion limit")
     active_converter = converter or _default_converter()
-    result = active_converter.convert_local(source)
-    markdown = getattr(result, "markdown", None)
-    if not isinstance(markdown, str):
-        markdown = getattr(result, "text_content", None)
+    # The receipt hashes these exact bytes, not a mutable source path that can
+    # change between capture and MarkItDown opening it.
+    with tempfile.TemporaryDirectory(prefix="fcr-markitdown-") as scratch:
+        snapshot = Path(scratch) / source.name
+        snapshot.write_bytes(source_bytes)
+        result = active_converter.convert_local(snapshot)
+        markdown = getattr(result, "markdown", None)
+        if not isinstance(markdown, str):
+            markdown = getattr(result, "text_content", None)
     if not isinstance(markdown, str):
         raise ConversionError("MarkItDown returned no Markdown text")
 

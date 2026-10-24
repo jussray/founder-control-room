@@ -506,6 +506,24 @@ function providerChain(env: NodeJS.ProcessEnv): StructuredProviderConfig[] {
   return fallback ? [primary, fallback] : [primary];
 }
 
+export type QuickScanChiefDataRecipient = 'local-ollama' | 'openai' | 'anthropic';
+
+/** All configured data recipients, including possible retry/failover destinations. */
+export function quickScanChiefDataRecipients(env: NodeJS.ProcessEnv = process.env): QuickScanChiefDataRecipient[] {
+  const explicit = env.QUICKSCAN_CHIEF_PROVIDER?.trim().toLowerCase();
+  if (explicit === 'anthropic') {
+    const recipients: QuickScanChiefDataRecipient[] = ['anthropic'];
+    if (env.QUICKSCAN_CHIEF_FALLBACK_PROVIDER?.trim().toLowerCase() === 'openai'
+      && env.OPENAI_API_KEY?.trim()) recipients.push('openai');
+    return recipients;
+  }
+  if (explicit && explicit !== 'openai') return [];
+  const recipients: QuickScanChiefDataRecipient[] = [];
+  if (selectFreeFirstCapability([localCandidate(env)], qualityRequirements(env))) recipients.push('local-ollama');
+  if (env.OPENAI_API_KEY?.trim()) recipients.push('openai');
+  return recipients;
+}
+
 export function createOpenAiQuickScanChiefRunner(dependencies: OpenAiQuickScanChiefDependencies = {}) {
   const env = dependencies.env ?? process.env;
   const fetchFn = dependencies.fetchFn ?? fetch;

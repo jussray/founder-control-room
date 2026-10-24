@@ -93,14 +93,26 @@ function assertAnthropicReferenceSafety(
 
   for (const [key, child] of Object.entries(value)) {
     if (key === '$ref') continue;
-    assertAnthropicReferenceSafety(root, child, `${path}.${key}`, activeRefs);
+    if ((key === 'properties' || key === '$defs' || key === 'definitions' || key === 'dependentSchemas') && isRecord(child)) {
+      for (const [name, schema] of Object.entries(child)) {
+        assertAnthropicReferenceSafety(root, schema, `${path}.${key}.${name}`, activeRefs);
+      }
+    } else if (['items', 'additionalItems', 'additionalProperties', 'not', 'if', 'then', 'else', 'contentSchema', 'contains', 'propertyNames'].includes(key)) {
+      assertAnthropicReferenceSafety(root, child, `${path}.${key}`, activeRefs);
+    } else if (['prefixItems', 'allOf', 'anyOf', 'oneOf'].includes(key) && Array.isArray(child)) {
+      child.forEach((schema, index) => assertAnthropicReferenceSafety(root, schema, `${path}.${key}[${index}]`, activeRefs));
+    }
   }
 }
 
+const SCHEMA_MAP_KEYS = new Set(['properties', '$defs', 'definitions', 'dependentSchemas']);
+const SCHEMA_VALUE_KEYS = new Set([
+  'items', 'additionalItems', 'additionalProperties', 'not', 'if', 'then', 'else',
+  'contentSchema',
+]);
+const SCHEMA_ARRAY_KEYS = new Set(['prefixItems', 'allOf', 'anyOf', 'oneOf']);
+
 function cloneForAnthropic(value: unknown, path: string): unknown {
-  if (Array.isArray(value)) {
-    return value.map((item, index) => cloneForAnthropic(item, `${path}[${index}]`));
-  }
   if (!isRecord(value)) return value;
 
   const result: JsonSchema = {};
@@ -110,16 +122,27 @@ function cloneForAnthropic(value: unknown, path: string): unknown {
       if (child === 0 || child === 1) result[key] = child;
       continue;
     }
-    result[key] = cloneForAnthropic(child, `${path}.${key}`);
+    if (SCHEMA_MAP_KEYS.has(key) && isRecord(child)) {
+      // Names in "properties" and "$defs" are user-defined, not schema keywords.
+      result[key] = Object.fromEntries(
+        Object.entries(child).map(([name, schema]) =>
+          [name, cloneForAnthropic(schema, `${path}.${key}.${name}`)]),
+      );
+    } else if (SCHEMA_VALUE_KEYS.has(key)) {
+      result[key] = cloneForAnthropic(child, `${path}.${key}`);
+    } else if (SCHEMA_ARRAY_KEYS.has(key) && Array.isArray(child)) {
+      result[key] = child.map((schema, index) =>
+        cloneForAnthropic(schema, `${path}.${key}[${index}]`));
+    } else {
+      // Literal values in const/enum/default/examples must not be rewritten.
+      result[key] = child;
+    }
   }
 
   const schemaType = result.type;
   const isObject = schemaType === 'object'
     || (Array.isArray(schemaType) && schemaType.includes('object'));
-  if (isObject) {
-    result.additionalProperties = false;
-  }
-
+  if (isObject) result.additionalProperties = false;
   return result;
 }
 

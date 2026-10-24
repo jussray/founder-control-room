@@ -301,16 +301,19 @@ async function runProvider(
     throw responseTooLargeError(config.provider, response.status);
   }
 
-  let payload: unknown;
+  let payload: unknown = null;
   try {
     payload = raw ? JSON.parse(raw) : null;
   } catch {
-    throw new StructuredProviderError(
-      `${config.provider} returned invalid JSON`,
-      config.provider,
-      `${prefix(config.provider)}_INVALID_RESPONSE`,
-      response.status,
-    );
+    // Status is authoritative for non-2xx errors even when a proxy emits HTML.
+    if (response.ok) {
+      throw new StructuredProviderError(
+        `${config.provider} returned invalid JSON`,
+        config.provider,
+        `${prefix(config.provider)}_INVALID_RESPONSE`,
+        response.status,
+      );
+    }
   }
 
   if (!response.ok) {

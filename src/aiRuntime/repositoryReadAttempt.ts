@@ -226,6 +226,9 @@ export async function runGovernedRepositoryRead(
       ...input.world,
       authorityWorld: {
         ...input.world.authorityWorld,
+        // A ref resolution may outlive the original lease observation.
+        // Re-evaluate authority against the real clock immediately before readFile.
+        now: new Date().toISOString(),
         repository,
         headSha: resolvedSha,
       },

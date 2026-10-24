@@ -24,6 +24,7 @@ import { getQuickScanProspect, listQuickScanProspects, saveQuickScanProspect } f
 import { buildTrackedStripePaymentLinkUrl } from '../../quickscan/stripeWebhook.js';
 import {
   createOpenAiQuickScanChiefRunner,
+  quickScanChiefDataRecipients,
   QuickScanChiefProviderError,
   type QuickScanChiefResult,
 } from '../../quickscan/chiefOpenaiClient.js';
@@ -97,6 +98,7 @@ quickScanRouter.get('/', (_req, res) => {
       executeN8n: false,
       stripeWebhookConfigured: Boolean(process.env.STRIPE_QUICKSCAN_WEBHOOK_SECRET?.trim()),
       chiefConfigured: quickScanChiefConfigured(),
+      chiefDataRecipients: quickScanChiefDataRecipients(),
     },
     architecture: { fcr: 'authority-evidence-ui', chief: 'replaceable-reasoning', promptos: 'versioned-workflow-provenance', ultrathink: 'domain-rules', n8n: 'orchestration-disabled-v1' },
     priceCents: QUICKSCAN_PRICE_CENTS,
@@ -255,8 +257,8 @@ quickScanRouter.post('/prospects/:id/delivery', (req: FounderRequest, res) => {
  * Sending this prospect's evidence notes and qualification text to the configured model provider
  * is a real trust-boundary crossing ("founder-observed" is not by itself a
  * privacy classification), so the request must explicitly acknowledge it
- * via `acknowledgeDataSharing: true` — a UI confirm() alone is bypassable
- * by any direct caller and proves nothing; this makes the gate structural.
+ * via `acknowledgeDataSharing: true` and the exact server-derived
+ * `acknowledgedProviders` list; stale consent fails closed before dispatch.
  *
  * Refuses (409 QUICKSCAN_CHIEF_INPUT_CHANGED) rather than applying the
  * recommendation if evidence, qualification, or lifecycle state changed
@@ -275,7 +277,14 @@ quickScanRouter.post('/prospects/:id/chief-recommendation', async (req: FounderR
 
   const body = record(req.body);
   if (body.acknowledgeDataSharing !== true) {
-    return fail(res, 400, 'DATA_SHARING_ACKNOWLEDGEMENT_REQUIRED', 'this prospect\'s business name, owner name, segment, evidence notes, and qualification text will be sent to the configured Chief model provider; acknowledgeDataSharing: true is required to proceed');
+    return fail(res, 400, 'DATA_SHARING_ACKNOWLEDGEMENT_REQUIRED', 'explicit acknowledgement is required before Chief receives prospect data');
+  }
+  const recipients = quickScanChiefDataRecipients();
+  const approved = body.acknowledgedProviders;
+  if (!Array.isArray(approved)
+    || approved.length !== recipients.length
+    || approved.some((name, index) => name !== recipients[index])) {
+    return fail(res, 409, 'CHIEF_PROVIDER_CONSENT_CHANGED', 'configured provider recipients changed or were not acknowledged; refresh provider consent and retry');
   }
 
   let result: QuickScanChiefResult;
@@ -341,7 +350,7 @@ quickScanRouter.post('/prospects/:id/chief-recommendation', async (req: FounderR
   prospect.audit.push({
     id: `audit_${Date.now()}`,
     type: 'chief.recommendation.provenance',
-    message: `provider=${result.provenance.provider} model=${result.provenance.model} response=${result.provenance.responseId ?? 'none'} promptVersion=${result.provenance.promptVersion}`
+    message: `provider=${result.provenance.provider} acknowledgedProviders=${recipients.join(',')} model=${result.provenance.model} response=${result.provenance.responseId ?? 'none'} promptVersion=${result.provenance.promptVersion}`
       + (result.provenance.selection ? ` costClass=${result.provenance.selection.costClass}` : '')
       + (result.provenance.fallbackReason ? ` fallbackReason=${result.provenance.fallbackReason}` : '')
       + (rejectedCandidates ? ` rejected=${rejectedCandidates}` : ''),
