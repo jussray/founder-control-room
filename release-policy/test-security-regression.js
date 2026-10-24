@@ -8,7 +8,7 @@
  * - Sekret-Bip data privacy boundaries
  * - Chief AI governance policy enforcement
  *
- * PLACEHOLDER: This test suite must be implemented by security team.
+ * This source-only diagnostic must fail closed until executable security suites are wired.
  */
 
 const fs = require('fs');
@@ -30,7 +30,7 @@ console.log('');
 const requiredAncestors = policy.requiredRecoveryAncestors.storyengine || [];
 console.log(`Security work (recovered from ${requiredAncestors.length} commits):`);
 for (const ancestor of requiredAncestors) {
-  console.log(`  ✓ ${ancestor} (ancestry verified by commit finder)`);
+  console.log(`  ✓ ${ancestor} (declared only; independently verify pinned ancestry)`);
 }
 console.log('');
 
@@ -38,26 +38,26 @@ const regressions = [
   {
     name: 'StoryEngine tenant isolation',
     ancestors: ['7dbfecd'],
-    status: 'VERIFIED',
-    reason: 'Commit 7dbfecd present in release tuple',
+    status: 'UNVERIFIED',
+    reason: 'Requires exact pinned ancestry and passing tenant isolation tests',
   },
   {
     name: 'StoryEngine studio guard hardening',
     ancestors: ['645d929'],
-    status: 'VERIFIED',
-    reason: 'Commit 645d929 present in release tuple',
+    status: 'UNVERIFIED',
+    reason: 'Requires exact pinned ancestry and passing studio authorization tests',
   },
   {
     name: 'Sekret-Bip teen safety boundaries',
     ancestors: [],
-    status: 'VERIFIED',
-    reason: 'Voice module isolated; no safety boundary changes',
+    status: 'UNVERIFIED',
+    reason: 'Requires executed Se'kret Bip privacy and safety tests',
   },
   {
     name: 'Chief AI governance enforcement',
     ancestors: [],
-    status: 'VERIFIED',
-    reason: 'Governance module present; policy integrity maintained',
+    status: 'UNVERIFIED',
+    reason: 'Requires executed Chief governance and authority tests',
   },
 ];
 
@@ -75,7 +75,7 @@ console.log('');
 if (verified === regressions.length) {
   console.log('✓ Security regression tests verified.');
   console.log('');
-  console.log('Full security audit to be completed post-release.');
+  console.log('Standalone checks alone do not prove a security release.');
   console.log('Known work recovered: 4 commits (tenant isolation, studio guard, styling, security fixes).');
   process.exit(0);
 } else {
