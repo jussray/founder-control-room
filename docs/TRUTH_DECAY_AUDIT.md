@@ -1,5 +1,9 @@
 # Truth Decay Audit: When a True Claim Becomes Unsafe to Reuse
 
+## October 23, 2026: PR #1004 peer-ref failure was dependency drift
+
+A fresh GitHub ref read resolves StoryEngine `refs/heads/main` to `6b97b78370fbc25d4b4bb88bfeab136eb4c7dc2f`; this commit had 15/15 successful check runs at the latest observed completion time, `2026-10-22T23:55:59Z`. FCR PR #1004 head `607ec05be0bce5639bab36b75c3661a8af751be6` expected `26b1c34ae7c97c5d1b66a23d6345b3965cfcdc1f` and failed its live-ref equality step before checkout, runtime, and browser federation ([failed job](https://github.com/jussray/founder-control-room/actions/runs/39875447018/job/120159809873)). The failure is verified external peer drift, not a failure of the PR's support-claims content. Refreshing the pin selects the successor peer only; PR #1004 must earn its own exact-head runtime and receipt/browser witness, and PR #1003's separate evidence cannot transfer. Movement of either repository expires pair-specific proof.
+
 ## October 16, 2026: StoryEngine peer-identity renewal, without inherited proof
 
 FCR's new actual-server GitHub Workspace/browser test, full founder UI journey, capability workbench, and guarded terminal scenarios passed on the predecessor candidate while the separate FCR-to-StoryEngine test failed at the live peer-ref gate. The workflow expected StoryEngine `a6e6a396ed30535af2fd9b1ec2347a84e1a3fbf3` while independently observed `refs/heads/main` resolved to `26b1c34ae7c97c5d1b66a23d6345b3965cfcdc1f`. The former is not a current federation subject.
