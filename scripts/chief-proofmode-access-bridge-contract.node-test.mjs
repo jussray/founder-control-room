@@ -63,7 +63,7 @@ test('recovery keeps repair identity mandatory while check may discover one exis
 
 test('repair requires founder approval but never publishes the raw approval reference', () => {
   const authorityStep = recoveryWorkflow.match(
-    /- name: Verify exact FCR main, target, and founder mutation approval([\s\S]*?)- name: Refuse unresolved prior Chief Access repair/,
+    /- name: Verify exact FCR main, target, and founder mutation approval([\s\S]*?)- name: Set up Node 24/,
   )?.[1] ?? '';
   assert.match(authorityStep, /repair requires an auditable 8-200 character approval_reference/);
   assert.match(authorityStep, /sha256sum/);
@@ -101,8 +101,16 @@ test('canonical selector is specificity-first and shared by recovery and runtime
 test('repair latch blocks blind retry and is bound to provider subject', () => {
   assert.match(recoveryWorkflow, /Refuse unresolved prior Chief Access repair/);
   assert.match(recoveryWorkflow, /chief-proofmode-access-reconciliation-state\.mjs/);
+  assert.match(recoveryWorkflow, /Observe exact Chief provider subject before repair latch/);
+  assert.match(recoveryWorkflow, /CHIEF_ACCESS_SUBJECT_ONLY:\s*'true'/);
+  assert.match(recoveryWorkflow, /Recover terminal orphaned repair latch/);
+  assert.match(recoveryWorkflow, /actions\/runs\/\$\{orphan_run\}/);
+  assert.match(recoveryWorkflow, /\$run_status" == 'completed'/);
+  assert.match(recoveryWorkflow, /\$orphan_subject" == "\$CURRENT_SUBJECT"/);
+  assert.match(recoveryWorkflow, /\$CURRENT_SUBJECT_CONFIGURED" == 'true'/);
   assert.match(recoveryWorkflow, /Persist repair-in-progress reconciliation latch/);
-  assert.match(recoveryWorkflow, /disposition=REPAIR_IN_PROGRESS/);
+  assert.match(recoveryWorkflow, /subject=\$PROVIDER_SUBJECT/);
+  assert.doesNotMatch(recoveryWorkflow, /disposition=REPAIR_IN_PROGRESS subject=pending/);
   assert.match(recoveryWorkflow, /RECONCILE_REQUIRED/);
   assert.match(recoveryWorkflow, /LATCH_OUTCOME/);
   assert.match(recoveryWorkflow, /\$LATCH_OUTCOME" == 'success'/);
@@ -114,6 +122,8 @@ test('repair latch blocks blind retry and is bound to provider subject', () => {
   assert.match(reconciliationState, /subject-v2/);
   assert.match(reconciliationState, /blockedSubjects/);
   assert.match(reconciliationState, /inProgressRuns/);
+  assert.match(reconciliationState, /inProgressSubjects/);
+  assert.match(reconciliationState, /--json/);
 });
 
 test('provider subject and ambiguous mutation outcome are durable and fail closed', () => {
