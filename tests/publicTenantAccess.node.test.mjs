@@ -74,3 +74,28 @@ test('accepts an exact MCP audience but rejects generic unbound tokens',async()=
  assert.equal(await authenticatePublicMcp(invalid,cfg,async()=>{called=true;return {id:'A'};}),null);
  assert.equal(called,false);
 });
+
+test('OAuth resource checks use exact full values, never URL prefixes or substrings',async()=>{
+ let verifyCalls=0;
+ const verify=async()=>{verifyCalls++;return {id:'A'}};
+ const deceptive=[
+  `https://evil.example/forward?to=${FCR_PUBLIC_MCP_RESOURCE}`,
+  `${FCR_PUBLIC_MCP_RESOURCE}/more`,
+  `${FCR_PUBLIC_MCP_RESOURCE}.evil.example`,
+  FCR_PUBLIC_MCP_RESOURCE.replace('https:', 'http:'),
+ ];
+ for(const address of deceptive){
+  for(const bad of [
+   {...claims,aud:address,resource:undefined},
+   {...claims,aud:['authenticated',address],resource:undefined},
+   {...claims,aud:'authenticated',resource:address},
+  ]){
+   assert.equal(await authenticatePublicMcp(jwt(bad),cfg,verify),null,address);
+  }
+ }
+ assert.equal(verifyCalls,0);
+
+ const accepted=jwt({...claims,aud:['authenticated',FCR_PUBLIC_MCP_RESOURCE],resource:undefined});
+ assert.deepEqual(await authenticatePublicMcp(accepted,cfg,verify),A);
+ assert.equal(verifyCalls,1);
+});
