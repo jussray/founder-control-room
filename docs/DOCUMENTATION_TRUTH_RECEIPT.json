@@ -349,7 +349,8 @@
     {
       "path": ".github/workflows/chief-proofmode-access-recovery.yml",
       "claims": [
-        "`.github/workflows/chief-proofmode-access-recovery.yml` must remain a repository-local reusable workflow with no standalone repair dispatch, keep read and repair authority separate, require an auditable repair approval reference, and fail closed on unresolved subject-bound reconciliation state before any provider POST."
+        "`.github/workflows/chief-proofmode-access-recovery.yml` must remain a repository-local reusable workflow with no standalone repair dispatch, keep read and repair authority separate, require an auditable repair approval reference, and fail closed on unresolved subject-bound reconciliation state before any provider POST.",
+        "`.github/workflows/chief-proofmode-access-recovery.yml` may recover an orphaned REPAIR_IN_PROGRESS latch only after the original GitHub Actions run is terminal and fresh read-only Cloudflare observation proves the same exact provider-subject fingerprint is currently configured; active, pending, mismatched, or unconfigured subjects remain blocked and recovery performs no provider mutation."
       ]
     },
     {
@@ -367,7 +368,14 @@
     {
       "path": "scripts/chief-proofmode-access-reconciliation-state.mjs",
       "claims": [
-        "`scripts/chief-proofmode-access-reconciliation-state.mjs` must persist REPAIR_IN_PROGRESS and RECONCILE_REQUIRED by provider-subject fingerprint, preserve unresolved legacy reconciliation through the v2 transition, and prevent evidence for a different application/token subject from clearing retry blocking."
+        "`scripts/chief-proofmode-access-reconciliation-state.mjs` must persist REPAIR_IN_PROGRESS and RECONCILE_REQUIRED by provider-subject fingerprint, preserve unresolved legacy reconciliation through the v2 transition, and prevent evidence for a different application/token subject from clearing retry blocking.",
+        "`scripts/chief-proofmode-access-reconciliation-state.mjs` must expose the exact in-progress run plus provider subject for bounded orphan reconciliation while requiring the recovery marker to target that original run; an unrelated run cannot silently clear the latch."
+      ]
+    },
+    {
+      "path": "docs/CHIEF_PROOFMODE_ACCESS_RECOVERY.md",
+      "claims": [
+        "`docs/CHIEF_PROOFMODE_ACCESS_RECOVERY.md` must document that terminal same-subject provider readback is required before orphaned Chief Access repair state can be cleared and that reconciliation recovery itself has no Cloudflare mutation authority."
       ]
     }
   ]
