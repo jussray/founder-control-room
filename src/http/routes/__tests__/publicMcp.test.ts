@@ -166,6 +166,29 @@ describe('public FCR MCP isolation', () => {
     expect(state.from).not.toHaveBeenCalled();
   });
 
+  it('rejects deceptive resource URL substrings before authentication and database access', async () => {
+    const deceptive = [
+      `https://attacker.example/redirect?next=${FCR_PUBLIC_MCP_RESOURCE}`,
+      `${FCR_PUBLIC_MCP_RESOURCE}/extra`,
+      `${FCR_PUBLIC_MCP_RESOURCE}.attacker.example`,
+      FCR_PUBLIC_MCP_RESOURCE.replace('https:', 'http:'),
+    ];
+    for (const address of deceptive) {
+      for (const overrides of [
+        { aud: address, resource: undefined },
+        { aud: ['authenticated', address], resource: undefined },
+        { aud: 'authenticated', resource: address },
+      ]) {
+        const response = await request(app()).post('/mcp/public')
+          .set('Authorization', `Bearer ${jwt('user-A', 'chatgpt-public', overrides)}`)
+          .send({ jsonrpc: '2.0', id: 1, method: 'tools/list' });
+        expect(response.status).toBe(401);
+      }
+    }
+    expect(state.getUser).not.toHaveBeenCalled();
+    expect(state.from).not.toHaveBeenCalled();
+  });
+
   it('refuses anonymous users, even with a matching client claim', async () => {
     state.getUser.mockResolvedValue({ data: { user: { id: 'user-A', is_anonymous: true } }, error: null });
     expect((await post(app())).status).toBe(401);
