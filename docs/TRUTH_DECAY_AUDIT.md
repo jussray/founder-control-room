@@ -1,5 +1,11 @@
 # Truth Decay Audit: When a True Claim Becomes Unsafe to Reuse
 
+## October 24, 2026: founder-dock privacy boundary and StoryEngine peer movement
+
+The signed-out Control Room previously left founder-stack navigation present in the DOM as a visible dock. The repair makes first paint fail closed and derives dock visibility from the authenticated `#root .shell`; losing that shell closes and hides the dock again. Structural fixtures may synthesize the authenticated shell only after proving the signed-out state, while the opaque HttpOnly-cookie browser path remains the authority for real session behavior. UI hiding does not replace server authorization and does not prove production privacy until the exact successor browser witness passes.
+
+During rollover, StoryEngine `main` advanced to `87501be2da31d12f421b0ed2da49df357fc9fcb1`, which is two commits strictly ahead and zero behind the prior current-main FCR pin `3c46b3649088ac4c6e1775102ba49abf5c779abf`. Sixteen observed exact-head checks completed successfully. Rebinding selects a new evidence subject and expires predecessor FCR federation proof; the successor FCR head remains UNKNOWN for pair compatibility until the complete exact-head federation/browser witness succeeds.
+
 ## October 24, 2026: StoryEngine capability-profile commit expired FCR peer proof
 
 FCR's exact-head Playwright run `40071010317` proved the local E2E harness green and then failed the separate StoryEngine live-ref equality step. The workflow expected `6b97b78370fbc25d4b4bb88bfeab136eb4c7dc2f`, while a fresh provider read resolved StoryEngine `refs/heads/main` to `3c46b3649088ac4c6e1775102ba49abf5c779abf`. The successor StoryEngine commit is the additive `.control-room/model-capabilities.v1.json` capability-profile change and its current Agent Contract v1, CodeQL, L99 Promotion Gates, and Control Room Test Ledger runs completed successfully. The mismatch is therefore verified peer identity drift caused by the new source commit, not proof that federation behavior failed. Updating the pin selects a new evidence subject only; predecessor browser proof does not transfer, runtime activation remains false, and the next FCR head must rerun the complete peer/runtime/browser witness.
