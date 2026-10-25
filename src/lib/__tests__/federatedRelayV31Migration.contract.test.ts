@@ -3,6 +3,9 @@ import { describe, expect, it } from 'vitest';
 
 const sql = readFileSync('supabase/migrations/20260913203000_federated_relay_v31.sql', 'utf8');
 const previewSql = readFileSync('supabase/preview-contracts/20260913203000_federated_relay_v31.sql', 'utf8');
+const retrySql = readFileSync('supabase/migrations/20261025010500_harden_federated_relay_v31_exact_retry_race.sql', 'utf8');
+const neonWorkflow = readFileSync('.github/workflows/neon-pr-branches.yml', 'utf8');
+const concurrencyScript = readFileSync('scripts/prove-federated-relay-v31-neon-concurrency.sh', 'utf8');
 
 describe('federated relay v3.1 migration contract', () => {
   it('keeps v3.1 additive and service-role mutation behind narrow RPCs', () => {
@@ -74,5 +77,25 @@ describe('federated relay v3.1 migration contract', () => {
     expect(previewSql).toContain("relay_v31_preview_schema_missing");
     expect(previewSql).not.toContain("ALTER ROLE");
     expect(sql).not.toContain("CREATE ROLE anon");
+  });
+
+  it('rechecks exact duplicates after cursor locks before sequence validation', () => {
+    const sourceLock = retrySql.indexOf('from public.federated_relay_v31_source_cursors');
+    const chainLock = retrySql.indexOf('from public.federated_relay_v31_chain_cursors');
+    const postLockDuplicate = retrySql.indexOf('where message_id = p_message_id', chainLock);
+    const sequenceCheck = retrySql.indexOf('p_source_sequence <> v_source.last_sequence + 1');
+    expect(sourceLock).toBeGreaterThan(0);
+    expect(chainLock).toBeGreaterThan(sourceLock);
+    expect(postLockDuplicate).toBeGreaterThan(chainLock);
+    expect(sequenceCheck).toBeGreaterThan(postLockDuplicate);
+    expect(retrySql).toContain("select 'duplicate'::text");
+  });
+
+  it('runs a real Neon exact-retry race for relay migrations', () => {
+    expect(neonWorkflow).toContain('Prove federated relay v3.1 concurrent exact retry');
+    expect(neonWorkflow).toContain('scripts/prove-federated-relay-v31-neon-concurrency.sh');
+    expect(concurrencyScript).toContain('run_accept >"$tmp/one.out"');
+    expect(concurrencyScript).toContain('run_accept >"$tmp/two.out"');
+    expect(concurrencyScript).toContain('one accepted, one duplicate, one durable message');
   });
 });
