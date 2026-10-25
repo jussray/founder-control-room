@@ -103,4 +103,31 @@ describe('operator relay', () => {
     const wrong = response(req, { toOperator: 'claude-code' });
     expect(validateOperatorRelayResponse(wrong, req)).toContain('response must return to source operator');
   });
+
+  it('bounds relay freshness and rejects malformed runtime JSON without throwing', () => {
+    const future = request({
+      createdAt: '2026-09-16T06:31:31.000Z',
+      expiresAt: '2026-09-16T06:36:31.000Z',
+    });
+    expect(validateOperatorRelayRequest(future, NOW)).toContain('relay request creation time is too far in the future');
+
+    const longLived = request({ expiresAt: '2026-09-16T06:40:00.001Z' });
+    expect(validateOperatorRelayRequest(longLived, NOW)).toContain('relay request ttl exceeds maximum');
+
+    const malformedRequest = {
+      contract: OPERATOR_RELAY_REQUEST_CONTRACT,
+      relayId: 'malformed',
+    };
+    expect(() => validateOperatorRelayRequest(malformedRequest, NOW)).not.toThrow();
+    expect(validateOperatorRelayRequest(malformedRequest, NOW)).toContain('context is required');
+
+    const req = request();
+    const malformedResponse = {
+      ...response(req),
+      evidenceRefs: [42],
+    };
+    expect(() => validateOperatorRelayResponse(malformedResponse, req)).not.toThrow();
+    expect(validateOperatorRelayResponse(malformedResponse, req)).toContain('response evidenceRefs must be a string array');
+  });
+
 });
