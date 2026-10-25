@@ -45,6 +45,63 @@ function receipt(toolName: 'fcr_relay_operator') {
   };
 }
 
+function evidenceInput(overrides: Partial<externalTools.RecordExternalMcpEvidenceInput> = {}) {
+  return {
+    identity: {
+      userId: 'founder-user-1',
+      email: 'founder@example.com',
+      clientId: 'chatgpt-client',
+      authMode: 'oauth' as const,
+    },
+    requestId: 'relay-evidence-1',
+    projectSlug: 'founder-control-room',
+    toolName: 'fcr_relay_operator' as const,
+    arguments: { goal: 'bounded relay' },
+    result: { status: 'failed' },
+    durationMs: 12,
+    risk: 'external_side_effect' as const,
+    ...overrides,
+  };
+}
+
+describe('external MCP durable evidence rows', () => {
+  it('persists failed relay truth and bounded failure metadata', () => {
+    const row = externalTools.buildExternalMcpEvidenceRow('project-row-1', evidenceInput({
+      outcomeStatus: 'failed',
+      failure: {
+        code: 'provider boundary failed with spaces',
+        provider: 'anthropic/messages',
+        externalProviderCall: true,
+      },
+    }));
+
+    expect(row).toMatchObject({
+      project_id: 'project-row-1',
+      status: 'failed',
+      risk: 'external_side_effect',
+      response_summary: {
+        rawResultStored: false,
+        failure: {
+          code: 'provider_boundary_failed_with_spaces',
+          provider: 'anthropic_messages',
+          externalProviderCall: true,
+        },
+      },
+    });
+  });
+
+  it('keeps ordinary successful evidence passed without invented failure metadata', () => {
+    const row = externalTools.buildExternalMcpEvidenceRow('project-row-1', evidenceInput({
+      outcomeStatus: 'passed',
+      result: { ok: true },
+      failure: undefined,
+    }));
+
+    expect(row.status).toBe('passed');
+    expect(row.response_summary).not.toHaveProperty('failure');
+  });
+});
+
 describe('external FCR operator relay authority boundary', () => {
   it('advertises the canonical peer set plus bounded work classes without mutation authority', () => {
     const tool = externalTools.externalMcpToolDefinitions()
@@ -317,6 +374,12 @@ describe('external relay provider-call receipts', () => {
 
     expect(recordEvidence).toHaveBeenCalledWith(expect.objectContaining({
       risk: 'external_side_effect',
+      outcomeStatus: 'failed',
+      failure: {
+        code: 'provider_boundary_failure',
+        provider: 'anthropic',
+        externalProviderCall: true,
+      },
       result: {
         contract: 'fcr/operator-relay-failure@v1',
         status: 'failed',
@@ -351,6 +414,12 @@ describe('external relay provider-call receipts', () => {
 
     expect(recordEvidence).toHaveBeenCalledWith(expect.objectContaining({
       risk: 'read',
+      outcomeStatus: 'failed',
+      failure: {
+        code: 'relay_failed_before_provider',
+        provider: undefined,
+        externalProviderCall: false,
+      },
       result: {
         contract: 'fcr/operator-relay-failure@v1',
         status: 'failed',
