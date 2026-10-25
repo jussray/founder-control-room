@@ -6,6 +6,7 @@ import {
   type OperatorRelayRequestV1,
 } from '../operatorRelay.js';
 import { createServerMuseRelayAdapter } from '../operatorRelayMuseProvider.js';
+import { OperatorRelayProviderBoundaryError } from '../operatorRelayProvider.js';
 
 const KEY = 'fixture-meta-model-key';
 
@@ -133,5 +134,32 @@ describe('createServerMuseRelayAdapter', () => {
 
     await expect(call).rejects.toThrow('Muse relay returned a non-completed response');
     await expect(call).rejects.not.toThrow(marker);
+  });
+});
+
+
+describe('Muse provider-call evidence boundary', () => {
+  it('marks a failed network attempt as an external provider call without leaking transport detail', async () => {
+    const marker = 'muse-secret-transport-detail';
+    const fetchMock = (async () => {
+      throw new Error(marker);
+    }) as typeof fetch;
+    const adapter = createServerMuseRelayAdapter({
+      MODEL_API_KEY: 'fixture-muse-key',
+      FCR_RELAY_MUSE_MODEL: 'muse-spark-1.1',
+    }, fetchMock);
+    expect(adapter).toBeDefined();
+
+    try {
+      await adapter!(relay());
+      throw new Error('expected Muse failure');
+    } catch (error) {
+      expect(error).toBeInstanceOf(OperatorRelayProviderBoundaryError);
+      expect(error).toMatchObject({
+        provider: 'muse',
+        externalProviderCall: true,
+      });
+      expect(String(error)).not.toContain(marker);
+    }
   });
 });
