@@ -1,6 +1,6 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Document current evidence-authority boundaries across cross-repository browser federation, resident Council/Muse relay activation, provider-held runtime-secret observation, and account-scoped founder-content metrics so source wiring, account identity, configured bindings, live provider invocation, and mutation authority remain separate claims with separate proof.",
+  "purpose": "Document current evidence-authority boundaries across cross-repository browser federation, resident Council/Muse relay activation, provider-held runtime-secret observation, account-scoped founder-content metrics, and the public Lovable external-project surface bindings so source wiring, account identity, configured bindings, live provider invocation, and mutation authority remain separate claims with separate proof.",
   "domains": [
     "cloudflare-authority",
     "repository-provider",
@@ -9,7 +9,8 @@
     "publishing",
     "merge-authority",
     "workflow-authority",
-    "truth-governance"
+    "truth-governance",
+    "external-surface-authority"
   ],
   "changes": [
     {
@@ -336,6 +337,24 @@
       "path": "wrangler.email.toml",
       "claims": [
         "`wrangler.email.toml` must declare the review-email Worker identity, account, entrypoint, private `FOUNDER_CONTROL_ROOM_API -> founder-control-room` Service Binding, and exactly one top-level `addresses` value `review@foundercontrolroom.org`; this is desired state for Wrangler reconciliation, not proof of provider readback or runtime invocation."
+      ]
+    },
+    {
+      "path": "public/.well-known/lovable-project-surfaces.json",
+      "claims": [
+        "`public/.well-known/lovable-project-surfaces.json` must bind every published Lovable surface to its canonical repository and canonical branch only while truthAuthority, executionAllowed, and externalMutationAllowed remain locked false; a binding entry must never grant truth, execution, or external-mutation authority through this manifest."
+      ]
+    },
+    {
+      "path": "public/.well-known/lovable-project-surfaces.schema.json",
+      "claims": [
+        "`public/.well-known/lovable-project-surfaces.schema.json` must reject any surfaceId that is not a canonical 8-4-4-4-12 UUID behind the lovable: prefix, and must keep truthAuthority, executionAllowed, and externalMutationAllowed constrained to the constant false for every published binding."
+      ]
+    },
+    {
+      "path": "scripts/verify-documentation-truth.mjs",
+      "claims": [
+        "`scripts/verify-documentation-truth.mjs` must classify both public Lovable surface-binding artifacts under the external-surface-authority domain so a change to either file fails closed without a current documentation receipt naming path-bound invariants for them."
       ]
     }
   ]
