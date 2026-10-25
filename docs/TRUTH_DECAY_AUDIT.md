@@ -1,5 +1,26 @@
 # Truth Decay Audit: When a True Claim Becomes Unsafe to Reuse
 
+## October 24, 2026: StoryEngine capability-profile commit expired FCR peer proof
+
+FCR's exact-head Playwright run `40071010317` proved the local E2E harness green and then failed the separate StoryEngine live-ref equality step. The workflow expected `6b97b78370fbc25d4b4bb88bfeab136eb4c7dc2f`, while a fresh provider read resolved StoryEngine `refs/heads/main` to `3c46b3649088ac4c6e1775102ba49abf5c779abf`. The successor StoryEngine commit is the additive `.control-room/model-capabilities.v1.json` capability-profile change and its current Agent Contract v1, CodeQL, L99 Promotion Gates, and Control Room Test Ledger runs completed successfully. The mismatch is therefore verified peer identity drift caused by the new source commit, not proof that federation behavior failed. Updating the pin selects a new evidence subject only; predecessor browser proof does not transfer, runtime activation remains false, and the next FCR head must rerun the complete peer/runtime/browser witness.
+
+
+## October 23, 2026: PR #1004 peer-ref failure was dependency drift
+
+A fresh GitHub ref read resolves StoryEngine `refs/heads/main` to `6b97b78370fbc25d4b4bb88bfeab136eb4c7dc2f`; this commit had 15/15 successful check runs at the latest observed completion time, `2026-10-22T23:55:59Z`. FCR PR #1004 head `607ec05be0bce5639bab36b75c3661a8af751be6` expected `26b1c34ae7c97c5d1b66a23d6345b3965cfcdc1f` and failed its live-ref equality step before checkout, runtime, and browser federation ([failed job](https://github.com/jussray/founder-control-room/actions/runs/39875447018/job/120159809873)). The failure is verified external peer drift, not a failure of the PR's support-claims content. Refreshing the pin selects the successor peer only; PR #1004 must earn its own exact-head runtime and receipt/browser witness, and PR #1003's separate evidence cannot transfer. Movement of either repository expires pair-specific proof.
+
+## October 16, 2026: StoryEngine peer-identity renewal, without inherited proof
+
+FCR's new actual-server GitHub Workspace/browser test, full founder UI journey, capability workbench, and guarded terminal scenarios passed on the predecessor candidate while the separate FCR-to-StoryEngine test failed at the live peer-ref gate. The workflow expected StoryEngine `a6e6a396ed30535af2fd9b1ec2347a84e1a3fbf3` while independently observed `refs/heads/main` resolved to `26b1c34ae7c97c5d1b66a23d6345b3965cfcdc1f`. The former is not a current federation subject.
+
+GitHub comparison classified the successor as strictly ahead by 22 commits, with changes across StoryEngine route, browser, video, and proof surfaces. The successor had 15 of 15 check runs successful at observation, including the Control Room federation contract, but those checks belong only to StoryEngine. Rebinding FCR's immutable peer SHA selects the newer evidence subject and unblocks the fresh witness; it neither verifies pair compatibility nor carries old Playwright results forward. Only completed exact-head FCR-to-StoryEngine runtime, directive/receipt, replay, and browser checks can renew that narrow integration claim. No merge, deploy, release, publisher, or production authority transfers by changing the pin.
+
+## October 16, 2026: FCR development workspace evidence
+
+The updated FCR GitHub Workspace exposes repository editing and read-only terminal controls together and links selected Portfolio projects to the same authenticated workbench. The browser test in `.github/workflows/playwright.yml` exercises the real served FCR application at a selected exact source commit, using test-only external GitHub and Supabase substitutes. A passing test must not imply production browser availability, provider account writes, unrestricted terminal execution, or release authority. A failed or skipped test keeps application integration unverified.
+
+The browser proof expires when the FCR candidate commit changes. Bip remains an independent application and control room; no evidence from FCR tests can establish a Bip runtime outcome. The project-selector URL is a read-context convenience and never authorizes repository mutation.
+
 ## Incident class
 
 A claim can be truthful when observed and still become false, stale, superseded, or unknown before it is used.

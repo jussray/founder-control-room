@@ -1,5 +1,10 @@
 # Founder Control Room
 
+## October 24, 2026 StoryEngine model-capability peer refresh
+
+A fresh GitHub observation resolves StoryEngine `refs/heads/main` to `3c46b3649088ac4c6e1775102ba49abf5c779abf` after the additive `.control-room/model-capabilities.v1.json` profile commit. StoryEngine's exact successor head completed Agent Contract v1, CodeQL, L99 Promotion Gates, and Control Room Test Ledger successfully. FCR exact-head Playwright run `40071010317` passed the local E2E harness, then correctly failed its live peer-ref equality gate because it still expected `6b97b78370fbc25d4b4bb88bfeab136eb4c7dc2f`. This repair advances only the pinned evidence subject to `3c46b3649088ac4c6e1775102ba49abf5c779abf`; it does not activate any model runtime, inherit predecessor federation proof, or grant merge, deploy, provider-mutation, publication, or production authority. The successor FCR head must earn its own complete federation/browser witness.
+
+
 > **Copyright © 2024–2026 Juss Ray. All rights reserved.**
 > This is proprietary software. No license to use, copy, modify, distribute,
 > sublicense, or create derivative works is granted. See [LICENSE](LICENSE).
@@ -7,6 +12,20 @@
 Founder Control Room is the provider-independent founder operating plane for governed portfolio work: repository truth, proposals, approvals, evidence, capability control, release control, production verification, rollback, founder-content execution, and cross-project decisions.
 
 GitHub, Cloudflare, Supabase, n8n, Zapier, HubSpot, Shopify, and other providers may supply execution or evidence. None of them becomes the product constitution.
+
+## October 23, 2026 StoryEngine peer refresh for FCR browser federation
+
+A fresh GitHub observation resolves StoryEngine `refs/heads/main` to `6b97b78370fbc25d4b4bb88bfeab136eb4c7dc2f`; the exact peer commit had 15 of 15 check runs successful, last completed at `2026-10-22T23:55:59Z`. FCR PR #1004 at head `607ec05be0bce5639bab36b75c3661a8af751be6` failed step 10, “Verify live StoryEngine peer ref still pinned,” because it still expected `26b1c34ae7c97c5d1b66a23d6345b3965cfcdc1f` ([failed job](https://github.com/jussray/founder-control-room/actions/runs/39875447018/job/120159809873)); the remaining peer-browser steps were skipped after the mismatch. The repair selects `6b97b78370fbc25d4b4bb88bfeab136eb4c7dc2f` as the next evidence subject. This pin does not prove PR #1004 federation or inherit PR #1003's separate exact-head witness; the full PR #1004 witness must pass for its own head. Any later movement of either repository expires pair-specific proof.
+
+## October 16, 2026 StoryEngine peer refresh for FCR browser federation
+
+The FCR Playwright workflow's StoryEngine peer identity was changed from `a6e6a396ed30535af2fd9b1ec2347a84e1a3fbf3` to the separately observed StoryEngine `main` SHA `26b1c34ae7c97c5d1b66a23d6345b3965cfcdc1f`. GitHub comparison showed a forward, 22-commit peer transition, and the successor had 15 passing checks at observation time, including the Control Room federation contract. This pin refresh is a prerequisite for running the FCR-to-StoryEngine browser test, **not** a passing FCR peer witness or an authorization to deploy.
+
+The former FCR browser run passed all local Control Room journeys before deliberately stopping on the stale peer-ref check. All predecessor FCR/StoryEngine federation evidence remains historical. Only an exact FCR head which independently checks StoryEngine's live ref, checks out the pinned commit, proves the peer runtime identity, and completes the full Playwright directive/receipt loop can claim current federation integration at this pair. Any movement of either head expires that claim again.
+
+## GitHub Workspace integration candidate
+
+FCR includes a project-linked repository editor and an integrated guarded terminal panel. The terminal operates only through existing mission-bound read-only Git commands and exact commit checks. CI runs a browser integration journey against the real FCR server using test substitutes for external providers. The candidate is not verified as a production release. Product control rooms, including Bip, retain separate product ownership and capabilities.
 
 ## Read this README as a truth surface
 
@@ -241,6 +260,10 @@ Source dependence on that topology is not proof the live provider is configured 
 
 `OPENAI_API_KEY` follows the same split authority. The canonical Worker registry requires the provider-held runtime binding because live FCR OpenAI paths consume it. GitHub Actions may separately hold the same logical credential for CI-only consumers such as the bounded AI Failure Repair workflow, but the Actions copy is not runtime proof and must not be copied into the Worker during deploy. `Runtime Secret Proof` derives its complete required-name set from `wrangler.worker.toml`, asks Cloudflare only for secret names, fingerprints that registry, and never reads or prints secret values. If the Cloudflare observation credential is malformed or unusable before enumeration, every unobserved runtime-secret presence claim remains `UNKNOWN`/`BLOCKED`, not missing.
 
+The Worker-only reconciliation workflow must run the same canonical Cloudflare runtime-secret **name** check inside its authority gate, before its first secret write or deployment. It derives requirements from `wrangler.worker.toml [secrets].required` and may exclude only the fail-closed `FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON` that it itself writes afterward. A missing name or unavailable Cloudflare enumeration blocks reconciliation; source declarations or historical runtime receipts never satisfy the live gate. No values are read, and passing the gate does not prove credential validity, API identity, or permission to deploy.
+
+Worker-only production reconciliation now has a second, separately verifiable release gate: direct `api.foundercontrolroom.org/version` and public `foundercontrolroom.org/version` must both return the canonical Worker service header and exact approved source SHA. The Pages `FCR_API` service binding, API Worker custom-domain assignment, Cloudflare request-tracer simulation, and a successful GitHub build are configuration or test evidence, **not** substitutes for these live response receipts. Missing public identity evidence fails the workflow closed rather than weakening Pages' identity check.
+
 The first-party FCR Shopify paid-order ingress follows the same boundary. `FCR_SHOPIFY_WEBHOOK_SECRET` and `FCR_COMMERCE_HASH_SALT` must remain provider-held required Worker secrets before promotion, while source merely declares their names. Their presence cannot prove that Shopify registered the `orders/paid` callback, that the deployed Worker serves the exact commerce head, that the production Supabase migration exists, or that any payment was collected; those claims require separate provider, deployment, database, runtime, and revenue receipts.
 
 Production does not deploy merely because `main` moved or a Cloudflare build succeeded. A production claim remains incomplete until the authorized lane proves, for one exact candidate:
@@ -451,6 +474,22 @@ Pin alignment alone cannot promote the successor federation state beyond `UNKNOW
 StoryEngine `main` advanced from the previously pinned `168d65ede38d2477ea00902fa1f0e76f292c583d` through `c9af4ea095561d0837a141e311e8977d796aaaa7` (`feat(video): expose StoryEngine MAKEVIDEO skill`) to independently observed `3c1689fe67142e783fe7d18b5ff610640bdc81d6` (`ci(video): prove StoryEngine MAKEVIDEO skill path`). FCR Playwright run #6969 on `897083276b6c775c49ce30be189a50bd610b5d4c` passed its local/direct browser harness but failed the separate live peer-ref freshness check, so that run is historical browser evidence for the predecessor peer rather than current federation proof.
 
 Rebinding `.github/workflows/playwright.yml` to `3c1689fe67142e783fe7d18b5ff610640bdc81d6` selects the successor evidence subject only. The successor FCR head must complete the live-ref check, immutable peer checkout, exact StoryEngine runtime identity, directive/receipt binding, replay protections, and full Playwright browser witness before federation may be called current. Pin alignment grants no merge, deploy, production, publication, billing, or provider-mutation authority.
+
+
+## Portfolio conversion tracking contract
+
+FCR carries a privacy-minimal portfolio conversion contract in [`docs/PORTFOLIO_CONVERSION_TRACKING.md`](docs/PORTFOLIO_CONVERSION_TRACKING.md). The first approved event set is `call_click`, `whatsapp_click`, `pickup_request`, and `directions_click`. The source contract forbids customer identity/device fields from the conversion table and keeps automatic deletion disabled unless the founder separately approves a retention policy.
+
+Provider configuration, site wiring, observed clicks, and commercial outcomes remain separate truth layers. The Cloudflare `jussco-conversions` Worker/D1 configuration is provider evidence only; it is not proof that a live portfolio site is sending events or that a sale occurred.
+
+
+## Sauce Guard + Source Guard — bounded source checks
+
+**Sauce Guard** is the existing founder-content protection workflow: evidence is reduced to a public-safe story, private implementation is withheld, claims receive temporal classification, and exact founder approval plus fresh provider readback remain separate requirements. Its governing source is [the Sauce Guard skill](.agents/skills/sauce-guard/SKILL.md); see [Sauce Guard documentation](docs/SAUCE_GUARD.md).
+
+**Source Guard** adds read-only repository checks for the documented guard boundaries and the portfolio conversion-tracking data contract. See [Source Guard documentation](docs/SOURCE_GUARD.md), scripts/verify-sauce-source-guard.mjs, the Node regression tests, and the separate GitHub Actions workflow. Source Guard complements, but does not replace, [Documentation Truth](.github/workflows/documentation-truth.yml).
+
+**Truth boundary:** checked-in policy and tests are source evidence only. A passing workflow does **not** establish that public content was approved or published, that the collector receives real site traffic, or that live security/runtime controls operate correctly. No new deploy, merge, publication, provider-mutation or deletion authority is granted.
 
 
 ## Cloudflare Access product boundary
