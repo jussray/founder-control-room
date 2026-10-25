@@ -52,7 +52,7 @@ function tenantReaderForBearer(bearer: string): PublicMcpTenantReader {
   const publicData = createSupabaseBearerClient(bearer);
   return {
   async listMemberships(userId) {
-    const { data, error } = await supabase.from('fcr_public_memberships')
+    const { data, error } = await publicData.from('fcr_public_memberships')
       .select('tenant_id,user_id,status')
       .eq('user_id', userId).eq('status', 'active').limit(21);
     if (error) throw new Error('public_mcp_membership_read_unavailable');
@@ -61,7 +61,7 @@ function tenantReaderForBearer(bearer: string): PublicMcpTenantReader {
     }));
   },
   async listProjects(tenantId) {
-    const { data, error } = await supabase.from('fcr_public_projects')
+    const { data, error } = await publicData.from('fcr_public_projects')
       .select('id,tenant_id,name,status,observed_at')
       .eq('tenant_id', tenantId).order('id').limit(51);
     if (error) throw new Error('public_mcp_projects_read_unavailable');
@@ -71,7 +71,7 @@ function tenantReaderForBearer(bearer: string): PublicMcpTenantReader {
     }));
   },
   async getProject(tenantId, projectId) {
-    const { data, error } = await supabase.from('fcr_public_projects')
+    const { data, error } = await publicData.from('fcr_public_projects')
       .select('id,tenant_id,name,status,observed_at')
       .eq('tenant_id', tenantId).eq('id', projectId).maybeSingle();
     if (error) throw new Error('public_mcp_project_read_unavailable');
