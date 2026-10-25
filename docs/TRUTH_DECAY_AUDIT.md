@@ -1,5 +1,20 @@
 # Truth Decay Audit: When a True Claim Becomes Unsafe to Reuse
 
+## October 24, 2026: founder-dock privacy boundary and StoryEngine peer movement
+
+The signed-out Control Room previously left founder-stack navigation present in the DOM as a visible dock. The repair makes first paint fail closed and derives dock visibility from the authenticated `#root .shell`; losing that shell closes and hides the dock again. Structural fixtures may synthesize the authenticated shell only after proving the signed-out state, while the opaque HttpOnly-cookie browser path remains the authority for real session behavior. UI hiding does not replace server authorization and does not prove production privacy until the exact successor browser witness passes.
+
+During rollover, StoryEngine `main` advanced to `87501be2da31d12f421b0ed2da49df357fc9fcb1`, which is two commits strictly ahead and zero behind the prior current-main FCR pin `3c46b3649088ac4c6e1775102ba49abf5c779abf`. Sixteen observed exact-head checks completed successfully. Rebinding selects a new evidence subject and expires predecessor FCR federation proof; the successor FCR head remains UNKNOWN for pair compatibility until the complete exact-head federation/browser witness succeeds.
+
+## October 24, 2026: StoryEngine capability-profile commit expired FCR peer proof
+
+FCR's exact-head Playwright run `40071010317` proved the local E2E harness green and then failed the separate StoryEngine live-ref equality step. The workflow expected `6b97b78370fbc25d4b4bb88bfeab136eb4c7dc2f`, while a fresh provider read resolved StoryEngine `refs/heads/main` to `3c46b3649088ac4c6e1775102ba49abf5c779abf`. The successor StoryEngine commit is the additive `.control-room/model-capabilities.v1.json` capability-profile change and its current Agent Contract v1, CodeQL, L99 Promotion Gates, and Control Room Test Ledger runs completed successfully. The mismatch is therefore verified peer identity drift caused by the new source commit, not proof that federation behavior failed. Updating the pin selects a new evidence subject only; predecessor browser proof does not transfer, runtime activation remains false, and the next FCR head must rerun the complete peer/runtime/browser witness.
+
+
+## October 23, 2026: PR #1004 peer-ref failure was dependency drift
+
+A fresh GitHub ref read resolves StoryEngine `refs/heads/main` to `6b97b78370fbc25d4b4bb88bfeab136eb4c7dc2f`; this commit had 15/15 successful check runs at the latest observed completion time, `2026-10-22T23:55:59Z`. FCR PR #1004 head `607ec05be0bce5639bab36b75c3661a8af751be6` expected `26b1c34ae7c97c5d1b66a23d6345b3965cfcdc1f` and failed its live-ref equality step before checkout, runtime, and browser federation ([failed job](https://github.com/jussray/founder-control-room/actions/runs/39875447018/job/120159809873)). The failure is verified external peer drift, not a failure of the PR's support-claims content. Refreshing the pin selects the successor peer only; PR #1004 must earn its own exact-head runtime and receipt/browser witness, and PR #1003's separate evidence cannot transfer. Movement of either repository expires pair-specific proof.
+
 ## October 16, 2026: StoryEngine peer-identity renewal, without inherited proof
 
 FCR's new actual-server GitHub Workspace/browser test, full founder UI journey, capability workbench, and guarded terminal scenarios passed on the predecessor candidate while the separate FCR-to-StoryEngine test failed at the live peer-ref gate. The workflow expected StoryEngine `a6e6a396ed30535af2fd9b1ec2347a84e1a3fbf3` while independently observed `refs/heads/main` resolved to `26b1c34ae7c97c5d1b66a23d6345b3965cfcdc1f`. The former is not a current federation subject.
