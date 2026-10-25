@@ -125,6 +125,82 @@ jobs:
             echo '- DNS, Worker route, deployment, database, secret, and application mutation: none'
           } >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Set up Node 24
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Resolve canonical Chief service-token identity
+        id: selector
+        env:
+          CHIEF_ACCESS_CLIENT_ID_SECRET: ${{ secrets.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID }}
+          CHIEF_ACCESS_CLIENT_ID_VARIABLE: ${{ vars.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID }}
+          GENERIC_ACCESS_CLIENT_ID_SECRET: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_ID }}
+          GENERIC_ACCESS_CLIENT_ID_VARIABLE: ${{ vars.CLOUDFLARE_ACCESS_CLIENT_ID }}
+          CHIEF_ACCESS_SERVICE_TOKEN_ID_VARIABLE: ${{ vars.CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID }}
+          GENERIC_ACCESS_SERVICE_TOKEN_ID_VARIABLE: ${{ vars.CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID }}
+          CHIEF_SELECTOR_REQUIRE_IDENTITY: ${{ inputs.mode == 'repair' && 'true' || 'false' }}
+        run: node scripts/resolve-chief-proofmode-access-selector.mjs
+
+      - name: Observe exact Chief provider subject before repair latch
+        id: subject
+        if: inputs.mode == 'repair' && steps.selector.outcome == 'success'
+        env:
+          CHIEF_ACCESS_MODE: check
+          CHIEF_ACCESS_SUBJECT_ONLY: 'true'
+          CLOUDFLARE_ACCESS_API_TOKEN: ${{ secrets.CLOUDFLARE_ACCESS_API_TOKEN }}
+        run: node scripts/reconcile-chief-proofmode-access.mjs >/dev/null 2>&1
+
+      - name: Recover terminal orphaned repair latch
+        if: inputs.mode == 'repair' && steps.subject.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CURRENT_SUBJECT: ${{ steps.subject.outputs.subject_fingerprint }}
+          CURRENT_SUBJECT_CONFIGURED: ${{ steps.subject.outputs.configured }}
+          RETURN_ISSUE: '485'
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$CURRENT_SUBJECT" =~ ^sha256:[0-9a-f]{64}$ ]] || {
+            echo '::error title=Invalid provider subject::read-only subject observation returned a malformed fingerprint.'
+            exit 1
+          }
+
+          state_json="$(gh api --paginate --slurp "repos/${GITHUB_REPOSITORY}/issues/${RETURN_ISSUE}/comments?per_page=100" \
+            | node scripts/chief-proofmode-access-reconciliation-state.mjs "$CHIEF_ACCESS_TARGET_URL" --json)"
+
+          while IFS= read -r encoded; do
+            [[ -n "$encoded" ]] || continue
+            item="$(printf '%s' "$encoded" | base64 --decode)"
+            orphan_run="$(printf '%s' "$item" | jq -r '.run')"
+            orphan_subject="$(printf '%s' "$item" | jq -r '.subject')"
+
+            [[ "$orphan_run" =~ ^[0-9]+$ ]] || continue
+            [[ "$orphan_subject" =~ ^sha256:[0-9a-f]{64}$ ]] || continue
+            [[ "$orphan_subject" == "$CURRENT_SUBJECT" ]] || continue
+            [[ "$CURRENT_SUBJECT_CONFIGURED" == 'true' ]] || continue
+
+            run_status="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${orphan_run}" --jq '.status' 2>/dev/null || printf 'unknown')"
+            [[ "$run_status" == 'completed' ]] || continue
+
+            recovery='test-results/chief-proofmode-access-orphan-recovery.md'
+            mkdir -p test-results
+            {
+              echo "<!-- chief-proofmode-access-reconciliation:v2 target=$CHIEF_ACCESS_TARGET_URL disposition=CLEAR subject=$CURRENT_SUBJECT head=$EXPECTED_HEAD_SHA run=$orphan_run -->"
+              echo
+              echo '## Chief ProofMode Access orphaned-latch recovery'
+              echo
+              echo '- Disposition: `CLEAR`'
+              echo "- Provider subject: `$CURRENT_SUBJECT`"
+              echo "- Original terminal workflow run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$orphan_run"
+              echo "- Recovery workflow run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+              echo '- Recovery evidence: original run is terminal and fresh read-only Cloudflare observation proves the same provider subject is currently configured.'
+              echo '- Authority effect: none; this clears reconciliation state only and performs no provider mutation.'
+            } > "$recovery"
+            gh issue comment "$RETURN_ISSUE" --repo "$GITHUB_REPOSITORY" --body-file "$recovery"
+          done < <(printf '%s' "$state_json" | jq -r '.inProgress[]? | @base64')
+
       - name: Refuse unresolved prior Chief Access repair
         id: reconcile_gate
         if: inputs.mode == 'repair'
@@ -138,12 +214,6 @@ jobs:
             echo '::error title=Chief Access reconciliation required::trusted subject-bound reconciliation remains unresolved for this exact target; a matching provider subject must clear the latch before another repair can execute.'
             exit 1
           fi
-
-      - name: Set up Node 24
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
-        with:
-          node-version: '24'
-          cache: npm
 
       - name: Install locked dependencies
         run: npm ci
@@ -160,40 +230,33 @@ jobs:
           node --test scripts/chief-proofmode-access-bridge-contract.node-test.mjs
           node --test scripts/fcr-cloudflare-bridge-contract.node-test.mjs
 
-      - name: Resolve canonical Chief service-token identity
-        id: selector
-        env:
-          CHIEF_ACCESS_CLIENT_ID_SECRET: ${{ secrets.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID }}
-          CHIEF_ACCESS_CLIENT_ID_VARIABLE: ${{ vars.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID }}
-          GENERIC_ACCESS_CLIENT_ID_SECRET: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_ID }}
-          GENERIC_ACCESS_CLIENT_ID_VARIABLE: ${{ vars.CLOUDFLARE_ACCESS_CLIENT_ID }}
-          CHIEF_ACCESS_SERVICE_TOKEN_ID_VARIABLE: ${{ vars.CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID }}
-          GENERIC_ACCESS_SERVICE_TOKEN_ID_VARIABLE: ${{ vars.CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID }}
-          CHIEF_SELECTOR_REQUIRE_IDENTITY: ${{ inputs.mode == 'repair' && 'true' || 'false' }}
-        run: node scripts/resolve-chief-proofmode-access-selector.mjs
-
       - name: Persist repair-in-progress reconciliation latch
         id: latch
-        if: inputs.mode == 'repair' && steps.selector.outcome == 'success'
+        if: inputs.mode == 'repair' && steps.subject.outcome == 'success'
         env:
           GH_TOKEN: ${{ github.token }}
           RETURN_ISSUE: '485'
+          PROVIDER_SUBJECT: ${{ steps.subject.outputs.subject_fingerprint }}
         shell: bash
         run: |
           set -euo pipefail
+          [[ "$PROVIDER_SUBJECT" =~ ^sha256:[0-9a-f]{64}$ ]] || {
+            echo '::error title=Missing provider subject::repair cannot latch without exact read-only provider identity.'
+            exit 1
+          }
           latch='test-results/chief-proofmode-access-reconciliation-latch.md'
           mkdir -p test-results
           {
-            echo "<!-- chief-proofmode-access-reconciliation:v2 target=$CHIEF_ACCESS_TARGET_URL disposition=REPAIR_IN_PROGRESS subject=pending head=$EXPECTED_HEAD_SHA run=$GITHUB_RUN_ID -->"
+            echo "<!-- chief-proofmode-access-reconciliation:v2 target=$CHIEF_ACCESS_TARGET_URL disposition=REPAIR_IN_PROGRESS subject=$PROVIDER_SUBJECT head=$EXPECTED_HEAD_SHA run=$GITHUB_RUN_ID -->"
             echo
             echo '## Chief ProofMode Access reconciliation latch'
             echo
             echo '- Disposition: `REPAIR_IN_PROGRESS`'
-            echo '- Provider subject: `pending provider readback`'
-            echo "- Exact FCR authority head: \`$EXPECTED_HEAD_SHA\`"
-            echo "- Chief target: \`$CHIEF_ACCESS_TARGET_URL\`"
+            echo "- Provider subject: `$PROVIDER_SUBJECT`"
+            echo "- Exact FCR authority head: `$EXPECTED_HEAD_SHA`"
+            echo "- Chief target: `$CHIEF_ACCESS_TARGET_URL`"
             echo "- Workflow run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
-            echo '- A later repair is blocked until this same run terminates safely or exact provider-subject evidence clears every unresolved subject.'
+            echo '- A later repair is blocked until this same run terminates safely or exact same-subject provider evidence clears the unresolved state.'
           } > "$latch"
           gh issue comment "$RETURN_ISSUE" --repo "$GITHUB_REPOSITORY" --body-file "$latch"
 
