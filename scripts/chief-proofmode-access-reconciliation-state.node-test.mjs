@@ -90,3 +90,22 @@ test('markers for another target never clear this target', () => {
   ], TARGET);
   assert.equal(state.clear, false);
 });
+
+
+test('unresolved legacy state survives unrelated v2 markers', () => {
+  const state = evaluateChiefAccessReconciliation([
+    comment(1, v1('RECONCILE_REQUIRED', '7')),
+    comment(2, v2('CLEAR', A, '8')),
+  ], TARGET);
+  assert.equal(state.clear, false);
+  assert.deepEqual(state.blockedSubjects, ['legacy-run:7']);
+});
+
+test('an explicit pending v2 clear can migrate and close legacy unresolved state', () => {
+  const state = evaluateChiefAccessReconciliation([
+    comment(1, v1('RECONCILE_REQUIRED', '7')),
+    comment(2, v2('CLEAR', 'pending', '8')),
+  ], TARGET);
+  assert.equal(state.clear, true);
+  assert.deepEqual(state.blockedSubjects, []);
+});
