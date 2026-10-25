@@ -337,7 +337,7 @@ test('freshness companion must have zero bypass actors and only exact strict che
 
 test('review membrane rejects unmodeled extra provider rules', () => {
   const extraRule = canonicalRuleset();
-  extraRule.rules.push({ type: 'copilot_code_review' });
+  extraRule.rules.push({ type: 'required_signatures' });
   const report = readyReport({ fullRulesets: [extraRule, freshnessRuleset()] });
   assert.equal(report.status, 'NOT_READY');
   assert.equal(report.canonicalFloorSatisfied, false);
