@@ -17,7 +17,7 @@
         "additionalProperties": false,
         "required": ["surfaceId", "name", "role", "canonicalRepository", "canonicalBranch", "surfaceCommit", "surfaceState", "truthAuthority", "executionAllowed", "externalMutationAllowed", "rules"],
         "properties": {
-          "surfaceId": { "type": "string", "pattern": "^lovable:[0-9a-f-]{36}$" },
+          "surfaceId": { "type": "string", "pattern": "^lovable:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$" },
           "name": { "type": "string", "minLength": 1, "maxLength": 120 },
           "role": { "enum": ["founder-control-surface", "reconciliation-prototype", "reasoning-proposal-surface"] },
           "canonicalRepository": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$" },

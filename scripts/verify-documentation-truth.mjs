@@ -73,6 +73,8 @@ const truthSensitiveRules = [
   { domain: 'cloudflare-authority', match: /^\.github\/workflows\/(?:deploy|cloudflare-build-diagnostic|fcr-access-front-door-recovery)\.yml$/ },
   { domain: 'cloudflare-authority', match: /^config\/cloudflare-/ },
   { domain: 'cloudflare-authority', match: /^wrangler\./ },
+  { domain: 'external-surface-authority', match: /^public\/\.well-known\/lovable-project-surfaces\.json$/ },
+  { domain: 'external-surface-authority', match: /^public\/\.well-known\/lovable-project-surfaces\.schema\.json$/ },
 ];
 
 const truthSensitiveChanges = changedFiles

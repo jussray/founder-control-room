@@ -49,7 +49,7 @@ describe('Lovable external project surface bindings', () => {
     for (const binding of data.bindings) {
       expect(ids.has(binding.surfaceId)).toBe(false);
       ids.add(binding.surfaceId);
-      expect(binding.surfaceId).toMatch(/^lovable:[0-9a-f-]{36}$/);
+      expect(binding.surfaceId).toMatch(/^lovable:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
       expect(activeRepositories.has(binding.canonicalRepository)).toBe(true);
       expect(binding.canonicalBranch).toBe('main');
       expect(binding.surfaceCommit).toMatch(EXACT_SHA);
@@ -58,6 +58,26 @@ describe('Lovable external project surface bindings', () => {
       expect(binding.externalMutationAllowed).toBe(false);
       expect(binding.rules.length).toBeGreaterThan(0);
     }
+  });
+
+  it('rejects malformed Lovable surface IDs under the published schema pattern', async () => {
+    const schema = JSON.parse(await readFile(schemaPath, 'utf8')) as {
+      properties?: { bindings?: { items?: { properties?: { surfaceId?: { pattern?: string } } } } };
+    };
+    const pattern = schema.properties?.bindings?.items?.properties?.surfaceId?.pattern;
+    expect(pattern).toBe(
+      '^lovable:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
+    );
+    const surfaceIdPattern = new RegExp(pattern as string);
+
+    const data = await readManifest();
+    for (const binding of data.bindings) {
+      expect(surfaceIdPattern.test(binding.surfaceId)).toBe(true);
+    }
+
+    expect(surfaceIdPattern.test(`lovable:${'-'.repeat(36)}`)).toBe(false);
+    expect(surfaceIdPattern.test('lovable:0fa1fd0f9ec24bf3941579bbfd4b3917')).toBe(false);
+    expect(surfaceIdPattern.test('lovable:0fa1fd0f-9ec2-4bf3-9415-79bbfd4b391')).toBe(false);
   });
 
   it('keeps each surface in its intended role and quarantines browser-local launch-test state', async () => {
