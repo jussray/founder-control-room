@@ -137,8 +137,12 @@ if [ "${#deliveries[@]}" -ne 2 ] || [ "${deliveries[0]}" != "accepted" ] || [ "$
   exit 1
 fi
 
-stored="$(psql "$NEON_DB_URL" -X -Atq -v ON_ERROR_STOP=1 -v message_id="$MESSAGE_ID" \
-  -c "SELECT count(*) FROM public.federated_relay_v31_messages WHERE message_id = :'message_id'::uuid;")"
+stored="$(psql "$NEON_DB_URL" -X -Atq -v ON_ERROR_STOP=1 -v message_id="$MESSAGE_ID" <<'SQL'
+SELECT count(*)
+FROM public.federated_relay_v31_messages
+WHERE message_id = :'message_id'::uuid;
+SQL
+)"
 test "$stored" = "1"
 
 echo "Relay v3.1 Neon concurrency proof passed: one accepted, one duplicate, one durable message."
