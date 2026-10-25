@@ -318,7 +318,7 @@
       "claims": [
         "`scripts/verify-documentation-truth.mjs` must classify `src/founder-os-lab/projectAdapters.ts` as evidence-authority truth-sensitive so a Chief exact-head pin movement cannot pass Documentation Truth without substantive README, truth-decay audit, and structured receipt updates that name the changed path.",
         "`scripts/verify-documentation-truth.mjs` must classify `tools/zapier/founder-content-outcome-contract.cjs` as evidence-authority truth-sensitive so account-provenance changes cannot pass Documentation Truth without substantive README, truth-decay audit, and path-bound receipt updates.",
-        "`scripts/verify-documentation-truth.mjs` must cross-check the FCR GitHubProvider required-deployment ownership boundary against the structured documentation receipt when `src/providers/GitHubProvider.ts` is part of the truth-sensitive diff, so provider changes cannot pass with a contradictory preservation claim while unrelated docs-only or test-only changes remain free of a receipt requirement."
+        "`scripts/verify-documentation-truth.mjs` must cross-check the FCR GitHubProvider required-deployment ownership boundary against the structured documentation receipt when `src/providers/GitHubProvider.ts` is part of the truth-sensitive diff, using an executable semantic guard that rejects preservation or negated-removal claims for `required_deployments`; unrelated docs-only or test-only changes remain free of a receipt requirement."
       ]
     },
     {
@@ -344,6 +344,12 @@
       "path": "src/providers/GitHubProvider.ts",
       "claims": [
         "`src/providers/GitHubProvider.ts` must snapshot an existing FCR review ruleset before two-membrane reconciliation, preserve required-linear-history, code-quality, and Copilot-review rules with their parameters unchanged, intentionally remove legacy pre-merge `required_deployments` because production release authority is exact-current-main/post-merge, reject unknown unowned rule types before provider mutation, and independently read back the preserved rules after update; bypass repair must never weaken unrelated live security controls."
+      ]
+    },
+    {
+      "path": "scripts/documentation-truth-required-deployment-guard.mjs",
+      "claims": [
+        "`scripts/documentation-truth-required-deployment-guard.mjs` must accept only affirmative removal or migration-debt claims tied to `required_deployments`, reject preserve/retain/keep/remain/unchanged semantics and negated removal, and remain the shared executable predicate used by Documentation Truth."
       ]
     }
   ]

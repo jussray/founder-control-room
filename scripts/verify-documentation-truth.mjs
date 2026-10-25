@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
+import { receiptClaimsDescribeRequiredDeploymentRemoval } from './documentation-truth-required-deployment-guard.mjs';
 
 const root = process.cwd();
 const FULL_SHA = /^[0-9a-f]{40}$/i;
@@ -59,6 +60,7 @@ const truthSensitiveRules = [
   { domain: 'truth-governance', match: /^src\/http\/routes\/(?:buildEvents|buildEventReceipts)\.ts$/ },
   { domain: 'truth-governance', match: /^src\/services\/buildEventStore\.ts$/ },
   { domain: 'truth-governance', match: /^scripts\/verify-documentation-truth\.mjs$/ },
+  { domain: 'truth-governance', match: /^scripts\/documentation-truth-required-deployment-guard\.mjs$/ },
   { domain: 'truth-governance', match: /^\.ai\/skills\/goalfix\/SKILL\.md$/ },
   { domain: 'truth-governance', match: /^\.claude\/skills\/goalfix\/SKILL\.md$/ },
   { domain: 'truth-governance', match: /^docs\/(?:FOUNDER_ADAPTIVE_KERNEL_V0|GOALFIX_EXECUTION_WORKFLOW_V2|CLAUDE_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC|PERPLEXITY_MCP_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC)\.md$/ },
@@ -291,11 +293,11 @@ const githubProviderTruthChanged = truthSensitiveChanges.some(
   (change) => change.file === 'src/providers/GitHubProvider.ts',
 );
 const githubProviderReceiptClaims = receipt?.claimsByPath.get('src/providers/GitHubProvider.ts') ?? [];
-const githubProviderReceiptText = githubProviderReceiptClaims.join(' ');
 const ownsLegacyRequiredDeployments = fcrOwnedRuleTypes.includes('"required_deployments"')
   && !fcrPreservableRuleTypes.includes('"required_deployments"');
-const receiptDescribesRequiredDeploymentRemoval = /required[_ -]deploy/i.test(githubProviderReceiptText)
-  && /(?:intentionally\s+remove|remove(?:s|d)?|migration\s+debt|exact-current-main\/post-merge)/i.test(githubProviderReceiptText);
+const receiptDescribesRequiredDeploymentRemoval = receiptClaimsDescribeRequiredDeploymentRemoval(
+  githubProviderReceiptClaims,
+);
 
 const consistencyChecks = [
   [!githubProviderTruthChanged || !ownsLegacyRequiredDeployments || receiptDescribesRequiredDeploymentRemoval, 'documentation truth receipt must describe intentional removal of legacy pre-merge required_deployments when GitHubProvider owns that migration boundary'],

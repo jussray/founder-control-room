@@ -1,4 +1,6 @@
+import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
+import { pathToFileURL } from 'node:url';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
@@ -20,6 +22,7 @@ const cloudflareTargets = read('docs/deployment/CLOUDFLARE_WORKER_TARGETS.md');
 const ci = read('.github/workflows/ci.yml');
 const documentationWorkflow = read('.github/workflows/documentation-truth.yml');
 const documentationVerifier = read('scripts/verify-documentation-truth.mjs');
+const deploymentGuardPath = pathToFileURL(resolve(process.cwd(), 'scripts/documentation-truth-required-deployment-guard.mjs')).href;
 const documentationReceipt = JSON.parse(read('docs/DOCUMENTATION_TRUTH_RECEIPT.json')) as {
   changes: Array<{ path: string; claims: string[] }>;
 };
@@ -144,6 +147,38 @@ describe('repository documentation truth control', () => {
     expect(documentationVerifier).toContain('founder-content-outcome-contract');
   });
 
+  it('rejects contradictory required-deployment preservation claims in the executable guard', () => {
+    const claims = [
+      {
+        expected: true,
+        value: 'src/providers/GitHubProvider.ts must intentionally remove legacy pre-merge required_deployments because production release authority is exact-current-main/post-merge.',
+      },
+      {
+        expected: false,
+        value: 'src/providers/GitHubProvider.ts must preserve required_deployments unchanged and must not remove this rule during two-membrane reconciliation.',
+      },
+      {
+        expected: false,
+        value: 'src/providers/GitHubProvider.ts must keep required_deployments while removing an unrelated legacy rule.',
+      },
+      {
+        expected: false,
+        value: 'src/providers/GitHubProvider.ts may remove old docs, while required_deployments remains unchanged.',
+      },
+    ];
+
+    for (const fixture of claims) {
+      const source = [
+        `import { claimAffirmativelyRemovesRequiredDeployments } from ${JSON.stringify(deploymentGuardPath)};`,
+        `process.stdout.write(JSON.stringify(claimAffirmativelyRemovesRequiredDeployments(${JSON.stringify(fixture.value)})));`,
+      ].join('\n');
+      const observed = JSON.parse(execFileSync(process.execPath, ['--input-type=module', '--eval', source], {
+        encoding: 'utf8',
+      })) as boolean;
+      expect(observed).toBe(fixture.expected);
+    }
+  });
+
   it('keeps FCR deployment-rule migration truth aligned with the provider source', () => {
     const providerEntry = documentationReceipt.changes.find(
       (change) => change.path === 'src/providers/GitHubProvider.ts',
@@ -155,7 +190,7 @@ describe('repository documentation truth control', () => {
       "!githubProviderTruthChanged || !ownsLegacyRequiredDeployments || receiptDescribesRequiredDeploymentRemoval",
     );
     expect(documentationVerifier).toContain('ownsLegacyRequiredDeployments');
-    expect(documentationVerifier).toContain('receiptDescribesRequiredDeploymentRemoval');
+    expect(documentationVerifier).toContain('receiptClaimsDescribeRequiredDeploymentRemoval');
     expect(providerClaims).toMatch(/required_deployments/);
     expect(providerClaims).toMatch(/intentionally remove/i);
     expect(providerClaims).toMatch(/exact-current-main\/post-merge/i);
