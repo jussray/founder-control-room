@@ -16,7 +16,14 @@ vi.mock('../../../lib/supabaseClient.js', () => ({ supabase: supabaseMock }));
 import express from 'express';
 import request from 'supertest';
 import { n8nConveyorRouter } from '../n8nConveyor.js';
-import { YOUTUBE_GROWTH_EVALUATION_CONTRACT } from '../youtubeGrowth.js';
+import {
+  CONTENT_LANE_SYSTEM_CONTRACT,
+} from '../../../lib/contentLaneSystem.js';
+import { FIRST_PARTY_SOCIAL_PLATFORMS } from '../../../lib/firstPartySocialPublisher.js';
+import {
+  YOUTUBE_CHANNEL_SYSTEM,
+  YOUTUBE_GROWTH_EVALUATION_CONTRACT,
+} from '../youtubeGrowth.js';
 
 const FOUNDER_EMAIL = 'founder@example.com';
 const BEARER = 'Bearer test-token';
@@ -84,7 +91,7 @@ describe('authenticated YouTube growth evaluation route', () => {
     expect(res.status).toBe(401);
   });
 
-  it('advertises an advisory-only route with no mutation authority', async () => {
+  it('advertises the existing channel system without creating a second content OS or mutation authority', async () => {
     const res = await request(buildApp())
       .get('/automation/conveyor/founder-content/youtube-growth')
       .set('Authorization', BEARER);
@@ -94,6 +101,7 @@ describe('authenticated YouTube growth evaluation route', () => {
       contract: YOUTUBE_GROWTH_EVALUATION_CONTRACT,
       route: '/automation/conveyor/founder-content/youtube-growth/evaluate',
       phases: ['TEST_AND_VALIDATE', 'DOUBLE_DOWN', 'SCALE'],
+      channelSystem: YOUTUBE_CHANNEL_SYSTEM,
       authority: {
         advisoryOnly: true,
         publish: false,
@@ -104,6 +112,69 @@ describe('authenticated YouTube growth evaluation route', () => {
         deploy: false,
       },
     }));
+    expect(res.body.channelSystem.sequence).toEqual([
+      'audience-problem-promise',
+      'repeatable-format',
+      'content-engine',
+      'return-loop',
+      'money-path',
+      'measure-compound-or-kill',
+    ]);
+    expect(res.body.channelSystem.pillars).toEqual(['DISCOVER', 'PROVE', 'BELONG', 'CONVERT']);
+    expect(res.body.channelSystem.contentUnit).toEqual(['HOOK', 'VALUE', 'PROOF', 'PAYOFF', 'CTA']);
+    expect(res.body.channelSystem.faceless).toEqual(expect.objectContaining({
+      allowed: true,
+      originalValueRequired: true,
+      copiedOrReusedContentIsStrategy: false,
+      faceNotRequiredButPointOfViewIsRequired: true,
+    }));
+    expect(res.body.channelSystem.monetization).toEqual(expect.objectContaining({
+      directMoneyPathDesignedEarly: true,
+      platformAdsAreBonus: true,
+      platformEligibilityRequiresProviderEvidence: true,
+      visibilityIsNotRevenue: true,
+      revenueRequiresOutcomeEvidence: true,
+    }));
+    expect(res.body.channelSystem.lane).toEqual(expect.objectContaining({
+      platform: 'youtube',
+      laneId: 'content-youtube',
+      northStar: expect.objectContaining({
+        id: 'returning-viewer-watchtime-to-qualified-action',
+      }),
+    }));
+  });
+
+  it('exposes one governed content lane for every existing first-party platform', async () => {
+    const res = await request(buildApp())
+      .get('/automation/conveyor/founder-content/youtube-growth')
+      .set('Authorization', BEARER);
+
+    expect(res.status).toBe(200);
+    expect(res.body.contentLaneSystem).toEqual(expect.objectContaining({
+      contract: CONTENT_LANE_SYSTEM_CONTRACT,
+      shared: expect.objectContaining({
+        pillars: ['DISCOVER', 'PROVE', 'BELONG', 'CONVERT'],
+        contentUnit: ['HOOK', 'VALUE', 'PROOF', 'PAYOFF', 'CTA'],
+        learning: expect.objectContaining({
+          promoteOnlyOnLaneNorthStarOutcomeEvidence: true,
+          missesRemainRevisionMemory: true,
+        }),
+      }),
+      authority: {
+        advisoryOnly: true,
+        authorizesPublish: false,
+        authorizesSchedule: false,
+        authorizesSpend: false,
+        authorizesScaleExecution: false,
+      },
+    }));
+
+    const lanes = res.body.contentLaneSystem.lanes;
+    expect(lanes).toHaveLength(FIRST_PARTY_SOCIAL_PLATFORMS.length);
+    expect(lanes.map((lane: { platform: string }) => lane.platform).sort())
+      .toEqual([...FIRST_PARTY_SOCIAL_PLATFORMS].sort());
+    expect(new Set(lanes.map((lane: { northStar: { id: string } }) => lane.northStar.id)).size)
+      .toBe(FIRST_PARTY_SOCIAL_PLATFORMS.length);
   });
 
   it('rejects malformed experiment evidence before core evaluation', async () => {
@@ -172,6 +243,7 @@ describe('authenticated YouTube growth evaluation route', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.ok).toBe(true);
+    expect(res.body.channelSystem).toEqual(YOUTUBE_CHANNEL_SYSTEM);
     expect(res.body.published).toBe(false);
     expect(res.body.providerMutationAttempted).toBe(false);
     expect(res.body.result).toEqual(expect.objectContaining({

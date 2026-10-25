@@ -52,20 +52,63 @@ function readinessCopy(readiness) {
   }
   return READINESS_COPY[readiness?.state] ?? null;
 }
+let readinessRequestId = 0;
 async function refreshConveyorReadiness() {
+  const requestId = ++readinessRequestId;
   setConveyorReadiness('checking', 'Checking n8n readiness…');
   try {
     const response = await fetch('/automation/conveyor/', { method: 'GET', cache: 'no-store', credentials: 'same-origin', headers: { Accept: 'application/json' } });
+    if (requestId !== readinessRequestId) return;
     if (response.status === 401) { setConveyorReadiness('signed-out', 'Sign in to check n8n readiness'); return; }
     if (!response.ok) throw new Error(`readiness request failed with HTTP ${response.status}`);
     const body = await response.json();
+    if (requestId !== readinessRequestId) return;
     if (body?.contract !== CONVEYOR_CONTRACT) { setConveyorReadiness('error', 'n8n contract mismatch'); return; }
     const state = body?.readiness?.state;
     const label = readinessCopy(body?.readiness);
     if (!label) { setConveyorReadiness('error', 'n8n readiness unavailable'); return; }
     setConveyorReadiness(state, label);
-  } catch { setConveyorReadiness('error', 'n8n readiness unavailable'); }
+  } catch {
+    if (requestId === readinessRequestId) setConveyorReadiness('error', 'n8n readiness unavailable');
+  }
 }
+
+function installCoworkLane() {
+  if (document.querySelector('[data-lane="cowork"]')) return;
+
+  const codeLane = document.querySelector('[data-lane="code"]');
+  if (!(codeLane instanceof HTMLElement)) return;
+
+  const projectHandoff = codeLane.nextElementSibling;
+  if (!(projectHandoff instanceof HTMLElement) || !projectHandoff.classList.contains('handoff')) return;
+
+  const intoCowork = document.createElement('div');
+  intoCowork.className = 'handoff';
+  intoCowork.textContent = 'Verified code + repository context becomes the Cowork task';
+
+  const coworkLane = document.createElement('section');
+  coworkLane.className = 'stack-lane';
+  coworkLane.dataset.lane = 'cowork';
+  coworkLane.setAttribute('aria-labelledby', 'stack-cowork');
+  coworkLane.innerHTML = `
+    <h2 class="lane-heading" id="stack-cowork"><span class="lane-number">3C</span>Cowork</h2>
+    <div class="lane-flow">
+      <a class="stage" href="/control-room/github-workspace.html"><small>Ground</small>Shared GitHub source</a>
+      <span class="stage"><small>Connect</small>Claude GitHub connector required</span>
+      <span class="stage"><small>Delegate</small>Claude Cowork</span>
+      <a class="stage" href="/control-room/?tab=missions"><small>Council</small>Founder AI Council</a>
+      <a class="stage" href="/control-room/github-workspace.html"><small>Build</small>Repository workspace</a>
+      <span class="stage"><small>Proof</small>FCR receipt adapter not wired</span>
+    </div>
+  `;
+
+  const outOfCowork = document.createElement('div');
+  outOfCowork.className = 'handoff';
+  outOfCowork.textContent = 'Cowork changes return through GitHub commit / PR evidence; FCR receipt binding remains separate';
+
+  codeLane.after(intoCowork, coworkLane, outOfCowork);
+}
+
 function requestedTabFromUrl() {
   const tab = new URL(window.location.href).searchParams.get('tab');
   return tab && ALLOWED_TABS.has(tab) ? tab : null;
@@ -84,7 +127,6 @@ function activateTab(tab) {
   removeTabQueryParameter();
   return true;
 }
-
 installTruthConsole();
 
 const requestedTab = requestedTabFromUrl();
@@ -101,9 +143,26 @@ if (pendingTab && ALLOWED_TABS.has(pendingTab) && !activateTab(pendingTab)) {
   }
 }
 const launchDock = document.querySelector('.launch-dock');
-if (launchDock instanceof HTMLDetailsElement) {
-  launchDock.addEventListener('toggle', () => { if (launchDock.open) void refreshConveyorReadiness(); });
+function syncLaunchDockVisibility() {
+  if (!(launchDock instanceof HTMLDetailsElement)) return;
+  const authenticated = document.querySelector('#root .shell') instanceof HTMLElement;
+  if (!authenticated && launchDock.open) launchDock.open = false;
+  launchDock.hidden = !authenticated;
+  launchDock.setAttribute('aria-hidden', authenticated ? 'false' : 'true');
 }
+
+if (launchDock instanceof HTMLDetailsElement) {
+  syncLaunchDockVisibility();
+  const root = document.getElementById('root');
+  if (root) {
+    const authVisibilityObserver = new MutationObserver(syncLaunchDockVisibility);
+    authVisibilityObserver.observe(root, { childList: true, subtree: true });
+  }
+  launchDock.addEventListener('toggle', () => {
+    if (launchDock.open && !launchDock.hidden) void refreshConveyorReadiness();
+  });
+}
+installCoworkLane();
 installMissionBoard();
 installProjectShellUi();
 void refreshConveyorReadiness();

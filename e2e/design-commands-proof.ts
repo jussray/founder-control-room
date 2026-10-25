@@ -91,12 +91,16 @@ try {
   const desktop = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
 
   await desktop.goto(`${baseUrl}/control-room/`, { waitUntil: 'domcontentloaded' });
-  await desktop.locator('.launch-dock summary').click();
+  assert(await desktop.locator('.launch-dock').isHidden(), 'signed-out founder navigation remains hidden');
   const projectDesignLink = desktop.locator('[data-project-design-commands]');
-  assert(await projectDesignLink.isVisible(), 'Projects Control Room exposes the 23 Design Commands entry point');
-  await projectDesignLink.click();
+  assert(await projectDesignLink.getAttribute('href') === '/control-room/design-commands.html',
+    'Projects Control Room retains the canonical Design Commands route in source');
+  // This isolated Design OS fixture has no authenticated session; the separate
+  // authenticated conveyor proof verifies that the founder dock becomes navigable.
+  await desktop.goto(`${baseUrl}/control-room/design-commands.html`, { waitUntil: 'domcontentloaded' });
   await desktop.locator('[data-command-id="intent"]').waitFor();
-  assert(new URL(desktop.url()).pathname === '/control-room/design-commands.html', 'Projects Control Room opens the canonical Design Commands surface');
+  assert(new URL(desktop.url()).pathname === '/control-room/design-commands.html',
+    'canonical Design Commands surface loads independently of the founder navigation fixture');
 
   assert(await desktop.locator('.design-command-card').count() === 23, 'desktop renders exactly 23 command cards');
   assert(await desktop.locator('[data-command-id="layout"] .slash').innerText() === '/layout', 'desktop exposes /layout');

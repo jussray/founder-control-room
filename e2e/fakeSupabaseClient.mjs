@@ -458,6 +458,38 @@ if (process.env.E2E_SEED_FOUNDER_EMAIL) {
   table('founder_users').push({ email: process.env.E2E_SEED_FOUNDER_EMAIL, created_at: new Date().toISOString() });
 }
 
+// Isolated product-workspace fixture for Playwright's real served FCR UI.
+// It is intentionally NOT a real V10 branch-approval receipt: a separate
+// negative test proves the production middleware refuses create_branch when
+// its Chief capability plan is absent. Only this Node loader can seed it.
+const workspaceProjectId = String(process.env.E2E_SEED_GITHUB_WORKSPACE_PROJECT_ID ?? '');
+const workspaceMissionId = String(process.env.E2E_SEED_GITHUB_WORKSPACE_MISSION_ID ?? '');
+const workspaceSha = String(process.env.E2E_SEED_GITHUB_WORKSPACE_SHA ?? '').toLowerCase();
+const uuid = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
+if (workspaceProjectId || workspaceMissionId || workspaceSha) {
+  if (!uuid.test(workspaceProjectId) || !uuid.test(workspaceMissionId) || !/^[0-9a-f]{40}$/.test(workspaceSha)) {
+    throw new Error('E2E GitHub Workspace seed requires valid project, mission, and exact HEAD identities');
+  }
+  table('projects').push(withDefaults({
+    id: workspaceProjectId,
+    slug: 'founder-control-room',
+    name: 'FCR Browser Fixture',
+    repo_provider: 'github',
+    repo_identifier: 'jussray/founder-control-room',
+    verification_enabled: true,
+  }, 'projects'));
+  table('missions').push(withDefaults({
+    id: workspaceMissionId,
+    project_id: workspaceProjectId,
+    title: 'FCR GitHub Workspace integration fixture',
+    status: 'sandboxed',
+    branch_ref: 'terminal-proof',
+    base_ref: 'main',
+    required_checks: ['typecheck'],
+    policy_snapshot: { expectedHeadSha: workspaceSha },
+  }, 'missions'));
+}
+
 // E2E-only mirror of the V10 founder approval boundary. The harness must
 // explicitly provide one exact registry hash and its canonical entries;
 // unlike an "always true" fake, every other registry remains unapproved and
