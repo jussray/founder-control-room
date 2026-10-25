@@ -182,7 +182,7 @@ SELECT public.ingest_founder_content_metric_observations(
 RESET ROLE;
 REVOKE service_role FROM CURRENT_USER;
 
-DO $
+DO $$
 DECLARE
   metric_count integer;
   event_count integer;
