@@ -43,7 +43,8 @@
     {
       "path": "public/_worker.js",
       "claims": [
-        "`public/_worker.js` must route public static discovery artifacts, including `crawlers.json`, through the Pages `ASSETS` binding while API-owned callback assets remain on `FCR_API`; this routing classification cannot authorize provider mutation or treat a static crawler policy as authentication."
+        "`public/_worker.js` must route public static discovery artifacts, including `crawlers.json`, through the Pages `ASSETS` binding while API-owned callback assets remain on `FCR_API`; this routing classification cannot authorize provider mutation or treat a static crawler policy as authentication.",
+        "`public/_worker.js` must rewrite the bare `/work` and `/work/` paths to `/work.html` and serve them through the Pages `ASSETS` binding, never falling through to the `FCR_API` proxy, because the API proxy answers that public page without the service identity header and returns a degraded 503."
       ]
     },
     {
