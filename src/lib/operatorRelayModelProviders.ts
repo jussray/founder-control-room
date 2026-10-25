@@ -1,7 +1,14 @@
 import type { OperatorRelayRequestV1, OperatorRelayUsageV1 } from './operatorRelay.js';
 import type { OperatorRelayAdapters } from './operatorRelayDispatch.js';
 import { anthropicPlaywrightMcpAttachment } from './operatorRelayAnthropicMcp.js';
-import { operatorRelayAdapterFromTextProvider } from './operatorRelayProvider.js';
+import {
+  OperatorRelayProviderBoundaryError,
+  operatorRelayAdapterFromTextProvider,
+  type OperatorRelayExternalProvider,
+} from './operatorRelayProvider.js';
+
+export { OperatorRelayProviderBoundaryError };
+export type { OperatorRelayExternalProvider };
 
 type FetchLike = typeof fetch;
 type JsonRecord = Record<string, unknown>;
@@ -15,24 +22,6 @@ const SAFE_PERPLEXITY_AGENT_MODEL = /^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/;
 const SAFE_DEEPSEEK_MODEL = /^(?:deepseek-flash|deepseek-v4-pro)$/;
 
 export const SEMANTIC_PEER_REVIEW_SPEND_MODE = 'paused' as const;
-
-export type OperatorRelayExternalProvider =
-  | 'gemini'
-  | 'openai'
-  | 'anthropic'
-  | 'perplexity'
-  | 'deepseek';
-
-export class OperatorRelayProviderBoundaryError extends Error {
-  readonly provider: OperatorRelayExternalProvider;
-  readonly externalProviderCall = true as const;
-
-  constructor(provider: OperatorRelayExternalProvider, message: string) {
-    super(message);
-    this.name = 'OperatorRelayProviderBoundaryError';
-    this.provider = provider;
-  }
-}
 
 function providerBoundaryError(
   providerId: OperatorRelayExternalProvider,
