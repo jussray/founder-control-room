@@ -109,3 +109,29 @@ test('an explicit pending v2 clear can migrate and close legacy unresolved state
   assert.equal(state.clear, true);
   assert.deepEqual(state.blockedSubjects, []);
 });
+
+
+test('fingerprinted in-progress latch exposes the exact run and subject for safe orphan recovery', () => {
+  const state = evaluateChiefAccessReconciliation([
+    comment(1, v2('REPAIR_IN_PROGRESS', A, '10')),
+  ], TARGET);
+  assert.equal(state.clear, false);
+  assert.deepEqual(state.inProgressRuns, ['10']);
+  assert.deepEqual(state.inProgress, [{ run: '10', subject: A }]);
+});
+
+test('only a terminal recovery marker written for the original run can clear its in-progress latch', () => {
+  const unrelatedRun = evaluateChiefAccessReconciliation([
+    comment(1, v2('REPAIR_IN_PROGRESS', A, '10')),
+    comment(2, v2('CLEAR', A, '11')),
+  ], TARGET);
+  assert.equal(unrelatedRun.clear, false);
+  assert.deepEqual(unrelatedRun.inProgressRuns, ['10']);
+
+  const recovered = evaluateChiefAccessReconciliation([
+    comment(1, v2('REPAIR_IN_PROGRESS', A, '10')),
+    comment(2, v2('CLEAR', A, '10')),
+  ], TARGET);
+  assert.equal(recovered.clear, true);
+  assert.deepEqual(recovered.inProgressRuns, []);
+});
