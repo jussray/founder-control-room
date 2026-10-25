@@ -1,0 +1,13 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "founder-control-room",
+  "version": "0.1.0",
+  "description": "User-scoped Founder Control Room project evidence and non-authorizing work previews. Public connection requires completed tenant-isolated MCP service.",
+  "repository": "https://github.com/jussray/founder-control-room",
+  "keywords": [
+    "founder-control-room",
+    "project-evidence",
+    "mcp",
+    "governance"
+  ]
+}
