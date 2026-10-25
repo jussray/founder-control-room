@@ -361,6 +361,8 @@ When a newer fingerprint contradicts an older present-tense statement, replace o
 
 Documentation Truth proves documentation coverage/materiality. It does not independently prove provider configuration, deployment, browser behavior, security review, publication, or human outcome.
 
+The public Lovable external-project surface bindings (`public/.well-known/lovable-project-surfaces.json` and its published schema) are registered with the verifier under the `external-surface-authority` domain, because that manifest is a public authority contract other systems resolve against. Any change to either artifact must ship with a current documentation receipt naming path-bound invariants for it; an unregistered or unreceipted binding change fails the gate instead of passing invisibly.
+
 See [`docs/TRUTH_DECAY_AUDIT.md`](docs/TRUTH_DECAY_AUDIT.md).
 
 ## Setup
