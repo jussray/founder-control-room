@@ -98,8 +98,15 @@ export function bindGovernedExecutionReceipt(
   if (normalized(receipt.idempotencyKey) !== normalized(input.lease.execution.idempotencyKey)) {
     reasons.push('receipt_idempotency_mismatch');
   }
-  if (!normalized(receipt.runtimeIdentity)) {
+  const expectedRuntimeIdentity = normalized(input.lease.runtime.harnessId)
+    && normalized(input.lease.subject.expectedVersion)
+    ? `${normalized(input.lease.runtime.harnessId)}@${normalized(input.lease.subject.expectedVersion)}`
+    : undefined;
+  const actualRuntimeIdentity = normalized(receipt.runtimeIdentity);
+  if (!actualRuntimeIdentity) {
     reasons.push('receipt_runtime_identity_missing');
+  } else if (!expectedRuntimeIdentity || actualRuntimeIdentity !== expectedRuntimeIdentity) {
+    reasons.push('receipt_runtime_identity_mismatch');
   }
   if (!Number.isFinite(Date.parse(receipt.observedAt))) {
     reasons.push('receipt_observed_at_invalid');
