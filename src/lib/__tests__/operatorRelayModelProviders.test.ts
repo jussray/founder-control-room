@@ -31,7 +31,7 @@ function relay(
     authority: { externalWrite: false, merge: false, deploy: false, publish: false, providerMutation: false },
     sensitivity,
     createdAt: '2026-09-16T06:30:00.000Z',
-    expiresAt: '2099-09-16T06:40:00.000Z',
+    expiresAt: '2026-09-16T06:40:00.000Z',
   };
   return { ...base, requestHash: operatorRelayRequestHash(base) };
 }
