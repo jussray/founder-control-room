@@ -104,6 +104,10 @@ test('repair latch blocks blind retry and is bound to provider subject', () => {
   assert.match(recoveryWorkflow, /Persist repair-in-progress reconciliation latch/);
   assert.match(recoveryWorkflow, /disposition=REPAIR_IN_PROGRESS/);
   assert.match(recoveryWorkflow, /RECONCILE_REQUIRED/);
+  assert.match(recoveryWorkflow, /LATCH_OUTCOME/);
+  assert.match(recoveryWorkflow, /\$LATCH_OUTCOME" == 'success'/);
+  assert.match(recoveryWorkflow, /\$current_subject" == "\$mutation_subject"/);
+  assert.match(recoveryWorkflow, /\$APPLY_OUTCOME" == 'skipped'/);
   assert.match(recoveryWorkflow, /Retry authority: `BLOCKED`/);
   assert.match(reconciliationState, /REPAIR_IN_PROGRESS/);
   assert.match(reconciliationState, /RECONCILE_REQUIRED/);
@@ -202,6 +206,10 @@ test('dedicated recovery documentation keeps source, provider, and browser truth
   assert.match(recoveryDoc, /CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID/);
   assert.match(recoveryDoc, /CLOUDFLARE_ACCESS_API_TOKEN/);
   assert.match(recoveryDoc, /CLOUDFLARE_ACCESS_ADMIN_API_TOKEN/);
+  assert.match(recoveryDoc, /selector source classes/);
+  assert.match(recoveryDoc, /reconciliation disposition/);
+  assert.match(recoveryDoc, /SHA-256 provider-subject fingerprint/);
+  assert.match(recoveryDoc, /Raw selector values, Access secrets, provider response bodies, and approval text remain excluded/);
   assert.match(recoveryDoc, /does not prove Chief runtime equivalence/);
   assert.match(recoveryDoc, /rerun failed Chief ProofMode MCP Playwright job/);
   assert.match(recoveryDoc, /rerun failed Chief capability-plan Playwright job/);
