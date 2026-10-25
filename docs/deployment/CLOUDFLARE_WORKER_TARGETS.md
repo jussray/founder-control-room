@@ -35,6 +35,8 @@ Current merged source uses this contract:
 
 Public discovery artifacts including `/robots.txt`, `/sitemap.xml`, `/llms.txt`, and `/crawlers.json` are static Pages assets and must remain on `env.ASSETS`; API-owned callback assets remain on `env.FCR_API`. This path classification is not authentication and cannot create crawler write authority, provider mutation authority, deployment authority, or publication authority.
 
+The bare `/work` and `/work/` paths carry the same static classification: `public/_worker.js` rewrites them to `/work.html` and serves the asset through `env.ASSETS`, because the edge redirect rule points `/work.html` at `/work` while the `FCR_API` proxy path answers that public page with a degraded 503.
+
 `API_ORIGIN = https://api.foundercontrolroom.org` remains part of request construction/loop protection in source. Dynamic network execution is performed through `FCR_API.fetch(...)`, not a direct public-origin `fetch()` call.
 
 ### Required Pages provider configuration
