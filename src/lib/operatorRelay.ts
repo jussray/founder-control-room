@@ -4,7 +4,7 @@ import { OPERATOR_RELAY_PEERS, OPERATOR_RELAY_SOURCES } from './operatorRelayCon
 
 export const OPERATOR_RELAY_REQUEST_CONTRACT = 'juss/operator-relay/request@v1' as const;
 export const OPERATOR_RELAY_RESPONSE_CONTRACT = 'juss/operator-relay/response@v1' as const;
-export const OPERATOR_RELAY_MAX_TTL_MS = 10 * 60_000;
+export const OPERATOR_RELAY_MAX_TTL_MS = 30 * 60_000;
 export const OPERATOR_RELAY_MAX_CLOCK_SKEW_MS = 30_000;
 
 export type RelayOperatorId = (typeof OPERATOR_RELAY_PEERS)[number];
