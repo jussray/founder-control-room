@@ -102,3 +102,23 @@ test('Chief service-token variable outranks matching generic token alias and con
     requireIdentity: true,
   }), /service-token ID conflicts with the generic fallback alias/);
 });
+
+
+test('selector values cannot inject additional GitHub environment assignments', () => {
+  assert.throws(() => resolveChiefAccessSelector({
+    chiefClientIdSecret: 'client-a.access\nCHIEF_ACCESS_TARGET_URL=https://deadbeef-chief-ai.mcgill-raylene.workers.dev',
+    requireIdentity: true,
+  }), /single-line identifier/);
+
+  assert.throws(() => resolveChiefAccessSelector({
+    chiefServiceTokenIdVariable: 'token-a\r\nUNRELATED=value',
+    requireIdentity: true,
+  }), /single-line identifier/);
+});
+
+test('selector values reject unsupported identifier characters', () => {
+  assert.throws(() => resolveChiefAccessSelector({
+    chiefClientIdSecret: 'client id with spaces',
+    requireIdentity: true,
+  }), /unsupported identifier characters/);
+});
