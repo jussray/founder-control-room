@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs';
 
 const API = 'https://api.cloudflare.com/client/v4';
 const POLICY_NAME = 'ProofMode CI service auth';
@@ -422,6 +422,36 @@ export function classifyChiefAccessError(error) {
   return 'bounded-check-failed';
 }
 
+export async function observeChiefAccessSubject(input) {
+  try {
+    const result = await ensureChiefProofModeAccessPolicy({ ...input, mode: 'check' });
+    return { subjectFingerprint: result.subjectFingerprint, configured: result.state === 'configured' };
+  } catch (error) {
+    const subjectFingerprint = typeof error?.chiefAccessSubjectFingerprint === 'string'
+      ? error.chiefAccessSubjectFingerprint
+      : null;
+    if (!subjectFingerprint) throw error;
+    return { subjectFingerprint, configured: false };
+  }
+}
+
+function writeSubjectObservationOutput(observation) {
+  const subject = typeof observation?.subjectFingerprint === 'string'
+    ? observation.subjectFingerprint
+    : '';
+  if (!/^sha256:[0-9a-f]{64}$/.test(subject)) {
+    throw new Error('Chief Access subject observation did not return a canonical fingerprint.');
+  }
+  if (!process.env.GITHUB_OUTPUT) {
+    throw new Error('GITHUB_OUTPUT is required for subject-only workflow observation.');
+  }
+  appendFileSync(
+    process.env.GITHUB_OUTPUT,
+    `subject_fingerprint=${subject}\nconfigured=${observation.configured === true ? 'true' : 'false'}\n`,
+    'utf8',
+  );
+}
+
 function writeReceipt(result, mode) {
   const mutationOutcome = result.changed ? 'performed' : 'none';
   mkdirSync('test-results', { recursive: true });
@@ -476,19 +506,24 @@ function writeBlockedReceipt(error, mode, targetUrl) {
 }
 
 async function main() {
-  const mode = validateMode(process.env.CHIEF_ACCESS_MODE || 'check');
+  const subjectOnly = process.env.CHIEF_ACCESS_SUBJECT_ONLY === 'true';
+  const mode = subjectOnly ? 'check' : validateMode(process.env.CHIEF_ACCESS_MODE || 'check');
   const apiToken = mode === 'repair'
     ? process.env.CLOUDFLARE_ACCESS_ADMIN_API_TOKEN
     : process.env.CLOUDFLARE_ACCESS_API_TOKEN;
-  const result = await ensureChiefProofModeAccessPolicy({
-    mode,
+  const common = {
     accountId: process.env.CLOUDFLARE_ACCOUNT_ID,
     apiToken,
     targetUrl: process.env.CHIEF_ACCESS_TARGET_URL,
     serviceClientId: process.env.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID,
     serviceTokenId: process.env.CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID,
     applicationName: process.env.CHIEF_ACCESS_APP_NAME || DEFAULT_APP_NAME,
-  });
+  };
+  if (subjectOnly) {
+    writeSubjectObservationOutput(await observeChiefAccessSubject(common));
+    return;
+  }
+  const result = await ensureChiefProofModeAccessPolicy({ mode, ...common });
   writeReceipt(result, mode);
 }
 
