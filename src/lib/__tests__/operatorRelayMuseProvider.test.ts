@@ -37,7 +37,7 @@ function relay(
     },
     sensitivity,
     createdAt: '2026-09-24T19:00:00.000Z',
-    expiresAt: '2099-09-24T19:10:00.000Z',
+    expiresAt: '2026-09-24T19:10:00.000Z',
   };
   return { ...base, requestHash: operatorRelayRequestHash(base) };
 }
