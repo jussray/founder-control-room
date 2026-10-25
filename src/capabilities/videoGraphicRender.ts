@@ -408,7 +408,7 @@ export async function readVideoGraphicRenderStatus(
       throw new VideoGraphicRenderError('remote_render_status_failed', 'Render completed but its evidence artifact could not be read.', 502);
     }
   }
-  const evidenceArtifact = artifacts.find((artifact) => artifact.name.startsWith('fcr-video-render-')) ?? null;
+  const evidenceArtifact = artifacts.find((artifact) => !artifact.expired && artifact.name.startsWith('fcr-video-render-')) ?? null;
 
   return {
     contract: VIDEO_GRAPHIC_RENDER_CONTRACT,

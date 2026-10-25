@@ -163,6 +163,43 @@ describe('video graphic render capability', () => {
     expect(dispatch).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ['missing', []],
+    ['expired', [{ id: 9, name: 'fcr-video-render-42-1', expired: true }]],
+  ])('keeps a successful run unverified when its evidence artifact is %s', async (_label, artifacts) => {
+    const invocationId = 'video-graphic-abcdef123456-11111111-2222-4333-8444-555555555555';
+    const { fake } = provider({
+      findRun: vi.fn().mockResolvedValue({ id: 42, status: 'completed', conclusion: 'success',
+        htmlUrl: 'https://github.com/jussray/founder-control-room/actions/runs/42',
+        headSha: MAIN_SHA, displayTitle: `FCR video render ${invocationId}` }),
+      listArtifacts: vi.fn().mockResolvedValue(artifacts),
+    });
+
+    const status = await readVideoGraphicRenderStatus(invocationId, fake);
+    expect(status.verification).toBe('WORKFLOW_NOT_VERIFIED');
+    expect(status.evidenceArtifact).toBeNull();
+    expect(status.publishAuthority).toBe(false);
+  });
+
+  it('selects retained evidence when an expired artifact appears first', async () => {
+    const invocationId = 'video-graphic-abcdef123456-11111111-2222-4333-8444-555555555555';
+    const retained = { id: 10, name: 'fcr-video-render-42-2', expired: false };
+    const { fake } = provider({
+      findRun: vi.fn().mockResolvedValue({ id: 42, status: 'completed', conclusion: 'success',
+        htmlUrl: 'https://github.com/jussray/founder-control-room/actions/runs/42',
+        headSha: MAIN_SHA, displayTitle: `FCR video render ${invocationId}` }),
+      listArtifacts: vi.fn().mockResolvedValue([
+        { id: 9, name: 'fcr-video-render-42-1', expired: true },
+        retained,
+      ]),
+    });
+
+    const status = await readVideoGraphicRenderStatus(invocationId, fake);
+    expect(status.verification).toBe('WORKFLOW_AND_PLAYBACK_VERIFIED');
+    expect(status.evidenceArtifact).toEqual(retained);
+    expect(status.publishAuthority).toBe(false);
+  });
+
   it('calls a completed run verified only when its retained FCR evidence artifact exists', async () => {
     const invocationId = 'video-graphic-abcdef123456-11111111-2222-4333-8444-555555555555';
     const run = {

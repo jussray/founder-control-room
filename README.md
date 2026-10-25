@@ -76,6 +76,8 @@ node scripts/verify-video-playback.mjs --media <output.mp4>
 
 A successful render authorizes bounded byte production only. It does not grant truth, release, publication, billing, deployment, or cross-project authority. FCR does not route its own render through Chief, Se’kret Bip, StoryEngine, or an external media provider unless a separate current capability and authority decision explicitly selects that route. The dedicated `.github/workflows/video-renderer-proof.yml` is the exact-head CI witness for invocation plus Playwright playback; predecessor green becomes historical whenever the FCR head moves.
 
+The authenticated remote graphic-render capability reports workflow/playback verification only when a successful workflow still has a retained, unexpired FCR evidence artifact. Expired or missing artifacts remain `WORKFLOW_NOT_VERIFIED`; when expired and retained artifacts coexist, the status selects retained evidence. Source tests do not establish a live render, deployment, or publication.
+
 ### Capital control architecture
 
 `src/governance/capitalControlArchitecture.ts` now defines the FCR-owned `fcr/capital-control-architecture@v1` contract for reasoning about future portfolio-level and project-level investment lanes while preserving founder control and project ownership boundaries. Its current architecture state is **`design_only`**. That means the source contract and tests exist, but FCR does not claim that a parent entity, project subsidiaries, share classes, cap table, valuation, securities terms, or a public offering have been legally formed or verified.
