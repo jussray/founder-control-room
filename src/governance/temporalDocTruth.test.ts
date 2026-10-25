@@ -151,7 +151,7 @@ describe('repository documentation truth control', () => {
     const claims = [
       {
         expected: true,
-        value: 'src/providers/GitHubProvider.ts must intentionally remove legacy pre-merge required_deployments because production release authority is exact-current-main/post-merge.',
+        value: 'src/providers/GitHubProvider.ts must snapshot an existing FCR review ruleset before two-membrane reconciliation, preserve required-linear-history, code-quality, and Copilot-review rules with their parameters unchanged, intentionally remove legacy pre-merge required_deployments because production release authority is exact-current-main/post-merge, reject unknown unowned rule types before provider mutation, and independently read back the preserved rules after update; bypass repair must never weaken unrelated live security controls.',
       },
       {
         expected: false,
