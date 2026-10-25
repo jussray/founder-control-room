@@ -293,6 +293,8 @@ export async function ensureChiefProofModeAccessPolicy({
   serviceTokenId,
   applicationName = DEFAULT_APP_NAME,
   nowMs = Date.now(),
+  expectedSubjectFingerprint,
+  mutationStagePath,
 }) {
   if (typeof fetchImpl !== 'function') throw new Error('A fetch implementation is required.');
   const normalizedMode = validateMode(mode);
@@ -330,6 +332,25 @@ export async function ensureChiefProofModeAccessPolicy({
     serviceTokenId: serviceId,
   });
 
+  const latchedSubjectFingerprint = typeof expectedSubjectFingerprint === 'string'
+    ? expectedSubjectFingerprint.trim()
+    : '';
+  if (latchedSubjectFingerprint) {
+    if (!/^sha256:[0-9a-f]{64}$/.test(latchedSubjectFingerprint)) {
+      throw markAccessSubject(
+        new Error('Latched Chief Access subject fingerprint is malformed; refusing to apply against an unbound subject.'),
+        subjectFingerprint,
+      );
+    }
+    if (latchedSubjectFingerprint !== subjectFingerprint) {
+      throw markAccessSubject(
+        new Error('Resolved Chief Access subject differs from the latched repair subject; refusing to mutate a subject that was not observed and latched.'),
+        subjectFingerprint,
+      );
+    }
+  }
+  const stagePath = typeof mutationStagePath === 'string' ? mutationStagePath.trim() : '';
+
   const exact = policies.find((policy) => hasSpecificServiceToken(policy, serviceId));
   if (exact) {
     return {
@@ -362,6 +383,17 @@ export async function ensureChiefProofModeAccessPolicy({
       new Error(`Effective Access scope ${effective.scope} is not the approved exact immutable-preview host; refusing repair.`),
       subjectFingerprint,
     );
+  }
+
+  if (stagePath) {
+    try {
+      writeFileSync(stagePath, 'attempted\n', 'utf8');
+    } catch {
+      throw markAccessSubject(
+        new Error('Could not record the Chief Access mutation stage before the provider write; refusing repair without a durable pre-mutation boundary.'),
+        subjectFingerprint,
+      );
+    }
   }
 
   let created;
@@ -408,7 +440,7 @@ export function classifyChiefAccessError(error) {
   if (/Multiple service-token identities/.test(message)) return 'service-token-binding-ambiguous';
   if (/No matching Chief Service Auth policy/.test(message)) return 'service-auth-policy-missing';
   if (/ProofMode CI service-auth policy exists for another rule/.test(message)) return 'service-auth-policy-conflict';
-  if (/Multiple public Access applications|Multiple preview_worker Access applications|Multiple worker Access applications|Expected exactly one Chief Worker identity|Could not resolve an effective Access application/.test(message)) {
+  if (/Multiple public Access applications|Multiple preview_worker Access applications|Multiple worker Access applications|Expected exactly one Chief Worker identity|Could not resolve an effective Access application|Resolved Chief Access subject differs from the latched repair subject|Latched Chief Access subject fingerprint is malformed/.test(message)) {
     return 'access-application-ambiguous-or-unresolved';
   }
   if (/configured Chief Access service token is disabled|configured Chief Access service token is expired|configured Chief Access service token has invalid expiry metadata|does not match the configured client ID|Expected exactly one configured Cloudflare Access service token|Expected exactly one Cloudflare Access service token/.test(message)) {
@@ -425,13 +457,21 @@ export function classifyChiefAccessError(error) {
 export async function observeChiefAccessSubject(input) {
   try {
     const result = await ensureChiefProofModeAccessPolicy({ ...input, mode: 'check' });
-    return { subjectFingerprint: result.subjectFingerprint, configured: result.state === 'configured' };
+    return {
+      subjectFingerprint: result.subjectFingerprint,
+      configured: result.state === 'configured',
+      reasonCode: null,
+    };
   } catch (error) {
     const subjectFingerprint = typeof error?.chiefAccessSubjectFingerprint === 'string'
       ? error.chiefAccessSubjectFingerprint
       : null;
     if (!subjectFingerprint) throw error;
-    return { subjectFingerprint, configured: false };
+    return {
+      subjectFingerprint,
+      configured: false,
+      reasonCode: classifyChiefAccessError(error),
+    };
   }
 }
 
@@ -445,9 +485,14 @@ function writeSubjectObservationOutput(observation) {
   if (!process.env.GITHUB_OUTPUT) {
     throw new Error('GITHUB_OUTPUT is required for subject-only workflow observation.');
   }
+  const reasonCode = observation.configured === true
+    ? 'none'
+    : BLOCKED_REASON_CODES.includes(observation.reasonCode)
+      ? observation.reasonCode
+      : 'bounded-check-failed';
   appendFileSync(
     process.env.GITHUB_OUTPUT,
-    `subject_fingerprint=${subject}\nconfigured=${observation.configured === true ? 'true' : 'false'}\n`,
+    `subject_fingerprint=${subject}\nconfigured=${observation.configured === true ? 'true' : 'false'}\nsubject_reason_code=${reasonCode}\n`,
     'utf8',
   );
 }
@@ -518,6 +563,8 @@ async function main() {
     serviceClientId: process.env.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID,
     serviceTokenId: process.env.CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID,
     applicationName: process.env.CHIEF_ACCESS_APP_NAME || DEFAULT_APP_NAME,
+    expectedSubjectFingerprint: process.env.CHIEF_ACCESS_LATCHED_SUBJECT_FINGERPRINT || undefined,
+    mutationStagePath: process.env.CHIEF_ACCESS_MUTATION_STAGE_PATH || undefined,
   };
   if (subjectOnly) {
     writeSubjectObservationOutput(await observeChiefAccessSubject(common));
