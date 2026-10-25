@@ -210,7 +210,7 @@ describe('createServerOperatorRelayAdapters', () => {
       expect(init?.signal).toBeInstanceOf(AbortSignal);
       expect(init?.headers).toMatchObject({
         'x-api-key': FIXTURE,
-        'anthropic-version': '2023-06-01',
+        'anthropic-version': '2026-10-21',
         'Content-Type': 'application/json',
       });
       const serialized = String(init?.body ?? '');

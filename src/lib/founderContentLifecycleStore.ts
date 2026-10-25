@@ -4,10 +4,6 @@ import {
   FIRST_PARTY_SOCIAL_PLATFORMS,
   type FirstPartySocialPlatform,
 } from './firstPartySocialPublisher.js';
-import {
-  FOUNDER_CONTENT_METRICS_CONTRACT,
-  normalizeFounderContentMetricsEnvelope,
-} from './founderContentMetrics.js';
 import type {
   FounderContentPostStatus,
   FounderContentProviderWriteState,
@@ -137,18 +133,6 @@ function record(value: unknown): JsonRecord {
   return value && typeof value === 'object' && !Array.isArray(value)
     ? value as JsonRecord
     : {};
-}
-
-function normalizeLifecycleEventPayload(eventType: string, value: unknown): JsonRecord {
-  const payload = record(value);
-  if (eventType !== 'metrics_synced') return payload;
-  return {
-    ...payload,
-    data: {
-      contract: FOUNDER_CONTENT_METRICS_CONTRACT,
-      observations: normalizeFounderContentMetricsEnvelope(payload.data),
-    },
-  };
 }
 
 function iso(value: unknown): string | null {
@@ -434,14 +418,12 @@ export async function mutateStoredFounderContentPost(
   repository?: FounderContentLifecycleRepository,
 ): Promise<StoredFounderContentPost> {
   const store = repository ?? await defaultRepository();
-  const eventType = text(input.eventType);
   return store.mutate({
     ...input,
     founderUserId: text(input.founderUserId),
     postId: text(input.postId),
-    eventType,
     actor: text(input.actor) || 'founder',
-    eventPayload: normalizeLifecycleEventPayload(eventType, input.eventPayload),
+    eventPayload: record(input.eventPayload),
     now: requireIso(input.now ?? new Date().toISOString(), 'now'),
   });
 }

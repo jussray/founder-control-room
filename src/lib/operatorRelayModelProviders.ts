@@ -8,7 +8,7 @@ type JsonRecord = Record<string, unknown>;
 
 const MAX_PROVIDER_RESPONSE_BYTES = 64 * 1024;
 const PROVIDER_TIMEOUT_MS = 60_000;
-const ANTHROPIC_API_VERSION = '2023-06-01';
+const ANTHROPIC_API_VERSION = '2026-10-21';
 const MAX_PROVIDER_RESPONSE_ID_LENGTH = 200;
 const SAFE_GEMINI_MODEL = /^[A-Za-z0-9._-]{1,160}$/;
 const SAFE_PERPLEXITY_AGENT_MODEL = /^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/;
@@ -437,16 +437,16 @@ export function createServerOperatorRelayAdapters(
         const body = await invokeJsonProvider(fetchImpl, 'https://api.anthropic.com/v1/messages', {
           method: 'POST',
           headers: {
+            ...(anthropicMcp?.headers ?? {}),
             'x-api-key': anthropicKey,
             'anthropic-version': ANTHROPIC_API_VERSION,
             'Content-Type': 'application/json',
-            ...(anthropicMcp?.headers ?? {}),
           },
           body: JSON.stringify({
+            ...(anthropicMcp?.body ?? {}),
             model: anthropicModel,
             max_tokens: 2_000,
             messages: [{ role: 'user', content: relayPrompt(request) }],
-            ...(anthropicMcp?.body ?? {}),
           }),
           redirect: 'error',
           signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
