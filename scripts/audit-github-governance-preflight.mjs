@@ -8,7 +8,6 @@ export const REQUIRED_CHECKS = ['Required Gate', 'Verify test-ledger contract'];
 export const PRESERVABLE_REVIEW_RULE_TYPES = Object.freeze([
   'required_linear_history',
   'code_quality',
-  'required_deployments',
   'copilot_code_review',
 ]);
 export const CODEQL_SECURITY_FLOOR = Object.freeze({

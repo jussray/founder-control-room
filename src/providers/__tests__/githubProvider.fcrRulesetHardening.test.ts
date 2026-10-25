@@ -46,10 +46,6 @@ function preservedProviderRules(): TestRule[] {
     { type: "required_linear_history" },
     { type: "code_quality", parameters: { severity: "errors" } },
     {
-      type: "required_deployments",
-      parameters: { required_deployment_environments: ["founder-signal-engine-review", "production"] },
-    },
-    {
       type: "copilot_code_review",
       parameters: { review_on_push: false, review_draft_pull_requests: false },
     },
@@ -420,7 +416,7 @@ describe("GitHubProvider FCR main ruleset hardening", () => {
     expect(mockUpdateRepoRuleset.mock.calls.map((call) => call[0].ruleset_id)).toEqual([22, 11]);
   });
 
-  it("preserves unrelated provider security and deployment rules when splitting the live review membrane", async () => {
+  it("preserves unrelated provider security rules when splitting the live review membrane", async () => {
     const preserved = preservedProviderRules();
     mockGetRepoRulesets.mockResolvedValue({
       data: [
@@ -447,6 +443,35 @@ describe("GitHubProvider FCR main ruleset hardening", () => {
     expect(reviewUpdate.rules).toEqual(expect.arrayContaining(preserved));
     expect(reviewUpdate.rules.some((rule: { type: string }) => rule.type === "required_status_checks")).toBe(false);
     expect(mockGetRepoRuleset.mock.calls.map((call) => call[0].ruleset_id)).toEqual([11, 22, 11]);
+  });
+
+  it("removes legacy pre-merge required deployments instead of preserving a circular production gate", async () => {
+    const legacyDeployment: TestRule = {
+      type: "required_deployments",
+      parameters: { required_deployment_environments: ["founder-signal-engine-review", "production"] },
+    };
+    mockGetRepoRulesets.mockResolvedValue({
+      data: [
+        { id: 11, name: config.name },
+        { id: 22, name: freshnessName() },
+      ],
+    });
+    mockUpdateRepoRuleset.mockImplementation(async (payload: { name: string; enforcement: string; ruleset_id: number }) => ({
+      data: { id: payload.ruleset_id, name: payload.name, enforcement: payload.enforcement },
+    }));
+    mockGetRepoRuleset
+      .mockResolvedValueOnce({ data: reviewReadback(config, [legacyDeployment]) })
+      .mockResolvedValueOnce({ data: { ...freshnessReadback(), id: 22 } })
+      .mockResolvedValueOnce({ data: { ...reviewReadback(config), id: 11 } });
+
+    const provider = buildProvider();
+    await expect(provider.applyBranchRuleset("founder-control-room", config)).resolves.toMatchObject({
+      name: config.name,
+      enforcement: "active",
+    });
+
+    const reviewUpdate = mockUpdateRepoRuleset.mock.calls.find((call) => call[0].ruleset_id === 11)?.[0];
+    expect(reviewUpdate.rules.some((rule: { type: string }) => rule.type === "required_deployments")).toBe(false);
   });
 
   it("fails before provider mutation when the live review membrane contains an unknown unowned rule", async () => {

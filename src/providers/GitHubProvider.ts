@@ -26,11 +26,14 @@ const FCR_REVIEW_OWNED_RULE_TYPES = new Set([
   "code_scanning",
   "non_fast_forward",
   "deletion",
+  // Legacy pre-merge deployment gates are FCR-owned policy. They must not be
+  // carried into the canonical review membrane because production deployment
+  // is authorized only for exact current main after merge.
+  "required_deployments",
 ]);
 const FCR_REVIEW_PRESERVABLE_RULE_TYPES = new Set([
   "required_linear_history",
   "code_quality",
-  "required_deployments",
   "copilot_code_review",
 ]);
 
@@ -531,9 +534,10 @@ export class GitHubProvider implements RepositoryProvider {
 
     if (hardenFounderControlRoomMainReview && reviewMatch) {
       // The governance reconciler owns PR/review, CodeQL, force-push/deletion,
-      // and strict-status freshness. Everything else already enforced by the
-      // provider is unrelated security policy and must survive the topology
-      // split byte-for-byte at the rule/parameter level.
+      // strict-status freshness, and legacy pre-merge deployment gates.
+      // Required deployments are intentionally removed because FCR production
+      // release authority is exact-current-main/post-merge. Other known live
+      // security policy survives the topology split byte-for-byte.
       const { data: existingReviewReadback } = await this.octokit.repos.getRepoRuleset({
         owner,
         repo,

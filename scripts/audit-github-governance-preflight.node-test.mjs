@@ -142,17 +142,13 @@ test('canonical review membrane permits only the known preservable provider rule
     { type: 'required_linear_history' },
     { type: 'code_quality', parameters: { severity: 'errors' } },
     {
-      type: 'required_deployments',
-      parameters: { required_deployment_environments: ['founder-signal-engine-review', 'production'] },
-    },
-    {
       type: 'copilot_code_review',
       parameters: { review_on_push: false, review_draft_pull_requests: false },
     },
   );
   assert.deepEqual(
     [...PRESERVABLE_REVIEW_RULE_TYPES].sort(),
-    ['code_quality', 'copilot_code_review', 'required_deployments', 'required_linear_history'].sort(),
+    ['code_quality', 'copilot_code_review', 'required_linear_history'].sort(),
   );
   assert.equal(canonicalFloorSatisfied(rulesetSnapshot(preserved, 'main', 'main'), expectedBypass), true);
 
@@ -333,6 +329,17 @@ test('freshness companion must have zero bypass actors and only exact strict che
   const wrongChecksReport = readyReport({ fullRulesets: [canonicalRuleset(), wrongChecks] });
   assert.equal(wrongChecksReport.status, 'NOT_READY');
   assert.equal(wrongChecksReport.freshnessFloorSatisfied, false);
+});
+
+test('review membrane rejects legacy pre-merge deployment requirements', () => {
+  const legacyDeployment = canonicalRuleset();
+  legacyDeployment.rules.push({
+    type: 'required_deployments',
+    parameters: { required_deployment_environments: ['founder-signal-engine-review', 'production'] },
+  });
+  const report = readyReport({ fullRulesets: [legacyDeployment, freshnessRuleset()] });
+  assert.equal(report.status, 'NOT_READY');
+  assert.equal(report.canonicalFloorSatisfied, false);
 });
 
 test('review membrane rejects unmodeled extra provider rules', () => {
