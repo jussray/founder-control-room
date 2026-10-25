@@ -21,6 +21,10 @@ This is an additive package candidate for `jussray/founder-control-room`. It doe
 7. Run exact-commit `npm run verify:mcp`, `npm test`, `npm run typecheck`, `npm run lint`, `npm run build`, integration tests, Playwright where a UI changes, and live authenticated MCP client discovery against the deployed Cloudflare Worker. Record full results and runtime identity.
 8. Provide verified HTTPS website, support, privacy, and terms URLs, a demo recording, a dedicated review account, and accurate production tool metadata. Perform the required domain verification, OAuth login and tool scan. **Only then** prepare a submission.
 
+## Submission-case contract
+
+The five positive and three negative proposed review cases are declared under `plugin.json` → `extensions.com.openai.review.test_cases` (the submission-imported field) and mirrored in `review/test-cases.json` for development review. All positive cases target **only** the two currently implemented read-only public tools. These cases remain **unexecuted** until a real demo tenant and deployed OAuth connection are independently verified.
+
 ## Configuration caveat
 
 The plugin `mcp.json` deliberately declares OAuth without a fabricated `clientId`, client secret or registration URL. Register a supported OAuth client or implement valid DCR/CIMD; the actual choice must match the production identity provider's verified capabilities. A secret must never be committed to the manifest.

@@ -27,10 +27,19 @@ assert.match(skill, /never run external actions/i);
 assert.match(skill, /founder-only/i);
 assert.match(instructions, /disabled-by-default candidate source/i);
 assert.match(instructions, /PRE-RELEASE/);
-assert.equal(tests.positive.length, 5);
-assert.equal(tests.negative.length, 3);
-assert.equal(new Set([...tests.positive, ...tests.negative].map(x=>x.id)).size, 8);
-for (const c of [...tests.positive,...tests.negative]) {
-  assert.ok(c.prompt?.trim() && c.expected?.trim());
+assert.equal(tests.status, 'test_cases_not_executed');
+const configuredCases = plugin.extensions?.['com.openai']?.review?.test_cases;
+assert.deepEqual(configuredCases, { positive: tests.positive, negative: tests.negative });
+assert.equal(configuredCases.positive.length, 5);
+assert.equal(configuredCases.negative.length, 3);
+const names = new Set(['fcr_list_my_projects', 'fcr_get_my_project']);
+for (const c of configuredCases.positive) {
+  assert.ok(c.description?.trim() && c.prompt?.trim() && c.expected_behavior?.trim());
+  const triggered = c.tools_triggered.split(',').map(name => name.trim());
+  assert.ok(triggered.length > 0 && triggered.every(name => names.has(name)));
+}
+for (const c of configuredCases.negative) {
+  assert.ok(c.description?.trim() && c.prompt?.trim());
+  assert.ok(!('tools_triggered' in c));
 }
 console.log('[verify:fcr-public-plugin] PASS: 12 static assertions / 8 unexecuted review scenarios; no production readiness claim.');
