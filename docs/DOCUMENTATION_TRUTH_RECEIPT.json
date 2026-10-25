@@ -97,7 +97,8 @@
     {
       "path": "src/http/routes/n8nConveyor.ts",
       "claims": [
-        "`src/http/routes/n8nConveyor.ts` may mount the authenticated YouTube growth evaluator under the existing founder-content conveyor only as a read/evaluation capability; mounting that route must not grant publish, schedule, spend, provider-mutation, scale-execution, merge, or deploy authority and must not weaken the existing founder-content publication membrane."
+        "`src/http/routes/n8nConveyor.ts` may mount the authenticated YouTube growth evaluator under the existing founder-content conveyor only as a read/evaluation capability; mounting that route must not grant publish, schedule, spend, provider-mutation, scale-execution, merge, or deploy authority and must not weaken the existing founder-content publication membrane.",
+        "`src/http/routes/n8nConveyor.ts` must mount founder-content metric CSV ingestion only beneath the existing founder-authenticated `/founder-content/lifecycle` boundary; mounting the observation route cannot create provider publication, freshness, strategy-mutation, merge, deploy, spend, or external-contact authority."
       ]
     },
     {
@@ -190,7 +191,8 @@
       "claims": [
         "`docs/PUBLIC_COMMUNICATION_TRUTH_CONTRACT.md` must keep YouTube growth HOLD/ADVANCE and diagnostic recommendations inside observation/recommendation authority and require separate provider/outcome evidence before public claims of publication, YPP eligibility, revenue, conversion, or provider-side state.",
         "`docs/PUBLIC_COMMUNICATION_TRUTH_CONTRACT.md` must keep Postiz MCP account/status readback separate from provider-write authority and must hold any publication claim when Postiz reports PUBLISHED without a destination-native permalink or equivalent independently verified terminal artifact.",
-        "Componecat catalog/context evidence must remain non-authorizing and cannot be used as public proof of project execution, deployment, or publication."
+        "Componecat catalog/context evidence must remain non-authorizing and cannot be used as public proof of project execution, deployment, or publication.",
+        "`docs/PUBLIC_COMMUNICATION_TRUTH_CONTRACT.md` must keep imported founder-content metrics bound to explicit content/provider/account/page/audience/metric/unit/time/source provenance, preserve blank values as unknown instead of zero, and forbid a historical import or database receipt from becoming a current metric claim without fresh authoritative evidence."
       ]
     },
     {
@@ -324,6 +326,24 @@
       "path": "tools/zapier/founder-content-outcome-contract.cjs",
       "claims": [
         "`tools/zapier/founder-content-outcome-contract.cjs` must bind founder-content metrics to the exact observed network, lane, account identity, connector identity, and coverage state; out-of-scope metrics must remain UNKNOWN, cross-account metric donation is forbidden, and these receipts can never grant publication, provider-write, merge, deploy, spend, or external-contact authority."
+      ]
+    },
+    {
+      "path": "src/http/routes/founderContentMetricsCsv.ts",
+      "claims": [
+        "`src/http/routes/founderContentMetricsCsv.ts` must reuse the canonical content-metrics CSV parser, bind every observation to the authenticated founder's stored post content fingerprint, provider, account, and one page identity, reject future observations and oversized CSV payloads, persist no raw CSV, and return observation-only authority."
+      ]
+    },
+    {
+      "path": "src/lib/contentMetricsStore.ts",
+      "claims": [
+        "`src/lib/contentMetricsStore.ts` must treat the durable database receipt as untrusted input, normalize and validate its contract, fingerprint, row accounting, timestamps, and false publication/freshness/strategy authority before accepting it, and must persist only normalized observations rather than raw CSV."
+      ]
+    },
+    {
+      "path": "supabase/migrations/20260919023000_founder_content_metric_observations.sql",
+      "claims": [
+        "`supabase/migrations/20260919023000_founder_content_metric_observations.sql` must keep founder-content metrics append-only and observation-only, deny direct browser/client access, deny direct service-role mutation of metric rows, allow only service-role execution of the atomic ingestion function, fail closed on post identity or conflicting evidence, and never persist raw CSV."
       ]
     }
   ]
