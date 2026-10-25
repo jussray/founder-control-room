@@ -39,11 +39,28 @@ const config = {
 
 type TestConfig = typeof config;
 
+type TestRule = { type: string; parameters?: Record<string, unknown> };
+
+function preservedProviderRules(): TestRule[] {
+  return [
+    { type: "required_linear_history" },
+    { type: "code_quality", parameters: { severity: "errors" } },
+    {
+      type: "required_deployments",
+      parameters: { required_deployment_environments: ["founder-signal-engine-review", "production"] },
+    },
+    {
+      type: "copilot_code_review",
+      parameters: { review_on_push: false, review_draft_pull_requests: false },
+    },
+  ];
+}
+
 function freshnessName(request: TestConfig = config) {
   return `${request.name} [strict freshness]`;
 }
 
-function reviewReadback(request: TestConfig = config) {
+function reviewReadback(request: TestConfig = config, preserved: TestRule[] = []) {
   const requireNativeHumanReview = request.requiredApprovingReviewCount > 0;
   const rules: Array<{ type: string; parameters?: Record<string, unknown> }> = [
     {
@@ -69,6 +86,7 @@ function reviewReadback(request: TestConfig = config) {
   ];
   if (request.blockForcePushes) rules.push({ type: "non_fast_forward" });
   if (request.blockDeletion) rules.push({ type: "deletion" });
+  rules.push(...preserved.map((rule) => structuredClone(rule)));
 
   return {
     id: 1,
@@ -400,6 +418,48 @@ describe("GitHubProvider FCR main ruleset hardening", () => {
 
     expect(mockCreateRepoRuleset).not.toHaveBeenCalled();
     expect(mockUpdateRepoRuleset.mock.calls.map((call) => call[0].ruleset_id)).toEqual([22, 11]);
+  });
+
+  it("preserves unrelated provider security and deployment rules when splitting the live review membrane", async () => {
+    const preserved = preservedProviderRules();
+    mockGetRepoRulesets.mockResolvedValue({
+      data: [
+        { id: 11, name: config.name },
+        { id: 22, name: freshnessName() },
+      ],
+    });
+    mockUpdateRepoRuleset.mockImplementation(async (payload: { name: string; enforcement: string; ruleset_id: number }) => ({
+      data: { id: payload.ruleset_id, name: payload.name, enforcement: payload.enforcement },
+    }));
+    mockGetRepoRuleset.mockImplementation(async ({ ruleset_id }: { ruleset_id: number }) => ({
+      data: ruleset_id === 22
+        ? { ...freshnessReadback(), id: 22 }
+        : { ...reviewReadback(config, preserved), id: 11 },
+    }));
+
+    const provider = buildProvider();
+    await expect(provider.applyBranchRuleset("founder-control-room", config)).resolves.toMatchObject({
+      name: config.name,
+      enforcement: "active",
+    });
+
+    const reviewUpdate = mockUpdateRepoRuleset.mock.calls.find((call) => call[0].ruleset_id === 11)?.[0];
+    expect(reviewUpdate.rules).toEqual(expect.arrayContaining(preserved));
+    expect(reviewUpdate.rules.some((rule: { type: string }) => rule.type === "required_status_checks")).toBe(false);
+    expect(mockGetRepoRuleset.mock.calls.map((call) => call[0].ruleset_id)).toEqual([11, 22, 11]);
+  });
+
+  it("fails before provider mutation when the live review membrane contains an unknown unowned rule", async () => {
+    mockGetRepoRulesets.mockResolvedValue({ data: [{ id: 11, name: config.name }] });
+    mockGetRepoRuleset.mockResolvedValue({
+      data: reviewReadback(config, [{ type: "creation" }]),
+    });
+
+    const provider = buildProvider();
+    await expect(provider.applyBranchRuleset("founder-control-room", config))
+      .rejects.toThrow("unowned rule types that cannot be safely preserved: creation");
+    expect(mockCreateRepoRuleset).not.toHaveBeenCalled();
+    expect(mockUpdateRepoRuleset).not.toHaveBeenCalled();
   });
 
   it("accepts renamed policy and additional protected refs when both membranes round-trip", async () => {

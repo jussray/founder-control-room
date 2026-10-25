@@ -20,6 +20,19 @@ import type {
 const FCR_CODE_SCANNING_TOOL = "CodeQL";
 const FCR_CODE_SCANNING_SECURITY_THRESHOLD = "high_or_higher";
 const FCR_CODE_SCANNING_ALERTS_THRESHOLD = "errors";
+const FCR_REVIEW_OWNED_RULE_TYPES = new Set([
+  "pull_request",
+  "required_status_checks",
+  "code_scanning",
+  "non_fast_forward",
+  "deletion",
+]);
+const FCR_REVIEW_PRESERVABLE_RULE_TYPES = new Set([
+  "required_linear_history",
+  "code_quality",
+  "required_deployments",
+  "copilot_code_review",
+]);
 
 export interface GitHubProviderConfig {
   token: string;
@@ -512,6 +525,40 @@ export class GitHubProvider implements RepositoryProvider {
       throw new Error(`GitHubProvider: unsupported bypass actor kind "${actor.kind}"`);
     });
 
+    const { data: existing } = await this.octokit.repos.getRepoRulesets({ owner, repo, per_page: 100 });
+    const reviewMatch = existing.find((ruleset) => ruleset.name === config.name);
+    let preservedReviewRuleSnapshot: NonNullable<RulesetReadback["rules"]> = [];
+
+    if (hardenFounderControlRoomMainReview && reviewMatch) {
+      // The governance reconciler owns PR/review, CodeQL, force-push/deletion,
+      // and strict-status freshness. Everything else already enforced by the
+      // provider is unrelated security policy and must survive the topology
+      // split byte-for-byte at the rule/parameter level.
+      const { data: existingReviewReadback } = await this.octokit.repos.getRepoRuleset({
+        owner,
+        repo,
+        ruleset_id: reviewMatch.id,
+      });
+      const existingReviewRules = Array.isArray(existingReviewReadback.rules)
+        ? existingReviewReadback.rules
+        : [];
+      const unsupportedUnowned = existingReviewRules
+        .map((rule) => String(rule.type ?? ""))
+        .filter((type) => type && !FCR_REVIEW_OWNED_RULE_TYPES.has(type) && !FCR_REVIEW_PRESERVABLE_RULE_TYPES.has(type));
+      if (unsupportedUnowned.length > 0) {
+        throw new Error(
+          `GitHubProvider: FCR review ruleset contains unowned rule types that cannot be safely preserved: ${unsupportedUnowned.sort().join(", ")}`,
+        );
+      }
+      preservedReviewRuleSnapshot = existingReviewRules
+        .filter((rule) => FCR_REVIEW_PRESERVABLE_RULE_TYPES.has(String(rule.type ?? "")))
+        .map((rule) => ({
+          type: String(rule.type ?? ""),
+          ...("parameters" in rule && rule.parameters != null ? { parameters: structuredClone(rule.parameters) } : {}),
+        }));
+      reviewRules.push(...(preservedReviewRuleSnapshot as RepoRule[]));
+    }
+
     const payload = {
       owner,
       repo,
@@ -528,7 +575,6 @@ export class GitHubProvider implements RepositoryProvider {
       rules: reviewRules,
     };
 
-    const { data: existing } = await this.octokit.repos.getRepoRulesets({ owner, repo, per_page: 100 });
     let freshnessComponent: NonNullable<RulesetResult["components"]>[number] | undefined;
     let reviewComponent: NonNullable<RulesetResult["components"]>[number] | undefined;
 
@@ -588,9 +634,8 @@ export class GitHubProvider implements RepositoryProvider {
     }
 
     const applyReviewMembrane = async () => {
-      const match = existing.find((ruleset) => ruleset.name === config.name);
-      const { data } = match
-        ? await this.octokit.repos.updateRepoRuleset({ ...payload, ruleset_id: match.id })
+      const { data } = reviewMatch
+        ? await this.octokit.repos.updateRepoRuleset({ ...payload, ruleset_id: reviewMatch.id })
         : await this.octokit.repos.createRepoRuleset(payload);
 
       reviewComponent = {
@@ -606,7 +651,7 @@ export class GitHubProvider implements RepositoryProvider {
           repo,
           ruleset_id: data.id,
         });
-        const errors = fcrMainReviewRulesetReadbackErrors(config, readback);
+        const errors = fcrMainReviewRulesetReadbackErrors(config, readback, preservedReviewRuleSnapshot);
         if (errors.length > 0) {
           throw new Error(`GitHubProvider: FCR review ruleset ${data.id} read-back mismatch: ${errors.join("; ")}`);
         }
@@ -725,7 +770,26 @@ function observedStatusCheckNames(readback: RulesetReadback): string[] {
     .sort();
 }
 
-function fcrMainReviewRulesetReadbackErrors(config: RulesetConfig, value: unknown): string[] {
+function stableRuleJson(value: unknown): string {
+  const normalize = (input: unknown): unknown => {
+    if (Array.isArray(input)) return input.map(normalize);
+    if (input && typeof input === "object") {
+      return Object.fromEntries(
+        Object.entries(input as Record<string, unknown>)
+          .sort(([left], [right]) => left.localeCompare(right))
+          .map(([key, nested]) => [key, normalize(nested)]),
+      );
+    }
+    return input;
+  };
+  return JSON.stringify(normalize(value));
+}
+
+function fcrMainReviewRulesetReadbackErrors(
+  config: RulesetConfig,
+  value: unknown,
+  preservedRules: NonNullable<RulesetReadback["rules"]> = [],
+): string[] {
   const readback = (value && typeof value === "object" && !Array.isArray(value))
     ? value as RulesetReadback
     : {};
@@ -790,11 +854,24 @@ function fcrMainReviewRulesetReadbackErrors(config: RulesetConfig, value: unknow
     errors.push("deletion protection is missing");
   }
 
+  for (const preserved of preservedRules) {
+    const preservedType = String(preserved.type ?? "");
+    const matches = rules.filter((rule) => rule.type === preservedType);
+    if (matches.length !== 1) {
+      errors.push(`preserved review rule ${preservedType} did not round-trip exactly once`);
+      continue;
+    }
+    if (stableRuleJson(matches[0]?.parameters ?? {}) !== stableRuleJson(preserved.parameters ?? {})) {
+      errors.push(`preserved review rule ${preservedType} parameters changed during reconciliation`);
+    }
+  }
+
   const expectedRuleTypes = [
     "pull_request",
     "code_scanning",
     ...(config.blockForcePushes ? ["non_fast_forward"] : []),
     ...(config.blockDeletion ? ["deletion"] : []),
+    ...preservedRules.map((rule) => String(rule.type ?? "")).filter(Boolean),
   ].sort();
   const observedRuleTypes = rules.map((rule) => String(rule.type ?? "")).filter(Boolean).sort();
   if (JSON.stringify(observedRuleTypes) !== JSON.stringify(expectedRuleTypes)) {
