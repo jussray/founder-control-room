@@ -1,6 +1,7 @@
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { OPERATOR_RELAY_PEERS } from '../lib/operatorRelayConstants.js';
 import type { RelayOperatorId } from '../lib/operatorRelay.js';
+import { OperatorRelayProviderBoundaryError } from '../lib/operatorRelayProvider.js';
 
 vi.mock('./vaultHub.js', () => ({
   hubForMcpProject: vi.fn(),
@@ -241,5 +242,123 @@ describe('external FCR operator relay authority boundary', () => {
       },
       requestId: 'relay-request-deepseek-instructor-1',
     })).rejects.toThrow('targetOperator is not a peer relay operator');
+  });
+});
+
+
+describe('external relay provider-call receipts', () => {
+  const identity = {
+    userId: 'founder-user-1',
+    email: 'founder@example.com',
+    clientId: 'chatgpt-client',
+    authMode: 'oauth' as const,
+  };
+  const args = {
+    targetOperator: 'claude-code',
+    capability: 'implement',
+    goal: 'Return bounded implementation evidence.',
+    contextSummary: 'No mutation, merge, deploy, or publish authority.',
+    sensitivity: 'internal',
+  };
+
+  it('keeps a successful non-provider relay read-only when no provider evidence exists', async () => {
+    const relayOperator = vi.fn(async (input: RelayCall) => ({
+      request: input,
+      response: {
+        fromOperator: input.toOperator,
+        toOperator: input.fromOperator,
+        answer: 'blocked locally',
+        evidenceRefs: ['local:policy:block'],
+      },
+    }));
+    const recordEvidence = vi.fn(async () => receipt('fcr_relay_operator'));
+    const execute = externalTools.createExternalMcpToolExecutor({
+      env: { FCR_REMOTE_MCP_OPERATOR_CLIENT_MAP: JSON.stringify({ 'chatgpt-client': 'codex' }) },
+      relayOperator,
+      recordEvidence,
+    });
+
+    const result = await execute({
+      name: 'fcr_relay_operator',
+      arguments: args,
+      allowedProjects: new Set(['founder-control-room']),
+      identity,
+      requestId: 'relay-non-provider-success',
+    });
+
+    expect(result.governanceBoundary).toMatchObject({ externalProviderCall: false });
+    expect(recordEvidence).toHaveBeenCalledWith(expect.objectContaining({
+      risk: 'read',
+      result: expect.objectContaining({
+        response: expect.objectContaining({ evidenceRefs: ['local:policy:block'] }),
+      }),
+    }));
+  });
+
+  it('records a sanitized external-provider failure receipt before rethrowing', async () => {
+    const marker = 'provider-secret-detail-marker';
+    const relayOperator = vi.fn(async () => {
+      throw new OperatorRelayProviderBoundaryError('anthropic', marker);
+    });
+    const recordEvidence = vi.fn(async () => receipt('fcr_relay_operator'));
+    const execute = externalTools.createExternalMcpToolExecutor({
+      env: { FCR_REMOTE_MCP_OPERATOR_CLIENT_MAP: JSON.stringify({ 'chatgpt-client': 'codex' }) },
+      relayOperator,
+      recordEvidence,
+    });
+
+    await expect(execute({
+      name: 'fcr_relay_operator',
+      arguments: args,
+      allowedProjects: new Set(['founder-control-room']),
+      identity,
+      requestId: 'relay-provider-failure',
+    })).rejects.toBeInstanceOf(OperatorRelayProviderBoundaryError);
+
+    expect(recordEvidence).toHaveBeenCalledWith(expect.objectContaining({
+      risk: 'external_side_effect',
+      result: {
+        contract: 'fcr/operator-relay-failure@v1',
+        status: 'failed',
+        targetOperator: 'claude-code',
+        externalProviderCall: true,
+        provider: 'anthropic',
+        code: 'provider_boundary_failure',
+      },
+    }));
+    expect(JSON.stringify(recordEvidence.mock.calls[0]?.[0] ?? '')).not.toContain(marker);
+  });
+
+  it('records pre-provider relay failures as read risk without inventing provider activity', async () => {
+    const marker = 'pre-provider-secret-detail-marker';
+    const relayOperator = vi.fn(async () => {
+      throw new Error(marker);
+    });
+    const recordEvidence = vi.fn(async () => receipt('fcr_relay_operator'));
+    const execute = externalTools.createExternalMcpToolExecutor({
+      env: { FCR_REMOTE_MCP_OPERATOR_CLIENT_MAP: JSON.stringify({ 'chatgpt-client': 'codex' }) },
+      relayOperator,
+      recordEvidence,
+    });
+
+    await expect(execute({
+      name: 'fcr_relay_operator',
+      arguments: args,
+      allowedProjects: new Set(['founder-control-room']),
+      identity,
+      requestId: 'relay-pre-provider-failure',
+    })).rejects.toThrow(marker);
+
+    expect(recordEvidence).toHaveBeenCalledWith(expect.objectContaining({
+      risk: 'read',
+      result: {
+        contract: 'fcr/operator-relay-failure@v1',
+        status: 'failed',
+        targetOperator: 'claude-code',
+        externalProviderCall: false,
+        code: 'relay_failed_before_provider',
+      },
+    }));
+    expect(JSON.stringify(recordEvidence.mock.calls[0]?.[0] ?? '')).not.toContain(marker);
   });
 });
