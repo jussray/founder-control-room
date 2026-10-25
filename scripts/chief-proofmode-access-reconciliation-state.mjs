@@ -41,6 +41,7 @@ export function evaluateChiefAccessReconciliation(rawComments, target) {
 
   const unresolvedSubjects = new Set();
   const inProgressRuns = new Set();
+  const inProgressSubjects = new Map();
   let legacyBlocked = Boolean(latestLegacy && latestLegacy.disposition !== 'CLEAR');
   if (legacyBlocked && latestLegacy) {
     unresolvedSubjects.add(`legacy-run:${latestLegacy.run}`);
@@ -61,11 +62,13 @@ export function evaluateChiefAccessReconciliation(rawComments, target) {
     }
     if (marker.disposition === 'REPAIR_IN_PROGRESS') {
       inProgressRuns.add(marker.run);
+      inProgressSubjects.set(marker.run, marker.subject);
       continue;
     }
 
     if (marker.disposition === 'RECONCILE_REQUIRED') {
       inProgressRuns.delete(marker.run);
+      inProgressSubjects.delete(marker.run);
       if (marker.subject === 'pending') {
         unresolvedSubjects.add(`pending-run:${marker.run}`);
       } else {
@@ -76,6 +79,7 @@ export function evaluateChiefAccessReconciliation(rawComments, target) {
 
     if (marker.disposition === 'CLEAR') {
       inProgressRuns.delete(marker.run);
+      inProgressSubjects.delete(marker.run);
       if (marker.subject === 'pending') {
         unresolvedSubjects.delete(`pending-run:${marker.run}`);
       } else {
@@ -89,6 +93,10 @@ export function evaluateChiefAccessReconciliation(rawComments, target) {
     mode: 'subject-v2',
     blockedSubjects: [...unresolvedSubjects],
     inProgressRuns: [...inProgressRuns],
+    inProgress: [...inProgressRuns].map((run) => ({
+      run,
+      subject: inProgressSubjects.get(run) ?? 'pending',
+    })),
   };
 }
 
@@ -98,6 +106,10 @@ function main() {
   const raw = readFileSync(0, 'utf8');
   const parsed = JSON.parse(raw || '[]');
   const state = evaluateChiefAccessReconciliation(parsed, target);
+  if (process.argv.includes('--json')) {
+    process.stdout.write(`${JSON.stringify(state)}\n`);
+    return;
+  }
   process.stdout.write(state.clear ? 'CLEAR\n' : 'BLOCKED\n');
   if (!state.clear) process.exitCode = 2;
 }
