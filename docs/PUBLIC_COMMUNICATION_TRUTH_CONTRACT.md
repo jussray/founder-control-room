@@ -58,6 +58,18 @@ Founder-content orchestration must not reuse the generic conveyor activation rec
 
 The governed Founder Content rescue may set `N8N_FOUNDER_CONTENT_ENABLED=true` in candidate source, restrict the enabled provider to Buffer, and pin the expected workflow/runtime identity. That is **source intent only**. It does not prove the canonical Worker carrying those bindings was deployed, that the production n8n workflow was published, that the Supabase migrations were applied, that Buffer accepted a schedule, or that a public artifact exists. A successful isolated n8n runtime proof or webhook `202` remains execution-plane evidence; present-tense `live`, `used`, `scheduled`, or `published` language requires the corresponding exact deployed runtime and provider-native readback.
 
+### Postiz readback boundary
+
+The current Postiz MCP integration is a **readback lane**, not a publication actuator. FCR may use server-held Postiz authentication to list connected provider accounts and read Postiz-reported post status, but the bounded lifecycle adapter does not expose `schedulePostTool`, `publish_now`, or any other Postiz provider-write operation.
+
+A Postiz `PUBLISHED` state without a destination-native permalink or equivalent independently verified terminal platform artifact is provider-reported state only. It must not be used to tell the public, a collaborator, or another control surface that publication is proven. Any future Postiz scheduling or publication path must pass FCR's exact Current You approval, execution-time authority and temporal checks, durable reservation, provider mutation, and terminal provider readback rather than inheriting authority from the readback adapter. Componecat catalog/context evidence is likewise non-authorizing and cannot prove project execution, deployment, or publication.
+
+### YouTube growth evaluation boundary
+
+The authenticated `fcr/youtube-growth-evaluation@v1` route may evaluate fresh founder-supplied YouTube measurements and return `HOLD` or `ADVANCE` for the internal `TEST_AND_VALIDATE -> DOUBLE_DOWN -> SCALE` strategy loop. That result is observation and recommendation only. It cannot authorize publication, scheduling, spend, provider mutation, scale execution, merge, deploy, or a public claim that a YouTube outcome occurred.
+
+Malformed measurements, experiments, continuity fingerprints, thresholds, targets, unknown fields, and duplicate repeatability receipts must fail closed before evaluation. A growth recommendation is not proof that a video published, a channel reached YPP eligibility, revenue was earned, a Short converted to long-form viewing, or any provider-side state changed. Those claims require fresh authoritative provider or outcome evidence at the applicable use boundary.
+
 ## /confess
 
 Before release, state internally and, when material to the audience, publicly:
@@ -192,6 +204,8 @@ Hold the post when:
 - configuration/readiness evidence is being used as proof that n8n, Buffer, or another provider actually executed or published;
 - a generic n8n stage-conveyor receipt is being used as proof that a founder-content provider write or publication occurred;
 - a founder-content `verified` proof label is missing Buffer provider binding, receipt identity, observation time, or exact deployed-SHA binding;
+- a Postiz-reported `PUBLISHED` state without a destination-native permalink or equivalent terminal artifact is being used as publication proof;
+- a YouTube growth `ADVANCE` or diagnostic recommendation is being used as publication, YPP, revenue, conversion, or provider-outcome proof;
 - the post falls outside the approved automated publishing class or a stricter exact Current You gate is unsatisfied;
 - the active first-party route cannot read and atomically claim an exact matching FCR-owned approval;
 - the post depends on a workflow that failed before executing steps;

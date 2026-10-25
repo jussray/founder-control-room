@@ -59,6 +59,8 @@ A merge is appropriate only when:
 
 Repository branch creation is a separate reversible mutation class and does not inherit merge authority. In `src/http/routes/approvals.ts`, an authenticated founder execute request may reach `RepositoryProvider.createBranch(...)` only after a fresh `create_branch` proof is present, FCR issues an `AuthorityEnvelopeV1` for capability `github.repository.create_branch`, and the execution is durably reserved under the same idempotency key before provider mutation.
 
+The authority issuance/expiry window begins at the server-observed execute request time injected by the HTTP edge, never at the proof receipt creation timestamp. Proof freshness remains a separate precondition, so a still-valid near-TTL proof cannot mint an authority envelope that is effectively expired at issuance while execution-time expiry remains fail-closed.
+
 The envelope binds the exact mission intent, authenticated actor/approver, repository scope, proposal hash, branch arguments, mission-state fingerprint, consequence class, tool-call identity, issuance/expiry window, and idempotency key. Immediately before the provider write, FCR must re-read current mission state, re-derive the execution context, and pass the original envelope through `executeAuthorizedCreateBranch()`. Changed state, arguments, repository scope, tool call, expiry, idempotency, capability, or envelope integrity must fail closed before GitHub can be mutated. A pending or ambiguous execution must reconcile before retry rather than minting a replacement write from uncertainty.
 
 This source/runtime membrane proves only that the branch-creation path is governed when that code executes. CI or unit green does not prove a live GitHub branch was created, and successful branch creation does not grant merge, deploy, publication, secret, database, billing, or destructive authority.
@@ -188,3 +190,5 @@ Immediately before merge, re-read current `main`, the exact PR head, required ch
 ## Load-bearing regression execution
 
 A required test contributes to merge readiness only when the exact-head workflow that feeds the applicable gate actually executes it. A committed but uninvoked test is source evidence, not CI proof. For LinkedIn analytics continuity, `.github/workflows/ci.yml` must keep `scripts.test_linkedin_analytics_continuity` inside the load-bearing `python-tests` job, and `Required Gate` must continue to depend on that job. Missing LinkedIn activity rows must remain `UNKNOWN_NO_EVIDENCE` with null metrics, never synthetic zero impressions or engagements.
+
+For public crawler and work-directory behavior, `.github/workflows/ci.yml` must keep `e2e/pages-api-recovery.spec.ts` and `e2e/public-work-directory.spec.ts` inside the load-bearing `Playwright e2e` job that feeds `Required Gate`; a green specialized Pages workflow alone cannot satisfy merge-required browser proof or authorize integration.

@@ -29,7 +29,7 @@ export interface CreateBranchAuthorityInput {
     gateId: string;
     createdAt: string;
   };
-  now?: string;
+  now: string;
   ttlMs?: number;
   toolCallId?: string;
 }
@@ -97,14 +97,15 @@ export function createBranchAuthorityContext(
  * observed mission state. The returned context is the execution-time binding
  * that must be re-derived/revalidated immediately before provider mutation.
  *
- * The isolated lab never reads ambient time or randomness. If the HTTP edge
- * does not inject them, the already-observed proof timestamp and idempotency
- * key are used as conservative deterministic fallbacks.
+ * The isolated lab never reads ambient time or randomness. The HTTP edge must
+ * inject the observed request time. The idempotency key remains the
+ * deterministic fallback for tool-call identity when no explicit toolCallId
+ * is supplied.
  */
 export function issueCreateBranchAuthority(input: CreateBranchAuthorityInput): IssuedCreateBranchAuthority {
   validateCreateBranchAuthorityInput(input);
 
-  const now = input.now ?? input.proof.createdAt;
+  const now = input.now;
   const issuedAtMs = Date.parse(now);
   if (!Number.isFinite(issuedAtMs)) throw new Error('issuance time must be a valid ISO date');
   const ttlMs = input.ttlMs ?? DEFAULT_AUTHORITY_TTL_MS;

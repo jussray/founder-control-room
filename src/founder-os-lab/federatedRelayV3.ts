@@ -437,7 +437,7 @@ function requireObservedTime(now: Date | undefined): Date {
 export function assertRelayKeyUsableV3(
   key: FederatedRelayPublicKeyV3,
   sourceMember: FederatedRelayMemberV3,
-  now?: Date,
+  now: Date,
 ): void {
   const observedAt = requireObservedTime(now);
   if (key.member !== sourceMember) throw new FederatedRelayV3Error('relay_source_key_member_mismatch');
@@ -451,7 +451,7 @@ export function assertRelayKeyUsableV3(
 
 export function assertRelayFreshnessV3(
   envelope: FederatedAgentRelayEnvelopeV3,
-  now?: Date,
+  now: Date,
   options: { maxTtlMs?: number; futureSkewMs?: number } = {},
 ): void {
   const observedAt = requireObservedTime(now);
@@ -483,7 +483,7 @@ export async function verifyRelayEnvelopeV3(input: {
   envelope: FederatedAgentRelayEnvelopeV3;
   key: FederatedRelayPublicKeyV3;
   expectedTarget: FederatedRelayIdentityV3;
-  now?: Date;
+  now: Date;
 }): Promise<{
   envelope: FederatedAgentRelayEnvelopeV3;
   messageFingerprint: string;

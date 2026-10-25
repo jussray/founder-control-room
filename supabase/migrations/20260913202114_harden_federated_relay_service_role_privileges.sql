@@ -1,7 +1,6 @@
--- Restore the least-privilege relay ledger contract after provider/default grants drift.
--- Relay messages are append-only through SECURITY DEFINER RPCs; service_role reads
--- them directly only for evidence/idempotency checks. Key registration/rotation
--- remains the only direct service-role table mutation surface.
+-- Reconcile the production-applied relay service-role privilege hardening into source.
+-- Production recorded this exact migration version as 20260913202114.
+-- Keep the SQL here so fresh databases reproduce the live least-privilege state.
 
 revoke all privileges on table public.federated_relay_public_keys from service_role;
 revoke all privileges on table public.federated_relay_sequence_counters from service_role;

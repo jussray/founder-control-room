@@ -72,7 +72,7 @@ requireTruthy('bindings.conveyor.sameOriginBrowserMutationGateBeforeMount', poli
 
 requireTruthy('controls.rateLimiting.desired', policy.controls?.rateLimiting?.desired);
 requireEqual('controls.rateLimiting.productionApplied', policy.controls?.rateLimiting?.productionApplied, 'unknown');
-requireEqual('controls.rateLimiting.applicationBaseline.generalPerIp.limit', policy.controls?.rateLimiting?.applicationBaseline?.generalPerIp?.limit, 60);
+requireEqual('controls.rateLimiting.applicationBaseline.generalPerIp.limit', policy.controls?.rateLimiting?.applicationBaseline?.generalPerIp?.limit, 120);
 requireEqual('controls.rateLimiting.applicationBaseline.generalPerIp.periodSeconds', policy.controls?.rateLimiting?.applicationBaseline?.generalPerIp?.periodSeconds, 60);
 requireEqual('controls.rateLimiting.applicationBaseline.magicLinkPerIp.limit', policy.controls?.rateLimiting?.applicationBaseline?.magicLinkPerIp?.limit, 5);
 requireEqual('controls.rateLimiting.applicationBaseline.magicLinkPerIp.periodSeconds', policy.controls?.rateLimiting?.applicationBaseline?.magicLinkPerIp?.periodSeconds, 900);
@@ -128,7 +128,8 @@ requireContains('csrf same-origin enforcement', csrf, "fetchSite !== 'same-origi
 requireContains('runtime referrer policy', security, "res.setHeader('Referrer-Policy', 'no-referrer');");
 requireContains('runtime frame policy', security, "res.setHeader('X-Frame-Options', 'SAMEORIGIN');");
 requireContains('runtime hsts', security, "res.setHeader('Strict-Transport-Security', 'max-age=15552000; includeSubDomains');");
-if (!/export const rateLimitGeneral = createRateLimiter\(\s*60 \* 1_000,\s*60,/s.test(security)) failures.push('application general rate limiter drifted from 60 requests per 60 seconds');
+if (!/const generalRateLimitCore = createRateLimiter\(\s*60 \* 1_000,\s*120,/s.test(security)) failures.push('application general rate limiter drifted from 120 requests per 60 seconds');
+if (!/export const rateLimitGeneral: RequestHandler = \(req, res, next\): void => \{[\s\S]*?generalRateLimitCore\(req,\s*res,\s*next\);[\s\S]*?\n\};/.test(security)) failures.push('exported general rate limiter must invoke the verified generalRateLimitCore');
 if (!/export const rateLimitMagicLink = createRateLimiter\(\s*15 \* 60 \* 1_000,\s*5,/s.test(security)) failures.push('application magic-link limiter drifted from 5 requests per 15 minutes');
 
 const csrfIndex = server.indexOf('app.use(requireSameOriginBrowserMutation);');

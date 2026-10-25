@@ -24,4 +24,27 @@ describe('FCR browser capability routing contract', () => {
     expect(contract).toContain('Opera is a preferred browser capability, not an architectural dependency.');
     expect(contract).toContain('A browser provider may not manufacture, inherit, widen, replay, or renew founder approval.');
   });
+
+  it('requires live probe evidence and preserves historical connector truth when current availability changes', async () => {
+    const contract = await readFile('docs/FCR_BROWSER_CAPABILITY_ROUTING_ADDENDUM.md', 'utf8');
+
+    for (const token of [
+      'The canonical connector-bridge truth carrier is [`.control-room/plugin-management.json`]',
+      'Installation state is not live connection truth.',
+      'A browser bridge may be called `CONNECTED` only after a current live read-only probe succeeds.',
+      '`list-tabs` is the canonical first live probe',
+      '`Browser not connected`, classify the bridge as `BLOCKED_CONNECTOR_BRIDGE`',
+      'Never claim that a connection probe was retried unless that live read-only probe actually executed',
+      'A materially different live-probe result expires the predecessor bridge claim.',
+      'A successful bridge probe proves only that the browser bridge is live.',
+      'historical = HISTORICALLY_VERIFIED',
+      'current = CURRENTLY_UNAVAILABLE',
+      'Never transform current absence into `NEVER_EXISTED`.',
+      '`CONNECTOR_STATE_CONFLICT`',
+      'CURRENTLY_UNAVAILABLE != NEVER_EXISTED',
+      'SUCCESSFUL_ONCE != VERIFIED_NOW',
+    ]) {
+      expect(contract).toContain(token);
+    }
+  });
 });
