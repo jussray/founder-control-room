@@ -55,6 +55,17 @@ function operationIsNegated(operation) {
 function classifyOccurrence(text, match) {
   const start = match.index ?? 0;
   const end = start + match[0].length;
+  const after = text.slice(end, segmentEnd(text, end));
+
+  // Explicit subject-bound disposition is authoritative for this occurrence.
+  // A prior verb may describe another rule or an earlier deployment mention,
+  // so it must never override "required_deployments must be removed" or
+  // "required_deployments must remain unchanged".
+  if (SUBJECT_NEGATED_REMOVAL.test(after)) return 'contradictory';
+  if (SUBJECT_PRESERVATION.test(after)) return 'contradictory';
+  if (SUBJECT_AFFIRMATIVE_REMOVAL.test(after)) return 'affirmative';
+  if (SUBJECT_MIGRATION_DEBT.test(after)) return 'affirmative';
+
   const beforeOperation = nearestOperationBefore(text, start);
   if (beforeOperation) {
     if (PRESERVATION_OPERATION.test(beforeOperation.verb)) return 'contradictory';
@@ -63,11 +74,6 @@ function classifyOccurrence(text, match) {
     }
   }
 
-  const after = text.slice(end, segmentEnd(text, end));
-  if (SUBJECT_NEGATED_REMOVAL.test(after)) return 'contradictory';
-  if (SUBJECT_PRESERVATION.test(after)) return 'contradictory';
-  if (SUBJECT_AFFIRMATIVE_REMOVAL.test(after)) return 'affirmative';
-  if (SUBJECT_MIGRATION_DEBT.test(after)) return 'affirmative';
   return 'neutral';
 }
 

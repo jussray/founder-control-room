@@ -349,7 +349,7 @@
     {
       "path": "scripts/documentation-truth-required-deployment-guard.mjs",
       "claims": [
-        "`scripts/documentation-truth-required-deployment-guard.mjs` must classify every provider-receipt claim mentioning `required_deployments`, require at least one relationship-bound affirmative removal or migration-debt claim, reject preservation or negated-removal semantics specifically bound to `required_deployments`, reject contradictory or ambiguous deployment-rule claims anywhere in the provider entry, and allow preservation of unrelated controls such as `required_linear_history`."
+        "`scripts/documentation-truth-required-deployment-guard.mjs` must classify every provider-receipt claim mentioning `required_deployments`, evaluate explicit subject-bound disposition for each occurrence before any inherited preceding operation, require at least one relationship-bound affirmative removal or migration-debt claim, reject preservation or negated-removal semantics specifically bound to `required_deployments`, reject contradictory or ambiguous deployment-rule claims anywhere in the provider entry, and allow preservation of unrelated controls such as `required_linear_history`."
       ]
     }
   ]

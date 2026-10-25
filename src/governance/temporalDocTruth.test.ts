@@ -171,6 +171,14 @@ describe('repository documentation truth control', () => {
         expected: false,
         value: 'src/providers/GitHubProvider.ts may remove old docs, while required_deployments remains unchanged.',
       },
+      {
+        expected: false,
+        value: 'src/providers/GitHubProvider.ts must remove required_deployments and required_deployments must remain unchanged.',
+      },
+      {
+        expected: true,
+        value: 'src/providers/GitHubProvider.ts must preserve required_linear_history and required_deployments must be removed.',
+      },
     ];
 
     for (const fixture of claimFixtures) {
