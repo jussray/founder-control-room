@@ -2,6 +2,7 @@ import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { OPERATOR_RELAY_PEERS } from '../lib/operatorRelayConstants.js';
 import type { RelayOperatorId } from '../lib/operatorRelay.js';
 import { OperatorRelayProviderBoundaryError } from '../lib/operatorRelayProvider.js';
+import type { RecordExternalMcpEvidenceInput } from './externalTools.js';
 
 vi.mock('./vaultHub.js', () => ({
   hubForMcpProject: vi.fn(),
@@ -45,7 +46,7 @@ function receipt(toolName: 'fcr_relay_operator') {
   };
 }
 
-function evidenceInput(overrides: Partial<externalTools.RecordExternalMcpEvidenceInput> = {}) {
+function evidenceInput(overrides: Partial<RecordExternalMcpEvidenceInput> = {}) {
   return {
     identity: {
       userId: 'founder-user-1',
