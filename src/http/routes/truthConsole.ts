@@ -7,7 +7,11 @@ import { requireFounder, type FounderRequest } from '../middleware/requireFounde
 export const truthConsoleRouter = Router();
 const rateLimitTruthConsole = rateLimit({
   windowMs: 60 * 1_000,
-  limit: 30,
+  // One complete seven-screen founder review performs multiple independent
+  // no-store readbacks plus bounded writes. Keep the surface rate-limited
+  // without letting a normal authenticated review self-DoS before its final
+  // continuity/dashboard verification.
+  limit: 120,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Truth console rate limit exceeded.' },
