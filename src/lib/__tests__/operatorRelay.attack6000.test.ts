@@ -265,3 +265,52 @@ describe('operator relay ATTACK-6000', () => {
     expect(rejected).toBe(6_000);
   });
 });
+
+// F-821-1 regression: bare credential formats embedded in the relay goal or
+// context summary must be rejected before the request can reach a provider.
+// Samples are assembled at runtime so no token-shaped literal is committed.
+const BARE_CREDENTIAL_SAMPLES: ReadonlyArray<{ name: string; sample: string }> = [
+  { name: 'github-classic-pat', sample: `ghp_${'a1'.repeat(18)}` },
+  { name: 'github-fine-grained-pat', sample: `github_pat_${'b2'.repeat(11)}` },
+  { name: 'gitlab-pat', sample: `glpat-${'c3'.repeat(10)}` },
+  { name: 'aws-access-key-id', sample: `AKIA${'D4'.repeat(8)}` },
+  { name: 'pem-private-key', sample: '-----BEGIN PRIVATE KEY-----' },
+];
+
+describe('operator relay bare-credential screening (F-821-1)', () => {
+  it('rejects every bare credential format embedded in the goal', () => {
+    for (const { name, sample } of BARE_CREDENTIAL_SAMPLES) {
+      const value = clone(validRequest(7));
+      value.goal = `Use this credential for the task: ${sample}`;
+      rehashRequest(value);
+      const errors = validateOperatorRelayRequest(value, NOW);
+      expect(errors, `goal case ${name}`).toContain('goal must not contain bare credentials');
+    }
+  });
+
+  it('rejects every bare credential format embedded in the context summary', () => {
+    for (const { name, sample } of BARE_CREDENTIAL_SAMPLES) {
+      const value = clone(validRequest(7));
+      const summary = `Prior context included this credential: ${sample}`;
+      value.context.summary = summary;
+      value.context.sourceFingerprint = relayContextFingerprint(
+        summary,
+        value.context.sourceRef ?? null,
+      );
+      rehashRequest(value);
+      const errors = validateOperatorRelayRequest(value, NOW);
+      expect(errors, `summary case ${name}`).toContain(
+        'context summary must not contain bare credentials',
+      );
+    }
+  });
+
+  it('accepts a clean request and prose that merely names a credential format', () => {
+    expect(validateOperatorRelayRequest(validRequest(7), NOW)).toEqual([]);
+
+    const value = clone(validRequest(7));
+    value.goal = 'Explain how ghp_ and glpat- token formats differ, in the abstract';
+    rehashRequest(value);
+    expect(validateOperatorRelayRequest(value, NOW)).toEqual([]);
+  });
+});

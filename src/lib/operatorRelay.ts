@@ -63,6 +63,21 @@ export interface OperatorRelayUsageV1 {
   cacheReadInputTokens: number;
 }
 
+// Bare credential formats must never ride a relay request to an external
+// provider. Pattern forms mirror the repo's committed-credential checks
+// (scripts/verify-mcp-config.mjs, scripts/verify-env-contract.mjs).
+const BARE_CREDENTIAL_PATTERNS: readonly RegExp[] = [
+  /\bghp_[A-Za-z0-9]{20,}/,
+  /\bgithub_pat_[A-Za-z0-9_]{20,}/,
+  /\bglpat-[A-Za-z0-9_-]{20,}/,
+  /\b(?:AKIA|ASIA)[A-Z0-9]{16}\b/,
+  /-----BEGIN [A-Z ]*PRIVATE KEY-----/,
+];
+
+function containsBareCredential(value: string): boolean {
+  return BARE_CREDENTIAL_PATTERNS.some((pattern) => pattern.test(value));
+}
+
 const USAGE_COUNT_FIELDS = ['inputTokens', 'outputTokens', 'cacheCreationInputTokens', 'cacheReadInputTokens'] as const;
 
 function isTokenCount(value: unknown): value is number {
@@ -202,6 +217,7 @@ export function validateOperatorRelayRequest(value: unknown, nowMs = Date.now())
 
   const goal = typeof value.goal === 'string' ? value.goal : '';
   if (!goal.trim() || goal.length > 4_000) errors.push('goal must be 1..4000 characters');
+  if (goal && containsBareCredential(goal)) errors.push('goal must not contain bare credentials');
 
   const context = isRecord(value.context) ? value.context : null;
   if (!context) {
@@ -214,6 +230,7 @@ export function validateOperatorRelayRequest(value: unknown, nowMs = Date.now())
   }
   const summary = typeof context?.summary === 'string' ? context.summary : '';
   if (!summary.trim() || summary.length > 12_000) errors.push('context summary must be 1..12000 characters');
+  if (summary && containsBareCredential(summary)) errors.push('context summary must not contain bare credentials');
   const sourceRefValue = context?.sourceRef;
   const sourceRefValid = sourceRefValue === undefined || sourceRefValue === null || typeof sourceRefValue === 'string';
   if (!sourceRefValid) errors.push('sourceRef must be a string or null');
