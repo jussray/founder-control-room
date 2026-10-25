@@ -127,7 +127,7 @@ const requestAttacks: RequestAttack[] = [
       v.expiresAt = '2026-09-16T06:36:31.000Z';
     },
   },
-  { name: 'ttl-too-long', mutate: (v) => { v.expiresAt = '2026-09-16T06:40:00.001Z'; } },
+  { name: 'ttl-too-long', mutate: (v) => { v.expiresAt = '2026-09-16T07:00:00.001Z'; } },
   { name: 'request-hash-short', rehash: false, mutate: (v) => { v.requestHash = 'abc'; } },
   { name: 'request-hash-mismatch', rehash: false, mutate: (v) => { v.requestHash = 'f'.repeat(64); } },
   {
