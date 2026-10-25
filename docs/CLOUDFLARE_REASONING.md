@@ -199,6 +199,14 @@ Cloudflare outbound email is a capability boundary, not a global portfolio trans
 
 Repository configuration can prove the desired binding name and sender restriction. It cannot prove Cloudflare has onboarded the sender domain, the deployed Worker currently exposes that binding, or a message was accepted/delivered. Those claims require fresh provider/runtime evidence and must remain separate from source truth.
 
+## Review-email inbound routing boundary
+
+`wrangler.email.toml` is source truth for the `founder-control-room-review-email` Worker identity, source entrypoint, Cloudflare account, public-route posture, private `FOUNDER_CONTROL_ROOM_API -> founder-control-room` Service Binding, and one bounded Email Routing desired-state declaration: `addresses = ["review@foundercontrolroom.org"]`. Cloudflare documents top-level `addresses` for Worker Email Routing on Wrangler 4.113+; the pinned review-email deploy uses Wrangler 4.129.0.
+
+A successful `wrangler deploy --config wrangler.email.toml` may reconcile that literal address-to-Worker rule, but deploy output is still not independent provider readback. The live Cloudflare rule, zone-level `support_subaddress` setting required for `review+<context-uuid>@...`, and an actual inbound-email invocation remain separate evidence planes. The lane also consumes Wrangler structured deploy telemetry: if Wrangler records a completed Worker deployment and then exits nonzero during a later reconciliation phase, the receipt must preserve `provider_deploy_succeeded=true` and a post-deploy blocked stage instead of falsely recording no production mutation. First deployment is two-phase: when the Worker is absent, the trusted reconciliation lane creates it from a temporary config with `addresses` removed and stops at `provider_secret_bootstrap`; only a later authorized canonical deploy may reconcile `review@` after required secrets exist.
+
+The reconciliation receipt therefore keeps `provider_deploy_succeeded`, `email_trigger_reconciled`, and `runtime_email_invocation_proven` independent. Worker/managed-route deployment must never promote provider readback or runtime invocation to green without their own evidence.
+
 ## Worker build authority membrane
 
 `wrangler.worker.toml` runs `scripts/verify-worker-build-authority.mjs` as its custom Worker build hook. The hook is a repository-side fail-closed membrane, not a provider mutation authority.
@@ -209,7 +217,9 @@ For GitHub Actions, production promotion is recognized only for the manual `Depl
 
 Canonical Deploy now separates **deployment-plane credentials** from **Worker runtime secrets**. The GitHub `production` authority gate needs only `SUPABASE_DB_URL`, `CLOUDFLARE_API_TOKEN`, and `CLOUDFLARE_ACCOUNT_ID` to prove the release can perform its database and Cloudflare operations. Runtime secret values remain provider-held in the canonical Cloudflare Worker and are not copied through the Deploy workflow. `wrangler.worker.toml [secrets].required` names the required runtime bindings, including `FOUNDER_SESSION_ENCRYPTION_KEY`, so Wrangler is the fail-closed binding-name membrane at deployment time.
 
-For TinyFish, that same membrane now includes `TINYFISH_API_KEY`. The provider-held value must remain only in Cloudflare; canonical Deploy may verify its binding name but cannot read or re-upload the value. Green source, CI, or Playwright therefore does not establish live TinyFish activation until a key-backed Search or Fetch is separately observed on the applicable runtime.
+FCR public-web observation no longer has a dedicated provider secret in the Worker membrane. The product contract is `public-web-observation-v1`; current read-only discovery/fetch adapters are resolved through FCR's governed research hub and remain replaceable implementation details. Source, adapter availability, returned evidence, and downstream truth remain separate proof planes.
+
+The FCR Shopify money path uses the same provider-held runtime-secret membrane: `FCR_SHOPIFY_WEBHOOK_SECRET` is required to authenticate the exact Shopify webhook bytes, and `FCR_COMMERCE_HASH_SALT` is required to derive privacy-safe order references. Canonical Deploy must fail closed when either binding name is absent, but binding-name presence cannot prove Shopify webhook registration, callback delivery, production database migration, or collected revenue. Those remain independent provider/runtime/database/outcome receipts.
 
 The only runtime secret canonical Deploy actively writes is the checked-in fail-closed `FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON` with `enabled:false`. This preserves the automation kill switch while leaving unrelated runtime secret values untouched. Other trusted workflows that actually need GitHub App execution credentials may still use their separately scoped `APP_ID` / `APP_PRIVATE_KEY` Actions inputs, but canonical Deploy does not re-upload the Worker's `GITHUB_APP_ID` / `GITHUB_PRIVATE_KEY` pair.
 

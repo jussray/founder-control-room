@@ -2,9 +2,11 @@ import { createServer, type Server } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { test, expect } from '@playwright/test';
+import { buildPortfolioMcpRegistryResponse } from '../src/mcp/portfolioRegistry.js';
 
 const CANONICAL_RULESET = 'Founder Control Room main exact-head gate';
 const SETTINGS_PATH = '/control-room/repository-settings.html';
+const REGISTRY_PATH = '/mcp/registry/v0.1/servers';
 
 let server: Server;
 let baseUrl = '';
@@ -13,9 +15,24 @@ test.beforeAll(async () => {
   const html = await readFile(join(process.cwd(), 'public/control-room/repository-settings.html'), 'utf8');
 
   server = createServer((request, response) => {
-    if (request.url === SETTINGS_PATH) {
+    const requestUrl = new URL(request.url ?? '/', 'http://127.0.0.1');
+
+    if (requestUrl.pathname === SETTINGS_PATH) {
       response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
       response.end(html);
+      return;
+    }
+
+    if (request.method === 'GET' && requestUrl.pathname === REGISTRY_PATH) {
+      const payload = buildPortfolioMcpRegistryResponse({
+        search: requestUrl.searchParams.get('search') ?? undefined,
+        version: requestUrl.searchParams.get('version') ?? undefined,
+      });
+      response.writeHead(200, {
+        'content-type': 'application/json; charset=utf-8',
+        'cache-control': 'public, max-age=60',
+      });
+      response.end(JSON.stringify(payload));
       return;
     }
 
@@ -102,5 +119,80 @@ test.describe('Repository Settings ruleset safety', () => {
       enforcement: 'evaluate',
       targetRefs: ['main'],
     });
+  });
+});
+
+type RegistryServer = {
+  name: string;
+  title: string;
+  remotes: Array<{
+    type: string;
+    url: string;
+    headers?: Array<{
+      name: string;
+      isRequired?: boolean;
+      isSecret?: boolean;
+    }>;
+  }>;
+};
+
+test.describe('Founder quartet MCP registry', () => {
+  test('serves FCR, Chief, Sol, and PromptOS with real governed remote URLs', async ({ request }) => {
+    const response = await request.get(`${baseUrl}${REGISTRY_PATH}`);
+    expect(response.status()).toBe(200);
+
+    const payload = await response.json() as {
+      servers: Array<{ server: RegistryServer }>;
+      metadata: { count: number };
+    };
+    expect(payload.metadata.count).toBe(4);
+
+    const servers = payload.servers.map((entry) => entry.server);
+    expect(servers.map((entry) => entry.name)).toEqual([
+      'org.foundercontrolroom/fcr',
+      'org.foundercontrolroom/chief',
+      'org.foundercontrolroom/sol',
+      'org.foundercontrolroom/promptos',
+    ]);
+
+    const byName = new Map(servers.map((entry) => [entry.name, entry]));
+    expect(byName.get('org.foundercontrolroom/fcr')?.remotes[0].url).toBe(
+      'https://api.foundercontrolroom.org/mcp/portfolio/founder-control-room',
+    );
+    expect(byName.get('org.foundercontrolroom/chief')?.remotes[0].url).toBe(
+      'https://chief-ai.mcgill-raylene.workers.dev/mcp',
+    );
+    expect(byName.get('org.foundercontrolroom/sol')?.remotes[0].url).toBe(
+      'https://api.foundercontrolroom.org/mcp/portfolio/solcontinuity',
+    );
+    expect(byName.get('org.foundercontrolroom/promptos')?.remotes[0].url).toBe(
+      'https://api.foundercontrolroom.org/mcp/portfolio/promptos',
+    );
+
+    for (const name of [
+      'org.foundercontrolroom/fcr',
+      'org.foundercontrolroom/sol',
+      'org.foundercontrolroom/promptos',
+    ]) {
+      expect(byName.get(name)?.remotes[0].headers).toEqual([
+        expect.objectContaining({
+          name: 'Authorization',
+          isRequired: true,
+          isSecret: true,
+        }),
+      ]);
+    }
+  });
+
+  test('supports registry search without exposing any credential value', async ({ request }) => {
+    const response = await request.get(`${baseUrl}${REGISTRY_PATH}?search=SolContinuity`);
+    expect(response.status()).toBe(200);
+    const body = await response.text();
+    const payload = JSON.parse(body) as { servers: Array<{ server: RegistryServer }> };
+
+    expect(payload.servers).toHaveLength(1);
+    expect(payload.servers[0].server.name).toBe('org.foundercontrolroom/sol');
+    expect(body).not.toContain('Bearer playwright');
+    expect(body).not.toContain('service_role');
   });
 });

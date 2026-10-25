@@ -17,6 +17,7 @@ const probe = read("scripts/probe-cloudflare-api-mcp.mjs");
 const workflow = read(".github/workflows/cloudflare-mcp-read-diagnostic.yml");
 const registry = read("src/mcp/defaultRegistry.ts");
 const secrets = read("docs/SECRETS.md");
+const worker = read("wrangler.worker.toml");
 
 assert(
   probe.includes('"https://mcp.cloudflare.com/mcp"'),
@@ -78,7 +79,15 @@ assert(
   secrets.includes("`FCR_CLOUDFLARE_MCP_READ_TOKEN`"),
   "secret registry must document the dedicated MCP read credential",
 );
+assert(
+  worker.includes('MCP_CLOUDFLARE_API_URL = "https://mcp.cloudflare.com/mcp"'),
+  "canonical Worker must expose the official Cloudflare API MCP endpoint to the runtime registry",
+);
+assert(
+  worker.includes('"FCR_CLOUDFLARE_MCP_READ_TOKEN"'),
+  "canonical Worker must require the dedicated Cloudflare MCP read credential",
+);
 
 console.log(
-  "[verify:cloudflare-mcp-read] official endpoint, exact-head workflow, GET-only witness, dedicated credential, and fail-closed runtime policy are pinned.",
+  "[verify:cloudflare-mcp-read] official endpoint, exact-head workflow, GET-only witness, dedicated credential, Worker runtime binding, and fail-closed policy are pinned.",
 );

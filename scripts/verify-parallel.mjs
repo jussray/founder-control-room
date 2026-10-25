@@ -20,6 +20,7 @@ const waveOne = [
 
 const waveTwo = [
   { id: "playwright-e2e", command: process.execPath, args: ["e2e/direct-browser-run.mjs"] },
+  { id: "founder-home-proof", command: process.execPath, args: ["e2e/founder-home-dashboard-proof.mjs"] },
 ];
 
 function redactFailureExcerpt(value) {
@@ -85,12 +86,14 @@ const firstWavePassed = firstWaveResults.every((result) => result.ok);
 if (firstWavePassed) {
   results.push(...(await runWave(waveTwo)));
 } else {
-  results.push({
-    id: "playwright-e2e",
-    ok: false,
-    skipped: true,
-    reason: "Skipped because a prerequisite typecheck, lint, unit, build, Pages build, or Cloudflare dry-run task failed.",
-  });
+  for (const task of waveTwo) {
+    results.push({
+      id: task.id,
+      ok: false,
+      skipped: true,
+      reason: "Skipped because a prerequisite typecheck, lint, unit, build, Pages build, or Cloudflare dry-run task failed.",
+    });
+  }
 }
 
 const failed = results.filter((result) => !result.ok && !result.skipped);

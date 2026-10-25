@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 
-import { access, cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { access, cp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { constants } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { resolve } from 'node:path';
+import { relative, resolve } from 'node:path';
 
 await import('./verify-sekret-bip-control-room-bridge.mjs');
 
@@ -70,4 +70,50 @@ for (const relativePath of requiredAssets) {
   }
 }
 
+const blockedNames = [
+  { label: 'git metadata', pattern: /(^|\/)\.git(?:\/|$)/i },
+  { label: 'environment file', pattern: /(^|\/)\.env(?:\.|$)/i },
+  { label: 'credential file', pattern: /(^|\/)(?:credentials|secrets?|id_rsa|id_ed25519|\.npmrc|\.netrc)(?:\.|$)/i },
+];
+const blockedContent = [
+  { label: 'private key material', pattern: /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/ },
+  { label: 'GitHub token', pattern: /\b(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{20,}\b|\bgithub_pat_[A-Za-z0-9_]{20,}\b/ },
+  { label: 'OpenAI secret key', pattern: /\bsk-(?:proj-)?[A-Za-z0-9_-]{20,}\b/ },
+  { label: 'Anthropic secret key', pattern: /\bsk-ant-[A-Za-z0-9_-]{20,}\b/ },
+  { label: 'service-role assignment', pattern: /\bSUPABASE_SERVICE_ROLE_KEY\s*[:=]\s*['"]?[^\s'"<>]{8,}/i },
+];
+const leakageFindings = [];
+
+async function scanPublicBundle(directory) {
+  for (const entry of await readdir(directory, { withFileTypes: true })) {
+    const fullPath = resolve(directory, entry.name);
+    const relativePath = relative(outputDirectory, fullPath).replaceAll('\\', '/');
+
+    for (const rule of blockedNames) {
+      if (rule.pattern.test(relativePath)) leakageFindings.push(`${relativePath}: ${rule.label}`);
+    }
+
+    if (entry.isDirectory()) {
+      await scanPublicBundle(fullPath);
+      continue;
+    }
+    if (!entry.isFile()) continue;
+
+    const data = await readFile(fullPath);
+    if (data.includes(0)) continue;
+    const text = data.toString('utf8');
+    for (const rule of blockedContent) {
+      if (rule.pattern.test(text)) leakageFindings.push(`${relativePath}: ${rule.label}`);
+    }
+  }
+}
+
+await scanPublicBundle(outputDirectory);
+if (leakageFindings.length) {
+  console.error(`Public bundle leakage scan failed (${leakageFindings.length} finding(s)); matched values are intentionally suppressed.`);
+  for (const finding of leakageFindings) console.error(`- ${finding}`);
+  throw new Error('Cloudflare Pages public bundle failed leakage validation');
+}
+
+console.log('Public bundle leakage scan passed: no blocked metadata or secret signatures detected.');
 console.log(`Cloudflare Pages output ready: ${outputDirectory}`);

@@ -13,6 +13,12 @@ Founder Control Room uses Cloudflare Pages for the browser frontend and one cano
 
 The former `founder-control-room2` Worker was retired. Its identity and `wrangler.api.toml` must not be recreated or targeted without a new explicit authority decision.
 
+### Review-email Worker and Email Routing
+
+`wrangler.email.toml` defines the `founder-control-room-review-email` Worker source identity, entrypoint, account, public-route posture, private `FOUNDER_CONTROL_ROOM_API -> founder-control-room` Service Binding, and exactly one Wrangler-managed Email Routing desired state: `addresses = ["review@foundercontrolroom.org"]`. If the Worker is missing, the bounded reconciliation workflow bootstraps it with a temporary no-`addresses` config and stops for secret provisioning; that bootstrap must not create or take over an Email Routing rule.
+
+With the pinned Wrangler 4.129.0, deploy may reconcile that literal address-to-Worker rule. Required-secret-name readback, Worker deploy success, managed-route intent, provider route readback, the zone-level subaddressing setting required for `review+<context-uuid>@...`, and a real inbound invocation are still distinct proof layers. `email_trigger_reconciled:true` requires provider readback of the live rule; runtime invocation requires a separate inbound-email execution receipt.
+
 ## Pages behavior
 
 The Pages project publishes `dist-pages`, a deterministic copy of `public/` containing the landing page, authenticated Control Room application, security headers, and `public/_worker.js`.
@@ -177,7 +183,13 @@ A failing or unavailable enrichment read is `UNKNOWN`/blocked evidence in that e
 
 The canonical Worker runtime secret values belong in the Cloudflare Worker secret store. Canonical `.github/workflows/deploy.yml` preserves those provider-held values instead of copying them through GitHub Actions. The required runtime secret names are declared by `wrangler.worker.toml [secrets].required`, including `FOUNDER_SESSION_ENCRYPTION_KEY`; Wrangler must fail closed when a required binding name is absent before the Worker promotion can be treated as successful.
 
-`TINYFISH_API_KEY` is one of those required canonical Worker binding names. Its value must remain only in the Cloudflare Worker secret plane; canonical Deploy may verify the provider-held name but never read, log, or re-upload the value. That binding-name receipt still does not prove TinyFish accepted a request, so live activation requires a separately observed key-backed Search or Fetch receipt.
+The Worker-only `.github/workflows/worker-reconcile.yml` authority gate must also enumerate the canonical Worker's provider-held secret **names** through Wrangler, compare them with the same `wrangler.worker.toml [secrets].required` registry, and fail before its first `secret put` or deploy if required names are missing or provider enumeration is unavailable. The fail-closed `FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON` is the single exception because the reconcile workflow explicitly replaces that one value with `enabled:false` after preflight. This verification proves name presence only, not secret validity, exact deployed source, live API response, or authorization to promote; all remain separate gates.
+
+The Worker-only reconciliation runtime proof must check the `X-Founder-Control-Room-Service` header and exact approved `gitSha` in the **direct API `/version`** response, and then independently check that the **public Pages `/version`** proxy returns the same required header and exact SHA. Successful `/health` alone, a JSON `/version` body without its header, a Pages preview deployment, or the existence of `FCR_API` service binding is not sufficient. The redacted Pages-proxy proof receipt is produced only after live readback; a green source contract test never substitutes for that receipt.
+
+FCR's `public-web-observation-v1` contract does not require a dedicated provider-held Worker secret. Public-web adapter selection occurs behind FCR's governed read-only research hub, so changing or losing an adapter cannot silently change product authority or become proof of an observed outcome.
+
+`FCR_SHOPIFY_WEBHOOK_SECRET` and `FCR_COMMERCE_HASH_SALT` are also required canonical Worker binding names for FCR's first-party Shopify paid-order ingress. The first authenticates Shopify's exact webhook body and the second creates a privacy-safe order reference; neither is authority by itself. Source and binding-name verification cannot prove the provider subscription, deployed callback, production database ledger, or a paid outcome, so those layers must remain separately evidenced before the money path is called active or proven.
 
 For the governed Founder Content n8n production-source lane, the same canonical Worker additionally requires the provider-held binding names `N8N_FOUNDER_CONTENT_WEBHOOK_URL`, `N8N_FOUNDER_CONTENT_BEARER_TOKEN`, `N8N_FOUNDER_CONTENT_EXPECTED_WORKFLOW_FINGERPRINT`, and `N8N_FOUNDER_CONTENT_IDENTITY_HMAC_SECRET`. Public-safe source may declare `N8N_FOUNDER_CONTENT_ENABLED=true`, Buffer-only provider selection, workflow ID `fcrFounderContentV1`, and runtime `2.32.6`, but those declarations do not prove any of the four secret values exist or that production n8n is active. Canonical exact-main Deploy must verify required binding-name presence before Worker mutation, and production truth still requires exact deployed Worker identity, production n8n workflow/fingerprint/runtime readback, and provider-native Buffer outcome evidence.
 
@@ -216,6 +228,8 @@ At minimum verify:
 9. authentication returns to `/control-room/` on the Pages origin;
 10. required Playwright/browser proof runs against the deployed path; and
 11. founder-content/provider claims use their own exact authorization and provider-readback gates.
+
+For the FCR Shopify money path specifically, production proof additionally requires the exact production database migration, a deployed Worker whose runtime identity matches the authorized release, provider readback that Shopify's `orders/paid` subscription targets the deployed callback, and a genuine provider-confirmed paid-order receipt before `payment_collected` can be presented as a live outcome. No test charge is implied by source or CI proof.
 
 Provider build/deploy comments, preview URLs, and successful uploads are useful evidence for the artifact they name. They do not substitute for runtime binding identity, auth, browser, publication, or fleet-wide proof.
 

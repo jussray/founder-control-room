@@ -150,6 +150,11 @@ export const CRYPTOGRAPHIC_REVIEW_REQUIRED: readonly CryptographicReviewRequired
     reason: 'PromptOS is primarily a rules/registry surface and this pass did not prove a canonical runtime authentication or signing primitive.',
     nextEvidence: 'Confirm whether any production runtime auth/signing path exists; otherwise retain provider-managed transport as an external dependency rather than inventing an app crypto layer.',
   },
+  {
+    projectSlug: 'sync-party',
+    reason: 'Sync Party entered the active portfolio after the last cryptographic inventory pass, and its multiplayer/runtime cryptographic boundary has not yet been source-proven.',
+    nextEvidence: 'Inspect Sync Party session, multiplayer transport, deployment, and any signed or provider-managed authentication paths before classifying migration exposure.',
+  },
 ] as const;
 
 export function cryptographicInventoryForProject(projectSlug: string): readonly CryptographicInventoryEntry[] {
