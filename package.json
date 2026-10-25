@@ -31,7 +31,7 @@
     "verify:parallel": "node scripts/verify-parallel.mjs",
     "preview:evidence": "node scripts/import-preview-evidence.mjs",
     "verify:capability-contract": "node scripts/verify-capability-contract.mjs",
-    "verify:mcp": "node scripts/verify-mcp-config.mjs && node scripts/verify-remote-read-mcp-config.mjs && node scripts/verify-served-mcp-contract.mjs && node scripts/verify-cloudflare-mcp-read-contract.mjs && node --check scripts/probe-cloudflare-api-mcp.mjs",
+    "verify:mcp": "node scripts/verify-mcp-config.mjs && node scripts/verify-remote-read-mcp-config.mjs && node scripts/verify-served-mcp-contract.mjs && node scripts/verify-cloudflare-mcp-read-contract.mjs && node --check scripts/probe-cloudflare-api-mcp.mjs && node scripts/verify-fcr-public-plugin.mjs && node --experimental-strip-types --test tests/publicTenantAccess.node.test.mjs",
     "verify:served-mcp": "node scripts/verify-served-mcp-contract.mjs",
     "verify:terminal-contract": "node --test test/extract-single-inline-script.test.mjs && node scripts/verify-guarded-terminal-contract.mjs",
     "verify:juss-flow": "node scripts/verify-juss-flow-launch-loop.mjs",

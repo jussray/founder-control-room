@@ -43,6 +43,14 @@ connected, sanitized project records, without exposing FCR's founder portfolio.
    security scheme compatibility, Terms/Privacy/support URLs, demo accounts,
    and plugin-directory submission rules. Do not publish this package as live.
 
+## Exact-head verification integration
+The existing `npm run verify:mcp` now invokes the public-plugin static review
+and six isolated tenancy/OAuth unit tests after its existing MCP checks.
+A passing `verify:mcp` proves only repository checks at that exact commit;
+it does not establish a live OAuth consent flow, tenant RLS, migration,
+production deployment, or public directory listing. The HTTP integration
+tests remain in the repository's Vitest suite (`npm test`).
+
 ## Authority and rollback
 This patch is a proposal; it changes no live provider or database. The server
 route defaults to 503 before activation. Turning the feature off is the safe
