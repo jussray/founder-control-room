@@ -39,10 +39,10 @@ Changes can be reversed via a separately reviewed source revision without deleti
 The active FCR Supabase project **oojzfmmywbvficgybaxd** accepted migration
 `20261024231659_sauce_source_guard_minimal_evidence_boundary`. The migration
 is mirrored in [source](../supabase/migrations/20261024231659_sauce_source_guard_minimal_evidence_boundary.sql).
-Supabase catalog readback verified `public.guard_source_verification_receipts`
-exists with RLS enabled, no client-facing policies, no `anon` or
-`authenticated` access, and `service_role` granted only SELECT and
-INSERT (not UPDATE, DELETE, or TRUNCATE).
+Fresh catalog readback on October 25, 2026 verified
+`public.guard_source_verification_receipts` exists with RLS enabled, no RLS
+policies, no `anon` or `authenticated` table grants, and `service_role`
+granted only SELECT and INSERT. The table had zero rows at that readback.
 
 The table stores **bounded source/catalog observation metadata only**: guard
 name, scope, FCR repository/commit identity, scoped result, optional GitHub
@@ -53,12 +53,12 @@ evidence against the exact version. It is not a second approval ledger and
 **never grants** merge, deployment, deletion, or publication permission.
 Existing approval and provider-readback records remain authoritative.
 
-The table was empty on the initial post-migration readback. No application
-writer or runtime collection behavior was established by the migration.
-No existing founder-content approvals or other rows were changed.
-
-**Drift disclosure:** Supabase's history includes
-`20261013223238_restrict_reconciliation_events_authenticated_read_20261013`,
-not present in the inspected GitHub migration directory at audit time.
-Do not replay, delete, repair, or claim migration-history parity from this
-receipt migration. Reconcile that history only in separately authorized work.
+Historical drift disclosure: at the initial audit, Supabase history contained
+`20261013223238_restrict_reconciliation_events_authenticated_read_20261013`
+without matching Git source. PR #995 later restored that applied migration and
+the Sauce/Source receipt migration source plus both preview contracts without
+replaying SQL or editing remote migration history. Post-merge exact-main
+verification at `fb9998c670f01a86b684290472d61a3775c0f9ff` observed
+112 remote and 112 local migration versions with zero drift. That parity is a
+dated observation, not permanent truth; future repository or provider movement
+requires fresh reconciliation.

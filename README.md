@@ -1,5 +1,11 @@
 # Founder Control Room
 
+## October 24, 2026 authenticated founder dock + StoryEngine peer renewal
+
+The public FCR entrance remains available without a session, while the internal `/control-room/` founder navigation dock starts `hidden` with `aria-hidden="true"` and becomes visible only after the existing authenticated `#root .shell` renders. Session/shell loss closes and hides the dock again. This is a UI privacy safeguard only; server-side authorization remains independently required.
+
+A fresh GitHub observation resolves StoryEngine `refs/heads/main` to `87501be2da31d12f421b0ed2da49df357fc9fcb1`, two commits strictly ahead and zero behind the prior FCR pin `3c46b3649088ac4c6e1775102ba49abf5c779abf`. All 16 observed exact-head checks completed successfully. Updating the peer selects the next federation evidence subject only. The successor FCR head must rerun live-ref equality, immutable checkout, runtime identity, directive/receipt, replay, and browser proof before federation is current. No merge, deploy, provider-mutation, publication, or production authority transfers with the pin.
+
 ## October 24, 2026 StoryEngine model-capability peer refresh
 
 A fresh GitHub observation resolves StoryEngine `refs/heads/main` to `3c46b3649088ac4c6e1775102ba49abf5c779abf` after the additive `.control-room/model-capabilities.v1.json` profile commit. StoryEngine's exact successor head completed Agent Contract v1, CodeQL, L99 Promotion Gates, and Control Room Test Ledger successfully. FCR exact-head Playwright run `40071010317` passed the local E2E harness, then correctly failed its live peer-ref equality gate because it still expected `6b97b78370fbc25d4b4bb88bfeab136eb4c7dc2f`. This repair advances only the pinned evidence subject to `3c46b3649088ac4c6e1775102ba49abf5c779abf`; it does not activate any model runtime, inherit predecessor federation proof, or grant merge, deploy, provider-mutation, publication, or production authority. The successor FCR head must earn its own complete federation/browser witness.
@@ -491,7 +497,8 @@ Provider configuration, site wiring, observed clicks, and commercial outcomes re
 
 **Truth boundary:** checked-in policy and tests are source evidence only. A passing workflow does **not** establish that public content was approved or published, that the collector receives real site traffic, or that live security/runtime controls operate correctly. No new deploy, merge, publication, provider-mutation or deletion authority is granted.
 
-
 ### Supabase source-observation receipts (bounded)
 
-On October 24, 2026, Supabase project `oojzfmmywbvficgybaxd` accepted migration `20261024231659_sauce_source_guard_minimal_evidence_boundary`. Post-migration catalog readback verified an empty, RLS-enabled `public.guard_source_verification_receipts` table, accessible only to `service_role` for SELECT and INSERT. It stores limited source/catalog check metadata, **not** founder approval or live publication proof. No app writer is claimed. See [Source Guard](docs/SOURCE_GUARD.md) for the evidence limits and a separately tracked pre-existing migration-history discrepancy.
+On October 24, 2026, Supabase project `oojzfmmywbvficgybaxd` accepted migration `20261024231659_sauce_source_guard_minimal_evidence_boundary`. Fresh catalog readback on October 25 verified an empty, RLS-enabled `public.guard_source_verification_receipts` table with no RLS policies, no `anon` or `authenticated` table grants, and `service_role` limited to SELECT and INSERT. The table stores bounded source/catalog observation metadata only and never represents founder approval, publication authority, deploy authority, or independent proof of the referenced outcome.
+
+The earlier migration-history discrepancy was repaired by PR #995 without replaying SQL or editing remote migration history. Post-merge exact-main verification observed 112 remote / 112 local migration versions with zero drift. That parity is dated evidence and must be re-observed after future repository or provider movement. See [Source Guard documentation](docs/SOURCE_GUARD.md) for the evidence boundary.
