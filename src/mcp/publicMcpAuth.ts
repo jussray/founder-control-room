@@ -30,9 +30,15 @@ export async function authenticatePublicMcp(
   // A token must identify the intended MCP resource in a signed audience or
   // resource claim, even when its generic Supabase audience is authenticated.
   const audiences = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
-  if (!audiences.includes('authenticated') && !audiences.includes(FCR_PUBLIC_MCP_RESOURCE)) return null;
-  const boundToResource = audiences.includes(FCR_PUBLIC_MCP_RESOURCE)
-    || claims.resource === FCR_PUBLIC_MCP_RESOURCE;
+  // Set membership compares complete string values, not URL substrings.
+  // Discard non-string audience members before evaluating exact resource binding.
+  const allowedAudiences = new Set(audiences.filter(
+    (audience): audience is string => typeof audience === 'string',
+  ));
+  const resourceAudience = allowedAudiences.has(FCR_PUBLIC_MCP_RESOURCE);
+  if (!allowedAudiences.has('authenticated') && !resourceAudience) return null;
+  const boundToResource = resourceAudience
+    || (typeof claims.resource === 'string' && claims.resource === FCR_PUBLIC_MCP_RESOURCE);
   if (!boundToResource) return null;
   const scope = typeof claims.scope === 'string' ? claims.scope.split(/\s+/) : [];
   if (!scope.includes(REQUIRED_SCOPE)) return null;
