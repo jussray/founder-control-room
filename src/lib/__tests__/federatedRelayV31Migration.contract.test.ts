@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 const sql = readFileSync('supabase/migrations/20260913203000_federated_relay_v31.sql', 'utf8');
+const previewSql = readFileSync('supabase/preview-contracts/20260913203000_federated_relay_v31.sql', 'utf8');
 
 describe('federated relay v3.1 migration contract', () => {
   it('keeps v3.1 additive and service-role mutation behind narrow RPCs', () => {
@@ -63,5 +64,15 @@ describe('federated relay v3.1 migration contract', () => {
     expect(sql).toContain("if v_source.pending_message_id is not null then raise exception 'relay_outbound_pending'");
     expect(sql).toContain('federated_relay_v31_finalize_outbound');
     expect(sql).toContain('federated_relay_v31_resolve_outbound');
+  });
+
+  it('keeps Neon compatibility preview-only while executing the unchanged production migration', () => {
+    expect(previewSql).toContain("CREATE ROLE anon NOLOGIN");
+    expect(previewSql).toContain("CREATE ROLE authenticated NOLOGIN");
+    expect(previewSql).toContain("CREATE ROLE service_role NOLOGIN");
+    expect(previewSql).toContain("\\ir ../migrations/20260913203000_federated_relay_v31.sql");
+    expect(previewSql).toContain("relay_v31_preview_schema_missing");
+    expect(previewSql).not.toContain("ALTER ROLE");
+    expect(sql).not.toContain("CREATE ROLE anon");
   });
 });
