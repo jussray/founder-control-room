@@ -26,23 +26,39 @@ function parseMarkers(comments, regex, version) {
 
 export function evaluateChiefAccessReconciliation(rawComments, target) {
   const comments = flattenComments(rawComments);
+  const legacy = parseMarkers(comments, MARKER_V1, 1).filter((marker) => marker.target === target);
+  const latestLegacy = legacy.at(-1);
   const v2 = parseMarkers(comments, MARKER_V2, 2).filter((marker) => marker.target === target);
 
   if (v2.length === 0) {
-    const legacy = parseMarkers(comments, MARKER_V1, 1).filter((marker) => marker.target === target);
-    const latest = legacy.at(-1);
     return {
-      clear: !latest || latest.disposition === 'CLEAR',
+      clear: !latestLegacy || latestLegacy.disposition === 'CLEAR',
       mode: 'legacy-v1',
-      blockedSubjects: latest && latest.disposition !== 'CLEAR' ? [`legacy-run:${latest.run}`] : [],
-      inProgressRuns: latest?.disposition === 'REPAIR_IN_PROGRESS' ? [latest.run] : [],
+      blockedSubjects: latestLegacy && latestLegacy.disposition !== 'CLEAR' ? [`legacy-run:${latestLegacy.run}`] : [],
+      inProgressRuns: latestLegacy?.disposition === 'REPAIR_IN_PROGRESS' ? [latestLegacy.run] : [],
     };
   }
 
   const unresolvedSubjects = new Set();
   const inProgressRuns = new Set();
+  let legacyBlocked = Boolean(latestLegacy && latestLegacy.disposition !== 'CLEAR');
+  if (legacyBlocked && latestLegacy) {
+    unresolvedSubjects.add(`legacy-run:${latestLegacy.run}`);
+    if (latestLegacy.disposition === 'REPAIR_IN_PROGRESS') inProgressRuns.add(latestLegacy.run);
+  }
 
   for (const marker of v2) {
+    if (
+      legacyBlocked
+      && latestLegacy
+      && marker.commentId > latestLegacy.commentId
+      && marker.disposition === 'CLEAR'
+      && marker.subject === 'pending'
+    ) {
+      unresolvedSubjects.delete(`legacy-run:${latestLegacy.run}`);
+      inProgressRuns.delete(latestLegacy.run);
+      legacyBlocked = false;
+    }
     if (marker.disposition === 'REPAIR_IN_PROGRESS') {
       inProgressRuns.add(marker.run);
       continue;
