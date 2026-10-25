@@ -202,7 +202,21 @@ export function prepareVideoGraphicRender(input: unknown): VideoGraphicRenderPla
 
   let invalid: string | null;
   try {
-    invalid = validateTimelineSpec(timeline);
+    // Project the remote contract explicitly: caller-controlled filesystem
+    // fields must never reach the local renderer's filesystem validation.
+    invalid = validateTimelineSpec({
+      width: timeline.width,
+      height: timeline.height,
+      fps: timeline.fps,
+      frameColor: timeline.frameColor,
+      edgeFadeSec: timeline.edgeFadeSec,
+      audio: timeline.audio,
+      segments: timeline.segments.map((segment) => ({
+        durationSec: segment.durationSec,
+        background: segment.background,
+        lines: segment.lines,
+      })),
+    });
   } catch {
     invalid = 'timeline does not match FfmpegTimelineSpec';
   }
