@@ -99,7 +99,7 @@ Do not interpret this trusted path as permission to merely `rerun failed Chief P
 
 ## Receipt and proof semantics
 
-Raw Cloudflare provider receipts are ephemeral and suppressed from workflow logs. Only allowlisted identifiers, scope, target origin, configured state, and mutation boolean may enter the public Access receipt returned to founder issue `#485` and the retained artifact. The founder approval reference is represented only by a SHA-256 receipt when mutation is requested.
+Raw Cloudflare provider receipts are ephemeral and suppressed from workflow logs. Only allowlisted identifiers, scope, target origin, configured state, mutation outcome/boolean, selector source classes, reconciliation disposition, and the non-secret SHA-256 provider-subject fingerprint may enter the public Access receipt returned to founder issue `#485` and the retained artifact. Raw selector values, Access secrets, provider response bodies, and approval text remain excluded. The founder approval reference is represented only by a SHA-256 receipt when mutation is requested.
 
 A successful read-only Access discovery proves only that the observed effective application already has one unambiguous, live service-token binding. It grants no mutation authority and does not create or overwrite policy state.
 
