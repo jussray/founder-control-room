@@ -111,7 +111,7 @@ describe('operator relay', () => {
     });
     expect(validateOperatorRelayRequest(future, NOW)).toContain('relay request creation time is too far in the future');
 
-    const longLived = request({ expiresAt: '2026-09-16T06:40:00.001Z' });
+    const longLived = request({ expiresAt: '2026-09-16T07:00:00.001Z' });
     expect(validateOperatorRelayRequest(longLived, NOW)).toContain('relay request ttl exceeds maximum');
 
     const malformedRequest = {
