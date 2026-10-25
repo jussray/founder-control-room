@@ -173,6 +173,7 @@ jobs:
         run: node scripts/resolve-chief-proofmode-access-selector.mjs
 
       - name: Persist repair-in-progress reconciliation latch
+        id: latch
         if: inputs.mode == 'repair' && steps.selector.outcome == 'success'
         env:
           GH_TOKEN: ${{ github.token }}
@@ -237,6 +238,7 @@ jobs:
           SELECTOR_OUTCOME: ${{ steps.selector.outcome }}
           SELECTOR_CLIENT_SOURCE: ${{ steps.selector.outputs.client_id_source }}
           SELECTOR_TOKEN_SOURCE: ${{ steps.selector.outputs.service_token_id_source }}
+          LATCH_OUTCOME: ${{ steps.latch.outcome }}
           APPLY_OUTCOME: ${{ steps.apply.outcome }}
           REREAD_OUTCOME: ${{ steps.reread.outcome }}
         shell: bash
@@ -336,22 +338,28 @@ jobs:
           reconciliation_subject=''
           if [[ "$safe_target" != 'UNKNOWN' && "$safe_head" != 'UNKNOWN' ]]; then
             if [[ "$CHIEF_ACCESS_MODE" == 'repair' ]]; then
-              if [[ "$RECONCILIATION_GATE_OUTCOME" == 'success' ]]; then
-                if [[ "$REREAD_OUTCOME" == 'success' && "$current_receipt_valid" == 'true' && "$current_state" == 'configured' && "$current_subject" =~ ^sha256:[0-9a-f]{64}$ ]]; then
-                  reconciliation_disposition='CLEAR'
-                  reconciliation_subject="$current_subject"
+              if [[ "$RECONCILIATION_GATE_OUTCOME" == 'success' && "$LATCH_OUTCOME" == 'success' ]]; then
+                if [[ "$mutation_receipt_valid" == 'true' && ( "$mutation_outcome" == 'performed' || "$mutation_outcome" == 'unknown' ) ]]; then
+                  if [[ "$REREAD_OUTCOME" == 'success' && "$current_receipt_valid" == 'true' && "$current_state" == 'configured' && "$mutation_subject" =~ ^sha256:[0-9a-f]{64}$ && "$current_subject" == "$mutation_subject" ]]; then
+                    reconciliation_disposition='CLEAR'
+                    reconciliation_subject="$mutation_subject"
+                  else
+                    reconciliation_disposition='RECONCILE_REQUIRED'
+                    if [[ "$mutation_subject" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+                      reconciliation_subject="$mutation_subject"
+                    else
+                      reconciliation_subject='pending'
+                    fi
+                  fi
                 elif [[ "$mutation_receipt_valid" == 'true' && "$mutation_outcome" == 'none' ]]; then
+                  reconciliation_disposition='CLEAR'
+                  reconciliation_subject='pending'
+                elif [[ "$APPLY_OUTCOME" == 'skipped' ]]; then
                   reconciliation_disposition='CLEAR'
                   reconciliation_subject='pending'
                 else
                   reconciliation_disposition='RECONCILE_REQUIRED'
-                  if [[ "$mutation_subject" =~ ^sha256:[0-9a-f]{64}$ ]]; then
-                    reconciliation_subject="$mutation_subject"
-                  elif [[ "$current_subject" =~ ^sha256:[0-9a-f]{64}$ ]]; then
-                    reconciliation_subject="$current_subject"
-                  else
-                    reconciliation_subject='pending'
-                  fi
+                  reconciliation_subject='pending'
                 fi
               fi
             elif [[ "$current_receipt_valid" == 'true' && "$current_state" == 'configured' && "$current_subject" =~ ^sha256:[0-9a-f]{64}$ ]]; then
