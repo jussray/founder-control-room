@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import {
   CANONICAL_NATIVE_APPROVAL_COUNT,
   CANONICAL_RULESET_NAME,
+  PRESERVABLE_REVIEW_RULE_TYPES,
   CODEQL_SECURITY_FLOOR,
   buildBlockedReport,
   buildReport,
@@ -132,6 +133,42 @@ test('canonical FCR governance preserves founder-only review and zero-bypass fre
   assert.deepEqual(freshness.requiredStatusCheckNames, ['Required Gate', 'Verify test-ledger contract']);
   assert.deepEqual(freshness.bypassActors, []);
   assert.equal(freshnessFloorSatisfied(freshness), true);
+});
+
+test('canonical review membrane permits only the known preservable provider rule classes', () => {
+  const expectedBypass = trustedBypassPolicy(TRUSTED_APP_ID);
+  const preserved = canonicalRuleset();
+  preserved.rules.push(
+    { type: 'required_linear_history' },
+    { type: 'code_quality', parameters: { severity: 'errors' } },
+    {
+      type: 'required_deployments',
+      parameters: { required_deployment_environments: ['founder-signal-engine-review', 'production'] },
+    },
+    {
+      type: 'copilot_code_review',
+      parameters: { review_on_push: false, review_draft_pull_requests: false },
+    },
+  );
+  assert.deepEqual(
+    [...PRESERVABLE_REVIEW_RULE_TYPES].sort(),
+    ['code_quality', 'copilot_code_review', 'required_deployments', 'required_linear_history'].sort(),
+  );
+  assert.equal(canonicalFloorSatisfied(rulesetSnapshot(preserved, 'main', 'main'), expectedBypass), true);
+
+  const unknown = structuredClone(preserved);
+  unknown.rules.push({ type: 'unknown_future_rule' });
+  assert.equal(canonicalFloorSatisfied(rulesetSnapshot(unknown, 'main', 'main'), expectedBypass), false);
+
+  const leakedStatus = structuredClone(preserved);
+  leakedStatus.rules.push({
+    type: 'required_status_checks',
+    parameters: {
+      strict_required_status_checks_policy: true,
+      required_status_checks: [{ context: 'Required Gate' }],
+    },
+  });
+  assert.equal(canonicalFloorSatisfied(rulesetSnapshot(leakedStatus, 'main', 'main'), expectedBypass), false);
 });
 
 test('future-team phase is representable without weakening any machine or provider floor', () => {
