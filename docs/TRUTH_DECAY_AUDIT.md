@@ -1,5 +1,11 @@
 # Truth Decay Audit: When a True Claim Becomes Unsafe to Reuse
 
+## October 24, 2026: founder-dock privacy boundary and StoryEngine peer movement
+
+The signed-out Control Room previously left founder-stack navigation present in the DOM as a visible dock. The repair makes first paint fail closed and derives dock visibility from the authenticated `#root .shell`; losing that shell closes and hides the dock again. Structural fixtures may synthesize the authenticated shell only after proving the signed-out state, while the opaque HttpOnly-cookie browser path remains the authority for real session behavior. UI hiding does not replace server authorization and does not prove production privacy until the exact successor browser witness passes.
+
+During rollover, StoryEngine `main` advanced to `87501be2da31d12f421b0ed2da49df357fc9fcb1`, which is two commits strictly ahead and zero behind the prior current-main FCR pin `3c46b3649088ac4c6e1775102ba49abf5c779abf`. Sixteen observed exact-head checks completed successfully. Rebinding selects a new evidence subject and expires predecessor FCR federation proof; the successor FCR head remains UNKNOWN for pair compatibility until the complete exact-head federation/browser witness succeeds.
+
 ## October 24, 2026: StoryEngine capability-profile commit expired FCR peer proof
 
 FCR's exact-head Playwright run `40071010317` proved the local E2E harness green and then failed the separate StoryEngine live-ref equality step. The workflow expected `6b97b78370fbc25d4b4bb88bfeab136eb4c7dc2f`, while a fresh provider read resolved StoryEngine `refs/heads/main` to `3c46b3649088ac4c6e1775102ba49abf5c779abf`. The successor StoryEngine commit is the additive `.control-room/model-capabilities.v1.json` capability-profile change and its current Agent Contract v1, CodeQL, L99 Promotion Gates, and Control Room Test Ledger runs completed successfully. The mismatch is therefore verified peer identity drift caused by the new source commit, not proof that federation behavior failed. Updating the pin selects a new evidence subject only; predecessor browser proof does not transfer, runtime activation remains false, and the next FCR head must rerun the complete peer/runtime/browser witness.
@@ -519,10 +525,3 @@ FCR exact-head Playwright on `ea09b7406eff2b85bde2ba1a4543e765e1f6d135` complete
 The successor StoryEngine head is strictly forward of the predecessor pin and has exact-head green evidence from `L99 Story Engine CI`, `Guardrails Playwright`, `L99 Promotion Gates`, `Agent Contract v1`, and `Control Room Test Ledger`. Source comparison shows the federation contract remains `juss-v10/product-build-directive@v1` / `juss-v10/product-build-receipt@v1`; the relevant change strengthens runtime identity by preferring provider-native deployment SHA in production and failing closed when production cannot prove an exact runtime head.
 
 Rebinding `.github/workflows/playwright.yml` to `a6e6a396ed30535af2fd9b1ec2347a84e1a3fbf3` selects the successor federation evidence subject only. All predecessor FCR-to-StoryEngine browser/federation green is historical. The successor FCR head remains `UNKNOWN` for current federation until the complete live-ref equality check, immutable peer checkout, runtime identity binding, directive/receipt loop, replay protections, and Playwright witness succeed against this exact peer. No founder approval, merge, deploy, production, publication, billing, or provider-mutation authority transfers with the pin.
-
-## 2026-10-24 StoryEngine relay-proof peer refresh
-
-The StoryEngine peer used by FCR's browser federation witness advanced to independently re-observed `refs/heads/main@87501be2da31d12f421b0ed2da49df357fc9fcb1`. Updating `.github/workflows/playwright.yml` to that exact SHA invalidates all predecessor pair-specific federation evidence; the new pin is an evidence-subject selection, not current runtime proof.
-
-Current federation remains `UNKNOWN` until the exact successor FCR head completes the live-ref equality check, immutable peer checkout, StoryEngine runtime-identity verification, directive/receipt loop, replay-safety checks, and full Playwright browser witness against this SHA. No prior green, founder approval, merge, deployment, production, publication, billing, or provider-mutation authority transfers through the peer refresh.
-

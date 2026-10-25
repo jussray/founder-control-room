@@ -29,6 +29,7 @@ import { designOsRouter } from './routes/designOs.js';
 import { cloudflareReasoningRouter } from './routes/cloudflareReasoning.js';
 import { mcpRouter } from './routes/mcp.js';
 import { handleRemoteMcpProtectedResourceMetadata } from './routes/remoteReadMcp.js';
+import { publicMcpRouter } from './routes/publicMcp.js';
 import { externalUseRouter } from './routes/externalUse.js';
 import { futureYouRouter } from './routes/futureYou.js';
 import { goalfixRouter } from './routes/goalfix.js';
@@ -274,6 +275,11 @@ export function createServer(options: CreateServerOptions = {}) {
     '/.well-known/oauth-protected-resource/mcp',
     handleRemoteMcpProtectedResourceMetadata,
   );
+
+  // Separate OAuth-scoped customer MCP. Parsing is limited to this path;
+  // existing founder-cookie/browser-CSRF routes remain unchanged.
+  app.use('/mcp/public', express.json({ type: 'application/json', limit: '64kb' }));
+  app.use(publicMcpRouter);
 
   app.use(requireSameOriginBrowserMutation);
   app.use(express.json({ limit: BODY_LIMIT }));

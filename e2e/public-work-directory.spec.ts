@@ -126,7 +126,17 @@ test('renders Claude Cowork as a GitHub-grounded Council lane in the founder sta
     .replace("import { installProjectShellUi } from './project-shell-ui.js';", 'const installProjectShellUi = () => {};');
 
   await page.setContent(appHtml);
+  await expect(page.locator('.launch-dock')).toBeHidden();
+  // This isolated structural fixture has no auth server. Simulate only the DOM
+  // shell after proving that the signed-out navigation starts hidden; the
+  // separate opaque-cookie Playwright test is authoritative for sign-in.
+  await page.evaluate(() => {
+    const root = document.getElementById('root');
+    if (!root) throw new Error('Missing Control Room root');
+    root.innerHTML = '<main class="shell" data-synthetic-auth-fixture></main>';
+  });
   await page.addScriptTag({ content: stackRouterSource, type: 'module' });
+  await expect(page.locator('.launch-dock')).toBeVisible();
   await page.locator('.launch-dock > summary').click();
 
   const cowork = page.locator('[data-lane="cowork"]');
