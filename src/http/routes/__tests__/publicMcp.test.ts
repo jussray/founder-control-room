@@ -16,12 +16,14 @@ vi.mock('../../../lib/supabaseClient.js', () => ({
 }));
 
 import { publicMcpRouter } from '../publicMcp.js';
+import { FCR_PUBLIC_MCP_RESOURCE } from '../../../mcp/publicMcpAuth.js';
 
 function jwt(subject: string, clientId = 'chatgpt-public', overrides: Record<string, unknown> = {}) {
   const b64 = (value: unknown) => Buffer.from(JSON.stringify(value)).toString('base64url');
   return `${b64({ alg: 'RS256' })}.${b64({
     iss: 'https://example.supabase.co/auth/v1',
-    aud: 'authenticated', sub: subject, client_id: clientId,
+    aud: 'authenticated', resource: FCR_PUBLIC_MCP_RESOURCE, scope: 'openid',
+    sub: subject, client_id: clientId,
     exp: Math.floor(Date.now() / 1000) + 3600, ...overrides,
   })}.test-signature`;
 }
@@ -134,6 +136,34 @@ describe('public FCR MCP isolation', () => {
       .send({ jsonrpc: '2.0', id: 1, method: 'tools/list' });
     expect(response.status).toBe(401);
     expect(state.getUser).not.toHaveBeenCalled();
+  });
+
+  it('rejects unbound generic audience tokens before calling Supabase', async () => {
+    const token = jwt('user-A', 'chatgpt-public', { resource: undefined });
+    const response = await request(app()).post('/mcp/public')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ jsonrpc: '2.0', id: 1, method: 'tools/list' });
+    expect(response.status).toBe(401);
+    expect(response.headers['www-authenticate']).toContain('resource_metadata=');
+    expect(state.getUser).not.toHaveBeenCalled();
+    expect(state.from).not.toHaveBeenCalled();
+  });
+
+  it('rejects foreign resources, missing openid, and future-dated tokens', async () => {
+    for (const overrides of [
+      { resource: 'https://elsewhere.example/mcp' },
+      { scope: 'profile' },
+      { nbf: Math.floor(Date.now() / 1000) + 7200 },
+      { aud: 'https://elsewhere.example/mcp' },
+    ]) {
+      const token = jwt('user-A', 'chatgpt-public', overrides);
+      const response = await request(app()).post('/mcp/public')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ jsonrpc: '2.0', id: 1, method: 'tools/list' });
+      expect(response.status).toBe(401);
+    }
+    expect(state.getUser).not.toHaveBeenCalled();
+    expect(state.from).not.toHaveBeenCalled();
   });
 
   it('refuses anonymous users, even with a matching client claim', async () => {
