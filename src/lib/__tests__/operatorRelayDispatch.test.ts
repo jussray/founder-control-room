@@ -91,6 +91,7 @@ describe('dispatchOperatorRelay', () => {
       },
     }, Date.parse('2026-09-16T06:31:00.000Z'))).rejects.toMatchObject({
       code: 'relay_response_invalid',
+      externalProviderCall: true,
     });
   });
 });
