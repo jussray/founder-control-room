@@ -1,13 +1,22 @@
 import { createHash } from 'node:crypto';
 import { appendFileSync } from 'node:fs';
 
-function normalize(value) {
-  return typeof value === 'string' ? value.trim() : '';
+function normalize(value, label = 'selector value') {
+  if (typeof value !== 'string') return '';
+  if (/[\r\n]/.test(value)) {
+    throw new Error(`${label} must be a single-line identifier.`);
+  }
+  const normalized = value.trim();
+  if (!normalized) return '';
+  if (normalized.length > 256 || !/^[A-Za-z0-9._:-]+$/.test(normalized)) {
+    throw new Error(`${label} contains unsupported identifier characters.`);
+  }
+  return normalized;
 }
 
 function collapseSources(entries, label) {
   const populated = entries
-    .map(({ source, value }) => ({ source, value: normalize(value) }))
+    .map(({ source, value }) => ({ source, value: normalize(value, label) }))
     .filter(({ value }) => Boolean(value));
   const values = [...new Set(populated.map(({ value }) => value))];
   if (values.length > 1) {
@@ -82,7 +91,9 @@ export function resolveChiefAccessSelector(input = {}) {
 
 function appendEnv(name, value) {
   if (!process.env.GITHUB_ENV) throw new Error('GITHUB_ENV is required for workflow selector resolution.');
-  appendFileSync(process.env.GITHUB_ENV, `${name}=${value || ''}\n`, 'utf8');
+  const safeValue = String(value || '');
+  if (/[\r\n]/.test(safeValue)) throw new Error(`${name} must be a single-line environment value.`);
+  appendFileSync(process.env.GITHUB_ENV, `${name}=${safeValue}\n`, 'utf8');
 }
 
 function main() {
