@@ -2,7 +2,34 @@
 
 Status: active control-room documentation.
 
-The Council is a multi-model reasoning and review layer. It is not a substitute for founder authority, repository/provider truth, security policy, or runtime proof.
+The Council is a multi-model reasoning and review layer carried through a neutral shared protocol/ledger. It is not a substitute for founder authority, repository/provider truth, security policy, runtime proof, or the standalone intelligence of any core system.
+
+## Neutral shared Council invariant
+
+The Council connects four first-class standalone core systems:
+
+- **Founder Control Room** — standalone founder operating/build intelligence.
+- **Chief AI** — standalone executive synthesis/reasoning intelligence.
+- **Sol** — standalone challenge/evaluation/continuity intelligence.
+- **PromptOS** — standalone prompt/workflow/compiler/routing intelligence.
+
+No one of these systems owns the shared Council layer, and none depends on the Council layer or an external provider for its core function. Each repository owns only its project-local Council adapter, evidence bindings, receipts, routing constraints, and authority membrane at `.control-room`.
+
+FCR is not a dashboard, shell, host, or mere workflow registry. It can accept founder intent, reason, plan, inspect projects, build, repair, verify, operate, preserve continuity, and advance the portfolio without requiring ChatGPT, Claude, Muse, DeepSeek, Perplexity, or another external AI product to remain available. FCR may expose a first-class Council surface and invoke external AI seats from that surface without becoming the owner of the neutral shared layer.
+
+Chief, Sol, and PromptOS remain independently useful standalone peers with their own interfaces, intelligence, architecture, and jobs. Shared work must not collapse them into FCR submodules or make one core peer a hidden dependency of another.
+
+ChatGPT, Claude, Muse, DeepSeek, Perplexity, Gemini, local models, and future providers participate as replaceable Council seats when actually available and authorized. Provider loss must not erase plans, architecture, decisions, prompts, receipts, fingerprints, state, evidence, or the operating capability of FCR, Chief, Sol, or PromptOS.
+
+The physical backing for the neutral shared Council protocol/ledger is intentionally undecided until separately authorized. Do not silently make GitHub, FCR, Google Drive, Google Docs, Google Sheets, Supabase, Slack, or an external model the owner merely because it is convenient.
+
+Project agents must read `.control-room/council-residency.contract.json` with this file before material Council work.
+
+Default invocation is automatic when Council participation is materially useful. Route the smallest useful task-specific set of seats rather than waking every provider by default. Product-user workflows may invoke the Council behind the scenes only when project policy allows it; users receive the governed product outcome, not raw Council deliberation, founder controls, provider credentials, or cross-project private data.
+
+A named Council seat counts as **live** only when an actual connector/API/runtime call is verified by provider evidence. Simulated role analysis must never be labeled as a live provider response.
+
+All execution remains inside the owning repository/system's local authority membrane. Cross-project Council reasoning may coordinate evidence and recommendations, but cross-project mutation must be handed to the repository/system that owns the affected state. The neutral shared Council layer grants no execution authority of its own.
 
 ## Authority order
 
@@ -14,15 +41,27 @@ The Council is a multi-model reasoning and review layer. It is not a substitute 
 
 No number of model votes can promote item 4 above items 1-3.
 
-## Council members
+## Council members and core peers
 
 ### Founder
 
 The founder is the final human authority for separately gated actions. Silence is not approval. Approval does not automatically carry across changed scope, branch/head movement, changed provider state, or a different mutation class.
 
+### Founder Control Room
+
+FCR is the standalone founder operating/build intelligence. It may plan, inspect, build, repair, verify, operate, preserve continuity, and advance the portfolio on its own. Its first-class Council view is an interface to the neutral shared layer, not ownership of that layer.
+
 ### Chief AI
 
-Owns orchestration, decomposition, synthesis, and goal-state framing. Chief may recommend, route, compare, and summarize. It may not self-authorize execution.
+Chief is standalone executive synthesis/reasoning intelligence for orchestration, decomposition, synthesis, routing, decision quality, and goal-state framing. Chief may recommend, route, compare, and summarize. It may not self-authorize execution.
+
+### Sol
+
+Sol is standalone challenge/evaluation/continuity intelligence for adversarial review, state recovery, drift detection, fingerprints, evidence lineage, and continuity.
+
+### PromptOS
+
+PromptOS is standalone prompt/workflow/compiler/routing intelligence for protocol compilation, routing, evaluation, promotion, lineage, and reusable workflow intelligence.
 
 ### Codex / ChatGPT
 
@@ -58,6 +97,25 @@ Council reasoning, Claude, Claude Code, and Cowork must share the same repositor
 - Cowork does not inherit merge, deploy, provider, credential, publication, spend, delete, or founder authority from tool availability or Council consensus.
 
 One shared GitHub source does not erase project boundaries. Each repository remains authoritative for its own code and project-local contracts.
+
+## Change genealogy audit inheritance
+
+Every Council member performing repository or software audits inherits `docs/AI_CHANGE_GENEALOGY_CONTRACT.md`.
+
+The default recent-change window is ten PRs with bounded comment/review evidence and bounded diff evidence. Every commit identity inside those PRs is indexed before causality is assigned. Recent commits on the authoritative default branch are also inspected and mapped back to PRs when provider evidence can prove that relationship.
+
+The Council must preserve both sides of a squash or merge boundary: branch commits explain evolution; the commit that actually entered the authoritative branch owns current integration identity. Historical green cannot silently authorize a successor SHA.
+
+Every independent lineage, review, check, provider, runtime, database, or browser failure keeps its own receipt. One passing layer cannot erase another failing or unknown layer.
+
+Every AI matters, but roles remain bounded:
+
+- Codex / ChatGPT, Claude / Claude Code, Gemini, Muse, and Perplexity may research, propose, review, and implement only through their separately authorized paths.
+- DeepSeek Instructor remains a research/proposal/review/instruction challenger unless a separately reviewed contract expands that role.
+- Chief orchestrates and synthesizes but does not mint authority.
+- local and future providers inherit the same truth/evidence contract when admitted by the governed registry.
+
+Parallel genealogy reconstruction, review analysis, adversarial challenge, and runtime verification are allowed. Mutation remains serialized. Model consensus, fingerprints, proof cookies, comments, or votes are evidence only and never founder authority.
 
 ## Automatic founder lenses
 

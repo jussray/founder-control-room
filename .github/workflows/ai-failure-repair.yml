@@ -140,6 +140,7 @@ jobs:
         with:
           name: ai-failure-receipt-${{ github.event.workflow_run.id }}
           path: .repair/
+          include-hidden-files: true
           if-no-files-found: error
           retention-days: 30
 
@@ -225,6 +226,7 @@ jobs:
         with:
           name: ai-repair-codex-${{ github.event.workflow_run.id }}
           path: .repair/
+          include-hidden-files: true
           if-no-files-found: error
           retention-days: 30
 
@@ -316,6 +318,7 @@ jobs:
         with:
           name: ai-repair-final-${{ github.event.workflow_run.id }}
           path: .repair/
+          include-hidden-files: true
           if-no-files-found: error
           retention-days: 30
 
@@ -524,5 +527,6 @@ jobs:
         with:
           name: ai-repair-receipt-${{ github.event.workflow_run.id }}
           path: .repair/final-repair-receipt.json
+          include-hidden-files: true
           if-no-files-found: ignore
           retention-days: 30

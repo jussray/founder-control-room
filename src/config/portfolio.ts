@@ -63,6 +63,13 @@ export const PORTFOLIO_PROJECTS: readonly PortfolioProject[] = [
     capabilities: ["shopify", "story-commerce", "playwright"],
   },
   {
+    slug: "sync-party",
+    name: "SYNC Party Game",
+    repository: "jussray/sync-party-game",
+    status: "active",
+    capabilities: ["multiplayer-game", "control-room", "playwright", "continuity"],
+  },
+  {
     slug: "founder-control-room",
     name: "Founder Control Room",
     repository: "jussray/founder-control-room",
@@ -107,10 +114,31 @@ export const EXTERNAL_PROJECTS: readonly PortfolioProject[] = [
   },
   {
     slug: "sweats",
-    name: "Sweats",
+    name: "SWEATS",
     repository: "jussray/Sweats",
     status: "external",
     capabilities: ["product", "continuity"],
+  },
+  {
+    slug: "truth-compass",
+    name: "Truth Compass",
+    repository: "jussray/truth-compass",
+    status: "external",
+    capabilities: ["truth-analysis", "evidence", "continuity"],
+  },
+  {
+    slug: "truth-weaver",
+    name: "Truth Weaver Counsel",
+    repository: "jussray/truth-weaver",
+    status: "external",
+    capabilities: ["legal-knowledge", "decision-support", "evidence", "continuity"],
+  },
+  {
+    slug: "alexa-commerce-engine",
+    name: "Alexa Commerce Engine",
+    repository: "jussray/alexa-commerce-engine-",
+    status: "external",
+    capabilities: ["commerce-agent", "continuity"],
   },
 ] as const;
 
@@ -140,25 +168,18 @@ export const CONTINUITY_ONLY_PROJECTS: readonly PortfolioProject[] = [
     capabilities: ["bip-universe", "continuity"],
   },
   {
-    slug: "truth-compass",
-    name: "Truth Compass",
-    repository: "jussray/truth-compass",
+    slug: "exact-match-engine",
+    name: "Exact Match Engine",
+    repository: "jussray/exact-match-engine",
     status: "continuity-only",
-    capabilities: ["truth-analysis", "evidence", "continuity"],
+    capabilities: ["claim-reconciliation", "evidence-provenance", "continuity"],
   },
   {
-    slug: "truth-weaver",
-    name: "Truth Weaver",
-    repository: "jussray/truth-weaver",
+    slug: "ayure",
+    name: "AYURE",
+    repository: "jussray/Ayure-",
     status: "continuity-only",
-    capabilities: ["decision-control", "evidence", "continuity"],
-  },
-  {
-    slug: "alexa-commerce-engine",
-    name: "Alexa Commerce Engine",
-    repository: "jussray/alexa-commerce-engine-",
-    status: "continuity-only",
-    capabilities: ["commerce-agent", "continuity"],
+    capabilities: ["property-network", "intent-matching", "cloudflare-d1", "playwright", "continuity"],
   },
 ] as const;
 

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 
-const relayOperators = ['gemini', 'codex', 'claude-code', 'perplexity'];
+const relayOperators = ['gemini', 'codex', 'claude-code', 'perplexity', 'deepseek'];
 const instructorOnly = 'deepseek-instructor';
 
 function relayEnvelope(fromOperator, toOperator) {
@@ -30,6 +30,10 @@ assert.deepEqual(Object.values(perplexity.authority), [false, false, false, fals
 
 const claude = relayEnvelope('perplexity', 'claude-code');
 assert.equal(claude.toOperator, 'claude-code');
+
+const deepseek = relayEnvelope('codex', 'deepseek');
+assert.equal(deepseek.toOperator, 'deepseek');
+assert.deepEqual(Object.values(deepseek.authority), [false, false, false, false, false]);
 
 assert.throws(() => relayEnvelope('codex', instructorOnly), /target must be a peer operator/);
 

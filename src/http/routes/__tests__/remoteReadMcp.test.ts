@@ -74,19 +74,20 @@ function jwt(claims: Record<string, unknown>) {
 function oauthEnv(): NodeJS.ProcessEnv {
   return {
     SUPABASE_URL: 'https://oojzfmmywbvficgybaxd.supabase.co',
-    FCR_REMOTE_MCP_OAUTH_AUDIENCE: 'authenticated',
+    FCR_REMOTE_MCP_OAUTH_AUDIENCE: RESOURCE,
     FCR_REMOTE_MCP_OAUTH_CLIENT_IDS: 'chatgpt-client,claude-client',
-    FCR_REMOTE_MCP_OAUTH_SCOPES: 'email',
-    FCR_REMOTE_MCP_READ_PROJECTS: `${CHIEF},${FCR}`,
+    FCR_REMOTE_MCP_OAUTH_REQUIRED_SCOPE: 'mcp:read',
   };
 }
 
 function validClaims(overrides: Record<string, unknown> = {}) {
   return {
     iss: 'https://oojzfmmywbvficgybaxd.supabase.co/auth/v1',
-    aud: 'authenticated',
+    aud: RESOURCE,
     sub: 'founder-user-1',
     client_id: 'chatgpt-client',
+    scope: 'openid mcp:read',
+    mcp_projects: [CHIEF, FCR],
     exp: Math.floor(Date.now() / 1000) + 3600,
     ...overrides,
   };
@@ -165,7 +166,7 @@ function modernPost(
 }
 
 describe('Supabase OAuth token verifier', () => {
-  it('accepts a standard Supabase OAuth token and derives project grants from server scope', async () => {
+  it('accepts only a current user and founder allowlist row after claim checks', async () => {
     mockGetUser.mockResolvedValueOnce({
       data: { user: { id: 'founder-user-1', email: 'founder@example.com' } },
       error: null,
@@ -192,46 +193,14 @@ describe('Supabase OAuth token verifier', () => {
     ['audience', { aud: 'https://attacker.example/mcp' }, 'audience'],
     ['client', { client_id: 'unknown-client' }, 'client'],
     ['expiry', { exp: Math.floor(Date.now() / 1000) - 1 }, 'expired'],
-    ['not-before', { nbf: Math.floor(Date.now() / 1000) + 3600 }, 'not active'],
+    ['scope', { scope: 'openid' }, 'scope'],
+    ['project grant', { mcp_projects: [] }, 'project grant'],
   ])('rejects a token with the wrong %s before Supabase data access', async (_label, overrides, message) => {
     mockGetUser.mockClear();
     mockFrom.mockClear();
     await expect(
       verifyRemoteMcpOauthToken(jwt(validClaims(overrides)), oauthEnv()),
     ).rejects.toThrow(message);
-    expect(mockGetUser).not.toHaveBeenCalled();
-    expect(mockFrom).not.toHaveBeenCalled();
-  });
-
-  it('does not require unsupported custom scopes or mcp_projects claims', async () => {
-    mockGetUser.mockResolvedValueOnce({
-      data: { user: { id: 'founder-user-1', email: 'founder@example.com' } },
-      error: null,
-    });
-    mockFrom.mockReturnValueOnce({
-      select: () => ({
-        eq: () => ({
-          maybeSingle: async () => ({ data: { email: 'founder@example.com' }, error: null }),
-        }),
-      }),
-    });
-
-    await expect(verifyRemoteMcpOauthToken(jwt(validClaims()), oauthEnv())).resolves.toMatchObject({
-      clientId: 'chatgpt-client',
-      projectIds: [CHIEF, FCR],
-      authMode: 'oauth',
-    });
-  });
-
-  it('rejects an explicitly configured unsupported custom OAuth scope', async () => {
-    mockGetUser.mockClear();
-    mockFrom.mockClear();
-    await expect(
-      verifyRemoteMcpOauthToken(jwt(validClaims()), {
-        ...oauthEnv(),
-        FCR_REMOTE_MCP_OAUTH_SCOPES: 'mcp:read',
-      }),
-    ).rejects.toThrow('Supabase standard scopes only');
     expect(mockGetUser).not.toHaveBeenCalled();
     expect(mockFrom).not.toHaveBeenCalled();
   });
@@ -267,7 +236,7 @@ describe('Founder Control Room paired remote MCP', () => {
     expect(response.body.error.message).toBe('Remote MCP static token is not configured');
   });
 
-  it('publishes Supabase-compatible OAuth protected-resource metadata without cookies', async () => {
+  it('publishes Supabase OAuth protected-resource metadata without cookies', async () => {
     const app = express();
     app.get('/.well-known/oauth-protected-resource/mcp',
       createRemoteMcpProtectedResourceMetadataHandler({
@@ -280,24 +249,10 @@ describe('Founder Control Room paired remote MCP', () => {
     expect(response.body).toMatchObject({
       resource: RESOURCE,
       authorization_servers: ['https://oojzfmmywbvficgybaxd.supabase.co/auth/v1'],
-      scopes_supported: ['email'],
+      scopes_supported: ['mcp:read'],
       bearer_methods_supported: ['header'],
     });
     expect(response.headers).not.toHaveProperty('set-cookie');
-  });
-
-  it('fails metadata closed when a custom Supabase-incompatible scope is configured', async () => {
-    const app = express();
-    app.get('/.well-known/oauth-protected-resource/mcp',
-      createRemoteMcpProtectedResourceMetadataHandler({
-        SUPABASE_URL: 'https://oojzfmmywbvficgybaxd.supabase.co',
-        FCR_REMOTE_MCP_RESOURCE: RESOURCE,
-        FCR_REMOTE_MCP_OAUTH_SCOPES: 'mcp:read',
-      }));
-
-    const response = await request(app).get('/.well-known/oauth-protected-resource/mcp');
-    expect(response.status).toBe(503);
-    expect(response.body.error).toContain('Supabase standard scopes only');
   });
 
   it('keeps legacy initialization while advertising the bounded relay tool', async () => {
@@ -317,6 +272,7 @@ describe('Founder Control Room paired remote MCP', () => {
       'chief_preview_capability_plan',
       'fcr_list_projects',
       'fcr_get_current_truth',
+      'fcr_audit_change_genealogy',
       'fcr_preview_skill_route',
       'fcr_relay_operator',
     ]);
@@ -389,7 +345,7 @@ describe('Founder Control Room paired remote MCP', () => {
     });
   });
 
-  it('intersects OAuth identity projects with the server-held project scope', async () => {
+  it('intersects OAuth token projects with the server-held project scope', async () => {
     const getCurrentTruth = vi.fn(async () => ({ ok: true }));
     const app = buildApp({
       authMode: 'oauth',
