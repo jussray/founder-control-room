@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { listMyPublicProjects, getMyPublicProject, PublicMcpAccessDenied } from '../src/mcp/publicTenantAccess.ts';
-import { authenticatePublicMcp } from '../src/mcp/publicMcpAuth.ts';
+import { authenticatePublicMcp, FCR_PUBLIC_MCP_RESOURCE } from '../src/mcp/publicMcpAuth.ts';
 
 const TA='11111111-1111-4111-8111-111111111111', TB='22222222-2222-4222-8222-222222222222';
 const PA='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', PB='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
@@ -17,7 +17,7 @@ const jwt=(claims)=>{
  const b64=x=>Buffer.from(JSON.stringify(x)).toString('base64url');
  return `${b64({alg:'RS256'})}.${b64(claims)}.signed`;
 };
-const claims={iss:'https://auth.example/auth/v1',aud:'authenticated',sub:'A',client_id:'oauth-client',exp:4102444800};
+const claims={iss:'https://auth.example/auth/v1',aud:'authenticated',resource:FCR_PUBLIC_MCP_RESOURCE,scope:'openid',sub:'A',client_id:'oauth-client',exp:4102444800};
 const cfg={issuer:'https://auth.example/auth/v1',allowedClientIds:['oauth-client'],now:1700000000};
 
 test('only own tenant projects are listed', async()=>{
@@ -58,6 +58,44 @@ test('rejects wrong issuer, client, expired and non-OAuth claims before verifier
  {...claims,exp:1},
  {...claims,aud:'something-else'},
  {...claims,client_id:undefined},
+ {...claims,resource:undefined},
+ {...claims,resource:'https://unrelated.example/mcp'},
+ {...claims,scope:'profile'},
+ {...claims,nbf:4102444800},
  ]) assert.equal(await authenticatePublicMcp(jwt(bad),cfg,verify),null);
  assert.equal(n,0);
+});
+
+test('accepts an exact MCP audience but rejects generic unbound tokens',async()=>{
+ const valid=jwt({...claims,aud:FCR_PUBLIC_MCP_RESOURCE,resource:undefined});
+ assert.deepEqual(await authenticatePublicMcp(valid,cfg,async()=>({id:'A'})),A);
+ const invalid=jwt({...claims,aud:'authenticated',resource:undefined});
+ let called=false;
+ assert.equal(await authenticatePublicMcp(invalid,cfg,async()=>{called=true;return {id:'A'};}),null);
+ assert.equal(called,false);
+});
+
+test('OAuth resource checks use exact full values, never URL prefixes or substrings',async()=>{
+ let verifyCalls=0;
+ const verify=async()=>{verifyCalls++;return {id:'A'}};
+ const deceptive=[
+  `https://evil.example/forward?to=${FCR_PUBLIC_MCP_RESOURCE}`,
+  `${FCR_PUBLIC_MCP_RESOURCE}/more`,
+  `${FCR_PUBLIC_MCP_RESOURCE}.evil.example`,
+  FCR_PUBLIC_MCP_RESOURCE.replace('https:', 'http:'),
+ ];
+ for(const address of deceptive){
+  for(const bad of [
+   {...claims,aud:address,resource:undefined},
+   {...claims,aud:['authenticated',address],resource:undefined},
+   {...claims,aud:'authenticated',resource:address},
+  ]){
+   assert.equal(await authenticatePublicMcp(jwt(bad),cfg,verify),null,address);
+  }
+ }
+ assert.equal(verifyCalls,0);
+
+ const accepted=jwt({...claims,aud:['authenticated',FCR_PUBLIC_MCP_RESOURCE],resource:undefined});
+ assert.deepEqual(await authenticatePublicMcp(accepted,cfg,verify),A);
+ assert.equal(verifyCalls,1);
 });

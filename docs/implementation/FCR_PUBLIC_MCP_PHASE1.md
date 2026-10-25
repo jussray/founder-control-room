@@ -8,7 +8,8 @@ connected, sanitized project records, without exposing FCR's founder portfolio.
 - New `/mcp/public` JSON-RPC endpoint, entirely separate from existing `/mcp`.
 - New public-only tenant/membership/project data ports and strict output projection.
 - Supabase Auth `getUser(token)` verification, signed claim correlation, client-ID allowlist,
-  `aud=authenticated` per current Supabase OAuth access-token docs, and issuer/expiry checks.
+  issuer, expiry, `nbf`, required `openid` scope, and canonical signed resource binding.
+  Generic Supabase `aud=authenticated` alone is explicitly insufficient.
 - Two OAuth-scoped read-only tools; no operator relay, writes, provider actions,
   founder portfolio list, raw repository patches, credentials, or cross-project reads.
 - Authenticated membership changes control access. A caller-supplied project ID
@@ -26,9 +27,11 @@ connected, sanitized project records, without exposing FCR's founder portfolio.
 ## Blockers BEFORE enabling
 1. Validate existing Supabase OAuth 2.1 support, registration, PKCE, consent UI,
    dynamic-client configuration, scope discovery, refresh/revocation, and `resource`
-   indicator handling. Supabase tokens document `aud=authenticated`; OpenAI's
-   MCP security requirements also demand resource binding. These must be
-   reconciled by observing real issued tokens and the supported provider flow.
+   indicator handling. The verifier now requires the exact public MCP URL as
+   a signed `aud` or `resource` claim, along with `openid` scope. Tokens
+   presenting only generic Supabase `aud=authenticated` correctly fail closed.
+   Prove the actual issuer can mint a resource-bound token before enabling;
+   do not fabricate a claim or weaken checks to make a connector appear green.
 2. Convert `FCR_PUBLIC_TENANCY_SCHEMA_PROPOSAL.sql` into a reviewed migration
    with the project's own migration workflow; run RLS and tenant-isolation SQL
    tests under anonymous, user-A, user-B, OAuth, and service-role contexts.
@@ -45,7 +48,7 @@ connected, sanitized project records, without exposing FCR's founder portfolio.
 
 ## Exact-head verification integration
 The existing `npm run verify:mcp` now invokes the public-plugin static review
-and six isolated tenancy/OAuth unit tests after its existing MCP checks.
+and seven isolated tenancy/OAuth unit tests after its existing MCP checks.
 A passing `verify:mcp` proves only repository checks at that exact commit;
 it does not establish a live OAuth consent flow, tenant RLS, migration,
 production deployment, or public directory listing. The HTTP integration
