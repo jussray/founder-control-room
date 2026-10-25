@@ -150,6 +150,10 @@ describe('repository documentation truth control', () => {
     );
     const providerClaims = providerEntry?.claims.join(' ') ?? '';
 
+    expect(documentationVerifier).toContain('githubProviderTruthChanged');
+    expect(documentationVerifier).toContain(
+      "!githubProviderTruthChanged || !ownsLegacyRequiredDeployments || receiptDescribesRequiredDeploymentRemoval",
+    );
     expect(documentationVerifier).toContain('ownsLegacyRequiredDeployments');
     expect(documentationVerifier).toContain('receiptDescribesRequiredDeploymentRemoval');
     expect(providerClaims).toMatch(/required_deployments/);

@@ -287,6 +287,9 @@ function namedSetBody(source, name) {
 
 const fcrOwnedRuleTypes = namedSetBody(githubProviderSource, 'FCR_REVIEW_OWNED_RULE_TYPES');
 const fcrPreservableRuleTypes = namedSetBody(githubProviderSource, 'FCR_REVIEW_PRESERVABLE_RULE_TYPES');
+const githubProviderTruthChanged = truthSensitiveChanges.some(
+  (change) => change.file === 'src/providers/GitHubProvider.ts',
+);
 const githubProviderReceiptClaims = receipt?.claimsByPath.get('src/providers/GitHubProvider.ts') ?? [];
 const githubProviderReceiptText = githubProviderReceiptClaims.join(' ');
 const ownsLegacyRequiredDeployments = fcrOwnedRuleTypes.includes('"required_deployments"')
@@ -295,7 +298,7 @@ const receiptDescribesRequiredDeploymentRemoval = /required[_ -]deploy/i.test(gi
   && /(?:intentionally\s+remove|remove(?:s|d)?|migration\s+debt|exact-current-main\/post-merge)/i.test(githubProviderReceiptText);
 
 const consistencyChecks = [
-  [!ownsLegacyRequiredDeployments || receiptDescribesRequiredDeploymentRemoval, 'documentation truth receipt must describe intentional removal of legacy pre-merge required_deployments when GitHubProvider owns that migration boundary'],
+  [!githubProviderTruthChanged || !ownsLegacyRequiredDeployments || receiptDescribesRequiredDeploymentRemoval, 'documentation truth receipt must describe intentional removal of legacy pre-merge required_deployments when GitHubProvider owns that migration boundary'],
   [!readme.includes('**Last refreshed:**'), 'README must not present a manually refreshed date as durable current repository authority'],
   [readme.includes('Current identity is resolved at use time'), 'README must resolve current repository identity at use time'],
   [readme.includes('Documentation truth gate'), 'README must describe the Documentation truth gate'],
