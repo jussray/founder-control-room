@@ -20,6 +20,9 @@ const cloudflareTargets = read('docs/deployment/CLOUDFLARE_WORKER_TARGETS.md');
 const ci = read('.github/workflows/ci.yml');
 const documentationWorkflow = read('.github/workflows/documentation-truth.yml');
 const documentationVerifier = read('scripts/verify-documentation-truth.mjs');
+const documentationReceipt = JSON.parse(read('docs/DOCUMENTATION_TRUTH_RECEIPT.json')) as {
+  changes: Array<{ path: string; claims: string[] }>;
+};
 
 const FORBIDDEN_REPOSITORY_WIDE_STALE_CLAIMS = [
   'Status: `CLASSIFICATION_ONLY_NO_GENERATION_NO_PROVIDER_CALLS`',
@@ -139,6 +142,20 @@ describe('repository documentation truth control', () => {
     expect(documentationVerifier).toContain('meaningfulInvariant(claim, sourcePath)');
     expect(documentationVerifier).toContain('meaningful path-bound invariant');
     expect(documentationVerifier).toContain('founder-content-outcome-contract');
+  });
+
+  it('keeps FCR deployment-rule migration truth aligned with the provider source', () => {
+    const providerEntry = documentationReceipt.changes.find(
+      (change) => change.path === 'src/providers/GitHubProvider.ts',
+    );
+    const providerClaims = providerEntry?.claims.join(' ') ?? '';
+
+    expect(documentationVerifier).toContain('ownsLegacyRequiredDeployments');
+    expect(documentationVerifier).toContain('receiptDescribesRequiredDeploymentRemoval');
+    expect(providerClaims).toMatch(/required_deployments/);
+    expect(providerClaims).toMatch(/intentionally remove/i);
+    expect(providerClaims).toMatch(/exact-current-main\/post-merge/i);
+    expect(providerClaims).not.toMatch(/preserve[^.]{0,120}required[-_ ]deployment/i);
   });
 
   it('keeps documentation analytics observation-only', () => {
