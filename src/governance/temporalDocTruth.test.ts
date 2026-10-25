@@ -147,11 +147,17 @@ describe('repository documentation truth control', () => {
     expect(documentationVerifier).toContain('founder-content-outcome-contract');
   });
 
-  it('rejects contradictory required-deployment preservation claims in the executable guard', () => {
-    const claims = [
+  it('rejects contradictory required-deployment semantics across the executable receipt guard', () => {
+    const fullValidClaim = 'src/providers/GitHubProvider.ts must snapshot an existing FCR review ruleset before two-membrane reconciliation, preserve required-linear-history, code-quality, and Copilot-review rules with their parameters unchanged, intentionally remove legacy pre-merge required_deployments because production release authority is exact-current-main/post-merge, reject unknown unowned rule types before provider mutation, and independently read back the preserved rules after update; bypass repair must never weaken unrelated live security controls.';
+
+    const claimFixtures = [
       {
         expected: true,
-        value: 'src/providers/GitHubProvider.ts must snapshot an existing FCR review ruleset before two-membrane reconciliation, preserve required-linear-history, code-quality, and Copilot-review rules with their parameters unchanged, intentionally remove legacy pre-merge required_deployments because production release authority is exact-current-main/post-merge, reject unknown unowned rule types before provider mutation, and independently read back the preserved rules after update; bypass repair must never weaken unrelated live security controls.',
+        value: fullValidClaim,
+      },
+      {
+        expected: true,
+        value: 'src/providers/GitHubProvider.ts must intentionally remove legacy required_deployments and preserve required_linear_history unchanged during reconciliation.',
       },
       {
         expected: false,
@@ -167,10 +173,45 @@ describe('repository documentation truth control', () => {
       },
     ];
 
-    for (const fixture of claims) {
+    for (const fixture of claimFixtures) {
       const source = [
         `import { claimAffirmativelyRemovesRequiredDeployments } from ${JSON.stringify(deploymentGuardPath)};`,
         `process.stdout.write(JSON.stringify(claimAffirmativelyRemovesRequiredDeployments(${JSON.stringify(fixture.value)})));`,
+      ].join('\n');
+      const observed = JSON.parse(execFileSync(process.execPath, ['--input-type=module', '--eval', source], {
+        encoding: 'utf8',
+      })) as boolean;
+      expect(observed).toBe(fixture.expected);
+    }
+
+    const receiptFixtures = [
+      {
+        expected: true,
+        claims: [
+          fullValidClaim,
+          'GitHubProvider must preserve unrelated code-quality and linear-history controls.',
+        ],
+      },
+      {
+        expected: false,
+        claims: [
+          fullValidClaim,
+          'GitHubProvider.ts must preserve required_deployments unchanged during reconciliation.',
+        ],
+      },
+      {
+        expected: false,
+        claims: [
+          fullValidClaim,
+          'GitHubProvider.ts records required_deployments provider state without stating its disposition.',
+        ],
+      },
+    ];
+
+    for (const fixture of receiptFixtures) {
+      const source = [
+        `import { receiptClaimsDescribeRequiredDeploymentRemoval } from ${JSON.stringify(deploymentGuardPath)};`,
+        `process.stdout.write(JSON.stringify(receiptClaimsDescribeRequiredDeploymentRemoval(${JSON.stringify(fixture.claims)})));`,
       ].join('\n');
       const observed = JSON.parse(execFileSync(process.execPath, ['--input-type=module', '--eval', source], {
         encoding: 'utf8',

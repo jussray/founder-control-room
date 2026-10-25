@@ -349,7 +349,7 @@
     {
       "path": "scripts/documentation-truth-required-deployment-guard.mjs",
       "claims": [
-        "`scripts/documentation-truth-required-deployment-guard.mjs` must accept only affirmative removal or migration-debt claims tied to `required_deployments`, reject preserve/retain/keep/remain/unchanged semantics and negated removal, and remain the shared executable predicate used by Documentation Truth."
+        "`scripts/documentation-truth-required-deployment-guard.mjs` must classify every provider-receipt claim mentioning `required_deployments`, require at least one relationship-bound affirmative removal or migration-debt claim, reject preservation or negated-removal semantics specifically bound to `required_deployments`, reject contradictory or ambiguous deployment-rule claims anywhere in the provider entry, and allow preservation of unrelated controls such as `required_linear_history`."
       ]
     }
   ]
