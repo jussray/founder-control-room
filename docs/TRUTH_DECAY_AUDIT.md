@@ -519,3 +519,10 @@ FCR exact-head Playwright on `ea09b7406eff2b85bde2ba1a4543e765e1f6d135` complete
 The successor StoryEngine head is strictly forward of the predecessor pin and has exact-head green evidence from `L99 Story Engine CI`, `Guardrails Playwright`, `L99 Promotion Gates`, `Agent Contract v1`, and `Control Room Test Ledger`. Source comparison shows the federation contract remains `juss-v10/product-build-directive@v1` / `juss-v10/product-build-receipt@v1`; the relevant change strengthens runtime identity by preferring provider-native deployment SHA in production and failing closed when production cannot prove an exact runtime head.
 
 Rebinding `.github/workflows/playwright.yml` to `a6e6a396ed30535af2fd9b1ec2347a84e1a3fbf3` selects the successor federation evidence subject only. All predecessor FCR-to-StoryEngine browser/federation green is historical. The successor FCR head remains `UNKNOWN` for current federation until the complete live-ref equality check, immutable peer checkout, runtime identity binding, directive/receipt loop, replay protections, and Playwright witness succeed against this exact peer. No founder approval, merge, deploy, production, publication, billing, or provider-mutation authority transfers with the pin.
+
+## 2026-10-24 StoryEngine relay-proof peer refresh
+
+The StoryEngine peer used by FCR's browser federation witness advanced to independently re-observed `refs/heads/main@87501be2da31d12f421b0ed2da49df357fc9fcb1`. Updating `.github/workflows/playwright.yml` to that exact SHA invalidates all predecessor pair-specific federation evidence; the new pin is an evidence-subject selection, not current runtime proof.
+
+Current federation remains `UNKNOWN` until the exact successor FCR head completes the live-ref equality check, immutable peer checkout, StoryEngine runtime-identity verification, directive/receipt loop, replay-safety checks, and full Playwright browser witness against this SHA. No prior green, founder approval, merge, deployment, production, publication, billing, or provider-mutation authority transfers through the peer refresh.
+

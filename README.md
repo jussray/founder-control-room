@@ -494,3 +494,10 @@ Provider configuration, site wiring, observed clicks, and commercial outcomes re
 **Source Guard** adds read-only repository checks for the documented guard boundaries and the portfolio conversion-tracking data contract. See [Source Guard documentation](docs/SOURCE_GUARD.md), scripts/verify-sauce-source-guard.mjs, the Node regression tests, and the separate GitHub Actions workflow. Source Guard complements, but does not replace, [Documentation Truth](.github/workflows/documentation-truth.yml).
 
 **Truth boundary:** checked-in policy and tests are source evidence only. A passing workflow does **not** establish that public content was approved or published, that the collector receives real site traffic, or that live security/runtime controls operate correctly. No new deploy, merge, publication, provider-mutation or deletion authority is granted.
+
+## October 24 StoryEngine relay-proof peer refresh
+
+StoryEngine `refs/heads/main` was independently re-observed at `87501be2da31d12f421b0ed2da49df357fc9fcb1`, so FCR's Playwright federation witness now pins that exact peer identity. This pin movement expires every predecessor FCR↔StoryEngine browser/federation witness; it selects the successor evidence subject only.
+
+The successor FCR head must still pass the live-ref equality check, immutable StoryEngine checkout, exact peer runtime identity, directive/receipt binding, replay protections, and the complete Playwright browser witness before the pair may be called current. Pin alignment grants no merge, deploy, production, publication, billing, or provider-mutation authority.
+
