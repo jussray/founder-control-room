@@ -1,8 +1,10 @@
 # Founder Control Room
 
-## October 24, 2026 later StoryEngine peer refresh
+## October 24, 2026 authenticated founder dock + StoryEngine peer renewal
 
-FCR exact-head Playwright run `40150972527` on review-email candidate `a2bd1b73718f5d0cd4cdc1206bd130491e1686cb` passed the real GitHub Workspace / guarded-terminal browser journey and the local E2E harness, then correctly failed only at the live StoryEngine peer-ref equality gate because the workflow still expected `3c46b3649088ac4c6e1775102ba49abf5c779abf` while a fresh GitHub read resolves `jussray/StoryEngine refs/heads/main` to `87501be2da31d12f421b0ed2da49df357fc9fcb1`. StoryEngine exact head `87501be2da31d12f421b0ed2da49df357fc9fcb1` has 16/16 completed-success check runs, including the Control Room federation contract, runtime promotion gates, Node tests, CodeQL, Cloudflare Workers build, Supabase Preview, and Anthropic live smoke. This refresh selects the successor StoryEngine evidence subject only. It does not carry predecessor FCR federation green forward or grant merge, deploy, provider-mutation, publication, or production authority; the successor FCR head must rerun the complete peer checkout, runtime, receipt, and browser witness.
+The public FCR entrance remains available without a session, while the internal `/control-room/` founder navigation dock starts `hidden` with `aria-hidden="true"` and becomes visible only after the existing authenticated `#root .shell` renders. Session/shell loss closes and hides the dock again. This is a UI privacy safeguard only; server-side authorization remains independently required.
+
+A fresh GitHub observation resolves StoryEngine `refs/heads/main` to `87501be2da31d12f421b0ed2da49df357fc9fcb1`, two commits strictly ahead and zero behind the prior FCR pin `3c46b3649088ac4c6e1775102ba49abf5c779abf`. All 16 observed exact-head checks completed successfully. Updating the peer selects the next federation evidence subject only. The successor FCR head must rerun live-ref equality, immutable checkout, runtime identity, directive/receipt, replay, and browser proof before federation is current. No merge, deploy, provider-mutation, publication, or production authority transfers with the pin.
 
 ## October 24, 2026 StoryEngine model-capability peer refresh
 

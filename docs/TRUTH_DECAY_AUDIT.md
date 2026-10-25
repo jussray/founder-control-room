@@ -1,8 +1,10 @@
 # Truth Decay Audit: When a True Claim Becomes Unsafe to Reuse
 
-## October 24, 2026: later StoryEngine movement expired the refreshed FCR peer proof
+## October 24, 2026: founder-dock privacy boundary and StoryEngine peer movement
 
-FCR exact-head Playwright run `40150972527` on `a2bd1b73718f5d0cd4cdc1206bd130491e1686cb` completed the real FCR GitHub Workspace / guarded-terminal journey and the local E2E harness successfully, then failed the separate StoryEngine live-ref equality step. The workflow expected `3c46b3649088ac4c6e1775102ba49abf5c779abf`, while fresh GitHub provider observation resolves StoryEngine `refs/heads/main` to `87501be2da31d12f421b0ed2da49df357fc9fcb1`. The successor StoryEngine head currently has 16 completed-success checks across source, federation, runtime-promotion, security, Supabase Preview, Cloudflare build, and Anthropic live-smoke lanes. The mismatch is therefore verified peer identity drift, not evidence that the FCR-to-StoryEngine federation behavior failed. Updating the pin selects a new evidence subject only; predecessor browser green and founder approval do not transfer, and the successor FCR head must complete its own immutable peer checkout, runtime, receipt, and browser witness before federation can return to current.
+The signed-out Control Room previously left founder-stack navigation present in the DOM as a visible dock. The repair makes first paint fail closed and derives dock visibility from the authenticated `#root .shell`; losing that shell closes and hides the dock again. Structural fixtures may synthesize the authenticated shell only after proving the signed-out state, while the opaque HttpOnly-cookie browser path remains the authority for real session behavior. UI hiding does not replace server authorization and does not prove production privacy until the exact successor browser witness passes.
+
+During rollover, StoryEngine `main` advanced to `87501be2da31d12f421b0ed2da49df357fc9fcb1`, which is two commits strictly ahead and zero behind the prior current-main FCR pin `3c46b3649088ac4c6e1775102ba49abf5c779abf`. Sixteen observed exact-head checks completed successfully. Rebinding selects a new evidence subject and expires predecessor FCR federation proof; the successor FCR head remains UNKNOWN for pair compatibility until the complete exact-head federation/browser witness succeeds.
 
 ## October 24, 2026: StoryEngine capability-profile commit expired FCR peer proof
 
