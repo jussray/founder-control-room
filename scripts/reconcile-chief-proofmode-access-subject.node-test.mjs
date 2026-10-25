@@ -4,6 +4,7 @@ import test from 'node:test';
 import {
   createChiefAccessSubjectFingerprint,
   ensureChiefProofModeAccessPolicy,
+  observeChiefAccessSubject,
 } from './reconcile-chief-proofmode-access.mjs';
 
 const TARGET = 'https://624e00c7-chief-ai.mcgill-raylene.workers.dev';
@@ -104,4 +105,31 @@ test('different provider identities cannot share a reconciliation subject finger
   assert.notEqual(appChanged, expectedSubject);
   assert.notEqual(tokenChanged, expectedSubject);
   assert.notEqual(appChanged, tokenChanged);
+});
+
+
+test('read-only subject observation distinguishes configured from merely resolvable identity', async () => {
+  const configured = await observeChiefAccessSubject({
+    fetchImpl: fixture({
+      policies: [{
+        id: 'policy-a',
+        decision: 'non_identity',
+        include: [{ service_token: { token_id: TOKEN_ID } }],
+      }],
+    }),
+    accountId: 'account-1',
+    apiToken: 'read-token',
+    targetUrl: TARGET,
+    serviceClientId: CLIENT_ID,
+  });
+  assert.deepEqual(configured, { subjectFingerprint: expectedSubject, configured: true });
+
+  const missingPolicy = await observeChiefAccessSubject({
+    fetchImpl: fixture(),
+    accountId: 'account-1',
+    apiToken: 'read-token',
+    targetUrl: TARGET,
+    serviceClientId: CLIENT_ID,
+  });
+  assert.deepEqual(missingPolicy, { subjectFingerprint: expectedSubject, configured: false });
 });
