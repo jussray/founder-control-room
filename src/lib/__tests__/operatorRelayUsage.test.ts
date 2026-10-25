@@ -25,7 +25,7 @@ function relay(): OperatorRelayRequestV1 {
     authority: { externalWrite: false, merge: false, deploy: false, publish: false, providerMutation: false },
     sensitivity: 'internal',
     createdAt: '2026-10-06T18:00:00.000Z',
-    expiresAt: '2099-10-06T18:10:00.000Z',
+    expiresAt: '2026-10-06T18:10:00.000Z',
   };
   return { ...base, requestHash: operatorRelayRequestHash(base) };
 }
