@@ -271,7 +271,7 @@ describe('external relay provider-call receipts', () => {
         evidenceRefs: ['local:policy:block'],
       },
     }));
-    const recordEvidence = vi.fn(async () => receipt('fcr_relay_operator'));
+    const recordEvidence = vi.fn(async (_input: unknown) => receipt('fcr_relay_operator'));
     const execute = externalTools.createExternalMcpToolExecutor({
       env: { FCR_REMOTE_MCP_OPERATOR_CLIENT_MAP: JSON.stringify({ 'chatgpt-client': 'codex' }) },
       relayOperator,
@@ -300,7 +300,7 @@ describe('external relay provider-call receipts', () => {
     const relayOperator = vi.fn(async () => {
       throw new OperatorRelayProviderBoundaryError('anthropic', marker);
     });
-    const recordEvidence = vi.fn(async () => receipt('fcr_relay_operator'));
+    const recordEvidence = vi.fn(async (_input: unknown) => receipt('fcr_relay_operator'));
     const execute = externalTools.createExternalMcpToolExecutor({
       env: { FCR_REMOTE_MCP_OPERATOR_CLIENT_MAP: JSON.stringify({ 'chatgpt-client': 'codex' }) },
       relayOperator,
@@ -334,7 +334,7 @@ describe('external relay provider-call receipts', () => {
     const relayOperator = vi.fn(async () => {
       throw new Error(marker);
     });
-    const recordEvidence = vi.fn(async () => receipt('fcr_relay_operator'));
+    const recordEvidence = vi.fn(async (_input: unknown) => receipt('fcr_relay_operator'));
     const execute = externalTools.createExternalMcpToolExecutor({
       env: { FCR_REMOTE_MCP_OPERATOR_CLIENT_MAP: JSON.stringify({ 'chatgpt-client': 'codex' }) },
       relayOperator,
