@@ -267,6 +267,10 @@ The same workflow also contains a privileged post-Deploy production witness. Tha
 
 That registration does not mean durable evidence persistence exists. The current Evidence Trust Plane slice defines receipt, validity, and action-ceiling contracts only; `ledgerState` is supplied state until a separately reviewed persistence writer/store exists. Current receipt use must also re-evaluate expiration and bind merge-review preparation to GitHub API evidence for an exact repository, full SHA, workflow, and run identity. Rejected or non-GitHub evidence cannot be relabeled as merge-review-ready merely because readback completed.
 
+### External-surface-authority registration
+
+The public Lovable surface bindings are now explicitly part of Documentation Truth. Changes to `public/.well-known/lovable-project-surfaces.json` or `public/.well-known/lovable-project-surfaces.schema.json` are truth-sensitive under the `external-surface-authority` domain because the manifest is a public provider and authority contract: external systems resolve Founder Control Room and Chief bindings from it, so silent drift would let a stale or authority-granting binding present as current truth. Before this registration the gate was green on heads that changed those files precisely because the verifier could not see them; a green that cannot see the change it claims to cover is a false green, and the registration exists to close that hole. The binding's authority fields remain locked to `false` by the published schema, and the schema only accepts canonical 8-4-4-4-12 UUID surface identifiers, so registration governs descriptive accuracy without opening any execution or mutation authority.
+
 ### Release-coverage at-use gate
 
 A signed rollout-coverage receipt is still sender-supplied observation. For a `passed` coverage claim, Founder Control Room must re-read current repository `main` and independently read a fresh production deployment witness from the Cloudflare provider-observation lane. The witness must be tied to a processed provider event and must not reuse `project_events`, where the receipt itself is stored.
