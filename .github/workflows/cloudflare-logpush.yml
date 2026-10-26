@@ -72,7 +72,9 @@ jobs:
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
-          test "$(git rev-parse origin/main)" = "$EXPECTED_HEAD_SHA"
+          live_main="$(git ls-remote origin refs/heads/main | awk '{print $1}')"
+          test -n "$live_main"
+          test "$live_main" = "$EXPECTED_HEAD_SHA"
           if [[ "$MODE" == apply ]]; then
             [[ "$APPROVAL_REFERENCE" =~ ^[A-Za-z0-9._:-]{8,200}$ ]]
           else
