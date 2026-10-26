@@ -1,5 +1,9 @@
 # Truth Decay Audit: When a True Claim Becomes Unsafe to Reuse
 
+## October 26, 2026: new media byte check is isolated, not a trusted asset pipeline
+
+An additive FSE helper computes SHA-256 directly over bounded streamed asset bytes and checks basic PNG/JPEG/WebP/MP4 byte markers, but does not authenticate the stream's origin, successfully decode the media, prove human identity or copyright permission, or inspect safety/accuracy. It cannot convert earlier user-declared license hashes or visual-verdict JSON into trusted provider evidence. It is not connected to production Media Router/Buffer and has no permission to create drafts or publish. A verified hash or familiar file signature alone must not be relabeled `MEDIA_VERIFIED` or `READY_TO_PUBLISH`.
+
 ## October 26, 2026: live public GitHub commit existence, not claim verification
 
 The new authenticated MCP `verify_founder_signal_public_source` makes fixed-host read-only public GitHub API requests and confirms one public repository identity and the exact SHA/permalink of one Git commit. Response state `VERIFIED_PUBLIC_GITHUB_COMMIT` does not prove whether the commit is currently `main`, merged, deployed, safe, used or accompanied by rendered media or business outcomes. HTTP errors, unavailable API, rate limits, private repos and stale/mismatched commits fail closed as `HOLD_UNVERIFIED`. Observed source existence is time-scoped and is **not an approval or permission** for Buffer/HubSpot/social provider writes. A later producer must reverify the relevant evidence and authority at execution time.
