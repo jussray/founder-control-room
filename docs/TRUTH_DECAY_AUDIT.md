@@ -1,5 +1,13 @@
 # Truth Decay Audit: When a True Claim Becomes Unsafe to Reuse
 
+## October 26, 2026: Founder Signal Engine campaign planner is not a published social campaign
+
+The new `plan_founder_signal_campaign` MCP tool produces founder-review **editorial proposals** from caller-supplied public GitHub identifiers and brief content. Its output is `USER_SUPPLIED_UNVERIFIED`; neither a source link nor a 40-character SHA independently confirms repository visibility, product behavior, audience response, or publication. Documented founder voice and editorial rules are not live social-history readback. A content continuity fingerprint is not a tracking cookie or permission to contact anyone.
+
+Prepared media is `NOT_RENDERED`: an image/video direction, storyboard, alt-text note, tag list or generated preview cannot stand in for a rights-cleared, source-matched rendered asset that has passed the existing `visual-wonder-contract.cjs` proof and quality checks. Brand/reputation heuristics reduce risk but cannot certify that a public post is harmless or commercially effective. The source planner grants no Buffer, scheduling, sending, publication, HubSpot, credential or AI invocation authority.
+
+Any later planned → rendered → approved → Buffer draft → provider-observed → HubSpot/FCR-recorded → measured promotion must retain the existing distinct provider, runtime, exact payload/approval, privacy and temporal evidence gates. Outcomes and partner/customer impact remain UNKNOWN until independently observed and reconciled. Source edits alone do not activate a workflow.
+
 ## October 24, 2026: founder-dock privacy boundary and StoryEngine peer movement
 
 The signed-out Control Room previously left founder-stack navigation present in the DOM as a visible dock. The repair makes first paint fail closed and derives dock visibility from the authenticated `#root .shell`; losing that shell closes and hides the dock again. Structural fixtures may synthesize the authenticated shell only after proving the signed-out state, while the opaque HttpOnly-cookie browser path remains the authority for real session behavior. UI hiding does not replace server authorization and does not prove production privacy until the exact successor browser witness passes.
