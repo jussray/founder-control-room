@@ -12,6 +12,8 @@ A bounded media-byte SHA-256/signature checker is available as a source-level he
 
 A separate version-bound media-reader **interface** now ties the canonical FCR asset registry to local SHA-256 byte checking and requires a promoted, same-project asset with asserted rights/authority. It is exercised only with injected mock readers, not real storage; no actual image or video is downloaded, processed in production, uploaded, or published. The result never approves Buffer drafts.
 
+The FSE local FFmpeg receipt-readback bridge now reads actual MP4 bytes beneath a server-trusted output directory and matches their SHA-256/container markers with the existing local renderer receipt. It is exercised by file-integrity negative tests and the existing conditional real-FFmpeg render integration test; it does **not** establish media licensing, visual safety, remote storage, social account connectivity, founder approval, or live publishing. No R2 bucket was present in the connected Cloudflare account at audit time; Supabase project visibility remained unverified.
+
 This source change must not be described as a working Zapier → Buffer → HubSpot integration or a safe-to-publish marketing campaign. Live GitHub visibility, original/licensed media, current founder approval, native Buffer Drafts readback, HubSpot and FCR evidence, and authentic 24h/48h outcomes remain separate proof gates. The original Buffer mode stays draft-only. See [MCP Native Media + Reputation Contract](docs/founder-signal-engine/media-reputation-mcp-v1.md) and `npm run verify:fse-campaign`. No merge or deployment authority is implied.
 
 ## October 24, 2026 authenticated founder dock + StoryEngine peer renewal
