@@ -145,6 +145,21 @@ describe('Founder Signal Engine standing-policy write gate', () => {
     expect(writePolicyAudit).not.toHaveBeenCalled();
   });
 
+  it('bypasses write authority for the named media handoff preview only', async () => {
+    const grantLookup=vi.fn(async () => { throw new Error('grant must not be read'); });
+    const audit=vi.fn(async () => { throw new Error('write audit must not occur'); });
+    const response=await request(buildApp({loadGrant:grantLookup,writePolicyAudit:audit}))
+      .post('/mcp').send({
+        jsonrpc:'2.0',id:9,method:'tools/call',
+        params:{name:'review_founder_signal_draft_handoff',
+          arguments:{requestedAction:'publish_or_send',allowHubSpotWrite:true}},
+      });
+    expect(response.status).toBe(200);
+    expect(response.body.authorization).toBeNull();
+    expect(grantLookup).not.toHaveBeenCalled();
+    expect(audit).not.toHaveBeenCalled();
+  });
+
   it('blocks caller-supplied approval-looking text before loading the standing grant', async () => {
     const loadGrant = vi.fn(async () => grant);
     const response = await request(buildApp({ loadGrant })).post('/mcp').send(
