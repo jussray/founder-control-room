@@ -91,6 +91,7 @@ export async function verifyFounderSignalPublicSource(raw: unknown, deps: Public
     contract: FSE_PUBLIC_SOURCE_CONTRACT,
     status: 'VERIFIED_PUBLIC_GITHUB_COMMIT' as const,
     evidenceClass: 'LIVE_PUBLIC_GITHUB_READBACK' as const,
+    reason: null,
     repository,
     commitSha: sha,
     proofUrl: expectedProof,
