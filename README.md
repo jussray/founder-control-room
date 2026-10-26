@@ -1,5 +1,9 @@
 # Founder Control Room
 
+## October 26, 2026 checkout hostname integration candidate
+
+Cloudflare provider readback showed `checkout.foundercontrolroom.org` as an active Pages custom domain with a proxied CNAME to `founder-control-room.pages.dev`. Draft PR #1032 extends the canonical FCR Worker browser-origin allowlist only to `https://checkout.foundercontrolroom.org`, preserving `https://foundercontrolroom.org` and the existing founder-auth callback base. `wrangler.worker.toml` is unmerged candidate source, not deployed Worker state. The hostname does not establish a checkout page, Stripe Checkout Session, verified payment, or Supabase Auth redirect configuration; commerce implementation, exact-head checks, founder-final merge approval, deployment, and independent runtime proof remain separate gates.
+
 ## October 24, 2026 authenticated founder dock + StoryEngine peer renewal
 
 The public FCR entrance remains available without a session, while the internal `/control-room/` founder navigation dock starts `hidden` with `aria-hidden="true"` and becomes visible only after the existing authenticated `#root .shell` renders. Session/shell loss closes and hides the dock again. This is a UI privacy safeguard only; server-side authorization remains independently required.
