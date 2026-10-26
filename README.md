@@ -8,6 +8,8 @@ The same authenticated MCP now also exposes `review_founder_signal_draft_handoff
 
 The source-verification tool `verify_founder_signal_public_source` now independently reads the **public** GitHub repository and exact commit via fixed, bounded GET requests. Unlike the editorial/media handoff, it checks actual repository and commit existence, but **not** whether a feature deployed, whether media is genuine, whether a post was delivered or whether any business outcome occurred. It is read-only and non-authorizing. A missing or private source, API error, or identity mismatch stays HOLD.
 
+A bounded media-byte SHA-256/signature checker is available as a source-level helper for a future authenticated asset reader. It is not a real media-provider connection: it cannot prove image/video licensing, full file integrity, authenticity of the supplied storage stream, brand/reputation suitability, or publication eligibility. It is not wired to the live MCP/Buffer handoff and grants no draft or upload capability.
+
 This source change must not be described as a working Zapier → Buffer → HubSpot integration or a safe-to-publish marketing campaign. Live GitHub visibility, original/licensed media, current founder approval, native Buffer Drafts readback, HubSpot and FCR evidence, and authentic 24h/48h outcomes remain separate proof gates. The original Buffer mode stays draft-only. See [MCP Native Media + Reputation Contract](docs/founder-signal-engine/media-reputation-mcp-v1.md) and `npm run verify:fse-campaign`. No merge or deployment authority is implied.
 
 ## October 24, 2026 authenticated founder dock + StoryEngine peer renewal
