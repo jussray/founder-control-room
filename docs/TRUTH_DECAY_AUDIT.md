@@ -1,5 +1,9 @@
 # Truth Decay Audit: When a True Claim Becomes Unsafe to Reuse
 
+## October 26, 2026: live public GitHub commit existence, not claim verification
+
+The new authenticated MCP `verify_founder_signal_public_source` makes fixed-host read-only public GitHub API requests and confirms one public repository identity and the exact SHA/permalink of one Git commit. Response state `VERIFIED_PUBLIC_GITHUB_COMMIT` does not prove whether the commit is currently `main`, merged, deployed, safe, used or accompanied by rendered media or business outcomes. HTTP errors, unavailable API, rate limits, private repos and stale/mismatched commits fail closed as `HOLD_UNVERIFIED`. Observed source existence is time-scoped and is **not an approval or permission** for Buffer/HubSpot/social provider writes. A later producer must reverify the relevant evidence and authority at execution time.
+
 ## October 26, 2026: local media handoff is not authenticated asset proof
 
 The additive `review_founder_signal_draft_handoff` MCP preview uses the existing first-party social publisher's **draft-mode structural validation**. Source URL, render SHA, image/video rights receipt, alternate text, media verdict and account labels remain self-attested until independent authenticated provider/asset checks occur. No draft is actually stored, no media is uploaded, no Buffer action executes, and a user-created verdict JSON cannot grant release approval. Even `LOCAL_DRAFT_SHAPE_VALID__PROVIDER_UNVERIFIED` means only a locally consistent copy/media proposal. If any source, account, rights, finished caption or asset changes after review, prior fingerprints and approval checks require renewal.
