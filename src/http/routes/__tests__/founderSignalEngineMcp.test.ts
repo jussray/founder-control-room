@@ -128,7 +128,7 @@ describe('Founder Signal Engine remote MCP', () => {
     expect(response.body.error.message).toBe('Unauthorized');
   });
 
-  it('supports initialize and exposes exactly one scoped mutating tool', async () => {
+  it('supports initialize, a scoped invocation tool and one read-only campaign planner', async () => {
     const app = buildApp();
     const initialized = await request(app)
       .post(ENDPOINT)
@@ -142,7 +142,11 @@ describe('Founder Signal Engine remote MCP', () => {
     expect(initialized.status).toBe(200);
     expect(initialized.body.result.protocolVersion).toBe('2025-06-18');
     expect(listed.status).toBe(200);
-    expect(listed.body.result.tools).toHaveLength(1);
+    expect(listed.body.result.tools).toHaveLength(2);
+    expect(listed.body.result.tools[1]).toMatchObject({
+      name: 'plan_founder_signal_campaign',
+      annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
+    });
     expect(listed.body.result.tools[0]).toMatchObject({
       name: 'invoke_founder_signal_engine',
       annotations: {
@@ -157,6 +161,50 @@ describe('Founder Signal Engine remote MCP', () => {
       type: 'object',
       additionalProperties: false,
     });
+  });
+
+  it('plans native image/video and hashtag packages through the MCP with no provider writes', async () => {
+    const fetchFn = mockFetch(async () => { throw new Error('unexpected provider call'); });
+    const resolveProjectId = vi.fn(async () => { throw new Error('unexpected database read'); });
+    const writeAuditEvent = vi.fn(async () => { throw new Error('unexpected database write'); });
+    const app=buildApp({fetchFn,resolveProjectId,writeAuditEvent});
+    const campaign={
+      source:{repository:'jussray/founder-control-room',commitSha:'a'.repeat(40),
+        proofUrl:'https://github.com/jussray/founder-control-room/commit/' + 'a'.repeat(40),visibility:'public'},
+      strategy:{intent:'proof-update',audience:'Developers reviewing ethical tooling',
+        observation:'The strongest update is the one people can actually verify.',
+        fact:'The project added a source-bound draft checking module.',
+        audienceValue:'Builders can inspect what happened without trusting marketing language.',
+        truthBoundary:'No live Buffer delivery or audience impact is proved by this code.',
+        callToAction:'What would you want to inspect next?',thesis:'Make proof accessible'},
+      topics:['BuildInPublic','DevTools','ResponsibleAI','ProductDesign','Learning'],
+      platforms:['linkedin','instagram','youtube'],
+    };
+    const response=await request(app).post(ENDPOINT)
+      .set('Authorization', `Bearer ${TOKEN}`)
+      .send(rpc('tools/call',{name:'plan_founder_signal_campaign',arguments:campaign}));
+    expect(response.status).toBe(200);
+    expect(response.body.result.structuredContent.contract).toBe('fcr/founder-signal-campaign@v1');
+    expect(response.body.result.structuredContent.variants).toHaveLength(3);
+    expect(response.body.result.structuredContent.variants[1].media.state).toBe('NOT_RENDERED');
+    expect(response.body.result.structuredContent.authority.canPublish).toBe(false);
+    expect(fetchFn).not.toHaveBeenCalled();
+    expect(resolveProjectId).not.toHaveBeenCalled();
+    expect(writeAuditEvent).not.toHaveBeenCalled();
+  });
+
+  it('rejects unsafe MCP campaign facts before any provider interaction', async () => {
+    const fetchFn=mockFetch(async () => { throw new Error('unexpected provider call'); });
+    const response=await request(buildApp({fetchFn})).post(ENDPOINT)
+      .set('Authorization', `Bearer ${TOKEN}`)
+      .send(rpc('tools/call',{name:'plan_founder_signal_campaign',arguments:{
+        source:{repository:'jussray/founder-control-room',commitSha:'a'.repeat(40),
+          proofUrl:'https://github.com/jussray/founder-control-room/commit/'+'a'.repeat(40),
+          visibility:'private'},strategy:{},platforms:['instagram'],topics:['Tech','Build','Trust'],
+      }}));
+    expect(response.status).toBe(400);
+    expect(response.body.error.message).toBe('Invalid campaign brief');
+    expect(fetchFn).not.toHaveBeenCalled();
   });
 
   it('blocks secret-like material and unexpected arguments before any provider call', async () => {
