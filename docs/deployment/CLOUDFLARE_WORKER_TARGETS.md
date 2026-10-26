@@ -74,10 +74,12 @@ The literal build command `0` is invalid. This repository intentionally uses `np
 name: founder-control-room
 route: api.foundercontrolroom.org
 FOUNDER_API_URL: https://foundercontrolroom.org
-FOUNDER_ALLOWED_ORIGINS: https://foundercontrolroom.org
+FOUNDER_ALLOWED_ORIGINS: https://foundercontrolroom.org,https://checkout.foundercontrolroom.org
 ```
 
 `FOUNDER_API_URL` points to the Pages origin intentionally. Supabase magic links return through Pages, Pages routes dynamic requests to the API Worker, and the Worker's relative `/control-room/` redirect lands back on the browser frontend.
+
+**Checkout hostname (source intent; not transaction proof):** Cloudflare DNS and Pages custom-domain readback on 2026-10-26 showed `checkout.foundercontrolroom.org` active on the `founder-control-room` Pages project, targeting `founder-control-room.pages.dev`. This candidate adds that exact browser origin to the canonical Worker CORS allowlist; it does not create a checkout page, payment session, or Stripe endpoint, and it does not change the Supabase hosted Auth redirect allowlist. Founder login callbacks remain bound to `https://foundercontrolroom.org/auth/callback`. If checkout later uses Supabase-hosted redirects, the app-specific project `oojzfmmywbvficgybaxd` needs a separately reviewed Auth > URL Configuration change with an exact callback URL rather than a broad wildcard. The Cloudflare domain registration, repository patch, Supabase provider config, merged/deployed Worker and functional checkout remain separate evidence planes.
 
 The canonical Worker owns the reconciliation cron because no duplicate HTTP Worker should exist.
 
