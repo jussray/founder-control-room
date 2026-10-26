@@ -154,6 +154,8 @@ See [`docs/REPOSITORY_FEDERATION.md`](docs/REPOSITORY_FEDERATION.md).
 
 ### Jira work automation
 
+The manual [Jira live provider probe](docs/JIRA_LIVE_PROVIDER_PROBE.md) binds its POST to the approved full runtime SHA in addition to the `/version` preflight. The authenticated ingress rejects missing, malformed, or mismatched probe bindings before provider dispatch, so a rollout between requests cannot turn a post-effect mismatch into false prevention. Ordinary authenticated Jira observations retain their existing contract. Dispatch receipts still require independent Jira readback before any end-to-end outcome claim.
+
 FCR owns the bounded Jira source contract, authenticated service ingress, and importable n8n workflow artifact. The artifact ships inactive and carries no Jira credential authority.
 
 Current truthful status is:

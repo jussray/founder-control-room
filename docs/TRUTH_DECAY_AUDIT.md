@@ -1,5 +1,9 @@
 # Truth Decay Audit: When a True Claim Becomes Unsafe to Reuse
 
+## Jira live-probe runtime binding at the mutation boundary
+
+A successful `/version` preflight is evidence about that GET request, not authority for a later POST. During a rollout the POST may reach a different runtime. The Jira live probe therefore transmits the approved full SHA in `X-FCR-Expected-Head-Sha` alongside its versioned probe header, and the authenticated ingress rejects invalid or mismatched bindings before invoking the dispatcher. Post-dispatch identity and canonical receipt validation remain separate checks; neither proves independent Jira outcome readback. The probe client, ingress, CLI, and manual workflow are registered as evidence-authority paths so changes require substantive documentation and path-bound truth receipts.
+
 ## October 24, 2026: founder-dock privacy boundary and StoryEngine peer movement
 
 The signed-out Control Room previously left founder-stack navigation present in the DOM as a visible dock. The repair makes first paint fail closed and derives dock visibility from the authenticated `#root .shell`; losing that shell closes and hides the dock again. Structural fixtures may synthesize the authenticated shell only after proving the signed-out state, while the opaque HttpOnly-cookie browser path remains the authority for real session behavior. UI hiding does not replace server authorization and does not prove production privacy until the exact successor browser witness passes.
