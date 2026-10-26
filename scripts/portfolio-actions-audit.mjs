@@ -18,11 +18,12 @@ function assess({ archived, workflowCount, runs, head, headCommittedAt, now, tru
   if (exact.some((r) => TERMINAL_FAILURES.has(r.conclusion))) return 'FAILED_EXACT_HEAD';
   if (exact.some((r) => r.status !== 'completed')) return 'PENDING_EXACT_HEAD';
   if (exact.some((r) => r.conclusion === 'cancelled')) return 'CANCELLED_EXACT_HEAD';
-  if (exact.length === 0) return 'NO_EXACT_HEAD_ACTION_EVIDENCE';
   if (truncated) return 'INCOMPLETE_EXACT_HEAD_COVERAGE';
+  if (exact.length === 0) return 'NO_EXACT_HEAD_ACTION_EVIDENCE';
   if (exact.some((r) => !['success', 'skipped', 'neutral'].includes(r.conclusion))) {
     return 'UNKNOWN_ACTION_CONCLUSION';
   }
+  if (!exact.some((r) => r.conclusion === 'success')) return 'NO_SUCCESSFUL_EXACT_HEAD_RUN';
   const age = (now - Date.parse(headCommittedAt || '')) / 86_400_000;
   if (!Number.isFinite(age) || age < 0) return 'UNKNOWN_FRESHNESS';
   if (age > STALE_DAYS) return 'STALE_SOURCE_30D';
@@ -42,7 +43,13 @@ function selfTest() {
   assert.equal(assess({ ...base, runs: [{ head_sha: base.head, status: 'in_progress', conclusion: null }] }), 'PENDING_EXACT_HEAD');
   assert.equal(assess({ ...base, runs: [{ head_sha: base.head, status: 'completed', conclusion: 'success' }],
     headCommittedAt: new Date(base.now - 31 * 86_400_000).toISOString() }), 'STALE_SOURCE_30D');
-  console.log('Portfolio classification regression: 10 assertions passed; this does NOT verify any external repository');
+  assert.equal(assess({ ...base, truncated: true }), 'INCOMPLETE_EXACT_HEAD_COVERAGE');
+  assert.equal(assess({ ...base, runs: [{ head_sha: base.head, status: 'completed', conclusion: 'skipped' }] }), 'NO_SUCCESSFUL_EXACT_HEAD_RUN');
+  assert.equal(assess({ ...base, runs: [{ head_sha: base.head, status: 'completed', conclusion: 'neutral' }] }), 'NO_SUCCESSFUL_EXACT_HEAD_RUN');
+  assert.equal(assess({ ...base, runs: [{ head_sha: base.head, status: 'completed', conclusion: 'weird' }] }), 'UNKNOWN_ACTION_CONCLUSION');
+  assert.equal(assess({ ...base, runs: [{ head_sha: base.head, status: 'completed', conclusion: 'success' }], headCommittedAt: '' }), 'UNKNOWN_FRESHNESS');
+  assert.equal(assess({ ...base, runs: [{ head_sha: 'b'.repeat(40), status: 'completed', conclusion: 'failure' }] }), 'NO_EXACT_HEAD_ACTION_EVIDENCE');
+  console.log('Portfolio classification regression: 16 assertions passed; this does NOT verify any external repository');
 }
 
 async function main() {
@@ -95,7 +102,7 @@ async function main() {
         repository,
         visibility: r.private ? 'private' : 'public',
         archived: Boolean(r.archived),
-        defaultBranch: r.default_branch || null,
+        defaultBranch: r.private ? null : (r.default_branch || null),
         head: null,
         workflowCount: null,
         sampledExactHeadRuns: 0,
@@ -111,22 +118,29 @@ async function main() {
         if (!/^[-\w.]+\/[-\w.]+$/.test(fullName)) throw new Error('INVALID_REPO_NAME');
         const key = fullName.split('/').map(encodeURIComponent).join('/');
         const branch = String(r.default_branch || 'main');
-        const [headResponse, workflowResponse, actionResponse] = await Promise.all([
+        const [headResponse, workflowResponse] = await Promise.all([
           api('/repos/' + key + '/branches/' + encodeURIComponent(branch)),
-          api('/repos/' + key + '/actions/workflows?per_page=1'),
-          api('/repos/' + key + '/actions/runs?per_page=' + MAX_HEAD_RUNS + '&branch=' + encodeURIComponent(branch))
+          api('/repos/' + key + '/actions/workflows?per_page=1')
         ]);
         const head = headResponse.commit?.sha;
+        const validHead = typeof head === 'string' && /^[a-f0-9]{40}$/.test(head) ? head : null;
         const headCommittedAt = headResponse.commit?.commit?.committer?.date || null;
-        result.head = typeof head === 'string' && /^[a-f0-9]{40}$/.test(head) ? head : null;
+        // Query exact-head runs rather than sampling unrelated branch activity.
+        const actionResponse = validHead
+          ? await api('/repos/' + key + '/actions/runs?per_page=' + MAX_HEAD_RUNS +
+            '&branch=' + encodeURIComponent(branch) + '&head_sha=' + encodeURIComponent(validHead))
+          : { workflow_runs: [], total_count: 0 };
+        result.head = r.private ? null : validHead;
         result.workflowCount = Number.isInteger(workflowResponse.total_count) ? workflowResponse.total_count : null;
-        const runs = Array.isArray(actionResponse.workflow_runs) ? actionResponse.workflow_runs : [];
+        if (!Array.isArray(actionResponse.workflow_runs)) throw new Error('INVALID_ACTION_RUN_LIST');
+        const runs = actionResponse.workflow_runs;
         const matching = runs.filter((run) => run.head_sha === head);
         result.sampledExactHeadRuns = matching.length;
         result.sampledFailures = matching.filter((run) => TERMINAL_FAILURES.has(run.conclusion)).length;
         result.state = assess({ archived: r.archived, workflowCount: result.workflowCount,
-          runs, head: result.head, headCommittedAt, now,
-          truncated: Number(actionResponse.total_count || 0) > MAX_HEAD_RUNS });
+          runs, head: validHead, headCommittedAt, now,
+          truncated: !Number.isInteger(actionResponse.total_count) ||
+            actionResponse.total_count > runs.length });
       } catch (error) {
         result.state = 'UNKNOWN_READ_BLOCKED';
         result.blocker = error instanceof Error && /^GITHUB_READ_STATUS_\d+$/.test(error.message)
@@ -166,10 +180,10 @@ async function main() {
     productionVerified: false,
     limitations: [
       'Accessible installation repositories can be fewer than the authenticated user portfolio',
-      'Latest 100 branch workflow runs are sampled and may omit older exact-head runs',
+      'Only the first 100 exact-head runs are inspected; missing pagination or counts is incomplete',
       'Freshness is based on the default-branch head commit date, not other branch pushes',
       'Passing checks are NOT proof of successful deployed actions',
-      'Private repository names are per-run pseudonyms, not published names'
+      'Private names use per-run pseudonyms; private branch names and head SHAs are omitted'
     ]
   };
   document.evidenceFingerprint = hash(document);
