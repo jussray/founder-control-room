@@ -1,5 +1,9 @@
 # Truth Decay Audit: When a True Claim Becomes Unsafe to Reuse
 
+## October 26, 2026: local media handoff is not authenticated asset proof
+
+The additive `review_founder_signal_draft_handoff` MCP preview uses the existing first-party social publisher's **draft-mode structural validation**. Source URL, render SHA, image/video rights receipt, alternate text, media verdict and account labels remain self-attested until independent authenticated provider/asset checks occur. No draft is actually stored, no media is uploaded, no Buffer action executes, and a user-created verdict JSON cannot grant release approval. Even `LOCAL_DRAFT_SHAPE_VALID__PROVIDER_UNVERIFIED` means only a locally consistent copy/media proposal. If any source, account, rights, finished caption or asset changes after review, prior fingerprints and approval checks require renewal.
+
 ## October 26, 2026: Founder Signal Engine campaign planner is not a published social campaign
 
 The new `plan_founder_signal_campaign` MCP tool produces founder-review **editorial proposals** from caller-supplied public GitHub identifiers and brief content. Its output is `USER_SUPPLIED_UNVERIFIED`; neither a source link nor a 40-character SHA independently confirms repository visibility, product behavior, audience response, or publication. Documented founder voice and editorial rules are not live social-history readback. A content continuity fingerprint is not a tracking cookie or permission to contact anyone.
