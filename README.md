@@ -2,6 +2,14 @@
 
 Documentation Truth and test discovery resolve a pull request's live target branch at verification time, fetch its exact commit, and require it to be an ancestor of the checked-out candidate before evaluating the change. The event's stored base SHA remains historical context. Push verification instead uses the exact push-before SHA; missing, malformed, unavailable, or non-ancestor bases block proof. Passing these source checks grants no merge or deployment authority.
 
+## October 26, 2026 Cloudflare Logpush control plane
+
+`config/cloudflare-logpush.portfolio.json` is the source-only desired-state registry for portfolio Logpush participation. It declares one account-scoped `workers_trace_events` job and the authorized repository set; it does not prove that a Cloudflare Logpush job currently exists or that any destination has received logs.
+
+Pull-request validation is non-mutating. Provider inspection uses a dedicated read credential. Provider apply remains a separate founder-gated action bound to the exact current `main` SHA, an auditable approval reference, a dedicated write credential, and provider-held destination configuration. A successful apply must complete provider readback before the receipt may claim the desired job is verified.
+
+Destination credentials and destination configuration stay outside source control. Depending on the selected destination, its network policy may also require Cloudflare Logpush source-IP allowlisting or a separately configured dedicated Logpush egress IP. Those provider/network facts require their own observation and are not established by repository CI.
+
 ## October 24, 2026 authenticated founder dock + StoryEngine peer renewal
 
 The public FCR entrance remains available without a session, while the internal `/control-room/` founder navigation dock starts `hidden` with `aria-hidden="true"` and becomes visible only after the existing authenticated `#root .shell` renders. Session/shell loss closes and hides the dock again. This is a UI privacy safeguard only; server-side authorization remains independently required.
