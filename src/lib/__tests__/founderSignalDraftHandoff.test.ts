@@ -68,6 +68,11 @@ describe('Founder Signal read-only draft handoff preview', () => {
     expect(x.accountOwnershipVerified).toBe(false);
   });
 
+  it('cannot override a known native safe limit with a caller-supplied larger limit', () => {
+    expect(() => reviewFounderSignalDraftHandoff(proposal({platformCharacterLimit:5000})))
+      .toThrow(/cannot override the platform hard safe limit/);
+  });
+
   it('holds an unrendered image/video plan and excludes draft envelope', () => {
     const x=reviewFounderSignalDraftHandoff(proposal({media:[]}));
     expect(x.status).toBe('HOLD');
