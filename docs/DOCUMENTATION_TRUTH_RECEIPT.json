@@ -366,7 +366,8 @@
       "claims": [
         "`docs/founder-signal-engine/media-reputation-mcp-v1.md` must separate source proposal, approved rendered media, exact founder review, Buffer draft-only native readback, HubSpot/FCR receipts, and provider-native outcome evidence; no planning output can promote itself to live publication or business growth.",
         "The media handoff documented in `docs/founder-signal-engine/media-reputation-mcp-v1.md` is only a self-attested source, licensed-media and draft-shape review; actual bytes, legal rights, live accounts, founder approval, Buffer-native draft and business outcomes must be independently proven.",
-        "`docs/founder-signal-engine/media-reputation-mcp-v1.md` must state public GitHub commit readback is time-bounded and independently verified for existence only, not proof of source claim, rendered/licensed media, account permission, Buffer draft, business impact, merge or deployment."
+        "`docs/founder-signal-engine/media-reputation-mcp-v1.md` must state public GitHub commit readback is time-bounded and independently verified for existence only, not proof of source claim, rendered/licensed media, account permission, Buffer draft, business impact, merge or deployment.",
+        "`docs/founder-signal-engine/media-reputation-mcp-v1.md` must distinguish local byte-integrity matching from separately authenticated media storage, origin, decoder, licensing and visual inspection; no media validation grants draft/publish authority."
       ]
     },
     {
@@ -379,6 +380,12 @@
       "path": "src/lib/founderSignalPublicSourceCheck.ts",
       "claims": [
         "`src/lib/founderSignalPublicSourceCheck.ts` must verify exact owned public GitHub repository visibility and immutable commit SHA/permalink using bounded GET-only GitHub API reads, never trust caller-supplied public/source proofs, and always distinguish exact commit existence from deployed features, outcomes, visual media and release authority."
+      ]
+    },
+    {
+      "path": "src/lib/founderSignalMediaByteCheck.ts",
+      "claims": [
+        "`src/lib/founderSignalMediaByteCheck.ts` implements only a bounded offline stream hash/PNG-JPEG-WebP-MP4 signature check, not trusted source identity, full media decoding, copyrights/usage rights, content-safety verification, founder approval, Buffer/provider actions, production Media Router wiring or permission to publish."
       ]
     }
   ]
