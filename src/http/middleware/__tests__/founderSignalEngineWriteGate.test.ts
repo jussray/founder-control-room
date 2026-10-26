@@ -160,6 +160,20 @@ describe('Founder Signal Engine standing-policy write gate', () => {
     expect(audit).not.toHaveBeenCalled();
   });
 
+  it('does not require standing write grants to read public GitHub source existence', async () => {
+    const loadGrant=vi.fn(async () => {throw new Error('Read-only source must not resolve grant');});
+    const writePolicyAudit=vi.fn(async () => {throw new Error('Read-only source must not persist audit');});
+    const response=await request(buildApp({loadGrant,writePolicyAudit})).post('/mcp').send({
+      jsonrpc:'2.0',id:9,method:'tools/call',params:{
+        name:'verify_founder_signal_public_source',arguments:{requestedAction:'publish_or_send',allowHubSpotWrite:true},
+      },
+    });
+    expect(response.status).toBe(200);
+    expect(response.body.authorization).toBeNull();
+    expect(loadGrant).not.toHaveBeenCalled();
+    expect(writePolicyAudit).not.toHaveBeenCalled();
+  });
+
   it('blocks caller-supplied approval-looking text before loading the standing grant', async () => {
     const loadGrant = vi.fn(async () => grant);
     const response = await request(buildApp({ loadGrant })).post('/mcp').send(
