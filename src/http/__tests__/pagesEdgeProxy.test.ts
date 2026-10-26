@@ -72,7 +72,16 @@ describe('Cloudflare Pages edge proxy', () => {
 
   it('serves the public work page from Pages when the edge redirect strips the extension', async () => {
     const handler = await loadHandler();
-    const assetFetch = vi.fn(async (_request: Request) => new Response('work page', { status: 200 }));
+    // Model the real Pages asset layer: the /work.html filename is not
+    // served; it canonicalizes to /work with a 308. Only the canonical
+    // extensionless URL returns the page. A mock that answers 200 for the
+    // filename hides the production /work -> /work redirect loop.
+    const assetFetch = vi.fn(async (request: Request) => {
+      if (new URL(request.url).pathname === '/work.html') {
+        return new Response(null, { status: 308, headers: { Location: '/work' } });
+      }
+      return new Response('work page', { status: 200 });
+    });
     const fcrApiFetch = vi.fn(async (_request: Request) => new Response(null, { status: 500 }));
 
     const response = await handler.fetch(
@@ -86,12 +95,17 @@ describe('Cloudflare Pages edge proxy', () => {
     expect(fcrApiFetch).not.toHaveBeenCalled();
     const requested = assetFetch.mock.calls[0]?.[0];
     expect(requested).toBeInstanceOf(Request);
-    expect(new URL(requested?.url).pathname).toBe('/work.html');
+    expect(new URL(requested?.url).pathname).toBe('/work');
   });
 
   it('serves the public work page with trailing slash and preserves query strings', async () => {
     const handler = await loadHandler();
-    const assetFetch = vi.fn(async (_request: Request) => new Response('work page', { status: 200 }));
+    const assetFetch = vi.fn(async (request: Request) => {
+      if (new URL(request.url).pathname === '/work.html') {
+        return new Response(null, { status: 308, headers: { Location: '/work' } });
+      }
+      return new Response('work page', { status: 200 });
+    });
     const fcrApiFetch = vi.fn(async (_request: Request) => new Response(null, { status: 500 }));
 
     const response = await handler.fetch(
@@ -103,7 +117,7 @@ describe('Cloudflare Pages edge proxy', () => {
     expect(fcrApiFetch).not.toHaveBeenCalled();
     const requested = assetFetch.mock.calls[0]?.[0];
     const url = new URL(requested?.url);
-    expect(url.pathname).toBe('/work.html');
+    expect(url.pathname).toBe('/work');
     expect(url.search).toBe('?ref=homepage');
   });
 
