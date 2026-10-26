@@ -1,5 +1,13 @@
 # Cloudflare Reasoning Contract
 
+## Logpush portfolio authority
+
+Founder Control Room owns the source contract for the portfolio Logpush desired state in `config/cloudflare-logpush.portfolio.json`. The first bounded dataset is account-scoped `workers_trace_events`; product repositories participate without receiving FCR Cloudflare write credentials.
+
+The Logpush workflow must keep pull-request execution read-only. Manual inspection may observe matching provider jobs with a dedicated read token, but inspection without access to the destination secret cannot claim full destination verification. Manual apply requires exact-current-main binding, a founder approval reference, a separate write token, destination configuration, and post-write provider readback.
+
+Repository source, workflow success, or a configured secret name cannot establish that Logpush is enabled in Cloudflare or that logs reached storage/SIEM. Provider job readback and destination-side receipt are separate evidence scopes. Destination networking may require Cloudflare Logpush IP allowlisting or dedicated egress; that remains destination-specific provider configuration.
+
 The Control Room treats Cloudflare as a replaceable execution and evidence provider, not as the owner of project truth or founder authority.
 
 The command-shaped contract is:
