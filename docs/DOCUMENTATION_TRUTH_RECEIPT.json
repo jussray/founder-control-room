@@ -13,6 +13,18 @@
   ],
   "changes": [
     {
+      "path": "config/cloudflare-logpush.portfolio.json",
+      "claims": [
+        "`config/cloudflare-logpush.portfolio.json` must remain the source-only desired-state registry for the account-scoped `workers_trace_events` Logpush job; pull-request verification cannot mutate Cloudflare or prove delivery, and provider apply requires exact-current-main binding, a founder approval reference, a dedicated write credential, destination configuration, and post-write readback."
+      ]
+    },
+    {
+      "path": ".github/workflows/cloudflare-logpush.yml",
+      "claims": [
+        "`.github/workflows/cloudflare-logpush.yml` must keep pull-request checks non-mutating and must require exact-current-main binding plus an auditable founder approval reference before any provider apply; workflow green cannot substitute for provider readback or destination-side delivery evidence."
+      ]
+    },
+    {
       "path": ".github/workflows/worker-reconcile.yml",
       "claims": [
         "`.github/workflows/worker-reconcile.yml` must compare Cloudflare's canonical Worker secret-name enumeration against the complete `wrangler.worker.toml [secrets].required` registry (excluding only its subsequently forced-disabled Founder Signal grant) inside the exact-main authority gate, before any `wrangler secret put` or Worker deployment. Unavailable provider enumeration or missing names must fail closed without exposing secret values or acquiring merge/deploy authority.",
