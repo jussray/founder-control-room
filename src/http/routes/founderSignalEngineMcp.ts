@@ -1,5 +1,6 @@
 import { timingSafeEqual } from 'node:crypto';
 import { FOUNDER_SIGNAL_CAMPAIGN_TOOL, planFounderSignalCampaign } from '../../lib/founderSignalCampaignPlanner.js';
+import { FSE_HANDOFF_TOOL, reviewFounderSignalDraftHandoff } from '../../lib/founderSignalDraftHandoff.js';
 import type { Request, RequestHandler, Response as ExpressResponse } from 'express';
 import { supabase } from '../../lib/supabaseClient.js';
 
@@ -620,6 +621,60 @@ function campaignToolDefinition(): DbRecord {
   };
 }
 
+function handoffToolDefinition(): DbRecord {
+  return {
+    name: FSE_HANDOFF_TOOL,
+    title: 'Review Founder Signal Draft Handoff (Read-Only)',
+    description: 'Reconstruct one platform campaign from the original brief; inspect caller-attested media/rights metadata and validate the exact draft shape against the existing first-party post contract. This tool cannot authenticate evidence, store drafts, render media, call providers or grant release authority.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['campaign', 'platform', 'accountId'],
+      properties: {
+        campaign: campaignToolDefinition().inputSchema,
+        platform: { type: 'string', enum: [
+          'linkedin', 'facebook', 'instagram', 'threads', 'x', 'tiktok',
+          'youtube', 'pinterest', 'bluesky', 'mastodon', 'google_business',
+        ] },
+        accountId: { type: 'string', minLength: 3, maxLength: 120 },
+        platformCharacterLimit: { type: 'integer', minimum: 1, maximum: 5000 },
+        media: {
+          type: 'array', maxItems: 4,
+          items: {
+            type: 'object', additionalProperties: false,
+            required: ['type', 'url', 'sha256', 'altText', 'rights', 'visualVerdict'],
+            properties: {
+              type: { type: 'string', enum: ['image', 'video'] },
+              url: { type: 'string', format: 'uri' },
+              sha256: { type: 'string', pattern: '^[a-fA-F0-9]{64}$' },
+              altText: { type: 'string', minLength: 15, maxLength: 280 },
+              rights: {
+                type: 'object', additionalProperties: false,
+                required: ['basis', 'receiptUrl', 'permissionGranted'],
+                properties: {
+                  basis: { type: 'string', enum: ['original', 'licensed', 'owner-provided'] },
+                  receiptUrl: { type: 'string', format: 'uri' },
+                  permissionGranted: { type: 'boolean' },
+                },
+              },
+              visualVerdict: {
+                type: 'object', additionalProperties: false,
+                required: ['contract', 'state', 'artifactSha256'],
+                properties: {
+                  contract: { type: 'string', enum: ['juss/visual-wonder-artifact-verdict'] },
+                  state: { type: 'string', enum: ['PASSED'] },
+                  artifactSha256: { type: 'string', pattern: '^[a-fA-F0-9]{64}$' },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  };
+}
+
 function toolDefinition(): DbRecord {
   return {
     name: TOOL_NAME,
@@ -1199,7 +1254,7 @@ export function createFounderSignalEngineMcpHandler(
       return;
     }
     if (body.method === 'tools/list') {
-      res.json(rpcResult(id, { tools: [toolDefinition(), campaignToolDefinition()] }));
+      res.json(rpcResult(id, { tools: [toolDefinition(), campaignToolDefinition(), handoffToolDefinition()] }));
       return;
     }
     if (body.method !== 'tools/call') {
@@ -1208,6 +1263,22 @@ export function createFounderSignalEngineMcpHandler(
     }
 
     const params = isRecord(body.params) ? body.params : null;
+    if (params?.name === FSE_HANDOFF_TOOL) {
+      try {
+        const result = reviewFounderSignalDraftHandoff(params.arguments);
+        res.json(rpcResult(id, {
+          content: [{ type: 'text', text: 'Offline shape review only. No media bytes or licensing checked; no draft created, approved or published.' }],
+          structuredContent: result,
+          isError: false,
+        }));
+      } catch (error) {
+        res.status(400).json(rpcError(id, -32602, 'Invalid draft handoff proposal', [
+          error instanceof Error ? error.message : 'Input validation failed',
+        ]));
+      }
+      return;
+    }
+
     if (params?.name === FOUNDER_SIGNAL_CAMPAIGN_TOOL) {
       try {
         const kit = planFounderSignalCampaign(params.arguments);
