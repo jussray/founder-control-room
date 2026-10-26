@@ -305,13 +305,29 @@ export default {
       return relaySyncControl(request, env);
     }
 
-    // The edge redirect rule sends /work.html -> /work, and /work is a public
-    // page, not an API route. Serve the static asset directly: falling through
-    // to the API proxy answers without the service identity header and yields
-    // a 503 degraded page for a link on the public homepage.
+    // The Pages asset layer canonicalizes /work.html -> /work with a 308,
+    // and /work is a public page, not an API route. Ask ASSETS for the
+    // canonical /work URL itself: fetching the /work.html filename returns
+    // the asset layer's 308 back to /work, and returning it verbatim loops
+    // /work -> /work forever. Falling through to the API proxy instead
+    // answers without the service identity header and yields a 503 degraded
+    // page for a link on the public homepage.
     if (requestUrl.pathname === '/work' || requestUrl.pathname === '/work/') {
       const assetUrl = new URL(request.url);
-      assetUrl.pathname = '/work.html';
+      assetUrl.pathname = '/work';
+      return env.ASSETS.fetch(new Request(assetUrl, request));
+    }
+
+    // /welcome is a public page, not an API route, but no static rule above
+    // classifies the extensionless path, so it falls through to the API
+    // proxy; the answer carries no service identity header and yields a 503
+    // degraded page. Ask ASSETS for the canonical /welcome URL itself: the
+    // Pages asset layer canonicalizes /welcome.html -> /welcome with a 308,
+    // so fetching the /welcome.html filename would return that redirect
+    // instead of the page.
+    if (requestUrl.pathname === '/welcome' || requestUrl.pathname === '/welcome/') {
+      const assetUrl = new URL(request.url);
+      assetUrl.pathname = '/welcome';
       return env.ASSETS.fetch(new Request(assetUrl, request));
     }
 
