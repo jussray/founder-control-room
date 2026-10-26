@@ -41,6 +41,14 @@ A successful `VERIFIED_PUBLIC_GITHUB_COMMIT` is narrowly factual: public repo vi
 
 The service must not copy an arbitrary caller-supplied success JSON into later steps as trusted proof. Any subsequent authorized executor must independently repeat the authoritative source and completed-media checks at its own action boundary. This tool uses no GitHub credential and cannot access private repositories; the *MCP endpoint* retains its independent bearer authentication. No external accounts or posts are mutated.
 
+## Source-level media byte-integrity stage (not yet connected to trusted asset storage)
+
+`src/lib/founderSignalMediaByteCheck.ts` adds `checkFounderSignalMediaBytes`, a bounded, asynchronous-stream byte checker designed for **future use by a separately authenticated media storage reader**. It compares SHA-256 against the exact media bytes, checks basic file container signatures (PNG, JPEG, WebP, MP4), enforces hard image/video byte limits, and fails closed on mismatches or reader errors. Streaming avoids retaining entire large media blobs inside the planner. It does not fetch URLs, read the network, invoke a decoder, check license or rights, perform visual/reputation review, or create a draft.
+
+The successful output is intentionally `LOCAL_BYTES_HASH_AND_SIGNATURE_MATCH__UNTRUSTED_ORIGIN` and marks `sourceAuthenticated=false`, `decodedMediaValidated=false`, `contentReviewed=false`, `privacyAndRightsVerified=false`, `founderApprovalVerified=false`, and all provider/publication authorities false. A matching hash for malicious, manipulated, copyrighted or fake visual content is **not an acceptable release decision**. A media reader must be authenticated, bind storage asset ID to the expected SHA, perform a full media decode/inspection and separately prove asset provenance/rights and Visual Wonder verdict before passing the handoff to an authorized draft executor.
+
+**Status:** source-level byte-integrity helper and local tests only; not invoked from MCP, Media Router, Buffer or production. No actual user media has been inspected. See `npm run verify:fse-campaign`.
+
 ## Target end-to-end path (already-governed stages, not newly activated)
 
 ```
