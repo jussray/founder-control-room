@@ -1,4 +1,4 @@
-const REQUIRED_DEPLOYMENT = /required[- ]deploy(?:ment|ments)?/gi;
+const REQUIRED_DEPLOYMENT = /required[- ]deploy(?:ments|ment)?\b/gi;
 const OPERATION = /\b(preserv(?:e|es|ed|ing)|retain(?:s|ed|ing)?|keep(?:s|ing)?|kept|remove(?:s|d|ing)?|drop(?:s|ped|ping)?|delete(?:s|d|ing)?)\b/gi;
 const PRESERVATION_OPERATION = /^(?:preserv|retain|keep|kept)/i;
 const REMOVAL_OPERATION = /^(?:remove|drop|delete)/i;
