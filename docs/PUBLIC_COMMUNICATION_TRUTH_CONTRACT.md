@@ -2,6 +2,14 @@
 
 This contract applies before publishing, scheduling, sending, announcing, promoting, pitching, or otherwise presenting ecosystem work to the public, partners, customers, investors, collaborators, or internal stakeholders who may reasonably treat the communication as an execution claim.
 
+## Read-only Founder Signal Engine campaign proposal boundary (October 26, 2026)
+
+The authenticated `plan_founder_signal_campaign` MCP tool is an advisory text-and-media-direction proposal maker inside the existing Founder Signal Engine. Its 5W1H, founder-voice guidance, platform-native proposed copy, optional hashtags, and image/video/storyboard directions are **not** evidence that a real post was prepared in Buffer, that the media was generated or legally usable, that a social account was contacted, or that a customer, partner or audience result occurred. The input is caller-supplied and the output must remain `USER_SUPPLIED_UNVERIFIED`.
+
+Before any operator may convert this proposal to an actual Buffer or first-party lifecycle draft, a separate authorized executor must independently re-read exact public source/visibility, current platform/account capabilities, the finalized full text and account recipient, image/video license and rendered SHA, Visual Wonder artifact verdict, contextual privacy/reputation risk, latest approved founder copy/asset hash and runtime authority. For publication or schedule, obtain the exact Current You approval required by the canonical route. A review-only brief or continuity fingerprint cannot authorize provider writes. The Buffer milestone is still **draft-only**, with no automatic queue, share-now, scheduling or publication path.
+
+The founder's documented writing style is not an independently fetched record of recent posts; measured reach, inbound inquiries, customer conversions or partner interest require account-native evidence, compatible time windows and reconciliation. No lexical reputation filter can promise risk-free posts or guarantee external results. Preserve human approval, privacy, age-appropriate boundaries, correction mechanisms, and a clear hold when confidence or proof is insufficient. See `docs/founder-signal-engine/media-reputation-mcp-v1.md`.
+
 ## Required posting loop
 
 ```text
