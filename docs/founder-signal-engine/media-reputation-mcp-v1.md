@@ -33,6 +33,14 @@ Even when all local checks pass, the result is \`LOCAL_DRAFT_SHAPE_VALID__PROVID
 
 **No image or video has been generated, read back or independently inspected by this connector. No local draft, Buffer draft, HubSpot record or publication has been created by this tool.** Later provider execution requires a separately reviewed adapter with actual permission and exact-payload Current You approval.
 
+## Implemented source-evidence step: bounded live public GitHub readback
+
+The authenticated Founder Signal MCP endpoint exposes **`verify_founder_signal_public_source`**. The tool performs read-only GitHub public API GET requests to fixed `api.github.com` paths for `jussray/<repository>`. It accepts an exact source SHA and the matching canonical `https://github.com/jussray/<repository>/commit/<sha>` link. It requires the repository metadata to identify the same **public** repository, then reads the exact commit and checks the returned SHA and canonical permalink. Nonpublic/missing repos, mismatches, malformed responses, HTTP errors and rate limits return `HOLD_UNVERIFIED`, never an inferred success.
+
+A successful `VERIFIED_PUBLIC_GITHUB_COMMIT` is narrowly factual: public repo visibility and immutable commit existence were observed *at that time*. It is not a cryptographically signed authorization; it does not prove the actual product claim, source branch head, PR merge, CI, deploy, runtime behavior, user traction, account ownership, media license, social publication or partner/customer activity. It grants no local draft, Buffer draft, HubSpot mutation, sending, schedule, spending, merge or publication authority.
+
+The service must not copy an arbitrary caller-supplied success JSON into later steps as trusted proof. Any subsequent authorized executor must independently repeat the authoritative source and completed-media checks at its own action boundary. This tool uses no GitHub credential and cannot access private repositories; the *MCP endpoint* retains its independent bearer authentication. No external accounts or posts are mutated.
+
 ## Target end-to-end path (already-governed stages, not newly activated)
 
 ```
