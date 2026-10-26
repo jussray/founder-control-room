@@ -1,5 +1,9 @@
 # Truth Decay Audit: When a True Claim Becomes Unsafe to Reuse
 
+## October 26, 2026: local FFmpeg output byte readback is not live media distribution
+
+`inspectFounderSignalLocalFfmpegRender` binds a locally accessible FFmpeg output path (confined to a trusted server-owned directory) and renderer receipt digest/byte count to actual MP4 file bytes, with path and race safeguards. The result is only `LOCAL_FFMPEG_RECEIPT_BYTE_MATCH__NOT_RELEASE_PROOF`; synthetic MP4 tests prove byte matching, and the conditional FFmpeg integration test exercises a real rendered file where the binaries are available. Neither result authenticates renderer receipt provenance, image rights, playable decoder output, visual truth, publication approval, or a social provider. Cloudflare R2 listed zero buckets and Supabase project discovery failed in the audit, so no live media storage provider can be claimed or invented. No storage or Buffer publication mutation took place.
+
 ## October 26, 2026: authenticated reader interface does not mean real media verified
 
 The additive FSE media reader boundary validates caller-independent server principal/project/registry metadata only when supplied by a **future trusted and audited implementation**. In the current PR it is dependency-injected with synthetic tests and is **not connected to a production storage provider**. Byte hashes and registry claims are distinct from full decode, copyright permission, identity consent, reputational safety, verified brand provenance, publication or business impact. No CHECK status can be treated as send, draft, upload or publish authority. Provider account readbacks and exact Current You approval remain unknown.
