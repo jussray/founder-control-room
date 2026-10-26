@@ -1,5 +1,11 @@
 # Founder Control Room
 
+## October 26, 2026: Founder Signal Engine review-only native media campaign MCP
+
+The existing authenticated `/mcp/founder-signal-engine` now has an additive **`plan_founder_signal_campaign`** advisory tool alongside `invoke_founder_signal_engine`. It accepts bounded, public-source and editorial input and prepares platform-specific copy, relevant hashtags, image/video or carousel production directions, truth/reputation flags, 5W1H and non-secret continuity markers. It reuses FCR's existing content-lane registry and points to the Visual Wonder rendered-artifact gate rather than creating a second media authority. No image/video is rendered, no actual recent social posts are fetched, no provider calls are made, and nothing is published or scheduled by this tool. Current evidence is `USER_SUPPLIED_UNVERIFIED`, even if the returned draft looks polished.
+
+This source change must not be described as a working Zapier → Buffer → HubSpot integration or a safe-to-publish marketing campaign. Live GitHub visibility, original/licensed media, current founder approval, native Buffer Drafts readback, HubSpot and FCR evidence, and authentic 24h/48h outcomes remain separate proof gates. The original Buffer mode stays draft-only. See [MCP Native Media + Reputation Contract](docs/founder-signal-engine/media-reputation-mcp-v1.md) and `npm run verify:fse-campaign`. No merge or deployment authority is implied.
+
 ## October 24, 2026 authenticated founder dock + StoryEngine peer renewal
 
 The public FCR entrance remains available without a session, while the internal `/control-room/` founder navigation dock starts `hidden` with `aria-hidden="true"` and becomes visible only after the existing authenticated `#root .shell` renders. Session/shell loss closes and hides the dock again. This is a UI privacy safeguard only; server-side authorization remains independently required.
