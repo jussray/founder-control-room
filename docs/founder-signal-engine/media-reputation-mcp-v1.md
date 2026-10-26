@@ -57,6 +57,14 @@ The maximum result `LOCAL_AUTHORIZED_READER_BYTE_MATCH__NOT_RELEASE_PROOF` means
 
 **Crucial:** this feature adds an interface and mocked contract tests; **no real Supabase/Cloudflare/Buffer media-storage reader is installed, called or deployed**. Runtime integration must use a server-bound principal, immutable asset version, actual storage-provider readback, a full decoder/safety examination and rights verification, existing Visual Wonder and exact Current You approval before any draft-only provider action. No new MCP action or provider write route is created.
 
+## Existing local FFmpeg renderer → real output byte readback
+
+The additive `inspectFounderSignalLocalFfmpegRender` bridge in `src/lib/founderSignalLocalRenderInspection.ts` now accepts a **local-process FFmpeg render receipt** (`founder-control-room/ffmpeg-render@v1`) and a separately server-configured trusted render directory. It rejects out-of-root paths, file aliases/symlinks, incorrect receipt sizes, modified files, non-regular files, bad or missing receipts, and SHA/container mismatches. It opens a fixed local file descriptor, streams actual MP4 bytes through `checkFounderSignalMediaBytes`, and compares observed bytes/hash against the original renderer receipt. It holds if the file changes during reading.
+
+`src/lib/__tests__/mediaFfmpegRender.test.ts` has an additional **real ffmpeg-to-FSE readback assertion**, executed when ffmpeg/ffprobe are installed; `founderSignalLocalRenderInspection.test.ts` covers the adversarial file/path cases using synthetic MP4 signatures. The synthetic fixture is not a playable or licensed video. The result `LOCAL_FFMPEG_RECEIPT_BYTE_MATCH__NOT_RELEASE_PROOF` proves only local file bytes match the presented receipt, and does **not** authenticate the receipt issuer, license/original footage, decode content, visual/brand safety, user identity, Current You approval, or social account delivery.
+
+**Execution scope:** LOCAL_PROCESS only. No Cloudflare Worker filesystem or provider storage is connected. Cloudflare R2 bucket list returned zero buckets in this account during the October 26 read-only audit; Supabase project enumeration failed and its storage state remains UNKNOWN. No bucket, credential, service binding, media upload, Buffer draft or publication was created. The local readback is a step toward actual media verification, **not** an end-to-end live multimedia delivery claim.
+
 ## Target end-to-end path (already-governed stages, not newly activated)
 
 ```
