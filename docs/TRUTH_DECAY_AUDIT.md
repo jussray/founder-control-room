@@ -1,5 +1,9 @@
 # Truth Decay Audit: When a True Claim Becomes Unsafe to Reuse
 
+## October 26, 2026: authenticated reader interface does not mean real media verified
+
+The additive FSE media reader boundary validates caller-independent server principal/project/registry metadata only when supplied by a **future trusted and audited implementation**. In the current PR it is dependency-injected with synthetic tests and is **not connected to a production storage provider**. Byte hashes and registry claims are distinct from full decode, copyright permission, identity consent, reputational safety, verified brand provenance, publication or business impact. No CHECK status can be treated as send, draft, upload or publish authority. Provider account readbacks and exact Current You approval remain unknown.
+
 ## October 26, 2026: new media byte check is isolated, not a trusted asset pipeline
 
 An additive FSE helper computes SHA-256 directly over bounded streamed asset bytes and checks basic PNG/JPEG/WebP/MP4 byte markers, but does not authenticate the stream's origin, successfully decode the media, prove human identity or copyright permission, or inspect safety/accuracy. It cannot convert earlier user-declared license hashes or visual-verdict JSON into trusted provider evidence. It is not connected to production Media Router/Buffer and has no permission to create drafts or publish. A verified hash or familiar file signature alone must not be relabeled `MEDIA_VERIFIED` or `READY_TO_PUBLISH`.
