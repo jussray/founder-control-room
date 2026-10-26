@@ -1,5 +1,16 @@
 # Founder Control Room
 
+## October 24, 2026 authenticated founder dock + StoryEngine peer renewal
+
+The public FCR entrance remains available without a session, while the internal `/control-room/` founder navigation dock starts `hidden` with `aria-hidden="true"` and becomes visible only after the existing authenticated `#root .shell` renders. Session/shell loss closes and hides the dock again. This is a UI privacy safeguard only; server-side authorization remains independently required.
+
+A fresh GitHub observation resolves StoryEngine `refs/heads/main` to `87501be2da31d12f421b0ed2da49df357fc9fcb1`, two commits strictly ahead and zero behind the prior FCR pin `3c46b3649088ac4c6e1775102ba49abf5c779abf`. All 16 observed exact-head checks completed successfully. Updating the peer selects the next federation evidence subject only. The successor FCR head must rerun live-ref equality, immutable checkout, runtime identity, directive/receipt, replay, and browser proof before federation is current. No merge, deploy, provider-mutation, publication, or production authority transfers with the pin.
+
+## October 24, 2026 StoryEngine model-capability peer refresh
+
+A fresh GitHub observation resolves StoryEngine `refs/heads/main` to `3c46b3649088ac4c6e1775102ba49abf5c779abf` after the additive `.control-room/model-capabilities.v1.json` profile commit. StoryEngine's exact successor head completed Agent Contract v1, CodeQL, L99 Promotion Gates, and Control Room Test Ledger successfully. FCR exact-head Playwright run `40071010317` passed the local E2E harness, then correctly failed its live peer-ref equality gate because it still expected `6b97b78370fbc25d4b4bb88bfeab136eb4c7dc2f`. This repair advances only the pinned evidence subject to `3c46b3649088ac4c6e1775102ba49abf5c779abf`; it does not activate any model runtime, inherit predecessor federation proof, or grant merge, deploy, provider-mutation, publication, or production authority. The successor FCR head must earn its own complete federation/browser witness.
+
+
 > **Copyright © 2024–2026 Juss Ray. All rights reserved.**
 > This is proprietary software. No license to use, copy, modify, distribute,
 > sublicense, or create derivative works is granted. See [LICENSE](LICENSE).
@@ -8,7 +19,13 @@ Founder Control Room is the provider-independent founder operating plane for gov
 
 GitHub, Cloudflare, Supabase, n8n, Zapier, HubSpot, Shopify, and other providers may supply execution or evidence. None of them becomes the product constitution.
 
+## October 23, 2026 StoryEngine peer refresh for FCR browser federation
+
+A fresh GitHub observation resolves StoryEngine `refs/heads/main` to `6b97b78370fbc25d4b4bb88bfeab136eb4c7dc2f`; the exact peer commit had 15 of 15 check runs successful, last completed at `2026-10-22T23:55:59Z`. FCR PR #1004 at head `607ec05be0bce5639bab36b75c3661a8af751be6` failed step 10, “Verify live StoryEngine peer ref still pinned,” because it still expected `26b1c34ae7c97c5d1b66a23d6345b3965cfcdc1f` ([failed job](https://github.com/jussray/founder-control-room/actions/runs/39875447018/job/120159809873)); the remaining peer-browser steps were skipped after the mismatch. The repair selects `6b97b78370fbc25d4b4bb88bfeab136eb4c7dc2f` as the next evidence subject. This pin does not prove PR #1004 federation or inherit PR #1003's separate exact-head witness; the full PR #1004 witness must pass for its own head. Any later movement of either repository expires pair-specific proof.
+
 ## October 22, 2026 ET: FCR PR #1005 StoryEngine evidence-subject refresh
+
+> **Historical PR #1005 evidence only.** This 2026-10-22 pin was superseded by later StoryEngine main movement. The current candidate workflow instead selects `499f2d4eb9edac8bb11b657cf003a056263528d9` as a new evidence subject; no earlier CI or production proof transfers.
 
 PR #1005's FCR Playwright check at `071e040759108318a7502c32eee1a4c88dda7d6b` correctly stopped because `STORYENGINE_PEER_SHA` named StoryEngine `main@26b1c34ae7c97c5d1b66a23d6345b3965cfcdc1f` while the independently observed current `refs/heads/main` resolved to `6b97b78370fbc25d4b4bb88bfeab136eb4c7dc2f`. The workflow now selects that exact successor peer (`11d8023c494b104171701f170879b205dbf480fb` is the FCR source commit which changed the pin). The StoryEngine federation route, directive/receipt library, federation test, and package manifest retain identical blob hashes across the two peer commits; the server's `/runtime-identity` handler remains present, but the server source itself changed and requires executed peer proof.
 
@@ -253,6 +270,8 @@ Public discovery artifacts such as `/robots.txt`, `/sitemap.xml`, `/llms.txt`, a
 
 Source dependence on that topology is not proof the live provider is configured correctly.
 
+The dedicated review-email Worker uses the same truth separation. `wrangler.email.toml` declares the `founder-control-room-review-email` Worker identity, source entrypoint, Cloudflare account, private `FOUNDER_CONTROL_ROOM_API -> founder-control-room` Service Binding, and the single Wrangler-managed desired route `review@foundercontrolroom.org`. Wrangler 4.113+ may reconcile that literal Worker Email Routing rule during deploy, but source verification or deploy success is not provider readback and cannot by itself set `email_trigger_reconciled=true` or prove that an inbound email invoked the Worker. Cloudflare route readback, the zone-level subaddressing setting required for `review+<context-uuid>@...`, and real runtime email evidence remain separate receipts. If the dedicated Worker does not exist yet, the reconciliation lane first bootstraps the Worker from a temporary config with `addresses` removed, proves the private Service Binding, records `provider_secret_bootstrap`, and stops before any Email Routing rule can move mail.
+
 `public-web-observation-v1` is an FCR-owned, provider-neutral product contract. FCR's governed research hub resolves a bounded read-only adapter at runtime, and adapter identity remains evidence rather than product authority. The capability itself requires no provider-specific runtime secret; provider configuration, adapter availability, source truth, and downstream outcomes remain separate proof planes.
 
 `OPENAI_API_KEY` follows the same split authority. The canonical Worker registry requires the provider-held runtime binding because live FCR OpenAI paths consume it. GitHub Actions may separately hold the same logical credential for CI-only consumers such as the bounded AI Failure Repair workflow, but the Actions copy is not runtime proof and must not be copied into the Worker during deploy. `Runtime Secret Proof` derives its complete required-name set from `wrangler.worker.toml`, asks Cloudflare only for secret names, fingerprints that registry, and never reads or prints secret values. If the Cloudflare observation credential is malformed or unusable before enumeration, every unobserved runtime-secret presence claim remains `UNKNOWN`/`BLOCKED`, not missing.
@@ -471,3 +490,19 @@ Pin alignment alone cannot promote the successor federation state beyond `UNKNOW
 StoryEngine `main` advanced from the previously pinned `168d65ede38d2477ea00902fa1f0e76f292c583d` through `c9af4ea095561d0837a141e311e8977d796aaaa7` (`feat(video): expose StoryEngine MAKEVIDEO skill`) to independently observed `3c1689fe67142e783fe7d18b5ff610640bdc81d6` (`ci(video): prove StoryEngine MAKEVIDEO skill path`). FCR Playwright run #6969 on `897083276b6c775c49ce30be189a50bd610b5d4c` passed its local/direct browser harness but failed the separate live peer-ref freshness check, so that run is historical browser evidence for the predecessor peer rather than current federation proof.
 
 Rebinding `.github/workflows/playwright.yml` to `3c1689fe67142e783fe7d18b5ff610640bdc81d6` selects the successor evidence subject only. The successor FCR head must complete the live-ref check, immutable peer checkout, exact StoryEngine runtime identity, directive/receipt binding, replay protections, and full Playwright browser witness before federation may be called current. Pin alignment grants no merge, deploy, production, publication, billing, or provider-mutation authority.
+
+
+## Portfolio conversion tracking contract
+
+FCR carries a privacy-minimal portfolio conversion contract in [`docs/PORTFOLIO_CONVERSION_TRACKING.md`](docs/PORTFOLIO_CONVERSION_TRACKING.md). The first approved event set is `call_click`, `whatsapp_click`, `pickup_request`, and `directions_click`. The source contract forbids customer identity/device fields from the conversion table and keeps automatic deletion disabled unless the founder separately approves a retention policy.
+
+Provider configuration, site wiring, observed clicks, and commercial outcomes remain separate truth layers. The Cloudflare `jussco-conversions` Worker/D1 configuration is provider evidence only; it is not proof that a live portfolio site is sending events or that a sale occurred.
+
+
+## Sauce Guard + Source Guard — bounded source checks
+
+**Sauce Guard** is the existing founder-content protection workflow: evidence is reduced to a public-safe story, private implementation is withheld, claims receive temporal classification, and exact founder approval plus fresh provider readback remain separate requirements. Its governing source is [the Sauce Guard skill](.agents/skills/sauce-guard/SKILL.md); see [Sauce Guard documentation](docs/SAUCE_GUARD.md).
+
+**Source Guard** adds read-only repository checks for the documented guard boundaries and the portfolio conversion-tracking data contract. See [Source Guard documentation](docs/SOURCE_GUARD.md), scripts/verify-sauce-source-guard.mjs, the Node regression tests, and the separate GitHub Actions workflow. Source Guard complements, but does not replace, [Documentation Truth](.github/workflows/documentation-truth.yml).
+
+**Truth boundary:** checked-in policy and tests are source evidence only. A passing workflow does **not** establish that public content was approved or published, that the collector receives real site traffic, or that live security/runtime controls operate correctly. No new deploy, merge, publication, provider-mutation or deletion authority is granted.

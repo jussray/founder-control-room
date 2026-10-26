@@ -199,6 +199,14 @@ Cloudflare outbound email is a capability boundary, not a global portfolio trans
 
 Repository configuration can prove the desired binding name and sender restriction. It cannot prove Cloudflare has onboarded the sender domain, the deployed Worker currently exposes that binding, or a message was accepted/delivered. Those claims require fresh provider/runtime evidence and must remain separate from source truth.
 
+## Review-email inbound routing boundary
+
+`wrangler.email.toml` is source truth for the `founder-control-room-review-email` Worker identity, source entrypoint, Cloudflare account, public-route posture, private `FOUNDER_CONTROL_ROOM_API -> founder-control-room` Service Binding, and one bounded Email Routing desired-state declaration: `addresses = ["review@foundercontrolroom.org"]`. Cloudflare documents top-level `addresses` for Worker Email Routing on Wrangler 4.113+; the pinned review-email deploy uses Wrangler 4.129.0.
+
+A successful `wrangler deploy --config wrangler.email.toml` may reconcile that literal address-to-Worker rule, but deploy output is still not independent provider readback. The live Cloudflare rule, zone-level `support_subaddress` setting required for `review+<context-uuid>@...`, and an actual inbound-email invocation remain separate evidence planes. The lane also consumes Wrangler structured deploy telemetry: if Wrangler records a completed Worker deployment and then exits nonzero during a later reconciliation phase, the receipt must preserve `provider_deploy_succeeded=true` and a post-deploy blocked stage instead of falsely recording no production mutation. First deployment is two-phase: when the Worker is absent, the trusted reconciliation lane creates it from a temporary config with `addresses` removed and stops at `provider_secret_bootstrap`; only a later authorized canonical deploy may reconcile `review@` after required secrets exist.
+
+The reconciliation receipt therefore keeps `provider_deploy_succeeded`, `email_trigger_reconciled`, and `runtime_email_invocation_proven` independent. Worker/managed-route deployment must never promote provider readback or runtime invocation to green without their own evidence.
+
 ## Worker build authority membrane
 
 `wrangler.worker.toml` runs `scripts/verify-worker-build-authority.mjs` as its custom Worker build hook. The hook is a repository-side fail-closed membrane, not a provider mutation authority.
