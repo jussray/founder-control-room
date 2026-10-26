@@ -311,7 +311,7 @@ assert.equal(linkedinBaseline.policy?.one_off_virality_is_the_goal, false);
 
 const publicBindings = new Map([
   ['SUPABASE_URL', 'https://oojzfmmywbvficgybaxd.supabase.co'],
-  ['FOUNDER_ALLOWED_ORIGINS', 'https://foundercontrolroom.org'],
+  ['FOUNDER_ALLOWED_ORIGINS', 'https://foundercontrolroom.org,https://checkout.foundercontrolroom.org'],
   ['FOUNDER_API_URL', 'https://foundercontrolroom.org'],
 ]);
 
