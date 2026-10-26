@@ -1,0 +1,70 @@
+# Founder Signal Engine — MCP-native campaign, media and reputation v1
+
+**Status:** `IMPLEMENTED_AS_REVIEW_ONLY_SOURCE__UNVERIFIED_PROVIDER_AND_MEDIA`.
+
+## Scope and standing conditions
+
+Expand **Founder Control Room's existing Founder Signal Engine**, not a duplicate social-media operating system. The end-to-end goal is to turn one independently verified, privacy-safe founder/project signal into honest platform-native posts with relevant hashtags, original/licensed visuals or videos when appropriate, an approval review, and attributable post-outcome learning.
+
+Preserve /human, /futureyou, /truthmode, /confess, 5W1H, Chief review, existing Content Lane System, Visual Wonder + Attack 2000, first-party post validator, Buffer draft-only firewall, content lifecycle authority, HubSpot association, proof receipts, and exact-current-you approval. No phase silently promotes simulated data into an observed production fact. Protect user dignity, privacy and future choices; no assumption that public exposure or commercial growth is appropriate for any age or situation.
+
+## Current implemented connector slice
+
+`/mcp/founder-signal-engine` now retains its original **`invoke_founder_signal_engine`** tool and adds **`plan_founder_signal_campaign`**. The new tool is read-only, protected by the existing MCP bearer token and returns a single `fcr/founder-signal-campaign@v1` structured package. It does not call Zapier, OpenAI, Buffer, HubSpot, n8n, media renderers, or databases.
+
+For one supplied public GitHub repo + exact SHA and a bounded, non-sensitive editorial brief, the new tool emits:
+- One content thesis with documented founder voice (direct, human, technically clear, specific, no hype) and a current 5W1H.
+- Platform-native finished **review drafts**, using the authoritative `contentLaneSystem.ts` platform list, field IDs and per-lane North Stars.
+- Topic-derived **hashtags** tailored by platform. For LinkedIn, 3–5 relevant tags, never invented traction hashtags or growth hacks.
+- Per-channel **media production direction**: 4:5 still/carousel, 9:16 short video, or text as applicable; caption/alt-text direction, motion, safe zones, media rights and proof-in-scene notes. `NOT_RENDERED` is mandatory until actual assets exist.
+- An anti-repetition fingerprint keyed to the proposed thesis and provenance-linked recent public-post records. If no recent posts are supplied with links, style is **documented editorial intent**, not an observed history of the founder's actual publishing.
+- Reputation-risk flags for outcome/endorsement claims, hard refusal of secrets or personal contact data in the brief, public-safe proof URL requirements and no suggestion that views equal customers.
+- A non-secret continuity fingerprint for review/reconciliation only, not a cookie, tracking ID, consent artifact or authorization token.
+
+This is **one planning package** aligned with the existing one-structured-AI-action contract. It does not consume an extra AI inference action. Its generated copy is deterministic from the supplied facts and may need a separate approved creative rewrite before founder review.
+
+## Target end-to-end path (already-governed stages, not newly activated)
+
+```
+public-safe GitHub signal + exact SHA + current visibility policy
+→ source proof and product truth classification (provider verification REQUIRED)
+→ one ME + FutureYou + Chief + 5W1H decision (decision lenses, not factual proof)
+→ plan_founder_signal_campaign (read-only MCP package)
+→ existing content foundry / Visual Wonder creative brief
+→ original/licensed stills, covers, carousels or real footage/rendered short video
+→ rendered-asset hash, visual Attack 2000, accessibility, rights and truth checks
+→ per-account/per-platform copy + relevant hashtags + rights-cleared media
+→ authenticated Current You review on the exact frozen payload
+→ existing Buffer draft-only source firewall / first-party lifecycle (separate authorization)
+→ native Buffer Drafts identity + content/media readback
+→ HubSpot deal-associated note/task and FCR correlated receipt
+→ provider-native 24h and 48h measurement; compare only like-for-like periods
+→ preserve winning mechanics, misses, corrections, provenance and next gate
+```
+
+MCP plan output is *not* itself accepted by Buffer or the first-party publication adapter. A future separately reviewed adapter must translate the exact reviewed, rendered package into the existing canonical `FirstPartySocialPostInput`, run `validateFirstPartySocialPost`, verify media identity and rights, obtain current founder approval and native provider readback. It must not bypass the Buffer draft-only mode by mapping review drafts to queue, schedule, share-next or publish.
+
+## Media and reputation guardrails
+
+Do not publish ordinary project status as "launched", "deployed", "used by customers", "has investor partners", or "produced revenue" without exact applicable evidence. Be careful with security, health, minors, customer identities, proprietary roadmaps, project secrets, claims about funding, partner logos or endorsements, manipulated screenshots, AI-generated fake people, synthetic testimonials and misinformation. No private personal photos or face/voice cloning without specific consent and appropriate safeguards. No engagement bait, spam tags, borrowed copyrighted clips, fabricated public interfaces or guaranteed outcomes.
+
+`visual-wonder-contract.cjs` remains the only canonical creative-brief/rendered-artifact acceptance contract. Its `evaluateVisualWonderArtifact` must run **after** an actual render is available and independently inspected. Copy and media must be checked together, and must match the exact approved campaign receipt. False-green JSON, a generated graphic or a planned storyboard do not prove a rendered asset is safe or published.
+
+Perfect reputational safety or guaranteed audience growth cannot be promised. Default: **hold until specific review**; maintain correction/rollback paths.
+
+## Release gates and known missing proof
+
+1. **SOURCE:** Gate the current GitHub event using independently observed repository visibility and exact commit. Tool input is user-supplied and is always labeled `USER_SUPPLIED_UNVERIFIED`.
+2. **HISTORY:** Read authentic recent posts/metrics from authorized provider sources before claiming actual founder posting patterns or a LinkedIn rising floor. The initial tool doesn't fetch those.
+3. **AI:** Verify output provenance of the canonical single AI action. Tool does not perform model inference or pretend it does.
+4. **MEDIA:** Produce and inspect actual licensed image/video; run the canonical visual artifact gate and store the asset hash. No assets are rendered by this MCP change.
+5. **REVIEW:** Show exact final copy, hashtags, media and destination/account to founder and obtain new exact-payload approval for any actual scheduling or publication class.
+6. **PROVIDER:** Restore missing secure Zapier hook binding only through a separately authorized secret-store action. Observe a real Zapier run; confirm a native Buffer Drafts readback, not queue or publish. Never print credentials.
+7. **CRM:** Reconcile the exact HubSpot account/deal/record and FCR receipt; no write from planning.
+8. **MEASURE:** Provider-native insights at comparable 24h/48h snapshots, qualified replies and attributable actions. Separate attention from customer/partner outcomes. Do not promise outcomes.
+
+## Testing
+
+Run `npm run verify:fse-campaign` on exact candidate SHA. Tests cover per-platform copy, hashtags, image/video directions, unverified/provenance states, hold-on-repeated-thesis, secret/contact rejections, mandatory-media mismatch, MCP additive discovery and absence of provider calls or database writes. Existing `verify:buffer-content`, Visual Wonder, first-party publisher, public communication truth, role/approval and repository CI gates remain independently required.
+
+This feature is source-level **review planning only**, not a live social automation completion claim. Nothing here grants merge, deploy, publishing, partner contact, credential installation, tracking or background automation. Rollback: revert the named planner, tests, MCP additive tool, middleware advisory path, documentation and test command; existing production tools remain unchanged.
