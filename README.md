@@ -1,5 +1,11 @@
 # Founder Control Room
 
+## October 26, 2026 — StoryEngine peer identity renewal for FCR PR #1020 (candidate only)
+
+The exact FCR PR #1020 Playwright run for `8e30ec5418f2fc732b96d8dc5263af4a82f5e5a3` passed its browser harness but stopped at live StoryEngine peer equality: expected `87501be2da31d12f421b0ed2da49df357fc9fcb1`, independently observed `499f2d4eb9edac8bb11b657cf003a056263528d9`. GitHub confirms StoryEngine `refs/heads/main` advanced strictly by two commits, with changes in `story-engine/lib/llmClient.js` and `story-engine/lib/museClient.js`; the federation-specific contract was unchanged in that compare. The successor commit completed its observed push workflows successfully, including the Control Room federation contract; its Supabase Preview check was skipped and cannot be counted as green runtime proof.
+
+`.github/workflows/playwright.yml` now selects `499f2d4eb9edac8bb11b657cf003a056263528d9` as a new exact peer evidence subject. This repin does **not** transfer any earlier FCR Playwright green or grant merge, deploy, publication, provider mutation, or independent runtime authority. Only the successor FCR head's full immutable-peer checkout, runtime identity, directive/receipt/replay, and browser checks can verify the new pair; any later peer/main movement invalidates the pin's currentness.
+
 ## October 24, 2026 authenticated founder dock + StoryEngine peer renewal
 
 The public FCR entrance remains available without a session, while the internal `/control-room/` founder navigation dock starts `hidden` with `aria-hidden="true"` and becomes visible only after the existing authenticated `#root .shell` renders. Session/shell loss closes and hides the dock again. This is a UI privacy safeguard only; server-side authorization remains independently required.

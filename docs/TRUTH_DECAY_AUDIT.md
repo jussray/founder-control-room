@@ -1,5 +1,11 @@
 # Truth Decay Audit: When a True Claim Becomes Unsafe to Reuse
 
+## October 26, 2026 — FCR PR #1020 peer freshness failure and source-only recovery
+
+At FCR PR #1020 candidate `8e30ec5418f2fc732b96d8dc5263af4a82f5e5a3`, the Playwright browser harness succeeded but the live StoryEngine ref gate correctly stopped: pinned `87501be2da31d12f421b0ed2da49df357fc9fcb1`, observed `499f2d4eb9edac8bb11b657cf003a056263528d9`. Independent GitHub readback shows a two-commit forward peer change affecting the StoryEngine LLM/Muse clients. The successor StoryEngine commit's observed source checks passed, including federation contract verification; this does not prove the new cross-app runtime pair, and the Supabase preview was skipped. Updating the FCR peer pin is an evidence-subject move only.
+
+The new FCR candidate must complete its own exact-head, live-ref-equal, immutable StoryEngine runtime and browser/federation witness. Do not inherit earlier CI green, claim current deployed federation, approve founder-final integration, change provider rules, or perform merge/deploy. If the peer advances again, repeat the current-head check rather than carrying forward stale evidence.
+
 ## October 24, 2026: founder-dock privacy boundary and StoryEngine peer movement
 
 The signed-out Control Room previously left founder-stack navigation present in the DOM as a visible dock. The repair makes first paint fail closed and derives dock visibility from the authenticated `#root .shell`; losing that shell closes and hides the dock again. Structural fixtures may synthesize the authenticated shell only after proving the signed-out state, while the opaque HttpOnly-cookie browser path remains the authority for real session behavior. UI hiding does not replace server authorization and does not prove production privacy until the exact successor browser witness passes.
