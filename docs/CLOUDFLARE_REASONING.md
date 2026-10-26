@@ -112,7 +112,7 @@ Those remain separate founder approval gates. Approval never carries forward.
 
 `public/_worker.js` must treat public discovery files such as `/robots.txt`, `/sitemap.xml`, `/llms.txt`, and `/crawlers.json` as static Pages assets and serve them through `env.ASSETS`. API-owned callback assets stay on `env.FCR_API`; the presence of crawler policy metadata never becomes authentication, write authority, provider-mutation authority, deployment authority, or publication authority.
 
-The same classification covers the public work page: the edge redirect rule sends `/work.html` to `/work`, and `public/_worker.js` must rewrite the bare `/work` and `/work/` paths back to `/work.html` and serve them through `env.ASSETS`. Falling through to the `FCR_API` proxy answers that public page without the service identity header and yields a degraded 503, so the static rewrite is the only correct route for it.
+The same classification covers the public work page: the Pages asset layer canonicalizes `/work.html` to `/work` with a 308, and `public/_worker.js` must serve the bare `/work` and `/work/` paths by requesting the canonical `/work` URL through `env.ASSETS` — requesting the `/work.html` filename returns that 308 to the browser and loops `/work` onto itself. Falling through to the `FCR_API` proxy answers that public page without the service identity header and yields a degraded 503, so the canonical static request is the only correct route for it.
 
 That routing distinction is source truth only. A repository diff or green unit test cannot prove the deployed Pages artifact currently serves the exact file, so the applicable Pages deployment and browser/runtime witness remain separate evidence gates.
 
