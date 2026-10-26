@@ -369,7 +369,8 @@
         "The media handoff documented in `docs/founder-signal-engine/media-reputation-mcp-v1.md` is only a self-attested source, licensed-media and draft-shape review; actual bytes, legal rights, live accounts, founder approval, Buffer-native draft and business outcomes must be independently proven.",
         "`docs/founder-signal-engine/media-reputation-mcp-v1.md` must state public GitHub commit readback is time-bounded and independently verified for existence only, not proof of source claim, rendered/licensed media, account permission, Buffer draft, business impact, merge or deployment.",
         "`docs/founder-signal-engine/media-reputation-mcp-v1.md` must distinguish local byte-integrity matching from separately authenticated media storage, origin, decoder, licensing and visual inspection; no media validation grants draft/publish authority.",
-        "`docs/founder-signal-engine/media-reputation-mcp-v1.md` separates a mock-injected authenticated reader contract from a real audited asset storage reader, provenance and rights evidence, decoder and visual inspection, founder review and native Buffer provider readback. Passing mock unit tests cannot prove storage, brand safety or publication."
+        "`docs/founder-signal-engine/media-reputation-mcp-v1.md` separates a mock-injected authenticated reader contract from a real audited asset storage reader, provenance and rights evidence, decoder and visual inspection, founder review and native Buffer provider readback. Passing mock unit tests cannot prove storage, brand safety or publication.",
+        "`docs/founder-signal-engine/media-reputation-mcp-v1.md` now distinguishes real local FFmpeg file-byte readback and a conditional real-render integration test from rights/decoder/brand review, authenticated external asset storage, founder approval, and Buffer-native delivery; R2 had no buckets in the observed account and Supabase discovery was unverified."
       ]
     },
     {
@@ -394,6 +395,18 @@
       "path": "src/lib/founderSignalAuthenticatedMediaReader.ts",
       "claims": [
         "`src/lib/founderSignalAuthenticatedMediaReader.ts` supplies an isolated dependency-injected, read-only media reader bridge. It requires a server-owned principal/workspace/project, promoted same-project FCR asset registry record, asserted commercial-use permission and domain authority receipt, immutable object version, matching metadata SHA and exact streamed byte count/hash. It never grants media uploads, Buffer draft writes, scheduling, publication or account authority; no live storage adapter is implemented."
+      ]
+    },
+    {
+      "path": "src/lib/founderSignalLocalRenderInspection.ts",
+      "claims": [
+        "`src/lib/founderSignalLocalRenderInspection.ts` verifies local FFmpeg MP4 output bytes against its renderer receipt and explicit server-owned output directory, rejects traversal, symlinks, modified files and digest/size mismatches, and returns only LOCAL_FFMPEG_RECEIPT_BYTE_MATCH__NOT_RELEASE_PROOF without any rights, publication, media upload or provider authority."
+      ]
+    },
+    {
+      "path": "src/lib/mediaFfmpegRender.ts",
+      "claims": [
+        "The existing `src/lib/mediaFfmpegRender.ts` local renderer remains the independent receipt producer: its generated MP4 and FFprobe/sha256 receipt can now be tested against a separate read-only FSE byte-inspection bridge, but neither code path proves release permission or social distribution."
       ]
     }
   ]
