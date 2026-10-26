@@ -10,6 +10,10 @@ Before any operator may convert this proposal to an actual Buffer or first-party
 
 The founder's documented writing style is not an independently fetched record of recent posts; measured reach, inbound inquiries, customer conversions or partner interest require account-native evidence, compatible time windows and reconciliation. No lexical reputation filter can promise risk-free posts or guarantee external results. Preserve human approval, privacy, age-appropriate boundaries, correction mechanisms, and a clear hold when confidence or proof is insufficient. See `docs/founder-signal-engine/media-reputation-mcp-v1.md`.
 
+### Media-bearing campaign handoff truth boundary
+
+`review_founder_signal_draft_handoff` is a read-only preview that calls the canonical first-party publisher validator in `mode=draft` with no external adapter. It reconstructs the draft from the original campaign brief, checks declared media/rights/hash/verdict correlations, and always marks source, rights, visual inspection, account ownership, provider delivery and founder approval **unverified**. Any locally valid return includes `handoffReady=false` and zero permissions to create a Buffer draft, schedule, publish or contact a third party. Caller-provided checks cannot replace independent rights, media bytes, current destination and exact approval evidence; the existing lifecycle/Buffer source authority must independently verify its own gates before a provider write.
+
 ## Required posting loop
 
 ```text
