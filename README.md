@@ -10,6 +10,8 @@ The source-verification tool `verify_founder_signal_public_source` now independe
 
 A bounded media-byte SHA-256/signature checker is available as a source-level helper for a future authenticated asset reader. It is not a real media-provider connection: it cannot prove image/video licensing, full file integrity, authenticity of the supplied storage stream, brand/reputation suitability, or publication eligibility. It is not wired to the live MCP/Buffer handoff and grants no draft or upload capability.
 
+A separate version-bound media-reader **interface** now ties the canonical FCR asset registry to local SHA-256 byte checking and requires a promoted, same-project asset with asserted rights/authority. It is exercised only with injected mock readers, not real storage; no actual image or video is downloaded, processed in production, uploaded, or published. The result never approves Buffer drafts.
+
 This source change must not be described as a working Zapier → Buffer → HubSpot integration or a safe-to-publish marketing campaign. Live GitHub visibility, original/licensed media, current founder approval, native Buffer Drafts readback, HubSpot and FCR evidence, and authentic 24h/48h outcomes remain separate proof gates. The original Buffer mode stays draft-only. See [MCP Native Media + Reputation Contract](docs/founder-signal-engine/media-reputation-mcp-v1.md) and `npm run verify:fse-campaign`. No merge or deployment authority is implied.
 
 ## October 24, 2026 authenticated founder dock + StoryEngine peer renewal
