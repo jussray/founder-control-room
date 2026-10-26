@@ -23,6 +23,12 @@ assert.match(localPlaywrightProof, /from 'playwright'/);
 assert.match(localPlaywrightProof, /LOCAL_NO_PROVIDER_FEE/);
 assert.match(localPlaywrightProof, /providerWalletRequired: false/);
 assert.doesNotMatch(localPlaywrightProof, /providerWalletRequired:\s*true/);
+assert.match(localPlaywrightProof, /evidenceScope: 'synthetic-dom-fixture'/);
+assert.match(localPlaywrightProof, /fixtureFormMutationProved:\s*true/);
+assert.match(localPlaywrightProof, /providerAccepted:\s*false/);
+assert.match(localPlaywrightProof, /verifiedOutcome:\s*false/);
+assert.doesNotMatch(localPlaywrightProof, /providerAccepted:\s*true/);
+assert.doesNotMatch(localPlaywrightProof, /verifiedOutcome:\s*true/);
 assert.match(ultrathinkPluginProof, /from 'playwright'/);
 assert.match(ultrathinkPluginProof, /data-plugin-id="ultrathink"/);
 assert.match(ultrathinkPluginProof, /non-authorizing/);
@@ -43,6 +49,17 @@ execFileSync(process.execPath, [fileURLToPath(localPlaywrightProofUrl)], {
   stdio: 'inherit',
   env: process.env,
 });
+
+const fixtureReceipt = JSON.parse(fs.readFileSync(
+  new URL('../artifacts/browser/local-playwright/local-playwright-proof.json', import.meta.url),
+  'utf8',
+));
+assert.equal(fixtureReceipt.contract, 'fcr/local-playwright-browser-fixture@v2');
+assert.equal(fixtureReceipt.evidenceScope, 'synthetic-dom-fixture');
+assert.equal(fixtureReceipt.fixtureFormMutationProved, true);
+assert.equal(fixtureReceipt.formMutationProved, false);
+assert.equal(fixtureReceipt.providerAccepted, false);
+assert.equal(fixtureReceipt.verifiedOutcome, false);
 
 execFileSync(process.execPath, [fileURLToPath(ultrathinkPluginProofUrl)], {
   stdio: 'inherit',

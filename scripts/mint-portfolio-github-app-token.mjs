@@ -1,6 +1,7 @@
 import { createPrivateKey, sign } from 'node:crypto';
 import { mkdir, writeFile, chmod } from 'node:fs/promises';
 import { dirname } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 function requiredEnv(name) {
   const value = process.env[name];
@@ -24,26 +25,79 @@ function unwrapMatchingSingleQuotes(value) {
     : value;
 }
 
-function decodeBase64Pem(value) {
+function base64Bytes(value) {
   const compact = value.replace(/\s+/g, '');
   if (!compact || !/^[A-Za-z0-9+/_-]+={0,2}$/.test(compact)) return null;
   const standard = compact.replace(/-/g, '+').replace(/_/g, '/');
   if (standard.length % 4 === 1) return null;
   const padded = standard.padEnd(standard.length + ((4 - (standard.length % 4)) % 4), '=');
   try {
-    const decoded = Buffer.from(padded, 'base64')
-      .toString('utf8')
-      .replace(/^\uFEFF/, '')
-      .replace(/\r\n/g, '\n')
-      .trim();
-    return decoded.includes('-----BEGIN') && decoded.includes('PRIVATE KEY-----') ? decoded : null;
+    return Buffer.from(padded, 'base64');
   } catch {
     return null;
   }
 }
 
-function normalizePrivateKey(secret) {
-  const trimmed = String(secret ?? '').trim().replace(/^\uFEFF/, '');
+function decodeBase64Pem(value) {
+  const bytes = base64Bytes(value);
+  if (bytes === null) return null;
+  const decoded = bytes
+    .toString('utf8')
+    .replace(/^﻿/, '')
+    .replace(/\r\n/g, '\n')
+    .trim();
+  return decoded.includes('-----BEGIN') && decoded.includes('PRIVATE KEY-----') ? decoded : null;
+}
+
+// A PEM body whose header lines were stripped base64-decodes to exactly the DER
+// bytes, so this single path recovers both that paste and a base64-encoded DER
+// export. Both previously classified as 'unknown' and failed closed.
+function decodeDerToPem(value) {
+  const bytes = base64Bytes(value);
+  if (bytes === null) return null;
+  for (const type of ['pkcs8', 'pkcs1']) {
+    try {
+      return createPrivateKey({ key: bytes, format: 'der', type })
+        .export({ type: 'pkcs8', format: 'pem' })
+        .trim();
+    } catch {
+      // Try the next DER container shape.
+    }
+  }
+  return null;
+}
+
+// Rewrap a PEM whose newlines a single-line input field collapsed to spaces.
+function rewrapCollapsedPem(value) {
+  const match = /^-----BEGIN ((?:RSA )?PRIVATE KEY)-----([\s\S]*?)-----END \1-----$/.exec(
+    value.trim(),
+  );
+  if (!match) return null;
+  const body = match[2].replace(/\s+/g, '');
+  if (!body || !/^[A-Za-z0-9+/]+={0,2}$/.test(body)) return null;
+  const wrapped = body.replace(/(.{64})/g, '$1\n').trim();
+  return `-----BEGIN ${match[1]}-----\n${wrapped}\n-----END ${match[1]}-----`;
+}
+
+// Boolean shape facts only, so a rejected secret stays debuggable without being
+// re-pasted. Emits no substring, hash, length, or other reconstructable metadata.
+function shapeDiagnostics(trimmed) {
+  const compact = trimmed.replace(/\s+/g, '');
+  return [
+    `begin=${trimmed.includes('-----BEGIN')}`,
+    `end=${trimmed.includes('-----END')}`,
+    `b64charset=${compact !== '' && /^[A-Za-z0-9+/_-]+={0,2}$/.test(compact)}`,
+    `escapedNewlines=${trimmed.includes('\\n')}`,
+    `multiline=${trimmed.includes('\n')}`,
+  ].join(' ');
+}
+
+// Single source of truth for App private-key transport classification. The
+// minting path and the read-only founder shape diagnostic both consume this, so
+// the diagnostic can never disagree with what minting actually accepts.
+function classifyPrivateKey(secret) {
+  const raw = String(secret ?? '');
+  const trimmed = raw.trim().replace(/^﻿/, '');
   let transportClass = 'unknown';
   let normalized = trimmed;
 
@@ -74,26 +128,70 @@ function normalizePrivateKey(secret) {
     .trim();
 
   if (!normalized.includes('-----BEGIN')) {
-    normalized = decodeBase64Pem(normalized) ?? normalized;
+    const pem = decodeBase64Pem(normalized);
+    if (pem !== null) {
+      normalized = pem;
+    } else {
+      const der = decodeDerToPem(normalized);
+      if (der !== null) {
+        normalized = der;
+        transportClass = 'base64-der';
+      }
+    }
   }
 
-  const pemBoundary = /^-----BEGIN (?:RSA )?PRIVATE KEY-----\n/.test(normalized)
+  let pemBoundary = /^-----BEGIN (?:RSA )?PRIVATE KEY-----\n/.test(normalized)
     && /\n-----END (?:RSA )?PRIVATE KEY-----$/.test(normalized);
 
   if (!pemBoundary) {
-    throw new Error(`APP_PRIVATE_KEY_SHAPE_INVALID:${transportClass}`);
+    const rewrapped = rewrapCollapsedPem(normalized);
+    if (rewrapped !== null) {
+      normalized = rewrapped;
+      if (transportClass === 'raw-pem') transportClass = 'collapsed-pem';
+      pemBoundary = true;
+    }
   }
+
+  const result = {
+    present: raw.length > 0,
+    transportClass,
+    recognizedTransport: transportClass !== 'unknown' && transportClass !== 'empty',
+    pemBoundary,
+    parseFailed: false,
+    rsaParse: false,
+    key: null,
+    diagnostics: shapeDiagnostics(trimmed),
+  };
+
+  if (!pemBoundary) return result;
 
   let key;
   try {
     key = createPrivateKey({ key: normalized, format: 'pem' });
   } catch {
+    result.parseFailed = true;
+    return result;
+  }
+  result.rsaParse = key.type === 'private' && key.asymmetricKeyType === 'rsa';
+  if (result.rsaParse) result.key = key;
+  return result;
+}
+
+function normalizePrivateKey(secret) {
+  const classified = classifyPrivateKey(secret);
+  const { transportClass } = classified;
+  if (!classified.pemBoundary) {
+    throw new Error(
+      `APP_PRIVATE_KEY_SHAPE_INVALID:${transportClass} [${classified.diagnostics}]`,
+    );
+  }
+  if (classified.parseFailed) {
     throw new Error(`APP_PRIVATE_KEY_RSA_PARSE_FAILED:${transportClass}`);
   }
-  if (key.type !== 'private' || key.asymmetricKeyType !== 'rsa') {
+  if (!classified.rsaParse) {
     throw new Error(`APP_PRIVATE_KEY_NOT_RSA_PRIVATE:${transportClass}`);
   }
-  return { key, transportClass };
+  return { key: classified.key, transportClass };
 }
 
 function b64urlJson(value) {
@@ -159,4 +257,8 @@ async function main() {
   console.log('secret_material_logged=false');
 }
 
-await main();
+export { normalizePrivateKey, classifyPrivateKey };
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  await main();
+}

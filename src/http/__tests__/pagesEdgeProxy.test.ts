@@ -70,6 +70,57 @@ describe('Cloudflare Pages edge proxy', () => {
     expect(fcrApiFetch).not.toHaveBeenCalled();
   });
 
+  it('serves the public work page from Pages when the edge redirect strips the extension', async () => {
+    const handler = await loadHandler();
+    // Model the real Pages asset layer: the /work.html filename is not
+    // served; it canonicalizes to /work with a 308. Only the canonical
+    // extensionless URL returns the page. A mock that answers 200 for the
+    // filename hides the production /work -> /work redirect loop.
+    const assetFetch = vi.fn(async (request: Request) => {
+      if (new URL(request.url).pathname === '/work.html') {
+        return new Response(null, { status: 308, headers: { Location: '/work' } });
+      }
+      return new Response('work page', { status: 200 });
+    });
+    const fcrApiFetch = vi.fn(async (_request: Request) => new Response(null, { status: 500 }));
+
+    const response = await handler.fetch(
+      new Request('https://foundercontrolroom.org/work'),
+      { ASSETS: { fetch: assetFetch }, FCR_API: { fetch: fcrApiFetch } },
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe('work page');
+    expect(assetFetch).toHaveBeenCalledOnce();
+    expect(fcrApiFetch).not.toHaveBeenCalled();
+    const requested = assetFetch.mock.calls[0]?.[0];
+    expect(requested).toBeInstanceOf(Request);
+    expect(new URL(requested?.url).pathname).toBe('/work');
+  });
+
+  it('serves the public work page with trailing slash and preserves query strings', async () => {
+    const handler = await loadHandler();
+    const assetFetch = vi.fn(async (request: Request) => {
+      if (new URL(request.url).pathname === '/work.html') {
+        return new Response(null, { status: 308, headers: { Location: '/work' } });
+      }
+      return new Response('work page', { status: 200 });
+    });
+    const fcrApiFetch = vi.fn(async (_request: Request) => new Response(null, { status: 500 }));
+
+    const response = await handler.fetch(
+      new Request('https://foundercontrolroom.org/work/?ref=homepage'),
+      { ASSETS: { fetch: assetFetch }, FCR_API: { fetch: fcrApiFetch } },
+    );
+
+    expect(response.status).toBe(200);
+    expect(fcrApiFetch).not.toHaveBeenCalled();
+    const requested = assetFetch.mock.calls[0]?.[0];
+    const url = new URL(requested?.url);
+    expect(url.pathname).toBe('/work');
+    expect(url.search).toBe('?ref=homepage');
+  });
+
   it('forwards dynamic GET routes through the FCR_API service binding', async () => {
     const handler = await loadHandler();
     const assetFetch = vi.fn(async (_request: Request) => new Response('unexpected', { status: 200 }));
