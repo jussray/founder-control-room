@@ -1,5 +1,17 @@
 # GitHub Actions Secrets and Cloudflare Bindings Registry
 
+## Cloudflare Logpush workflow secrets
+
+These names are used only by the founder-gated Logpush workflow. Values must remain in GitHub/Cloudflare secret planes and must never be committed, printed, or copied into documentation.
+
+| Secret | Purpose |
+| --- | --- |
+| `CLOUDFLARE_LOGPUSH_READ_TOKEN` | Dedicated Cloudflare credential for non-mutating Logpush job inspection. |
+| `CLOUDFLARE_LOGPUSH_WRITE_TOKEN` | Separate Cloudflare credential allowed to create/update the bounded Logpush job during an approved manual apply. |
+| `CLOUDFLARE_LOGPUSH_DESTINATION_CONF` | Provider-held destination configuration for the Logpush job; treat the entire value as secret because it may contain endpoint credentials. |
+
+`CLOUDFLARE_ACCOUNT_ID` remains the account selector. Secret-name documentation proves only the expected binding names; it does not prove a value is configured, valid, authorized, or currently present in GitHub or Cloudflare.
+
 This repository has three separate configuration planes:
 
 1. **Cloudflare Pages build settings** for the static frontend.
