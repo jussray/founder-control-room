@@ -10,7 +10,7 @@ Preserve /human, /futureyou, /truthmode, /confess, 5W1H, Chief review, existing 
 
 ## Current implemented connector slice
 
-`/mcp/founder-signal-engine` now retains its original **`invoke_founder_signal_engine`** tool and adds **`plan_founder_signal_campaign`**. The new tool is read-only, protected by the existing MCP bearer token and returns a single `fcr/founder-signal-campaign@v1` structured package. It does not call Zapier, OpenAI, Buffer, HubSpot, n8n, media renderers, or databases.
+`/mcp/founder-signal-engine` now retains its original **`invoke_founder_signal_engine`** tool and adds **`plan_founder_signal_campaign`** and **`review_founder_signal_draft_handoff`**. The new tool is read-only, protected by the existing MCP bearer token and returns a single `fcr/founder-signal-campaign@v1` structured package. It does not call Zapier, OpenAI, Buffer, HubSpot, n8n, media renderers, or databases.
 
 For one supplied public GitHub repo + exact SHA and a bounded, non-sensitive editorial brief, the new tool emits:
 - One content thesis with documented founder voice (direct, human, technically clear, specific, no hype) and a current 5W1H.
@@ -22,6 +22,16 @@ For one supplied public GitHub repo + exact SHA and a bounded, non-sensitive edi
 - A non-secret continuity fingerprint for review/reconciliation only, not a cookie, tracking ID, consent artifact or authorization token.
 
 This is **one planning package** aligned with the existing one-structured-AI-action contract. It does not consume an extra AI inference action. Its generated copy is deterministic from the supplied facts and may need a separate approved creative rewrite before founder review.
+
+## Next implemented connector slice: first-party media draft handoff shape
+
+The **read-only** \`review_founder_signal_draft_handoff\` MCP tool reconstructs the exact planned campaign from its source brief and checks a selected platform, account label, declared image/video assets and proposed copy against the existing \`validateFirstPartySocialPost\` function in \`src/lib/firstPartySocialPublisher.ts\`. It does **not** bypass the canonical publisher or create a parallel Buffer adapter.
+
+A proposed media handoff must contain public-safe media URLs without signed-token queries, alt text, an image/video type consistent with the creative plan, declared media SHA-256, claimed original/licensed/owner-provided rights and a rights receipt, and a named Visual Wonder verdict whose claimed SHA matches the asset reference. Accounts with no known platform limit require an explicit bounded limit; this remains caller-supplied and is not a provider check. Campaigns already blocked for reputation or thesis repetition cannot be promoted. Missing, mismatched or unrendered media stays HOLD.
+
+Even when all local checks pass, the result is \`LOCAL_DRAFT_SHAPE_VALID__PROVIDER_UNVERIFIED\` with \`handoffReady: false\` and all provider/creation/publication authority set to false. URL strings, licensing metadata, visual-verdict flags and media hashes are **self-attested** until authenticated source, asset-byte/rights, founder-review and provider checks are completed by distinct trusted systems.
+
+**No image or video has been generated, read back or independently inspected by this connector. No local draft, Buffer draft, HubSpot record or publication has been created by this tool.** Later provider execution requires a separately reviewed adapter with actual permission and exact-payload Current You approval.
 
 ## Target end-to-end path (already-governed stages, not newly activated)
 
@@ -65,6 +75,6 @@ Perfect reputational safety or guaranteed audience growth cannot be promised. De
 
 ## Testing
 
-Run `npm run verify:fse-campaign` on exact candidate SHA. Tests cover per-platform copy, hashtags, image/video directions, unverified/provenance states, hold-on-repeated-thesis, secret/contact rejections, mandatory-media mismatch, MCP additive discovery and absence of provider calls or database writes. Existing `verify:buffer-content`, Visual Wonder, first-party publisher, public communication truth, role/approval and repository CI gates remain independently required.
+Run `npm run verify:fse-campaign` on exact candidate SHA. Tests also cover missing media, manipulated asset hashes, absent rights, unsafe media URLs, unverifiable visual verdicts and isolated no-provider handoff behavior. Tests cover per-platform copy, hashtags, image/video directions, unverified/provenance states, hold-on-repeated-thesis, secret/contact rejections, mandatory-media mismatch, MCP additive discovery and absence of provider calls or database writes. Existing `verify:buffer-content`, Visual Wonder, first-party publisher, public communication truth, role/approval and repository CI gates remain independently required.
 
 This feature is source-level **review planning only**, not a live social automation completion claim. Nothing here grants merge, deploy, publishing, partner contact, credential installation, tracking or background automation. Rollback: revert the named planner, tests, MCP additive tool, middleware advisory path, documentation and test command; existing production tools remain unchanged.
