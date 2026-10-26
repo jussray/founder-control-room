@@ -22,6 +22,10 @@ The founder's documented writing style is not an independently fetched record of
 
 The isolated `checkFounderSignalMediaBytes` stage can digest a bounded, already-supplied stream and inspect basic PNG/JPEG/WebP/MP4 signatures. It proves only **local byte equality** to a declared hash plus shallow container markers; no producer identity, actual public visibility, visual accuracy, licensing, release rights, account identity, founder permission, or Buffer provider action is established. It cannot be used as authorization to create a draft or publish. Production use requires a separate authenticated storage reader, full safe media decode, source/rights evidence, exact-payload approval and existing publication-truth policies.
 
+### Authenticated media reader interface is not production authorization
+
+The new FSE `checkAuthorizedFounderSignalMedia` contract ties an asserted server-owned principal/project scope and promoted FCR media registry status/rights records to an immutable versioned stream and byte check. It does **not** connect to live asset storage or independently authenticate the adapter, license receipt, decoded visual content, person, account, or approval. The result does not make an image or video public-safe and cannot create or schedule a Buffer post. Existing Current You and provider readback rules remain load-bearing.
+
 ## Required posting loop
 
 ```text
