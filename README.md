@@ -411,6 +411,8 @@ The public `/work` page is a static Pages asset: `public/_worker.js` serves the 
 
 ## cross-repository browser witness freshness
 
+The truth-console recovery in PR #1035 completed its local browser harness before a separate StoryEngine peer-freshness failure. The observed dependency transition is recorded in [Truth Decay Audit](docs/TRUTH_DECAY_AUDIT.md#october-26-2026-truth-console-browser-proof-stopped-on-storyengine-identity-drift). A refreshed pin selects the next evidence subject; successor federation remains UNKNOWN until the complete witness succeeds for its own exact repository pair.
+
 The exact StoryEngine peer configured in `.github/workflows/playwright.yml` is an evidence subject, not a durable alias for current StoryEngine. A peer refresh must be backed by an independent ref/SHA observation and must reset predecessor federation/browser proof until the complete FCR → StoryEngine → receipt → FCR Playwright witness passes on the exact FCR head. Pin alignment alone grants no merge, deploy, production, or provider-mutation authority.
 
 When the live StoryEngine ref advances after a previously proven FCR head, updating the pin is recovery setup, not recovered proof. The successor FCR head remains `UNKNOWN` for federation until its own exact-head Playwright job proves runtime identity, directive/receipt binding, replay safety, and the browser loop against that newly observed peer.

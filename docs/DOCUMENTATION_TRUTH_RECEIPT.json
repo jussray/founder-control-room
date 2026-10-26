@@ -51,6 +51,7 @@
     {
       "path": ".github/workflows/playwright.yml",
       "claims": [
+        "`.github/workflows/playwright.yml` must keep the PR #1035 peer refresh as identity recovery only: the successor FCR head requires fresh live-ref equality, immutable peer checkout, runtime identity, and the complete directive/receipt/replay/browser witness before pair compatibility can be current; predecessor proof stays historical, and pin alignment grants no merge, deploy, production, or provider-mutation authority.",
         "`.github/workflows/playwright.yml` must bind the FCR-to-StoryEngine browser federation witness to a separately verified exact StoryEngine peer SHA and ref; changing that peer identity expires predecessor federation/browser proof and requires the complete exact-head witness to rerun without granting merge, deploy, production, or provider-mutation authority.",
         "A fresh peer ref/SHA observation may select the successor StoryEngine evidence subject, but the successor FCR federation state remains UNKNOWN until the complete exact-head runtime identity, directive, receipt, and Playwright browser witness succeeds against that peer.",
         "Refreshing `STORYENGINE_PEER_SHA` after independently observing StoryEngine main is recovery setup only; pin alignment must not carry predecessor Playwright green or founder approval onto the successor FCR head.",
