@@ -29,6 +29,10 @@ A Cloudflare incident can present several facts that look contradictory:
 
 The engine separates those states rather than compressing them into “Cloudflare is broken.” That sentence is emotionally satisfying and operationally useless.
 
+## Checkout hostname: DNS, Pages, origin, and payment truth are separate
+
+Cloudflare provider readback on October 26, 2026 observed `checkout.foundercontrolroom.org` active on the `founder-control-room` Pages project and a proxied CNAME targeting `founder-control-room.pages.dev`. The reviewed GitHub candidate adds exactly `https://checkout.foundercontrolroom.org` alongside the existing apex browser origin in `FOUNDER_ALLOWED_ORIGINS`, while retaining the canonical Pages `FOUNDER_API_URL` used for Supabase founder-auth callback routing. A configured DNS or Pages domain, source CORS edit, and active Supabase project are separate facts: none verifies a dedicated checkout UI, Stripe transaction, completed payment, hosted Supabase redirect allowlist, merged source, deployed Worker, or successful browser test. Keep founder-final merger, production deployment, Supabase Auth changes, and any commerce/payment mutation gated separately.
+
 ## Temporal truth and intent drift
 
 A statement can be accurate when recorded and wrong when reused later. The Control Room must therefore distinguish five lanes instead of flattening them into one memory value:
