@@ -367,7 +367,8 @@
         "`docs/founder-signal-engine/media-reputation-mcp-v1.md` must separate source proposal, approved rendered media, exact founder review, Buffer draft-only native readback, HubSpot/FCR receipts, and provider-native outcome evidence; no planning output can promote itself to live publication or business growth.",
         "The media handoff documented in `docs/founder-signal-engine/media-reputation-mcp-v1.md` is only a self-attested source, licensed-media and draft-shape review; actual bytes, legal rights, live accounts, founder approval, Buffer-native draft and business outcomes must be independently proven.",
         "`docs/founder-signal-engine/media-reputation-mcp-v1.md` must state public GitHub commit readback is time-bounded and independently verified for existence only, not proof of source claim, rendered/licensed media, account permission, Buffer draft, business impact, merge or deployment.",
-        "`docs/founder-signal-engine/media-reputation-mcp-v1.md` must distinguish local byte-integrity matching from separately authenticated media storage, origin, decoder, licensing and visual inspection; no media validation grants draft/publish authority."
+        "`docs/founder-signal-engine/media-reputation-mcp-v1.md` must distinguish local byte-integrity matching from separately authenticated media storage, origin, decoder, licensing and visual inspection; no media validation grants draft/publish authority.",
+        "`docs/founder-signal-engine/media-reputation-mcp-v1.md` separates a mock-injected authenticated reader contract from a real audited asset storage reader, provenance and rights evidence, decoder and visual inspection, founder review and native Buffer provider readback. Passing mock unit tests cannot prove storage, brand safety or publication."
       ]
     },
     {
@@ -386,6 +387,12 @@
       "path": "src/lib/founderSignalMediaByteCheck.ts",
       "claims": [
         "`src/lib/founderSignalMediaByteCheck.ts` implements only a bounded offline stream hash/PNG-JPEG-WebP-MP4 signature check, not trusted source identity, full media decoding, copyrights/usage rights, content-safety verification, founder approval, Buffer/provider actions, production Media Router wiring or permission to publish."
+      ]
+    },
+    {
+      "path": "src/lib/founderSignalAuthenticatedMediaReader.ts",
+      "claims": [
+        "`src/lib/founderSignalAuthenticatedMediaReader.ts` supplies an isolated dependency-injected, read-only media reader bridge. It requires a server-owned principal/workspace/project, promoted same-project FCR asset registry record, asserted commercial-use permission and domain authority receipt, immutable object version, matching metadata SHA and exact streamed byte count/hash. It never grants media uploads, Buffer draft writes, scheduling, publication or account authority; no live storage adapter is implemented."
       ]
     }
   ]
