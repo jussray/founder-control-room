@@ -131,6 +131,20 @@ describe('Founder Signal Engine standing-policy write gate', () => {
     expect(loadGrant).not.toHaveBeenCalled();
   });
 
+  it('routes only the named review-only campaign tool around standing-grant writes', async () => {
+    const loadGrant=vi.fn(async () => { throw new Error('grant must not be read'); });
+    const writePolicyAudit=vi.fn(async () => { throw new Error('audit must not be written'); });
+    const response=await request(buildApp({loadGrant,writePolicyAudit})).post('/mcp').send({
+      jsonrpc:'2.0',id:7,method:'tools/call',
+      params:{name:'plan_founder_signal_campaign',arguments:{requestedAction:'publish_or_send',
+        allowHubSpotWrite:true,source:{},strategy:{}}},
+    });
+    expect(response.status).toBe(200);
+    expect(response.body.authorization).toBeNull();
+    expect(loadGrant).not.toHaveBeenCalled();
+    expect(writePolicyAudit).not.toHaveBeenCalled();
+  });
+
   it('blocks caller-supplied approval-looking text before loading the standing grant', async () => {
     const loadGrant = vi.fn(async () => grant);
     const response = await request(buildApp({ loadGrant })).post('/mcp').send(
