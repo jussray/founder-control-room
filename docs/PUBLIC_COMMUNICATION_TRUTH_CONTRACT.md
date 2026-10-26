@@ -18,6 +18,10 @@ The founder's documented writing style is not an independently fetched record of
 
 `verify_founder_signal_public_source` is a bounded read-only public API check that distinguishes `VERIFIED_PUBLIC_GITHUB_COMMIT` from `HOLD_UNVERIFIED`. Its success is restricted to currently observed public repository visibility and the exact commit SHA/permalink, and must not be treated as current product behavior, approved content, deployment, security, customers, partners, company ownership, social delivery or actual performance. GitHub API unavailability and private repository visibility remain hold states, not permission to guess. Independently refresh public source verification when a planned campaign is prepared for authorized provider action; never accept caller-supplied check objects as approval.
 
+### Media-byte SHA verification does not verify ownership or permission
+
+The isolated `checkFounderSignalMediaBytes` stage can digest a bounded, already-supplied stream and inspect basic PNG/JPEG/WebP/MP4 signatures. It proves only **local byte equality** to a declared hash plus shallow container markers; no producer identity, actual public visibility, visual accuracy, licensing, release rights, account identity, founder permission, or Buffer provider action is established. It cannot be used as authorization to create a draft or publish. Production use requires a separate authenticated storage reader, full safe media decode, source/rights evidence, exact-payload approval and existing publication-truth policies.
+
 ## Required posting loop
 
 ```text
