@@ -498,3 +498,9 @@ Provider configuration, site wiring, observed clicks, and commercial outcomes re
 **Source Guard** adds read-only repository checks for the documented guard boundaries and the portfolio conversion-tracking data contract. See [Source Guard documentation](docs/SOURCE_GUARD.md), scripts/verify-sauce-source-guard.mjs, the Node regression tests, and the separate GitHub Actions workflow. Source Guard complements, but does not replace, [Documentation Truth](.github/workflows/documentation-truth.yml).
 
 **Truth boundary:** checked-in policy and tests are source evidence only. A passing workflow does **not** establish that public content was approved or published, that the collector receives real site traffic, or that live security/runtime controls operate correctly. No new deploy, merge, publication, provider-mutation or deletion authority is granted.
+
+## 2026-10-26 locked-install and StoryEngine evidence update
+
+FCR PR #1024 replaces four unlocked `npm install` commands in the core CI Type check, Lint, Test, and Playwright e2e jobs with `npm ci --no-audit --no-fund` against the committed npm lockfile. This restricts dependency installation to the reviewed lockfile; it does not by itself prove that those jobs pass, that the dependency supply chain is safe, or that a release is authorized.
+
+The FCR Playwright workflow previously expected StoryEngine `refs/heads/main` at `87501be2da31d12f421b0ed2da49df357fc9fcb1`. An authenticated read of the StoryEngine branch now resolves to `499f2d4eb9edac8bb11b657cf003a056263528d9`. The exact peer SHA in the workflow is refreshed as a prerequisite for a new federation witness only. All browser, directive, receipt, runtime-identity, and repository-protection claims for the successor FCR head remain **UNKNOWN** until its own exact-head checks complete. Merge, deploy, provider writes, spending, and publication remain separately founder-gated.
