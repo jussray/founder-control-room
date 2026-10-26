@@ -142,7 +142,11 @@ describe('Founder Signal Engine remote MCP', () => {
     expect(initialized.status).toBe(200);
     expect(initialized.body.result.protocolVersion).toBe('2025-06-18');
     expect(listed.status).toBe(200);
-    expect(listed.body.result.tools).toHaveLength(3);
+    expect(listed.body.result.tools).toHaveLength(4);
+    expect(listed.body.result.tools[3]).toMatchObject({
+      name: 'verify_founder_signal_public_source',
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
+    });
     expect(listed.body.result.tools[2]).toMatchObject({
       name: 'review_founder_signal_draft_handoff',
       annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
@@ -233,6 +237,54 @@ describe('Founder Signal Engine remote MCP', () => {
     expect(fetchFn).not.toHaveBeenCalled();
     expect(resolveProjectId).not.toHaveBeenCalled();
     expect(writeAuditEvent).not.toHaveBeenCalled();
+  });
+
+  it('verifies exact public GitHub commit readbacks through MCP without database writes', async () => {
+    const repo='jussray/founder-control-room';
+    const sha='a'.repeat(40);
+    const proof='https://github.com/' + repo + '/commit/' + sha;
+    const fetchFn=vi.fn(async (url: string | URL | Request) => {
+      const value=String(url);
+      if(value==='https://api.github.com/repos/'+repo) {
+        return new globalThis.Response(JSON.stringify({full_name:repo,private:false}),{
+          status:200,headers:{'content-type':'application/json'},
+        });
+      }
+      if(value==='https://api.github.com/repos/'+repo+'/commits/'+sha) {
+        return new globalThis.Response(JSON.stringify({sha,html_url:proof}),{
+          status:200,headers:{'content-type':'application/json'},
+        });
+      }
+      throw new Error('Unexpected source or provider');
+    });
+    const resolveProjectId=vi.fn(async () => {throw new Error('No DB lookup allowed');});
+    const writeAuditEvent=vi.fn(async () => {throw new Error('No DB write allowed');});
+    const app=buildApp({fetchFn:fetchFn as unknown as typeof fetch,resolveProjectId,writeAuditEvent});
+    const response=await request(app).post(ENDPOINT)
+      .set('Authorization', `Bearer ${TOKEN}`)
+      .send(rpc('tools/call',{name:'verify_founder_signal_public_source',arguments:{
+        repository:repo,commitSha:sha,proofUrl:proof,
+      }}));
+    expect(response.status).toBe(200);
+    expect(response.body.result.structuredContent.status).toBe('VERIFIED_PUBLIC_GITHUB_COMMIT');
+    expect(response.body.result.structuredContent.authorizesPublish).toBe(false);
+    expect(response.body.result.structuredContent.sourceClaimVerified).toBe(false);
+    expect(fetchFn).toHaveBeenCalledTimes(2);
+    expect(resolveProjectId).not.toHaveBeenCalled();
+    expect(writeAuditEvent).not.toHaveBeenCalled();
+  });
+
+  it('holds forged GitHub public-source evidence with no external request', async () => {
+    const fetchFn=vi.fn(async () => {throw new Error('No provider request should occur');});
+    const app=buildApp({fetchFn:fetchFn as unknown as typeof fetch});
+    const response=await request(app).post(ENDPOINT)
+      .set('Authorization', `Bearer ${TOKEN}`)
+      .send(rpc('tools/call',{name:'verify_founder_signal_public_source',arguments:{
+        repository:'unowned/example',commitSha:'a'.repeat(40),proofUrl:'https://example.org/not-github',
+      }}));
+    expect(response.status).toBe(200);
+    expect(response.body.result.structuredContent.status).toBe('HOLD_UNVERIFIED');
+    expect(fetchFn).not.toHaveBeenCalled();
   });
 
   it('rejects unsafe MCP campaign facts before any provider interaction', async () => {
