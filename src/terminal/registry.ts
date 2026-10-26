@@ -112,6 +112,10 @@ export const TERMINAL_COMMANDS: readonly TerminalCommandSpec[] = [
   ...gitReadCommands('chief-ai-machine', 'chief-ai-machine'),
   cookieVerification('chief-ai-machine', 'chief-ai-machine'),
 
+  // SignalLoop stays in its own checkout and runtime. The legacy terminal permits
+  // only exact-head Git observations; build and browser proof require an L99 sandbox.
+  ...gitReadCommands('signal-loop', 'signal-loop'),
+
   ...gitReadCommands('juss-beautiful-hair-private', 'jbh-private'),
   spec('juss-beautiful-hair-private', 'jbh-private/admin', 'deps.install', 'Install private hair dependencies', 'npm', ['ci', '--no-audit', '--no-fund'], 'write', {timeoutMs: INSTALL_TIMEOUT}),
   ...playwrightSetupCommands('juss-beautiful-hair-private', 'jbh-private/admin'),

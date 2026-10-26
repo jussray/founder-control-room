@@ -305,6 +305,19 @@ export default {
       return relaySyncControl(request, env);
     }
 
+    // The Pages asset layer canonicalizes /work.html -> /work with a 308,
+    // and /work is a public page, not an API route. Ask ASSETS for the
+    // canonical /work URL itself: fetching the /work.html filename returns
+    // the asset layer's 308 back to /work, and returning it verbatim loops
+    // /work -> /work forever. Falling through to the API proxy instead
+    // answers without the service identity header and yields a 503 degraded
+    // page for a link on the public homepage.
+    if (requestUrl.pathname === '/work' || requestUrl.pathname === '/work/') {
+      const assetUrl = new URL(request.url);
+      assetUrl.pathname = '/work';
+      return env.ASSETS.fetch(new Request(assetUrl, request));
+    }
+
     if (shouldServeFromPages(request)) {
       return env.ASSETS.fetch(request);
     }

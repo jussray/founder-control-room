@@ -112,6 +112,8 @@ Those remain separate founder approval gates. Approval never carries forward.
 
 `public/_worker.js` must treat public discovery files such as `/robots.txt`, `/sitemap.xml`, `/llms.txt`, and `/crawlers.json` as static Pages assets and serve them through `env.ASSETS`. API-owned callback assets stay on `env.FCR_API`; the presence of crawler policy metadata never becomes authentication, write authority, provider-mutation authority, deployment authority, or publication authority.
 
+The same classification covers the public work page: the Pages asset layer canonicalizes `/work.html` to `/work` with a 308, and `public/_worker.js` must serve the bare `/work` and `/work/` paths by requesting the canonical `/work` URL through `env.ASSETS` — requesting the `/work.html` filename returns that 308 to the browser and loops `/work` onto itself. Falling through to the `FCR_API` proxy answers that public page without the service identity header and yields a degraded 503, so the canonical static request is the only correct route for it.
+
 That routing distinction is source truth only. A repository diff or green unit test cannot prove the deployed Pages artifact currently serves the exact file, so the applicable Pages deployment and browser/runtime witness remain separate evidence gates.
 
 ## HTTP surfaces
@@ -198,6 +200,14 @@ Expanding this remote grant beyond Chief AI + Founder Control Room is a separate
 Cloudflare outbound email is a capability boundary, not a global portfolio transport. Founder Control Room's canonical Worker uses the `FCR_EMAIL` send binding and pins the sender identity to `welcome@api.foundercontrolroom.org`; the application wrapper does not accept caller-controlled `from`. Other projects do not inherit that binding merely because they share the same founder or Cloudflare account.
 
 Repository configuration can prove the desired binding name and sender restriction. It cannot prove Cloudflare has onboarded the sender domain, the deployed Worker currently exposes that binding, or a message was accepted/delivered. Those claims require fresh provider/runtime evidence and must remain separate from source truth.
+
+## Review-email inbound routing boundary
+
+`wrangler.email.toml` is source truth for the `founder-control-room-review-email` Worker identity, source entrypoint, Cloudflare account, public-route posture, private `FOUNDER_CONTROL_ROOM_API -> founder-control-room` Service Binding, and one bounded Email Routing desired-state declaration: `addresses = ["review@foundercontrolroom.org"]`. Cloudflare documents top-level `addresses` for Worker Email Routing on Wrangler 4.113+; the pinned review-email deploy uses Wrangler 4.129.0.
+
+A successful `wrangler deploy --config wrangler.email.toml` may reconcile that literal address-to-Worker rule, but deploy output is still not independent provider readback. The live Cloudflare rule, zone-level `support_subaddress` setting required for `review+<context-uuid>@...`, and an actual inbound-email invocation remain separate evidence planes. The lane also consumes Wrangler structured deploy telemetry: if Wrangler records a completed Worker deployment and then exits nonzero during a later reconciliation phase, the receipt must preserve `provider_deploy_succeeded=true` and a post-deploy blocked stage instead of falsely recording no production mutation. First deployment is two-phase: when the Worker is absent, the trusted reconciliation lane creates it from a temporary config with `addresses` removed and stops at `provider_secret_bootstrap`; only a later authorized canonical deploy may reconcile `review@` after required secrets exist.
+
+The reconciliation receipt therefore keeps `provider_deploy_succeeded`, `email_trigger_reconciled`, and `runtime_email_invocation_proven` independent. Worker/managed-route deployment must never promote provider readback or runtime invocation to green without their own evidence.
 
 ## Worker build authority membrane
 
