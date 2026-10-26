@@ -305,6 +305,16 @@ export default {
       return relaySyncControl(request, env);
     }
 
+    // The edge redirect rule sends /work.html -> /work, and /work is a public
+    // page, not an API route. Serve the static asset directly: falling through
+    // to the API proxy answers without the service identity header and yields
+    // a 503 degraded page for a link on the public homepage.
+    if (requestUrl.pathname === '/work' || requestUrl.pathname === '/work/') {
+      const assetUrl = new URL(request.url);
+      assetUrl.pathname = '/work.html';
+      return env.ASSETS.fetch(new Request(assetUrl, request));
+    }
+
     if (shouldServeFromPages(request)) {
       return env.ASSETS.fetch(request);
     }
