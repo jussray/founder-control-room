@@ -338,6 +338,30 @@
       "claims": [
         "`wrangler.email.toml` must declare the review-email Worker identity, account, entrypoint, private `FOUNDER_CONTROL_ROOM_API -> founder-control-room` Service Binding, and exactly one top-level `addresses` value `review@foundercontrolroom.org`; this is desired state for Wrangler reconciliation, not proof of provider readback or runtime invocation."
       ]
+    },
+    {
+      "path": "src/http/routes/founderSignalEngineMcp.ts",
+      "claims": [
+        "`src/http/routes/founderSignalEngineMcp.ts` retains `invoke_founder_signal_engine` under the exact standing write-policy boundary while adding `plan_founder_signal_campaign` as an authenticated read-only local editorial tool. A submitted campaign package is USER_SUPPLIED_UNVERIFIED and grants no Buffer, HubSpot, Zapier, publication, schedule, media or model side effect."
+      ]
+    },
+    {
+      "path": "src/http/middleware/founderSignalEngineWriteGate.ts",
+      "claims": [
+        "`src/http/middleware/founderSignalEngineWriteGate.ts` routes only the named review-only campaign tool without standing-grant resolution or write-side policy audit; the downstream tool schema rejects unexpected fields. This is not a caller-supplied standing publication approval."
+      ]
+    },
+    {
+      "path": "src/lib/founderSignalCampaignPlanner.ts",
+      "claims": [
+        "`src/lib/founderSignalCampaignPlanner.ts` uses existing platform/capability registry to create distinct proposed copy, relevant hashtags, media directions, 5W1H, documented founder style, and non-authorizing continuity markers. Media remains NOT_RENDERED, recent posting style requires provenance-linked provider history, and outcome/performance claims require independent live proof; reputational heuristics do not certify safety."
+      ]
+    },
+    {
+      "path": "docs/founder-signal-engine/media-reputation-mcp-v1.md",
+      "claims": [
+        "`docs/founder-signal-engine/media-reputation-mcp-v1.md` must separate source proposal, approved rendered media, exact founder review, Buffer draft-only native readback, HubSpot/FCR receipts, and provider-native outcome evidence; no planning output can promote itself to live publication or business growth."
+      ]
     }
   ]
 }
