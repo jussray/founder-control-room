@@ -14,6 +14,10 @@ The founder's documented writing style is not an independently fetched record of
 
 `review_founder_signal_draft_handoff` is a read-only preview that calls the canonical first-party publisher validator in `mode=draft` with no external adapter. It reconstructs the draft from the original campaign brief, checks declared media/rights/hash/verdict correlations, and always marks source, rights, visual inspection, account ownership, provider delivery and founder approval **unverified**. Any locally valid return includes `handoffReady=false` and zero permissions to create a Buffer draft, schedule, publish or contact a third party. Caller-provided checks cannot replace independent rights, media bytes, current destination and exact approval evidence; the existing lifecycle/Buffer source authority must independently verify its own gates before a provider write.
 
+### Public GitHub evidence: existence does not establish business proof
+
+`verify_founder_signal_public_source` is a bounded read-only public API check that distinguishes `VERIFIED_PUBLIC_GITHUB_COMMIT` from `HOLD_UNVERIFIED`. Its success is restricted to currently observed public repository visibility and the exact commit SHA/permalink, and must not be treated as current product behavior, approved content, deployment, security, customers, partners, company ownership, social delivery or actual performance. GitHub API unavailability and private repository visibility remain hold states, not permission to guess. Independently refresh public source verification when a planned campaign is prepared for authorized provider action; never accept caller-supplied check objects as approval.
+
 ## Required posting loop
 
 ```text
