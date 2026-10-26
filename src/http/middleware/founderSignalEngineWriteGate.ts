@@ -438,7 +438,7 @@ export function createFounderSignalEngineWriteGate(
     // Explicitly advisory MCP tool: never let malformed caller fields route
     // this tool into standing-grant resolution or provider-write policy audits.
     // The downstream MCP handler strictly validates its own campaign schema.
-    if (params?.name === 'plan_founder_signal_campaign') {
+    if (params?.name === 'plan_founder_signal_campaign' || params?.name === 'review_founder_signal_draft_handoff') {
       next();
       return;
     }
