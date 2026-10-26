@@ -343,14 +343,16 @@
       "path": "src/http/routes/founderSignalEngineMcp.ts",
       "claims": [
         "`src/http/routes/founderSignalEngineMcp.ts` retains `invoke_founder_signal_engine` under the exact standing write-policy boundary while adding `plan_founder_signal_campaign` as an authenticated read-only local editorial tool. A submitted campaign package is USER_SUPPLIED_UNVERIFIED and grants no Buffer, HubSpot, Zapier, publication, schedule, media or model side effect.",
-        "The MCP route now also exposes authenticated `review_founder_signal_draft_handoff` as an isolated read-only tool while retaining the original invoke and campaign-plan tools; it must not use Zapier, HubSpot, provider writes or local persistence."
+        "The MCP route now also exposes authenticated `review_founder_signal_draft_handoff` as an isolated read-only tool while retaining the original invoke and campaign-plan tools; it must not use Zapier, HubSpot, provider writes or local persistence.",
+        "`src/http/routes/founderSignalEngineMcp.ts` now also exposes authenticated read-only `verify_founder_signal_public_source` without Zapier, Buffer, HubSpot, model, media or database writes; a GitHub public commit source readback never grants publishing authority."
       ]
     },
     {
       "path": "src/http/middleware/founderSignalEngineWriteGate.ts",
       "claims": [
         "`src/http/middleware/founderSignalEngineWriteGate.ts` routes only the named review-only campaign tool without standing-grant resolution or write-side policy audit; the downstream tool schema rejects unexpected fields. This is not a caller-supplied standing publication approval.",
-        "The write gate exempts only the specifically named read-only campaign and handoff preview tools from mutation policy processing, while the original invocation still obeys exact standing authorization and audited provider boundaries."
+        "The write gate exempts only the specifically named read-only campaign and handoff preview tools from mutation policy processing, while the original invocation still obeys exact standing authorization and audited provider boundaries.",
+        "`src/http/middleware/founderSignalEngineWriteGate.ts` must isolate only the named read-only source verification from standing write authorization, preserving the existing separate approval and provider policy boundary for mutation."
       ]
     },
     {
@@ -363,13 +365,20 @@
       "path": "docs/founder-signal-engine/media-reputation-mcp-v1.md",
       "claims": [
         "`docs/founder-signal-engine/media-reputation-mcp-v1.md` must separate source proposal, approved rendered media, exact founder review, Buffer draft-only native readback, HubSpot/FCR receipts, and provider-native outcome evidence; no planning output can promote itself to live publication or business growth.",
-        "The media handoff documented in `docs/founder-signal-engine/media-reputation-mcp-v1.md` is only a self-attested source, licensed-media and draft-shape review; actual bytes, legal rights, live accounts, founder approval, Buffer-native draft and business outcomes must be independently proven."
+        "The media handoff documented in `docs/founder-signal-engine/media-reputation-mcp-v1.md` is only a self-attested source, licensed-media and draft-shape review; actual bytes, legal rights, live accounts, founder approval, Buffer-native draft and business outcomes must be independently proven.",
+        "`docs/founder-signal-engine/media-reputation-mcp-v1.md` must state public GitHub commit readback is time-bounded and independently verified for existence only, not proof of source claim, rendered/licensed media, account permission, Buffer draft, business impact, merge or deployment."
       ]
     },
     {
       "path": "src/lib/founderSignalDraftHandoff.ts",
       "claims": [
         "`src/lib/founderSignalDraftHandoff.ts` must rebuild a canonical campaign, hold stale or reputation-blocked drafts, accept only bounded public-safe media references, and call the existing first-party publisher validator in mode draft. It never verifies media bytes or rights and returns handoffReady false, no Buffer/local-draft, schedule, publish, or provider authority."
+      ]
+    },
+    {
+      "path": "src/lib/founderSignalPublicSourceCheck.ts",
+      "claims": [
+        "`src/lib/founderSignalPublicSourceCheck.ts` must verify exact owned public GitHub repository visibility and immutable commit SHA/permalink using bounded GET-only GitHub API reads, never trust caller-supplied public/source proofs, and always distinguish exact commit existence from deployed features, outcomes, visual media and release authority."
       ]
     }
   ]
