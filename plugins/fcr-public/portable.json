@@ -1,0 +1,42 @@
+{
+  "format": "fcr-portable-mcp-profile/v1",
+  "id": "org.foundercontrolroom.public",
+  "name": "founder-control-room",
+  "version": "0.1.0",
+  "releaseStage": "pre-release",
+  "description": "FCR public tenant-scoped project evidence; a source candidate, not an enabled service or an execution authority.",
+  "mcp": {
+    "transport": "streamable-http",
+    "url": "https://api.foundercontrolroom.org/mcp/public",
+    "authentication": {
+      "type": "oauth2",
+      "scopes": [
+        "openid"
+      ]
+    }
+  },
+  "tools": [
+    {
+      "name": "fcr_list_my_projects",
+      "mode": "read-only",
+      "result": "projects[] with projectId, name, status, observedAt, executionAuthorized=false"
+    },
+    {
+      "name": "fcr_get_my_project",
+      "mode": "read-only",
+      "input": {
+        "projectId": "UUID returned to this authenticated user"
+      },
+      "result": "project with projectId, name, status, observedAt, executionAuthorized=false"
+    }
+  ],
+  "authority": {
+    "externalActions": false,
+    "founderOnlyRoutesExcluded": [
+      "/mcp",
+      "/mcp/read"
+    ],
+    "projectGrantSource": "server-verified active tenant membership"
+  },
+  "skill": "skills/fcr-public-workflows/SKILL.md"
+}

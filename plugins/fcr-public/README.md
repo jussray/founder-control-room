@@ -31,7 +31,7 @@ The plugin `mcp.json` deliberately declares OAuth without a fabricated `clientId
 
 ## Authority gate
 
-The maintainer alone decides whether to commit, open a PR, merge, deploy, give reviewer access, submit, or publish. This artifact is a local proposal; no provider or account state was changed.
+The maintainer alone decides whether to commit, open a PR, merge, deploy, give reviewer access, submit, or publish. This package remains a pre-release source proposal; a repository branch commit alone changes no provider or account state.
 
 ## Verification
 
@@ -40,3 +40,22 @@ Run `node scripts/verify-fcr-public-plugin.mjs` from the repository root after c
 ## Public route candidate (new in patch)
 
 The patch adds a disabled-by-default `/mcp/public` endpoint with a two-tool read-only catalog, server-verified Supabase OAuth user identity, client-ID allowlisting, and tenant-scoped membership/project reads. It does **not** supply public account creation, the production OAuth consent UI, a live database migration, persisted external read receipts, or production runtime proof. It uses the OIDC `openid` scope and enforces database read permissions independently through memberships. The proposed schema is a design file, not an applied migration. Never enable `FCR_PUBLIC_MCP_ENABLED` until the remaining gates are verified.
+
+## Model-neutral profile and reproducible export
+
+This repository has **one canonical FCR public plugin** under `plugins/fcr-public/`; the separate ULTRATHINK and GODMODE-style reasoning skills are not copies of this MCP tool package. Do not create a second FCR plugin directory to support another model.
+
+- `portable.json` is a **FCR-owned, vendor-neutral profile** (not an external interoperability standard). It identifies the exact public endpoint, the two non-authorizing tools, OAuth scope, and excluded founder-only routes.
+- `mcp.json` supplies the MCP transport details for compatible clients. Its `com.openai` extension and `plugin.json` review metadata are optional client-specific metadata, **not** additional authority or a dependency of the skill.
+- `skills/fcr-public-workflows/SKILL.md` is Markdown and can be read by Claude, ChatGPT, Codex, Gemini, or another capable agent. Any runtime must independently support and authenticate the public MCP server; simply loading Markdown or the manifest does not create a connection.
+
+From the repository root, run:
+
+```sh
+node scripts/verify-fcr-public-plugin.mjs
+python3 scripts/export-fcr-public-plugin.py --output dist/fcr-public-plugin.zip
+```
+
+The first command checks manifest/skill/review consistency and performs a deterministic ZIP self-test. The second creates a ZIP with exactly six reviewed files (no repository config, secrets, or extra skill copies); it refuses to overwrite a different existing archive. `--check` tests exporting without leaving an archive behind.
+
+A ZIP is **an offline distribution artifact only**. Do not enable `FCR_PUBLIC_MCP_ENABLED`, claim verified tenant isolation, register external connectors, or publish the plugin until the release blockers above have independent proof. No merge or deployment is implied by a branch commit.
