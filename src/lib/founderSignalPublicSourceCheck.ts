@@ -6,7 +6,7 @@
 export const FSE_PUBLIC_SOURCE_TOOL = 'verify_founder_signal_public_source' as const;
 export const FSE_PUBLIC_SOURCE_CONTRACT = 'fcr/founder-signal-public-source-check@v1' as const;
 const SHA = /^[a-f0-9]{40}$/i;
-const REPO = /^jussray\/[A-Za-z0-9_.-]{1,80}$/i;
+const REPO = /^jussray\/(?:[A-Za-z0-9]|[A-Za-z0-9][A-Za-z0-9_.-]{0,78}[A-Za-z0-9])$/i;
 const HOST = 'https://api.github.com';
 type JsonRecord = Record<string, unknown>;
 const record = (x: unknown): JsonRecord | null =>
