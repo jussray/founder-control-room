@@ -13,6 +13,12 @@ Founder Control Room uses Cloudflare Pages for the browser frontend and one cano
 
 The former `founder-control-room2` Worker was retired. Its identity and `wrangler.api.toml` must not be recreated or targeted without a new explicit authority decision.
 
+### Review-email Worker and Email Routing
+
+`wrangler.email.toml` defines the `founder-control-room-review-email` Worker source identity, entrypoint, account, public-route posture, private `FOUNDER_CONTROL_ROOM_API -> founder-control-room` Service Binding, and exactly one Wrangler-managed Email Routing desired state: `addresses = ["review@foundercontrolroom.org"]`. If the Worker is missing, the bounded reconciliation workflow bootstraps it with a temporary no-`addresses` config and stops for secret provisioning; that bootstrap must not create or take over an Email Routing rule.
+
+With the pinned Wrangler 4.129.0, deploy may reconcile that literal address-to-Worker rule. Required-secret-name readback, Worker deploy success, managed-route intent, provider route readback, the zone-level subaddressing setting required for `review+<context-uuid>@...`, and a real inbound invocation are still distinct proof layers. `email_trigger_reconciled:true` requires provider readback of the live rule; runtime invocation requires a separate inbound-email execution receipt.
+
 ## Pages behavior
 
 The Pages project publishes `dist-pages`, a deterministic copy of `public/` containing the landing page, authenticated Control Room application, security headers, and `public/_worker.js`.
@@ -28,6 +34,8 @@ Current merged source uses this contract:
 7. fail closed with a bounded 503 recovery response when the service binding is absent, unreachable, returns Cloudflare upstream failure status, or fails service identity verification.
 
 Public discovery artifacts including `/robots.txt`, `/sitemap.xml`, `/llms.txt`, and `/crawlers.json` are static Pages assets and must remain on `env.ASSETS`; API-owned callback assets remain on `env.FCR_API`. This path classification is not authentication and cannot create crawler write authority, provider mutation authority, deployment authority, or publication authority.
+
+The bare `/work` and `/work/` paths carry the same static classification: `public/_worker.js` serves them by requesting the canonical `/work` URL through `env.ASSETS`, because the asset layer canonicalizes `/work.html` to `/work` with a 308 (requesting the filename loops) while the `FCR_API` proxy path answers that public page with a degraded 503. The bare `/welcome` and `/welcome/` paths carry the same static classification: `public/_worker.js` serves them by requesting the canonical `/welcome` URL through `env.ASSETS`, because the extensionless welcome path otherwise falls through to the `FCR_API` proxy and answers with a degraded 503.
 
 `API_ORIGIN = https://api.foundercontrolroom.org` remains part of request construction/loop protection in source. Dynamic network execution is performed through `FCR_API.fetch(...)`, not a direct public-origin `fetch()` call.
 
