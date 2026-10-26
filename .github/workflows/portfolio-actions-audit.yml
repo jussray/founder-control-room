@@ -5,11 +5,13 @@ on:
     branches: [main]
     paths:
       - 'scripts/portfolio-actions-audit.mjs'
+      - 'scripts/mint-portfolio-github-app-token.mjs'
       - '.github/workflows/portfolio-actions-audit.yml'
   push:
     branches: [main]
     paths:
       - 'scripts/portfolio-actions-audit.mjs'
+      - 'scripts/mint-portfolio-github-app-token.mjs'
       - '.github/workflows/portfolio-actions-audit.yml'
   schedule:
     - cron: '23 6 * * *'
@@ -48,6 +50,8 @@ jobs:
           node-version: '24'
       - name: Exercise source classifications
         run: node scripts/portfolio-actions-audit.mjs --self-test
+      - name: Validate read-only audit token permissions without credentials
+        run: node scripts/mint-portfolio-github-app-token.mjs --self-test-token-profiles
 
   observe:
     name: Audit accessible installation repositories (read-only)
@@ -71,7 +75,7 @@ jobs:
           APP_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}
           GITHUB_APP_OWNER: jussray
           PORTFOLIO_SYNC_TOKEN_FILE: ${{ runner.temp }}/portfolio-audit-token
-        run: node scripts/mint-portfolio-github-app-token.mjs
+        run: node scripts/mint-portfolio-github-app-token.mjs --actions-audit-read-only
       - name: Collect bounded exact-head and stale evidence
         shell: bash
         env:

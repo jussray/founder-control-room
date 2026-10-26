@@ -9,7 +9,7 @@ const STALE_DAYS = 30;
 const TERMINAL_FAILURES = new Set(['failure', 'timed_out', 'startup_failure', 'action_required']);
 const hash = (value) => 'sha256:' + createHash('sha256').update(JSON.stringify(value)).digest('hex');
 
-function assess({ archived, workflowCount, runs, head, pushedAt, now, truncated }) {
+function assess({ archived, workflowCount, runs, head, headCommittedAt, now, truncated }) {
   if (archived) return 'ARCHIVED';
   if (workflowCount === null) return 'UNKNOWN_WORKFLOW_COVERAGE';
   if (workflowCount === 0) return 'NO_WORKFLOWS';
@@ -23,14 +23,14 @@ function assess({ archived, workflowCount, runs, head, pushedAt, now, truncated 
   if (exact.some((r) => !['success', 'skipped', 'neutral'].includes(r.conclusion))) {
     return 'UNKNOWN_ACTION_CONCLUSION';
   }
-  const age = (now - Date.parse(pushedAt || '')) / 86_400_000;
+  const age = (now - Date.parse(headCommittedAt || '')) / 86_400_000;
   if (!Number.isFinite(age) || age < 0) return 'UNKNOWN_FRESHNESS';
   if (age > STALE_DAYS) return 'STALE_SOURCE_30D';
   return 'OBSERVED_CHECKS_ONLY';
 }
 function selfTest() {
   const base = { archived: false, workflowCount: 1, runs: [], head: 'a'.repeat(40),
-    pushedAt: new Date().toISOString(), now: Date.now(), truncated: false };
+    headCommittedAt: new Date().toISOString(), now: Date.now(), truncated: false };
   assert.equal(assess(base), 'NO_EXACT_HEAD_ACTION_EVIDENCE');
   assert.equal(assess({ ...base, workflowCount: 0 }), 'NO_WORKFLOWS');
   assert.equal(assess({ ...base, runs: [{ head_sha: base.head, status: 'completed', conclusion: 'failure' }] }), 'FAILED_EXACT_HEAD');
@@ -38,7 +38,11 @@ function selfTest() {
   assert.equal(assess({ ...base, runs: [{ head_sha: base.head, status: 'completed', conclusion: 'success' }], truncated: true }), 'INCOMPLETE_EXACT_HEAD_COVERAGE');
   assert.equal(assess({ ...base, archived: true }), 'ARCHIVED');
   assert.equal(assess({ ...base, workflowCount: null }), 'UNKNOWN_WORKFLOW_COVERAGE');
-  console.log('Portfolio classification regression: 7 assertions passed; this does NOT verify any external repository');
+  assert.equal(assess({ ...base, runs: [{ head_sha: base.head, status: 'completed', conclusion: 'cancelled' }] }), 'CANCELLED_EXACT_HEAD');
+  assert.equal(assess({ ...base, runs: [{ head_sha: base.head, status: 'in_progress', conclusion: null }] }), 'PENDING_EXACT_HEAD');
+  assert.equal(assess({ ...base, runs: [{ head_sha: base.head, status: 'completed', conclusion: 'success' }],
+    headCommittedAt: new Date(base.now - 31 * 86_400_000).toISOString() }), 'STALE_SOURCE_30D');
+  console.log('Portfolio classification regression: 10 assertions passed; this does NOT verify any external repository');
 }
 
 async function main() {
@@ -99,6 +103,10 @@ async function main() {
         state: 'UNKNOWN',
         limitation: 'No production actions or end-user operations are verified by GitHub checks'
       };
+      if (result.archived) {
+        result.state = 'ARCHIVED';
+        return result;
+      }
       try {
         if (!/^[-\w.]+\/[-\w.]+$/.test(fullName)) throw new Error('INVALID_REPO_NAME');
         const key = fullName.split('/').map(encodeURIComponent).join('/');
@@ -109,6 +117,7 @@ async function main() {
           api('/repos/' + key + '/actions/runs?per_page=' + MAX_HEAD_RUNS + '&branch=' + encodeURIComponent(branch))
         ]);
         const head = headResponse.commit?.sha;
+        const headCommittedAt = headResponse.commit?.commit?.committer?.date || null;
         result.head = typeof head === 'string' && /^[a-f0-9]{40}$/.test(head) ? head : null;
         result.workflowCount = Number.isInteger(workflowResponse.total_count) ? workflowResponse.total_count : null;
         const runs = Array.isArray(actionResponse.workflow_runs) ? actionResponse.workflow_runs : [];
@@ -116,7 +125,7 @@ async function main() {
         result.sampledExactHeadRuns = matching.length;
         result.sampledFailures = matching.filter((run) => TERMINAL_FAILURES.has(run.conclusion)).length;
         result.state = assess({ archived: r.archived, workflowCount: result.workflowCount,
-          runs, head: result.head, pushedAt: r.pushed_at, now,
+          runs, head: result.head, headCommittedAt, now,
           truncated: Number(actionResponse.total_count || 0) > MAX_HEAD_RUNS });
       } catch (error) {
         result.state = 'UNKNOWN_READ_BLOCKED';
@@ -158,6 +167,7 @@ async function main() {
     limitations: [
       'Accessible installation repositories can be fewer than the authenticated user portfolio',
       'Latest 100 branch workflow runs are sampled and may omit older exact-head runs',
+      'Freshness is based on the default-branch head commit date, not other branch pushes',
       'Passing checks are NOT proof of successful deployed actions',
       'Private repository names are per-run pseudonyms, not published names'
     ]
