@@ -1,6 +1,7 @@
 import { timingSafeEqual } from 'node:crypto';
 import { FOUNDER_SIGNAL_CAMPAIGN_TOOL, planFounderSignalCampaign } from '../../lib/founderSignalCampaignPlanner.js';
 import { FSE_HANDOFF_TOOL, reviewFounderSignalDraftHandoff } from '../../lib/founderSignalDraftHandoff.js';
+import { FSE_PUBLIC_SOURCE_TOOL, verifyFounderSignalPublicSource } from '../../lib/founderSignalPublicSourceCheck.js';
 import type { Request, RequestHandler, Response as ExpressResponse } from 'express';
 import { supabase } from '../../lib/supabaseClient.js';
 
@@ -675,6 +676,24 @@ function handoffToolDefinition(): DbRecord {
   };
 }
 
+function publicSourceToolDefinition(): DbRecord {
+  return {
+    name: FSE_PUBLIC_SOURCE_TOOL,
+    title: 'Verify Public Founder Signal GitHub Commit (Read-Only)',
+    description: 'Independently check publicly accessible GitHub repository visibility and exact immutable commit SHA using bounded unauthenticated GET readbacks to api.github.com. Never proves post claims, launch, media rights, publishing or user outcomes.',
+    inputSchema: {
+      type: 'object', additionalProperties: false,
+      required: ['repository', 'commitSha', 'proofUrl'],
+      properties: {
+        repository: { type: 'string', pattern: '^jussray/[A-Za-z0-9_.-]{1,80}$' },
+        commitSha: { type: 'string', pattern: '^[a-fA-F0-9]{40}$' },
+        proofUrl: { type: 'string', format: 'uri' },
+      },
+    },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  };
+}
+
 function toolDefinition(): DbRecord {
   return {
     name: TOOL_NAME,
@@ -1254,7 +1273,7 @@ export function createFounderSignalEngineMcpHandler(
       return;
     }
     if (body.method === 'tools/list') {
-      res.json(rpcResult(id, { tools: [toolDefinition(), campaignToolDefinition(), handoffToolDefinition()] }));
+      res.json(rpcResult(id, { tools: [toolDefinition(), campaignToolDefinition(), handoffToolDefinition(), publicSourceToolDefinition()] }));
       return;
     }
     if (body.method !== 'tools/call') {
@@ -1263,6 +1282,22 @@ export function createFounderSignalEngineMcpHandler(
     }
 
     const params = isRecord(body.params) ? body.params : null;
+    if (params?.name === FSE_PUBLIC_SOURCE_TOOL) {
+      try {
+        const check = await verifyFounderSignalPublicSource(params.arguments, {
+          fetchFn: dependencies.fetchFn,
+        });
+        res.json(rpcResult(id, {
+          content: [{ type: 'text', text: 'Public GitHub source check completed. Existence of a commit is not evidence of deployment, product claims, customers or publication.' }],
+          structuredContent: check,
+          isError: false,
+        }));
+      } catch {
+        res.status(503).json(rpcError(id, -32008, 'Public GitHub source verification unavailable'));
+      }
+      return;
+    }
+
     if (params?.name === FSE_HANDOFF_TOOL) {
       try {
         const result = reviewFounderSignalDraftHandoff(params.arguments);
