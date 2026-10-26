@@ -61,6 +61,11 @@ export function reviewFounderSignalDraftHandoff(raw: unknown) {
     fail('platformCharacterLimit must be an integer from 1 to 5000');
   }
 
+  if (capability.safeCharacterLimit !== null && limit !== undefined &&
+    Number(limit) > capability.safeCharacterLimit) {
+    fail('account limit cannot override the platform hard safe limit');
+  }
+
   const issues: string[] = [];
   if (variant.status !== 'FOUNDER_REVIEW_ONLY' || campaign.operationalState !== 'FOUNDER_REVIEW_ONLY') {
     issues.push('HOLD_ORIGINAL_CAMPAIGN_' + variant.status);
