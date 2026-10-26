@@ -142,7 +142,11 @@ describe('Founder Signal Engine remote MCP', () => {
     expect(initialized.status).toBe(200);
     expect(initialized.body.result.protocolVersion).toBe('2025-06-18');
     expect(listed.status).toBe(200);
-    expect(listed.body.result.tools).toHaveLength(2);
+    expect(listed.body.result.tools).toHaveLength(3);
+    expect(listed.body.result.tools[2]).toMatchObject({
+      name: 'review_founder_signal_draft_handoff',
+      annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
+    });
     expect(listed.body.result.tools[1]).toMatchObject({
       name: 'plan_founder_signal_campaign',
       annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
@@ -188,6 +192,44 @@ describe('Founder Signal Engine remote MCP', () => {
     expect(response.body.result.structuredContent.variants).toHaveLength(3);
     expect(response.body.result.structuredContent.variants[1].media.state).toBe('NOT_RENDERED');
     expect(response.body.result.structuredContent.authority.canPublish).toBe(false);
+    expect(fetchFn).not.toHaveBeenCalled();
+    expect(resolveProjectId).not.toHaveBeenCalled();
+    expect(writeAuditEvent).not.toHaveBeenCalled();
+  });
+
+  it('previews source-bound image media handoff under first-party draft contract without provider calls', async () => {
+    const fetchFn=mockFetch(async () => { throw new Error('unwanted network call'); });
+    const resolveProjectId=vi.fn(async () => { throw new Error('unwanted db read'); });
+    const writeAuditEvent=vi.fn(async () => { throw new Error('unwanted db write'); });
+    const app=buildApp({fetchFn,resolveProjectId,writeAuditEvent});
+    const campaign={
+      source:{repository:'jussray/founder-control-room',commitSha:'a'.repeat(40),
+        proofUrl:'https://github.com/jussray/founder-control-room/commit/'+'a'.repeat(40),visibility:'public'},
+      strategy:{intent:'proof-update',audience:'Builders who value truth',
+        observation:'A useful update explains its uncertainty.',
+        fact:'This project includes a reversible, testable content control boundary.',
+        audienceValue:'A builder can check facts before sharing them.',
+        truthBoundary:'The bridge is source code, not confirmed social-provider execution.',
+        callToAction:'What would you verify next?',thesis:'Show verifiable progress'},
+      topics:['BuildInPublic','DevTools','Transparency','ContentStrategy','ProductDesign'],
+      platforms:['linkedin'],
+    };
+    const asset={
+      type:'image',url:'https://cdn.example.org/draft/founder-image.png',sha256:'b'.repeat(64),
+      altText:'An accessible diagram of a review first publishing boundary.',
+      rights:{basis:'original',receiptUrl:'https://cdn.example.org/rights/founder-image',permissionGranted:true},
+      visualVerdict:{contract:'juss/visual-wonder-artifact-verdict',
+        state:'PASSED',artifactSha256:'b'.repeat(64)},
+    };
+    const result=await request(app).post(ENDPOINT)
+      .set('Authorization', `Bearer ${TOKEN}`)
+      .send(rpc('tools/call',{name:'review_founder_signal_draft_handoff',
+        arguments:{campaign,platform:'linkedin',accountId:'founder-profile-001',media:[asset]}}));
+    expect(result.status).toBe(200);
+    expect(result.body.result.structuredContent.status).toBe('LOCAL_DRAFT_SHAPE_VALID__PROVIDER_UNVERIFIED');
+    expect(result.body.result.structuredContent.preview.mode).toBe('draft');
+    expect(result.body.result.structuredContent.authority.canCreateBufferDraft).toBe(false);
+    expect(result.body.result.structuredContent.renderedMediaBytesChecked).toBe(false);
     expect(fetchFn).not.toHaveBeenCalled();
     expect(resolveProjectId).not.toHaveBeenCalled();
     expect(writeAuditEvent).not.toHaveBeenCalled();
