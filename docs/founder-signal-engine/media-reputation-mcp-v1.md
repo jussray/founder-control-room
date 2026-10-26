@@ -49,6 +49,14 @@ The successful output is intentionally `LOCAL_BYTES_HASH_AND_SIGNATURE_MATCH__UN
 
 **Status:** source-level byte-integrity helper and local tests only; not invoked from MCP, Media Router, Buffer or production. No actual user media has been inspected. See `npm run verify:fse-campaign`.
 
+## Trusted-reader boundary for FSE media (source contract; not production-connected)
+
+`src/lib/founderSignalAuthenticatedMediaReader.ts` introduces `checkAuthorizedFounderSignalMedia`, an **isolated, dependency-injected** bridge between FCR's existing `AssetRegistryEntryV1` and the bounded `checkFounderSignalMediaBytes` helper. It takes a **server-owned authenticated principal, workspace and project** plus a source asset ID and expected digest. A future separately reviewed adapter must authorize that principal, return the same project's promoted registry entry, and open exact immutable/version-bound bytes. The bridge requires `commercialUseStatus: allowed`, `domainAuthorityGranted: true`, a nonempty domain authority record and renderer receipt; checks MIME/kind, stable object/version IDs, exact expected/storage SHA, streamed bytes and reported byte count.
+
+The maximum result `LOCAL_AUTHORIZED_READER_BYTE_MATCH__NOT_RELEASE_PROOF` means only that a supplied trusted-reader *asserted* scoped authorization and that the returned stream passed the byte-integrity checks. It is not proof that storage, authentic user identity or provenance were independently audited; it cannot validate full image/video decoding, license authenticity, media truth or founder approval. No caller may inject registry rows, media streams or URLs through the MCP endpoint and turn them into authenticated evidence. A hostile/incorrect provider adapter can still lie and must be audited separately.
+
+**Crucial:** this feature adds an interface and mocked contract tests; **no real Supabase/Cloudflare/Buffer media-storage reader is installed, called or deployed**. Runtime integration must use a server-bound principal, immutable asset version, actual storage-provider readback, a full decoder/safety examination and rights verification, existing Visual Wonder and exact Current You approval before any draft-only provider action. No new MCP action or provider write route is created.
+
 ## Target end-to-end path (already-governed stages, not newly activated)
 
 ```
