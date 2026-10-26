@@ -57,7 +57,7 @@ export function reviewFounderSignalDraftHandoff(raw: unknown) {
   if (!ACCOUNT.test(accountId) || SEC.test(accountId)) fail('account identifier invalid');
   const capability = FIRST_PARTY_PLATFORM_CAPABILITIES[platform];
   const limit = input.platformCharacterLimit;
-  if (limit !== undefined && (!Number.isInteger(limit) || Number(limit) < 1 || Number(limit) > 5000)) {
+  if (limit !== undefined && (typeof limit !== 'number' || !Number.isInteger(limit) || limit < 1 || limit > 5000)) {
     fail('platformCharacterLimit must be an integer from 1 to 5000');
   }
 
