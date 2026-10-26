@@ -26,6 +26,10 @@ The isolated `checkFounderSignalMediaBytes` stage can digest a bounded, already-
 
 The new FSE `checkAuthorizedFounderSignalMedia` contract ties an asserted server-owned principal/project scope and promoted FCR media registry status/rights records to an immutable versioned stream and byte check. It does **not** connect to live asset storage or independently authenticate the adapter, license receipt, decoded visual content, person, account, or approval. The result does not make an image or video public-safe and cannot create or schedule a Buffer post. Existing Current You and provider readback rules remain load-bearing.
 
+### FFmpeg output readback is not a publish-ready video
+
+The FSE local-process FFmpeg bridge now reopens a renderer-produced MP4 under an explicit trusted output root and independently compares its actual bytes, file size and SHA-256 against the renderer receipt. The result proves only a local byte/receipt match and shallow MP4 container markers; it does not prove video playback, rights, brand/canon, absence of misrepresentation, account access, Current You consent or actual delivery. A missing, symlinked, escaped or modified path fails closed. The verified local render still requires decoder/visual inspection, commercial-use rights, exact text/image approval, and provider-native draft readback through existing governed controls. No new Buffer authority.
+
 ## Required posting loop
 
 ```text
