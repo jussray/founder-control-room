@@ -116,8 +116,15 @@ function platformCopy(platform: string, x: { observation: string; fact: string; 
 
 export function planFounderSignalCampaign(raw: unknown) {
   const input = record(raw);
+  const ROOT_FIELDS = new Set(['source', 'strategy', 'topics', 'platforms', 'mediaPreference', 'recentPosts']);
+  const SOURCE_FIELDS = new Set(['repository', 'commitSha', 'proofUrl', 'visibility']);
+  const STRATEGY_FIELDS = new Set(['intent', 'audience', 'observation', 'fact',
+    'audienceValue', 'truthBoundary', 'callToAction', 'thesis']);
+  if (Object.keys(input).some(k => !ROOT_FIELDS.has(k))) throw new Error('Unexpected campaign field');
   const source = record(input.source);
   const strategy = record(input.strategy);
+  if (Object.keys(source).some(k => !SOURCE_FIELDS.has(k))) throw new Error('Unexpected source field');
+  if (Object.keys(strategy).some(k => !STRATEGY_FIELDS.has(k))) throw new Error('Unexpected strategy field');
   const repo = safeText(source.repository, 'source.repository', 100);
   const sha = string(source.commitSha);
   const url = string(source.proofUrl);
@@ -155,6 +162,9 @@ export function planFounderSignalCampaign(raw: unknown) {
   if (!Array.isArray(prior) || prior.length > 15) throw new Error('recentPosts must contain up to 15 provenance-bound records');
   const past = prior.map((item: unknown) => {
     const post = record(item);
+    if (Object.keys(post).some(k => !['thesis', 'publicPostUrl'].includes(k))) {
+      throw new Error('Unexpected recent post field');
+    }
     const priorThesis = safeText(post.thesis, 'recentPosts.thesis', 150);
     const priorUrl = string(post.publicPostUrl);
     if (!/^https:\/\/[^\s?#]+$/.test(priorUrl) || SECRET.test(priorUrl)) {
@@ -163,6 +173,13 @@ export function planFounderSignalCampaign(raw: unknown) {
     return { thesis: normalize(priorThesis), postUrl: priorUrl };
   });
   const stale = past.some(p => p.thesis === normalize(thesis));
+  // Risk review is separate from factual verification. This classifier is deliberately
+  // conservative and makes no claim to catch every reputational problem.
+  const sensitivePublicClaim = /(?:\bguaranteed\b|\b(?:\d[\d,.]*\s+)?(?:customers?|users?|partners?|investors?|sales|revenue|funding|impressions|views)\b)/i
+    .test(fact + ' ' + observation);
+  const reputationReview = sensitivePublicClaim
+    ? 'HOLD_UNVERIFIED_OUTCOME_OR_ENDORSEMENT'
+    : 'HUMAN_EDITORIAL_REVIEW_REQUIRED';
   const fields = { observation, fact, value, boundary, cta, proof: url, intent };
   const variants = platforms.map((id: FirstPartySocialPlatform) => {
     const lane = getContentLane(id);
@@ -177,7 +194,7 @@ export function planFounderSignalCampaign(raw: unknown) {
       copy, hashtags, charCount: copy.length, safeCharacterLimit: limit,
       textFitsVerifiedPlatformLimit: textFits,
       media: creative,
-      status: stale ? 'HOLD_FRESHNESS' : textFits === false ? 'HOLD_COPY_LIMIT' : 'FOUNDER_REVIEW_ONLY',
+      status: stale ? 'HOLD_FRESHNESS' : textFits === false ? 'HOLD_COPY_LIMIT' : sensitivePublicClaim ? 'HOLD_REPUTATION_REVIEW' : 'FOUNDER_REVIEW_ONLY',
       requires: ['Verify exact public source and current claim', 'Confirm intended account and current native limits',
         'Review founder voice, subject and visual assets', 'Apply existing content/output and visual-wonder gates',
         'Obtain per-copy current founder approval before any scheduling/publication'],
@@ -186,7 +203,8 @@ export function planFounderSignalCampaign(raw: unknown) {
   const kit = {
     contract: FOUNDER_SIGNAL_CAMPAIGN_CONTRACT,
     evidenceClass: 'USER_SUPPLIED_UNVERIFIED',
-    operationalState: stale ? 'HOLD_REPETITIVE_ANGLE' : 'FOUNDER_REVIEW_ONLY',
+    operationalState: stale ? 'HOLD_REPETITIVE_ANGLE' : sensitivePublicClaim ? 'HOLD_REPUTATION_REVIEW' : 'FOUNDER_REVIEW_ONLY',
+    reputationReview,
     authority: {
       canPublish: false, canSchedule: false, canCreateBufferDraft: false,
       canMutateHubSpot: false, canCallModel: false, canUploadMedia: false,
