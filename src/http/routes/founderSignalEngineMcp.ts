@@ -1,4 +1,5 @@
 import { timingSafeEqual } from 'node:crypto';
+import { FOUNDER_SIGNAL_CAMPAIGN_TOOL, planFounderSignalCampaign } from '../../lib/founderSignalCampaignPlanner.js';
 import type { Request, RequestHandler, Response as ExpressResponse } from 'express';
 import { supabase } from '../../lib/supabaseClient.js';
 
@@ -576,6 +577,1911 @@ function founderSignalContentPolicyContract(): DbRecord {
         publicProofLinkRequired: false,
       },
     },
+  };
+}
+
+function campaignToolDefinition(): DbRecord {
+  const text = (maxLength: number) => ({ type: 'string', minLength: 1, maxLength });
+  return {
+    name: FOUNDER_SIGNAL_CAMPAIGN_TOOL,
+    title: 'Plan Founder Signal Campaign (Review-Only)',
+    description: 'Build bounded platform-native text, hashtags, original image/video creative directions, founder voice, 5W1H, continuity and reputation gates from caller-supplied public GitHub evidence. All inputs and outputs remain unverified drafts. No AI, Buffer, storage, media rendering, scheduling or publication side effects.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['source', 'strategy', 'topics', 'platforms'],
+      properties: {
+        source: {
+          type: 'object', additionalProperties: false,
+          required: ['repository', 'commitSha', 'proofUrl', 'visibility'],
+          properties: {
+            repository: { type: 'string', pattern: '^jussray/[A-Za-z0-9_.-]+
+  return {
+    name: TOOL_NAME,
+    title: 'Invoke Founder Signal Engine',
+    description:
+      'Invoke the scoped Founder Signal Engine Zapier bridge for verified GitHub evidence. The tool never accepts raw credentials. Publication and sending require the server-side standing-policy gate. LinkedIn publication also requires a fresh reviewed content-policy result. A Zapier run receipt is not complete Day 3 proof.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      required: [
+        'invocationId',
+        'sourceRepository',
+        'sourcePr',
+        'sourceCommitSha',
+        'requestedAction',
+        'steeringGrantId',
+        'auditPath',
+        'rollbackStep',
+        'requestingAgent',
+        'allowHubSpotWrite',
+      ],
+      properties: {
+        invocationId: {
+          type: 'string',
+          format: 'uuid',
+          description: 'Caller-generated idempotency identifier.',
+        },
+        sourceRepository: { type: 'string', enum: [ACTIVE_REPOSITORY] },
+        sourcePr: { type: 'integer', minimum: 1 },
+        sourceCommitSha: { type: 'string', pattern: '^[0-9a-fA-F]{40}$' },
+        requestedAction: { type: 'string', enum: Array.from(ALLOWED_ACTIONS) },
+        steeringGrantId: { type: 'string', minLength: 1, maxLength: 200 },
+        auditPath: { type: 'string', minLength: 1, maxLength: 500 },
+        rollbackStep: { type: 'string', minLength: 1, maxLength: 500 },
+        requestingAgent: { type: 'string', minLength: 1, maxLength: 100 },
+        allowHubSpotWrite: { type: 'boolean' },
+        founderApprovalId: {
+          type: ['string', 'null'],
+          minLength: 1,
+          maxLength: 200,
+          description: 'Runtime-populated authorization receipt. Caller values are rejected upstream.',
+        },
+        automationCandidate: automationCandidateSchema(),
+        contentPolicyResult: contentPolicyResultSchema(),
+      },
+    },
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+  };
+}
+
+async function defaultResolveProjectId(): Promise<string> {
+  const { data, error } = await supabase
+    .from('projects')
+    .select('id')
+    .eq('slug', ACTIVE_PROJECT_SLUG)
+    .maybeSingle();
+
+  if (error) throw new Error(`PROJECT_LOOKUP_FAILED:${error.message}`);
+  const id = isRecord(data) ? nonEmptyString(data.id, 100) : null;
+  if (!id) throw new Error(`PROJECT_NOT_REGISTERED:${ACTIVE_PROJECT_SLUG}`);
+  return id;
+}
+
+async function defaultWriteAuditEvent(projectId: string, event: AuditEvent): Promise<void> {
+  const { error } = await supabase.from('project_events').insert({
+    project_id: projectId,
+    source_event_id: event.sourceEventId,
+    event_type: event.eventType,
+    severity: event.severity,
+    screen: 'founder-signal-engine-remote-mcp',
+    provider: 'zapier',
+    decision: event.decision,
+    metadata: event.metadata,
+  });
+
+  if (!error) return;
+  if ((error as { code?: string }).code === '23505') throw new DuplicateInvocationError();
+  throw new Error(`AUDIT_WRITE_FAILED:${error.message}`);
+}
+
+function hookUrl(env: NodeJS.ProcessEnv): URL {
+  const raw = env.ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL?.trim();
+  if (!raw) throw new Error('ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL is not configured');
+
+  const url = new URL(raw);
+  if (!['http:', 'https:'].includes(url.protocol)) {
+    throw new Error('Zapier hook URL must use http or https');
+  }
+  if (
+    env.NODE_ENV === 'production' &&
+    (url.protocol !== 'https:' || url.hostname !== 'hooks.zapier.com')
+  ) {
+    throw new Error('Production Zapier hook URL must use https://hooks.zapier.com');
+  }
+  return url;
+}
+
+function timeoutMs(env: NodeJS.ProcessEnv): number {
+  const configured = Number(env.FOUNDER_SIGNAL_ENGINE_HOOK_TIMEOUT_MS ?? DEFAULT_TIMEOUT_MS);
+  return Number.isFinite(configured) && configured >= 500 && configured <= 60_000
+    ? configured
+    : DEFAULT_TIMEOUT_MS;
+}
+
+async function readProviderResponse(response: globalThis.Response): Promise<ParsedProviderBody> {
+  if (!response.body) return { kind: 'empty', payload: null, detail: null };
+
+  const declaredLength = Number(response.headers.get('content-length'));
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_PROVIDER_RESPONSE_BYTES) {
+    await response.body.cancel();
+    throw new Error('Zapier response exceeded the allowed size');
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let total = 0;
+  let text = '';
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (!value) continue;
+      total += value.byteLength;
+      if (total > MAX_PROVIDER_RESPONSE_BYTES) {
+        await reader.cancel();
+        throw new Error('Zapier response exceeded the allowed size');
+      }
+      text += decoder.decode(value, { stream: true });
+    }
+    text += decoder.decode();
+  } finally {
+    reader.releaseLock();
+  }
+
+  const trimmed = text.trim();
+  if (!trimmed) return { kind: 'empty', payload: null, detail: null };
+
+  const contentType = response.headers.get('content-type') ?? '';
+  if (contentType.includes('application/json')) {
+    try {
+      return { kind: 'json', payload: JSON.parse(trimmed), detail: null };
+    } catch {
+      return { kind: 'text', payload: null, detail: 'Zapier returned invalid JSON' };
+    }
+  }
+
+  return { kind: 'text', payload: null, detail: trimmed.slice(0, 500) };
+}
+
+function explicitRunId(payload: unknown, response: globalThis.Response): string | null {
+  const headerRunId = nonEmptyString(response.headers.get('x-zapier-run-id'), 200);
+  if (headerRunId) return headerRunId;
+  if (!isRecord(payload)) return null;
+
+  const candidates: unknown[] = [
+    payload.zapier_run_id,
+    payload.zapierRunId,
+    payload.run_id,
+    payload.runId,
+  ];
+  const data = isRecord(payload.data) ? payload.data : null;
+  if (data) {
+    candidates.push(data.zapier_run_id, data.zapierRunId, data.run_id, data.runId);
+  }
+
+  for (const candidate of candidates) {
+    const runId = nonEmptyString(candidate, 200);
+    if (runId) return runId;
+  }
+  return null;
+}
+
+function zapierAutomationCandidate(candidate: AutomationCandidate | null): DbRecord | null {
+  if (!candidate) return null;
+  return {
+    channel: candidate.channel,
+    audience_segment: candidate.audienceSegment,
+    proof_url: candidate.proofUrl,
+    who: candidate.who,
+    what: candidate.what,
+    where: candidate.where,
+    when: candidate.when,
+    why: candidate.why,
+    how: candidate.how,
+    recipient_id: candidate.recipientId,
+    recipient_specific_why: candidate.recipientSpecificWhy,
+  };
+}
+
+function zapierContentPolicyResult(result: ContentPolicyResult | null): DbRecord | null {
+  if (!result) return null;
+  return {
+    version: result.version,
+    intent: result.intent,
+    fingerprint: result.fingerprint,
+    freshness_decision: result.freshnessDecision,
+  };
+}
+
+async function callZapier(
+  args: InvocationArguments,
+  env: NodeJS.ProcessEnv,
+  fetchFn: typeof fetch,
+): Promise<ProviderReceipt> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs(env));
+
+  try {
+    const response = await fetchFn(hookUrl(env).toString(), {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-founder-signal-invocation-id': args.invocationId,
+      },
+      body: JSON.stringify({
+        event: 'founder_signal_engine_mcp_invocation',
+        invocation_id: args.invocationId,
+        source_repository: args.sourceRepository,
+        source_pr: args.sourcePr,
+        source_commit_sha: args.sourceCommitSha,
+        requested_action: args.requestedAction,
+        steering_grant_id: args.steeringGrantId,
+        audit_path: args.auditPath,
+        rollback_step: args.rollbackStep,
+        requesting_agent: args.requestingAgent,
+        allow_hubspot_write: args.allowHubSpotWrite,
+        founder_approval_id: args.founderApprovalId,
+        authorization_mode: args.authorizationMode,
+        automation_candidate: zapierAutomationCandidate(args.automationCandidate),
+        content_policy_contract: founderSignalContentPolicyContract(),
+        content_policy_result: zapierContentPolicyResult(args.contentPolicyResult),
+        key_reference: OPENAI_KEY_REFERENCE,
+      }),
+      signal: controller.signal,
+    });
+
+    const parsed = await readProviderResponse(response);
+    return {
+      accepted: response.ok,
+      httpStatus: response.status,
+      runId: explicitRunId(parsed.payload, response),
+      responseKind: parsed.kind,
+      detail: parsed.detail,
+    };
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('Zapier hook request timed out');
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function toolResponse(receipt: DbRecord, isError: boolean): DbRecord {
+  const invocationId = String(receipt.invocationId ?? 'unknown');
+  const runId = nonEmptyString(receipt.zapierRunId, 200);
+  const text = isError
+    ? `Founder Signal Engine invocation failed or remains blocked. Invocation ${invocationId}.`
+    : runId
+      ? `Founder Signal Engine bridge accepted invocation ${invocationId}. Zapier run ${runId} was returned, but downstream Day 3 proof is still incomplete.`
+      : `Founder Signal Engine bridge accepted invocation ${invocationId}. Zapier did not return a run ID, so end-to-end proof is still incomplete.`;
+
+  return {
+    content: [{ type: 'text', text }],
+    structuredContent: receipt,
+    isError,
+  };
+}
+
+async function invokeTool(
+  args: InvocationArguments,
+  dependencies: Required<FounderSignalEngineMcpDependencies>,
+): Promise<DbRecord> {
+  const projectId = await dependencies.resolveProjectId();
+  const contentPolicyEventId = `fse-mcp:${args.invocationId}:content-policy`;
+  const requestEventId = `fse-mcp:${args.invocationId}:requested`;
+  const resultEventId = `fse-mcp:${args.invocationId}:result`;
+
+  const isLinkedInPublication =
+    args.requestedAction === 'publish_or_send' &&
+    args.automationCandidate?.channel === 'linkedin';
+  if (isLinkedInPublication) {
+    const freshnessDecision = args.contentPolicyResult?.freshnessDecision ?? null;
+    if (!args.contentPolicyResult || freshnessDecision !== 'fresh') {
+      try {
+        await dependencies.writeAuditEvent(projectId, {
+          sourceEventId: contentPolicyEventId,
+          eventType: 'founder_signal_engine_content_policy_blocked',
+          severity: 'warning',
+          decision: 'blocked',
+          metadata: {
+            invocationId: args.invocationId,
+            sourceCommitSha: args.sourceCommitSha,
+            requestedAction: args.requestedAction,
+            authorizationMode: args.authorizationMode,
+            channel: 'linkedin',
+            contentPolicyVersion:
+              args.contentPolicyResult?.version ?? FOUNDER_SIGNAL_CONTENT_POLICY_VERSION,
+            contentIntent: args.contentPolicyResult?.intent ?? null,
+            contentFingerprint: args.contentPolicyResult?.fingerprint ?? null,
+            freshnessDecision,
+            reason: args.contentPolicyResult
+              ? 'linkedin publication requires freshnessDecision=fresh'
+              : 'linkedin publication requires a reviewed contentPolicyResult',
+            zapierRunIdentified: false,
+            endToEndProofComplete: false,
+          },
+        });
+      } catch (error) {
+        if (error instanceof DuplicateInvocationError) {
+          return toolResponse(
+            {
+              invocationId: args.invocationId,
+              accepted: false,
+              auditComplete: true,
+              duplicateBlocked: true,
+              contentPolicyBlocked: true,
+              zapierRunIdentified: false,
+              endToEndProofComplete: false,
+              nextGate: 'Inspect the retained content-policy decision and use a new invocationId.',
+            },
+            true,
+          );
+        }
+        throw error;
+      }
+
+      return toolResponse(
+        {
+          invocationId: args.invocationId,
+          accepted: false,
+          auditComplete: true,
+          contentPolicyBlocked: true,
+          contentPolicyVersion: FOUNDER_SIGNAL_CONTENT_POLICY_VERSION,
+          contentIntent: args.contentPolicyResult?.intent ?? null,
+          contentFingerprint: args.contentPolicyResult?.fingerprint ?? null,
+          freshnessDecision,
+          zapierRunId: null,
+          zapierRunIdentified: false,
+          endToEndProofComplete: false,
+          nextGate:
+            'Regenerate or review the LinkedIn draft until contentPolicyResult.freshnessDecision is fresh, then retry with a new invocationId.',
+        },
+        true,
+      );
+    }
+  }
+
+  try {
+    await dependencies.writeAuditEvent(projectId, {
+      sourceEventId: requestEventId,
+      eventType: 'founder_signal_engine_bridge_requested',
+      severity: 'warning',
+      decision: 'requested',
+      metadata: {
+        invocationId: args.invocationId,
+        sourceRepository: args.sourceRepository,
+        sourcePr: args.sourcePr,
+        sourceCommitSha: args.sourceCommitSha,
+        requestedAction: args.requestedAction,
+        steeringGrantId: args.steeringGrantId,
+        auditPath: args.auditPath,
+        rollbackStep: args.rollbackStep,
+        requestingAgent: args.requestingAgent,
+        allowHubSpotWrite: args.allowHubSpotWrite,
+        founderApprovalPresent: Boolean(args.founderApprovalId),
+        authorizationMode: args.authorizationMode,
+        channel: args.automationCandidate?.channel ?? null,
+        audienceSegment: args.automationCandidate?.audienceSegment ?? null,
+        proofUrl: args.automationCandidate?.proofUrl ?? null,
+        recipientId: args.automationCandidate?.recipientId ?? null,
+        contentPolicyVersion:
+          args.contentPolicyResult?.version ?? FOUNDER_SIGNAL_CONTENT_POLICY_VERSION,
+        contentIntent: args.contentPolicyResult?.intent ?? null,
+        contentFingerprint: args.contentPolicyResult?.fingerprint ?? null,
+        freshnessDecision: args.contentPolicyResult?.freshnessDecision ?? null,
+      },
+    });
+  } catch (error) {
+    if (error instanceof DuplicateInvocationError) {
+      return toolResponse(
+        {
+          invocationId: args.invocationId,
+          accepted: false,
+          auditComplete: true,
+          duplicateBlocked: true,
+          zapierRunIdentified: false,
+          endToEndProofComplete: false,
+          nextGate: 'Use a new invocationId only after inspecting the prior invocation evidence.',
+        },
+        true,
+      );
+    }
+    throw error;
+  }
+
+  let providerReceipt: ProviderReceipt;
+  try {
+    providerReceipt = await callZapier(args, dependencies.env, dependencies.fetchFn);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown Zapier bridge failure';
+    await dependencies.writeAuditEvent(projectId, {
+      sourceEventId: resultEventId,
+      eventType: 'founder_signal_engine_bridge_failed',
+      severity: 'error',
+      decision: 'failed',
+      metadata: {
+        invocationId: args.invocationId,
+        sourceCommitSha: args.sourceCommitSha,
+        requestedAction: args.requestedAction,
+        authorizationMode: args.authorizationMode,
+        channel: args.automationCandidate?.channel ?? null,
+        contentPolicyVersion:
+          args.contentPolicyResult?.version ?? FOUNDER_SIGNAL_CONTENT_POLICY_VERSION,
+        contentIntent: args.contentPolicyResult?.intent ?? null,
+        contentFingerprint: args.contentPolicyResult?.fingerprint ?? null,
+        freshnessDecision: args.contentPolicyResult?.freshnessDecision ?? null,
+        failure: message,
+        zapierRunIdentified: false,
+        endToEndProofComplete: false,
+      },
+    });
+
+    return toolResponse(
+      {
+        invocationId: args.invocationId,
+        accepted: false,
+        auditComplete: true,
+        providerError: message,
+        zapierRunId: null,
+        zapierRunIdentified: false,
+        endToEndProofComplete: false,
+        nextGate:
+          'Repair the configured Zapier Catch Hook or network path, then invoke with a new invocationId.',
+      },
+      true,
+    );
+  }
+
+  const zapierRunIdentified = providerReceipt.accepted && Boolean(providerReceipt.runId);
+
+  try {
+    await dependencies.writeAuditEvent(projectId, {
+      sourceEventId: resultEventId,
+      eventType: providerReceipt.accepted
+        ? 'founder_signal_engine_bridge_accepted'
+        : 'founder_signal_engine_bridge_rejected',
+      severity: providerReceipt.accepted ? 'info' : 'error',
+      decision: providerReceipt.accepted ? 'accepted' : 'rejected',
+      metadata: {
+        invocationId: args.invocationId,
+        sourceCommitSha: args.sourceCommitSha,
+        requestedAction: args.requestedAction,
+        authorizationMode: args.authorizationMode,
+        channel: args.automationCandidate?.channel ?? null,
+        contentPolicyVersion:
+          args.contentPolicyResult?.version ?? FOUNDER_SIGNAL_CONTENT_POLICY_VERSION,
+        contentIntent: args.contentPolicyResult?.intent ?? null,
+        contentFingerprint: args.contentPolicyResult?.fingerprint ?? null,
+        freshnessDecision: args.contentPolicyResult?.freshnessDecision ?? null,
+        providerHttpStatus: providerReceipt.httpStatus,
+        providerResponseKind: providerReceipt.responseKind,
+        zapierRunId: providerReceipt.runId,
+        zapierRunIdentified,
+        endToEndProofComplete: false,
+      },
+    });
+  } catch (error) {
+    return toolResponse(
+      {
+        invocationId: args.invocationId,
+        accepted: providerReceipt.accepted,
+        providerHttpStatus: providerReceipt.httpStatus,
+        zapierRunId: providerReceipt.runId,
+        zapierRunIdentified,
+        auditComplete: false,
+        endToEndProofComplete: false,
+        auditError: error instanceof Error ? error.message : 'Unknown post-call audit failure',
+        nextGate:
+          'The provider call occurred, but Founder Control Room could not retain the result audit. Repair audit storage before retrying.',
+      },
+      true,
+    );
+  }
+
+  return toolResponse(
+    {
+      invocationId: args.invocationId,
+      accepted: providerReceipt.accepted,
+      providerHttpStatus: providerReceipt.httpStatus,
+      providerResponseKind: providerReceipt.responseKind,
+      providerDetail: providerReceipt.detail,
+      zapierRunId: providerReceipt.runId,
+      zapierRunIdentified,
+      auditComplete: true,
+      endToEndProofComplete: false,
+      sourceRepository: args.sourceRepository,
+      sourcePr: args.sourcePr,
+      sourceCommitSha: args.sourceCommitSha,
+      requestedAction: args.requestedAction,
+      authorizationMode: args.authorizationMode,
+      channel: args.automationCandidate?.channel ?? null,
+      contentPolicyVersion:
+        args.contentPolicyResult?.version ?? FOUNDER_SIGNAL_CONTENT_POLICY_VERSION,
+      contentIntent: args.contentPolicyResult?.intent ?? null,
+      contentFingerprint: args.contentPolicyResult?.fingerprint ?? null,
+      freshnessDecision: args.contentPolicyResult?.freshnessDecision ?? null,
+      nextGate: zapierRunIdentified
+        ? 'Capture and verify the OpenAI 5W1H + content-policy result, Buffer artifact, HubSpot deal association, and final Founder Control Room evidence before marking Day 3 complete.'
+        : 'Locate the invocation in Zapier history using invocationId, record its run ID, and continue downstream evidence capture.',
+    },
+    !providerReceipt.accepted,
+  );
+}
+
+function requiredDependencies(
+  overrides: FounderSignalEngineMcpDependencies,
+): Required<FounderSignalEngineMcpDependencies> {
+  return {
+    env: overrides.env ?? process.env,
+    fetchFn: overrides.fetchFn ?? fetch,
+    resolveProjectId: overrides.resolveProjectId ?? defaultResolveProjectId,
+    writeAuditEvent: overrides.writeAuditEvent ?? defaultWriteAuditEvent,
+  };
+}
+
+export function createFounderSignalEngineMcpHandler(
+  overrides: FounderSignalEngineMcpDependencies = {},
+): RequestHandler {
+  const dependencies = requiredDependencies(overrides);
+
+  return async (req: Request, res: ExpressResponse): Promise<void> => {
+    const configuredToken = dependencies.env.FOUNDER_SIGNAL_ENGINE_MCP_TOKEN?.trim();
+    if (!configuredToken) {
+      res.status(503).json(
+        rpcError(null, -32001, 'Founder Signal Engine MCP token is not configured'),
+      );
+      return;
+    }
+
+    const token = bearerToken(req);
+    if (!token || !secureEqual(token, configuredToken)) {
+      res.status(401).json(rpcError(null, -32000, 'Unauthorized'));
+      return;
+    }
+
+    const body = req.body as JsonRpcRequestBody;
+    const id = rpcId(body?.id);
+    if (!isRecord(body) || body.jsonrpc !== '2.0' || typeof body.method !== 'string') {
+      res.status(400).json(rpcError(id, -32600, 'Invalid JSON-RPC request'));
+      return;
+    }
+
+    if (body.method === 'notifications/initialized') {
+      res.status(204).send();
+      return;
+    }
+    if (body.method === 'initialize') {
+      res.json(
+        rpcResult(id, {
+          protocolVersion: MCP_PROTOCOL_VERSION,
+          capabilities: { tools: { listChanged: false } },
+          serverInfo: { name: 'founder-signal-engine-bridge', version: '1.3.0' },
+        }),
+      );
+      return;
+    }
+    if (body.method === 'ping') {
+      res.json(rpcResult(id, {}));
+      return;
+    }
+    if (body.method === 'tools/list') {
+      res.json(rpcResult(id, { tools: [toolDefinition(), campaignToolDefinition()] }));
+      return;
+    }
+    if (body.method !== 'tools/call') {
+      res.status(404).json(rpcError(id, -32601, `Method not found: ${body.method}`));
+      return;
+    }
+
+    const params = isRecord(body.params) ? body.params : null;
+    if (!params || params.name !== TOOL_NAME) {
+      res.status(400).json(rpcError(id, -32602, `Only ${TOOL_NAME} is available`));
+      return;
+    }
+
+    if (params?.name === FOUNDER_SIGNAL_CAMPAIGN_TOOL) {
+      try {
+        const kit = planFounderSignalCampaign(params.arguments);
+        res.json(rpcResult(id, {
+          content: [{ type: 'text', text: 'Review-only campaign package generated. User-supplied evidence not independently verified; no providers were called.' }],
+          structuredContent: kit,
+          isError: false,
+        }));
+      } catch (error) {
+        res.status(400).json(rpcError(id, -32602, 'Invalid review-only campaign brief', [
+          error instanceof Error ? error.message : 'Invalid campaign input',
+        ]));
+      }
+      return;
+    }
+
+    const internalAuthorization = standingPolicyContext(
+      res.locals.founderSignalAutomationAuthorization,
+    );
+    const parsed = parseInvocationArguments(params.arguments, internalAuthorization);
+    if (!parsed.value) {
+      res.status(400).json(rpcError(id, -32602, 'Invalid tool arguments', parsed.errors));
+      return;
+    }
+
+    try {
+      const result = await invokeTool(parsed.value, dependencies);
+      res.json(rpcResult(id, result));
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Founder Signal Engine MCP failure';
+      res.status(500).json(rpcError(id, -32603, message));
+    }
+  };
+}
+
+export const handleFounderSignalEngineMcp = createFounderSignalEngineMcpHandler(); },
+            commitSha: { type: 'string', pattern: '^[a-fA-F0-9]{40}
+  return {
+    name: TOOL_NAME,
+    title: 'Invoke Founder Signal Engine',
+    description:
+      'Invoke the scoped Founder Signal Engine Zapier bridge for verified GitHub evidence. The tool never accepts raw credentials. Publication and sending require the server-side standing-policy gate. LinkedIn publication also requires a fresh reviewed content-policy result. A Zapier run receipt is not complete Day 3 proof.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      required: [
+        'invocationId',
+        'sourceRepository',
+        'sourcePr',
+        'sourceCommitSha',
+        'requestedAction',
+        'steeringGrantId',
+        'auditPath',
+        'rollbackStep',
+        'requestingAgent',
+        'allowHubSpotWrite',
+      ],
+      properties: {
+        invocationId: {
+          type: 'string',
+          format: 'uuid',
+          description: 'Caller-generated idempotency identifier.',
+        },
+        sourceRepository: { type: 'string', enum: [ACTIVE_REPOSITORY] },
+        sourcePr: { type: 'integer', minimum: 1 },
+        sourceCommitSha: { type: 'string', pattern: '^[0-9a-fA-F]{40}$' },
+        requestedAction: { type: 'string', enum: Array.from(ALLOWED_ACTIONS) },
+        steeringGrantId: { type: 'string', minLength: 1, maxLength: 200 },
+        auditPath: { type: 'string', minLength: 1, maxLength: 500 },
+        rollbackStep: { type: 'string', minLength: 1, maxLength: 500 },
+        requestingAgent: { type: 'string', minLength: 1, maxLength: 100 },
+        allowHubSpotWrite: { type: 'boolean' },
+        founderApprovalId: {
+          type: ['string', 'null'],
+          minLength: 1,
+          maxLength: 200,
+          description: 'Runtime-populated authorization receipt. Caller values are rejected upstream.',
+        },
+        automationCandidate: automationCandidateSchema(),
+        contentPolicyResult: contentPolicyResultSchema(),
+      },
+    },
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+  };
+}
+
+async function defaultResolveProjectId(): Promise<string> {
+  const { data, error } = await supabase
+    .from('projects')
+    .select('id')
+    .eq('slug', ACTIVE_PROJECT_SLUG)
+    .maybeSingle();
+
+  if (error) throw new Error(`PROJECT_LOOKUP_FAILED:${error.message}`);
+  const id = isRecord(data) ? nonEmptyString(data.id, 100) : null;
+  if (!id) throw new Error(`PROJECT_NOT_REGISTERED:${ACTIVE_PROJECT_SLUG}`);
+  return id;
+}
+
+async function defaultWriteAuditEvent(projectId: string, event: AuditEvent): Promise<void> {
+  const { error } = await supabase.from('project_events').insert({
+    project_id: projectId,
+    source_event_id: event.sourceEventId,
+    event_type: event.eventType,
+    severity: event.severity,
+    screen: 'founder-signal-engine-remote-mcp',
+    provider: 'zapier',
+    decision: event.decision,
+    metadata: event.metadata,
+  });
+
+  if (!error) return;
+  if ((error as { code?: string }).code === '23505') throw new DuplicateInvocationError();
+  throw new Error(`AUDIT_WRITE_FAILED:${error.message}`);
+}
+
+function hookUrl(env: NodeJS.ProcessEnv): URL {
+  const raw = env.ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL?.trim();
+  if (!raw) throw new Error('ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL is not configured');
+
+  const url = new URL(raw);
+  if (!['http:', 'https:'].includes(url.protocol)) {
+    throw new Error('Zapier hook URL must use http or https');
+  }
+  if (
+    env.NODE_ENV === 'production' &&
+    (url.protocol !== 'https:' || url.hostname !== 'hooks.zapier.com')
+  ) {
+    throw new Error('Production Zapier hook URL must use https://hooks.zapier.com');
+  }
+  return url;
+}
+
+function timeoutMs(env: NodeJS.ProcessEnv): number {
+  const configured = Number(env.FOUNDER_SIGNAL_ENGINE_HOOK_TIMEOUT_MS ?? DEFAULT_TIMEOUT_MS);
+  return Number.isFinite(configured) && configured >= 500 && configured <= 60_000
+    ? configured
+    : DEFAULT_TIMEOUT_MS;
+}
+
+async function readProviderResponse(response: globalThis.Response): Promise<ParsedProviderBody> {
+  if (!response.body) return { kind: 'empty', payload: null, detail: null };
+
+  const declaredLength = Number(response.headers.get('content-length'));
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_PROVIDER_RESPONSE_BYTES) {
+    await response.body.cancel();
+    throw new Error('Zapier response exceeded the allowed size');
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let total = 0;
+  let text = '';
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (!value) continue;
+      total += value.byteLength;
+      if (total > MAX_PROVIDER_RESPONSE_BYTES) {
+        await reader.cancel();
+        throw new Error('Zapier response exceeded the allowed size');
+      }
+      text += decoder.decode(value, { stream: true });
+    }
+    text += decoder.decode();
+  } finally {
+    reader.releaseLock();
+  }
+
+  const trimmed = text.trim();
+  if (!trimmed) return { kind: 'empty', payload: null, detail: null };
+
+  const contentType = response.headers.get('content-type') ?? '';
+  if (contentType.includes('application/json')) {
+    try {
+      return { kind: 'json', payload: JSON.parse(trimmed), detail: null };
+    } catch {
+      return { kind: 'text', payload: null, detail: 'Zapier returned invalid JSON' };
+    }
+  }
+
+  return { kind: 'text', payload: null, detail: trimmed.slice(0, 500) };
+}
+
+function explicitRunId(payload: unknown, response: globalThis.Response): string | null {
+  const headerRunId = nonEmptyString(response.headers.get('x-zapier-run-id'), 200);
+  if (headerRunId) return headerRunId;
+  if (!isRecord(payload)) return null;
+
+  const candidates: unknown[] = [
+    payload.zapier_run_id,
+    payload.zapierRunId,
+    payload.run_id,
+    payload.runId,
+  ];
+  const data = isRecord(payload.data) ? payload.data : null;
+  if (data) {
+    candidates.push(data.zapier_run_id, data.zapierRunId, data.run_id, data.runId);
+  }
+
+  for (const candidate of candidates) {
+    const runId = nonEmptyString(candidate, 200);
+    if (runId) return runId;
+  }
+  return null;
+}
+
+function zapierAutomationCandidate(candidate: AutomationCandidate | null): DbRecord | null {
+  if (!candidate) return null;
+  return {
+    channel: candidate.channel,
+    audience_segment: candidate.audienceSegment,
+    proof_url: candidate.proofUrl,
+    who: candidate.who,
+    what: candidate.what,
+    where: candidate.where,
+    when: candidate.when,
+    why: candidate.why,
+    how: candidate.how,
+    recipient_id: candidate.recipientId,
+    recipient_specific_why: candidate.recipientSpecificWhy,
+  };
+}
+
+function zapierContentPolicyResult(result: ContentPolicyResult | null): DbRecord | null {
+  if (!result) return null;
+  return {
+    version: result.version,
+    intent: result.intent,
+    fingerprint: result.fingerprint,
+    freshness_decision: result.freshnessDecision,
+  };
+}
+
+async function callZapier(
+  args: InvocationArguments,
+  env: NodeJS.ProcessEnv,
+  fetchFn: typeof fetch,
+): Promise<ProviderReceipt> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs(env));
+
+  try {
+    const response = await fetchFn(hookUrl(env).toString(), {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-founder-signal-invocation-id': args.invocationId,
+      },
+      body: JSON.stringify({
+        event: 'founder_signal_engine_mcp_invocation',
+        invocation_id: args.invocationId,
+        source_repository: args.sourceRepository,
+        source_pr: args.sourcePr,
+        source_commit_sha: args.sourceCommitSha,
+        requested_action: args.requestedAction,
+        steering_grant_id: args.steeringGrantId,
+        audit_path: args.auditPath,
+        rollback_step: args.rollbackStep,
+        requesting_agent: args.requestingAgent,
+        allow_hubspot_write: args.allowHubSpotWrite,
+        founder_approval_id: args.founderApprovalId,
+        authorization_mode: args.authorizationMode,
+        automation_candidate: zapierAutomationCandidate(args.automationCandidate),
+        content_policy_contract: founderSignalContentPolicyContract(),
+        content_policy_result: zapierContentPolicyResult(args.contentPolicyResult),
+        key_reference: OPENAI_KEY_REFERENCE,
+      }),
+      signal: controller.signal,
+    });
+
+    const parsed = await readProviderResponse(response);
+    return {
+      accepted: response.ok,
+      httpStatus: response.status,
+      runId: explicitRunId(parsed.payload, response),
+      responseKind: parsed.kind,
+      detail: parsed.detail,
+    };
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('Zapier hook request timed out');
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function toolResponse(receipt: DbRecord, isError: boolean): DbRecord {
+  const invocationId = String(receipt.invocationId ?? 'unknown');
+  const runId = nonEmptyString(receipt.zapierRunId, 200);
+  const text = isError
+    ? `Founder Signal Engine invocation failed or remains blocked. Invocation ${invocationId}.`
+    : runId
+      ? `Founder Signal Engine bridge accepted invocation ${invocationId}. Zapier run ${runId} was returned, but downstream Day 3 proof is still incomplete.`
+      : `Founder Signal Engine bridge accepted invocation ${invocationId}. Zapier did not return a run ID, so end-to-end proof is still incomplete.`;
+
+  return {
+    content: [{ type: 'text', text }],
+    structuredContent: receipt,
+    isError,
+  };
+}
+
+async function invokeTool(
+  args: InvocationArguments,
+  dependencies: Required<FounderSignalEngineMcpDependencies>,
+): Promise<DbRecord> {
+  const projectId = await dependencies.resolveProjectId();
+  const contentPolicyEventId = `fse-mcp:${args.invocationId}:content-policy`;
+  const requestEventId = `fse-mcp:${args.invocationId}:requested`;
+  const resultEventId = `fse-mcp:${args.invocationId}:result`;
+
+  const isLinkedInPublication =
+    args.requestedAction === 'publish_or_send' &&
+    args.automationCandidate?.channel === 'linkedin';
+  if (isLinkedInPublication) {
+    const freshnessDecision = args.contentPolicyResult?.freshnessDecision ?? null;
+    if (!args.contentPolicyResult || freshnessDecision !== 'fresh') {
+      try {
+        await dependencies.writeAuditEvent(projectId, {
+          sourceEventId: contentPolicyEventId,
+          eventType: 'founder_signal_engine_content_policy_blocked',
+          severity: 'warning',
+          decision: 'blocked',
+          metadata: {
+            invocationId: args.invocationId,
+            sourceCommitSha: args.sourceCommitSha,
+            requestedAction: args.requestedAction,
+            authorizationMode: args.authorizationMode,
+            channel: 'linkedin',
+            contentPolicyVersion:
+              args.contentPolicyResult?.version ?? FOUNDER_SIGNAL_CONTENT_POLICY_VERSION,
+            contentIntent: args.contentPolicyResult?.intent ?? null,
+            contentFingerprint: args.contentPolicyResult?.fingerprint ?? null,
+            freshnessDecision,
+            reason: args.contentPolicyResult
+              ? 'linkedin publication requires freshnessDecision=fresh'
+              : 'linkedin publication requires a reviewed contentPolicyResult',
+            zapierRunIdentified: false,
+            endToEndProofComplete: false,
+          },
+        });
+      } catch (error) {
+        if (error instanceof DuplicateInvocationError) {
+          return toolResponse(
+            {
+              invocationId: args.invocationId,
+              accepted: false,
+              auditComplete: true,
+              duplicateBlocked: true,
+              contentPolicyBlocked: true,
+              zapierRunIdentified: false,
+              endToEndProofComplete: false,
+              nextGate: 'Inspect the retained content-policy decision and use a new invocationId.',
+            },
+            true,
+          );
+        }
+        throw error;
+      }
+
+      return toolResponse(
+        {
+          invocationId: args.invocationId,
+          accepted: false,
+          auditComplete: true,
+          contentPolicyBlocked: true,
+          contentPolicyVersion: FOUNDER_SIGNAL_CONTENT_POLICY_VERSION,
+          contentIntent: args.contentPolicyResult?.intent ?? null,
+          contentFingerprint: args.contentPolicyResult?.fingerprint ?? null,
+          freshnessDecision,
+          zapierRunId: null,
+          zapierRunIdentified: false,
+          endToEndProofComplete: false,
+          nextGate:
+            'Regenerate or review the LinkedIn draft until contentPolicyResult.freshnessDecision is fresh, then retry with a new invocationId.',
+        },
+        true,
+      );
+    }
+  }
+
+  try {
+    await dependencies.writeAuditEvent(projectId, {
+      sourceEventId: requestEventId,
+      eventType: 'founder_signal_engine_bridge_requested',
+      severity: 'warning',
+      decision: 'requested',
+      metadata: {
+        invocationId: args.invocationId,
+        sourceRepository: args.sourceRepository,
+        sourcePr: args.sourcePr,
+        sourceCommitSha: args.sourceCommitSha,
+        requestedAction: args.requestedAction,
+        steeringGrantId: args.steeringGrantId,
+        auditPath: args.auditPath,
+        rollbackStep: args.rollbackStep,
+        requestingAgent: args.requestingAgent,
+        allowHubSpotWrite: args.allowHubSpotWrite,
+        founderApprovalPresent: Boolean(args.founderApprovalId),
+        authorizationMode: args.authorizationMode,
+        channel: args.automationCandidate?.channel ?? null,
+        audienceSegment: args.automationCandidate?.audienceSegment ?? null,
+        proofUrl: args.automationCandidate?.proofUrl ?? null,
+        recipientId: args.automationCandidate?.recipientId ?? null,
+        contentPolicyVersion:
+          args.contentPolicyResult?.version ?? FOUNDER_SIGNAL_CONTENT_POLICY_VERSION,
+        contentIntent: args.contentPolicyResult?.intent ?? null,
+        contentFingerprint: args.contentPolicyResult?.fingerprint ?? null,
+        freshnessDecision: args.contentPolicyResult?.freshnessDecision ?? null,
+      },
+    });
+  } catch (error) {
+    if (error instanceof DuplicateInvocationError) {
+      return toolResponse(
+        {
+          invocationId: args.invocationId,
+          accepted: false,
+          auditComplete: true,
+          duplicateBlocked: true,
+          zapierRunIdentified: false,
+          endToEndProofComplete: false,
+          nextGate: 'Use a new invocationId only after inspecting the prior invocation evidence.',
+        },
+        true,
+      );
+    }
+    throw error;
+  }
+
+  let providerReceipt: ProviderReceipt;
+  try {
+    providerReceipt = await callZapier(args, dependencies.env, dependencies.fetchFn);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown Zapier bridge failure';
+    await dependencies.writeAuditEvent(projectId, {
+      sourceEventId: resultEventId,
+      eventType: 'founder_signal_engine_bridge_failed',
+      severity: 'error',
+      decision: 'failed',
+      metadata: {
+        invocationId: args.invocationId,
+        sourceCommitSha: args.sourceCommitSha,
+        requestedAction: args.requestedAction,
+        authorizationMode: args.authorizationMode,
+        channel: args.automationCandidate?.channel ?? null,
+        contentPolicyVersion:
+          args.contentPolicyResult?.version ?? FOUNDER_SIGNAL_CONTENT_POLICY_VERSION,
+        contentIntent: args.contentPolicyResult?.intent ?? null,
+        contentFingerprint: args.contentPolicyResult?.fingerprint ?? null,
+        freshnessDecision: args.contentPolicyResult?.freshnessDecision ?? null,
+        failure: message,
+        zapierRunIdentified: false,
+        endToEndProofComplete: false,
+      },
+    });
+
+    return toolResponse(
+      {
+        invocationId: args.invocationId,
+        accepted: false,
+        auditComplete: true,
+        providerError: message,
+        zapierRunId: null,
+        zapierRunIdentified: false,
+        endToEndProofComplete: false,
+        nextGate:
+          'Repair the configured Zapier Catch Hook or network path, then invoke with a new invocationId.',
+      },
+      true,
+    );
+  }
+
+  const zapierRunIdentified = providerReceipt.accepted && Boolean(providerReceipt.runId);
+
+  try {
+    await dependencies.writeAuditEvent(projectId, {
+      sourceEventId: resultEventId,
+      eventType: providerReceipt.accepted
+        ? 'founder_signal_engine_bridge_accepted'
+        : 'founder_signal_engine_bridge_rejected',
+      severity: providerReceipt.accepted ? 'info' : 'error',
+      decision: providerReceipt.accepted ? 'accepted' : 'rejected',
+      metadata: {
+        invocationId: args.invocationId,
+        sourceCommitSha: args.sourceCommitSha,
+        requestedAction: args.requestedAction,
+        authorizationMode: args.authorizationMode,
+        channel: args.automationCandidate?.channel ?? null,
+        contentPolicyVersion:
+          args.contentPolicyResult?.version ?? FOUNDER_SIGNAL_CONTENT_POLICY_VERSION,
+        contentIntent: args.contentPolicyResult?.intent ?? null,
+        contentFingerprint: args.contentPolicyResult?.fingerprint ?? null,
+        freshnessDecision: args.contentPolicyResult?.freshnessDecision ?? null,
+        providerHttpStatus: providerReceipt.httpStatus,
+        providerResponseKind: providerReceipt.responseKind,
+        zapierRunId: providerReceipt.runId,
+        zapierRunIdentified,
+        endToEndProofComplete: false,
+      },
+    });
+  } catch (error) {
+    return toolResponse(
+      {
+        invocationId: args.invocationId,
+        accepted: providerReceipt.accepted,
+        providerHttpStatus: providerReceipt.httpStatus,
+        zapierRunId: providerReceipt.runId,
+        zapierRunIdentified,
+        auditComplete: false,
+        endToEndProofComplete: false,
+        auditError: error instanceof Error ? error.message : 'Unknown post-call audit failure',
+        nextGate:
+          'The provider call occurred, but Founder Control Room could not retain the result audit. Repair audit storage before retrying.',
+      },
+      true,
+    );
+  }
+
+  return toolResponse(
+    {
+      invocationId: args.invocationId,
+      accepted: providerReceipt.accepted,
+      providerHttpStatus: providerReceipt.httpStatus,
+      providerResponseKind: providerReceipt.responseKind,
+      providerDetail: providerReceipt.detail,
+      zapierRunId: providerReceipt.runId,
+      zapierRunIdentified,
+      auditComplete: true,
+      endToEndProofComplete: false,
+      sourceRepository: args.sourceRepository,
+      sourcePr: args.sourcePr,
+      sourceCommitSha: args.sourceCommitSha,
+      requestedAction: args.requestedAction,
+      authorizationMode: args.authorizationMode,
+      channel: args.automationCandidate?.channel ?? null,
+      contentPolicyVersion:
+        args.contentPolicyResult?.version ?? FOUNDER_SIGNAL_CONTENT_POLICY_VERSION,
+      contentIntent: args.contentPolicyResult?.intent ?? null,
+      contentFingerprint: args.contentPolicyResult?.fingerprint ?? null,
+      freshnessDecision: args.contentPolicyResult?.freshnessDecision ?? null,
+      nextGate: zapierRunIdentified
+        ? 'Capture and verify the OpenAI 5W1H + content-policy result, Buffer artifact, HubSpot deal association, and final Founder Control Room evidence before marking Day 3 complete.'
+        : 'Locate the invocation in Zapier history using invocationId, record its run ID, and continue downstream evidence capture.',
+    },
+    !providerReceipt.accepted,
+  );
+}
+
+function requiredDependencies(
+  overrides: FounderSignalEngineMcpDependencies,
+): Required<FounderSignalEngineMcpDependencies> {
+  return {
+    env: overrides.env ?? process.env,
+    fetchFn: overrides.fetchFn ?? fetch,
+    resolveProjectId: overrides.resolveProjectId ?? defaultResolveProjectId,
+    writeAuditEvent: overrides.writeAuditEvent ?? defaultWriteAuditEvent,
+  };
+}
+
+export function createFounderSignalEngineMcpHandler(
+  overrides: FounderSignalEngineMcpDependencies = {},
+): RequestHandler {
+  const dependencies = requiredDependencies(overrides);
+
+  return async (req: Request, res: ExpressResponse): Promise<void> => {
+    const configuredToken = dependencies.env.FOUNDER_SIGNAL_ENGINE_MCP_TOKEN?.trim();
+    if (!configuredToken) {
+      res.status(503).json(
+        rpcError(null, -32001, 'Founder Signal Engine MCP token is not configured'),
+      );
+      return;
+    }
+
+    const token = bearerToken(req);
+    if (!token || !secureEqual(token, configuredToken)) {
+      res.status(401).json(rpcError(null, -32000, 'Unauthorized'));
+      return;
+    }
+
+    const body = req.body as JsonRpcRequestBody;
+    const id = rpcId(body?.id);
+    if (!isRecord(body) || body.jsonrpc !== '2.0' || typeof body.method !== 'string') {
+      res.status(400).json(rpcError(id, -32600, 'Invalid JSON-RPC request'));
+      return;
+    }
+
+    if (body.method === 'notifications/initialized') {
+      res.status(204).send();
+      return;
+    }
+    if (body.method === 'initialize') {
+      res.json(
+        rpcResult(id, {
+          protocolVersion: MCP_PROTOCOL_VERSION,
+          capabilities: { tools: { listChanged: false } },
+          serverInfo: { name: 'founder-signal-engine-bridge', version: '1.3.0' },
+        }),
+      );
+      return;
+    }
+    if (body.method === 'ping') {
+      res.json(rpcResult(id, {}));
+      return;
+    }
+    if (body.method === 'tools/list') {
+      res.json(rpcResult(id, { tools: [toolDefinition()] }));
+      return;
+    }
+    if (body.method !== 'tools/call') {
+      res.status(404).json(rpcError(id, -32601, `Method not found: ${body.method}`));
+      return;
+    }
+
+    const params = isRecord(body.params) ? body.params : null;
+    if (!params || params.name !== TOOL_NAME) {
+      res.status(400).json(rpcError(id, -32602, `Only ${TOOL_NAME} is available`));
+      return;
+    }
+
+    const internalAuthorization = standingPolicyContext(
+      res.locals.founderSignalAutomationAuthorization,
+    );
+    const parsed = parseInvocationArguments(params.arguments, internalAuthorization);
+    if (!parsed.value) {
+      res.status(400).json(rpcError(id, -32602, 'Invalid tool arguments', parsed.errors));
+      return;
+    }
+
+    try {
+      const result = await invokeTool(parsed.value, dependencies);
+      res.json(rpcResult(id, result));
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Founder Signal Engine MCP failure';
+      res.status(500).json(rpcError(id, -32603, message));
+    }
+  };
+}
+
+export const handleFounderSignalEngineMcp = createFounderSignalEngineMcpHandler(); },
+            proofUrl: { type: 'string', format: 'uri' },
+            visibility: { type: 'string', enum: ['public'] },
+          },
+        },
+        strategy: {
+          type: 'object', additionalProperties: false,
+          required: ['intent', 'audience', 'observation', 'fact', 'audienceValue', 'truthBoundary', 'callToAction', 'thesis'],
+          properties: {
+            intent: { type: 'string', enum: ['proof-update', 'conversation-research', 'personal-founder', 'offer'] },
+            audience: text(180), observation: text(220), fact: text(260),
+            audienceValue: text(220), truthBoundary: text(240),
+            callToAction: text(140), thesis: text(150),
+          },
+        },
+        topics: { type: 'array', minItems: 3, maxItems: 10, items: { type: 'string', pattern: '^[A-Za-z][A-Za-z0-9]{2,23}
+  return {
+    name: TOOL_NAME,
+    title: 'Invoke Founder Signal Engine',
+    description:
+      'Invoke the scoped Founder Signal Engine Zapier bridge for verified GitHub evidence. The tool never accepts raw credentials. Publication and sending require the server-side standing-policy gate. LinkedIn publication also requires a fresh reviewed content-policy result. A Zapier run receipt is not complete Day 3 proof.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      required: [
+        'invocationId',
+        'sourceRepository',
+        'sourcePr',
+        'sourceCommitSha',
+        'requestedAction',
+        'steeringGrantId',
+        'auditPath',
+        'rollbackStep',
+        'requestingAgent',
+        'allowHubSpotWrite',
+      ],
+      properties: {
+        invocationId: {
+          type: 'string',
+          format: 'uuid',
+          description: 'Caller-generated idempotency identifier.',
+        },
+        sourceRepository: { type: 'string', enum: [ACTIVE_REPOSITORY] },
+        sourcePr: { type: 'integer', minimum: 1 },
+        sourceCommitSha: { type: 'string', pattern: '^[0-9a-fA-F]{40}$' },
+        requestedAction: { type: 'string', enum: Array.from(ALLOWED_ACTIONS) },
+        steeringGrantId: { type: 'string', minLength: 1, maxLength: 200 },
+        auditPath: { type: 'string', minLength: 1, maxLength: 500 },
+        rollbackStep: { type: 'string', minLength: 1, maxLength: 500 },
+        requestingAgent: { type: 'string', minLength: 1, maxLength: 100 },
+        allowHubSpotWrite: { type: 'boolean' },
+        founderApprovalId: {
+          type: ['string', 'null'],
+          minLength: 1,
+          maxLength: 200,
+          description: 'Runtime-populated authorization receipt. Caller values are rejected upstream.',
+        },
+        automationCandidate: automationCandidateSchema(),
+        contentPolicyResult: contentPolicyResultSchema(),
+      },
+    },
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+  };
+}
+
+async function defaultResolveProjectId(): Promise<string> {
+  const { data, error } = await supabase
+    .from('projects')
+    .select('id')
+    .eq('slug', ACTIVE_PROJECT_SLUG)
+    .maybeSingle();
+
+  if (error) throw new Error(`PROJECT_LOOKUP_FAILED:${error.message}`);
+  const id = isRecord(data) ? nonEmptyString(data.id, 100) : null;
+  if (!id) throw new Error(`PROJECT_NOT_REGISTERED:${ACTIVE_PROJECT_SLUG}`);
+  return id;
+}
+
+async function defaultWriteAuditEvent(projectId: string, event: AuditEvent): Promise<void> {
+  const { error } = await supabase.from('project_events').insert({
+    project_id: projectId,
+    source_event_id: event.sourceEventId,
+    event_type: event.eventType,
+    severity: event.severity,
+    screen: 'founder-signal-engine-remote-mcp',
+    provider: 'zapier',
+    decision: event.decision,
+    metadata: event.metadata,
+  });
+
+  if (!error) return;
+  if ((error as { code?: string }).code === '23505') throw new DuplicateInvocationError();
+  throw new Error(`AUDIT_WRITE_FAILED:${error.message}`);
+}
+
+function hookUrl(env: NodeJS.ProcessEnv): URL {
+  const raw = env.ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL?.trim();
+  if (!raw) throw new Error('ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL is not configured');
+
+  const url = new URL(raw);
+  if (!['http:', 'https:'].includes(url.protocol)) {
+    throw new Error('Zapier hook URL must use http or https');
+  }
+  if (
+    env.NODE_ENV === 'production' &&
+    (url.protocol !== 'https:' || url.hostname !== 'hooks.zapier.com')
+  ) {
+    throw new Error('Production Zapier hook URL must use https://hooks.zapier.com');
+  }
+  return url;
+}
+
+function timeoutMs(env: NodeJS.ProcessEnv): number {
+  const configured = Number(env.FOUNDER_SIGNAL_ENGINE_HOOK_TIMEOUT_MS ?? DEFAULT_TIMEOUT_MS);
+  return Number.isFinite(configured) && configured >= 500 && configured <= 60_000
+    ? configured
+    : DEFAULT_TIMEOUT_MS;
+}
+
+async function readProviderResponse(response: globalThis.Response): Promise<ParsedProviderBody> {
+  if (!response.body) return { kind: 'empty', payload: null, detail: null };
+
+  const declaredLength = Number(response.headers.get('content-length'));
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_PROVIDER_RESPONSE_BYTES) {
+    await response.body.cancel();
+    throw new Error('Zapier response exceeded the allowed size');
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let total = 0;
+  let text = '';
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (!value) continue;
+      total += value.byteLength;
+      if (total > MAX_PROVIDER_RESPONSE_BYTES) {
+        await reader.cancel();
+        throw new Error('Zapier response exceeded the allowed size');
+      }
+      text += decoder.decode(value, { stream: true });
+    }
+    text += decoder.decode();
+  } finally {
+    reader.releaseLock();
+  }
+
+  const trimmed = text.trim();
+  if (!trimmed) return { kind: 'empty', payload: null, detail: null };
+
+  const contentType = response.headers.get('content-type') ?? '';
+  if (contentType.includes('application/json')) {
+    try {
+      return { kind: 'json', payload: JSON.parse(trimmed), detail: null };
+    } catch {
+      return { kind: 'text', payload: null, detail: 'Zapier returned invalid JSON' };
+    }
+  }
+
+  return { kind: 'text', payload: null, detail: trimmed.slice(0, 500) };
+}
+
+function explicitRunId(payload: unknown, response: globalThis.Response): string | null {
+  const headerRunId = nonEmptyString(response.headers.get('x-zapier-run-id'), 200);
+  if (headerRunId) return headerRunId;
+  if (!isRecord(payload)) return null;
+
+  const candidates: unknown[] = [
+    payload.zapier_run_id,
+    payload.zapierRunId,
+    payload.run_id,
+    payload.runId,
+  ];
+  const data = isRecord(payload.data) ? payload.data : null;
+  if (data) {
+    candidates.push(data.zapier_run_id, data.zapierRunId, data.run_id, data.runId);
+  }
+
+  for (const candidate of candidates) {
+    const runId = nonEmptyString(candidate, 200);
+    if (runId) return runId;
+  }
+  return null;
+}
+
+function zapierAutomationCandidate(candidate: AutomationCandidate | null): DbRecord | null {
+  if (!candidate) return null;
+  return {
+    channel: candidate.channel,
+    audience_segment: candidate.audienceSegment,
+    proof_url: candidate.proofUrl,
+    who: candidate.who,
+    what: candidate.what,
+    where: candidate.where,
+    when: candidate.when,
+    why: candidate.why,
+    how: candidate.how,
+    recipient_id: candidate.recipientId,
+    recipient_specific_why: candidate.recipientSpecificWhy,
+  };
+}
+
+function zapierContentPolicyResult(result: ContentPolicyResult | null): DbRecord | null {
+  if (!result) return null;
+  return {
+    version: result.version,
+    intent: result.intent,
+    fingerprint: result.fingerprint,
+    freshness_decision: result.freshnessDecision,
+  };
+}
+
+async function callZapier(
+  args: InvocationArguments,
+  env: NodeJS.ProcessEnv,
+  fetchFn: typeof fetch,
+): Promise<ProviderReceipt> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs(env));
+
+  try {
+    const response = await fetchFn(hookUrl(env).toString(), {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-founder-signal-invocation-id': args.invocationId,
+      },
+      body: JSON.stringify({
+        event: 'founder_signal_engine_mcp_invocation',
+        invocation_id: args.invocationId,
+        source_repository: args.sourceRepository,
+        source_pr: args.sourcePr,
+        source_commit_sha: args.sourceCommitSha,
+        requested_action: args.requestedAction,
+        steering_grant_id: args.steeringGrantId,
+        audit_path: args.auditPath,
+        rollback_step: args.rollbackStep,
+        requesting_agent: args.requestingAgent,
+        allow_hubspot_write: args.allowHubSpotWrite,
+        founder_approval_id: args.founderApprovalId,
+        authorization_mode: args.authorizationMode,
+        automation_candidate: zapierAutomationCandidate(args.automationCandidate),
+        content_policy_contract: founderSignalContentPolicyContract(),
+        content_policy_result: zapierContentPolicyResult(args.contentPolicyResult),
+        key_reference: OPENAI_KEY_REFERENCE,
+      }),
+      signal: controller.signal,
+    });
+
+    const parsed = await readProviderResponse(response);
+    return {
+      accepted: response.ok,
+      httpStatus: response.status,
+      runId: explicitRunId(parsed.payload, response),
+      responseKind: parsed.kind,
+      detail: parsed.detail,
+    };
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('Zapier hook request timed out');
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function toolResponse(receipt: DbRecord, isError: boolean): DbRecord {
+  const invocationId = String(receipt.invocationId ?? 'unknown');
+  const runId = nonEmptyString(receipt.zapierRunId, 200);
+  const text = isError
+    ? `Founder Signal Engine invocation failed or remains blocked. Invocation ${invocationId}.`
+    : runId
+      ? `Founder Signal Engine bridge accepted invocation ${invocationId}. Zapier run ${runId} was returned, but downstream Day 3 proof is still incomplete.`
+      : `Founder Signal Engine bridge accepted invocation ${invocationId}. Zapier did not return a run ID, so end-to-end proof is still incomplete.`;
+
+  return {
+    content: [{ type: 'text', text }],
+    structuredContent: receipt,
+    isError,
+  };
+}
+
+async function invokeTool(
+  args: InvocationArguments,
+  dependencies: Required<FounderSignalEngineMcpDependencies>,
+): Promise<DbRecord> {
+  const projectId = await dependencies.resolveProjectId();
+  const contentPolicyEventId = `fse-mcp:${args.invocationId}:content-policy`;
+  const requestEventId = `fse-mcp:${args.invocationId}:requested`;
+  const resultEventId = `fse-mcp:${args.invocationId}:result`;
+
+  const isLinkedInPublication =
+    args.requestedAction === 'publish_or_send' &&
+    args.automationCandidate?.channel === 'linkedin';
+  if (isLinkedInPublication) {
+    const freshnessDecision = args.contentPolicyResult?.freshnessDecision ?? null;
+    if (!args.contentPolicyResult || freshnessDecision !== 'fresh') {
+      try {
+        await dependencies.writeAuditEvent(projectId, {
+          sourceEventId: contentPolicyEventId,
+          eventType: 'founder_signal_engine_content_policy_blocked',
+          severity: 'warning',
+          decision: 'blocked',
+          metadata: {
+            invocationId: args.invocationId,
+            sourceCommitSha: args.sourceCommitSha,
+            requestedAction: args.requestedAction,
+            authorizationMode: args.authorizationMode,
+            channel: 'linkedin',
+            contentPolicyVersion:
+              args.contentPolicyResult?.version ?? FOUNDER_SIGNAL_CONTENT_POLICY_VERSION,
+            contentIntent: args.contentPolicyResult?.intent ?? null,
+            contentFingerprint: args.contentPolicyResult?.fingerprint ?? null,
+            freshnessDecision,
+            reason: args.contentPolicyResult
+              ? 'linkedin publication requires freshnessDecision=fresh'
+              : 'linkedin publication requires a reviewed contentPolicyResult',
+            zapierRunIdentified: false,
+            endToEndProofComplete: false,
+          },
+        });
+      } catch (error) {
+        if (error instanceof DuplicateInvocationError) {
+          return toolResponse(
+            {
+              invocationId: args.invocationId,
+              accepted: false,
+              auditComplete: true,
+              duplicateBlocked: true,
+              contentPolicyBlocked: true,
+              zapierRunIdentified: false,
+              endToEndProofComplete: false,
+              nextGate: 'Inspect the retained content-policy decision and use a new invocationId.',
+            },
+            true,
+          );
+        }
+        throw error;
+      }
+
+      return toolResponse(
+        {
+          invocationId: args.invocationId,
+          accepted: false,
+          auditComplete: true,
+          contentPolicyBlocked: true,
+          contentPolicyVersion: FOUNDER_SIGNAL_CONTENT_POLICY_VERSION,
+          contentIntent: args.contentPolicyResult?.intent ?? null,
+          contentFingerprint: args.contentPolicyResult?.fingerprint ?? null,
+          freshnessDecision,
+          zapierRunId: null,
+          zapierRunIdentified: false,
+          endToEndProofComplete: false,
+          nextGate:
+            'Regenerate or review the LinkedIn draft until contentPolicyResult.freshnessDecision is fresh, then retry with a new invocationId.',
+        },
+        true,
+      );
+    }
+  }
+
+  try {
+    await dependencies.writeAuditEvent(projectId, {
+      sourceEventId: requestEventId,
+      eventType: 'founder_signal_engine_bridge_requested',
+      severity: 'warning',
+      decision: 'requested',
+      metadata: {
+        invocationId: args.invocationId,
+        sourceRepository: args.sourceRepository,
+        sourcePr: args.sourcePr,
+        sourceCommitSha: args.sourceCommitSha,
+        requestedAction: args.requestedAction,
+        steeringGrantId: args.steeringGrantId,
+        auditPath: args.auditPath,
+        rollbackStep: args.rollbackStep,
+        requestingAgent: args.requestingAgent,
+        allowHubSpotWrite: args.allowHubSpotWrite,
+        founderApprovalPresent: Boolean(args.founderApprovalId),
+        authorizationMode: args.authorizationMode,
+        channel: args.automationCandidate?.channel ?? null,
+        audienceSegment: args.automationCandidate?.audienceSegment ?? null,
+        proofUrl: args.automationCandidate?.proofUrl ?? null,
+        recipientId: args.automationCandidate?.recipientId ?? null,
+        contentPolicyVersion:
+          args.contentPolicyResult?.version ?? FOUNDER_SIGNAL_CONTENT_POLICY_VERSION,
+        contentIntent: args.contentPolicyResult?.intent ?? null,
+        contentFingerprint: args.contentPolicyResult?.fingerprint ?? null,
+        freshnessDecision: args.contentPolicyResult?.freshnessDecision ?? null,
+      },
+    });
+  } catch (error) {
+    if (error instanceof DuplicateInvocationError) {
+      return toolResponse(
+        {
+          invocationId: args.invocationId,
+          accepted: false,
+          auditComplete: true,
+          duplicateBlocked: true,
+          zapierRunIdentified: false,
+          endToEndProofComplete: false,
+          nextGate: 'Use a new invocationId only after inspecting the prior invocation evidence.',
+        },
+        true,
+      );
+    }
+    throw error;
+  }
+
+  let providerReceipt: ProviderReceipt;
+  try {
+    providerReceipt = await callZapier(args, dependencies.env, dependencies.fetchFn);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown Zapier bridge failure';
+    await dependencies.writeAuditEvent(projectId, {
+      sourceEventId: resultEventId,
+      eventType: 'founder_signal_engine_bridge_failed',
+      severity: 'error',
+      decision: 'failed',
+      metadata: {
+        invocationId: args.invocationId,
+        sourceCommitSha: args.sourceCommitSha,
+        requestedAction: args.requestedAction,
+        authorizationMode: args.authorizationMode,
+        channel: args.automationCandidate?.channel ?? null,
+        contentPolicyVersion:
+          args.contentPolicyResult?.version ?? FOUNDER_SIGNAL_CONTENT_POLICY_VERSION,
+        contentIntent: args.contentPolicyResult?.intent ?? null,
+        contentFingerprint: args.contentPolicyResult?.fingerprint ?? null,
+        freshnessDecision: args.contentPolicyResult?.freshnessDecision ?? null,
+        failure: message,
+        zapierRunIdentified: false,
+        endToEndProofComplete: false,
+      },
+    });
+
+    return toolResponse(
+      {
+        invocationId: args.invocationId,
+        accepted: false,
+        auditComplete: true,
+        providerError: message,
+        zapierRunId: null,
+        zapierRunIdentified: false,
+        endToEndProofComplete: false,
+        nextGate:
+          'Repair the configured Zapier Catch Hook or network path, then invoke with a new invocationId.',
+      },
+      true,
+    );
+  }
+
+  const zapierRunIdentified = providerReceipt.accepted && Boolean(providerReceipt.runId);
+
+  try {
+    await dependencies.writeAuditEvent(projectId, {
+      sourceEventId: resultEventId,
+      eventType: providerReceipt.accepted
+        ? 'founder_signal_engine_bridge_accepted'
+        : 'founder_signal_engine_bridge_rejected',
+      severity: providerReceipt.accepted ? 'info' : 'error',
+      decision: providerReceipt.accepted ? 'accepted' : 'rejected',
+      metadata: {
+        invocationId: args.invocationId,
+        sourceCommitSha: args.sourceCommitSha,
+        requestedAction: args.requestedAction,
+        authorizationMode: args.authorizationMode,
+        channel: args.automationCandidate?.channel ?? null,
+        contentPolicyVersion:
+          args.contentPolicyResult?.version ?? FOUNDER_SIGNAL_CONTENT_POLICY_VERSION,
+        contentIntent: args.contentPolicyResult?.intent ?? null,
+        contentFingerprint: args.contentPolicyResult?.fingerprint ?? null,
+        freshnessDecision: args.contentPolicyResult?.freshnessDecision ?? null,
+        providerHttpStatus: providerReceipt.httpStatus,
+        providerResponseKind: providerReceipt.responseKind,
+        zapierRunId: providerReceipt.runId,
+        zapierRunIdentified,
+        endToEndProofComplete: false,
+      },
+    });
+  } catch (error) {
+    return toolResponse(
+      {
+        invocationId: args.invocationId,
+        accepted: providerReceipt.accepted,
+        providerHttpStatus: providerReceipt.httpStatus,
+        zapierRunId: providerReceipt.runId,
+        zapierRunIdentified,
+        auditComplete: false,
+        endToEndProofComplete: false,
+        auditError: error instanceof Error ? error.message : 'Unknown post-call audit failure',
+        nextGate:
+          'The provider call occurred, but Founder Control Room could not retain the result audit. Repair audit storage before retrying.',
+      },
+      true,
+    );
+  }
+
+  return toolResponse(
+    {
+      invocationId: args.invocationId,
+      accepted: providerReceipt.accepted,
+      providerHttpStatus: providerReceipt.httpStatus,
+      providerResponseKind: providerReceipt.responseKind,
+      providerDetail: providerReceipt.detail,
+      zapierRunId: providerReceipt.runId,
+      zapierRunIdentified,
+      auditComplete: true,
+      endToEndProofComplete: false,
+      sourceRepository: args.sourceRepository,
+      sourcePr: args.sourcePr,
+      sourceCommitSha: args.sourceCommitSha,
+      requestedAction: args.requestedAction,
+      authorizationMode: args.authorizationMode,
+      channel: args.automationCandidate?.channel ?? null,
+      contentPolicyVersion:
+        args.contentPolicyResult?.version ?? FOUNDER_SIGNAL_CONTENT_POLICY_VERSION,
+      contentIntent: args.contentPolicyResult?.intent ?? null,
+      contentFingerprint: args.contentPolicyResult?.fingerprint ?? null,
+      freshnessDecision: args.contentPolicyResult?.freshnessDecision ?? null,
+      nextGate: zapierRunIdentified
+        ? 'Capture and verify the OpenAI 5W1H + content-policy result, Buffer artifact, HubSpot deal association, and final Founder Control Room evidence before marking Day 3 complete.'
+        : 'Locate the invocation in Zapier history using invocationId, record its run ID, and continue downstream evidence capture.',
+    },
+    !providerReceipt.accepted,
+  );
+}
+
+function requiredDependencies(
+  overrides: FounderSignalEngineMcpDependencies,
+): Required<FounderSignalEngineMcpDependencies> {
+  return {
+    env: overrides.env ?? process.env,
+    fetchFn: overrides.fetchFn ?? fetch,
+    resolveProjectId: overrides.resolveProjectId ?? defaultResolveProjectId,
+    writeAuditEvent: overrides.writeAuditEvent ?? defaultWriteAuditEvent,
+  };
+}
+
+export function createFounderSignalEngineMcpHandler(
+  overrides: FounderSignalEngineMcpDependencies = {},
+): RequestHandler {
+  const dependencies = requiredDependencies(overrides);
+
+  return async (req: Request, res: ExpressResponse): Promise<void> => {
+    const configuredToken = dependencies.env.FOUNDER_SIGNAL_ENGINE_MCP_TOKEN?.trim();
+    if (!configuredToken) {
+      res.status(503).json(
+        rpcError(null, -32001, 'Founder Signal Engine MCP token is not configured'),
+      );
+      return;
+    }
+
+    const token = bearerToken(req);
+    if (!token || !secureEqual(token, configuredToken)) {
+      res.status(401).json(rpcError(null, -32000, 'Unauthorized'));
+      return;
+    }
+
+    const body = req.body as JsonRpcRequestBody;
+    const id = rpcId(body?.id);
+    if (!isRecord(body) || body.jsonrpc !== '2.0' || typeof body.method !== 'string') {
+      res.status(400).json(rpcError(id, -32600, 'Invalid JSON-RPC request'));
+      return;
+    }
+
+    if (body.method === 'notifications/initialized') {
+      res.status(204).send();
+      return;
+    }
+    if (body.method === 'initialize') {
+      res.json(
+        rpcResult(id, {
+          protocolVersion: MCP_PROTOCOL_VERSION,
+          capabilities: { tools: { listChanged: false } },
+          serverInfo: { name: 'founder-signal-engine-bridge', version: '1.3.0' },
+        }),
+      );
+      return;
+    }
+    if (body.method === 'ping') {
+      res.json(rpcResult(id, {}));
+      return;
+    }
+    if (body.method === 'tools/list') {
+      res.json(rpcResult(id, { tools: [toolDefinition()] }));
+      return;
+    }
+    if (body.method !== 'tools/call') {
+      res.status(404).json(rpcError(id, -32601, `Method not found: ${body.method}`));
+      return;
+    }
+
+    const params = isRecord(body.params) ? body.params : null;
+    if (!params || params.name !== TOOL_NAME) {
+      res.status(400).json(rpcError(id, -32602, `Only ${TOOL_NAME} is available`));
+      return;
+    }
+
+    const internalAuthorization = standingPolicyContext(
+      res.locals.founderSignalAutomationAuthorization,
+    );
+    const parsed = parseInvocationArguments(params.arguments, internalAuthorization);
+    if (!parsed.value) {
+      res.status(400).json(rpcError(id, -32602, 'Invalid tool arguments', parsed.errors));
+      return;
+    }
+
+    try {
+      const result = await invokeTool(parsed.value, dependencies);
+      res.json(rpcResult(id, result));
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Founder Signal Engine MCP failure';
+      res.status(500).json(rpcError(id, -32603, message));
+    }
+  };
+}
+
+export const handleFounderSignalEngineMcp = createFounderSignalEngineMcpHandler(); } },
+        platforms: { type: 'array', minItems: 1, maxItems: 11, uniqueItems: true, items: { type: 'string', enum: [
+          'linkedin', 'facebook', 'instagram', 'threads', 'x', 'tiktok',
+          'youtube', 'pinterest', 'bluesky', 'mastodon', 'google_business',
+        ] } },
+        mediaPreference: { type: 'string', enum: ['auto', 'image', 'video', 'carousel', 'none'] },
+        recentPosts: {
+          type: 'array', maxItems: 15,
+          items: { type: 'object', additionalProperties: false,
+            required: ['thesis', 'publicPostUrl'],
+            properties: { thesis: text(150), publicPostUrl: { type: 'string', format: 'uri' } },
+          },
+        },
+      },
+    },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   };
 }
 
