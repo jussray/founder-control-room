@@ -421,7 +421,7 @@ A child-app reconciliation may classify evidence as `CURRENT`, `UNDECLARED`, `SC
 
 For public crawler and work-directory behavior, `.github/workflows/ci.yml` must keep `e2e/pages-api-recovery.spec.ts` and `e2e/public-work-directory.spec.ts` inside the load-bearing `Playwright e2e` job that feeds `Required Gate`. The specialized Pages workflow is supplementary evidence only; it cannot replace this required exact-head browser proof or authorize merge.
 
-The public `/work` page is a static Pages asset: `public/_worker.js` rewrites the bare `/work` and `/work/` paths to `/work.html` and serves them through the `ASSETS` binding, so the page never falls through to the API proxy path that answered it with a degraded 503.
+The public `/work` page is a static Pages asset: `public/_worker.js` serves the bare `/work` and `/work/` paths by requesting the canonical `/work` URL through the `ASSETS` binding (requesting the `/work.html` filename returns the asset layer's 308 canonicalization back to `/work` and loops), so the page never falls through to the API proxy path that answered it with a degraded 503.
 
 ## cross-repository browser witness freshness
 
