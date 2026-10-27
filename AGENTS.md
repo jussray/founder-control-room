@@ -42,6 +42,18 @@ For messaging, lead generation, sales automation, unified inbox, consent, outrea
 
 The default growth-inbox mode is `draft_only`. No live outreach, calling, campaign, credential creation, paid provider enablement, deployment, pricing/discount action, or publication is authorized merely because a skill or connector exists.
 
+## Mandatory read-only GitHub / Cloudflare / Supabase preflight for every coding agent
+
+Before nontrivial implementation, PR preparation, review, merge-readiness, release-readiness, provider configuration planning, or cross-application handoff, perform a **read-only audit of the affected application's authoritative sources** within the founder-authorized project scope. This is required regardless of agent, model, connector, branch, or whether another agent previously reported success. It is not permission to browse unrelated private resources.
+
+- **GitHub:** resolve the exact repository, default branch, current main SHA, candidate branch/head/base, open and draft PRs, unresolved reviews, code-scanning findings/annotations, latest relevant red commits and failed Actions jobs, all applicable exact-head tests/checks, and effective branch rulesets/bypass paths. A check with no job, stale SHA, failed step, or missing access is not green. Do not substitute a successful SARIF upload for a passing vulnerability scan.
+- **Cloudflare:** from an authorized **read-only** provider connector, inspect the matching Pages/Workers project and account identity, source revision, build status, deployment version, routes/custom domains/service bindings, and bounded sanitized error/log summaries. Confirm which Worker serves the specific application, not merely that a Worker with a familiar name exists. Credentials, account approval failures, or absent build/log access are `UNKNOWN/BLOCKED`, not an authorization to manufacture receipts or increase token scope.
+- **Supabase:** resolve the intended **app-specific** project reference from checked-in configuration and independently compare it to the connected live project. Inspect read-only migration history, relevant schema/RLS/grants/auth advisors, Edge Function identities and deploy versions, and minimized runtime failures. Do not query user content, export tables, or view raw teen/parent/customer data. Never treat another project's successful tests or migration state as proof for this one.
+- **Parity:** keep `source_sha`, `ci_head_sha`, `cloudflare_release_sha`, `supabase_project_ref`, `migration_head`, and runtime/browser identity separate. Compare them only for the relevant application and release target. A mismatch, unavailable independent provider readback, or unreviewed security finding is a blocking evidence gap for the associated merge/release claim; it does not by itself prove code is defective.
+- **Receipt and stop rule:** produce a minimized `READ_ONLY_AUDIT_RECEIPT` with application, repository, exact SHAs, time, sources consulted, finding IDs/severities, statuses (`PASS / FAIL / UNKNOWN / NOT_APPLICABLE`), reason for each N/A, and next owner. **No current receipt = no advancement claim.** If a required finding is `FAIL` or `UNKNOWN`, stop unrelated implementation and any merge, deploy, production data, or credential action; allow only founder-authorized, scoped diagnostic work or isolated draft remediation. New head, branch, provider, or migration evidence expires the relevant old receipt.
+
+All mutation classes (repository write, merge, Cloudflare deployment/token/route change, Supabase policy/migration, publication, deletion) still require their own founder authority. Provider credentials and private application data must never be copied into receipts, CI artifacts, issues, or prompts. A prompt instruction or agent self-attestation is **not a machine-enforced release gate**: live ruleset requirements, trusted exact-head checks, provider evidence, and explicit founder review must enforce consequential transitions.
+
 ## Founder stack compatibility and expanded reasoning
 
 The existing routing shorthand remains supported:
@@ -303,3 +315,14 @@ List goal, reality, ULTRATHINK decomposition, Product Design state, Data Analyti
 
 - Read [`skills/fact-check-every-claim/SKILL.md`](./skills/fact-check-every-claim/SKILL.md) before externally using factual claims, numbers, quotations, dates, or action guidance.
 - Read [`docs/PORTABLE_FOUNDER_APPROVALS.md`](./docs/PORTABLE_FOUNDER_APPROVALS.md) before treating approval from another approved founder console as mutation authority.
+
+## Reds rule — implant on sight (standing law, installed 2026-10-26)
+
+Any error or red that surfaces in this repository — CI/Actions failure,
+failing test, broken build, runtime defect — is diagnosed and fixed in the
+same flow it is seen, with the smallest reversible change, landed through
+this repo's normal gate and verified green on the exact head. A seen red is
+never parked as a report. Never merge over a blocked mandatory gate or a
+red exact head. A credential- or founder-gated red gets a full diagnosis
+plus the one unblocking action named — never silence, never a faked fix.
+Full charter: `.github/agents/reds-implant.agent.md`.
