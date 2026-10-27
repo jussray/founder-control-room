@@ -1110,6 +1110,51 @@ approvalsRouter.post(
       });
     }
 
+    // Patch-path ledger: same idempotency contract as the execute route.
+    // A patch commit is a provider mutation; it must not execute twice.
+    const idempotencyKey = text((req.body as Record<string, unknown>)['idempotencyKey']);
+    if (!idempotencyKey) {
+      return res.status(400).json({ ok: false, code: 'IDEMPOTENCY_KEY_REQUIRED', error: 'idempotencyKey is required for patch commits.' });
+    }
+    const patchScope = {
+      missionId,
+      projectId: mission.project_id as string,
+      actionType: 'patch',
+    };
+    const existingPatch = await findExecution(idempotencyKey);
+    if (existingPatch.error) {
+      return res.status(500).json({
+        error: 'Unable to inspect the action idempotency ledger.',
+        detail: existingPatch.error.message,
+      });
+    }
+    if (existingPatch.data) {
+      if (!executionScopeMatches(existingPatch.data, patchScope)) {
+        return res.status(409).json({
+          ok: false,
+          code: 'IDEMPOTENCY_SCOPE_MISMATCH',
+          error: 'This idempotency key belongs to a different mission, project, or action.',
+        });
+      }
+      if (existingPatch.data.status === 'succeeded') {
+        return res.json({ ok: true, idempotent: true, idempotencyKey, result: existingPatch.data.result });
+      }
+      if (existingPatch.data.status === 'pending') {
+        return res.status(409).json({
+          ok: false,
+          code: 'ACTION_ALREADY_PENDING',
+          error: 'This patch action is already reserved or may have executed. Reconcile it before retrying.',
+          executionId: existingPatch.data.id,
+        });
+      }
+      return res.status(409).json({
+        ok: false,
+        code: 'ACTION_PREVIOUSLY_FAILED',
+        error: 'This idempotency key is bound to a prior failed patch. Use a new key after review.',
+        result: existingPatch.data.result,
+      });
+    }
+
     const { data: project, error: projectError } = await supabase
       .from('projects')
       .select('id, slug, repo_provider, repo_identifier')
@@ -1130,6 +1175,42 @@ approvalsRouter.post(
     }
     const provider = configured.provider;
 
+    // Reserve before the provider mutation. The globally unique idempotency
+    // key is the final race barrier if two requests pass the lookup above
+    // concurrently.
+    const { data: patchReservation, error: patchReservationError } = await supabase
+      .from('approval_executions')
+      .insert({
+        mission_id: missionId,
+        project_id: mission.project_id,
+        action_type: 'patch',
+        idempotency_key: idempotencyKey,
+        executed_by: req.founder!.email,
+        status: 'pending',
+        request: { message, changes, branch: mission.branch_ref },
+        result: {},
+        success: null,
+        started_at: new Date().toISOString(),
+      })
+      .select('id')
+      .single();
+
+    if (patchReservationError || !patchReservation) {
+      if ((patchReservationError as { code?: string } | null)?.code === '23505') {
+        return res.status(409).json({
+          ok: false,
+          code: 'ACTION_ALREADY_PENDING',
+          error: 'A concurrent request reserved this patch action first. Reconcile it before retrying.',
+        });
+      }
+      return res.status(500).json({
+        ok: false,
+        code: 'PATCH_RESERVATION_FAILED',
+        error: 'Unable to reserve the patch action.',
+        detail: patchReservationError?.message ?? 'Reservation insert returned no record.',
+      });
+    }
+
     let commitSha: string;
     try {
       commitSha = await provider.commitPatch(project.slug, mission.branch_ref, {
@@ -1138,10 +1219,29 @@ approvalsRouter.post(
         authorName: 'founder-control-room',
       });
     } catch (error) {
+      await supabase
+        .from('approval_executions')
+        .update({ status: 'failed', result: { error: error instanceof Error ? error.message : String(error) }, success: false, executed_at: new Date().toISOString() })
+        .eq('id', patchReservation.id)
+        .eq('status', 'pending');
       return res.status(502).json({
         error: error instanceof Error ? error.message : 'Patch commit failed',
         code: 'PATCH_COMMIT_FAILED',
       });
+    }
+
+    const { error: finalizeError } = await supabase
+      .from('approval_executions')
+      .update({
+        status: 'succeeded',
+        result: { commitSha, branch: mission.branch_ref },
+        success: true,
+        executed_at: new Date().toISOString(),
+      })
+      .eq('id', patchReservation.id)
+      .eq('status', 'pending');
+    if (finalizeError) {
+      console.error('patch ledger finalize failed; row left pending for reconciliation', { executionId: patchReservation.id, commitSha, error: finalizeError.message });
     }
 
     await supabase.from('project_events').insert({
@@ -1178,6 +1278,6 @@ approvalsRouter.post(
       warning = `Commit succeeded, but expectedHeadSha could not be re-pinned: ${pinUpdateError.message}`;
     }
 
-    return res.status(201).json({ ok: true, commitSha, branch: mission.branch_ref, ...(warning ? { warning } : {}) });
+    return res.status(201).json({ ok: true, idempotencyKey, commitSha, branch: mission.branch_ref, ...(warning ? { warning } : {}) });
   },
 );

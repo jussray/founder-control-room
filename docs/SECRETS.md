@@ -41,6 +41,40 @@ The GitHub App **Client ID is not used** by the current installation-token witne
 
 `APP_ID` and `APP_PRIVATE_KEY` must identify the same installed App. The read-only `github-app-secret-shape-diagnostic.yml` proves only local credential transport/PEM/RSA shape and explicitly performs no provider authentication or issuer readback. For workflows that claim provider proof, success must separately establish that both mapped runtime values were usable and that provider readback reports the expected App issuer; secret-name presence or a green shape diagnostic alone is not provider proof.
 
+
+#### Accepted `APP_PRIVATE_KEY` transport shapes
+
+Secret input fields damage PEM text in predictable ways, so the private key is
+normalized before use. `scripts/mint-portfolio-github-app-token.mjs` owns the
+minting classifier. `github-app-secret-shape-diagnostic.yml` intentionally embeds
+an isolated duplicate rather than importing repository code into its secret-bearing
+step. Both implementations must be kept in sync; marker-string contract tests do
+not prove behavioral equivalence, so disagreement remains possible.
+
+Accepted shapes, with the `transport_class` each reports:
+
+| Stored value | `transport_class` |
+|---|---|
+| PKCS#8 or PKCS#1 PEM as issued by GitHub | `raw-pem` |
+| PEM with CRLF line endings or surrounding whitespace | `raw-pem` |
+| PEM with literal `\n` escapes instead of newlines | `escaped-newline-pem` |
+| PEM wrapped in double quotes | `json-quoted-pem` |
+| PEM wrapped in single quotes | `single-quoted-pem` |
+| Base64 or base64url of the whole PEM | `base64-pem` |
+| Base64 of the DER bytes, or a PEM body with its header lines stripped | `base64-der` |
+| PEM whose newlines a single-line field collapsed to spaces | `collapsed-pem` |
+
+An empty, non-key, truncated, or non-RSA value still fails closed. A rejected
+value raises `APP_PRIVATE_KEY_SHAPE_INVALID:<transport_class>` followed by
+boolean shape facts only — whether `-----BEGIN`/`-----END` markers were
+seen, whether the character set looked base64, whether literal `\n` escapes
+were present, and whether the value was multiline. Length and line counts are not emitted. No substring, hash, or other derivation of
+the key material is ever emitted.
+
+A recognized transport proves local parsing only. It is not provider proof: the
+App must still be installed for the owner and the installation token must still
+be issued.
+
 ---
 
 ## Supabase
@@ -250,6 +284,7 @@ This table covers GitHub Actions secret names that are referenced outside the ca
 | `OPENAI_API_KEY` | `playwright.yml` | Injected only into the E2E harness when configured; do not expose it to browser/static assets. |
 | `PERPLEXITY_API_KEY` | `playwright.yml` | Injected only into the E2E harness when configured; do not expose it to browser/static assets. |
 | `FCR_PLAYWRIGHT_FOUNDER_BEARER` | `prompt-workflow-router-runtime-proof.yml` | Founder bearer credential used only for authorized deployed-runtime Playwright proof of the prompt workflow router. Keep it workflow-side, never log or expose the value in browser/static assets or receipts. |
+| `FCR_OPERATOR_RELAY_OAUTH_TOKEN` | `prompt-workflow-router-runtime-proof.yml` | Dedicated short-lived Supabase OAuth access token for the canonical `POST /mcp` operator-relay witness. It must carry the configured MCP audience, an allowed `client_id`, `mcp:read`, at least one allowed `mcp_projects` grant, and a current founder identity. Do not reuse the founder browser bearer, static `/mcp/read` token, provider API key, deploy token, or service-role credential. Never log or expose the token value in artifacts. |
 | `N8N_CONVEYOR_WEBHOOK_URL` | `n8n-conveyor-live-probe.yml` | Required private webhook URL for the founder-approved live conveyor probe. |
 | `N8N_CONVEYOR_BEARER_TOKEN` | `n8n-conveyor-live-probe.yml` | Required bearer credential paired with the live conveyor webhook probe. |
 | `CLOUDFLARE_DEPLOY_HOOK_URL` | `pages-production-release.yml` | Required reusable-workflow secret used to trigger the exact-SHA Pages release. |
