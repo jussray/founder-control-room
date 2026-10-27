@@ -108,7 +108,8 @@
     {
       "path": "src/http/routes/approvals.ts",
       "claims": [
-        "`src/http/routes/approvals.ts` must require exact-head evidence plus provider-backed PR identity, deterministic independent review, and authenticated founder-final confirmation bound to the exact PR, base, and head before FCR integration, then must re-read the mutable branch head immediately before provider integration."
+        "`src/http/routes/approvals.ts` must require exact-head evidence plus provider-backed PR identity, deterministic independent review, and authenticated founder-final confirmation bound to the exact PR, base, and head before FCR integration, then must re-read the mutable branch head immediately before provider integration.",
+        "`src/http/routes/approvals.ts` must read the exact FCR candidate's StoryEngine peer SHA/ref, resolve the registered `jussray/StoryEngine` peer immediately before FCR provider integration, and fail closed without calling `integrate()` when live peer identity differs from the candidate pin."
       ]
     },
     {
