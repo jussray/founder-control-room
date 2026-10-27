@@ -185,7 +185,7 @@ Those actions still require their own exact approval unless a later founder dire
 
 Do not merge merely because a PR exists, because a badge looks green, because `merge_authority` is true, or because the founder asked for review/implementation. **Before every merge, ask for and obtain explicit founder approval for the exact current repository, PR, base SHA, and head SHA unless that exact approval is already present and still current.**
 
-Immediately before merge, re-read current `main`, the exact PR head, required checks, review state, founder-final receipt state, exact-candidate founder approval, and applicable provider state. If base or head moved after approval, stop and ask again. After merge, re-read the resulting `main`, Documentation Truth, and the next release/runtime gate. Old-head green and old approval remain historical evidence only.
+Immediately before merge, re-read current `main`, the exact PR head, required checks, review state, founder-final receipt state, exact-candidate founder approval, and applicable provider state. For Founder Control Room, the exact candidate's `.github/workflows/playwright.yml` StoryEngine peer SHA/ref is also load-bearing: merge execution must resolve the registered `jussray/StoryEngine` peer at that ref immediately before provider integration and fail closed if live peer identity differs from the candidate pin. If base, head, or that external peer moved after approval/proof, stop and reacquire proof before merge. After merge, re-read the resulting `main`, Documentation Truth, and the next release/runtime gate. Old-head green and old approval remain historical evidence only.
 
 ## Load-bearing regression execution
 
