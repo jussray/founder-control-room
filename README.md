@@ -1,5 +1,13 @@
 # Founder Control Room
 
+## October 26, 2026 Cloudflare Logpush control plane
+
+`config/cloudflare-logpush.portfolio.json` is the source-only desired-state registry for portfolio Logpush participation. It declares one account-scoped `workers_trace_events` job and the authorized repository set; it does not prove that a Cloudflare Logpush job currently exists or that any destination has received logs.
+
+Pull-request validation is non-mutating. Provider inspection uses a dedicated read credential. Provider apply remains a separate founder-gated action bound to the exact current `main` SHA, an auditable approval reference, a dedicated write credential, and provider-held destination configuration. A successful apply must complete provider readback before the receipt may claim the desired job is verified.
+
+Destination credentials and destination configuration stay outside source control. Depending on the selected destination, its network policy may also require Cloudflare Logpush source-IP allowlisting or a separately configured dedicated Logpush egress IP. Those provider/network facts require their own observation and are not established by repository CI.
+
 ## October 24, 2026 authenticated founder dock + StoryEngine peer renewal
 
 The public FCR entrance remains available without a session, while the internal `/control-room/` founder navigation dock starts `hidden` with `aria-hidden="true"` and becomes visible only after the existing authenticated `#root .shell` renders. Session/shell loss closes and hides the dock again. This is a UI privacy safeguard only; server-side authorization remains independently required.
@@ -196,11 +204,11 @@ canonical capability declaration
 
 ### Proof-weighted model capability market
 
-`src/lib/modelCapabilityMarket.ts` adds a task-specific routing layer for Council operators. Public launch benchmarks and provider claims are discovery signals only: they enter as bounded priors and cannot by themselves make a model primary, prove an outcome, or grant execution authority. Promotion requires fresh local receipts for the same task class; stale observations expire, false-green behavior is penalized, and a fresh authority-boundary violation blocks promotion.
+`src/lib/modelCapabilityMarket.ts` adds a task-specific routing layer for Council operators. Public launch benchmarks and provider claims are discovery signals only: they enter as bounded priors and cannot by themselves make a model primary, prove an outcome, or grant execution authority. Promotion requires fresh local receipts for the same task class; the primary-eligibility gate now requires enough independently proven samples **and verified completed outcomes**, not raw provider responses or verified failures/blocked stops. Stale observations expire, false-green behavior is penalized, and any fresh authority-boundary violation (including an unproven or malformed violation observation) blocks promotion.
 
 The market may recommend a primary, an independent challenger from another provider family, and shadow trials for promising unproven models. Every route remains explicitly non-authorizing (`selectionAuthority: false`, `executionAuthority: false`). Founder approval, repository/provider gates, provider readback, Playwright for load-bearing browser claims, and outcome verification remain separate. See [`docs/MODEL_CAPABILITY_MARKET.md`](docs/MODEL_CAPABILITY_MARKET.md).
 
-The market's intended first receipt source is the operator relay: `src/lib/capabilityObservationFeed.ts` folds relay responses into per-operator, per-task-class observations (only independently verified receipts count as proof; false green = completed without evidence; authority violation = any `authorityRequested` other than `none`; stale, duplicate, in-flight and foreign-operator receipts excluded). State: the ranking and the fold are **contract-capable** tested source; relay responses are not yet persisted, no outcome verifier exists, and no live route calls the market — advisory, not enforced routing.
+The market's intended first receipt source is the operator relay: `src/lib/capabilityObservationFeed.ts` folds relay responses into per-operator, per-task-class observations (only independently verified exact response hashes whose contents still match their canonical digest count as proof; false green = completed without evidence; authority violation = any `authorityRequested` other than `none`; stale, duplicate, in-flight and foreign-operator receipts excluded). State: the ranking and the fold are **contract-capable** tested source; relay responses are not yet persisted, no outcome verifier exists, and no live route calls the market — advisory, not enforced routing.
 
 ### Founder-content execution
 
@@ -407,6 +415,8 @@ A child-app reconciliation may classify evidence as `CURRENT`, `UNDECLARED`, `SC
 
 For public crawler and work-directory behavior, `.github/workflows/ci.yml` must keep `e2e/pages-api-recovery.spec.ts` and `e2e/public-work-directory.spec.ts` inside the load-bearing `Playwright e2e` job that feeds `Required Gate`. The specialized Pages workflow is supplementary evidence only; it cannot replace this required exact-head browser proof or authorize merge.
 
+The public `/work` page is a static Pages asset: `public/_worker.js` serves the bare `/work` and `/work/` paths by requesting the canonical `/work` URL through the `ASSETS` binding (requesting the `/work.html` filename returns the asset layer's 308 canonicalization back to `/work` and loops), so the page never falls through to the API proxy path that answered it with a degraded 503. The public `/welcome` page carries the same static classification: `public/_worker.js` serves the bare `/welcome` and `/welcome/` paths by requesting the canonical `/welcome` URL through the `ASSETS` binding, because the extensionless path otherwise falls through to the API proxy and returns a degraded 503.
+
 ## cross-repository browser witness freshness
 
 The exact StoryEngine peer configured in `.github/workflows/playwright.yml` is an evidence subject, not a durable alias for current StoryEngine. A peer refresh must be backed by an independent ref/SHA observation and must reset predecessor federation/browser proof until the complete FCR → StoryEngine → receipt → FCR Playwright witness passes on the exact FCR head. Pin alignment alone grants no merge, deploy, production, or provider-mutation authority.
@@ -443,9 +453,15 @@ An exact StoryEngine ref/pin match renews only the peer-identity prerequisite; a
 
 The AI Failure Repair workflow stores its bounded evidence under `.repair/`, a hidden directory. Every `actions/upload-artifact` step that uploads that evidence must explicitly include hidden files; otherwise the upload can fail even when evidence capture succeeded. Artifact transport is part of repair evidence integrity and does not grant merge, deploy, publication, provider, or production authority.
 
+## Se’kret Bip front-door adapter refresh — October 24, 2026
+
+The read-only Se’kret Bip project adapter now stages an audit against independently observed Se’kret Bip `main` at exact source `e3b6a3a36737f3c1d24c37fd2842ee6d7bf97150`. Comparing all seven required contract paths against the previous audited head `be6db16b248ec32048d8ff71c46dd2052d021443` showed exactly one changed blob: `screens/WebWelcomeScreen.tsx` now `9d3a1128d09d47f3e9b4eb5d8f3da5f3dbe2709c`. The screen stages Teen and Bip Jr artwork after image readiness and respects reduced-motion preferences while preserving Night, Suhana, Sy, and Cloud in the existing composite, the two audience-to-account-side mappings, and non-executing preview-only authority. The original seven-path contract still binds this adapter; motion implementation/tests are separately inspected supporting context, not an expansion of authority. This source audit does not prove live browser delivery, deployment, or any provider write. Any movement of Se’kret Bip `main` requires a fresh blob readback before accepting FCR freshness.
+
 ## Chief adapter exact-head truth
 
 `src/founder-os-lab/projectAdapters.ts` binds Chief integration evidence to one audited exact Chief head. Moving that pin is an evidence-authority transition: the same change must refresh this README, `docs/TRUTH_DECAY_AUDIT.md`, and `docs/DOCUMENTATION_TRUTH_RECEIPT.json`, and the successor FCR head must earn its own adapter, pair-contract, CI, and applicable runtime/browser proof. Pin alignment selects the next evidence subject only; it does not prove Chief deployment, served-MCP reachability, production behavior, merge authority, or deploy authority.
+
+**2026-10-24 candidate transition (draft only):** FCR draft PR #1015 stages Chief adapter provenance against Chief draft PR #242 at candidate `0d1106424802fa21d37c6a05fc3e6f6422cc989a` after a semantic review found outdated standalone-product and posting approval wording on Chief `main`. Chief PR #242 restores the previously audited `.control-room/necessary-fix-policy.json` and byte-identical FCR pairing policy (`config/founder-chief-pair.contract.json` blob `dd008420e1a91e78516b45d9e27de89344abf432`) and regression assertions. The five audited Chief contract blobs are pinned to that candidate, not claimed to be current Chief `main`. Until Chief `main` includes those exact blobs, the GitHub-API-backed FCR project-adapter freshness check is expected to report drift; it must not be waived. Chief's restored pair CI passing does not transfer release authority, prove Cloudflare runtime identity, or make FCR's candidate audit ready to merge.
 
 ## September 27 StoryEngine peer transition
 
