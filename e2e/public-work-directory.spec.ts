@@ -121,9 +121,12 @@ test('serves the public work directory from Pages and keeps live/source states d
 
 test('renders Claude Cowork as a GitHub-grounded Council lane in the founder stack', async ({ page }) => {
   const appHtml = readFileSync(resolve(repoRoot, 'public/control-room/index.html'), 'utf8');
+  const truthConsoleSource = readFileSync(resolve(repoRoot, 'public/control-room/truth-console.js'), 'utf8');
+  const truthConsoleModuleUrl = `data:text/javascript;base64,${Buffer.from(truthConsoleSource, 'utf8').toString('base64')}`;
   const stackRouterSource = readFileSync(resolve(repoRoot, 'public/control-room/stack-router.js'), 'utf8')
     .replace("import { installMissionBoard } from './mission-board.js';", 'const installMissionBoard = () => {};')
-    .replace("import { installProjectShellUi } from './project-shell-ui.js';", 'const installProjectShellUi = () => {};');
+    .replace("import { installProjectShellUi } from './project-shell-ui.js';", 'const installProjectShellUi = () => {};')
+    .replace("'./truth-console.js'", JSON.stringify(truthConsoleModuleUrl));
 
   await page.setContent(appHtml);
   await expect(page.locator('.launch-dock')).toBeHidden();

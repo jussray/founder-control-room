@@ -7,7 +7,7 @@ import { Router } from 'express';
 import { rateLimit } from 'express-rate-limit';
 import { supabaseAuth } from '../../lib/supabaseAuthClient.js';
 import { supabase } from '../../lib/supabaseClient.js';
-import { authenticatePublicMcp } from '../../mcp/publicMcpAuth.js';
+import { authenticatePublicMcp, FCR_PUBLIC_MCP_RESOURCE } from '../../mcp/publicMcpAuth.js';
 import {
   PublicMcpAccessDenied,
   getMyPublicProject,
@@ -16,7 +16,7 @@ import {
   type PublicProjectSummary,
 } from '../../mcp/publicTenantAccess.js';
 
-const RESOURCE = 'https://api.foundercontrolroom.org/mcp/public';
+const RESOURCE = FCR_PUBLIC_MCP_RESOURCE;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const READ_SCHEME = [{ type: 'oauth2', scopes: ['openid'] }];
 const publicMcpTools = [
