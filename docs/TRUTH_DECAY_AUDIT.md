@@ -1,5 +1,11 @@
 # Truth Decay Audit: When a True Claim Becomes Unsafe to Reuse
 
+## October 27, 2026: StoryEngine production-proof repair moved the federation subject
+
+StoryEngine current `main` advanced from `ca962186b7185f44ac98e09395786c70a394542e` to merge commit `dc79a23ffa8e6e5b0964efccdaee7c961b9b9e1d` through PR #147. The merge repairs Railway production-environment identity and cleanly no-ops non-`main` deployment-status signals. On the exact merge commit, Agent Contract v1, L99 Promotion Gates, CodeQL, Guardrails Playwright, L99 Story Engine CI, Control Room Test Ledger, Story Video Engine Playwright, and StoryEngine Production Proof all completed successfully.
+
+That proves the successor StoryEngine source/provider subject is currently viable. It does not make any predecessor FCR federation/browser witness current. Updating FCR's `STORYENGINE_PEER_SHA` to `dc79a23ffa8e6e5b0964efccdaee7c961b9b9e1d` resets the FCR↔StoryEngine pair to UNKNOWN until the complete successor FCR exact-head live-ref, immutable checkout, runtime identity, directive/receipt/replay, and browser witness succeeds. The new FCR merge-time peer freshness veto must also re-read StoryEngine immediately before any later governed FCR integration.
+
 ## October 27, 2026: StoryEngine preview configuration moved the federation subject
 
 FCR PR #1038 exact head `79d9890946288ed86bee6be10977fb963aae09af` completed the local E2E and truth-console browser journeys before Playwright run `40437862623` stopped at the separate StoryEngine live-ref equality gate. The workflow expected `89e92445dfde114b831e8cf6b5383f42ebccca4d` and observed `4601cc3a8297875c97e54717f2aeb47db44d0595`; peer checkout/runtime/federation steps were therefore correctly skipped.
