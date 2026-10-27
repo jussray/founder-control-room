@@ -16,7 +16,7 @@
       "path": "config/cloudflare-logpush.portfolio.json",
       "claims": [
         "`config/cloudflare-logpush.portfolio.json` must remain the source-only desired-state registry for the account-scoped `workers_trace_events` Logpush job; pull-request verification cannot mutate Cloudflare or prove delivery, and provider apply requires exact-current-main binding, a founder approval reference, a dedicated write credential, destination configuration, and post-write readback.",
-        "`config/cloudflare-logpush.portfolio.json` must exclude repositories whose local governance marks them historical/investigate-only and must also exclude repositories where audited current `main` has no Cloudflare Worker runtime; `jussray/sekret-bip-companions`, `jussray/Bip-Jr`, and `jussray/Sekret-Bip-Bridge` are governance-excluded, while `jussray/jussray-bip-and-seek` is runtime-inapplicable because current `main` is Roblox-only."
+        "`config/cloudflare-logpush.portfolio.json` must exclude repositories whose current-main governance forbids active participation and repositories without an actual Cloudflare Worker execution surface; governance-excluded repos are `jussray/sekret-bip-companions`, `jussray/Bip-Jr`, and `jussray/Sekret-Bip-Bridge`, while runtime-inapplicable repos are Roblox-only `jussray/jussray-bip-and-seek`, static-Pages `jussray/Sekret-Bip-Parents`, and governance-only `jussray/Sekret-Bip-Gov`."
       ]
     },
     {
