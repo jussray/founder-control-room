@@ -4,6 +4,8 @@
 
 `config/cloudflare-logpush.portfolio.json` is the source-only desired-state registry for portfolio Logpush participation. It declares one account-scoped `workers_trace_events` job and the authorized repository set; it does not prove that a Cloudflare Logpush job currently exists or that any destination has received logs.
 
+Active participation must also respect repository-local governance. Investigate-only or historical repositories are excluded from the active Logpush registry even when FCR preserves them for provenance; `jussray/sekret-bip-companions` is therefore not an active participant under its current investigate-only contract.
+
 Pull-request validation is non-mutating. Provider inspection uses a dedicated read credential. Provider apply remains a separate founder-gated action bound to the exact current `main` SHA, an auditable approval reference, a dedicated write credential, and provider-held destination configuration. A successful apply must complete provider readback before the receipt may claim the desired job is verified.
 
 Destination credentials and destination configuration stay outside source control. Depending on the selected destination, its network policy may also require Cloudflare Logpush source-IP allowlisting or a separately configured dedicated Logpush egress IP. Those provider/network facts require their own observation and are not established by repository CI.
