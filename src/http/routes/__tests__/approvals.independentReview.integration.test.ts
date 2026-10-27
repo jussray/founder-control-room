@@ -515,7 +515,19 @@ describe('FCR independent review merge membrane', () => {
       founderFinalPolicy,
     );
     expect(mockResolveRef).toHaveBeenLastCalledWith('founder-control-room', 'mission/review-gate');
+    expect(mockReadFile).toHaveBeenCalledWith(
+      'founder-control-room',
+      HEAD_SHA,
+      '.github/workflows/playwright.yml',
+    );
+    expect(mockStoryEngineResolveRef).toHaveBeenCalledWith('story-engine', 'refs/heads/main');
     expect(mockIntegrate).toHaveBeenCalledWith('founder-control-room', 'main', 'mission/review-gate');
+    expect(response.body.result.externalPeerFreshness).toEqual({
+      repository: 'jussray/StoryEngine',
+      ref: 'refs/heads/main',
+      pinnedSha: STORYENGINE_SHA,
+      currentSha: STORYENGINE_SHA,
+    });
     expect(response.body.result.independentReview).toMatchObject({
       semanticClearCount: 0,
       deterministicClearCount: 1,
