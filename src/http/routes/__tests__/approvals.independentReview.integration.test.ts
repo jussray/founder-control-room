@@ -8,6 +8,8 @@ const {
   mockProviderForProject,
   mockEnqueue,
   mockResolveRef,
+  mockReadFile,
+  mockStoryEngineResolveRef,
   mockGetPullRequestReviewContext,
   mockCompare,
   mockIntegrate,
@@ -20,6 +22,8 @@ const {
   mockProviderForProject: vi.fn(),
   mockEnqueue: vi.fn(),
   mockResolveRef: vi.fn(),
+  mockReadFile: vi.fn(),
+  mockStoryEngineResolveRef: vi.fn(),
   mockGetPullRequestReviewContext: vi.fn(),
   mockCompare: vi.fn(),
   mockIntegrate: vi.fn(),
@@ -66,6 +70,8 @@ const BASE_SHA = 'a'.repeat(40);
 const HEAD_SHA = 'b'.repeat(40);
 const POLICY_HASH = '2'.repeat(64);
 const REVIEW_HASH = '3'.repeat(64);
+const STORYENGINE_SHA = 'c'.repeat(40);
+const STORYENGINE_DRIFT_SHA = 'e'.repeat(40);
 
 const reviewPolicy = {
   requiredSemanticReviews: 1,
@@ -96,6 +102,7 @@ const validEvidence = {
 const provider = {
   name: 'github',
   resolveRef: mockResolveRef,
+  readFile: mockReadFile,
   getPullRequestReviewContext: mockGetPullRequestReviewContext,
   compare: mockCompare,
   integrate: mockIntegrate,
@@ -104,6 +111,11 @@ const provider = {
   listReviewSignals: vi.fn(),
   createBranch: vi.fn(),
   commitPatch: vi.fn(),
+};
+
+const storyEngineProvider = {
+  name: 'github',
+  resolveRef: mockStoryEngineResolveRef,
 };
 
 function buildApp() {
@@ -140,8 +152,16 @@ function authSuccess() {
 
 function providerDefaults() {
   mockProviderConfigurationError.mockReturnValue(null);
-  mockProviderForProject.mockReturnValue(provider);
+  mockProviderForProject.mockImplementation((config: { repo_identifier?: string }) =>
+    config.repo_identifier === 'jussray/StoryEngine' ? storyEngineProvider : provider
+  );
   mockResolveRef.mockResolvedValue(HEAD_SHA);
+  mockReadFile.mockResolvedValue(`
+env:
+  STORYENGINE_PEER_SHA: ${STORYENGINE_SHA}
+  STORYENGINE_PEER_REF: refs/heads/main
+`);
+  mockStoryEngineResolveRef.mockResolvedValue(STORYENGINE_SHA);
   mockGetPullRequestReviewContext.mockResolvedValue({
     number: 470,
     repository: 'jussray/founder-control-room',
@@ -286,14 +306,32 @@ function executeStack(options: { founderFinal?: boolean } = {}) {
     if (table === 'projects') {
       return {
         select: () => ({
-          eq: () => ({
+          eq: (column: string, value: string) => ({
             single: () => Promise.resolve({
-              data: {
-                id: PROJECT_ID,
-                slug: 'founder-control-room',
-                repo_provider: 'github',
-                repo_identifier: 'jussray/founder-control-room',
-              },
+              data: column === 'repo_identifier' && value === 'jussray/StoryEngine'
+                ? {
+                    id: 'project-storyengine',
+                    slug: 'story-engine',
+                    repo_provider: 'github',
+                    repo_identifier: 'jussray/StoryEngine',
+                  }
+                : {
+                    id: PROJECT_ID,
+                    slug: 'founder-control-room',
+                    repo_provider: 'github',
+                    repo_identifier: 'jussray/founder-control-room',
+                  },
+              error: null,
+            }),
+            maybeSingle: () => Promise.resolve({
+              data: column === 'repo_identifier' && value === 'jussray/StoryEngine'
+                ? {
+                    id: 'project-storyengine',
+                    slug: 'story-engine',
+                    repo_provider: 'github',
+                    repo_identifier: 'jussray/StoryEngine',
+                  }
+                : null,
               error: null,
             }),
           }),
@@ -491,6 +529,37 @@ describe('FCR independent review merge membrane', () => {
       founderIdentity: FOUNDER_EMAIL,
     });
     expect(Date.parse(response.body.result.founderFinalReview.approvedAt)).toBeGreaterThanOrEqual(before);
+  });
+
+  it('fails closed at merge execution when StoryEngine current main moved after FCR federation proof', async () => {
+    executeStack({ founderFinal: true });
+    clearReviewGate();
+    mockStoryEngineResolveRef.mockResolvedValue(STORYENGINE_DRIFT_SHA);
+
+    const response = await request(buildApp())
+      .post(`/approvals/${MISSION_ID}/execute`)
+      .set('Authorization', BEARER)
+      .send({
+        actionType: 'merge',
+        idempotencyKey: 'storyengine-peer-drift',
+        payload: {
+          head: 'mission/review-gate',
+          base: 'main',
+          expectedHeadSha: HEAD_SHA,
+          independentReviews: [{ reviewHash: REVIEW_HASH }],
+          founderFinalReview: { pullRequestNumber: 470, confirmExactCandidate: true },
+        },
+      });
+
+    expect(response.status).toBe(409);
+    expect(response.body.error).toMatch(/StoryEngine peer moved after federation proof/i);
+    expect(mockReadFile).toHaveBeenCalledWith(
+      'founder-control-room',
+      HEAD_SHA,
+      '.github/workflows/playwright.yml',
+    );
+    expect(mockStoryEngineResolveRef).toHaveBeenCalledWith('story-engine', 'refs/heads/main');
+    expect(mockIntegrate).not.toHaveBeenCalled();
   });
 
   it('fails closed after deterministic review when founder-final confirmation is missing', async () => {
