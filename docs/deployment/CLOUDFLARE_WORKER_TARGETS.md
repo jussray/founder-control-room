@@ -1,5 +1,13 @@
 # Cloudflare Deployment Targets
 
+## Portfolio Logpush target
+
+The repository declares a single account-level Cloudflare Logpush desired job named `fcr-portfolio-workers-trace` for the `workers_trace_events` dataset. This is a source target, not a claim about current provider state or successful log delivery.
+
+Only the Founder Control Room manual provider workflow may reconcile that desired job, and only after exact-main SHA binding plus founder approval. Product repositories may declare participation, but they must not inherit the Cloudflare Logpush write credential or destination secret.
+
+A provider job readback can establish the configured Cloudflare job within that account; it still cannot prove destination-side ingestion unless the destination itself supplies corresponding receipt evidence.
+
 ## Canonical topology
 
 Founder Control Room uses Cloudflare Pages for the browser frontend and one canonical HTTP Worker for backend execution.
