@@ -4,6 +4,15 @@
 
 A successful `/version` preflight is evidence about that GET request, not authority for a later POST. During a rollout the POST may reach a different runtime. The Jira live probe therefore transmits the approved full SHA in `X-FCR-Expected-Head-Sha` alongside its versioned probe header, and the authenticated ingress rejects invalid or mismatched bindings before invoking the dispatcher. Post-dispatch identity and canonical receipt validation remain separate checks; neither proves independent Jira outcome readback. The probe client, ingress, CLI, and manual workflow are registered as evidence-authority paths so changes require substantive documentation and path-bound truth receipts.
 
+## October 26, 2026: truth-console browser proof stopped on StoryEngine identity drift
+
+FCR PR #1035 head `f4dcd5844bc6fd09de184f8fc7e8aece3f26b8ce` completed its local E2E harness before [Playwright run 40421408549, job 121916477738](https://github.com/jussray/founder-control-room/actions/runs/40421408549/job/121916477738) failed the separate live-peer equality check at `2026-10-26T23:44:53Z`. It expected StoryEngine `499f2d4eb9edac8bb11b657cf003a056263528d9` and observed `89e92445dfde114b831e8cf6b5383f42ebccca4d`; the federation steps after that check did not execute.
+
+An independent [StoryEngine main read](https://api.github.com/repos/jussray/StoryEngine/branches/main) at `2026-10-26T23:47:43.039Z` confirmed the latter SHA. [The comparison](https://github.com/jussray/StoryEngine/compare/499f2d4eb9edac8bb11b657cf003a056263528d9...89e92445dfde114b831e8cf6b5383f42ebccca4d) was six commits ahead and zero behind, adding only logpush-contract and documentation files. The `story-engine/` runtime subtree stayed `c685c6120831e05cdb897738fad22d8024aeeefb` at both refs. Twelve returned peer checks included ten successes, a failed Workers build, and a skipped Supabase preview; the successful federation contract is source evidence, not proof of deployed peer health.
+
+Refreshing the FCR pin selects that independently observed dependency subject only. The successor FCR head remains UNKNOWN for federation until live-ref equality, immutable checkout, runtime identity, directive/receipt binding, replay safety, and the complete browser witness execute successfully for the new pair. Predecessor green remains historical, and no production, merge, deploy, or provider authority transfers.
+
+
 ## October 24, 2026: founder-dock privacy boundary and StoryEngine peer movement
 
 The signed-out Control Room previously left founder-stack navigation present in the DOM as a visible dock. The repair makes first paint fail closed and derives dock visibility from the authenticated `#root .shell`; losing that shell closes and hides the dock again. Structural fixtures may synthesize the authenticated shell only after proving the signed-out state, while the opaque HttpOnly-cookie browser path remains the authority for real session behavior. UI hiding does not replace server authorization and does not prove production privacy until the exact successor browser witness passes.
