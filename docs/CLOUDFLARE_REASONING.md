@@ -4,7 +4,7 @@
 
 Founder Control Room owns the source contract for the portfolio Logpush desired state in `config/cloudflare-logpush.portfolio.json`. The first bounded dataset is account-scoped `workers_trace_events`; product repositories participate without receiving FCR Cloudflare write credentials.
 
-Participation is subordinate to repository-local governance. Historical or investigate-only repositories must stay outside the active participant registry; under its current `AGENTS.md` contract, `jussray/sekret-bip-companions` is provenance-only and is not an active Logpush participant.
+Participation is subordinate to repository-local governance. Historical or investigate-only repositories must stay outside the active participant registry. Under their current `AGENTS.md` contracts, `jussray/sekret-bip-companions`, `jussray/Bip-Jr`, and `jussray/Sekret-Bip-Bridge` are provenance/investigation-only and are not active Logpush participants.
 
 The Logpush workflow must keep pull-request execution read-only. Manual inspection may observe matching provider jobs with a dedicated read token, but inspection without access to the destination secret cannot claim full destination verification. Manual apply requires exact-current-main binding, a founder approval reference, a separate write token, destination configuration, and post-write provider readback.
 
