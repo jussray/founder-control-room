@@ -1,5 +1,14 @@
 # Truth Decay Audit: When a True Claim Becomes Unsafe to Reuse
 
+## October 26, 2026: truth-console browser proof stopped on StoryEngine identity drift
+
+FCR PR #1035 head `f4dcd5844bc6fd09de184f8fc7e8aece3f26b8ce` completed its local E2E harness before [Playwright run 40421408549, job 121916477738](https://github.com/jussray/founder-control-room/actions/runs/40421408549/job/121916477738) failed the separate live-peer equality check at `2026-10-26T23:44:53Z`. It expected StoryEngine `499f2d4eb9edac8bb11b657cf003a056263528d9` and observed `89e92445dfde114b831e8cf6b5383f42ebccca4d`; the federation steps after that check did not execute.
+
+An independent [StoryEngine main read](https://api.github.com/repos/jussray/StoryEngine/branches/main) at `2026-10-26T23:47:43.039Z` confirmed the latter SHA. [The comparison](https://github.com/jussray/StoryEngine/compare/499f2d4eb9edac8bb11b657cf003a056263528d9...89e92445dfde114b831e8cf6b5383f42ebccca4d) was six commits ahead and zero behind, adding only logpush-contract and documentation files. The `story-engine/` runtime subtree stayed `c685c6120831e05cdb897738fad22d8024aeeefb` at both refs. Twelve returned peer checks included ten successes, a failed Workers build, and a skipped Supabase preview; the successful federation contract is source evidence, not proof of deployed peer health.
+
+Refreshing the FCR pin selects that independently observed dependency subject only. The successor FCR head remains UNKNOWN for federation until live-ref equality, immutable checkout, runtime identity, directive/receipt binding, replay safety, and the complete browser witness execute successfully for the new pair. Predecessor green remains historical, and no production, merge, deploy, or provider authority transfers.
+
+
 ## October 24, 2026: founder-dock privacy boundary and StoryEngine peer movement
 
 The signed-out Control Room previously left founder-stack navigation present in the DOM as a visible dock. The repair makes first paint fail closed and derives dock visibility from the authenticated `#root .shell`; losing that shell closes and hides the dock again. Structural fixtures may synthesize the authenticated shell only after proving the signed-out state, while the opaque HttpOnly-cookie browser path remains the authority for real session behavior. UI hiding does not replace server authorization and does not prove production privacy until the exact successor browser witness passes.
@@ -469,11 +478,17 @@ The current-main CI repair cycle added an exact StoryEngine peer-pin transition 
 
 Truth boundary: peer-pin and repair-artifact changes must refresh the README, this truth-decay audit, and `docs/DOCUMENTATION_TRUTH_RECEIPT.json` in the same exact-head range. A successor head must earn its own CI and Playwright proof; predecessor green runs do not transfer.
 
+## October 24 Se’kret Bip front-door evidence refresh
+
+FCR PR #1015 updates the read-only Se’kret Bip adapter source pin from `be6db16b248ec32048d8ff71c46dd2052d021443` to independently confirmed Se’kret Bip `main` `e3b6a3a36737f3c1d24c37fd2842ee6d7bf97150` after review of all seven audited contract blobs. Six blobs are unchanged. The sole changed required blob is `screens/WebWelcomeScreen.tsx` (`b66acdb7b2f733c78ab53a50db194439b8629c4f` → `9d3a1128d09d47f3e9b4eb5d8f3da5f3dbe2709c`). The source change adds staged audience reveals after image-load readback; preserved guarantees include reduced-motion behavior, existing Teen/Bip Jr audience-to-account-side routing, composite family artwork and established character canon. Supporting `src/motion/frontDoorMotion.ts` and `test/front-door-motion-contract.test.mjs` were reviewed but are not silently added to the seven required adapter paths. This refresh supersedes prior adapter source evidence only and does not assert production runtime/browser truth. The PR remains a draft pending exact-head checks and independent review.
+
 ## Chief adapter exact-head decay
 
 The Chief SHA in `src/founder-os-lab/projectAdapters.ts` is an audited evidence identity, not a durable alias for current Chief. Any Chief-head or FCR-head movement expires predecessor adapter, pair-contract, CI, runtime, and browser proof according to the witness actually affected. A blob comparison can justify selecting a successor evidence subject when the audited contract paths are unchanged, but it cannot donate predecessor green or establish Chief deployment, served-MCP reachability, or production behavior.
 
 Documentation Truth therefore treats the adapter source path as evidence-authority-sensitive. Every pin transition must update the focused assertion, README boundary, this truth-decay record, and the structured documentation receipt in the same exact-head range before successor CI can certify the documentation contract. None of those source artifacts grants merge, deploy, publication, provider mutation, or founder authority.
+
+**2026-10-24 Chief pair candidate:** FCR draft PR #1015 stages the successor Chief source identity `0d1106424802fa21d37c6a05fc3e6f6422cc989a` from Chief draft PR #242. The full candidate also restores the audited `.control-room/necessary-fix-policy.json` required by FCR's paired gate. The five contract blobs were re-read by exact commit: unchanged capability-plan `7b0c2e8d2bbbfce6a0b053134cc79ee3e0a17ec5`, changed capability-registry `abb2daf0ee7ce85442cd4b04588b4881cc4b9b53`, changed merge-intent `ba7b3d1ff4dbc846d79489ec9ffb0c346597b559`, restored pair-contract `dd008420e1a91e78516b45d9e27de89344abf432`, and changed Playwright capability test `ad41d9f614dc94df7d5ebde3d9b3a8cefd96e39b`. The prior audited Chief head `4c126a442522b006d499170a812fcd5b80355bf0` no longer covers four changed blobs on Chief main; it remains historical. Chief #242 and FCR #1015 are draft and unmerged. The live FCR freshness gate is intentionally blocked while Chief main has not yet incorporated the corrected pairing blob; rerun exact-head CI and all contract reads after independently approved Chief integration. The Cloudflare build/deployment success reported separately does not by itself prove the served `/version` identity or authorize a production change.
 
 ## 2026-09-27 StoryEngine peer transition after Sync Avenue
 
