@@ -24,25 +24,30 @@ describe('Founder Control Room Cloudflare topology', () => {
     expect(buildScript).toContain("'portable-founder-console/index.html'");
   });
 
-  it('provides the founder-os-v2 five-screen public front door into the founder-authenticated app', () => {
+  it('provides the approved-mockup-v3 User/Founder public front door into the founder-authenticated app', () => {
     const landing = read('public/index.html');
     const app = read('public/control-room/index.html');
     const bootstrap = read('public/control-room/opaque-session-bootstrap.js');
 
     expect(landing).toContain('<link rel="canonical" href="https://www.foundercontrolroom.org/" />');
-    expect(landing).toContain('href="https://www.foundercontrolroom.org/control-room/"');
-    expect(landing).toContain('data-fcr-visual="founder-os-v2"');
-    expect(landing).toContain('data-command-shell');
-    expect(landing).toContain('href="/control-room/" data-founder-start="authenticated"');
-    expect(landing).toContain('data-bottom-nav="five-screen"');
-    for (const screen of ['home', 'control-room', 'chief', 'promptos', 'proof']) {
-      expect(landing).toContain(`data-public-screen="${screen}"`);
-      expect(landing).toContain(`data-nav-screen="${screen}"`);
-    }
-    expect(landing).toContain('Turns founder intent into bounded work while keeping permission, receipts, evidence, and claims separate.');
-    expect(landing).toContain('Turns approved intent into prompts, commands, workflows, tests, and stop conditions that compound.');
-    expect(landing).toContain('The public surface explains the operating model without exposing founder sessions, credentials, customer data, private projects, raw internal evidence, or hidden operating instructions.');
-    expect(landing).toContain('Choosing a view does not grant private authority. Founder access still passes through FCR authentication.');
+    expect(landing).toContain('data-fcr-visual="approved-mockup-v3"');
+    expect(landing).toContain('<div class="wrap" id="top">');
+    expect((landing.match(/<main>/g) ?? [])).toHaveLength(1);
+    expect(landing).toContain('id="community-f" aria-labelledby="founder-community-title"');
+    expect(landing).toContain('<h3 id="founder-community-title">Founder Community</h3>');
+    expect(landing).toContain('<script src="/fcr-public-tabs.js" defer></script>');
+    expect(landing).not.toMatch(/<script\b(?![^>]*\bsrc=)/i);
+    const tabController = read('public/fcr-public-tabs.js');
+    expect(tabController).toContain("addEventListener('keydown'");
+    expect(tabController).toContain("addEventListener('hashchange'");
+    expect(read('public/_headers')).toContain("script-src 'self'");
+    expect(landing).not.toContain('data-fcr-visual="founder-os-v2"');
+    expect(landing).toContain('Back Founders');
+    expect(landing).toContain('Same truth. Higher outcomes');
+    expect(landing).toContain('href="/control-room/"');
+    expect(landing).toContain('Founder access still passes through FCR authentication');
+    expect(landing).toContain('Sign in to view');
+    expect(landing).toContain('Live reads only');
     expect(app).toContain('src="/control-room/opaque-session-bootstrap.js"');
     expect(app).not.toContain('src="/control-room/app.js"');
     expect(bootstrap).toContain("await import('/control-room/app.js')");

@@ -1,0 +1,32 @@
+{
+  "schemaVersion": "1.0",
+  "authority": {
+    "repository": "jussray/founder-control-room",
+    "provider": "cloudflare",
+    "mutationPolicy": "manual-founder-gated",
+    "accountIdEnv": "CLOUDFLARE_ACCOUNT_ID",
+    "inspectTokenEnv": "CLOUDFLARE_LOGPUSH_READ_TOKEN",
+    "applyTokenEnv": "CLOUDFLARE_LOGPUSH_WRITE_TOKEN",
+    "destinationEnv": "CLOUDFLARE_LOGPUSH_DESTINATION_CONF",
+    "approvalReferenceEnv": "APPROVAL_REFERENCE"
+  },
+  "jobs": [
+    {
+      "name": "fcr-portfolio-workers-trace",
+      "scope": "account",
+      "dataset": "workers_trace_events",
+      "enabled": true
+    }
+  ],
+  "repositories": [
+    "jussray/founder-control-room",
+    "jussray/chief-ai-machine",
+    "jussray/Sekret-Bip",
+    "jussray/StoryEngine",
+    "jussray/THINK-TANK",
+    "jussray/solcontinuity",
+    "jussray/promptos",
+    "jussray/juss-protect-me",
+    "jussray/juss-protect-me-2"
+  ]
+}
