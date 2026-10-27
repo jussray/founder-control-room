@@ -6,6 +6,8 @@ The repository declares a single account-level Cloudflare Logpush desired job na
 
 Only the Founder Control Room manual provider workflow may reconcile that desired job, and only after exact-main SHA binding plus founder approval. Product repositories may declare participation, but they must not inherit the Cloudflare Logpush write credential or destination secret.
 
+The active repository set must exclude repositories whose own governance marks them historical or investigate-only. `jussray/sekret-bip-companions` remains available for provenance investigation but is not an active Logpush target while that governance contract remains in force.
+
 A provider job readback can establish the configured Cloudflare job within that account; it still cannot prove destination-side ingestion unless the destination itself supplies corresponding receipt evidence.
 
 ## Canonical topology

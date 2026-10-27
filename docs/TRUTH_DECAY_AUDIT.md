@@ -1,5 +1,13 @@
 # Truth Decay Audit: When a True Claim Becomes Unsafe to Reuse
 
+## October 27, 2026: StoryEngine preview configuration moved the federation subject
+
+FCR PR #1038 exact head `79d9890946288ed86bee6be10977fb963aae09af` completed the local E2E and truth-console browser journeys before Playwright run `40437862623` stopped at the separate StoryEngine live-ref equality gate. The workflow expected `89e92445dfde114b831e8cf6b5383f42ebccca4d` and observed `4601cc3a8297875c97e54717f2aeb47db44d0595`; peer checkout/runtime/federation steps were therefore correctly skipped.
+
+A fresh StoryEngine comparison shows the successor is one commit ahead and zero behind. The only changed path is `story-engine/wrangler.jsonc`, where the commit adds a `previews` block with the preview runtime origin and the same bounded API rate-limit shape. Exact-main push runs for Agent Contract v1, L99 Promotion Gates, Control Room Test Ledger, Guardrails Playwright, CodeQL, and L99 Story Engine CI all completed successfully.
+
+Those StoryEngine checks establish the successor dependency as a verified source candidate, not FCR↔StoryEngine pair compatibility. Updating FCR's peer pin merely selects the new evidence subject. The refreshed FCR head remains UNKNOWN for federation until the complete live-ref, immutable checkout, runtime identity, directive/receipt/replay, and browser witness succeeds. Prior FCR browser green and prior founder approval do not transfer across the head change.
+
 ## October 26, 2026: truth-console browser proof stopped on StoryEngine identity drift
 
 FCR PR #1035 head `f4dcd5844bc6fd09de184f8fc7e8aece3f26b8ce` completed its local E2E harness before [Playwright run 40421408549, job 121916477738](https://github.com/jussray/founder-control-room/actions/runs/40421408549/job/121916477738) failed the separate live-peer equality check at `2026-10-26T23:44:53Z`. It expected StoryEngine `499f2d4eb9edac8bb11b657cf003a056263528d9` and observed `89e92445dfde114b831e8cf6b5383f42ebccca4d`; the federation steps after that check did not execute.

@@ -1,8 +1,16 @@
 # Founder Control Room
 
+## October 27, 2026 StoryEngine preview-config peer refresh
+
+FCR PR #1038 passed its local browser journeys and then correctly failed the separate StoryEngine live-ref equality gate because the pinned peer `89e92445dfde114b831e8cf6b5383f42ebccca4d` had advanced to `4601cc3a8297875c97e54717f2aeb47db44d0595`. The successor is one commit strictly ahead and changes only `story-engine/wrangler.jsonc`, adding preview-specific runtime-origin and API rate-limit configuration.
+
+The exact StoryEngine successor completed Agent Contract v1, L99 Promotion Gates, Control Room Test Ledger, Guardrails Playwright, CodeQL, and L99 Story Engine CI successfully. Rebinding `STORYENGINE_PEER_SHA` selects that current evidence subject only. The successor FCR head must still pass live-ref equality, immutable peer checkout, peer runtime identity, directive/receipt/replay checks, and the complete browser witness before pair compatibility is current. No merge, deployment, production, publication, or provider-mutation authority transfers with the pin.
+
 ## October 26, 2026 Cloudflare Logpush control plane
 
 `config/cloudflare-logpush.portfolio.json` is the source-only desired-state registry for portfolio Logpush participation. It declares one account-scoped `workers_trace_events` job and the authorized repository set; it does not prove that a Cloudflare Logpush job currently exists or that any destination has received logs.
+
+Active participation must also respect repository-local governance. Investigate-only or historical repositories are excluded from the active Logpush registry even when FCR preserves them for provenance; `jussray/sekret-bip-companions` is therefore not an active participant under its current investigate-only contract. The repository-side cleanup is tracked separately in FCR issue #1036 because that repo requires explicit founder approval before deletion or revert.
 
 Pull-request validation is non-mutating. Provider inspection uses a dedicated read credential. Provider apply remains a separate founder-gated action bound to the exact current `main` SHA, an auditable approval reference, a dedicated write credential, and provider-held destination configuration. A successful apply must complete provider readback before the receipt may claim the desired job is verified.
 
