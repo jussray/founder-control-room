@@ -23,6 +23,7 @@ function observation(operatorId: string, overrides: Partial<CapabilityObservatio
     sampleSize: 5,
     successRate: 0.9,
     proofRate: 0.9,
+    verifiedCompletedCount: 5,
     falseGreenRate: 0,
     authorityViolationRate: 0,
     rootCauseAccuracy: 0.9,
@@ -73,6 +74,111 @@ describe('proof-weighted model capability market', () => {
     });
     expect(ranked[0]?.operatorId).toBe('codex');
     expect(ranked[0]?.score).toBeGreaterThan(ranked[1]?.score ?? 0);
+  });
+
+  it('counts only independently proven samples when evaluating primary eligibility', () => {
+    const ranked = rankCapabilityCandidates({
+      taskClass: 'repository-repair', candidates,
+      observations: [observation('codex', {
+        sampleSize: 100,
+        proofRate: 0.01,
+        successRate: 1,
+        evidenceRefs: ['ci:one-independently-verified-outcome'],
+      })],
+      options: { now },
+    });
+    const codex = ranked.find((candidate) => candidate.operatorId === 'codex');
+    expect(codex?.localSamples).toBe(1);
+    expect(codex?.status).toBe('trial');
+    expect(codex?.selectionAuthority).toBe(false);
+    expect(codex?.executionAuthority).toBe(false);
+  });
+
+  it('blocks fresh authority violations even when they have no proof references', () => {
+    const ranked = rankCapabilityCandidates({
+      taskClass: 'repository-repair', candidates,
+      observations: [
+        observation('codex', { sampleSize: 5, proofRate: 1 }),
+        observation('codex', {
+          sampleSize: 1, proofRate: 0, evidenceRefs: [],
+          authorityViolationRate: 1,
+        }),
+      ],
+      options: { now },
+    });
+    const codex = ranked.find((candidate) => candidate.operatorId === 'codex');
+    expect(codex?.localSamples).toBe(5);
+    expect(codex?.status).toBe('blocked');
+    expect(codex?.selectionAuthority).toBe(false);
+    expect(codex?.executionAuthority).toBe(false);
+  });
+
+  it('fails closed for malformed fresh authority metrics but does not reuse stale violations', () => {
+    const ranked = rankCapabilityCandidates({
+      taskClass: 'repository-repair', candidates,
+      observations: [
+        observation('codex', { sampleSize: 5, proofRate: 1 }),
+        observation('codex', { sampleSize: 1, proofRate: 0, evidenceRefs: [], authorityViolationRate: NaN }),
+      ],
+      options: { now },
+    });
+    expect(ranked.find((candidate) => candidate.operatorId === 'codex')?.status).toBe('blocked');
+
+    const negativeMetric = rankCapabilityCandidates({
+      taskClass: 'repository-repair', candidates,
+      observations: [
+        observation('codex', { sampleSize: 5, proofRate: 1 }),
+        observation('codex', { sampleSize: 1, proofRate: 0, evidenceRefs: [], authorityViolationRate: -0.1 }),
+      ],
+      options: { now },
+    });
+    expect(negativeMetric.find((candidate) => candidate.operatorId === 'codex')?.status).toBe('blocked');
+
+    const staleViolation = rankCapabilityCandidates({
+      taskClass: 'repository-repair', candidates,
+      observations: [
+        observation('codex', { sampleSize: 5, proofRate: 1 }),
+        observation('codex', {
+          sampleSize: 1, proofRate: 0, evidenceRefs: [],
+          authorityViolationRate: 1,
+          observedAt: '2026-03-01T00:00:00.000Z',
+        }),
+      ],
+      options: { now },
+    });
+    expect(staleViolation.find((candidate) => candidate.operatorId === 'codex')?.status).toBe('eligible');
+  });
+
+  it('never promotes an operator whose only independently verified outcomes are failures or blocked stops', () => {
+    const failedOnly = rankCapabilityCandidates({
+      taskClass: 'repository-repair', candidates,
+      observations: [observation('codex', {
+        sampleSize: 50, proofRate: 0.1, verifiedCompletedCount: 0,
+        successRate: 0.9, evidenceRefs: ['ci:independently-verified-failure'],
+      })],
+      options: { now },
+    });
+    const candidate = failedOnly.find((entry) => entry.operatorId === 'codex');
+    expect(candidate?.status).toBe('trial');
+    expect(candidate?.localSamples).toBe(5);
+    expect(candidate?.reasons).toContain('insufficient independently verified successful completions for primary routing');
+    const blockedOnly = rankCapabilityCandidates({
+      taskClass: 'repository-repair', candidates,
+      observations: [observation('codex', {
+        sampleSize: 5, proofRate: 1, verifiedCompletedCount: 0, successRate: 0,
+        evidenceRefs: ['audit:verified-block'],
+      })], options: { now },
+    });
+    expect(blockedOnly.find((entry) => entry.operatorId === 'codex')?.status).toBe('trial');
+  });
+
+  it('does not promote a legacy observation without a verified-success count', () => {
+    const ranked = rankCapabilityCandidates({
+      taskClass: 'repository-repair', candidates,
+      observations: [observation('codex', { verifiedCompletedCount: undefined })],
+      options: { now },
+    });
+    expect(ranked.find((entry) => entry.operatorId === 'codex')?.status).toBe('trial');
   });
 
   it('selects a cross-provider challenger and keeps new contenders in shadow trials', () => {
