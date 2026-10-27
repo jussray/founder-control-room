@@ -58,6 +58,8 @@ function isSafeRepoPath(path: string): boolean {
 const PROOF_GATED_ACTIONS = new Set(['merge', 'create_branch']);
 const PROOF_GATE_TTL_MS = 15 * 60 * 1_000;
 const FCR_REPOSITORY = 'jussray/founder-control-room';
+const STORYENGINE_REPOSITORY = 'jussray/StoryEngine';
+const STORYENGINE_PEER_WORKFLOW_PATH = '.github/workflows/playwright.yml';
 const FOUNDER_FINAL_REVIEW_CONTRACT = 'juss-v10/founder-final-merge@v1' as const;
 const FULL_SHA = /^[0-9a-f]{40}$/i;
 const SHA256 = /^[0-9a-f]{64}$/i;
@@ -250,6 +252,84 @@ function configuredRepositoryProvider(
   } catch (error) {
     return { error: error instanceof Error ? error.message : String(error) };
   }
+}
+
+function readStoryEnginePeerPin(workflowSource: string): { sha: string; ref: string } {
+  const shaMatch = workflowSource.match(/^\s*STORYENGINE_PEER_SHA:\s*([0-9a-f]{40})\s*$/im);
+  const refMatch = workflowSource.match(/^\s*STORYENGINE_PEER_REF:\s*(\S+)\s*$/im);
+  const sha = lower(shaMatch?.[1]);
+  const ref = text(refMatch?.[1]);
+
+  if (!FULL_SHA.test(sha) || !ref) {
+    throw new Error(
+      'StoryEngine peer freshness gate blocked: exact candidate does not contain a valid StoryEngine peer SHA/ref.',
+    );
+  }
+  return { sha, ref };
+}
+
+async function verifyStoryEnginePeerFreshnessAtMerge(
+  fcrProvider: RepositoryProvider,
+  fcrProject: RepositoryProjectRow,
+  expectedHeadSha: string,
+): Promise<{ repository: string; ref: string; pinnedSha: string; currentSha: string }> {
+  let workflowSource: string;
+  try {
+    workflowSource = await fcrProvider.readFile(
+      fcrProject.slug,
+      expectedHeadSha,
+      STORYENGINE_PEER_WORKFLOW_PATH,
+    );
+  } catch (error) {
+    throw new Error(
+      `StoryEngine peer freshness gate blocked: unable to read exact candidate peer pin: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+
+  const pinned = readStoryEnginePeerPin(workflowSource);
+  const { data: peerProject, error: peerProjectError } = await supabase
+    .from('projects')
+    .select('slug, repo_provider, repo_identifier')
+    .eq('repo_identifier', STORYENGINE_REPOSITORY)
+    .maybeSingle();
+
+  if (peerProjectError || !peerProject) {
+    throw new Error(
+      `StoryEngine peer freshness gate blocked: registered peer project is unavailable${peerProjectError?.message ? `: ${peerProjectError.message}` : ''}.`,
+    );
+  }
+
+  const peerProviderResult = configuredRepositoryProvider(peerProject as RepositoryProjectRow);
+  if ('error' in peerProviderResult) {
+    throw new Error(
+      `StoryEngine peer freshness gate blocked: peer provider unavailable: ${peerProviderResult.error}`,
+    );
+  }
+
+  let currentSha: string;
+  try {
+    currentSha = lower(await peerProviderResult.provider.resolveRef(peerProject.slug, pinned.ref));
+  } catch (error) {
+    throw new Error(
+      `StoryEngine peer freshness gate blocked: unable to resolve current peer ref: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+
+  if (!FULL_SHA.test(currentSha)) {
+    throw new Error('StoryEngine peer freshness gate blocked: current peer ref did not resolve to an exact SHA.');
+  }
+  if (currentSha !== pinned.sha) {
+    throw new Error(
+      `StoryEngine peer moved after federation proof: current ${currentSha}, pinned ${pinned.sha}.`,
+    );
+  }
+
+  return {
+    repository: STORYENGINE_REPOSITORY,
+    ref: pinned.ref,
+    pinnedSha: pinned.sha,
+    currentSha,
+  };
 }
 
 function validateEvidence(body: unknown): { ok: true; evidence: ProofEvidence } | { ok: false; error: string } {
@@ -987,6 +1067,15 @@ approvalsRouter.post(
           );
         }
 
+        let externalPeerFreshness: Record<string, unknown> | null = null;
+        if (isFounderControlRoomRepository(projectRow)) {
+          externalPeerFreshness = await verifyStoryEnginePeerFreshnessAtMerge(
+            provider,
+            projectRow,
+            expectedHeadSha,
+          );
+        }
+
         const mergeCommitSha = await provider.integrate(project.slug, base, head);
         executionResult = {
           mergeCommitSha,
@@ -996,6 +1085,7 @@ approvalsRouter.post(
           evidence: evidenceResult.summary,
           ...(independentReviewEvidence ? { independentReview: independentReviewEvidence } : {}),
           ...(founderFinalReviewEvidence ? { founderFinalReview: founderFinalReviewEvidence } : {}),
+          ...(externalPeerFreshness ? { externalPeerFreshness } : {}),
         };
 
         const { error: missionUpdateError } = await supabase
