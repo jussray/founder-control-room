@@ -1,5 +1,11 @@
 # Founder Control Room
 
+## October 27, 2026 StoryEngine production-proof peer refresh
+
+StoryEngine PR #147 merged to current `main` `dc79a23ffa8e6e5b0964efccdaee7c961b9b9e1d` after repairing two production-proof defects: Railway's canonical `StoryEngine / production` environment identity and false-red proof runs from non-`main` deployment-status signals. Exact-main Agent Contract, L99 Promotion Gates, CodeQL, Guardrails Playwright, L99 Story Engine CI, Control Room Test Ledger, and the actual StoryEngine Production Proof all completed successfully on the merge commit.
+
+FCR therefore selects `dc79a23ffa8e6e5b0964efccdaee7c961b9b9e1d` as the next exact StoryEngine evidence subject. This refresh does not inherit predecessor FCR federation green. The successor FCR head must pass live-ref equality, immutable peer checkout, peer runtime identity, directive/receipt/replay checks, and the complete browser witness against this exact StoryEngine main before pair compatibility is current.
+
 ## October 27, 2026 StoryEngine preview-config peer refresh
 
 FCR PR #1038 passed its local browser journeys and then correctly failed the separate StoryEngine live-ref equality gate because the pinned peer `89e92445dfde114b831e8cf6b5383f42ebccca4d` had advanced to `4601cc3a8297875c97e54717f2aeb47db44d0595`. The successor is one commit strictly ahead and changes only `story-engine/wrangler.jsonc`, adding preview-specific runtime-origin and API rate-limit configuration.
