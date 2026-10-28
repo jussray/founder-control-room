@@ -19,6 +19,6 @@ test('six agent surfaces point to one canonical source', async () => {
 
 test('eight agent behavior scenarios are explicitly unexecuted', async () => {
   const s = await get('skills/outcome-first/ACCEPTANCE-TESTS.md');
-  assert.equal((s.match(/^\\| [1-8] \\|/gm) || []).length, 8);
+  assert.equal((s.match(/^\| [1-8] \|/gm) || []).length, 8);
   assert.match(s, /not-yet-executed behavior tests/i);
 });
