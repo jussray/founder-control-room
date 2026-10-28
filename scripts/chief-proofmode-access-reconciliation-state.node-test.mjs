@@ -120,6 +120,28 @@ test('fingerprinted in-progress latch exposes the exact run and subject for safe
   assert.deepEqual(state.inProgress, [{ run: '10', subject: A }]);
 });
 
+test('terminal orphan recovery of one latch never erases a different unresolved subject', () => {
+  const state = evaluateChiefAccessReconciliation([
+    comment(1, v2('RECONCILE_REQUIRED', B, '9')),
+    comment(2, v2('REPAIR_IN_PROGRESS', A, '10')),
+    comment(3, v2('CLEAR', A, '10')),
+  ], TARGET);
+  assert.deepEqual(state.inProgressRuns, []);
+  assert.deepEqual(state.blockedSubjects, [B]);
+  assert.equal(state.clear, false);
+});
+
+test('a pending terminal marker cannot erase a subject-bound reconcile record', () => {
+  const state = evaluateChiefAccessReconciliation([
+    comment(1, v2('REPAIR_IN_PROGRESS', A, '10')),
+    comment(2, v2('RECONCILE_REQUIRED', A, '10')),
+    comment(3, v2('CLEAR', 'pending', '10')),
+  ], TARGET);
+  assert.deepEqual(state.inProgressRuns, []);
+  assert.deepEqual(state.blockedSubjects, [A]);
+  assert.equal(state.clear, false);
+});
+
 test('only a terminal recovery marker written for the original run can clear its in-progress latch', () => {
   const unrelatedRun = evaluateChiefAccessReconciliation([
     comment(1, v2('REPAIR_IN_PROGRESS', A, '10')),
