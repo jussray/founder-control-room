@@ -17,15 +17,10 @@ import {
   ULTRATHINK_SHARED_REASONING_CAPABILITY,
   ULTRATHINK_SHARED_REASONING_CAPABILITY_ID,
 } from '../../capabilities/ultrathinkSharedReasoning.js';
-import {
-  VIDEO_GRAPHIC_RENDER_CAPABILITY,
-  VIDEO_GRAPHIC_RENDER_CAPABILITY_ID,
-} from '../../capabilities/videoGraphicRender.js';
 import { capabilities } from '../../capabilities/workbenchRegistry.js';
 import { enqueueReconcile } from '../../events/outbox.js';
 import { supabase } from '../../lib/supabaseClient.js';
 import { requireFounder, type FounderRequest } from '../middleware/requireFounder.js';
-import { videoGraphicRenderCapabilityRouter } from './videoGraphicRenderCapability.js';
 
 export const capabilitiesRouter = Router();
 
@@ -40,7 +35,6 @@ const WORKBENCH_CAPABILITIES = Object.freeze([
   ...capabilities,
   PUBLIC_WEB_OBSERVATION_CAPABILITY,
   ULTRATHINK_SHARED_REASONING_CAPABILITY,
-  VIDEO_GRAPHIC_RENDER_CAPABILITY,
 ]);
 
 function continuityValue(value: unknown): string | null {
@@ -182,8 +176,6 @@ async function runPublicWebObservation(
 capabilitiesRouter.get('/', (_req, res) => {
   res.set('Cache-Control', 'no-store').json({ capabilities: WORKBENCH_CAPABILITIES });
 });
-
-capabilitiesRouter.use(`/${VIDEO_GRAPHIC_RENDER_CAPABILITY_ID}`, videoGraphicRenderCapabilityRouter);
 
 capabilitiesRouter.post('/:capabilityId/runs', async (req: FounderRequest, res) => {
   const capabilityId = req.params.capabilityId;
