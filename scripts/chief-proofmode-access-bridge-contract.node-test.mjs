@@ -208,6 +208,23 @@ test('runtime witness remains check-only and cannot inherit repair authority', (
   assert.match(runtimeWitness, /node scripts\/resolve-chief-proofmode-access-selector\.mjs/);
 });
 
+test('apply is bound to the latched subject and pre-mutation failures mint no reconcile record', () => {
+  assert.match(reconciler, /expectedSubjectFingerprint/);
+  assert.match(reconciler, /differs from the latched repair subject/);
+  assert.match(reconciler, /mutationStagePath/);
+  assert.match(reconciler, /subject_reason_code=/);
+  assert.match(reconciler, /reasonCode: classifyChiefAccessError/);
+  assert.match(recoveryWorkflow, /CHIEF_ACCESS_LATCHED_SUBJECT_FINGERPRINT:\s*\$\{\{ steps\.subject\.outputs\.subject_fingerprint \}\}/);
+  assert.match(recoveryWorkflow, /CHIEF_ACCESS_MUTATION_STAGE_PATH: test-results\/chief-proofmode-access-mutation-stage\.txt/);
+  assert.match(recoveryWorkflow, /printf 'not-attempted\\n' > test-results\/chief-proofmode-access-mutation-stage\.txt/);
+  assert.match(recoveryWorkflow, /\$mutation_stage" == 'not-attempted'/);
+  assert.match(recoveryWorkflow, /\$CURRENT_SUBJECT_REASON" == 'service-auth-policy-missing'/);
+  assert.match(recoveryWorkflow, /orphan_recovery_basis/);
+  assert.match(recoveryDoc, /bound to the latched subject/);
+  assert.match(recoveryDoc, /mutation-stage record/);
+  assert.match(recoveryDoc, /service-auth-policy-missing/);
+});
+
 test('dedicated recovery documentation keeps source, provider, and browser truth separate', () => {
   assert.match(recoveryDoc, /SOURCE CONTRACT \/ PROVIDER REPAIR NOT YET EXECUTED/);
   assert.match(recoveryDoc, /read-only `check` may discover/);

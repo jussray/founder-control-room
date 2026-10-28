@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { classifyChiefAccessError, ensureChiefProofModeAccessPolicy } from './reconcile-chief-proofmode-access.mjs';
+import {
+  classifyChiefAccessError,
+  createChiefAccessSubjectFingerprint,
+  ensureChiefProofModeAccessPolicy,
+} from './reconcile-chief-proofmode-access.mjs';
 
 const ACCOUNT = 'account-1';
 const READ_TOKEN = 'read-token';
@@ -421,6 +425,60 @@ test('repair marks successful POST with invalid returned policy shape as mutatio
     },
   );
   assert.equal(routed.calls.filter(({ init }) => init.method === 'POST').length, 1);
+});
+
+test('repair bound to a latched subject refuses a swapped subject before any POST', async () => {
+  const { fetchImpl, calls } = routeFetch({
+    serviceTokens: [activeToken],
+    apps: [workerApp, exactPublicApp],
+    policiesByApp: { [exactPublicApp.id]: [] },
+  });
+  const swappedSubject = createChiefAccessSubjectFingerprint({
+    targetOrigin: TARGET,
+    applicationId: 'app-swapped-after-latch',
+    serviceTokenId: SERVICE_ID,
+  });
+
+  await assert.rejects(
+    ensureChiefProofModeAccessPolicy({
+      ...baseArgs,
+      mode: 'repair',
+      apiToken: ADMIN_TOKEN,
+      expectedSubjectFingerprint: swappedSubject,
+      fetchImpl,
+    }),
+    (error) => {
+      assert.match(error.message, /differs from the latched repair subject/);
+      assert.equal(error.chiefAccessMutationOutcome, undefined);
+      assert.equal(classifyChiefAccessError(error), 'access-application-ambiguous-or-unresolved');
+      return true;
+    },
+  );
+  assert.equal(calls.filter(({ init }) => init.method === 'POST').length, 0);
+});
+
+test('repair bound to the matching latched subject still creates exactly one policy', async () => {
+  const { fetchImpl, calls } = routeFetch({
+    serviceTokens: [activeToken],
+    apps: [workerApp, exactPublicApp],
+    policiesByApp: { [exactPublicApp.id]: [] },
+  });
+  const latchedSubject = createChiefAccessSubjectFingerprint({
+    targetOrigin: TARGET,
+    applicationId: exactPublicApp.id,
+    serviceTokenId: SERVICE_ID,
+  });
+
+  const result = await ensureChiefProofModeAccessPolicy({
+    ...baseArgs,
+    mode: 'repair',
+    apiToken: ADMIN_TOKEN,
+    expectedSubjectFingerprint: latchedSubject,
+    fetchImpl,
+  });
+  assert.equal(result.changed, true);
+  assert.equal(result.subjectFingerprint, latchedSubject);
+  assert.equal(calls.filter(({ init }) => init.method === 'POST').length, 1);
 });
 
 test('provider credential appears only in Authorization header', async () => {
