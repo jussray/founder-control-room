@@ -1,5 +1,11 @@
 # Founder Control Room
 
+## October 28, 2026: PR #1044 peer identity renews after StoryEngine governance move
+
+The previous FCR candidate at `e35b9ecff7801e2b6d36910a9f40208f9815cfdb` selected StoryEngine `dc79a23ffa8e6e5b0964efccdaee7c961b9b9e1d`, but StoryEngine `main` subsequently moved strictly one commit forward to `bffc9f771b673055403f52b29c86b30e5f4dd8c8`. The single successor commit changed `.control-room/necessary-fix-policy.json` and `AGENTS_FOUNDER_INTELLIGENCE.md` and had 14 successful exact-head check runs at observation. This is a governance/instruction delta, **not** FCR-to-StoryEngine runtime proof.
+
+FCR's `STORYENGINE_PEER_SHA` now selects `bffc9f771b673055403f52b29c86b30e5f4dd8c8` as the next evidence subject. Exact-head CI must re-run live-ref equality, immutable checkout, federation runtime, directive/receipt/replay and browser witnesses. Any later peer movement expires the match. The renewed pin cannot authorize merge, deploy, provider writes, publication or production claims.
+
 ## October 28, 2026 (UTC): StoryEngine peer moved during Outcome-First PR review
 
 At FCR PR #1044 head `ad1d98285a72f9166584f8208618775eb3e21c73`, local Playwright journeys passed, but the separate live-ref equality gate correctly failed: the FCR workflow expected StoryEngine `4601cc3a8297875c97e54717f2aeb47db44d0595` and observed `dc79a23ffa8e6e5b0964efccdaee7c961b9b9e1d`. A fresh GitHub compare established that the successor was three commits ahead and zero behind. Changes include StoryEngine runtime and test paths as well as workflows, so this is **not** a configuration-only no-op.
