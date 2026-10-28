@@ -1,5 +1,14 @@
 # Founder Control Room
 
+## October 28, 2026 (UTC): StoryEngine peer moved during Outcome-First PR review
+
+At FCR PR #1044 head `ad1d98285a72f9166584f8208618775eb3e21c73`, local Playwright journeys passed, but the separate live-ref equality gate correctly failed: the FCR workflow expected StoryEngine `4601cc3a8297875c97e54717f2aeb47db44d0595` and observed `dc79a23ffa8e6e5b0964efccdaee7c961b9b9e1d`. A fresh GitHub compare established that the successor was three commits ahead and zero behind. Changes include StoryEngine runtime and test paths as well as workflows, so this is **not** a configuration-only no-op.
+
+The successor StoryEngine commit showed 17 successful check runs and one skipped check when inspected. Rebasing the FCR `STORYENGINE_PEER_SHA` pin to `dc79a23ffa8e6e5b0964efccdaee7c961b9b9e1d` only selects the next dependency subject: it does **not** establish FCR↔StoryEngine runtime compatibility, passed Playwright, deployability, merge readiness, or outcome proof. The amended FCR candidate requires a fresh exact-head peer-ref comparison, immutable checkout, runtime identity, federation contract and browser witness. Any future StoryEngine main movement invalidates this pin's live-ref equality claim.
+
+No merge, deployment, provider, credential, production, or publication permission is granted by this documentation or pin update.
+
+
 ## Outcome-First agent workflow
 
 `skills/outcome-first/SKILL.md` defines one shared outcome, authority, acceptance and stop workflow for Codex, Claude Code, Gemini, Copilot, Cursor and Windsurf. Thin adapters point to the same source; FCR founder approval, privacy, evidence, exact-head review, merge and deployment gates remain unchanged. This is repository instruction text, not proof of live agent activation.
