@@ -13,6 +13,19 @@
   ],
   "changes": [
     {
+      "path": "config/cloudflare-logpush.portfolio.json",
+      "claims": [
+        "`config/cloudflare-logpush.portfolio.json` must remain the source-only desired-state registry for the account-scoped `workers_trace_events` Logpush job; pull-request verification cannot mutate Cloudflare or prove delivery, and provider apply requires exact-current-main binding, a founder approval reference, a dedicated write credential, destination configuration, and post-write readback.",
+        "`config/cloudflare-logpush.portfolio.json` must exclude repositories whose current-main governance forbids active participation and repositories without an actual Cloudflare Worker execution surface; governance-excluded repos are `jussray/sekret-bip-companions`, `jussray/Bip-Jr`, and `jussray/Sekret-Bip-Bridge`, while runtime-inapplicable repos are Roblox-only `jussray/jussray-bip-and-seek`, static-Pages `jussray/Sekret-Bip-Parents`, and governance-only `jussray/Sekret-Bip-Gov`."
+      ]
+    },
+    {
+      "path": ".github/workflows/cloudflare-logpush.yml",
+      "claims": [
+        "`.github/workflows/cloudflare-logpush.yml` must keep pull-request checks non-mutating and must require exact-current-main binding plus an auditable founder approval reference before any provider apply; workflow green cannot substitute for provider readback or destination-side delivery evidence."
+      ]
+    },
+    {
       "path": ".github/workflows/worker-reconcile.yml",
       "claims": [
         "`.github/workflows/worker-reconcile.yml` must compare Cloudflare's canonical Worker secret-name enumeration against the complete `wrangler.worker.toml [secrets].required` registry (excluding only its subsequently forced-disabled Founder Signal grant) inside the exact-main authority gate, before any `wrangler secret put` or Worker deployment. Unavailable provider enumeration or missing names must fail closed without exposing secret values or acquiring merge/deploy authority.",
@@ -43,12 +56,15 @@
     {
       "path": "public/_worker.js",
       "claims": [
-        "`public/_worker.js` must route public static discovery artifacts, including `crawlers.json`, through the Pages `ASSETS` binding while API-owned callback assets remain on `FCR_API`; this routing classification cannot authorize provider mutation or treat a static crawler policy as authentication."
+        "`public/_worker.js` must route public static discovery artifacts, including `crawlers.json`, through the Pages `ASSETS` binding while API-owned callback assets remain on `FCR_API`; this routing classification cannot authorize provider mutation or treat a static crawler policy as authentication.",
+        "`public/_worker.js` must serve the bare `/work` and `/work/` paths by requesting the canonical `/work` URL through the Pages `ASSETS` binding, never requesting the `/work.html` filename (the asset layer canonicalizes it back to `/work` with a 308, which loops when returned verbatim) and never falling through to the `FCR_API` proxy, because the API proxy answers that public page without the service identity header and returns a degraded 503.",
+        "`public/_worker.js` must serve the bare `/welcome` and `/welcome/` paths by requesting the canonical `/welcome` URL through the Pages `ASSETS` binding, never falling through to the `FCR_API` proxy, because no static classification otherwise covers the extensionless welcome path and the API proxy answers that public page without the service identity header, returning a degraded 503 (`API_SERVICE_IDENTITY_MISMATCH`)."
       ]
     },
     {
       "path": ".github/workflows/playwright.yml",
       "claims": [
+        "`.github/workflows/playwright.yml` must keep the PR #1035 peer refresh as identity recovery only: the successor FCR head requires fresh live-ref equality, immutable peer checkout, runtime identity, and the complete directive/receipt/replay/browser witness before pair compatibility can be current; predecessor proof stays historical, and pin alignment grants no merge, deploy, production, or provider-mutation authority.",
         "`.github/workflows/playwright.yml` must bind the FCR-to-StoryEngine browser federation witness to a separately verified exact StoryEngine peer SHA and ref; changing that peer identity expires predecessor federation/browser proof and requires the complete exact-head witness to rerun without granting merge, deploy, production, or provider-mutation authority.",
         "A fresh peer ref/SHA observation may select the successor StoryEngine evidence subject, but the successor FCR federation state remains UNKNOWN until the complete exact-head runtime identity, directive, receipt, and Playwright browser witness succeeds against that peer.",
         "Refreshing `STORYENGINE_PEER_SHA` after independently observing StoryEngine main is recovery setup only; pin alignment must not carry predecessor Playwright green or founder approval onto the successor FCR head.",
@@ -65,7 +81,8 @@
         "`.github/workflows/playwright.yml` must pin StoryEngine at the forward, independently observed 2026-10-16 main identity `26b1c34ae7c97c5d1b66a23d6345b3965cfcdc1f`, require a fresh live-ref equality check and immutable peer checkout, then withhold all FCR-to-StoryEngine federation readiness until the exact successor FCR head completes the full runtime, directive, receipt, replay, and browser witness; prior peer green must remain historical and cannot authorize provider mutation or production release.",
         "FCR Playwright pins StoryEngine to independently re-observed refs/heads/main 6b97b78370fbc25d4b4bb88bfeab136eb4c7dc2f; PR #1004 head 607ec05be0bce5639bab36b75c3661a8af751be6 failed its live-ref gate because it expected 26b1c34ae7c97c5d1b66a23d6345b3965cfcdc1f. The exact StoryEngine commit had 15/15 successful checks at 2026-10-22T23:55:59Z. Pin alignment selects an evidence subject only; PR #1004 needs its own exact-head runtime and receipt/browser witness, and other PR evidence does not transfer.",
         "`.github/workflows/playwright.yml` must pin StoryEngine to freshly observed refs/heads/main 3c46b3649088ac4c6e1775102ba49abf5c779abf after the additive model-capability profile commit moved the peer; pin alignment selects only the successor evidence subject and requires a fresh complete federation/browser witness.",
-        "The October 24, 2026 StoryEngine transition from 3c46b3649088ac4c6e1775102ba49abf5c779abf to independently observed 87501be2da31d12f421b0ed2da49df357fc9fcb1 is strictly forward by two commits with 16 observed exact-head checks successful; rebinding STORYENGINE_PEER_SHA selects only the successor federation evidence subject, expires predecessor FCR browser/federation proof, and requires a fresh complete exact-head witness without granting merge, deploy, production, publication, or provider-mutation authority."
+        "The October 24, 2026 StoryEngine transition from 3c46b3649088ac4c6e1775102ba49abf5c779abf to independently observed 87501be2da31d12f421b0ed2da49df357fc9fcb1 is strictly forward by two commits with 16 observed exact-head checks successful; rebinding STORYENGINE_PEER_SHA selects only the successor federation evidence subject, expires predecessor FCR browser/federation proof, and requires a fresh complete exact-head witness without granting merge, deploy, production, publication, or provider-mutation authority.",
+        "`.github/workflows/playwright.yml` must pin the independently verified StoryEngine successor `4601cc3a8297875c97e54717f2aeb47db44d0595` after preview-runtime configuration moved `main`; the pin selects only the new evidence subject, and the successor FCR head must rerun the complete live-ref, immutable checkout, runtime identity, directive/receipt/replay, and browser witness before pair compatibility can be current."
       ]
     },
     {
@@ -135,7 +152,7 @@
       "path": "src/lib/modelCapabilityMarket.ts",
       "claims": [
         "`src/lib/modelCapabilityMarket.ts` may rank Council operators only from task-specific evidence with external benchmarks treated as bounded priors; a benchmark win cannot by itself establish local eligibility, outcome proof, selection authority, or execution authority.",
-        "Fresh authority-boundary violations must block promotion, false-green behavior must reduce ranking, stale local evidence must expire, and challenger selection should preserve provider-family independence when available without granting mutation authority.",
+        "Fresh authority-boundary violations must block promotion regardless of proof-reference presence, the sample gate must count only independently proven outcomes and must require enough verified completed outcomes, never promoting from failure-only, blocked-only, or count-missing legacy observations, false-green behavior must reduce ranking, stale local evidence must expire, and challenger selection should preserve provider-family independence when available without granting mutation authority.",
         "`src/lib/modelCapabilityMarket.ts` names `multimodal-generation` as a task class so provider-dependent generation work is ranked from local receipts like every other class; adding a task class grants no operator eligibility, selection authority, or execution authority."
       ]
     },
@@ -143,7 +160,7 @@
       "path": "src/lib/capabilityObservationFeed.ts",
       "claims": [
         "`src/lib/capabilityObservationFeed.ts` may fold operator relay receipts into capability observations only for the operator that answered them, only from outcome statuses, deduplicated by response hash with the latest outcome per relay id, and only inside the caller's freshness window so stale evidence cannot renew itself.",
-        "`src/lib/capabilityObservationFeed.ts` must treat a provider answering as unproven: only independently verified relay ids contribute proof or evidence references, completed-without-evidence is a false green, any non-`none` authorityRequested is an authority violation, and `blocked` never lowers success.",
+        "`src/lib/capabilityObservationFeed.ts` must treat a provider answering as unproven: only independently verified exact response hashes contribute proof or evidence references; verification never transfers to a later response sharing a relay id and changed receipt contents must fail canonical hash validation, completed-without-evidence is a false green, any non-`none` authorityRequested is an authority violation, and `blocked` never lowers success.",
         "The fold is contract-capable tested source; relay responses are not persisted, no outcome verifier exists, no live route calls the market, and the fold grants no selection or execution authority."
       ]
     },
@@ -318,7 +335,9 @@
     {
       "path": "src/founder-os-lab/projectAdapters.ts",
       "claims": [
-        "`src/founder-os-lab/projectAdapters.ts` must bind Chief integration evidence to one audited exact Chief head; moving that head expires predecessor adapter and pair-contract proof, requires the focused assertion and path-bound documentation receipt to move together, and grants no Chief runtime, merge, deploy, publication, or provider authority."
+        "`src/founder-os-lab/projectAdapters.ts` must bind Chief integration evidence to one audited exact Chief head; moving that head expires predecessor adapter and pair-contract proof, requires the focused assertion and path-bound documentation receipt to move together, and grants no Chief runtime, merge, deploy, publication, or provider authority.",
+        "`src/founder-os-lab/projectAdapters.ts` must bind Chief PR #242 exact candidate `0d1106424802fa21d37c6a05fc3e6f6422cc989a` to five observed contract blobs, the restored `necessary-fix-policy.json`, and pair blob `dd008420e1a91e78516b45d9e27de89344abf432`. FCR PR #1015 and Chief PR #242 remain draft. Live freshness must fail closed while Chief main still carries stale pair content; no preceding CI proof grants merge, founder, publishing, provider-write, or deploy authority.",
+        "`src/founder-os-lab/projectAdapters.ts` must pin read-only Se’kret Bip adapter evidence to exact observed `main` `e3b6a3a36737f3c1d24c37fd2842ee6d7bf97150` and required `screens/WebWelcomeScreen.tsx` blob `9d3a1128d09d47f3e9b4eb5d8f3da5f3dbe2709c`; the other six audited contract blobs must still match. Audience-to-account-side routing, composite character canon, reduced-motion protection, and preview-only non-execution remain required. Head movement or blob drift must fail closed and cannot create merge, production, publication, or provider authority."
       ]
     },
     {
