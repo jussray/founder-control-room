@@ -10,7 +10,7 @@ The exact StoryEngine successor completed Agent Contract v1, L99 Promotion Gates
 
 `config/cloudflare-logpush.portfolio.json` is the source-only desired-state registry for portfolio Logpush participation. It declares one account-scoped `workers_trace_events` job and the authorized repository set; it does not prove that a Cloudflare Logpush job currently exists or that any destination has received logs.
 
-Active participation must also respect repository-local governance. Investigate-only or historical repositories are excluded from the active Logpush registry even when FCR preserves them for provenance; `jussray/sekret-bip-companions` is therefore not an active participant under its current investigate-only contract. The repository-side cleanup is tracked separately in FCR issue #1036 because that repo requires explicit founder approval before deletion or revert.
+Active participation must also respect repository-local governance. Investigate-only or historical repositories are excluded from the active Logpush registry even when FCR preserves them for provenance. Under their current repository contracts, `jussray/sekret-bip-companions`, `jussray/Bip-Jr`, and `jussray/Sekret-Bip-Bridge` are provenance/investigation-only rather than active Logpush participants. `jussray/jussray-bip-and-seek` is also excluded because audited current `main` is a Roblox runtime with no Cloudflare Worker. `jussray/Sekret-Bip-Parents` is currently a static Cloudflare Pages site with no Functions, `_worker.js`, or Wrangler Worker runtime, and `jussray/Sekret-Bip-Gov` is a governance/control repository with no runtime surface. Account-scoped `workers_trace_events` participation is therefore not applicable to those repositories in their current-main states. The Companions repository-side cleanup is tracked separately in FCR issue #1036 because that repo requires explicit founder approval before deletion or revert.
 
 Pull-request validation is non-mutating. Provider inspection uses a dedicated read credential. Provider apply remains a separate founder-gated action bound to the exact current `main` SHA, an auditable approval reference, a dedicated write credential, and provider-held destination configuration. A successful apply must complete provider readback before the receipt may claim the desired job is verified.
 
@@ -169,8 +169,6 @@ The StoryEngine peer pin is an evidence identity, not a durable alias for “cur
 See [`docs/REPOSITORY_FEDERATION.md`](docs/REPOSITORY_FEDERATION.md).
 
 ### Jira work automation
-
-The manual [Jira live provider probe](docs/JIRA_LIVE_PROVIDER_PROBE.md) binds its POST to the approved full runtime SHA in addition to the `/version` preflight. The authenticated ingress rejects missing, malformed, or mismatched probe bindings before provider dispatch, so a rollout between requests cannot turn a post-effect mismatch into false prevention. Ordinary authenticated Jira observations retain their existing contract. Dispatch receipts still require independent Jira readback before any end-to-end outcome claim.
 
 FCR owns the bounded Jira source contract, authenticated service ingress, and importable n8n workflow artifact. The artifact ships inactive and carries no Jira credential authority.
 
