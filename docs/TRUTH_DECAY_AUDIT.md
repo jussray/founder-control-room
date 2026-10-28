@@ -1,5 +1,12 @@
 # Truth Decay Audit: When a True Claim Becomes Unsafe to Reuse
 
+## October 27, 2026: StoryEngine preview configuration moved the federation subject
+
+FCR PR #1038 exact head `79d9890946288ed86bee6be10977fb963aae09af` completed the local E2E and truth-console browser journeys before Playwright run `40437862623` stopped at the separate StoryEngine live-ref equality gate. The workflow expected `89e92445dfde114b831e8cf6b5383f42ebccca4d` and observed `4601cc3a8297875c97e54717f2aeb47db44d0595`; peer checkout/runtime/federation steps were therefore correctly skipped.
+
+A fresh StoryEngine comparison shows the successor is one commit ahead and zero behind. The only changed path is `story-engine/wrangler.jsonc`, where the commit adds a `previews` block with the preview runtime origin and the same bounded API rate-limit shape. Exact-main push runs for Agent Contract v1, L99 Promotion Gates, Control Room Test Ledger, Guardrails Playwright, CodeQL, and L99 Story Engine CI all completed successfully.
+
+Those StoryEngine checks establish the successor dependency as a verified source candidate, not FCR↔StoryEngine pair compatibility. Updating FCR's peer pin merely selects the new evidence subject. The refreshed FCR head remains UNKNOWN for federation until the complete live-ref, immutable checkout, runtime identity, directive/receipt/replay, and browser witness succeeds. Prior FCR browser green and prior founder approval do not transfer across the head change.
 ## Jira live-probe runtime binding at the mutation boundary
 
 A successful `/version` preflight is evidence about that GET request, not authority for a later POST. During a rollout the POST may reach a different runtime. The Jira live probe therefore transmits the approved full SHA in `X-FCR-Expected-Head-Sha` alongside its versioned probe header, and the authenticated ingress rejects invalid or mismatched bindings before invoking the dispatcher. Post-dispatch identity and canonical receipt validation remain separate checks; neither proves independent Jira outcome readback. The probe client, ingress, CLI, and manual workflow are registered as evidence-authority paths so changes require substantive documentation and path-bound truth receipts.
