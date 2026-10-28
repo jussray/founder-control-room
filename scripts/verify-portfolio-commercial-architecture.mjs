@@ -19,6 +19,8 @@ requireValue(/^\d{4}-\d{2}-\d{2}\.\d+$/.test(contract.contractVersion), 'contrac
 requireValue(contract.authority?.repository === 'jussray/founder-control-room', 'FCR must own the portfolio commercial contract');
 requireValue(contract.invariants?.repositoryIsNotAutomaticallyACompany === true, 'repo != company invariant is required');
 requireValue(contract.invariants?.technicalIndependenceDoesNotRequireSeparateCommercialPackaging === true, 'technical/commercial separation invariant is required');
+requireValue(contract.invariants?.standaloneProductIdentityIsIndependentOfBundling === true, 'standalone product identity must survive bundling');
+requireValue(contract.invariants?.standalonePeersDoNotDefaultToParentPackaging === true, 'standalone peers must not default to parent-product packaging');
 requireValue(contract.invariants?.visibilityUsageAndEngagementAreNotRevenue === true, 'visibility/usage/revenue separation invariant is required');
 requireValue(contract.invariants?.moneyClaimsRequireEconomicEvidence === true, 'money claims must require economic evidence');
 requireValue(contract.invariants?.customerAndPayerMayDiffer === true, 'customer/payer distinction is required');
@@ -28,6 +30,9 @@ requireValue(JSON.stringify(contract.invariants?.truthStatuses) === JSON.stringi
 
 const expectedPillars = [
   ['founder-software', 'founder-control-room'],
+  ['founder-intelligence', 'chief-ai-machine'],
+  ['prompt-governance', 'promptos'],
+  ['continuity-infrastructure', 'solcontinuity'],
   ['creator-software', 'storyengine'],
   ['family-product', 'sekret-bip'],
   ['commerce', 'juss-beautiful-hair'],
@@ -36,6 +41,10 @@ requireValue(
   JSON.stringify((contract.publicPillars ?? []).map((pillar) => [pillar.id, pillar.leadProduct])) === JSON.stringify(expectedPillars),
   'public pillar architecture drifted',
 );
+
+const founderSoftware = (contract.publicPillars ?? []).find((pillar) => pillar.id === 'founder-software');
+requireValue(!(founderSoftware?.supportingSystems ?? []).includes('promptos'), 'PromptOS must not be nested under FCR supporting systems');
+requireValue(!(founderSoftware?.supportingSystems ?? []).includes('solcontinuity'), 'SolContinuity must not be nested under FCR supporting systems');
 
 requireValue(
   JSON.stringify(contract.commercialPriority) === JSON.stringify([
@@ -72,13 +81,32 @@ for (const [productId, product] of Object.entries(contract.products ?? {})) {
 }
 
 const chief = contract.products?.['chief-ai-machine'];
+requireValue(chief?.role === 'core-founder-intelligence-product', 'Chief commercial role must remain standalone');
+requireValue(chief?.pillar === 'founder-intelligence', 'Chief must retain its own public product pillar');
 requireValue(chief?.technicalIndependence === true, 'Chief must preserve technical independence');
-requireValue(chief?.defaultCommercialPackaging === 'inside-founder-control-room', 'Chief must default to FCR commercial packaging');
-requireValue(typeof chief?.separateOfferGate === 'string' && chief.separateOfferGate.includes('independent customer'), 'Chief separate-offer gate is required');
+requireValue(chief?.commercialIndependence === true, 'Chief must preserve commercial independence');
+requireValue(chief?.defaultCommercialPackaging === 'chief-owned-offer', 'Chief must default to its own commercial offer');
+requireValue(typeof chief?.bundleRule === 'string' && chief.bundleRule.includes('without becoming a module'), 'Chief bundle boundary is required');
+requireValue(typeof chief?.separateOfferGate === 'string' && chief.separateOfferGate.includes('does not require FCR demand proof'), 'Chief standalone offer boundary is required');
 
 const promptos = contract.products?.promptos;
-requireValue(promptos?.role === 'engine-and-acquisition-layer', 'PromptOS commercial role drifted');
-requireValue(promptos?.revenueMechanism?.includes('included-in-fcr'), 'PromptOS must compound FCR by default');
+requireValue(promptos?.role === 'core-prompt-governance-product', 'PromptOS commercial role must remain standalone');
+requireValue(promptos?.pillar === 'prompt-governance', 'PromptOS must retain its own public product pillar');
+requireValue(promptos?.technicalIndependence === true, 'PromptOS must preserve technical independence');
+requireValue(promptos?.commercialIndependence === true, 'PromptOS must preserve commercial independence');
+requireValue(promptos?.defaultCommercialPackaging === 'promptos-owned-offer', 'PromptOS must default to its own commercial offer');
+requireValue(typeof promptos?.bundleRule === 'string' && promptos.bundleRule.includes('without becoming a module'), 'PromptOS bundle boundary is required');
+requireValue(typeof promptos?.separateOfferGate === 'string' && promptos.separateOfferGate.includes('does not require FCR demand proof'), 'PromptOS standalone offer boundary is required');
+requireValue(!promptos?.revenueMechanism?.includes('included-in-fcr'), 'PromptOS must not default to included-in-FCR packaging');
+
+const solcontinuity = contract.products?.solcontinuity;
+requireValue(solcontinuity?.role === 'core-continuity-infrastructure-product', 'SolContinuity commercial role must remain standalone');
+requireValue(solcontinuity?.pillar === 'continuity-infrastructure', 'SolContinuity must retain its own public product pillar');
+requireValue(solcontinuity?.technicalIndependence === true, 'SolContinuity must preserve technical independence');
+requireValue(solcontinuity?.commercialIndependence === true, 'SolContinuity must preserve commercial independence');
+requireValue(solcontinuity?.defaultCommercialPackaging === 'solcontinuity-owned-offer', 'SolContinuity must default to its own commercial offer');
+requireValue(typeof solcontinuity?.bundleRule === 'string' && solcontinuity.bundleRule.includes('without becoming an FCR module'), 'SolContinuity bundle boundary is required');
+requireValue(typeof solcontinuity?.separateOfferGate === 'string' && solcontinuity.separateOfferGate.includes('does not require FCR demand proof'), 'SolContinuity standalone offer boundary is required');
 
 const truthWeaver = contract.products?.['truth-weaver'];
 requireValue(truthWeaver?.role === 'premium-decision-module', 'Truth Weaver commercial role drifted');
@@ -113,5 +141,5 @@ if (failures.length > 0) {
 }
 
 console.log(`Portfolio commercial architecture ${contract.contractVersion} passed.`);
-console.log('Four public pillars, money-path fields, truth boundaries, and module-vs-company roles verified.');
+console.log('Seven public pillars, money-path fields, truth boundaries, and standalone-vs-bundle roles verified.');
 console.log('This verification does not prove customers, payments, revenue, retention, checkout, deployment, or demand.');

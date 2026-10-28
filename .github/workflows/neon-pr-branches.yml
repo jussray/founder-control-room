@@ -181,16 +181,19 @@ jobs:
             EXISTING="$(psql "$NEON_DB_URL" -X -Atq \
               -c "SELECT sha256 FROM ci_preview.migration_receipts WHERE filename = '$migration';")"
 
+            PREVIEW_CONTRACT="supabase/preview-contracts/${migration##*/}"
             if [ -n "$EXISTING" ]; then
               if [ "$EXISTING" = "$CHECKSUM" ]; then
                 echo "Preview migration already applied with matching checksum: $migration"
+                if [ -f "$PREVIEW_CONTRACT" ]; then
+                  echo "Re-running migration preview contract on exact candidate: $PREVIEW_CONTRACT"
+                  psql "$NEON_DB_URL" -X -v ON_ERROR_STOP=1 -f "$PREVIEW_CONTRACT"
+                fi
                 continue
               fi
               echo "::error title=Applied migration changed::$migration was already executed on this preview with a different checksum. Add a new migration instead of rewriting history."
               exit 1
             fi
-
-            PREVIEW_CONTRACT="supabase/preview-contracts/${migration##*/}"
             if [ -f "$PREVIEW_CONTRACT" ]; then
               echo "Running migration preview contract: $PREVIEW_CONTRACT"
               psql "$NEON_DB_URL" -X -v ON_ERROR_STOP=1 -f "$PREVIEW_CONTRACT"
