@@ -229,6 +229,7 @@ const TABS = [
 // they are deliberately not `.tabs button[data-tab]` so the tab router never
 // treats them as in-app tabs.
 const SURFACE_LINKS = [
+  ['Build · GitHub', '/control-room/github-workspace.html'],
   ['Content', '/control-room/content-manager.html'],
   ['Automation', '/control-room/command-bridge.html'],
   ['Integrations', '/control-room/plugin-center.html'],
@@ -569,10 +570,14 @@ function renderProjectsTab(mount) {
       <div class="card" data-slug="${escapeHtml(p.slug)}">
         <div class="meta">${escapeHtml(p.repo_provider)} · ${riskBadge(p.risk_level)} · ${escapeHtml(p.status)}</div>
         <div class="title">${escapeHtml(p.name)} <span class="muted mono">(${escapeHtml(p.slug)})</span></div>
+        <a class="link-button" href="/control-room/github-workspace.html?project=${encodeURIComponent(p.slug)}" aria-label="Open ${escapeHtml(p.name)} GitHub workspace">Open workspace ↗</a>
       </div>
     `).join('');
     list.querySelectorAll('.card').forEach((card) => {
-      card.addEventListener('click', () => selectProject(card.dataset.slug));
+      card.addEventListener('click', (event) => {
+        if (event.target.closest('a')) return;
+        selectProject(card.dataset.slug);
+      });
     });
   }
 
@@ -617,6 +622,7 @@ function renderProjectDetail(mount) {
 
   panel.innerHTML = `
     <h2>${escapeHtml(p.project.name)} <span class="muted mono">(${escapeHtml(p.project.slug)})</span></h2>
+    <p><a href="/control-room/github-workspace.html?project=${encodeURIComponent(p.project.slug)}">Open this project's GitHub Workspace ↗</a> · <a href="/control-room/?tab=terminal">Guarded terminal</a></p>
     ${p.liveError ? `<p class="error">Live repository fetch failed: ${escapeHtml(p.liveError)}</p>` : ''}
     ${p.live ? `<p class="muted">Default branch: <span class="mono">${escapeHtml(p.live.defaultBranch)}</span></p>` : ''}
 

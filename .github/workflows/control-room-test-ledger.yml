@@ -25,7 +25,7 @@ permissions:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-  CONTROL_ROOM_LEDGER_SELF_CHECK: Publish exact-head test ledger
+  CONTROL_ROOM_LEDGER_SELF_CHECK: Verify test-ledger contract
   CONTROL_ROOM_TEST_LEDGER_PATH: artifacts/control-room-test-ledger.json
   CONTROL_ROOM_RUNTIME_STATE_PATH: artifacts/control-room-runtime-state.json
   CONTROL_ROOM_EXTERNAL_STATE_ACTION: ${{ github.event.action || '' }}
@@ -38,7 +38,7 @@ concurrency:
 
 jobs:
   ledger-contract:
-    name: Verify test-ledger contract
+    name: Validate test-ledger source contract
     runs-on: ubuntu-22.04
     timeout-minutes: 10
     steps:
@@ -92,7 +92,7 @@ jobs:
         run: node --test test/control-room-runtime-state.test.mjs
 
   publish-ledger:
-    name: Publish exact-head test ledger
+    name: Verify test-ledger contract
     needs: ledger-contract
     runs-on: ubuntu-22.04
     timeout-minutes: 25
