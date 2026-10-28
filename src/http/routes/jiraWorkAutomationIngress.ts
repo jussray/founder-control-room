@@ -10,7 +10,6 @@ import {
 const MAX_OBSERVATION_AGE_MS = 5 * 60 * 1000;
 const MAX_OBSERVATION_FUTURE_SKEW_MS = 30 * 1000;
 const MIN_INGRESS_TOKEN_LENGTH = 32;
-const FULL_SHA = /^[0-9a-f]{40}$/i;
 const ALLOWED_FIELDS = new Set([
   'event',
   'projectKey',
@@ -34,11 +33,6 @@ function isRecord(value: unknown): value is JsonRecord {
 
 function tokenDigest(value: string): Uint8Array {
   return createHash('sha256').update(value, 'utf8').digest();
-}
-
-function currentRuntimeHeadSha(): string | null {
-  const candidate = process.env.GIT_SHA?.trim().toLowerCase() ?? '';
-  return FULL_SHA.test(candidate) ? candidate : null;
 }
 
 export function verifyJiraWorkAutomationIngressBearer(
@@ -151,25 +145,12 @@ export function createJiraWorkAutomationIngressHandler(
       });
     }
 
-    const liveProbeVersion = req.get('X-FCR-Jira-Live-Probe');
-    const expectedHeadHeader = req.get('X-FCR-Expected-Head-Sha');
-    if (liveProbeVersion !== undefined || expectedHeadHeader !== undefined) {
-      const expectedHeadSha = expectedHeadHeader?.trim().toLowerCase() ?? '';
-      if (liveProbeVersion !== 'v1' || !FULL_SHA.test(expectedHeadSha)) {
-        return res.status(400).json({ ok: false, code: 'INVALID_JIRA_LIVE_PROBE_RUNTIME_BINDING' });
-      }
-      if (currentRuntimeHeadSha() !== expectedHeadSha) {
-        return res.status(409).json({ ok: false, code: 'JIRA_LIVE_PROBE_RUNTIME_MISMATCH' });
-      }
-    }
-
     try {
       const result = await dispatcher(envelope.input);
       return res.status(result.status).json({
         ok: result.ok,
         code: result.code,
         receiptId: result.receiptId,
-        ...(result.code === 'DISPATCHED' ? { runtimeHeadSha: currentRuntimeHeadSha() } : {}),
       });
     } catch {
       return res.status(503).json({
