@@ -16,7 +16,7 @@
       "path": "config/cloudflare-logpush.portfolio.json",
       "claims": [
         "`config/cloudflare-logpush.portfolio.json` must remain the source-only desired-state registry for the account-scoped `workers_trace_events` Logpush job; pull-request verification cannot mutate Cloudflare or prove delivery, and provider apply requires exact-current-main binding, a founder approval reference, a dedicated write credential, destination configuration, and post-write readback.",
-        "`config/cloudflare-logpush.portfolio.json` must exclude repositories whose local governance marks them historical or investigate-only from active Logpush participation; `jussray/sekret-bip-companions` remains provenance-only until its own governance is explicitly changed."
+        "`config/cloudflare-logpush.portfolio.json` must exclude repositories whose current-main governance forbids active participation and repositories without an actual Cloudflare Worker execution surface; governance-excluded repos are `jussray/sekret-bip-companions`, `jussray/Bip-Jr`, and `jussray/Sekret-Bip-Bridge`, while runtime-inapplicable repos are Roblox-only `jussray/jussray-bip-and-seek`, static-Pages `jussray/Sekret-Bip-Parents`, and governance-only `jussray/Sekret-Bip-Gov`."
       ]
     },
     {
@@ -342,8 +342,7 @@
       "path": "scripts/verify-documentation-truth.mjs",
       "claims": [
         "`scripts/verify-documentation-truth.mjs` must classify `src/founder-os-lab/projectAdapters.ts` as evidence-authority truth-sensitive so a Chief exact-head pin movement cannot pass Documentation Truth without substantive README, truth-decay audit, and structured receipt updates that name the changed path.",
-        "`scripts/verify-documentation-truth.mjs` must classify `tools/zapier/founder-content-outcome-contract.cjs` as evidence-authority truth-sensitive so account-provenance changes cannot pass Documentation Truth without substantive README, truth-decay audit, and path-bound receipt updates.",
-        "scripts/verify-documentation-truth.mjs must register the Jira live-probe client, authenticated ingress, CLI, and manual workflow as evidence-authority paths so changes cannot pass without substantive README, truth-decay, and path-bound receipt updates."
+        "`scripts/verify-documentation-truth.mjs` must classify `tools/zapier/founder-content-outcome-contract.cjs` as evidence-authority truth-sensitive so account-provenance changes cannot pass Documentation Truth without substantive README, truth-decay audit, and path-bound receipt updates."
       ]
     },
     {
@@ -356,30 +355,6 @@
       "path": "wrangler.email.toml",
       "claims": [
         "`wrangler.email.toml` must declare the review-email Worker identity, account, entrypoint, private `FOUNDER_CONTROL_ROOM_API -> founder-control-room` Service Binding, and exactly one top-level `addresses` value `review@foundercontrolroom.org`; this is desired state for Wrangler reconciliation, not proof of provider readback or runtime invocation."
-      ]
-    },
-    {
-      "path": "src/lib/jiraWorkAutomationLiveProbe.ts",
-      "claims": [
-        "src/lib/jiraWorkAutomationLiveProbe.ts must bind the authenticated live-probe POST to the exact expected full runtime SHA in a dedicated header after the version preflight, retain post-dispatch receipt and runtime validation, and never promote dispatch proof into an independent Jira outcome."
-      ]
-    },
-    {
-      "path": "src/http/routes/jiraWorkAutomationIngress.ts",
-      "claims": [
-        "src/http/routes/jiraWorkAutomationIngress.ts must reject missing, malformed, unsupported, mismatched, or unavailable live-probe runtime bindings before calling the dispatcher while preserving ordinary authenticated observation behavior and the strict observation field allowlist."
-      ]
-    },
-    {
-      "path": "scripts/verify-jira-work-automation-live.ts",
-      "claims": [
-        "scripts/verify-jira-work-automation-live.ts must use explicit required configuration and the bounded live-probe runner without printing secret values or claiming independent Jira outcome proof."
-      ]
-    },
-    {
-      "path": ".github/workflows/jira-work-automation-live-probe.yml",
-      "claims": [
-        ".github/workflows/jira-work-automation-live-probe.yml must remain manually dispatched from protected main with an exact live-main target, production-scoped dedicated issue configuration, retained dispatch receipts, and no automatic provider activation."
       ]
     }
   ]
