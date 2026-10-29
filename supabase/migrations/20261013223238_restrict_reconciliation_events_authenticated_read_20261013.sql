@@ -1,7 +1,3 @@
--- Forward-only source reconciliation for production Supabase migration 20261013223238.
--- Restrict ordinary authenticated clients from reading operational drift records.
--- Preserve the 20260719213300 historical migration and service-role ingestion.
--- Database target: Founder Control Room (oojzfmmywbvficgybaxd).
 DO $$
 DECLARE current_expression text;
 BEGIN
