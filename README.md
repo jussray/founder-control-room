@@ -1,5 +1,12 @@
 # Founder Control Room
 
+## October 29, 2026: Founder Proof Audit Shopify product-route candidate (not deployed)
+
+FCR Shopify Admin currently reports `Founder Proof Audit` as ACTIVE at $99 (SKU `FCR-PROOF-AUDIT-99`) with the product path `/products/founder-proof-audit`. Prior FCR Pages routing did not explicitly own that extensionless path. The candidate source adds a branded, inquiry-only public page under `public/products/founder-proof-audit/index.html`, routes both slash forms through `STATIC_EXACT_PATHS` in `public/_worker.js`, and adds `founderProofAuditPublicProduct.test.ts`.
+
+The inquiry page intentionally does not initiate checkout: the Shopify MAIN redirect was independently observed pointing to JBH, while the corrected FCR Shopify redirect theme targeting `www.foundercontrolroom.org` remains UNPUBLISHED. The candidate does not establish live DNS/Pages behavior, a sale, checkout, or fulfillment. Exact-head checks, browser and Cloudflare deployment proof, final reviewed merge approval, and a separate Shopify theme publication gate are outstanding. The Truthweaver store and JBH remain separate.
+
+
 ## October 28, 2026: PR #1044 peer identity renews after StoryEngine governance move
 
 The previous FCR candidate at `e35b9ecff7801e2b6d36910a9f40208f9815cfdb` selected StoryEngine `dc79a23ffa8e6e5b0964efccdaee7c961b9b9e1d`, but StoryEngine `main` subsequently moved strictly one commit forward to `bffc9f771b673055403f52b29c86b30e5f4dd8c8`. The single successor commit changed `.control-room/necessary-fix-policy.json` and `AGENTS_FOUNDER_INTELLIGENCE.md` and had 14 successful exact-head check runs at observation. This is a governance/instruction delta, **not** FCR-to-StoryEngine runtime proof.
