@@ -77,6 +77,23 @@ describe('capability workbench registry', () => {
     expect(runtime?.implementation).toContain('Bind approval to proposalId');
   });
 
+  it('registers Buffer once as the governed publishing runtime for peer projects', () => {
+    const buffer = capabilities.find((capability) => capability.id === 'buffer-publishing-runtime-v1');
+
+    expect(buffer).toBeDefined();
+    expect(buffer?.kind).toBe('Automation');
+    expect(buffer?.category).toBe('integrations');
+    expect(buffer?.runtime).toBe('dynamic');
+    expect(buffer?.environment).toContain('FCR remains the control plane and authority owner');
+    expect(buffer?.environment).toContain('Canonical plugin package: plugins/buffer-control');
+    expect(buffer?.environment).toContain('Preferred provider runtime: https://mcp.buffer.com/mcp via Buffer OAuth');
+    expect(buffer?.proof).toContain('Provider acceptance and verified publication remain separate truth states');
+    expect(buffer?.proof).toContain('SignalLoop=propose/measure, Chief=route/compose, FCR=authorize/execute, Sol=verify/continuity, PromptOS=prompt/copy input');
+    expect(buffer?.risk).toContain('does not let SignalLoop, Chief, Sol, PromptOS');
+    expect(buffer?.implementation).toContain('canonicalPlugin=plugins/buffer-control');
+    expect(buffer?.implementation).toContain('providerAcceptedIsPublished=false');
+  });
+
   it('uses local Playwright as the browser execution lane without a provider wallet', () => {
     const browser = capabilities.find((capability) => capability.id === 'local-playwright-browser-v1');
 
