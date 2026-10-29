@@ -217,7 +217,7 @@ console.log('\n[1] Signed-in founder lands on the Home dashboard (desktop 1280×
     assert((await page.locator('.founder-email').innerText()) === FOUNDER_EMAIL, 'topbar shows the founder email');
     assert((await page.locator('.tabs button[data-tab="home"].active').count()) === 1, 'Home is the active tab without any click');
     const tabIds = await page.locator('.tabs button[data-tab]').evaluateAll((nodes) => nodes.map((n) => n.dataset.tab));
-    assert(JSON.stringify(tabIds) === JSON.stringify(['home', 'projects', 'missions', 'activity', 'l99', 'promptos', 'analytics', 'terminal']), `sidebar keeps the tab-id contract (${tabIds.join(', ')})`);
+    assert(JSON.stringify(tabIds) === JSON.stringify(['home', 'projects', 'missions', 'activity', 'l99', 'promptos', 'analytics', 'terminal', 'truth-dashboard', 'truth-claims', 'truth-evidence', 'truth-reconcile', 'truth-attacks', 'truth-world', 'truth-continuity']), `sidebar keeps the tab-id contract (${tabIds.join(', ')})`);
     assert((await page.locator('.sidebar .side-link').count()) >= 4, 'sidebar links the sibling Control Room surfaces');
     assert((await page.locator('[data-systems-truth="unknown"]').count()) === 1, 'systems status is rendered as not observed, not as a green light');
 
