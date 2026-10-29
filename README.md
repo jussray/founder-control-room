@@ -1,8 +1,35 @@
 # Founder Control Room
 
+## October 28, 2026: PR #1044 peer identity renews after StoryEngine governance move
+
+The previous FCR candidate at `e35b9ecff7801e2b6d36910a9f40208f9815cfdb` selected StoryEngine `dc79a23ffa8e6e5b0964efccdaee7c961b9b9e1d`, but StoryEngine `main` subsequently moved strictly one commit forward to `bffc9f771b673055403f52b29c86b30e5f4dd8c8`. The single successor commit changed `.control-room/necessary-fix-policy.json` and `AGENTS_FOUNDER_INTELLIGENCE.md` and had 14 successful exact-head check runs at observation. This is a governance/instruction delta, **not** FCR-to-StoryEngine runtime proof.
+
+FCR's `STORYENGINE_PEER_SHA` now selects `bffc9f771b673055403f52b29c86b30e5f4dd8c8` as the next evidence subject. Exact-head CI must re-run live-ref equality, immutable checkout, federation runtime, directive/receipt/replay and browser witnesses. Any later peer movement expires the match. The renewed pin cannot authorize merge, deploy, provider writes, publication or production claims.
+
+## October 28, 2026 (UTC): StoryEngine peer moved during Outcome-First PR review
+
+At FCR PR #1044 head `ad1d98285a72f9166584f8208618775eb3e21c73`, local Playwright journeys passed, but the separate live-ref equality gate correctly failed: the FCR workflow expected StoryEngine `4601cc3a8297875c97e54717f2aeb47db44d0595` and observed `dc79a23ffa8e6e5b0964efccdaee7c961b9b9e1d`. A fresh GitHub compare established that the successor was three commits ahead and zero behind. Changes include StoryEngine runtime and test paths as well as workflows, so this is **not** a configuration-only no-op.
+
+The successor StoryEngine commit showed 17 successful check runs and one skipped check when inspected. Rebasing the FCR `STORYENGINE_PEER_SHA` pin to `dc79a23ffa8e6e5b0964efccdaee7c961b9b9e1d` only selects the next dependency subject: it does **not** establish FCR↔StoryEngine runtime compatibility, passed Playwright, deployability, merge readiness, or outcome proof. The amended FCR candidate requires a fresh exact-head peer-ref comparison, immutable checkout, runtime identity, federation contract and browser witness. Any future StoryEngine main movement invalidates this pin's live-ref equality claim.
+
+No merge, deployment, provider, credential, production, or publication permission is granted by this documentation or pin update.
+
+
+## Outcome-First agent workflow
+
+`skills/outcome-first/SKILL.md` defines one shared outcome, authority, acceptance and stop workflow for Codex, Claude Code, Gemini, Copilot, Cursor and Windsurf. Thin adapters point to the same source; FCR founder approval, privacy, evidence, exact-head review, merge and deployment gates remain unchanged. This is repository instruction text, not proof of live agent activation.
+
+## October 27, 2026 StoryEngine preview-config peer refresh
+
+FCR PR #1038 passed its local browser journeys and then correctly failed the separate StoryEngine live-ref equality gate because the pinned peer `89e92445dfde114b831e8cf6b5383f42ebccca4d` had advanced to `4601cc3a8297875c97e54717f2aeb47db44d0595`. The successor is one commit strictly ahead and changes only `story-engine/wrangler.jsonc`, adding preview-specific runtime-origin and API rate-limit configuration.
+
+The exact StoryEngine successor completed Agent Contract v1, L99 Promotion Gates, Control Room Test Ledger, Guardrails Playwright, CodeQL, and L99 Story Engine CI successfully. Rebinding `STORYENGINE_PEER_SHA` selects that current evidence subject only. The successor FCR head must still pass live-ref equality, immutable peer checkout, peer runtime identity, directive/receipt/replay checks, and the complete browser witness before pair compatibility is current. No merge, deployment, production, publication, or provider-mutation authority transfers with the pin.
+
 ## October 26, 2026 Cloudflare Logpush control plane
 
 `config/cloudflare-logpush.portfolio.json` is the source-only desired-state registry for portfolio Logpush participation. It declares one account-scoped `workers_trace_events` job and the authorized repository set; it does not prove that a Cloudflare Logpush job currently exists or that any destination has received logs.
+
+Active participation must also respect repository-local governance. Investigate-only or historical repositories are excluded from the active Logpush registry even when FCR preserves them for provenance. Under their current repository contracts, `jussray/sekret-bip-companions`, `jussray/Bip-Jr`, and `jussray/Sekret-Bip-Bridge` are provenance/investigation-only rather than active Logpush participants. `jussray/jussray-bip-and-seek` is also excluded because audited current `main` is a Roblox runtime with no Cloudflare Worker. `jussray/Sekret-Bip-Parents` is currently a static Cloudflare Pages site with no Functions, `_worker.js`, or Wrangler Worker runtime, and `jussray/Sekret-Bip-Gov` is a governance/control repository with no runtime surface. Account-scoped `workers_trace_events` participation is therefore not applicable to those repositories in their current-main states. The Companions repository-side cleanup is tracked separately in FCR issue #1036 because that repo requires explicit founder approval before deletion or revert.
 
 Pull-request validation is non-mutating. Provider inspection uses a dedicated read credential. Provider apply remains a separate founder-gated action bound to the exact current `main` SHA, an auditable approval reference, a dedicated write credential, and provider-held destination configuration. A successful apply must complete provider readback before the receipt may claim the desired job is verified.
 
@@ -30,14 +57,6 @@ GitHub, Cloudflare, Supabase, n8n, Zapier, HubSpot, Shopify, and other providers
 ## October 23, 2026 StoryEngine peer refresh for FCR browser federation
 
 A fresh GitHub observation resolves StoryEngine `refs/heads/main` to `6b97b78370fbc25d4b4bb88bfeab136eb4c7dc2f`; the exact peer commit had 15 of 15 check runs successful, last completed at `2026-10-22T23:55:59Z`. FCR PR #1004 at head `607ec05be0bce5639bab36b75c3661a8af751be6` failed step 10, “Verify live StoryEngine peer ref still pinned,” because it still expected `26b1c34ae7c97c5d1b66a23d6345b3965cfcdc1f` ([failed job](https://github.com/jussray/founder-control-room/actions/runs/39875447018/job/120159809873)); the remaining peer-browser steps were skipped after the mismatch. The repair selects `6b97b78370fbc25d4b4bb88bfeab136eb4c7dc2f` as the next evidence subject. This pin does not prove PR #1004 federation or inherit PR #1003's separate exact-head witness; the full PR #1004 witness must pass for its own head. Any later movement of either repository expires pair-specific proof.
-
-## October 22, 2026 ET: FCR PR #1005 StoryEngine evidence-subject refresh
-
-> **Historical PR #1005 evidence only.** This 2026-10-22 pin was superseded by later StoryEngine main movement. The current candidate workflow instead selects `499f2d4eb9edac8bb11b657cf003a056263528d9` as a new evidence subject; no earlier CI or production proof transfers.
-
-PR #1005's FCR Playwright check at `071e040759108318a7502c32eee1a4c88dda7d6b` correctly stopped because `STORYENGINE_PEER_SHA` named StoryEngine `main@26b1c34ae7c97c5d1b66a23d6345b3965cfcdc1f` while the independently observed current `refs/heads/main` resolved to `6b97b78370fbc25d4b4bb88bfeab136eb4c7dc2f`. The workflow now selects that exact successor peer (`11d8023c494b104171701f170879b205dbf480fb` is the FCR source commit which changed the pin). The StoryEngine federation route, directive/receipt library, federation test, and package manifest retain identical blob hashes across the two peer commits; the server's `/runtime-identity` handler remains present, but the server source itself changed and requires executed peer proof.
-
-This updates the **candidate evidence identity only**. It does not inherit historical Playwright green, prove the newly pinned peer's behavior, fix the separate Chief adapter contract drift, authorize FCR/StoryEngine production publication, approve a merge, or permit any provider mutation. A complete exact-FCR-head browser and federation receipt witness must pass against the new peer, and either repo's subsequent head movement expires this evidence. Documentation Truth and the independent founder/review gates remain mandatory.
 
 ## October 16, 2026 StoryEngine peer refresh for FCR browser federation
 
@@ -212,11 +231,11 @@ canonical capability declaration
 
 ### Proof-weighted model capability market
 
-`src/lib/modelCapabilityMarket.ts` adds a task-specific routing layer for Council operators. Public launch benchmarks and provider claims are discovery signals only: they enter as bounded priors and cannot by themselves make a model primary, prove an outcome, or grant execution authority. Promotion requires fresh local receipts for the same task class; stale observations expire, false-green behavior is penalized, and a fresh authority-boundary violation blocks promotion.
+`src/lib/modelCapabilityMarket.ts` adds a task-specific routing layer for Council operators. Public launch benchmarks and provider claims are discovery signals only: they enter as bounded priors and cannot by themselves make a model primary, prove an outcome, or grant execution authority. Promotion requires fresh local receipts for the same task class; the primary-eligibility gate now requires enough independently proven samples **and verified completed outcomes**, not raw provider responses or verified failures/blocked stops. Stale observations expire, false-green behavior is penalized, and any fresh authority-boundary violation (including an unproven or malformed violation observation) blocks promotion.
 
 The market may recommend a primary, an independent challenger from another provider family, and shadow trials for promising unproven models. Every route remains explicitly non-authorizing (`selectionAuthority: false`, `executionAuthority: false`). Founder approval, repository/provider gates, provider readback, Playwright for load-bearing browser claims, and outcome verification remain separate. See [`docs/MODEL_CAPABILITY_MARKET.md`](docs/MODEL_CAPABILITY_MARKET.md).
 
-The market's intended first receipt source is the operator relay: `src/lib/capabilityObservationFeed.ts` folds relay responses into per-operator, per-task-class observations (only independently verified receipts count as proof; false green = completed without evidence; authority violation = any `authorityRequested` other than `none`; stale, duplicate, in-flight and foreign-operator receipts excluded). State: the ranking and the fold are **contract-capable** tested source; relay responses are not yet persisted, no outcome verifier exists, and no live route calls the market — advisory, not enforced routing.
+The market's intended first receipt source is the operator relay: `src/lib/capabilityObservationFeed.ts` folds relay responses into per-operator, per-task-class observations (only independently verified exact response hashes whose contents still match their canonical digest count as proof; false green = completed without evidence; authority violation = any `authorityRequested` other than `none`; stale, duplicate, in-flight and foreign-operator receipts excluded). State: the ranking and the fold are **contract-capable** tested source; relay responses are not yet persisted, no outcome verifier exists, and no live route calls the market — advisory, not enforced routing.
 
 ### Founder-content execution
 
@@ -248,6 +267,7 @@ Investor email is a separate authority class and must not auto-send without the 
 ### Content evidence and Trend Radar
 
 FCR's `content-outcome-learning@v1` Attack 3000 adapter and `evaluateContentTrendRadar` are source-level observation and recommendation capabilities inside the existing ULTRATHINK content lane. They do not create a separate publishing system and do not make analytics or trends authoritative merely because a caller labels them `CURRENT`, `VERIFIED`, or `EMERGING_SIGNAL`.
+Founder-content metrics can also enter the existing founder-content lifecycle through an authenticated bounded CSV-import route. The route reuses `content-metrics-csv@v1`, binds every observation to the stored post content fingerprint, provider, account, and one page identity, rejects future observations, and persists only normalized observation rows through the service-role store. Raw CSV is not durable state. The durable receipt is normalized as untrusted data at the application boundary and cannot grant publication, freshness, or strategy-mutation authority. Source code and a committed migration do not prove the production schema was applied or that current LinkedIn analytics were observed.
 Founder-content outcome metrics are account-bound evidence. When a connector is scoped to one account type or lane, such as a Facebook brand Page, FCR must not donate that observation to a different account identity such as a personal profile. Out-of-scope account metrics remain `UNKNOWN` rather than becoming synthetic zero, and account/lane identity participates in the observation hash. This remains observation-only evidence and grants no publication, provider-write, merge, deploy, spend, or external-contact authority.
 
 
@@ -426,6 +446,8 @@ For public crawler and work-directory behavior, `.github/workflows/ci.yml` must 
 The public `/work` page is a static Pages asset: `public/_worker.js` serves the bare `/work` and `/work/` paths by requesting the canonical `/work` URL through the `ASSETS` binding (requesting the `/work.html` filename returns the asset layer's 308 canonicalization back to `/work` and loops), so the page never falls through to the API proxy path that answered it with a degraded 503. The public `/welcome` page carries the same static classification: `public/_worker.js` serves the bare `/welcome` and `/welcome/` paths by requesting the canonical `/welcome` URL through the `ASSETS` binding, because the extensionless path otherwise falls through to the API proxy and returns a degraded 503.
 
 ## cross-repository browser witness freshness
+
+The truth-console recovery in PR #1035 completed its local browser harness before a separate StoryEngine peer-freshness failure. The observed dependency transition is recorded in [Truth Decay Audit](docs/TRUTH_DECAY_AUDIT.md#october-26-2026-truth-console-browser-proof-stopped-on-storyengine-identity-drift). A refreshed pin selects the next evidence subject; successor federation remains UNKNOWN until the complete witness succeeds for its own exact repository pair.
 
 The exact StoryEngine peer configured in `.github/workflows/playwright.yml` is an evidence subject, not a durable alias for current StoryEngine. A peer refresh must be backed by an independent ref/SHA observation and must reset predecessor federation/browser proof until the complete FCR → StoryEngine → receipt → FCR Playwright witness passes on the exact FCR head. Pin alignment alone grants no merge, deploy, production, or provider-mutation authority.
 
