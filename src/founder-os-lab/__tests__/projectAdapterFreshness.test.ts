@@ -20,6 +20,15 @@ function assess(overrides: Partial<Parameters<typeof assessProjectAdapterFreshne
 }
 
 describe('project adapter freshness', () => {
+  it('fails closed when an adapter has no audited contract paths', () => {
+    const result = assess({ auditedContractBlobs: {}, observedContractBlobs: {} });
+    expect(result.state).toBe('unknown');
+    expect(result.freshness).toBe('missing');
+    expect(result.blocker).toContain('no required contract blobs');
+    expect(result.promotionAllowed).toBe(false);
+    expect(result.mutationAuthorized).toBe(false);
+  });
+
   it('verifies every checked-in adapter only when current main and every required contract blob match', () => {
     for (const adapter of FOUNDER_OS_LAB_PROJECT_ADAPTERS) {
       const result = assessProjectAdapterFreshness({
