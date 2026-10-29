@@ -1,5 +1,12 @@
 # Cloudflare Deployment Targets
 
+## October 29, 2026: Founder Proof Audit Pages destination (candidate)
+
+The Shopify FCR store declares the active offer `founder-proof-audit` at $99, SKU `FCR-PROOF-AUDIT-99`. Its extensionless storefront path `/products/founder-proof-audit` must be served by the Cloudflare Pages static `ASSETS` binding on both slash variants. Candidate source changes are limited to `public/_worker.js`, `public/products/founder-proof-audit/index.html`, and the matching focused test. The page preserves a scoped inquiry path without introducing unverified direct checkout.
+
+A Shopify draft redirect to `www.foundercontrolroom.org` exists separately; FCR's Shopify MAIN theme was observed still pointing to JBH. This repository patch does not publish that draft, modify DNS, or deploy Pages/Workers. Required runtime evidence: exact Pages deployment SHA, successful anonymous product-page GET and HEAD for both paths with correct brand/offer content, no wrong-store navigation, and a separately validated FCR checkout before any purchase claim. Rollback requires reverting only the new static page/route and selecting the prior approved Pages deployment without changing adjacent API or brand routes.
+
+
 ## Portfolio Logpush target
 
 The repository declares a single account-level Cloudflare Logpush desired job named `fcr-portfolio-workers-trace` for the `workers_trace_events` dataset. This is a source target, not a claim about current provider state or successful log delivery.
