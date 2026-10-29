@@ -46,10 +46,23 @@ requireValue(/^\d{4}-\d{2}-\d{2}\.\d+$/.test(contract.contractVersion), 'contrac
 requireValue(contract.pair?.controlRoom === 'jussray/founder-control-room', 'control-room repository drifted');
 requireValue(contract.pair?.chiefAI === 'jussray/chief-ai-machine', 'Chief AI repository drifted');
 requireValue(pkg.name === 'founder-control-room', 'validator is running in the wrong repository');
+requireValue(contract.relationship?.topology === 'standalone-peers', 'FCR/Chief topology must remain standalone peers');
+requireValue(contract.commercialPackaging?.portfolioCommercialTopology === 'independent-products-with-explicit-bundles', 'commercial topology drifted');
+requireValue(contract.commercialPackaging?.defaultPublicFounderSoftwareIdentity === 'product-specific', 'public product identity must remain product-specific');
+requireValue(contract.commercialPackaging?.chiefTechnicalIndependence === true, 'Chief technical independence must remain true');
+requireValue(contract.commercialPackaging?.chiefCommercialIndependence === true, 'Chief commercial independence must remain true');
+requireValue(contract.commercialPackaging?.chiefDefaultCommercialRole === 'standalone-product', 'Chief commercial role must remain standalone');
+requireValue(contract.commercialPackaging?.chiefDefaultCommercialPackaging === 'chief-owned-offer', 'Chief commercial packaging must remain Chief-owned');
+requireValue(contract.commercialPackaging?.bundleRule?.includes('does not collapse product identity'), 'Chief bundle boundary is required');
 requireValue(contract.roles?.controlRoom?.join('|') === 'memory|governance|evidence|coordination|execution authority|outcome receipts', 'control-room V10 role contract drifted');
 requireValue(contract.roles?.chiefAI?.join('|') === 'reasoning|synthesis|capability composition|recommendations|executive judgment', 'Chief AI V10 role contract drifted');
 requireValue(contract.roles?.n8n?.join('|') === 'workflow execution|retries|API orchestration|execution receipts', 'n8n execution role contract drifted');
 requireValue(contract.v10?.capabilityPlanContract === 'juss-v10/capability-plan@v1', 'V10 capability-plan contract drifted');
+requireValue(contract.v10?.promptOSCommandIntentContract === 'promptos/public-command-intent@v1', 'PromptOS public command intent contract drifted');
+requireValue(contract.v10?.promptOSChiefHandoffContract === 'juss/promptos-chief-fcr-command-handoff@v1', 'PromptOS/Chief/FCR command handoff contract drifted');
+requireValue(contract.v10?.promptOSCommandIntakeContract === 'juss/fcr-public-command-intake@v1', 'FCR public command intake contract drifted');
+requireValue(contract.v10?.promptOSCommandBoundary?.includes('still requires a hash-bound Chief capability plan before authority resolution'), 'PromptOS command boundary must preserve the Chief capability-plan gate');
+requireValue(contract.v10?.promptOSCommandBoundary?.includes('never authorize execution'), 'PromptOS command boundary must remain non-authorizing');
 requireValue(contract.v10?.outcomeObservationContract === 'juss-v10/outcome-observation@v1', 'V10 outcome contract drifted');
 requireValue(contract.v10?.conveyorContract === 'founder-control-room/n8n-conveyor@v3', 'V10 conveyor contract drifted');
 requireValue(contract.v10?.capabilitySelector === 'chief-ai-machine', 'Chief AI must remain the capability selector');
@@ -169,7 +182,7 @@ if (failures.length > 0) {
 }
 
 console.log(`Pair contract ${contract.contractVersion} passed for Founder Control Room.`);
-console.log('V10 Twin Core roles, capability routing, authority, outcomes, public communication, and necessary-fix controls verified.');
+console.log('Standalone peer identity, V10 roles, capability routing, authority, outcomes, public communication, and necessary-fix controls verified.');
 console.log(counterpartPath ? 'Cross-repository static policy alignment verified.' : 'Local FCR contract verified; cross-repository comparison was not requested.');
 console.log(counterpartNecessaryFixPolicyPath ? 'Cross-repository necessary-fix policy alignment verified.' : 'Local FCR necessary-fix policy verified; Chief counterpart comparison was not requested.');
 console.log('Runtime behavior remains unverified.');
