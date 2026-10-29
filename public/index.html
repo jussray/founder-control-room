@@ -12,17 +12,16 @@
       color-scheme: dark;
       --bg: #070818;
       --panel: #0e1126;
-      --panel-2: #141a36;
       --line: rgba(160, 140, 255, .18);
+      --line-strong: rgba(155, 107, 255, .48);
       --ink: #f6f5ff;
       --muted: #b4b6cc;
       --muted-2: #8d90aa;
       --violet: #9b6bff;
       --violet-2: #c26bf5;
       --blue: #55c8ff;
-      --green: #5ee6a0;
       --amber: #ffc66b;
-      --red: #ff7a8a;
+      --scrim: #12173a;
     }
     * { box-sizing: border-box; }
     [hidden] { display: none !important; }
@@ -30,9 +29,9 @@
     body {
       min-height: 100vh;
       background:
-        radial-gradient(circle at 12% 0%, rgba(60, 120, 255, .22), transparent 28rem),
-        radial-gradient(circle at 92% 6%, rgba(170, 70, 255, .22), transparent 30rem),
-        linear-gradient(180deg, #0a0d24 0%, var(--bg) 60%, #05060f 100%);
+        radial-gradient(circle at 88% -4%, rgba(255, 168, 96, .16), transparent 26rem),
+        radial-gradient(circle at 10% 0%, rgba(60, 120, 255, .20), transparent 28rem),
+        linear-gradient(180deg, #0a0d24 0%, var(--bg) 62%, #05060f 100%);
       color: var(--ink);
       font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
       overflow-x: hidden;
@@ -40,37 +39,37 @@
     a { color: inherit; text-decoration: none; }
     button { font: inherit; }
     :focus-visible { outline: 2px solid var(--blue); outline-offset: 3px; }
-
+    h1, h2, h3 { margin: 0; letter-spacing: -.02em; line-height: 1.05; }
     .wrap { width: min(1240px, calc(100% - 2rem)); margin: 0 auto; }
 
-    /* Top bars */
+    /* Top bar */
     .topbar {
       display: flex; align-items: center; justify-content: space-between; gap: 1rem;
-      padding: 1rem 0 .5rem; flex-wrap: wrap;
+      padding: 1.2rem 0 .8rem; flex-wrap: wrap;
     }
-    .logo { display: flex; align-items: center; gap: .6rem; font-weight: 800; letter-spacing: .02em; }
-    .logo-mark {
-      width: 2rem; height: 2rem; border-radius: .6rem; display: grid; place-items: center;
-      background: linear-gradient(145deg, #55c8ff, #8a6bff 55%, #c26bf5); color: #08091a; font-weight: 900;
+    .logo { display: flex; flex-direction: column; line-height: 1; }
+    .logo-word {
+      font-size: 2rem; font-weight: 900; letter-spacing: -.03em;
+      background: linear-gradient(90deg, #55c8ff, #9b6bff 70%, #c26bf5);
+      -webkit-background-clip: text; background-clip: text; color: transparent;
     }
-    .navlinks { display: flex; gap: .3rem; flex-wrap: wrap; }
-    .navlinks a, .navlinks button {
-      padding: .5rem .75rem; border-radius: .7rem; border: 1px solid transparent;
-      background: none; color: var(--muted); font-size: .86rem; cursor: pointer;
-    }
-    .navlinks a:hover, .navlinks button:hover { color: var(--ink); background: rgba(255,255,255,.04); }
-    .navlinks .on { color: #fff; background: rgba(85,200,255,.14); border-color: rgba(85,200,255,.35); }
+    .logo-sub { margin-top: .35rem; font-size: .6rem; letter-spacing: .16em; color: var(--muted); }
+    .navlinks { display: flex; align-items: center; gap: .15rem; flex-wrap: wrap; }
+    .navlinks a { padding: .55rem .8rem; color: var(--muted); font-size: .9rem; border-radius: .6rem; }
+    .navlinks a:hover { color: var(--ink); }
+    .navlinks a.on { color: #fff; border-radius: 0; box-shadow: inset 0 -2px 0 var(--blue); }
     .avatar {
-      width: 2rem; height: 2rem; border-radius: 50%;
-      background: linear-gradient(135deg, #55c8ff, #c26bf5); display: inline-grid; place-items: center;
-      color: #08091a; font-weight: 800; font-size: .8rem;
+      width: 2.3rem; height: 2.3rem; margin-left: .4rem; border-radius: 50%;
+      display: inline-grid; place-items: center; color: #08091a;
+      background: linear-gradient(135deg, #55c8ff, #c26bf5);
+      box-shadow: 0 0 0 2px rgba(155, 107, 255, .35);
     }
 
     /* View switch */
-    .switch { display: flex; justify-content: center; margin: 1.1rem 0 1.4rem; }
+    .switch { display: flex; justify-content: center; margin: 1rem 0 1.3rem; }
     .switch-track {
       display: inline-flex; padding: .3rem; border-radius: 999px;
-      border: 1px solid var(--line); background: rgba(10,13,32,.8);
+      border: 1px solid var(--line); background: rgba(10, 13, 32, .8);
     }
     .switch button {
       border: 0; background: none; color: var(--muted); padding: .55rem 1.1rem;
@@ -78,164 +77,180 @@
     }
     .switch button[aria-selected="true"] { color: #08091a; background: linear-gradient(100deg, #55c8ff, #9b6bff); }
 
-    .view[hidden] { display: none; }
-
-    /* Frames */
+    /* Frame shared by both views */
     .frame {
-      border: 1px solid var(--line); border-radius: 1.2rem; overflow: hidden;
-      background: linear-gradient(180deg, rgba(20,26,54,.85), rgba(10,13,30,.95));
-      box-shadow: 0 30px 90px rgba(0,0,0,.45), 0 0 60px rgba(120,90,255,.12);
-    }
-    .frame-bar {
-      display: flex; align-items: center; gap: 1rem; justify-content: space-between;
-      padding: .8rem 1rem; border-bottom: 1px solid var(--line); flex-wrap: wrap;
+      border: 1px solid var(--line); border-radius: 1.4rem; overflow: hidden;
+      background: linear-gradient(180deg, rgba(20, 26, 54, .85), rgba(10, 13, 30, .96));
+      box-shadow: 0 30px 90px rgba(0, 0, 0, .45), 0 0 60px rgba(120, 90, 255, .12);
     }
 
-    /* Hero */
+    /* User view: hero */
     .hero {
-      position: relative; min-height: 420px; padding: 2.4rem 2rem;
-      display: grid; grid-template-columns: 1.1fr .9fr; gap: 1rem; align-items: center;
-      background:
-        radial-gradient(circle at 78% 30%, rgba(255,170,110,.28), transparent 14rem),
-        linear-gradient(180deg, #2b3a7a 0%, #5a3f9c 45%, #1a1d3f 100%);
+      position: relative; display: grid; grid-template-columns: 1.05fr .95fr; gap: 1.6rem;
+      align-items: center; padding: 2.6rem 2.4rem 2rem; min-height: 470px;
     }
-    .hero-copy { position: relative; z-index: 2; }
-    .eyebrow { font-size: .72rem; letter-spacing: .2em; color: #d7d4ff; text-transform: uppercase; margin: 0 0 1rem; }
-    h1, h2, h3 { margin: 0; letter-spacing: -.02em; line-height: 1.05; }
-    .hero h1 { font-size: clamp(2.3rem, 5vw, 3.9rem); font-weight: 800; }
-    .hero h1 .grad { background: linear-gradient(90deg, #7cd8ff, #b59bff); -webkit-background-clip: text; background-clip: text; color: transparent; }
-    .hero p.sub { margin: 1rem 0 1.4rem; color: #e6e4ff; font-size: 1rem; }
+    .eyebrow { margin: 0 0 1.1rem; font-size: .74rem; letter-spacing: .24em; color: #d7d4ff; font-weight: 600; }
+    .hero h1 { font-size: clamp(2.2rem, 5.4vw, 4.4rem); font-weight: 800; }
+    .hero h1 .grad {
+      background: linear-gradient(90deg, #8fdcff, #b59bff);
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+    }
+    .sub { margin: 1.1rem 0 1.6rem; color: #e6e4ff; font-size: 1.05rem; line-height: 1.5; max-width: 30ch; }
     .btn {
-      display: inline-flex; align-items: center; gap: .5rem; padding: .85rem 1.3rem; border-radius: .9rem;
-      border: 1px solid rgba(255,255,255,.14); background: linear-gradient(100deg, #5b5cf0, #a061ff);
-      color: #fff; font-weight: 700; cursor: pointer;
+      display: inline-flex; align-items: center; gap: .55rem; padding: .95rem 1.5rem; border-radius: 999px;
+      background: linear-gradient(100deg, #5b5cf0, #a061ff); color: #fff; font-weight: 700;
+      box-shadow: 0 10px 30px rgba(120, 90, 255, .35);
     }
-    .btn.ghost { background: rgba(255,255,255,.06); }
-    .hero-art { position: relative; min-height: 260px; }
-    .hero-art .sun {
-      position: absolute; right: 18%; top: 14%; width: 90px; height: 90px; border-radius: 50%;
-      background: radial-gradient(circle, #fff3d6 0%, #ffb27a 60%, transparent 72%);
+    .btn.ghost { background: rgba(255, 255, 255, .05); box-shadow: none; border: 1px solid var(--line); }
+    .hero-art {
+      position: relative; margin: 0; min-height: 380px; height: 100%;
+      border-radius: 1.2rem; overflow: hidden; border: 1px solid var(--line);
     }
-    .hero-art .ridge {
-      position: absolute; inset: auto 0 0; height: 62%;
-      background: linear-gradient(160deg, #3b2f6e, #22184d);
-      clip-path: polygon(0 80%, 12% 55%, 24% 68%, 40% 30%, 54% 62%, 70% 22%, 84% 58%, 100% 40%, 100% 100%, 0 100%);
+    .hero-art img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 62% 40%; }
+    .hero-art::after {
+      content: ""; position: absolute; inset: 0;
+      background: linear-gradient(180deg, rgba(7, 8, 24, 0) 45%, rgba(7, 8, 24, .6) 100%);
     }
-    .hero-art .ridge.front {
-      background: linear-gradient(160deg, #1a1538, #0d0a24);
-      height: 40%; clip-path: polygon(0 60%, 18% 30%, 36% 58%, 58% 18%, 80% 52%, 100% 36%, 100% 100%, 0 100%);
+    .hero-tag {
+      position: absolute; z-index: 1; right: 1.1rem; bottom: 1rem; margin: 0;
+      font-size: .7rem; letter-spacing: .22em; line-height: 1.7; color: #f3f0ff; text-align: right;
+      text-shadow: 0 2px 10px rgba(0, 0, 0, .6);
     }
-    .hero-art .tag {
-      position: absolute; right: 2%; bottom: 6%; font-size: .72rem; letter-spacing: .25em; line-height: 1.6;
-      color: #e7e3ff; text-align: right; opacity: .9;
+    .quote-serif {
+      position: absolute; top: 1.6rem; right: 2.4rem; margin: 0; text-align: right;
+      font-family: Georgia, "Iowan Old Style", "Times New Roman", serif; font-style: italic;
+      font-size: 1.15rem; color: #e8e4ff;
     }
 
-    /* Feature cards */
-    .cards { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: .9rem; padding: 1rem; }
+    /* User view: four cards */
+    .cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .9rem; padding: 0 1.2rem 1.2rem; }
     .card {
-      position: relative; min-height: 230px; border-radius: 1rem; padding: 1rem;
-      border: 1px solid var(--line); background: linear-gradient(180deg, #1c2550, #0c0f26);
-      overflow: hidden; display: flex; flex-direction: column;
+      position: relative; display: flex; min-height: 320px; padding: 1.1rem 1rem 1.2rem;
+      border-radius: 1.1rem; border: 1px solid var(--line); overflow: hidden; background: #0f1430;
     }
-    .card h3 { font-size: 1rem; }
-    .card p { margin: .4rem 0 0; color: var(--muted); font-size: .84rem; line-height: 1.45; }
-    .card .art { margin-top: auto; height: 96px; border-radius: .7rem; background: linear-gradient(160deg, #3c2c78, #1b1c44); position: relative; overflow: hidden; }
-    .card .art::after {
-      content: ""; position: absolute; inset: auto 0 0; height: 55%;
-      background: linear-gradient(160deg, #2a2160, #100d2c);
-      clip-path: polygon(0 70%, 25% 35%, 50% 65%, 75% 30%, 100% 60%, 100% 100%, 0 100%);
+    a.card:hover { border-color: var(--line-strong); }
+    .card-photo { position: absolute; inset: 0; background-size: cover; background-position: 50% 100%; }
+    .card-photo::after {
+      content: ""; position: absolute; inset: 0;
+      background: linear-gradient(180deg, var(--scrim) 0%, var(--scrim) 40%, rgba(18, 23, 58, 0) 72%);
     }
-    .card .art.warm { background: linear-gradient(160deg, #ffb27a, #7a4cb0); }
-    .card .art.note { background: #f3ead8; }
-    .card .art.note::after { display: none; }
-    .card .art.note span {
-      position: absolute; inset: .6rem; color: #3a2d52; font-family: Georgia, serif; font-size: .85rem; line-height: 1.15;
-      transform: rotate(-4deg); display: flex; align-items: center; justify-content: center; text-align: center;
+    .card-photo.stories { background-image: url("/assets/front-door/card-stories.jpg"); }
+    .card-photo.missions { background-image: url("/assets/front-door/card-missions.jpg"); }
+    .card-photo.learn { background-image: url("/assets/front-door/card-learn.jpg"); }
+    .card-photo.community { background-image: url("/assets/front-door/card-community.jpg"); }
+    .card-body { position: relative; z-index: 1; padding-right: 2.4rem; }
+    .card h3 { font-size: 1.08rem; font-weight: 750; }
+    .card p { margin: .45rem 0 0; color: #d6d6ea; font-size: .88rem; line-height: 1.45; }
+    .card .more {
+      position: absolute; z-index: 1; top: .9rem; right: .9rem; width: 2rem; height: 2rem;
+      border-radius: 50%; display: grid; place-items: center; color: var(--ink);
+      border: 1px solid rgba(255, 255, 255, .22); background: rgba(10, 13, 30, .55);
     }
-    .card .more { position: absolute; top: .9rem; right: .9rem; color: var(--muted); }
 
+    /* User view: support banner and notes */
     .banner {
-      margin: 0 1rem 1rem; padding: 1rem 1.2rem; border-radius: 1rem; border: 1px solid var(--line);
-      display: flex; align-items: center; justify-content: space-between; gap: 1rem; background: rgba(12,15,36,.85);
+      display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+      margin: 0 1.2rem 1.2rem; padding: 1.1rem 1.3rem; border-radius: 1.1rem;
+      border: 1px solid var(--line); background: rgba(12, 15, 36, .85);
     }
     .banner strong { display: block; font-size: 1rem; }
-    .banner span { color: var(--muted); font-size: .88rem; }
-    .banner .arrow { font-size: 1.3rem; color: var(--muted); }
+    .banner .line { color: var(--muted); font-size: .9rem; }
+    .arrow-dot {
+      width: 2.2rem; height: 2.2rem; flex: none; border-radius: 50%; display: grid; place-items: center;
+      border: 1px solid var(--line); color: var(--muted);
+    }
+    .notes { margin: 0; padding: 0 1.4rem 1.2rem; color: var(--muted); font-size: .86rem; line-height: 1.55; }
+    .notes a { color: var(--blue); }
 
     /* Founder view */
-    .greet { display: flex; justify-content: space-between; gap: 1rem; padding: 1.4rem 1.4rem .6rem; flex-wrap: wrap; align-items: flex-start; }
-    .greet h2 { font-size: clamp(1.6rem, 3vw, 2.2rem); }
-    .greet p { margin: .4rem 0 0; color: var(--muted); font-size: .9rem; }
-    .quote {
-      padding: .8rem 1rem; border-radius: .9rem; border: 1px solid var(--line); background: rgba(255,255,255,.03);
-      color: #e6e4ff; font-style: italic; font-size: .92rem; max-width: 260px;
+    .f-head {
+      display: flex; justify-content: space-between; align-items: flex-start; gap: 1.2rem; flex-wrap: wrap;
+      padding: 1.8rem 1.6rem .9rem;
     }
-    .stats { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: .8rem; padding: .6rem 1.4rem 1rem; }
-    .stat { padding: .9rem 1rem; border-radius: .9rem; border: 1px solid var(--line); background: linear-gradient(180deg, #1c2550, #0c0f26); }
-    .stat b { display: block; font-size: 1.35rem; }
-    .stat small { color: var(--muted); font-size: .78rem; }
-    .stat.muted b { font-size: 1rem; color: var(--muted-2); font-weight: 600; }
-
-    .fgrid { display: grid; grid-template-columns: 1.15fr .85fr; gap: .9rem; padding: 0 1.4rem 1.4rem; }
-    #community-f { grid-column: 1 / -1; }
-    .panel { border: 1px solid var(--line); border-radius: 1rem; padding: 1rem; background: linear-gradient(180deg, #1c2550, #0c0f26); box-shadow: 0 18px 50px rgba(0,0,0,.3); }
-    .note-line { margin: 1rem 1.2rem 1.2rem; color: var(--muted); font-size: .84rem; line-height: 1.5; }
-    .hero-short { min-height: 230px; padding: 1.8rem 2rem; }
-    .hero-short .sub { margin-top: .6rem; }
-    .greet-h { font-size: clamp(1.7rem, 3.2vw, 2.4rem); font-weight: 800; }
-    .hero .quote { margin: 1.1rem 0 0; max-width: 360px; background: rgba(10,13,30,.45); }
-    .panel-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: .7rem; }
-    .panel-head h3 { font-size: .98rem; }
-    .panel-head a, .panel-head small { color: var(--blue); font-size: .8rem; }
-    .panel-head small { color: var(--muted-2); }
+    .f-head h2 { font-size: clamp(1.9rem, 3.4vw, 2.6rem); font-weight: 800; }
+    .lede { margin: .55rem 0 0; color: var(--muted); font-size: .98rem; }
+    .small-line { margin: .7rem 0 0; font-size: .68rem; letter-spacing: .18em; color: #c9c2ff; }
+    .quote-card {
+      margin: 0; max-width: 280px; padding: .9rem 1.1rem; border-radius: 1rem;
+      border: 1px solid var(--line); background: rgba(255, 255, 255, .03);
+      font-family: Georgia, serif; font-style: italic; color: #e6e4ff; font-size: .98rem;
+    }
+    .stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .8rem; padding: .6rem 1.6rem 1rem; }
+    .stat {
+      padding: 1rem; border-radius: 1rem; border: 1px solid var(--line);
+      background: linear-gradient(180deg, #1c2550, #0c0f26);
+    }
+    .stat .k { display: block; font-size: .76rem; color: var(--muted); }
+    .stat .v { display: block; margin-top: .4rem; font-size: .92rem; color: var(--muted-2); font-weight: 600; }
+    .fgrid { display: grid; grid-template-columns: 1.25fr .9fr; gap: .9rem; padding: .4rem 1.6rem .9rem; }
+    .fgrid.one { grid-template-columns: 1fr; }
+    .fgrid.pair { grid-template-columns: 1fr 1fr; }
+    .stack { display: grid; gap: .9rem; align-content: start; }
+    .panel {
+      border: 1px solid var(--line); border-radius: 1.1rem; padding: 1.1rem;
+      background: linear-gradient(180deg, #1c2550, #0c0f26);
+    }
+    .panel-head { display: flex; justify-content: space-between; align-items: center; gap: .6rem; margin-bottom: .6rem; }
+    .panel-head h3 { font-size: 1rem; }
+    .panel-head small { color: var(--muted-2); font-size: .78rem; }
     .row {
-      display: grid; grid-template-columns: auto 1fr auto; gap: .7rem; align-items: center;
-      padding: .6rem .3rem; border-top: 1px solid rgba(255,255,255,.05);
+      display: grid; grid-template-columns: 2.2rem 1fr auto; gap: .8rem; align-items: center;
+      padding: .7rem .2rem; border-top: 1px solid rgba(255, 255, 255, .06);
     }
     .row:first-of-type { border-top: 0; }
-    .ico {
-      width: 2rem; height: 2rem; border-radius: .6rem; display: grid; place-items: center;
-      background: rgba(155,107,255,.18); color: #d9ccff; font-weight: 800; font-size: .8rem;
+    .glyph {
+      width: 2.2rem; height: 2.2rem; border-radius: .7rem; display: grid; place-items: center;
+      background: rgba(155, 107, 255, .16); color: #d9ccff; font-weight: 800; font-size: .72rem;
     }
-    .row strong { display: block; font-size: .9rem; }
-    .row small { color: var(--muted); font-size: .76rem; }
-    .chip { font-size: .68rem; font-weight: 800; letter-spacing: .08em; padding: .25rem .5rem; border-radius: 999px; border: 1px solid; white-space: nowrap; }
-    .chip.blocked { color: var(--red); border-color: rgba(255,122,138,.4); }
-    .chip.unknown { color: var(--amber); border-color: rgba(255,198,107,.4); }
-    .chip.ok { color: var(--green); border-color: rgba(94,230,160,.4); }
-    .empty { color: var(--muted); font-size: .85rem; padding: .8rem .3rem; line-height: 1.5; }
-    .check { display: flex; gap: .6rem; align-items: flex-start; padding: .45rem 0; font-size: .86rem; color: #e3e1f5; }
-    .check input { margin-top: .2rem; accent-color: var(--violet); }
-    .integ { display: flex; justify-content: space-between; align-items: center; padding: .5rem 0; font-size: .86rem; border-top: 1px solid rgba(255,255,255,.05); }
-    .integ:first-of-type { border-top: 0; }
-    .integ small { color: var(--muted-2); }
-
-    .owner-cta { display: inline-block; margin: 0 1.4rem 1.4rem; }
+    .row strong { display: block; font-size: .92rem; }
+    .row small { color: var(--muted); font-size: .78rem; }
+    .pill {
+      font-size: .72rem; color: var(--muted-2); border: 1px solid var(--line);
+      border-radius: 999px; padding: .25rem .6rem; white-space: nowrap;
+    }
+    .empty { margin: 0; color: var(--muted); font-size: .88rem; line-height: 1.5; padding: .3rem .2rem; }
+    .sunrise {
+      position: relative; border-radius: 1.1rem; overflow: hidden; min-height: 140px; padding: 1.1rem;
+      border: 1px solid var(--line);
+      background: radial-gradient(circle at 78% 20%, rgba(255, 190, 120, .45), transparent 9rem),
+        linear-gradient(180deg, #2b3a7a 0%, #5a3f9c 55%, #1a1d3f 100%);
+    }
+    .sunrise strong { display: block; font-size: 1.05rem; }
+    .sunrise span { color: #e6e4ff; font-size: .86rem; }
+    .owner-cta { display: inline-block; margin: .3rem 1.6rem 1.4rem; }
 
     .slogan { text-align: center; padding: 1.4rem 1rem 1.6rem; }
     .slogan strong { display: block; font-size: 1.2rem; letter-spacing: .02em; }
     .slogan span { color: var(--muted); font-size: .85rem; letter-spacing: .14em; text-transform: uppercase; }
-
-    .foot { display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; padding: 1.4rem 0 2rem; color: var(--muted-2); font-size: .8rem; }
+    .foot {
+      display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap;
+      padding: 1.2rem 0 2rem; color: var(--muted-2); font-size: .8rem;
+    }
 
     /* Responsive */
     @media (max-width: 980px) {
-      .cards { grid-template-columns: repeat(2, minmax(0,1fr)); }
-      .stats { grid-template-columns: repeat(2, minmax(0,1fr)); }
-      .fgrid { grid-template-columns: 1fr; }
-      .hero { grid-template-columns: 1fr; }
+      .hero { grid-template-columns: 1fr; padding: 2rem 1.8rem; min-height: 0; }
+      .quote-serif { position: static; text-align: left; margin-top: 1.2rem; }
+      .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .fgrid, .fgrid.pair { grid-template-columns: 1fr; }
     }
     @media (max-width: 620px) {
       .wrap { width: calc(100% - 2rem); }
-      .hero { padding: 1.6rem 1.2rem; min-height: 0; }
-      .hero-art { min-height: 200px; }
+      .topbar { padding-top: .9rem; }
+      .logo-word { font-size: 1.7rem; }
+      .navlinks a { padding: .45rem .55rem; font-size: .85rem; }
+      .hero { padding: 1.4rem 1.1rem; }
+      .hero-art { min-height: 250px; }
       .cards { grid-template-columns: 1fr; }
-      .card { min-height: 0; }
-      .stats { grid-template-columns: 1fr 1fr; padding: .6rem 1rem 1rem; }
-      .greet, .fgrid { padding-left: 1rem; padding-right: 1rem; }
-      .quote { max-width: none; }
-      .navlinks a, .navlinks button { padding: .45rem .55rem; font-size: .8rem; }
-      .banner { margin: 0 .6rem .8rem; flex-direction: column; align-items: flex-start; }
+      .card { min-height: 280px; }
+      .banner { margin: 0 .6rem .9rem; }
+      .notes { padding-left: .6rem; padding-right: .6rem; }
+      .f-head { padding: 1.2rem 1rem .6rem; }
+      .stats { grid-template-columns: 1fr 1fr; padding: .6rem 1rem; }
+      .fgrid { padding-left: 1rem; padding-right: 1rem; }
+      .owner-cta { margin-left: 1rem; }
+      .quote-card { max-width: none; }
     }
   </style>
 </head>
@@ -243,8 +258,8 @@
   <div class="wrap" id="top">
     <header class="topbar">
       <a class="logo" href="#top" aria-label="Founder Control Room home">
-        <span class="logo-mark">F</span>
-        <span>FCR</span>
+        <span class="logo-word">FCR</span>
+        <span class="logo-sub">FOUNDER CONTROL ROOM</span>
       </a>
       <nav class="navlinks" aria-label="Public sections" data-user-nav>
         <a class="on" href="#discover">Discover</a>
@@ -252,7 +267,12 @@
         <a href="#support">Support</a>
         <a href="#community">Community</a>
         <a href="#messages">Messages</a>
-        <a href="/control-room/">Founder sign-in</a>
+        <a class="avatar" href="/control-room/" aria-label="Founder sign-in">
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+            <circle cx="12" cy="8.5" r="4" fill="currentColor" />
+            <path d="M4.5 21c1.4-4 4.2-6 7.5-6s6.1 2 7.5 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+          </svg>
+        </a>
       </nav>
       <nav class="navlinks" aria-label="Founder sections" data-founder-nav hidden>
         <a class="on" href="#dashboard">Dashboard</a>
@@ -260,7 +280,12 @@
         <a href="#proof">Proof</a>
         <a href="#community-f">Community</a>
         <a href="#automations">Automations</a>
-        <a href="/control-room/">Founder sign-in</a>
+        <a class="avatar" href="/control-room/" aria-label="Founder sign-in">
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+            <circle cx="12" cy="8.5" r="4" fill="currentColor" />
+            <path d="M4.5 21c1.4-4 4.2-6 7.5-6s6.1 2 7.5 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+          </svg>
+        </a>
       </nav>
     </header>
 
@@ -281,107 +306,115 @@
           <p class="sub">Real people. Real progress. Real impact.</p>
           <a class="btn" href="/work.html">Explore Founders →</a>
         </div>
-        <div class="hero-art" aria-hidden="true">
-          <div class="sun"></div>
-          <div class="ridge"></div>
-          <div class="ridge front"></div>
-          <div class="tag">PEOPLE<br />IDEAS<br />PROGRESS<br />A BRIGHTER<br />TOMORROW</div>
-        </div>
+        <figure class="hero-art">
+          <img src="/assets/front-door/hero-peak.jpg" alt="" width="940" height="730" decoding="async" />
+          <p class="hero-tag" aria-hidden="true">PEOPLE<br />IDEAS<br />PROGRESS<br />A BRIGHTER<br />TOMORROW</p>
+        </figure>
+        <p class="quote-serif">“Bigger thinking.<br />Real outcomes.”</p>
       </div>
 
       <div class="cards" id="learn">
         <a class="card" id="founders" href="/juss-rayy/" data-public-card-link="story">
-          <h3>Founder Stories</h3>
-          <p>Real founders. Real progress. Stories publish as they are verified.</p>
+          <span class="card-photo stories" aria-hidden="true"></span>
+          <div class="card-body">
+            <h3>Founder Stories</h3>
+            <p>Real founders. Real progress. Stories publish as they are verified.</p>
+          </div>
           <span class="more" aria-hidden="true">→</span>
-          <div class="art"></div>
         </a>
         <a class="card" href="/work.html" data-public-card-link="missions">
-          <h3>Missions That Matter</h3>
-          <p>Purpose-driven projects, each with its current state shown.</p>
+          <span class="card-photo missions" aria-hidden="true"></span>
+          <div class="card-body">
+            <h3>Missions That Matter</h3>
+            <p>Purpose-driven projects, each with its current state shown.</p>
+          </div>
           <span class="more" aria-hidden="true">→</span>
-          <div class="art warm"></div>
         </a>
         <a class="card" href="/control-room/founder-shell.html" data-public-card-link="learn">
-          <h3>Learn &amp; Grow</h3>
-          <p>Practical resources from real builders.</p>
+          <span class="card-photo learn" aria-hidden="true"></span>
+          <div class="card-body">
+            <h3>Learn &amp; Grow</h3>
+            <p>Practical resources from real builders.</p>
+          </div>
           <span class="more" aria-hidden="true">→</span>
-          <div class="art note"><span>Better<br />Builders.<br />A Brighter<br />Tomorrow</span></div>
         </a>
         <article class="card" id="community">
-          <h3>Community Highlights</h3>
-          <p>Supporter highlights appear here once real supporters exist.</p>
-          <span class="more" aria-hidden="true">→</span>
-          <div class="art"></div>
+          <span class="card-photo community" aria-hidden="true"></span>
+          <div class="card-body">
+            <h3>Community Highlights</h3>
+            <p>Supporter highlights appear here once real supporters exist.</p>
+          </div>
         </article>
       </div>
 
       <div class="banner" id="support">
         <div>
           <strong>A public front door for founders, supporters and builders.</strong>
-          <span>Real people. Real projects. A brighter tomorrow.</span>
+          <span class="line">Real people. Real projects. A brighter tomorrow.</span>
         </div>
-        <span class="arrow" aria-hidden="true">→</span>
+        <span class="arrow-dot" aria-hidden="true">→</span>
       </div>
-      <p id="messages" class="note-line">No account is required to explore the public FCR world. Messages open after sign-in; nothing is sent from this public view.</p>
-      <p class="note-line"><a href="/work.html">Explore public work</a> · <a href="/juss-rayy/">Meet Juss Rayy</a></p>
+      <p id="messages" class="notes">No account is required to explore the public FCR world. Messages open after sign-in; nothing is sent from this public view.</p>
+      <p class="notes"><a href="/work.html">Explore public work</a> · <a href="/juss-rayy/">Meet Juss Rayy</a></p>
     </section>
 
     <!-- FOUNDER VIEW -->
     <section id="view-founder" class="view frame" role="tabpanel" aria-labelledby="tab-founder" data-view-panel="founder" hidden>
-      <div class="frame-bar">
-        <strong>Founder View</strong>
-        <span class="chip unknown">SIGN-IN REQUIRED</span>
-      </div>
-      <div id="dashboard" class="hero hero-short">
-        <div class="hero-copy">
-          <p class="eyebrow">Turn ideas into progress</p>
-          <h2 class="greet-h">Founder View</h2>
-          <p class="sub">Build. Prove. Grow. Move one thing forward.</p>
-          <blockquote class="quote">“Progress is a series of small wins.”</blockquote>
+      <header class="f-head" id="dashboard">
+        <div>
+          <h2>Founder View</h2>
+          <p class="lede">Build. Prove. Grow. Move One Thing Forward.</p>
+          <p class="small-line">SAME TRUTH. HIGHER OUTCOMES.</p>
         </div>
-        <div class="hero-art" aria-hidden="true">
-          <div class="sun"></div>
-          <div class="ridge"></div>
-          <div class="ridge front"></div>
-        </div>
-      </div>
+        <blockquote class="quote-card">“Progress is a series of small wins.”</blockquote>
+      </header>
 
-      <div class="stats">
-        <div class="stat muted"><b>Sign in to view</b><small>Tracked projects</small></div>
-        <div class="stat muted"><b>Sign in to view</b><small>Proof items</small></div>
-        <div class="stat muted"><b>Sign in to view</b><small>Community supporters</small></div>
-        <div class="stat muted"><b>Sign in to view</b><small>Weekly growth</small></div>
+      <div class="stats" aria-label="Founder metrics">
+        <div class="stat"><span class="k">Active projects</span><span class="v">Sign in to view</span></div>
+        <div class="stat"><span class="k">Proof items</span><span class="v">Sign in to view</span></div>
+        <div class="stat"><span class="k">Community supporters</span><span class="v">Sign in to view</span></div>
+        <div class="stat"><span class="k">Weekly growth</span><span class="v">Sign in to view</span></div>
       </div>
 
       <div class="fgrid">
         <div class="panel" id="projects">
-          <div class="panel-head"><h3>Projects</h3><small>Sign-in required</small></div>
-          <p class="empty">Project status is shown only after founder sign-in. Nothing from private project state is published on this page.</p>
+          <div class="panel-head"><h3>Projects</h3><small>Status after sign-in</small></div>
+          <div class="row"><span class="glyph" aria-hidden="true">FCR</span><div><strong>Founder Control Room</strong><small>Platform · Build the future</small></div><span class="pill">Sign in to view</span></div>
+          <div class="row"><span class="glyph" aria-hidden="true">AI</span><div><strong>Chief AI Prompt Machine</strong><small>AI · Founder Intelligence OS</small></div><span class="pill">Sign in to view</span></div>
+          <div class="row"><span class="glyph" aria-hidden="true">L99</span><div><strong>L99</strong><small>Trust · Verification</small></div><span class="pill">Sign in to view</span></div>
+          <div class="row"><span class="glyph" aria-hidden="true">SE</span><div><strong>StoryEngine</strong><small>Media · Storytelling</small></div><span class="pill">Sign in to view</span></div>
         </div>
-
-        <div class="panel" id="proof">
-          <div class="panel-head"><h3>Recent Proof</h3><small>Receipts only</small></div>
-          <div class="empty">Receipts are shown only after founder sign-in. Public proof is published separately, after verification.</div>
+        <div class="stack">
+          <div class="sunrise">
+            <strong>Turn ideas into progress.</strong>
+            <span>Truth. Proof. Impact.</span>
+          </div>
+          <div class="panel" id="proof">
+            <div class="panel-head"><h3>Recent Proof</h3><small>Receipts only</small></div>
+            <p class="empty">Receipts are shown only after founder sign-in. Public proof is published separately, after verification.</p>
+          </div>
         </div>
       </div>
 
-      <div class="fgrid" style="padding-top: 0;">
+      <div class="fgrid pair">
         <div class="panel">
           <div class="panel-head"><h3>Focus This Week</h3><small>Sign-in required</small></div>
           <p class="empty">Open decisions are shown only after founder sign-in.</p>
         </div>
         <div class="panel" id="automations">
           <div class="panel-head"><h3>Messages &amp; Integrations</h3><small>Live reads only</small></div>
-          <div class="empty">Messages and connected tools are available only after founder sign-in.</div>
+          <p class="empty">Messages and connected tools are available only after founder sign-in.</p>
         </div>
+      </div>
+
+      <div class="fgrid one">
         <div class="panel" id="community-f" aria-labelledby="founder-community-title">
           <div class="panel-head"><h3 id="founder-community-title">Founder Community</h3><small>Sign-in required</small></div>
           <p class="empty">Community conversations, supporter details, and founder collaborations require sign-in. Verified public founder stories remain available in the public work directory.</p>
         </div>
       </div>
 
-      <p class="note-line">Founder access still passes through FCR authentication. General member authentication and multi-tenant founder workspaces remain a separate implementation gate. Connection never creates authority by itself.</p>
+      <p class="notes">Founder access still passes through FCR authentication. General member authentication and multi-tenant founder workspaces remain a separate implementation gate. Connection never creates authority by itself.</p>
       <a class="btn ghost owner-cta" href="/control-room/">Enter authenticated Control Room →</a>
     </section>
     </main>
