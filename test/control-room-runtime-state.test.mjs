@@ -26,6 +26,20 @@ test('tracked configuration movement changes the receipt fingerprint', () => {
   assert.deepEqual(before.files, ['.github/workflows/ci.yml', 'package.json']);
 });
 
+test('written runtime state receipt is one valid JSON document with a newline', () => {
+  const root = fixture();
+  try {
+    const receiptPath = path.join(root, 'artifacts', 'runtime-receipt.json');
+    const receipt = writeRuntimeStateReceipt(env({ CONTROL_ROOM_RUNTIME_STATE_PATH: receiptPath }), root);
+    const contents = fs.readFileSync(receiptPath, 'utf8');
+    assert.deepEqual(JSON.parse(contents), receipt);
+    assert.equal(contents.endsWith(String.fromCharCode(10)), true);
+    assert.equal(contents.endsWith(String.fromCharCode(92, 110)), false);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test('ordinary source events stay source-bound and do not pretend to prove provider state', () => {
   const receipt = buildRuntimeStateReceipt(env(), fixture(), new Date('2026-10-12T22:00:00Z'));
   assert.equal(receipt.externalState.mode, 'source-bound'); assert.equal(receipt.externalState.epoch, null);
@@ -68,13 +82,4 @@ test('the exact-head ledger binds the runtime-state receipt into its proof surfa
     runtimeState,
   });
   assert.deepEqual(ledger.runtimeState, runtimeState);
-});
-
-test('persisted runtime-state receipt is valid JSON for the ledger consumer', () => {
-  const root = fixture();
-  const output = path.join(root, 'artifacts', 'receipt.json');
-  const receipt = writeRuntimeStateReceipt(env({ CONTROL_ROOM_RUNTIME_STATE_PATH: output }), root);
-  const stored = fs.readFileSync(output, 'utf8');
-  assert.deepEqual(JSON.parse(stored), receipt);
-  assert.ok(stored.endsWith('\n'));
 });
