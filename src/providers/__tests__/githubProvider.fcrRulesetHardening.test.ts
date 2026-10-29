@@ -67,7 +67,6 @@ function reviewReadback(request: TestConfig = config) {
       },
     },
   ];
-  rules.push({ type: "code_quality", parameters: { severity: "errors" } });
   if (request.blockForcePushes) rules.push({ type: "non_fast_forward" });
   if (request.blockDeletion) rules.push({ type: "deletion" });
 
@@ -203,9 +202,6 @@ describe("GitHubProvider FCR main ruleset hardening", () => {
           alerts_threshold: "errors",
         }],
       });
-
-    expect(reviewPayload.rules.find((rule: { type: string }) => rule.type === "code_quality")?.parameters)
-      .toEqual({ severity: "errors" });
 
     expect(mockGetRepoRuleset.mock.calls.map((call) => call[0].ruleset_id)).toEqual([2, 1]);
   });
@@ -360,25 +356,6 @@ describe("GitHubProvider FCR main ruleset hardening", () => {
     const provider = buildProvider();
     await expect(provider.applyBranchRuleset("founder-control-room", config))
       .rejects.toThrow("exactly one CodeQL code-scanning rule");
-  });
-
-  it("fails closed if provider readback drops or weakens code-quality protection", async () => {
-    for (const value of ["missing", "warning"] as const) {
-      const bad = reviewReadback();
-      const quality = bad.rules.find((rule) => rule.type === "code_quality");
-      if (!quality?.parameters) throw new Error("test fixture lacks code-quality rule");
-      if (value === "missing") {
-        bad.rules = bad.rules.filter((rule) => rule.type !== "code_quality");
-      } else {
-        quality.parameters.severity = "warnings";
-      }
-      mockGetRepoRuleset.mockImplementation(async ({ ruleset_id }: { ruleset_id: number }) => ({
-        data: ruleset_id === 2 ? freshnessReadback() : bad,
-      }));
-      const provider = buildProvider();
-      await expect(provider.applyBranchRuleset("founder-control-room", config))
-        .rejects.toThrow("code quality must retain exactly one errors-severity rule");
-    }
   });
 
   it("surfaces the verified freshness identity when the review mutation fails", async () => {

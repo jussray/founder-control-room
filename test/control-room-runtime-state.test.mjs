@@ -26,6 +26,20 @@ test('tracked configuration movement changes the receipt fingerprint', () => {
   assert.deepEqual(before.files, ['.github/workflows/ci.yml', 'package.json']);
 });
 
+test('written runtime state receipt is one valid JSON document with a newline', () => {
+  const root = fixture();
+  try {
+    const receiptPath = path.join(root, 'artifacts', 'runtime-receipt.json');
+    const receipt = writeRuntimeStateReceipt(env({ CONTROL_ROOM_RUNTIME_STATE_PATH: receiptPath }), root);
+    const contents = fs.readFileSync(receiptPath, 'utf8');
+    assert.deepEqual(JSON.parse(contents), receipt);
+    assert.equal(contents.endsWith(String.fromCharCode(10)), true);
+    assert.equal(contents.endsWith(String.fromCharCode(92, 110)), false);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test('ordinary source events stay source-bound and do not pretend to prove provider state', () => {
   const receipt = buildRuntimeStateReceipt(env(), fixture(), new Date('2026-10-12T22:00:00Z'));
   assert.equal(receipt.externalState.mode, 'source-bound'); assert.equal(receipt.externalState.epoch, null);
@@ -51,17 +65,6 @@ test('the ledger workflow exposes the external-state invalidation trigger', () =
   const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
   const workflow = fs.readFileSync(path.join(repositoryRoot, '.github', 'workflows', 'control-room-test-ledger.yml'), 'utf8');
   for (const expected of ['repository_dispatch:', 'types: [runtime_state_changed]', 'external_state_epoch:', 'CONTROL_ROOM_EXTERNAL_STATE_EPOCH:', 'CONTROL_ROOM_EXTERNAL_STATE_SOURCE:', 'node --test test/control-room-runtime-state.test.mjs', 'node scripts/control-room-runtime-state.mjs', 'artifacts/control-room-runtime-state.json']) assert.ok(workflow.includes(expected), `workflow missing ${expected}`);
-});
-
-test('runtime-state writer emits strict JSON with one trailing newline', () => {
-  const root = fixture();
-  const outputPath = path.join(root, 'artifacts', 'receipt.json');
-  const receipt = writeRuntimeStateReceipt(env({
-    CONTROL_ROOM_RUNTIME_STATE_PATH: outputPath,
-  }), root);
-  const content = fs.readFileSync(outputPath, 'utf8');
-  assert.ok(content.endsWith('\n'));
-  assert.deepEqual(JSON.parse(content), receipt);
 });
 
 test('the exact-head ledger binds the runtime-state receipt into its proof surface', () => {
