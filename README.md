@@ -1,5 +1,24 @@
 # Founder Control Room
 
+## October 28, 2026: PR #1044 peer identity renews after StoryEngine governance move
+
+The previous FCR candidate at `e35b9ecff7801e2b6d36910a9f40208f9815cfdb` selected StoryEngine `dc79a23ffa8e6e5b0964efccdaee7c961b9b9e1d`, but StoryEngine `main` subsequently moved strictly one commit forward to `bffc9f771b673055403f52b29c86b30e5f4dd8c8`. The single successor commit changed `.control-room/necessary-fix-policy.json` and `AGENTS_FOUNDER_INTELLIGENCE.md` and had 14 successful exact-head check runs at observation. This is a governance/instruction delta, **not** FCR-to-StoryEngine runtime proof.
+
+FCR's `STORYENGINE_PEER_SHA` now selects `bffc9f771b673055403f52b29c86b30e5f4dd8c8` as the next evidence subject. Exact-head CI must re-run live-ref equality, immutable checkout, federation runtime, directive/receipt/replay and browser witnesses. Any later peer movement expires the match. The renewed pin cannot authorize merge, deploy, provider writes, publication or production claims.
+
+## October 28, 2026 (UTC): StoryEngine peer moved during Outcome-First PR review
+
+At FCR PR #1044 head `ad1d98285a72f9166584f8208618775eb3e21c73`, local Playwright journeys passed, but the separate live-ref equality gate correctly failed: the FCR workflow expected StoryEngine `4601cc3a8297875c97e54717f2aeb47db44d0595` and observed `dc79a23ffa8e6e5b0964efccdaee7c961b9b9e1d`. A fresh GitHub compare established that the successor was three commits ahead and zero behind. Changes include StoryEngine runtime and test paths as well as workflows, so this is **not** a configuration-only no-op.
+
+The successor StoryEngine commit showed 17 successful check runs and one skipped check when inspected. Rebasing the FCR `STORYENGINE_PEER_SHA` pin to `dc79a23ffa8e6e5b0964efccdaee7c961b9b9e1d` only selects the next dependency subject: it does **not** establish FCR↔StoryEngine runtime compatibility, passed Playwright, deployability, merge readiness, or outcome proof. The amended FCR candidate requires a fresh exact-head peer-ref comparison, immutable checkout, runtime identity, federation contract and browser witness. Any future StoryEngine main movement invalidates this pin's live-ref equality claim.
+
+No merge, deployment, provider, credential, production, or publication permission is granted by this documentation or pin update.
+
+
+## Outcome-First agent workflow
+
+`skills/outcome-first/SKILL.md` defines one shared outcome, authority, acceptance and stop workflow for Codex, Claude Code, Gemini, Copilot, Cursor and Windsurf. Thin adapters point to the same source; FCR founder approval, privacy, evidence, exact-head review, merge and deployment gates remain unchanged. This is repository instruction text, not proof of live agent activation.
+
 ## October 27, 2026 StoryEngine preview-config peer refresh
 
 FCR PR #1038 passed its local browser journeys and then correctly failed the separate StoryEngine live-ref equality gate because the pinned peer `89e92445dfde114b831e8cf6b5383f42ebccca4d` had advanced to `4601cc3a8297875c97e54717f2aeb47db44d0595`. The successor is one commit strictly ahead and changes only `story-engine/wrangler.jsonc`, adding preview-specific runtime-origin and API rate-limit configuration.
