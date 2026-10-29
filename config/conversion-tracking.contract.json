@@ -1,0 +1,81 @@
+{
+  "schemaVersion": 1,
+  "authority": "fcr/portfolio-conversion-tracking@v1",
+  "eventNames": [
+    "call_click",
+    "whatsapp_click",
+    "pickup_request",
+    "directions_click"
+  ],
+  "allowedPayloadFields": [
+    "project",
+    "event_name",
+    "page_path",
+    "cta_location",
+    "service_context",
+    "occurred_at"
+  ],
+  "forbiddenPayloadFields": [
+    "email",
+    "phone",
+    "phone_number",
+    "message",
+    "message_text",
+    "whatsapp_message",
+    "ip",
+    "ip_address",
+    "user_agent",
+    "cookie",
+    "device_id",
+    "browser_fingerprint",
+    "user_id"
+  ],
+  "storage": {
+    "provider": "cloudflare-d1",
+    "workerName": "jussco-conversions",
+    "databaseName": "jussco-conversions",
+    "databaseId": "3b77c3d5-4068-4597-9d97-96009d339e73",
+    "bindingName": "DB"
+  },
+  "retention": {
+    "automaticDeletionEnabled": false,
+    "deletionRequiresExplicitFounderApproval": true
+  },
+  "projects": {
+    "pappa-razzy-laundry": {
+      "allowedOrigin": "https://pappa-razzy-laundry.p9s5nbwqyt.chatgpt.site",
+      "serviceContext": "laundry",
+      "redirectRoutes": {
+        "call_click": "/pappa/call",
+        "whatsapp_click": "/pappa/whatsapp",
+        "pickup_request": "/pappa/pickup",
+        "directions_click": "/pappa/directions"
+      },
+      "allowedPagePaths": [
+        "/",
+        "/contact",
+        "/services",
+        "/pickup",
+        "/directions"
+      ],
+      "eventCtaLocations": {
+        "call_click": "primary_call",
+        "whatsapp_click": "primary_whatsapp",
+        "pickup_request": "pickup_cta",
+        "directions_click": "find_us"
+      }
+    }
+  },
+  "inputPolicy": {
+    "rejectUnknownProjects": true,
+    "stripPageQueryAndFragment": true,
+    "rejectUnknownPagePaths": true,
+    "ctaLocationServerBoundByEvent": true,
+    "serviceContextServerBoundByProject": true,
+    "apiOriginBoundByProject": true
+  },
+  "reliability": {
+    "businessRedirectsSurviveStorageFailure": true,
+    "apiStorageFailureStatus": 503
+  }
+}

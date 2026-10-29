@@ -22,7 +22,7 @@ env:
   PLAYWRIGHT_BROWSERS_PATH: /opt/pw-browsers
   EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
   PR_BASE_SHA: ${{ github.event.pull_request.base.sha || '' }}
-  STORYENGINE_PEER_SHA: 6d6fe0d84464ceee783fa86543ab9a335f6f0246
+  STORYENGINE_PEER_SHA: bffc9f771b673055403f52b29c86b30e5f4dd8c8
   STORYENGINE_PEER_REF: refs/heads/main
   STORYENGINE_PEER_URL: http://127.0.0.1:3901
   STORYENGINE_PEER_API_KEY: fcr-ci-product-build
@@ -86,6 +86,16 @@ jobs:
           path.write_text(source)
           PY
           grep -n "CHROME_PATH\|chromium.launch" e2e/run.mjs
+
+      - name: Verify real FCR GitHub Workspace and guarded terminal journey
+        shell: bash
+        env:
+          NODE_ENV: test
+        run: |
+          set -euo pipefail
+          mkdir -p logs
+          npm run build
+          FCR_E2E_SCENARIO=guarded-terminal node e2e/run.mjs 2>&1 | tee logs/github-workspace-e2e.log
 
       - name: Run E2E harness
         shell: bash
