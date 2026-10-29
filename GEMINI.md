@@ -10,6 +10,7 @@ Before material repository or control-room work, read and inherit:
 4. `docs/AI_CHANGE_GENEALOGY_CONTRACT.md`
 5. `docs/FCR_MULTI_AGENT_ENABLEMENT_CONTRACT.md`
 6. the narrow project/repository contracts that apply to the current goal
+7. `skills/outcome-first/SKILL.md` — shared outcome-first decisions under all existing authority gates
 
 For repository audits, use the governed genealogy window by default: authoritative repository and default branch, current exact head, ten recent PRs, comments and bounded diff evidence, every commit identity inside each PR, recent default-branch commits and provider-proven PR associations, then exact-head checks/runtime/browser evidence where load-bearing.
 
