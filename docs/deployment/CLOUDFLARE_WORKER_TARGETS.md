@@ -1,5 +1,15 @@
 # Cloudflare Deployment Targets
 
+## Portfolio Logpush target
+
+The repository declares a single account-level Cloudflare Logpush desired job named `fcr-portfolio-workers-trace` for the `workers_trace_events` dataset. This is a source target, not a claim about current provider state or successful log delivery.
+
+Only the Founder Control Room manual provider workflow may reconcile that desired job, and only after exact-main SHA binding plus founder approval. Product repositories may declare participation, but they must not inherit the Cloudflare Logpush write credential or destination secret.
+
+The active repository set must exclude repositories whose own governance marks them historical or investigate-only. `jussray/sekret-bip-companions`, `jussray/Bip-Jr`, and `jussray/Sekret-Bip-Bridge` remain available for provenance/investigation but are not active Logpush targets while those governance contracts remain in force. `jussray/jussray-bip-and-seek` is also not an active Logpush target while audited current `main` remains Roblox-only with no Cloudflare Worker runtime. `jussray/Sekret-Bip-Parents` remains a static Pages target without Worker execution, and `jussray/Sekret-Bip-Gov` has no runtime target at all; neither belongs in the active `workers_trace_events` registry until that current-main reality changes.
+
+A provider job readback can establish the configured Cloudflare job within that account; it still cannot prove destination-side ingestion unless the destination itself supplies corresponding receipt evidence.
+
 ## Canonical topology
 
 Founder Control Room uses Cloudflare Pages for the browser frontend and one canonical HTTP Worker for backend execution.
@@ -35,7 +45,7 @@ Current merged source uses this contract:
 
 Public discovery artifacts including `/robots.txt`, `/sitemap.xml`, `/llms.txt`, and `/crawlers.json` are static Pages assets and must remain on `env.ASSETS`; API-owned callback assets remain on `env.FCR_API`. This path classification is not authentication and cannot create crawler write authority, provider mutation authority, deployment authority, or publication authority.
 
-The bare `/work` and `/work/` paths carry the same static classification: `public/_worker.js` serves them by requesting the canonical `/work` URL through `env.ASSETS`, because the asset layer canonicalizes `/work.html` to `/work` with a 308 (requesting the filename loops) while the `FCR_API` proxy path answers that public page with a degraded 503.
+The bare `/work` and `/work/` paths carry the same static classification: `public/_worker.js` serves them by requesting the canonical `/work` URL through `env.ASSETS`, because the asset layer canonicalizes `/work.html` to `/work` with a 308 (requesting the filename loops) while the `FCR_API` proxy path answers that public page with a degraded 503. The bare `/welcome` and `/welcome/` paths carry the same static classification: `public/_worker.js` serves them by requesting the canonical `/welcome` URL through `env.ASSETS`, because the extensionless welcome path otherwise falls through to the `FCR_API` proxy and answers with a degraded 503.
 
 `API_ORIGIN = https://api.foundercontrolroom.org` remains part of request construction/loop protection in source. Dynamic network execution is performed through `FCR_API.fetch(...)`, not a direct public-origin `fetch()` call.
 
@@ -74,12 +84,10 @@ The literal build command `0` is invalid. This repository intentionally uses `np
 name: founder-control-room
 route: api.foundercontrolroom.org
 FOUNDER_API_URL: https://foundercontrolroom.org
-FOUNDER_ALLOWED_ORIGINS: https://foundercontrolroom.org,https://checkout.foundercontrolroom.org
+FOUNDER_ALLOWED_ORIGINS: https://foundercontrolroom.org
 ```
 
 `FOUNDER_API_URL` points to the Pages origin intentionally. Supabase magic links return through Pages, Pages routes dynamic requests to the API Worker, and the Worker's relative `/control-room/` redirect lands back on the browser frontend.
-
-**Checkout hostname (source intent; not transaction proof):** Cloudflare DNS and Pages custom-domain readback on 2026-10-26 showed `checkout.foundercontrolroom.org` active on the `founder-control-room` Pages project, targeting `founder-control-room.pages.dev`. This candidate adds that exact browser origin to the canonical Worker CORS allowlist; it does not create a checkout page, payment session, or Stripe endpoint, and it does not change the Supabase hosted Auth redirect allowlist. Founder login callbacks remain bound to `https://foundercontrolroom.org/auth/callback`. If checkout later uses Supabase-hosted redirects, the app-specific project `oojzfmmywbvficgybaxd` needs a separately reviewed Auth > URL Configuration change with an exact callback URL rather than a broad wildcard. The Cloudflare domain registration, repository patch, Supabase provider config, merged/deployed Worker and functional checkout remain separate evidence planes.
 
 The canonical Worker owns the reconciliation cron because no duplicate HTTP Worker should exist.
 
