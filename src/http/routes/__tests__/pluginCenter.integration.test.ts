@@ -163,6 +163,24 @@ describe('GET /plugin-center', () => {
     expect(openai.description).toContain('OpenAI Developers');
     expect(openai.blockedByDefault).toContain('create_or_rotate_key_without_gate');
 
+    const heygen = res.body.catalog.find((plugin: { type: string }) => plugin.type === 'heygen');
+    expect(heygen).toMatchObject({
+      label: 'HeyGen',
+      defaultAuthorityLevel: 'L6',
+    });
+    expect(heygen.secretsPolicy).toContain('backend secret store');
+    expect(heygen.capabilities).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: 'generate_paid_avatar_video',
+        authorityLevel: 'L6',
+        requiresEvidence: true,
+        separateFounderGate: true,
+      }),
+    ]));
+    expect(heygen.blockedByDefault).toContain('automatic_paid_retry');
+    expect(heygen.blockedByDefault).toContain('publish_without_separate_release_approval');
+    expect(res.body.connections.some((connection: { type: string }) => connection.type === 'heygen')).toBe(false);
+
     expect(res.body.summary).toMatchObject({
       installedConnections: 1,
       activeConnections: 1,
