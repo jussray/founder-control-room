@@ -11,8 +11,6 @@ export const CODEQL_SECURITY_FLOOR = Object.freeze({
   alertsThreshold: 'errors',
 });
 
-export const CODE_QUALITY_SEVERITY_FLOOR = 'errors';
-
 const API_VERSION = '2026-03-10';
 const API_ROOT = 'https://api.github.com';
 const RECEIPT_PATH = 'artifacts/github-governance-preflight.json';
@@ -51,7 +49,6 @@ export function rulesetSnapshot(ruleset, targetRef = 'main', defaultBranch = tar
   const pull = ruleOfType(ruleset, 'pull_request');
   const status = ruleOfType(ruleset, 'required_status_checks');
   const codeScanning = ruleOfType(ruleset, 'code_scanning');
-  const codeQuality = ruleOfType(ruleset, 'code_quality');
   const statusChecks = Array.isArray(status?.parameters?.required_status_checks)
     ? status.parameters.required_status_checks
         .map((entry) => text(entry?.context))
@@ -99,7 +96,6 @@ export function rulesetSnapshot(ruleset, targetRef = 'main', defaultBranch = tar
     strictRequiredStatusChecks: status?.parameters?.strict_required_status_checks_policy === true,
     requiredStatusCheckNames: statusChecks.sort(),
     codeScanningTools,
-    codeQualitySeverity: text(codeQuality?.parameters?.severity),
     blockForcePushes: Boolean(ruleOfType(ruleset, 'non_fast_forward')),
     blockDeletion: Boolean(ruleOfType(ruleset, 'deletion')),
     bypassObservationComplete,
@@ -154,7 +150,7 @@ export function canonicalFloorSatisfied(
     && snapshot.enforcement === 'active'
     && snapshot.target === 'branch'
     && snapshot.targetsRequestedRef === true
-    && exactRuleTypesMatch(snapshot, ['pull_request', 'code_scanning', 'code_quality', 'non_fast_forward', 'deletion'])
+    && exactRuleTypesMatch(snapshot, ['pull_request', 'code_scanning', 'non_fast_forward', 'deletion'])
     && snapshot.requirePullRequest === true
     && snapshot.requiredApprovingReviewCount === requiredNativeApprovals
     && snapshot.dismissStaleReviewsOnPush === true
@@ -164,7 +160,6 @@ export function canonicalFloorSatisfied(
     && snapshot.strictRequiredStatusChecks === false
     && snapshot.requiredStatusCheckNames.length === 0
     && codeQLSecurityFloorSatisfied(snapshot)
-    && snapshot.codeQualitySeverity === CODE_QUALITY_SEVERITY_FLOOR
     && snapshot.blockForcePushes === true
     && snapshot.blockDeletion === true
     && bypassPolicyMatches(snapshot, expectedBypassActors);
