@@ -110,6 +110,38 @@ export const capabilities = [
     implementation: `browserExecutor=local-playwright; costClass=LOCAL_NO_PROVIDER_FEE; runtime=repository-playwright;\n// Use the existing FCR authority spine. For writes, bind approval to proposalId,\n// recheck authority at the commit boundary, execute in local Chromium, capture\n// screenshot/final-page receipt, verify outcome, then update continuity markers.`,
   },
   {
+    id: 'buffer-publishing-runtime-v1', kind: 'Automation', category: 'integrations', score: 96, runtime: 'dynamic',
+    summary: 'Use one governed Buffer runtime across Juss-owned projects without copying credentials or provider authority into peer repositories.',
+    purpose: 'Make Buffer the distribution transport behind the shared FCR capability spine so SignalLoop can propose, Chief can route, FCR can authorize and execute, Sol can verify receipts, and PromptOS can supply reusable prompt/copy inputs without creating parallel publishing systems.',
+    inputs: [
+      ['project', 'enum', 'signal-loop | chief-ai-machine | founder-control-room | solcontinuity | promptos | another registered Juss project'],
+      ['intent', 'enum', 'draft | queue | schedule | shareNow | edit | readback | analytics'],
+      ['channel', 'provider channel ref', 'Exact Buffer channel selected from current runtime discovery'],
+      ['contentRef', 'evidence ref', 'Exact reviewed content or stable content hash'],
+      ['proposalId', 'string', 'Exact proposal identity required whenever provider mutation is possible'],
+      ['authorityRevision', 'string', 'Live FCR authority revision rechecked immediately before execution'],
+    ],
+    environment: [
+      'FCR remains the control plane and authority owner',
+      'Canonical plugin package: plugins/buffer-control',
+      'Preferred provider runtime: https://mcp.buffer.com/mcp via Buffer OAuth',
+      'Provider credentials remain external to every repository',
+      'Host adapters such as Make are transport adapters only and require fresh runtime discovery',
+    ],
+    proof: [
+      'Current Buffer account and channel are resolved from the live authorized runtime before provider mutation',
+      'shareNow requires explicit current founder instruction; queue/schedule/draft preserve their distinct semantics',
+      'Successful writes retain the provider post ID, channel, content fingerprint, action state, and tool timestamp',
+      'Provider acceptance and verified publication remain separate truth states',
+      'Peer projects receive bounded role-specific receipts without gaining Buffer credentials or self-granted authority',
+      'SignalLoop=propose/measure, Chief=route/compose, FCR=authorize/execute, Sol=verify/continuity, PromptOS=prompt/copy input',
+    ],
+    risk: 'Consequential provider writes remain proposal-bound FCR actions. This capability does not let SignalLoop, Chief, Sol, PromptOS, a model, a prompt, or a host adapter manufacture publication authority, expose Buffer credentials, or treat provider acceptance as proof of publication.',
+    implementation: `canonicalPlugin=plugins/buffer-control; provider=buffer; preferredMcp=https://mcp.buffer.com/mcp; authorityOwner=fcr; credentials=external;
+peerRoles=signal-loop:propose+measure,chief:route+compose,fcr:authorize+execute,sol:verify+continuity,promptos:prompt+copy;
+runtimeDiscovery=required; approvalBinding=proposalId; receiptRequired=true; providerAcceptedIsPublished=false;`,
+  },
+  {
     id: 'google-cloud-provider-v1', kind: 'Contract', category: 'integrations', score: 95,
     summary: 'Use Google Cloud and Google Workspace capabilities through one least-privilege FCR provider boundary.',
     purpose: 'Let FCR and the assistant use the same Google capability without replacing Supabase Google sign-in, storing provider secrets in Git, or turning a gcloud login into mutation authority.',
