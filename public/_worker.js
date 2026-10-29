@@ -17,6 +17,8 @@ const API_OWNED_ASSET_PATHS = new Set([
 const STATIC_EXACT_PATHS = new Set([
   '/products/business-leak-quickscan',
   '/products/business-leak-quickscan/',
+  '/products/founder-proof-audit',
+  '/products/founder-proof-audit/',
 ]);
 const STATIC_FILE_PATTERN = /\.(?:avif|css|gif|html|ico|jpe?g|js|json|map|png|svg|txt|webmanifest|webp|woff2?|xml)$/i;
 const STATIC_DIRECTORY_PREFIXES = [
