@@ -1,5 +1,12 @@
 # Cloudflare Reasoning Contract
 
+## October 29, 2026: FCR storefront product routing — source candidate only
+
+The FCR Shopify offer `founder-proof-audit` has a Shopify-declared product path `/products/founder-proof-audit` with a $99 active listing, but the previous Pages edge `STATIC_EXACT_PATHS` recognized only the QuickScan path. This candidate adds exact route ownership for both `/products/founder-proof-audit` and its trailing-slash twin, serving `public/products/founder-proof-audit/index.html` from Pages assets rather than the authenticated API proxy.
+
+The page provides honest offer scope and an inquiry CTA, never an unverified payment or delivery claim. A separate FCR Shopify draft theme corrects the wrong-store redirect to `www.foundercontrolroom.org`, but remains unpublished. A GitHub commit or passing source check does not show that Cloudflare Pages deployed this file, public DNS resolves to the intended runtime, a customer reached the page, or checkout belongs to FCR. Preserve the old Pages deployment and static path map for authorized rollback.
+
+
 ## Logpush portfolio authority
 
 Founder Control Room owns the source contract for the portfolio Logpush desired state in `config/cloudflare-logpush.portfolio.json`. The first bounded dataset is account-scoped `workers_trace_events`; product repositories participate without receiving FCR Cloudflare write credentials.
