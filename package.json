@@ -54,7 +54,7 @@
     "verify:founder-onboarding": "node scripts/verify-founder-onboarding.mjs",
     "verify:growth-inbox": "node scripts/verify-unified-growth-inbox.mjs",
     "verify:design-os": "node scripts/verify-design-os-contract.mjs && vitest run --config vitest.design-os.config.ts",
-    "verify:capability-workbench": "node scripts/verify-capability-workbench.mjs && vitest run src/capabilities/__tests__/workbenchRegistry.test.ts src/http/routes/__tests__/capabilities.integration.test.ts src/http/__tests__/server.integration.test.ts",
+    "verify:capability-workbench": "npm run verify:buffer-control-plugin && node scripts/verify-capability-workbench.mjs && vitest run src/capabilities/__tests__/workbenchRegistry.test.ts src/http/routes/__tests__/capabilities.integration.test.ts src/http/__tests__/server.integration.test.ts",
     "verify:google-cloud-capability": "node scripts/verify-google-cloud-capability.mjs && vitest run src/capabilities/__tests__/workbenchRegistry.test.ts",
     "verify:local-workspace": "node scripts/verify-local-workspace.mjs",
     "verify:rls-contract": "node scripts/verify-rls-contract.mjs",
@@ -64,7 +64,8 @@
     "verify:mirror-contract": "node scripts/verify-mirror-and-fact-check-contract.mjs",
     "proof:goalfix": "npm run build && node e2e/goalfix-proof.mjs && node e2e/goalfix-same-sha-proof.mjs",
     "verify:test-discovery": "node scripts/verify-test-discovery.mjs",
-    "generate:worker-types": "node -e \"require('node:fs').mkdirSync('.wrangler/types',{recursive:true})\" && wrangler types .wrangler/types/worker-configuration.d.ts --config wrangler.worker.toml --env-interface FcrWorkerEnv --include-env=false"
+    "generate:worker-types": "node -e \"require('node:fs').mkdirSync('.wrangler/types',{recursive:true})\" && wrangler types .wrangler/types/worker-configuration.d.ts --config wrangler.worker.toml --env-interface FcrWorkerEnv --include-env=false",
+    "verify:buffer-control-plugin": "node scripts/verify-buffer-control-plugin.mjs"
   },
   "dependencies": {
     "@octokit/rest": "^21.0.2",
