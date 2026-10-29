@@ -44,12 +44,15 @@
     {
       "path": "public/_worker.js",
       "claims": [
-        "`public/_worker.js` must route public static discovery artifacts, including `crawlers.json`, through the Pages `ASSETS` binding while API-owned callback assets remain on `FCR_API`; this routing classification cannot authorize provider mutation or treat a static crawler policy as authentication."
+        "`public/_worker.js` must route public static discovery artifacts, including `crawlers.json`, through the Pages `ASSETS` binding while API-owned callback assets remain on `FCR_API`; this routing classification cannot authorize provider mutation or treat a static crawler policy as authentication.",
+        "`public/_worker.js` must serve the bare `/work` and `/work/` paths by requesting the canonical `/work` URL through the Pages `ASSETS` binding, never requesting the `/work.html` filename (the asset layer canonicalizes it back to `/work` with a 308, which loops when returned verbatim) and never falling through to the `FCR_API` proxy, because the API proxy answers that public page without the service identity header and returns a degraded 503.",
+        "`public/_worker.js` must serve the bare `/welcome` and `/welcome/` paths by requesting the canonical `/welcome` URL through the Pages `ASSETS` binding, never falling through to the `FCR_API` proxy, because no static classification otherwise covers the extensionless welcome path and the API proxy answers that public page without the service identity header, returning a degraded 503 (`API_SERVICE_IDENTITY_MISMATCH`)."
       ]
     },
     {
       "path": ".github/workflows/playwright.yml",
       "claims": [
+        "`.github/workflows/playwright.yml` must keep the PR #1035 peer refresh as identity recovery only: the successor FCR head requires fresh live-ref equality, immutable peer checkout, runtime identity, and the complete directive/receipt/replay/browser witness before pair compatibility can be current; predecessor proof stays historical, and pin alignment grants no merge, deploy, production, or provider-mutation authority.",
         "`.github/workflows/playwright.yml` must bind the FCR-to-StoryEngine browser federation witness to a separately verified exact StoryEngine peer SHA and ref; changing that peer identity expires predecessor federation/browser proof and requires the complete exact-head witness to rerun without granting merge, deploy, production, or provider-mutation authority.",
         "A fresh peer ref/SHA observation may select the successor StoryEngine evidence subject, but the successor FCR federation state remains UNKNOWN until the complete exact-head runtime identity, directive, receipt, and Playwright browser witness succeeds against that peer.",
         "Refreshing `STORYENGINE_PEER_SHA` after independently observing StoryEngine main is recovery setup only; pin alignment must not carry predecessor Playwright green or founder approval onto the successor FCR head.",
@@ -63,7 +66,13 @@
         "The October 3, 2026 agent-contract v1 transition from StoryEngine `18d9ba257a69c3d1743f346d424daf31796aaeed` to independently observed `168d65ede38d2477ea00902fa1f0e76f292c583d` selects a new evidence subject only; Chief Access recovery PR #913 failing the live-peer check is dependency drift, and the successor FCR head must earn a complete exact-head Playwright witness against the successor before the pair is current.",
         "The October 5, 2026 transition from StoryEngine `168d65ede38d2477ea00902fa1f0e76f292c583d` through `c9af4ea095561d0837a141e311e8977d796aaaa7` to independently observed `3c1689fe67142e783fe7d18b5ff610640bdc81d6` selects a new evidence subject only; FCR Playwright run #6969 on `897083276b6c775c49ce30be189a50bd610b5d4c` passed the local/direct browser harness but failed the peer freshness check, so `.github/workflows/playwright.yml` must bind the successor exact peer and require a complete exact-head federation rerun before the pair is current.",
         "`.github/workflows/playwright.yml` must run the authenticated, real-served Founder Control Room GitHub Workspace and terminal journey against its checked-out exact source HEAD using isolated test providers; green local integration proves neither production browser readiness nor external provider writes or unrestricted terminal execution.",
-        "`.github/workflows/playwright.yml` must pin StoryEngine at the independently observed 2026-10-23 main identity `6b97b78370fbc25d4b4bb88bfeab136eb4c7dc2f` (the 2026-10-16 pin `26b1c34ae7c97c5d1b66a23d6345b3965cfcdc1f` is historical), require a fresh live-ref equality check and immutable peer checkout, then withhold all FCR-to-StoryEngine federation readiness until the exact successor FCR head completes the full runtime, directive, receipt, replay, and browser witness; prior peer green must remain historical and cannot authorize provider mutation or production release."
+        "`.github/workflows/playwright.yml` must pin StoryEngine at the forward, independently observed 2026-10-16 main identity `26b1c34ae7c97c5d1b66a23d6345b3965cfcdc1f`, require a fresh live-ref equality check and immutable peer checkout, then withhold all FCR-to-StoryEngine federation readiness until the exact successor FCR head completes the full runtime, directive, receipt, replay, and browser witness; prior peer green must remain historical and cannot authorize provider mutation or production release.",
+        "FCR Playwright pins StoryEngine to independently re-observed refs/heads/main 6b97b78370fbc25d4b4bb88bfeab136eb4c7dc2f; PR #1004 head 607ec05be0bce5639bab36b75c3661a8af751be6 failed its live-ref gate because it expected 26b1c34ae7c97c5d1b66a23d6345b3965cfcdc1f. The exact StoryEngine commit had 15/15 successful checks at 2026-10-22T23:55:59Z. Pin alignment selects an evidence subject only; PR #1004 needs its own exact-head runtime and receipt/browser witness, and other PR evidence does not transfer.",
+        "`.github/workflows/playwright.yml` must pin StoryEngine to freshly observed refs/heads/main 3c46b3649088ac4c6e1775102ba49abf5c779abf after the additive model-capability profile commit moved the peer; pin alignment selects only the successor evidence subject and requires a fresh complete federation/browser witness.",
+        "The October 24, 2026 StoryEngine transition from 3c46b3649088ac4c6e1775102ba49abf5c779abf to independently observed 87501be2da31d12f421b0ed2da49df357fc9fcb1 is strictly forward by two commits with 16 observed exact-head checks successful; rebinding STORYENGINE_PEER_SHA selects only the successor federation evidence subject, expires predecessor FCR browser/federation proof, and requires a fresh complete exact-head witness without granting merge, deploy, production, publication, or provider-mutation authority.",
+        "`.github/workflows/playwright.yml` must pin the independently verified StoryEngine successor `4601cc3a8297875c97e54717f2aeb47db44d0595` after preview-runtime configuration moved `main`; the pin selects only the new evidence subject, and the successor FCR head must rerun the complete live-ref, immutable checkout, runtime identity, directive/receipt/replay, and browser witness before pair compatibility can be current.",
+        "`.github/workflows/playwright.yml` must pin StoryEngine `dc79a23ffa8e6e5b0964efccdaee7c961b9b9e1d` only as the independently observed successor evidence subject from PR #1044; the new FCR head must reverify live ref equality, immutable checkout, runtime identity, directive/receipt/replay and browser federation before compatibility is current. This new pin cannot grant merge, deployment, provider, publication or production authority.",
+        "`.github/workflows/playwright.yml` must select the independently observed StoryEngine successor `bffc9f771b673055403f52b29c86b30e5f4dd8c8` only as the next exact peer identity; a complete fresh live-ref, immutable checkout, federation runtime and browser/receipt witness is required before current pair compatibility can be claimed, and the pin cannot confer merge, deployment or provider authority."
       ]
     },
     {
@@ -95,7 +104,8 @@
     {
       "path": "src/http/routes/n8nConveyor.ts",
       "claims": [
-        "`src/http/routes/n8nConveyor.ts` may mount the authenticated YouTube growth evaluator under the existing founder-content conveyor only as a read/evaluation capability; mounting that route must not grant publish, schedule, spend, provider-mutation, scale-execution, merge, or deploy authority and must not weaken the existing founder-content publication membrane."
+        "`src/http/routes/n8nConveyor.ts` may mount the authenticated YouTube growth evaluator under the existing founder-content conveyor only as a read/evaluation capability; mounting that route must not grant publish, schedule, spend, provider-mutation, scale-execution, merge, or deploy authority and must not weaken the existing founder-content publication membrane.",
+        "`src/http/routes/n8nConveyor.ts` must mount founder-content metric CSV ingestion only beneath the existing founder-authenticated `/founder-content/lifecycle` boundary; mounting the observation route cannot create provider publication, freshness, strategy-mutation, merge, deploy, spend, or external-contact authority."
       ]
     },
     {
@@ -133,7 +143,7 @@
       "path": "src/lib/modelCapabilityMarket.ts",
       "claims": [
         "`src/lib/modelCapabilityMarket.ts` may rank Council operators only from task-specific evidence with external benchmarks treated as bounded priors; a benchmark win cannot by itself establish local eligibility, outcome proof, selection authority, or execution authority.",
-        "Fresh authority-boundary violations must block promotion, false-green behavior must reduce ranking, stale local evidence must expire, and challenger selection should preserve provider-family independence when available without granting mutation authority.",
+        "Fresh authority-boundary violations must block promotion regardless of proof-reference presence, the sample gate must count only independently proven outcomes and must require enough verified completed outcomes, never promoting from failure-only, blocked-only, or count-missing legacy observations, false-green behavior must reduce ranking, stale local evidence must expire, and challenger selection should preserve provider-family independence when available without granting mutation authority.",
         "`src/lib/modelCapabilityMarket.ts` names `multimodal-generation` as a task class so provider-dependent generation work is ranked from local receipts like every other class; adding a task class grants no operator eligibility, selection authority, or execution authority."
       ]
     },
@@ -141,7 +151,7 @@
       "path": "src/lib/capabilityObservationFeed.ts",
       "claims": [
         "`src/lib/capabilityObservationFeed.ts` may fold operator relay receipts into capability observations only for the operator that answered them, only from outcome statuses, deduplicated by response hash with the latest outcome per relay id, and only inside the caller's freshness window so stale evidence cannot renew itself.",
-        "`src/lib/capabilityObservationFeed.ts` must treat a provider answering as unproven: only independently verified relay ids contribute proof or evidence references, completed-without-evidence is a false green, any non-`none` authorityRequested is an authority violation, and `blocked` never lowers success.",
+        "`src/lib/capabilityObservationFeed.ts` must treat a provider answering as unproven: only independently verified exact response hashes contribute proof or evidence references; verification never transfers to a later response sharing a relay id and changed receipt contents must fail canonical hash validation, completed-without-evidence is a false green, any non-`none` authorityRequested is an authority violation, and `blocked` never lowers success.",
         "The fold is contract-capable tested source; relay responses are not persisted, no outcome verifier exists, no live route calls the market, and the fold grants no selection or execution authority."
       ]
     },
@@ -178,7 +188,11 @@
         "`README.md` must keep the GitHub Actions and Cloudflare Worker copies of `OPENAI_API_KEY` as separate CI/runtime authority planes and state that the all-secret proof derives names from the canonical Worker registry without reading values.",
         "`README.md` must treat a successful successor StoryEngine Playwright witness as current only for the exact FCR/StoryEngine evidence pair recorded by the run and expire that proof when either repository moves.",
         "`README.md` must record that the StoryEngine peer refresh discovered during URLFix PR #914 merge review is a focused recovery transition handled by PR #896, not URLFix failure, and that pin alignment alone cannot promote the successor federation state beyond UNKNOWN.",
-        "`README.md` must record that the StoryEngine peer refresh after the agent-contract v1 rollout is a focused recovery transition, not a #913 failure, and that pin alignment alone cannot promote the successor federation state beyond UNKNOWN."
+        "`README.md` must record that the StoryEngine peer refresh after the agent-contract v1 rollout is a focused recovery transition, not a #913 failure, and that pin alignment alone cannot promote the successor federation state beyond UNKNOWN.",
+        "README.md records the October 23 peer refresh to 6b97b78370fbc25d4b4bb88bfeab136eb4c7dc2f, StoryEngine's exact-head 15/15 successful check state, PR #1004's failure at its old 26b1c34ae7c97c5d1b66a23d6345b3965cfcdc1f pin, and the requirement that PR #1004 earn its own exact-head witness; no separate PR witness or production/deploy authority transfers.",
+        "README.md records the October 24 StoryEngine peer refresh from 6b97b78370fbc25d4b4bb88bfeab136eb4c7dc2f to 3c46b3649088ac4c6e1775102ba49abf5c779abf, the exact-head StoryEngine green source checks, and the FCR Playwright live-ref mismatch without promoting the successor to runtime-verified.",
+        "`README.md` must describe review-email routing as one bounded Wrangler-managed desired-state address plus independent Cloudflare provider readback, subaddressing state, and runtime invocation proof; deploy success alone cannot mint `email_trigger_reconciled=true` or runtime truth.",
+        "`README.md` must state that first deployment of a missing review-email Worker uses a temporary no-`addresses` bootstrap config and stops at secret provisioning before any Email Routing rule can move mail."
       ]
     },
     {
@@ -186,7 +200,8 @@
       "claims": [
         "`docs/PUBLIC_COMMUNICATION_TRUTH_CONTRACT.md` must keep YouTube growth HOLD/ADVANCE and diagnostic recommendations inside observation/recommendation authority and require separate provider/outcome evidence before public claims of publication, YPP eligibility, revenue, conversion, or provider-side state.",
         "`docs/PUBLIC_COMMUNICATION_TRUTH_CONTRACT.md` must keep Postiz MCP account/status readback separate from provider-write authority and must hold any publication claim when Postiz reports PUBLISHED without a destination-native permalink or equivalent independently verified terminal artifact.",
-        "Componecat catalog/context evidence must remain non-authorizing and cannot be used as public proof of project execution, deployment, or publication."
+        "Componecat catalog/context evidence must remain non-authorizing and cannot be used as public proof of project execution, deployment, or publication.",
+        "`docs/PUBLIC_COMMUNICATION_TRUTH_CONTRACT.md` must keep imported founder-content metrics bound to explicit content/provider/account/page/audience/metric/unit/time/source provenance, preserve blank values as unknown instead of zero, and forbid a historical import or database receipt from becoming a current metric claim without fresh authoritative evidence."
       ]
     },
     {
@@ -204,7 +219,9 @@
     {
       "path": "docs/CLOUDFLARE_REASONING.md",
       "claims": [
-        "`docs/CLOUDFLARE_REASONING.md` must require FCR provider-held Worker binding names to pass the canonical Deploy membrane without treating source, binding-name presence, CI, or Playwright as proof of downstream provider activation or business outcomes."
+        "`docs/CLOUDFLARE_REASONING.md` must require FCR provider-held Worker binding names to pass the canonical Deploy membrane without treating source, binding-name presence, CI, or Playwright as proof of downstream provider activation or business outcomes.",
+        "`docs/CLOUDFLARE_REASONING.md` must keep review-email Worker/managed-route deployment, provider route readback, zone subaddressing state, and runtime email invocation as distinct evidence planes; Wrangler 4.113+ may reconcile the literal `review@foundercontrolroom.org` Worker route without making provider readback or runtime proof implicit.",
+        "`docs/CLOUDFLARE_REASONING.md` must require structured Wrangler deploy telemetry to preserve completed Worker mutation truth when a later Email Routing reconciliation step exits nonzero; post-deploy failure must never be collapsed into provider_deploy_succeeded=false."
       ]
     },
     {
@@ -217,13 +234,19 @@
         "`docs/TRUTH_DECAY_AUDIT.md` must separate observation transport failure from target-secret truth: failure before Cloudflare secret enumeration leaves provider-held runtime secret presence UNKNOWN/BLOCKED and cannot be relabeled as evidence of absence.",
         "`docs/TRUTH_DECAY_AUDIT.md` must record that FCR `c75a361cdee0a56ccd4351c48f38231429cf9e74` Playwright run `36344620958` succeeded against StoryEngine `e2473a10945b57bb7abedba6d45ea0dbacbd904a`, while explicitly refusing to convert that browser-federation proof into production or provider authority.",
         "`docs/TRUTH_DECAY_AUDIT.md` must record the October 3 URLFix merge-review peer drift as dependency freshness evidence and require PR #896's successor exact-head federation witness before any current pair claim.",
-        "`docs/TRUTH_DECAY_AUDIT.md` must record the October 3 agent-contract v1 peer drift as dependency freshness evidence and require the successor exact-head federation witness before any current pair claim."
+        "`docs/TRUTH_DECAY_AUDIT.md` must record the October 3 agent-contract v1 peer drift as dependency freshness evidence and require the successor exact-head federation witness before any current pair claim.",
+        "The audit records PR #1004 head 607ec05be0bce5639bab36b75c3661a8af751be6 failing at stale StoryEngine peer 26b1c34ae7c97c5d1b66a23d6345b3965cfcdc1f, while live StoryEngine main was independently observed at 6b97b78370fbc25d4b4bb88bfeab136eb4c7dc2f with 15/15 successful peer checks. Rebinding does not prove PR #1004 federation or transfer another PR's exact-head evidence.",
+        "TRUTH_DECAY_AUDIT records that the October 24 FCR Playwright failure occurred after the local E2E harness passed and was caused by StoryEngine peer identity drift to 3c46b3649088ac4c6e1775102ba49abf5c779abf; predecessor federation proof does not transfer.",
+        "`docs/TRUTH_DECAY_AUDIT.md` must preserve PR #1044's prior local Playwright success and failed StoryEngine peer equality as separate historical facts: FCR expected `4601cc3a8297875c97e54717f2aeb47db44d0595`, observed `dc79a23ffa8e6e5b0964efccdaee7c961b9b9e1d`, and cannot claim the successor pair VERIFIED until the new exact FCR head passes the full independent federation and browser witness.",
+        "`docs/TRUTH_DECAY_AUDIT.md` must record that the PR #1044 reconciliation candidate's StoryEngine peer `dc79a23ffa8e6e5b0964efccdaee7c961b9b9e1d` expired when `main` moved to `bffc9f771b673055403f52b29c86b30e5f4dd8c8`, and cannot transfer predecessor federation proof, founder approval, merge or production authority to the successor FCR head."
       ]
     },
     {
       "path": "docs/deployment/CLOUDFLARE_WORKER_TARGETS.md",
       "claims": [
-        "`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` must keep canonical Worker runtime secret bindings provider-held while separating provider subscription, runtime delivery, production database state, and business outcomes into their own activation proof."
+        "`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` must keep canonical Worker runtime secret bindings provider-held while separating provider subscription, runtime delivery, production database state, and business outcomes into their own activation proof.",
+        "`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` must declare exactly one Wrangler-managed review-email route, `review@foundercontrolroom.org -> founder-control-room-review-email`, while requiring independent provider readback, subaddressing verification for `review+<context-uuid>@...`, and runtime invocation proof before calling ingress live.",
+        "`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` must state that a missing review-email Worker is bootstrapped without `addresses`, so first creation cannot implicitly reroute `review@` before secrets exist."
       ]
     },
     {
@@ -304,7 +327,9 @@
     {
       "path": "src/founder-os-lab/projectAdapters.ts",
       "claims": [
-        "`src/founder-os-lab/projectAdapters.ts` must bind Chief integration evidence to one audited exact Chief head; moving that head expires predecessor adapter and pair-contract proof, requires the focused assertion and path-bound documentation receipt to move together, and grants no Chief runtime, merge, deploy, publication, or provider authority."
+        "`src/founder-os-lab/projectAdapters.ts` must bind Chief integration evidence to one audited exact Chief head; moving that head expires predecessor adapter and pair-contract proof, requires the focused assertion and path-bound documentation receipt to move together, and grants no Chief runtime, merge, deploy, publication, or provider authority.",
+        "`src/founder-os-lab/projectAdapters.ts` must bind Chief PR #242 exact candidate `0d1106424802fa21d37c6a05fc3e6f6422cc989a` to five observed contract blobs, the restored `necessary-fix-policy.json`, and pair blob `dd008420e1a91e78516b45d9e27de89344abf432`. FCR PR #1015 and Chief PR #242 remain draft. Live freshness must fail closed while Chief main still carries stale pair content; no preceding CI proof grants merge, founder, publishing, provider-write, or deploy authority.",
+        "`src/founder-os-lab/projectAdapters.ts` must pin read-only Se’kret Bip adapter evidence to exact observed `main` `e3b6a3a36737f3c1d24c37fd2842ee6d7bf97150` and required `screens/WebWelcomeScreen.tsx` blob `9d3a1128d09d47f3e9b4eb5d8f3da5f3dbe2709c`; the other six audited contract blobs must still match. Audience-to-account-side routing, composite character canon, reduced-motion protection, and preview-only non-execution remain required. Head movement or blob drift must fail closed and cannot create merge, production, publication, or provider authority."
       ]
     },
     {
@@ -385,6 +410,43 @@
       "path": "scripts/verify-ai-skill-contract.mjs",
       "claims": [
         "The AI-skill verifier must reject missing paired hostile-PR workflow instructions; this static instruction-presence gate cannot prove agent compliance, runtime adoption, independent review, tests, Playwright or production outcome."
+      ]
+    },
+    {
+      "path": "config/cloudflare-logpush.portfolio.json",
+      "claims": [
+        "`config/cloudflare-logpush.portfolio.json` must remain the source-only desired-state registry for the account-scoped `workers_trace_events` Logpush job; pull-request verification cannot mutate Cloudflare or prove delivery, and provider apply requires exact-current-main binding, a founder approval reference, a dedicated write credential, destination configuration, and post-write readback.",
+        "`config/cloudflare-logpush.portfolio.json` must exclude repositories whose current-main governance forbids active participation and repositories without an actual Cloudflare Worker execution surface; governance-excluded repos are `jussray/sekret-bip-companions`, `jussray/Bip-Jr`, and `jussray/Sekret-Bip-Bridge`, while runtime-inapplicable repos are Roblox-only `jussray/jussray-bip-and-seek`, static-Pages `jussray/Sekret-Bip-Parents`, and governance-only `jussray/Sekret-Bip-Gov`."
+      ]
+    },
+    {
+      "path": ".github/workflows/cloudflare-logpush.yml",
+      "claims": [
+        "`.github/workflows/cloudflare-logpush.yml` must keep pull-request checks non-mutating and must require exact-current-main binding plus an auditable founder approval reference before any provider apply; workflow green cannot substitute for provider readback or destination-side delivery evidence."
+      ]
+    },
+    {
+      "path": "wrangler.email.toml",
+      "claims": [
+        "`wrangler.email.toml` must declare the review-email Worker identity, account, entrypoint, private `FOUNDER_CONTROL_ROOM_API -> founder-control-room` Service Binding, and exactly one top-level `addresses` value `review@foundercontrolroom.org`; this is desired state for Wrangler reconciliation, not proof of provider readback or runtime invocation."
+      ]
+    },
+    {
+      "path": "src/http/routes/founderContentMetricsCsv.ts",
+      "claims": [
+        "`src/http/routes/founderContentMetricsCsv.ts` must reuse the canonical content-metrics CSV parser, bind every observation to the authenticated founder's stored post content fingerprint, provider, account, and one page identity, reject future observations and oversized CSV payloads, persist no raw CSV, and return observation-only authority."
+      ]
+    },
+    {
+      "path": "src/lib/contentMetricsStore.ts",
+      "claims": [
+        "`src/lib/contentMetricsStore.ts` must treat the durable database receipt as untrusted input, normalize and validate its contract, fingerprint, row accounting, timestamps, and false publication/freshness/strategy authority before accepting it, and must persist only normalized observations rather than raw CSV."
+      ]
+    },
+    {
+      "path": "supabase/migrations/20260919023000_founder_content_metric_observations.sql",
+      "claims": [
+        "`supabase/migrations/20260919023000_founder_content_metric_observations.sql` must keep founder-content metrics append-only and observation-only, deny direct browser/client access, deny direct service-role mutation of metric rows, allow only service-role execution of the atomic ingestion function, fail closed on post identity or conflicting evidence, and never persist raw CSV."
       ]
     }
   ]

@@ -70,6 +70,12 @@ The authenticated `fcr/youtube-growth-evaluation@v1` route may evaluate fresh fo
 
 Malformed measurements, experiments, continuity fingerprints, thresholds, targets, unknown fields, and duplicate repeatability receipts must fail closed before evaluation. A growth recommendation is not proof that a video published, a channel reached YPP eligibility, revenue was earned, a Short converted to long-form viewing, or any provider-side state changed. Those claims require fresh authoritative provider or outcome evidence at the applicable use boundary.
 
+### Imported founder-content metric observations
+
+The authenticated founder-content CSV-import route is an observation intake boundary, not a metric-truth mint. Every normalized row must retain explicit content fingerprint, provider, account, page, audience segment, metric name, unit, measurement window, observation time, source, source reference, and row provenance. Blank metric values remain unknown evidence rather than synthetic zeroes. Exact duplicate rows may be idempotent; conflicting duplicate identities must fail closed instead of selecting a convenient value.
+
+Imported rows must be bound to the stored founder-content post identity before persistence. Raw CSV is not durable evidence. A database receipt is treated as untrusted input at the application boundary and must preserve `observation_only` authority with publication, freshness, and strategy-mutation authority all false. A parsed CSV, accepted database write, historical import, or stored observation proves only what it directly observed; a current numerical claim still requires fresh authoritative metric evidence at the use boundary.
+
 ## /confess
 
 Before release, state internally and, when material to the audience, publicly:
