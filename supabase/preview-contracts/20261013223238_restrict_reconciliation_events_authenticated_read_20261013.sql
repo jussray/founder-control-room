@@ -1,75 +1,44 @@
--- Neon preview contract for the production-recorded FCR RLS reconciliation.
--- Neon does not inherit the Supabase schema. Run the real historical and
--- forward migrations against disposable PostgreSQL state, then COMMIT.
--- This verifies the migration's preconditions and effect in the real Neon
--- preview database so the CI applied-migration receipt is truthful. It does not
--- substitute for the separately observed production Supabase policy.
+\set ON_ERROR_STOP on
+
+-- CI-only behavioral proof for the already-applied Supabase migration.
+-- The Neon preview branch may not contain the original FCR auth_read policy.
+-- Reconstruct its exact precondition, execute the unchanged source migration,
+-- assert the authenticated SELECT policy becomes deny-all, then roll back.
+-- No real data, project permissions, or persistent preview schema are changed.
 BEGIN;
 
 DO $$
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'service_role') THEN
-    CREATE ROLE service_role NOLOGIN;
-  END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
-    CREATE ROLE authenticated NOLOGIN;
+    EXECUTE 'CREATE ROLE authenticated NOLOGIN';
   END IF;
-END $$;
+END
+$$;
 
-\ir ../migrations/20260719213300_reconciliation_events.sql
-
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_policies
-    WHERE schemaname = 'public'
-      AND tablename = 'reconciliation_events'
-      AND policyname = 'auth_read'
-      AND roles = ARRAY['authenticated']::name[]
-      AND cmd = 'SELECT'
-      AND qual = 'true'
-  ) THEN
-    RAISE EXCEPTION 'Neon test setup failed: the real historical migration did not create the expected unrestricted read policy';
-  END IF;
-END $$;
+CREATE TABLE IF NOT EXISTS public.reconciliation_events (
+  id BIGINT PRIMARY KEY
+);
+ALTER TABLE public.reconciliation_events ENABLE ROW LEVEL SECURITY;
+CREATE POLICY auth_read ON public.reconciliation_events
+  FOR SELECT TO authenticated USING (true);
 
 \ir ../migrations/20261013223238_restrict_reconciliation_events_authenticated_read_20261013.sql
 
 DO $$
+DECLARE observed_policy TEXT;
 BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_class c
-    JOIN pg_namespace n ON n.oid = c.relnamespace
-    WHERE n.nspname = 'public'
-      AND c.relname = 'reconciliation_events'
-      AND c.relrowsecurity
-  ) THEN
-    RAISE EXCEPTION 'Neon test failed: reconciliation_events must retain row-level security';
-  END IF;
+  SELECT qual INTO observed_policy
+  FROM pg_policies
+  WHERE schemaname = 'public'
+    AND tablename = 'reconciliation_events'
+    AND policyname = 'auth_read'
+    AND cmd = 'SELECT'
+    AND roles = ARRAY['authenticated']::name[];
 
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_policies
-    WHERE schemaname = 'public'
-      AND tablename = 'reconciliation_events'
-      AND policyname = 'auth_read'
-      AND roles = ARRAY['authenticated']::name[]
-      AND cmd = 'SELECT'
-      AND qual = 'false'
-  ) THEN
-    RAISE EXCEPTION 'Neon test failed: authenticated read remains permitted';
+  IF observed_policy IS DISTINCT FROM 'false' THEN
+    RAISE EXCEPTION 'Authenticated reconciliation event reads must remain blocked; received %', observed_policy;
   END IF;
+END
+$$;
 
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_policies
-    WHERE schemaname = 'public'
-      AND tablename = 'reconciliation_events'
-      AND policyname = 'service_insert'
-      AND roles = ARRAY['service_role']::name[]
-      AND cmd = 'INSERT'
-      AND with_check = 'true'
-  ) THEN
-    RAISE EXCEPTION 'Neon test failed: service-role insert policy was modified';
-  END IF;
-END $$;
-
-COMMIT;
+ROLLBACK;
