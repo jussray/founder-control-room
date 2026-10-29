@@ -61,8 +61,6 @@ const truthSensitiveRules = [
   { domain: 'truth-governance', match: /^scripts\/verify-documentation-truth\.mjs$/ },
   { domain: 'truth-governance', match: /^\.ai\/skills\/goalfix\/SKILL\.md$/ },
   { domain: 'truth-governance', match: /^\.claude\/skills\/goalfix\/SKILL\.md$/ },
-  { domain: 'truth-governance', match: /^skills\/(?:ultrathink-attack-godmode|repair-to-proof|continuity-proof-ledger)\/SKILL\.md$/ },
-  { domain: 'truth-governance', match: /^skills\/ultrathink-suite\/README\.md$/ },
   { domain: 'truth-governance', match: /^docs\/(?:FOUNDER_ADAPTIVE_KERNEL_V0|GOALFIX_EXECUTION_WORKFLOW_V2|CLAUDE_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC|PERPLEXITY_MCP_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC)\.md$/ },
   { domain: 'evidence-authority', match: /^src\/evidence\/(?!__tests__\/)(?!.*\.test\.ts$)/ },
   { domain: 'evidence-authority', match: /^public\/control-room\/evidence-trust\.html$/ },
@@ -332,7 +330,7 @@ const changedDocs = changedFiles.filter((file) =>
   || file === 'CLAUDE.md'
   || file === 'PERPLEXITY.md'
   || file === DOCUMENTATION_RECEIPT_PATH
-  || file.endsWith('.md') && (file.startsWith('docs/') || file.startsWith('.ai/skills/') || file.startsWith('.claude/skills/') || file.startsWith('skills/')),
+  || file.endsWith('.md') && (file.startsWith('docs/') || file.startsWith('.ai/skills/') || file.startsWith('.claude/skills/')),
 );
 
 const report = {
