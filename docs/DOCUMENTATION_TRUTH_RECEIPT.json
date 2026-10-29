@@ -13,6 +13,24 @@
   ],
   "changes": [
     {
+      "path": "public/_worker.js",
+      "claims": [
+        "FCR Pages edge must treat both /products/founder-proof-audit and /products/founder-proof-audit/ as exact Pages-owned static routes, preserving the API proxy boundary for private routes; this source contract does not prove deployed Pages or Shopify theme routing."
+      ]
+    },
+    {
+      "path": "public/products/founder-proof-audit/index.html",
+      "claims": [
+        "Founder Proof Audit source page must present FCR's Shopify-observed $99 USD offer, SKU FCR-PROOF-AUDIT-99, with an inquiry-before-payment boundary, explicit no-secret handling, and no unverified direct checkout; live publication, payment, or delivery outcomes remain UNKNOWN."
+      ]
+    },
+    {
+      "path": "src/http/__tests__/founderProofAuditPublicProduct.test.ts",
+      "claims": [
+        "A focused source test must verify the Shopify-declared FCR Founder Proof Audit path and its trailing-slash Pages classification, branded SKU/price, and the absence of a JBH or unverified Shopify checkout CTA; static checks and CI are distinct from runtime/browser proof."
+      ]
+    },
+    {
       "path": "config/cloudflare-logpush.portfolio.json",
       "claims": [
         "`config/cloudflare-logpush.portfolio.json` must remain the source-only desired-state registry for the account-scoped `workers_trace_events` Logpush job; pull-request verification cannot mutate Cloudflare or prove delivery, and provider apply requires exact-current-main binding, a founder approval reference, a dedicated write credential, destination configuration, and post-write readback.",
