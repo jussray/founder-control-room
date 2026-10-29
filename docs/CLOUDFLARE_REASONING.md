@@ -1,5 +1,31 @@
 # Cloudflare Reasoning Contract
 
+## Logpush portfolio authority
+
+Founder Control Room owns the source contract for the portfolio Logpush desired state in `config/cloudflare-logpush.portfolio.json`. The first bounded dataset is account-scoped `workers_trace_events`; product repositories participate without receiving FCR Cloudflare write credentials.
+
+Participation is subordinate to repository-local governance. Historical or investigate-only repositories must stay outside the active participant registry. Under their current `AGENTS.md` contracts, `jussray/sekret-bip-companions`, `jussray/Bip-Jr`, and `jussray/Sekret-Bip-Bridge` are provenance/investigation-only and are not active Logpush participants. `jussray/jussray-bip-and-seek` is separately excluded because current `main` is a Roblox/Rojo runtime with no Cloudflare Worker; its Cloudflare model profile is trial-only with runtime activation disabled. `jussray/Sekret-Bip-Parents` is a static Cloudflare Pages entry site with no Worker execution surface, and `jussray/Sekret-Bip-Gov` is a governance/control repository with no Worker runtime. Cloudflare product references, Pages hosting, or governance metadata alone do not make `workers_trace_events` applicable.
+
+The Logpush workflow must keep pull-request execution read-only. Manual inspection may observe matching provider jobs with a dedicated read token, but inspection without access to the destination secret cannot claim full destination verification. Manual apply requires exact-current-main binding, a founder approval reference, a separate write token, destination configuration, and post-write provider readback.
+
+Repository source, workflow success, or a configured secret name cannot establish that Logpush is enabled in Cloudflare or that logs reached storage/SIEM. Provider job readback and destination-side receipt are separate evidence scopes. Destination networking may require Cloudflare Logpush IP allowlisting or dedicated egress; that remains destination-specific provider configuration.
+
+The Control Room treats Cloudflare as a replaceable execution and evidence provider, not as the owner of project truth or founder authority.
+
+The command-shaped contract is:
+
+```text
+:cloudflare reason <project>
+```
+
+It runs the implementation sequence:
+
+```text
+Goal → Reality → Redteam I → Lindy → L99 → Redteam II → OODA → Bill Gates → Elon Musk → Proof → Rollback → Next gate
+```
+
+The engine is deterministic. It does not call a model, execute Wrangler, deploy a Worker, change DNS, rotate secrets, or roll back production.
+
 The Control Room treats Cloudflare as a replaceable execution and evidence provider, not as the owner of project truth or founder authority.
 
 The command-shaped contract is:
@@ -28,10 +54,6 @@ A Cloudflare incident can present several facts that look contradictory:
 - runtime health still fails after a successful build.
 
 The engine separates those states rather than compressing them into “Cloudflare is broken.” That sentence is emotionally satisfying and operationally useless.
-
-## Checkout hostname: DNS, Pages, origin, and payment truth are separate
-
-Cloudflare provider readback on October 26, 2026 observed `checkout.foundercontrolroom.org` active on the `founder-control-room` Pages project and a proxied CNAME targeting `founder-control-room.pages.dev`. The reviewed GitHub candidate adds exactly `https://checkout.foundercontrolroom.org` alongside the existing apex browser origin in `FOUNDER_ALLOWED_ORIGINS`, while retaining the canonical Pages `FOUNDER_API_URL` used for Supabase founder-auth callback routing. A configured DNS or Pages domain, source CORS edit, and active Supabase project are separate facts: none verifies a dedicated checkout UI, Stripe transaction, completed payment, hosted Supabase redirect allowlist, merged source, deployed Worker, or successful browser test. Keep founder-final merger, production deployment, Supabase Auth changes, and any commerce/payment mutation gated separately.
 
 ## Temporal truth and intent drift
 
@@ -116,7 +138,7 @@ Those remain separate founder approval gates. Approval never carries forward.
 
 `public/_worker.js` must treat public discovery files such as `/robots.txt`, `/sitemap.xml`, `/llms.txt`, and `/crawlers.json` as static Pages assets and serve them through `env.ASSETS`. API-owned callback assets stay on `env.FCR_API`; the presence of crawler policy metadata never becomes authentication, write authority, provider-mutation authority, deployment authority, or publication authority.
 
-The same classification covers the public work page: the Pages asset layer canonicalizes `/work.html` to `/work` with a 308, and `public/_worker.js` must serve the bare `/work` and `/work/` paths by requesting the canonical `/work` URL through `env.ASSETS` — requesting the `/work.html` filename returns that 308 to the browser and loops `/work` onto itself. Falling through to the `FCR_API` proxy answers that public page without the service identity header and yields a degraded 503, so the canonical static request is the only correct route for it.
+The same classification covers the public work page: the Pages asset layer canonicalizes `/work.html` to `/work` with a 308, and `public/_worker.js` must serve the bare `/work` and `/work/` paths by requesting the canonical `/work` URL through `env.ASSETS` — requesting the `/work.html` filename returns that 308 to the browser and loops `/work` onto itself. Falling through to the `FCR_API` proxy answers that public page without the service identity header and yields a degraded 503, so the canonical static request is the only correct route for it. The public welcome page has the same shape with a different symptom: no rule classified the extensionless `/welcome` path at all, so it fell through to the `FCR_API` proxy and returned a degraded 503 (`API_SERVICE_IDENTITY_MISMATCH`) while the asset layer canonicalized `/welcome.html` to `/welcome` with a 308; `public/_worker.js` now serves the bare `/welcome` and `/welcome/` paths by requesting the canonical `/welcome` URL through `env.ASSETS`.
 
 That routing distinction is source truth only. A repository diff or green unit test cannot prove the deployed Pages artifact currently serves the exact file, so the applicable Pages deployment and browser/runtime witness remain separate evidence gates.
 
