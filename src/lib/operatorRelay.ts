@@ -48,7 +48,32 @@ export interface OperatorRelayResponseV1 {
   unresolved: string[];
   authorityRequested: 'none';
   completedAt: string;
+  /** Provider-reported token usage. Measurement only; never authority. Omitted when the provider reports none. */
+  usage?: OperatorRelayUsageV1;
   responseHash: string;
+}
+
+export interface OperatorRelayUsageV1 {
+  provider: 'anthropic';
+  inputTokens: number;
+  outputTokens: number;
+  cacheCreationInputTokens: number;
+  cacheReadInputTokens: number;
+}
+
+const USAGE_COUNT_FIELDS = ['inputTokens', 'outputTokens', 'cacheCreationInputTokens', 'cacheReadInputTokens'] as const;
+
+function isTokenCount(value: unknown): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
+}
+
+export function operatorRelayUsageErrors(usage: OperatorRelayUsageV1): string[] {
+  const errors: string[] = [];
+  if (usage.provider !== 'anthropic') errors.push('relay usage provider is unsupported');
+  for (const field of USAGE_COUNT_FIELDS) {
+    if (!isTokenCount(usage[field])) errors.push(`relay usage ${field} must be a non-negative integer`);
+  }
+  return errors;
 }
 
 const SHA256 = /^[0-9a-f]{64}$/i;
@@ -107,6 +132,8 @@ function responseIdentity(input: Omit<OperatorRelayResponseV1, 'responseHash'>):
     normalizedList(input.unresolved),
     'none',
     input.completedAt,
+    // Appended only when present so every pre-usage receipt keeps its original hash.
+    ...(input.usage ? [[input.usage.provider, ...USAGE_COUNT_FIELDS.map((field) => input.usage![field])]] : []),
   ];
 }
 
@@ -172,6 +199,7 @@ export function validateOperatorRelayResponse(value: OperatorRelayResponseV1, re
   if (value.authorityRequested !== 'none') errors.push('relay response cannot request authority');
   if (!Number.isFinite(Date.parse(value.completedAt))) errors.push('completedAt must be RFC3339-compatible');
   if (!SHA256.test(value.responseHash ?? '')) errors.push('responseHash must be sha256');
+  if (value.usage !== undefined) errors.push(...operatorRelayUsageErrors(value.usage));
   if (errors.length === 0) {
     const { responseHash: _responseHash, ...identity } = value;
     const expected = operatorRelayResponseHash(identity);
