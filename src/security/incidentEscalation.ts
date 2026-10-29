@@ -288,12 +288,37 @@ export async function logIncidentToLinear(
       }),
     });
 
+    const rawBody: unknown = await response.json();
+    // Provider responses are untrusted. Decode the minimal fields we need and
+    // fail closed on malformed payloads rather than trusting response.json().
+    const body = rawBody !== null && typeof rawBody === 'object' && !Array.isArray(rawBody)
+      ? rawBody as {
+          errors?: Array<{ message?: string }>;
+          data?: { issueCreate?: { issue?: { id?: string } } };
+        }
+      : null;
+    const errors = Array.isArray(body?.errors) ? body.errors : [];
+
+    // GraphQL can report a permission/validation failure with HTTP 200.
+    if (errors.length > 0) {
+      console.error(
+        '[incident-escalation] Linear GraphQL error (permission/validation):',
+        typeof errors[0]?.message === 'string' ? errors[0].message : 'unknown error',
+      );
+      return false;
+    }
+
     if (!response.ok) {
       console.error(
-        '[incident-escalation] Linear creation failed:',
+        '[incident-escalation] Linear HTTP error:',
         response.status,
-        await response.text(),
+        JSON.stringify(rawBody),
       );
+      return false;
+    }
+
+    if (typeof body?.data?.issueCreate?.issue?.id !== 'string' || !body.data.issueCreate.issue.id) {
+      console.error('[incident-escalation] Linear response missing issue ID:', body);
       return false;
     }
 
@@ -328,6 +353,21 @@ export async function escalateIncident(
 
   const succeeded = results.filter((r) => r.status === 'fulfilled' && r.value).length;
   const failed = results.filter((r) => r.status === 'rejected' || !r.value).length;
+
+  // IMPLANT 5: Critical escalation failure detection — alert if all channels failed on high-severity verdict
+  const hasExternalThreat = verdict.boundaries?.externalCompromise || verdict.boundaries?.externalExploit;
+  if (failed > 0 && (verdict.verdict === 'REPAIR_REQUIRED' || hasExternalThreat)) {
+    console.error(
+      '[incident-escalation] CRITICAL: Escalation failed for high-severity verdict:',
+      {
+        verdict: verdict.verdict,
+        service: verdict.service,
+        receipt: verdict.receipt,
+        channels_failed: failed,
+        has_external_threat: hasExternalThreat,
+      },
+    );
+  }
 
   console.log(`[incident-escalation] Escalation complete: ${succeeded} succeeded, ${failed} failed`);
 }
