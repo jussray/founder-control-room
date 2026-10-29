@@ -124,7 +124,7 @@ await page.route(`${BASE_URL}/**`, async (route) => {
 
 async function waitForFounderProjects(label) {
   try {
-    await page.locator('.founder-email').waitFor({ state: 'visible', timeout: 10_000 });
+    await page.locator('#root .shell').waitFor({ state: 'visible', timeout: 10_000 });
     await page.locator('#project-list').waitFor({ state: 'visible', timeout: 10_000 });
   } catch (error) {
     const diagnostic = await page.evaluate(() => ({

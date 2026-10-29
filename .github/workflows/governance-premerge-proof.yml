@@ -4,16 +4,29 @@ on:
   push:
     branches:
       - 'governance/**'
+      - 'security/**'
     paths:
       - 'config/founder-intelligence*.json'
       - 'scripts/verify-founder-intelligence-inheritance.mjs'
       - 'src/config/portfolio.ts'
       - 'src/config/portfolio.test.ts'
+      - 'src/config/__tests__/portfolio.sync.test.ts'
       - 'src/governance/__tests__/founderChallengeStack.contract.test.ts'
+      - 'src/http/middleware/security.ts'
+      - 'src/http/__tests__/rateLimitBaseline.contract.test.ts'
+      - 'public/_worker.js'
+      - 'public/control-room/sync.html'
+      - 'public/control-room/sync.css'
+      - 'public/control-room/sync.js'
+      - 'e2e/sync-control-room-bridge.spec.ts'
       - '.github/workflows/governance-premerge-proof.yml'
 
 permissions:
   contents: read
+
+concurrency:
+  group: governance-premerge-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -26,7 +39,7 @@ jobs:
     timeout-minutes: 30
     steps:
       - name: Check out exact head
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ env.EXPECTED_HEAD_SHA }}
 
@@ -39,7 +52,7 @@ jobs:
           test "$actual" = "$EXPECTED_HEAD_SHA"
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '24'
 
@@ -55,11 +68,13 @@ jobs:
       - name: Type check
         run: npm run typecheck
 
-      - name: Run focused governance contracts
+      - name: Run focused governance and security contracts
         run: >-
           npx vitest run
           src/config/portfolio.test.ts
+          src/config/__tests__/portfolio.sync.test.ts
           src/governance/__tests__/founderChallengeStack.contract.test.ts
+          src/http/__tests__/rateLimitBaseline.contract.test.ts
 
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
@@ -69,9 +84,14 @@ jobs:
         env:
           NODE_ENV: test
 
+      - name: Run Sync control bridge Playwright proof
+        run: npx playwright test -c playwright.config.ts e2e/sync-control-room-bridge.spec.ts
+        env:
+          NODE_ENV: test
+
       - name: Upload browser failure evidence
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: governance-premerge-playwright-${{ github.run_id }}
           path: |

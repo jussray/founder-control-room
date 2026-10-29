@@ -1,0 +1,104 @@
+{
+  "contract": "juss/court-independent-challenger-receipt@v1",
+  "observed_at": "2026-09-27T19:40:00Z",
+  "case": {
+    "project": "jussray/sync-party-game",
+    "reported_source_sha": "7920be25c2371051d4cf4efe66a5a24a80c749a8",
+    "surface": "https://sync-party-game.mcgill-raylene.workers.dev/?utm_campaign=sync-launch-threads-01&utm_source=threads&utm_medium=organic-social&utm_content=launch-post-01",
+    "posture": "INDEPENDENT_REPRODUCTION_PARTIAL"
+  },
+  "witness": {
+    "name": "Muse",
+    "provenance": "user-supplied independent challenger report",
+    "access_mode": "independent browser read plus screenshot inspection",
+    "mutation_authority": "READ_ONLY",
+    "identity_note": "This receipt records the challenger report supplied to Court; it does not claim a direct Muse connector invocation by FCR."
+  },
+  "verdict": "CONCUR_WITH_SCOPE_ANNOTATION",
+  "independent_findings": {
+    "http_200": "VERIFIED_BY_CHALLENGER",
+    "document_title": "SYNC ✦ Think alike. Beat the clock.",
+    "landing_render": "VERIFIED_BY_CHALLENGER",
+    "host_setup_render": "VERIFIED_BY_CHALLENGER",
+    "lobby_render": "VERIFIED_BY_CHALLENGER",
+    "in_game_render": "UNREACHED",
+    "exact_sha_identity": "NOT_INDEPENDENTLY_VERIFIED",
+    "chatgpt_site_runtime_equivalence": "UNKNOWN",
+    "campaign_outcomes": "PENDING"
+  },
+  "visual_reproduction": {
+    "screenshots_visually_confirmed": 3,
+    "screenshots_expected": 4,
+    "failed_screenshot_read": "host-setup disk read failed and was explicitly retained as a limitation",
+    "confirmed_traits": [
+      "deep navy field with electric-blue glow treatment",
+      "large glowing white SYNC identity",
+      "THINK ALIKE. BEAT THE CLOCK. tagline",
+      "four character avatars framing the hero",
+      "pink Create a Game action",
+      "purple Join a Game action",
+      "feature strip on landing",
+      "pink, purple, teal-cyan, orange-gold and blue mode-card accents",
+      "neon system continues into the live lobby surface"
+    ],
+    "phrasing_annotation": "Landing strip wording is Real-time multiplayer / No account / No install; cross-device and room-code claims are reproduced in substance through the lobby and room-code flow rather than those exact strip labels."
+  },
+  "functional_reproduction": {
+    "room_creation": "VERIFIED_BY_CHALLENGER",
+    "room_share_surface": "VERIFIED_BY_CHALLENGER",
+    "host_badge": "VERIFIED_BY_CHALLENGER",
+    "player_count": "VERIFIED_BY_CHALLENGER",
+    "classic_sync_mode": "VERIFIED_BY_CHALLENGER",
+    "round_count": "VERIFIED_BY_CHALLENGER",
+    "round_timer_configuration": "VERIFIED_BY_CHALLENGER",
+    "single_player_start_gate": "VERIFIED_BY_CHALLENGER",
+    "multi_client_gameplay": "UNREACHED"
+  },
+  "evidence_boundaries": {
+    "exact_sha": "INFERRED_FROM_EXISTING_COURT_REPORT_NOT_REPRODUCED_BY_CHALLENGER",
+    "asset_hashing": "Assets observed with unhashed filenames; no independent runtime version string found.",
+    "console": "No page-level render failures observed; verbatim console logs were unobtainable on the challenger route and therefore remain inferred rather than verified.",
+    "in_game_visuals": "Timer, choices, reveal bars, scores and game-over were not reached by Muse; those surfaces remain without a second independent visual witness.",
+    "production_mutation": "NONE"
+  },
+  "challenger_flags": {
+    "stale_anchor": {
+      "state": "SUSTAINED",
+      "finding": "The original 7920be25 visual case cannot continue to describe the current live runtime once production advances. Proof does not transfer across heads.",
+      "court_reanchor": "a5e27a8d2dfb8383c5d9a35cbb14e8a69ae088a1",
+      "relation_to_original_case": "18 commits ahead at Court recheck",
+      "court_automated_proof": "github-actions:core-proof:36346310394; github-actions:deploy:36346385988:SUCCESS",
+      "muse_exact_sha_binding": "NOT_VERIFIED"
+    },
+    "threads_ordering": {
+      "state": "RECORDED",
+      "finding": "The Threads post went live approximately 30 minutes before the visual fix and therefore briefly pointed to a visual-fail runtime under the same Workers URL.",
+      "current_destination": "HEALED",
+      "remediation_required": false,
+      "historical_truth_rule": "Later healing does not erase the earlier exposure window."
+    }
+  },
+  "court_crosscheck": {
+    "state": "VERIFIED_BY_COURT_NOT_BY_MUSE",
+    "current_production_sha_at_reanchor": "a5e27a8d2dfb8383c5d9a35cbb14e8a69ae088a1",
+    "relation_to_reported_source_sha": "18 commits ahead",
+    "core_proof": "github-actions:36346310394:SUCCESS",
+    "deploy_and_public_exact_sha_proof": "github-actions:36346385988:SUCCESS",
+    "public_multiplayer_suite": "SUCCESS",
+    "identity_boundary": "These GitHub/Cloudflare proof facts establish the current production successor separately. They do not retroactively prove which exact SHA Muse's browser session observed.",
+    "successor_note": "Court re-anchors current production independently of Muse testimony and keeps the original 7920be25 case as historical visual evidence."
+  },
+  "court_effect": {
+    "runtime_green": "UNCHALLENGED",
+    "visual_green": "CONCURRED_FOR_LANDING_HOST_SETUP_AND_LOBBY",
+    "threads_visual_hold": false,
+    "historical_threads_visual_fail_window": "RECORDED",
+    "in_game_visual_annotation": "automated exact-SHA proof exists; Muse reproduction reached lobby only"
+  },
+  "remaining_gates": [
+    "second independent witness for in-game surfaces using two clients or equivalent",
+    "chatgpt.site ↔ workers.dev runtime equivalence",
+    "real campaign/player outcome collection in FCR"
+  ],
+  "next_gate": "Collect real campaign/player outcomes while preserving a two-client independent in-game visual reproduction as the open second-witness gate."
+}

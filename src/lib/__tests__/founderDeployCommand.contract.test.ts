@@ -143,6 +143,49 @@ describe('Founder deploy command authority contract', () => {
     expect(reconcileWorkflow).not.toContain('PUBLISH_ALLOWED');
   });
 
+  it('proves direct API and public Pages version headers and bodies against the exact release SHA', () => {
+    const runtimeProof = reconcileWorkflow.slice(reconcileWorkflow.indexOf('  runtime-proof:'));
+    expect(runtimeProof).toContain('API_ORIGIN: https://api.foundercontrolroom.org');
+    expect(runtimeProof).toContain('PAGES_ORIGIN: https://foundercontrolroom.org');
+    expect(runtimeProof).toContain('--dump-header "$version_headers"');
+    expect(runtimeProof).toContain('--dump-header "$pages_headers"');
+    expect(runtimeProof).toContain('"$API_ORIGIN/version"');
+    expect(runtimeProof).toContain('"$PAGES_ORIGIN/version"');
+    expect(runtimeProof).toContain('< "$version_headers" | grep -Eiq');
+    expect(runtimeProof).toContain('< "$pages_headers" | grep -Eiq');
+    expect(runtimeProof).toContain('.gitSha == $expected');
+    expect(runtimeProof).toContain('public_proxy_version_verified: true');
+    expect(runtimeProof).toContain('test-results/fcr-pages-proxy-proof.json');
+    expect(runtimeProof).not.toContain('wrangler secret put');
+    expect(runtimeProof).not.toContain('wrangler deploy');
+  });
+
+  it('fails closed on missing provider-held Worker bindings before any reconciliation mutation', () => {
+    const preflight = reconcileWorkflow.indexOf('Verify provider-held Worker secret names before reconciliation');
+    const receipt = reconcileWorkflow.indexOf('Record bounded authority receipt');
+    const workerJob = reconcileWorkflow.indexOf('  worker-deploy:');
+    const firstMutation = reconcileWorkflow.indexOf('wrangler secret put FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON');
+    const deploy = reconcileWorkflow.indexOf('command: deploy --config wrangler.worker.toml');
+
+    expect(preflight).toBeGreaterThan(0);
+    expect(preflight).toBeLessThan(receipt);
+    expect(receipt).toBeLessThan(workerJob);
+    expect(workerJob).toBeLessThan(firstMutation);
+    expect(firstMutation).toBeLessThan(deploy);
+
+    const authorityGate = reconcileWorkflow.slice(0, workerJob);
+    expect(authorityGate).toContain('npx --yes wrangler@4.110.0 secret list');
+    expect(authorityGate).toContain('--config wrangler.worker.toml');
+    expect(authorityGate).toContain("config.get('secrets', {}).get('required')");
+    expect(authorityGate).toContain("workflow_written = {'FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON'}");
+    expect(authorityGate).toContain('missing = sorted(required - present)');
+    expect(authorityGate).toContain('sys.exit(1)');
+    expect(authorityGate).toContain('trap \'rm -f "$secret_receipt"\' EXIT');
+    expect(authorityGate).not.toContain('wrangler secret put');
+    expect(authorityGate).not.toContain('wrangler deploy');
+    expect(authorityGate).not.toContain('supabase db push');
+  });
+
   it('preserves every declared Worker secret name while forcing the publication grant disabled through the canonical config', () => {
     expect(reconcileWorkflow).toContain('Existing Worker runtime secrets: preserved except \\`FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON\\`, which this workflow forces disabled');
     expect(reconcileWorkflow).toContain('CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}');
@@ -153,7 +196,7 @@ describe('Founder deploy command authority contract', () => {
     expect(reconcileWorkflow).not.toContain('GITHUB_PRIVATE_KEY: ${{ secrets.GITHUB_PRIVATE_KEY }}');
     expect(reconcileWorkflow).not.toContain('FCR_SHOPIFY_WEBHOOK_SECRET: ${{ secrets.FCR_SHOPIFY_WEBHOOK_SECRET }}');
     expect(reconcileWorkflow).not.toContain('FCR_COMMERCE_HASH_SALT: ${{ secrets.FCR_COMMERCE_HASH_SALT }}');
-    expect(reconcileWorkflow).not.toContain('TINYFISH_API_KEY: ${{ secrets.TINYFISH_API_KEY }}');
+    expect(reconcileWorkflow).not.toContain('OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}');
     expect(reconcileWorkflow).not.toContain('FOUNDER_SIGNAL_ENGINE_MCP_TOKEN: ${{ secrets.FOUNDER_SIGNAL_ENGINE_MCP_TOKEN }}');
     expect(configuredWorkerSecretNames()).toEqual([
       'SUPABASE_SERVICE_ROLE_KEY',
@@ -165,8 +208,9 @@ describe('Founder deploy command authority contract', () => {
       'FCR_REMOTE_MCP_READ_TOKEN',
       'FCR_SHOPIFY_WEBHOOK_SECRET',
       'FCR_COMMERCE_HASH_SALT',
-      'TINYFISH_API_KEY',
       'FCR_CLOUDFLARE_MCP_READ_TOKEN',
+      'OPENAI_API_KEY',
+      'ANTHROPIC_API_KEY',
       'MODEL_API_KEY',
       'FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON',
       'FOUNDER_SIGNAL_ENGINE_MCP_TOKEN',
