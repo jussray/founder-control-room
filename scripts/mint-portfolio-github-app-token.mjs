@@ -1,3 +1,4 @@
+import assert from 'node:assert/strict';
 import { createPrivateKey, sign } from 'node:crypto';
 import { mkdir, writeFile, chmod } from 'node:fs/promises';
 import { dirname } from 'node:path';
@@ -228,7 +229,27 @@ async function request(jwt, path, { method = 'GET', body } = {}) {
   return parsed;
 }
 
+const TOKEN_PROFILES = Object.freeze({
+  'portfolio-sync': Object.freeze({ contents: 'write', pull_requests: 'read', checks: 'read' }),
+  'actions-audit-read-only': Object.freeze({ contents: 'read', actions: 'read' }),
+});
+
+function tokenPermissions(profile) {
+  if (!Object.hasOwn(TOKEN_PROFILES, profile)) throw new Error('UNSUPPORTED_PORTFOLIO_TOKEN_PROFILE');
+  return { ...TOKEN_PROFILES[profile] };
+}
+
+function selfTestTokenProfiles() {
+  assert.deepEqual(tokenPermissions('actions-audit-read-only'), { contents: 'read', actions: 'read' });
+  assert.ok(Object.values(tokenPermissions('actions-audit-read-only')).every((permission) => permission === 'read'));
+  assert.deepEqual(tokenPermissions('portfolio-sync'), { contents: 'write', pull_requests: 'read', checks: 'read' });
+  assert.throws(() => tokenPermissions('unknown'), /UNSUPPORTED_PORTFOLIO_TOKEN_PROFILE/);
+  console.log('Portfolio token profiles: 4 assertions passed; no token minted');
+}
+
 async function main() {
+  const tokenProfile = process.argv.includes('--actions-audit-read-only')
+    ? 'actions-audit-read-only' : 'portfolio-sync';
   const appId = requiredEnv('APP_ID').trim();
   if (!/^\d+$/.test(appId)) throw new Error('APP_ID_NOT_NUMERIC');
   const owner = (process.env.GITHUB_APP_OWNER || 'jussray').trim();
@@ -240,25 +261,23 @@ async function main() {
   const tokenResponse = await request(jwt, `/app/installations/${installation.id}/access_tokens`, {
     method: 'POST',
     body: {
-      permissions: {
-        contents: 'write',
-        pull_requests: 'read',
-        checks: 'read',
-      },
+      permissions: tokenPermissions(tokenProfile),
     },
   });
   if (!tokenResponse?.token) throw new Error('GITHUB_APP_INSTALLATION_TOKEN_MISSING');
   await mkdir(dirname(tokenFile), { recursive: true });
   await writeFile(tokenFile, `${tokenResponse.token}\n`, { encoding: 'utf8', mode: 0o600 });
   await chmod(tokenFile, 0o600);
+  console.log(`token_profile=${tokenProfile}`);
   console.log(`transport_class=${transportClass}`);
   console.log(`installation_id=${installation.id}`);
   console.log('token_written=true');
   console.log('secret_material_logged=false');
 }
 
-export { normalizePrivateKey, classifyPrivateKey };
+export { normalizePrivateKey, classifyPrivateKey, tokenPermissions };
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  await main();
+  if (process.argv.includes('--self-test-token-profiles')) selfTestTokenProfiles();
+  else await main();
 }
