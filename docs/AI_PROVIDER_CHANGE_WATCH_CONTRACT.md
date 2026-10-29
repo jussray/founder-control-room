@@ -10,14 +10,14 @@ FCR reports verified public changes and the product-specific impact. It does not
 
 For each newly verified material change, emit one `juss.ai-provider-change@v1` receipt with:
 
-- `event_fingerprint`: SHA-256 of normalized provider, category, canonical source URL, published date, normalized headline, availability, and change summary. Repeated observations of the same change retain the fingerprint.
+- `event_fingerprint`: lowercase SHA-256 of canonical JSON containing provider, category, canonical `source_url`, `published_at`, normalized headline, availability, and normalized change summary. Repeated observations of the same change retain the fingerprint.
 - `provider`: `openai`, `anthropic`, or `perplexity`.
 - `category`: `coding`, `computer_use`, `integrations`, `authorized_actions`, `pricing`, `plans`, or `limits`.
 - `headline`, `change_summary`, `previous_state`, and `new_state`: distinguish the confirmed delta from unknown account-specific availability.
 - `availability`: `GA`, `PREVIEW`, `BETA`, `PLAN_GATED`, `REGION_GATED`, `DEVICE_GATED`, `API_BILLED`, or `UNKNOWN`.
 - `source_url`, `evidence_urls`, `published_at`, `effective_at`, and `observed_at`: use direct official sources and preserve missing dates as unknown.
 - `source_coverage`: `COMPLETE`, `PARTIAL`, or `FAILED`; a fetch failure must never be reported as “no change.”
-- `project_impacts`: evidence-bounded impact for FCR, Chief AI Machine, SolContinuity, and the PromptOS library.
+- `project_impacts`: object with string values for `fcr`, `chief`, `solcontinuity`, and `promptos`; each value is an evidence-bounded impact or an explicit `UNKNOWN`.
 - `safe_test`: exactly one reversible, read-only test.
 
 Only alert on a newly verified material delta or a newly material source-coverage failure. Suppress duplicate fingerprints and routine releases. Do not imply that a provider feature is included in Ray's account unless account entitlement was independently verified; this watch does not inspect or change account settings.
