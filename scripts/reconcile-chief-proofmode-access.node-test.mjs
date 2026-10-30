@@ -410,3 +410,34 @@ test('maps fail-closed provider outcomes to bounded diagnostic codes', () => {
   );
   assert.equal(classifyChiefAccessError(new Error('secret-shaped internal detail')), 'bounded-check-failed');
 });
+
+test('refuses to certify or repair while any Everyone Allow/Bypass policy shares the effective application', async () => {
+  for (const decision of ['allow', 'bypass']) {
+    const everyonePolicy = { id: `policy-everyone-${decision}`, decision, include: [{ everyone: {} }] };
+
+    const checkRun = routeFetch({
+      serviceTokens: [activeToken],
+      apps: [workerApp, exactPublicApp],
+      policiesByApp: { [exactPublicApp.id]: [configuredPolicy, everyonePolicy] },
+    });
+    await assert.rejects(
+      ensureChiefProofModeAccessPolicy({ ...baseArgs, fetchImpl: checkRun.fetchImpl }),
+      /Everyone policy/,
+    );
+
+    const repairRun = routeFetch({
+      serviceTokens: [activeToken],
+      apps: [workerApp, exactPublicApp],
+      policiesByApp: { [exactPublicApp.id]: [everyonePolicy] },
+    });
+    await assert.rejects(
+      ensureChiefProofModeAccessPolicy({ ...baseArgs, mode: 'repair', apiToken: ADMIN_TOKEN, fetchImpl: repairRun.fetchImpl }),
+      /Everyone policy/,
+    );
+    assert.equal(repairRun.calls.filter(({ init }) => init.method === 'POST').length, 0);
+  }
+  assert.equal(
+    classifyChiefAccessError(new Error('Effective Chief Access application carries an Everyone policy (allow); remove it before Service Auth can be certified.')),
+    'everyone-policy-present',
+  );
+});
