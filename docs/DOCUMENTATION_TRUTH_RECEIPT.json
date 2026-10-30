@@ -13,6 +13,19 @@
   ],
   "changes": [
     {
+      "path": "config/cloudflare-logpush.portfolio.json",
+      "claims": [
+        "`config/cloudflare-logpush.portfolio.json` must remain the source-only desired-state registry for the account-scoped `workers_trace_events` Logpush job; pull-request verification cannot mutate Cloudflare or prove delivery, and provider apply requires exact-current-main binding, a founder approval reference, a dedicated write credential, destination configuration, and post-write readback.",
+        "`config/cloudflare-logpush.portfolio.json` must exclude repositories whose local governance marks them historical or investigate-only from active Logpush participation; `jussray/sekret-bip-companions` remains provenance-only until its own governance is explicitly changed."
+      ]
+    },
+    {
+      "path": ".github/workflows/cloudflare-logpush.yml",
+      "claims": [
+        "`.github/workflows/cloudflare-logpush.yml` must keep pull-request checks non-mutating and must require exact-current-main binding plus an auditable founder approval reference before any provider apply; workflow green cannot substitute for provider readback or destination-side delivery evidence."
+      ]
+    },
+    {
       "path": ".github/workflows/worker-reconcile.yml",
       "claims": [
         "`.github/workflows/worker-reconcile.yml` must compare Cloudflare's canonical Worker secret-name enumeration against the complete `wrangler.worker.toml [secrets].required` registry (excluding only its subsequently forced-disabled Founder Signal grant) inside the exact-main authority gate, before any `wrangler secret put` or Worker deployment. Unavailable provider enumeration or missing names must fail closed without exposing secret values or acquiring merge/deploy authority.",
@@ -336,7 +349,7 @@
       "claims": [
         "`scripts/verify-documentation-truth.mjs` must classify `src/founder-os-lab/projectAdapters.ts` as evidence-authority truth-sensitive so a Chief exact-head pin movement cannot pass Documentation Truth without substantive README, truth-decay audit, and structured receipt updates that name the changed path.",
         "`scripts/verify-documentation-truth.mjs` must classify `tools/zapier/founder-content-outcome-contract.cjs` as evidence-authority truth-sensitive so account-provenance changes cannot pass Documentation Truth without substantive README, truth-decay audit, and path-bound receipt updates.",
-        "`scripts/verify-documentation-truth.mjs` must cross-check the FCR GitHubProvider required-deployment ownership boundary against the structured documentation receipt when `src/providers/GitHubProvider.ts` is part of the truth-sensitive diff, using an executable semantic guard that rejects preservation or negated-removal claims for `required_deployments`; unrelated docs-only or test-only changes remain free of a receipt requirement."
+        "scripts/verify-documentation-truth.mjs must register the Jira live-probe client, authenticated ingress, CLI, and manual workflow as evidence-authority paths so changes cannot pass without substantive README, truth-decay, and path-bound receipt updates."
       ]
     },
     {
@@ -352,41 +365,27 @@
       ]
     },
     {
-      "path": ".github/workflows/pr-continuity.yml",
+      "path": "src/lib/jiraWorkAutomationLiveProbe.ts",
       "claims": [
-        "`.github/workflows/pr-continuity.yml` must trigger read-only exact-head continuity audit and trusted metadata refresh on `auto_merge_enabled` and `auto_merge_disabled` events without enabling, merging, deploying, or widening authority. GitHub native Auto-merge may integrate only after the live provider's configured required checks, tests, reviews and protections succeed; optional checks require explicit provider required-check configuration to block.",
-        "`.github/workflows/pr-continuity.yml` must keep the metadata reader on default-branch trusted code and preserve the existing event-permission floor. Queue observation is not exact-candidate founder-final approval; conflicts, stale refs, missing authority, or unverified provider rules must never be represented as merge-authorized."
+        "src/lib/jiraWorkAutomationLiveProbe.ts must bind the authenticated live-probe POST to the exact expected full runtime SHA in a dedicated header after the version preflight, retain post-dispatch receipt and runtime validation, and never promote dispatch proof into an independent Jira outcome."
       ]
     },
     {
-      "path": "scripts/pr-continuity.mjs",
+      "path": "src/http/routes/jiraWorkAutomationIngress.ts",
       "claims": [
-        "`scripts/pr-continuity.mjs` must classify provider-observed auto_merge as QUEUED, NOT_QUEUED, or UNKNOWN, include it in non-authorizing continuity receipts, and never infer merge_approved or authorizes_merge from a native auto-merge click. GitHub must remain the only actor performing the eventual merge after configured live required gates, and FCR's exact-candidate founder-final contract must remain separate."
+        "src/http/routes/jiraWorkAutomationIngress.ts must reject missing, malformed, unsupported, mismatched, or unavailable live-probe runtime bindings before calling the dispatcher while preserving ordinary authenticated observation behavior and the strict observation field allowlist."
       ]
     },
     {
-      "path": "src/providers/GitHubProvider.ts",
+      "path": "scripts/verify-jira-work-automation-live.ts",
       "claims": [
-        "`src/providers/GitHubProvider.ts` must snapshot an existing FCR review ruleset before two-membrane reconciliation, preserve required-linear-history, code-quality, and Copilot-review rules with their parameters unchanged, intentionally remove legacy pre-merge `required_deployments` because production release authority is exact-current-main/post-merge, reject unknown unowned rule types before provider mutation, and independently read back the preserved rules after update; bypass repair must never weaken unrelated live security controls."
+        "scripts/verify-jira-work-automation-live.ts must use explicit required configuration and the bounded live-probe runner without printing secret values or claiming independent Jira outcome proof."
       ]
     },
     {
-      "path": "scripts/documentation-truth-required-deployment-guard.mjs",
+      "path": ".github/workflows/jira-work-automation-live-probe.yml",
       "claims": [
-        "`scripts/documentation-truth-required-deployment-guard.mjs` must classify every provider-receipt claim mentioning `required_deployments`, evaluate explicit subject-bound disposition for each occurrence before any inherited preceding operation, require at least one relationship-bound affirmative removal or migration-debt claim, reject preservation or negated-removal semantics specifically bound to `required_deployments`, reject contradictory or ambiguous deployment-rule claims anywhere in the provider entry, and allow preservation of unrelated controls such as `required_linear_history`."
-      ]
-    },
-    {
-      "path": "config/cloudflare-logpush.portfolio.json",
-      "claims": [
-        "`config/cloudflare-logpush.portfolio.json` must remain the source-only desired-state registry for the account-scoped `workers_trace_events` Logpush job; pull-request verification cannot mutate Cloudflare or prove delivery, and provider apply requires exact-current-main binding, a founder approval reference, a dedicated write credential, destination configuration, and post-write readback.",
-        "`config/cloudflare-logpush.portfolio.json` must exclude repositories whose current-main governance forbids active participation and repositories without an actual Cloudflare Worker execution surface; governance-excluded repos are `jussray/sekret-bip-companions`, `jussray/Bip-Jr`, and `jussray/Sekret-Bip-Bridge`, while runtime-inapplicable repos are Roblox-only `jussray/jussray-bip-and-seek`, static-Pages `jussray/Sekret-Bip-Parents`, and governance-only `jussray/Sekret-Bip-Gov`."
-      ]
-    },
-    {
-      "path": ".github/workflows/cloudflare-logpush.yml",
-      "claims": [
-        "`.github/workflows/cloudflare-logpush.yml` must keep pull-request checks non-mutating and must require exact-current-main binding plus an auditable founder approval reference before any provider apply; workflow green cannot substitute for provider readback or destination-side delivery evidence."
+        ".github/workflows/jira-work-automation-live-probe.yml must remain manually dispatched from protected main with an exact live-main target, production-scoped dedicated issue configuration, retained dispatch receipts, and no automatic provider activation."
       ]
     },
     {
