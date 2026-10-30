@@ -559,6 +559,12 @@ Provider configuration, site wiring, observed clicks, and commercial outcomes re
 
 **Truth boundary:** checked-in policy and tests are source evidence only. A passing workflow does **not** establish that public content was approved or published, that the collector receives real site traffic, or that live security/runtime controls operate correctly. No new deploy, merge, publication, provider-mutation or deletion authority is granted.
 
+## 2026-10-26 locked-install and StoryEngine evidence update
+
+FCR PR #1024 replaces four unlocked `npm install` commands in the core CI Type check, Lint, Test, and Playwright e2e jobs with `npm ci --no-audit --no-fund` against the committed npm lockfile. This restricts dependency installation to the reviewed lockfile; it does not by itself prove that those jobs pass, that the dependency supply chain is safe, or that a release is authorized.
+
+Historical dependency observation (superseded): a prior StoryEngine branch read recorded `499f2d4eb9edac8bb11b657cf003a056263528d9`, following an earlier expectation of `87501be2da31d12f421b0ed2da49df357fc9fcb1`. Neither SHA is the current Playwright dependency pin. At the reviewed PR head, `.github/workflows/playwright.yml` pins StoryEngine to `bffc9f771b673055403f52b29c86b30e5f4dd8c8`; this PR does **not** change that pin. Its actual scope is the four CI locked-install changes above. The October 26 entry in `docs/TRUTH_DECAY_AUDIT.md` also records the supersession. Browser, directive, receipt, runtime-identity, and repository-protection outcomes must be established by their own exact-head evidence; merge, deploy, provider writes, spending, and publication remain separately founder-gated.
+
 ## October 24 StoryEngine relay-proof peer refresh
 
 StoryEngine `refs/heads/main` was independently re-observed at `87501be2da31d12f421b0ed2da49df357fc9fcb1`, so FCR's Playwright federation witness now pins that exact peer identity. This pin movement expires every predecessor FCR↔StoryEngine browser/federation witness; it selects the successor evidence subject only.
