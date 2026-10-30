@@ -1,5 +1,13 @@
 # Truth Decay Audit: When a True Claim Becomes Unsafe to Reuse
 
+## October 26, 2026: PR #1025 StoryEngine peer-head freshness repair (evidence-subject change only)
+
+FCR's draft Buffer evidence-gate PR #1025 ran exact-head Playwright on `c0c7d1f1c27f41303fcbba00525215aaf50f2a6e` and failed **after** the FCR browser harness, at the separate `git ls-remote` assertion that `jussray/StoryEngine refs/heads/main` still matched the immutable peer pin. The workflow expected `87501be2da31d12f421b0ed2da49df357fc9fcb1`, while the real live reference was `499f2d4eb9edac8bb11b657cf003a056263528d9`. This is an exact-peer identity mismatch, not evidence that the Buffer draft source tests or earlier FCR E2E steps failed.
+
+An independent GitHub compare of `87501be…499f2d4` returned `ahead_by: 2`, `behind_by: 0` and changed only `story-engine/lib/llmClient.js` and `story-engine/lib/museClient.js`, adding shared fetch-policy transport for Muse. [StoryEngine PR #137](https://github.com/jussray/StoryEngine/pull/137) records the same change and is merged; its PR body describes local tests, but those claims are not independent runtime or production proof.
+
+The smallest repair updates only `.github/workflows/playwright.yml`'s `STORYENGINE_PEER_SHA` value to the independently observed successor, preserving the **required** live-ref equality assertion, immutable checkout, runtime SHA identity validation, and subsequent full browser federation receipt loop. All predecessor federation/browser success evidence is historical only, and the successor FCR candidate must earn fresh exact-head CI and StoryEngine runtime/browser results. A further StoryEngine main ref movement would make the refreshed pin stale again. No deployment or merger is implied.
+
 ## October 28, 2026: PR #1044 second peer movement after main reconciliation
 
 The reconciled FCR head `e35b9ecff7801e2b6d36910a9f40208f9815cfdb` selected StoryEngine `dc79a23ffa8e6e5b0964efccdaee7c961b9b9e1d` but current StoryEngine main was observed at `bffc9f771b673055403f52b29c86b30e5f4dd8c8`, one commit strictly ahead with two governance/instruction files changed and 14 successful observed head checks. The old FCR head's code and browser proof remains historical and must not be promoted to current federation proof for the successor.
@@ -20,6 +28,9 @@ FCR PR #1038 exact head `79d9890946288ed86bee6be10977fb963aae09af` completed the
 A fresh StoryEngine comparison shows the successor is one commit ahead and zero behind. The only changed path is `story-engine/wrangler.jsonc`, where the commit adds a `previews` block with the preview runtime origin and the same bounded API rate-limit shape. Exact-main push runs for Agent Contract v1, L99 Promotion Gates, Control Room Test Ledger, Guardrails Playwright, CodeQL, and L99 Story Engine CI all completed successfully.
 
 Those StoryEngine checks establish the successor dependency as a verified source candidate, not FCR↔StoryEngine pair compatibility. Updating FCR's peer pin merely selects the new evidence subject. The refreshed FCR head remains UNKNOWN for federation until the complete live-ref, immutable checkout, runtime identity, directive/receipt/replay, and browser witness succeeds. Prior FCR browser green and prior founder approval do not transfer across the head change.
+## Jira live-probe runtime binding at the mutation boundary
+
+A successful `/version` preflight is evidence about that GET request, not authority for a later POST. During a rollout the POST may reach a different runtime. The Jira live probe therefore transmits the approved full SHA in `X-FCR-Expected-Head-Sha` alongside its versioned probe header, and the authenticated ingress rejects invalid or mismatched bindings before invoking the dispatcher. Post-dispatch identity and canonical receipt validation remain separate checks; neither proves independent Jira outcome readback. The probe client, ingress, CLI, and manual workflow are registered as evidence-authority paths so changes require substantive documentation and path-bound truth receipts.
 
 ## October 26, 2026: truth-console browser proof stopped on StoryEngine identity drift
 
