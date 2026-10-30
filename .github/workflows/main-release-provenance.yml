@@ -106,6 +106,10 @@ jobs:
         shell: bash
         env:
           CURRENT_MAIN_SHA: ${{ steps.provider.outputs.current_main_sha }}
+          MAIN_RELEASE_EVENT_NAME: ${{ github.event_name }}
+          MAIN_RELEASE_REF: ${{ github.ref }}
+          MAIN_RELEASE_ACTOR: ${{ github.actor }}
+          MAIN_RELEASE_REPOSITORY_OWNER: ${{ github.repository_owner }}
         run: |
           set -euo pipefail
           export ASSOCIATED_PULLS_JSON="$(cat associated-pulls.json)"

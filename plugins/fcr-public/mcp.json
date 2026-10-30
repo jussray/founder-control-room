@@ -1,0 +1,20 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+  "mcpServers": {
+    "founder-control-room": {
+      "type": "streamable-http",
+      "url": "https://api.foundercontrolroom.org/mcp/public",
+      "extensions": {
+        "com.openai": {
+          "auth": {
+            "type": "oauth",
+            "resource": "https://api.foundercontrolroom.org/mcp/public",
+            "baseScopes": [
+              "openid"
+            ]
+          }
+        }
+      }
+    }
+  }
+}

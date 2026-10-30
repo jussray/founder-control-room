@@ -7,10 +7,16 @@ on:
       - agent/design-os-registry-refresh
     paths:
       - '.github/workflows/design-os-contract.yml'
+      - '.agents/skills/control-room-design-implementation/SKILL.md'
       - 'src/design-os/**'
       - 'src/http/routes/designOs.ts'
       - 'src/http/routes/designOs.test.ts'
       - 'src/http/server.ts'
+      - 'src/lib/fcrSkillRouter.ts'
+      - 'src/lib/__tests__/fcrSkillRouter.test.ts'
+      - 'public/control-room/index.html'
+      - 'public/control-room/design-commands.html'
+      - 'e2e/design-commands-proof.ts'
       - 'scripts/verify-design-os-contract.mjs'
       - 'docs/PORTFOLIO_DESIGN_OS.md'
       - 'artifacts/truthmode/PORTFOLIO_DESIGN_OS_PROOF.md'
@@ -21,10 +27,16 @@ on:
   pull_request:
     paths:
       - '.github/workflows/design-os-contract.yml'
+      - '.agents/skills/control-room-design-implementation/SKILL.md'
       - 'src/design-os/**'
       - 'src/http/routes/designOs.ts'
       - 'src/http/routes/designOs.test.ts'
       - 'src/http/server.ts'
+      - 'src/lib/fcrSkillRouter.ts'
+      - 'src/lib/__tests__/fcrSkillRouter.test.ts'
+      - 'public/control-room/index.html'
+      - 'public/control-room/design-commands.html'
+      - 'e2e/design-commands-proof.ts'
       - 'scripts/verify-design-os-contract.mjs'
       - 'docs/PORTFOLIO_DESIGN_OS.md'
       - 'artifacts/truthmode/PORTFOLIO_DESIGN_OS_PROOF.md'
@@ -45,11 +57,11 @@ jobs:
   exact-head-design-os:
     name: Exact-head Design OS proof
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
 
     steps:
       - name: Checkout exact event head
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 1
@@ -63,7 +75,7 @@ jobs:
           test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: 24
           cache: npm
@@ -89,6 +101,21 @@ jobs:
           set -o pipefail
           npm run lint:design-os 2>&1 | tee logs/lint-design-os.log
 
+      - name: Verify design command skill routing
+        shell: bash
+        run: |
+          set -o pipefail
+          npx vitest run src/lib/__tests__/fcrSkillRouter.test.ts 2>&1 | tee logs/design-command-routing.log
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Prove project Design Commands in Chromium
+        shell: bash
+        run: |
+          set -o pipefail
+          npx tsx e2e/design-commands-proof.ts 2>&1 | tee logs/design-commands-playwright.log
+
       - name: Repository typecheck diagnostic
         continue-on-error: true
         shell: bash
@@ -112,7 +139,7 @@ jobs:
 
       - name: Upload Design OS proof logs
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: design-os-proof-${{ github.event.pull_request.head.sha || github.sha }}
           path: logs/

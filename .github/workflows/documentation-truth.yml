@@ -12,7 +12,6 @@ permissions:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-  DOC_TRUTH_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
 
 jobs:
   documentation-truth:
@@ -20,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out exact target with history
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ env.EXPECTED_HEAD_SHA }}
           fetch-depth: 0
@@ -30,11 +29,44 @@ jobs:
         run: |
           set -euo pipefail
           actual="$(git rev-parse HEAD)"
-          printf 'expected=%s\nactual=%s\nbase=%s\n' "$EXPECTED_HEAD_SHA" "$actual" "$DOC_TRUTH_BASE_SHA"
+          printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
           test "$actual" = "$EXPECTED_HEAD_SHA"
 
+      - name: Resolve exact live base
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.event.pull_request.base.ref || '' }}
+          PUSH_BEFORE_SHA: ${{ github.event.before || '' }}
+        run: |
+          set -euo pipefail
+
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            test -n "$BASE_REF"
+            git check-ref-format "refs/heads/${BASE_REF}"
+            live_base_sha="$(git ls-remote --heads origin "refs/heads/${BASE_REF}" | awk 'NR == 1 {print $1}')"
+          else
+            live_base_sha="$PUSH_BEFORE_SHA"
+          fi
+
+          if ! [[ "$live_base_sha" =~ ^[0-9a-f]{40}$ ]] || [ "$live_base_sha" = "0000000000000000000000000000000000000000" ]; then
+            echo "Documentation Truth base resolution failed: expected an exact live base SHA." >&2
+            exit 1
+          fi
+
+          git fetch --no-tags origin "$live_base_sha"
+          if ! git merge-base --is-ancestor "$live_base_sha" "$EXPECTED_HEAD_SHA"; then
+            echo "Documentation Truth base resolution failed: live base is not an ancestor of the exact candidate." >&2
+            echo "live_base_sha=$live_base_sha" >&2
+            echo "candidate_sha=$EXPECTED_HEAD_SHA" >&2
+            exit 1
+          fi
+
+          printf 'DOC_TRUTH_BASE_SHA=%s\n' "$live_base_sha" >> "$GITHUB_ENV"
+          printf 'resolved_base_sha=%s\n' "$live_base_sha"
+
       - name: Set up Node 24
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '24'
 
@@ -43,7 +75,7 @@ jobs:
 
       - name: Upload documentation truth receipt
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: documentation-truth-${{ github.run_id }}
           path: artifacts/documentation-truth-report.json

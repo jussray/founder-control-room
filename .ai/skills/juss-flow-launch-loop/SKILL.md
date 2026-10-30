@@ -5,12 +5,14 @@ description: >
   release, documentation truth, and full-app-launch work. Converts ULTRATHINK,
   Product Design, Data Analytics, Redteam, Lindy, L99, OODA, Hormozi, Bill Gates,
   Elon Musk, GoalFix, and Juss Flow into an evidence-gated loop.
-version: 1.1
+version: 1.2
 visibility: private
 owner: Juss
 ---
 
 # Juss Flow Launch Loop
+
+When verifying pull-request Documentation Truth or test discovery, resolve the live target branch, fetch its full SHA, and require it to be an ancestor of the exact checked-out candidate before computing the reviewed range. Stored event-base identity is historical context; default-branch push verification instead uses the exact before SHA. Invalid refs, unavailable fetches, malformed identities, and stale candidate ancestry fail closed without becoming product-regression or merge-approval claims.
 
 ## Goal
 
@@ -255,6 +257,12 @@ verified product progress
 
 Public-safe story may explain what changed, why it matters, what was learned, and approved public proof. Keep private prompts, raw diffs, credentials, customer/security data, internal proof references, unreleased roadmap, private metrics, provider payloads, and proprietary mechanics behind the curtain.
 
+## Governed repository mutation gate
+
+Operational branch creation is not ambient repository power. For the FCR `create_branch` path, the authenticated founder execute request plus a fresh proof record must produce a server-owned `AuthorityEnvelopeV1` bound to `github.repository.create_branch`, the exact repository scope, branch arguments, current mission-state fingerprint, tool-call identity, expiry, founder identity, and idempotency key. The envelope's lifetime must begin at the server-observed execute request time rather than the proof receipt timestamp; proof freshness and authority expiry are separate fail-closed windows.
+
+The execution must be reserved before provider mutation. Immediately before `RepositoryProvider.createBranch(...)`, FCR must reacquire mission state, re-derive the execution context, and validate the original envelope through `executeAuthorizedCreateBranch()`. Any state, argument, scope, idempotency, tool-call, capability, expiry, or integrity drift must fail closed. A pending or ambiguous provider outcome requires reconciliation before another mutation attempt. Branch authority never inherits merge, deploy, publication, credential, database, spend, or destructive authority.
+
 ## Implementation contract
 
 Before mutation record:
@@ -311,6 +319,10 @@ Do not call author approval “independent review.” For canonical FCR merges, 
 A deterministic witness must be produced from provider-observed PR/base/head/diff state, published only through the repository provider's narrow App-backed witness capability, and then read back from the exact head with the provider-recorded App issuer equal to server-owned `GITHUB_APP_ID`. The local/development `GITHUB_TOKEN` fallback may support ordinary bounded repository access but must not mint deterministic review evidence. The receipt and Check Run remain proposal/evidence only. A candidate that changes the deterministic producer, gate, merge consumer, or trusted witness provider boundary must fail its own deterministic self-review and requires a separately explicit bootstrap/constitutional authority path.
 
 Trusted witness ignition must execute from code already integrated and deployed as exact current FCR `main`, never from candidate-controlled pull-request workflows, candidate previews, stale releases, or PAT-only environments. The founder-runtime `POST /review/deterministic-witness/:pullRequestNumber` surface is the canonical ignition shape once integrated and exact-release-proven: it accepts only a positive PR number behind same-origin, rate-limit, authenticated-founder, and privileged-execution membranes; derives repository/provider/PR/base/head/diff/verdict/hash/App identity from server/provider state; requires full runtime `GIT_SHA` to equal provider-resolved current `main` before and after witness publication or reconciliation; performs reconcile-before-create; and returns the complete deterministic receipt without granting merge authority. A default-branch dispatch is only an equivalent ignition surface when it preserves the same invariants. Any ignition surface, its credential boundary, producer/publisher, workflow, or runner is a deterministic-review trust root; changing it must P1-block normal self-certification and require the separately explicit exact-candidate bootstrap/constitutional path.
+
+### Founder-selected native Auto-merge
+
+If the founder clicks GitHub **Enable auto-merge** for an exact PR, leave the PR queued for GitHub to merge **only after** configured required status checks, tests, review/approval policies, and branch protections have passed. All intended load-bearing gates must be required in live provider settings; optional green/red jobs alone are not native merge requirements. PR Continuity only observes the queue status from GitHub's readback; it never merges, creates founder-final approval, or relaxes a ruleset. Conflicts, draft status, changing base/head, missing exact-candidate founder authority, or stale review block the merge. Do not call `merge_pull_request` as a substitute for waiting for native Auto-merge or claim GitHub's eventual merge proves the FCR in-app founder-final route. An explicit Auto-merge click is the queue request, not a new independent review or production deployment authorization.
 
 ## Merge gate
 
@@ -396,3 +408,9 @@ Release state:
 Next exact action:
 Next founder gate:
 ```
+
+## Load-bearing regression execution
+
+A committed regression test is source evidence only until the exact-head workflow that feeds the applicable gate actually executes it. For LinkedIn analytics continuity, `.github/workflows/ci.yml` must keep `scripts.test_linkedin_analytics_continuity` inside the load-bearing `python-tests` job, and `Required Gate` must continue to depend on that job. Missing LinkedIn activity rows must remain `UNKNOWN_NO_EVIDENCE` with null metrics, never synthetic zero impressions or engagements.
+
+For public crawler and work-directory behavior, `.github/workflows/ci.yml` must keep `e2e/pages-api-recovery.spec.ts` and `e2e/public-work-directory.spec.ts` inside the load-bearing `Playwright e2e` job that feeds `Required Gate`. The specialized Pages workflow remains useful evidence, but it cannot substitute for this required exact-head browser execution or authorize merge by itself.

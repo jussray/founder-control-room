@@ -7,6 +7,7 @@ const TOOL_NAME = 'invoke_founder_signal_engine';
 const ACTIVE_REPOSITORY = 'jussray/Sekret-Bip';
 const ACTIVE_PROJECT_SLUG = 'sekret-bip';
 const OPENAI_KEY_REFERENCE = 'zapier-founder-signal-engine';
+const FOUNDER_SIGNAL_CONTENT_POLICY_VERSION = 'founder-signal-content-v2' as const;
 const MAX_PROVIDER_RESPONSE_BYTES = 64 * 1024;
 const DEFAULT_TIMEOUT_MS = 10_000;
 const INVOCATION_ID_PATTERN =
@@ -16,7 +17,16 @@ const SECRETISH_PATTERN =
   /(sk-[A-Za-z0-9_-]{12,}|Bearer\s+\S+|hooks\.zapier\.com|API[_-]?KEY|SERVICE[_-]?ROLE|PASSWORD|SECRET|TOKEN)/i;
 
 const AUTOMATION_CHANNELS = ['linkedin', 'facebook', 'instagram', 'gmail'] as const;
+const CONTENT_INTENTS = [
+  'proof-update',
+  'conversation-research',
+  'personal-founder',
+  'offer',
+] as const;
+const FRESHNESS_DECISIONS = ['fresh', 'revise-angle', 'hold'] as const;
 type AutomationChannel = (typeof AUTOMATION_CHANNELS)[number];
+type ContentIntent = (typeof CONTENT_INTENTS)[number];
+type FreshnessDecision = (typeof FRESHNESS_DECISIONS)[number];
 type JsonRpcId = string | number | null;
 type DbRecord = Record<string, unknown>;
 type RequestedAction = 'run_openai_step' | 'queue_review_draft' | 'publish_or_send';
@@ -41,6 +51,7 @@ const ALLOWED_ARGUMENT_KEYS = new Set([
   'allowHubSpotWrite',
   'founderApprovalId',
   'automationCandidate',
+  'contentPolicyResult',
 ]);
 
 const ALLOWED_AUTOMATION_CANDIDATE_KEYS = new Set([
@@ -57,6 +68,13 @@ const ALLOWED_AUTOMATION_CANDIDATE_KEYS = new Set([
   'recipientSpecificWhy',
 ]);
 
+const ALLOWED_CONTENT_POLICY_RESULT_KEYS = new Set([
+  'version',
+  'intent',
+  'fingerprint',
+  'freshnessDecision',
+]);
+
 interface AutomationCandidate {
   channel: AutomationChannel;
   audienceSegment: string;
@@ -69,6 +87,13 @@ interface AutomationCandidate {
   how: string;
   recipientId: string | null;
   recipientSpecificWhy: string | null;
+}
+
+interface ContentPolicyResult {
+  version: typeof FOUNDER_SIGNAL_CONTENT_POLICY_VERSION;
+  intent: ContentIntent;
+  fingerprint: string;
+  freshnessDecision: FreshnessDecision;
 }
 
 interface StandingPolicyAuthorizationContext {
@@ -89,6 +114,7 @@ interface InvocationArguments {
   allowHubSpotWrite: boolean;
   founderApprovalId: string | null;
   automationCandidate: AutomationCandidate | null;
+  contentPolicyResult: ContentPolicyResult | null;
   authorizationMode: AuthorizationMode;
 }
 
@@ -289,6 +315,57 @@ function parseAutomationCandidate(
   };
 }
 
+function parseContentPolicyResult(
+  value: unknown,
+): { value: ContentPolicyResult | null; errors: string[] } {
+  if (value === undefined || value === null) return { value: null, errors: [] };
+  if (!isRecord(value)) {
+    return { value: null, errors: ['contentPolicyResult must be an object'] };
+  }
+
+  const errors: string[] = [];
+  for (const key of Object.keys(value)) {
+    if (!ALLOWED_CONTENT_POLICY_RESULT_KEYS.has(key)) {
+      errors.push(`unexpected contentPolicyResult field: ${key}`);
+    }
+  }
+
+  const version = nonEmptyString(value.version, 100);
+  if (version !== FOUNDER_SIGNAL_CONTENT_POLICY_VERSION) {
+    errors.push(`contentPolicyResult.version must be ${FOUNDER_SIGNAL_CONTENT_POLICY_VERSION}`);
+  }
+
+  const intent = nonEmptyString(value.intent, 50);
+  if (!intent || !CONTENT_INTENTS.includes(intent as ContentIntent)) {
+    errors.push('contentPolicyResult.intent is not supported');
+  }
+
+  const fingerprint = nonEmptyString(value.fingerprint, 2000);
+  if (!fingerprint) errors.push('contentPolicyResult.fingerprint is required');
+
+  const freshnessDecision = nonEmptyString(value.freshnessDecision, 50);
+  if (
+    !freshnessDecision ||
+    !FRESHNESS_DECISIONS.includes(freshnessDecision as FreshnessDecision)
+  ) {
+    errors.push('contentPolicyResult.freshnessDecision is not supported');
+  }
+
+  if (errors.length > 0 || !intent || !fingerprint || !freshnessDecision) {
+    return { value: null, errors };
+  }
+
+  return {
+    value: {
+      version: FOUNDER_SIGNAL_CONTENT_POLICY_VERSION,
+      intent: intent as ContentIntent,
+      fingerprint,
+      freshnessDecision: freshnessDecision as FreshnessDecision,
+    },
+    errors: [],
+  };
+}
+
 function standingPolicyContext(value: unknown): StandingPolicyAuthorizationContext | null {
   if (!isRecord(value)) return null;
   const grantId = nonEmptyString(value.grantId, 100);
@@ -371,6 +448,8 @@ function parseInvocationArguments(
 
   const parsedCandidate = parseAutomationCandidate(value.automationCandidate);
   errors.push(...parsedCandidate.errors);
+  const parsedContentPolicy = parseContentPolicyResult(value.contentPolicyResult);
+  errors.push(...parsedContentPolicy.errors);
 
   let authorizationMode: AuthorizationMode = founderApprovalId
     ? 'manual-reference'
@@ -419,6 +498,7 @@ function parseInvocationArguments(
       allowHubSpotWrite,
       founderApprovalId,
       automationCandidate: parsedCandidate.value,
+      contentPolicyResult: parsedContentPolicy.value,
       authorizationMode,
     },
     errors: [],
@@ -460,12 +540,51 @@ function automationCandidateSchema(): DbRecord {
   };
 }
 
+function contentPolicyResultSchema(): DbRecord {
+  return {
+    type: 'object',
+    additionalProperties: false,
+    required: ['version', 'intent', 'fingerprint', 'freshnessDecision'],
+    properties: {
+      version: { type: 'string', enum: [FOUNDER_SIGNAL_CONTENT_POLICY_VERSION] },
+      intent: { type: 'string', enum: [...CONTENT_INTENTS] },
+      fingerprint: { type: 'string', minLength: 1, maxLength: 2000 },
+      freshnessDecision: { type: 'string', enum: [...FRESHNESS_DECISIONS] },
+    },
+  };
+}
+
+function founderSignalContentPolicyContract(): DbRecord {
+  return {
+    version: FOUNDER_SIGNAL_CONTENT_POLICY_VERSION,
+    classifyBeforeDrafting: true,
+    recentFingerprintRequired: true,
+    intents: [...CONTENT_INTENTS],
+    freshnessDecisions: [...FRESHNESS_DECISIONS],
+    linkedin: {
+      publishRequiresFreshness: 'fresh',
+      conversationResearch: {
+        publicProofLinkRequired: false,
+        projectNameRequired: false,
+        humanObservationFirst: true,
+        maxInternalWorkflowTerms: 1,
+        onePrimaryQuestion: true,
+        hashtagRange: [3, 5],
+      },
+      proofUpdate: {
+        verifiedInternalEvidenceRequired: true,
+        publicProofLinkRequired: false,
+      },
+    },
+  };
+}
+
 function toolDefinition(): DbRecord {
   return {
     name: TOOL_NAME,
     title: 'Invoke Founder Signal Engine',
     description:
-      'Invoke the scoped Founder Signal Engine Zapier bridge for verified GitHub evidence. The tool never accepts raw credentials. Publication and sending require the server-side standing-policy gate. A Zapier run receipt is not complete Day 3 proof.',
+      'Invoke the scoped Founder Signal Engine Zapier bridge for verified GitHub evidence. The tool never accepts raw credentials. Publication and sending require the server-side standing-policy gate. LinkedIn publication also requires a fresh reviewed content-policy result. A Zapier run receipt is not complete Day 3 proof.',
     inputSchema: {
       type: 'object',
       additionalProperties: false,
@@ -503,6 +622,7 @@ function toolDefinition(): DbRecord {
           description: 'Runtime-populated authorization receipt. Caller values are rejected upstream.',
         },
         automationCandidate: automationCandidateSchema(),
+        contentPolicyResult: contentPolicyResultSchema(),
       },
     },
     annotations: {
@@ -654,6 +774,16 @@ function zapierAutomationCandidate(candidate: AutomationCandidate | null): DbRec
   };
 }
 
+function zapierContentPolicyResult(result: ContentPolicyResult | null): DbRecord | null {
+  if (!result) return null;
+  return {
+    version: result.version,
+    intent: result.intent,
+    fingerprint: result.fingerprint,
+    freshness_decision: result.freshnessDecision,
+  };
+}
+
 async function callZapier(
   args: InvocationArguments,
   env: NodeJS.ProcessEnv,
@@ -684,6 +814,8 @@ async function callZapier(
         founder_approval_id: args.founderApprovalId,
         authorization_mode: args.authorizationMode,
         automation_candidate: zapierAutomationCandidate(args.automationCandidate),
+        content_policy_contract: founderSignalContentPolicyContract(),
+        content_policy_result: zapierContentPolicyResult(args.contentPolicyResult),
         key_reference: OPENAI_KEY_REFERENCE,
       }),
       signal: controller.signal,
@@ -728,8 +860,79 @@ async function invokeTool(
   dependencies: Required<FounderSignalEngineMcpDependencies>,
 ): Promise<DbRecord> {
   const projectId = await dependencies.resolveProjectId();
+  const contentPolicyEventId = `fse-mcp:${args.invocationId}:content-policy`;
   const requestEventId = `fse-mcp:${args.invocationId}:requested`;
   const resultEventId = `fse-mcp:${args.invocationId}:result`;
+
+  const isLinkedInPublication =
+    args.requestedAction === 'publish_or_send' &&
+    args.automationCandidate?.channel === 'linkedin';
+  if (isLinkedInPublication) {
+    const freshnessDecision = args.contentPolicyResult?.freshnessDecision ?? null;
+    if (!args.contentPolicyResult || freshnessDecision !== 'fresh') {
+      try {
+        await dependencies.writeAuditEvent(projectId, {
+          sourceEventId: contentPolicyEventId,
+          eventType: 'founder_signal_engine_content_policy_blocked',
+          severity: 'warning',
+          decision: 'blocked',
+          metadata: {
+            invocationId: args.invocationId,
+            sourceCommitSha: args.sourceCommitSha,
+            requestedAction: args.requestedAction,
+            authorizationMode: args.authorizationMode,
+            channel: 'linkedin',
+            contentPolicyVersion:
+              args.contentPolicyResult?.version ?? FOUNDER_SIGNAL_CONTENT_POLICY_VERSION,
+            contentIntent: args.contentPolicyResult?.intent ?? null,
+            contentFingerprint: args.contentPolicyResult?.fingerprint ?? null,
+            freshnessDecision,
+            reason: args.contentPolicyResult
+              ? 'linkedin publication requires freshnessDecision=fresh'
+              : 'linkedin publication requires a reviewed contentPolicyResult',
+            zapierRunIdentified: false,
+            endToEndProofComplete: false,
+          },
+        });
+      } catch (error) {
+        if (error instanceof DuplicateInvocationError) {
+          return toolResponse(
+            {
+              invocationId: args.invocationId,
+              accepted: false,
+              auditComplete: true,
+              duplicateBlocked: true,
+              contentPolicyBlocked: true,
+              zapierRunIdentified: false,
+              endToEndProofComplete: false,
+              nextGate: 'Inspect the retained content-policy decision and use a new invocationId.',
+            },
+            true,
+          );
+        }
+        throw error;
+      }
+
+      return toolResponse(
+        {
+          invocationId: args.invocationId,
+          accepted: false,
+          auditComplete: true,
+          contentPolicyBlocked: true,
+          contentPolicyVersion: FOUNDER_SIGNAL_CONTENT_POLICY_VERSION,
+          contentIntent: args.contentPolicyResult?.intent ?? null,
+          contentFingerprint: args.contentPolicyResult?.fingerprint ?? null,
+          freshnessDecision,
+          zapierRunId: null,
+          zapierRunIdentified: false,
+          endToEndProofComplete: false,
+          nextGate:
+            'Regenerate or review the LinkedIn draft until contentPolicyResult.freshnessDecision is fresh, then retry with a new invocationId.',
+        },
+        true,
+      );
+    }
+  }
 
   try {
     await dependencies.writeAuditEvent(projectId, {
@@ -754,6 +957,11 @@ async function invokeTool(
         audienceSegment: args.automationCandidate?.audienceSegment ?? null,
         proofUrl: args.automationCandidate?.proofUrl ?? null,
         recipientId: args.automationCandidate?.recipientId ?? null,
+        contentPolicyVersion:
+          args.contentPolicyResult?.version ?? FOUNDER_SIGNAL_CONTENT_POLICY_VERSION,
+        contentIntent: args.contentPolicyResult?.intent ?? null,
+        contentFingerprint: args.contentPolicyResult?.fingerprint ?? null,
+        freshnessDecision: args.contentPolicyResult?.freshnessDecision ?? null,
       },
     });
   } catch (error) {
@@ -790,6 +998,11 @@ async function invokeTool(
         requestedAction: args.requestedAction,
         authorizationMode: args.authorizationMode,
         channel: args.automationCandidate?.channel ?? null,
+        contentPolicyVersion:
+          args.contentPolicyResult?.version ?? FOUNDER_SIGNAL_CONTENT_POLICY_VERSION,
+        contentIntent: args.contentPolicyResult?.intent ?? null,
+        contentFingerprint: args.contentPolicyResult?.fingerprint ?? null,
+        freshnessDecision: args.contentPolicyResult?.freshnessDecision ?? null,
         failure: message,
         zapierRunIdentified: false,
         endToEndProofComplete: false,
@@ -828,6 +1041,11 @@ async function invokeTool(
         requestedAction: args.requestedAction,
         authorizationMode: args.authorizationMode,
         channel: args.automationCandidate?.channel ?? null,
+        contentPolicyVersion:
+          args.contentPolicyResult?.version ?? FOUNDER_SIGNAL_CONTENT_POLICY_VERSION,
+        contentIntent: args.contentPolicyResult?.intent ?? null,
+        contentFingerprint: args.contentPolicyResult?.fingerprint ?? null,
+        freshnessDecision: args.contentPolicyResult?.freshnessDecision ?? null,
         providerHttpStatus: providerReceipt.httpStatus,
         providerResponseKind: providerReceipt.responseKind,
         zapierRunId: providerReceipt.runId,
@@ -870,8 +1088,13 @@ async function invokeTool(
       requestedAction: args.requestedAction,
       authorizationMode: args.authorizationMode,
       channel: args.automationCandidate?.channel ?? null,
+      contentPolicyVersion:
+        args.contentPolicyResult?.version ?? FOUNDER_SIGNAL_CONTENT_POLICY_VERSION,
+      contentIntent: args.contentPolicyResult?.intent ?? null,
+      contentFingerprint: args.contentPolicyResult?.fingerprint ?? null,
+      freshnessDecision: args.contentPolicyResult?.freshnessDecision ?? null,
       nextGate: zapierRunIdentified
-        ? 'Capture and verify the OpenAI 5W1H result, Buffer artifact, HubSpot deal association, and final Founder Control Room evidence before marking Day 3 complete.'
+        ? 'Capture and verify the OpenAI 5W1H + content-policy result, Buffer artifact, HubSpot deal association, and final Founder Control Room evidence before marking Day 3 complete.'
         : 'Locate the invocation in Zapier history using invocationId, record its run ID, and continue downstream evidence capture.',
     },
     !providerReceipt.accepted,
@@ -925,7 +1148,7 @@ export function createFounderSignalEngineMcpHandler(
         rpcResult(id, {
           protocolVersion: MCP_PROTOCOL_VERSION,
           capabilities: { tools: { listChanged: false } },
-          serverInfo: { name: 'founder-signal-engine-bridge', version: '1.2.0' },
+          serverInfo: { name: 'founder-signal-engine-bridge', version: '1.3.0' },
         }),
       );
       return;

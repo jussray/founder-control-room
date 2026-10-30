@@ -196,7 +196,12 @@ function executeStack(options: ExecuteOptions = {}) {
                     limit: () => ({
                       maybeSingle: () => Promise.resolve({
                         data: options.proofRecord === undefined
-                          ? { id: 'proof', status: 'pass' }
+                          ? {
+                              id: 'proof',
+                              status: 'pass',
+                              gate_id: missionStatus === 'proposed' ? 'create_branch' : 'merge',
+                              created_at: new Date().toISOString(),
+                            }
                           : options.proofRecord,
                         error: null,
                       }),
@@ -845,6 +850,21 @@ describe('POST /:missionId/patch — founder read/write/edit on a sandbox branch
       if (table === 'missions') return missionRow(missionOverrides, missionRowOptions);
       if (table === 'projects') return projectRow();
       if (table === 'project_events') return { insert: projectEventInsert };
+      // A patch reserves an idempotent execution before touching GitHub.
+      // Keep this mock faithful to the Supabase select/insert/update chain.
+      if (table === 'approval_executions') return {
+        select: () => ({
+          eq: () => ({
+            maybeSingle: () => Promise.resolve({ data: null, error: null }),
+          }),
+        }),
+        insert: () => ({
+          select: () => ({
+            single: () => Promise.resolve({ data: { id: EXECUTION_ID }, error: null }),
+          }),
+        }),
+        update: () => twoEqUpdate(),
+      };
       return {};
     });
     return { projectEventInsert };
@@ -909,6 +929,17 @@ describe('POST /:missionId/patch — founder read/write/edit on a sandbox branch
     expect(mockCommitPatch).not.toHaveBeenCalled();
   });
 
+  it('requires an idempotency key before any patch provider mutation', async () => {
+    wireStandardTables();
+    const response = await request(buildApp())
+      .post(`/approvals/${MISSION_ID}/patch`)
+      .set('Authorization', BEARER)
+      .send({ message: 'edit', changes: [{ path: 'src/example.ts', content: 'hello' }] });
+    expect(response.status).toBe(400);
+    expect(response.body.code).toBe('IDEMPOTENCY_KEY_REQUIRED');
+    expect(mockCommitPatch).not.toHaveBeenCalled();
+  });
+
   it('commits the patch to the mission branch and audits it — never touches base_ref', async () => {
     const { projectEventInsert } = wireStandardTables();
     mockCommitPatch.mockResolvedValue('deadbeef'.repeat(5));
@@ -918,6 +949,7 @@ describe('POST /:missionId/patch — founder read/write/edit on a sandbox branch
       .set('Authorization', BEARER)
       .send({
         message: 'Fix the thing',
+        idempotencyKey: 'patch-key-1',
         changes: [{ path: 'src/example.ts', content: 'export const x = 1;' }],
       });
 
@@ -941,7 +973,7 @@ describe('POST /:missionId/patch — founder read/write/edit on a sandbox branch
     const res = await request(buildApp())
       .post(`/approvals/${MISSION_ID}/patch`)
       .set('Authorization', BEARER)
-      .send({ message: 'edit', changes: [{ path: 'a.txt', content: 'hi' }] });
+      .send({ message: 'edit', idempotencyKey: 'patch-provider-failure', changes: [{ path: 'a.txt', content: 'hi' }] });
 
     expect(res.status).toBe(502);
   });
@@ -955,7 +987,7 @@ describe('POST /:missionId/patch — founder read/write/edit on a sandbox branch
     const res = await request(buildApp())
       .post(`/approvals/${MISSION_ID}/patch`)
       .set('Authorization', BEARER)
-      .send({ message: 'Fix the thing', changes: [{ path: 'src/example.ts', content: 'export const x = 1;' }] });
+      .send({ message: 'Fix the thing', idempotencyKey: 'patch-key-2', changes: [{ path: 'src/example.ts', content: 'export const x = 1;' }] });
 
     expect(res.status).toBe(201);
     expect(res.body.warning).toBeUndefined();
@@ -971,7 +1003,7 @@ describe('POST /:missionId/patch — founder read/write/edit on a sandbox branch
     const res = await request(buildApp())
       .post(`/approvals/${MISSION_ID}/patch`)
       .set('Authorization', BEARER)
-      .send({ message: 'edit', changes: [{ path: 'a.txt', content: 'hi' }] });
+      .send({ message: 'edit', idempotencyKey: 'patch-key-3', changes: [{ path: 'a.txt', content: 'hi' }] });
 
     expect(res.status).toBe(201);
     expect(res.body.ok).toBe(true);

@@ -209,7 +209,15 @@ describe("GitLab approvals routing", () => {
                   gte: () => ({
                     order: () => ({
                       limit: () => ({
-                        maybeSingle: () => Promise.resolve({ data: { id: "proof", status: "pass" }, error: null }),
+                        maybeSingle: () => Promise.resolve({
+                          data: {
+                            id: "proof",
+                            status: "pass",
+                            gate_id: "create_branch",
+                            created_at: new Date().toISOString(),
+                          },
+                          error: null,
+                        }),
                       }),
                     }),
                   }),
@@ -285,13 +293,22 @@ describe("GitLab approvals routing", () => {
       if (table === "project_events") {
         return { insert: () => Promise.resolve({ error: null }) };
       }
+      if (table === "approval_executions") {
+        return {
+          select: () => ({ eq: () => ({ maybeSingle: () => Promise.resolve({ data: null, error: null }) }) }),
+          insert: () => ({
+            select: () => ({ single: () => Promise.resolve({ data: { id: EXECUTION_ID }, error: null }) }),
+          }),
+          update: () => twoEqUpdate(),
+        };
+      }
       return {};
     });
 
     const response = await request(app())
       .post(`/approvals/${MISSION_ID}/patch`)
       .set("Authorization", BEARER)
-      .send({ message: "edit via GitLab", changes: [{ path: "src/example.ts", content: "export const ok = true;" }] });
+      .send({ message: "edit via GitLab", idempotencyKey: "gitlab-patch-test-1", changes: [{ path: "src/example.ts", content: "export const ok = true;" }] });
 
     expect(response.status).toBe(201);
     expect(mockCommitPatch).toHaveBeenCalledWith(
@@ -338,7 +355,15 @@ describe("GitLab approvals routing", () => {
                   gte: () => ({
                     order: () => ({
                       limit: () => ({
-                        maybeSingle: () => Promise.resolve({ data: { id: "proof", status: "pass" }, error: null }),
+                        maybeSingle: () => Promise.resolve({
+                          data: {
+                            id: "proof",
+                            status: "pass",
+                            gate_id: "create_branch",
+                            created_at: new Date().toISOString(),
+                          },
+                          error: null,
+                        }),
                       }),
                     }),
                   }),

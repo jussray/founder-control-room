@@ -6,6 +6,7 @@ import { authRouter } from './routes/auth.js';
 import { onboardingRouter } from './routes/onboarding.js';
 import { founderOnboardingRouter } from './routes/founderOnboarding.js';
 import { projectsRouter } from './routes/projects.js';
+import { projectShellStateRouter } from './routes/projectShellState.js';
 import { buildEventsRouter } from './routes/buildEvents.js';
 import { handleBuildEventReceiptIngest } from './routes/buildEventReceipts.js';
 import { reasoningRunsRouter } from './routes/reasoningRuns.js';
@@ -17,6 +18,8 @@ import { terminalRouter } from './routes/terminal.js';
 import { dashboardRouter } from './routes/dashboard.js';
 import { missionsRouter } from './routes/missions.js';
 import { promptosRouter } from './routes/promptos.js';
+import { createPromptOSCommandIntakeRouter } from './routes/promptOsCommandIntake.js';
+import { builderPromptWorkflowRouter } from './routes/builderPromptWorkflow.js';
 import { agentsRouter } from './routes/agents.js';
 import { capabilitiesRouter } from './routes/capabilities.js';
 import { authorityLevelsRouter } from './routes/authorityLevels.js';
@@ -26,6 +29,7 @@ import { designOsRouter } from './routes/designOs.js';
 import { cloudflareReasoningRouter } from './routes/cloudflareReasoning.js';
 import { mcpRouter } from './routes/mcp.js';
 import { handleRemoteMcpProtectedResourceMetadata } from './routes/remoteReadMcp.js';
+import { publicMcpRouter } from './routes/publicMcp.js';
 import { externalUseRouter } from './routes/externalUse.js';
 import { futureYouRouter } from './routes/futureYou.js';
 import { goalfixRouter } from './routes/goalfix.js';
@@ -41,6 +45,7 @@ import { handleFounderSignalReviewContextIngest } from './routes/founderSignalRe
 import { handleFounderSignalReviewEmailIngest } from './routes/founderSignalReviewEmailIngress.js';
 import { handleJiraWorkAutomationIngress } from './routes/jiraWorkAutomationIngress.js';
 import { handleHairCommerceReceiptIngest } from './routes/hairCommerceReceipts.js';
+import { handleFederatedRelayV3 } from './routes/federatedRelayV3.js';
 import {
   handleProofOfShipCommitLookup,
   handleProofOfShipReceiptIngest,
@@ -78,6 +83,7 @@ import { requireV10DecisionFounderBinding } from './middleware/v10DecisionFounde
 import { requireFounderSignalEngineMcpToken } from './middleware/founderSignalEngineMcpAuth.js';
 import { requireFounderSignalReadMcpToken } from './middleware/founderSignalReadMcpAuth.js';
 import { requireFounderSignalEngineReviewOnly } from './middleware/founderSignalEngineWriteGate.js';
+import type { ChiefAiEvidenceServiceBinding } from '../worker/handler.js';
 
 const EXACT_COMMIT_SHA = /^[0-9a-f]{40}$/i;
 const SUPABASE_PROJECT_REF = /^[a-z0-9]{20}$/;
@@ -147,6 +153,8 @@ export interface CreateServerOptions {
    * separately, not this Worker's filesystem.
    */
   serveStatic?: boolean;
+  /** Private Cloudflare service binding used only for proposal-only PromptOS -> Chief intake. */
+  chiefAiBinding?: ChiefAiEvidenceServiceBinding;
 }
 
 export function createServer(options: CreateServerOptions = {}) {
@@ -239,6 +247,12 @@ export function createServer(options: CreateServerOptions = {}) {
     handleProductBuildReceiptIngest,
   );
   app.post(
+    '/api/federated-relay/v3',
+    rateLimitGeneral,
+    express.json({ type: 'application/json', limit: '64kb' }),
+    handleFederatedRelayV3,
+  );
+  app.post(
     '/mcp/founder-signal-engine',
     rateLimitGeneral,
     express.json({ type: 'application/json', limit: '64kb' }),
@@ -261,6 +275,11 @@ export function createServer(options: CreateServerOptions = {}) {
     '/.well-known/oauth-protected-resource/mcp',
     handleRemoteMcpProtectedResourceMetadata,
   );
+
+  // Separate OAuth-scoped customer MCP. Parsing is limited to this path;
+  // existing founder-cookie/browser-CSRF routes remain unchanged.
+  app.use('/mcp/public', express.json({ type: 'application/json', limit: '64kb' }));
+  app.use(publicMcpRouter);
 
   app.use(requireSameOriginBrowserMutation);
   app.use(express.json({ limit: BODY_LIMIT }));
@@ -371,6 +390,7 @@ export function createServer(options: CreateServerOptions = {}) {
   app.use('/projects', repositoryVerificationRouter);
   app.use('/projects', buildEventsRouter);
   app.use('/projects', reasoningRunsRouter);
+  app.use('/projects', requireProjectReadAudit, projectShellStateRouter);
   app.use('/projects', requireProjectReadAudit, projectsRouter);
   // Privileged mission execution still uses the existing approvals router, but
   // it must now pass founder authentication + founder master switch + V10
@@ -393,7 +413,9 @@ export function createServer(options: CreateServerOptions = {}) {
   app.use('/founder-os', founderOsSkillsRouter);
   app.use('/mirror', mirrorRouter);
   app.use('/missions', missionsRouter);
+  app.use('/promptos', createPromptOSCommandIntakeRouter(options.chiefAiBinding));
   app.use('/promptos', promptosRouter);
+  app.use('/prompt-workflows', builderPromptWorkflowRouter);
   app.use('/agents', agentsRouter);
   app.use('/capabilities', capabilitiesRouter);
   app.use('/authority-levels', authorityLevelsRouter);

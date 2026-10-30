@@ -215,6 +215,23 @@ globalThis.fetch = async (input, init = {}) => {
 
 async function withV10PlanAwarePage(page) {
   activeBrowserPage = page;
+  page.on('response', (response) => {
+    const url = response.url();
+    if (!url.includes('/approvals/') || !url.endsWith('/execute') || response.ok()) return;
+    void response.json()
+      .then((body) => {
+        console.error('[E2E_EXECUTE_REJECTION]', JSON.stringify({
+          status: response.status(),
+          code: body?.code ?? null,
+          error: body?.error ?? null,
+          detail: body?.detail ?? null,
+        }));
+      })
+      .catch(() => {
+        console.error('[E2E_EXECUTE_REJECTION]', JSON.stringify({ status: response.status(), code: null, error: 'non-json rejection body' }));
+      });
+  });
+
   const originalEvaluate = page.evaluate.bind(page);
   page.evaluate = async (...args) => {
     const [pageFunction] = args;
