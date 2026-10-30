@@ -92,9 +92,8 @@ export function validateWorkerEnv(
   // External repository credentials are capability-scoped, not core startup dependencies.
   // FCR GitHub operations still require the complete trusted App pair in providerFactory.
 
-  // The required-binding check above proves every core value is non-empty.
-  // a non-empty string. TypeScript cannot derive that fact through the dynamic
-  // key iteration, so narrow once at this boundary.
+  // TypeScript cannot derive these nonempty guarantees from dynamic iteration,
+  // so narrow the validated core bindings once at this boundary.
   const validated = env as ControlRoomWorkerEnv;
 
   const founderSessionKey = validated.FOUNDER_SESSION_ENCRYPTION_KEY.trim();
