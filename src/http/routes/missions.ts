@@ -2,32 +2,27 @@
  * Mission-scoped routes: multitool assignment, Agent Council, Bench, and
  * per-mission Analytics.
  *
- * `council_conversations`, `agent_runs`, and `agent_costs` already exist in
- * 0001_init.sql with founder-gated RLS from
- * 0002_enable_rls_and_founder_policy.sql — they were never wrong, just
- * never exposed over HTTP.
- *
- * Bench (`agent_runs`) stays READ-ONLY here: those rows are meant to be
- * objective CI/test evidence produced by the guarded terminal + proof-gate
- * path, not something fabricated through this API — a write route here
- * would let a founder action masquerade as machine evidence.
- *
- * Council rounds and cost entries are legitimately founder/agent-logged
- * bookkeeping (what was discussed, what was spent) — those get real write
- * routes, because multitool orchestration (assigning which tool builds and
- * reviews a mission, logging council rounds between tools, attributing
- * spend) is exactly what `builder_agent`/`reviewer_agent`/
- * `council_conversations.participants`/`agent_costs.agent_name` already
- * modeled. This does not call any AI provider — it records what already
- * happened outside this process.
+ * The legacy Council POST records caller-supplied rounds. The /council/run
+ * route executes the governed provider relay in-process and persists its exact
+ * lineage receipt. Neither path grants merge, deploy, publish, or provider
+ * mutation authority.
  */
 
 import { Router } from 'express';
+import { runCouncilRound, type CouncilConversationRow } from '../../lib/councilRound.js';
+import { OPERATOR_RELAY_PEERS } from '../../lib/operatorRelayConstants.js';
+import { createServerOperatorRelayAdapters } from '../../lib/operatorRelayModelProviders.js';
+import type { RelayCapability, RelayOperatorId, RelaySensitivity } from '../../lib/operatorRelay.js';
 import { supabase } from '../../lib/supabaseClient.js';
 import { requireFounder, type FounderRequest } from '../middleware/requireFounder.js';
 
 export const missionsRouter = Router();
 missionsRouter.use(requireFounder);
+
+const RELAY_PEERS = new Set<string>(OPERATOR_RELAY_PEERS);
+const RELAY_CAPABILITIES = new Set<RelayCapability>(['research', 'propose', 'review', 'implement']);
+const RELAY_SENSITIVITIES = new Set<RelaySensitivity>(['public', 'internal']);
+const DEFAULT_COUNCIL_PARTICIPANTS: readonly RelayOperatorId[] = ['codex', 'claude-code', 'muse'];
 
 interface MissionRow {
   id: string;
@@ -43,14 +38,20 @@ async function missionExists(missionId: string): Promise<boolean> {
   return (await findMission(missionId)) !== null;
 }
 
+async function nextCouncilRound(missionId: string): Promise<number> {
+  const { data: latest } = await supabase
+    .from('council_conversations')
+    .select('round')
+    .eq('mission_id', missionId)
+    .order('round', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return (latest?.round ?? 0) + 1;
+}
+
 /**
  * PATCH /missions/:missionId
  * Body: { builderAgent?, reviewerAgent?, riskLevel? }
- *
- * Assigns which tool builds and which reviews a mission. Free-text, not
- * restricted to GET /agents' registry — the schema's own example list
- * ("codex", "claude-code", "cursor") already includes tools outside that
- * registry, and this is a label, not a credentialed integration.
  */
 missionsRouter.patch('/:missionId', async (req: FounderRequest, res) => {
   const { missionId } = req.params;
@@ -79,7 +80,7 @@ missionsRouter.patch('/:missionId', async (req: FounderRequest, res) => {
   return res.json({ mission });
 });
 
-/** GET /missions/:missionId/council — Agent Council conversation rounds for this mission. */
+/** GET /missions/:missionId/council */
 missionsRouter.get('/:missionId/council', async (req: FounderRequest, res) => {
   const { missionId } = req.params;
   if (!(await missionExists(missionId))) return res.status(404).json({ error: 'Mission not found' });
@@ -96,11 +97,7 @@ missionsRouter.get('/:missionId/council', async (req: FounderRequest, res) => {
 
 /**
  * POST /missions/:missionId/council
- * Body: { participants, outcome?, transcript?, round? }
- *
- * Logs one Agent Council round — which tools participated and what they
- * concluded. `round` defaults to one past the highest existing round for
- * this mission, so callers don't need to track round numbers themselves.
+ * Logs one caller-supplied Council round without invoking providers.
  */
 missionsRouter.post('/:missionId/council', async (req: FounderRequest, res) => {
   const { missionId } = req.params;
@@ -112,18 +109,7 @@ missionsRouter.post('/:missionId/council', async (req: FounderRequest, res) => {
   }
 
   if (!(await missionExists(missionId))) return res.status(404).json({ error: 'Mission not found' });
-
-  let round = typeof body['round'] === 'number' ? body['round'] : null;
-  if (round === null) {
-    const { data: latest } = await supabase
-      .from('council_conversations')
-      .select('round')
-      .eq('mission_id', missionId)
-      .order('round', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    round = (latest?.round ?? 0) + 1;
-  }
+  const round = typeof body['round'] === 'number' ? body['round'] : await nextCouncilRound(missionId);
 
   const { data: conversation, error } = await supabase
     .from('council_conversations')
@@ -141,7 +127,87 @@ missionsRouter.post('/:missionId/council', async (req: FounderRequest, res) => {
   return res.status(201).json({ conversation });
 });
 
-/** GET /missions/:missionId/runs — Bench: runner/CI check results for this mission. */
+/**
+ * POST /missions/:missionId/council/run
+ * Body: { goal, seed?, participants?, capability?, sensitivity?, sourceRef? }
+ *
+ * Executes a real zero-clipboard Council round. FCR is the transport source of
+ * the first hop; every later source is the provider that actually completed the
+ * prior hop. Provider failures/blocks persist as interrupted receipts.
+ */
+missionsRouter.post('/:missionId/council/run', async (req: FounderRequest, res) => {
+  const { missionId } = req.params;
+  const body = req.body as Record<string, unknown>;
+
+  const goal = typeof body['goal'] === 'string' ? body['goal'].trim() : '';
+  const seed = typeof body['seed'] === 'string' ? body['seed'].trim() : goal;
+  if (!goal || goal.length > 4_000) return res.status(400).json({ error: 'goal must be 1..4000 characters' });
+  if (!seed || seed.length > 12_000) return res.status(400).json({ error: 'seed must be 1..12000 characters' });
+
+  let participants: RelayOperatorId[] = [...DEFAULT_COUNCIL_PARTICIPANTS];
+  if (body['participants'] !== undefined) {
+    const raw = body['participants'];
+    if (!Array.isArray(raw) || raw.length === 0 || raw.length > OPERATOR_RELAY_PEERS.length) {
+      return res.status(400).json({ error: 'participants must be a non-empty bounded array of Council peers' });
+    }
+    if (!raw.every((seat) => typeof seat === 'string' && RELAY_PEERS.has(seat))) {
+      return res.status(400).json({ error: 'participants contains an unsupported Council peer' });
+    }
+    participants = raw as RelayOperatorId[];
+  }
+  if (new Set(participants).size !== participants.length) {
+    return res.status(400).json({ error: 'participants cannot contain duplicates' });
+  }
+
+  const capability = body['capability'] === undefined ? 'propose' : body['capability'];
+  if (typeof capability !== 'string' || !RELAY_CAPABILITIES.has(capability as RelayCapability)) {
+    return res.status(400).json({ error: 'capability is unsupported' });
+  }
+
+  const sensitivity = body['sensitivity'] === undefined ? 'internal' : body['sensitivity'];
+  if (typeof sensitivity !== 'string' || !RELAY_SENSITIVITIES.has(sensitivity as RelaySensitivity)) {
+    return res.status(400).json({ error: 'sensitivity must be public or internal for live Council relay' });
+  }
+
+  if (!(await missionExists(missionId))) return res.status(404).json({ error: 'Mission not found' });
+
+  const round = await nextCouncilRound(missionId);
+  const sourceRef = typeof body['sourceRef'] === 'string' && body['sourceRef'].trim()
+    ? body['sourceRef'].trim()
+    : `mission:${missionId}`;
+  let conversation: unknown = null;
+
+  try {
+    const relay = await runCouncilRound({
+      goal,
+      initiator: 'fcr',
+      sourceRef,
+      seed,
+      seats: participants.map((operator) => ({ operator, capability: capability as RelayCapability })),
+      missionId,
+      round,
+      sensitivity: sensitivity as RelaySensitivity,
+      persist: async (row: CouncilConversationRow) => {
+        const { data, error } = await supabase
+          .from('council_conversations')
+          .insert(row)
+          .select('id, round, participants, transcript, outcome, created_at')
+          .single();
+        if (error) throw new Error(`Council persistence failed: ${error.message}`);
+        conversation = data;
+      },
+    }, createServerOperatorRelayAdapters(process.env));
+
+    return res.status(201).set('Cache-Control', 'no-store').json({ conversation, relay });
+  } catch (error) {
+    return res.status(500).set('Cache-Control', 'no-store').json({
+      error: error instanceof Error ? error.message : 'Council relay failed.',
+      code: 'council_relay_internal_failure',
+    });
+  }
+});
+
+/** GET /missions/:missionId/runs */
 missionsRouter.get('/:missionId/runs', async (req: FounderRequest, res) => {
   const { missionId } = req.params;
   if (!(await missionExists(missionId))) return res.status(404).json({ error: 'Mission not found' });
@@ -156,7 +222,7 @@ missionsRouter.get('/:missionId/runs', async (req: FounderRequest, res) => {
   return res.json({ runs: data ?? [] });
 });
 
-/** GET /missions/:missionId/costs — per-mission agent cost ledger. */
+/** GET /missions/:missionId/costs */
 missionsRouter.get('/:missionId/costs', async (req: FounderRequest, res) => {
   const { missionId } = req.params;
   if (!(await missionExists(missionId))) return res.status(404).json({ error: 'Mission not found' });
@@ -172,13 +238,7 @@ missionsRouter.get('/:missionId/costs', async (req: FounderRequest, res) => {
   return res.json({ costs: data ?? [], totalUsd });
 });
 
-/**
- * POST /missions/:missionId/costs
- * Body: { agentName, provider?, model?, inputTokens?, outputTokens?, costUsd? }
- *
- * Attributes spend to whichever tool did the work — the Analytics rollup
- * (GET /dashboard/costs) reads exactly this table.
- */
+/** POST /missions/:missionId/costs */
 missionsRouter.post('/:missionId/costs', async (req: FounderRequest, res) => {
   const { missionId } = req.params;
   const body = req.body as Record<string, unknown>;

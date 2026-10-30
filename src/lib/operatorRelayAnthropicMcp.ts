@@ -15,6 +15,11 @@ export const ANTHROPIC_PLAYWRIGHT_READ_TOOL_ALLOWLIST = [
   'browser_wait_for',
 ] as const;
 
+export type AnthropicPlaywrightBridgeReadiness =
+  | { state: 'not_configured'; runtimeReachable: false; reason: 'missing_remote_mcp_url' }
+  | { state: 'configured_unverified'; runtimeReachable: false; url: string; reason: 'awaiting_browser_tabs_receipt' }
+  | { state: 'runtime_verified'; runtimeReachable: true; url: string; receiptRef: string };
+
 export interface AnthropicMcpAttachment {
   headers: Record<string, string>;
   body: {
@@ -34,9 +39,7 @@ function canonicalHttpsUrl(value: string): string | null {
   return url.toString();
 }
 
-export function anthropicPlaywrightMcpAttachment(
-  env: NodeJS.ProcessEnv = process.env,
-): AnthropicMcpAttachment | null {
+function configuredPlaywrightMcpUrl(env: NodeJS.ProcessEnv): string | null {
   const configuredUrl = env.FCR_RELAY_ANTHROPIC_PLAYWRIGHT_MCP_URL?.trim();
   if (!configuredUrl) return null;
 
@@ -44,6 +47,31 @@ export function anthropicPlaywrightMcpAttachment(
   if (!url) {
     throw new Error('FCR_RELAY_ANTHROPIC_PLAYWRIGHT_MCP_URL must be a canonical https URL without embedded credentials or a fragment');
   }
+  return url;
+}
+
+export function anthropicPlaywrightBridgeReadiness(
+  env: NodeJS.ProcessEnv = process.env,
+  browserTabsReceiptRef?: string | null,
+): AnthropicPlaywrightBridgeReadiness {
+  const url = configuredPlaywrightMcpUrl(env);
+  if (!url) {
+    return { state: 'not_configured', runtimeReachable: false, reason: 'missing_remote_mcp_url' };
+  }
+
+  const receiptRef = browserTabsReceiptRef?.trim();
+  if (!receiptRef) {
+    return { state: 'configured_unverified', runtimeReachable: false, url, reason: 'awaiting_browser_tabs_receipt' };
+  }
+
+  return { state: 'runtime_verified', runtimeReachable: true, url, receiptRef };
+}
+
+export function anthropicPlaywrightMcpAttachment(
+  env: NodeJS.ProcessEnv = process.env,
+): AnthropicMcpAttachment | null {
+  const url = configuredPlaywrightMcpUrl(env);
+  if (!url) return null;
 
   const authorizationToken = env.FCR_RELAY_ANTHROPIC_PLAYWRIGHT_MCP_TOKEN?.trim();
   const configs = Object.fromEntries(

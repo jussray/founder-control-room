@@ -1,5 +1,11 @@
 import { requestHash } from './safety.js';
 import { hubForMcpProject } from './vaultHub.js';
+import { auditGitHubChangeGenealogy } from './github-truth/changeGenealogy.js';
+import type {
+  GitHubChangeGenealogyEvidence,
+  GitHubChangeGenealogyReaderLike,
+} from '../providers/GitHubChangeGenealogyReader.js';
+import { createAppAwareRepositoryProvider } from '../providers/RepositoryProviderFactory.js';
 import { supabase } from '../lib/supabaseClient.js';
 import {
   routeFcrSkills,
@@ -21,6 +27,7 @@ export const EXTERNAL_MCP_TOOL_NAMES = [
   'chief_preview_capability_plan',
   'fcr_list_projects',
   'fcr_get_current_truth',
+  'fcr_audit_change_genealogy',
   'fcr_preview_skill_route',
   'fcr_relay_operator',
 ] as const;
@@ -73,6 +80,12 @@ export interface ExternalMcpToolDependencies {
   listProjects?: (allowedProjects: ReadonlySet<string>) => Promise<unknown>;
   listCapabilities?: (projectSlug: string) => Promise<unknown>;
   getCurrentTruth?: (projectSlug: string) => Promise<unknown>;
+  auditChangeGenealogy?: (input: {
+    projectSlug: string;
+    limit: number;
+    includeComments: boolean;
+    includeDiff: boolean;
+  }) => Promise<unknown>;
   previewCapabilityPlan?: (proposal: Record<string, unknown>) => Promise<unknown>;
   previewSkillRoute?: (input: {
     goal: string;
@@ -141,6 +154,20 @@ function projectSlug(value: unknown): string {
   const slug = text(value, 'projectId', 120);
   if (!PROJECT_SLUG.test(slug)) throw new Error('projectId is not a valid project slug');
   return slug;
+}
+
+function boundedInteger(value: unknown, field: string, min: number, max: number, fallback: number): number {
+  if (value === undefined) return fallback;
+  if (!Number.isInteger(value) || (value as number) < min || (value as number) > max) {
+    throw new Error(`${field} must be an integer between ${min} and ${max}`);
+  }
+  return value as number;
+}
+
+function optionalBoolean(value: unknown, field: string, fallback: boolean): boolean {
+  if (value === undefined) return fallback;
+  if (typeof value !== 'boolean') throw new Error(`${field} must be a boolean`);
+  return value;
 }
 
 function allowedProject(slug: string, allowedProjects: ReadonlySet<string>): string {
@@ -231,6 +258,42 @@ async function projectRow(slug: string) {
     risk_level: string;
     updated_at: string;
   };
+}
+
+async function defaultAuditChangeGenealogy(
+  input: {
+    projectSlug: string;
+    limit: number;
+    includeComments: boolean;
+    includeDiff: boolean;
+  },
+  env: NodeJS.ProcessEnv,
+) {
+  const project = await projectRow(input.projectSlug);
+  if (project.repo_provider.trim().toLowerCase() !== 'github' || !project.repo_identifier?.trim()) {
+    throw new Error('Project does not have a registered GitHub repository');
+  }
+  const repository = project.repo_identifier.trim();
+  const provider = await createAppAwareRepositoryProvider({
+    slug: project.slug,
+    repoProvider: project.repo_provider,
+    repoIdentifier: repository,
+  }, env);
+  if (!provider.readChangeGenealogyEvidence) {
+    throw new Error('Configured repository provider does not expose change-genealogy evidence');
+  }
+  const reader: GitHubChangeGenealogyReaderLike = {
+    readGenealogyEvidence: async (options) => {
+      const evidence = await provider.readChangeGenealogyEvidence!(project.slug, options);
+      return evidence as GitHubChangeGenealogyEvidence;
+    },
+  };
+  return auditGitHubChangeGenealogy(reader, {
+    repository,
+    limit: input.limit,
+    includeComments: input.includeComments,
+    includeDiff: input.includeDiff,
+  });
 }
 
 async function defaultListProjects(allowedProjects: ReadonlySet<string>) {
@@ -578,6 +641,24 @@ export function externalMcpToolDefinitions(): JsonRecord[] {
       annotations: readAnnotations,
     },
     {
+      name: 'fcr_audit_change_genealogy',
+      title: 'Audit recent GitHub change genealogy',
+      description:
+        'Read a granted project’s registered GitHub repository and reconstruct a bounded recent-change genealogy: ten PRs by default, every PR commit identity, bounded comments/reviews and file-level diff evidence, recent default-branch commits, and provider-proven commit-to-PR associations. Returns separate failure receipts and never returns raw patch bodies or grants mutation authority.',
+      inputSchema: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['projectId'],
+        properties: {
+          projectId: { type: 'string', minLength: 1, maxLength: 120 },
+          limit: { type: 'integer', minimum: 1, maximum: 20, default: 10 },
+          includeComments: { type: 'boolean', default: true },
+          includeDiff: { type: 'boolean', default: true },
+        },
+      },
+      annotations: { ...readAnnotations, openWorldHint: true },
+    },
+    {
       name: 'fcr_preview_skill_route',
       title: 'Preview a fail-closed skill route',
       description:
@@ -646,6 +727,8 @@ export function createExternalMcpToolExecutor(
   const listProjects = overrides.listProjects ?? defaultListProjects;
   const listCapabilities = overrides.listCapabilities ?? defaultListCapabilities;
   const getCurrentTruth = overrides.getCurrentTruth ?? defaultGetCurrentTruth;
+  const auditChangeGenealogy = overrides.auditChangeGenealogy
+    ?? ((input) => defaultAuditChangeGenealogy(input, env));
   const previewCapabilityPlan = overrides.previewCapabilityPlan
     ?? ((proposal: Record<string, unknown>) => defaultPreviewCapabilityPlan(proposal, env));
   const previewSkillRoute = overrides.previewSkillRoute ?? defaultPreviewSkillRoute;
@@ -710,6 +793,15 @@ export function createExternalMcpToolExecutor(
       noUnexpectedKeys(input.arguments, ['projectId'], input.name);
       receiptProject = allowedProject(projectSlug(input.arguments.projectId), input.allowedProjects);
       result = await getCurrentTruth(receiptProject);
+    } else if (input.name === 'fcr_audit_change_genealogy') {
+      noUnexpectedKeys(input.arguments, ['projectId', 'limit', 'includeComments', 'includeDiff'], input.name);
+      receiptProject = allowedProject(projectSlug(input.arguments.projectId), input.allowedProjects);
+      result = await auditChangeGenealogy({
+        projectSlug: receiptProject,
+        limit: boundedInteger(input.arguments.limit, 'limit', 1, 20, 10),
+        includeComments: optionalBoolean(input.arguments.includeComments, 'includeComments', true),
+        includeDiff: optionalBoolean(input.arguments.includeDiff, 'includeDiff', true),
+      });
     } else if (input.name === 'fcr_relay_operator') {
       receiptProject = allowedProject('founder-control-room', input.allowedProjects);
       noUnexpectedKeys(

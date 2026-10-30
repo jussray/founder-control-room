@@ -138,6 +138,20 @@
       "challengeStackNextGate": "Keep brand/story interpretation separate from catalog, checkout, fulfillment, publication, and customer-outcome proof."
     },
     {
+      "slug": "sync-party",
+      "repository": "jussray/sync-party-game",
+      "role": "real-time multiplayer party game and independently deployable project control room",
+      "entrypoint": "AGENTS_FOUNDER_INTELLIGENCE.md",
+      "constitution": "docs/FOUNDER_INTELLIGENCE_CONSTITUTION.md",
+      "primaryAgentContract": "AGENTS.md",
+      "status": "enforced",
+      "nextAction": "Keep SYNC independently operable while preserving its privacy-safe bounded relay into Founder Control Room and re-prove exact runtime identity whenever authoritative source moves.",
+      "challengeStackStatus": "on-main",
+      "challengeStackCarrier": "AGENTS_FOUNDER_INTELLIGENCE.md",
+      "challengeStackEvidence": "Re-read from SYNC main on 2026-09-27 at exact SHA 81912973c7355e7de95e0e66f8fe736cf6418a1d. Its local Founder Intelligence entrypoint, constitution, focused inheritance contract, main replay, exact deployed SHA readback, and public production Playwright proof were green before FCR authority registration.",
+      "challengeStackNextGate": "Future SYNC main movement expires the current exact-SHA runtime observation; re-run its core proof and public production Playwright path before carrying successor runtime truth into FCR."
+    },
+    {
       "slug": "promptos",
       "repository": "jussray/promptos",
       "role": "prompt, skill, agent, and instruction governance",

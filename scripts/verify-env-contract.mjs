@@ -71,7 +71,7 @@ function stripQuotes(value) {
 function isSensitiveTemplateKey(key) {
   const normalized = key.toUpperCase();
   return /(?:^|_)(?:SECRET|TOKEN|PASSWORD)(?:_|$)/.test(normalized)
-    || /(?:^|_)(?:PRIVATE|SERVICE_ROLE|API|ENCRYPTION|SIGNING|ACCESS)_KEY(?:_|$)/.test(normalized)
+    || /(?:^|_)(?:PRIVATE|SERVICE_ROLE|API|ENCRYPTION|SIGNING|ACCESS|OPERATOR)_KEY(?:_|$)/.test(normalized)
     || /_HOOK_URL$/.test(normalized)
     || /_GRANT_JSON$/.test(normalized)
     || normalized === 'DATABASE_URL';
@@ -83,6 +83,7 @@ for (const sensitiveKey of [
   'STRIPE_SECRET_KEY',
   'GITHUB_PRIVATE_KEY',
   'SUPABASE_SERVICE_ROLE_KEY',
+  'PROMPTOS_AI_OPERATOR_KEY',
 ]) {
   requireValue(isSensitiveTemplateKey(sensitiveKey), `sensitive key classifier must reject ${sensitiveKey}`);
 }
