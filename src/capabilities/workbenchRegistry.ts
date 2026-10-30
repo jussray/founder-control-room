@@ -124,7 +124,8 @@ export const capabilities = [
     environment: [
       'FCR remains the control plane and authority owner',
       'Canonical plugin package: plugins/buffer-control',
-      'Preferred provider runtime: https://mcp.buffer.com/mcp via Buffer OAuth',
+      'Native provider backend: src/lib/bufferDirectProvider.ts → https://api.buffer.com with server-side BUFFER_API_KEY',
+      'Optional provider runtime: https://mcp.buffer.com/mcp when a compatible OAuth MCP host is available',
       'Provider credentials remain external to every repository',
       'Host adapters such as Make are transport adapters only and require fresh runtime discovery',
     ],
@@ -137,7 +138,7 @@ export const capabilities = [
       'SignalLoop=propose/measure, Chief=route/compose, FCR=authorize/execute, Sol=verify/continuity, PromptOS=prompt/copy input',
     ],
     risk: 'Consequential provider writes remain proposal-bound FCR actions. This capability does not let SignalLoop, Chief, Sol, PromptOS, a model, a prompt, or a host adapter manufacture publication authority, expose Buffer credentials, or treat provider acceptance as proof of publication.',
-    implementation: `canonicalPlugin=plugins/buffer-control; provider=buffer; preferredMcp=https://mcp.buffer.com/mcp; authorityOwner=fcr; credentials=external;
+    implementation: `canonicalPlugin=plugins/buffer-control; directAdapter=src/lib/bufferDirectProvider.ts; provider=buffer; directApi=https://api.buffer.com; optionalMcp=https://mcp.buffer.com/mcp; authorityOwner=fcr; credentials=external;
 peerRoles=signal-loop:propose+measure,chief:route+compose,fcr:authorize+execute,sol:verify+continuity,promptos:prompt+copy;
 runtimeDiscovery=required; approvalBinding=proposalId; receiptRequired=true; providerAcceptedIsPublished=false;`,
   },
