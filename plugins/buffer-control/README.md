@@ -54,3 +54,10 @@ Source implementation alone is not runtime proof. Before calling this plugin liv
 8. only then enable queue/schedule writes for the campaign.
 
 Do not treat a request being sent as proof that Buffer accepted, scheduled, or published it.
+
+
+## Native FCR backend
+
+FCR can execute governed Buffer drafts without Make. The native backend is `src/lib/bufferDirectProvider.ts` against `https://api.buffer.com`, authenticated only by the server-side `BUFFER_API_KEY` secret. `src/lib/bufferEditorialDraftRuntime.ts` applies the checked-in draft firewall, resolves the logical Juss/FCR channel binding, creates a Buffer draft, then verifies the post remains in `draft` state.
+
+The Buffer MCP package remains available as a portable optional integration surface. It does not replace FCR authority, approval, idempotency, or receipt truth.
