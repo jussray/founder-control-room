@@ -1,5 +1,7 @@
 # Founder Merge Authority
 
+Documentation Truth and the test-discovery ratchet must evaluate PR changes against the freshly resolved target branch, with exact-SHA fetch and candidate-ancestry validation. A stored PR-event base can predate inherited main changes and cannot replace that live observation. Push events retain their exact before-SHA range. Resolution, fetch, or ancestry failures block the associated proof; a corrected input or passing gate never supplies founder-final merge approval.
+
 ## Current founder decision
 
 Juss grants Founder Control Room and its governed operators the merge capability/authority class, but **does not grant standing approval to execute any specific merge**.
@@ -180,6 +182,12 @@ Merge authority and exact-candidate merge approval do not automatically authoriz
 - deletion of branches, files, records, history, or user material.
 
 Those actions still require their own exact approval unless a later founder directive explicitly grants standing authority for that category.
+
+## GitHub native Auto-merge — founder-selected queue
+
+When the founder explicitly selects **Enable auto-merge** on a specific pull request, GitHub may queue that PR for automatic integration after *all configured required* reviews, exact-head checks, tests, and branch protection or merge-queue conditions succeed. The founder should not have to perform a second manual merge click once every actual provider gate permits integration. Optional workflows are **not** implicitly required by GitHub: keep each load-bearing workflow/job wired to an authoritative required status check or required aggregate gate. Source declarations are not proof of live GitHub ruleset configuration.
+
+The queue request is **not** proof that merge happened, does not waive founder-final exact PR/base/head approval where required by the canonical FCR authority membrane, and grants no deployment or other mutation. PR Continuity may observe `auto_merge_intent: QUEUED` from provider readback, but its `merge_approved` and `authorizes_merge` fields remain false. A merge conflict, draft state, stale review, changed base/head, incomplete required check, or missing applicable approval must block integration; do not force-merge, auto-fabricate receipts, silently rebase, or downgrade rules. A new candidate requires fresh exact-head verification and approvals. GitHub's native Auto-merge machinery—not PR Continuity or an AI agent—performs any eventual merge.
 
 ## Operating rule
 

@@ -4,7 +4,7 @@ import {
   escalateToPagerDuty,
   type SecurityVerdict,
   emitReciprocalTelemetryWithEscalation,
-} from '../incidentEscalation';
+} from '../incidentEscalation.js';
 
 function createMockVerdict(verdict: string = 'REPAIR_REQUIRED'): SecurityVerdict {
   return {
@@ -135,5 +135,54 @@ describe('incident-escalation', () => {
 
     expect(logSpy).not.toHaveBeenCalled();
     logSpy.mockRestore();
+  });
+
+  // IMPLANT 4 TEST: GraphQL error detection in Linear
+  it('detects Linear GraphQL permission error (200 OK but errors in body)', async () => {
+    let linearCalled = false;
+    global.fetch = vi.fn(async (url) => {
+      if (typeof url === 'string' && url.includes('linear')) {
+        linearCalled = true;
+        // Simulate Linear returning 200 OK with permission error in body
+        return new Response(
+          JSON.stringify({
+            errors: [{ message: 'Insufficient scope: issues:create' }],
+            data: null,
+          }),
+          { status: 200 },
+        );
+      }
+      return new Response('error', { status: 404 });
+    }) as any;
+
+    const { logIncidentToLinear } = await import('../incidentEscalation.js');
+    const verdict = createMockVerdict('REPAIR_REQUIRED');
+    const env = { LINEAR_API_KEY: 'read-only-key' };
+
+    const result = await logIncidentToLinear(verdict, env);
+    expect(linearCalled).toBe(true);
+    expect(result).toBe(false); // Should detect the error and return false
+  });
+
+  // IMPLANT 5 TEST: Critical escalation failure detection
+  it('detects when all escalation channels fail on REPAIR_REQUIRED', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    // All channels fail
+    global.fetch = vi.fn(async () => new Response('error', { status: 500 })) as any;
+
+    const { escalateIncident } = await import('../incidentEscalation.js');
+    const verdict = createMockVerdict('REPAIR_REQUIRED');
+    const env = {}; // No webhooks
+
+    await escalateIncident(verdict, env);
+
+    // Check if critical error was logged
+    const criticalErrorCall = errorSpy.mock.calls.find((call) =>
+      typeof call[0] === 'string' && call[0].includes('CRITICAL: Escalation failed'),
+    );
+
+    expect(criticalErrorCall).toBeDefined();
+    errorSpy.mockRestore();
   });
 });

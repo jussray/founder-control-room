@@ -1,6 +1,7 @@
 # Cursor Rules — founder-control-room
 
 Before nontrivial work, also read `AGENTS.md`, `GLOBAL_AI.md`, `docs/FOUNDER_CONTROL_ROOM_AND_CHIEF_AI_MASTER_BUILD_SPEC.md`, and `docs/FOUNDER_MERGE_AUTHORITY.md`.
+Also read `skills/outcome-first/SKILL.md` for the minimal authorized outcome, proof, and stopping rule; it never weakens existing founder authority.
 
 Repository and runtime evidence outrank stale prose. When an older instruction conflicts with inspected current code, record the drift and repair the contract rather than reverting reality to the obsolete description.
 

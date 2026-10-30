@@ -281,6 +281,18 @@ export async function ensureChiefProofModeAccessPolicy({
   });
 
   const exact = policies.find((policy) => hasSpecificServiceToken(policy, serviceId));
+  if (policies.some((policy) => policy !== exact && policy?.name === POLICY_NAME)) {
+    throw new Error('A ProofMode CI service-auth policy exists for another rule; refusing automatic overwrite.');
+  }
+  const everyonePolicy = policies.find((policy) => (
+    (policy?.decision === 'allow' || policy?.decision === 'bypass')
+    && Array.isArray(policy.include)
+    && policy.include.some((rule) => rule && typeof rule === 'object' && !Array.isArray(rule)
+      && Object.prototype.hasOwnProperty.call(rule, 'everyone'))
+  ));
+  if (everyonePolicy) {
+    throw new Error(`Effective Chief Access application carries an Everyone policy (${everyonePolicy.decision}); remove it before Service Auth can be certified.`);
+  }
   if (exact) {
     return { state: 'configured', changed: false, appId, policyId: exact.id || null, scope: effective.scope, serviceTokenId: serviceId, targetOrigin: target.origin };
   }
@@ -319,6 +331,7 @@ export function classifyChiefAccessError(error) {
   if (/Multiple service-token identities/.test(message)) return 'service-token-binding-ambiguous';
   if (/No matching Chief Service Auth policy/.test(message)) return 'service-auth-policy-missing';
   if (/ProofMode CI service-auth policy exists for another rule/.test(message)) return 'service-auth-policy-conflict';
+  if (/carries an Everyone policy/.test(message)) return 'everyone-policy-present';
   if (/Multiple public Access applications|Multiple preview_worker Access applications|Multiple worker Access applications|Expected exactly one Chief Worker identity|Could not resolve an effective Access application/.test(message)) {
     return 'access-application-ambiguous-or-unresolved';
   }
