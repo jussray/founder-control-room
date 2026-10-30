@@ -26,6 +26,17 @@ export function planFreshnessIncident(receipt) {
   if (receipt.allFresh && results.length === 0) {
     throw new Error('inconsistent allFresh receipt: no adapter results');
   }
+  if (results.length > 0 && (
+    !Number.isSafeInteger(receipt.adapterCount)
+    || receipt.adapterCount !== results.length
+    || receipt.adapterCount < 1
+  )) {
+    throw new Error('inconsistent adapter count in freshness receipt');
+  }
+  const identities = results.map((item) => item?.adapterId);
+  if (new Set(identities).size !== identities.length) {
+    throw new Error('duplicate adapter identity in freshness receipt');
+  }
 
   const abnormal = results.filter((item) =>
     !item || !item.assessment
