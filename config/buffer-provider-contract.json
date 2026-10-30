@@ -98,16 +98,46 @@
     "releaseState": "VERIFIED_PUBLISHED",
     "verifiedLeverageCountState": "VERIFIED_PUBLISHED",
     "assertions": [
-      { "id": "A1", "name": "founder_approval_claim_correlated_advisory_only" },
-      { "id": "A2", "name": "authority_consumption_claim_correlated_advisory_only" },
-      { "id": "A3", "name": "review_window_twenty_minute_duration_enforced" },
-      { "id": "A4", "name": "actual_canonical_payload_hashed_and_correlated" },
-      { "id": "A5", "name": "provider_capability_claim_correlated_advisory_only" },
-      { "id": "A6", "name": "derived_idempotency_and_reservation_claim_correlated" },
-      { "id": "A7", "name": "provider_readback_claim_linkedin_correlated" },
-      { "id": "A8", "name": "ingress_verification_claim_correlated_replay_bounded" },
-      { "id": "A9", "name": "runtime_claim_linkedin_correlated" },
-      { "id": "A10", "name": "current_exact_evidence_history_and_red_states_safe" }
+      {
+        "id": "A1",
+        "name": "founder_approval_claim_correlated_advisory_only"
+      },
+      {
+        "id": "A2",
+        "name": "authority_consumption_claim_correlated_advisory_only"
+      },
+      {
+        "id": "A3",
+        "name": "review_window_twenty_minute_duration_enforced"
+      },
+      {
+        "id": "A4",
+        "name": "actual_canonical_payload_hashed_and_correlated"
+      },
+      {
+        "id": "A5",
+        "name": "provider_capability_claim_correlated_advisory_only"
+      },
+      {
+        "id": "A6",
+        "name": "derived_idempotency_and_reservation_claim_correlated"
+      },
+      {
+        "id": "A7",
+        "name": "provider_readback_claim_linkedin_correlated"
+      },
+      {
+        "id": "A8",
+        "name": "ingress_verification_claim_correlated_replay_bounded"
+      },
+      {
+        "id": "A9",
+        "name": "runtime_claim_linkedin_correlated"
+      },
+      {
+        "id": "A10",
+        "name": "current_exact_evidence_history_and_red_states_safe"
+      }
     ],
     "identityBindings": [
       "publication_run_id",
@@ -212,5 +242,24 @@
     "gmailPollingTriggerAcceptedForDeadlineCommands": false,
     "controlledSyntheticRunRequired": true,
     "exactReceiptCorrelationRequired": true
+  },
+  "directApi": {
+    "endpoint": "https://api.buffer.com",
+    "auth": "bearer-env",
+    "apiKeyEnv": "BUFFER_API_KEY",
+    "allowedWrite": "create_draft_only",
+    "createPost": {
+      "schedulingType": "automatic",
+      "mode": "addToQueue",
+      "saveToDraft": true,
+      "dueAt": null
+    },
+    "requiredReadback": {
+      "postId": true,
+      "channelIdMatch": true,
+      "textMatch": true,
+      "status": "draft"
+    },
+    "publicPublishAllowed": false
   }
 }
