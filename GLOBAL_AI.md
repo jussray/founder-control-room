@@ -1,5 +1,7 @@
 # Founder Control Room Global AI Contract
 
+For pull-request Documentation Truth and test-discovery proof, resolve and fetch the live target branch before comparing it with the exact candidate; reject missing, invalid, unavailable, or non-ancestor bases. Keep the event's historical base identity separate from current scope. Default-branch push proof uses the exact push-before SHA. This repairs proof inputs without transferring merge, deployment, or provider authority.
+
 ## Parent operating contract
 
 Before nontrivial work, read [`Juss Founder OS`](.ai/skills/juss-founder-os/SKILL.md).

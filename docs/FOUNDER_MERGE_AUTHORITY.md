@@ -1,5 +1,7 @@
 # Founder Merge Authority
 
+Documentation Truth and the test-discovery ratchet must evaluate PR changes against the freshly resolved target branch, with exact-SHA fetch and candidate-ancestry validation. A stored PR-event base can predate inherited main changes and cannot replace that live observation. Push events retain their exact before-SHA range. Resolution, fetch, or ancestry failures block the associated proof; a corrected input or passing gate never supplies founder-final merge approval.
+
 ## Current founder decision
 
 Juss grants Founder Control Room and its governed operators the merge capability/authority class, but **does not grant standing approval to execute any specific merge**.

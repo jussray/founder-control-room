@@ -12,6 +12,8 @@ owner: Juss
 
 # Juss Flow Launch Loop
 
+When verifying pull-request Documentation Truth or test discovery, resolve the live target branch, fetch its full SHA, and require it to be an ancestor of the exact checked-out candidate before computing the reviewed range. Stored event-base identity is historical context; default-branch push verification instead uses the exact before SHA. Invalid refs, unavailable fetches, malformed identities, and stale candidate ancestry fail closed without becoming product-regression or merge-approval claims.
+
 ## Goal
 
 Move the authoritative product toward a truthful full app launch without replacing Juss's intent with a smaller cosmetic task, creating fake-green evidence, deleting history, leaking private sauce, or scaling an unproven path.
