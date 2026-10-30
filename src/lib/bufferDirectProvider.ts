@@ -256,6 +256,8 @@ export function createBufferDirectProvider(config: BufferDirectProviderConfig) {
       input: {
         text: body,
         channelId,
+        assets: [],
+        needsApproval: false,
         schedulingType: 'automatic',
         mode: 'addToQueue',
         saveToDraft: true,
