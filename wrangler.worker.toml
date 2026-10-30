@@ -94,6 +94,15 @@ N8N_FOUNDER_CONTENT_EXPECTED_RUNTIME_VERSION = "2.32.6"
 # deployment preserves them rather than copying their values through Actions.
 # The deploy preflight reads this required-name registry and fails closed before
 # mutation when any provider-held binding is missing. Values are never read.
+#
+# Founder Path B ruling (2026-10-30): the deploy gate requires only the
+# boot/deploy-essential names below — every one is already installed on the
+# production Worker, and the Worker's startup bindings
+# (src/worker/handler.ts REQUIRED_STRING_BINDINGS) are fully satisfied by
+# these secrets plus the [vars] above. The feature names under
+# [secrets].optional are NOT required to deploy or boot; each must be
+# installed on the Worker before its named feature is activated, and the
+# feature stays dark until then.
 [secrets]
 required = [
   "SUPABASE_SERVICE_ROLE_KEY",
@@ -101,16 +110,22 @@ required = [
   "FOUNDER_SESSION_ENCRYPTION_KEY",
   "GITHUB_WEBHOOK_SECRET",
   "GITHUB_APP_ID",
+  "OPENAI_API_KEY",
+  "FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON",
+  "FOUNDER_SIGNAL_ENGINE_MCP_TOKEN",
+]
+
+# Feature secrets: required before enabling the named feature, not required
+# to deploy or boot. Install on the founder-control-room Worker first, then
+# move the name into [secrets].required in the feature's activation change.
+optional = [
   "GITHUB_PRIVATE_KEY",
   "FCR_REMOTE_MCP_READ_TOKEN",
   "FCR_SHOPIFY_WEBHOOK_SECRET",
   "FCR_COMMERCE_HASH_SALT",
   "FCR_CLOUDFLARE_MCP_READ_TOKEN",
-  "OPENAI_API_KEY",
   "ANTHROPIC_API_KEY",
   "MODEL_API_KEY",
-  "FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON",
-  "FOUNDER_SIGNAL_ENGINE_MCP_TOKEN",
   "ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL",
   "FOUNDER_REVIEW_EMAIL_INGRESS_SECRET",
   "N8N_FOUNDER_CONTENT_WEBHOOK_URL",
