@@ -24,6 +24,16 @@ export interface BufferEditorialDraftRuntimeOptions {
   fetchImpl?: typeof fetch;
 }
 
+export interface PreparedBufferEditorialDraft {
+  logicalChannel: string;
+  providerChannelId: string;
+  service: string;
+  text: string;
+  sourceCommitSha: string;
+  invocationId: string;
+  proposalFingerprint: string;
+}
+
 export interface BufferEditorialDraftRuntimeReceipt {
   contract: typeof BUFFER_EDITORIAL_DRAFT_RUNTIME_CONTRACT;
   provider: 'buffer';
@@ -78,11 +88,10 @@ function assertDraftContract(prepared: JsonRecord): void {
   }
 }
 
-export async function executeBufferEditorialDraft(
+export function prepareBufferEditorialDraft(
   input: JsonRecord,
-  options: BufferEditorialDraftRuntimeOptions = {},
-): Promise<BufferEditorialDraftRuntimeReceipt> {
-  const env = options.env ?? process.env;
+  options: Pick<BufferEditorialDraftRuntimeOptions, 'now'> = {},
+): PreparedBufferEditorialDraft {
   const nowMs = validNow(options.now);
   const prepared = firewall.validateBufferPublishInput(input, { nowMs });
   assertDraftContract(prepared);
@@ -92,20 +101,49 @@ export async function executeBufferEditorialDraft(
   const body = text(prepared.validated_post_text);
   const sourceCommitSha = text(prepared.source_commit_sha).toLowerCase();
   const invocationId = text(prepared.invocation_id);
+  const proposalFingerprint = sha256({
+    contract: BUFFER_EDITORIAL_DRAFT_RUNTIME_CONTRACT,
+    logicalChannel: proposal.logicalChannel,
+    providerChannelId: proposal.providerChannelId,
+    service: proposal.service,
+    text: body,
+    sourceCommitSha,
+    invocationId,
+    publishAllowed: false,
+    scheduleAllowed: false,
+  });
+
+  return {
+    logicalChannel: binding.logicalChannel,
+    providerChannelId: binding.providerChannelId,
+    service: binding.service,
+    text: body,
+    sourceCommitSha,
+    invocationId,
+    proposalFingerprint,
+  };
+}
+
+export async function executeBufferEditorialDraft(
+  input: JsonRecord,
+  options: BufferEditorialDraftRuntimeOptions = {},
+): Promise<BufferEditorialDraftRuntimeReceipt> {
+  const env = options.env ?? process.env;
+  const proposal = prepareBufferEditorialDraft(input, { now: options.now });
 
   const provider = createBufferDirectProvider({
     apiKey: apiKey(env),
     fetchImpl: options.fetchImpl,
   });
   const receipt: BufferDraftReceipt = await provider.createDraftPost({
-    channelId: binding.providerChannelId,
-    text: body,
+    channelId: proposal.providerChannelId,
+    text: proposal.text,
   });
 
   if (receipt.state !== 'BUFFER_ACCEPTED_DRAFT' || receipt.status !== 'draft') {
     throw new Error('BUFFER_DRAFT_RUNTIME_PROVIDER_STATE_INVALID');
   }
-  if (receipt.channelId !== binding.providerChannelId) {
+  if (receipt.channelId !== proposal.providerChannelId) {
     throw new Error('BUFFER_DRAFT_RUNTIME_PROVIDER_CHANNEL_MISMATCH');
   }
 
@@ -118,15 +156,9 @@ export async function executeBufferEditorialDraft(
     service: binding.service,
     postId: receipt.postId,
     status: 'draft',
-    contentFingerprint: sha256({
-      text: body,
-      channel: binding.logicalChannel,
-      providerChannelId: binding.providerChannelId,
-      sourceCommitSha,
-      invocationId,
-    }),
-    sourceCommitSha,
-    invocationId,
+    contentFingerprint: proposal.proposalFingerprint,
+    sourceCommitSha: proposal.sourceCommitSha,
+    invocationId: proposal.invocationId,
     publishAllowed: false,
     scheduleAllowed: false,
     providerAcceptanceIsPublished: false,
