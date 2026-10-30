@@ -1,5 +1,7 @@
 # Founder Merge Authority
 
+Documentation Truth and the test-discovery ratchet must evaluate PR changes against the freshly resolved target branch, with exact-SHA fetch and candidate-ancestry validation. A stored PR-event base can predate inherited main changes and cannot replace that live observation. Push events retain their exact before-SHA range. Resolution, fetch, or ancestry failures block the associated proof; a corrected input or passing gate never supplies founder-final merge approval.
+
 ## Current founder decision
 
 Juss grants Founder Control Room and its governed operators the merge capability/authority class, but **does not grant standing approval to execute any specific merge**.
@@ -181,6 +183,12 @@ Merge authority and exact-candidate merge approval do not automatically authoriz
 
 Those actions still require their own exact approval unless a later founder directive explicitly grants standing authority for that category.
 
+## GitHub native Auto-merge — founder-selected queue
+
+When the founder explicitly selects **Enable auto-merge** on a specific pull request, GitHub may queue that PR for automatic integration after *all configured required* reviews, exact-head checks, tests, and branch protection or merge-queue conditions succeed. The founder should not have to perform a second manual merge click once every actual provider gate permits integration. Optional workflows are **not** implicitly required by GitHub: keep each load-bearing workflow/job wired to an authoritative required status check or required aggregate gate. Source declarations are not proof of live GitHub ruleset configuration.
+
+The queue request is **not** proof that merge happened, does not waive founder-final exact PR/base/head approval where required by the canonical FCR authority membrane, and grants no deployment or other mutation. PR Continuity may observe `auto_merge_intent: QUEUED` from provider readback, but its `merge_approved` and `authorizes_merge` fields remain false. A merge conflict, draft state, stale review, changed base/head, incomplete required check, or missing applicable approval must block integration; do not force-merge, auto-fabricate receipts, silently rebase, or downgrade rules. A new candidate requires fresh exact-head verification and approvals. GitHub's native Auto-merge machinery—not PR Continuity or an AI agent—performs any eventual merge.
+
 ## Operating rule
 
 Do not merge merely because a PR exists, because a badge looks green, because `merge_authority` is true, or because the founder asked for review/implementation. **Before every merge, ask for and obtain explicit founder approval for the exact current repository, PR, base SHA, and head SHA unless that exact approval is already present and still current.**
@@ -192,7 +200,3 @@ Immediately before merge, re-read current `main`, the exact PR head, required ch
 A required test contributes to merge readiness only when the exact-head workflow that feeds the applicable gate actually executes it. A committed but uninvoked test is source evidence, not CI proof. For LinkedIn analytics continuity, `.github/workflows/ci.yml` must keep `scripts.test_linkedin_analytics_continuity` inside the load-bearing `python-tests` job, and `Required Gate` must continue to depend on that job. Missing LinkedIn activity rows must remain `UNKNOWN_NO_EVIDENCE` with null metrics, never synthetic zero impressions or engagements.
 
 For public crawler and work-directory behavior, `.github/workflows/ci.yml` must keep `e2e/pages-api-recovery.spec.ts` and `e2e/public-work-directory.spec.ts` inside the load-bearing `Playwright e2e` job that feeds `Required Gate`; a green specialized Pages workflow alone cannot satisfy merge-required browser proof or authorize integration.
-
-## 2026-10-26 locked-install and StoryEngine evidence update
-
-Core CI reproducibility requires the Type check, Lint, Test, and Playwright e2e install steps in `.github/workflows/ci.yml` to use `npm ci --no-audit --no-fund` with the committed lockfile; a command edit is source evidence, not a completed required check. A separately observed StoryEngine main SHA may update the pinned peer subject in `.github/workflows/playwright.yml` only as a recovery prerequisite. Neither pinned peer equality nor local browser success substitutes for the complete current-head federation witness, required reviews, branch rules, or exact PR/base/head founder merge approval.
