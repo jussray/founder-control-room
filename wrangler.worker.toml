@@ -117,6 +117,7 @@ required = [
   "N8N_FOUNDER_CONTENT_BEARER_TOKEN",
   "N8N_FOUNDER_CONTENT_EXPECTED_WORKFLOW_FINGERPRINT",
   "N8N_FOUNDER_CONTENT_IDENTITY_HMAC_SECRET",
+  "BUFFER_API_KEY",
 ]
 
 # With the duplicate API Worker deleted, this Worker is also the sole owner of
