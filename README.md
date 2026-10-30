@@ -1,5 +1,32 @@
 # Founder Control Room
 
+Documentation Truth and test discovery resolve a pull request's live target branch at verification time, fetch its exact commit, and require it to be an ancestor of the checked-out candidate before evaluating the change. The event's stored base SHA remains historical context. Push verification instead uses the exact push-before SHA; missing, malformed, unavailable, or non-ancestor bases block proof. Passing these source checks grants no merge or deployment authority.
+
+## October 26, 2026 — StoryEngine peer identity renewal for FCR PR #1020 (candidate only)
+
+The exact FCR PR #1020 Playwright run for `8e30ec5418f2fc732b96d8dc5263af4a82f5e5a3` passed its browser harness but stopped at live StoryEngine peer equality: expected `87501be2da31d12f421b0ed2da49df357fc9fcb1`, independently observed `499f2d4eb9edac8bb11b657cf003a056263528d9`. GitHub confirms StoryEngine `refs/heads/main` advanced strictly by two commits, with changes in `story-engine/lib/llmClient.js` and `story-engine/lib/museClient.js`; the federation-specific contract was unchanged in that compare. The successor commit completed its observed push workflows successfully, including the Control Room federation contract; its Supabase Preview check was skipped and cannot be counted as green runtime proof.
+
+`.github/workflows/playwright.yml` now selects `499f2d4eb9edac8bb11b657cf003a056263528d9` as a new exact peer evidence subject. This repin does **not** transfer any earlier FCR Playwright green or grant merge, deploy, publication, provider mutation, or independent runtime authority. Only the successor FCR head's full immutable-peer checkout, runtime identity, directive/receipt/replay, and browser checks can verify the new pair; any later peer/main movement invalidates the pin's currentness.
+
+## October 28, 2026: PR #1044 peer identity renews after StoryEngine governance move
+
+The previous FCR candidate at `e35b9ecff7801e2b6d36910a9f40208f9815cfdb` selected StoryEngine `dc79a23ffa8e6e5b0964efccdaee7c961b9b9e1d`, but StoryEngine `main` subsequently moved strictly one commit forward to `bffc9f771b673055403f52b29c86b30e5f4dd8c8`. The single successor commit changed `.control-room/necessary-fix-policy.json` and `AGENTS_FOUNDER_INTELLIGENCE.md` and had 14 successful exact-head check runs at observation. This is a governance/instruction delta, **not** FCR-to-StoryEngine runtime proof.
+
+FCR's `STORYENGINE_PEER_SHA` now selects `bffc9f771b673055403f52b29c86b30e5f4dd8c8` as the next evidence subject. Exact-head CI must re-run live-ref equality, immutable checkout, federation runtime, directive/receipt/replay and browser witnesses. Any later peer movement expires the match. The renewed pin cannot authorize merge, deploy, provider writes, publication or production claims.
+
+## October 28, 2026 (UTC): StoryEngine peer moved during Outcome-First PR review
+
+At FCR PR #1044 head `ad1d98285a72f9166584f8208618775eb3e21c73`, local Playwright journeys passed, but the separate live-ref equality gate correctly failed: the FCR workflow expected StoryEngine `4601cc3a8297875c97e54717f2aeb47db44d0595` and observed `dc79a23ffa8e6e5b0964efccdaee7c961b9b9e1d`. A fresh GitHub compare established that the successor was three commits ahead and zero behind. Changes include StoryEngine runtime and test paths as well as workflows, so this is **not** a configuration-only no-op.
+
+The successor StoryEngine commit showed 17 successful check runs and one skipped check when inspected. Rebasing the FCR `STORYENGINE_PEER_SHA` pin to `dc79a23ffa8e6e5b0964efccdaee7c961b9b9e1d` only selects the next dependency subject: it does **not** establish FCR↔StoryEngine runtime compatibility, passed Playwright, deployability, merge readiness, or outcome proof. The amended FCR candidate requires a fresh exact-head peer-ref comparison, immutable checkout, runtime identity, federation contract and browser witness. Any future StoryEngine main movement invalidates this pin's live-ref equality claim.
+
+No merge, deployment, provider, credential, production, or publication permission is granted by this documentation or pin update.
+
+
+## Outcome-First agent workflow
+
+`skills/outcome-first/SKILL.md` defines one shared outcome, authority, acceptance and stop workflow for Codex, Claude Code, Gemini, Copilot, Cursor and Windsurf. Thin adapters point to the same source; FCR founder approval, privacy, evidence, exact-head review, merge and deployment gates remain unchanged. This is repository instruction text, not proof of live agent activation.
+
 ## October 27, 2026 StoryEngine preview-config peer refresh
 
 FCR PR #1038 passed its local browser journeys and then correctly failed the separate StoryEngine live-ref equality gate because the pinned peer `89e92445dfde114b831e8cf6b5383f42ebccca4d` had advanced to `4601cc3a8297875c97e54717f2aeb47db44d0595`. The successor is one commit strictly ahead and changes only `story-engine/wrangler.jsonc`, adding preview-specific runtime-origin and API rate-limit configuration.
@@ -10,7 +37,7 @@ The exact StoryEngine successor completed Agent Contract v1, L99 Promotion Gates
 
 `config/cloudflare-logpush.portfolio.json` is the source-only desired-state registry for portfolio Logpush participation. It declares one account-scoped `workers_trace_events` job and the authorized repository set; it does not prove that a Cloudflare Logpush job currently exists or that any destination has received logs.
 
-Active participation must also respect repository-local governance. Investigate-only or historical repositories are excluded from the active Logpush registry even when FCR preserves them for provenance. Under their current repository contracts, `jussray/sekret-bip-companions`, `jussray/Bip-Jr`, and `jussray/Sekret-Bip-Bridge` are provenance/investigation-only rather than active Logpush participants. `jussray/jussray-bip-and-seek` is also excluded because audited current `main` is a Roblox runtime with no Cloudflare Worker. `jussray/Sekret-Bip-Parents` is currently a static Cloudflare Pages site with no Functions, `_worker.js`, or Wrangler Worker runtime, and `jussray/Sekret-Bip-Gov` is a governance/control repository with no runtime surface. Account-scoped `workers_trace_events` participation is therefore not applicable to those repositories in their current-main states. The Companions repository-side cleanup is tracked separately in FCR issue #1036 because that repo requires explicit founder approval before deletion or revert.
+Active participation must also respect repository-local governance. Investigate-only or historical repositories are excluded from the active Logpush registry even when FCR preserves them for provenance; `jussray/sekret-bip-companions` is therefore not an active participant under its current investigate-only contract. The repository-side cleanup is tracked separately in FCR issue #1036 because that repo requires explicit founder approval before deletion or revert.
 
 Pull-request validation is non-mutating. Provider inspection uses a dedicated read credential. Provider apply remains a separate founder-gated action bound to the exact current `main` SHA, an auditable approval reference, a dedicated write credential, and provider-held destination configuration. A successful apply must complete provider readback before the receipt may claim the desired job is verified.
 
@@ -131,6 +158,10 @@ Actual Cowork access to GitHub depends on the user's Claude-side GitHub connecto
 
 The current FCR Cowork lane intentionally labels its native receipt integration as **not wired**. Generic Activity entries are not promoted to Cowork receipts, and FCR does not claim Cowork-specific receipt ingestion until a separately reviewed adapter exists and is proven. Council participation, connector availability, or Cowork tool access grants no merge, deploy, provider, credential, billing, publication, deletion, or founder authority.
 
+### Founder-selected GitHub Auto-merge
+
+When the founder enables GitHub's native Auto-merge on an individual PR, GitHub queues that PR until all **configured required** reviews, checks, tests, and branch-protection or merge-queue conditions pass; no second manual merge click is required after those gates clear. Checks that are merely optional are not automatically merge blockers, so intended load-bearing checks must be configured as required in the live ruleset. The PR Continuity workflow now observes `auto_merge_enabled` and `auto_merge_disabled` and records `auto_merge_intent` from provider PR readback as `QUEUED`, `NOT_QUEUED`, or `UNKNOWN`. This is queue metadata, **not** exact-candidate founder-final approval, deterministic independent review, production proof, or merge/deploy authority. Merge conflicts, draft PRs, stale exact heads, missing required gates, or missing applicable founder approval remain blocked. Verify GitHub's current ruleset before claiming native enforcement; no source workflow can silently change that provider setting.
+
 ### PR continuity
 
 The repository has machine-enforced PR continuity. Eligible same-repository branches may roll forward when their live base moves, but every head movement creates a new proof subject.
@@ -169,6 +200,8 @@ The StoryEngine peer pin is an evidence identity, not a durable alias for “cur
 See [`docs/REPOSITORY_FEDERATION.md`](docs/REPOSITORY_FEDERATION.md).
 
 ### Jira work automation
+
+The manual [Jira live provider probe](docs/JIRA_LIVE_PROVIDER_PROBE.md) binds its POST to the approved full runtime SHA in addition to the `/version` preflight. The authenticated ingress rejects missing, malformed, or mismatched probe bindings before provider dispatch, so a rollout between requests cannot turn a post-effect mismatch into false prevention. Ordinary authenticated Jira observations retain their existing contract. Dispatch receipts still require independent Jira readback before any end-to-end outcome claim.
 
 FCR owns the bounded Jira source contract, authenticated service ingress, and importable n8n workflow artifact. The artifact ships inactive and carries no Jira credential authority.
 
@@ -289,7 +322,7 @@ The Worker-only reconciliation workflow must run the same canonical Cloudflare r
 
 Worker-only production reconciliation now has a second, separately verifiable release gate: direct `api.foundercontrolroom.org/version` and public `foundercontrolroom.org/version` must both return the canonical Worker service header and exact approved source SHA. The Pages `FCR_API` service binding, API Worker custom-domain assignment, Cloudflare request-tracer simulation, and a successful GitHub build are configuration or test evidence, **not** substitutes for these live response receipts. Missing public identity evidence fails the workflow closed rather than weakening Pages' identity check.
 
-The first-party FCR Shopify paid-order ingress follows the same boundary. `FCR_SHOPIFY_WEBHOOK_SECRET` and `FCR_COMMERCE_HASH_SALT` must remain provider-held required Worker secrets before promotion, while source merely declares their names. Their presence cannot prove that Shopify registered the `orders/paid` callback, that the deployed Worker serves the exact commerce head, that the production Supabase migration exists, or that any payment was collected; those claims require separate provider, deployment, database, runtime, and revenue receipts.
+The first-party FCR Shopify paid-order ingress follows the same boundary. `FCR_SHOPIFY_WEBHOOK_SECRET` and `FCR_COMMERCE_HASH_SALT` must be installed as provider-held Worker secrets before the commerce ingress is activated; under the founder Path B gate (2026-10-30) they are declared in `wrangler.worker.toml [secrets].optional`, so they no longer block canonical Worker promotion, and the ingress must fail closed while either name is absent. Source merely declares their names. Their presence cannot prove that Shopify registered the `orders/paid` callback, that the deployed Worker serves the exact commerce head, that the production Supabase migration exists, or that any payment was collected; those claims require separate provider, deployment, database, runtime, and revenue receipts.
 
 Production does not deploy merely because `main` moved or a Cloudflare build succeeded. A production claim remains incomplete until the authorized lane proves, for one exact candidate:
 
@@ -525,3 +558,10 @@ Provider configuration, site wiring, observed clicks, and commercial outcomes re
 **Source Guard** adds read-only repository checks for the documented guard boundaries and the portfolio conversion-tracking data contract. See [Source Guard documentation](docs/SOURCE_GUARD.md), scripts/verify-sauce-source-guard.mjs, the Node regression tests, and the separate GitHub Actions workflow. Source Guard complements, but does not replace, [Documentation Truth](.github/workflows/documentation-truth.yml).
 
 **Truth boundary:** checked-in policy and tests are source evidence only. A passing workflow does **not** establish that public content was approved or published, that the collector receives real site traffic, or that live security/runtime controls operate correctly. No new deploy, merge, publication, provider-mutation or deletion authority is granted.
+
+## October 24 StoryEngine relay-proof peer refresh
+
+StoryEngine `refs/heads/main` was independently re-observed at `87501be2da31d12f421b0ed2da49df357fc9fcb1`, so FCR's Playwright federation witness now pins that exact peer identity. This pin movement expires every predecessor FCR↔StoryEngine browser/federation witness; it selects the successor evidence subject only.
+
+The successor FCR head must still pass the live-ref equality check, immutable StoryEngine checkout, exact peer runtime identity, directive/receipt binding, replay protections, and the complete Playwright browser witness before the pair may be called current. Pin alignment grants no merge, deploy, production, publication, billing, or provider-mutation authority.
+

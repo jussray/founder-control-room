@@ -16,7 +16,7 @@
       "path": "config/cloudflare-logpush.portfolio.json",
       "claims": [
         "`config/cloudflare-logpush.portfolio.json` must remain the source-only desired-state registry for the account-scoped `workers_trace_events` Logpush job; pull-request verification cannot mutate Cloudflare or prove delivery, and provider apply requires exact-current-main binding, a founder approval reference, a dedicated write credential, destination configuration, and post-write readback.",
-        "`config/cloudflare-logpush.portfolio.json` must exclude repositories whose current-main governance forbids active participation and repositories without an actual Cloudflare Worker execution surface; governance-excluded repos are `jussray/sekret-bip-companions`, `jussray/Bip-Jr`, and `jussray/Sekret-Bip-Bridge`, while runtime-inapplicable repos are Roblox-only `jussray/jussray-bip-and-seek`, static-Pages `jussray/Sekret-Bip-Parents`, and governance-only `jussray/Sekret-Bip-Gov`."
+        "`config/cloudflare-logpush.portfolio.json` must exclude repositories whose local governance marks them historical or investigate-only from active Logpush participation; `jussray/sekret-bip-companions` remains provenance-only until its own governance is explicitly changed."
       ]
     },
     {
@@ -82,13 +82,16 @@
         "FCR Playwright pins StoryEngine to independently re-observed refs/heads/main 6b97b78370fbc25d4b4bb88bfeab136eb4c7dc2f; PR #1004 head 607ec05be0bce5639bab36b75c3661a8af751be6 failed its live-ref gate because it expected 26b1c34ae7c97c5d1b66a23d6345b3965cfcdc1f. The exact StoryEngine commit had 15/15 successful checks at 2026-10-22T23:55:59Z. Pin alignment selects an evidence subject only; PR #1004 needs its own exact-head runtime and receipt/browser witness, and other PR evidence does not transfer.",
         "`.github/workflows/playwright.yml` must pin StoryEngine to freshly observed refs/heads/main 3c46b3649088ac4c6e1775102ba49abf5c779abf after the additive model-capability profile commit moved the peer; pin alignment selects only the successor evidence subject and requires a fresh complete federation/browser witness.",
         "The October 24, 2026 StoryEngine transition from 3c46b3649088ac4c6e1775102ba49abf5c779abf to independently observed 87501be2da31d12f421b0ed2da49df357fc9fcb1 is strictly forward by two commits with 16 observed exact-head checks successful; rebinding STORYENGINE_PEER_SHA selects only the successor federation evidence subject, expires predecessor FCR browser/federation proof, and requires a fresh complete exact-head witness without granting merge, deploy, production, publication, or provider-mutation authority.",
-        "`.github/workflows/playwright.yml` must pin the independently verified StoryEngine successor `4601cc3a8297875c97e54717f2aeb47db44d0595` after preview-runtime configuration moved `main`; the pin selects only the new evidence subject, and the successor FCR head must rerun the complete live-ref, immutable checkout, runtime identity, directive/receipt/replay, and browser witness before pair compatibility can be current."
+        "`.github/workflows/playwright.yml` must pin the independently verified StoryEngine successor `4601cc3a8297875c97e54717f2aeb47db44d0595` after preview-runtime configuration moved `main`; the pin selects only the new evidence subject, and the successor FCR head must rerun the complete live-ref, immutable checkout, runtime identity, directive/receipt/replay, and browser witness before pair compatibility can be current.",
+        "`.github/workflows/playwright.yml` must pin StoryEngine `dc79a23ffa8e6e5b0964efccdaee7c961b9b9e1d` only as the independently observed successor evidence subject from PR #1044; the new FCR head must reverify live ref equality, immutable checkout, runtime identity, directive/receipt/replay and browser federation before compatibility is current. This new pin cannot grant merge, deployment, provider, publication or production authority.",
+        "`.github/workflows/playwright.yml` must select the independently observed StoryEngine successor `bffc9f771b673055403f52b29c86b30e5f4dd8c8` only as the next exact peer identity; a complete fresh live-ref, immutable checkout, federation runtime and browser/receipt witness is required before current pair compatibility can be claimed, and the pin cannot confer merge, deployment or provider authority."
       ]
     },
     {
       "path": ".github/workflows/ci.yml",
       "claims": [
-        "`.github/workflows/ci.yml` must keep the existing crawler and public-work Playwright specs inside the load-bearing `Playwright e2e` job that feeds `Required Gate`; a separate advisory Pages workflow cannot substitute for required exact-head browser execution or grant merge authority."
+        "`.github/workflows/ci.yml` must keep the existing crawler and public-work Playwright specs inside the load-bearing `Playwright e2e` job that feeds `Required Gate`; a separate advisory Pages workflow cannot substitute for required exact-head browser execution or grant merge authority.",
+        ".github/workflows/ci.yml must resolve and fetch the live PR target branch separately for Documentation Truth and test discovery, validate a full nonzero SHA and ancestry in the exact checked-out head, retain exact push-before ranges for push events, and fail without exporting a proof base on resolution or fetch failure."
       ]
     },
     {
@@ -246,7 +249,9 @@
         "`docs/TRUTH_DECAY_AUDIT.md` must record the October 3 URLFix merge-review peer drift as dependency freshness evidence and require PR #896's successor exact-head federation witness before any current pair claim.",
         "`docs/TRUTH_DECAY_AUDIT.md` must record the October 3 agent-contract v1 peer drift as dependency freshness evidence and require the successor exact-head federation witness before any current pair claim.",
         "The audit records PR #1004 head 607ec05be0bce5639bab36b75c3661a8af751be6 failing at stale StoryEngine peer 26b1c34ae7c97c5d1b66a23d6345b3965cfcdc1f, while live StoryEngine main was independently observed at 6b97b78370fbc25d4b4bb88bfeab136eb4c7dc2f with 15/15 successful peer checks. Rebinding does not prove PR #1004 federation or transfer another PR's exact-head evidence.",
-        "TRUTH_DECAY_AUDIT records that the October 24 FCR Playwright failure occurred after the local E2E harness passed and was caused by StoryEngine peer identity drift to 3c46b3649088ac4c6e1775102ba49abf5c779abf; predecessor federation proof does not transfer."
+        "TRUTH_DECAY_AUDIT records that the October 24 FCR Playwright failure occurred after the local E2E harness passed and was caused by StoryEngine peer identity drift to 3c46b3649088ac4c6e1775102ba49abf5c779abf; predecessor federation proof does not transfer.",
+        "`docs/TRUTH_DECAY_AUDIT.md` must preserve PR #1044's prior local Playwright success and failed StoryEngine peer equality as separate historical facts: FCR expected `4601cc3a8297875c97e54717f2aeb47db44d0595`, observed `dc79a23ffa8e6e5b0964efccdaee7c961b9b9e1d`, and cannot claim the successor pair VERIFIED until the new exact FCR head passes the full independent federation and browser witness.",
+        "`docs/TRUTH_DECAY_AUDIT.md` must record that the PR #1044 reconciliation candidate's StoryEngine peer `dc79a23ffa8e6e5b0964efccdaee7c961b9b9e1d` expired when `main` moved to `bffc9f771b673055403f52b29c86b30e5f4dd8c8`, and cannot transfer predecessor federation proof, founder approval, merge or production authority to the successor FCR head."
       ]
     },
     {
@@ -337,14 +342,16 @@
       "claims": [
         "`src/founder-os-lab/projectAdapters.ts` must bind Chief integration evidence to one audited exact Chief head; moving that head expires predecessor adapter and pair-contract proof, requires the focused assertion and path-bound documentation receipt to move together, and grants no Chief runtime, merge, deploy, publication, or provider authority.",
         "`src/founder-os-lab/projectAdapters.ts` must bind Chief PR #242 exact candidate `0d1106424802fa21d37c6a05fc3e6f6422cc989a` to five observed contract blobs, the restored `necessary-fix-policy.json`, and pair blob `dd008420e1a91e78516b45d9e27de89344abf432`. FCR PR #1015 and Chief PR #242 remain draft. Live freshness must fail closed while Chief main still carries stale pair content; no preceding CI proof grants merge, founder, publishing, provider-write, or deploy authority.",
-        "`src/founder-os-lab/projectAdapters.ts` must pin read-only Se’kret Bip adapter evidence to exact observed `main` `e3b6a3a36737f3c1d24c37fd2842ee6d7bf97150` and required `screens/WebWelcomeScreen.tsx` blob `9d3a1128d09d47f3e9b4eb5d8f3da5f3dbe2709c`; the other six audited contract blobs must still match. Audience-to-account-side routing, composite character canon, reduced-motion protection, and preview-only non-execution remain required. Head movement or blob drift must fail closed and cannot create merge, production, publication, or provider authority."
+        "`src/founder-os-lab/projectAdapters.ts` must pin read-only Se\u2019kret Bip adapter evidence to exact observed `main` `e3b6a3a36737f3c1d24c37fd2842ee6d7bf97150` and required `screens/WebWelcomeScreen.tsx` blob `9d3a1128d09d47f3e9b4eb5d8f3da5f3dbe2709c`; the other six audited contract blobs must still match. Audience-to-account-side routing, composite character canon, reduced-motion protection, and preview-only non-execution remain required. Head movement or blob drift must fail closed and cannot create merge, production, publication, or provider authority."
       ]
     },
     {
       "path": "scripts/verify-documentation-truth.mjs",
       "claims": [
         "`scripts/verify-documentation-truth.mjs` must classify `src/founder-os-lab/projectAdapters.ts` as evidence-authority truth-sensitive so a Chief exact-head pin movement cannot pass Documentation Truth without substantive README, truth-decay audit, and structured receipt updates that name the changed path.",
-        "`scripts/verify-documentation-truth.mjs` must classify `tools/zapier/founder-content-outcome-contract.cjs` as evidence-authority truth-sensitive so account-provenance changes cannot pass Documentation Truth without substantive README, truth-decay audit, and path-bound receipt updates."
+        "`scripts/verify-documentation-truth.mjs` must classify `tools/zapier/founder-content-outcome-contract.cjs` as evidence-authority truth-sensitive so account-provenance changes cannot pass Documentation Truth without substantive README, truth-decay audit, and path-bound receipt updates.",
+        "`scripts/verify-documentation-truth.mjs` must cross-check the FCR GitHubProvider required-deployment ownership boundary against the structured documentation receipt when `src/providers/GitHubProvider.ts` is part of the truth-sensitive diff, using an executable semantic guard that rejects preservation or negated-removal claims for `required_deployments`; unrelated docs-only or test-only changes remain free of a receipt requirement.",
+        "scripts/verify-documentation-truth.mjs must register the Jira live-probe client, authenticated ingress, CLI, and manual workflow as evidence-authority paths so changes cannot pass without substantive README, truth-decay, and path-bound receipt updates."
       ]
     },
     {
@@ -357,6 +364,61 @@
       "path": "wrangler.email.toml",
       "claims": [
         "`wrangler.email.toml` must declare the review-email Worker identity, account, entrypoint, private `FOUNDER_CONTROL_ROOM_API -> founder-control-room` Service Binding, and exactly one top-level `addresses` value `review@foundercontrolroom.org`; this is desired state for Wrangler reconciliation, not proof of provider readback or runtime invocation."
+      ]
+    },
+    {
+      "path": ".github/workflows/pr-continuity.yml",
+      "claims": [
+        "`.github/workflows/pr-continuity.yml` must trigger read-only exact-head continuity audit and trusted metadata refresh on `auto_merge_enabled` and `auto_merge_disabled` events without enabling, merging, deploying, or widening authority. GitHub native Auto-merge may integrate only after the live provider's configured required checks, tests, reviews and protections succeed; optional checks require explicit provider required-check configuration to block.",
+        "`.github/workflows/pr-continuity.yml` must keep the metadata reader on default-branch trusted code and preserve the existing event-permission floor. Queue observation is not exact-candidate founder-final approval; conflicts, stale refs, missing authority, or unverified provider rules must never be represented as merge-authorized."
+      ]
+    },
+    {
+      "path": "scripts/pr-continuity.mjs",
+      "claims": [
+        "`scripts/pr-continuity.mjs` must classify provider-observed auto_merge as QUEUED, NOT_QUEUED, or UNKNOWN, include it in non-authorizing continuity receipts, and never infer merge_approved or authorizes_merge from a native auto-merge click. GitHub must remain the only actor performing the eventual merge after configured live required gates, and FCR's exact-candidate founder-final contract must remain separate."
+      ]
+    },
+    {
+      "path": "src/providers/GitHubProvider.ts",
+      "claims": [
+        "`src/providers/GitHubProvider.ts` must snapshot an existing FCR review ruleset before two-membrane reconciliation, preserve required-linear-history, code-quality, and Copilot-review rules with their parameters unchanged, intentionally remove legacy pre-merge `required_deployments` because production release authority is exact-current-main/post-merge, reject unknown unowned rule types before provider mutation, and independently read back the preserved rules after update; bypass repair must never weaken unrelated live security controls."
+      ]
+    },
+    {
+      "path": "scripts/documentation-truth-required-deployment-guard.mjs",
+      "claims": [
+        "`scripts/documentation-truth-required-deployment-guard.mjs` must classify every provider-receipt claim mentioning `required_deployments`, evaluate explicit subject-bound disposition for each occurrence before any inherited preceding operation, require at least one relationship-bound affirmative removal or migration-debt claim, reject preservation or negated-removal semantics specifically bound to `required_deployments`, reject contradictory or ambiguous deployment-rule claims anywhere in the provider entry, and allow preservation of unrelated controls such as `required_linear_history`."
+      ]
+    },
+    {
+      "path": ".github/workflows/documentation-truth.yml",
+      "claims": [
+        ".github/workflows/documentation-truth.yml must derive PR documentation scope from the freshly resolved target branch rather than the stored event base, fetch and validate the exact ancestor commit before verification, and preserve exact push-before semantics without creating merge or deployment authority."
+      ]
+    },
+    {
+      "path": "src/lib/jiraWorkAutomationLiveProbe.ts",
+      "claims": [
+        "src/lib/jiraWorkAutomationLiveProbe.ts must bind the authenticated live-probe POST to the exact expected full runtime SHA in a dedicated header after the version preflight, retain post-dispatch receipt and runtime validation, and never promote dispatch proof into an independent Jira outcome."
+      ]
+    },
+    {
+      "path": "src/http/routes/jiraWorkAutomationIngress.ts",
+      "claims": [
+        "src/http/routes/jiraWorkAutomationIngress.ts must reject missing, malformed, unsupported, mismatched, or unavailable live-probe runtime bindings before calling the dispatcher while preserving ordinary authenticated observation behavior and the strict observation field allowlist."
+      ]
+    },
+    {
+      "path": "scripts/verify-jira-work-automation-live.ts",
+      "claims": [
+        "scripts/verify-jira-work-automation-live.ts must use explicit required configuration and the bounded live-probe runner without printing secret values or claiming independent Jira outcome proof."
+      ]
+    },
+    {
+      "path": ".github/workflows/jira-work-automation-live-probe.yml",
+      "claims": [
+        ".github/workflows/jira-work-automation-live-probe.yml must remain manually dispatched from protected main with an exact live-main target, production-scoped dedicated issue configuration, retained dispatch receipts, and no automatic provider activation."
       ]
     },
     {
@@ -375,6 +437,12 @@
       "path": "supabase/migrations/20260919023000_founder_content_metric_observations.sql",
       "claims": [
         "`supabase/migrations/20260919023000_founder_content_metric_observations.sql` must keep founder-content metrics append-only and observation-only, deny direct browser/client access, deny direct service-role mutation of metric rows, allow only service-role execution of the atomic ingestion function, fail closed on post identity or conflicting evidence, and never persist raw CSV."
+      ]
+    },
+    {
+      "path": "wrangler.worker.toml",
+      "claims": [
+        "`wrangler.worker.toml` must gate canonical deployment only on the boot-essential provider-held secret names declared in [secrets].required, and the thirteen feature secret names declared in [secrets].optional must never block deployment or Worker boot; each optional name is required only before its named feature is activated on the Worker."
       ]
     }
   ]

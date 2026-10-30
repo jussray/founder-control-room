@@ -198,28 +198,18 @@ describe('Founder deploy command authority contract', () => {
     expect(reconcileWorkflow).not.toContain('FCR_COMMERCE_HASH_SALT: ${{ secrets.FCR_COMMERCE_HASH_SALT }}');
     expect(reconcileWorkflow).not.toContain('OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}');
     expect(reconcileWorkflow).not.toContain('FOUNDER_SIGNAL_ENGINE_MCP_TOKEN: ${{ secrets.FOUNDER_SIGNAL_ENGINE_MCP_TOKEN }}');
+    // Founder Path B ruling (2026-10-30): [secrets].required is the
+    // boot/deploy-essential set only. Feature secrets live in
+    // [secrets].optional and are installed before feature activation.
     expect(configuredWorkerSecretNames()).toEqual([
       'SUPABASE_SERVICE_ROLE_KEY',
       'SUPABASE_PUBLISHABLE_KEY',
       'FOUNDER_SESSION_ENCRYPTION_KEY',
       'GITHUB_WEBHOOK_SECRET',
       'GITHUB_APP_ID',
-      'GITHUB_PRIVATE_KEY',
-      'FCR_REMOTE_MCP_READ_TOKEN',
-      'FCR_SHOPIFY_WEBHOOK_SECRET',
-      'FCR_COMMERCE_HASH_SALT',
-      'FCR_CLOUDFLARE_MCP_READ_TOKEN',
       'OPENAI_API_KEY',
-      'ANTHROPIC_API_KEY',
-      'MODEL_API_KEY',
       'FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON',
       'FOUNDER_SIGNAL_ENGINE_MCP_TOKEN',
-      'ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL',
-      'FOUNDER_REVIEW_EMAIL_INGRESS_SECRET',
-      'N8N_FOUNDER_CONTENT_WEBHOOK_URL',
-      'N8N_FOUNDER_CONTENT_BEARER_TOKEN',
-      'N8N_FOUNDER_CONTENT_EXPECTED_WORKFLOW_FINGERPRINT',
-      'N8N_FOUNDER_CONTENT_IDENTITY_HMAC_SECRET',
     ]);
     expect(reconcileWorkflow).toContain('./node_modules/.bin/wrangler secret put FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON \\');
     expect(reconcileWorkflow).toContain('--config wrangler.worker.toml < "$grant_file"');
