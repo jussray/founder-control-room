@@ -146,4 +146,21 @@ describe('action cost ledger', () => {
     expect(receipt.budgetUtilizationPct).toBeNull();
     expect(receipt.budgetRemainingUsd).toBeNull();
   });
+  it('rejects derived-field tampering that keeps the canonical receiptHash', () => {
+    const legit = JSON.parse(JSON.stringify(buildActionCostReceipt(base() as never)));
+    expect(validateActionCostReceipt(legit)).toEqual([]);
+
+    const tampered = { ...legit, budgetState: 'exceeded' };
+    expect(validateActionCostReceipt(tampered as ActionCostReceiptV1)).toEqual([
+      'receipt fields do not match canonical action-cost receipt',
+    ]);
+  });
+
+  it('rejects an untrimmed receiptId that keeps the canonical receiptHash', () => {
+    const legit = JSON.parse(JSON.stringify(buildActionCostReceipt(base() as never)));
+    const padded = { ...legit, receiptId: ` ${legit.receiptId} ` };
+    expect(validateActionCostReceipt(padded as ActionCostReceiptV1)).toEqual([
+      'receipt fields do not match canonical action-cost receipt',
+    ]);
+  });
 });
