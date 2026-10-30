@@ -108,6 +108,8 @@ describe('buffer direct provider', () => {
     expect(createBody.variables.input).toMatchObject({
       channelId: CHANNEL_ID,
       text: 'Draft proof only',
+      assets: [],
+      needsApproval: false,
       schedulingType: 'automatic',
       mode: 'addToQueue',
       saveToDraft: true,
