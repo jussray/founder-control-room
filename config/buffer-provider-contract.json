@@ -252,7 +252,9 @@
       "schedulingType": "automatic",
       "mode": "addToQueue",
       "saveToDraft": true,
-      "dueAt": null
+      "dueAt": null,
+      "assets": [],
+      "needsApproval": false
     },
     "requiredReadback": {
       "postId": true,
