@@ -87,6 +87,31 @@ Run only fixed allowlisted command IDs through the authenticated terminal API:
 
 Every terminal run must bind `expectedCommitSha` to the mission SHA. `output_truncated=true` is warning evidence and cannot satisfy the proof gate.
 
+## SignalLoop control-room onboarding (read-only observation only)
+
+SignalLoop is a standalone Juss & Co. product whose canonical GitHub repository
+is `JussAndCo/signal-loop`. Keep its worktree at
+`<workspace-root>/signal-loop`, separate from the FCR repository and other
+projects. Verify its Git remote is exactly the intended organization repository
+and its HEAD is the approved 40-character commit SHA before collecting evidence.
+
+The FCR legacy terminal registry recognizes the project slug `signal-loop`
+for the fixed `git.head`, `git.status`, and `git.diff-stat` commands **only**.
+Those reads are not build, unit, integration, browser, source-export, deployment,
+or production verification. An approved FCR project/mission row, founder session,
+loopback workspace, and exact-head checks are still prerequisites; the registry
+entry does not create them.
+
+SignalLoop application tests must be executed by its own product control-room
+sandbox under a fresh L99 ApprovalReceipt and imported to FCR with a matching
+exact-head result. The legacy FCR terminal refuses executable test commands;
+do not change its risk classification or permit a raw shell as a workaround.
+
+The original 24app/Vibe Coding React export has not been verified in the
+`JussAndCo/signal-loop` main branch. Do not merge the divergent standalone
+freemium PR as a substitute for that original product, and do not describe
+a synthetic `page.setContent` browser fixture as provider acceptance.
+
 ## Completion rules
 
 A mission stays `sandboxed` until every required evidence kind has a latest `pass` row at the exact SHA:
