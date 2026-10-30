@@ -371,6 +371,56 @@ jobs:
       - name: Build canonical provider implementation
         run: npm run build
 
+      - name: Verify GitHub App credential shape before provider mutation
+        env:
+          EXPECTED_MAIN_SHA: ${{ steps.governance-command.outputs.expected_main_sha }}
+          GOVERNANCE_APPROVAL_REFERENCE: ${{ steps.governance-command.outputs.approval_reference }}
+          GOVERNANCE_COMMAND_COMMENT_ID: ${{ github.event.comment.id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs/promises';
+          import { createGitHubAppJwt } from './dist/providers/githubAppAuth.js';
+
+          const appId = String(process.env.GITHUB_APP_ID ?? '').trim();
+          const privateKey = String(process.env.GITHUB_PRIVATE_KEY ?? '').trim();
+          const expectedMainSha = String(process.env.EXPECTED_MAIN_SHA ?? '').trim().toLowerCase();
+          const approvalReference = String(process.env.GOVERNANCE_APPROVAL_REFERENCE ?? '').trim();
+          const commandCommentId = String(process.env.GOVERNANCE_COMMAND_COMMENT_ID ?? '').trim();
+
+          try {
+            createGitHubAppJwt(appId, privateKey, Date.now());
+            console.log('GitHub App credential shape preflight passed without provider authentication.');
+          } catch {
+            await fs.mkdir('artifacts', { recursive: true });
+            await fs.writeFile(
+              'artifacts/github-governance-reconcile.json',
+              `${JSON.stringify({
+                schema: 'fcr/github-governance-reconcile@v2',
+                expectedMainSha,
+                beforeMain: null,
+                afterMain: null,
+                approvalReference,
+                commandCommentId,
+                generatedAt: new Date().toISOString(),
+                providerMutationAttempted: false,
+                providerMutationState: 'NOT_ATTEMPTED',
+                requiredNativeApprovals: 0,
+                result: null,
+                topology: null,
+                failure: {
+                  name: 'CredentialShapeError',
+                  message: 'APP_PRIVATE_KEY_SHAPE_INVALID: replace the production APP_PRIVATE_KEY secret with the complete matching GitHub App RSA private-key PEM or a documented supported transport encoding',
+                },
+              }, null, 2)}\n`,
+              'utf8',
+            );
+            console.error('::error title=GitHub App credential shape invalid::APP_PRIVATE_KEY_SHAPE_INVALID: production APP_PRIVATE_KEY is not a complete supported GitHub App RSA private-key transport. Provider authentication and provider mutation were not attempted.');
+            process.exit(1);
+          }
+          NODE
+
       - name: Reconcile canonical two-membrane governance and prove full topology
         env:
           EXPECTED_MAIN_SHA: ${{ steps.governance-command.outputs.expected_main_sha }}

@@ -1,3 +1,9 @@
+# Portfolio CI state — 2026-07-16 [SUPERSEDED]
+
+**STATUS: HISTORICAL. Current state is tracked in `docs/CI_SETUP_PYTHON_PIN_REPAIR_2026-10-04.md` and `TRUTH_DECAY_AUDIT.md`.**
+
+---
+
 # Portfolio CI state — 2026-07-16
 
 ## Executive state

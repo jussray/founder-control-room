@@ -179,6 +179,6 @@ describe('n8n live activation probe', () => {
     expect(workflow).toContain('FCR_V10_RECEIPT_PERSISTENCE_REQUIRED:');
     expect(workflow).toContain('npx tsx scripts/verify-n8n-conveyor-live.ts');
     expect(workflow).toContain('n8n-live-probe-receipt.json');
-    expect(workflow).toContain('actions/upload-artifact@v4');
+    expect(workflow).toContain('actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02');
   });
 });
