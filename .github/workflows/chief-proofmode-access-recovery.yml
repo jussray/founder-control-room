@@ -216,6 +216,7 @@ jobs:
                 or . == "service-token-binding-ambiguous"
                 or . == "service-auth-policy-missing"
                 or . == "service-auth-policy-conflict"
+                or . == "everyone-policy-present"
                 or . == "access-application-ambiguous-or-unresolved"
                 or . == "service-token-invalid-or-ambiguous"
                 or . == "access-scope-not-repair-eligible"
