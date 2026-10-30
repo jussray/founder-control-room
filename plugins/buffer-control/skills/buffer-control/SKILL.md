@@ -90,3 +90,10 @@ Stop and report the blocker instead of writing when any of these is true:
 - provider response is unknown or contradictory.
 
 Never hide a failed or unknown provider outcome behind a success message.
+
+
+## Native FCR runtime
+
+Founder Control Room's canonical server-side Buffer execution backend is the checked-in direct provider adapter at `src/lib/bufferDirectProvider.ts`, which calls `https://api.buffer.com` with the provider-held `BUFFER_API_KEY` secret. The portable Buffer MCP manifest remains a supported optional client/runtime surface when a compatible OAuth MCP host is available; it is not required for FCR to create governed drafts.
+
+For review-only work, FCR must pass the checked-in Buffer content firewall before calling the direct provider. The direct draft runtime must preserve `saveToDraft: true`, no `dueAt`, no `shareNow`, provider readback status `draft`, and `providerAcceptanceIsPublished=false`.
