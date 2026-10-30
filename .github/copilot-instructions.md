@@ -3,6 +3,8 @@
 Read and follow the repository-root `AGENTS.md`, `GLOBAL_AI.md`, and
 `.agents/skills/founder-control-room-operator/SKILL.md` before nontrivial work.
 
+Also follow `skills/outcome-first/SKILL.md` for the outcome, scoped delegation, proportional proof and stop condition. This is not a new permission or approval source.
+
 For Cloudflare tasks, also read:
 
 - `.agents/skills/control-room-cloudflare-agent-fleet/SKILL.md`

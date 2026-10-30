@@ -95,7 +95,18 @@ export function replaceManagedBlock(body = '', block) {
   return `${block}${human ? `\n\n${human}` : ''}\n`;
 }
 
+// GitHub-native auto-merge is an observed queue preference, not an authority receipt.
+export function observedAutoMerge(pr) {
+  if (!pr || !Object.prototype.hasOwnProperty.call(pr, 'auto_merge')) return 'UNKNOWN';
+  if (pr.auto_merge === null) return 'NOT_QUEUED';
+  if (pr.auto_merge && typeof pr.auto_merge === 'object' && !Array.isArray(pr.auto_merge)) return 'QUEUED';
+  return 'UNKNOWN';
+}
+
 export function continuityBlock(value) {
+  const autoMergeIntent = ['QUEUED', 'NOT_QUEUED', 'UNKNOWN'].includes(value.autoMergeIntent)
+    ? value.autoMergeIntent
+    : 'UNKNOWN';
   return [
     START_MARKER,
     '## PR Continuity Receipt',
@@ -111,6 +122,7 @@ export function continuityBlock(value) {
     `- proof_subject: \`${value.headSha}\``,
     `- continuity: **${value.continuityState}**`,
     `- proof: **${value.proofState}**`,
+    `- auto_merge_intent: **${autoMergeIntent}**`,
     '- merge_authority: **true**',
     '- merge_approval: **REQUIRED_EXACT_CANDIDATE**',
     '- merge_approved: **false**',
@@ -119,6 +131,7 @@ export function continuityBlock(value) {
     '',
     '> Merge authority means the merge capability exists; it is not candidate approval. Without fresh explicit founder approval bound to this exact repository, PR, base SHA, and head SHA, the merge must not execute. Base/head movement expires any prior approval.',
     '> Base/head movement also expires predecessor exact-head CI, review, runtime, and browser proof. A successful rollover preserves history but does not donate green proof to the successor head.',
+    '> GitHub native Auto-merge, if queued, executes only when its configured required reviews, tests, checks, and branch protections permit it. Optional checks must be explicitly required to block; this receipt never authorizes or dispatches a merge.',
     END_MARKER,
   ].join('\n');
 }
@@ -231,6 +244,7 @@ const blockFor = (repository, pr, rootRef, rootSha, baseSha, state, proof) =>
     headSha: pr.head.sha,
     continuityState: state,
     proofState: proof,
+    autoMergeIntent: observedAutoMerge(pr),
   });
 
 async function updateOnePull(repository, number, rootRef) {
@@ -341,6 +355,7 @@ export async function auditMode() {
     compareStatus: status,
     state,
     proofSubjectSha: pr.head.sha,
+    autoMergeIntent: observedAutoMerge(pr),
     predecessorProofExpiresOnHeadMove: true,
     ...nonAuthorizingMergeState,
   };
@@ -366,7 +381,7 @@ export async function metadataMode() {
     pr,
     blockFor(repository, pr, rootRef, rootSha, baseSha, state, state === 'CURRENT' ? 'EXACT_HEAD_PROOF_SEPARATE' : 'REVERIFY_OR_ROLLOVER_REQUIRED'),
   );
-  const receipt = { schema: SCHEMA, mode: 'metadata', repository, prNumber: number, state, metadata, ...nonAuthorizingMergeState };
+  const receipt = { schema: SCHEMA, mode: 'metadata', repository, prNumber: number, state, autoMergeIntent: observedAutoMerge(pr), metadata, ...nonAuthorizingMergeState };
   writeReceipt(receipt);
   if (metadata.blocked) throw new Error(`METADATA_BLOCKED: ${metadata.reason}`);
   console.log(JSON.stringify(receipt));
