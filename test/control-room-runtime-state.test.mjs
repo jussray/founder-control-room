@@ -26,15 +26,18 @@ test('tracked configuration movement changes the receipt fingerprint', () => {
   assert.deepEqual(before.files, ['.github/workflows/ci.yml', 'package.json']);
 });
 
-test('persisted runtime-state receipt is parseable JSON with a real trailing newline', () => {
+test('written runtime state receipt is one valid JSON document with a newline', () => {
   const root = fixture();
-  const outputPath = path.join(root, 'artifacts', 'runtime-state.json');
-  const receipt = writeRuntimeStateReceipt(env({ CONTROL_ROOM_RUNTIME_STATE_PATH: outputPath }), root);
-  const written = fs.readFileSync(outputPath, 'utf8');
-
-  assert.ok(written.endsWith('\\n') === false, 'must not end with a literal backslash-n suffix');
-  assert.ok(written.endsWith('\n'), 'JSON receipt should end with a real newline');
-  assert.deepEqual(JSON.parse(written), receipt);
+  try {
+    const receiptPath = path.join(root, 'artifacts', 'runtime-receipt.json');
+    const receipt = writeRuntimeStateReceipt(env({ CONTROL_ROOM_RUNTIME_STATE_PATH: receiptPath }), root);
+    const contents = fs.readFileSync(receiptPath, 'utf8');
+    assert.deepEqual(JSON.parse(contents), receipt);
+    assert.equal(contents.endsWith(String.fromCharCode(10)), true);
+    assert.equal(contents.endsWith(String.fromCharCode(92, 110)), false);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test('ordinary source events stay source-bound and do not pretend to prove provider state', () => {
