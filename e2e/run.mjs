@@ -195,12 +195,14 @@ const { branches: fakeGitHubBranches, trees: fakeGitHubTrees } = demoRepo;
 // returns exactly the sha the real local `git rev-parse HEAD` will also
 // return, letting the terminal's exact-head check pass for real.
 const TERMINAL_PROOF_REPO = 'founder-control-room';
+// Project slug still targets the real local terminal registry; GitHub provider identity is a separate sandbox.
+const TERMINAL_PROOF_PROVIDER_REPO = 'founder-control-room-e2e-fixture';
 const TERMINAL_PROOF_PROJECT_ID = 'ca4f2035-e2cb-4a17-b3a6-77e249568617';
 const TERMINAL_PROOF_MISSION_ID = 'da2f84ca-c0db-4d34-b4a7-e2d7017d66c9';
 // Isolated fake GitHub branch only, not an authorized provider mutation.
 const terminalFixtureRepo = addRepo({
   owner: GITHUB_OWNER,
-  repo: TERMINAL_PROOF_REPO,
+  repo: TERMINAL_PROOF_PROVIDER_REPO,
   defaultBranch: 'main',
   rootCommitSha: REAL_REPO_HEAD_SHA,
 });
@@ -342,7 +344,7 @@ async function runGuardedTerminalProof(page) {
   const firstReceiptText = await waitForText(page, '#result', '"commitSha"');
   const firstReceipt = JSON.parse(firstReceiptText);
   assert(firstReceipt.ok === true && /^[a-f0-9]{40}$/.test(firstReceipt.commitSha), 'workspace committed a patch with a real idempotency key');
-  const repoAfterPatch = getRepo(GITHUB_OWNER, TERMINAL_PROOF_REPO);
+  const repoAfterPatch = getRepo(GITHUB_OWNER, TERMINAL_PROOF_PROVIDER_REPO);
   const patchedHead = repoAfterPatch?.branches.get('terminal-proof')?.sha;
   const changedTree = repoAfterPatch?.branches.get('terminal-proof')?.treeSha;
   assert(patchedHead === firstReceipt.commitSha, 'provider fixture branch HEAD matches patch receipt');
