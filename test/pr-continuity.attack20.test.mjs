@@ -12,6 +12,7 @@ import {
   classifyUpdateBranchFailure,
   replaceManagedBlock,
   continuityBlock,
+  observedAutoMerge,
   collectRolloverOrder,
   sameRepositoryPull,
 } from '../scripts/pr-continuity.mjs';
@@ -64,6 +65,40 @@ test('AT16 receipt exposes merge authority while denying candidate approval and 
   assert.match(block, /authorizes_merge: \*\*false\*\*/);
   assert.match(block, /must not execute/);
 });
+test('auto-merge intent distinguishes queued, not queued, and provider-unknown without inferring authority', () => {
+  assert.equal(observedAutoMerge({ auto_merge: { enabled_by: { login: 'founder' } } }), 'QUEUED');
+  assert.equal(observedAutoMerge({ auto_merge: null }), 'NOT_QUEUED');
+  assert.equal(observedAutoMerge({}), 'UNKNOWN');
+  assert.equal(observedAutoMerge({ auto_merge: 'true' }), 'UNKNOWN');
+  for (const autoMergeIntent of ['QUEUED', 'NOT_QUEUED', 'UNKNOWN']) {
+    const block = continuityBlock({
+      repository: repo,
+      prNumber: 1010,
+      rootBaseRef: 'main',
+      rootBaseSha: '1'.repeat(40),
+      baseRef: 'main',
+      baseSha: '1'.repeat(40),
+      headRef: 'feature',
+      headSha: '2'.repeat(40),
+      continuityState: 'CURRENT',
+      proofState: 'EXACT_HEAD_PROOF_SEPARATE',
+      autoMergeIntent,
+    });
+    assert.ok(block.includes(`auto_merge_intent: **${autoMergeIntent}**`));
+    assert.match(block, /merge_approved: \*\*false\*\*/);
+    assert.match(block, /authorizes_merge: \*\*false\*\*/);
+    assert.match(block, /required reviews, tests, checks, and branch protections/);
+  }
+});
+
+test('auto-merge click or cancellation triggers authoritative continuity metadata refresh', () => {
+  const workflow = readFileSync('.github/workflows/pr-continuity.yml', 'utf8');
+  assert.match(workflow, /pull_request_target:[\s\S]*auto_merge_enabled, auto_merge_disabled/);
+  assert.match(workflow, /pull_request:[\s\S]*auto_merge_enabled, auto_merge_disabled/);
+  assert.match(workflow, /permissions: \{\}/);
+  assert.match(workflow, /name: PR Continuity Metadata Receipt/);
+});
+
 test('AT17 receipt explicitly denies deploy authority', () => assert.match(continuityBlock({ repository: repo, prNumber: 1, rootBaseRef: 'main', rootBaseSha: '1', baseRef: 'main', baseSha: '1', headRef: 'x', headSha: '2', continuityState: 'CURRENT', proofState: 'SEPARATE' }), /deploy_authority: \*\*false\*\*/));
 test('AT18 stacked dependency graph rolls parent before child', () => assert.deepEqual(collectRolloverOrder([pr(10, 'main', 'parent'), pr(11, 'parent', 'child')]), [10, 11]));
 test('AT19 unrelated stack is excluded', () => assert.deepEqual(collectRolloverOrder([pr(10, 'other', 'child')]), []));
