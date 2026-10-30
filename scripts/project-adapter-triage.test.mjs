@@ -7,6 +7,7 @@ const good = {
   schemaVersion: 1,
   kind: 'portfolio-project-adapter-freshness',
   allFresh: true,
+  adapterCount: 1,
   results: [{
     adapterId: 'sekret-bip',
     repository: 'jussray/Sekret-Bip',
@@ -65,4 +66,15 @@ test('existing incidents are updated, closed only on full freshness, and reopene
   assert.equal(chooseIncidentAction(badPlan, { state: 'closed', body: badPlan.body }).type, 'reopen');
   assert.equal(chooseIncidentAction(badPlan, { state: 'open', body: 'old details' }).type, 'update');
   assert.equal(chooseIncidentAction(planFreshnessIncident(good), { state: 'open', body: badPlan.body }).type, 'close');
+});
+
+test('a green receipt cannot omit adapters or repeat their identities', () => {
+  const missing = structuredClone(good);
+  missing.adapterCount = 2;
+  assert.throws(() => planFreshnessIncident(missing), /inconsistent adapter count/);
+
+  const duplicate = structuredClone(good);
+  duplicate.results.push(structuredClone(duplicate.results[0]));
+  duplicate.adapterCount = 2;
+  assert.throws(() => planFreshnessIncident(duplicate), /duplicate adapter/);
 });
