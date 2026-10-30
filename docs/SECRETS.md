@@ -89,8 +89,8 @@ The former `founder-control-room2` Worker was deleted and must not be recreated 
 | `SUPABASE_PUBLISHABLE_KEY` | secret or protected variable | Required publishable Supabase key used by server auth. |
 | `FOUNDER_SESSION_ENCRYPTION_KEY` | secret | Required 32-byte base64url key used only by the API Worker to encrypt Supabase credentials stored behind the opaque HttpOnly founder session. Generate it once with a cryptographically secure RNG; do not expose it to Pages or browser code. |
 | `GITHUB_WEBHOOK_SECRET` | secret | Required webhook verification secret. |
-| `GITHUB_APP_ID` | protected variable | Preferred GitHub authentication path; paired with `GITHUB_PRIVATE_KEY`. This is a Worker/runtime binding name, not the GitHub Actions secret name. |
-| `GITHUB_PRIVATE_KEY` | secret | Preferred GitHub authentication path; paired with `GITHUB_APP_ID`. This is a Worker/runtime binding name, not the GitHub Actions secret name. |
+| `GITHUB_APP_ID` | protected variable | GitHub App capability identity; paired with `GITHUB_PRIVATE_KEY` for trusted repository operations. An absent credential must not block core Worker startup. |
+| `GITHUB_PRIVATE_KEY` | secret | GitHub App capability credential; required with `GITHUB_APP_ID` for trusted repository operations, not core HTTP startup. Missing or partial credentials fail closed at the GitHub provider boundary. |
 | `GITHUB_TOKEN` | secret | Local/development fallback only when the GitHub App pair is absent. |
 | `FOUNDER_ALLOWED_ORIGINS` | non-secret variable | `https://foundercontrolroom.org`. |
 | `FOUNDER_API_URL` | non-secret variable | `https://foundercontrolroom.org` so auth callbacks return through Pages and are proxied to the API Worker. |

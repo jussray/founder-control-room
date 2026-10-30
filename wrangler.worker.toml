@@ -92,14 +92,13 @@ N8N_FOUNDER_CONTENT_EXPECTED_RUNTIME_VERSION = "2.32.6"
 # Keep only secrets required for the Worker to boot safely. Capability-specific
 # credentials are declared in config/worker-capability-secrets.json and fail
 # closed at the owning route or capability rather than blocking all of FCR.
+# GitHub App and AI credentials are verified at their capability boundaries.
 [secrets]
 required = [
   "SUPABASE_SERVICE_ROLE_KEY",
   "SUPABASE_PUBLISHABLE_KEY",
   "FOUNDER_SESSION_ENCRYPTION_KEY",
   "GITHUB_WEBHOOK_SECRET",
-  "GITHUB_APP_ID",
-  "GITHUB_PRIVATE_KEY",
   "FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON",
 ]
 

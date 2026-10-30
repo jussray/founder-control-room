@@ -329,7 +329,7 @@ if (canonicalEnv) {
 }
 
 for (const githubAuthName of ['GITHUB_APP_ID', 'GITHUB_PRIVATE_KEY']) {
-  requireValue(workerRequiredSecrets.includes(githubAuthName), `Worker required secrets must include ${githubAuthName}`);
+  requireValue(!workerRequiredSecrets.includes(githubAuthName), `GitHub App credentials must not block core Worker startup: ${githubAuthName}`);
   requireValue(canonicalEnv?.entries.has(githubAuthName), `.env.example must declare ${githubAuthName}`);
 }
 requireValue(handler.includes('FCR_EMAIL'), 'Worker handler must retain the FCR_EMAIL binding contract');

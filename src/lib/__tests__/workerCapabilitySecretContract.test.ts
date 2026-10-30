@@ -22,8 +22,6 @@ describe('Worker startup vs capability secret contract', () => {
       'SUPABASE_PUBLISHABLE_KEY',
       'FOUNDER_SESSION_ENCRYPTION_KEY',
       'GITHUB_WEBHOOK_SECRET',
-      'GITHUB_APP_ID',
-      'GITHUB_PRIVATE_KEY',
       'FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON',
     ]);
   });
@@ -32,12 +30,16 @@ describe('Worker startup vs capability secret contract', () => {
     expect(manifest.schema).toBe('fcr/worker-capability-secrets@v1');
     const optional = manifest.capabilityOptional.map(({ name }) => name);
     expect(optional).toEqual([
+      'GITHUB_APP_ID',
+      'GITHUB_PRIVATE_KEY',
       'FCR_REMOTE_MCP_READ_TOKEN',
       'FCR_SHOPIFY_WEBHOOK_SECRET',
       'FCR_COMMERCE_HASH_SALT',
       'TINYFISH_API_KEY',
       'FCR_CLOUDFLARE_MCP_READ_TOKEN',
       'MODEL_API_KEY',
+      'OPENAI_API_KEY',
+      'ANTHROPIC_API_KEY',
       'FOUNDER_SIGNAL_ENGINE_MCP_TOKEN',
       'ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL',
       'FOUNDER_REVIEW_EMAIL_INGRESS_SECRET',

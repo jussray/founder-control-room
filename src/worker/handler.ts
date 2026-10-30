@@ -89,21 +89,10 @@ export function validateWorkerEnv(
     throw new Error('Missing required Worker binding: CHIEF_AI');
   }
 
-  const hasGitHubToken = hasNonEmptyString(env.GITHUB_TOKEN);
-  const hasGitHubAppId = hasNonEmptyString(env.GITHUB_APP_ID);
-  const hasGitHubPrivateKey = hasNonEmptyString(env.GITHUB_PRIVATE_KEY);
+  // External repository credentials are capability-scoped, not core startup dependencies.
+  // FCR GitHub operations still require the complete trusted App pair in providerFactory.
 
-  if (!hasGitHubToken && !hasGitHubAppId && !hasGitHubPrivateKey) {
-    throw new Error(
-      'GitHub authentication is not configured; set GITHUB_APP_ID and GITHUB_PRIVATE_KEY or GITHUB_TOKEN',
-    );
-  }
-
-  if (hasGitHubAppId !== hasGitHubPrivateKey) {
-    throw new Error('GITHUB_APP_ID and GITHUB_PRIVATE_KEY must be configured together');
-  }
-
-  // The complete-key check above is runtime proof that every required value is
+  // The required-binding check above proves every core value is non-empty.
   // a non-empty string. TypeScript cannot derive that fact through the dynamic
   // key iteration, so narrow once at this boundary.
   const validated = env as ControlRoomWorkerEnv;

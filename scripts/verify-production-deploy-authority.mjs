@@ -344,8 +344,6 @@ const requiredWorkerSecrets = [
   'SUPABASE_PUBLISHABLE_KEY',
   'FOUNDER_SESSION_ENCRYPTION_KEY',
   'GITHUB_WEBHOOK_SECRET',
-  'GITHUB_APP_ID',
-  'GITHUB_PRIVATE_KEY',
   'FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON',
 ];
 
@@ -360,6 +358,12 @@ const deploySectionEnd = workflow.indexOf('  # ── 3.', deploySectionStart);
 assert.notEqual(deploySectionStart, -1, 'worker-deploy section must exist');
 assert.notEqual(deploySectionEnd, -1, 'worker-deploy section must have a bounded end');
 const deploySection = workflow.slice(deploySectionStart, deploySectionEnd);
+
+const startupSecretBlock = wrangler.match(/\[secrets\]\s+required\s*=\s*\[([\s\S]*?)\]/);
+assert.ok(startupSecretBlock, 'startup Worker secret list must be parseable');
+for (const name of ['GITHUB_APP_ID', 'GITHUB_PRIVATE_KEY']) {
+  assert.doesNotMatch(startupSecretBlock[1], new RegExp(`"${name}"`), `${name} must remain capability-scoped`);
+}
 
 for (const name of requiredWorkerSecrets) {
   assert.match(
