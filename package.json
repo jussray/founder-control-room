@@ -65,7 +65,8 @@
     "proof:goalfix": "npm run build && node e2e/goalfix-proof.mjs && node e2e/goalfix-same-sha-proof.mjs",
     "verify:test-discovery": "node scripts/verify-test-discovery.mjs",
     "generate:worker-types": "node -e \"require('node:fs').mkdirSync('.wrangler/types',{recursive:true})\" && wrangler types .wrangler/types/worker-configuration.d.ts --config wrangler.worker.toml --env-interface FcrWorkerEnv --include-env=false",
-    "verify:buffer-control-plugin": "node scripts/verify-buffer-control-plugin.mjs"
+    "verify:buffer-control-plugin": "node scripts/verify-buffer-control-plugin.mjs && npm run verify:buffer-direct-provider",
+    "verify:buffer-direct-provider": "vitest run src/lib/__tests__/bufferDirectProvider.test.ts"
   },
   "dependencies": {
     "@octokit/rest": "^21.0.2",
