@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { Router, type Response } from 'express';
 import {
   finalizeSharedReadOnlyCapabilityRun,
@@ -17,6 +17,12 @@ import {
   ULTRATHINK_SHARED_REASONING_CAPABILITY,
   ULTRATHINK_SHARED_REASONING_CAPABILITY_ID,
 } from '../../capabilities/ultrathinkSharedReasoning.js';
+import {
+  BUFFER_PUBLISHING_RUNTIME_CAPABILITY_ID,
+  executeConfirmedBufferDraft,
+  previewBufferDraft,
+  type BufferDraftProposal,
+} from '../../capabilities/bufferPublishingRuntime.js';
 import { capabilities } from '../../capabilities/workbenchRegistry.js';
 import { enqueueReconcile } from '../../events/outbox.js';
 import { supabase } from '../../lib/supabaseClient.js';
@@ -51,6 +57,249 @@ function publicWebErrorStatus(error: PublicWebObservationError): number {
 
 function sharedRuntimeErrorStatus(error: SharedCapabilityRuntimeError): number {
   return error.code === 'shared_runtime_invalid_request' ? 400 : 403;
+}
+
+type JsonRecord = Record<string, unknown>;
+
+const BUFFER_DRAFT_ACTION_TYPE = 'buffer_editorial_draft';
+
+function asRecord(value: unknown): JsonRecord | null {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? value as JsonRecord
+    : null;
+}
+
+async function activeProjectId(projectSlug: string): Promise<string> {
+  const { data, error } = await supabase
+    .from('projects')
+    .select('id, status')
+    .eq('slug', projectSlug)
+    .maybeSingle();
+  if (error) throw new Error('BUFFER_DRAFT_PROJECT_LOOKUP_FAILED');
+  if (!data) throw new Error('BUFFER_DRAFT_PROJECT_NOT_FOUND');
+  if (data.status !== 'active') throw new Error('BUFFER_DRAFT_PROJECT_NOT_ACTIVE');
+  return String(data.id);
+}
+
+async function reserveBufferDraft(
+  projectId: string,
+  proposal: BufferDraftProposal,
+  executedBy: string,
+): Promise<{ executionId: string; idempotentResult?: JsonRecord }> {
+  const existing = await supabase
+    .from('approval_executions')
+    .select('id, project_id, action_type, status, result')
+    .eq('idempotency_key', proposal.proposalHash)
+    .maybeSingle();
+  if (existing.error) throw new Error('BUFFER_DRAFT_IDEMPOTENCY_LOOKUP_FAILED');
+  if (existing.data) {
+    if (
+      String(existing.data.project_id) !== projectId
+      || existing.data.action_type !== BUFFER_DRAFT_ACTION_TYPE
+    ) {
+      throw new Error('BUFFER_DRAFT_IDEMPOTENCY_SCOPE_MISMATCH');
+    }
+    if (existing.data.status === 'succeeded') {
+      return {
+        executionId: String(existing.data.id),
+        idempotentResult: asRecord(existing.data.result) ?? {},
+      };
+    }
+    throw new Error('BUFFER_DRAFT_ALREADY_RESERVED');
+  }
+
+  const created = await supabase
+    .from('approval_executions')
+    .insert({
+      mission_id: null,
+      project_id: projectId,
+      action_type: BUFFER_DRAFT_ACTION_TYPE,
+      idempotency_key: proposal.proposalHash,
+      executed_by: executedBy,
+      status: 'pending',
+      request: {
+        contract: proposal.contract,
+        capabilityId: proposal.capabilityId,
+        proposalHash: proposal.proposalHash,
+        contentFingerprint: proposal.contentFingerprint,
+        logicalChannel: proposal.logicalChannel,
+        providerChannelId: proposal.providerChannelId,
+        sourceCommitSha: proposal.sourceCommitSha,
+        invocationId: proposal.invocationId,
+        publishAllowed: false,
+        scheduleAllowed: false,
+      },
+      result: { provider_write_attempted: false },
+      success: null,
+      started_at: new Date().toISOString(),
+    })
+    .select('id')
+    .single();
+
+  if (created.error || !created.data?.id) {
+    throw new Error('BUFFER_DRAFT_RESERVATION_FAILED');
+  }
+  return { executionId: String(created.data.id) };
+}
+
+async function finalizeBufferDraft(
+  executionId: string,
+  status: 'succeeded' | 'failed',
+  result: JsonRecord,
+  success: boolean,
+): Promise<void> {
+  const updated = await supabase
+    .from('approval_executions')
+    .update({
+      status,
+      result,
+      success,
+      executed_at: new Date().toISOString(),
+    })
+    .eq('id', executionId)
+    .eq('status', 'pending')
+    .select('id')
+    .maybeSingle();
+  if (updated.error || String(updated.data?.id ?? '') !== executionId) {
+    throw new Error('BUFFER_DRAFT_AUDIT_FINALIZE_FAILED');
+  }
+}
+
+function bufferDraftErrorStatus(message: string): number {
+  if (
+    message.includes('CONFIRMATION_REQUIRED')
+    || message.includes('PROJECT_SLUG_INVALID')
+    || message.includes('FOUNDER_SIGNAL_CONTENT_REJECTED')
+  ) return 400;
+  if (
+    message.includes('PROPOSAL_HASH_MISMATCH')
+    || message.includes('ALREADY_RESERVED')
+    || message.includes('IDEMPOTENCY_SCOPE_MISMATCH')
+  ) return 409;
+  if (
+    message.includes('API_KEY_NOT_CONFIGURED')
+    || message.includes('PROJECT_LOOKUP_FAILED')
+    || message.includes('IDEMPOTENCY_LOOKUP_FAILED')
+    || message.includes('RESERVATION_FAILED')
+    || message.includes('AUDIT_FINALIZE_FAILED')
+  ) return 503;
+  if (message.includes('PROJECT_NOT_FOUND')) return 404;
+  if (message.includes('PROJECT_NOT_ACTIVE')) return 409;
+  return 502;
+}
+
+async function runBufferPublishingRuntime(
+  req: FounderRequest,
+  res: Response,
+  body: Record<string, unknown>,
+) {
+  const action = typeof body.action === 'string' ? body.action.trim() : '';
+  const projectSlug = typeof body.projectSlug === 'string' ? body.projectSlug.trim() : '';
+  const input = asRecord(body.input);
+  if (!projectSlug || !input) {
+    return res.status(400).set('Cache-Control', 'no-store').json({
+      error: 'projectSlug and input are required.',
+      code: 'BUFFER_DRAFT_REQUEST_INVALID',
+    });
+  }
+
+  try {
+    await activeProjectId(projectSlug);
+    if (action === 'preview_draft') {
+      const proposal = previewBufferDraft(input, req.founder!, projectSlug);
+      return res.status(200).set('Cache-Control', 'no-store').json({
+        run: {
+          capabilityId: BUFFER_PUBLISHING_RUNTIME_CAPABILITY_ID,
+          state: 'PROPOSED',
+          authority: 'founder_required',
+          consequence: 'REVERSIBLE_WRITE',
+          mutationAllowed: false,
+          proposal,
+        },
+      });
+    }
+
+    if (action !== 'create_draft') {
+      return res.status(400).set('Cache-Control', 'no-store').json({
+        error: 'action must be preview_draft or create_draft.',
+        code: 'BUFFER_DRAFT_ACTION_INVALID',
+      });
+    }
+
+    const proposalHash = typeof body.proposalHash === 'string' ? body.proposalHash.trim() : '';
+    const confirmDraft = body.confirmDraft === true;
+    const proposal = previewBufferDraft(input, req.founder!, projectSlug);
+    if (!confirmDraft) throw new Error('BUFFER_DRAFT_CONFIRMATION_REQUIRED');
+    if (proposalHash !== proposal.proposalHash) throw new Error('BUFFER_DRAFT_PROPOSAL_HASH_MISMATCH');
+
+    const projectId = await activeProjectId(projectSlug);
+    const reserved = await reserveBufferDraft(
+      projectId,
+      proposal,
+      req.founder!.email,
+    );
+    if (reserved.idempotentResult) {
+      return res.status(200).set('Cache-Control', 'no-store').json({
+        run: {
+          capabilityId: BUFFER_PUBLISHING_RUNTIME_CAPABILITY_ID,
+          state: 'BUFFER_ACCEPTED_DRAFT',
+          idempotent: true,
+          published: false,
+          scheduled: false,
+          executionId: reserved.executionId,
+          receipt: reserved.idempotentResult,
+        },
+      });
+    }
+
+    try {
+      const executed = await executeConfirmedBufferDraft({
+        input,
+        founder: req.founder!,
+        projectSlug,
+        proposalHash,
+        confirmDraft,
+      });
+      const result: JsonRecord = {
+        ...executed.receipt,
+        proposalHash: executed.proposal.proposalHash,
+        provider_write_attempted: true,
+      };
+      await finalizeBufferDraft(reserved.executionId, 'succeeded', result, true);
+
+      return res.status(201).set('Cache-Control', 'no-store').json({
+        run: {
+          capabilityId: BUFFER_PUBLISHING_RUNTIME_CAPABILITY_ID,
+          state: 'BUFFER_ACCEPTED_DRAFT',
+          executionId: reserved.executionId,
+          published: false,
+          scheduled: false,
+          providerAcceptanceIsPublished: false,
+          receipt: executed.receipt,
+        },
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'BUFFER_DRAFT_EXECUTION_FAILED';
+      await finalizeBufferDraft(
+        reserved.executionId,
+        'failed',
+        {
+          provider_write_attempted: true,
+          errorCode: createHash('sha256').update(message).digest('hex').slice(0, 16),
+          published: false,
+          scheduled: false,
+        },
+        false,
+      ).catch(() => undefined);
+      throw error;
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'BUFFER_DRAFT_RUNTIME_FAILED';
+    return res.status(bufferDraftErrorStatus(message)).set('Cache-Control', 'no-store').json({
+      error: 'Buffer draft runtime failed closed.',
+      code: message.split(':')[0],
+    });
+  }
 }
 
 function boundedIntent(body: Record<string, unknown>, operation: 'search' | 'fetch'): string {
@@ -189,6 +438,10 @@ capabilitiesRouter.post('/:capabilityId/runs', async (req: FounderRequest, res) 
 
   if (capabilityId === PUBLIC_WEB_OBSERVATION_CAPABILITY_ID) {
     return runPublicWebObservation(req, res, body);
+  }
+
+  if (capabilityId === BUFFER_PUBLISHING_RUNTIME_CAPABILITY_ID) {
+    return runBufferPublishingRuntime(req, res, body);
   }
 
   const runtime = DYNAMIC_CAPABILITIES.get(capabilityId);
