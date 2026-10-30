@@ -578,6 +578,10 @@ The successor StoryEngine head is strictly forward of the predecessor pin and ha
 
 Rebinding `.github/workflows/playwright.yml` to `a6e6a396ed30535af2fd9b1ec2347a84e1a3fbf3` selects the successor federation evidence subject only. All predecessor FCR-to-StoryEngine browser/federation green is historical. The successor FCR head remains `UNKNOWN` for current federation until the complete live-ref equality check, immutable peer checkout, runtime identity binding, directive/receipt loop, replay protections, and Playwright witness succeed against this exact peer. No founder approval, merge, deploy, production, publication, billing, or provider-mutation authority transfers with the pin.
 
+## 2026-10-26 locked-install and StoryEngine evidence update
+
+The previous FCR Playwright peer pin `87501be2da31d12f421b0ed2da49df357fc9fcb1` is historical after the observed StoryEngine `refs/heads/main` head advanced to `499f2d4eb9edac8bb11b657cf003a056263528d9`. Updating the pin restores an exact comparison target but does **not** renew prior FCR-to-StoryEngine federation evidence. The new FCR candidate requires its own exact-head live-peer check, immutable checkout, runtime-identity proof, directive/receipt path, and browser witness. The four CI `npm ci --no-audit --no-fund` substitutions independently require current-head Type check/Lint/Test/Playwright results. Until observed, these outcomes remain UNKNOWN and do not authorize consequential action.
+
 ## 2026-10-24 StoryEngine relay-proof peer refresh
 
 The StoryEngine peer used by FCR's browser federation witness advanced to independently re-observed `refs/heads/main@87501be2da31d12f421b0ed2da49df357fc9fcb1`. Updating `.github/workflows/playwright.yml` to that exact SHA invalidates all predecessor pair-specific federation evidence; the new pin is an evidence-subject selection, not current runtime proof.
