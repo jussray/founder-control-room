@@ -1,5 +1,7 @@
 # Founder Control Room Global AI Contract
 
+For pull-request Documentation Truth and test-discovery proof, resolve and fetch the live target branch before comparing it with the exact candidate; reject missing, invalid, unavailable, or non-ancestor bases. Keep the event's historical base identity separate from current scope. Default-branch push proof uses the exact push-before SHA. This repairs proof inputs without transferring merge, deployment, or provider authority.
+
 ## Parent operating contract
 
 Before nontrivial work, read [`Juss Founder OS`](.ai/skills/juss-founder-os/SKILL.md).
@@ -182,6 +184,10 @@ Investor email remains separate. Never auto-send without both the applicable sta
 - Founder authorization requires both a valid session and founder allowlist. Authentication alone is not authorization.
 - Every material read, proposal, approval, integration, deployment, rollback, publication, and provider action should leave an auditable event.
 - No authority class silently grants another.
+
+## Founder-selected GitHub Auto-merge queue
+
+The founder may use GitHub's **Enable auto-merge** UI for an individual PR. The PR is queued, not immediately merged, until GitHub enforces every configured required check/test/review and branch protection or merge-queue rule. Every genuinely load-bearing step must feed a configured required check; a non-required advisory check does not block native Auto-merge. PR Continuity observes the live queue setting on `auto_merge_enabled`/`auto_merge_disabled` events but cannot authorize or dispatch a merge. Native queue intent is not a replacement for the canonical exact-repo/PR/base/head founder-final approval receipt; stale heads, conflicts, missing approval, or provider uncertainty remain blocked. No extra manual merge click is needed after GitHub independently clears its enforced gates, and queueing confers no deploy/provider-write authority. Verify live rulesets before claiming enforcement.
 
 ## FCR merge review boundary
 
