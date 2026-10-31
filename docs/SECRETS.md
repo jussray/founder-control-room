@@ -24,7 +24,7 @@ The output includes `public/_worker.js`, which forwards missing routes and brows
 
 ## GitHub Actions secrets
 
-Set these in **GitHub → Settings → Secrets and variables → Actions**, using the `production` environment where required by the workflow.
+Set GitHub Actions secrets in the scope actually consumed by each workflow. In particular, `.github/workflows/portfolio-evidence-sync.yml` and `.github/workflows/portfolio-actions-audit.yml` both use `environment: production` and reference `${{ secrets.APP_ID }}` / `${{ secrets.APP_PRIVATE_KEY }}`. If the same name exists in the `production` environment and at repository or organization scope, GitHub selects the **environment-level** secret. Replacing a same-named repository secret does not replace the value seen by those jobs. Environment secrets are read when a job starts; repository secrets are read when the run is queued. Read back secret **name and `updated_at` metadata**, not secret contents, before attributing a repeated failure to an unchanged value.
 
 Secrets marked required cause the named workflow job to fail if absent.
 
@@ -36,11 +36,21 @@ The GitHub App **Client ID is not used** by the current installation-token witne
 
 | Secret | Required by | Description |
 |---|---|---|
-| `APP_ID` | `deterministic-review-core-advisory.yml` trusted witness publication, `github-app-secret-shape-diagnostic.yml` read-only production shape diagnostic, and FCR governance reconciliation | Numeric GitHub App ID for the repository-scoped Founder Control Room App. Mapped at job runtime to `GITHUB_APP_ID`. |
-| `APP_PRIVATE_KEY` | `deterministic-review-core-advisory.yml` trusted witness publication, `github-app-secret-shape-diagnostic.yml` read-only production shape diagnostic, and FCR governance reconciliation | Complete PEM private key for the same GitHub App. Mapped at job runtime to `GITHUB_PRIVATE_KEY`. Never log or expose the value. |
+| `APP_ID` | `portfolio-evidence-sync.yml`, `portfolio-actions-audit.yml`, `deterministic-review-core-advisory.yml`, `github-app-secret-shape-diagnostic.yml`, and FCR governance reconciliation | Numeric GitHub App ID for the installed Founder Control Room App. Portfolio workflows read `secrets.APP_ID` directly; other trusted witness paths may map it to `GITHUB_APP_ID`. |
+| `APP_PRIVATE_KEY` | `portfolio-evidence-sync.yml`, `portfolio-actions-audit.yml`, `deterministic-review-core-advisory.yml`, `github-app-secret-shape-diagnostic.yml`, and FCR governance reconciliation | RSA private key for the same App in one of the transport formats accepted below. Portfolio workflows read `secrets.APP_PRIVATE_KEY` directly; other witness paths may map it to `GITHUB_PRIVATE_KEY`. Never log or expose the value. |
 
 `APP_ID` and `APP_PRIVATE_KEY` must identify the same installed App. The read-only `github-app-secret-shape-diagnostic.yml` proves only local credential transport/PEM/RSA shape and explicitly performs no provider authentication or issuer readback. For workflows that claim provider proof, success must separately establish that both mapped runtime values were usable and that provider readback reports the expected App issuer; secret-name presence or a green shape diagnostic alone is not provider proof.
 
+
+#### 2026-10-31 portfolio incident: replacement history is not key-shape proof
+
+The founder reports prior replacements of `APP_PRIVATE_KEY`. A failing run does **not** prove those replacements never occurred or that the founder failed to perform them. Secret values are deliberately unreadable after storage; this repository and the workflow log do not establish the provider-held secret's update timestamp or which earlier secret scope was changed.
+
+- [Run 41202399202, job 124585730361, step 6](https://github.com/jussray/founder-control-room/actions/runs/41202399202/job/124585730361#step:6:1) checked out `f957663c3a4e0520cc06d266203f212e288e498b`. Its portfolio self-test passed. GitHub App minting failed at `APP_PRIVATE_KEY_SHAPE_INVALID:unknown` with `begin=false`, `end=false`, `b64charset=true`, `escapedNewlines=false`, `multiline=false`. Evidence publication and Chromium/Playwright proof were **skipped**; the uploaded `BLOCKED` receipt is not a live-proof receipt.
+- The normalizer in that exact commit already attempts PEM, escaped newline, quoted PEM, Base64 PEM, Base64 DER (PKCS#1 and PKCS#8), and collapsed-whitespace PEM. Therefore the error cannot honestly be presented as proof that *missing support for these formats* caused this run. `b64charset=true` describes a character set, **not** proof the value is a complete key or valid DER.
+- **Next diagnostic, before requesting another replacement:** use GitHub's read-only `updated_at` metadata for both `production` environment secret `APP_PRIVATE_KEY` and any repository-scoped secret of that name. Compare their timestamps with the job start on **2026-10-31 at 16:03 UTC**, and use the documented environment-over-repository precedence. This differentiates a replacement after the failed job from a lower-scope replacement that never reached it. Do not claim either explanation without metadata.
+- If the effective secret was updated before the job, `unknown` means the bytes supplied to the normalizer were not recognized. The specific reason remains **UNKNOWN** without secret-safe provider-side validation. Do not print the value, add a PAT or `GITHUB_TOKEN` fallback, weaken the App-only policy, or call the subsequent skipped stages passing.
+- A corrected secret format is still only the first gate. An actual installation-token mint, cross-repository evidence sync, and deployed Playwright browser proof each require independent successful receipts.
 
 #### Accepted `APP_PRIVATE_KEY` transport shapes
 
