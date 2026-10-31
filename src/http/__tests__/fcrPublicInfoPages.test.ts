@@ -14,11 +14,12 @@ describe('FCR public information pages', () => {
     expect(html).toContain('<nav aria-label="Information pages">');
     expect(html).toContain(`https://www.foundercontrolroom.org/${route}.html`);
     expect(html).toContain('/assets/fcr-information.css');
-    expect(html).not.toMatch(/<form\\b/i);
+    expect(html).not.toMatch(/<form\b/i);
   });
 
   it('links to every public information page from the home footer', () => {
     const home = read('index.html');
+    expect(home).toContain('.foot nav { display: flex; flex-wrap: wrap; gap: .5rem 1rem; }');
     for (const route of routes) {
       expect(home).toContain(`href="/${route}.html"`);
     }
