@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { validateBindingTypes } from '../scripts/verify-worker-binding-types.mjs';
+import { validateBindingTypes, runProviderPreflight } from '../scripts/verify-worker-binding-types.mjs';
 
 const response = bindings => ({ success: true, result: { bindings } });
 
@@ -41,4 +41,29 @@ test('rejects plain-text role keys, private keys, webhook secrets and OAuth secr
     const result = validateBindingTypes(response([{ name, type: 'plain_text', text: 'redacted' }]));
     assert.equal(result.ok, false, name);
   }
+});
+
+test('provider metadata fingerprint is stable and excludes plaintext binding values', async () => {
+  const config = { CLOUDFLARE_API_TOKEN: 'test-only-token' };
+  const provider = bindings => async () => ({
+    ok: true,
+    json: async () => response(bindings),
+  });
+  const base = [
+    { name: 'FCR_MODE', type: 'plain_text', text: 'one' },
+    { name: 'CF_API_TOKEN', type: 'secret_text' },
+  ];
+  const first = await runProviderPreflight({ env: config, fetchFn: provider(base) });
+  const second = await runProviderPreflight({ env: config, fetchFn: provider([
+    { name: 'CF_API_TOKEN', type: 'secret_text' },
+    { name: 'FCR_MODE', type: 'plain_text', text: 'different-value' },
+  ]) });
+  assert.match(first.bindingFingerprint, /^sha256:[0-9a-f]{64}$/);
+  assert.equal(first.bindingFingerprint, second.bindingFingerprint);
+  assert.doesNotMatch(JSON.stringify(first), /different-value|test-only-token/);
+  const changed = await runProviderPreflight({ env: config, fetchFn: provider([
+    { name: 'CF_API_TOKEN', type: 'secret_text' },
+    { name: 'FCR_MODE', type: 'secret_text' },
+  ]) });
+  assert.notEqual(changed.bindingFingerprint, first.bindingFingerprint);
 });
