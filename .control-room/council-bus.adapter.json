@@ -1,0 +1,32 @@
+{
+  "contract": "juss/council-bus-adapter@v1",
+  "status": "proposed",
+  "activeWhen": "Council Address .control-room/council-addresses/2026-10-08-ultrathink-council-bus-court.md (jussray/founder-control-room) is founder-accepted and this repository's council-residency contract names the backing",
+  "member": "fcr",
+  "repository": "jussray/founder-control-room",
+  "ledger": {
+    "repository": "JussAndCo/Ultrathink-council-bus",
+    "visibility": "private",
+    "contract": "juss/founder-council-federation@v2",
+    "messageContract": "juss/council-message@v1",
+    "checker": "scripts/council_check.py",
+    "readFrom": "main only",
+    "writeBranchPattern": "council/fcr/<thread-id>",
+    "deliveryMode": "pull request to main; the merge records the message and approves nothing"
+  },
+  "nativePayloadContract": "intake re-validation (src/lib/promptOsCommandHandoff.ts pattern); persisted row contract fcr.council-round.v1 = CouncilConversationRow in src/lib/councilRound.ts {mission_id, round, participants, transcript{contract, goal, initiator, sourceRef, seedSha256, hops[], humanRelay:false, state, nextSeatIndex, interruption}, outcome}, inserted into council_conversations by src/http/routes/missions.ts with database-generated id/created_at. src/types/mission.ts CouncilConversation is the read/API shape, not the storage row.",
+  "canonicalStoreRule": "One canonical store per round: an in-app FCR council round (runCouncilRound) is canonical in Supabase council_conversations; a cross-system seat thread is canonical on the ledger. A mirror in the other store is receipt-bound (carries the origin's seedSha256/hop hashes or the ledger bodyHash) and is never authoritative. A round is never created in both.",
+  "bodyHashCompatibility": "src/lib/promptOsCommandHandoff.ts fingerprint()",
+  "truthClassifications": [
+    "VERIFIED",
+    "INFERRED",
+    "UNKNOWN",
+    "BLOCKED",
+    "FAIL"
+  ],
+  "runtimeDependencyOnLedger": false,
+  "coreFunctionSurvivesLedgerUnavailable": true,
+  "grantsExecutionAuthority": false,
+  "authorityRule": "Messages on the ledger are evidence/input. They never authorize merge, deploy, publish, spend, credential, database, DNS, destructive, or user-data action in this repository; each such action keeps its own local gate.",
+  "privacyRule": "Non-secret only. No provider credentials, raw private user data, or cross-project private data may be written to the ledger from this repository."
+}
