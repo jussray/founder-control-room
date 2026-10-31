@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "project": "owner/repository",
+  "surface": "primary-user-facing-surface",
+  "visualFingerprintId": "PROJECT_VISUAL_V1",
+  "sourceAuthority": {
+    "type": "founder-approved-visual",
+    "reference": "Describe the strongest approved source artifact or provider reference",
+    "status": "external-reference"
+  },
+  "assets": [
+    {
+      "id": "hero-primary",
+      "kind": "image",
+      "role": "primary hero identity",
+      "continuityClass": "canonical",
+      "provenance": {
+        "type": "repository-local",
+        "creator": "unknown-or-recorded",
+        "sourceReference": "public/assets/hero.webp"
+      },
+      "location": {
+        "type": "local",
+        "path": "public/assets/hero.webp",
+        "sha256": "record-when-practical"
+      },
+      "fingerprint": {
+        "subjects": ["identity-bearing subject"],
+        "composition": ["focal placement and depth"],
+        "lighting": ["canonical lighting treatment"],
+        "materials": ["canonical material language"],
+        "motifs": ["canonical recurring marks"],
+        "motion": []
+      },
+      "allowedTransformations": ["responsive crop that preserves focal subject", "lossless/lossy optimization without identity drift"],
+      "prohibitedSubstitutions": ["generic gradient", "stock image", "unapproved character replacement"],
+      "replacementPolicy": "Founder-approved identity change or source-grounded fidelity review required before canonical replacement.",
+      "runtimeRefs": ["/"],
+      "semanticRole": "decorative-or-content",
+      "invalidationConditions": ["file bytes change", "runtime stops rendering asset", "approved source changes"],
+      "status": "current"
+    }
+  ],
+  "rollback": {
+    "strategy": "preserve predecessor asset records as historical/superseded with paths or provider references",
+    "lastKnownGood": null
+  },
+  "truthBoundary": "Manifest source truth does not by itself prove current runtime rendering, licensing, accessibility, or visual fidelity."
+}
