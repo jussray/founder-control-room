@@ -24,6 +24,7 @@ import { getQuickScanProspect, listQuickScanProspects, saveQuickScanProspect } f
 import { buildTrackedStripePaymentLinkUrl } from '../../quickscan/stripeWebhook.js';
 import {
   createOpenAiQuickScanChiefRunner,
+  quickScanChiefDataRecipients,
   QuickScanChiefProviderError,
   type QuickScanChiefResult,
 } from '../../quickscan/chiefOpenaiClient.js';
@@ -64,6 +65,19 @@ function providerErrorCode(error: unknown): string {
   return error instanceof QuickScanChiefProviderError ? error.code : 'QUICKSCAN_CHIEF_FAILED';
 }
 
+function quickScanChiefConfigured(env: NodeJS.ProcessEnv = process.env): boolean {
+  const provider = env.QUICKSCAN_CHIEF_PROVIDER?.trim().toLowerCase() || 'openai';
+  if (provider === 'anthropic') {
+    return Boolean(env.ANTHROPIC_API_KEY?.trim() && env.QUICKSCAN_CHIEF_ANTHROPIC_MODEL?.trim());
+  }
+  if (provider !== 'openai') return false;
+  return Boolean(env.OPENAI_API_KEY?.trim());
+}
+
+function providerConfigurationMissing(code: string): boolean {
+  return code === 'MODEL_PROVIDER_NOT_CONFIGURED' || code.endsWith('_NOT_CONFIGURED');
+}
+
 export function createQuickScanRouter(dependencies: QuickScanRouteDependencies = {}) {
   const quickScanRouter = Router();
   const runChief = dependencies.runChief ?? createOpenAiQuickScanChiefRunner();
@@ -83,7 +97,8 @@ quickScanRouter.get('/', (_req, res) => {
       scrape: false,
       executeN8n: false,
       stripeWebhookConfigured: Boolean(process.env.STRIPE_QUICKSCAN_WEBHOOK_SECRET?.trim()),
-      chiefConfigured: Boolean(process.env.OPENAI_API_KEY?.trim()),
+      chiefConfigured: quickScanChiefConfigured(),
+      chiefDataRecipients: quickScanChiefDataRecipients(),
     },
     architecture: { fcr: 'authority-evidence-ui', chief: 'replaceable-reasoning', promptos: 'versioned-workflow-provenance', ultrathink: 'domain-rules', n8n: 'orchestration-disabled-v1' },
     priceCents: QUICKSCAN_PRICE_CENTS,
@@ -239,11 +254,11 @@ quickScanRouter.post('/prospects/:id/delivery', (req: FounderRequest, res) => {
  * still has to APPROVE/EDIT/SKIP through the existing approval routes;
  * Chief never sends anything itself.
  *
- * Sending this prospect's evidence notes and qualification text to OpenAI
+ * Sending this prospect's evidence notes and qualification text to the configured model provider
  * is a real trust-boundary crossing ("founder-observed" is not by itself a
  * privacy classification), so the request must explicitly acknowledge it
- * via `acknowledgeDataSharing: true` — a UI confirm() alone is bypassable
- * by any direct caller and proves nothing; this makes the gate structural.
+ * via `acknowledgeDataSharing: true` and the exact server-derived
+ * `acknowledgedProviders` list; stale consent fails closed before dispatch.
  *
  * Refuses (409 QUICKSCAN_CHIEF_INPUT_CHANGED) rather than applying the
  * recommendation if evidence, qualification, or lifecycle state changed
@@ -262,7 +277,14 @@ quickScanRouter.post('/prospects/:id/chief-recommendation', async (req: FounderR
 
   const body = record(req.body);
   if (body.acknowledgeDataSharing !== true) {
-    return fail(res, 400, 'DATA_SHARING_ACKNOWLEDGEMENT_REQUIRED', 'this prospect\'s business name, owner name, segment, evidence notes, and qualification text will be sent to the configured OpenAI-backed Chief provider; acknowledgeDataSharing: true is required to proceed');
+    return fail(res, 400, 'DATA_SHARING_ACKNOWLEDGEMENT_REQUIRED', 'explicit acknowledgement is required before Chief receives prospect data');
+  }
+  const recipients = quickScanChiefDataRecipients();
+  const approved = body.acknowledgedProviders;
+  if (!Array.isArray(approved)
+    || approved.length !== recipients.length
+    || approved.some((name, index) => name !== recipients[index])) {
+    return fail(res, 409, 'CHIEF_PROVIDER_CONSENT_CHANGED', 'configured provider recipients changed or were not acknowledged; refresh provider consent and retry');
   }
 
   let result: QuickScanChiefResult;
@@ -280,9 +302,9 @@ quickScanRouter.post('/prospects/:id/chief-recommendation', async (req: FounderR
     const code = providerErrorCode(error);
     return fail(
       res,
-      code === 'OPENAI_NOT_CONFIGURED' ? 503 : 502,
+      providerConfigurationMissing(code) ? 503 : 502,
       code,
-      code === 'OPENAI_NOT_CONFIGURED' ? 'QuickScan Chief model provider is not configured' : 'QuickScan Chief model provider failed',
+      providerConfigurationMissing(code) ? 'QuickScan Chief model provider is not configured' : 'QuickScan Chief model provider failed',
     );
   }
 
@@ -328,7 +350,7 @@ quickScanRouter.post('/prospects/:id/chief-recommendation', async (req: FounderR
   prospect.audit.push({
     id: `audit_${Date.now()}`,
     type: 'chief.recommendation.provenance',
-    message: `provider=${result.provenance.provider} model=${result.provenance.model} response=${result.provenance.responseId ?? 'none'} promptVersion=${result.provenance.promptVersion}`
+    message: `provider=${result.provenance.provider} acknowledgedProviders=${recipients.join(',')} model=${result.provenance.model} response=${result.provenance.responseId ?? 'none'} promptVersion=${result.provenance.promptVersion}`
       + (result.provenance.selection ? ` costClass=${result.provenance.selection.costClass}` : '')
       + (result.provenance.fallbackReason ? ` fallbackReason=${result.provenance.fallbackReason}` : '')
       + (rejectedCandidates ? ` rejected=${rejectedCandidates}` : ''),
