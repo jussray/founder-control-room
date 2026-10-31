@@ -23,10 +23,14 @@ import { runProofGate } from '../../proof-gate/gate.js';
 import { requireFounder, type FounderRequest } from '../middleware/requireFounder.js';
 import type { ProofEvidence } from '../../proof-gate/types.js';
 import {
+  L99_GIT_CONNECTION_LABEL,
+  L99_GIT_CONNECTION_TYPE,
   L99_PROJECT_SLUG,
   L99_REPOSITORY_IDENTIFIER,
   L99_REPOSITORY_PROVIDER,
+  buildL99GitConnectionConfig,
   buildL99RepositoryFields,
+  needsL99GitConnectionReconciliation,
   needsL99RepositoryReconciliation,
 } from '../../config/l99Repository.js';
 import { productBuildRouter } from './productBuild.js';
@@ -62,6 +66,17 @@ async function getL99Project() {
     .eq('slug', L99_SLUG)
     .maybeSingle();
   return { project: data, error };
+}
+
+async function getL99GitConnection(projectId: string) {
+  const { data, error } = await supabase
+    .from('project_connections')
+    .select('id, config, status')
+    .eq('project_id', projectId)
+    .eq('connection_type', L99_GIT_CONNECTION_TYPE)
+    .eq('label', L99_GIT_CONNECTION_LABEL)
+    .maybeSingle();
+  return { connection: data, error };
 }
 
 async function auditEvent(
@@ -222,47 +237,87 @@ l99Router.post('/gate/:gateId', requireFounder, async (req: FounderRequest, res)
 // ─── POST /l99/seed ───────────────────────────────────────────────────────────
 /**
  * Idempotent. Registers L99 in the Control Room project registry if not
- * already present, and repairs a stale repository locator without creating a
- * second project identity.
+ * already present, and reconciles both the canonical project row and its
+ * existing primary Git connection without creating a second project identity.
  */
 l99Router.post('/seed', requireFounder, async (req: FounderRequest, res) => {
   const { project: existing, error: lookupError } = await getL99Project();
   if (lookupError) return res.status(500).json({ error: lookupError.message });
 
   if (existing) {
-    if (!needsL99RepositoryReconciliation(existing)) {
-      return res.json({
+    const { connection, error: connectionError } = await getL99GitConnection(existing.id);
+    if (connectionError) return res.status(500).json({ error: connectionError.message });
+
+    if (!connection) {
+      return res.status(409).json({
         seeded: false,
         reconciled: false,
-        message: 'L99 project already registered with the authoritative repository.',
+        code: 'L99_GIT_CONNECTION_MISSING',
+        message: 'L99 project is registered but its primary Git connection is missing. Register the connection explicitly before claiming repository parity.',
         project: existing,
       });
     }
 
-    const previousRepository = existing.repo_identifier ?? null;
-    const { data: reconciled, error: reconcileError } = await supabase
-      .from('projects')
-      .update(buildL99RepositoryFields(new Date().toISOString()))
-      .eq('id', existing.id)
-      .select()
-      .single();
+    const projectNeedsReconciliation = needsL99RepositoryReconciliation(existing);
+    const connectionNeedsReconciliation = needsL99GitConnectionReconciliation(connection.config);
 
-    if (reconcileError) {
-      return res.status(500).json({ error: reconcileError.message });
+    if (!projectNeedsReconciliation && !connectionNeedsReconciliation) {
+      return res.json({
+        seeded: false,
+        reconciled: false,
+        message: 'L99 project and primary Git connection already use the authoritative repository.',
+        project: existing,
+        connection,
+      });
     }
 
-    await auditEvent(reconciled.id, 'l99_project_repository_reconciled', {
+    const previousRepository = existing.repo_identifier ?? null;
+    const previousConnectionRepository =
+      connection.config && typeof connection.config === 'object' && !Array.isArray(connection.config)
+        ? (connection.config as Record<string, unknown>).repository ?? null
+        : null;
+
+    let reconciledProject = existing;
+    if (projectNeedsReconciliation) {
+      const { data, error } = await supabase
+        .from('projects')
+        .update(buildL99RepositoryFields(new Date().toISOString()))
+        .eq('id', existing.id)
+        .select()
+        .single();
+      if (error) return res.status(500).json({ error: error.message });
+      reconciledProject = data;
+    }
+
+    let reconciledConnection = connection;
+    if (connectionNeedsReconciliation) {
+      const { data, error } = await supabase
+        .from('project_connections')
+        .update({ config: buildL99GitConnectionConfig(connection.config) })
+        .eq('id', connection.id)
+        .eq('project_id', existing.id)
+        .select('id, config, status')
+        .single();
+      if (error) return res.status(500).json({ error: error.message });
+      reconciledConnection = data;
+    }
+
+    await auditEvent(existing.id, 'l99_project_repository_reconciled', {
       reconciled_by: req.founder?.email,
       previous_repository: previousRepository,
+      previous_connection_repository: previousConnectionRepository,
       repository: L99_REPOSITORY_IDENTIFIER,
+      project_row_reconciled: projectNeedsReconciliation,
+      git_connection_reconciled: connectionNeedsReconciliation,
       route: 'POST /l99/seed',
     });
 
     return res.json({
       seeded: false,
       reconciled: true,
-      message: 'L99 project repository locator reconciled.',
-      project: reconciled,
+      message: 'L99 project and primary Git connection repository identity reconciled.',
+      project: reconciledProject,
+      connection: reconciledConnection,
     });
   }
 
@@ -298,7 +353,7 @@ l99Router.post('/seed', requireFounder, async (req: FounderRequest, res) => {
     reconciled: false,
     message: 'L99 registered in Control Room project registry.',
     project: inserted,
-    nextStep: 'POST /l99/gate/l99-creator-journey with ProofEvidence to begin OODA loop.',
+    nextStep: 'Register the primary Git connection, then POST /l99/gate/l99-creator-journey with ProofEvidence to begin OODA loop.',
   });
 });
 
