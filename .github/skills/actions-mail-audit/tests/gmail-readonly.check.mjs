@@ -1,5 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { URL } from 'node:url';
+import { Buffer } from 'node:buffer';
 import { fetchGmailAlertMetadata } from '../scripts/gmail-readonly.mjs';
 
 const repo = 'jussray/founder-control-room';
