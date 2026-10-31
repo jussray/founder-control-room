@@ -28,3 +28,25 @@ node --test .github/skills/actions-mail-audit/tests/triage.test.mjs
 ```
 
 The example placeholders are not runtime configuration. Never copy personal tokens into logs, a code file, or a prompt. Read-only on-demand profile: `.github/agents/actions-mail-auditor.agent.md`. No automatic ingestion or delivery should be claimed until separately proven.
+
+## FCR native provider handoff (implemented as an opt-in local command)
+
+This repository now includes `.github/skills/actions-mail-audit/scripts/gmail-readonly.mjs`. It queries ONLY Gmail's read endpoints to acquire metadata for recent GitHub notification and GitGuardian messages. It confirms the authenticated Gmail profile matches one of the designated founder mailboxes and includes Inbox, Spam, and Trash. It uses the body **in memory only** to extract a canonical `github.com/jussray/.../actions/runs/<id>` link; bodies, tracking tokens, HTML, raw headers, attachments, and OAuth tokens never enter the output. GitGuardian messages without a matching run link are allowed as UNVERIFIED security triage only if their subject names the exact repository.
+
+The adapter requires a separately granted **Gmail read-only OAuth access token** for each mailbox, injected securely as `GMAIL_READONLY_ACCESS_TOKEN` for that invocation. Existing ChatGPT Gmail connections cannot be reused or copied into this project automatically. It does not request new consent, manage OAuth grants, refresh tokens, or store credentials. **No project-side Gmail OAuth grant is currently verified or installed.** If absent or mismatched, return BLOCKED and do not guess. The GitHub readback step independently requires repository-scoped GitHub API `actions:read` and `contents:read`, supplied by the authorized environment. Never hand tokens to a console, command argument, GitHub issue, PR comment, commit, or build log.
+
+For a securely provisioned session, pipe the two processes directly without storing raw mail or JSON on disk:
+
+```sh
+# Precondition: the named variables are supplied as protected environment secrets.
+node .github/skills/actions-mail-audit/scripts/gmail-readonly.mjs |
+  node .github/skills/actions-mail-audit/scripts/triage.mjs
+```
+
+Both commands must have `GITHUB_REPOSITORY` set to the exact `jussray/...` target. The first also requires `GMAIL_AUDIT_MAILBOX` and `GMAIL_READONLY_ACCESS_TOKEN`; the second requires a read-only `GITHUB_TOKEN` or `GH_TOKEN`. Execute once per authorized mailbox; reconcile across those outputs by canonical repo/run identity. This is **on-demand evidence ingestion only**, not a periodic deployment or production worker.
+
+### Authority and FCR integration
+
+FCR already includes the HMAC-verified GitHub webhook path `src/http/webhooks/github.ts`, with bounded `workflow_run` and `check_run` ingestion. Preserve that provider-signature verification, project-resolution logic, and FCR's canonical reconciliation stores. The Gmail adapter is a discovery-only supplement; it **does not** create a webhook, database writer, GitHub workflow-dispatcher, secondary incident authority, or publication pipeline. Never promote email metadata into persisted canonical evidence without the existing authenticated FCR pathway and an explicitly reviewed, tested integration. Both new audit scripts do GET-only provider reads. No install or deployment has been performed.
+
+Offline proof: `node --test .github/skills/actions-mail-audit/tests/*.mjs`. CI runs this command at the exact PR head when these files change. Mocked Gmail tests prove extraction and redaction behavior but do NOT prove that a live Gmail OAuth credential, background ingestion, Gmail quota, production webhook, or provider route is configured.
