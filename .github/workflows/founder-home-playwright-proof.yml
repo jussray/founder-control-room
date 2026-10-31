@@ -1,0 +1,40 @@
+name: Founder Home Playwright Proof
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: founder-home-proof-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  founder-home-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact workflow commit
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Verify Founder Home browser contract
+        run: npm run verify:founder-home
+      - name: Upload browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: founder-home-proof-${{ github.sha }}
+          path: test-results/
+          if-no-files-found: warn
+          retention-days: 7
