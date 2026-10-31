@@ -66,6 +66,13 @@ jobs:
         with:
           ref: ${{ env.EXPECTED_HEAD_SHA }}
           persist-credentials: false
+      - name: Bind audit producer to exact checked-out source
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
+          echo "PORTFOLIO_AUDIT_SOURCE_SHA=$actual" >> "$GITHUB_ENV"
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '24'
@@ -92,9 +99,29 @@ jobs:
         shell: bash
         run: |
           if test ! -s artifacts/portfolio-actions-audit/receipt.json; then
-            mkdir -p artifacts/portfolio-actions-audit
-            node -e "require('node:fs').writeFileSync('artifacts/portfolio-actions-audit/receipt.json',JSON.stringify({schema:'fcr/portfolio-actions-audit@v1',state:'BLOCKED',reason:'AUDIT_DID_NOT_PRODUCE_RECEIPT',operationVerified:false,productionVerified:false,mutationAuthorized:false},null,2)+'\n')"
+            node scripts/portfolio-actions-audit.mjs --blocked-receipt || test -s artifacts/portfolio-actions-audit/receipt.json
           fi
+      - name: Present the next non-authorizing audit task
+        if: always()
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFileSync, appendFileSync } from 'node:fs';
+          const receipt = JSON.parse(readFileSync('artifacts/portfolio-actions-audit/receipt.json', 'utf8'));
+          const action = receipt.nextAction;
+          const safe = (value) => typeof value === 'string' && /^[A-Za-z0-9_-]+$/.test(value) ? value : 'UNKNOWN';
+          const lines = [
+            '## Portfolio audit handoff',
+            '',
+            '- State: ' + safe(receipt.state),
+            '- Next action: ' + safe(action?.action),
+            '- Next owner: ' + safe(action?.owner),
+            '- Source/run bindings: recorded in the attached receipt; revalidate before use.',
+            '- This audit observes default-branch Actions only; it does not prove Cloudflare, production, or unmerged repair branches.',
+            '- Audit evidence and next-task proposals grant no execution authority.',
+          ];
+          appendFileSync(process.env.GITHUB_STEP_SUMMARY, lines.join('\n') + '\n');
+          NODE
       - name: Upload safe summary artifact, including failure or incomplete coverage
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
