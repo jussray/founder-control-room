@@ -78,7 +78,7 @@ jobs:
           set -euo pipefail
 
           if [[ -z "${CLOUDFLARE_API_TOKEN:-}" ]]; then
-            echo '::error title=Missing Worker reconcile credential::Set CLOUDFLARE_API_TOKEN in the GitHub production environment before reconciliation.'
+            echo '::error title=Missing GitHub deployment credential::CLOUDFLARE_API_TOKEN is empty in this job. Verify the production environment secret name, repository/organization secret visibility, and environment protection approvals. Cloudflare Worker runtime secrets are checked separately; do not copy them into GitHub Actions.'
             exit 1
           fi
 
@@ -88,7 +88,7 @@ jobs:
 
           token = os.environ.get('CLOUDFLARE_API_TOKEN', '')
           if not token:
-              print('::error title=Missing Worker reconcile credential::CLOUDFLARE_API_TOKEN is empty.')
+              print('::error title=Missing GitHub deployment credential::CLOUDFLARE_API_TOKEN is empty in the production job; check environment scope and approval, not Worker runtime bindings.')
               sys.exit(1)
 
           try:
