@@ -5,7 +5,12 @@ default-branch GitHub Actions daily, in parallel batches of six repositories.
 Its receipt includes a prioritized, non-authorizing next-task handoff bound to
 the observed repository/head and the audit source/run. The workflow preserves
 that handoff even when collection is blocked and presents the next action in its
-job summary. Consumers must re-read the current head before acting. This is an
+job summary.
+The credential-bearing observation job is restricted to main push, schedule,
+or manual-dispatch events and verifies its checked-out SHA against freshly
+fetched main immediately before token minting. Production-environment branch
+restrictions still require independent provider readback.
+Consumers must re-read the current head before acting. This is an
 artifact handoff, not a hosted task-queue write or proof of deployed protection;
 Cloudflare checks, unmerged repair branches, and production behavior need
 separate evidence. Integration on the default branch and a successful scheduled

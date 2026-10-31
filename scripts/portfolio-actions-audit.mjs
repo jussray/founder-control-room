@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { createHash, createHmac, randomBytes } from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
+import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
 const RECEIPT = 'artifacts/portfolio-actions-audit/receipt.json';
@@ -183,6 +184,22 @@ function selfTest() {
       assert.equal(task.requiresCurrentHeadRevalidation, true);
     }
   }
+  const workflow = readFileSync(new URL('../.github/workflows/portfolio-actions-audit.yml', import.meta.url), 'utf8');
+  const observeJob = workflow.slice(workflow.indexOf('\n  observe:'));
+  const observeCondition = observeJob.match(/\n    if: >-\n([\s\S]*?)(?=\n    needs:)/)?.[1].replace(/\s+/g, ' ').trim();
+  assert.equal(observeCondition, "github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')",
+    'credential-bearing observation must allow only trusted-main push, schedule, and dispatch events');
+  const trustAt = observeJob.indexOf('- name: Verify trusted main immediately before token mint');
+  const mintAt = observeJob.indexOf('- name: Mint read-only portfolio installation token');
+  assert.ok(trustAt > 0 && mintAt > trustAt, 'trusted-main verification must precede the credential-bearing step');
+  const trustStep = observeJob.slice(trustAt, mintAt);
+  assert.match(trustStep, /git fetch --no-tags --depth=1 origin refs\/heads\/main:refs\/remotes\/origin\/main/);
+  assert.match(trustStep, /test "\$actual" = "\$EXPECTED_HEAD_SHA"/);
+  assert.match(trustStep, /current_main="\$\(git rev-parse refs\/remotes\/origin\/main\)"/);
+  assert.match(trustStep, /test "\$current_main" = "\$actual"/);
+  assert.equal(trustStep.slice(trustStep.indexOf('\n')).includes('\n      - '), false,
+    'no intervening action may separate trusted-main verification from credential minting');
+  assert.match(trustStep, /set -euo pipefail/);
   console.log('Portfolio classification regression: 16 assertions passed; this does NOT verify any external repository');
   console.log('PORTFOLIO_HANDOFF_REGRESSION_PASSED');
 }
