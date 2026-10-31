@@ -205,6 +205,22 @@ jobs:
               -c "INSERT INTO ci_preview.migration_receipts(filename, sha256) VALUES ('$migration', '$CHECKSUM');"
           done
 
+      - name: Prove federated relay v3.1 concurrent exact retry
+        if: steps.neon_scope.outputs.needs_neon == 'true'
+        shell: bash
+        env:
+          LIVE_BASE_SHA: ${{ steps.neon_scope.outputs.live_base_sha }}
+          EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          NEON_DB_URL: ${{ steps.create_neon_branch.outputs.db_url }}
+        run: |
+          set -euo pipefail
+          if ! git diff --name-only "$LIVE_BASE_SHA" "$EXPECTED_HEAD_SHA" -- 'supabase/migrations/*.sql' \
+            | grep -Eq 'federated_relay_v31'; then
+            echo 'No federated relay v3.1 migration changed; concurrency proof not required.'
+            exit 0
+          fi
+          bash scripts/prove-federated-relay-v31-neon-concurrency.sh
+
       - name: Verify FCR commerce preview schema when present
         if: steps.neon_scope.outputs.needs_neon == 'true'
         shell: bash

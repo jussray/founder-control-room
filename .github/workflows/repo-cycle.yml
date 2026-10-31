@@ -57,8 +57,33 @@ on:
         default: main
         type: string
       founder_approval_id:
-        description: Founder approval receipt/decision ID; required by merge_gate
+        description: Founder approval receipt/decision ID; required by merge_gate and protected relay proof
         required: false
+        type: string
+      verify_federated_relay_v31:
+        description: Run protected signed durable FCR → Chief → FCR v3.1 roundtrip after repository verification
+        required: false
+        default: false
+        type: boolean
+      fcr_relay_base_url:
+        description: Optional exact FCR candidate runtime origin override; leave blank to resolve it read-only from Cloudflare Builds
+        required: false
+        default: ''
+        type: string
+      chief_relay_base_url:
+        description: Exact immutable Chief workers.dev preview origin
+        required: false
+        default: ''
+        type: string
+      chief_relay_target_sha:
+        description: Exact Chief runtime SHA for relay proof
+        required: false
+        default: ''
+        type: string
+      chief_relay_target_branch:
+        description: Exact Chief repository branch carried by the preview runtime
+        required: false
+        default: ''
         type: string
 
 permissions:
@@ -134,6 +159,11 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
 
+      - name: Verify exact FCR preview resolver contract
+        run: |
+          node --check scripts/resolve-fcr-worker-preview.mjs
+          node --test scripts/resolve-fcr-worker-preview.node-test.mjs
+
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
 
@@ -165,7 +195,7 @@ jobs:
             echo "- Approval ID: \`${FOUNDER_APPROVAL_ID:-not supplied}\`"
             echo "- Merge authorized: \`${MERGE_AUTHORIZED}\`"
             echo
-            echo "> Only a founder-issued receipt can authorize this exact SHA. This workflow remains evidence-only and read-only; the exact-SHA receipt is consumed by a separate merge executor."
+            echo "> Only a founder-issued receipt can authorize this exact SHA. This job remains evidence-only and read-only; the exact-SHA receipt is consumed by a separate merge executor."
             if [ -f repo-cycle-result.json ]; then
               echo
               echo "### Result"
@@ -181,5 +211,153 @@ jobs:
         with:
           name: repo-cycle-${{ env.REPO_CYCLE_OPERATION }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: repo-cycle-result.json
+          if-no-files-found: warn
+          retention-days: 30
+
+  relay-v31-proof:
+    name: Protected federated relay v3.1 exact-runtime proof
+    if: github.event_name == 'workflow_dispatch' && inputs.verify_federated_relay_v31
+    needs: repo-cycle
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment: production
+    env:
+      EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha }}
+      TARGET_BRANCH: ${{ inputs.target_branch }}
+      FOUNDER_APPROVAL_ID: ${{ inputs.founder_approval_id || '' }}
+      FCR_FEDERATED_RELAY_BASE_URL: ${{ inputs.fcr_relay_base_url || '' }}
+      FCR_FEDERATED_RELAY_SOURCE_SHA: ${{ inputs.expected_head_sha }}
+      FCR_FEDERATED_RELAY_SOURCE_BRANCH: ${{ inputs.target_branch }}
+      CHIEF_FEDERATED_RELAY_BASE_URL: ${{ inputs.chief_relay_base_url }}
+      CHIEF_FEDERATED_RELAY_TARGET_SHA: ${{ inputs.chief_relay_target_sha }}
+      CHIEF_FEDERATED_RELAY_TARGET_BRANCH: ${{ inputs.chief_relay_target_branch }}
+
+    steps:
+      - name: Validate protected relay proof authority and inputs
+        shell: bash
+        env:
+          CHIEF_RUNTIME_ACCESS_CLIENT_ID: ${{ secrets.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID || secrets.CLOUDFLARE_ACCESS_CLIENT_ID || vars.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID || vars.CLOUDFLARE_ACCESS_CLIENT_ID }}
+          CHIEF_RUNTIME_ACCESS_CLIENT_SECRET: ${{ secrets.CHIEF_CLOUDFLARE_ACCESS_CLIENT_SECRET || secrets.CLOUDFLARE_ACCESS_CLIENT_SECRET }}
+        run: |
+          set -euo pipefail
+          if [ "${{ inputs.operation }}" != 'verify' ]; then
+            echo '::error title=Wrong proof operation::Protected relay proof requires operation=verify.'
+            exit 1
+          fi
+          if [[ ! "$EXPECTED_HEAD_SHA" =~ ^[0-9a-f]{40}$ ]] || [[ ! "$CHIEF_FEDERATED_RELAY_TARGET_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo '::error title=Invalid exact identity::Both FCR and Chief exact lowercase 40-character SHAs are required.'
+            exit 1
+          fi
+          if [ -z "$FOUNDER_APPROVAL_ID" ]; then
+            echo '::error title=Missing founder proof approval::Protected relay evidence writes require a founder approval reference.'
+            exit 1
+          fi
+          git check-ref-format --branch "$TARGET_BRANCH" >/dev/null
+          git check-ref-format --branch "$CHIEF_FEDERATED_RELAY_TARGET_BRANCH" >/dev/null
+          if [ -z "$CHIEF_RUNTIME_ACCESS_CLIENT_ID" ] || [ -z "$CHIEF_RUNTIME_ACCESS_CLIENT_SECRET" ]; then
+            echo '::error title=Missing Chief protected runtime credentials::Both Chief Access client credentials are required in the FCR production environment.'
+            exit 1
+          fi
+          node --input-type=module <<'NODE'
+          const raw = process.env.CHIEF_FEDERATED_RELAY_BASE_URL;
+          let url;
+          try { url = new URL(raw); } catch { process.exit(1); }
+          if (
+            url.protocol !== 'https:'
+            || url.username
+            || url.password
+            || url.search
+            || url.hash
+            || (url.pathname !== '/' && url.pathname !== '')
+            || !/^[0-9a-f]{8}-chief-ai\.mcgill-raylene\.workers\.dev$/i.test(url.hostname)
+          ) process.exit(1);
+          NODE
+
+      - name: Verify dispatch ref remains exact
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_SHA" != "$EXPECTED_HEAD_SHA" ]; then
+            echo "::error title=Stale protected relay dispatch::Workflow ref ${GITHUB_SHA} no longer matches ${EXPECTED_HEAD_SHA}."
+            exit 1
+          fi
+
+      - name: Checkout protected proof subject
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Re-read exact FCR branch after repository verification
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
+          git fetch --no-tags origin "$TARGET_BRANCH"
+          current_tip="$(git rev-parse FETCH_HEAD)"
+          if [ "$current_tip" != "$EXPECTED_HEAD_SHA" ]; then
+            echo "::error title=Stale FCR proof subject::${TARGET_BRANCH} moved to ${current_tip}."
+            exit 1
+          fi
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Build exact FCR proof subject
+        run: npm run build
+
+      - name: Resolve exact FCR Worker preview read-only
+        if: inputs.fcr_relay_base_url == ''
+        env:
+          CLOUDFLARE_ACCOUNT_ID: 9b59861bd1747cf7525571b4c51d2aa0
+          FCR_CLOUDFLARE_BUILDS_USER_TOKEN: ${{ secrets.FCR_CLOUDFLARE_BUILDS_USER_TOKEN }}
+          FCR_CLOUDFLARE_WORKER_NAME: founder-control-room
+        run: node scripts/resolve-fcr-worker-preview.mjs
+
+      - name: Prove protected signed durable FCR to Chief to FCR v3.1 roundtrip
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          FCR_RELAY_SUPABASE_URL: https://oojzfmmywbvficgybaxd.supabase.co
+          CHIEF_RUNTIME_ACCESS_CLIENT_ID: ${{ secrets.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID || secrets.CLOUDFLARE_ACCESS_CLIENT_ID || vars.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID || vars.CLOUDFLARE_ACCESS_CLIENT_ID }}
+          CHIEF_RUNTIME_ACCESS_CLIENT_SECRET: ${{ secrets.CHIEF_CLOUDFLARE_ACCESS_CLIENT_SECRET || secrets.CLOUDFLARE_ACCESS_CLIENT_SECRET }}
+        run: node scripts/prove-federated-agent-roundtrip-v31-protected.mjs
+
+      - name: Publish protected relay proof summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo '## Protected federated relay v3.1 proof'
+            echo
+            echo "- FCR exact head: \`${EXPECTED_HEAD_SHA}\`"
+            echo "- FCR branch: \`${TARGET_BRANCH}\`"
+            echo "- FCR candidate runtime: \`${FCR_FEDERATED_RELAY_BASE_URL:-unresolved}\`"
+            echo "- Chief exact head: \`${CHIEF_FEDERATED_RELAY_TARGET_SHA}\`"
+            echo "- Chief branch: \`${CHIEF_FEDERATED_RELAY_TARGET_BRANCH}\`"
+            echo "- Founder proof approval reference: \`${FOUNDER_APPROVAL_ID}\`"
+            if [ -f federated-agent-roundtrip-v31.json ]; then
+              echo '- Roundtrip: `VERIFIED`'
+            else
+              echo '- Roundtrip: `NOT VERIFIED`'
+            fi
+            echo
+            echo '> This proof may write non-authorizing relay evidence only. It does not authorize merge, deploy, provider mutation, or execution authority.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload protected relay evidence receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: federated-relay-v31-${{ inputs.expected_head_sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            federated-agent-roundtrip-v31.json
+            test-results/fcr-worker-preview-resolution.json
           if-no-files-found: warn
           retention-days: 30
