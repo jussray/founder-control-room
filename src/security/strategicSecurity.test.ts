@@ -12,6 +12,15 @@ import {
 } from './strategicSecurity.js';
 
 describe('strategic security v10', () => {
+  it('rejects omitted or non-boolean Lantern safeguards', () => {
+    for (const key of Object.keys(DEFAULT_LANTERN_POLICY)) {
+      for (const invalid of [undefined, null, 0, 1, 'false', 'true']) {
+        const candidate = { ...DEFAULT_LANTERN_POLICY, [key]: invalid };
+        expect(validateLanternPolicy(candidate as typeof DEFAULT_LANTERN_POLICY).length).toBeGreaterThan(0);
+      }
+    }
+  });
+
   it('defines one ordered, cumulative V1 through V10 security ladder', () => {
     expect(STRATEGIC_SECURITY_STAGES).toHaveLength(10);
     expect(STRATEGIC_SECURITY_STAGES.map((stage) => stage.version)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);

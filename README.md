@@ -1,5 +1,26 @@
 # Founder Control Room
 
+The existing Portfolio Actions and Stale Evidence Audit is configured to observe
+default-branch GitHub Actions daily, in parallel batches of six repositories.
+Its receipt includes a prioritized, non-authorizing next-task handoff bound to
+the observed repository/head and the audit source/run. The workflow preserves
+that handoff even when collection is blocked and presents the next action in its
+job summary.
+The credential-bearing observation job is restricted to main push, schedule,
+or manual-dispatch events and verifies its checked-out SHA against freshly
+fetched main immediately before token minting. Production-environment branch
+restrictions still require independent provider readback.
+Consumers must re-read the current head before acting. This is an
+artifact handoff, not a hosted task-queue write or proof of deployed protection;
+Cloudflare checks, unmerged repair branches, and production behavior need
+separate evidence. Integration on the default branch and a successful scheduled
+run are required before claiming the new handoff operates automatically.
+
+Lantern policy validation requires every sandbox safeguard to be an explicit
+boolean matching the isolated, evidence-only policy. Missing values and string
+or numeric substitutes fail validation; this source contract does not establish
+a running decoy, deployed protection, or permission to execute.
+
 Documentation Truth and test discovery resolve a pull request's live target branch at verification time, fetch its exact commit, and require it to be an ancestor of the checked-out candidate before evaluating the change. The event's stored base SHA remains historical context. Push verification instead uses the exact push-before SHA; missing, malformed, unavailable, or non-ancestor bases block proof. Passing these source checks grants no merge or deployment authority.
 
 ## October 26, 2026 — StoryEngine peer identity renewal for FCR PR #1020 (candidate only)
