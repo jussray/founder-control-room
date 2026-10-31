@@ -10,7 +10,8 @@ const GMAIL_ORIGIN = 'https://gmail.googleapis.com';
 const RUN_LINKS = /https:\/\/github\.com\/jussray\/[A-Za-z0-9_.-]+\/actions\/runs\/[1-9][0-9]*/g;
 const REPO = /^jussray\/[A-Za-z0-9_.-]+$/;
 const HEADER_NAMES = new Set(['from', 'subject']);
-const MAX_MESSAGES = 25;
+const PAGE_SIZE = 50;
+const MAX_PAGES = 5;
 const MAX_TEXT_BYTES = 131072;
 
 function parseSafeHeaders(payload) {
@@ -87,10 +88,23 @@ export async function fetchGmailAlertMetadata({ token, mailbox, repo, fetcher = 
   if (String(profile.emailAddress || '').toLowerCase() !== mailbox) {
     throw new Error('GMAIL_PROFILE_MISMATCH');
   }
-  const params = new URLSearchParams({ q: EMAIL_QUERY, includeSpamTrash: 'true', maxResults: String(MAX_MESSAGES) });
-  const result = await gmailGet('/gmail/v1/users/me/messages?' + params.toString(), token, fetcher);
+  const hits = [];
+  let pageToken = '';
+  let complete = false;
+  for (let page = 0; page < MAX_PAGES; page++) {
+    const params = new URLSearchParams({ q: EMAIL_QUERY, includeSpamTrash: 'true', maxResults: String(PAGE_SIZE) });
+    if (pageToken) params.set('pageToken', pageToken);
+    const pageData = await gmailGet('/gmail/v1/users/me/messages?' + params.toString(), token, fetcher);
+    if (!Array.isArray(pageData.messages) && pageData.messages != null) throw new Error('GMAIL_PAGE_SHAPE_INVALID');
+    hits.push(...(pageData.messages || []).slice(0, PAGE_SIZE));
+    if (!pageData.nextPageToken) { complete = true; break; }
+    if (typeof pageData.nextPageToken !== 'string' || pageData.nextPageToken === pageToken) throw new Error('GMAIL_PAGE_TOKEN_INVALID');
+    pageToken = pageData.nextPageToken;
+  }
+  // Never declare a complete audit from a silently truncated result.
+  if (!complete) throw new Error('GMAIL_COVERAGE_INCOMPLETE');
   const notices = [];
-  for (const hit of Array.isArray(result.messages) ? result.messages.slice(0, MAX_MESSAGES) : []) {
+  for (const hit of hits) {
     if (!/^[a-f0-9]{8,40}$/i.test(hit?.id || '')) continue;
     const message = await gmailGet('/gmail/v1/users/me/messages/' + encodeURIComponent(hit.id) + '?format=full', token, fetcher);
     const headers = parseSafeHeaders(message.payload);
