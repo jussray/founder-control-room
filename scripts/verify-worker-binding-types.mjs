@@ -4,6 +4,7 @@
  * Checks only names and types; never logs binding values.
  */
 import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
 export const WORKER = 'founder-control-room';
@@ -57,7 +58,14 @@ export async function runProviderPreflight({ fetchFn = fetch, env = process.env 
     const result = validateBindingTypes(payload);
     if (!result.ok) throw new Error(result.reason + ': ' +
       result.unsafe.map(b => b.name + '(' + b.type + ')').join(', '));
-    return { ok: true, worker: WORKER, bindingCount: payload.result.bindings.length };
+    // Fingerprint only sorted binding names and types, never credential contents.
+    const metadata = payload.result.bindings
+      .map(({ name, type }) => ({ name, type }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    const bindingFingerprint = 'sha256:' + createHash('sha256')
+      .update(JSON.stringify({ worker: WORKER, metadata }))
+      .digest('hex');
+    return { ok: true, worker: WORKER, bindingCount: metadata.length, bindingFingerprint };
   } finally {
     clearTimeout(timeout);
   }
@@ -66,7 +74,7 @@ export async function runProviderPreflight({ fetchFn = fetch, env = process.env 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   runProviderPreflight().then(result => {
     console.log('WORKER_BINDING_SECURITY_PASS worker=' + result.worker +
-      ' checked=' + result.bindingCount + ' values=redacted');
+      ' checked=' + result.bindingCount + ' fingerprint=' + result.bindingFingerprint + ' values=redacted');
   }).catch(error => {
     console.error('WORKER_BINDING_SECURITY_BLOCKED ' +
       (error instanceof Error ? error.message : 'unknown'));
