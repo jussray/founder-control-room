@@ -4,17 +4,20 @@ Status: founder-approved bridge slice
 
 ## Purpose
 
-Let a governed operator hand a bounded task to another governed peer operator through Founder Control Room so the founder does not have to copy/paste between ChatGPT/Codex, Claude/Claude Code, Gemini, Perplexity, and DeepSeek.
+Let a governed operator hand a bounded task to another governed peer operator through Founder Control Room so the founder does not have to copy/paste between ChatGPT/Codex, Claude/Claude Code, Gemini, Perplexity, Meta AI, and Muse. DeepSeek remains outside the peer lane as the bounded Instructor/adversary.
 
 ## Peer operator lane
 
-Peer relay operators:
+The canonical peer registry is `src/lib/operatorRelayConstants.ts`. The current governed peer relay operators are:
 
 - `gemini`
 - `codex`
 - `claude-code`
 - `perplexity`
-- `deepseek`
+- `meta-ai`
+- `muse`
+
+Docs, MCP schemas, adapters, and tests must remain aligned to that registry. A name appearing here does not prove its provider is configured or live in the deployed runtime.
 
 Allowed relay capabilities:
 
@@ -23,15 +26,23 @@ Allowed relay capabilities:
 - `review`
 - `implement`
 
-A relay capability describes the requested work class. It is not mutation permission.
+A relay capability describes the requested work class. It is not mutation permission. The target operator's own policy may narrow this list. `meta-ai` is currently research/propose/review only and rejects `implement`.
 
-## DeepSeek dual-role boundary
+## DeepSeek instructor boundary
 
-`deepseek` is a governed peer relay operator subject to the same zero-authority relay ceiling as every other peer.
+`deepseek-instructor` is the bounded Instructor/adversary identity defined by `src/lib/agentInterop.ts` and `docs/DEEPSEEK_INSTRUCTOR_CONTRACT.md`. It is not a peer relay operator and must never be routed through `fcr_relay_operator`.
 
-`deepseek-instructor` is a separate bounded instructor/adversary identity defined by `src/lib/agentInterop.ts` and `docs/DEEPSEEK_INSTRUCTOR_CONTRACT.md`. It is not a peer mutation operator and must never be silently substituted for `deepseek`.
+A plain `deepseek` peer target is unsupported. DeepSeek instruction returns to FCR as proposal/challenge data and never becomes direct repository, provider, merge, deploy, publish, or tool authority.
 
-The instructor lane may challenge, teach, synthesize, and extract portable patterns. Its output returns to FCR as proposal data and never becomes direct repository/provider/tool authority.
+## Meta AI / Muse identity boundary
+
+`meta-ai` and `muse` are distinct governed peer identities. Meta AI is currently a research/propose/review Court/Council witness seat; Muse retains its separately governed operator role. FCR must never satisfy a `meta-ai` request by falling back to the Muse adapter or reuse a Muse receipt as Meta AI evidence.
+
+A present-tense Meta AI claim requires its own authenticated adapter plus provider/runtime evidence bound to that exact relay invocation. If that adapter is absent, the relay must fail closed as unavailable.
+
+## Muse runtime boundary
+
+`muse` is a governed peer relay operator in the canonical registry. Source wiring or provider configuration does not prove a live Muse invocation. Present-tense Muse participation requires provider/runtime evidence bound to the exact relay invocation and deployed FCR subject, plus the same browser/Playwright gate required for other live relay claims.
 
 ## Relay authority
 
@@ -84,7 +95,9 @@ A relay response is evidence, not authority. Disagreement never grants any peer 
 
 ## Intended conversational behavior
 
-When the founder says, for example, `tell Claude to build this`, `ask Gemini to attack the visual direction`, `tell Perplexity to research this`, or `tell DeepSeek to attack this`, the active operator should be able to create a relay request, have FCR dispatch it to the exact requested provider/operator runtime when available, validate the response, and return it to the active conversation without founder copy/paste.
+When the founder says, for example, `tell Claude to build this`, `ask Gemini to attack the visual direction`, `tell Perplexity to research this`, `ask Meta AI to challenge this`, or `ask Muse to review this`, the active operator should be able to create a relay request, have FCR dispatch it to the exact requested provider/operator runtime when available, validate the response, and return it to the active conversation without founder copy/paste.
+
+Requests addressed to DeepSeek belong to the separate Instructor interop membrane, not the peer relay tool.
 
 If the target operator runtime is unavailable or unauthenticated, FCR must return a precise blocked state. It must never silently substitute a different provider or a different role and claim that the requested operator answered.
 
@@ -99,4 +112,4 @@ The bridge is not proven by packet validation alone. Completion requires:
 5. Playwright proof from the FCR surface that a founder-issued relay request reaches the requested operator and its validated response returns;
 6. provider/runtime evidence showing which operator actually answered.
 
-Until all six pass on the same exact head, the status is `PARTIAL`, not `VERIFIED`.
+Until all six pass on the same exact deployed head for the claimed provider path, that live path remains `PARTIAL`, not `VERIFIED`.

@@ -16,7 +16,8 @@ describe('FCR governed agent enablement', () => {
     expect(policy?.capabilities).toEqual(expect.arrayContaining(['research', 'propose', 'review', 'implement']));
   });
 
-  it('enables DeepSeek as an instructor without implementation authority', () => {
+  it('enables DeepSeek only as an instructor without implementation authority', () => {
+    expect(agentOperatorPolicy('deepseek')).toBeNull();
     const policy = agentOperatorPolicy('deepseek-instructor');
 
     expect(policy).not.toBeNull();

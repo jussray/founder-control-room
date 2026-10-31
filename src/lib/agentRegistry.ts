@@ -29,6 +29,7 @@ const MULTI_AGENT = 'docs/FCR_MULTI_AGENT_ENABLEMENT_CONTRACT.md';
 const DEEPSEEK_INSTRUCTOR = 'docs/DEEPSEEK_INSTRUCTOR_CONTRACT.md';
 const MUSE_CONTROL = '.control-room/MUSE.md';
 const COUNCIL_CONTROL = '.control-room/COUNCIL.md';
+const COURT_CONTROL = '.control-room/COURT.md';
 const CHANGE_GENEALOGY = 'docs/AI_CHANGE_GENEALOGY_CONTRACT.md';
 
 export const AGENT_REGISTRY: readonly AgentDescriptor[] = [
@@ -69,6 +70,18 @@ export const AGENT_REGISTRY: readonly AgentDescriptor[] = [
     },
   },
   {
+    id: 'meta-ai',
+    label: 'Meta AI',
+    role: 'Governed external Founder AI Council and Court witness for independent challenge, research, source comparison, and synthesis. Meta AI is distinct from the Muse operator/model identity; neither may inherit the other\'s evidence or authority.',
+    operator: {
+      enabled: true,
+      capabilities: ['research', 'propose', 'review'],
+      firstSliceRuntimeModel: false,
+      externalWritesRequireBoundAuthority: true,
+      instructionContracts: [COUNCIL_CONTROL, COURT_CONTROL, FCR_V14, MULTI_AGENT, CHANGE_GENEALOGY],
+    },
+  },
+  {
     id: 'muse',
     label: 'Muse',
     role: 'Governed Founder AI Council challenger for cross-provider analysis, repository implementation, and GitHub/Supabase/Cloudflare drift detection under existing founder authority gates.',
@@ -83,14 +96,7 @@ export const AGENT_REGISTRY: readonly AgentDescriptor[] = [
   {
     id: 'deepseek',
     label: 'DeepSeek',
-    role: 'Governed peer reasoning, implementation review, adversarial verification, and bounded implementation through the operator relay without inheriting mutation authority.',
-    operator: {
-      enabled: true,
-      capabilities: ['research', 'propose', 'review', 'implement'],
-      firstSliceRuntimeModel: false,
-      externalWritesRequireBoundAuthority: true,
-      instructionContracts: ['DEEPSEEK.md', FCR_V14, MULTI_AGENT, CHANGE_GENEALOGY],
-    },
+    role: 'Non-operating legacy/model-facing alias. DeepSeek work is governed through the separate deepseek-instructor identity and never enters the peer relay lane.',
   },
   {
     id: 'deepseek-instructor',
@@ -127,7 +133,7 @@ export const AGENT_REGISTRY: readonly AgentDescriptor[] = [
   {
     id: 'meta-ai-platform',
     label: 'Meta AI / Muse Platform',
-    role: 'Replaceable server-side Muse model capability behind adapters; provider availability, model capability, or Council membership never grants mutation or founder authority.',
+    role: 'Replaceable Meta provider-family capability behind adapters. Meta AI and Muse operator identities remain distinct; provider availability, model capability, Council membership, or one seat\'s receipt never grants the other seat authority or evidence.',
   },
   {
     id: 'perplexity',
