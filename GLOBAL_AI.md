@@ -283,3 +283,7 @@ The Control Room exists to preserve founder authority, not automate it out of ex
 A committed regression test is source evidence only until the exact-head workflow that feeds `Required Gate` actually executes it. For LinkedIn analytics continuity, `.github/workflows/ci.yml` must keep `scripts.test_linkedin_analytics_continuity` inside the load-bearing `python-tests` job, and `Required Gate` must continue to depend on that job. Missing LinkedIn activity rows must remain `UNKNOWN_NO_EVIDENCE` with null metrics, never synthetic zero impressions or engagements.
 
 For public crawler and work-directory behavior, `.github/workflows/ci.yml` must keep `e2e/pages-api-recovery.spec.ts` and `e2e/public-work-directory.spec.ts` inside the load-bearing `Playwright e2e` job that feeds `Required Gate`. A green advisory Pages workflow is supplementary evidence only; it cannot replace this required exact-head browser proof or create merge authority.
+
+## 2026-10-26 locked-install and StoryEngine evidence update
+
+Treat locked `npm ci --no-audit --no-fund` installation in FCR core CI as a reproducibility constraint, not proof of test success or production health. Treat any StoryEngine `main` peer-pin refresh in FCR Playwright as an evidence-subject transition. Exact-live-ref equality, immutable checkout, runtime identity, directive/receipt, and full browser replay must succeed at the new FCR head before declaring federation verified. Never inherit the predecessor browser result or infer merge, deployment, publication, or provider-mutation authority.
