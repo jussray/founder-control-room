@@ -59,6 +59,23 @@ test('live Pages front door, discovery contract, and API proxy resolve the exact
   };
   const surfaces = receipt.surfaces as Record<string, unknown>;
 
+  const disclosure = await request.get("https://www.foundercontrolroom.org/.well-known/security.txt", {
+    headers: { 'cache-control': 'no-cache' },
+    maxRedirects: 0,
+  });
+  expect(disclosure.status()).toBe(200);
+  expect(disclosure.headers()['content-type'] ?? '').toContain('text/plain');
+  const disclosureText = await disclosure.text();
+  expect(disclosureText).toMatch(/^Contact: mailto:founder@jussco\.company$/m);
+  const disclosureExpires = disclosureText.match(/^Expires: ([^\r\n]+)$/m);
+  expect(disclosureExpires).not.toBeNull();
+  expect(Date.parse(disclosureExpires![1])).toBeGreaterThan(Date.now());
+  surfaces.securityTxt = {
+    url: disclosure.url(),
+    status: disclosure.status(),
+    sha256: sha256(disclosureText),
+  };
+
   const robots = await request.get(`${canonicalOrigin}/robots.txt`, {
     headers: { 'cache-control': 'no-cache' },
   });
