@@ -1,6 +1,7 @@
 import type { OperatorRelayRequestV1, OperatorRelayResponseV1, RelayOperatorId } from './operatorRelay.js';
 import { validateOperatorRelayRequest, validateOperatorRelayResponse } from './operatorRelay.js';
 import { createServerMuseRelayAdapter } from './operatorRelayMuseProvider.js';
+import { relayMayDispatch } from './operatorRelayPolicy.js';
 
 export type OperatorRelayAdapter = (request: OperatorRelayRequestV1) => Promise<OperatorRelayResponseV1>;
 
@@ -18,7 +19,8 @@ export class OperatorRelayDispatchError extends Error {
     public readonly code:
       | 'relay_request_invalid'
       | 'relay_target_unavailable'
-      | 'relay_response_invalid',
+      | 'relay_response_invalid'
+      | 'relay_disclosure_denied',
     message: string,
   ) {
     super(message);
@@ -34,6 +36,15 @@ export async function dispatchOperatorRelay(
   const requestErrors = validateOperatorRelayRequest(request, nowMs);
   if (requestErrors.length > 0) {
     throw new OperatorRelayDispatchError('relay_request_invalid', requestErrors.join('; '));
+  }
+
+  // This is the common trust boundary, including injected/custom adapters.
+  // No provider call may receive restricted context or malformed authority.
+  if (!relayMayDispatch(request)) {
+    throw new OperatorRelayDispatchError(
+      'relay_disclosure_denied',
+      'relay context is not authorized for external operator dispatch',
+    );
   }
 
   // Own-property lookup only: toOperator is allowlist-validated above, and this
