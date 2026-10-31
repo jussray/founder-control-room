@@ -282,12 +282,15 @@ The verifier classifies truth-sensitive changed files by domain and requires the
 
 Goalfix governance is explicitly part of that classification. Changes to `.ai/skills/goalfix/SKILL.md`, `.claude/skills/goalfix/SKILL.md`, `docs/FOUNDER_ADAPTIVE_KERNEL_V0.md`, `docs/GOALFIX_EXECUTION_WORKFLOW_V2.md`, `docs/CLAUDE_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC.md`, or `docs/PERPLEXITY_MCP_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC.md` must be treated as truth-sensitive because those files can change how future operators select targets, interpret proof, consume founder authority, or report post-merge state.
 
+Founder-permission authority is also explicitly part of the classification. Changes to `src/http/routes/founderPermissions.ts`, `src/lib/founderPermissionBroker.ts`, or `src/lib/founderPermissionExecution.ts` must require current portable-approval documentation and a path-bound receipt because those paths can change what a founder decision means, what live state is trusted, and whether a receipt can unlock an external effect.
+
 It also checks cross-document invariants that are easy to regress during fast-moving work, including:
 
 - README does not freeze a manual “Last refreshed” date as current authority;
 - current repository identity is resolved at use time only by separately authorized provider revalidation, while webhook facts remain historical last-observed provenance;
 - FCR merge docs describe the independent-review membrane and server-owned reviewer trust;
 - live GitHub ruleset enforcement stays a separate provider truth;
+- PromptOS workflow-registry approval binds exact workflow and registry state, uses trusted server-side observation, and keeps public receipts non-authorizing;
 - Goalfix carries the verified target branch rather than assuming `main`, authenticates Founder Final through the checked-in authority contract, rereads mutable provider/PR/base/head/diff/check/review state immediately before integration, distinguishes browser Playwright proof from backend/provider evidence, and reports `MERGED_UNVERIFIED` until required runtime proof exists;
 - Claude and Perplexity master execution overlays defer Goalfix execution order to the canonical workflow rather than maintaining weaker parallel loops;
 - the adaptive kernel remains a governance/source contract until runtime/API/UI integration is separately implemented and proven;
@@ -595,3 +598,18 @@ Current federation remains `UNKNOWN` until the exact successor FCR head complete
 **Federation drift:** FCR Playwright local browser scenarios passed on PR head \`af49d1c089193c4ffe381818267484f36ebeae4b\`, then the separate StoryEngine peer check failed because it expected \`87501be2da31d12f421b0ed2da49df357fc9fcb1\` while GitHub StoryEngine \`refs/heads/main\` resolved to \`499f2d4eb9edac8bb11b657cf003a056263528d9\`. PR head \`68b020105c9a4d22851643e3f029571b53cc6af4\` updates the immutable peer pin to that independently observed revision. StoryEngine's inspected current SHA had 14 successful checks and one skipped; those checks are not FCR's own federation proof.
 
 **Branch and release gates:** FCR candidate \`68b020105c9a4d22851643e3f029571b53cc6af4\` was five commits behind FCR main \`fb4af1dccc81a0ab5e334e8038f23cb10af21b6a\`. Its CI recorded seven failures across ancestry, documentation truth, missing structured PR evidence, and a downstream Required Gate. Corrective integration must preserve main's unrelated changes and original branch history, rerun current exact-head checks, and obtain fresh, separate founder approval for that exact head/base pair before any merge or deployment. No green or merge authority is transferred by this documentation entry.
+
+## 2026-09 control correction: founder-permission authority false-green
+
+ATTACK-6000 against the PromptOS workflow-registry approval path found a documentation-governance defect in addition to the runtime threats. `src/http/routes/founderPermissions.ts`, `src/lib/founderPermissionBroker.ts`, and the new `src/lib/founderPermissionExecution.ts` can change the boundary between founder decision capture and consequential execution, but the Documentation Truth classifier did not recognize those production paths. The old Documentation Truth run could therefore report green while the durable approval documentation still described exact target binding primarily as a merge concern.
+
+That green is classified as a false-green coverage result, not proof that the authority implementation was unsafe by itself. The corrected verifier registers all three production paths as `founder-permission-authority`. Any future movement in that domain now requires a substantive refresh of `docs/PORTABLE_FOUNDER_APPROVALS.md`, README coverage, and a path-bound documentation receipt. Changes to the verifier itself remain `truth-governance`, so the repair cannot exempt itself from the documentation controls it enforces.
+
+The PromptOS action contract now documents the same boundaries enforced in source: canonical repository and `main`, exact head, exact workflow and registry content hashes, canonical paths, provider identity, capability version, and consequence class. Founder decision capture remains non-authorizing with `executionAuthorized: false`. Mutable state must be derived through a trusted server-side provider observation before one-shot consumption and revalidated immediately at the effect boundary. Caller-supplied “live” context, copied API responses, binding fingerprints, proof cookies, and continuity receipts cannot be promoted into bearer execution authority.
+
+This repair still does not prove a PromptOS provider write occurred. Documentation consistency, request consumption, provider acceptance, and verified external outcome remain separate planes. A consequential effect requires its separately gated server-side execution path, and completion requires provider-native readback of the resulting state. If the approved state moves after consumption, the prior authority stays consumed and a new approval is required rather than replaying or blindly retrying the action.
+
+### PromptOS founder-permission proof invariants
+
+- A founder-permission decision, consume receipt, or binding fingerprint cannot become provider-write authority; consequential execution must stay server-side, bind exact live state, and fail closed when that state moves.
+- A Documentation Truth green cannot certify an authority surface the classifier does not recognize; missing path registration is itself a false green that must be repaired before the result is trusted.
