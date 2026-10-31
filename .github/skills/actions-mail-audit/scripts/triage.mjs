@@ -40,6 +40,7 @@ export async function reconcileNotices(notices, { repo, readRun, readBranch }) {
   const seen = new Set();
   for (const entry of notices) {
     if (!entry || typeof entry !== 'object' || Array.isArray(entry)) continue;
+    if (Object.keys(entry).some(k => !MAIL_FIELDS.includes(k))) throw new Error('notice contains disallowed fields');
     const kind = entry.kind === 'security' ? 'security' : 'actions';
     const parsed = parseRunUrl(entry.run_url, repo);
     const messageId = typeof entry.message_id === 'string' ? entry.message_id.slice(0, 80) : '';
@@ -78,10 +79,10 @@ export async function reconcileNotices(notices, { repo, readRun, readBranch }) {
 }
 
 async function githubJson(path, token) {
-  const response = await fetch('https://api.github.com' + path, {
+  const response = await globalThis.fetch('https://api.github.com' + path, {
     headers: { authorization: 'Bearer ' + token, accept: 'application/vnd.github+json', 'x-github-api-version': '2022-11-28' },
     redirect: 'error',
-    signal: AbortSignal.timeout(12000)
+    signal: globalThis.AbortSignal.timeout(12000)
   });
   if (!response.ok) throw new Error('GitHub readback unavailable');
   return response.json();
