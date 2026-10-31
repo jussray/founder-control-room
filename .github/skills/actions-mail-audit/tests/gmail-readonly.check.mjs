@@ -67,6 +67,20 @@ describe('Gmail alert ingestion metadata is read-only, bounded, and opt-in', () 
     const second = await fetchGmailAlertMetadata({ token: 'test', mailbox, repo, fetcher: forged.fetcher });
     assert.deepEqual(second.notices, []);
   });
+  it('fails closed rather than silently dropping additional Gmail result pages', async () => {
+    let pages = 0;
+    const fetcher = async (raw) => {
+      const u = new URL(raw);
+      if (u.pathname.endsWith('/profile')) return { ok: true, json: async () => ({ emailAddress: mailbox }) };
+      if (u.pathname.endsWith('/messages')) {
+        pages++;
+        return { ok: true, json: async () => ({ messages: [], nextPageToken: 'next-' + pages }) };
+      }
+      throw new Error('unexpected mocked GET');
+    };
+    await assert.rejects(fetchGmailAlertMetadata({ token: 'test', mailbox, repo, fetcher }), /GMAIL_COVERAGE_INCOMPLETE/);
+    assert.equal(pages, 5);
+  });
   it('holds scoped GitGuardian alerts without inventing GitHub run evidence', async () => {
     const mock = mockGmail({
       sender: 'Security <alerts@gitguardian.com>',
