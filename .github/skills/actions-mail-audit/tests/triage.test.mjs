@@ -35,6 +35,9 @@ describe('actions-mail audit read-only input and exact-head contract', () => {
     const out = await reconcileNotices([{ kind: 'security', message_id: 'security-1', run_url: runUrl }], { repo, readRun: async () => ({ head_branch: 'main', head_sha: sha, status: 'completed', conclusion: 'success' }), readBranch: async () => sha });
     assert.equal(out[0].status, 'SECURITY_TRIAGE_UNVERIFIED');
   });
+  it('rejects unredacted mail content rather than silently discarding it', async () => {
+    await assert.rejects(reconcileNotices([{ message_id: 'm1', body: 'not allowed in runtime', run_url: runUrl }], { repo, readRun: async () => ({ head_branch: 'main', head_sha: sha, status: 'completed', conclusion: 'failure' }), readBranch: async () => sha }), /disallowed fields/);
+  });
   it('does not turn unavailable GitHub access into success', async () => {
     const out = await reconcileNotices([{ message_id: 'm1', run_url: runUrl }], { repo, readRun: async () => { throw new Error('no access'); }, readBranch: async () => sha });
     assert.equal(out[0].status, 'COVERAGE_BLOCKED');
