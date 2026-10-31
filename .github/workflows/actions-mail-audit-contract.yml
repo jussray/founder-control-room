@@ -27,4 +27,4 @@ jobs:
         with:
           node-version: '24'
       - name: Execute offline red-team classification tests
-        run: node --test .github/skills/actions-mail-audit/tests/triage.test.mjs
+        run: node --test .github/skills/actions-mail-audit/tests/*.mjs
