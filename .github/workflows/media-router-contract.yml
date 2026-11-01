@@ -7,7 +7,9 @@ on:
       - 'src/lib/mediaRouter.ts'
       - 'src/lib/mediaRouterDomainProtocol.ts'
       - 'src/lib/mediaRouterPhase1Contracts.ts'
+      - 'src/lib/mediaExecutionService.ts'
       - 'src/lib/__tests__/mediaRouter*.test.ts'
+      - 'src/lib/__tests__/mediaExecutionService.test.ts'
       - 'docs/MEDIA_ROUTER_DOMAIN_PROTOCOL_V1.md'
       - '.github/workflows/media-router-contract.yml'
   pull_request:
@@ -16,7 +18,9 @@ on:
       - 'src/lib/mediaRouter.ts'
       - 'src/lib/mediaRouterDomainProtocol.ts'
       - 'src/lib/mediaRouterPhase1Contracts.ts'
+      - 'src/lib/mediaExecutionService.ts'
       - 'src/lib/__tests__/mediaRouter*.test.ts'
+      - 'src/lib/__tests__/mediaExecutionService.test.ts'
       - 'docs/MEDIA_ROUTER_DOMAIN_PROTOCOL_V1.md'
       - '.github/workflows/media-router-contract.yml'
 
@@ -61,3 +65,4 @@ jobs:
           src/lib/__tests__/mediaRouterDomainProtocol.test.ts
           src/lib/__tests__/mediaRouter.test.ts
           src/lib/__tests__/mediaRouterPhase1Contracts.test.ts
+          src/lib/__tests__/mediaExecutionService.test.ts

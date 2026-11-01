@@ -5,6 +5,7 @@ import type {
   DomainMediaContextV1,
   MediaIntentV1,
 } from './mediaRouterDomainProtocol.js';
+import type { MediaExecutionReceiptV1 } from './mediaRouterPhase1Contracts.js';
 
 export const MEDIA_ROUTER_POLICY_VERSION = 'fcr/media-routing@v1' as const;
 
@@ -745,18 +746,6 @@ export async function revokeMediaAsset(args: {
   if (!asset) throw new Error(`Cannot revoke unknown asset ${args.revocation.assetId}`);
   await args.ledger.append(args.revocation);
   if (asset.status !== 'revoked') await args.registry.updateStatus(asset.assetId, 'revoked');
-}
-
-export interface MediaExecutionReceiptV1 {
-  receiptId: string;
-  correlationId: string;
-  workspaceId: string;
-  projectId: string;
-  requestId: string;
-  routeRecommendationId: string;
-  status: 'VERIFIED' | 'INFERRED' | 'FAILED' | 'BLOCKED' | 'CANCELLED' | 'TRUNCATED';
-  recommendationFingerprint: string;
-  receiptFingerprint: string;
 }
 
 export class InMemoryMediaReceiptLedger {
