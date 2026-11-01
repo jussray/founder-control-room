@@ -18,7 +18,7 @@ concurrency:
 jobs:
   audit:
     name: Read-only Gmail-to-GitHub evidence audit
-    if: ${{ vars.FCR_GMAIL_AUDIT_ENABLED == 'true' }}
+    if: ${{ vars.FCR_GMAIL_AUDIT_ENABLED == 'true' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
