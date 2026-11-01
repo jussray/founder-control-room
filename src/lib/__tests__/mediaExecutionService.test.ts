@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest';
 import {
   InMemoryMediaReceiptLedger,
   MEDIA_ATTACK_FLOW_IDS,
-  MEDIA_REQUIRED_FOUNDER_SKILLS,
   mediaFounderSkillBundle,
   snapshotAllowance,
   snapshotBudget,
