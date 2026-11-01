@@ -5,6 +5,10 @@ on:
     branches: [feat/fcr-threat-intelligence-watch-20261031, main]
     paths:
       - 'scripts/security-threat-watch*.mjs'
+      - 'src/lib/fcrSkillRouter.ts'
+      - 'src/lib/__tests__/fcrSkillRouter.test.ts'
+      - 'src/founder-os-lab/registry.ts'
+      - 'src/founder-os-lab/contracts.ts'
       - 'config/security-threat-watch.json'
       - '.agents/skills/broke-founder/SKILL.md'
       - '.github/workflows/security-threat-watch.yml'
@@ -23,7 +27,7 @@ jobs:
   test:
     name: First-party zero-cost watcher contract
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 12
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -33,6 +37,11 @@ jobs:
           node-version: '24'
       - run: node --test scripts/security-threat-watch.test.mjs
       - run: node --check scripts/security-threat-watch.mjs
+      - name: Verify TypeScript Broke Founder routing regression and types
+        run: |
+          npm install --no-audit --no-fund
+          npx vitest run src/lib/__tests__/fcrSkillRouter.test.ts
+          npm run typecheck
   observe:
     name: Read-only feed and attack-surface watch
     needs: test
