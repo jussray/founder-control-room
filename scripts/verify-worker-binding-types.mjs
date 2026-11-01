@@ -21,7 +21,7 @@ export function safePreflightError(error) {
 }
 const CREDENTIAL_BINDING = /(?:^|_)(?:TOKEN|SECRET|PASSWORD|PASSWD|KEY|CREDENTIAL|HMAC|PEM|SEED|APIKEY)(?:_|$)/i;
 
-export function validateBindingTypes(payload) {
+export function validateBindingTypes(payload, { allowStaleCfApiTokenRemoval = false } = {}) {
   const bindings = payload?.result?.bindings;
   if (payload?.success !== true || !Array.isArray(bindings)) {
     return { ok: false, reason: 'provider-settings-not-verified', unsafe: [] };
@@ -38,7 +38,21 @@ export function validateBindingTypes(payload) {
       unsafe.push({ name, type });
     }
   }
-  return { ok: unsafe.length === 0, reason: unsafe.length ? 'credential-binding-not-secret' : 'verified-name-type-only', unsafe };
+  const repairableStaleCfApiToken =
+    allowStaleCfApiTokenRemoval &&
+    unsafe.length === 1 &&
+    unsafe[0].name === 'CF_API_TOKEN' &&
+    unsafe[0].type === 'plain_text';
+  return {
+    ok: unsafe.length === 0 || repairableStaleCfApiToken,
+    reason: unsafe.length === 0
+      ? 'verified-name-type-only'
+      : repairableStaleCfApiToken
+        ? 'repairable-stale-cf-api-token-plaintext'
+        : 'credential-binding-not-secret',
+    unsafe,
+    repairableStaleCfApiToken,
+  };
 }
 
 function checkedInAccountId(env) {
@@ -80,7 +94,9 @@ export async function runProviderPreflight({ fetchFn = fetch, env = process.env 
     } catch {
       throw new Error('provider-response-invalid');
     }
-    const result = validateBindingTypes(payload);
+    const result = validateBindingTypes(payload, {
+      allowStaleCfApiTokenRemoval: env.FCR_ALLOW_STALE_CF_API_TOKEN_REMOVAL === 'true',
+    });
     if (!result.ok) throw new Error(result.reason);
     // Fingerprint only sorted binding names and types, never credential contents.
     const metadata = payload.result.bindings
@@ -89,7 +105,7 @@ export async function runProviderPreflight({ fetchFn = fetch, env = process.env 
     const bindingFingerprint = 'sha256:' + createHash('sha256')
       .update(JSON.stringify({ worker: WORKER, metadata }))
       .digest('hex');
-    return { ok: true, worker: WORKER, bindingCount: metadata.length, bindingFingerprint };
+    return { ok: true, worker: WORKER, bindingCount: metadata.length, bindingFingerprint, repairableStaleCfApiToken: result.repairableStaleCfApiToken === true };
   } finally {
     clearTimeout(timeout);
   }
@@ -98,7 +114,9 @@ export async function runProviderPreflight({ fetchFn = fetch, env = process.env 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   runProviderPreflight().then(result => {
     console.log('WORKER_BINDING_SECURITY_PASS worker=' + result.worker +
-      ' checked=' + result.bindingCount + ' fingerprint=' + result.bindingFingerprint + ' values=redacted');
+      ' checked=' + result.bindingCount + ' fingerprint=' + result.bindingFingerprint +
+      ' repair=' + (result.repairableStaleCfApiToken ? 'stale-cf-api-token-plaintext' : 'none') +
+      ' values=redacted');
   }).catch(error => {
     console.error('WORKER_BINDING_SECURITY_BLOCKED ' +
       safePreflightError(error));

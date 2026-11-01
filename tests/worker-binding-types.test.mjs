@@ -14,6 +14,40 @@ test('rejects Cloudflare token as plaintext without disclosing its value', () =>
   assert.doesNotMatch(JSON.stringify(findings), /never-log-this/);
 });
 
+test('bounded repair mode tolerates only the sole legacy CF_API_TOKEN plaintext binding', async () => {
+  const bindings = [
+    { name: 'CF_API_TOKEN', type: 'plain_text', text: 'never-log-this-either' },
+    { name: 'GITHUB_APP_ID', type: 'secret_text' },
+  ];
+  const repairable = validateBindingTypes(response(bindings), { allowStaleCfApiTokenRemoval: true });
+  assert.equal(repairable.ok, true);
+  assert.equal(repairable.reason, 'repairable-stale-cf-api-token-plaintext');
+  assert.equal(repairable.repairableStaleCfApiToken, true);
+  assert.doesNotMatch(JSON.stringify(repairable), /never-log-this-either/);
+
+  const extraUnsafe = validateBindingTypes(response([
+    ...bindings,
+    { name: 'GITHUB_PRIVATE_KEY', type: 'plain_text', text: 'still-blocked' },
+  ]), { allowStaleCfApiTokenRemoval: true });
+  assert.equal(extraUnsafe.ok, false);
+  assert.equal(extraUnsafe.reason, 'credential-binding-not-secret');
+
+  const otherCredential = validateBindingTypes(response([
+    { name: 'OTHER_API_TOKEN', type: 'plain_text', text: 'still-blocked' },
+  ]), { allowStaleCfApiTokenRemoval: true });
+  assert.equal(otherCredential.ok, false);
+
+  const preflight = await runProviderPreflight({
+    env: {
+      CLOUDFLARE_API_TOKEN: 'test-only-token',
+      FCR_ALLOW_STALE_CF_API_TOKEN_REMOVAL: 'true',
+    },
+    fetchFn: async () => ({ ok: true, json: async () => response(bindings) }),
+  });
+  assert.equal(preflight.repairableStaleCfApiToken, true);
+  assert.doesNotMatch(JSON.stringify(preflight), /never-log-this-either|test-only-token/);
+});
+
 test('accepts secret credentials and ordinary public bindings', () => {
   const result = validateBindingTypes(response([
     { name: 'CF_API_TOKEN', type: 'secret_text' },
