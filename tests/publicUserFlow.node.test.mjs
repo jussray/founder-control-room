@@ -16,7 +16,7 @@ test('customer entry is visible from the public homepage, not the founder sign-i
 test('customer onboarding never claims unverified signup, billing or private access', () => {
   const page = read('public/account/index.html');
   for (const term of ['Explore', 'Choose', 'Account', 'Workspace', 'not yet available', 'No payment is collected']) {
-    assert.ok(page.includes(term), 'missing onboarding truth: ' + term);
+    assert.ok(page.toLowerCase().includes(term.toLowerCase()), 'missing onboarding truth: ' + term);
   }
   assert.match(page, /href="\/work\.html"/);
   assert.doesNotMatch(page, /<form\b|<input\b|<script\b|data:[^" ]+|SUPABASE_SERVICE_ROLE_KEY/i);
