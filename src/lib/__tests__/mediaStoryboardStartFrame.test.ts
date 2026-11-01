@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import {
   MEDIA_ATTACK_FLOW_IDS,
+  MEDIA_REQUIRED_FOUNDER_SKILLS,
+  mediaFounderSkillBundle,
   evaluateMediaRoute,
   snapshotAllowance,
   snapshotBudget,
@@ -112,6 +114,7 @@ function binding(overrides: Partial<StoryboardStartFrameBindingV1> = {}): Storyb
 function passingAttackFlow(): MediaAttackFlowBundleV1 {
   return {
     version: 'media-attack-flow-v1',
+    founderSkills: mediaFounderSkillBundle(at),
     records: MEDIA_ATTACK_FLOW_IDS.map((flow, index) => ({
       flow,
       verdict: 'pass',
