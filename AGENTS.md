@@ -3,6 +3,7 @@
 Read these before changing code, configuration, schemas, providers, verification contracts, commercial plans, launch surfaces, or documentation:
 
 - [`Juss Founder OS`](.ai/skills/juss-founder-os/SKILL.md) first
+- [`Broke Founder`](.agents/skills/broke-founder/SKILL.md) always before provider selection, builder implementation, or recurring automation: $0 incremental spend without founder approval; build first-party alternatives when provider access is unavailable
 - [`Outcome-First`](skills/outcome-first/SKILL.md) for outcome, bounded delegation, proportional proof, and an explicit stop condition; it does not weaken any existing founder or evidence gate
 - [`Founder Intelligence Agent Entry Point`](./AGENTS_FOUNDER_INTELLIGENCE.md) for the portfolio constitution, remembrance loop, and inheritance registry
 - [`founder-control-room-operator`](.agents/skills/founder-control-room-operator/SKILL.md) for the repository-scoped 5W1H operating contract
