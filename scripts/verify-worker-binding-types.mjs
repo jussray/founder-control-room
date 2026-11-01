@@ -8,7 +8,7 @@ import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
 export const WORKER = 'founder-control-room';
-const CREDENTIAL_BINDING = /(?:^|_)(?:API_?TOKEN|ACCESS_?TOKEN|SECRET|PASSWORD|PRIVATE_?KEY|SERVICE_ROLE_KEY|ENCRYPTION_KEY|WEBHOOK_?TOKEN|BEARER_?TOKEN|AUTH_?TOKEN|KEY)$/i;
+const CREDENTIAL_BINDING = /(?:^|_)(?:API_?TOKEN|ACCESS_?TOKEN|SECRET|PASSWORD|PRIVATE_?KEY|SERVICE_ROLE_KEY|ENCRYPTION_KEY|WEBHOOK_?TOKEN|BEARER_?TOKEN|AUTH_?TOKEN|KEY)(?:_|$)/i;
 
 export function validateBindingTypes(payload) {
   const bindings = payload?.result?.bindings;
@@ -23,8 +23,7 @@ export function validateBindingTypes(payload) {
   for (const { name, type } of bindings) {
     if (seen.has(name)) return { ok: false, reason: 'duplicate-provider-binding-names', unsafe: [] };
     seen.add(name);
-    const normalizedName = name.replace(/_(?:PEM|BASE64|B64)$/i, '');
-    if (CREDENTIAL_BINDING.test(normalizedName) && type !== 'secret_text' && type !== 'secrets_store_secret') {
+    if (CREDENTIAL_BINDING.test(name) && type !== 'secret_text' && type !== 'secrets_store_secret') {
       unsafe.push({ name, type });
     }
   }
