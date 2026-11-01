@@ -187,6 +187,9 @@ describe("shared GitHub App wrapper transports", () => {
       JSON.stringify({ private_key: pem }),
       JSON.stringify({ privateKey: pem }),
       pem.replace(/\n/g, "\r"),
+      // Fences and decoded PEMs must preserve signature identity with CR-only lines.
+      fence + "pem\r" + pem.trim().replace(/\n/g, "\r") + "\r" + fence,
+      Buffer.from(pem.trim().replace(/\n/g, "\r"), "utf8").toString("base64"),
     ];
     for (const wrapper of wrappers) {
       expect(createGitHubAppJwt("99", wrapper, now)).toBe(expected);
