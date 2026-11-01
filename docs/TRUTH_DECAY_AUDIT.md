@@ -1,5 +1,10 @@
 # Truth Decay Audit: When a True Claim Becomes Unsafe to Reuse
 
+## November 1, 2026 UTC: exact-head MCP credential preflight and StoryEngine peer freshness
+
+FCR PR #1056 Playwright failed its live StoryEngine peer-ref equality gate because `.github/workflows/playwright.yml` expected `bffc9f771b673055403f52b29c86b30e5f4dd8c8` while `refs/heads/main` resolved to `b2397272a37ed5d987f0b71b2a37dc31c9c84cf5`. GitHub comparison confirmed a forward four-commit, zero-behind transition consisting of documentation and governance files. Updating the pin selects the new immutable peer subject only; it must not convert skipped federation/browser steps into passing proof or confer merge, deploy, production, or execution authority.
+
+
 ## October 26, 2026 — FCR PR #1020 peer freshness failure and source-only recovery
 
 At FCR PR #1020 candidate `8e30ec5418f2fc732b96d8dc5263af4a82f5e5a3`, the Playwright browser harness succeeded but the live StoryEngine ref gate correctly stopped: pinned `87501be2da31d12f421b0ed2da49df357fc9fcb1`, observed `499f2d4eb9edac8bb11b657cf003a056263528d9`. Independent GitHub readback shows a two-commit forward peer change affecting the StoryEngine LLM/Muse clients. The successor StoryEngine commit's observed source checks passed, including federation contract verification; this does not prove the new cross-app runtime pair, and the Supabase preview was skipped. Updating the FCR peer pin is an evidence-subject move only.

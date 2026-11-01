@@ -1,5 +1,10 @@
 # Cloudflare Deployment Targets
 
+## November 1, 2026 UTC: exact-head MCP credential preflight
+
+The existing canonical `founder-control-room` Worker remains the sole API/MCP deployment target. `.github/workflows/deploy.yml` and `.github/workflows/worker-reconcile.yml` must fail closed at `scripts/verify-worker-binding-types.mjs` whenever Cloudflare reports a credential as `plain_text` or cannot provide trustworthy binding name/type metadata. This release gate does not rotate or copy secrets, grant public MCP access, alter Pages routing, or prove live `/mcp` authentication; production promotion still requires safe provider-held secret classification and independent exact-SHA runtime proof.
+
+
 ## Portfolio Logpush target
 
 The repository declares a single account-level Cloudflare Logpush desired job named `fcr-portfolio-workers-trace` for the `workers_trace_events` dataset. This is a source target, not a claim about current provider state or successful log delivery.
