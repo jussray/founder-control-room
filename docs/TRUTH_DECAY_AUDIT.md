@@ -1,5 +1,10 @@
 # Truth Decay Audit: When a True Claim Becomes Unsafe to Reuse
 
+## November 1, 2026: bounded GitHub App transport reconciliation
+
+The existing PR #986 reconciles bounded private-key wrapper parsing against current main without replacing a protected secret, changing GitHub App installation grants, or asserting production repair. On the November 1 exact-main founder-only diagnostic, the production binding was present and the App ID numeric, but the runtime key transport was classified as unknown; this is evidence of failed parsing, not evidence that the secret was missing or recently replaced. Protected-value scope and provider identity remain independent gates. No inherited historic CI or Playwright result authorizes a merge or release.
+
+
 ## November 1, 2026 UTC: exact-head MCP credential preflight and StoryEngine peer freshness
 
 FCR PR #1056 Playwright failed its live StoryEngine peer-ref equality gate because `.github/workflows/playwright.yml` expected `bffc9f771b673055403f52b29c86b30e5f4dd8c8` while `refs/heads/main` resolved to `b2397272a37ed5d987f0b71b2a37dc31c9c84cf5`. GitHub comparison confirmed a forward four-commit, zero-behind transition consisting of documentation and governance files. Updating the pin selects the new immutable peer subject only; it must not convert skipped federation/browser steps into passing proof or confer merge, deploy, production, or execution authority.
