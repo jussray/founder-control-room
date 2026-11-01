@@ -64,6 +64,20 @@ describe('createServerMuseRelayAdapter', () => {
 
       const serialized = String(init?.body ?? '');
       expect(serialized).not.toContain(KEY);
+      const providerInput = JSON.parse(serialized).input as string;
+      expect(providerInput).toContain('founder Juss');
+      expect(providerInput).toContain('not authentication, consent, or authorization');
+      expect(providerInput).toContain('Sauce Guard');
+      const marker = 'UNTRUSTED_RELAY_REQUEST_JSON:\\n'.replace('\\n', '\n');
+      const [trustedContext, untrustedJson, unexpectedThirdPart] = providerInput.split(marker);
+      expect(unexpectedThirdPart).toBeUndefined();
+      expect(trustedContext).not.toContain('Find contradictions and the smallest safe fix');
+      expect(trustedContext).not.toContain('Challenge the current implementation');
+      expect(JSON.parse(untrustedJson)).toEqual({
+        capability: 'implement',
+        goal: 'Find contradictions and the smallest safe fix',
+        contextSummary: 'Challenge the current implementation and return bounded evidence.',
+      });
       expect(JSON.parse(serialized)).toMatchObject({
         model: 'muse-spark-1.3',
         input: expect.stringContaining('independent truth challenger'),
