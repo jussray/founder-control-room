@@ -30,3 +30,26 @@ test('customer static route stays on Pages, never proxies to the privileged API'
   const headers = read('public/_headers');
   assert.match(headers, /\/account\/\*[\s\S]*?Cache-Control: no-store/);
 });
+
+test('customer GET and HEAD paths never reach the founder API binding', async () => {
+  const { default: worker } = await import('../public/_worker.js');
+  const fetched = [];
+  const env = {
+    ASSETS: { fetch: async request => {
+      fetched.push(new URL(request.url).pathname);
+      return new Response('public customer asset', { status: 200 });
+    } },
+    FCR_API: { fetch: async () => { throw new Error('founder API must not be contacted'); } },
+  };
+  for (const path of ['/account', '/account/', '/account/index.html']) {
+    for (const method of ['GET', 'HEAD']) {
+      const response = await worker.fetch(new Request('https://www.foundercontrolroom.org' + path, { method }), env);
+      assert.equal(response.status, 200, method + ' ' + path);
+    }
+  }
+  assert.deepEqual(fetched, ['/account','/account','/account/','/account/','/account/index.html','/account/index.html']);
+});
+
+test('the Cloudflare Pages build includes customer onboarding as a required asset', () => {
+  assert.match(read('scripts/build-pages.mjs'), /'account\/index\.html'/);
+});
