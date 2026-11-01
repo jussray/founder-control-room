@@ -7,6 +7,12 @@
  * a model provider and cannot be selected as a target seat.
  */
 import { createHash } from 'node:crypto';
+import {
+  councilSpecialistGoal,
+  parseCouncilSpecialistContribution,
+  type CouncilSpecialistContribution,
+  type CouncilSpecialistSeatBinding,
+} from './councilSpecialistContribution.js';
 import { relayBetweenOperators } from './operatorRelayBridge.js';
 import type { OperatorRelayAdapters } from './operatorRelayDispatch.js';
 import type {
@@ -23,6 +29,7 @@ export const COUNCIL_ROUND_CONTRACT = 'fcr.council-round.v1' as const;
 export interface CouncilSeat {
   operator: RelayOperatorId;
   capability: RelayCapability;
+  specialist?: CouncilSpecialistSeatBinding;
 }
 
 export interface CouncilHop {
@@ -39,6 +46,8 @@ export interface CouncilHop {
   answer: string;
   evidenceRefs: string[];
   liveProviderEvidence: boolean;
+  /** Chief-compatible specialist judgment. Operational reality is supplied separately by FCR evidence ingestion. */
+  specialistContribution?: CouncilSpecialistContribution;
   /** Provider-reported token usage copied from the hash-bound relay response; measurement only. */
   usage?: OperatorRelayUsageV1;
   completedAt: string;
@@ -117,6 +126,16 @@ function verifyResumeLineage(input: CouncilRoundInput, prior: CouncilTranscript)
   prior.hops.forEach((hop, i) => {
     const seat = input.seats[i];
     if (!seat || seat.operator !== hop.toOperator) throw new CouncilLineageError(`resume hop ${i} seat mismatch`);
+    if (seat.specialist) {
+      if (!hop.specialistContribution) throw new CouncilLineageError(`resume hop ${i} lost specialist contribution`);
+      try {
+        parseCouncilSpecialistContribution(JSON.stringify(hop.specialistContribution), seat.specialist);
+      } catch {
+        throw new CouncilLineageError(`resume hop ${i} specialist binding mismatch`);
+      }
+    } else if (hop.specialistContribution) {
+      throw new CouncilLineageError(`resume hop ${i} unexpectedly carries specialist contribution`);
+    }
     if (hop.fromOperator !== expectedSource) throw new CouncilLineageError(`resume hop ${i} source mismatch`);
     if (hop.inputSha256 !== expectedInput) throw new CouncilLineageError(`resume hop ${i} input fingerprint broken`);
     if (sha256(hop.answer) !== hop.answerSha256) throw new CouncilLineageError(`resume hop ${i} answer tampered`);
@@ -151,13 +170,17 @@ export async function runCouncilRound(
     const expected = i === 0 ? sha256(input.seed) : hops[i - 1].answerSha256;
     if (inputSha256 !== expected) throw new CouncilLineageError(`hop ${i} would receive altered input`);
 
+    const relayGoal = seat.specialist
+      ? councilSpecialistGoal(input.goal, seat.specialist)
+      : input.goal;
+
     let result;
     try {
       result = await relayBetweenOperators({
         fromOperator: from,
         toOperator: seat.operator,
         capability: seat.capability,
-        goal: input.goal,
+        goal: relayGoal,
         contextSummary: context,
         sourceRef,
         sensitivity: input.sensitivity,
@@ -201,6 +224,25 @@ export async function runCouncilRound(
       break;
     }
 
+    let specialistContribution: CouncilSpecialistContribution | undefined;
+    if (seat.specialist) {
+      try {
+        specialistContribution = parseCouncilSpecialistContribution(response.answer, seat.specialist);
+      } catch (error) {
+        interruption = {
+          seatIndex: i,
+          operator: seat.operator,
+          reason: error instanceof Error ? error.message.slice(0, 300) : 'invalid specialist contribution',
+          status: 'failed',
+          requestHash: request.requestHash,
+          responseHash: response.responseHash,
+          evidenceRefs,
+          liveProviderEvidence,
+        };
+        break;
+      }
+    }
+
     hops.push({
       index: i,
       relayId: request.relayId,
@@ -215,6 +257,7 @@ export async function runCouncilRound(
       answer: response.answer,
       evidenceRefs,
       liveProviderEvidence,
+      ...(specialistContribution ? { specialistContribution } : {}),
       completedAt: response.completedAt,
       ...(response.usage ? { usage: response.usage } : {}),
     });
