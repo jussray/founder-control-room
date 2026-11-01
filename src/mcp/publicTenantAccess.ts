@@ -42,7 +42,7 @@ export class PublicMcpAccessDenied extends Error {
   constructor() { super('Resource not found or not available to this connection'); }
 }
 
-function membershipsFor(user: PublicMcpUser, rows: readonly PublicTenantMembership[]) {
+export function membershipsFor(user: PublicMcpUser, rows: readonly PublicTenantMembership[]) {
   // A hard upper bound fails closed instead of silently dropping grants.
   if (rows.length > MAX_TENANTS) throw new PublicMcpAccessDenied();
   const ids = new Set<string>();
