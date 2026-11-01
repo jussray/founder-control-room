@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <meta name="description" content="Founder Control Room customer journey preview. Public exploration works now; customer accounts and payments are not yet enabled.">
+  <title>Get started · Founder Control Room</title>
+  <style>
+    :root { color-scheme: dark; --bg:#070818; --card:#121631; --line:#38365a; --text:#f6f5ff; --muted:#b7bed5; --blue:#55c8ff; --purple:#aa7bff; }
+    * { box-sizing:border-box; }
+    body { margin:0; color:var(--text); background:radial-gradient(circle at top right,#1e2149 0,transparent 35%),var(--bg); font:16px/1.55 system-ui,-apple-system,Segoe UI,sans-serif; }
+    a { color:var(--blue); }
+    a:focus-visible, button:focus-visible { outline:3px solid var(--blue); outline-offset:3px; }
+    .wrap { max-width:1080px; margin:auto; padding:1.2rem clamp(1rem,4vw,2.4rem) 4rem; }
+    header { display:flex; align-items:center; justify-content:space-between; gap:1rem; padding-bottom:1.8rem; }
+    .brand { color:var(--text); text-decoration:none; font-weight:900; font-size:1.3rem; letter-spacing:-.04em; }
+    nav { display:flex; flex-wrap:wrap; gap:1.2rem; }
+    nav a { text-decoration:none; color:var(--muted); }
+    .eyebrow { letter-spacing:.18em; color:var(--blue); font-size:.76rem; text-transform:uppercase; font-weight:750; }
+    h1 { font-size:clamp(2.2rem,5vw,4.3rem); line-height:1.1; max-width:15ch; margin:.4rem 0 1rem; }
+    h1 span { color:#b99bff; }
+    h2 { margin:.2rem 0 .6rem; font-size:1.5rem; }
+    p { margin:.4rem 0 1.1rem; }
+    .lede { max-width:65ch; color:#d5d7ed; font-size:1.1rem; }
+    .status { border:1px solid var(--line); border-radius:1rem; background:rgba(25,25,57,.9); padding:1.1rem 1.3rem; margin:1.5rem 0 2rem; }
+    .status strong { display:block; }
+    .status p { margin:.4rem 0 0; color:var(--muted); }
+    .steps { display:grid; gap:1rem; }
+    .step { border:1px solid var(--line); background:var(--card); border-radius:1.2rem; padding:1.5rem; }
+    .number { display:inline-grid; place-items:center; width:2rem; height:2rem; border-radius:50%; border:1px solid var(--purple); font-weight:750; color:#e7d7ff; }
+    .step h2 { margin:.7rem 0; }
+    .step > p { color:var(--muted); max-width:70ch; }
+    .plans { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.8rem; margin-top:1rem; }
+    .plan { padding:1rem; border:1px solid var(--line); border-radius:.8rem; background:#0a0e24; }
+    .plan h3 { margin:0 0 .25rem; font-size:1rem; }
+    .plan p { color:var(--muted); font-size:.9rem; margin:0; }
+    .tag { font-size:.8rem; font-weight:750; color:#ccbcff; display:block; padding-bottom:.4rem; }
+    .action { display:inline-block; border-radius:999px; padding:.75rem 1.2rem; background:linear-gradient(100deg,#4c6de1,#8555de); color:white; text-decoration:none; font-weight:700; }
+    .disabled { padding:.75rem 1.2rem; border-radius:999px; border:1px solid var(--line); background:#262942; color:#c2c5da; font:inherit; cursor:not-allowed; }
+    .fine { font-size:.9rem; color:var(--muted); }
+    footer { border-top:1px solid var(--line); margin-top:2.5rem; padding-top:1.5rem; color:var(--muted); }
+    @media (max-width:700px) { .plans { grid-template-columns:1fr; } header { align-items:flex-start; } .step { padding:1rem; } }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <a class="brand" href="/" aria-label="Founder Control Room home">FCR</a>
+      <nav aria-label="Public navigation"><a href="/work.html">Explore</a><a href="/">Home</a></nav>
+    </header>
+    <main>
+      <p class="eyebrow">Your workspace, your authority</p>
+      <h1>Start building with <span>Founder Control Room.</span></h1>
+      <p class="lede">Explore real public work today. A separate customer workspace will let you bring your own projects, choose your access, and use approved tools without seeing anyone else's data.</p>
+      <aside class="status" role="status">
+        <strong>Customer accounts are not yet available.</strong>
+        <p>This is a public onboarding preview, not a signup service. No personal information or payment is collected. Founder-only access is separate and never granted by choosing a plan.</p>
+      </aside>
+      <div class="steps" aria-label="Customer onboarding steps">
+        <section class="step" id="explore">
+          <span class="number" aria-hidden="true">1</span>
+          <h2>Explore FCR free</h2>
+          <p>Visit published work and public product explanations without signing in.</p>
+          <a class="action" href="/work.html">Explore public work</a>
+        </section>
+        <section class="step" id="choose">
+          <span class="number" aria-hidden="true">2</span>
+          <h2>Choose how you use FCR</h2>
+          <p>Planned customer options are shown for navigation only. No paid tier, entitlement, allowance, or price is active or promised on this page.</p>
+          <div class="plans">
+            <article class="plan"><span class="tag">Available now · public</span><h3>Public explorer</h3><p>Browse verified public pages. No account required.</p></article>
+            <article class="plan"><span class="tag">Proposed · not available</span><h3>Solo workspace</h3><p>Personal projects, private history, and customer-scoped tools after verification.</p></article>
+            <article class="plan"><span class="tag">Proposed · not available</span><h3>Team workspace</h3><p>Member roles and shared projects, with per-team permissions and spend controls.</p></article>
+          </div>
+        </section>
+        <section class="step" id="account">
+          <span class="number" aria-hidden="true">3</span>
+          <h2>Create your customer account</h2>
+          <p>Customer registration needs its own verified identity provider, email verification, session protections, and tenant-scoped records. The existing founder sign-in cannot be used as public signup.</p>
+          <button class="disabled" type="button" disabled aria-disabled="true">Create account · not yet available</button>
+          <p class="fine">Sign-up is deliberately disabled until account creation and privacy tests pass.</p>
+        </section>
+        <section class="step" id="workspace">
+          <span class="number" aria-hidden="true">4</span>
+          <h2>Enter your own workspace</h2>
+          <p>After identity verification, each customer must receive only their own projects and entitlements. Paid tools require a verified subscription and server-side authorization. Unconnected tools stay off.</p>
+          <p class="fine">No payment is collected. No founder-only project data, credentials, agents, or approvals are exposed here.</p>
+        </section>
+      </div>
+    </main>
+    <footer>Founder Control Room · Public preview only. Customer accounts, private workspaces, and checkout are not live.</footer>
+  </div>
+</body>
+</html>
