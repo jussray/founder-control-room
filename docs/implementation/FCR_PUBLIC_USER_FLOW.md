@@ -15,6 +15,16 @@
 6. **Workspace:** after tenant-bound authorization, show only customer-owned projects, consumption, and entitlements. Every tool call enforces actor, tenant, action, and current plan; anonymous/browser role cannot elevate itself.
 7. **Billing:** show and enable prices/checkout only after the product, payment provider, webhook verification, billing lifecycle, refunds, customer delivery, and entitlement-to-provider round trip are proven. Never grant a paid feature based on a client-supplied plan field.
 
+## Added customer workspace read API — source candidate
+
+- `GET /customer/status` reports public browsing enabled; registration, checkout and paid capabilities disabled. It advertises the read-only API gate separately.
+- `GET /customer/workspace` is a **bearer-only read** that defaults to 503 unless `FCR_PUBLIC_CUSTOMER_WORKSPACES_ENABLED=true`. It is not enabled in this change.
+- When and only when a correctly configured verified identity provider and tenant schema are independently proven, the route uses Supabase Auth `getUser(token)` to validate a bearer token, requires a non-anonymous user with a confirmed email, and applies the existing strict public-tenant membership projector.
+- Database access uses `src/mcp/publicTenantReader.ts`, the same bounded public-only adapter used by `/mcp/public`. Its only tables are `fcr_public_memberships` and `fcr_public_projects`, with explicit user and tenant filters, strict output projection and row caps.
+- JSON responses include only a verified account ID and sanitized public project summaries; execution, paid capabilities, checkout and connected-provider permissions remain `false` irrespective of user metadata.
+- Missing/invalid bearer = 401, foreign or invalid membership = 404, unavailable DB or issuer = 503. The existing opaque founder cookie never authenticates this route.
+- This is **not a public login or account creation interface**. There is no front-end token collector and no identity cookie for customers yet. No user should be asked to authenticate to an unavailable workflow.
+
 ## Current implementation boundary
 
 - The public site now links to `/account/` and the Pages worker serves `/account*` from static assets for GET/HEAD rather than proxying that route to `FCR_API`.
@@ -42,7 +52,7 @@ npm run build:pages
 npm run verify:founder-home
 ```
 
-The Node checks assert source truth, required Pages assets, and Cloudflare Pages routing of `GET/HEAD /account*`. Actual Cloudflare, live customer auth, tenant RLS and checkout are not proven by these commands. Keep the existing founder visual and browser proofs intact.
+The static checks assert source truth, required Pages assets, and Cloudflare Pages routing of `GET/HEAD /account*`. The Node and Vitest tests cover read-only tenant isolation and API failure states with fixtures and injected verifiers. These tests have not been executed in this session. Passing them would not prove live Cloudflare routing, customer authentication, tenant RLS, or checkout. Keep the existing founder visual and browser proofs intact.
 
 ## Cross-provider state at authoring
 
