@@ -53,3 +53,32 @@ test('customer GET and HEAD paths never reach the founder API binding', async ()
 test('the Cloudflare Pages build includes customer onboarding as a required asset', () => {
   assert.match(read('scripts/build-pages.mjs'), /'account\/index\.html'/);
 });
+
+test('customer API remains on the verified backend and preserves bearer authorization', async () => {
+  const { default: worker } = await import('../public/_worker.js');
+  const apiCalls = [];
+  const env = {
+    ASSETS: { fetch: async () => { throw new Error('Customer API must never be served as a public static asset'); } },
+    FCR_API: { fetch: async req => {
+      apiCalls.push({
+        pathname: new URL(req.url).pathname,
+        authorization: req.headers.get('authorization'),
+        edge: req.headers.get('x-founder-control-room-edge'),
+      });
+      return new Response('{}', {
+        status: 200,
+        headers: { 'x-founder-control-room-service': 'founder-control-room' },
+      });
+    } },
+  };
+  for (const path of ['/customer/status', '/customer/workspace']) {
+    const response = await worker.fetch(new Request('https://www.foundercontrolroom.org' + path, {
+      headers: { Authorization: 'Bearer source-test-token' },
+    }), env);
+    assert.equal(response.status, 200);
+  }
+  assert.deepEqual(apiCalls, [
+    { pathname: '/customer/status', authorization: 'Bearer source-test-token', edge: 'cloudflare-pages' },
+    { pathname: '/customer/workspace', authorization: 'Bearer source-test-token', edge: 'cloudflare-pages' },
+  ]);
+});
