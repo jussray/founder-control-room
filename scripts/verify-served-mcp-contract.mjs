@@ -49,6 +49,8 @@ const xEngagementMcp = read("src/http/routes/xEngagementSignalMcp.ts");
 const mcpRouter = read("src/http/routes/mcp.ts");
 const mcpRateLimit = read("src/http/middleware/mcpRateLimit.ts");
 const server = read("src/http/server.ts");
+const runtimeProof = read(".github/workflows/prompt-workflow-router-runtime-proof.yml");
+const secretsDoc = read("docs/SECRETS.md");
 
 /* ---------- externalTools.ts: the tool catalog invoked by /mcp and /mcp/read ---------- */
 
@@ -113,6 +115,21 @@ assert(
   !remoteReadMcp.includes('six read/preview-only tools') &&
     !remoteReadMcp.includes('Six read/preview-only tools'),
   "served MCP must not regress to the stale read-only-only catalog description",
+);
+
+/* ---------- deployed runtime proof: founder HTTP auth != canonical MCP OAuth ---------- */
+
+assert(
+  runtimeProof.includes('FCR_OPERATOR_RELAY_OAUTH_TOKEN: ${{ secrets.FCR_OPERATOR_RELAY_OAUTH_TOKEN }}'),
+  "operator relay runtime proof must use its dedicated canonical MCP OAuth token",
+);
+assert(
+  !runtimeProof.includes('FCR_OPERATOR_RELAY_OAUTH_TOKEN: ${{ secrets.FCR_PLAYWRIGHT_FOUNDER_BEARER }}'),
+  "operator relay runtime proof must not relabel the founder browser bearer as MCP OAuth authority",
+);
+assert(
+  secretsDoc.includes('| `FCR_OPERATOR_RELAY_OAUTH_TOKEN` | `prompt-workflow-router-runtime-proof.yml` |'),
+  "docs/SECRETS.md must document the dedicated operator-relay OAuth proof token",
 );
 assert(
   remoteReadMcp.includes('research/propose/review') &&
