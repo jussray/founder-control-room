@@ -27,7 +27,7 @@
     "test:e2e": "npm run build && npm run verify:direct-browser && node e2e/pages-auth-callback-proof.mjs && node e2e/direct-browser-run.mjs && node e2e/truth-console-proof.mjs",
     "setup:test-browser": "playwright install chromium",
     "verify:direct-browser": "node scripts/verify-direct-browser-contract.mjs",
-    "verify:public-customer-flow": "node --test tests/publicUserFlow.node.test.mjs && node --import tsx --test tests/publicCustomerWorkspace.node.test.mjs && vitest run src/http/routes/__tests__/publicCustomer.test.ts",
+    "verify:public-customer-flow": "node --test tests/publicUserFlow.node.test.mjs tests/publicTenantSchema.node.test.mjs && node --import tsx --test tests/publicCustomerWorkspace.node.test.mjs tests/publicCustomerEntitlements.node.test.mjs && vitest run src/http/routes/__tests__/publicCustomer.test.ts",
     "verify:founder-home": "npm run verify:public-customer-flow && node e2e/founder-home-dashboard-proof.mjs",
     "verify:parallel": "node scripts/verify-parallel.mjs",
     "preview:evidence": "node scripts/import-preview-evidence.mjs",
