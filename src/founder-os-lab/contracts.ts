@@ -15,6 +15,7 @@ export type FounderOsLabAction =
   | 'send-email';
 
 export type FounderOsLabSkillId =
+  | 'broke-founder'
   | 'juss-chief-ai'
   | 'goalfix'
   | 'repo-truth'
