@@ -192,6 +192,8 @@ Implemented now:
 - in-memory budget reservation;
 - in-memory asset, receipt, and revocation ledgers;
 - terminal revoked-state behavior;
+- dry-run `MediaExecutionService` orchestration that returns recommendation-only results without budget reservation, provider calls, asset creation, or publication;
+- fail-closed execute-mode planning receipts until a separately approved execution-capable adapter layer exists;
 - honest FFmpeg, Gemini/Nano Banana, and Seedance adapter stubs.
 
 Still deliberately deferred:
