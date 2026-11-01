@@ -18,7 +18,8 @@ test('customer schema proposal is explicitly unexecuted and creates isolated pub
 test('no client write grants, paid or billing read grants, or user-editable authorization sources',()=>{
  assert.doesNotMatch(sql,/grant (?:all|insert|update|delete)\b/i);
  assert.doesNotMatch(sql,/grant select on public\.fcr_public_(?:entitlements|billing_receipts|tenants)/i);
- assert.doesNotMatch(sql,/raw_user_meta_data|user_metadata|security definer/i);
+ const executableSql=sql.split('\n').filter(line=>!line.trimStart().startsWith('--')).join('\n');
+ assert.doesNotMatch(executableSql,/raw_user_meta_data|user_metadata|security definer/i);
  assert.match(sql,/unique \(provider, provider_event_id\)/i);
  assert.match(sql,/foreign key \(verified_receipt_id, tenant_id\)/i);
 });
