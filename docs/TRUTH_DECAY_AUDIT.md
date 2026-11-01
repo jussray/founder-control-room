@@ -1,5 +1,12 @@
 # Truth Decay Audit: When a True Claim Becomes Unsafe to Reuse
 
+## November 1, 2026: Actions Mail Audit governance and proof expiry
+
+The existing FCR PR #965 carries a repository-owned, **default-disabled** GitHub Actions monitoring workflow and a GitHub Copilot audit skill. Changes to `docs/GOALFIX_EXECUTION_WORKFLOW_V2.md` and the monitoring evidence contract must not upgrade a verified source/test result to Gmail OAuth consent, operating scheduler, exact current production configuration, incident resolution, or merge authority. The adapter is scoped to GitHub run metadata and separately provisioned read-only Gmail credentials; account profile equality is checked at run time. The FCR GitHub webhook continues to own provider event authority and is not replaced by notification mail.
+
+Documentation names five protected workflow secrets in `docs/SECRETS.md`; naming does not establish secret presence, provider scope, token validity, or mailbox authorization. A security alert remains triage until reviewed by its actual provider. Older checks, including the successful PR-head auditor contract and historical GitGuardian incident, expire for any successor head. Exact-head CI, Playwright, CodeQL, Documentation Truth, independent review, GitGuardian adjudication, and provider/runtime readback remain separate. The monitor cannot auto-merge, auto-repair, mutate email, or certify all cross-repository workflows with a repository-scoped GitHub token.
+
+
 ## November 1, 2026: bounded GitHub App transport reconciliation
 
 The existing PR #986 reconciles bounded private-key wrapper parsing against current main without replacing a protected secret, changing GitHub App installation grants, or asserting production repair. On the November 1 exact-main founder-only diagnostic, the production binding was present and the App ID numeric, but the runtime key transport was classified as unknown; this is evidence of failed parsing, not evidence that the secret was missing or recently replaced. Protected-value scope and provider identity remain independent gates. No inherited historic CI or Playwright result authorizes a merge or release.
