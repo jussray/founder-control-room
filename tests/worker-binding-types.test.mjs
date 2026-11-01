@@ -67,3 +67,14 @@ test('provider metadata fingerprint is stable and excludes plaintext binding val
   ]) });
   assert.notEqual(changed.bindingFingerprint, first.bindingFingerprint);
 });
+
+test('rejects plaintext encoded credential and PEM bindings', () => {
+  for (const name of [
+    'GITHUB_PRIVATE_KEY_PEM',
+    'FCR_AUTH_TOKEN_BASE64',
+    'SERVICE_ACCOUNT_KEY_B64',
+  ]) {
+    const verdict = validateBindingTypes(response([{ name, type: 'plain_text', text: 'fixture-only' }]));
+    assert.equal(verdict.ok, false, name);
+  }
+});
