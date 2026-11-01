@@ -43,6 +43,10 @@ describe('Council specialist contribution bridge', () => {
     expect(() => parseCouncilSpecialistContribution(JSON.stringify(contribution({
       reality: [{ state: 'verified', statement: 'invented' }],
     })), binding)).toThrow('specialist contribution cannot carry reality');
+
+    expect(() => parseCouncilSpecialistContribution(JSON.stringify(contribution({
+      risks: 'not-an-array',
+    })), binding)).toThrow('specialist contribution risks must be an array');
   });
 
   it('persists a structured specialist contribution on the exact provider hop', async () => {
