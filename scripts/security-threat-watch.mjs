@@ -2,6 +2,8 @@
 // Read-only threat intelligence collector. Does not auto-block, investigate users, or modify Cloudflare.
 import {mkdir,writeFile,readFile} from 'node:fs/promises';
 import {createHash} from 'node:crypto';
+import {pathToFileURL} from 'node:url';
+import {resolve} from 'node:path';
 import {parseSyndication,extractIndicators,detectPromptInjection,summarizePortfolioObservation,brokeFounderGate} from './security-threat-watch-core.mjs';
 const MAX_BYTES=300000;
 const ALLOWED_FEED_HOSTS=new Set(['www.cisa.gov','developers.cloudflare.com']);
@@ -94,6 +96,6 @@ export async function main() {
   console.log(JSON.stringify({status:result.status,counts:result.counts,action:result.action,receiptPath:OUT}));
   if(observations.every(x=>x.status==='rejected'))process.exitCode=2;
 }
-if(process.argv[1]&&import.meta.url===new URL('file://'+process.argv[1]).href)main().catch(e=>{
+if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href)main().catch(e=>{
   console.error('Security observation failed:',truncateError(e));process.exitCode=1;
 });
