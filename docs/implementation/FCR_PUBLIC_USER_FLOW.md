@@ -34,6 +34,16 @@
 - `public/_headers` marks the preview `Cache-Control: no-store` and denies training/search ingestion; the page itself is `noindex,nofollow`. It must not publish private product implementation details.
 - Distinguish a public visitor, an authenticated customer, a tenant member, a plan-entitled user, and the privileged founder as **different** authority classes.
 
+## Production schema inspection — November 1, 2026
+
+Connected Supabase project `oojzfmmywbvficgybaxd` was read using schema metadata only. The existing `public.fcr_public_*` table set, grants, and policies are **absent**. Existing production migrations do not include the public tenancy proposal. The prior candidate's five GitHub build/security checks succeeded; Supabase Preview was skipped. This is **not** a passing database, identity, or customer release proof.
+
+Review SQL: `docs/implementation/FCR_PUBLIC_TENANCY_REVIEW_CANDIDATE.sql` (source only, **not applied**). It creates separate public tenants, memberships, projects, billing receipts, and entitlements; tightens default-deny grants and RLS; and has no client mutations. The earlier `FCR_PUBLIC_TENANCY_SCHEMA_PROPOSAL.sql` is superseded for execution: its `auth.jwt()->>'client_id'` requirement would reject ordinary first-party sessions with no OAuth client claim.
+
+The paid entitlement policy in `src/mcp/publicCustomerEntitlements.ts` requires a confirmed customer identity, active matching tenant membership, a future-valid paid plan, matching service-held verified receipt, and independent feature activation. It is **not mounted as a live paid API**. The current `/customer/workspace` always reports `paidCapabilitiesAuthorized: false`.
+
+Run `npm run verify:public-customer-flow` for source and mocked-unit assertions. Before enabling anything, generate and review a proper Supabase CLI migration on isolated staging, run a genuine tenant A/B/revoked/anonymous SQL RLS matrix, verify customer-only Auth callback/recovery/logout, prove trusted payment webhook idempotency and entitlement revocation, and capture exact deployment receipts. None of these live gates have passed here.
+
 ## Required proof before activating customer accounts
 
 - Exact target Supabase Auth project verified; customer-only login, callback, logout and recovery flow; verified auth tokens; secure HttpOnly cookies; CSRF and rate limiting.
