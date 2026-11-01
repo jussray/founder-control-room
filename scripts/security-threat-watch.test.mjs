@@ -4,6 +4,7 @@ import {
   extractIndicators, parseSyndication, detectPromptInjection,
   classifySecuritySignal, routeSecuritySkills, summarizePortfolioObservation, brokeFounderGate,
 } from './security-threat-watch-core.mjs';
+import { readBounded } from './security-threat-watch.mjs';
 
 test('RSS and Atom entries are parsed as untrusted text without following URLs', () => {
   const rss = '<rss><channel><item><title>CVE-2026-12345</title><description>Review this advisory</description><link>https://example.org/r1</link></item></channel></rss>';
@@ -63,4 +64,16 @@ test('Broke Founder refuses all new costs without transaction-specific approval'
   assert.deepEqual(brokeFounderGate({providerAvailable:false,firstPartyFeasible:true}),{allowed:true,reason:'BUILD_FIRST_PARTY_ADAPTER'});
   assert.equal(brokeFounderGate({providerAvailable:false,firstPartyFeasible:false}).allowed,false);
   assert.ok(routeSecuritySkills({kind:'threat'}).skills.includes('broke-founder'));
+});
+
+test('provider and feed bodies are bounded before buffering', async () => {
+  assert.equal(await readBounded(new Response('small'), 10), 'small');
+  await assert.rejects(
+    readBounded(new Response('x'.repeat(256)), 64),
+    /Response too large/,
+  );
+  await assert.rejects(
+    readBounded(new Response('not found', { status: 404 }), 64),
+    /HTTP_404/,
+  );
 });
