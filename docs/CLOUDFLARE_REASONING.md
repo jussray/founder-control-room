@@ -1,5 +1,10 @@
 # Cloudflare Reasoning Contract
 
+## November 1, 2026 UTC: exact-head MCP credential preflight
+
+The canonical `.github/workflows/deploy.yml` and `.github/workflows/worker-reconcile.yml` must run the reviewed `scripts/verify-worker-binding-types.mjs` before any Cloudflare Worker mutation. This preflight inspects only Worker binding names and type classifications; a credential binding classified `plain_text`, a malformed provider response, or unavailable provider metadata must block the release without revealing values, provider response bodies, or arbitrary binding names in logs. A source-green preflight is not evidence that the observed `CF_API_TOKEN` binding has been remediated, that OAuth works, or that production is deployed.
+
+
 ## Logpush portfolio authority
 
 Founder Control Room owns the source contract for the portfolio Logpush desired state in `config/cloudflare-logpush.portfolio.json`. The first bounded dataset is account-scoped `workers_trace_events`; product repositories participate without receiving FCR Cloudflare write credentials.
