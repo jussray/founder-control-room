@@ -118,6 +118,10 @@ export function parseCouncilSpecialistContribution(
     throw new Error('specialist contribution confidence must be an integer from 0 to 100');
   }
 
+  if (!Array.isArray(record.assumptions)) throw new Error('specialist contribution assumptions must be an array');
+  if (!Array.isArray(record.risks)) throw new Error('specialist contribution risks must be an array');
+  if (!Array.isArray(record.dependencies)) throw new Error('specialist contribution dependencies must be an array');
+
   const assumptions = stringList(record.assumptions);
   const risks = stringList(record.risks);
   const dependencies = stringList(record.dependencies);
