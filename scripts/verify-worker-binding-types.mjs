@@ -23,7 +23,8 @@ export function validateBindingTypes(payload) {
   for (const { name, type } of bindings) {
     if (seen.has(name)) return { ok: false, reason: 'duplicate-provider-binding-names', unsafe: [] };
     seen.add(name);
-    if (CREDENTIAL_BINDING.test(name) && type !== 'secret_text' && type !== 'secrets_store_secret') {
+    const normalizedName = name.replace(/_(?:PEM|BASE64|B64)$/i, '');
+    if (CREDENTIAL_BINDING.test(normalizedName) && type !== 'secret_text' && type !== 'secrets_store_secret') {
       unsafe.push({ name, type });
     }
   }
