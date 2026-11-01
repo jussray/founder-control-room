@@ -57,6 +57,13 @@ export interface RouteFcrSkillsInput {
   projectSlug: string;
   expectedHeadSha: string;
   expectedRegistryHash: string;
+  /** Optional read-only economics evidence: absence never authorizes a paid operation. */
+  economics?: {
+    incrementalMonthlyUsd: number;
+    incrementalOneTimeUsd: number;
+    providerAvailable: boolean;
+    firstPartyFeasible: boolean;
+  };
   capabilityPlan?: V10CapabilityPlan;
   repository?: FcrSkillRouterRepositoryContext;
 }
@@ -190,6 +197,28 @@ export function routeFcrSkills(input: RouteFcrSkillsInput): FcrSkillRoutingDecis
   const contentFoundry = routeContentFoundryCouncil(input.goal, input.action);
   const standingCommands = routeFcrStandingCommands(input.goal, input.action);
 
+  // Broke Founder is always-on. This plan is never an executable cost or provider approval.
+  pushUnique(requiredProof, 'Broke Founder: zero new spending without independently verified founder approval; prefer existing or first-party tools and test the actual outcome');
+  if (input.economics) {
+    const { incrementalMonthlyUsd, incrementalOneTimeUsd, providerAvailable, firstPartyFeasible } = input.economics;
+    if (![incrementalMonthlyUsd, incrementalOneTimeUsd].every(
+      (cost) => Number.isFinite(cost) && cost >= 0,
+    )) {
+      errors.push('Broke Founder: invalid or unknown incremental cost evidence');
+    } else if (incrementalMonthlyUsd > 0 || incrementalOneTimeUsd > 0) {
+      errors.push('Broke Founder: paid provider/build choice requires independent, transaction-specific founder approval outside this planning router');
+    }
+    if (!providerAvailable) {
+      pushUnique(policyRequiredCapabilityIds, 'broke-founder');
+      if (!firstPartyFeasible) {
+        errors.push('Broke Founder: provider unavailable and safe first-party parity not established');
+      } else {
+        pushUnique(requiredProof, 'Broke Founder: use a first-party provider-independent adapter with scope, privacy, tests, cost evidence, rollback and runtime proof');
+      }
+    }
+  } else {
+    pushUnique(requiredProof, 'Broke Founder: runtime cost and provider availability must be independently discovered; unknown does not mean free');
+  }
   pushUnique(requiredProof, 'Founder Council is applied automatically in code; slash commands are optional foreground aliases and never create authority');
   pushUnique(requiredProof, 'Broke Founder always on: $0 incremental recurring and one-time cost without explicit founder approval; prefer existing or secure first-party adapter if provider unavailable; a missing provider never grants execution authority');
   pushUnique(requiredProof, 'Standing command routing is inferred from founder intent and action; manual slash invocation is emphasis or override, not an activation requirement');
