@@ -1,0 +1,45 @@
+name: Public customer candidate verification
+
+on:
+  push:
+    branches:
+      - feat/fcr-public-customer-flow-20261101
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  EXPECTED_HEAD_SHA: ${{ github.sha }}
+
+jobs:
+  customer-contract:
+    name: Public customer contract (no production access)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          persist-credentials: false
+      - name: Verify exact candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Assert customer data boundaries and non-authorizing billing
+        run: npm run verify:public-customer-flow
+        env:
+          NODE_ENV: test
+      - name: Compile TypeScript
+        run: npm run typecheck
+        env:
+          NODE_ENV: test
