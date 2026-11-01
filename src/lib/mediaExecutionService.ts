@@ -160,13 +160,27 @@ export class DryRunMediaExecutionService implements MediaExecutionService {
     const timestamp = this.now();
     if (!Number.isFinite(Date.parse(timestamp))) throw new Error('clock returned an invalid timestamp');
 
-    const routeBlocked = recommendation.outcome.kind === 'BLOCKED';
-    const interactive = recommendation.outcome.kind === 'INTERACTIVE_HUMAN';
-    const safeMessage = routeBlocked
-      ? recommendation.outcome.safeMessage
-      : interactive
-        ? recommendation.outcome.reason
-        : 'Execution adapters are not enabled in the dry-run orchestrator. Recommendation recorded without reservation, provider call, asset creation, or publication.';
+    let safeMessage: string;
+    let failureCode: string;
+    let rejectedRoutes: MediaExecutionReceiptV1['rejectedRoutes'];
+
+    switch (recommendation.outcome.kind) {
+      case 'BLOCKED':
+        safeMessage = recommendation.outcome.safeMessage;
+        failureCode = recommendation.outcome.reason;
+        rejectedRoutes = [{ providerId: 'none', reason: recommendation.outcome.reason }];
+        break;
+      case 'INTERACTIVE_HUMAN':
+        safeMessage = recommendation.outcome.reason;
+        failureCode = 'INTERACTIVE_HUMAN_REQUIRED';
+        rejectedRoutes = [];
+        break;
+      default:
+        safeMessage = 'Execution adapters are not enabled in the dry-run orchestrator. Recommendation recorded without reservation, provider call, asset creation, or publication.';
+        failureCode = 'EXECUTION_NOT_ENABLED';
+        rejectedRoutes = [];
+        break;
+    }
 
     const receiptWithoutFingerprint: Omit<MediaExecutionReceiptV1, 'receiptFingerprint'> = {
       receiptId,
@@ -188,7 +202,7 @@ export class DryRunMediaExecutionService implements MediaExecutionService {
         referenceAssetIds: [...input.request.referenceAssetIds],
       },
       selectedRoute: selectedRoute(recommendation),
-      rejectedRoutes: routeBlocked ? [{ providerId: 'none', reason: recommendation.outcome.reason }] : [],
+      rejectedRoutes,
       cost: estimatedCostLedger(recommendation),
       output: {
         assetIds: [],
@@ -201,11 +215,7 @@ export class DryRunMediaExecutionService implements MediaExecutionService {
         completedAt: timestamp,
       },
       failure: {
-        code: routeBlocked
-          ? recommendation.outcome.reason
-          : interactive
-            ? 'INTERACTIVE_HUMAN_REQUIRED'
-            : 'EXECUTION_NOT_ENABLED',
+        code: failureCode,
         safeMessage,
         retryable: false,
       },
