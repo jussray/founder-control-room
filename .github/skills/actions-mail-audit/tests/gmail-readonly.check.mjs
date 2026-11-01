@@ -55,8 +55,43 @@ describe('Gmail alert ingestion metadata is read-only, bounded, and opt-in', () 
   });
   it('rejects unavailable credentials without making API calls', async () => {
     const { fetcher, calls } = mockGmail();
-    await assert.rejects(fetchGmailAlertMetadata({ token: '', mailbox, repo, fetcher }), /GMAIL_TOKEN_UNAVAILABLE/);
+    await assert.rejects(fetchGmailAlertMetadata({ token: '', mailbox, repo, fetcher }), /GMAIL_READONLY_AUTH_MISSING/);
     assert.equal(calls.length, 0);
+  });
+  it('refreshes a separately consented token without exporting its credential fields', async () => {
+    const original = mockGmail();
+    const authCalls = [];
+    const fetcher = async (url, options) => {
+      if (String(url) === 'https://oauth2.googleapis.com/token') {
+        authCalls.push(options);
+        return { ok: true, json: async () => ({ access_token: 'SHORT_LIVED_READONLY_TOKEN' }) };
+      }
+      assert.equal(options.headers.authorization, 'Bearer SHORT_LIVED_READONLY_TOKEN');
+      return original.fetcher(url, options);
+    };
+    const result = await fetchGmailAlertMetadata({
+      refresh: { refreshToken: 'PRIVATE_REFRESH', clientId: 'CLIENT_ID', clientSecret: 'CLIENT_SECRET' },
+      mailbox, repo, fetcher,
+    });
+    assert.equal(result.notices.length, 1);
+    assert.equal(authCalls.length, 1);
+    assert.equal(authCalls[0].method, 'POST');
+    assert.equal(authCalls[0].body.get('grant_type'), 'refresh_token');
+    assert.equal(authCalls[0].body.get('refresh_token'), 'PRIVATE_REFRESH');
+    assert.equal(JSON.stringify(result).includes('PRIVATE_REFRESH'), false);
+    assert.equal(JSON.stringify(result).includes('SHORT_LIVED_READONLY_TOKEN'), false);
+  });
+  it('blocks failed OAuth refresh before reading any Gmail messages', async () => {
+    const calls = [];
+    const fetcher = async (url) => {
+      calls.push(String(url));
+      return { ok: false, json: async () => ({ error: 'invalid_grant' }) };
+    };
+    await assert.rejects(fetchGmailAlertMetadata({
+      refresh: { refreshToken: 'REVOKED', clientId: 'client', clientSecret: 'secret' },
+      mailbox, repo, fetcher,
+    }), /GMAIL_READONLY_REFRESH_BLOCKED/);
+    assert.deepEqual(calls, ['https://oauth2.googleapis.com/token']);
   });
   it('rejects other repository run links and untrusted senders', async () => {
     const crossLink = Buffer.from('https://github.com/jussray/Sekret-Bip/actions/runs/150', 'utf8').toString('base64url');
