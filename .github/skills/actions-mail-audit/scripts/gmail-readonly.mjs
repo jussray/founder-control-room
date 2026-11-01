@@ -7,6 +7,7 @@ import { parseRunUrl } from './triage.mjs';
 const ACCOUNTS = new Set(['mcgillraylene@gmail.com', 'sekretbip@gmail.com', 'raymcg9@gmail.com']);
 const EMAIL_QUERY = 'newer_than:7d {from:notifications@github.com from:gitguardian.com}';
 const GMAIL_ORIGIN = 'https://gmail.googleapis.com';
+const TOKEN_ENDPOINT = 'https://oauth2.googleapis.com/token';
 const RUN_LINKS = /https:\/\/github\.com\/jussray\/[A-Za-z0-9_.-]+\/actions\/runs\/[1-9][0-9]*/g;
 const REPO = /^jussray\/[A-Za-z0-9_.-]+$/;
 const HEADER_NAMES = new Set(['from', 'subject']);
@@ -80,11 +81,38 @@ async function gmailGet(path, token, fetcher) {
  * Requires caller-provided OAuth token granted Gmail read-only scope.
  * NO messages or raw provider errors are logged, cached, returned, or written.
  */
-export async function fetchGmailAlertMetadata({ token, mailbox, repo, fetcher = globalThis.fetch }) {
-  if (!token || typeof token !== 'string') throw new Error('GMAIL_TOKEN_UNAVAILABLE');
+export async function obtainGmailAuditToken({ token, refresh, fetcher = globalThis.fetch }) {
+  if (typeof token === 'string' && token.length) return token;
+  const { refreshToken, clientId, clientSecret } = refresh || {};
+  if (![refreshToken, clientId, clientSecret].every(x => typeof x === 'string' && x.length > 0)) {
+    throw new Error('GMAIL_READONLY_AUTH_MISSING');
+  }
+  const response = await fetcher(TOKEN_ENDPOINT, {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      grant_type: 'refresh_token',
+      refresh_token: refreshToken,
+      client_id: clientId,
+      client_secret: clientSecret,
+    }),
+    redirect: 'error',
+    signal: globalThis.AbortSignal.timeout(12000),
+  });
+  if (!response.ok) throw new Error('GMAIL_READONLY_REFRESH_BLOCKED');
+  let data;
+  try { data = await response.json(); } catch { throw new Error('GMAIL_READONLY_REFRESH_BLOCKED'); }
+  if (typeof data?.access_token !== 'string' || !data.access_token.length) {
+    throw new Error('GMAIL_READONLY_REFRESH_BLOCKED');
+  }
+  return data.access_token;
+}
+
+export async function fetchGmailAlertMetadata({ token, refresh, mailbox, repo, fetcher = globalThis.fetch }) {
   if (!ACCOUNTS.has(mailbox)) throw new Error('GMAIL_MAILBOX_NOT_AUTHORIZED');
   if (!REPO.test(repo || '')) throw new Error('GITHUB_REPO_NOT_AUTHORIZED');
-  const profile = await gmailGet('/gmail/v1/users/me/profile', token, fetcher);
+  const accessToken = await obtainGmailAuditToken({ token, refresh, fetcher });
+  const profile = await gmailGet('/gmail/v1/users/me/profile', accessToken, fetcher);
   if (String(profile.emailAddress || '').toLowerCase() !== mailbox) {
     throw new Error('GMAIL_PROFILE_MISMATCH');
   }
@@ -94,7 +122,7 @@ export async function fetchGmailAlertMetadata({ token, mailbox, repo, fetcher = 
   for (let page = 0; page < MAX_PAGES; page++) {
     const params = new URLSearchParams({ q: EMAIL_QUERY, includeSpamTrash: 'true', maxResults: String(PAGE_SIZE) });
     if (pageToken) params.set('pageToken', pageToken);
-    const pageData = await gmailGet('/gmail/v1/users/me/messages?' + params.toString(), token, fetcher);
+    const pageData = await gmailGet('/gmail/v1/users/me/messages?' + params.toString(), accessToken, fetcher);
     if (!Array.isArray(pageData.messages) && pageData.messages != null) throw new Error('GMAIL_PAGE_SHAPE_INVALID');
     hits.push(...(pageData.messages || []).slice(0, PAGE_SIZE));
     if (!pageData.nextPageToken) { complete = true; break; }
@@ -106,7 +134,7 @@ export async function fetchGmailAlertMetadata({ token, mailbox, repo, fetcher = 
   const notices = [];
   for (const hit of hits) {
     if (!/^[a-f0-9]{8,40}$/i.test(hit?.id || '')) continue;
-    const message = await gmailGet('/gmail/v1/users/me/messages/' + encodeURIComponent(hit.id) + '?format=full', token, fetcher);
+    const message = await gmailGet('/gmail/v1/users/me/messages/' + encodeURIComponent(hit.id) + '?format=full', accessToken, fetcher);
     const headers = parseSafeHeaders(message.payload);
     if (!trustedSignalSender(headers.from || '')) continue;
     const security = /gitguardian\.com/i.test(headers.from || '');
@@ -131,6 +159,11 @@ export async function fetchGmailAlertMetadata({ token, mailbox, repo, fetcher = 
 async function main() {
   const result = await fetchGmailAlertMetadata({
     token: process.env.GMAIL_READONLY_ACCESS_TOKEN,
+    refresh: {
+      refreshToken: process.env.GMAIL_AUDIT_REFRESH_TOKEN,
+      clientId: process.env.GMAIL_AUDIT_CLIENT_ID,
+      clientSecret: process.env.GMAIL_AUDIT_CLIENT_SECRET,
+    },
     mailbox: process.env.GMAIL_AUDIT_MAILBOX,
     repo: process.env.GITHUB_REPOSITORY,
   });
