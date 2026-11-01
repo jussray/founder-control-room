@@ -21,6 +21,7 @@ describe('FCR skill registry', () => {
     const ids = registry.entries.map((entry) => entry.id);
 
     expect(ids).toContain('skill:goalfix');
+    expect(ids).toContain('skill:broke-founder');
     expect(ids).toContain('command:goalfix');
     expect(new Set(ids).size).toBe(ids.length);
   });
