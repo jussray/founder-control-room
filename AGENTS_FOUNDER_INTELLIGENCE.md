@@ -222,3 +222,7 @@ ULTRATHINK
 A failed pass narrows, changes, or stops the work. No mode grants merge, deployment, publication, spending, provider mutation, credential, migration, destructive-write, or founder authority. Founder Control Room remains the single operating system; ULTRATHINK, Red Team, Lindy, L99, and OODA are coordinated internal reasoning/execution disciplines serving the same founder intent, not separate operating systems.
 
 This entrypoint supplements `AGENTS.md`, `GLOBAL_AI.md`, Juss Founder OS, Founder Merge Authority, and repository-local skills. It never weakens privacy, safety, approval, rollback, evidence, or non-deletion rules.
+
+## Canon Knowledge — durable last-known verification
+
+Every agent must also apply [`docs/CANON_KNOWLEDGE_POLICY.md`](docs/CANON_KNOWLEDGE_POLICY.md): source-backed verification remains last-known canon with its original scope, timestamp, and receipt until a newer independently verified observation supersedes it. Missing access, a new conversation, a model disagreement, or an expired at-use truth lease never erase historical verification. Operational current/live claims still require fresh exact-subject evidence and existing founder gates. The library reducer is not deployed persistence or an authorized MCP interface.
