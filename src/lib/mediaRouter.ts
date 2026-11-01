@@ -129,9 +129,46 @@ export interface MediaAttackFlowRecordV1 {
   rationale: string;
 }
 
+export const MEDIA_REQUIRED_FOUNDER_SKILLS = Object.freeze([
+  { id: 'juss-founder-os', version: '1.0', sourcePath: '.ai/skills/juss-founder-os/SKILL.md' },
+  { id: 'ultrathink-devil', version: '1.0.0', sourcePath: 'skills/ultrathink-devil/SKILL.md' },
+  { id: 'goalfix', version: '2.2', sourcePath: '.ai/skills/goalfix/SKILL.md' },
+  { id: 'juss-flow-launch-loop', version: '1.2', sourcePath: '.ai/skills/juss-flow-launch-loop/SKILL.md' },
+  { id: 'outcome-first', version: '1.0.0', sourcePath: 'skills/outcome-first/SKILL.md' },
+] as const);
+
+export type MediaFounderSkillId = (typeof MEDIA_REQUIRED_FOUNDER_SKILLS)[number]['id'];
+
+export interface MediaFounderSkillRecordV1 {
+  skillId: MediaFounderSkillId;
+  version: string;
+  sourcePath: string;
+  sourceRecordIds: string[];
+  assertedAt: string;
+}
+
+export interface MediaFounderSkillBundleV1 {
+  version: 'media-founder-skills-v1';
+  records: MediaFounderSkillRecordV1[];
+}
+
+export function mediaFounderSkillBundle(assertedAt: string): MediaFounderSkillBundleV1 {
+  return {
+    version: 'media-founder-skills-v1',
+    records: MEDIA_REQUIRED_FOUNDER_SKILLS.map((skill) => ({
+      skillId: skill.id,
+      version: skill.version,
+      sourcePath: skill.sourcePath,
+      sourceRecordIds: [`skill:${skill.id}@${skill.version}`],
+      assertedAt,
+    })),
+  };
+}
+
 export interface MediaAttackFlowBundleV1 {
   version: 'media-attack-flow-v1';
   records: MediaAttackFlowRecordV1[];
+  founderSkills: MediaFounderSkillBundleV1;
 }
 
 export type MediaCapability =
@@ -336,6 +373,31 @@ export function receiptFingerprint(input: {
 export function validateMediaAttackFlowBundle(bundle: MediaAttackFlowBundleV1): string[] {
   const errors: string[] = [];
   if (bundle.version !== 'media-attack-flow-v1') errors.push('unsupported attack-flow bundle version');
+
+  if (bundle.founderSkills?.version !== 'media-founder-skills-v1') {
+    errors.push('unsupported or missing founder skill bundle version');
+  } else {
+    for (const required of MEDIA_REQUIRED_FOUNDER_SKILLS) {
+      const matches = bundle.founderSkills.records.filter((record) => record.skillId === required.id);
+      if (matches.length !== 1) {
+        errors.push(`founder skill ${required.id} must appear exactly once`);
+        continue;
+      }
+      const record = matches[0];
+      if (record.version !== required.version) {
+        errors.push(`founder skill ${required.id} must use version ${required.version}`);
+      }
+      if (record.sourcePath !== required.sourcePath) {
+        errors.push(`founder skill ${required.id} must bind canonical source ${required.sourcePath}`);
+      }
+      if (record.sourceRecordIds.length === 0 || record.sourceRecordIds.some((id) => !id.trim())) {
+        errors.push(`founder skill ${required.id} requires source record evidence`);
+      }
+      if (!Number.isFinite(Date.parse(record.assertedAt))) {
+        errors.push(`founder skill ${required.id} requires timestamp`);
+      }
+    }
+  }
   for (const flow of MEDIA_ATTACK_FLOW_IDS) {
     if (bundle.records.filter((record) => record.flow === flow).length !== 1) {
       errors.push(`attack flow ${flow} must appear exactly once`);

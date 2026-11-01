@@ -129,6 +129,22 @@ Order of operations:
 
 Wrapper selection is deliberately blocked in Phase 1 unless a later version adds an evidence-backed unique-value record and execution path.
 
+## Founder skill inheritance
+
+Media execution is also bound to the canonical founder-authored/shared skill contracts that control how the work is reasoned about and verified:
+
+- `juss-founder-os@1.0` from `.ai/skills/juss-founder-os/SKILL.md`;
+- `ultrathink-devil@1.0.0` from `skills/ultrathink-devil/SKILL.md`;
+- `goalfix@2.2` from `.ai/skills/goalfix/SKILL.md`;
+- `juss-flow-launch-loop@1.2` from `.ai/skills/juss-flow-launch-loop/SKILL.md`;
+- `outcome-first@1.0.0` from `skills/outcome-first/SKILL.md`.
+
+Each route bundle must carry exactly one version-bound, canonical-path-bound, evidence-referenced record for every required skill. Missing skills, duplicate skills, version drift, source-path drift, empty evidence, or stale/malformed timestamps fail closed before route selection.
+
+This is an execution prerequisite, **not an authority source**. Skills may deepen analysis, require proof, or block an unsafe route. They cannot mint provider credentials, spend authority, domain rights, release permission, merge/deploy authority, or publication authority.
+
+`fact-check-every-claim` remains a separate publication/content-claims gate when externally communicated factual claims are present. It is not forced onto every internal media draft.
+
 ## Attack-flow contract
 
 Every governed production route requires exactly one evidence-bound record for:

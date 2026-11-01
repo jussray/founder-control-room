@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import {
   InMemoryMediaReceiptLedger,
   MEDIA_ATTACK_FLOW_IDS,
+  MEDIA_REQUIRED_FOUNDER_SKILLS,
+  mediaFounderSkillBundle,
   snapshotAllowance,
   snapshotBudget,
   type AssetRegistryEntryV1,
@@ -21,6 +23,7 @@ const at = '2026-11-01T18:30:00.000Z';
 function attackFlow(): MediaAttackFlowBundleV1 {
   return {
     version: 'media-attack-flow-v1',
+    founderSkills: mediaFounderSkillBundle(at),
     records: MEDIA_ATTACK_FLOW_IDS.map((flow, index) => ({
       flow,
       verdict: 'pass',
