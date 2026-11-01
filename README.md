@@ -1,5 +1,9 @@
 # Founder Control Room
 
+## Public customer journey — implementation candidate (not live)
+
+The public homepage now links to a customer onboarding preview at `/account/`. It keeps the public exploration path separate from founder authentication and shows solo/team workspaces only as proposed. Customer signup, tenant provisioning, paid entitlements, billing and the public MCP connector remain disabled until independently verified and explicitly released. See [FCR Public User Flow](docs/implementation/FCR_PUBLIC_USER_FLOW.md). This feature branch is not deployment proof.
+
 ## November 1, 2026: bounded GitHub App transport reconciliation
 
 The existing PR #986 reconciles bounded private-key wrapper parsing against current main without replacing a protected secret, changing GitHub App installation grants, or asserting production repair. On the November 1 exact-main founder-only diagnostic, the production binding was present and the App ID numeric, but the runtime key transport was classified as unknown; this is evidence of failed parsing, not evidence that the secret was missing or recently replaced. Protected-value scope and provider identity remain independent gates. No inherited historic CI or Playwright result authorizes a merge or release.
