@@ -12,7 +12,7 @@ function truncateError(error) {
   const message=error instanceof Error?error.message:String(error);
   return message.replace(/https?:\/\/\S+/g,'[url]').replace(/(?:sk-|ghp_|github_pat_|Bearer\s+)\S+/gi,'[redacted]').slice(0,100);
 }
-async function readBounded(response) {
+export async function readBounded(response, maxBytes=MAX_BYTES) {
   if(!response.ok)throw Error('HTTP_'+response.status);
   const reader=response.body?.getReader();
   if(!reader) throw Error('Empty body');
@@ -21,7 +21,7 @@ async function readBounded(response) {
     for(;;) {
       const {done,value}=await reader.read(); if(done)break;
       total+=value.byteLength;
-      if(total>MAX_BYTES)throw Error('Feed too large');
+      if(total>maxBytes)throw Error('Response too large');
       chunks.push(value);
     }
   } finally {await reader.cancel().catch(()=>{});}
@@ -48,9 +48,10 @@ async function getCloudflareObservation() {
   const responses=await Promise.allSettled(paths.map(async path=>{
     const res=await fetch(base+path,{redirect:'error',headers,signal:AbortSignal.timeout(15000)});
     if(!res.ok)throw Error('HTTP_'+res.status);
-    const raw=await res.text();if(raw.length>750000)throw Error('PROVIDER_RESPONSE_TOO_LARGE');
+    const raw=await readBounded(res,750000);
     const json=JSON.parse(raw);
     if(json.success!==true)throw Error('CLOUDFLARE_API_FAILED');
+    if(Number(json.result_info?.total_pages||1)>1)throw Error('PROVIDER_RESPONSE_PAGINATED');
     return json.result;
   }));
   const blocked=[];
