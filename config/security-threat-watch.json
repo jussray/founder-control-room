@@ -1,0 +1,64 @@
+{
+  "schema": "juss/fcr-threat-watch-config@v1",
+  "owner": "Juss",
+  "costPolicy": "broke-founder",
+  "incrementalMonthlyCost": 0,
+  "incrementalOneTimeCost": 0,
+  "mode": "observe-only",
+  "externalFeedInputs": "untrusted",
+  "domains": [
+    {
+      "zone": "foundercontrolroom.org",
+      "projects": [
+        "founder-control-room",
+        "chief-ai-machine",
+        "promptos"
+      ]
+    },
+    {
+      "zone": "jussco.company",
+      "projects": [
+        "portfolio",
+        "truth-weaver",
+        "storyengine",
+        "juss-protect-me",
+        "juss-protect-me-2"
+      ]
+    },
+    {
+      "zone": "sekretbip.net",
+      "projects": [
+        "sekret-bip",
+        "sekret-bip-parents"
+      ]
+    },
+    {
+      "zone": "jussbeautifulhair.com",
+      "projects": [
+        "jussbeautifulhair-site",
+        "jbh-private"
+      ]
+    },
+    {
+      "zone": "ayure.us",
+      "projects": [
+        "ayure"
+      ]
+    }
+  ],
+  "feeds": [
+    {
+      "id": "cisa-advisories",
+      "url": "https://www.cisa.gov/cybersecurity-advisories/all.xml"
+    },
+    {
+      "id": "cloudflare-changelog",
+      "url": "https://developers.cloudflare.com/changelog/rss/index.xml"
+    }
+  ],
+  "authority": {
+    "autoRespond": "notify-only",
+    "preventProviderWrites": true,
+    "requireFounderApprovalForMutations": true
+  }
+}
