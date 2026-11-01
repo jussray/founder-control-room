@@ -8,7 +8,7 @@ import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
 export const WORKER = 'founder-control-room';
-const CREDENTIAL_BINDING = /(?:^|_)(?:API_?TOKEN|ACCESS_?TOKEN|SECRET|PASSWORD|PRIVATE_?KEY|SERVICE_ROLE_KEY|ENCRYPTION_KEY|WEBHOOK_?TOKEN|BEARER_?TOKEN|AUTH_?TOKEN|KEY)(?:_|$)/i;
+const CREDENTIAL_BINDING = /(?:^|_)(?:TOKEN|SECRET|PASSWORD|PASSWD|KEY|CREDENTIAL|HMAC|PEM|SEED|APIKEY)(?:_|$)/i;
 
 export function validateBindingTypes(payload) {
   const bindings = payload?.result?.bindings;
