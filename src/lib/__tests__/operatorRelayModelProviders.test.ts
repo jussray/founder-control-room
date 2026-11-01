@@ -67,6 +67,26 @@ describe('createServerOperatorRelayAdapters', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it.each(['incomplete', 'failed', 'cancelled', 'queued', 'in_progress', undefined])(
+    'rejects non-completed OpenAI status %s without promoting partial text',
+    async (status) => {
+      const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+        id: 'resp_openai_partial',
+        status,
+        output_text: 'unfinished answer',
+        error: { message: 'untrusted-provider-detail' },
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } })) as typeof fetch;
+      const adapters = createServerOperatorRelayAdapters({
+        OPENAI_API_KEY: FIXTURE,
+        FCR_RELAY_OPENAI_MODEL: 'gpt-test-model',
+      }, fetchMock);
+
+      await expect(adapters.codex?.(relay('internal', 'codex')))
+        .rejects.toThrow('OpenAI relay returned a non-completed response');
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    },
+  );
+
   it('calls Gemini with the bounded request contract without serializing the configured key', async () => {
     const fetchMock = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
       expect(String(url)).toBe('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent');
