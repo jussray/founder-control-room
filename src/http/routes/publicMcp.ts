@@ -6,14 +6,12 @@
 import { Router } from 'express';
 import { rateLimit } from 'express-rate-limit';
 import { supabaseAuth } from '../../lib/supabaseAuthClient.js';
-import { supabase } from '../../lib/supabaseClient.js';
+import { publicTenantReader } from '../../mcp/publicTenantReader.js';
 import { authenticatePublicMcp, FCR_PUBLIC_MCP_RESOURCE } from '../../mcp/publicMcpAuth.js';
 import {
   PublicMcpAccessDenied,
   getMyPublicProject,
   listMyPublicProjects,
-  type PublicMcpTenantReader,
-  type PublicProjectSummary,
 } from '../../mcp/publicTenantAccess.js';
 
 const RESOURCE = FCR_PUBLIC_MCP_RESOURCE;
@@ -46,38 +44,6 @@ const rpcError = (id: unknown, code: number, message: string) => ({
   jsonrpc: '2.0', id, error: { code, message },
 });
 
-// Deliberately does NOT read the founder projects table or execute providers.
-const tenantReader: PublicMcpTenantReader = {
-  async listMemberships(userId) {
-    const { data, error } = await supabase.from('fcr_public_memberships')
-      .select('tenant_id,user_id,status')
-      .eq('user_id', userId).eq('status', 'active').limit(21);
-    if (error) throw new Error('public_mcp_membership_read_unavailable');
-    return (data ?? []).map((row) => ({
-      tenantId: row.tenant_id, userId: row.user_id, status: row.status,
-    }));
-  },
-  async listProjects(tenantId) {
-    const { data, error } = await supabase.from('fcr_public_projects')
-      .select('id,tenant_id,name,status,observed_at')
-      .eq('tenant_id', tenantId).order('id').limit(51);
-    if (error) throw new Error('public_mcp_projects_read_unavailable');
-    return (data ?? []).map((row): PublicProjectSummary => ({
-      id: row.id, tenantId: row.tenant_id, name: row.name,
-      status: row.status, observedAt: row.observed_at,
-    }));
-  },
-  async getProject(tenantId, projectId) {
-    const { data, error } = await supabase.from('fcr_public_projects')
-      .select('id,tenant_id,name,status,observed_at')
-      .eq('tenant_id', tenantId).eq('id', projectId).maybeSingle();
-    if (error) throw new Error('public_mcp_project_read_unavailable');
-    return data ? {
-      id: data.id, tenantId: data.tenant_id, name: data.name,
-      status: data.status, observedAt: data.observed_at,
-    } : null;
-  },
-};
 
 export const publicMcpRouter = Router();
 const publicMcpRateLimit = rateLimit({
@@ -141,9 +107,9 @@ publicMcpRouter.post('/mcp/public', publicMcpRateLimit, async (req, res) => {
   try {
     let output: unknown;
     if (name === 'fcr_list_my_projects' && Object.keys(args).length === 0) {
-      output = await listMyPublicProjects(user, tenantReader);
+      output = await listMyPublicProjects(user, publicTenantReader);
     } else if (name === 'fcr_get_my_project' && Object.keys(args).length === 1 && UUID.test(args.projectId)) {
-      output = await getMyPublicProject(user, tenantReader, args.projectId);
+      output = await getMyPublicProject(user, publicTenantReader, args.projectId);
     } else {
       return res.status(400).json(rpcError(id, -32602, 'Unknown tool or invalid arguments'));
     }
