@@ -78,3 +78,14 @@ test('rejects plaintext encoded credential and PEM bindings', () => {
     assert.equal(verdict.ok, false, name);
   }
 });
+
+test('rejects plaintext credential version aliases and backups', () => {
+  for (const name of [
+    'CF_API_TOKEN_BACKUP',
+    'OAUTH_CLIENT_SECRET_V2',
+    'DATABASE_PASSWORD_ROTATED',
+  ]) {
+    const result = validateBindingTypes(response([{ name, type: 'plain_text', text: 'fixture-value' }]));
+    assert.equal(result.ok, false, name);
+  }
+});
