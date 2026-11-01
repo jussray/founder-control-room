@@ -89,7 +89,8 @@ function decodeRecognizedKeyWrapper(value: string): string {
 }
 
 function normalizePrivateKey(value: string): string {
-  let normalized = value.trim().replace(/^\uFEFF/, "");
+  // Normalize CR-only and CRLF transport before detecting fences or key wrappers.
+  let normalized = value.trim().replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n");
   normalized = decodeRecognizedKeyWrapper(normalized);
   normalized = unwrapMatchingSingleQuotes(decodeJsonQuotedString(normalized))
     .replace(/\\r\\n/g, "\n")
@@ -102,7 +103,8 @@ function normalizePrivateKey(value: string): string {
     normalized = decodeBase64Pem(normalized);
   }
 
-  return normalized.replace(/\r\n/g, "\n").trim();
+  // Base64-decoded PEM can itself contain CR-only lines: normalize after decode too.
+  return normalized.replace(/\r\n?/g, "\n").trim();
 }
 
 function parseGitHubAppPrivateKey(value: string): KeyObject {
