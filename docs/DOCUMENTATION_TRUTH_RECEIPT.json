@@ -453,5 +453,24 @@
         "`wrangler.worker.toml` must gate canonical deployment only on the boot-essential provider-held secret names declared in [secrets].required, and the thirteen feature secret names declared in [secrets].optional must never block deployment or Worker boot; each optional name is required only before its named feature is activated on the Worker."
       ]
     }
+,
+    {
+      "path": "src/providers/githubAppAuth.ts",
+      "claims": [
+        "src/providers/githubAppAuth.ts must recognize only bounded, transport-equivalent private-key wrappers, preserve RSA-only cryptographic parsing, reject ambiguous or malformed values without logging secret material, and never turn parsing or source tests into current provider or release proof."
+      ]
+    },
+    {
+      "path": "scripts/mint-portfolio-github-app-token.mjs",
+      "claims": [
+        "scripts/mint-portfolio-github-app-token.mjs must recognize only bounded, transport-equivalent private-key wrappers, preserve RSA-only cryptographic parsing, reject ambiguous or malformed values without logging secret material, and never turn parsing or source tests into current provider or release proof."
+      ]
+    },
+    {
+      "path": ".github/workflows/github-app-secret-shape-diagnostic.yml",
+      "claims": [
+        ".github/workflows/github-app-secret-shape-diagnostic.yml must recognize only bounded, transport-equivalent private-key wrappers, preserve RSA-only cryptographic parsing, reject ambiguous or malformed values without logging secret material, and never turn parsing or source tests into current provider or release proof."
+      ]
+    }
   ]
 }

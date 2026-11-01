@@ -1,5 +1,10 @@
 # Founder Control Room
 
+## November 1, 2026: bounded GitHub App transport reconciliation
+
+The existing PR #986 reconciles bounded private-key wrapper parsing against current main without replacing a protected secret, changing GitHub App installation grants, or asserting production repair. On the November 1 exact-main founder-only diagnostic, the production binding was present and the App ID numeric, but the runtime key transport was classified as unknown; this is evidence of failed parsing, not evidence that the secret was missing or recently replaced. Protected-value scope and provider identity remain independent gates. No inherited historic CI or Playwright result authorizes a merge or release.
+
+
 ## November 1, 2026 UTC: exact-head MCP credential preflight
 
 FCR PR #1056 protects the existing `founder-control-room` Worker by requiring `scripts/verify-worker-binding-types.mjs` in both canonical pre-mutation workflows. The verifier reads provider binding names and types only, rejects plaintext credential bindings, withholds deployment when the provider response is unavailable, and never reports credential values as proof. Cloudflare readback previously classified `CF_API_TOKEN` as `plain_text`, so this candidate does not authorize production promotion or secret re-upload.
