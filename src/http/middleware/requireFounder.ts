@@ -23,6 +23,7 @@ interface AuthenticatedIdentity {
 function authenticatedIdentity(user: unknown): AuthenticatedIdentity | null {
   if (!user || typeof user !== 'object' || Array.isArray(user)) return null;
   const record = user as Record<string, unknown>;
+  if (record.is_anonymous === true) return null;
   const email = typeof record.email === 'string'
     ? record.email.trim().toLowerCase()
     : '';
@@ -33,8 +34,8 @@ function authenticatedIdentity(user: unknown): AuthenticatedIdentity | null {
 async function founderAllowlisted(identity: AuthenticatedIdentity): Promise<'allowed' | 'denied' | 'error'> {
   const { data: allowRow, error: allowError } = await supabase
     .from('founder_users')
-    .select('email')
-    .eq('email', identity.email)
+    .select('user_id')
+    .eq('user_id', identity.userId)
     .maybeSingle();
 
   if (allowError) return 'error';
@@ -47,7 +48,7 @@ async function founderAllowlisted(identity: AuthenticatedIdentity): Promise<'all
  * 1. A valid Supabase Auth session, supplied either as a Bearer token for API
  *    clients or resolved server-side from the opaque HttpOnly Control Room
  *    browser session capability.
- * 2. The authenticated email must still exist in the service-role-only
+ * 2. The verified immutable user ID must still exist in the service-role-only
  *    `founder_users` allowlist.
  *
  * Cookie sessions may refresh once with their server-held refresh token. A

@@ -117,7 +117,7 @@ function setAllowlist(allowed: boolean) {
       select: () => ({
         eq: () => ({
           maybeSingle: () => Promise.resolve({
-            data: allowed ? { email: EMAIL } : null,
+            data: allowed ? { email: EMAIL, user_id: 'founder-user' } : null,
             error: null,
           }),
         }),
@@ -226,7 +226,7 @@ describe('founder browser onboarding', () => {
     expect(mockSignInWithOtp).toHaveBeenCalledWith({
       email: EMAIL,
       options: expect.objectContaining({
-        shouldCreateUser: true,
+        shouldCreateUser: false,
         emailRedirectTo: expect.stringMatching(/\/auth\/callback$/),
       }),
     });

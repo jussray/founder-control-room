@@ -67,7 +67,7 @@ function allowlist() {
     return {
       select: () => ({
         eq: () => ({
-          maybeSingle: async () => ({ data: { email: EMAIL }, error: null }),
+          maybeSingle: async () => ({ data: { email: EMAIL, user_id: 'founder-user' }, error: null }),
         }),
       }),
     };

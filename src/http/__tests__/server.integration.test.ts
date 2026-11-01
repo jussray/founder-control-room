@@ -1,19 +1,23 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { mockGetUser } = vi.hoisted(() => ({
+const { mockGetUser, mockFrom } = vi.hoisted(() => ({
   mockGetUser: vi.fn(),
+  mockFrom: vi.fn(),
 }));
 
 vi.mock('../../lib/supabaseAuthClient.js', () => ({
   supabaseAuth: { auth: { getUser: mockGetUser } },
 }));
-vi.mock('../../lib/supabaseClient.js', () => ({ supabase: { from: vi.fn(), rpc: vi.fn() } }));
+vi.mock('../../lib/supabaseClient.js', () => ({ supabase: { from: mockFrom, rpc: vi.fn() } }));
 
 import request from 'supertest';
 import { createServer } from '../server.js';
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockGetUser.mockResolvedValue({ data: { user: { id: 'founder-id', email: 'founder@example.test', is_anonymous: false } }, error: null });
+  const chain = { select: vi.fn(), eq: vi.fn(), maybeSingle: vi.fn().mockResolvedValue({ data: { user_id: 'founder-id' }, error: null }) };
+  chain.select.mockReturnValue(chain); chain.eq.mockReturnValue(chain); mockFrom.mockReturnValue(chain);
 });
 
 afterEach(() => {
@@ -28,7 +32,7 @@ describe('createServer', () => {
     expect(res.headers['x-founder-control-room-service']).toBe('founder-control-room');
   });
 
-  it('exposes exact deployed V10 and Supabase runtime identity without secrets', async () => {
+  it('keeps operational configuration behind founder authentication', async () => {
     const sha = 'a'.repeat(40);
     vi.stubEnv('GIT_SHA', sha);
     vi.stubEnv('SUPABASE_PROJECT_REF', 'abcdefghijklmnopqrst');
@@ -36,10 +40,12 @@ describe('createServer', () => {
     vi.stubEnv('FCR_V10_REGISTRY_RESOLUTION_REQUIRED', 'true');
     vi.stubEnv('FCR_V10_RECEIPT_PERSISTENCE_REQUIRED', 'true');
 
-    const res = await request(createServer()).get('/version');
+    const publicVersion = await request(createServer()).get('/version');
+    expect(publicVersion.body).toEqual({ service: 'founder-control-room', gitSha: sha });
+    const res = await request(createServer()).get('/_debug/runtime').set('Authorization', 'Bearer founder');
 
     expect(res.status).toBe(200);
-    expect(res.headers['cache-control']).toBe('no-store');
+    expect(res.headers['cache-control']).toBe('private, no-store');
     expect(res.body).toMatchObject({
       service: 'founder-control-room',
       gitSha: sha,
@@ -66,15 +72,22 @@ describe('createServer', () => {
     expect(res.status).toBe(404);
   });
 
-  it('serves the static frontend when serveStatic is true', async () => {
-    const res = await request(createServer({ serveStatic: true })).get('/control-room/index.html');
+  it('serves the static frontend only to a verified founder when serveStatic is true', async () => {
+    const res = await request(createServer({ serveStatic: true })).get('/control-room/index.html').set('Authorization', 'Bearer founder');
     expect(res.status).toBe(200);
     expect(res.text).toContain('Founder Control Room');
   });
 
+  it.each(['/control-room/index.html', '/control-room/app.js', '/_debug/provider', '/_debug/runtime', '/guardrails', '/guardrails.json'])('denies signed-out access to %s', async (path) => {
+    const res = await request(createServer({ serveStatic: true })).get(path);
+    expect(res.status).toBe(401);
+    expect(res.text).not.toContain('openaiKeyPresent');
+    expect(res.text).not.toContain('<!DOCTYPE');
+  });
+
   it('does not publish the capability registry as a static asset', async () => {
     const res = await request(createServer({ serveStatic: true }))
-      .get('/control-room/capability-registry.js');
+      .get('/control-room/capability-registry.js').set('Authorization', 'Bearer founder');
     expect(res.status).toBe(404);
   });
 

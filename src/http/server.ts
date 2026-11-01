@@ -172,7 +172,11 @@ export function createServer(options: CreateServerOptions = {}) {
 
   if (options.serveStatic) {
     const publicDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '../../public');
-    app.use('/control-room', express.static(path.join(publicDir, 'control-room')));
+    app.use('/control-room', (_req, res, next) => {
+      res.setHeader('Cache-Control', 'private, no-store');
+      res.setHeader('X-Robots-Tag', 'noindex, nofollow, noarchive');
+      next();
+    }, requireFounder, express.static(path.join(publicDir, 'control-room')));
   }
 
   // Webhooks, remote MCP calls, repo-runner pings, sanitized commerce
@@ -293,10 +297,16 @@ export function createServer(options: CreateServerOptions = {}) {
       'Referrer-Policy': 'no-referrer',
       'X-Content-Type-Options': 'nosniff',
     });
+    const { service, gitSha } = deploymentVersion();
+    res.status(200).json({ service, gitSha });
+  });
+
+  app.get('/_debug/runtime', requireFounder, (_req, res) => {
+    res.setHeader('Cache-Control', 'private, no-store');
     res.status(200).json(deploymentVersion());
   });
 
-  app.get('/guardrails', (_req, res) => {
+  app.get('/guardrails', requireFounder, (_req, res) => {
     res.set({
       'Cache-Control': 'no-store',
       'Content-Type': 'text/html; charset=utf-8',
@@ -308,7 +318,7 @@ export function createServer(options: CreateServerOptions = {}) {
     res.status(200).send(renderGuardrailStatusPage());
   });
 
-  app.get('/guardrails.json', (_req, res) => {
+  app.get('/guardrails.json', requireFounder, (_req, res) => {
     res.set({
       'Cache-Control': 'no-store',
       'Content-Type': 'application/json; charset=utf-8',
@@ -430,7 +440,7 @@ export function createServer(options: CreateServerOptions = {}) {
   app.use('/economic-intelligence', economicIntelligenceRouter);
 
   // Debug routes — CI and founder inspection only (no secrets exposed).
-  app.use('/_debug', debugRouter);
+  app.use('/_debug', requireFounder, debugRouter);
 
   app.use(jsonParseErrorHandler);
   app.use(errorHandler);

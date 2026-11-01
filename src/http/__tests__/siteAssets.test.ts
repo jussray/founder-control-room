@@ -133,7 +133,8 @@ describe('Founder Control Room Cloudflare topology', () => {
     expect(proxy).toContain("'/control-room'");
     expect(proxy).toContain("'/portable-founder-console'");
     expect(proxy).toContain('if (shouldServeFromPages(request))');
-    expect(proxy).toContain('return env.ASSETS.fetch(request)');
+    expect(proxy).toContain('const response = await env.ASSETS.fetch(request)');
+    expect(proxy).toContain('privatePath ? privateResponse(response, sessionCookie) : response');
     expect(proxy).toContain("headers.set('x-forwarded-host', sourceUrl.host)");
     expect(proxy).toContain("redirect: 'manual'");
     expect(proxy).toContain("typeof env.FCR_API.fetch !== 'function'");

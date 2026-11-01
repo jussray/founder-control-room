@@ -38,26 +38,30 @@ afterEach(() => {
 });
 
 describe('Cloudflare Pages edge proxy', () => {
-  it('serves an existing browser asset without calling the API Worker', async () => {
+  it('serves a founder browser asset only after server-verified identity', async () => {
     const handler = await loadHandler();
     const assetFetch = vi.fn(async (_request: Request) => new Response('asset', { status: 200 }));
-    const fcrApiFetch = vi.fn(async (_request: Request) => new Response(null, { status: 500 }));
+    const fcrApiFetch = vi.fn(async (_request: Request) => identifiedResponse(JSON.stringify({ success: true, data: { founder: { userId: 'founder-id', email: 'founder@example.test' } } }), { headers: { 'Set-Cookie': 'fcr_session=rotated; HttpOnly; Secure' } }));
 
     const response = await handler.fetch(
-      new Request('https://foundercontrolroom.org/control-room/app.js'),
+      new Request('https://foundercontrolroom.org/control-room/app.js', { headers: { Cookie: 'fcr_session=opaque' } }),
       { ASSETS: { fetch: assetFetch }, FCR_API: { fetch: fcrApiFetch } },
     );
 
     expect(response.status).toBe(200);
     expect(await response.text()).toBe('asset');
     expect(assetFetch).toHaveBeenCalledOnce();
-    expect(fcrApiFetch).not.toHaveBeenCalled();
+    expect(fcrApiFetch).toHaveBeenCalledOnce();
+    expect(new URL(fcrApiFetch.mock.calls[0][0].url).pathname).toBe('/auth/me');
+    expect(fcrApiFetch.mock.calls[0][0].headers.get('cookie')).toBe('fcr_session=opaque');
+    expect(response.headers.get('cache-control')).toBe('private, no-store');
+    expect(response.headers.get('set-cookie')).toContain('fcr_session=rotated');
   });
 
   it('serves the portable founder console directory from Pages', async () => {
     const handler = await loadHandler();
     const assetFetch = vi.fn(async (_request: Request) => new Response('portable console', { status: 200 }));
-    const fcrApiFetch = vi.fn(async (_request: Request) => new Response(null, { status: 500 }));
+    const fcrApiFetch = vi.fn(async (_request: Request) => identifiedResponse(JSON.stringify({ success: true, data: { founder: { userId: 'founder-id', email: 'founder@example.test' } } })));
 
     const response = await handler.fetch(
       new Request('https://foundercontrolroom.org/portable-founder-console/'),
@@ -67,7 +71,34 @@ describe('Cloudflare Pages edge proxy', () => {
     expect(response.status).toBe(200);
     expect(await response.text()).toBe('portable console');
     expect(assetFetch).toHaveBeenCalledOnce();
-    expect(fcrApiFetch).not.toHaveBeenCalled();
+    expect(fcrApiFetch).toHaveBeenCalledOnce();
+  });
+
+  it.each(['/control-room/', '/control-room/app.js', '/control%2droom/index.html', '//control-room/index.html', '/x%2f..%2fcontrol-room/index.html', '/x/%252e%252e/control-room/index.html', '/portable-founder-console/', '/api/project-control/sync'])('never serves private bytes to a signed-out visitor at %s', async (path) => {
+    const handler = await loadHandler();
+    const assetFetch = vi.fn(async () => new Response('PRIVATE'));
+    const apiFetch = vi.fn(async () => identifiedResponse('{}', { status: 401 }));
+    const response = await handler.fetch(new Request(`https://preview.founder-control-room.pages.dev${path}`), { ASSETS: { fetch: assetFetch }, FCR_API: { fetch: apiFetch } });
+    expect(response.status).toBe(401);
+    expect(await response.text()).not.toContain('PRIVATE');
+    expect(response.headers.get('cache-control')).toBe('private, no-store');
+    expect(assetFetch).not.toHaveBeenCalled();
+  });
+
+  it.each([new Response('{}', { status: 200 }), identifiedResponse('{"success":true,"data":{"user":{"id":"customer"}}}'), identifiedResponse('{}', { status: 403 }), identifiedResponse('not json')])('fails closed for forged identity, customer denial, or malformed verification', async (verification) => {
+    const handler = await loadHandler();
+    const assetFetch = vi.fn(async () => new Response('PRIVATE'));
+    const response = await handler.fetch(new Request('https://foundercontrolroom.org/control-room/'), { ASSETS: { fetch: assetFetch }, FCR_API: { fetch: async () => verification.clone() } });
+    expect([403, 503]).toContain(response.status);
+    expect(assetFetch).not.toHaveBeenCalled();
+  });
+
+  it('keeps the public entrance available without founder verification', async () => {
+    const handler = await loadHandler();
+    const assetFetch = vi.fn(async () => new Response('public entrance'));
+    const response = await handler.fetch(new Request('https://foundercontrolroom.org/'), { ASSETS: { fetch: assetFetch } });
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe('public entrance');
   });
 
   it('serves the public work page from Pages when the edge redirect strips the extension', async () => {

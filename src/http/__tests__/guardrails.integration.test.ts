@@ -1,16 +1,16 @@
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../lib/supabaseAuthClient.js', () => ({
-  supabaseAuth: { auth: { getUser: vi.fn() } },
+  supabaseAuth: { auth: { getUser: vi.fn(async () => ({ data: { user: { id: 'founder-id', email: 'founder@example.test' } }, error: null })) } },
 }));
-vi.mock('../../lib/supabaseClient.js', () => ({ supabase: { from: vi.fn() } }));
+vi.mock('../../lib/supabaseClient.js', () => ({ supabase: { from: vi.fn(() => ({ select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { user_id: 'founder-id' }, error: null }) }) }) })) } }));
 
 import request from 'supertest';
 import { createServer } from '../server.js';
 
-describe('public guardrail contract', () => {
-  it('publishes a public-safe HTML status surface', async () => {
-    const res = await request(createServer()).get('/guardrails');
+describe('founder-only operational status contract', () => {
+  it('serves the operational HTML status surface to the founder', async () => {
+    const res = await request(createServer()).get('/guardrails').set('Authorization', 'Bearer founder');
 
     expect(res.status).toBe(200);
     expect(res.headers['content-type']).toContain('text/html');
@@ -30,7 +30,7 @@ describe('public guardrail contract', () => {
   });
 
   it('publishes minimized JSON without credentials or private product fields', async () => {
-    const res = await request(createServer()).get('/guardrails.json');
+    const res = await request(createServer()).get('/guardrails.json').set('Authorization', 'Bearer founder');
 
     expect(res.status).toBe(200);
     expect(res.headers['cache-control']).toBe('no-store');
@@ -86,10 +86,10 @@ describe('public guardrail contract', () => {
     vi.stubEnv('FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON', JSON.stringify(grant));
 
     try {
-      const res = await request(createServer()).get('/version');
+      const res = await request(createServer()).get('/_debug/runtime').set('Authorization', 'Bearer founder');
 
       expect(res.status).toBe(200);
-      expect(res.headers['cache-control']).toBe('no-store');
+      expect(res.headers['cache-control']).toBe('private, no-store');
       expect(res.body).toEqual({
         service: 'founder-control-room',
         gitSha,
@@ -117,7 +117,7 @@ describe('public guardrail contract', () => {
   });
 
   it('reports absent or invalid grant configuration without echoing it', async () => {
-    const absent = await request(createServer()).get('/version');
+    const absent = await request(createServer()).get('/_debug/runtime').set('Authorization', 'Bearer founder');
     expect(absent.body.founderSignalAutomationGrant).toEqual({
       configured: false,
       enabled: null,
@@ -125,7 +125,7 @@ describe('public guardrail contract', () => {
 
     vi.stubEnv('FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON', '{invalid-secret-json');
     try {
-      const invalid = await request(createServer()).get('/version');
+      const invalid = await request(createServer()).get('/_debug/runtime').set('Authorization', 'Bearer founder');
       expect(invalid.body.founderSignalAutomationGrant).toEqual({
         configured: true,
         enabled: null,

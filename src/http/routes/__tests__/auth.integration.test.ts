@@ -31,7 +31,7 @@ const SESSION = {
 
 type ResponseWithHeaders = { headers: Record<string, string | string[] | undefined> };
 function buildApp() { const app = express(); app.use(express.json()); app.use('/auth', authRouter); return app; }
-function founderUsersRow(match: boolean) { return { select: () => ({ eq: () => ({ maybeSingle: () => Promise.resolve({ data: match ? { email: FOUNDER_EMAIL } : null, error: null }) }) }) }; }
+function founderUsersRow(match: boolean) { return { select: () => ({ eq: (field: string, value: string) => ({ maybeSingle: () => Promise.resolve({ data: match && ((field === 'user_id' && value === FOUNDER_USER_ID) || (field === 'email' && value === FOUNDER_EMAIL)) ? { email: FOUNDER_EMAIL, user_id: FOUNDER_USER_ID } : null, error: null }) }) }) }; }
 function browserSessionTable() {
   return {
     insert: () => Promise.resolve({ data: null, error: null }),
@@ -62,7 +62,7 @@ beforeEach(() => {
 describe('POST /auth/magic-link', () => {
   it('requires an email with the standard error envelope', async () => { const res = await request(buildApp()).post('/auth/magic-link').send({}); expect(res.status).toBe(400); expect(res.body).toEqual({ success: false, error: { code: 'BAD_REQUEST', message: 'A valid email is required.', details: [] } }); });
   it('sends the same generic response for a non-allowlisted email without sending an OTP', async () => { setAllowlist(false); const res = await request(buildApp()).post('/auth/magic-link').send({ email: 'stranger@example.com' }); expect(res.status).toBe(202); expect(res.body.success).toBe(true); expect(mockSignInWithOtp).not.toHaveBeenCalled(); });
-  it('sends an OTP for an allowlisted email with the same generic response', async () => { setAllowlist(true); const res = await request(buildApp()).post('/auth/magic-link').send({ email: FOUNDER_EMAIL }); expect(res.status).toBe(202); expect(res.body.success).toBe(true); expect(mockSignInWithOtp).toHaveBeenCalledWith(expect.objectContaining({ email: FOUNDER_EMAIL, options: expect.objectContaining({ shouldCreateUser: true }) })); });
+  it('sends an OTP for an allowlisted email with the same generic response', async () => { setAllowlist(true); const res = await request(buildApp()).post('/auth/magic-link').send({ email: FOUNDER_EMAIL }); expect(res.status).toBe(202); expect(res.body.success).toBe(true); expect(mockSignInWithOtp).toHaveBeenCalledWith(expect.objectContaining({ email: FOUNDER_EMAIL, options: expect.objectContaining({ shouldCreateUser: false }) })); });
 });
 
 describe('GET /auth/callback', () => {
@@ -104,5 +104,25 @@ describe('POST /auth/logout', () => {
       .set('Cookie', `__Host-fcr_session=${VALID_OPAQUE_COOKIE}`);
     expect(res.status).toBe(204);
     expectClearedSessionCookie(res);
+  });
+});
+
+
+describe('founder login cannot inherit an email-only allowlist', () => {
+  for (const user of [{id:'different-user',email:FOUNDER_EMAIL},{...VERIFIED_USER,is_anonymous:true}]) {
+    it(`denies callback and session for ${'is_anonymous' in user?'anonymous':'different ID'}`, async()=>{
+      setAllowlist(true);
+      mockVerifyOtp.mockResolvedValue({data:{session:SESSION,user},error:null});
+      const callback=await request(buildApp()).get('/auth/callback').query({token_hash:'verified'});
+      expect(callback.status).toBe(401); expect(callback.headers['set-cookie']).toBeUndefined();
+      mockSetSession.mockResolvedValue({data:{session:SESSION,user},error:null});
+      const session=await request(buildApp()).post('/auth/session').send({access_token:'valid',refresh_token:'valid'});
+      expect(session.status).toBe(403); expect(session.headers['set-cookie']).toBeUndefined();
+    });
+  }
+  it('does not create an account from an unbound discovery email',async()=>{
+    supabaseMock.from.mockReturnValue({select:()=>({eq:()=>({maybeSingle:async()=>({data:{email:FOUNDER_EMAIL,user_id:null},error:null})})})});
+    const response=await request(buildApp()).post('/auth/magic-link').send({email:FOUNDER_EMAIL});
+    expect(response.status).toBe(202); expect(mockSignInWithOtp).not.toHaveBeenCalled();
   });
 });

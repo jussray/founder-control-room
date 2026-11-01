@@ -143,7 +143,7 @@ describe('POST /auth/password provider failure', () => {
       return {
         select: () => ({
           eq: () => ({
-            maybeSingle: () => Promise.resolve({ data: { email: EMAIL }, error: null }),
+            maybeSingle: () => Promise.resolve({ data: { email: EMAIL, user_id: SESSION.user.id }, error: null }),
           }),
         }),
       };
@@ -181,4 +181,11 @@ describe('POST /auth/password provider failure', () => {
 
     warn.mockRestore();
   });
+  it('rejects a same-email account switch before changing credentials', async () => {
+    mockSetSession.mockResolvedValue({data:{session:SESSION,user:{id:'different-user',email:EMAIL}},error:null});
+    const response=await request(app()).post('/auth/password').set('Cookie',await browserCookie()).send({password:'correct horse battery staple'});
+    expect(response.status).toBe(401);
+    expect(mockUpdateUser).not.toHaveBeenCalled();
+  });
+
 });

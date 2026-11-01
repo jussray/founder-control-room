@@ -27,7 +27,7 @@ vi.mock('../../../lib/supabaseClient.js', () => ({
 }));
 
 import { writeFounderSession } from '../../../auth/founderSession.js';
-import { requireFounder } from '../requireFounder.js';
+import { requireFounder, requireInteractiveFounder } from '../requireFounder.js';
 
 const FOUNDER_SESSION_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString('base64url');
 
@@ -227,7 +227,7 @@ describe('requireFounder', () => {
       },
     });
     expect(mocks.getUser).toHaveBeenCalledWith('founder-access-token');
-    expect(mocks.eq).toHaveBeenCalledWith('email', 'founder@example.com');
+    expect(mocks.eq).toHaveBeenCalledWith('user_id', 'founder-user-1');
     expect(mocks.createAuthClient).not.toHaveBeenCalled();
     expect(response.headers['set-cookie']).toBeUndefined();
   });
@@ -299,7 +299,7 @@ describe('requireFounder', () => {
     expect(mocks.refreshSession).toHaveBeenCalledWith({
       refresh_token: 'cookie-refresh-token',
     });
-    expect(mocks.eq).toHaveBeenCalledWith('email', 'founder@example.com');
+    expect(mocks.eq).toHaveBeenCalledWith('user_id', 'founder-user-1');
     expect(response.headers['set-cookie']?.[0]).toContain('__Host-fcr_session=');
     expect(response.headers['set-cookie']?.[0]).toContain('HttpOnly');
     expect(response.headers['cache-control']).toBe('private, no-store');
@@ -370,4 +370,29 @@ describe('requireFounder', () => {
     expect(response.status).toBe(401);
     expect(mocks.from).not.toHaveBeenCalled();
   });
+});
+
+describe('immutable founder identity boundary', () => {
+  for (const interactive of [false, true]) {
+    it(`denies same-email different-account identity (${interactive ? 'interactive' : 'API'})`, async () => {
+      mocks.getUser.mockResolvedValue({data:{user:{id:'outsider-user',email:'founder@example.com'}},error:null});
+      mocks.eq.mockImplementation((field: string, value: string) => {
+        if (field !== 'user_id') throw new Error('Email must not confer founder authority');
+        return {maybeSingle: async()=>({data:value==='founder-user-1'?{user_id:value}:null,error:null})};
+      });
+      const app=express(); app.get('/private',interactive?requireInteractiveFounder:requireFounder,(_req,res)=>res.json({ok:true}));
+      const cookie=await founderCookie();
+      const response=await request(app).get('/private').set(interactive?'Cookie':'Authorization',interactive?cookie:'Bearer valid-user');
+      expect(response.status).toBe(403);
+      expect(mocks.eq).toHaveBeenCalledWith('user_id','outsider-user');
+    });
+    it(`denies an anonymous account before allowlist lookup (${interactive ? 'interactive' : 'API'})`, async () => {
+      mocks.getUser.mockResolvedValue({data:{user:{id:'founder-user-1',email:'founder@example.com',is_anonymous:true}},error:null});
+      const app=express(); app.get('/private',interactive?requireInteractiveFounder:requireFounder,(_req,res)=>res.json({ok:true}));
+      const cookie=await founderCookie();
+      const response=await request(app).get('/private').set(interactive?'Cookie':'Authorization',interactive?cookie:'Bearer valid-user');
+      expect(response.status).toBe(401);
+      expect(mocks.from.mock.calls.some(([table])=>table==='founder_users')).toBe(false);
+    });
+  }
 });

@@ -57,6 +57,61 @@ function shouldServeFromPages(request) {
     || STATIC_FILE_PATTERN.test(pathname);
 }
 
+function founderOnlyPath(pathname) {
+  // Match the path the asset layer will decode/canonicalize, including aliases.
+  let path = pathname;
+  try {
+    for (let i = 0; i < 4 && path.includes('%'); i++) path = decodeURIComponent(path);
+  } catch { return true; }
+  if (path.includes('%')) return true;
+  path = path.replaceAll('\\', '/').replace(/\/{2,}/g, '/').toLowerCase();
+  if (path.split('/').some((segment) => segment === '.' || segment === '..')) return true;
+  return ['/control-room', '/portable-founder-console', SYNC_CONTROL_ROUTE].some(
+    (prefix) => path === prefix || path.startsWith(`${prefix}/`),
+  );
+}
+
+function privateResponse(response, sessionCookie) {
+  const headers = new Headers(response.headers);
+  headers.set('Cache-Control', 'private, no-store');
+  headers.set('Vary', 'Cookie, Authorization');
+  headers.set('X-Robots-Tag', 'noindex, nofollow, noarchive');
+  if (sessionCookie) headers.append('Set-Cookie', sessionCookie);
+  return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+}
+
+async function founderAssetAccess(request, env) {
+  if (!env?.FCR_API || typeof env.FCR_API.fetch !== 'function') {
+    return { denied: degradedResponse(request, 'API_SERVICE_BINDING_UNAVAILABLE') };
+  }
+  try {
+    const url = new URL('/auth/me', request.url);
+    const headers = new Headers({ Accept: 'application/json' });
+    for (const name of ['cookie', 'authorization']) {
+      if (request.headers.has(name)) headers.set(name, request.headers.get(name));
+    }
+    const response = await env.FCR_API.fetch(createApiRequest(new Request(url, { headers })));
+    if (upstreamFailureCode(response)) return { denied: degradedResponse(request, 'API_SERVICE_IDENTITY_MISMATCH') };
+    if (response.status === 401 || response.status === 403) {
+      const html = wantsHtml(request);
+      return { denied: new Response(request.method === 'HEAD' ? null : html
+        ? '<!doctype html><title>Private workspace</title><h1>Sign in to your private workspace</h1><p><a href="/welcome">Continue to sign in</a></p>'
+        : JSON.stringify({ error: 'Private workspace sign-in required' }), {
+        status: response.status,
+        headers: { 'Content-Type': html ? 'text/html; charset=utf-8' : 'application/json; charset=utf-8' },
+      }) };
+    }
+    if (!response.ok) return { denied: degradedResponse(request, 'FOUNDER_IDENTITY_UNAVAILABLE') };
+    const payload = await response.json();
+    const founder = payload?.data?.founder;
+    if (payload?.success !== true || typeof founder?.userId !== 'string' || !founder.userId.trim() ||
+        typeof founder?.email !== 'string' || !founder.email.trim()) {
+      return { denied: degradedResponse(request, 'FOUNDER_IDENTITY_UNAVAILABLE') };
+    }
+    return { sessionCookie: response.headers.get('set-cookie') };
+  } catch { return { denied: degradedResponse(request, 'FOUNDER_IDENTITY_UNAVAILABLE') }; }
+}
+
 function createApiRequest(request) {
   const sourceUrl = new URL(request.url);
   const targetUrl = new URL(`${sourceUrl.pathname}${sourceUrl.search}`, API_ORIGIN);
@@ -301,8 +356,16 @@ export default {
       return new Response('Founder Control Room proxy loop blocked.', { status: 508 });
     }
 
+    const privatePath = founderOnlyPath(requestUrl.pathname);
+    let sessionCookie;
+    if (privatePath) {
+      const access = await founderAssetAccess(request, env);
+      if (access.denied) return privateResponse(access.denied);
+      sessionCookie = access.sessionCookie;
+    }
+
     if (requestUrl.pathname === SYNC_CONTROL_ROUTE) {
-      return relaySyncControl(request, env);
+      return privateResponse(await relaySyncControl(request, env), sessionCookie);
     }
 
     // The Pages asset layer canonicalizes /work.html -> /work with a 308,
@@ -332,7 +395,8 @@ export default {
     }
 
     if (shouldServeFromPages(request)) {
-      return env.ASSETS.fetch(request);
+      const response = await env.ASSETS.fetch(request);
+      return privatePath ? privateResponse(response, sessionCookie) : response;
     }
 
     if (!env?.FCR_API || typeof env.FCR_API.fetch !== 'function') {
