@@ -579,3 +579,7 @@ StoryEngine `refs/heads/main` was independently re-observed at `87501be2da31d12f
 
 The successor FCR head must still pass the live-ref equality check, immutable StoryEngine checkout, exact peer runtime identity, directive/receipt binding, replay protections, and the complete Playwright browser witness before the pair may be called current. Pin alignment grants no merge, deploy, production, publication, billing, or provider-mutation authority.
 
+
+### Private operator media jobs
+
+`npm run media:job -- --action fingerprint --input /private/request.json` starts the approved-input workflow documented in [MEDIA_JOB_EXECUTION.md](docs/MEDIA_JOB_EXECUTION.md). Durable private jobs connect the existing local FFmpeg graphic renderer and an explicitly configured Runway image-to-video adapter through queue, submit, poll, status and candidate materialization. Provider results remain review-required. Source implementation and local tests do not establish deployed capability, paid provider execution, visual approval or publication.
