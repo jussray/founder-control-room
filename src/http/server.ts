@@ -30,6 +30,7 @@ import { cloudflareReasoningRouter } from './routes/cloudflareReasoning.js';
 import { mcpRouter } from './routes/mcp.js';
 import { handleRemoteMcpProtectedResourceMetadata } from './routes/remoteReadMcp.js';
 import { publicMcpRouter } from './routes/publicMcp.js';
+import { publicCustomerRouter } from './routes/publicCustomer.js';
 import { externalUseRouter } from './routes/externalUse.js';
 import { futureYouRouter } from './routes/futureYou.js';
 import { goalfixRouter } from './routes/goalfix.js';
@@ -383,6 +384,8 @@ export function createServer(options: CreateServerOptions = {}) {
 
   app.use('/', onboardingRouter);
   app.use('/auth', authRouter);
+  // Customer authorization is a distinct read-only, bearer-only boundary.
+  app.use('/customer', publicCustomerRouter);
   app.use('/onboarding', founderOnboardingRouter);
   app.use('/portfolio', portfolioVerificationRouter);
   app.use('/switchboard', switchboardRouter);
