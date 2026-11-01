@@ -1,130 +1,143 @@
-import { readFile } from 'node:fs/promises';
+import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
-import type { ContentMetricCsvReceipt } from '../contentMetricsCsv.js';
+import { parseContentMetricsCsv } from '../contentMetricsCsv.js';
 import {
-  listStoredFounderContentMetricObservations,
-  persistFounderContentMetricReceipt,
-  type FounderContentMetricRepository,
+  importFounderContentMetricObservations,
+  type FounderContentMetricImportResult,
 } from '../contentMetricsStore.js';
 
-const MIGRATION = fileURLToPath(
-  new URL('../../../supabase/migrations/20261027133000_founder_content_metric_observations.sql', import.meta.url),
-);
+const CONTENT_HASH = 'f'.repeat(64);
+const header = [
+  'observation_id',
+  'content_fingerprint',
+  'provider',
+  'account_id',
+  'page_id',
+  'audience_segment',
+  'metric_name',
+  'metric_value',
+  'unit',
+  'window_start',
+  'window_end',
+  'observed_at',
+  'source',
+  'source_ref',
+].join(',');
+const row = [
+  'obs-1', CONTENT_HASH, 'linkedin', 'acct-fcr', 'page-founder', 'founders',
+  'impressions', '542', 'count', '2026-09-10T00:00:00Z', '2026-09-16T00:00:00Z',
+  '2026-09-16T08:30:00Z', 'linkedin_native_export', 'export:20260916',
+].join(',');
+const receipt = parseContentMetricsCsv(`${header}\n${row}`);
 
-function receipt(): ContentMetricCsvReceipt {
+type DurableImportInput = {
+  founderUserId: string;
+  postId: string;
+  observations: readonly unknown[];
+  importFingerprint: string;
+  importedAt: string;
+};
+
+function result(overrides: Partial<FounderContentMetricImportResult> = {}): FounderContentMetricImportResult {
   return {
-    contract: 'content-metrics-csv@v1',
+    contract: 'fcr/founder-content-metric-observation-store@v1',
     authority: 'observation_only',
-    freshnessAuthority: false,
-    publicationAuthority: false,
-    strategyMutationAuthority: false,
-    importFingerprint: 'a'.repeat(64),
-    inputRowCount: 1,
+    importFingerprint: receipt.importFingerprint,
     normalizedRowCount: 1,
-    duplicateRowsCollapsed: 0,
-    observations: [{
-      observationId: 'obs-1',
-      contentFingerprint: 'content-1',
-      provider: 'linkedin',
-      accountId: 'account-1',
-      pageId: 'page-1',
-      audienceSegment: 'Founder',
-      metricName: 'impressions',
-      metricValue: 10,
-      unit: 'count',
-      windowStart: '2026-10-01T00:00:00Z',
-      windowEnd: '2026-10-07T00:00:00Z',
-      observedAt: '2026-10-08T00:00:00Z',
-      evidenceState: 'OBSERVED',
-      provenance: {
-        source: 'manual_export',
-        sourceRef: 'export-1',
-        rowFingerprint: 'b'.repeat(64),
-      },
-    }],
+    insertedRowCount: 1,
+    existingRowCount: 0,
+    latestObservedAt: '2026-09-16T08:30:00.000Z',
+    publicationAuthority: false,
+    freshnessAuthority: false,
+    strategyMutationAuthority: false,
+    ...overrides,
   };
 }
 
-function repository(): FounderContentMetricRepository {
-  return {
-    ingest: vi.fn(async (_founderUserId, input) => ({
-      contract: 'fcr/founder-content-metric-import@v1',
-      importFingerprint: input.importFingerprint,
-      insertedCount: 1,
-      idempotentCount: 0,
-      authority: 'observation_only',
-      freshnessAuthority: false,
-      publicationAuthority: false,
-      strategyMutationAuthority: false,
-    })),
-    list: vi.fn(async () => []),
-  };
-}
+describe('founder content metric observation store', () => {
+  it('sends only normalized observations to the durable boundary and preserves observation-only authority', async () => {
+    let durableInput: DurableImportInput | null = null;
+    const repository = {
+      importObservations: vi.fn(async (input: DurableImportInput) => {
+        durableInput = input;
+        return result();
+      }),
+    };
 
-describe('founder-content metric durable store', () => {
-  it('keeps the parsed receipt observation-only at the persistence boundary', async () => {
-    const repo = repository();
-    const result = await persistFounderContentMetricReceipt({
-      founderUserId: 'founder-user-1',
-      receipt: receipt(),
-    }, repo);
+    const imported = await importFounderContentMetricObservations({
+      founderUserId: 'founder-1',
+      postId: '11111111-1111-4111-8111-111111111111',
+      receipt,
+      importedAt: '2026-09-19T00:00:00Z',
+    }, repository);
 
-    expect(result).toMatchObject({
-      contract: 'fcr/founder-content-metric-import@v1',
-      insertedCount: 1,
+    expect(imported).toMatchObject({
       authority: 'observation_only',
-      freshnessAuthority: false,
+      insertedRowCount: 1,
+      existingRowCount: 0,
       publicationAuthority: false,
+      freshnessAuthority: false,
       strategyMutationAuthority: false,
     });
-    expect(repo.ingest).toHaveBeenCalledTimes(1);
+    expect(repository.importObservations).toHaveBeenCalledTimes(1);
+    expect(durableInput).toMatchObject({
+      founderUserId: 'founder-1',
+      importFingerprint: receipt.importFingerprint,
+      observations: receipt.observations,
+    });
+    expect(durableInput).not.toHaveProperty('csv');
+    expect(JSON.stringify(durableInput)).not.toContain(`${header}\n${row}`);
   });
 
-  it('rejects invalid founder identity and unsafe read limits before database access', async () => {
-    const repo = repository();
-    await expect(persistFounderContentMetricReceipt({
-      founderUserId: '',
-      receipt: receipt(),
-    }, repo)).rejects.toThrow(/founder user id/i);
+  it('fails closed when the durable receipt changes fingerprint, row accounting, or authority', async () => {
+    await expect(importFounderContentMetricObservations({
+      founderUserId: 'founder-1',
+      postId: '11111111-1111-4111-8111-111111111111',
+      receipt,
+    }, {
+      importObservations: async () => result({ importFingerprint: 'a'.repeat(64) }),
+    })).rejects.toThrow('fingerprint mismatch');
 
-    await expect(listStoredFounderContentMetricObservations({
-      founderUserId: 'founder-user-1',
-      limit: 501,
-    }, repo)).rejects.toThrow(/1 through 500/);
+    await expect(importFounderContentMetricObservations({
+      founderUserId: 'founder-1',
+      postId: '11111111-1111-4111-8111-111111111111',
+      receipt,
+    }, {
+      importObservations: async () => result({ insertedRowCount: 1, existingRowCount: 1 }),
+    })).rejects.toThrow('accounting mismatch');
 
-    expect(repo.ingest).not.toHaveBeenCalled();
-    expect(repo.list).not.toHaveBeenCalled();
+    await expect(importFounderContentMetricObservations({
+      founderUserId: 'founder-1',
+      postId: '11111111-1111-4111-8111-111111111111',
+      receipt,
+    }, {
+      importObservations: async () => ({ ...result(), publicationAuthority: true }),
+    })).rejects.toThrow('exceeded observation-only authority');
   });
 
-  it('locks direct mutation behind a service-role-only bounded RPC', async () => {
-    const migration = await readFile(MIGRATION, 'utf8');
+  it('keeps the SQL store append-only, service-role-only, post-bound, conflict-detecting, and raw-CSV-free', () => {
+    const sql = readFileSync(fileURLToPath(new URL(
+      '../../../supabase/migrations/20260919023000_founder_content_metric_observations.sql',
+      import.meta.url,
+    )), 'utf8');
 
-    expect(migration).toContain('enable row level security');
-    expect(migration).toContain(
-      'revoke all on table public.founder_content_metric_observations from public, anon, authenticated, service_role',
-    );
-    expect(migration).toContain(
-      'grant select on table public.founder_content_metric_observations to service_role',
-    );
-    expect(migration).toContain('security definer');
-    expect(migration).toContain("set search_path = ''");
-    expect(migration).toContain(
-      'revoke all on function public.ingest_founder_content_metrics_v1(text, jsonb)',
-    );
-    expect(migration).toContain(
-      'grant execute on function public.ingest_founder_content_metrics_v1(text, jsonb)',
-    );
-    expect(migration).not.toMatch(/grant\s+(insert|update|delete).*service_role/i);
-  });
-
-  it('recomputes durable identity and storage fingerprints inside Postgres', async () => {
-    const migration = await readFile(MIGRATION, 'utf8');
-
-    expect(migration).toContain('v_identity_fingerprint := encode(extensions.digest(');
-    expect(migration).toContain('v_storage_fingerprint := encode(extensions.digest(');
-    expect(migration).toContain('founder_content_metric_identity_unique unique');
-    expect(migration).toContain('conflicting duplicate identity');
-    expect(migration).toContain('source_row_fingerprint');
+    expect(sql).toContain('create table if not exists public.founder_content_metric_observations');
+    expect(sql).toContain('references public.founder_content_posts(post_id) on delete cascade');
+    expect(sql).toContain('enable row level security');
+    expect(sql).toContain('revoke all on table public.founder_content_metric_observations from public, anon, authenticated, service_role');
+    expect(sql).toContain('grant select on table public.founder_content_metric_observations to service_role');
+    expect(sql).not.toContain("auth.role()");
+    expect(sql).toContain('security definer');
+    expect(sql).toContain('set search_path = pg_catalog');
+    expect(sql).toContain('from public, anon, authenticated, service_role');
+    expect(sql).toContain('grant execute on function public.ingest_founder_content_metric_observations');
+    expect(sql).toContain('FOUNDER_CONTENT_METRICS_POST_IDENTITY_MISMATCH');
+    expect(sql).toContain('FOUNDER_CONTENT_METRICS_CONFLICT');
+    expect(sql).toContain('pg_catalog.pg_advisory_xact_lock');
+    expect(sql).toContain("e.payload->>'import_fingerprint' = btrim(p_import_fingerprint)");
+    expect(sql).toContain("'metrics_csv_imported'");
+    expect(sql).not.toContain('raw_csv');
+    expect(sql).not.toContain('p_csv');
   });
 });

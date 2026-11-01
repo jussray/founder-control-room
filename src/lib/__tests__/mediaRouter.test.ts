@@ -6,6 +6,8 @@ import {
   InMemoryMediaBudgetReservationService,
   InMemoryMediaRevocationLedger,
   MEDIA_ATTACK_FLOW_IDS,
+  MEDIA_REQUIRED_FOUNDER_SKILLS,
+  mediaFounderSkillBundle,
   canCompleteWithPostProduction,
   canonicalMediaJson,
   evaluateMediaRoute,
@@ -26,6 +28,7 @@ const at = '2026-09-24T03:00:00.000Z';
 function passingAttackFlow(): MediaAttackFlowBundleV1 {
   return {
     version: 'media-attack-flow-v1',
+    founderSkills: mediaFounderSkillBundle(at),
     records: MEDIA_ATTACK_FLOW_IDS.map((flow, index) => ({
       flow,
       verdict: 'pass',
@@ -170,6 +173,37 @@ describe('media attack-flow gate', () => {
       records: bundle.records.filter((record) => record.flow !== 'attack10'),
     };
     expect(validateMediaAttackFlowBundle(missing)).toContain('attack flow attack10 must appear exactly once');
+  });
+
+  it('requires the canonical founder-owned skill stack as evidence, not decoration', () => {
+    const bundle = passingAttackFlow();
+    expect(MEDIA_REQUIRED_FOUNDER_SKILLS.map((skill) => skill.id)).toEqual([
+      'juss-founder-os',
+      'ultrathink-devil',
+      'goalfix',
+      'juss-flow-launch-loop',
+      'outcome-first',
+    ]);
+
+    const missing = {
+      ...bundle,
+      founderSkills: {
+        ...bundle.founderSkills,
+        records: bundle.founderSkills.records.filter((record) => record.skillId !== 'goalfix'),
+      },
+    };
+    expect(validateMediaAttackFlowBundle(missing)).toContain('founder skill goalfix must appear exactly once');
+
+    const drifted = {
+      ...bundle,
+      founderSkills: {
+        ...bundle.founderSkills,
+        records: bundle.founderSkills.records.map((record) =>
+          record.skillId === 'ultrathink-devil' ? { ...record, version: '999.0.0' } : record,
+        ),
+      },
+    };
+    expect(validateMediaAttackFlowBundle(drifted)).toContain('founder skill ultrathink-devil must use version 1.0.0');
   });
 
   it('blocks execution when any attack flow blocks', () => {
