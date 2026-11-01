@@ -1,8 +1,8 @@
 # Deterministic Review Witness V1
 
-Status: **CORE INTEGRATED ON MAIN / FOUNDER-RUNTIME IGNITION CANDIDATE / BOOTSTRAP REQUIRED / NOT MERGE AUTHORITY**
+Status: **CORE + TRUSTED-MAIN INVOCATION SURFACES PRESENT IN SOURCE / CURRENT LIVE WITNESS NOT PROVEN / NOT MERGE AUTHORITY** (reconciled 2026-10-29)
 
-Milestones A and B are integrated on `main`: the deterministic producer, narrow GitHub-App witness provider, publication/readback logic, and founder-final consumer exist in the trusted source tree. The remaining execution gap is a trusted invocation surface that runs those integrated components from an exact current-`main` FCR release rather than from candidate-controlled pull-request code.
+Milestones A and B are integrated on `main`: the deterministic producer, narrow GitHub-App witness provider, publication/readback logic, and founder-final consumer exist in the trusted source tree. The trusted-main invocation surfaces also exist in source: the issue #418 `/review-witness` command in `.github/workflows/deterministic-review-core-advisory.yml`, and the protected `POST /review/deterministic-witness/:pullRequestNumber` in `src/http/server.ts`. **Their presence in current source does not prove current production deployment, provider credential validity, or successful trusted-App witness publication for any current PR head.**
 
 ## Authority chain
 
@@ -40,7 +40,7 @@ Witness publication is retry-safe by **reconcile-before-create**. After rederivi
 
 Trusted ignition must execute from code that is already integrated and running as exact current FCR `main`. Candidate-controlled PR workflows, candidate preview deployments, stale production releases, and PAT-only environments are not trusted witness issuers.
 
-The current founder-runtime ignition candidate adds `POST /review/deterministic-witness/:pullRequestNumber` inside the protected FCR server trust root. It is intentionally narrow:
+The implemented founder-runtime source includes `POST /review/deterministic-witness/:pullRequestNumber` inside the protected FCR server trust root. Its live availability requires separately verified deployment identity and provider readiness. It is intentionally narrow:
 
 1. the browser mutation must first pass the existing same-origin membrane;
 2. repository-wide rate limiting applies before the route;
@@ -61,10 +61,10 @@ A default-branch workflow could provide another trusted ignition surface only if
 
 A successful advisory test workflow or successful route source test proves source execution only. It does not itself emit the constitutional independent-review witness, satisfy founder-final authority, authorize merge, or prove that the exact merged release and GitHub App credentials are live in production.
 
-## Bootstrap boundary
+## Historical bootstrap boundary and current provider proof
 
-The candidate that first installs trusted ignition necessarily changes the deterministic-review trust root, so normal deterministic review is expected to report trust-root self-modification and withhold its own constitutional witness. That is the correct fail-closed result, not a defect to suppress.
+The original candidate that first installed trusted ignition changed the deterministic-review trust root, so normal deterministic review was expected to report trust-root self-modification and withhold its own constitutional witness. That was a fail-closed bootstrap requirement, **not proof that current `main` still lacks the code**.
 
 Its integration therefore requires the separately explicit, exact-candidate, durable founder manual-merge override class defined by issue #418 after fresh exact-head machine proof and applicable provider/readback evidence are captured. Ordinary `approved`, `cont`, mergeability, machine green, model review, or bypass capability do not invoke that exception.
 
-After lawful integration, the exact merged release must be deployed and `/version` must re-observe that release identity before the founder-runtime trigger may be treated as available witness-production authority. Once that is proven, later non-trust-root candidates can use the normal deterministic receipt + trusted witness + founder-final path without this bootstrap exception.
+For every currently trusted release, the exact merged release must be deployed and `/version` must re-observe that release identity before the founder-runtime trigger may be treated as live witness-production authority. Later non-trust-root candidates use the normal deterministic receipt + trusted witness + founder-final path. A historical credential-preflight failure must be classified as an **execution receipt**, not an unconditional recommendation to replace a GitHub App private key; use the existing read-only diagnostic and current provider evidence first.

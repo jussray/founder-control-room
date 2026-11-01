@@ -1,5 +1,7 @@
 # Founder Control Room Global AI Contract
 
+For pull-request Documentation Truth and test-discovery proof, resolve and fetch the live target branch before comparing it with the exact candidate; reject missing, invalid, unavailable, or non-ancestor bases. Keep the event's historical base identity separate from current scope. Default-branch push proof uses the exact push-before SHA. This repairs proof inputs without transferring merge, deployment, or provider authority.
+
 ## Parent operating contract
 
 Before nontrivial work, read [`Juss Founder OS`](.ai/skills/juss-founder-os/SKILL.md).
@@ -183,6 +185,10 @@ Investor email remains separate. Never auto-send without both the applicable sta
 - Every material read, proposal, approval, integration, deployment, rollback, publication, and provider action should leave an auditable event.
 - No authority class silently grants another.
 
+## Founder-selected GitHub Auto-merge queue
+
+The founder may use GitHub's **Enable auto-merge** UI for an individual PR. The PR is queued, not immediately merged, until GitHub enforces every configured required check/test/review and branch protection or merge-queue rule. Every genuinely load-bearing step must feed a configured required check; a non-required advisory check does not block native Auto-merge. PR Continuity observes the live queue setting on `auto_merge_enabled`/`auto_merge_disabled` events but cannot authorize or dispatch a merge. Native queue intent is not a replacement for the canonical exact-repo/PR/base/head founder-final approval receipt; stale heads, conflicts, missing approval, or provider uncertainty remain blocked. No extra manual merge click is needed after GitHub independently clears its enforced gates, and queueing confers no deploy/provider-write authority. Verify live rulesets before claiming enforcement.
+
 ## FCR merge review boundary
 
 The canonical in-app FCR merge path uses **deterministic independent review followed by authenticated founder-final approval**. It requires exact provider PR identity, exact-head machine proof, canonical diff/policy hashes, a passed deterministic exact-head review witness, P2 blocking, an authenticated founder-final receipt pinned to the exact PR/base/head, and a final mutable-head re-read before provider integration.
@@ -278,6 +284,7 @@ A committed regression test is source evidence only until the exact-head workflo
 
 For public crawler and work-directory behavior, `.github/workflows/ci.yml` must keep `e2e/pages-api-recovery.spec.ts` and `e2e/public-work-directory.spec.ts` inside the load-bearing `Playwright e2e` job that feeds `Required Gate`. A green advisory Pages workflow is supplementary evidence only; it cannot replace this required exact-head browser proof or create merge authority.
 
-## 2026-10-26 locked-install and StoryEngine evidence update
+### November 1, 2026: FCR PR #1024 exact-main lockfile reconciliation
 
-Treat locked `npm ci --no-audit --no-fund` installation in FCR core CI as a reproducibility constraint, not proof of test success or production health. Treat any StoryEngine `main` peer-pin refresh in FCR Playwright as an evidence-subject transition. Exact-live-ref equality, immutable checkout, runtime identity, directive/receipt, and full browser replay must succeed at the new FCR head before declaring federation verified. Never inherit the predecessor browser result or infer merge, deployment, publication, or provider-mutation authority.
+Current FCR core CI Type check, Lint, Test and Playwright e2e jobs install dependencies using `npm ci --no-audit --no-fund` from the committed lockfile. This is a source-level deterministic install requirement, not a claim that new exact-head tests have executed, that StoryEngine peer evidence is current, or that review, merge, release, provider or production authority has been earned. Preserve newer main governance rules and fail closed when any required lane is failed, skipped, missing or stale.
+

@@ -1,5 +1,10 @@
 # Cloudflare Reasoning Contract
 
+## November 1, 2026 UTC: exact-head MCP credential preflight
+
+The canonical `.github/workflows/deploy.yml` and `.github/workflows/worker-reconcile.yml` must run the reviewed `scripts/verify-worker-binding-types.mjs` before any Cloudflare Worker mutation. This preflight inspects only Worker binding names and type classifications; a credential binding classified `plain_text`, a malformed provider response, or unavailable provider metadata must block the release without revealing values, provider response bodies, or arbitrary binding names in logs. A source-green preflight is not evidence that the observed `CF_API_TOKEN` binding has been remediated, that OAuth works, or that production is deployed.
+
+
 ## Logpush portfolio authority
 
 Founder Control Room owns the source contract for the portfolio Logpush desired state in `config/cloudflare-logpush.portfolio.json`. The first bounded dataset is account-scoped `workers_trace_events`; product repositories participate without receiving FCR Cloudflare write credentials.
@@ -247,7 +252,7 @@ Canonical Deploy now separates **deployment-plane credentials** from **Worker ru
 
 FCR public-web observation no longer has a dedicated provider secret in the Worker membrane. The product contract is `public-web-observation-v1`; current read-only discovery/fetch adapters are resolved through FCR's governed research hub and remain replaceable implementation details. Source, adapter availability, returned evidence, and downstream truth remain separate proof planes.
 
-The FCR Shopify money path uses the same provider-held runtime-secret membrane: `FCR_SHOPIFY_WEBHOOK_SECRET` is required to authenticate the exact Shopify webhook bytes, and `FCR_COMMERCE_HASH_SALT` is required to derive privacy-safe order references. Canonical Deploy must fail closed when either binding name is absent, but binding-name presence cannot prove Shopify webhook registration, callback delivery, production database migration, or collected revenue. Those remain independent provider/runtime/database/outcome receipts.
+The FCR Shopify money path uses the same provider-held runtime-secret membrane: `FCR_SHOPIFY_WEBHOOK_SECRET` is required to authenticate the exact Shopify webhook bytes, and `FCR_COMMERCE_HASH_SALT` is required to derive privacy-safe order references. Since the founder Path B ruling (2026-10-30), both names are declared in `wrangler.worker.toml [secrets].optional`: they remain required before the Shopify money path is activated and the commerce ingress must fail closed while either name is absent, but their absence no longer blocks canonical Deploy, because `[secrets].required` now declares only the boot-essential binding names. Binding-name presence still cannot prove Shopify webhook registration, callback delivery, production database migration, or collected revenue. Those remain independent provider/runtime/database/outcome receipts.
 
 The only runtime secret canonical Deploy actively writes is the checked-in fail-closed `FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON` with `enabled:false`. This preserves the automation kill switch while leaving unrelated runtime secret values untouched. Other trusted workflows that actually need GitHub App execution credentials may still use their separately scoped `APP_ID` / `APP_PRIVATE_KEY` Actions inputs, but canonical Deploy does not re-upload the Worker's `GITHUB_APP_ID` / `GITHUB_PRIVATE_KEY` pair.
 

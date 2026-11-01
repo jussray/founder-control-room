@@ -1,5 +1,10 @@
 # Truth Decay Audit: When a True Claim Becomes Unsafe to Reuse
 
+## November 1, 2026 UTC: exact-head MCP credential preflight and StoryEngine peer freshness
+
+FCR PR #1056 Playwright failed its live StoryEngine peer-ref equality gate because `.github/workflows/playwright.yml` expected `bffc9f771b673055403f52b29c86b30e5f4dd8c8` while `refs/heads/main` resolved to `b2397272a37ed5d987f0b71b2a37dc31c9c84cf5`. GitHub comparison confirmed a forward four-commit, zero-behind transition consisting of documentation and governance files. Updating the pin selects the new immutable peer subject only; it must not convert skipped federation/browser steps into passing proof or confer merge, deploy, production, or execution authority.
+
+
 ## October 26, 2026 — FCR PR #1020 peer freshness failure and source-only recovery
 
 At FCR PR #1020 candidate `8e30ec5418f2fc732b96d8dc5263af4a82f5e5a3`, the Playwright browser harness succeeded but the live StoryEngine ref gate correctly stopped: pinned `87501be2da31d12f421b0ed2da49df357fc9fcb1`, observed `499f2d4eb9edac8bb11b657cf003a056263528d9`. Independent GitHub readback shows a two-commit forward peer change affecting the StoryEngine LLM/Muse clients. The successor StoryEngine commit's observed source checks passed, including federation contract verification; this does not prove the new cross-app runtime pair, and the Supabase preview was skipped. Updating the FCR peer pin is an evidence-subject move only.
@@ -595,3 +600,8 @@ Current federation remains `UNKNOWN` until the exact successor FCR head complete
 **Federation drift:** FCR Playwright local browser scenarios passed on PR head \`af49d1c089193c4ffe381818267484f36ebeae4b\`, then the separate StoryEngine peer check failed because it expected \`87501be2da31d12f421b0ed2da49df357fc9fcb1\` while GitHub StoryEngine \`refs/heads/main\` resolved to \`499f2d4eb9edac8bb11b657cf003a056263528d9\`. PR head \`68b020105c9a4d22851643e3f029571b53cc6af4\` updates the immutable peer pin to that independently observed revision. StoryEngine's inspected current SHA had 14 successful checks and one skipped; those checks are not FCR's own federation proof.
 
 **Branch and release gates:** FCR candidate \`68b020105c9a4d22851643e3f029571b53cc6af4\` was five commits behind FCR main \`fb4af1dccc81a0ab5e334e8038f23cb10af21b6a\`. Its CI recorded seven failures across ancestry, documentation truth, missing structured PR evidence, and a downstream Required Gate. Corrective integration must preserve main's unrelated changes and original branch history, rerun current exact-head checks, and obtain fresh, separate founder approval for that exact head/base pair before any merge or deployment. No green or merge authority is transferred by this documentation entry.
+
+### November 1, 2026: FCR PR #1024 exact-main lockfile reconciliation
+
+Current FCR core CI Type check, Lint, Test and Playwright e2e jobs install dependencies using `npm ci --no-audit --no-fund` from the committed lockfile. This is a source-level deterministic install requirement, not a claim that new exact-head tests have executed, that StoryEngine peer evidence is current, or that review, merge, release, provider or production authority has been earned. Preserve newer main governance rules and fail closed when any required lane is failed, skipped, missing or stale.
+

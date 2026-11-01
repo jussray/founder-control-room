@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
+import { receiptClaimsDescribeRequiredDeploymentRemoval } from './documentation-truth-required-deployment-guard.mjs';
 
 const root = process.cwd();
 const FULL_SHA = /^[0-9a-f]{40}$/i;
@@ -59,6 +60,7 @@ const truthSensitiveRules = [
   { domain: 'truth-governance', match: /^src\/http\/routes\/(?:buildEvents|buildEventReceipts)\.ts$/ },
   { domain: 'truth-governance', match: /^src\/services\/buildEventStore\.ts$/ },
   { domain: 'truth-governance', match: /^scripts\/verify-documentation-truth\.mjs$/ },
+  { domain: 'truth-governance', match: /^scripts\/documentation-truth-required-deployment-guard\.mjs$/ },
   { domain: 'truth-governance', match: /^\.ai\/skills\/goalfix\/SKILL\.md$/ },
   { domain: 'truth-governance', match: /^\.claude\/skills\/goalfix\/SKILL\.md$/ },
   { domain: 'truth-governance', match: /^docs\/(?:FOUNDER_ADAPTIVE_KERNEL_V0|GOALFIX_EXECUTION_WORKFLOW_V2|CLAUDE_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC|PERPLEXITY_MCP_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC)\.md$/ },
@@ -261,6 +263,7 @@ const claudeMaster = read('docs/CLAUDE_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC.md
 const perplexityMaster = read('docs/PERPLEXITY_MCP_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC.md');
 const ci = read('.github/workflows/ci.yml');
 const documentationWorkflow = read('.github/workflows/documentation-truth.yml');
+const githubProviderSource = read('src/providers/GitHubProvider.ts');
 
 const goalfixExecutionPaths = [
   ['portable Goalfix skill', goalfixSkill],
@@ -280,7 +283,28 @@ const goalfixInvariantChecks = goalfixExecutionPaths.flatMap(([label, content]) 
   [content.includes('MERGED_UNVERIFIED'), `${label} must preserve MERGED_UNVERIFIED until required runtime truth exists`],
 ]);
 
+function namedSetBody(source, name) {
+  const marker = `const ${name} = new Set([`;
+  const start = source.indexOf(marker);
+  if (start < 0) return '';
+  const end = source.indexOf(']);', start);
+  return end < 0 ? '' : source.slice(start, end + 3);
+}
+
+const fcrOwnedRuleTypes = namedSetBody(githubProviderSource, 'FCR_REVIEW_OWNED_RULE_TYPES');
+const fcrPreservableRuleTypes = namedSetBody(githubProviderSource, 'FCR_REVIEW_PRESERVABLE_RULE_TYPES');
+const githubProviderTruthChanged = truthSensitiveChanges.some(
+  (change) => change.file === 'src/providers/GitHubProvider.ts',
+);
+const githubProviderReceiptClaims = receipt?.claimsByPath.get('src/providers/GitHubProvider.ts') ?? [];
+const ownsLegacyRequiredDeployments = fcrOwnedRuleTypes.includes('"required_deployments"')
+  && !fcrPreservableRuleTypes.includes('"required_deployments"');
+const receiptDescribesRequiredDeploymentRemoval = receiptClaimsDescribeRequiredDeploymentRemoval(
+  githubProviderReceiptClaims,
+);
+
 const consistencyChecks = [
+  [!githubProviderTruthChanged || !ownsLegacyRequiredDeployments || receiptDescribesRequiredDeploymentRemoval, 'documentation truth receipt must describe intentional removal of legacy pre-merge required_deployments when GitHubProvider owns that migration boundary'],
   [!readme.includes('**Last refreshed:**'), 'README must not present a manually refreshed date as durable current repository authority'],
   [readme.includes('Current identity is resolved at use time'), 'README must resolve current repository identity at use time'],
   [readme.includes('Documentation truth gate'), 'README must describe the Documentation truth gate'],
