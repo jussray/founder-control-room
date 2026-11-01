@@ -64,6 +64,8 @@ describe('FCR GitHub App private-key transport', () => {
     ['env-assignment-pem', `APP_PRIVATE_KEY=${pem.trim()}`],
     ['json-object-pem', JSON.stringify({ private_key: pem })],
     ['old-mac-cr-pem', pem.replace(/\n/g, '\r')],
+    ['cr-only-fenced-pem', `\`\`\`pem\r${pem.trim().replace(/\n/g, '\r')}\r\`\`\``],
+    ['assignment-base64-cr-only-pem', `APP_PRIVATE_KEY=${Buffer.from(pem.trim().replace(/\n/g, '\r')).toString('base64')}`],
   ] as const;
 
   for (const [transport, value] of cases) {
