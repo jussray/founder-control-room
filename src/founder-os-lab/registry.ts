@@ -46,6 +46,7 @@ export interface FounderOsLabActionRoute {
 }
 
 export const FOUNDER_OS_LAB_SKILLS: readonly FounderOsLabSkillDescriptor[] = [
+  { id: 'broke-founder', role: 'Always-on $0 incremental spending gate and secure first-party builder fallback when a provider is unavailable; no execution authority.', mayExecute: false },
   { id: 'juss-chief-ai', role: 'Chief AI capability selection and founder-intent translation.', mayExecute: false },
   { id: 'goalfix', role: 'Founder-native focused diagnosis capability inventory entry.', mayExecute: false },
   { id: 'repo-truth', role: 'Founder-native repository truth capability inventory entry.', mayExecute: false },
