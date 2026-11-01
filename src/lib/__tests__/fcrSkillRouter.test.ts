@@ -251,4 +251,56 @@ describe('FCR skill router trust gate', () => {
     expect(decision.missingPolicyCapabilityIds).toContain('goalfix');
     expect(decision.status).toBe('blocked');
   });
+
+  it('fails closed for incremental paid plans, with or without an available provider', () => {
+    const goal = 'Build a provider-neutral application capability.';
+    const decision = route(goal, 'write', ['broke-founder'], {
+      economics: {
+        incrementalMonthlyUsd: 5,
+        incrementalOneTimeUsd: 0,
+        providerAvailable: true,
+        firstPartyFeasible: true,
+      },
+    });
+    expect(decision.status).toBe('blocked');
+    expect(decision.executionAllowed).toBe(false);
+    expect(decision.errors.join(' ')).toMatch(/paid provider\/build choice/);
+  });
+
+  it('requires a Broke Founder skill and first-party proof when external providers are missing', () => {
+    const goal = 'Build a provider-neutral application capability.';
+    const economics = {
+      incrementalMonthlyUsd: 0,
+      incrementalOneTimeUsd: 0,
+      providerAvailable: false,
+      firstPartyFeasible: true,
+    };
+    const missing = route(goal, 'write', ['juss-chief-ai'], { economics });
+    expect(missing.policyRequiredCapabilityIds).toContain('broke-founder');
+    expect(missing.missingPolicyCapabilityIds).toContain('broke-founder');
+    expect(missing.status).toBe('blocked');
+    const ready = route(goal, 'write', ['broke-founder'], { economics });
+    expect(ready.status).toBe('ready_for_runtime_discovery');
+    expect(ready.requiredProof.join(' ')).toMatch(/first-party provider-independent adapter/);
+    expect(ready.executionAllowed).toBe(false);
+    const impossible = route(goal, 'write', ['broke-founder'], {
+      economics: { ...economics, firstPartyFeasible: false },
+    });
+    expect(impossible.status).toBe('blocked');
+    expect(impossible.errors.join(' ')).toMatch(/safe first-party parity not established/);
+  });
+
+  it('blocks invalid Broke Founder cost evidence, including negative or NaN estimates', () => {
+    const goal = 'Build a provider-neutral application capability.';
+    const decision = route(goal, 'plan', ['broke-founder'], {
+      economics: {
+        incrementalMonthlyUsd: Number.NaN,
+        incrementalOneTimeUsd: -1,
+        providerAvailable: false,
+        firstPartyFeasible: true,
+      },
+    });
+    expect(decision.errors.join(' ')).toMatch(/invalid or unknown incremental cost evidence/);
+    expect(decision.status).toBe('blocked');
+  });
 });
