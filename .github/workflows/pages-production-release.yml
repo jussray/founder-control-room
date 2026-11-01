@@ -71,6 +71,7 @@ jobs:
         run: |
           set -euo pipefail
           DEPLOY_URL="${DEPLOY_URL%/}"
+          test "$DEPLOY_URL" = "https://api.foundercontrolroom.org" || { echo "Noncanonical credential destination blocked"; exit 1; }
           test -n "$FCR_ACCESS_CLIENT_ID"
           test -n "$FCR_ACCESS_CLIENT_SECRET"
           version_body="$(curl --fail --silent --show-error \

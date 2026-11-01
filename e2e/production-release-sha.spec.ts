@@ -12,7 +12,6 @@ test.describe('production exact-SHA release witness', () => {
 
   test('binds Worker identity, public proxy, and browser proof to one exact release', async ({
     page,
-    request,
   }, testInfo) => {
     expect(deployUrl, 'DEPLOY_URL must be supplied by the production environment').not.toBe('');
     expect(expectedReleaseSha, 'EXPECTED_RELEASE_SHA must be the exact approved commit').toMatch(
@@ -20,19 +19,28 @@ test.describe('production exact-SHA release witness', () => {
     );
     expect(accessClientId, 'FCR_ACCESS_CLIENT_ID must be configured for direct API proof').not.toBe('');
     expect(accessClientSecret, 'FCR_ACCESS_CLIENT_SECRET must be configured for direct API proof').not.toBe('');
+    // Never send a credential to a mutable DEPLOY_URL, even if HTTPS.
+    expect(deployUrl, 'Direct API proof must use the canonical Access-protected origin')
+      .toBe('https://api.foundercontrolroom.org');
+
 
     const readDirectIdentity = async (phase: string) => {
       const nonce = `${Date.now()}-${testInfo.retry}-${phase}`;
-      const response = await request.get(`${deployUrl}/version?release_witness=${nonce}`, {
+      // Node fetch does not enter Playwright's APIRequestContext or trace/HAR
+      // artifacts. This proof must not attach credential-bearing requests.
+      const response = await fetch(`${deployUrl}/version?release_witness=${nonce}`, {
+        method: 'GET',
         headers: {
           'cache-control': 'no-cache',
           pragma: 'no-cache',
           'CF-Access-Client-Id': accessClientId,
           'CF-Access-Client-Secret': accessClientSecret,
         },
+        redirect: 'manual',
+        signal: AbortSignal.timeout(20_000),
       });
-      expect(response.status()).toBe(200);
-      expect(response.headers()['x-founder-control-room-service']).toBe('founder-control-room');
+      expect(response.status).toBe(200);
+      expect(response.headers.get('x-founder-control-room-service')).toBe('founder-control-room');
       const body = (await response.json()) as {
         service?: string;
         gitSha?: string | null;

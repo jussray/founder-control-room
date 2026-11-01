@@ -294,3 +294,16 @@ List goal, reality, ULTRATHINK decomposition, Product Design state, Data Analyti
 
 - Read [`skills/fact-check-every-claim/SKILL.md`](./skills/fact-check-every-claim/SKILL.md) before externally using factual claims, numbers, quotations, dates, or action guidance.
 - Read [`docs/PORTABLE_FOUNDER_APPROVALS.md`](./docs/PORTABLE_FOUNDER_APPROVALS.md) before treating approval from another approved founder console as mutation authority.
+
+
+## Project-owned Sprites execution (standing rule)
+
+For authorized FCR verification and repair, reuse the existing private
+`fcr-governed-exec` and, when separately approved, `fcr-production-proof`
+Sprites as FCR-controlled infrastructure, not as tools that only a chat agent
+can operate. Follow [docs/SPRITES_RUNTIME.md](docs/SPRITES_RUNTIME.md):
+authenticated exact-head jobs, independent receipt/CI/Playwright gates,
+no unmanaged commands, no implicit merge/deploy/provider permissions,
+no overwriting unfinished Sprite work. If the FCR runtime lacks a verified
+provider credential or approved authority path, classify activation BLOCKED
+rather than invent connectivity.
