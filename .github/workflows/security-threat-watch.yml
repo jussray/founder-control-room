@@ -1,0 +1,61 @@
+name: JUSS Threat Watch — zero-spend observation
+
+on:
+  push:
+    branches: [feat/fcr-threat-intelligence-watch-20261031, main]
+    paths:
+      - 'scripts/security-threat-watch*.mjs'
+      - 'config/security-threat-watch.json'
+      - '.agents/skills/broke-founder/SKILL.md'
+      - '.github/workflows/security-threat-watch.yml'
+  schedule:
+    - cron: '17 11 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: juss-threat-watch-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  test:
+    name: First-party zero-cost watcher contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+      - run: node --test scripts/security-threat-watch.test.mjs
+      - run: node --check scripts/security-threat-watch.mjs
+  observe:
+    name: Read-only feed and attack-surface watch
+    needs: test
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+      - name: Observe with read-only Cloudflare token if already configured
+        env:
+          CF_INTEL_READ_TOKEN: ${{ secrets.CF_INTEL_READ_TOKEN }}
+          CF_ACCOUNT_ID: ${{ vars.CF_ACCOUNT_ID }}
+        run: node scripts/security-threat-watch.mjs
+      - name: Upload counts-only evidence even if provider is blocked
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: juss-threat-watch-${{ github.run_id }}
+          path: artifacts/security-threat-watch/receipt.json
+          if-no-files-found: warn
+          retention-days: 7
