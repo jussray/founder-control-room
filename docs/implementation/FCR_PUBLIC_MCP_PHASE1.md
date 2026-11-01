@@ -69,20 +69,20 @@ artifact-only environment.
 
 ## Binding, provenance, and browser-session boundary — 2026-10-31 candidate
 
-- The canonical Cloudflare Worker is \`founder-control-room\` at
-  \`api.foundercontrolroom.org\`. The repository candidate does **not** establish
+- The canonical Cloudflare Worker is `founder-control-room` at
+  `api.foundercontrolroom.org`. The repository candidate does **not** establish
   live MCP/plugin activation or authorize a production deployment.
 - A read-only Cloudflare inspection on 2026-10-31 found the existing
-  \`CF_API_TOKEN\` Worker binding classified \`plain_text\`. The value was
+  `CF_API_TOKEN` Worker binding classified `plain_text`. The value was
   not inspected or copied. This is a release blocker until that credential is
   safely replaced, reviewed for exposure, and the binding type is reverified.
 - Both canonical GitHub production workflows now call
-  \`node scripts/verify-worker-binding-types.mjs\` before provider mutation;
+  `node scripts/verify-worker-binding-types.mjs` before provider mutation;
   the check fails closed when provider metadata is unavailable or credential
   binding types are unsafe. It inspects only names and types and logs a
   SHA-256 fingerprint of sorted names/types, **never binding values**.
 - FCR's founder browser session uses a server-owned, opaque
-  \`__Host-fcr_session\` cookie with Secure/HttpOnly/SameSite=Strict. It must
+  `__Host-fcr_session` cookie with Secure/HttpOnly/SameSite=Strict. It must
   remain separate from OAuth bearer authentication for public MCP users.
   No visitor/device fingerprinting, third-party tracking cookie, or cross-site
   recognition is introduced by this candidate.
