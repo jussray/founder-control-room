@@ -13,6 +13,7 @@ describe('actions-mail audit read-only input and exact-head contract', () => {
     assert.equal(parseRunUrl('https://evil.example/path', repo), null);
     assert.equal(parseRunUrl('https://github.com/jussray/StoryEngine/actions/runs/100', repo), null);
     assert.equal(parseRunUrl('https://github.com.evil.example/jussray/founder-control-room/actions/runs/100', repo), null);
+    assert.equal(parseRunUrl('https://username@github.com/jussray/founder-control-room/actions/runs/100', repo), null);
   });
   it('marks an older failing run stale, not resolved', () => {
     assert.equal(classifyRun({ head_sha: sha, status: 'completed', conclusion: 'failure' }, newer), 'STALE_HEAD_NOT_PROVEN_FIXED');
