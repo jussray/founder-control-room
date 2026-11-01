@@ -13,6 +13,7 @@ const outputDirectory = resolve(repositoryRoot, 'dist-pages');
 
 const requiredAssets = [
   'index.html',
+  'account/index.html',
   '_headers',
   '_worker.js',
   'robots.txt',
