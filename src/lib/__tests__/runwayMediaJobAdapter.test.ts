@@ -132,7 +132,7 @@ describe('private Runway candidate materialization', () => {
   });
   it('rejects oversized, truncated and non-MP4 candidates and removes only its own incomplete output',async()=>{
     await fixture(); const dest=join(dirs.at(-1)!,'candidate.mp4');
-    const cases=[
+    const cases: { body: Buffer; headers: Record<string, string>; maxBytes: number; code: string }[]=[
       {body:mp4,headers:{'Content-Type':'video/mp4','Content-Length':'99'},maxBytes:128,code:'RUNWAY_DOWNLOAD_INCOMPLETE'},
       {body:mp4,headers:{'Content-Type':'video/mp4'},maxBytes:12,code:'RUNWAY_DOWNLOAD_TOO_LARGE'},
       {body:Buffer.alloc(16),headers:{'Content-Type':'video/mp4'},maxBytes:128,code:'RUNWAY_DOWNLOAD_FORMAT_INVALID'},
