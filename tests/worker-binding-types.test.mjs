@@ -107,3 +107,26 @@ test('fails closed on MCP read tokens and generic secret credential names', () =
     { name: 'REPOSITORY_KEYWORD', type: 'plain_text', text: 'guide' },
   ])).ok, true);
 });
+
+test('preflight failures never propagate response bodies, credentials, or untrusted binding names into CI logs', async () => {
+  const { safePreflightError } = await import('../scripts/verify-worker-binding-types.mjs');
+  const sensitive = 'sensitive-response-snippet';
+  assert.equal(safePreflightError(new Error(`Unexpected token near ${sensitive}`)), 'provider-preflight-failed');
+  assert.equal(safePreflightError(new Error(`credential-binding-not-secret: CF_TOKEN_${sensitive}(plain_text)`)), 'provider-preflight-failed');
+  assert.equal(safePreflightError(new Error('provider-settings-http-403')), 'provider-settings-http-403');
+  assert.equal(safePreflightError(new Error(`provider-settings-http-403 ${sensitive}`)), 'provider-preflight-failed');
+  assert.equal(safePreflightError({ toString: () => sensitive }), 'provider-preflight-failed');
+});
+
+test('provider JSON parsing errors and unsafe binding names do not reveal response content to callers', async () => {
+  const env = { CLOUDFLARE_API_TOKEN: 'fixture-token' };
+  const secret = 'sensitive-blob-NEVER-LOG';
+  await assert.rejects(
+    runProviderPreflight({ env, fetchFn: async () => ({ ok: true, json: async () => { throw Error('parse: ' + secret); } }) }),
+    { message: 'provider-response-invalid' },
+  );
+  await assert.rejects(
+    runProviderPreflight({ env, fetchFn: async () => ({ ok: true, json: async () => response([{ name: 'CF_API_TOKEN_' + secret, type: 'plain_text' }]) }) }),
+    { message: 'credential-binding-not-secret' },
+  );
+});
