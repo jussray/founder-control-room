@@ -60,41 +60,15 @@ test('every declared public machine exception maps to a real server surface', ()
     "'/.well-known/oauth-protected-resource'",
     "'/.well-known/oauth-protected-resource/mcp'",
   ];
-  for (const marker of serverMarkers) assert.match(server, new RegExp(marker.replace(/[.*+?^$(){}|[\]\\]/g, '\\  const requiredMarkers = [
-    "'/webhooks/github'",
-    "'/webhooks/stripe-quickscan'",
-    "'/ingest/repository-verification'",
-    "'/ingest/build-events/:slug'",
-    "'/ingest/hair-commerce-receipts'",
-    "'/ingest/proof-of-ship-receipts'",
-    "'/ingest/founder-review-contexts'",
-    "'/ingest/jira-work-automation'",
-    "'/ingest/product-build-receipts/storyengine'",
-    "'/api/federated-relay/v3'",
-    "'/mcp'",
-    "'/mcp/read'",
-    "'/.well-known/oauth-protected-resource'",
-    "'/.well-known/oauth-protected-resource/mcp'",
-  ];
-  for (const marker of requiredMarkers) assert.match(server, new RegExp(marker.replace(/[.*+?^$(){}|[\]\\]/g, '\\$&')));')));
-  for (const marker of ['mcpRouter.post("/",', 'mcpRouter.post("/read",', 'mcpRouter.get("/registry/v0.1/servers"']) {
-    assert.match(mcpRouter, new RegExp(marker.replace(/[.*+?^$(){}|[\]\\]/g, '\\  const requiredMarkers = [
-    "'/webhooks/github'",
-    "'/webhooks/stripe-quickscan'",
-    "'/ingest/repository-verification'",
-    "'/ingest/build-events/:slug'",
-    "'/ingest/hair-commerce-receipts'",
-    "'/ingest/proof-of-ship-receipts'",
-    "'/ingest/founder-review-contexts'",
-    "'/ingest/jira-work-automation'",
-    "'/ingest/product-build-receipts/storyengine'",
-    "'/api/federated-relay/v3'",
-    "'/mcp'",
-    "'/mcp/read'",
-    "'/.well-known/oauth-protected-resource'",
-    "'/.well-known/oauth-protected-resource/mcp'",
-  ];
-  for (const marker of requiredMarkers) assert.match(server, new RegExp(marker.replace(/[.*+?^$(){}|[\]\\]/g, '\\$&')));')));
+  for (const marker of serverMarkers) {
+    assert.ok(server.includes(marker), `Missing server route marker: ${marker}`);
+  }
+  for (const marker of [
+    'mcpRouter.post("/",',
+    'mcpRouter.post("/read",',
+    'mcpRouter.get("/registry/v0.1/servers"',
+  ]) {
+    assert.ok(mcpRouter.includes(marker), `Missing MCP route marker: ${marker}`);
   }
 });
 
