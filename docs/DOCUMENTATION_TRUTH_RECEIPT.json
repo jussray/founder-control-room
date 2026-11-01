@@ -13,6 +13,12 @@
   ],
   "changes": [
     {
+      "path": ".github/workflows/deploy.yml",
+      "claims": [
+        "`.github/workflows/deploy.yml` must run `scripts/verify-worker-binding-types.mjs` before the first Cloudflare Worker mutation, rejecting plaintext credential bindings or unavailable name/type provider evidence while never logging secret values or treating a passing source preflight as live deployment proof."
+      ]
+    },
+    {
       "path": "config/cloudflare-logpush.portfolio.json",
       "claims": [
         "`config/cloudflare-logpush.portfolio.json` must remain the source-only desired-state registry for the account-scoped `workers_trace_events` Logpush job; pull-request verification cannot mutate Cloudflare or prove delivery, and provider apply requires exact-current-main binding, a founder approval reference, a dedicated write credential, destination configuration, and post-write readback.",
@@ -64,6 +70,7 @@
     {
       "path": ".github/workflows/playwright.yml",
       "claims": [
+        "`.github/workflows/playwright.yml` must bind the independently observed StoryEngine successor `b2397272a37ed5d987f0b71b2a37dc31c9c84cf5` only as a new exact peer evidence subject, requiring fresh live-ref equality, immutable checkout, runtime identity, federation receipts, and browser verification before compatibility can be claimed.",
         "`.github/workflows/playwright.yml` must keep the PR #1035 peer refresh as identity recovery only: the successor FCR head requires fresh live-ref equality, immutable peer checkout, runtime identity, and the complete directive/receipt/replay/browser witness before pair compatibility can be current; predecessor proof stays historical, and pin alignment grants no merge, deploy, production, or provider-mutation authority.",
         "`.github/workflows/playwright.yml` must bind the FCR-to-StoryEngine browser federation witness to a separately verified exact StoryEngine peer SHA and ref; changing that peer identity expires predecessor federation/browser proof and requires the complete exact-head witness to rerun without granting merge, deploy, production, or provider-mutation authority.",
         "A fresh peer ref/SHA observation may select the successor StoryEngine evidence subject, but the successor FCR federation state remains UNKNOWN until the complete exact-head runtime identity, directive, receipt, and Playwright browser witness succeeds against that peer.",
