@@ -115,6 +115,7 @@ describe('FCR skill router trust gate', () => {
       'product-design',
       'data-analytics',
       'deep-research',
+      'broke-founder',
     ]);
     expect(decision.requiredParallelLenses).toEqual([...FCR_REQUIRED_PARALLEL_LENSES]);
     expect(decision.missingParallelLenses).toEqual([]);
@@ -122,6 +123,7 @@ describe('FCR skill router trust gate', () => {
       expect.stringMatching(/missing required RayOS lens/),
     ]));
     expect(decision.requiredProof.join(' ')).toMatch(/Founder Council is applied automatically in code/);
+    expect(decision.requiredProof.join(' ')).toMatch(/Broke Founder always on/);
     expect(decision.requiredProof.join(' ')).toMatch(/two separate passes/);
     expect(decision.requiredProof.join(' ')).toMatch(/Steal adapts principles/);
   });
