@@ -1,3 +1,6 @@
+-- HISTORICAL ONLY — SUPERSEDED FOR EXECUTION. DO NOT APPLY.
+-- Use FCR_PUBLIC_TENANCY_REVIEW_CANDIDATE.sql after independent staging review.
+-- In particular, the first-party customer flow does not guarantee a JWT client_id claim.
 -- PRE-RELEASE SCHEMA PROPOSAL ONLY. This is NOT a migration and has NOT run.
 -- A separate founder-approved migration is required before activation.
 -- Public customers MUST NOT share the governed founder projects tables.
