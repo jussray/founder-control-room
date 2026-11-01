@@ -2,7 +2,7 @@
 
 ## Public customer journey — implementation candidate (not live)
 
-The public homepage now links to a customer onboarding preview at `/account/`. It keeps the public exploration path separate from founder authentication and shows solo/team workspaces only as proposed. Customer signup, tenant provisioning, paid entitlements, billing and the public MCP connector remain disabled until independently verified and explicitly released. See [FCR Public User Flow](docs/implementation/FCR_PUBLIC_USER_FLOW.md). This feature branch is not deployment proof.
+The public homepage now links to a customer onboarding preview at `/account/`. It keeps the public exploration path separate from founder authentication and shows solo/team workspaces only as proposed. The separate `GET /customer/status` route reports availability, and `GET /customer/workspace` is a bearer-only, tenant-bound read candidate disabled by default under `FCR_PUBLIC_CUSTOMER_WORKSPACES_ENABLED`. Customer signup, tenant provisioning, paid entitlements, billing and the public MCP connector remain disabled until independently verified and explicitly released. See [FCR Public User Flow](docs/implementation/FCR_PUBLIC_USER_FLOW.md). This feature branch is not deployment proof.
 
 ## November 1, 2026: bounded GitHub App transport reconciliation
 
