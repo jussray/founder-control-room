@@ -177,3 +177,41 @@ test('fails closed before provider mutation because this verifier is read-only',
   assert.ok(calls.length > 0);
   assert.ok(calls.every((call) => !call.init.method || call.init.method === 'GET'));
 });
+
+test('rejects path-only Access app as full app hostname coverage', async () => {
+  const state = readyState();
+  state.apps.find((app) => app.id === 'app-browser').destinations = [
+    { type: 'public', uri: 'app.foundercontrolroom.org/private-only' },
+  ];
+  await assert.rejects(
+    verifyFcrCloudflareAccessBoundary({ fetchImpl: provider(state).fetchImpl, env, nowMs: NOW, boundary }),
+    (error) => error?.classification === 'app-access-application-missing-or-ambiguous',
+  );
+});
+
+test('rejects service token excluded by its own Service Auth policy', async () => {
+  const state = readyState();
+  state.policies['api-worker'][0].exclude = [{ service_token: { token_id: TOKEN_ID } }];
+  await assert.rejects(
+    verifyFcrCloudflareAccessBoundary({ fetchImpl: provider(state).fetchImpl, env, nowMs: NOW, boundary }),
+    (error) => error?.classification === 'api-service-auth-policy-missing',
+  );
+});
+
+test('fails closed on unverified Service Auth require conditions', async () => {
+  const state = readyState();
+  state.policies['api-worker'][0].require = [{ email: { email: 'owner@example.com' } }];
+  await assert.rejects(
+    verifyFcrCloudflareAccessBoundary({ fetchImpl: provider(state).fetchImpl, env, nowMs: NOW, boundary }),
+    (error) => error?.classification === 'api-service-auth-policy-missing',
+  );
+});
+
+test('rejects worker bypass policies even alongside a valid service token', async () => {
+  const state = readyState();
+  state.policies['api-worker'].push({ decision: 'bypass', include: [{ everyone: {} }] });
+  await assert.rejects(
+    verifyFcrCloudflareAccessBoundary({ fetchImpl: provider(state).fetchImpl, env, nowMs: NOW, boundary }),
+    (error) => error?.classification === 'api-worker-access-policy-invalid',
+  );
+});
