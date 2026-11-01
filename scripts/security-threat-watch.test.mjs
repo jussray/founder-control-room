@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   extractIndicators, parseSyndication, detectPromptInjection,
-  classifySecuritySignal, routeSecuritySkills, summarizePortfolioObservation,
+  classifySecuritySignal, routeSecuritySkills, summarizePortfolioObservation, brokeFounderGate,
 } from './security-threat-watch-core.mjs';
 
 test('RSS and Atom entries are parsed as untrusted text without following URLs', () => {
@@ -55,4 +55,12 @@ test('receipt is deterministic and exposes no sensitive indicator text', () => {
   assert.equal(JSON.stringify(receipt).includes('secret credentials'), false);
   assert.equal(JSON.stringify(receipt).includes('sensitive-ip'), false);
   assert.equal(receipt.action, 'REVIEW_REQUIRED');
+});
+
+test('Broke Founder refuses all new costs without transaction-specific approval', () => {
+  assert.deepEqual(brokeFounderGate({incrementalMonthlyCost:5}),{allowed:false,reason:'FOUNDER_COST_APPROVAL_REQUIRED'});
+  assert.deepEqual(brokeFounderGate({incrementalOneTimeCost:1}),{allowed:false,reason:'FOUNDER_COST_APPROVAL_REQUIRED'});
+  assert.deepEqual(brokeFounderGate({providerAvailable:false,firstPartyFeasible:true}),{allowed:true,reason:'BUILD_FIRST_PARTY_ADAPTER'});
+  assert.equal(brokeFounderGate({providerAvailable:false,firstPartyFeasible:false}).allowed,false);
+  assert.ok(routeSecuritySkills({kind:'threat'}).skills.includes('broke-founder'));
 });
