@@ -60,6 +60,13 @@ function shouldServeFromPages(request) {
     || STATIC_FILE_PATTERN.test(pathname);
 }
 
+function isDirectAccessOnlyPath(pathname) {
+  // Match the same case-insensitive, optional-trailing-slash route variants
+  // accepted by the downstream Express app before any service-binding proxy.
+  const canonicalPath = pathname.toLowerCase().replace(/\/+$/, '') || '/';
+  return DIRECT_ACCESS_ONLY_PATHS.has(canonicalPath);
+}
+
 function directAccessOnlyResponse() {
   return new Response(JSON.stringify({
     ok: false,
@@ -329,7 +336,7 @@ export default {
       return relaySyncControl(request, env);
     }
 
-    if (DIRECT_ACCESS_ONLY_PATHS.has(requestUrl.pathname)) {
+    if (isDirectAccessOnlyPath(requestUrl.pathname)) {
       return directAccessOnlyResponse();
     }
 

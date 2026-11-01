@@ -161,6 +161,28 @@ describe('Cloudflare Pages edge proxy', () => {
     expect(fcrApiFetch).not.toHaveBeenCalled();
   });
 
+  it('blocks protected MCP route variants before any public Pages forwarding', async () => {
+    const handler = await loadHandler();
+    const assetFetch = vi.fn(async (_request: Request) => new Response('unexpected', { status: 500 }));
+    const fcrApiFetch = vi.fn(async (_request: Request) => identifiedResponse('unexpected', { status: 200 }));
+
+    for (const path of ['/mcp/founder-signal-engine/', '/MCP/FOUNDER-SIGNAL-ENGINE']) {
+      const response = await handler.fetch(
+        new Request(`https://foundercontrolroom.org${path}`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: '{}',
+        }),
+        { ASSETS: { fetch: assetFetch }, FCR_API: { fetch: fcrApiFetch } },
+      );
+      expect(response.status).toBe(403);
+      await expect(response.json()).resolves.toMatchObject({ code: 'DIRECT_API_ACCESS_REQUIRED' });
+    }
+
+    expect(assetFetch).not.toHaveBeenCalled();
+    expect(fcrApiFetch).not.toHaveBeenCalled();
+  });
+
   it('continues to proxy the read-only X engagement MCP exception through the public service binding', async () => {
     const handler = await loadHandler();
     const assetFetch = vi.fn(async (_request: Request) => new Response('unexpected', { status: 500 }));
