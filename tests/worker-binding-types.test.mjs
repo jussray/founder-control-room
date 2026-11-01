@@ -89,3 +89,21 @@ test('rejects plaintext credential version aliases and backups', () => {
     assert.equal(result.ok, false, name);
   }
 });
+
+test('fails closed on MCP read tokens and generic secret credential names', () => {
+  for (const name of [
+    'FCR_REMOTE_MCP_READ_TOKEN',
+    'FCR_SESSION_SIGNING_CREDENTIAL',
+    'FCR_ROTATION_TOKEN',
+    'FCR_CSRF_HMAC',
+    'FCR_SERVICE_PEM',
+    'FCR_SIGNING_SEED',
+  ]) {
+    const result = validateBindingTypes(response([{ name, type: 'plain_text', text: 'sensitive-fixture' }]));
+    assert.equal(result.ok, false, name);
+  }
+  assert.equal(validateBindingTypes(response([
+    { name: 'FCR_TOKENIZER_MODE', type: 'plain_text', text: 'enabled' },
+    { name: 'REPOSITORY_KEYWORD', type: 'plain_text', text: 'guide' },
+  ])).ok, true);
+});
