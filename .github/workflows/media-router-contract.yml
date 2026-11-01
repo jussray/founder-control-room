@@ -8,6 +8,15 @@ on:
       - 'src/lib/mediaRouterDomainProtocol.ts'
       - 'src/lib/mediaRouterPhase1Contracts.ts'
       - 'src/lib/mediaExecutionService.ts'
+      - 'src/lib/mediaStoryboardStartFrame.ts'
+      - 'src/lib/makeVideoStoryboardBridge.ts'
+      - 'src/lib/makeVideoNervousSystem.ts'
+      - 'src/lib/__tests__/mediaStoryboardStartFrame.test.ts'
+      - 'src/lib/__tests__/makeVideoStoryboardBridge.test.ts'
+      - 'src/lib/mediaFfmpegRender.ts'
+      - 'src/lib/__tests__/makeVideoNervousSystem.test.ts'
+      - 'src/lib/__tests__/mediaFfmpegRender.test.ts'
+      - 'package.json'
       - 'src/lib/__tests__/mediaRouter*.test.ts'
       - 'src/lib/__tests__/mediaExecutionService.test.ts'
       - 'docs/MEDIA_ROUTER_DOMAIN_PROTOCOL_V1.md'
@@ -19,6 +28,15 @@ on:
       - 'src/lib/mediaRouterDomainProtocol.ts'
       - 'src/lib/mediaRouterPhase1Contracts.ts'
       - 'src/lib/mediaExecutionService.ts'
+      - 'src/lib/mediaStoryboardStartFrame.ts'
+      - 'src/lib/makeVideoStoryboardBridge.ts'
+      - 'src/lib/makeVideoNervousSystem.ts'
+      - 'src/lib/__tests__/mediaStoryboardStartFrame.test.ts'
+      - 'src/lib/__tests__/makeVideoStoryboardBridge.test.ts'
+      - 'src/lib/mediaFfmpegRender.ts'
+      - 'src/lib/__tests__/makeVideoNervousSystem.test.ts'
+      - 'src/lib/__tests__/mediaFfmpegRender.test.ts'
+      - 'package.json'
       - 'src/lib/__tests__/mediaRouter*.test.ts'
       - 'src/lib/__tests__/mediaExecutionService.test.ts'
       - 'docs/MEDIA_ROUTER_DOMAIN_PROTOCOL_V1.md'
@@ -59,10 +77,8 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
-      - name: Run focused Media Router tests
-        run: >-
-          npx vitest run
-          src/lib/__tests__/mediaRouterDomainProtocol.test.ts
-          src/lib/__tests__/mediaRouter.test.ts
-          src/lib/__tests__/mediaRouterPhase1Contracts.test.ts
-          src/lib/__tests__/mediaExecutionService.test.ts
+      - name: Install deterministic rendering tools
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
+      - name: Verify media routing and storyboard handoff
+        run: npm run verify:media:handoff

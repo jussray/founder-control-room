@@ -243,3 +243,9 @@ The following remain true under council, Red Team, OODA, L99, Lindy, GoalFix, Tr
 ## Rollback
 
 The Phase 1 implementation is additive source code. Rollback is a source revert of the protocol/router/tests/docs. Real provider calls, billing mutations, publication, and database migrations are not part of Phase 1, so those external states are not touched by this implementation.
+
+## Reproducible storyboard handoff verification
+
+Run `npm ci --ignore-scripts --no-audit --no-fund` followed by `npm run verify:media:handoff` to exercise the existing router, receipt contracts, dry-run execution service, canonical opening-frame binding, MAKEVIDEO director/storyboard bridge, and first-party graphic renderer together. Install FFmpeg/ffprobe before running the command. The focused CI workflow includes these sources and tests in its path filters and runs the same command on its exact checked-out head.
+
+This verification uses synthetic fixtures and makes no paid provider call. Passing it proves the checked-in handoff behavior only. The generic provider execution service remains dry-run-only: execute mode records a blocked receipt until an approved execution adapter exists. It does not prove a rendered video, provider access, deployment, playback, founder content approval, or publication. Reverting this focused package/workflow/documentation change restores the prior verification entry point without altering media assets or provider state.
