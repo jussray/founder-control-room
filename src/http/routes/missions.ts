@@ -9,7 +9,7 @@
  */
 
 import { Router } from 'express';
-import { runCouncilRound, type CouncilConversationRow } from '../../lib/councilRound.js';
+import { runCouncilRound, type CouncilConversationRow, type CouncilSeat } from '../../lib/councilRound.js';
 import { OPERATOR_RELAY_PEERS } from '../../lib/operatorRelayConstants.js';
 import { createServerOperatorRelayAdapters } from '../../lib/operatorRelayModelProviders.js';
 import type { RelayCapability, RelayOperatorId, RelaySensitivity } from '../../lib/operatorRelay.js';
@@ -164,6 +164,56 @@ missionsRouter.post('/:missionId/council/run', async (req: FounderRequest, res) 
     return res.status(400).json({ error: 'capability is unsupported' });
   }
 
+  let seats: CouncilSeat[] = participants.map((operator) => ({
+    operator,
+    capability: capability as RelayCapability,
+  }));
+
+  if (body['specialists'] !== undefined) {
+    if (body['participants'] !== undefined) {
+      return res.status(400).json({ error: 'use either participants or specialists, not both' });
+    }
+    const rawSpecialists = body['specialists'];
+    if (!Array.isArray(rawSpecialists) || rawSpecialists.length === 0 || rawSpecialists.length > OPERATOR_RELAY_PEERS.length) {
+      return res.status(400).json({ error: 'specialists must be a non-empty bounded array' });
+    }
+
+    const parsed: CouncilSeat[] = [];
+    for (const value of rawSpecialists) {
+      if (!value || typeof value !== 'object' || Array.isArray(value)) {
+        return res.status(400).json({ error: 'each specialist must be an object' });
+      }
+      const specialist = value as Record<string, unknown>;
+      const operator = typeof specialist['operator'] === 'string' ? specialist['operator'] : '';
+      const role = typeof specialist['role'] === 'string' ? specialist['role'].trim() : '';
+      const domain = typeof specialist['domain'] === 'string' ? specialist['domain'].trim().toLowerCase() : '';
+      const seatCapability = specialist['capability'] === undefined ? capability : specialist['capability'];
+
+      if (!RELAY_PEERS.has(operator)) return res.status(400).json({ error: 'specialist operator is unsupported' });
+      if (!role || role.length > 120) return res.status(400).json({ error: 'specialist role must be 1..120 characters' });
+      if (!domain || domain.length > 120) return res.status(400).json({ error: 'specialist domain must be 1..120 characters' });
+      if (typeof seatCapability !== 'string' || !RELAY_CAPABILITIES.has(seatCapability as RelayCapability)) {
+        return res.status(400).json({ error: 'specialist capability is unsupported' });
+      }
+
+      parsed.push({
+        operator: operator as RelayOperatorId,
+        capability: seatCapability as RelayCapability,
+        specialist: { role, domain },
+      });
+    }
+
+    const operators = parsed.map((seat) => seat.operator);
+    const domains = parsed.map((seat) => seat.specialist?.domain ?? '');
+    if (new Set(operators).size !== operators.length) {
+      return res.status(400).json({ error: 'specialists cannot reuse the same operator in one round' });
+    }
+    if (new Set(domains).size !== domains.length) {
+      return res.status(400).json({ error: 'specialists cannot reuse the same domain in one round' });
+    }
+    seats = parsed;
+  }
+
   const sensitivity = body['sensitivity'] === undefined ? 'internal' : body['sensitivity'];
   if (typeof sensitivity !== 'string' || !RELAY_SENSITIVITIES.has(sensitivity as RelaySensitivity)) {
     return res.status(400).json({ error: 'sensitivity must be public or internal for live Council relay' });
@@ -183,7 +233,7 @@ missionsRouter.post('/:missionId/council/run', async (req: FounderRequest, res) 
       initiator: 'fcr',
       sourceRef,
       seed,
-      seats: participants.map((operator) => ({ operator, capability: capability as RelayCapability })),
+      seats,
       missionId,
       round,
       sensitivity: sensitivity as RelaySensitivity,
