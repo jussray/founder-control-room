@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 
 import {
   MEDIA_ATTACK_FLOW_IDS,
-  MEDIA_REQUIRED_FOUNDER_SKILLS,
   mediaFounderSkillBundle,
   evaluateMediaRoute,
   snapshotAllowance,
