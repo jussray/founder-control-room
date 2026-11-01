@@ -10,6 +10,7 @@ vi.mock('../../../lib/supabaseClient.js', () => ({
 }));
 
 import { createPublicCustomerRouter } from '../publicCustomer.js';
+import type { PublicMcpTenantReader } from '../../../mcp/publicTenantAccess.js';
 
 const USER='33333333-3333-4333-8333-333333333333';
 const TENANT='11111111-1111-4111-8111-111111111111';
@@ -21,7 +22,7 @@ const reader={
   listProjects:async(tenantId:string)=>[{tenantId,id:PROJECT,name:'Mine',status:'observed',observedAt:null,secret:'never'}],
   getProject:async()=>null,
 };
-const build=(verify:(token:string)=>Promise<unknown>=async()=>identity, data=reader)=>{
+const build=(verify:(token:string)=>Promise<unknown>=async()=>identity, data:PublicMcpTenantReader=reader)=>{
  const app=express();app.use('/customer',createPublicCustomerRouter(verify,data));return app;
 };
 
