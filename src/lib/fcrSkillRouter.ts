@@ -27,6 +27,7 @@ export const FCR_AUTOMATIC_COUNCIL_LENSES = [
   'product-design',
   'data-analytics',
   'deep-research',
+  'broke-founder',
 ] as const;
 
 export const FCR_REQUIRED_PARALLEL_LENSES = FCR_AUTOMATIC_COUNCIL_LENSES;
@@ -190,6 +191,7 @@ export function routeFcrSkills(input: RouteFcrSkillsInput): FcrSkillRoutingDecis
   const standingCommands = routeFcrStandingCommands(input.goal, input.action);
 
   pushUnique(requiredProof, 'Founder Council is applied automatically in code; slash commands are optional foreground aliases and never create authority');
+  pushUnique(requiredProof, 'Broke Founder always on: $0 incremental recurring and one-time cost without explicit founder approval; prefer existing or secure first-party adapter if provider unavailable; a missing provider never grants execution authority');
   pushUnique(requiredProof, 'Standing command routing is inferred from founder intent and action; manual slash invocation is emphasis or override, not an activation requirement');
   pushUnique(requiredProof, `Operating-system identity remains separate from implementation/runtime proof: ${standingCommands.operatingSystemIds.join(', ')}`);
   pushUnique(requiredProof, 'Redteam remains two separate passes: premise before selection and solution after selection; distinct failures keep distinct receipts');
