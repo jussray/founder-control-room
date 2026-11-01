@@ -6,6 +6,7 @@ on:
       - '.github/skills/actions-mail-audit/**'
       - '.github/agents/actions-mail-auditor.agent.md'
       - '.github/workflows/actions-mail-audit-contract.yml'
+      - '.github/workflows/actions-mail-audit-monitor.yml'
   workflow_dispatch:
 
 permissions:
