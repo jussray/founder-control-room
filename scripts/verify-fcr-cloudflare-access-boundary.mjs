@@ -58,14 +58,16 @@ function isIdentityAllowPolicy(policy) {
     && policy.include.length > 0;
 }
 
-function serviceTokenIds(policies) {
-  return [...new Set(
-    policies
-      .filter((policy) => clean(policy?.decision).toLowerCase() === 'non_identity')
-      .flatMap((policy) => Array.isArray(policy?.include) ? policy.include : [])
-      .map((rule) => clean(rule?.service_token?.token_id))
-      .filter(Boolean),
-  )];
+function hasUnconstrainedServiceAuthPolicy(policies, tokenId) {
+  return policies.some((policy) => {
+    if (clean(policy?.decision).toLowerCase() !== 'non_identity') return false;
+    // Never certify token usability when unsupported Require or Exclude rules
+    // could prevent the configured token from authenticating.
+    if ((Array.isArray(policy?.require) ? policy.require : []).length > 0) return false;
+    if ((Array.isArray(policy?.exclude) ? policy.exclude : []).length > 0) return false;
+    return (Array.isArray(policy?.include) ? policy.include : [])
+      .some((rule) => clean(rule?.service_token?.token_id) === tokenId);
+  });
 }
 
 async function cloudflareJson(fetchImpl, apiToken, method, path) {
@@ -115,6 +117,13 @@ async function listServiceTokens(args) {
 
 function applicationHasHost(application, hostname) {
   return publicDestinations(application).some((destination) => publicHost(destination?.uri || destination?.hostname) === hostname);
+}
+
+function applicationCoversWholeHost(application, hostname) {
+  return publicDestinations(application).some((destination) => {
+    const uri = normalizePublicUri(destination?.uri || destination?.hostname);
+    return uri === hostname || uri === `${hostname}/*`;
+  });
 }
 
 function applicationOwnsUri(application, normalizedUri) {
@@ -220,8 +229,8 @@ export async function verifyFcrCloudflareAccessBoundary({
   }
 
   const appHostApps = applications.filter((application) => applicationHasHost(application, 'app.foundercontrolroom.org'));
-  if (appHostApps.length !== 1) {
-    fail(`Expected exactly one Access application for app.foundercontrolroom.org; found ${appHostApps.length}.`, 'app-access-application-missing-or-ambiguous');
+  if (appHostApps.length !== 1 || !applicationCoversWholeHost(appHostApps[0], 'app.foundercontrolroom.org')) {
+    fail('Expected exactly one hostname-wide Access application for app.foundercontrolroom.org.', 'app-access-application-missing-or-ambiguous');
   }
   const appHostId = required(appHostApps[0]?.id, 'App Access application ID');
   const appPolicies = await listPolicies(args, appHostId);
@@ -235,13 +244,16 @@ export async function verifyFcrCloudflareAccessBoundary({
   }
   const workerId = required(workers[0]?.id, 'API Worker Access application ID');
   const workerPolicies = await listPolicies(args, workerId);
+  if (workerPolicies.some((policy) => clean(policy?.decision).toLowerCase() === 'bypass')) {
+    fail('API Worker Access application must not contain bypass policies.', 'api-worker-access-policy-invalid');
+  }
   const serviceTokens = await listServiceTokens(args);
   const serviceTokenId = resolveServiceToken(serviceTokens, {
     clientId: env.FCR_CLOUDFLARE_ACCESS_CLIENT_ID,
     tokenId: env.FCR_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID,
     nowMs,
   });
-  if (!serviceTokenIds(workerPolicies).includes(serviceTokenId)) {
+  if (!hasUnconstrainedServiceAuthPolicy(workerPolicies, serviceTokenId)) {
     fail('The API Worker Access application does not bind the configured FCR service token.', 'api-service-auth-policy-missing');
   }
 
