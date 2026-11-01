@@ -12,7 +12,7 @@ export function parseRunUrl(value, scopedRepo) {
   if (typeof value !== 'string' || !REPO.test(scopedRepo || '')) return null;
   let url;
   try { url = new URL(value); } catch { return null; }
-  if (url.protocol !== 'https:' || url.hostname !== 'github.com' || url.username || url.password || url.port) return null;
+  if (url.protocol !== 'https:' || url.host !== 'github.com' || url.href.includes('@')) return null;
   const match = RUN_PATH.exec(url.pathname);
   if (!match) return null;
   const repo = match[1] + '/' + match[2];
