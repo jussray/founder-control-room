@@ -1,5 +1,5 @@
 import {describe,it,expect} from 'vitest';
-import {createSignedCouncilBusAckVerifier,COUNCIL_BUS_SIGNED_ACK,type CouncilBusAckKey} from '../councilBusSignedAck.js';
+import {createSignedCouncilBusAckVerifier,canonicalBusPrincipalSubject,COUNCIL_BUS_SIGNED_ACK,type CouncilBusAckKey} from '../councilBusSignedAck.js';
 import {canonicalizeRelayJsonV3} from '../../founder-os-lab/federatedRelayV3.js';
 
 async function fixture(){
@@ -19,7 +19,8 @@ async function fixture(){
     agent:origin.agent,route:origin.route,validFrom:'2026-11-01T00:00:00.000Z'
   };
   const make=async(payload:Record<string,unknown>)=>{
-    const raw=new TextEncoder().encode(canonicalizeRelayJsonV3(payload));
+    const {signature:_previousSignature,...unsigned}=payload;
+    const raw=new TextEncoder().encode(canonicalizeRelayJsonV3(unsigned));
     const sig=await crypto.subtle.sign('Ed25519',pair.privateKey,raw);
     const signature=Buffer.from(sig).toString('base64url');
     return {...payload,signature};
@@ -30,6 +31,14 @@ async function fixture(){
   return {ack,verify,input,keyEntry,make,now};
 }
 describe('Council Bus signed origin ACK',()=>{
+ it('converts an authenticated founder UUID into a deterministic opaque principal',async()=>{
+   const userId='123e4567-e89b-42d3-a456-426614174000';
+   const p=await canonicalBusPrincipalSubject(userId);
+   expect(p).toMatch(/^fcr-[a-f0-9]{40}$/);
+   expect(p).toBe(await canonicalBusPrincipalSubject(userId.toUpperCase()));
+   await expect(canonicalBusPrincipalSubject('founder-display-name')).rejects.toThrow(/UUID/);
+ });
+
  it('accepts exact route-bound Ed25519 receipt from registered origin key',async()=>{
    const f=await fixture();expect(await f.verify(f.input)).toBe(true);
  });
@@ -64,7 +73,7 @@ describe('Council Bus signed origin ACK',()=>{
      {issuedAt:'2026-11-02T19:55:00.000Z',expiresAt:'2026-11-02T20:00:00.000Z'},
      {issuedAt:'2026-11-02T19:59:00.000Z',expiresAt:'2026-11-02T20:10:00.000Z'}
    ]){
-      const ack=await f.make({...f.ack,...patch,signature:undefined} as Record<string,unknown>);
+      const ack=await f.make({...f.ack,...patch} as Record<string,unknown>);
       expect(await f.verify({...f.input,ack})).toBe(false);
    }
  });

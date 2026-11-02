@@ -29,6 +29,18 @@ const TOKEN=/^[a-z][a-z0-9-]{0,79}$/;
 const KEY=/^[a-zA-Z0-9:._-]{3,128}$/;
 const RECEIPT=/^[A-Za-z0-9_-]{1,128}$/;
 const SIGNATURE=/^[A-Za-z0-9_-]{64,172}$/;
+
+/** Encode an authenticated UUID founder ID as an opaque, stable Bus principal.
+ * Council v1 principal IDs require a leading letter; never expose the raw ID
+ * or use a claimed display name as a substitute for authenticated identity.
+ */
+export async function canonicalBusPrincipalSubject(founderUserId:string):Promise<string>{
+  if(typeof founderUserId!=='string'||!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(founderUserId))
+    throw new Error('Invalid authenticated founder UUID');
+  const bytes=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(founderUserId.toLowerCase()));
+  return 'fcr-'+Array.from(new Uint8Array(bytes),b=>b.toString(16).padStart(2,'0')).join('').slice(0,40);
+}
+
 const FIELDS=['contract','status','idempotencyKey','correlationId','receiptId',
   'agent','route','threadId','keyId','issuedAt','expiresAt','signature'];
 const record=(v:unknown):v is Record<string,unknown>=>v!==null&&typeof v==='object'&&!Array.isArray(v);
