@@ -75,3 +75,14 @@ This is a source-level integration, NOT a live origin callback.
 A production endpoint must still authenticate, implement signed
 allowed-route delivery and durable idempotency under zero-trust.
 No credential deletion, new PR, merge, deployment or provider mutation.
+
+## Executable bundled runtime proof
+
+The focused CI additionally invokes
+\`src/lib/__tests__/councilBusPinnedRuntime.test.ts\`, importing the
+exact-pinned original \`runEmbeddedCouncilBus\` code through
+\`dispatchPinnedCouncilBus\`. The test proves source-level handoff,
+claim-once, duplicate suppression, Court HOLD, staged switches,
+fingerprint checks and ACK verification with explicitly simulated
+ports. **The test does not establish an installed sender, a real
+transport key, a production journal or a receiving ChatGPT ACK.**
