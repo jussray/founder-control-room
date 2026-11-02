@@ -102,6 +102,17 @@ function repositoryEvidence(observation, observedAt) {
       reason: observation?.reason || 'PROVIDER_READ_UNAVAILABLE',
     };
   }
+  if (observation.visibility !== 'public') {
+    return {
+      contract: CONTRACT,
+      observedAt,
+      authority: 'observation-only',
+      source: 'founder-control-room',
+      status: 'restricted',
+      visibility: observation.visibility,
+      reason: 'NON_PUBLIC_REPOSITORY_EVIDENCE_REDACTED',
+    };
+  }
   const evidence = {
     contract: CONTRACT,
     observedAt,
@@ -189,17 +200,16 @@ export function applyEvidence({ worldsRegistry, systemsRegistry, observations, n
   return { worlds, systems, changedWorlds, changedSystems, observedAt };
 }
 
-async function githubRequest(token, path, { method = 'GET', body } = {}) {
+// Read-only transport; this scheduled observer cannot create commits or update refs.
+async function githubRequest(token, path) {
   const response = await fetch(`https://api.github.com${path}`, {
-    method,
+    method: 'GET',
     headers: {
       Authorization: `Bearer ${token}`,
       Accept: 'application/vnd.github+json',
       'X-GitHub-Api-Version': '2022-11-28',
       'User-Agent': 'founder-control-room-portfolio-evidence-sync',
-      ...(body ? { 'Content-Type': 'application/json' } : {}),
     },
-    body: body ? JSON.stringify(body) : undefined,
   });
   const text = await response.text();
   let parsed = null;
@@ -301,43 +311,6 @@ async function readTargetState(token, targetRepository, branch) {
   };
 }
 
-async function publishAtomicRegistryCommit(token, target, branch, beforeHead, baseTreeSha, worlds, systems) {
-  const currentRef = await githubRequest(token, `${target.root}/git/ref/heads/${encodeURIComponent(branch)}`);
-  if (currentRef.object.sha !== beforeHead) throw new Error(`STALE_TARGET_HEAD:${beforeHead}:${currentRef.object.sha}`);
-
-  const [worldBlob, systemBlob] = await Promise.all([
-    githubRequest(token, `${target.root}/git/blobs`, { method: 'POST', body: { content: `${JSON.stringify(worlds, null, 2)}\n`, encoding: 'utf-8' } }),
-    githubRequest(token, `${target.root}/git/blobs`, { method: 'POST', body: { content: `${JSON.stringify(systems, null, 2)}\n`, encoding: 'utf-8' } }),
-  ]);
-  const tree = await githubRequest(token, `${target.root}/git/trees`, {
-    method: 'POST',
-    body: {
-      base_tree: baseTreeSha,
-      tree: [
-        { path: 'site/data/worlds.json', mode: '100644', type: 'blob', sha: worldBlob.sha },
-        { path: 'site/data/systems.json', mode: '100644', type: 'blob', sha: systemBlob.sha },
-      ],
-    },
-  });
-  const commit = await githubRequest(token, `${target.root}/git/commits`, {
-    method: 'POST',
-    body: {
-      message: 'chore(site): refresh FCR portfolio evidence',
-      tree: tree.sha,
-      parents: [beforeHead],
-    },
-  });
-
-  const refReadback = await githubRequest(token, `${target.root}/git/ref/heads/${encodeURIComponent(branch)}`);
-  if (refReadback.object.sha !== beforeHead) throw new Error(`STALE_TARGET_HEAD_BEFORE_REF_UPDATE:${beforeHead}:${refReadback.object.sha}`);
-  await githubRequest(token, `${target.root}/git/refs/heads/${encodeURIComponent(branch)}`, {
-    method: 'PATCH',
-    body: { sha: commit.sha, force: false },
-  });
-  const finalRef = await githubRequest(token, `${target.root}/git/ref/heads/${encodeURIComponent(branch)}`);
-  if (finalRef.object.sha !== commit.sha) throw new Error(`TARGET_REF_READBACK_MISMATCH:${commit.sha}:${finalRef.object.sha}`);
-  return commit.sha;
-}
 
 async function writeReceipt(path, receipt) {
   await mkdir(dirname(path), { recursive: true });
@@ -366,24 +339,37 @@ async function runSync() {
   const now = new Date();
   const result = applyEvidence({ worldsRegistry: target.worlds, systemsRegistry: target.systems, observations, now });
   const changed = result.changedWorlds.length + result.changedSystems.length > 0;
-  const targetCommit = changed
-    ? await publishAtomicRegistryCommit(token, target, branch, target.headSha, target.treeSha, result.worlds, result.systems)
-    : target.headSha;
+  const proposals = changed ? {
+    worlds: 'artifacts/portfolio-evidence-sync/proposed/worlds.json',
+    systems: 'artifacts/portfolio-evidence-sync/proposed/systems.json',
+  } : {};
+  // No GitHub mutation authority: save reviewable local artifacts. A separate
+  // authenticated, exact-head founder release gate must authorize publication.
+  if (changed) {
+    await Promise.all([
+      writeReceipt(proposals.worlds, result.worlds),
+      writeReceipt(proposals.systems, result.systems),
+    ]);
+  }
   const unavailableRepositories = observed.filter(([, value]) => value.status === 'unavailable').map(([repository, value]) => ({ repository, reason: value.reason }));
   const receipt = {
     contract: CONTRACT,
-    state: changed ? 'PUBLISHED' : 'NO_CHANGE',
+    state: changed ? 'PROPOSED_UNPUBLISHED' : 'NO_CHANGE',
     targetRepository,
     branch,
     previousTargetHead: target.headSha,
-    targetCommit,
+    targetCommit: target.headSha,
+    publicationAuthorized: false,
+    published: false,
+    liveVerified: false,
+    proposals,
     worldsGeneratedAt: result.worlds.generatedAt,
     systemsGeneratedAt: result.systems.generatedAt,
     observedRepositoryCount: repoList.length,
     unavailableRepositories,
     changedWorlds: result.changedWorlds,
     changedSystems: result.changedSystems,
-    mutationBoundary: 'evidence fields + registry generatedAt only',
+    mutationBoundary: 'local reviewable evidence proposal; no GitHub mutation',
   };
   await writeReceipt(receiptPath, receipt);
   console.log(JSON.stringify(receipt));
@@ -422,7 +408,7 @@ async function runSelfTest() {
   assert.equal(summarizeChecks(Array.from({length:100},()=>onlySuccess[0]),101).state,'unknown');
   assert.equal(summarizeChecks([{status:'queued',conclusion:null}],1).state,'pending');
   const observation = (repository, sha) => ({
-    status: 'observed', repository, visibility: 'private', archived: false, defaultBranch: 'main', headSha: sha,
+    status: 'observed', repository, visibility: 'public', archived: false, defaultBranch: 'main', headSha: sha,
     headDate: '2026-10-01T11:55:00Z', latestMergedPr: { number: 7, title: 'Focused fix', mergedAt: '2026-10-01T11:50:00Z', mergeCommitSha: sha },
     checks: summarizeChecks([{ status: 'completed', conclusion: 'success' }]),
   });
@@ -443,6 +429,14 @@ async function runSelfTest() {
   assert.equal(first.systems.systems[2].evidence, undefined);
   assert.deepEqual(stripMutableEvidence(first.worlds), stripMutableEvidence(baseWorlds));
   assert.deepEqual(stripMutableEvidence(first.systems), stripMutableEvidence(baseSystems));
+
+  const privateEvidence=repositoryEvidence({...observation('jussray/private-repo','c'.repeat(40)),visibility:'private'},now.toISOString());
+  assert.equal(privateEvidence.status,'restricted');
+  assert.equal(privateEvidence.reason,'NON_PUBLIC_REPOSITORY_EVIDENCE_REDACTED');
+  assert.equal(privateEvidence.headSha,undefined);
+  assert.equal(privateEvidence.mainSha,undefined);
+  assert.equal(privateEvidence.latestMergedPr,undefined);
+  assert.equal(privateEvidence.repository,undefined);
 
   const second = applyEvidence({ worldsRegistry: first.worlds, systemsRegistry: first.systems, observations, now: new Date(now.getTime() + 60 * 60 * 1000) });
   assert.deepEqual(second.changedWorlds, []);
