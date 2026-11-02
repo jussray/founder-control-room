@@ -51,3 +51,27 @@ The FCR integration now mandates additional injected verification ports:
 Both fail closed when absent or denying. Local test stubs prove interface behavior only, not the existence of a production signer, provider, or originating-agent ACK.
 
 Cloudflare Worker CF_API_TOKEN was still classified plain_text. Its value was not retrieved or copied. Existing canonical Worker Reconcile already provides a guarded legacy-removal workflow and a strict post-deployment check. Do not run that workflow without exact-head production approval and provider readback. No deletion, rotation, deploy, or credential mutation performed.
+
+## 2026-11-02: exact-pinned canonical verifier implementation
+
+The previous injected boolean \`verifyBundle\` was removed. The FCR
+bridge now imports actual Council verifier source from a **snapshot of**
+\`jussray/ULTRATHINK-COUNCIL@223ad28ce4b0831912a3cd9b9c49541d559c7683\`.
+No floating dependency, network fetch, runtime URL import, or mutable
+remote package is involved; \`.github/workflows/fcr-council-bus-return-gate.yml\`
+compares the vendored canonical source Git blobs against the exact
+verified upstream blob fingerprints. The embedded Council Bus source
+code, verification library and type declarations are kept together.
+
+FCR now rejects a Council record that does not bind to deterministic
+\`fcrCouncilRoundId(missionId,round)\` and replays the original mission's
+persisted findings. Full canonical packet validators check Court policy
+and handoff fingerprint, including the \`PREPARED_NOT_SENT\` state.
+\`dispatchPinnedCouncilBus\` is the direct official delivery entrypoint,
+but **all server-owned ports remain required**, without a supplied
+network/secret/journal implementation.
+
+This is a source-level integration, NOT a live origin callback.
+A production endpoint must still authenticate, implement signed
+allowed-route delivery and durable idempotency under zero-trust.
+No credential deletion, new PR, merge, deployment or provider mutation.
