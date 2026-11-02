@@ -574,6 +574,63 @@ describe('FCR independent review merge membrane', () => {
     expect(mockIntegrate).not.toHaveBeenCalled();
   });
 
+  it('rejects a candidate-controlled StoryEngine ref that is not canonical main', async () => {
+    executeStack({ founderFinal: true });
+    clearReviewGate();
+    mockReadFile.mockResolvedValue(`env:
+  STORYENGINE_PEER_SHA: ${STORYENGINE_SHA}
+  STORYENGINE_PEER_REF: refs/heads/review-bypass
+`);
+
+    const response = await request(buildApp())
+      .post(`/approvals/${MISSION_ID}/execute`)
+      .set('Authorization', BEARER)
+      .send({
+        actionType: 'merge',
+        idempotencyKey: 'storyengine-peer-ref-spoof',
+        payload: {
+          head: 'mission/review-gate',
+          base: 'main',
+          expectedHeadSha: HEAD_SHA,
+          independentReviews: [{ reviewHash: REVIEW_HASH }],
+          founderFinalReview: { pullRequestNumber: 470, confirmExactCandidate: true },
+        },
+      });
+
+    expect(response.status).toBe(409);
+    expect(response.body.error).toMatch(/refs\/heads\/main/i);
+    expect(mockStoryEngineResolveRef).not.toHaveBeenCalled();
+    expect(mockIntegrate).not.toHaveBeenCalled();
+  });
+
+  it('rejects a candidate head that moves during the external peer read', async () => {
+    executeStack({ founderFinal: true });
+    clearReviewGate();
+    mockStoryEngineResolveRef.mockImplementation(async () => {
+      mockResolveRef.mockResolvedValue('f'.repeat(40));
+      return STORYENGINE_SHA;
+    });
+
+    const response = await request(buildApp())
+      .post(`/approvals/${MISSION_ID}/execute`)
+      .set('Authorization', BEARER)
+      .send({
+        actionType: 'merge',
+        idempotencyKey: 'storyengine-race-head',
+        payload: {
+          head: 'mission/review-gate',
+          base: 'main',
+          expectedHeadSha: HEAD_SHA,
+          independentReviews: [{ reviewHash: REVIEW_HASH }],
+          founderFinalReview: { pullRequestNumber: 470, confirmExactCandidate: true },
+        },
+      });
+
+    expect(response.status).toBe(409);
+    expect(response.body.error).toMatch(/Branch moved during external peer verification/i);
+    expect(mockIntegrate).not.toHaveBeenCalled();
+  });
+
   it('fails closed after deterministic review when founder-final confirmation is missing', async () => {
     executeStack({ founderFinal: true });
     clearReviewGate();
