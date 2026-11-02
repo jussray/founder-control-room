@@ -97,15 +97,48 @@ describe('public FCR MCP isolation', () => {
     expect(state.getUser).not.toHaveBeenCalled();
   });
 
-  it('returns only two read-only, OAuth-scoped tools', async () => {
+  it('returns only customer-scoped read-only OAuth tools', async () => {
     const response = await post(app());
     expect(response.status).toBe(200);
     expect(response.body.result.tools.map((t: { name: string }) => t.name)).toEqual([
-      'fcr_list_my_projects', 'fcr_get_my_project',
+      'fcr_list_my_projects', 'fcr_get_my_project', 'fcr_customer_start',
     ]);
     expect(response.body.result.tools.every((t: { annotations: { readOnlyHint: boolean } }) =>
       t.annotations.readOnlyHint)).toBe(true);
     expect(JSON.stringify(response.body)).not.toMatch(/fcr_relay_operator|founder_users/);
+  });
+
+  it('starts a brand-new user from six 5W1H questions without reading any database', async () => {
+    const response = await post(app(), 'new-user', {
+      jsonrpc: '2.0', id: 16, method: 'tools/call',
+      params: { name: 'fcr_customer_start', arguments: {} },
+    });
+    expect(response.status).toBe(200);
+    const output = response.body.result.structuredContent;
+    expect(output.questions.map((q: { key: string }) => q.key))
+      .toEqual(['who', 'what', 'when', 'where', 'why', 'how']);
+    expect(output.inheritedContext).toBe(false);
+    expect(output.serverStateWritten).toBe(false);
+    expect(state.from).not.toHaveBeenCalled();
+    expect(JSON.stringify(output)).not.toMatch(/founder_users|founder-private|jussray/);
+  });
+
+  it('gives brand-new customers an empty project list without inherited projects', async () => {
+    const response = await post(app(), 'new-user', {
+      jsonrpc: '2.0', id: 17, method: 'tools/call',
+      params: { name: 'fcr_list_my_projects', arguments: {} },
+    });
+    expect(response.status).toBe(200);
+    expect(response.body.result.structuredContent.projects).toEqual([]);
+  });
+
+  it('rejects customer_start arguments that try to import a founder workspace', async () => {
+    const response = await post(app(), 'new-user', {
+      jsonrpc: '2.0', id: 18, method: 'tools/call',
+      params: { name: 'fcr_customer_start', arguments: { founderWorkspace: 'private' } },
+    });
+    expect(response.status).toBe(400);
+    expect(state.from).not.toHaveBeenCalled();
   });
 
   it('shows user A only projects under user A memberships', async () => {
