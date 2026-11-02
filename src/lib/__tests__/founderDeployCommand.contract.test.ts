@@ -143,6 +143,19 @@ describe('Founder deploy command authority contract', () => {
     expect(reconcileWorkflow).not.toContain('PUBLISH_ALLOWED');
   });
 
+  it('uses the bounded plaintext repair exception only before canonical deploy and proves strict cleanup afterward', () => {
+    const workerJob = reconcileWorkflow.indexOf('  worker-deploy:');
+    const runtimeJob = reconcileWorkflow.indexOf('  runtime-proof:');
+    const authorityGate = reconcileWorkflow.slice(0, workerJob);
+    const workerDeploy = reconcileWorkflow.slice(workerJob, runtimeJob);
+    const strictProof = workerDeploy.slice(workerDeploy.indexOf('Verify repaired Worker binding types'));
+
+    expect(authorityGate).toContain("FCR_ALLOW_STALE_CF_API_TOKEN_REMOVAL: 'true'");
+    expect(workerDeploy).toContain('Verify repaired Worker binding types');
+    expect(strictProof).toContain('node scripts/verify-worker-binding-types.mjs');
+    expect(strictProof).not.toContain('FCR_ALLOW_STALE_CF_API_TOKEN_REMOVAL');
+  });
+
   it('proves direct API and public Pages version headers and bodies against the exact release SHA', () => {
     const runtimeProof = reconcileWorkflow.slice(reconcileWorkflow.indexOf('  runtime-proof:'));
     expect(runtimeProof).toContain('API_ORIGIN: https://api.foundercontrolroom.org');
@@ -181,6 +194,8 @@ describe('Founder deploy command authority contract', () => {
     expect(authorityGate).toContain('missing = sorted(required - present)');
     expect(authorityGate).toContain('sys.exit(1)');
     expect(authorityGate).toContain('trap \'rm -f "$secret_receipt"\' EXIT');
+    expect(authorityGate).toContain("FCR_ALLOW_STALE_CF_API_TOKEN_REMOVAL: 'true'");
+    expect(authorityGate).toContain('CF_API_TOKEN must remain absent from wrangler.worker.toml');
     expect(authorityGate).not.toContain('wrangler secret put');
     expect(authorityGate).not.toContain('wrangler deploy');
     expect(authorityGate).not.toContain('supabase db push');
