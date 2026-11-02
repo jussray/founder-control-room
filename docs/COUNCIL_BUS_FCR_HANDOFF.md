@@ -112,3 +112,7 @@ Added **founder-only Truth Console** tabs for:
 Read-only Cloudflare discovery showed a gateway named \`truth-weaver-evidence\`, not an FCR gateway; the FCR route refuses that identity. No Google credential, FCR gateway or model delivery has been installed or verified. The UI exposes unknown/unconfigured states rather than mock indexing stats or model conclusions. For SEO/AEO/GEO, treat published metadata, structured answers, canonical links, robots and sitemap as independently testable sources; do not expose private founder, partner or paid customer surfaces.
 
 **Access limitation:** existing FCR Truth Console requires \`requireFounder\`. General project-owner tenant-specific signup/authorization is NOT implemented by this source feature. That would need a separately reviewed tenant ACL and billing entitlement.
+
+## Provider receipt — 2026-11-02 FCR evidence gateway
+
+Read-only Cloudflare gateway readback after creation confirmed `fcr-evidence`, authentication=true, byok_only=true, collect_logs=false, cache_ttl=0, rate_limiting_limit=5, rate_limiting_interval=60. The source-only `FCR_EVIDENCE_GATEWAY_ID` variable is now pinned in wrangler.worker.toml. This is an account-level configuration creation, **not** evidence of successful model inference or production authorization. Gateway-specific authentication token, runtime secret installation, exact-head deployment and a real restricted model roundtrip remain unverified. No claim/evidence text was sent to the new gateway.

@@ -68,6 +68,8 @@ FOUNDER_ALLOWED_ORIGINS = "https://foundercontrolroom.org"
 FOUNDER_API_URL = "https://foundercontrolroom.org"
 FCR_EMAIL_FROM = "welcome@api.foundercontrolroom.org"
 FCR_REMOTE_MCP_READ_PROJECTS = "chief-ai-machine,founder-control-room"
+# FCR-owned, authenticated, BYOK-only AI Gateway. Identity only; not an activation grant.
+FCR_EVIDENCE_GATEWAY_ID = "fcr-evidence"
 FCR_REMOTE_MCP_RESOURCE = "https://api.foundercontrolroom.org/mcp"
 FCR_REMOTE_MCP_OAUTH_ISSUER = "https://oojzfmmywbvficgybaxd.supabase.co/auth/v1"
 FCR_REMOTE_MCP_OAUTH_AUDIENCE = "authenticated"
