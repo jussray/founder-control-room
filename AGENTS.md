@@ -335,3 +335,7 @@ For every authorized creation or repair, leave the result in the corresponding p
 ## Private workspace and media product boundary
 
 Apply [Private Workspaces and Media](docs/PRIVATE_WORKSPACES_AND_MEDIA.md) to account, tenant, plan, media and destination work. Keep founder operational data private, bind founder authority to verified immutable user ID, and isolate each member workspace. Verify entitlements and exact destination/schedule grants server-side; no account, plan, connection or vague request grants founder or publication authority. Track missing signup, schema, billing and transport separately from implemented local media code.
+
+## Member Shorts publishing boundary (review branch)
+
+Use `src/lib/shortsPublicationGate.ts` and `src/lib/shortsYouTubeTransport.ts` as **source-only**, non-executing customer publication building blocks. Execute `npm run verify:youtube-shorts-transport` for the focused isolated suite. The caller must obtain identity, workspace membership, billing entitlement, approved review and channel/content-scoped grant from **trusted server-side stores**, provide a durable atomic publication claim, and reconcile ambiguous uploads. Never accept these records from browser input. These modules do not create member accounts, a billing webhook, a YouTube OAuth connection, a publishing route, or a live service. Do not enable posting or claim production readiness until independent end-to-end validation and publication authority are present.
