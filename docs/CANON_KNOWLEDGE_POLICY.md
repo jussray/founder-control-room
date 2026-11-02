@@ -30,6 +30,13 @@ Both gates fail closed. The reducer rejects stale/equal-time successors, subject
 - Keep original and successor events. Do not delete, silently overwrite, or manufacture continuity receipts.
 - Share minimal evidence references with authorized agents; project-private information remains inside its approved boundary. Cross-agent sync/MCP remains a separate authenticated, permission-scoped feature, **not established by this source patch**.
 
+
+## Stale → fix to present
+
+For an authorized task, evidence that a **present-tense** agent instruction, policy document, issue, status, or implementation is stale creates an obligation to reconcile the claim in the corresponding authoritative project, not merely append “stale” or generate another report. Inspect the current subject and compare proof scopes; **preserve the predecessor last-known verified event**, and repair only what newer independent evidence actually establishes. When authorized, implement a minimal direct source change with appropriate tests and exact-head/readback receipts. If code, provider configuration, secret, PR/branch creation, founder-final merge, or production operations require separate authority, mark that operation `BLOCKED` and name its exact gate—do not falsely call the system fixed.
+
+For merge authority, **zero native human GitHub approvals in the FCR founder-only phase is intended**: the deterministic exact-head independent review witness and separately authenticated exact-candidate Founder Final remain required. The verified source policy is `docs/FOUNDER_MERGE_AUTHORITY.md` and `docs/PROVIDERS.md`; live GitHub enforcement needs distinct provider readback. For credentials, a workflow `APP_PRIVATE_KEY_SHAPE_INVALID:unknown` output documents input/parser failure, **not** an invalid or unrotated GitHub App key. The founder reports a rotation about two to three months before 2026-11-02; record this as `USER-REPORTED` unless an independent permitted provider source confirms the rotation date or effective key identity. Never copy or expose credential values, assume new rotation authority, or bypass validation.
+
 ## Verification and adoption
 
 Focused unit test: node --experimental-strip-types --test tests/canonKnowledge.node.test.mjs (Node with TypeScript stripping support).
