@@ -50,6 +50,7 @@ jobs:
         run: node scripts/sync-jussco-portfolio-evidence.mjs --self-test
 
       - name: Normalize key and mint portfolio GitHub App token
+        id: mint
         env:
           APP_ID: ${{ secrets.APP_ID }}
           APP_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}
@@ -109,10 +110,11 @@ jobs:
           JUSSCO_URLS: https://jussco.company,https://www.jussco.company
         run: node scripts/sync-jussco-portfolio-evidence.mjs --live-proof
 
-      - name: Record blocked authentication evidence
+      - name: Record blocked workflow-stage evidence without asserting credential revocation
         if: ${{ failure() }}
         env:
           FAILED_JOB_STATUS: ${{ job.status }}
+          MINT_STEP_OUTCOME: ${{ steps.mint.outcome }}
           FCR_RUN_ID: ${{ github.run_id }}
           FCR_HEAD_SHA: ${{ github.sha }}
         shell: bash
@@ -127,7 +129,8 @@ jobs:
             --arg run "$FCR_RUN_ID" \
             --arg sha "$FCR_HEAD_SHA" \
             --arg status "$FAILED_JOB_STATUS" \
-            '{contract:"juss/fcr-portfolio-evidence@v1",state:"BLOCKED",reason:"WORKFLOW_FAILED_BEFORE_EVIDENCE_RECEIPT",runId:$run,headSha:$sha,jobStatus:$status,sourceVerified:false,liveVerified:false}' \
+            --arg mint "$MINT_STEP_OUTCOME" \
+            '{contract:"juss/fcr-portfolio-evidence@v1",state:"BLOCKED",reason:"WORKFLOW_FAILED_BEFORE_EVIDENCE_RECEIPT",runId:$run,headSha:$sha,jobStatus:$status,mintStepOutcome:$mint,bindingOrigin:"UNKNOWN_FROM_WORKFLOW",providerCredentialValidity:"NOT_EVALUATED_BY_THIS_RECEIPT",sourceVerified:false,liveVerified:false}' \
             > "$PORTFOLIO_SYNC_RECEIPT"
 
       - name: Upload bounded evidence receipt and browser proof
