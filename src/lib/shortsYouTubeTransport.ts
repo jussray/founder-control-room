@@ -15,7 +15,7 @@ export interface YouTubeShortUploadOptions {
   accessToken: string;
   /** Must be a durable, atomic, workspace-scoped provider reservation. */
   claim: (key: string) => Promise<boolean>;
-  complete?: (key: string, receipt: {videoId: string; channelId: string; privacy: string; assetSha256: string}) => Promise<void>;
+  complete: (key: string, receipt: {videoId: string; channelId: string; privacy: string; assetSha256: string}) => Promise<void>;
   fetchImpl?: typeof fetch;
 }
 async function boundedJson(response: Response): Promise<Record<string, unknown>> {
@@ -65,7 +65,7 @@ export async function uploadReviewedYouTubeShort(options: YouTubeShortUploadOpti
   const sent = await fetcher(url.toString(), {
     method: 'PUT',
     headers: { ...headers, 'Content-Type': 'video/mp4', 'Content-Length': String(bytes.length) },
-    body: bytes,
+    body: new Uint8Array(bytes),
   });
   if (!sent.ok) fail('PUBLICATION_PROVIDER_UPLOAD_FAILED');
   const body = await boundedJson(sent);
@@ -79,6 +79,6 @@ export async function uploadReviewedYouTubeShort(options: YouTubeShortUploadOpti
   if (observed?.id !== videoId || observed?.snippet?.channelId !== p.channelId ||
       observed?.status?.privacyStatus !== p.privacy) fail('PUBLICATION_PROVIDER_READBACK_MISMATCH');
   const receipt = { videoId, channelId: p.channelId, privacy: p.privacy, assetSha256: digest };
-  await options.complete?.(key, receipt);
+  await options.complete(key, receipt);
   return receipt;
 }
