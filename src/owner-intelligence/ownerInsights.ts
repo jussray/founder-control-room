@@ -154,9 +154,9 @@ export async function reviewEvidenceWithGateway(input:ClaimInput,config:{account
   const result=await jsonResponse(response,45000);
   const choices=Array.isArray(result.choices)?result.choices:[];
   const first=asObject(choices[0]);
-  let raw=asObject(first.message).content;
-  if(typeof raw!=='string'||raw.length>20000)throw new InsightsError(502,'AI_GATEWAY_INVALID_RESPONSE');
-  raw=raw.trim();
+  const responseContent=asObject(first.message).content;
+  if(typeof responseContent!=='string'||responseContent.length>20000)throw new InsightsError(502,'AI_GATEWAY_INVALID_RESPONSE');
+  let raw: string=responseContent.trim();
   if(raw.startsWith('```'))raw=raw.replace(/^```(?:json)?\s*/i,'').replace(/\s*```$/,'');
   let value:Record<string,unknown>;
   try{value=asObject(JSON.parse(raw));}catch{throw new InsightsError(502,'AI_GATEWAY_INVALID_RESPONSE');}
