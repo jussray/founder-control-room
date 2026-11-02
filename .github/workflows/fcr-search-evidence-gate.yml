@@ -11,6 +11,9 @@ on:
       - 'public/control-room/seo-evidence.js'
       - 'public/control-room/truth-console.js'
       - 'public/control-room/stack-router.js'
+      - 'public/index.html'
+      - 'public/sitemap.xml'
+      - 'src/http/__tests__/seoAssets.test.ts'
       - '.github/workflows/fcr-search-evidence-gate.yml'
   pull_request:
     paths:
@@ -23,6 +26,9 @@ on:
       - 'public/control-room/seo-evidence.js'
       - 'public/control-room/truth-console.js'
       - 'public/control-room/stack-router.js'
+      - 'public/index.html'
+      - 'public/sitemap.xml'
+      - 'src/http/__tests__/seoAssets.test.ts'
       - '.github/workflows/fcr-search-evidence-gate.yml'
 permissions:
   contents: read
@@ -37,7 +43,7 @@ jobs:
           node-version: '24'
       - run: npm install --no-audit --no-fund
       - run: npx tsc --noEmit --strict --target ES2022 --module NodeNext --moduleResolution NodeNext src/lib/searchConsoleRead.ts src/lib/evidenceGatewayReview.ts
-      - run: npx vitest run src/lib/__tests__/searchConsoleRead.test.ts src/lib/__tests__/evidenceGatewayReview.test.ts
+      - run: npx vitest run src/lib/__tests__/searchConsoleRead.test.ts src/lib/__tests__/evidenceGatewayReview.test.ts src/http/__tests__/seoAssets.test.ts
       - run: node --check public/control-room/seo-evidence.js
       - run: node --check public/control-room/truth-console.js
       - run: node --check public/control-room/stack-router.js
