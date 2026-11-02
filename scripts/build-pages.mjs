@@ -33,6 +33,8 @@ const requiredAssets = [
   'control-room/capital-decision.js',
   'control-room/capital-decision.css',
   'control-room/security.html',
+  'control-room/search-evidence.html',
+  'control-room/search-evidence.js',
   'control-room/security.js',
   'control-room/security.css',
   'control-room/quickscan.html',
