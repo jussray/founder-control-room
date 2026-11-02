@@ -2,7 +2,9 @@
 
 ## Purpose and boundary
 
-Founder Control Room is the portfolio's evidence and notification point for official ChatGPT/OpenAI, Claude/Anthropic, and Perplexity changes affecting research-to-build work. The current carrier checks hourly. This is hourly polling, not a provider push feed, not guaranteed instant delivery, and not proof that every provider page was reachable.
+Founder Control Room is the portfolio's evidence and notification point for official ChatGPT/OpenAI, Claude/Anthropic, and Perplexity changes affecting research-to-build work. The project Worker source performs an hourly Exa search and writes deduplicated candidate receipts to FCR's existing event inbox. This is hourly polling, not a provider push feed, not guaranteed instant delivery, and not proof that every provider page was reachable. The separate ChatGPT automation is not connected to this project runtime.
+
+Search results are candidate discovery, not verified account availability. The project code accepts only official provider-domain URLs, keeps each candidate marked `review_required`, leaves entitlement and cross-project impact unknown, and records search-based coverage as `PARTIAL`. It emails a review-only digest for newly deduplicated candidates and newly failed source searches; those messages are not claims of a verified provider change. A failed provider search produces a separate coverage-failure event; it is never treated as “no change.” No automatic Chief or SolContinuity handoff is claimed.
 
 FCR reports verified public changes and the product-specific impact. It does not change provider plans, accounts, settings, permissions, repositories, files, or deployments. Chief may analyze a supplied event; SolContinuity may validate its freshness and continuity; PromptOS owns its reusable research prompt. These are optional peer handoffs and do not grant authority or make one product dependent on another.
 
