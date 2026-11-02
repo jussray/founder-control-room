@@ -86,3 +86,19 @@ claim-once, duplicate suppression, Court HOLD, staged switches,
 fingerprint checks and ACK verification with explicitly simulated
 ports. **The test does not establish an installed sender, a real
 transport key, a production journal or a receiving ChatGPT ACK.**
+
+
+## Origin-signed ACK verification contract
+
+The optional \`src/lib/councilBusSignedAck.ts\` verifier implements the
+pinned Bus \`verifyAck\` port with **Ed25519** verification. It checks
+registered server-side key state, tenant/subject/agent/route binding,
+exact thread and correlation IDs, idempotency SHA, bounded receipt,
+signature, and a short signed lifetime. It returns false on missing
+or untrusted registry data and never accepts arbitrary callback URLs.
+
+The originating provider still needs a real registered key, receiver
+implementation, authenticated callback transport and durable
+claim-once journal; FCR does not generate any provider key or expose
+a public callback route in this candidate. Test-generated Ed25519 keys
+are transient fixtures only. No ChatGPT receipt has been observed.
