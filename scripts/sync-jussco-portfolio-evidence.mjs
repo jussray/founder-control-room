@@ -8,7 +8,6 @@ const DEFAULT_TARGET = 'jussray/jussray';
 const DEFAULT_BRANCH = 'main';
 const MAX_STABLE_AGE_MS = 24 * 60 * 60 * 1000;
 const HARD_FAILURES = new Set(['failure', 'timed_out', 'cancelled', 'action_required', 'startup_failure']);
-const PASSING_CONCLUSIONS = new Set(['success', 'neutral', 'skipped']);
 
 class GitHubHttpError extends Error {
   constructor(status, path, body) {
@@ -63,28 +62,32 @@ function evidenceIsFresh(evidence, nowMs) {
   return Number.isFinite(observed) && nowMs - observed < MAX_STABLE_AGE_MS;
 }
 
-function summarizeChecks(checkRuns) {
-  const runs = Array.isArray(checkRuns) ? checkRuns : [];
-  if (!runs.length) {
-    return { state: 'unknown', total: 0, completed: 0, passing: 0, failing: 0, pending: 0, ci: 'UNKNOWN · no exact-head checks observed' };
-  }
-  let completed = 0;
-  let passing = 0;
-  let failing = 0;
-  let pending = 0;
+// A successful subset of GitHub check-runs is not proof that all checks passed.
+// Skipped/neutral jobs are not green, and truncated or incomplete API reads are
+// UNKNOWN rather than a fabricated PASS.
+function summarizeChecks(checkRuns, providerTotal = Array.isArray(checkRuns) ? checkRuns.length : null) {
+  const runs=Array.isArray(checkRuns) ? checkRuns : [];
+  if (!Number.isSafeInteger(providerTotal) || providerTotal<0 || providerTotal!==runs.length)
+    return { state:'unknown',total:providerTotal,observed:runs.length,completed:0,passing:0,failing:0,pending:0,
+      ci:'UNKNOWN · incomplete exact-head check inventory' };
+  if (!runs.length)
+    return { state:'unknown',total:0,completed:0,passing:0,failing:0,pending:0,ci:'UNKNOWN · no exact-head checks observed' };
+  let completed=0,passing=0,failing=0,pending=0,indeterminate=0;
   for (const run of runs) {
-    if (run?.status !== 'completed') {
-      pending += 1;
-      continue;
-    }
-    completed += 1;
-    if (HARD_FAILURES.has(run?.conclusion)) failing += 1;
-    else if (PASSING_CONCLUSIONS.has(run?.conclusion)) passing += 1;
+    if (run?.status!=='completed') {pending++;continue;}
+    completed++;
+    if (HARD_FAILURES.has(run?.conclusion)) failing++;
+    else if (run?.conclusion==='success') passing++;
+    else indeterminate++;
   }
-  if (failing > 0) return { state: 'failed', total: runs.length, completed, passing, failing, pending, ci: `FAIL · ${failing}/${runs.length} exact-head checks` };
-  if (pending > 0) return { state: 'pending', total: runs.length, completed, passing, failing, pending, ci: `PENDING · ${pending}/${runs.length} exact-head checks` };
-  if (passing === runs.length) return { state: 'passed', total: runs.length, completed, passing, failing, pending, ci: `PASS · ${runs.length} exact-head checks` };
-  return { state: 'unknown', total: runs.length, completed, passing, failing, pending, ci: 'UNKNOWN · exact-head check conclusions incomplete' };
+  if (failing>0) return {state:'failed',total:runs.length,completed,passing,failing,pending,indeterminate,
+    ci:`FAIL · ${failing}/${runs.length} exact-head checks`};
+  if (pending>0) return {state:'pending',total:runs.length,completed,passing,failing,pending,indeterminate,
+    ci:`PENDING · ${pending}/${runs.length} exact-head checks`};
+  if (indeterminate>0) return {state:'unknown',total:runs.length,completed,passing,failing,pending,indeterminate,
+    ci:`UNKNOWN · ${indeterminate}/${runs.length} skipped, neutral or unrecognized conclusions`};
+  return {state:'passed',total:runs.length,completed,passing,failing,pending,indeterminate,
+    ci:`PASS · ${runs.length} observed exact-head checks (not a complete release gate)`};
 }
 
 function repositoryEvidence(observation, observedAt) {
@@ -245,7 +248,7 @@ async function observeRepository(token, repository) {
 
   const checksResponse = await optionalProviderRead(() => githubRequest(token, `${root}/commits/${encodeURIComponent(headSha)}/check-runs?per_page=100`));
   const checks = checksResponse
-    ? summarizeChecks(checksResponse.check_runs)
+    ? summarizeChecks(checksResponse.check_runs, checksResponse.total_count ?? null)
     : { state: 'unavailable', total: 0, completed: 0, passing: 0, failing: 0, pending: 0, ci: 'UNKNOWN · exact-head check read unavailable' };
 
   return {
@@ -402,6 +405,22 @@ async function runSelfTest() {
       { name: 'Internal', kind: 'standalone_internal_os', public: false, builder: { provider: 'Base44', appId: 'internal-1' } },
     ],
   };
+  // A pass requires a complete inventory of successful observations, not a
+  // subset of green jobs. These assertions run before any token is minted.
+  const onlySuccess=[{status:'completed',conclusion:'success'}];
+  assert.equal(summarizeChecks(onlySuccess,1).state,'passed');
+  assert.equal(summarizeChecks([{status:'completed',conclusion:'skipped'}],1).state,'unknown');
+  assert.equal(summarizeChecks([{status:'completed',conclusion:'neutral'}],1).state,'unknown');
+  assert.equal(summarizeChecks([{status:'completed',conclusion:null}],1).state,'unknown');
+  assert.equal(summarizeChecks([...onlySuccess,{status:'completed',conclusion:'skipped'}],2).state,'unknown');
+  assert.equal(summarizeChecks([...onlySuccess,{status:'in_progress',conclusion:null}],2).state,'pending');
+  assert.equal(summarizeChecks([...onlySuccess,{status:'completed',conclusion:'failure'}],2).state,'failed');
+  assert.equal(summarizeChecks(onlySuccess,2).state,'unknown');
+  assert.equal(summarizeChecks(onlySuccess,null).state,'unknown');
+  assert.equal(summarizeChecks(onlySuccess,0).state,'unknown');
+  assert.equal(summarizeChecks([],0).state,'unknown');
+  assert.equal(summarizeChecks(Array.from({length:100},()=>onlySuccess[0]),101).state,'unknown');
+  assert.equal(summarizeChecks([{status:'queued',conclusion:null}],1).state,'pending');
   const observation = (repository, sha) => ({
     status: 'observed', repository, visibility: 'private', archived: false, defaultBranch: 'main', headSha: sha,
     headDate: '2026-10-01T11:55:00Z', latestMergedPr: { number: 7, title: 'Focused fix', mergedAt: '2026-10-01T11:50:00Z', mergeCommitSha: sha },
