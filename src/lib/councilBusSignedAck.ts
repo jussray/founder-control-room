@@ -44,7 +44,7 @@ export async function canonicalBusPrincipalSubject(founderUserId:string):Promise
 export function canonicalCouncilAckPayload(value:Record<string,unknown>):string {
   return '{'+Object.keys(value).sort().map(key=>{
     const field=value[key];
-    if(typeof field!=='string'||/[\\uD800-\\uDFFF]/u.test(field))throw new Error('Invalid ACK string');
+    if(typeof field!=='string'||Array.from(field).some(ch=>{const cp=ch.codePointAt(0)??0;return cp<32||cp>126;}))throw new Error('Invalid ACK string');
     return JSON.stringify(key)+':'+JSON.stringify(field);
   }).join(',')+'}';
 }
