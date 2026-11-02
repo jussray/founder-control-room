@@ -1,6 +1,5 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { appendVerifiedCanon, readCanonKnowledge } from '../src/lib/canonKnowledge.ts';
 
 const subject = { project: 'founder-control-room', key: 'cloudflare.worker.release' };
@@ -81,22 +80,4 @@ test('missing record remains unknown, without weakening existing canon', () => {
     digest: null, lastVerifiedAt: null, evidenceRef: null,
     currentRuntimeVerified: false, totalObservations: 0,
   });
-});
-
-test('global AI and agent contracts reconcile stale claims without weakening founder merge or credential truth', () => {
-  const globalAi = readFileSync(new URL('../GLOBAL_AI.md', import.meta.url), 'utf8');
-  const agents = readFileSync(new URL('../AGENTS.md', import.meta.url), 'utf8');
-  const policy = readFileSync(new URL('../docs/CANON_KNOWLEDGE_POLICY.md', import.meta.url), 'utf8');
-  assert.match(globalAi, /Stale → fix to present/);
-  assert.match(globalAi, /repair the affected authoritative project source/);
-  assert.match(globalAi, /required_approving_review_count: 0/);
-  assert.match(globalAi, /deterministic, exact-head independent review/);
-  assert.match(globalAi, /separate authenticated founder-final approval/);
-  assert.match(globalAi, /APP_PRIVATE_KEY_SHAPE_INVALID:unknown/);
-  assert.match(globalAi, /USER-REPORTED/);
-  assert.match(agents, /zero native approving human reviews/);
-  assert.match(agents, /FCR_TRUSTED_SEMANTIC_REVIEWER_IDS.*compatibility-only/);
-  assert.match(policy, /Stale → fix to present/);
-  assert.match(policy, /preserve the predecessor last-known verified event/);
-  assert.match(policy, /USER-REPORTED/);
 });

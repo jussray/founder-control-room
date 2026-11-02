@@ -81,6 +81,21 @@ describe('repository documentation truth control', () => {
     expect(mergeAuthority).toContain('Documentation truth');
   });
 
+  it('enforces stale-to-present source repair without native reviewer or credential truth drift', () => {
+    expect(globalAi).toContain('## Stale → fix to present');
+    expect(globalAi).toContain('repair the affected authoritative project source');
+    expect(globalAi).toContain('Native GitHub `required_approving_review_count: 0` is intentional');
+    expect(globalAi).toContain('deterministic, exact-head independent review');
+    expect(globalAi).toContain('separate authenticated founder-final approval');
+    expect(globalAi).toContain('APP_PRIVATE_KEY_SHAPE_INVALID:unknown');
+    expect(globalAi).toContain('USER-REPORTED');
+    expect(agents).toContain('zero native approving human reviews');
+    expect(agents).toContain('`FCR_TRUSTED_SEMANTIC_REVIEWER_IDS` is compatibility-only');
+    expect(mergeAuthority).toContain('requiredSemanticReviews: 0');
+    expect(mergeAuthority).toContain('founderFinalApprovalRequired: true');
+    expect(mergeAuthority).toContain('zero native approving reviews');
+  });
+
   it('keeps the shared AI workflow on truth leases, docs sync, product design, analytics, and value review', () => {
     expect(globalAi).toContain('Truth Lease');
     expect(globalAi).toContain('Documentation truth');
