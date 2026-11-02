@@ -147,7 +147,7 @@ export async function reviewEvidenceWithGateway(input:ClaimInput,config:{account
   const body={model,messages:[{role:'system',content:instructions},{role:'user',content:JSON.stringify({projectSlug:input.projectSlug,claim:input.claim,evidence:input.evidence})}],temperature:0,max_tokens:800};
   let response:Response;
   try{response=await requester(CF_API_ROOT+config.accountId+'/ai/v1/chat/completions',
-    {method:'POST',headers:{Authorization:'Bearer '+config.token,'cf-aig-gateway-id':gatewayId,'Content-Type':'application/json','Cache-Control':'no-store'},
+    {method:'POST',headers:{Authorization:'Bearer '+config.token,'cf-aig-gateway-id':gatewayId,'cf-aig-collect-log':'false','cf-aig-skip-cache':'true','Content-Type':'application/json','Cache-Control':'no-store'},
     body:JSON.stringify(body),signal:timeoutSignal()});}
   catch{throw new InsightsError(502,'AI_GATEWAY_UNAVAILABLE');}
   if(!response.ok)throw new InsightsError(response.status===429?429:502,'AI_GATEWAY_REJECTED');

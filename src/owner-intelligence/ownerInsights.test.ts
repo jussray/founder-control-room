@@ -80,6 +80,8 @@ describe('Cloudflare AI Gateway advisory owner claims',()=>{
     const requester=async (input:URL|string|Request,init?:RequestInit)=>{
       expect(String(input)).toBe('https://api.cloudflare.com/client/v4/accounts/'+'a'.repeat(32)+'/ai/v1/chat/completions');
       expect((init?.headers as Record<string,string>)['cf-aig-gateway-id']).toBe('default');
+      expect((init?.headers as Record<string,string>)['cf-aig-collect-log']).toBe('false');
+      expect((init?.headers as Record<string,string>)['cf-aig-skip-cache']).toBe('true');
       requestPayload=JSON.parse(String(init?.body)) as Record<string,unknown>;
       return json({choices:[{message:{content:JSON.stringify({gaps:['No independent indexed proof'],attackQuestions:['Can the Search Console sample be reproduced?'],nextGate:'verify_source',rationale:'A submit count does not prove indexed coverage'})}}]});
     };

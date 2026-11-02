@@ -19,7 +19,7 @@ Status: **source candidate; NOT deployed or live-verified**. Implemented on exis
 - Calls only `POST https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/v1/chat/completions` with `cf-aig-gateway-id`. Provider timeouts, quotas, malformed model JSON, and unknown next gates return a BLOCKED error rather than fabricated output or local fallback.
 - The output contains `gaps`, `attackQuestions`, `nextGate` and `rationale`, explicitly `ADVISORY_ONLY`, `verified:false`, `releaseAuthorized:false`, `mutationsPerformed:false`. The model cannot inspect private evidence on its own or grant a launch/merge/deploy.
 - **Gateway account observation on 2026-11-02:** Cloudflare returned an empty gateway list for FCR's account. No new gateway, token, billing plan or provider key was created. Source implementation is **not proof of live inference**; a future founder-authorized provider setup is required.
-- Sensitive material may be retained in provider-side AI Gateway logs depending on administrator logging configuration. Obtain consent, disable unsafe retention, and establish terms before production use.
+- The request sets `cf-aig-collect-log: false` and `cf-aig-skip-cache: true` to avoid provider-side request/response logging and caching for user evidence. Verify actual gateway policy and provider behavior independently; headers are not proof that upstream retention is zero. Sensitive material may still be subject to provider retention, so obtain informed consent and verify administrator retention rules. Obtain consent, disable unsafe retention, and establish terms before production use.
 
 ## SEO, AEO and GEO safeguards
 
