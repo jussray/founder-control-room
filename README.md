@@ -1,5 +1,17 @@
 # Founder Control Room
 
+## November 1, 2026: bounded GitHub App transport reconciliation
+
+The existing PR #986 reconciles bounded private-key wrapper parsing against current main without replacing a protected secret, changing GitHub App installation grants, or asserting production repair. On the November 1 exact-main founder-only diagnostic, the production binding was present and the App ID numeric, but the runtime key transport was classified as unknown; this is evidence of failed parsing, not evidence that the secret was missing or recently replaced. Protected-value scope and provider identity remain independent gates. No inherited historic CI or Playwright result authorizes a merge or release.
+
+
+## November 1, 2026 UTC: exact-head MCP credential preflight
+
+FCR PR #1056 protects the existing `founder-control-room` Worker by requiring `scripts/verify-worker-binding-types.mjs` in both canonical pre-mutation workflows. The verifier reads provider binding names and types only, rejects plaintext credential bindings, withholds deployment when the provider response is unavailable, and never reports credential values as proof. Cloudflare readback previously classified `CF_API_TOKEN` as `plain_text`, so this candidate does not authorize production promotion or secret re-upload.
+
+FCR Playwright also selects a newly observed StoryEngine peer `b2397272a37ed5d987f0b71b2a37dc31c9c84cf5`, four commits ahead and zero behind the prior pin `bffc9f771b673055403f52b29c86b30e5f4dd8c8`. The changed peer files are documentation and governance content, but only a fresh exact-head live-ref check, immutable checkout, runtime and browser/receipt witness can establish compatibility. Previous skipped steps and green predecessor receipts cannot transfer.
+
+
 Documentation Truth and test discovery resolve a pull request's live target branch at verification time, fetch its exact commit, and require it to be an ancestor of the checked-out candidate before evaluating the change. The event's stored base SHA remains historical context. Push verification instead uses the exact push-before SHA; missing, malformed, unavailable, or non-ancestor bases block proof. Passing these source checks grants no merge or deployment authority.
 
 ## October 26, 2026 — StoryEngine peer identity renewal for FCR PR #1020 (candidate only)
@@ -565,3 +577,6 @@ StoryEngine `refs/heads/main` was independently re-observed at `87501be2da31d12f
 
 The successor FCR head must still pass the live-ref equality check, immutable StoryEngine checkout, exact peer runtime identity, directive/receipt binding, replay protections, and the complete Playwright browser witness before the pair may be called current. Pin alignment grants no merge, deploy, production, publication, billing, or provider-mutation authority.
 
+### FCR external MCP consent candidate (not deployed)
+
+The OAuth consent UI is served by the FCR API service **through the same-origin Pages proxy** at `https://foundercontrolroom.org/oauth/consent`, matching the configured founder callback, CSRF origin, host-only session cookie, and same-tab `sessionStorage`. An exact www consent GET navigates to the canonical apex before login. The API serves the consent UI and assets behind the Pages proxy and requires an interactive, explicitly UUID-bound founder before approve/deny. The OAuth callback resumes a pending, syntax-validated authorization ID on the same apex origin. These are candidate source behaviors, not evidence that Supabase OAuth is enabled, Cloudflare Access permits discovery, or ChatGPT can connect.
