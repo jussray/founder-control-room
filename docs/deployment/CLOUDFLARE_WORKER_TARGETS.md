@@ -1,5 +1,12 @@
 # Cloudflare Deployment Targets
 
+## November 2, 2026: Owner Insights optional bindings — source only
+
+The existing `founder-control-room` Worker remains the single FCR API target. This branch declares an optional Workers AI `AI` binding and an optional, provider-held `GSC_SERVICE_ACCOUNT_JSON` secret. The AI binding permits only the authenticated, proposal-only evidence challenge route `/owner-insights/challenge`; the Google secret permits only the read-only `/owner-insights/search-console` lookup after the exact Search Console property grants access. Missing Google authorization must return a blocked state. Neither binding allows payments, production mutation, deploys, or an unauthenticated public dashboard, and no credential value belongs in Wrangler source, GitHub Actions output, or Pages assets.
+
+The presence of `[ai]` and an optional-secret name is **configuration intent, not proof** of Worker runtime bindings, live AI Gateway inference, Google index measurements, or tenant/project-owner entitlements. Protect the founder session, same-origin CSRF barrier, existing service boundaries, and existing exact-head deploy guard. Verify the full test suite, CodeQL, provider readback, founder-only browser behavior and an approved Cloudflare deployment before claiming activation. Source details: `docs/OWNER_INSIGHTS_SOURCE_CANDIDATE.md`.
+
+
 ## November 1, 2026 UTC: exact-head MCP credential preflight
 
 The existing canonical `founder-control-room` Worker remains the sole API/MCP deployment target. `.github/workflows/deploy.yml` and `.github/workflows/worker-reconcile.yml` must fail closed at `scripts/verify-worker-binding-types.mjs` whenever Cloudflare reports a credential as `plain_text` or cannot provide trustworthy binding name/type metadata. This release gate does not rotate or copy secrets, grant public MCP access, alter Pages routing, or prove live `/mcp` authentication; production promotion still requires safe provider-held secret classification and independent exact-SHA runtime proof.

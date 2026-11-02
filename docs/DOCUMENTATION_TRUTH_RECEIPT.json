@@ -490,6 +490,32 @@
       "claims": [
         "The MCP rate-limit middleware is a dependency-free unit-testable 60-request/minute per-IP and per-process express-rate-limit instance; both canonical and compatibility MCP routes must reuse this same instance before authentication, and this does not prove globally distributed Cloudflare enforcement or override OAuth/founder authorization."
       ]
+    },
+    {
+      "path": "wrangler.worker.toml",
+      "claims": [
+        "Owner Insights adds an optional Workers AI [ai] binding and optional secret name GSC_SERVICE_ACCOUNT_JSON to the same canonical FCR Worker. Neither authorizes production deployment, proves credentials exist, or exposes a public API.",
+        "The existing FCR Worker preflight, auth, Cloudflare provider verification, and exact-head release gates must remain in force; source-only configuration is not observed runtime authority."
+      ]
+    },
+    {
+      "path": "src/http/routes/ownerInsights.ts",
+      "claims": [
+        "Owner Insights only accepts Google Search Console read-only responses for the fixed sc-domain:jussco.company property and six explicitly sampled URLs; unknown provider authorization must never be represented as zero-indexed pages.",
+        "An authenticated founder with explicit consent may submit a bounded claim and supporting evidence to Workers AI through AI Gateway for unverified gap analysis and manual gate recommendations; the model output cannot authorize mutation or certify claims."
+      ]
+    },
+    {
+      "path": "src/worker/cf-entry.ts",
+      "claims": [
+        "The canonical Worker passes its optional AI binding only into the established authenticated Express owner-insights route. The binding does not create a secondary Worker or deployment path."
+      ]
+    },
+    {
+      "path": "public/control-room/owner-insights.html",
+      "claims": [
+        "The founder-only source candidate uses the existing Control Room UI with a protected API, no-index metadata, unknown states for missing provider proof, and a separate consent gate for model-submitted evidence. Public page source must not contain provider credentials, page indexing assertions, or private evidence."
+      ]
     }
   ]
 }

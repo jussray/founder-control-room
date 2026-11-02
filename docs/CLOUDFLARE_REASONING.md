@@ -1,5 +1,12 @@
 # Cloudflare Reasoning Contract
 
+## November 2, 2026: AI Gateway owner-evidence challenge boundary
+
+The owner-insights candidate introduces an optional Cloudflare `AI` binding on the canonical Founder Control Room Worker, configured through `[ai]` in `wrangler.worker.toml` and passed as `aiBinding` to the existing authenticated Express server. `POST /owner-insights/challenge` requires founder authentication, bounded submitted evidence and explicit disclosure consent before calling Workers AI with the AI Gateway `default` ID, no response caching, and no gateway request logging. The model output is treated as unverified text and limited to questions, evidence gaps, and a proposed **manual** next gate; it is not evidence of independent provider validation and never executes a release decision. Binding absence or malformed model output fails closed without a substitute success.
+
+The parallel `GET /owner-insights/search-console` requires an independently authorized, Worker-held read-only `GSC_SERVICE_ACCOUNT_JSON` credential; it cannot reveal indexing metrics without a real Google Search Console property response. Sitemaps, six sampled URL inspections and unknown/error states must be labeled as provider observations, not a property-wide index count. This source change does not demonstrate a live gateway invocation, provider grant, runtime activation, successful release, or safe tenant-level access. See `docs/OWNER_INSIGHTS_SOURCE_CANDIDATE.md` for the missing gates.
+
+
 ## November 1, 2026 UTC: exact-head MCP credential preflight
 
 The canonical `.github/workflows/deploy.yml` and `.github/workflows/worker-reconcile.yml` must run the reviewed `scripts/verify-worker-binding-types.mjs` before any Cloudflare Worker mutation. This preflight inspects only Worker binding names and type classifications; a credential binding classified `plain_text`, a malformed provider response, or unavailable provider metadata must block the release without revealing values, provider response bodies, or arbitrary binding names in logs. A source-green preflight is not evidence that the observed `CF_API_TOKEN` binding has been remediated, that OAuth works, or that production is deployed.
