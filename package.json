@@ -67,7 +67,8 @@
     "verify:test-discovery": "node scripts/verify-test-discovery.mjs",
     "generate:worker-types": "node -e \"require('node:fs').mkdirSync('.wrangler/types',{recursive:true})\" && wrangler types .wrangler/types/worker-configuration.d.ts --config wrangler.worker.toml --env-interface FcrWorkerEnv --include-env=false",
     "verify:media:handoff": "vitest run src/lib/__tests__/mediaRouterDomainProtocol.test.ts src/lib/__tests__/mediaRouter.test.ts src/lib/__tests__/mediaRouterPhase1Contracts.test.ts src/lib/__tests__/mediaExecutionService.test.ts src/lib/__tests__/mediaStoryboardStartFrame.test.ts src/lib/__tests__/makeVideoStoryboardBridge.test.ts src/lib/__tests__/makeVideoNervousSystem.test.ts src/lib/__tests__/mediaFfmpegRender.test.ts src/lib/__tests__/mediaJobExecution.test.ts src/lib/__tests__/mediaJobCli.test.ts src/lib/__tests__/runwayMediaJobAdapter.test.ts",
-    "media:job": "node --import tsx scripts/media-job.mts"
+    "media:job": "node --import tsx scripts/media-job.mts",
+    "verify:youtube-shorts-transport": "node --experimental-strip-types --test tests/shortsPublication.node.test.mjs"
   },
   "dependencies": {
     "@octokit/rest": "^21.0.2",
