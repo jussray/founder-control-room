@@ -3,7 +3,6 @@
  * Trusts only registered server-owned public keys for the exact tenant,
  * principal, agent and symbolic route. Never accepts caller-supplied URLs.
  */
-import { canonicalizeRelayJsonV3 } from '../founder-os-lab/federatedRelayV3.js';
 
 export const COUNCIL_BUS_SIGNED_ACK = 'juss/council-bus-signed-ack@v1';
 type Principal = { authenticated:boolean;subject:string;tenant:string };
@@ -41,6 +40,14 @@ export async function canonicalBusPrincipalSubject(founderUserId:string):Promise
   return 'fcr-'+Array.from(new Uint8Array(bytes),b=>b.toString(16).padStart(2,'0')).join('').slice(0,40);
 }
 
+/** Canonical JSON for this flat, all-string, fixed-field signed envelope. */
+export function canonicalCouncilAckPayload(value:Record<string,unknown>):string {
+  return '{'+Object.keys(value).sort().map(key=>{
+    const field=value[key];
+    if(typeof field!=='string'||/[\\uD800-\\uDFFF]/u.test(field))throw new Error('Invalid ACK string');
+    return JSON.stringify(key)+':'+JSON.stringify(field);
+  }).join(',')+'}';
+}
 const FIELDS=['contract','status','idempotencyKey','correlationId','receiptId',
   'agent','route','threadId','keyId','issuedAt','expiresAt','signature'];
 const record=(v:unknown):v is Record<string,unknown>=>v!==null&&typeof v==='object'&&!Array.isArray(v);
@@ -89,7 +96,7 @@ export function createSignedCouncilBusAckVerifier(
       const publicKey=await crypto.subtle.importKey('jwk',registered.publicKeyJwk,
         {name:'Ed25519'},false,['verify']);
       return await crypto.subtle.verify({name:'Ed25519'},publicKey,
-        decodeBase64Url(signature),new TextEncoder().encode(canonicalizeRelayJsonV3(unsigned)));
+        new Uint8Array(decodeBase64Url(signature)),new TextEncoder().encode(canonicalCouncilAckPayload(unsigned)));
     }catch{return false;}
   };
 }

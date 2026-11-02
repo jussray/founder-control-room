@@ -1,6 +1,5 @@
 import {describe,it,expect} from 'vitest';
-import {createSignedCouncilBusAckVerifier,canonicalBusPrincipalSubject,COUNCIL_BUS_SIGNED_ACK,type CouncilBusAckKey} from '../councilBusSignedAck.js';
-import {canonicalizeRelayJsonV3} from '../../founder-os-lab/federatedRelayV3.js';
+import {createSignedCouncilBusAckVerifier,canonicalBusPrincipalSubject,canonicalCouncilAckPayload,COUNCIL_BUS_SIGNED_ACK,type CouncilBusAckKey} from '../councilBusSignedAck.js';
 
 async function fixture(){
   const pair=await crypto.subtle.generateKey({name:'Ed25519'},true,['sign','verify']);
@@ -20,7 +19,7 @@ async function fixture(){
   };
   const make=async(payload:Record<string,unknown>)=>{
     const {signature:_previousSignature,...unsigned}=payload;
-    const raw=new TextEncoder().encode(canonicalizeRelayJsonV3(unsigned));
+    const raw=new TextEncoder().encode(canonicalCouncilAckPayload(unsigned));
     const sig=await crypto.subtle.sign('Ed25519',pair.privateKey,raw);
     const signature=Buffer.from(sig).toString('base64url');
     return {...payload,signature};
