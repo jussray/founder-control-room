@@ -102,3 +102,13 @@ implementation, authenticated callback transport and durable
 claim-once journal; FCR does not generate any provider key or expose
 a public callback route in this candidate. Test-generated Ed25519 keys
 are transient fixtures only. No ChatGPT receipt has been observed.
+
+## 2026-11-02 Search Console and evidence challenger — source feature gate
+
+Added **founder-only Truth Console** tabs for:
+- Read-only Search Console property sitemap-processing status and *five URL sample* inspection. Google requires OAuth refresh credentials in a server-held \`FCR_GSC_OAUTH_JSON\` binding scoped \`webmasters.readonly\` with property access. No credential is bundled. Cache 15 minutes; failures do not fabricate zero indexed pages. \`indexedCount: null\` is deliberate.
+- Claim evidence review: claim and up to 12 source-labelled evidence items are sent through \`FCR_EVIDENCE_GATEWAY_ID\` using the server-held \`OPENAI_API_KEY\`, optional \`FCR_EVIDENCE_GATEWAY_TOKEN\`, and server-owned model \`FCR_EVIDENCE_MODEL\`. Caller cannot pick model or gateway. Output schema restricts next gates to HOLD, COLLECT_EVIDENCE, or INDEPENDENT_REVIEW and cannot authorize deployment, merge, spend or publishing. Claims are not saved by this route.
+
+Read-only Cloudflare discovery showed a gateway named \`truth-weaver-evidence\`, not an FCR gateway; the FCR route refuses that identity. No Google credential, FCR gateway or model delivery has been installed or verified. The UI exposes unknown/unconfigured states rather than mock indexing stats or model conclusions. For SEO/AEO/GEO, treat published metadata, structured answers, canonical links, robots and sitemap as independently testable sources; do not expose private founder, partner or paid customer surfaces.
+
+**Access limitation:** existing FCR Truth Console requires \`requireFounder\`. General project-owner tenant-specific signup/authorization is NOT implemented by this source feature. That would need a separately reviewed tenant ACL and billing entitlement.
