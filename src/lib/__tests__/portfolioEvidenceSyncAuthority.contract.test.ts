@@ -41,4 +41,20 @@ describe('portfolio evidence sync authority contract', () => {
     expect(syncSource).toContain('NON_PUBLIC_REPOSITORY_EVIDENCE_REDACTED');
     expect(syncSource).toContain('visibility: observation.visibility');
   });
+  it('preserves credential history by marking scope and validity unverified on a failed workflow', () => {
+    expect(workflow).toContain('id: mint');
+    expect(workflow).toContain('MINT_STEP_OUTCOME: ${{ steps.mint.outcome }}');
+    expect(workflow).toContain('bindingOrigin:"UNKNOWN_FROM_WORKFLOW"');
+    expect(workflow).toContain('providerCredentialValidity:"NOT_EVALUATED_BY_THIS_RECEIPT"');
+    expect(workflow).toContain('mintStepOutcome:$mint');
+    expect(workflow).not.toContain('credentialRevoked:true');
+    expect(workflow).not.toContain('rotate_private_key');
+  });
+
+  it('keeps sensitive provider identity scoped to the production environment', () => {
+    expect(workflow).toContain('environment: production');
+    expect(workflow).toContain('APP_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}');
+    expect(workflow).not.toContain('APP_PRIVATE_KEY: ${{ vars.APP_PRIVATE_KEY }}');
+  });
+
 });
