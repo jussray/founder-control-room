@@ -1,0 +1,27 @@
+name: FCR Council Bus return gate
+on:
+  push:
+    paths:
+      - 'src/lib/councilBusFcrIntegration.ts'
+      - 'src/lib/__tests__/councilBusFcrIntegration.test.ts'
+      - '.github/workflows/fcr-council-bus-return-gate.yml'
+  pull_request:
+    paths:
+      - 'src/lib/councilBusFcrIntegration.ts'
+      - 'src/lib/__tests__/councilBusFcrIntegration.test.ts'
+      - '.github/workflows/fcr-council-bus-return-gate.yml'
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+      - run: npm install --no-audit --no-fund
+      - run: npx tsc --noEmit --strict --target ES2022 --module NodeNext --moduleResolution NodeNext src/lib/councilBusFcrIntegration.ts
+      - run: npx vitest run src/lib/__tests__/councilBusFcrIntegration.test.ts
+      - run: node scripts/verify-test-discovery.mjs
