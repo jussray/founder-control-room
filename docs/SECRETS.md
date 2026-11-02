@@ -1,5 +1,10 @@
 # GitHub Actions Secrets and Cloudflare Bindings Registry
 
+## November 1, 2026: bounded GitHub App transport reconciliation
+
+The existing PR #986 reconciles bounded private-key wrapper parsing against current main without replacing a protected secret, changing GitHub App installation grants, or asserting production repair. On the November 1 exact-main founder-only diagnostic, the production binding was present and the App ID numeric, but the runtime key transport was classified as unknown; this is evidence of failed parsing, not evidence that the secret was missing or recently replaced. Protected-value scope and provider identity remain independent gates. No inherited historic CI or Playwright result authorizes a merge or release.
+
+
 ## Cloudflare Logpush workflow secrets
 
 These names are used only by the founder-gated Logpush workflow. Values must remain in GitHub/Cloudflare secret planes and must never be committed, printed, or copied into documentation.

@@ -1,5 +1,10 @@
 # Founder Control Room
 
+## November 1, 2026: bounded GitHub App transport reconciliation
+
+The existing PR #986 reconciles bounded private-key wrapper parsing against current main without replacing a protected secret, changing GitHub App installation grants, or asserting production repair. On the November 1 exact-main founder-only diagnostic, the production binding was present and the App ID numeric, but the runtime key transport was classified as unknown; this is evidence of failed parsing, not evidence that the secret was missing or recently replaced. Protected-value scope and provider identity remain independent gates. No inherited historic CI or Playwright result authorizes a merge or release.
+
+
 ## November 1, 2026 UTC: exact-head MCP credential preflight
 
 FCR PR #1056 protects the existing `founder-control-room` Worker by requiring `scripts/verify-worker-binding-types.mjs` in both canonical pre-mutation workflows. The verifier reads provider binding names and types only, rejects plaintext credential bindings, withholds deployment when the provider response is unavailable, and never reports credential values as proof. Cloudflare readback previously classified `CF_API_TOKEN` as `plain_text`, so this candidate does not authorize production promotion or secret re-upload.
@@ -140,6 +145,8 @@ Exact SHAs belong in receipts, PRs, artifacts, incidents, and provenance. The RE
 ### Repository and mission control
 
 FCR models projects, proposals, missions, exact refs, verification runs, evidence, approval state, and bounded repository operations behind provider-neutral interfaces.
+
+The existing Worker schedule includes an hourly AI provider change watch in `src/external-use/aiProviderChangeWatchService.ts`. It searches Exa for OpenAI, Anthropic, and Perplexity results, accepts only official provider-domain URLs, stores fingerprinted candidate receipts in FCR's existing `events` inbox, records source coverage, and emails a review-only digest through FCR's existing email binding. Search-derived coverage remains `PARTIAL`, each candidate requires review, and account entitlement and project impact remain `UNKNOWN`; this source implementation does not prove that it is deployed or that a peer handoff is active. See [`docs/AI_PROVIDER_CHANGE_WATCH_CONTRACT.md`](docs/AI_PROVIDER_CHANGE_WATCH_CONTRACT.md).
 
 Branch creation through `src/http/routes/approvals.ts` is now an exact-action governed repository mutation. A fresh `create_branch` proof and authenticated founder execute request cause FCR to issue a server-derived `AuthorityEnvelopeV1` bound to `github.repository.create_branch`, repository scope, exact branch arguments, current mission-state fingerprint, tool-call identity, expiry, founder identity, and idempotency key. The authority lifetime starts from the server-observed execute request time, not the proof receipt timestamp, so proof freshness and authority expiry remain separate fail-closed windows. FCR reserves the execution before the external write, re-reads mission state immediately before mutation, and `executeAuthorizedCreateBranch()` must reject drift before `RepositoryProvider.createBranch(...)` can be reached. A pending or ambiguous execution remains reconcile-before-retry; source and CI proof of this membrane do not by themselves prove that a live GitHub branch was created.
 
@@ -592,3 +599,6 @@ StoryEngine `refs/heads/main` was independently re-observed at `87501be2da31d12f
 
 The successor FCR head must still pass the live-ref equality check, immutable StoryEngine checkout, exact peer runtime identity, directive/receipt binding, replay protections, and the complete Playwright browser witness before the pair may be called current. Pin alignment grants no merge, deploy, production, publication, billing, or provider-mutation authority.
 
+### FCR external MCP consent candidate (not deployed)
+
+The OAuth consent UI is served by the FCR API service **through the same-origin Pages proxy** at `https://foundercontrolroom.org/oauth/consent`, matching the configured founder callback, CSRF origin, host-only session cookie, and same-tab `sessionStorage`. An exact www consent GET navigates to the canonical apex before login. The API serves the consent UI and assets behind the Pages proxy and requires an interactive, explicitly UUID-bound founder before approve/deny. The OAuth callback resumes a pending, syntax-validated authorization ID on the same apex origin. These are candidate source behaviors, not evidence that Supabase OAuth is enabled, Cloudflare Access permits discovery, or ChatGPT can connect.
