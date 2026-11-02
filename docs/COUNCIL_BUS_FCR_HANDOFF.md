@@ -30,9 +30,8 @@ Do not label a test-injected ACK as an independent delivery proof.
 
 Read-only Cloudflare worker settings showed `CF_API_TOKEN` with
 binding type `plain_text`. **Its value was not retrieved.**
-Pages latest deployment metadata pointed to commit
-`61669738246f4d3e2129489989dd0db8347dab0c`, not the observed FCR
-`main`. The matched FCR Supabase project has the
+Cloudflare Pages canonical_deployment was subsequently read back as production/main at GitHub main SHA 680b7b7aac38103d8386465f6ae3acbded4a9d5c. The earlier mismatch compared latest PREVIEW with production and was not a production drift.
+The matched FCR Supabase project has the
 `council_conversations` table with RLS enabled, but the provider
 readback did not establish any actual external-origin ACK.
 
@@ -43,3 +42,12 @@ security and signed-return evidence.
 
 **Rollback:** remove this new integration file, its tests and this
 document from the isolated branch. No existing runtime code was edited.
+
+## 2026-11-02 current-gate amendment
+
+The FCR integration now mandates additional injected verification ports:
+- verifyBundle must apply the pinned official Council, Court, and Bus handoff validators to the complete packets, not merely compare user-supplied fingerprints.
+- authorizeOrigin must prove the originating agent and route are authorized and owned by the authenticated session; no arbitrary external callback URLs may be honored.
+Both fail closed when absent or denying. Local test stubs prove interface behavior only, not the existence of a production signer, provider, or originating-agent ACK.
+
+Cloudflare Worker CF_API_TOKEN was still classified plain_text. Its value was not retrieved or copied. Existing canonical Worker Reconcile already provides a guarded legacy-removal workflow and a strict post-deployment check. Do not run that workflow without exact-head production approval and provider readback. No deletion, rotation, deploy, or credential mutation performed.

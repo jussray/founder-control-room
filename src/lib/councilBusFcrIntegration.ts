@@ -40,6 +40,10 @@ export interface FcrCouncilBusRuntime {
   canAccessMission: (founder: FcrFounderSession, missionId: string) => Promise<boolean>;
   /** Independently re-read the persisted Council round from the owning DB. */
   loadPersisted: (missionId: string, round: number) => Promise<FcrCouncilRoundReadback | null>;
+  /** Must invoke the exact pinned Council/Court/handoff validators, not trust hash string equality. */
+  verifyBundle: (bundle: PortableCouncilReturnBundle) => Promise<boolean>;
+  /** Validate a server-owned origin-agent and channel binding; reject caller-supplied URLs. */
+  authorizeOrigin: (context: { founder: FcrFounderSession; missionId: string; origin: PortableCouncilReturnBundle['handoff']['origin'] }) => Promise<boolean>;
   /**
    * Must wrap the pinned, real Council runEmbeddedCouncilBus with legitimate
    * signer, sender, persistent claim-once journal and verified origin ACK.
@@ -70,7 +74,7 @@ export async function returnCouncilToOrigin(
   runtime: FcrCouncilBusRuntime,
 ): Promise<{ status: string; productionVerified: false }> {
   requireCondition(Boolean(input && runtime), 'Council Bus input/runtime required');
-  for (const name of ['enabled', 'canAccessMission', 'loadPersisted', 'deliver'] as const) {
+  for (const name of ['enabled', 'canAccessMission', 'loadPersisted', 'verifyBundle', 'authorizeOrigin', 'deliver'] as const) {
     requireCondition(typeof runtime[name] === 'function', `Missing Council Bus runtime port: ${name}`);
   }
   requireCondition(TOKEN.test(input.missionId) && Number.isSafeInteger(input.round) && input.round >= 1,
@@ -103,6 +107,8 @@ export async function returnCouncilToOrigin(
     handoff.decisionStatus === court.verdict,
     'Council Bus Court/handoff lineage mismatch');
   requireCondition(handoff.deliveryStatus === 'PREPARED_NOT_SENT', 'Council Bus handoff not prepared');
+  // Only the exact canonical Council implementation can validate complete Court policy.
+  requireCondition(await runtime.verifyBundle(input.bundle) === true, 'Council Bus canonical Court/handoff verification denied');
   if (court.verdict !== 'READY_FOR_EXTERNAL_VERIFICATION') {
     return { status: 'COURT_HOLD', productionVerified: false };
   }
@@ -112,6 +118,8 @@ export async function returnCouncilToOrigin(
     'Invalid return-to-origin identity');
   requireCondition(!input.signal?.aborted, 'Council Bus request aborted');
   requireCondition(await runtime.enabled() === true, 'FCR Council Bus disabled');
+  requireCondition(await runtime.authorizeOrigin({founder:input.founder,missionId:input.missionId,origin:handoff.origin}) === true,
+    'Council Bus origin/route authorization denied');
   const outcome = await runtime.deliver({
     council, court, handoff, origin: handoff.origin, founder: input.founder, signal: input.signal,
   });

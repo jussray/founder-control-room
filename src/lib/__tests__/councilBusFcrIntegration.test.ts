@@ -34,6 +34,8 @@ function fixture(): {
     enabled: async () => true,
     canAccessMission: async () => true,
     loadPersisted: async () => stored,
+    verifyBundle: async () => true,
+    authorizeOrigin: async () => true,
     deliver: async (context) => {
       calls.push(context);
       return { status: 'ACK_REPORTED_BY_TRUSTED_PORT', delivered: true };
@@ -101,4 +103,27 @@ describe('FCR Council Bus protected return adapter boundary', () => {
       status: 'NOT_DELIVERED', productionVerified: false,
     });
   });
+  it('blocks internally consistent forged Court hashes if canonical validator declines', async () => {
+    const f = fixture();
+    f.runtime.verifyBundle = async () => false;
+    await expect(returnCouncilToOrigin(f.input, f.runtime)).rejects.toThrow(/canonical Court/);
+    expect(f.calls).toHaveLength(0);
+  });
+
+  it('blocks forged route or unrecognized origin before calling sender', async () => {
+    const f = fixture();
+    f.runtime.authorizeOrigin = async () => false;
+    await expect(returnCouncilToOrigin(f.input, f.runtime)).rejects.toThrow(/origin\/route authorization/);
+    expect(f.calls).toHaveLength(0);
+  });
+
+  it('fails closed without canonical bundle validator or route authority provider', async () => {
+    for (const name of ['verifyBundle', 'authorizeOrigin'] as const) {
+      const f = fixture();
+      delete (f.runtime as Partial<FcrCouncilBusRuntime>)[name];
+      await expect(returnCouncilToOrigin(f.input, f.runtime)).rejects.toThrow(/Missing Council Bus runtime port/);
+      expect(f.calls).toHaveLength(0);
+    }
+  });
+
 });
