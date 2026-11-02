@@ -63,7 +63,7 @@ function decodeBase64Url(value:string):Uint8Array{
 export function createSignedCouncilBusAckVerifier(
   resolveKey:ResolveCouncilBusAckKey,
   now:()=>Date=()=>new Date(),
-):({ack:unknown;principal:Principal;origin:Origin;key:string})=>Promise<boolean>{
+): (args:{ack:unknown;principal:Principal;origin:Origin;key:string})=>Promise<boolean> {
   return async({ack,principal,origin,key})=>{
     try{
       if(typeof resolveKey!=='function'||!principal||principal.authenticated!==true||
