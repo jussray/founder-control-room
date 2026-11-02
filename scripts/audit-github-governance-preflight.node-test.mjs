@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import {
   CANONICAL_NATIVE_APPROVAL_COUNT,
   CANONICAL_RULESET_NAME,
+  PRESERVABLE_REVIEW_RULE_TYPES,
   CODEQL_SECURITY_FLOOR,
   buildBlockedReport,
   buildReport,
@@ -132,6 +133,38 @@ test('canonical FCR governance preserves founder-only review and zero-bypass fre
   assert.deepEqual(freshness.requiredStatusCheckNames, ['Required Gate', 'Verify test-ledger contract']);
   assert.deepEqual(freshness.bypassActors, []);
   assert.equal(freshnessFloorSatisfied(freshness), true);
+});
+
+test('canonical review membrane permits only the known preservable provider rule classes', () => {
+  const expectedBypass = trustedBypassPolicy(TRUSTED_APP_ID);
+  const preserved = canonicalRuleset();
+  preserved.rules.push(
+    { type: 'required_linear_history' },
+    { type: 'code_quality', parameters: { severity: 'errors' } },
+    {
+      type: 'copilot_code_review',
+      parameters: { review_on_push: false, review_draft_pull_requests: false },
+    },
+  );
+  assert.deepEqual(
+    [...PRESERVABLE_REVIEW_RULE_TYPES].sort(),
+    ['code_quality', 'copilot_code_review', 'required_linear_history'].sort(),
+  );
+  assert.equal(canonicalFloorSatisfied(rulesetSnapshot(preserved, 'main', 'main'), expectedBypass), true);
+
+  const unknown = structuredClone(preserved);
+  unknown.rules.push({ type: 'unknown_future_rule' });
+  assert.equal(canonicalFloorSatisfied(rulesetSnapshot(unknown, 'main', 'main'), expectedBypass), false);
+
+  const leakedStatus = structuredClone(preserved);
+  leakedStatus.rules.push({
+    type: 'required_status_checks',
+    parameters: {
+      strict_required_status_checks_policy: true,
+      required_status_checks: [{ context: 'Required Gate' }],
+    },
+  });
+  assert.equal(canonicalFloorSatisfied(rulesetSnapshot(leakedStatus, 'main', 'main'), expectedBypass), false);
 });
 
 test('future-team phase is representable without weakening any machine or provider floor', () => {
@@ -298,9 +331,20 @@ test('freshness companion must have zero bypass actors and only exact strict che
   assert.equal(wrongChecksReport.freshnessFloorSatisfied, false);
 });
 
+test('review membrane rejects legacy pre-merge deployment requirements', () => {
+  const legacyDeployment = canonicalRuleset();
+  legacyDeployment.rules.push({
+    type: 'required_deployments',
+    parameters: { required_deployment_environments: ['founder-signal-engine-review', 'production'] },
+  });
+  const report = readyReport({ fullRulesets: [legacyDeployment, freshnessRuleset()] });
+  assert.equal(report.status, 'NOT_READY');
+  assert.equal(report.canonicalFloorSatisfied, false);
+});
+
 test('review membrane rejects unmodeled extra provider rules', () => {
   const extraRule = canonicalRuleset();
-  extraRule.rules.push({ type: 'copilot_code_review' });
+  extraRule.rules.push({ type: 'required_signatures' });
   const report = readyReport({ fullRulesets: [extraRule, freshnessRuleset()] });
   assert.equal(report.status, 'NOT_READY');
   assert.equal(report.canonicalFloorSatisfied, false);

@@ -137,6 +137,35 @@ describe('trusted review witness command contract', () => {
     expect(governanceJob).toContain('main moved during governance reconciliation');
   });
 
+  it('fails malformed GitHub App credentials before any governance provider mutation', () => {
+    const governanceJob = reviewWorkflow.split('  reconcile-fcr-governance:')[1] ?? '';
+    const credentialPreflight = governanceJob.split(
+      '- name: Verify GitHub App credential shape before provider mutation',
+    )[1]?.split('- name: Reconcile canonical two-membrane governance and prove full topology')[0] ?? '';
+    const preflightIndex = governanceJob.indexOf(
+      '- name: Verify GitHub App credential shape before provider mutation',
+    );
+    const mutationIndex = governanceJob.indexOf(
+      '- name: Reconcile canonical two-membrane governance and prove full topology',
+    );
+
+    expect(preflightIndex).toBeGreaterThan(-1);
+    expect(mutationIndex).toBeGreaterThan(preflightIndex);
+    expect(credentialPreflight).toContain(
+      "import { createGitHubAppJwt } from './dist/providers/githubAppAuth.js';",
+    );
+    expect(credentialPreflight).toContain('createGitHubAppJwt(appId, privateKey, Date.now())');
+    expect(credentialPreflight).toContain('APP_PRIVATE_KEY_SHAPE_INVALID');
+    expect(credentialPreflight).toContain('providerMutationAttempted: false');
+    expect(credentialPreflight).toContain("providerMutationState: 'NOT_ATTEMPTED'");
+    expect(credentialPreflight).toContain("name: 'CredentialShapeError'");
+    expect(credentialPreflight).toContain(
+      'Provider authentication and provider mutation were not attempted.',
+    );
+    expect(credentialPreflight).not.toContain('console.log(privateKey');
+    expect(credentialPreflight).not.toContain('console.error(privateKey');
+  });
+
   it('keeps provider-policy mutation inside production App authority and the canonical provider factory', () => {
     const governanceJob = reviewWorkflow.split('  reconcile-fcr-governance:')[1] ?? '';
 
