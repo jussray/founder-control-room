@@ -414,8 +414,3 @@ Next founder gate:
 A committed regression test is source evidence only until the exact-head workflow that feeds the applicable gate actually executes it. For LinkedIn analytics continuity, `.github/workflows/ci.yml` must keep `scripts.test_linkedin_analytics_continuity` inside the load-bearing `python-tests` job, and `Required Gate` must continue to depend on that job. Missing LinkedIn activity rows must remain `UNKNOWN_NO_EVIDENCE` with null metrics, never synthetic zero impressions or engagements.
 
 For public crawler and work-directory behavior, `.github/workflows/ci.yml` must keep `e2e/pages-api-recovery.spec.ts` and `e2e/public-work-directory.spec.ts` inside the load-bearing `Playwright e2e` job that feeds `Required Gate`. The specialized Pages workflow remains useful evidence, but it cannot substitute for this required exact-head browser execution or authorize merge by itself.
-
-### November 1, 2026: FCR PR #1024 exact-main lockfile reconciliation
-
-Current FCR core CI Type check, Lint, Test and Playwright e2e jobs install dependencies using `npm ci --no-audit --no-fund` from the committed lockfile. This is a source-level deterministic install requirement, not a claim that new exact-head tests have executed, that StoryEngine peer evidence is current, or that review, merge, release, provider or production authority has been earned. Preserve newer main governance rules and fail closed when any required lane is failed, skipped, missing or stale.
-

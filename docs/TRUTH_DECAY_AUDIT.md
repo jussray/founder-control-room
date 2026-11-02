@@ -606,7 +606,6 @@ Current federation remains `UNKNOWN` until the exact successor FCR head complete
 
 **Branch and release gates:** FCR candidate \`68b020105c9a4d22851643e3f029571b53cc6af4\` was five commits behind FCR main \`fb4af1dccc81a0ab5e334e8038f23cb10af21b6a\`. Its CI recorded seven failures across ancestry, documentation truth, missing structured PR evidence, and a downstream Required Gate. Corrective integration must preserve main's unrelated changes and original branch history, rerun current exact-head checks, and obtain fresh, separate founder approval for that exact head/base pair before any merge or deployment. No green or merge authority is transferred by this documentation entry.
 
-### November 1, 2026: FCR PR #1024 exact-main lockfile reconciliation
+### October 14, 2026 StoryEngine peer evidence rollover
 
-Current FCR core CI Type check, Lint, Test and Playwright e2e jobs install dependencies using `npm ci --no-audit --no-fund` from the committed lockfile. This is a source-level deterministic install requirement, not a claim that new exact-head tests have executed, that StoryEngine peer evidence is current, or that review, merge, release, provider or production authority has been earned. Preserve newer main governance rules and fail closed when any required lane is failed, skipped, missing or stale.
-
+The FCR Playwright peer pin was advanced from `a6e6a396ed30535af2fd9b1ec2347a84e1a3fbf3` to the observed StoryEngine `refs/heads/main` commit `809d30ae2ef57dce6d4fee9a3b6afa24bfa83497`. This selects a fresh external evidence subject. Historical passing tests cannot be used as current proof. The exact FCR head must pass the live peer-reference check, peer-runtime identity check, and the product-build federation Playwright witness before declaring the new pair verified.
