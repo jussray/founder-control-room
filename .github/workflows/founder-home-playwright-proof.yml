@@ -10,29 +10,39 @@ concurrency:
   group: founder-home-proof-${{ github.ref }}
   cancel-in-progress: false
 
+env:
+  EXPECTED_HEAD_SHA: ${{ github.sha }}
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   founder-home-proof:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - name: Check out exact workflow commit
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
           persist-credentials: false
+      - name: Verify exact dispatched SHA
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '24'
           cache: npm
       - name: Install locked dependencies
-        run: npm ci
+        run: npm ci --no-audit --no-fund
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
       - name: Verify Founder Home browser contract
         run: npm run verify:founder-home
       - name: Upload browser evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: founder-home-proof-${{ github.sha }}
           path: test-results/
