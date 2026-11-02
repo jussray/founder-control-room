@@ -98,7 +98,7 @@ export async function renderEvidenceIntelligence(root){
    if(fields.length===12)add.disabled=true;
  };
  add.addEventListener('click',addField);addField();
- const status=node('p','No evidence is saved or published by this review.','muted');
+ const status=node('p','FCR does not save or publish this submission. Your claim and evidence are sent through Cloudflare AI Gateway to the configured model provider, which may process them under its policies. Do not enter secrets or private customer data.','muted');
  status.setAttribute('role','status');status.setAttribute('aria-live','polite');
  const result=node('section');
  form.append(group,add,submit,status);
