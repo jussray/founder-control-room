@@ -64,7 +64,9 @@
       "claims": [
         "`public/_worker.js` must route public static discovery artifacts, including `crawlers.json`, through the Pages `ASSETS` binding while API-owned callback assets remain on `FCR_API`; this routing classification cannot authorize provider mutation or treat a static crawler policy as authentication.",
         "`public/_worker.js` must serve the bare `/work` and `/work/` paths by requesting the canonical `/work` URL through the Pages `ASSETS` binding, never requesting the `/work.html` filename (the asset layer canonicalizes it back to `/work` with a 308, which loops when returned verbatim) and never falling through to the `FCR_API` proxy, because the API proxy answers that public page without the service identity header and returns a degraded 503.",
-        "`public/_worker.js` must serve the bare `/welcome` and `/welcome/` paths by requesting the canonical `/welcome` URL through the Pages `ASSETS` binding, never falling through to the `FCR_API` proxy, because no static classification otherwise covers the extensionless welcome path and the API proxy answers that public page without the service identity header, returning a degraded 503 (`API_SERVICE_IDENTITY_MISMATCH`)."
+        "`public/_worker.js` must serve the bare `/welcome` and `/welcome/` paths by requesting the canonical `/welcome` URL through the Pages `ASSETS` binding, never falling through to the `FCR_API` proxy, because no static classification otherwise covers the extensionless welcome path and the API proxy answers that public page without the service identity header, returning a degraded 503 (`API_SERVICE_IDENTITY_MISMATCH`).",
+        "`public/_worker.js` must keep consent navigation, API-owned consent assets, and consent POST on the canonical apex Pages browser origin by forwarding to FCR_API; only the www consent GET navigates to apex. Cookie authority, same-tab authorization state, and same-origin mutation checks must not silently change host, and source behavior is not live OAuth/provider proof.",
+        "The Pages FCR_API proxy must forward a consent POST's ReadableStream with compatible half-duplex request construction, without stripping the canonical Pages Origin, browser host-only founder session cookie, or approval request body. A 503 is never evidence that consent was applied."
       ]
     },
     {
@@ -164,7 +166,8 @@
       "claims": [
         "`src/lib/modelCapabilityMarket.ts` may rank Council operators only from task-specific evidence with external benchmarks treated as bounded priors; a benchmark win cannot by itself establish local eligibility, outcome proof, selection authority, or execution authority.",
         "Fresh authority-boundary violations must block promotion regardless of proof-reference presence, the sample gate must count only independently proven outcomes and must require enough verified completed outcomes, never promoting from failure-only, blocked-only, or count-missing legacy observations, false-green behavior must reduce ranking, stale local evidence must expire, and challenger selection should preserve provider-family independence when available without granting mutation authority.",
-        "`src/lib/modelCapabilityMarket.ts` names `multimodal-generation` as a task class so provider-dependent generation work is ranked from local receipts like every other class; adding a task class grants no operator eligibility, selection authority, or execution authority."
+        "`src/lib/modelCapabilityMarket.ts` names `multimodal-generation` as a task class so provider-dependent generation work is ranked from local receipts like every other class; adding a task class grants no operator eligibility, selection authority, or execution authority.",
+        "Fresh authority-boundary violations must block promotion, false-green behavior must reduce ranking, stale local evidence must expire, and challenger selection should preserve provider-family independence when available without granting mutation authority."
       ]
     },
     {
@@ -172,7 +175,8 @@
       "claims": [
         "`src/lib/capabilityObservationFeed.ts` may fold operator relay receipts into capability observations only for the operator that answered them, only from outcome statuses, deduplicated by response hash with the latest outcome per relay id, and only inside the caller's freshness window so stale evidence cannot renew itself.",
         "`src/lib/capabilityObservationFeed.ts` must treat a provider answering as unproven: only independently verified exact response hashes contribute proof or evidence references; verification never transfers to a later response sharing a relay id and changed receipt contents must fail canonical hash validation, completed-without-evidence is a false green, any non-`none` authorityRequested is an authority violation, and `blocked` never lowers success.",
-        "The fold is contract-capable tested source; relay responses are not persisted, no outcome verifier exists, no live route calls the market, and the fold grants no selection or execution authority."
+        "The fold is contract-capable tested source; relay responses are not persisted, no outcome verifier exists, no live route calls the market, and the fold grants no selection or execution authority.",
+        "`src/lib/capabilityObservationFeed.ts` must treat a provider answering as unproven: only independently verified relay ids contribute proof or evidence references, completed-without-evidence is a false green, any non-`none` authorityRequested is an authority violation, and `blocked` never lowers success."
       ]
     },
     {
@@ -349,7 +353,7 @@
       "claims": [
         "`src/founder-os-lab/projectAdapters.ts` must bind Chief integration evidence to one audited exact Chief head; moving that head expires predecessor adapter and pair-contract proof, requires the focused assertion and path-bound documentation receipt to move together, and grants no Chief runtime, merge, deploy, publication, or provider authority.",
         "`src/founder-os-lab/projectAdapters.ts` must bind Chief PR #242 exact candidate `0d1106424802fa21d37c6a05fc3e6f6422cc989a` to five observed contract blobs, the restored `necessary-fix-policy.json`, and pair blob `dd008420e1a91e78516b45d9e27de89344abf432`. FCR PR #1015 and Chief PR #242 remain draft. Live freshness must fail closed while Chief main still carries stale pair content; no preceding CI proof grants merge, founder, publishing, provider-write, or deploy authority.",
-        "`src/founder-os-lab/projectAdapters.ts` must pin read-only Se\u2019kret Bip adapter evidence to exact observed `main` `e3b6a3a36737f3c1d24c37fd2842ee6d7bf97150` and required `screens/WebWelcomeScreen.tsx` blob `9d3a1128d09d47f3e9b4eb5d8f3da5f3dbe2709c`; the other six audited contract blobs must still match. Audience-to-account-side routing, composite character canon, reduced-motion protection, and preview-only non-execution remain required. Head movement or blob drift must fail closed and cannot create merge, production, publication, or provider authority."
+        "`src/founder-os-lab/projectAdapters.ts` must pin read-only Se’kret Bip adapter evidence to exact observed `main` `e3b6a3a36737f3c1d24c37fd2842ee6d7bf97150` and required `screens/WebWelcomeScreen.tsx` blob `9d3a1128d09d47f3e9b4eb5d8f3da5f3dbe2709c`; the other six audited contract blobs must still match. Audience-to-account-side routing, composite character canon, reduced-motion protection, and preview-only non-execution remain required. Head movement or blob drift must fail closed and cannot create merge, production, publication, or provider authority."
       ]
     },
     {
@@ -449,10 +453,13 @@
     {
       "path": "wrangler.worker.toml",
       "claims": [
-        "`wrangler.worker.toml` must gate canonical deployment only on the boot-essential provider-held secret names declared in [secrets].required, and the thirteen feature secret names declared in [secrets].optional must never block deployment or Worker boot; each optional name is required only before its named feature is activated on the Worker."
+        "`wrangler.worker.toml` must gate canonical deployment only on the boot-essential provider-held secret names declared in [secrets].required, and the thirteen feature secret names declared in [secrets].optional must never block deployment or Worker boot; each optional name is required only before its named feature is activated on the Worker.",
+        "`wrangler.worker.toml` must list `FCR_SHOPIFY_WEBHOOK_SECRET` and `FCR_COMMERCE_HASH_SALT` under `[secrets].required`, so canonical exact-main Deploy rejects a missing FCR Shopify runtime binding before Worker mutation while never reading, logging, or re-uploading either provider-held value; this source boundary cannot prove webhook registration, production migration, runtime delivery, or collected revenue.",
+        "`wrangler.worker.toml` must declare `FCR_CLOUDFLARE_MCP_READ_TOKEN`, `OPENAI_API_KEY`, and Muse `MODEL_API_KEY` as provider-held required Worker secret names while keeping public-safe runtime configuration outside the secret plane; declaration proves required-name policy only, not provider presence, deployed runtime identity, or successful provider use.",
+        "A separate GitHub Actions copy of `OPENAI_API_KEY` may serve CI-only OpenAI consumers such as AI Failure Repair, but it is a distinct authority plane and does not prove or replace the provider-held Worker runtime binding.",
+        "`wrangler.worker.toml` must publish only public-safe FCR OAuth resource, issuer, audience, and scope configuration while preserving server-held project authority and provider-held MCP secrets; a passing source build cannot be treated as proof of a deployed Cloudflare Worker, completed Supabase consent, ChatGPT client discovery, or persisted live tool-call evidence."
       ]
-    }
-,
+    },
     {
       "path": "src/providers/githubAppAuth.ts",
       "claims": [
@@ -469,6 +476,19 @@
       "path": ".github/workflows/github-app-secret-shape-diagnostic.yml",
       "claims": [
         ".github/workflows/github-app-secret-shape-diagnostic.yml must recognize only bounded, transport-equivalent private-key wrappers, preserve RSA-only cryptographic parsing, reject ambiguous or malformed values without logging secret material, and never turn parsing or source tests into current provider or release proof."
+      ]
+    },
+    {
+      "path": "src/http/routes/mcp.ts",
+      "claims": [
+        "The canonical /mcp and legacy /mcp/read POST auth/tool routes must share one explicit 60-per-minute per-IP, per-process route-local express-rate-limit middleware before any OAuth/static-token dispatch, alongside the existing 120-per-minute global baseline; this source guard does not prove globally distributed or deployed enforcement and must not weaken the authentication/grant checks.",
+        "`src/http/routes/mcp.ts` must preserve exact-token bounded static /mcp/read auth while redirecting all non-legacy POSTs with HTTP 307 to the canonical HTTPS /mcp OAuth resource. Authentication/resource metadata cannot be advertised for a different URL, and no failed OAuth credential may downgrade into static authorization."
+      ]
+    },
+    {
+      "path": "src/http/middleware/mcpRateLimit.ts",
+      "claims": [
+        "The MCP rate-limit middleware is a dependency-free unit-testable 60-request/minute per-IP and per-process express-rate-limit instance; both canonical and compatibility MCP routes must reuse this same instance before authentication, and this does not prove globally distributed Cloudflare enforcement or override OAuth/founder authorization."
       ]
     }
   ]
