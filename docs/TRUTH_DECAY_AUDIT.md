@@ -1,5 +1,11 @@
 # Truth Decay Audit: When a True Claim Becomes Unsafe to Reuse
 
+## November 3, 2026: FCR auth-lifecycle proof is narrower than release proof
+
+FCR PR #978's predecessor `82d0e7139d3876e166844de64e17b4a770c23b90` passed its dedicated Playwright welcome → magic-link login → opaque browser-session identity → authenticated welcome redirect → server-revoked logout → private-shell denial scenario. GitHub run `41728146923` nevertheless failed in the independently required guarded-terminal journey when the V10 client-side fetch membrane rejected a planless privileged action before the older test could observe the server's separate rejection. A source or test fix must preserve both negative guards and require fresh, exact-head Playwright execution; it may never create the branch that the test is supposed to deny.
+
+The updated `.github/workflows/playwright.yml` is evidence-authority code and requires this documented distinction: a local auth scenario PASS is bounded to isolated test providers; overall CI, independent review, StoryEngine peer-ref identity, the actual ChatGPT Site, production Cloudflare routing, authenticated runtime, and deployment remain separate UNKNOWN or blocked gates until directly observed. Previous-head browser evidence expires after any branch commit, even if only a test or receipt changes.
+
 ## November 1, 2026: bounded GitHub App transport reconciliation
 
 The existing PR #986 reconciles bounded private-key wrapper parsing against current main without replacing a protected secret, changing GitHub App installation grants, or asserting production repair. On the November 1 exact-main founder-only diagnostic, the production binding was present and the App ID numeric, but the runtime key transport was classified as unknown; this is evidence of failed parsing, not evidence that the secret was missing or recently replaced. Protected-value scope and provider identity remain independent gates. No inherited historic CI or Playwright result authorizes a merge or release.
