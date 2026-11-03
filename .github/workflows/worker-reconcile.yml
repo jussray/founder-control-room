@@ -94,11 +94,11 @@ jobs:
           try:
               token.encode('ascii')
           except UnicodeEncodeError:
-              print('::error title=Malformed Worker deploy credential::CLOUDFLARE_API_TOKEN contains non-ASCII characters and cannot be used as an HTTP Authorization value. Re-copy the exact Cloudflare-issued token.')
+              print('::error title=Malformed Worker deploy credential::CLOUDFLARE_API_TOKEN supplied to this production job contains non-ASCII characters and cannot be used as an HTTP Authorization value. Inspect the effective production environment secret first: when the same name exists at repository and environment levels, the environment secret takes precedence. Do not expose token values or bypass validation.')
               sys.exit(1)
 
           if any(ord(char) < 33 or ord(char) > 126 or char.isspace() for char in token):
-              print('::error title=Malformed Worker deploy credential::CLOUDFLARE_API_TOKEN contains whitespace or non-printable characters. Re-copy the exact Cloudflare-issued token.')
+              print('::error title=Malformed Worker deploy credential::CLOUDFLARE_API_TOKEN supplied to this production job contains whitespace or non-printable characters. Check the effective production environment secret and same-name secret precedence; do not silently trim or bypass validation.')
               sys.exit(1)
 
           if token.lower().startswith('bearer '):
