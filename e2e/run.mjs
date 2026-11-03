@@ -283,11 +283,6 @@ async function runGuardedTerminalProof(page) {
   // the same real approval routes; it does not stand in for terminal execution.
   // Negative authority proof: both the browser transport and the server must
   // refuse a missing Chief V10 plan. Keep these as two separate boundaries.
-  const planlessRequest = (missionId) => ({
-    actionType: 'create_branch',
-    idempotencyKey: `e2e-rejected-branch-${missionId}`,
-    payload: { branchName: 'should-not-exist', baseRef: 'main' },
-  });
   const clientBlocked = await page.evaluate(async (missionId) => {
     try {
       await fetch(`/approvals/${missionId}/execute`, {
