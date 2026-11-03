@@ -40,6 +40,9 @@ export function linkAsanaTask(
   task: AsanaTaskSnapshot,
   observedAt: string,
 ): LinkedAsanaTask {
+  if (!Object.prototype.hasOwnProperty.call(ASANA_PROJECT_LINKS, slug)) {
+    throw new Error("Unlinked FCR project");
+  }
   if (!/^[0-9]+$/.test(task.gid) || !task.name.trim()) {
     throw new Error("Invalid Asana task identity");
   }
