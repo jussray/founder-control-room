@@ -44,7 +44,7 @@ const GITHUB_REPO = 'demo-project';
 const GITHUB_WEBHOOK_SECRET = 'e2e-webhook-secret';
 const E2E_SCENARIO = process.env.FCR_E2E_SCENARIO ?? 'full';
 
-if (!['full', 'capability-workbench', 'guarded-terminal'].includes(E2E_SCENARIO)) {
+if (!['full', 'capability-workbench', 'guarded-terminal', 'auth-lifecycle'].includes(E2E_SCENARIO)) {
   throw new Error(`Unsupported FCR_E2E_SCENARIO: ${E2E_SCENARIO}`);
 }
 
@@ -281,24 +281,51 @@ async function runGuardedTerminalProof(page) {
   // The terminal runs a real `git` process in this checkout. The fake GitHub
   // server is used only to establish the exact-head proof prerequisite through
   // the same real approval routes; it does not stand in for terminal execution.
-  // Negative authority proof: a mission ID alone cannot create a Git branch.
-  const denied = await page.evaluate(async (missionId) => {
-    const response = await fetch(`/approvals/${missionId}/execute`, {
-      method: 'POST',
-      credentials: 'same-origin',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        actionType: 'create_branch',
-        idempotencyKey: `e2e-rejected-branch-${missionId}`,
-        payload: { branchName: 'should-not-exist', baseRef: 'main' },
-      }),
-    });
-    return { status: response.status, body: await response.json() };
+  // Negative authority proof: both the browser transport and the server must
+  // refuse a missing Chief V10 plan. Keep these as two separate boundaries.
+  const clientBlocked = await page.evaluate(async (missionId) => {
+    try {
+      await fetch(`/approvals/${missionId}/execute`, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          actionType: 'create_branch',
+          idempotencyKey: `e2e-rejected-branch-${missionId}`,
+          payload: { branchName: 'should-not-exist', baseRef: 'main' },
+        }),
+      });
+      return false;
+    } catch (error) {
+      return /Attach the Chief AI V10 capability plan/.test(String(error));
+    }
   }, TERMINAL_PROOF_MISSION_ID);
-  assert(denied.status === 400 && denied.body.code === 'V10_CAPABILITY_PLAN_REQUIRED',
-    'FCR privileged branch creation remains blocked without the approved V10 plan');
+  assert(clientBlocked, 'browser V10 transport rejects a planless privileged request');
+
+  // XMLHttpRequest is intentionally used only in this negative security test
+  // to reach the real same-origin server without the app's fetch wrapper.
+  // It carries the existing browser session and must receive a server 400.
+  const denied = await page.evaluate(async (missionId) => new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', `/approvals/${missionId}/execute`);
+    xhr.withCredentials = true;
+    xhr.setRequestHeader('Content-Type', 'application/json');
+    xhr.onload = () => {
+      let body = null;
+      try { body = JSON.parse(xhr.responseText); } catch { /* non-JSON remains a failure */ }
+      resolve({ status: xhr.status, body });
+    };
+    xhr.onerror = () => reject(new Error('Real server authority request could not complete'));
+    xhr.send(JSON.stringify({
+      actionType: 'create_branch',
+      idempotencyKey: `e2e-rejected-branch-${missionId}`,
+      payload: { branchName: 'should-not-exist', baseRef: 'main' },
+    }));
+  }), TERMINAL_PROOF_MISSION_ID);
+  assert(denied.status === 400 && denied.body?.code === 'V10_CAPABILITY_PLAN_REQUIRED',
+    'real server rejects the planless branch creation with the V10 authority error');
   assert(!terminalFixtureRepo.branches.has('should-not-exist'),
-    'denied privileged request did not mutate GitHub');
+    'both rejected requests left the fake GitHub branch store unchanged');
 
   // This pre-seeded mission exists only in the isolated fake Supabase.
   // Exercise real FCR UI/routes/read-only git and patch ledger, but do NOT
@@ -360,6 +387,24 @@ async function runGuardedTerminalProof(page) {
     'replayed patch did not create another Git commit');
 }
 
+async function verifyLogoutAndProtectedBoundary(page) {
+  console.log('\n[logout] Server-revoked logout returns to welcome and denies the private shell');
+  await page.goto(`${BASE_URL}/control-room/`);
+  await page.waitForSelector('#sign-out');
+  await page.click('#sign-out');
+  await page.waitForURL(`${BASE_URL}/welcome`);
+  await page.waitForFunction(() => document.getElementById('door')?.dataset.state === 'signed_out');
+  assert(await page.locator('#magic').isVisible(), 'welcome is signed out after logout');
+  const identityAfterLogout = await page.evaluate(async () => {
+    const response = await fetch('/auth/me', { credentials: 'same-origin', cache: 'no-store' });
+    return response.status;
+  });
+  assert(identityAfterLogout === 401, 'revoked browser cookie no longer authorizes founder identity');
+  await page.goto(`${BASE_URL}/control-room/`);
+  await page.waitForSelector('#magic-link-form');
+  assert(await page.locator('.shell').count() === 0, 'protected founder shell remains hidden after logout');
+}
+
 async function main() {
   await waitForServer(`${BASE_URL}/health`);
   console.log(`Server up on ${BASE_URL}, fake GitHub up on ${fakeGitHubUrl}`);
@@ -383,15 +428,31 @@ async function main() {
     else jsExceptions.push(msg.text());
   });
 
-  console.log('\n[1] Sign-in screen renders for real, unauthenticated');
+  // Express hosts the real local auth API; Cloudflare Pages normally serves
+  // these two source-controlled static assets. Adapt only asset delivery here.
+  await page.route(`${BASE_URL}/welcome`, (route) => route.fulfill({
+    status: 200,
+    contentType: 'text/html',
+    body: readFileSync(join(REPO_ROOT, 'public/welcome.html'), 'utf8'),
+  }));
+  await page.route(`${BASE_URL}/assets/welcome-door.js`, (route) => route.fulfill({
+    status: 200,
+    contentType: 'text/javascript',
+    body: readFileSync(join(REPO_ROOT, 'public/assets/welcome-door.js'), 'utf8'),
+  }));
+
+  console.log('\n[1] Signed-out Control Room remains founder gated');
   await page.goto(`${BASE_URL}/control-room/`);
   await page.waitForSelector('#magic-link-form');
   assert(await page.locator('.sign-in-card h2').innerText() === 'Founder Control Room', 'sign-in card is shown');
 
-  console.log('\n[2] Request a magic link through the real UI and real API');
-  await page.fill('input[name="email"]', FOUNDER_EMAIL);
-  await page.click('#magic-link-form button[type=submit]');
-  await page.waitForSelector('.notice');
+  console.log('\n[2] Existing welcome screen requests a magic link through the real auth API');
+  await page.goto(`${BASE_URL}/welcome`);
+  await page.waitForFunction(() => document.getElementById('door')?.dataset.state === 'signed_out');
+  assert(await page.locator('#magic').isVisible(), 'welcome renders anonymous sign-in state');
+  await page.fill('#email', FOUNDER_EMAIL);
+  await page.click('#primary');
+  await page.waitForFunction(() => document.getElementById('primary')?.textContent === 'Check your email');
 
   let bridge;
   for (let i = 0; i < 30 && !bridge; i += 1) {
@@ -401,9 +462,55 @@ async function main() {
   assert(Boolean(bridge?.tokenHash), 'the server generated a real token_hash for the magic link');
 
   console.log('\n[3] Follow the real /auth/callback redirect (simulating clicking the emailed link)');
+  // Observe the actual callback's response headers without printing any credential.
+  const callbackResponsePromise = page.waitForResponse((response) =>
+    response.url().startsWith(`${BASE_URL}/auth/callback?`) && response.status() === 303);
   await page.goto(`${BASE_URL}/auth/callback?token_hash=${bridge.tokenHash}`);
+  const callbackResponse = await callbackResponsePromise;
   await page.waitForSelector('.topbar', { timeout: 5000 });
   assert(await page.locator('.founder-email').innerText() === FOUNDER_EMAIL, 'landed on the app shell signed in as the founder');
+
+  console.log('\n[login] Verify the authenticated cookie, identity API and welcome-to-Control-Room handoff');
+  const authenticatedIdentity = await page.evaluate(async () => {
+    const response = await fetch('/auth/me', {
+      credentials: 'same-origin', cache: 'no-store',
+      headers: { Accept: 'application/json' },
+    });
+    return { status: response.status, envelope: await response.json() };
+  });
+  assert(authenticatedIdentity.status === 200, 'browser session authorizes /auth/me after login');
+  assert(
+    authenticatedIdentity.envelope?.success === true &&
+      authenticatedIdentity.envelope?.data?.founder?.email === FOUNDER_EMAIL,
+    'authenticated browser identity matches the allowlisted founder',
+  );
+  const callbackCookies = await callbackResponse.headerValues('set-cookie');
+  assert(
+    callbackCookies.some((value) =>
+      /^__Host-fcr_session=[^;]+;/i.test(value) &&
+      /;\s*Secure(?:;|$)/i.test(value) &&
+      /;\s*HttpOnly(?:;|$)/i.test(value) &&
+      /;\s*Path=\/(?:;|$)/i.test(value)),
+    'real callback sets a Secure HttpOnly host-only session cookie',
+  );
+  assert(
+    await page.evaluate(() => !document.cookie.split('; ').some((value) => value.startsWith('__Host-fcr_session='))),
+    'opaque browser session is not accessible to JavaScript',
+  );
+  await page.goto(`${BASE_URL}/welcome`);
+  await page.waitForURL(`${BASE_URL}/control-room/`);
+  await page.waitForSelector('.shell');
+  assert(
+    await page.locator('.founder-email').innerText() === FOUNDER_EMAIL,
+    'signed-in welcome redirects to the founder-only Control Room',
+  );
+
+  if (E2E_SCENARIO === 'auth-lifecycle') {
+    await verifyLogoutAndProtectedBoundary(page);
+    assert(jsExceptions.length === 0, `no uncaught JS exceptions (saw: ${JSON.stringify(jsExceptions)})`);
+    await browser.close();
+    return;
+  }
 
   if (E2E_SCENARIO === 'capability-workbench') {
     // Run the workbench browser journey in an isolated server process. The full
@@ -493,6 +600,7 @@ async function main() {
 
   if (E2E_SCENARIO === 'guarded-terminal') {
     await runGuardedTerminalProof(page);
+    await verifyLogoutAndProtectedBoundary(page);
     assert(jsExceptions.length === 0, `no uncaught JS exceptions (saw: ${JSON.stringify(jsExceptions)})`);
     if (networkDiagnostics.length) console.log(`  (${networkDiagnostics.length} expected network diagnostic message(s), not counted as failures: ${JSON.stringify(networkDiagnostics)})`);
     await browser.close();
@@ -665,7 +773,11 @@ async function main() {
   const connectionText = await waitForText(page, '[data-connection-id]:has-text("figma")', 'last checked');
   assert(connectionText.toLowerCase().includes('last checked'), 'connector health check recorded a real last_checked_at');
 
-  console.log('\n[10] No uncaught JS exceptions during the whole run');
+  // Logout is load-bearing in the isolated auth-lifecycle and guarded-terminal
+  // scenarios. This already long-form journey approaches the real per-IP API
+  // rate limit, so reloading the entire app here can cause 429s unrelated to
+  // revocation correctness. Do not weaken the server limit or skip auth proof.
+  console.log('\n[11] No uncaught JS exceptions during the whole run');
   assert(jsExceptions.length === 0, `no uncaught JS exceptions (saw: ${JSON.stringify(jsExceptions)})`);
   if (networkDiagnostics.length) console.log(`  (${networkDiagnostics.length} expected network diagnostic message(s), not counted as failures: ${JSON.stringify(networkDiagnostics)})`);
 
