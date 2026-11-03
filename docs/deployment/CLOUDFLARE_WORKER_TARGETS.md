@@ -1,5 +1,10 @@
 # Cloudflare Deployment Targets
 
+## November 3, 2026 — separate member browser session candidate (PR #1060)
+
+The canonical public Pages site continues to serve `/welcome` and the new `/member/` empty-state interface via `ASSETS`. Dynamic `/auth/member/*` requests and the API-generated callback script require the existing same-origin `FCR_API` binding to `founder-control-room`; they must not be served as static assets or bypass service-identity verification. The server-side `fcr_member_browser_sessions` migration is source-only and must not be treated as applied. A real release requires reviewed SQL migration and RLS checks, existing founder-cookie isolation, live account-switch revocation, deployed API and Pages SHA readback, founder authorization, and a zero-leak cross-account browser test. Do not publish or deploy from PR source or use a passing CI check as provider/runtime proof.
+
+
 ## November 2, 2026 — FCR Council Bus and search evidence source candidate
 
 The isolated `feat/fcr-council-bus-handoff-guard-20261102` branch contains pinned Council/Court validators, a signed-ACK contract, and founder-gated Search Console and AI evidence review panels. The Search Console panel inspects five fixed public URLs and sitemap metadata; it does not claim a full indexed-page count. The evidence challenger is advisory, uses a dedicated authenticated BYOK Cloudflare AI Gateway, and never grants publishing or deployment authority. Current candidate source and tests do not prove live delivery. Google OAuth refresh credentials and the dedicated gateway token have not been installed in the Worker; `CF_API_TOKEN` remains incorrectly typed as plaintext and must be remediated through an exact-head authorized reconcile. The public homepage uses CSP-compatible WebPage Microdata, not inline scripts. No PR, merge, or production deployment follows from this source candidate.

@@ -1,5 +1,10 @@
 # Cloudflare Reasoning Contract
 
+## November 3, 2026 — FCR member callback and same-origin Pages boundary (PR #1060; unmerged)
+
+Member email sign-in is distinct from the founder allowlist. `public/_worker.js` must route API-generated `/auth/member/callback.js` and all `/auth/member/*` requests through the same-origin Pages `FCR_API` service binding, while serving the static `/welcome` and `/member/` interfaces from Pages assets. The FCR API validates the Supabase identity, rejects founder accounts in member sessions, revokes cross-role browser sessions, and issues a separate opaque, HttpOnly, Secure, SameSite=Strict cookie backed by `fcr_member_browser_sessions`. The new member route returns only the member's empty workspace, not founder projects or agent state. A source route, pending SQL migration, or mock Playwright result cannot establish an applied migration, a correctly provisioned service binding, a live OTP, or real network/browser isolation. Release must fail closed until independent provider and runtime evidence is observed.
+
+
 ## November 2, 2026 — FCR Council Bus and search evidence source candidate
 
 The isolated `feat/fcr-council-bus-handoff-guard-20261102` branch contains pinned Council/Court validators, a signed-ACK contract, and founder-gated Search Console and AI evidence review panels. The Search Console panel inspects five fixed public URLs and sitemap metadata; it does not claim a full indexed-page count. The evidence challenger is advisory, uses a dedicated authenticated BYOK Cloudflare AI Gateway, and never grants publishing or deployment authority. Current candidate source and tests do not prove live delivery. Google OAuth refresh credentials and the dedicated gateway token have not been installed in the Worker; `CF_API_TOKEN` remains incorrectly typed as plaintext and must be remediated through an exact-head authorized reconcile. The public homepage uses CSP-compatible WebPage Microdata, not inline scripts. No PR, merge, or production deployment follows from this source candidate.

@@ -66,7 +66,8 @@
         "`public/_worker.js` must serve the bare `/work` and `/work/` paths by requesting the canonical `/work` URL through the Pages `ASSETS` binding, never requesting the `/work.html` filename (the asset layer canonicalizes it back to `/work` with a 308, which loops when returned verbatim) and never falling through to the `FCR_API` proxy, because the API proxy answers that public page without the service identity header and returns a degraded 503.",
         "`public/_worker.js` must serve the bare `/welcome` and `/welcome/` paths by requesting the canonical `/welcome` URL through the Pages `ASSETS` binding, never falling through to the `FCR_API` proxy, because no static classification otherwise covers the extensionless welcome path and the API proxy answers that public page without the service identity header, returning a degraded 503 (`API_SERVICE_IDENTITY_MISMATCH`).",
         "`public/_worker.js` must keep consent navigation, API-owned consent assets, and consent POST on the canonical apex Pages browser origin by forwarding to FCR_API; only the www consent GET navigates to apex. Cookie authority, same-tab authorization state, and same-origin mutation checks must not silently change host, and source behavior is not live OAuth/provider proof.",
-        "The Pages FCR_API proxy must forward a consent POST's ReadableStream with compatible half-duplex request construction, without stripping the canonical Pages Origin, browser host-only founder session cookie, or approval request body. A 503 is never evidence that consent was applied."
+        "The Pages FCR_API proxy must forward a consent POST's ReadableStream with compatible half-duplex request construction, without stripping the canonical Pages Origin, browser host-only founder session cookie, or approval request body. A 503 is never evidence that consent was applied.",
+        "`public/_worker.js` must preserve Pages `ASSETS` handling for the static member and welcome screens while forwarding every `/auth/member/*` request, including its dynamic callback script, through the canonical same-origin `FCR_API` binding with service identity verification; static routing and unit tests cannot authorize a member session or prove live OAuth delivery."
       ]
     },
     {
@@ -93,7 +94,8 @@
         "The October 24, 2026 StoryEngine transition from 3c46b3649088ac4c6e1775102ba49abf5c779abf to independently observed 87501be2da31d12f421b0ed2da49df357fc9fcb1 is strictly forward by two commits with 16 observed exact-head checks successful; rebinding STORYENGINE_PEER_SHA selects only the successor federation evidence subject, expires predecessor FCR browser/federation proof, and requires a fresh complete exact-head witness without granting merge, deploy, production, publication, or provider-mutation authority.",
         "`.github/workflows/playwright.yml` must pin the independently verified StoryEngine successor `4601cc3a8297875c97e54717f2aeb47db44d0595` after preview-runtime configuration moved `main`; the pin selects only the new evidence subject, and the successor FCR head must rerun the complete live-ref, immutable checkout, runtime identity, directive/receipt/replay, and browser witness before pair compatibility can be current.",
         "`.github/workflows/playwright.yml` must pin StoryEngine `dc79a23ffa8e6e5b0964efccdaee7c961b9b9e1d` only as the independently observed successor evidence subject from PR #1044; the new FCR head must reverify live ref equality, immutable checkout, runtime identity, directive/receipt/replay and browser federation before compatibility is current. This new pin cannot grant merge, deployment, provider, publication or production authority.",
-        "`.github/workflows/playwright.yml` must select the independently observed StoryEngine successor `bffc9f771b673055403f52b29c86b30e5f4dd8c8` only as the next exact peer identity; a complete fresh live-ref, immutable checkout, federation runtime and browser/receipt witness is required before current pair compatibility can be claimed, and the pin cannot confer merge, deployment or provider authority."
+        "`.github/workflows/playwright.yml` must select the independently observed StoryEngine successor `bffc9f771b673055403f52b29c86b30e5f4dd8c8` only as the next exact peer identity; a complete fresh live-ref, immutable checkout, federation runtime and browser/receipt witness is required before current pair compatibility can be claimed, and the pin cannot confer merge, deployment or provider authority.",
+        "`.github/workflows/playwright.yml` must run FCR's exact-head welcome/login/logout `auth-lifecycle` Chromium scenario before the separately required guarded-terminal journey, verify real browser same-origin opaque-session identity and server-revoked logout through `e2e/run.mjs`, preserve both client-side and server-side V10 planless-action denial, and never treat an isolated passing test as deployed Site or production proof."
       ]
     },
     {
@@ -490,6 +492,24 @@
       "path": "src/http/middleware/mcpRateLimit.ts",
       "claims": [
         "The MCP rate-limit middleware is a dependency-free unit-testable 60-request/minute per-IP and per-process express-rate-limit instance; both canonical and compatibility MCP routes must reuse this same instance before authentication, and this does not prove globally distributed Cloudflare enforcement or override OAuth/founder authorization."
+      ]
+    },
+    {
+      "path": "src/http/routes/memberAuth.ts",
+      "claims": [
+        "`src/http/routes/memberAuth.ts` must reject founder addresses for member sessions, require a Supabase-verified user, preserve generic email responses and rate limits, fail closed when founder classification or session persistence is unavailable, and never return founder project or agent data in member workspace responses."
+      ]
+    },
+    {
+      "path": "src/auth/memberSession.ts",
+      "claims": [
+        "`src/auth/memberSession.ts` must persist only salted or cryptographically hashed opaque browser capabilities server-side, issue Secure HttpOnly SameSite=Strict host-only cookies, reject malformed and expired sessions, and refuse to pretend revocation succeeded when storage is unavailable."
+      ]
+    },
+    {
+      "path": "supabase/migrations/20261103000000_member_browser_sessions.sql",
+      "claims": [
+        "`supabase/migrations/20261103000000_member_browser_sessions.sql` must enable row level security, revoke public, anon and authenticated table access, allow only service-role access, and store only hashed opaque session identifiers rather than bearer credentials; checked-in SQL is not evidence that the migration was applied."
       ]
     }
   ]
