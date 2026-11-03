@@ -10,17 +10,19 @@ FCR implements `juss/portable-control-input@v1` in `src/lib/founderControlDecisi
 
 ## What's Inside
 
+Unless marked as repository-root paths, local file paths below are relative to this README's `.ai-skills/` directory. Paths beginning with `.ai-skills/` or `src/` are repository-root paths.
+
 ### Skill Files (`skills/`)
 
-Five installable skills — for Perplexity Computer (`save_custom_skill`) or as Claude Projects knowledge base files:
+Five canonical suite skills are vendored here. Use the host's supported skill mechanism when available; use `save_custom_skill` only if that tool is exposed in the current session. Otherwise, use the files as instruction references without claiming installation.
 
 | Skill | Purpose |
 |-------|---------|
-| **lean-build-orchestrator** | Max build output, min token usage, working code first, incremental shipping |
-| **regression-stagnation-guard** | Prevent code regression, detect project stagnation, dependency drift, stuck loops |
-| **truth-research-optimizer** | Source discipline, contradiction detection, confidence labeling, anti-hallucination |
-| **intent-repair-reader** | Parse human intent from typos using context clues, keyboard analysis, phonics |
-| **capability-mode-router** | Provider-neutral bounded reasoning, evidence, verification, and composition rules for authorized modes; never a public trigger surface |
+| [lean-build-orchestrator](skills/lean-build-orchestrator.md) | Max build output, min token usage, working code first, incremental shipping |
+| [regression-stagnation-guard](skills/regression-stagnation-guard.md) | Prevent code regression, detect project stagnation, dependency drift, stuck loops |
+| [truth-research-optimizer](skills/truth-research-optimizer.md) | Source discipline, contradiction detection, confidence labeling, anti-hallucination |
+| [intent-repair-reader](skills/intent-repair-reader.md) | Parse human intent from typos using context clues, keyboard analysis, phonics |
+| [capability-mode-router](skills/capability-mode-router.md) | Provider-neutral bounded reasoning, evidence, verification, and composition rules for authorized modes; never a public trigger surface |
 
 The canonical router contract is `.ai-skills/gpts/capability-mode-router.md`. Host-specific adapters may change presentation and available tools, but they must not weaken its authority, evidence, stop-state, or verification rules.
 
@@ -30,14 +32,13 @@ The same five skills, rewritten as standalone GPT instruction templates. Where G
 
 Tool-dependent rules inside these templates are capability-aware: web search, Code Interpreter & Data Analysis, file tools, apps, actions, repository tools, and external execution must only be used when they are actually enabled for the current account/workspace/session.
 
-### Cross-Platform Adapters (`cross-platform/`)
+### Cross-Platform Adapters (top level of `.ai-skills/`)
 
 | File | For | How to Use |
 |------|-----|-----------|
 | `claude-project-instructions.md` | Claude (claude.ai) | Paste into Projects → Project Instructions where that feature is available |
 | `chatgpt-custom-instructions.md` | ChatGPT | Use as reusable custom/project instruction text where supported |
 | `universal-commands.md` | All three | Reference for command behaviors |
-| `minimal-token-operating-protocol.md` | All three | Token economy strategy when usage is constrained |
 | `HUMAN_SAFE_BUILD.md` | All three | Required human-facing state and recovery doctrine |
 
 ## Quick Start
