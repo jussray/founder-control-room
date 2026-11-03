@@ -115,4 +115,17 @@ describe('public founder discovery assets', () => {
     expect(headers).toContain('/.well-known/sekret-bip-control-room.json');
     expect(headers).toContain('/crawlers.json');
   });
+  it('publishes factual canonical homepage SEO/AEO/GEO metadata, never indexing the private application',()=>{
+    const html=read('public/index.html');
+    const sitemap=read('public/sitemap.xml');
+    expect(html).toContain('<meta property="og:url" content="https://www.foundercontrolroom.org/"');
+    expect(html).toContain('<meta name="twitter:card" content="summary"');
+    expect(html).not.toMatch(/<script\\b(?![^>]*\\bsrc=)/i);
+    expect(html).toContain('itemscope itemtype="https://schema.org/WebPage"');
+    expect(html).toContain('<meta itemprop="url" content="https://www.foundercontrolroom.org/"');
+    expect(html).toContain('<meta itemprop="description" content="Public founder work');
+    expect(sitemap).toContain('<lastmod>2026-11-02</lastmod>');
+    expect(sitemap).not.toContain('<loc>https://www.foundercontrolroom.org/control-room/');
+  });
+
 });
