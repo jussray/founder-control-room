@@ -75,11 +75,24 @@ export function validateBindingTypes(payload, { allowStaleCfApiTokenRemoval = fa
   }
   const seen = new Set();
   const unsafe = [];
+  let hasUndeclaredPlainText = false;
+  let hasUnreviewedJson = false;
   for (const { name, type } of bindings) {
     if (seen.has(name)) return { ok: false, reason: 'duplicate-provider-binding-names', unsafe: [] };
     seen.add(name);
     if (isCredentialBindingName(name) && type !== 'secret_text' && type !== 'secrets_store_secret') {
       unsafe.push({ name, type });
+      continue;
+    }
+    // JSON contents cannot be verified from provider name/type metadata alone.
+    if (type === 'json') {
+      unsafe.push({ name, type });
+      hasUnreviewedJson = true;
+      continue;
+    }
+    if (type === 'plain_text' && !allowedPublicPlainTextBindings.has(name)) {
+      unsafe.push({ name, type });
+      hasUndeclaredPlainText = true;
     }
   }
   const repairableStaleCfApiToken =
