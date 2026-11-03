@@ -480,3 +480,55 @@ describe('POST /plugin-center/grants/:grantId/revoke', () => {
     });
   });
 });
+
+
+describe('Google Workspace legacy connection classification', () => {
+  it('classifies legacy Google Drive connections without treating Google Cloud as Drive', async () => {
+    authSuccess();
+    supabaseMock.from.mockImplementation((table: string) => {
+      if (table === 'founder_users') return founderUsersRow();
+      if (table === 'project_connections') {
+        return {
+          select: () => ({
+            order: () => Promise.resolve({
+              data: ['Google Drive', 'Google Cloud'].map((label, index) => ({
+                id: `google-${index}`,
+                project_id: PROJECT_ID,
+                connection_type: 'other',
+                label,
+                status: 'disconnected',
+                authority_level: 'L1',
+                capabilities: [],
+                secret_ref: null,
+                projects: { id: PROJECT_ID, slug: PROJECT_SLUG, name: 'Founder Control Room' },
+              })),
+              error: null,
+            }),
+          }),
+        };
+      }
+      if (table === 'plugin_permission_grants') {
+        return {
+          select: () => ({
+            is: () => ({
+              gt: () => ({
+                order: () => ({
+                  limit: () => Promise.resolve({ data: [], error: null }),
+                }),
+              }),
+            }),
+          }),
+        };
+      }
+      return {};
+    });
+
+    const res = await request(buildApp()).get('/plugin-center').set('Authorization', BEARER);
+    expect(res.status).toBe(200);
+    expect(res.body.catalog.some((item: { type: string }) => item.type === 'google-drive')).toBe(true);
+    expect(res.body.connections[0].catalogLabel).toBe('Google Drive');
+    expect(res.body.connections[1].catalogLabel).toBe('Other provider');
+    expect(res.body.connections[0].status).toBe('disconnected');
+    expect(res.body.connections[0].secretRef).toBeNull();
+  });
+});
