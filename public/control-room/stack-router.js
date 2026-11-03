@@ -167,4 +167,3 @@ if (launchDock instanceof HTMLDetailsElement) {
 installCoworkLane();
 installMissionBoard();
 installProjectShellUi();
-void refreshConveyorReadiness();
