@@ -210,3 +210,16 @@ test('legacy one-binding removal exception cannot excuse undeclared plaintext', 
   assert.equal(safePreflightError(new Error('json-config-binding-not-reviewed')), 'json-config-binding-not-reviewed');
   assert.doesNotMatch(JSON.stringify(findings), /fixture-private/);
 });
+
+test('unknown provider binding type cannot bypass checks with an innocent name', () => {
+  for (const type of ['plaintext', 'json_value', 'unexpected_type']) {
+    const finding = validateBindingTypes(response([{ name: 'CONFIG_DATA', type, text: 'fixture-private' }]));
+    assert.equal(finding.ok, false, type);
+    assert.equal(finding.reason, 'unrecognized-binding-type', type);
+    assert.doesNotMatch(JSON.stringify(finding), /fixture-private/);
+  }
+  for (const type of ['service', 'workflow', 'send_email']) {
+    assert.equal(validateBindingTypes(response([{ name: 'CHIEF_AI', type }])).ok, true, type);
+  }
+  assert.equal(validateBindingTypes(response([{ name: '', type: 'secret_text' }])).ok, false);
+});
