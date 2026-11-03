@@ -52,7 +52,7 @@ jobs:
       - name: Normalize key and mint portfolio GitHub App token
         env:
           APP_ID: ${{ secrets.APP_ID }}
-          APP_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}
+          APP_PRIVATE_KEY: ${{ secrets.FCR_GITHUB_APP_PRIVATE_KEY }}
           GITHUB_APP_OWNER: jussray
           PORTFOLIO_SYNC_TOKEN_FILE: ${{ runner.temp }}/portfolio-sync-token
         run: node scripts/mint-portfolio-github-app-token.mjs

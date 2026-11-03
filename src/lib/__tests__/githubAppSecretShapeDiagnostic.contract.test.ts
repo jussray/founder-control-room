@@ -71,7 +71,7 @@ describe('GitHub App secret-shape diagnostic contract', () => {
     const afterClassification = workflow.slice(retainStart);
     const secretMappings = [
       'GITHUB_APP_ID: ${{ secrets.APP_ID }}',
-      'GITHUB_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}',
+      'GITHUB_PRIVATE_KEY: ${{ secrets.FCR_GITHUB_APP_PRIVATE_KEY }}',
     ];
 
     expect(workflow).toContain('environment: production');

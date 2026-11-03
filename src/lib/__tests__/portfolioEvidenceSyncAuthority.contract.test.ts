@@ -6,7 +6,7 @@ const workflow = readFileSync('.github/workflows/portfolio-evidence-sync.yml', '
 describe('portfolio evidence sync authority contract', () => {
   it('fails closed when GitHub App minting fails', () => {
     expect(workflow).toContain('APP_ID: ${{ secrets.APP_ID }}');
-    expect(workflow).toContain('APP_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}');
+    expect(workflow).toContain('APP_PRIVATE_KEY: ${{ secrets.FCR_GITHUB_APP_PRIVATE_KEY }}');
     expect(workflow).toContain('node scripts/mint-portfolio-github-app-token.mjs');
     expect(workflow).toContain('PORTFOLIO_SYNC_TOKEN_FILE: ${{ runner.temp }}/portfolio-sync-token');
     expect(workflow).toContain('test -s "$PORTFOLIO_SYNC_TOKEN_FILE"');

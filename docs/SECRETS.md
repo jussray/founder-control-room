@@ -45,7 +45,7 @@ Set these in **GitHub → Settings → Secrets and variables → Actions**, usin
 
 Secrets marked required cause the named workflow job to fail if absent.
 
-GitHub Actions secret names must not use the reserved `GITHUB_` prefix. The trusted GitHub App workflows therefore store the App credentials as `APP_ID` and `APP_PRIVATE_KEY`, then map them into the server/runtime environment names `GITHUB_APP_ID` and `GITHUB_PRIVATE_KEY` inside the job. Those internal environment names remain the provider contract and are intentionally unchanged.
+GitHub Actions secret names must not use the reserved `GITHUB_` prefix. For the FCR GitHub App, trusted workflows consume the existing **repository Actions secret** `FCR_GITHUB_APP_PRIVATE_KEY`, even when the job is bound to `environment: production`. They map it into the runtime variable `GITHUB_PRIVATE_KEY`. The App ID still uses `secrets.APP_ID` and is mapped into `GITHUB_APP_ID`. No key value is copied or logged by this configuration change.
 
 The GitHub App **Client ID is not used** by the current installation-token witness or governance-reconciliation path. Keeping a separately stored Client ID is harmless, but it is not a substitute for the numeric App ID or the App private-key PEM and should not be treated as proof that the trusted App path is configured.
 
@@ -54,32 +54,25 @@ The GitHub App **Client ID is not used** by the current installation-token witne
 | Secret | Required by | Description |
 |---|---|---|
 | `APP_ID` | `deterministic-review-core-advisory.yml` trusted witness publication, `github-app-secret-shape-diagnostic.yml` read-only production shape diagnostic, and FCR governance reconciliation | Numeric GitHub App ID for the repository-scoped Founder Control Room App. Mapped at job runtime to `GITHUB_APP_ID`. |
-| `APP_PRIVATE_KEY` | `deterministic-review-core-advisory.yml` trusted witness publication, `github-app-secret-shape-diagnostic.yml` read-only production shape diagnostic, and FCR governance reconciliation | Complete PEM private key for the same GitHub App. Mapped at job runtime to `GITHUB_PRIVATE_KEY`. Never log or expose the value. |
+| `FCR_GITHUB_APP_PRIVATE_KEY` | Trusted review witness, shape diagnostic, portfolio evidence sync, portfolio Actions audit, Chief ProofMode witness, and guarded AI-failure repair | Existing repository-level GitHub Actions RSA private-key secret for the matching GitHub App. Mapped at job runtime to `GITHUB_PRIVATE_KEY` or `APP_PRIVATE_KEY`. Never log or expose the value. |
 
-`APP_ID` and `APP_PRIVATE_KEY` must identify the same installed App. The read-only `github-app-secret-shape-diagnostic.yml` proves only local credential transport/PEM/RSA shape and explicitly performs no provider authentication or issuer readback. For workflows that claim provider proof, success must separately establish that both mapped runtime values were usable and that provider readback reports the expected App issuer; secret-name presence or a green shape diagnostic alone is not provider proof.
+`APP_ID` and `FCR_GITHUB_APP_PRIVATE_KEY` must identify the same installed App. The read-only `github-app-secret-shape-diagnostic.yml` proves only local credential transport/PEM/RSA shape and explicitly performs no provider authentication or issuer readback. For workflows that claim provider proof, success must separately establish that both mapped runtime values were usable and that provider readback reports the expected App issuer; secret-name presence or a green shape diagnostic alone is not provider proof.
 
 
-#### Failed shape diagnostic: verify the effective Actions secret
+#### Failed shape diagnostic: verify the actual repository Actions secret
 
-On the `github-app-secret-shape-diagnostic.yml` job, `environment: production` means
-`secrets.APP_PRIVATE_KEY` may resolve to the **production environment secret**;
-that value overrides a repository secret with the same name. A secret being
-present (`present=true`) does not prove it contains a valid GitHub App RSA key.
-The workflow exposes only boolean `input_shape` facts and a bounded
-`failure_reason`, never private-key bytes or length.
+The trusted-review, portfolio, and secret-safe diagnostic workflows explicitly reference
+`secrets.FCR_GITHUB_APP_PRIVATE_KEY`. An unrelated `production` environment secret
+named `APP_PRIVATE_KEY` is **not** consumed by those patched bindings. GitHub Actions
+can still use `environment: production` to enforce deployment protections.
 
-If `failure_reason=private-key-transport-unrecognized`, verify the **effective**
-`APP_PRIVATE_KEY` in Settings → Secrets and variables → Actions, including the
-`production` environment's secrets. Confirm that it is the **complete contents**
-of the private-key `.pem` downloaded for the matching GitHub App, not the file
-path, client secret, App ID, installation token, or a placeholder. Check both
-repository and `production` scopes for same-name shadowing before considering
-any credential change. Store the key only through GitHub's secret UI; never
-paste it into a chat, issue, workflow log, artifact, source file, or PR.
-
-Changing parser code cannot make an incorrect or damaged stored credential
-valid. A shape-valid result is local cryptographic evidence only; the separately
-authorized provider-authentication and issuer readback are still required.
+If the diagnostic reports an unrecognized private-key transport, verify that the
+existing repository Actions secret `FCR_GITHUB_APP_PRIVATE_KEY` contains the complete,
+matching GitHub App RSA private key. Do not substitute an App ID, client secret,
+installation token, placeholder, or local file path. Never paste the key into
+chat, issues, Actions logs, artifacts, source, or a PR. A passing RSA-shape
+diagnostic is not issuer proof: verify provider authentication and the App ID
+match independently before trusting publication, merge, or deployment.
 
 #### Accepted `APP_PRIVATE_KEY` transport shapes
 
@@ -264,7 +257,7 @@ Never commit, log, or expose this value through a `NEXT_PUBLIC_*` variable.
 [ ] NEXT_PUBLIC_SUPABASE_URL
 [ ] GITHUB_WEBHOOK_SECRET
 [ ] APP_ID (numeric Founder Control Room GitHub App ID)
-[ ] APP_PRIVATE_KEY (matching GitHub App private-key PEM)
+[ ] FCR_GITHUB_APP_PRIVATE_KEY (existing repository Actions secret for the matching GitHub App private-key PEM)
 [ ] CLOUDFLARE_API_TOKEN for canonical founder-control-room mutation only
 [ ] CLOUDFLARE_REVIEW_EMAIL_DEPLOY_TOKEN for founder-control-room-review-email only
 [ ] FCR_CLOUDFLARE_BUILDS_USER_TOKEN for read-only FCR Workers Builds inspection

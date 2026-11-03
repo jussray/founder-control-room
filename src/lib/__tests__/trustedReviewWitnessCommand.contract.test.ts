@@ -86,7 +86,7 @@ describe('trusted review witness command contract', () => {
     expect(reviewWorkflow).toContain('environment: production');
     expect(reviewWorkflow).toContain('EXPECTED_TRUSTED_MAIN_SHA: ${{ github.sha }}');
     expect(reviewWorkflow).toContain('GITHUB_APP_ID: ${{ secrets.APP_ID }}');
-    expect(reviewWorkflow).toContain('GITHUB_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}');
+    expect(reviewWorkflow).toContain('GITHUB_PRIVATE_KEY: ${{ secrets.FCR_GITHUB_APP_PRIVATE_KEY }}');
     expect(reviewWorkflow).not.toContain('secrets.GITHUB_APP_ID');
     expect(reviewWorkflow).not.toContain('secrets.GITHUB_PRIVATE_KEY');
     expect(reviewWorkflow).toContain('test "$EXPECTED_TRUSTED_MAIN_SHA" = "$current_main"');
@@ -171,7 +171,7 @@ describe('trusted review witness command contract', () => {
 
     expect(governanceJob).toContain('environment: production');
     expect(governanceJob).toContain('GITHUB_APP_ID: ${{ secrets.APP_ID }}');
-    expect(governanceJob).toContain('GITHUB_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}');
+    expect(governanceJob).toContain('GITHUB_PRIVATE_KEY: ${{ secrets.FCR_GITHUB_APP_PRIVATE_KEY }}');
     expect(governanceJob).not.toContain('secrets.GITHUB_APP_ID');
     expect(governanceJob).not.toContain('secrets.GITHUB_PRIVATE_KEY');
     expect(governanceJob).toContain("from './dist/providers/providerFactory.js'");
