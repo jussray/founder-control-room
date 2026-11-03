@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { validateBindingTypes, runProviderPreflight } from '../scripts/verify-worker-binding-types.mjs';
+import { validateBindingTypes, runProviderPreflight, isCredentialBindingName, PUBLIC_PLAINTEXT_BINDINGS, safePreflightError } from '../scripts/verify-worker-binding-types.mjs';
+import { readFileSync } from 'node:fs';
 
 const response = bindings => ({ success: true, result: { bindings } });
 
@@ -84,20 +85,20 @@ test('provider metadata fingerprint is stable and excludes plaintext binding val
     json: async () => response(bindings),
   });
   const base = [
-    { name: 'FCR_MODE', type: 'plain_text', text: 'one' },
+    { name: 'ENVIRONMENT', type: 'plain_text', text: 'one' },
     { name: 'CF_API_TOKEN', type: 'secret_text' },
   ];
   const first = await runProviderPreflight({ env: config, fetchFn: provider(base) });
   const second = await runProviderPreflight({ env: config, fetchFn: provider([
     { name: 'CF_API_TOKEN', type: 'secret_text' },
-    { name: 'FCR_MODE', type: 'plain_text', text: 'different-value' },
+    { name: 'ENVIRONMENT', type: 'plain_text', text: 'different-value' },
   ]) });
   assert.match(first.bindingFingerprint, /^sha256:[0-9a-f]{64}$/);
   assert.equal(first.bindingFingerprint, second.bindingFingerprint);
   assert.doesNotMatch(JSON.stringify(first), /different-value|test-only-token/);
   const changed = await runProviderPreflight({ env: config, fetchFn: provider([
     { name: 'CF_API_TOKEN', type: 'secret_text' },
-    { name: 'FCR_MODE', type: 'secret_text' },
+    { name: 'ENVIRONMENT', type: 'secret_text' },
   ]) });
   assert.notEqual(changed.bindingFingerprint, first.bindingFingerprint);
 });
@@ -136,10 +137,8 @@ test('fails closed on MCP read tokens and generic secret credential names', () =
     const result = validateBindingTypes(response([{ name, type: 'plain_text', text: 'sensitive-fixture' }]));
     assert.equal(result.ok, false, name);
   }
-  assert.equal(validateBindingTypes(response([
-    { name: 'FCR_TOKENIZER_MODE', type: 'plain_text', text: 'enabled' },
-    { name: 'REPOSITORY_KEYWORD', type: 'plain_text', text: 'guide' },
-  ])).ok, true);
+  assert.equal(isCredentialBindingName('FCR_TOKENIZER_MODE'), false);
+  assert.equal(isCredentialBindingName('REPOSITORY_KEYWORD'), false);
 });
 
 test('preflight failures never propagate response bodies, credentials, or untrusted binding names into CI logs', async () => {
@@ -163,4 +162,51 @@ test('provider JSON parsing errors and unsafe binding names do not reveal respon
     runProviderPreflight({ env, fetchFn: async () => ({ ok: true, json: async () => response([{ name: 'CF_API_TOKEN_' + secret, type: 'plain_text' }]) }) }),
     { message: 'credential-binding-not-secret' },
   );
+});
+
+test('credential-word parsing closes suffixes, plurals and camelCase without substring false positives', () => {
+  for (const name of ['API_TOKEN2', 'apiToken', 'SESSION_TOKENS', 'GITHUB_APP_PEM2', 'CFAPIToken', 'FCR_CREDENTIALS']) {
+    assert.equal(isCredentialBindingName(name), true, name);
+    assert.equal(validateBindingTypes(response([{ name, type: 'plain_text', text: 'fixture-value' }])).ok, false, name);
+  }
+  for (const name of ['MONKEY_MODE', 'FCR_TOKENIZER_MODE', 'REPOSITORY_KEYWORD']) {
+    assert.equal(isCredentialBindingName(name), false, name);
+  }
+});
+
+test('only explicitly reviewed Wrangler public vars may be plaintext; deny unknown names and JSON', () => {
+  for (const name of ['ENVIRONMENT', 'FOUNDER_API_URL', 'N8N_FOUNDER_CONTENT_ENABLED']) {
+    assert.equal(validateBindingTypes(response([{ name, type: 'plain_text', text: 'public-fixture' }])).ok, true, name);
+  }
+  for (const name of ['CONFIG_DATA', 'MONKEY_MODE', 'REPOSITORY_KEYWORD']) {
+    const result = validateBindingTypes(response([{ name, type: 'plain_text', text: 'fixture-secret-not-for-logs' }]));
+    assert.equal(result.ok, false, name);
+    assert.equal(result.reason, 'undeclared-plaintext-binding', name);
+    assert.doesNotMatch(JSON.stringify(result), /fixture-secret-not-for-logs/);
+  }
+  const jsonBinding = validateBindingTypes(response([{ name: 'ENVIRONMENT', type: 'json', json: '{"nested":"fixture-secret"}' }]));
+  assert.equal(jsonBinding.ok, false);
+  assert.equal(jsonBinding.reason, 'json-config-binding-not-reviewed');
+  assert.doesNotMatch(JSON.stringify(jsonBinding), /fixture-secret/);
+});
+
+test('reviewed plaintext binding allowlist matches exactly the source-authored Wrangler vars', () => {
+  const toml = readFileSync(new URL('../wrangler.worker.toml', import.meta.url), 'utf8');
+  const section = toml.split(/(?:^|\\n)\\[vars\\]\\s*\\n/)[1]?.split(/\\n\\[/)[0];
+  assert.ok(section, 'missing [vars] section');
+  const declared = section.split(/\\r?\\n/).map(line => line.match(/^([A-Z][A-Z0-9_]*)\\s*=/)?.[1]).filter(Boolean);
+  assert.deepEqual([...PUBLIC_PLAINTEXT_BINDINGS].sort(), declared.sort());
+  assert.equal(PUBLIC_PLAINTEXT_BINDINGS.every(name => !isCredentialBindingName(name)), true);
+});
+
+test('legacy one-binding removal exception cannot excuse undeclared plaintext', () => {
+  const findings = validateBindingTypes(response([
+    { name: 'CF_API_TOKEN', type: 'plain_text', text: 'fixture-private' },
+    { name: 'CONFIG_DATA', type: 'plain_text', text: 'fixture-private-2' },
+  ]), { allowStaleCfApiTokenRemoval: true });
+  assert.equal(findings.ok, false);
+  assert.equal(findings.repairableStaleCfApiToken, false);
+  assert.equal(safePreflightError(new Error('undeclared-plaintext-binding')), 'undeclared-plaintext-binding');
+  assert.equal(safePreflightError(new Error('json-config-binding-not-reviewed')), 'json-config-binding-not-reviewed');
+  assert.doesNotMatch(JSON.stringify(findings), /fixture-private/);
 });
