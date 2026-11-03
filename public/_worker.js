@@ -13,6 +13,8 @@ const NON_RETRYABLE_GET_PATHS = new Set(['/auth/callback']);
 const API_OWNED_ASSET_PATHS = new Set([
   '/assets/auth-callback.js',
   '/assets/control-room.css',
+  '/assets/oauth-consent.js',
+  '/assets/oauth-consent.css',
 ]);
 const DIRECT_ACCESS_ONLY_PATHS = new Set([
   '/mcp/founder-signal-engine',
@@ -332,12 +334,60 @@ export default {
       return new Response('Founder Control Room proxy loop blocked.', { status: 508 });
     }
 
+    // OAuth consent and its API-owned assets travel through the same Pages
+    // browser origin as the __Host-fcr_session cookie and same-origin CSRF
+    // checks. They are served by FCR_API, never by public Pages ASSETS.
+
+    // Canonical founder OAuth/session origin is the apex Pages hostname.
+    // A www entry must move to apex *before* collecting pending auth state.
+    if (request.method === 'GET' &&
+        requestUrl.pathname === '/oauth/consent' &&
+        requestUrl.origin === 'https://www.foundercontrolroom.org') {
+      const destination = new URL('/oauth/consent', 'https://foundercontrolroom.org');
+      destination.search = requestUrl.search;
+      return new Response(null, {
+        status: 302,
+        headers: {
+          Location: destination.toString(),
+          'Cache-Control': 'no-store',
+          'Referrer-Policy': 'no-referrer',
+          'X-Robots-Tag': 'noindex, nofollow',
+        },
+      });
+    }
+
     if (requestUrl.pathname === SYNC_CONTROL_ROUTE) {
       return relaySyncControl(request, env);
     }
 
     if (isDirectAccessOnlyPath(requestUrl.pathname)) {
       return directAccessOnlyResponse();
+    }
+
+    // The Pages asset layer canonicalizes /work.html -> /work with a 308,
+    // and /work is a public page, not an API route. Ask ASSETS for the
+    // canonical /work URL itself: fetching the /work.html filename returns
+    // the asset layer's 308 back to /work, and returning it verbatim loops
+    // /work -> /work forever. Falling through to the API proxy instead
+    // answers without the service identity header and yields a 503 degraded
+    // page for a link on the public homepage.
+    if (requestUrl.pathname === '/work' || requestUrl.pathname === '/work/') {
+      const assetUrl = new URL(request.url);
+      assetUrl.pathname = '/work';
+      return env.ASSETS.fetch(new Request(assetUrl, request));
+    }
+
+    // /welcome is a public page, not an API route, but no static rule above
+    // classifies the extensionless path, so it falls through to the API
+    // proxy; the answer carries no service identity header and yields a 503
+    // degraded page. Ask ASSETS for the canonical /welcome URL itself: the
+    // Pages asset layer canonicalizes /welcome.html -> /welcome with a 308,
+    // so fetching the /welcome.html filename would return that redirect
+    // instead of the page.
+    if (requestUrl.pathname === '/welcome' || requestUrl.pathname === '/welcome/') {
+      const assetUrl = new URL(request.url);
+      assetUrl.pathname = '/welcome';
+      return env.ASSETS.fetch(new Request(assetUrl, request));
     }
 
     if (shouldServeFromPages(request)) {

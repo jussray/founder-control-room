@@ -70,6 +70,64 @@ describe('Cloudflare Pages edge proxy', () => {
     expect(fcrApiFetch).not.toHaveBeenCalled();
   });
 
+  it('retains public work and welcome routing from current main without API fallback', async () => {
+    const handler = await loadHandler();
+    const assets = vi.fn(async (request: Request) => new Response(new URL(request.url).pathname));
+    const api = vi.fn(async () => identifiedResponse('wrong API'));
+    for (const route of ['/work', '/work/?ref=home', '/welcome', '/welcome/?ref=home']) {
+      const path = route.startsWith('/work') ? '/work' : '/welcome';
+      const response = await handler.fetch(
+        new Request('https://foundercontrolroom.org' + route),
+        { ASSETS: { fetch: assets }, FCR_API: { fetch: api } },
+      );
+      expect(response.status).toBe(200);
+      expect(await response.text()).toBe(path);
+      const assetRequest = assets.mock.calls.at(-1)?.[0];
+      expect(new URL(assetRequest?.url ?? '').pathname).toBe(path);
+      expect(new URL(assetRequest?.url ?? '').search).toBe(route.includes('?') ? '?ref=home' : '');
+    }
+    expect(assets).toHaveBeenCalledTimes(4);
+    expect(api).not.toHaveBeenCalled();
+  });
+
+  it('retains consent-origin redirects and API-owned consent assets without opening Access-only MCP routes', async () => {
+    const handler = await loadHandler();
+    const assets = vi.fn(async () => new Response('wrong Pages asset'));
+    const api = vi.fn(async () => identifiedResponse('API consent'));
+    const env = { ASSETS: { fetch: assets }, FCR_API: { fetch: api } };
+
+    const redirect = await handler.fetch(new Request(
+      'https://www.foundercontrolroom.org/oauth/consent?authorization_id=synthetic-123',
+    ), env);
+    expect(redirect.status).toBe(302);
+    expect(redirect.headers.get('location')).toBe(
+      'https://foundercontrolroom.org/oauth/consent?authorization_id=synthetic-123',
+    );
+    expect(redirect.headers.get('cache-control')).toBe('no-store');
+    expect(redirect.headers.get('set-cookie')).toBeNull();
+    expect(api).not.toHaveBeenCalled();
+
+    for (const path of ['/oauth/consent', '/assets/oauth-consent.js', '/assets/oauth-consent.css']) {
+      const response = await handler.fetch(
+        new Request('https://foundercontrolroom.org' + path, {
+          headers: { Cookie: '__Host-fcr_session=synthetic-session' },
+        }), env,
+      );
+      expect(response.status).toBe(200);
+      expect(await response.text()).toBe('API consent');
+      const forwarded = api.mock.calls.at(-1)?.[0];
+      expect(new URL(forwarded?.url ?? '').pathname).toBe(path);
+      expect(forwarded?.headers.get('cookie')).toBe('__Host-fcr_session=synthetic-session');
+    }
+    expect(assets).not.toHaveBeenCalled();
+    const guarded = await handler.fetch(new Request(
+      'https://foundercontrolroom.org/MCP/FOUNDER-SIGNAL-ENGINE/',
+      { method: 'POST', body: 'synthetic' },
+    ), env);
+    expect(guarded.status).toBe(403);
+    expect(api).toHaveBeenCalledTimes(3);
+  });
+
   it('forwards dynamic GET routes through the FCR_API service binding', async () => {
     const handler = await loadHandler();
     const assetFetch = vi.fn(async (_request: Request) => new Response('unexpected', { status: 200 }));
