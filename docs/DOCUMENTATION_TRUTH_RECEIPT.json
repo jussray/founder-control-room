@@ -476,7 +476,8 @@
     {
       "path": ".github/workflows/github-app-secret-shape-diagnostic.yml",
       "claims": [
-        ".github/workflows/github-app-secret-shape-diagnostic.yml must recognize only bounded, transport-equivalent private-key wrappers, preserve RSA-only cryptographic parsing, reject ambiguous or malformed values without logging secret material, and never turn parsing or source tests into current provider or release proof."
+        ".github/workflows/github-app-secret-shape-diagnostic.yml must recognize only bounded, transport-equivalent private-key wrappers, preserve RSA-only cryptographic parsing, reject ambiguous or malformed values without logging secret material, and never turn parsing or source tests into current provider or release proof.",
+        ".github/workflows/github-app-secret-shape-diagnostic.yml must classify the existing repository Actions FCR_GITHUB_APP_PRIVATE_KEY input in a founder-gated exact-main read-only job, retaining only bounded shape booleans and never exposing key material or substituting local RSA parsing for the App issuer and installation proof."
       ]
     },
     {
@@ -490,6 +491,12 @@
       "path": "src/http/middleware/mcpRateLimit.ts",
       "claims": [
         "The MCP rate-limit middleware is a dependency-free unit-testable 60-request/minute per-IP and per-process express-rate-limit instance; both canonical and compatibility MCP routes must reuse this same instance before authentication, and this does not prove globally distributed Cloudflare enforcement or override OAuth/founder authorization."
+      ]
+    },
+    {
+      "path": ".github/workflows/deterministic-review-core-advisory.yml",
+      "claims": [
+        ".github/workflows/deterministic-review-core-advisory.yml must bind its trusted witness publisher's GitHub App private key to the existing repository Actions secret FCR_GITHUB_APP_PRIVATE_KEY while preserving APP_ID issuer identity, protected environment approval, exact current-main verification, fail-closed RSA parsing, independent provider readback, and separately authorized merge and deployment gates."
       ]
     }
   ]

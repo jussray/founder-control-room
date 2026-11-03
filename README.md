@@ -4,6 +4,18 @@
 
 The isolated `feat/fcr-council-bus-handoff-guard-20261102` branch contains pinned Council/Court validators, a signed-ACK contract, and founder-gated Search Console and AI evidence review panels. The Search Console panel inspects five fixed public URLs and sitemap metadata; it does not claim a full indexed-page count. The evidence challenger is advisory, uses a dedicated authenticated BYOK Cloudflare AI Gateway, and never grants publishing or deployment authority. Current candidate source and tests do not prove live delivery. Google OAuth refresh credentials and the dedicated gateway token have not been installed in the Worker; `CF_API_TOKEN` remains incorrectly typed as plaintext and must be remediated through an exact-head authorized reconcile. The public homepage uses CSP-compatible WebPage Microdata, not inline scripts. No PR, merge, or production deployment follows from this source candidate.
 
+## November 3, 2026: reuse the existing GitHub Actions App key
+
+Draft PR #1061 rebinds FCR's trusted-review, portfolio-evidence, Actions-audit,
+secret-safe diagnostic, guarded repair, and Chief ProofMode GitHub App
+consumers from `secrets.APP_PRIVATE_KEY` to the existing **repository Actions**
+secret `secrets.FCR_GITHUB_APP_PRIVATE_KEY`. This changes a source reference,
+not any secret value, installation grant, App ID, or Cloudflare Worker credential.
+The repository still requires RSA parsing, App-issuer readback, exact-head
+checks, founder authority, and separate live evidence before release.
+A green source test alone does not prove the protected secret is valid or
+that PR #1006 can merge.
+
 ## November 1, 2026: bounded GitHub App transport reconciliation
 
 The existing PR #986 reconciles bounded private-key wrapper parsing against current main without replacing a protected secret, changing GitHub App installation grants, or asserting production repair. On the November 1 exact-main founder-only diagnostic, the production binding was present and the App ID numeric, but the runtime key transport was classified as unknown; this is evidence of failed parsing, not evidence that the secret was missing or recently replaced. Protected-value scope and provider identity remain independent gates. No inherited historic CI or Playwright result authorizes a merge or release.
