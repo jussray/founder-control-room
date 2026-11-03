@@ -15,7 +15,8 @@ test('payload cannot leak private repository names or raw audit entries', () => 
 });
 
 test('observed CI status sends ok but never claims production verification', () => {
-  const payload = formatAlert({ ...good, state: 'OBSERVED_CHECKS_ONLY' });
+  const payload = formatAlert({ ...good, state: 'OBSERVED_CHECKS_ONLY', expectedMinimum: 46,
+    items: Array.from({ length: 50 }, () => ({ state: 'OBSERVED_CHECKS_ONLY', archived: false })) });
   assert.equal(payload.state, 'ok');
   assert.match(payload.message, /not production verification/i);
 });
@@ -65,4 +66,26 @@ test('provider failure or redirect does not claim delivery or leak the secret en
   await assert.rejects(dispatchAlert({ enabled: true, receipt: good, url, bearerToken: 'glsa_test',
     fetchImpl: async () => { throw new Error('The secret URL is '+url); } }),
     (error) => error.message === 'GRAFANA_IRM_DELIVERY_UNVERIFIED');
+});
+
+test('never auto-resolves from incomplete, contradictory, or stale proof', () => {
+  const healthy = { ...good, state: 'OBSERVED_CHECKS_ONLY', expectedMinimum: 46,
+    items: Array.from({ length: 50 }, () => ({ state: 'OBSERVED_CHECKS_ONLY', archived: false })) };
+  assert.equal(formatAlert(healthy).state, 'ok');
+  for (const untrustworthy of [
+    { ...healthy, discoveryComplete: false },
+    { ...healthy, installationRepositories: 40 },
+    { ...healthy, expectedMinimum: 51 },
+    { ...healthy, items: healthy.items.slice(1) },
+    { ...healthy, items: [{ state: 'FAILED_EXACT_HEAD', archived: false }, ...healthy.items.slice(1)] },
+    { ...healthy, expectedMinimum: undefined },
+  ]) {
+    assert.throws(() => formatAlert(untrustworthy), /INCONSISTENT_PORTFOLIO_AUDIT_RECEIPT/);
+  }
+});
+
+test('BLOCKED receipt without counts still sends alerting, not an ok', () => {
+  const payload = formatAlert({ schema: 'fcr/portfolio-actions-audit@v1', state: 'BLOCKED' });
+  assert.equal(payload.state, 'alerting');
+  assert.match(payload.message, /unknown/);
 });
