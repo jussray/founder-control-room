@@ -80,7 +80,7 @@ function app() {
   api.get('/founder-only', requireFounder, (_req, res) => res.json({ private: true }));
   return api;
 }
-function memberCookie(response: request.Response) {
+function memberCookie(response: { headers: Record<string, string | string[] | undefined> }) {
   const header = response.headers['set-cookie'];
   const cookieList = Array.isArray(header) ? header : [String(header ?? '')];
   const cookie = cookieList.find((item) => item.startsWith('__Host-fcr_member_session='));

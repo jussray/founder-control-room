@@ -3,6 +3,7 @@ import { rateLimit } from 'express-rate-limit';
 import { createSupabaseAuthClient, supabaseAuth } from '../../lib/supabaseAuthClient.js';
 import { supabase } from '../../lib/supabaseClient.js';
 import { clearMemberSession, readMemberSession, revokeMemberSession, writeMemberSession } from '../../auth/memberSession.js';
+import { clearFounderSession, revokeFounderSession } from '../../auth/founderSession.js';
 import { respondError, respondSuccess } from '../apiResponse.js';
 import { FOUNDER_API_URL, rateLimitMagicLink } from '../middleware/security.js';
 import { onboardingContentSecurityPolicy } from '../middleware/onboardingSecurity.js';
@@ -35,6 +36,14 @@ function verifiedIdentity(value: unknown): { userId: string; email: string } | n
   const userId = typeof user.id === 'string' ? user.id : '';
   const email = emailFrom(user.email);
   return userId && EMAIL_PATTERN.test(email) && email.length <= 254 ? { userId, email } : null;
+}
+
+async function establishMemberSession(req: import('express').Request, res: import('express').Response, identity: {userId: string; email: string}): Promise<void> {
+  // Verified account-switching must not leave an older founder capability active.
+  if (!(await revokeFounderSession(req, 'member_account_switch'))) throw new Error('Founder session revocation failed');
+  if (!(await revokeMemberSession(req))) throw new Error('Previous member session revocation failed');
+  clearFounderSession(res);
+  await writeMemberSession(res, identity);
 }
 
 const callbackHtml = '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Member sign-in | Founder Control Room</title><link rel="stylesheet" href="/assets/control-room.css"><script type="module" src="/auth/member/callback.js"></script></head><body><main class="shell callback"><section class="panel"><p class="eyebrow">Member account</p><h1 id="callback-title">Completing secure sign-in</h1><p id="callback-message">Verifying your session.</p><a id="callback-return" href="/welcome" hidden>Back to welcome</a></section></main></body></html>';
@@ -97,7 +106,7 @@ memberAuthRouter.get('/callback', callbackThrottle, onboardingContentSecurityPol
     if (await isFounder(identity.email)) {
       return respondError(res, 403, 'FORBIDDEN', 'Use founder sign-in for this account.');
     }
-    await writeMemberSession(res, identity);
+    await establishMemberSession(req, res, identity);
     return res.redirect(303, '/member/');
   } catch {
     return respondError(res, 503, 'SESSION_UNAVAILABLE', 'Member session unavailable.');
@@ -122,7 +131,7 @@ memberAuthRouter.post('/session', sessionThrottle, async (req, res) => {
     if (await isFounder(identity.email)) {
       return respondError(res, 403, 'FORBIDDEN', 'Use founder sign-in for this account.');
     }
-    await writeMemberSession(res, identity);
+    await establishMemberSession(req, res, identity);
     return respondSuccess(res, { member: identity }, 201);
   } catch {
     return respondError(res, 503, 'SESSION_UNAVAILABLE', 'Member session unavailable.');
@@ -147,6 +156,8 @@ memberAuthRouter.get('/me', async (req, res) => {
 memberAuthRouter.post('/logout', async (req, res) => {
   const revoked = await revokeMemberSession(req);
   if (!revoked) return respondError(res, 503, 'SESSION_REVOCATION_FAILED', 'Member session could not be revoked.');
+  if (!(await revokeFounderSession(req, 'member_logout'))) return respondError(res, 503, 'SESSION_REVOCATION_FAILED', 'Founder session could not be revoked.');
+  clearFounderSession(res);
   clearMemberSession(res);
   return res.status(204).end();
 });
