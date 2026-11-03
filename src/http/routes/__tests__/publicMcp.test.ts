@@ -90,6 +90,19 @@ afterEach(() => {
 });
 
 describe('public FCR MCP isolation', () => {
+  it('never serves 5W1H to an unauthenticated caller or reads founder state', async () => {
+    const response = await request(app()).post('/mcp/public')
+      .send({
+        jsonrpc: '2.0',
+        id: 19,
+        method: 'tools/call',
+        params: { name: 'fcr_customer_start', arguments: {} },
+      });
+    expect(response.status).toBe(401);
+    expect(state.from).not.toHaveBeenCalled();
+    expect(state.getUser).not.toHaveBeenCalled();
+  });
+
   it('fails closed when the public feature is not activated', async () => {
     delete process.env.FCR_PUBLIC_MCP_ENABLED;
     const response = await post(app());
