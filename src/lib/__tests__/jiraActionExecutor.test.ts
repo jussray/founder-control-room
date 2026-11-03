@@ -71,6 +71,34 @@ describe('claim-gated Jira execution', () => {
     expect(write).not.toHaveBeenCalled();
   });
 
+
+  it.each(['verified', 'denied'] as const)(
+    'does not claim or write when action is %s', async (state) => {
+      const { store, write } = setup(state);
+      expect(await runClaimedJiraAction(key, store, write))
+        .toBe(state === 'verified' ? 'already-verified' : 'stop');
+      expect(store.claimOnce).not.toHaveBeenCalled();
+      expect(write).not.toHaveBeenCalled();
+    },
+  );
+
+  it('does not falsely report provider acceptance when recording it fails', async () => {
+    const { store, write } = setup();
+    vi.mocked(store.markProviderAccepted).mockRejectedValueOnce(new Error('db offline'));
+    await expect(runClaimedJiraAction(key, store, write)).rejects.toThrow('db offline');
+    expect(write).toHaveBeenCalledOnce();
+    expect(store.markUnknown).not.toHaveBeenCalled();
+  });
+
+  it('does not falsely report verification when unknown outcome persistence fails', async () => {
+    const { store, write } = setup();
+    vi.mocked(write).mockRejectedValueOnce(new Error('timeout'));
+    vi.mocked(store.markUnknown).mockRejectedValueOnce(new Error('db offline'));
+    await expect(runClaimedJiraAction(key, store, write)).rejects.toThrow('db offline');
+    expect(write).toHaveBeenCalledOnce();
+    expect(store.markProviderAccepted).not.toHaveBeenCalled();
+  });
+
   it('rejects invalid action keys before claiming', async () => {
     const { store, write } = setup();
     await expect(runClaimedJiraAction('', store, write)).rejects.toThrow('invalid_jira_action_key');
