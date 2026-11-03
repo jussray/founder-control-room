@@ -10,6 +10,10 @@
       ],
       "boundary": "Repository, pull-request, Actions, and security evidence. Exact branch, commit, and approval state remain mandatory for writes."
     },
+    "grafana": {
+      "skills": ["control-room-repo-contract"],
+      "boundary": "Read-only sanitized operational evidence via founder-authorized Grafana OAuth; no tenant, customer, teen, payment, secret, or personal raw data. OAuth write permission and production changes are not authorized."
+    },
     "context7": {
       "skills": [
         "control-room-repo-contract"
