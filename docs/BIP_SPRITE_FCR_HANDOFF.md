@@ -21,7 +21,7 @@ This is **not** a teen or guardian app capability and does not create a public a
 Place `SPRITES_TOKEN` only in FCR GitHub Actions Production environment secrets, with an approved organization-scoped Sprites API token. Do not paste it in chat or files.
 Bind each live run to exact `BIP_SPRITE_APPROVED_SHA` and `BIP_SPRITE_APPROVED_MISSION` Production environment variables, and require appropriate environment reviewer authorization.
 Apply this candidate to FCR production only after code review, exact-head Actions and real-path verification.
-The private Sprite repository must first be synchronized to the exact approved GitHub SHA by a separately authorized source-read operation, restoring deny-all network afterward. Otherwise the runner will reject the request.
+The private Sprite clean isolated worktree at `/home/sprite/bip-governed-proof` must first be synchronized to the exact approved GitHub SHA by a separately authorized source-read operation, restoring deny-all network afterward. This worktree is separate from `/home/sprite/bip-source`, which may contain unrelated edits. Otherwise the runner will reject the request.
 Current pull request #1054 is a candidate only: do not claim this dispatch is live or that it fixes Se’kret PR #615, Supabase migration lineage or Cloudflare CI credentials.
 
 ## Rollback

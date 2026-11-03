@@ -10,6 +10,7 @@ export const TARGET = Object.freeze({
   branch:'governance/repo-reality-v10-20261025',
   name:'sekret-bip-governed-proof',
   id:'sprite-4709ae6f-3a4c-4e45-8c47-e73a7ee54f1f',
+  checkoutDir:'/home/sprite/bip-governed-proof',
 });
 const API='https://api.sprites.dev/v1/sprites/'+TARGET.name;
 const SHA=/^[a-f0-9]{40}$/;
@@ -79,9 +80,9 @@ export async function dispatch(input,{
   if(!INVOCATION.test(invocationId))throw Error('INVOCATION_ID_INVALID');
   const start=now();
   const url=new URL(API+'/exec');
-  for(const x of ['node','/home/sprite/bip-source/scripts/bip-sprite-proof.mjs',
+  for(const x of ['node',TARGET.checkoutDir+'/scripts/bip-sprite-proof.mjs',
     '--mission',request.mission,'--sha',request.sha,'--invocation',invocationId])url.searchParams.append('cmd',x);
-  url.searchParams.set('dir','/home/sprite/bip-source');
+  url.searchParams.set('dir',TARGET.checkoutDir);
   url.searchParams.set('stdin','false');
   await get(fetcher,url.toString(),{method:'POST',headers:{...headers,'Content-Type':'application/octet-stream'}},false);
   const proofURL=new URL(API+'/fs/read');

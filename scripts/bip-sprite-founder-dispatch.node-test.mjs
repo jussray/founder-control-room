@@ -66,8 +66,9 @@ test('live executes one immutable command; reads receipt; checks policy twice',a
  assert.equal(out.status,'VERIFIED_READ_ONLY_PROOF');
  const exec=urls.filter(x=>x.u.includes('/exec?'));assert.equal(exec.length,1);
  assert.deepEqual(new URL(exec[0].u).searchParams.getAll('cmd'),
- ['node','/home/sprite/bip-source/scripts/bip-sprite-proof.mjs','--mission','repo-truth','--sha',sha,'--invocation',invocationId]);
+ ['node',TARGET.checkoutDir+'/scripts/bip-sprite-proof.mjs','--mission','repo-truth','--sha',sha,'--invocation',invocationId]);
  assert.equal(urls.filter(x=>x.u.includes('/policy/network')).length,2);
+ assert.equal(new URL(exec[0].u).searchParams.get('dir'),TARGET.checkoutDir);
 });
 
 test('an earlier same-commit receipt cannot satisfy a new invocation',()=>{
