@@ -19,14 +19,33 @@ export function safePreflightError(error) {
   if (/^provider-settings-http-[1-5][0-9]{2}$/.test(code)) return code;
   return 'provider-preflight-failed';
 }
-const CREDENTIAL_BINDING = /(?:^|_)(?:TOKEN|SECRET|PASSWORD|PASSWD|KEY|CREDENTIAL|HMAC|PEM|SEED|APIKEY)(?:_|$)/i;
+const CREDENTIAL_WORDS = new Set(['TOKEN', 'SECRET', 'PASSWORD', 'PASSWD', 'KEY', 'CREDENTIAL', 'HMAC', 'PEM', 'SEED', 'APIKEY']);
+
+// Compact suffixes catch all-uppercase aliases without turning MONKEY or KEYWORD into secrets.
+// Standalone KEY remains a whole-word match; generic KEY suffix matching is too ambiguous.
+const COMPACT_CREDENTIAL_SUFFIX = /(?:TOKENS?|SECRETS?|PASSWORDS?|PASSWDS?|CREDENTIALS?|HMACS?|PEMS?|SEEDS?|APIKEYS?|PRIVATEKEYS?|SIGNINGKEYS?|ENCRYPTIONKEYS?|ACCESSKEYS?|WEBHOOKKEYS?)$/;
+
+export function isCredentialBindingName(name) {
+  const parts = String(name)
+    .replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2')
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .split(/[^A-Za-z0-9]+/)
+    .filter(Boolean)
+    .map(part => part.toUpperCase());
+  return parts.some(part => {
+    const stem = part.replace(/(?:V?\\d+)$/, '');
+    return CREDENTIAL_WORDS.has(stem) ||
+      (stem.endsWith('S') && CREDENTIAL_WORDS.has(stem.slice(0, -1))) ||
+      COMPACT_CREDENTIAL_SUFFIX.test(stem);
+  });
+}
 
 export function validateBindingTypes(payload, { allowStaleCfApiTokenRemoval = false } = {}) {
   const bindings = payload?.result?.bindings;
   if (payload?.success !== true || !Array.isArray(bindings)) {
     return { ok: false, reason: 'provider-settings-not-verified', unsafe: [] };
   }
-  if (bindings.some(b => !b || typeof b.name !== 'string' || typeof b.type !== 'string')) {
+  if (bindings.some(b => !b || typeof b.name !== 'string' || typeof b.type !== 'string' || !b.name.trim() || !b.type.trim())) {
     return { ok: false, reason: 'malformed-provider-bindings', unsafe: [] };
   }
   const seen = new Set();
@@ -34,7 +53,7 @@ export function validateBindingTypes(payload, { allowStaleCfApiTokenRemoval = fa
   for (const { name, type } of bindings) {
     if (seen.has(name)) return { ok: false, reason: 'duplicate-provider-binding-names', unsafe: [] };
     seen.add(name);
-    if (CREDENTIAL_BINDING.test(name) && type !== 'secret_text' && type !== 'secrets_store_secret') {
+    if (isCredentialBindingName(name) && type !== 'secret_text' && type !== 'secrets_store_secret') {
       unsafe.push({ name, type });
     }
   }
