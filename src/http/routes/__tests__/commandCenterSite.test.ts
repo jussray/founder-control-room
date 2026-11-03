@@ -76,7 +76,7 @@ beforeEach(() => {
     const rows = () => table === 'founder_users'
       ? [{ email: 'owner@example.test' }]
       : table === 'fcr_public_memberships' ? state.memberships : state.projects;
-    const selected = () => rows().filter(row => predicates.every(([key, value]) => row[key] === value));
+    const selected = () => rows().filter(row => predicates.every(([key, value]) => (row as Record<string, unknown>)[key] === value));
     const query = {
       select: () => query,
       eq: (column: string, value: unknown) => { predicates.push([column, value]); return query; },
