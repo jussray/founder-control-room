@@ -10,6 +10,8 @@ describe("read-only Asana identity mapping", () => {
       modified_at: "2026-11-03T12:00:00Z",
     }, "2026-11-03T13:00:00Z");
     expect(linked.sourceProjectId).toBe("1216469762380974");
+    expect(linked.sourceTaskId).toBe("1216469873781942");
+    expect(linked.observedAt).toBe("2026-11-03T13:00:00Z");
     expect(linked.releaseAuthorized).toBe(false);
     expect(linked.authority).toBe("task-coordination-only");
     expect(linked.completed).toBe(true);
