@@ -204,8 +204,8 @@ describe("shared GitHub App wrapper transports", () => {
     const transports = [
       privateKey.export({ type: "pkcs8", format: "der" }).toString("base64"),
       privateKey.export({ type: "pkcs1", format: "der" }).toString("base64url"),
-      pem.split("\\n").slice(1, -1).join("\\n"),
-      pem.replace(/\\n/g, " "),
+      pem.split("\n").slice(1, -1).join("\n"),
+      pem.replace(/\n/g, " "),
     ];
     for (const transport of transports) {
       expect(createGitHubAppJwt("99", transport, now)).toBe(expected);
