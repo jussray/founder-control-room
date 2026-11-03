@@ -18,6 +18,33 @@ import {
 const RESOURCE = FCR_PUBLIC_MCP_RESOURCE;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const READ_SCHEME = [{ type: 'oauth2', scopes: ['openid'] }];
+const CUSTOMER_QUESTIONS = Object.freeze([
+  {
+    "key": "who",
+    "question": "Who are you helping, and who can access this workspace?"
+  },
+  {
+    "key": "what",
+    "question": "What is your goal or project?"
+  },
+  {
+    "key": "when",
+    "question": "When do you need the result?"
+  },
+  {
+    "key": "where",
+    "question": "Where will your work run or be used?"
+  },
+  {
+    "key": "why",
+    "question": "Why is this important to you?"
+  },
+  {
+    "key": "how",
+    "question": "How would you like to proceed, and what permissions are you granting?"
+  }
+]);
+
 const publicMcpTools = [
   {
     name: 'fcr_list_my_projects',
@@ -35,6 +62,14 @@ const publicMcpTools = [
       type: 'object', required: ['projectId'], additionalProperties: false,
       properties: { projectId: { type: 'string', format: 'uuid' } },
     },
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
+    securitySchemes: READ_SCHEME,
+  },
+  {
+    name: 'fcr_customer_start',
+    title: 'Start my own FCR workspace with 5W1H',
+    description: 'Return six customer-specific questions with no founder inheritance, external data reads, storage, or approval authority.',
+    inputSchema: { type: 'object', properties: {}, additionalProperties: false },
     annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
     securitySchemes: READ_SCHEME,
   },
@@ -131,7 +166,7 @@ publicMcpRouter.post('/mcp/public', publicMcpRateLimit, async (req, res) => {
       protocolVersion: '2025-11-25',
       capabilities: { tools: { listChanged: false } },
       serverInfo: { name: 'founder-control-room-public', version: '0.1.0' },
-      instructions: 'Read only sanitized projects belonging to this authenticated user. No founder portfolio or external actions.',
+      instructions: 'A new customer starts with a blank slate. Only this authenticated user\'s tenant-granted projects may be read. No inherited founder/company context, provider access, or external actions.',
     }));
   }
   if (method === 'ping') return res.json(jsonRpc(id, {}));
@@ -145,7 +180,15 @@ publicMcpRouter.post('/mcp/public', publicMcpRateLimit, async (req, res) => {
   try {
     const tenantReader = tenantReaderForBearer(token);
     let output: unknown;
-    if (name === 'fcr_list_my_projects' && Object.keys(args).length === 0) {
+    if (name === 'fcr_customer_start' && Object.keys(args).length === 0) {
+      output = {
+        questions: CUSTOMER_QUESTIONS,
+        inheritedContext: false,
+        serverStateWritten: false,
+        externalSourcesQueried: false,
+        actionAuthorized: false,
+      };
+    } else if (name === 'fcr_list_my_projects' && Object.keys(args).length === 0) {
       output = await listMyPublicProjects(user, tenantReader);
     } else if (name === 'fcr_get_my_project' && Object.keys(args).length === 1 && UUID.test(args.projectId)) {
       output = await getMyPublicProject(user, tenantReader, args.projectId);
