@@ -1,0 +1,118 @@
+{
+  "contract": "juss/council-model-catalog@v1",
+  "observedAt": "2026-10-24",
+  "provider": "cloudflare-workers-ai",
+  "accountCatalogVerified": true,
+  "runtimeActivation": false,
+  "verifiedNative": [
+    {
+      "model": "@cf/deepseek-ai/deepseek-v4.1-flash-1017",
+      "status": "trial",
+      "roles": [
+        "reasoning",
+        "adversarial_challenge",
+        "multimodal_context"
+      ],
+      "providerFacts": [
+        "text_generation",
+        "vision",
+        "function_calling",
+        "reasoning",
+        "context_1048576"
+      ]
+    },
+    {
+      "model": "@cf/cloudflare/clairic",
+      "status": "trial",
+      "roles": [
+        "typed_extraction",
+        "compute",
+        "estimate",
+        "forecast",
+        "confidence_scoring"
+      ],
+      "providerFacts": [
+        "typed_outputs",
+        "confidence_scores",
+        "probabilities",
+        "vision",
+        "context_65536"
+      ]
+    },
+    {
+      "model": "@cf/cloudflare/clef-omni",
+      "status": "trial",
+      "roles": [
+        "multimodal_decision",
+        "typed_questions",
+        "probability_judgment",
+        "evidence_adjudication"
+      ],
+      "providerFacts": [
+        "text",
+        "json",
+        "image",
+        "audio",
+        "video",
+        "context_65536"
+      ]
+    },
+    {
+      "model": "@cf/daily-co/phonellm-mini-alpha-2",
+      "status": "trial",
+      "roles": [
+        "voice_agent",
+        "low_latency_dialogue",
+        "function_calling"
+      ],
+      "providerFacts": [
+        "voice_agent_tuned",
+        "function_calling",
+        "context_262140"
+      ]
+    }
+  ],
+  "externalOrUnverifiedCandidates": [
+    {
+      "model": "typesafe/jev-1.14.0",
+      "status": "not_visible_in_connected_workers_ai_catalog"
+    },
+    {
+      "model": "google/gemini-4-argon",
+      "status": "not_visible_in_connected_workers_ai_catalog"
+    },
+    {
+      "model": "meta/muse-wonder-1.0",
+      "status": "not_visible_in_connected_workers_ai_catalog"
+    },
+    {
+      "model": "anthropic/claude-haiku-5.5",
+      "status": "not_visible_in_connected_workers_ai_catalog"
+    },
+    {
+      "model": "topaz/starlight-fast-2",
+      "status": "not_visible_in_connected_workers_ai_catalog"
+    },
+    {
+      "model": "meta/muse-spark-1.2",
+      "status": "not_visible_in_connected_workers_ai_catalog"
+    },
+    {
+      "model": "meta/muse-spark-1.1",
+      "status": "not_visible_in_connected_workers_ai_catalog"
+    },
+    {
+      "model": "google/nano-banana-2.1",
+      "status": "not_visible_in_connected_workers_ai_catalog"
+    }
+  ],
+  "authority": {
+    "providerAvailabilityGrantsAuthority": false,
+    "selectionAuthority": false,
+    "executionAuthority": false,
+    "mergeAuthority": false,
+    "deployAuthority": false,
+    "publishAuthority": false,
+    "spendAuthority": false
+  }
+}
