@@ -1,6 +1,7 @@
 import { createHash, createSign } from 'node:crypto';
 import { Router } from 'express';
 import { requireFounder } from '../middleware/requireFounder.js';
+import { rateLimitFounderPermissions } from '../middleware/security.js';
 
 export const GSC_SITE_PROPERTY = 'sc-domain:jussco.company';
 export const GSC_INSPECTION_URLS = [
@@ -225,7 +226,7 @@ export async function getSearchConsoleSnapshot(
 let cached: { until: number; data: Json } | null = null;
 export function createOwnerInsightsRouter(options: OwnerInsightsOptions = {}) {
   const router = Router();
-  router.use(requireFounder);
+  router.use(rateLimitFounderPermissions, requireFounder);
   router.use((_req, res, next) => {
     res.set({ 'Cache-Control': 'private, no-store', 'X-Robots-Tag': 'noindex, nofollow', 'Referrer-Policy': 'no-referrer' });
     next();
