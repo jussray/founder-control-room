@@ -41,7 +41,7 @@ intelligenceRouter.post('/review',aiLimit,async (req,res)=>{
  };
  // Gateway call cannot proceed unless FCR's own explicit, non-Truth-Weaver
  // gateway is configured; never fall back to an unrelated brand's gateway.
- if(!options.gatewayId||options.gatewayId==='truth-weaver-evidence'||!options.providerToken)
+ if(!options.gatewayId||options.gatewayId==='truth-weaver-evidence'||!options.providerToken||!options.gatewayToken)
    return res.status(503).json({state:'not_configured',error:'fcr_gateway_not_configured'});
  try{
    const result=await reviewEvidence(req.body,options);
