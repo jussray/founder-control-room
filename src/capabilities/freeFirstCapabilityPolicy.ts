@@ -45,23 +45,65 @@ export interface CapabilitySelectionReceipt {
   transportEvidence?: string | null;
 }
 
+export type CapabilityIneligibilityReason =
+  | 'safety'
+  | 'privacy'
+  | 'quality'
+  | 'quota'
+  | 'transport'
+  | 'commercial-rights'
+  | 'automation';
+
+export interface CapabilityDecisionTrace {
+  providerId: string;
+  eligible: boolean;
+  reasons: CapabilityIneligibilityReason[];
+  eligibilityRevision: string;
+}
+
 const COST_RANK: Record<CapabilityCostClass, number> = {
   LOCAL_NO_PROVIDER_FEE: 0,
   HOSTED_FREE_ALLOWANCE: 1,
   PAID: 2,
 };
 
+export function explainCapabilityCandidateIneligibility(
+  candidate: CapabilityCandidate,
+  requirements: CapabilityRequirements,
+): CapabilityIneligibilityReason[] {
+  const reasons: CapabilityIneligibilityReason[] = [];
+  if (!candidate.safetyEligible) reasons.push('safety');
+  if (!candidate.privacyEligible) reasons.push('privacy');
+  if (!requirements.minimumQualityMet(candidate)) reasons.push('quality');
+  if (!candidate.quotaAvailable) reasons.push('quota');
+  if (candidate.transportReady === false) reasons.push('transport');
+  if (requirements.commercialUseRequired && candidate.commercialRights !== 'VERIFIED') {
+    reasons.push('commercial-rights');
+  }
+  if (requirements.automationRequired && !candidate.automationEligible) reasons.push('automation');
+  return reasons;
+}
+
+export function traceCapabilityDecision(
+  candidates: CapabilityCandidate[],
+  requirements: CapabilityRequirements,
+): CapabilityDecisionTrace[] {
+  return candidates.map((candidate) => {
+    const reasons = explainCapabilityCandidateIneligibility(candidate, requirements);
+    return {
+      providerId: candidate.id,
+      eligible: reasons.length === 0,
+      reasons,
+      eligibilityRevision: candidate.eligibilityRevision,
+    };
+  });
+}
+
 export function isCapabilityCandidateEligible(
   candidate: CapabilityCandidate,
   requirements: CapabilityRequirements,
 ): boolean {
-  if (!candidate.safetyEligible || !candidate.privacyEligible) return false;
-  if (!requirements.minimumQualityMet(candidate)) return false;
-  if (!candidate.quotaAvailable) return false;
-  if (candidate.transportReady === false) return false;
-  if (requirements.commercialUseRequired && candidate.commercialRights !== 'VERIFIED') return false;
-  if (requirements.automationRequired && !candidate.automationEligible) return false;
-  return true;
+  return explainCapabilityCandidateIneligibility(candidate, requirements).length === 0;
 }
 
 export function selectFreeFirstCapability(
@@ -101,4 +143,6 @@ export function selectFreeFirstCapability(
  * Fallback does not inherit authority from the failed provider. The selected
  * candidate still has to satisfy the same requirements and emits its own
  * eligibility/transport evidence in the selection receipt when observed.
+ * Decision traces explain why cheaper candidates were rejected without turning
+ * those explanations into authority.
  */

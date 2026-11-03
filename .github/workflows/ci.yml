@@ -12,8 +12,6 @@ permissions:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-  DOC_TRUTH_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
-  TEST_DISCOVERY_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
 
 jobs:
   typecheck:
@@ -21,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out exact head
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ env.EXPECTED_HEAD_SHA }}
       - name: Record and verify exact head
@@ -30,7 +28,7 @@ jobs:
           actual="$(git rev-parse HEAD)"
           printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
           test "$actual" = "$EXPECTED_HEAD_SHA"
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '24'
       - name: Install dependencies
@@ -45,7 +43,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out exact head
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ env.EXPECTED_HEAD_SHA }}
       - name: Record and verify exact head
@@ -54,7 +52,7 @@ jobs:
           actual="$(git rev-parse HEAD)"
           printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
           test "$actual" = "$EXPECTED_HEAD_SHA"
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '24'
       - name: Install dependencies
@@ -67,7 +65,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out exact head
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ env.EXPECTED_HEAD_SHA }}
       - name: Record and verify exact head
@@ -76,7 +74,7 @@ jobs:
           actual="$(git rev-parse HEAD)"
           printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
           test "$actual" = "$EXPECTED_HEAD_SHA"
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '24'
       - name: Install dependencies
@@ -92,7 +90,7 @@ jobs:
     timeout-minutes: 30
     steps:
       - name: Check out exact head
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ env.EXPECTED_HEAD_SHA }}
       - name: Record and verify exact head
@@ -102,7 +100,7 @@ jobs:
           printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
           test "$actual" = "$EXPECTED_HEAD_SHA"
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '24'
 
@@ -122,12 +120,21 @@ jobs:
           NODE_ENV: test
           PLAYWRIGHT_BROWSERS_PATH: /opt/pw-browsers
 
+      - name: Run crawler and public-work browser proof
+        run: >-
+          npx playwright test -c playwright.config.ts
+          e2e/pages-api-recovery.spec.ts
+          e2e/public-work-directory.spec.ts
+        env:
+          NODE_ENV: test
+          PLAYWRIGHT_BROWSERS_PATH: /opt/pw-browsers
+
   python-tests:
     name: Python tests
     runs-on: ubuntu-latest
     steps:
       - name: Check out exact head
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ env.EXPECTED_HEAD_SHA }}
       - name: Record and verify exact head
@@ -136,18 +143,18 @@ jobs:
           actual="$(git rev-parse HEAD)"
           printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
           test "$actual" = "$EXPECTED_HEAD_SHA"
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: '3.11'
       - name: Run Python unit tests
-        run: python3 -m unittest scripts.test_whoami scripts.test_capability_receipt -v
+        run: python3 -m unittest scripts.test_whoami scripts.test_capability_receipt scripts.test_linkedin_analytics_continuity -v
 
   rls-contract:
     name: RLS migration contract
     runs-on: ubuntu-latest
     steps:
       - name: Check out exact head
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ env.EXPECTED_HEAD_SHA }}
       - name: Record and verify exact head
@@ -156,7 +163,7 @@ jobs:
           actual="$(git rev-parse HEAD)"
           printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
           test "$actual" = "$EXPECTED_HEAD_SHA"
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '24'
       - name: Verify every public migration table has reviewed RLS state
@@ -166,7 +173,7 @@ jobs:
           npm run verify:rls-contract 2>&1 | tee rls-contract-report.txt
       - name: Upload RLS contract report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: rls-contract-report
           path: rls-contract-report.txt
@@ -178,7 +185,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out exact head with history
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ env.EXPECTED_HEAD_SHA }}
           fetch-depth: 0
@@ -187,16 +194,48 @@ jobs:
         run: |
           set -euo pipefail
           actual="$(git rev-parse HEAD)"
-          printf 'expected=%s\nactual=%s\nbase=%s\n' "$EXPECTED_HEAD_SHA" "$actual" "$DOC_TRUTH_BASE_SHA"
+          printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
           test "$actual" = "$EXPECTED_HEAD_SHA"
-      - uses: actions/setup-node@v4
+      - name: Resolve exact live base
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.event.pull_request.base.ref || '' }}
+          PUSH_BEFORE_SHA: ${{ github.event.before || '' }}
+        run: |
+          set -euo pipefail
+
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            test -n "$BASE_REF"
+            git check-ref-format "refs/heads/${BASE_REF}"
+            live_base_sha="$(git ls-remote --heads origin "refs/heads/${BASE_REF}" | awk 'NR == 1 {print $1}')"
+          else
+            live_base_sha="$PUSH_BEFORE_SHA"
+          fi
+
+          if ! [[ "$live_base_sha" =~ ^[0-9a-f]{40}$ ]] || [ "$live_base_sha" = "0000000000000000000000000000000000000000" ]; then
+            echo "CI Documentation Truth base resolution failed: expected an exact live base SHA." >&2
+            exit 1
+          fi
+
+          git fetch --no-tags origin "$live_base_sha"
+          if ! git merge-base --is-ancestor "$live_base_sha" "$EXPECTED_HEAD_SHA"; then
+            echo "CI Documentation Truth base resolution failed: live base is not an ancestor of the exact candidate." >&2
+            echo "live_base_sha=$live_base_sha" >&2
+            echo "candidate_sha=$EXPECTED_HEAD_SHA" >&2
+            exit 1
+          fi
+
+          printf 'DOC_TRUTH_BASE_SHA=%s\n' "$live_base_sha" >> "$GITHUB_ENV"
+          printf 'resolved_base_sha=%s\n' "$live_base_sha"
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '24'
       - name: Verify documentation truth
         run: node scripts/verify-documentation-truth.mjs
       - name: Upload documentation truth report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: documentation-truth-ci-${{ github.run_id }}
           path: artifacts/documentation-truth-report.json
@@ -209,7 +248,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Check out exact head
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ env.EXPECTED_HEAD_SHA }}
           persist-credentials: false
@@ -220,7 +259,7 @@ jobs:
           actual="$(git rev-parse HEAD)"
           printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
           test "$actual" = "$EXPECTED_HEAD_SHA"
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '24'
       - name: Verify Cloudflare bridge syntax and authority contracts
@@ -237,17 +276,50 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out exact head
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ env.EXPECTED_HEAD_SHA }}
           fetch-depth: 0
       - name: Record and verify exact head
         shell: bash
         run: |
+          set -euo pipefail
           actual="$(git rev-parse HEAD)"
           printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
           test "$actual" = "$EXPECTED_HEAD_SHA"
-      - uses: actions/setup-node@v4
+      - name: Resolve exact live base
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.event.pull_request.base.ref || '' }}
+          PUSH_BEFORE_SHA: ${{ github.event.before || '' }}
+        run: |
+          set -euo pipefail
+
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            test -n "$BASE_REF"
+            git check-ref-format "refs/heads/${BASE_REF}"
+            live_base_sha="$(git ls-remote --heads origin "refs/heads/${BASE_REF}" | awk 'NR == 1 {print $1}')"
+          else
+            live_base_sha="$PUSH_BEFORE_SHA"
+          fi
+
+          if ! [[ "$live_base_sha" =~ ^[0-9a-f]{40}$ ]] || [ "$live_base_sha" = "0000000000000000000000000000000000000000" ]; then
+            echo "Test discovery base resolution failed: expected an exact live base SHA." >&2
+            exit 1
+          fi
+
+          git fetch --no-tags origin "$live_base_sha"
+          if ! git merge-base --is-ancestor "$live_base_sha" "$EXPECTED_HEAD_SHA"; then
+            echo "Test discovery base resolution failed: live base is not an ancestor of the exact candidate." >&2
+            echo "live_base_sha=$live_base_sha" >&2
+            echo "candidate_sha=$EXPECTED_HEAD_SHA" >&2
+            exit 1
+          fi
+
+          printf 'TEST_DISCOVERY_BASE_SHA=%s\n' "$live_base_sha" >> "$GITHUB_ENV"
+          printf 'resolved_base_sha=%s\n' "$live_base_sha"
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '24'
       - name: Prove the discovery ratchet rejects baseline laundering
@@ -259,7 +331,7 @@ jobs:
     name: Migration lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - uses: supabase/setup-cli@v1
         with:
           version: 2.101.0

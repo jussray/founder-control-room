@@ -112,6 +112,7 @@ interface PluginManagementManifest {
 }
 
 const manifest = JSON.parse(await readFile(new URL('../../../.control-room/plugin-management.json', import.meta.url), 'utf8')) as PluginManagementManifest;
+const universalCommands = await readFile(new URL('../../../.ai-skills/universal-commands.md', import.meta.url), 'utf8');
 
 const expectedPlugins = ['GitHub','Google Drive','Supabase','Slack','Asana','HubSpot','Figma','LinkedIn','Cambiante: Content Manager','Metricool for Social Media','Opera Browser Connector'];
 const allowedManifestKeys = ['schemaVersion','contract','repository','authorityRepository','controlPlane','runtimeDiscoveryRequired','liveStateStored','writesRequireExplicitUserIntent','writesRequireFreshRepositoryAuthority','permissionStateSource','connectionStateSource','truthBoundary','writeProofTruth','capabilityUnlockTruth','youtubeProductionTruth','connectorBridgeTruth','evidenceSourceTruth','socialAnalyticsTruth','plugins'].sort();
@@ -194,6 +195,17 @@ describe('ChatGPT plugin management repository contract', () => {
     expect(manifest.connectorBridgeTruth.recoveryRule).toMatch(/Browser not connected/i);
     expect(manifest.connectorBridgeTruth.recoveryRule).toMatch(/do not blame or reset the page/i);
     expect(manifest.connectorBridgeTruth.recoveryRule).toMatch(/fresh bridge evidence/i);
+  });
+
+  it('binds ULTRATHINK to connector-bridge recovery instead of stale setup loops', () => {
+    expect(universalCommands).toMatch(/^## Connector bridge recovery$/m);
+    expect(universalCommands).toMatch(/connector surface[\s\S]*live session[\s\S]*provider page/i);
+    expect(universalCommands).toMatch(/BLOCKED_CONNECTOR_BRIDGE/);
+    expect(universalCommands).toMatch(/re-probe once when useful/i);
+    expect(universalCommands).toMatch(/not proof that provider setup is wrong/i);
+    expect(universalCommands).toMatch(/equivalent direct capability/i);
+    expect(universalCommands).toMatch(/continuity fingerprints and proof cookies never authorize browser action/i);
+    expect(universalCommands).toMatch(/browser or app connector[\s\S]*bridge\/session failure[\s\S]*three evidence planes separate/i);
   });
 
   it('preserves equivalent evidence when one provider source is unreadable', () => {

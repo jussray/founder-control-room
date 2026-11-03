@@ -6,9 +6,17 @@
 <meta name="description" content="Founder Control Room experience architecture: public user view, member founder workspace, and the founder-only FCR owner control plane." />
 <title>FCR experience architecture · Founder Control Room</title>
 <link rel="stylesheet" href="/control-room/founder-shell.css" />
+<style>
+  .signature-strip{display:flex;align-items:center;flex-wrap:wrap;gap:.65rem 1rem;margin-top:1.35rem;padding:.85rem 1rem;border:1px solid rgba(151,126,255,.2);border-radius:1rem;background:linear-gradient(90deg,rgba(78,196,255,.055),rgba(147,100,255,.09),rgba(255,203,103,.045));box-shadow:inset 0 0 34px rgba(111,92,255,.045)}
+  .signature-note{display:inline-block;font-family:"Segoe Print","Bradley Hand",cursive;font-size:clamp(.9rem,1.35vw,1.18rem);font-weight:700;line-height:1.08;letter-spacing:.015em;color:#ded4ff;text-shadow:0 0 22px rgba(135,102,255,.3);transform:rotate(-2.2deg)}
+  .signature-note.alt{color:#aee9ff;transform:rotate(1.8deg)}
+  .signature-rule{width:clamp(2.5rem,5vw,4.8rem);height:1px;background:linear-gradient(90deg,rgba(91,211,255,.08),rgba(156,112,255,.9),rgba(255,203,103,.16));box-shadow:0 0 12px rgba(145,104,255,.45)}
+  .signature-seal{margin-left:auto;display:grid;place-items:center;min-width:2.55rem;height:2.55rem;padding:0 .65rem;border:1px solid rgba(255,203,103,.4);border-radius:999px;color:#ffda8d;background:rgba(255,203,103,.055);font-size:.68rem;font-weight:950;letter-spacing:.14em;text-transform:uppercase;box-shadow:0 0 28px rgba(255,203,103,.08)}
+  @media(max-width:780px){.signature-strip{gap:.55rem .7rem}.signature-rule{width:2.4rem}.signature-seal{margin-left:0}}
+</style>
 </head>
 <body>
-<main class="experience-shell" data-fcr-experience>
+<main class="experience-shell" data-fcr-experience data-fcr-signature="cinematic-proof-v1">
   <header class="masthead">
     <a class="brand" href="/" aria-label="Founder Control Room home">
       <span class="brand-mark" aria-hidden="true">F</span>
@@ -25,6 +33,12 @@
       <div class="hero-actions">
         <a class="button button-primary" href="#views">See the views</a>
         <a class="button" href="/control-room/">Enter owner Control Room</a>
+      </div>
+      <div class="signature-strip" data-signature-strip aria-label="FCR visual signature">
+        <span class="signature-note">Same mission. Bigger impact.</span>
+        <span class="signature-rule" aria-hidden="true"></span>
+        <span class="signature-note alt">A brighter tomorrow.</span>
+        <span class="signature-seal" aria-hidden="true">FCR</span>
       </div>
     </div>
     <div class="mission-card" aria-label="FCR mission">

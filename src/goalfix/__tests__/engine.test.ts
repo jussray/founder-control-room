@@ -53,11 +53,68 @@ describe('buildGoalfixReport', () => {
     expect(report.fix).toEqual(['No fix was applied. Goalfix v1 stops at inspection and founder decision authority.']);
   });
 
-  it('blocks on any exact-head failed signal and names it as the bottleneck', () => {
+  it('emits source/evidence fingerprints and an evidence-only proof cookie', () => {
+    const report = buildGoalfixReport(baseInput({
+      verificationSignals: [
+        { id: 'check-1', name: 'Typecheck', status: 'passed', commitSha: SHA, provider: 'github' },
+        { id: 'check-2', name: 'Playwright', status: 'passed', commitSha: SHA, provider: 'github' },
+      ],
+    }));
+
+    expect(report.continuity.contract).toBe('goalfix-continuity-v1');
+    expect(report.continuity.sourceFingerprint).toMatch(/^[a-f0-9]{64}$/);
+    expect(report.continuity.evidenceFingerprint).toMatch(/^[a-f0-9]{64}$/);
+    expect(report.continuity.authority).toBe('EVIDENCE_ONLY');
+    expect(report.continuity.browserCookieStored).toBe(false);
+    expect(report.continuity.proofCookie).toMatchObject({
+      contextType: 'verification-run',
+      owner: 'goalfix-read-only-inspector',
+      createdAt: '2026-07-27T20:00:00.000Z',
+      expiresAt: null,
+      parentCookieId: null,
+    });
+    expect(report.continuity.proofCookie.cookieId).toMatch(/^goalfix-proof-[a-f0-9]{24}$/);
+    expect(report.proof.some((line) => line.includes(report.continuity.sourceFingerprint))).toBe(true);
+    expect(report.proof.some((line) => line.includes(report.continuity.evidenceFingerprint))).toBe(true);
+    expect(report.proof.some((line) => line.includes(report.continuity.proofCookie.cookieId))).toBe(true);
+    expect(report.risk).toContain(
+      'The proof cookie is a non-secret evidence marker in the report, not a browser cookie, founder session, approval token, merge token, or mutation authority.',
+    );
+  });
+
+  it('changes continuity when the exact subject or evidence changes', () => {
+    const first = buildGoalfixReport(baseInput({
+      verificationSignals: [
+        { id: 'check-1', name: 'Typecheck', status: 'passed', commitSha: SHA, provider: 'github' },
+        { id: 'check-2', name: 'Playwright', status: 'failed', commitSha: SHA, provider: 'github' },
+      ],
+    }));
+    const changedEvidence = buildGoalfixReport(baseInput({
+      verificationSignals: [
+        { id: 'check-1', name: 'Typecheck', status: 'passed', commitSha: SHA, provider: 'github' },
+        { id: 'check-2', name: 'Playwright', status: 'passed', commitSha: SHA, provider: 'github' },
+      ],
+    }));
+    const newSha = 'def456def456def456def456def456def456def4';
+    const changedSubject = buildGoalfixReport(baseInput({
+      target: { name: 'main', commitSha: newSha },
+      verificationSignals: [
+        { id: 'check-1', name: 'Typecheck', status: 'passed', commitSha: newSha, provider: 'github' },
+        { id: 'check-2', name: 'Playwright', status: 'passed', commitSha: newSha, provider: 'github' },
+      ],
+    }));
+
+    expect(changedEvidence.continuity.sourceFingerprint).toBe(first.continuity.sourceFingerprint);
+    expect(changedEvidence.continuity.evidenceFingerprint).not.toBe(first.continuity.evidenceFingerprint);
+    expect(changedSubject.continuity.sourceFingerprint).not.toBe(first.continuity.sourceFingerprint);
+    expect(changedSubject.continuity.evidenceFingerprint).not.toBe(first.continuity.evidenceFingerprint);
+  });
+
+  it('blocks on a named required exact-head failed signal and names it as the bottleneck', () => {
     const report = buildGoalfixReport(baseInput({
       verificationSignals: [{
         id: 'check-1',
-        name: 'Product Design Playwright Proof',
+        name: 'Playwright',
         status: 'failed',
         commitSha: SHA,
         provider: 'github',
@@ -66,16 +123,35 @@ describe('buildGoalfixReport', () => {
 
     expect(report.readiness).toBe('blocked');
     expect(report.evidence.blocked).toEqual([
-      `Product Design Playwright Proof: failed at ${SHA}`,
+      `Playwright: failed at ${SHA}`,
     ]);
     expect(report.bottleneck).toMatchObject({
       kind: 'failed_verification',
       evidenceState: 'VERIFIED',
       freezesUnrelatedWork: false,
     });
-    expect(report.bottleneck.statement).toContain('Product Design Playwright Proof');
+    expect(report.bottleneck.statement).toContain('Playwright');
     expect(report.bottleneck.smallestSafeRemoval).toContain('repair only its verified root cause');
     expect(report.nextGate).toContain('repair only its verified root cause');
+  });
+
+  it('keeps unrelated exact-head failures visible without letting them block a complete named proof set', () => {
+    const report = buildGoalfixReport(baseInput({
+      verificationSignals: [
+        { id: 'typecheck', name: 'Typecheck', status: 'passed', commitSha: SHA, provider: 'github' },
+        { id: 'playwright', name: 'Playwright', status: 'passed', commitSha: SHA, provider: 'github' },
+        { id: 'docs', name: 'Unrelated Documentation Proof', status: 'failed', commitSha: SHA, provider: 'github' },
+      ],
+    }));
+
+    expect(report.readiness).toBe('ready_for_founder_decision');
+    expect(report.evidence.blocked).toEqual([]);
+    expect(report.proof).toContain(`Unrelated Documentation Proof: failed at ${SHA}`);
+    expect(report.bottleneck).toMatchObject({
+      kind: 'founder_decision',
+      evidenceState: 'VERIFIED',
+      freezesUnrelatedWork: false,
+    });
   });
 
   it('uses the latest same-SHA signal when a check rerun replaces an older failure', () => {
@@ -161,7 +237,7 @@ describe('buildGoalfixReport', () => {
     }));
 
     expect(report.readiness).toBe('ready_for_founder_decision');
-    expect(report.proof).toHaveLength(3);
+    expect(report.proof).toHaveLength(6);
     expect(report.proof[0]).toBe('Required exact-head checks: Typecheck, Playwright.');
     expect(report.nextGate).toContain('complete named proof set');
     expect(report.reality).toContain(
@@ -169,6 +245,82 @@ describe('buildGoalfixReport', () => {
     );
     expect(report.reality.some((line) => line.startsWith('Bottleneck:'))).toBe(true);
     expect(report.rollback[0]).toContain('retain any sanitized audit event as historical evidence');
+  });
+
+  it('keeps value, usability, feasibility, and viability as separate decision evidence planes', () => {
+    const report = buildGoalfixReport(baseInput({
+      verificationSignals: [
+        { id: 'check-1', name: 'Typecheck', status: 'passed', commitSha: SHA, provider: 'github' },
+        { id: 'check-2', name: 'Playwright', status: 'passed', commitSha: SHA, provider: 'github' },
+      ],
+    }));
+
+    expect(report.decisionKernel).toMatchObject({
+      contract: 'goalfix-decision-kernel-v1',
+      authority: 'DECISION_SUPPORT_ONLY',
+      affectsTechnicalReadiness: false,
+      productRisk: {
+        value: { state: 'UNKNOWN' },
+        usability: { state: 'UNKNOWN' },
+        feasibility: { state: 'SUPPORTED_BY_CURRENT_PROOF' },
+        viability: { state: 'UNKNOWN' },
+      },
+    });
+    expect(report.decisionKernel.productRisk.feasibility.basis.join(' ')).toContain('implementation feasibility only');
+    expect(report.decisionKernel.gaps).toContain('product value: UNKNOWN');
+    expect(report.decisionKernel.gaps).not.toContain('product feasibility: SUPPORTED_BY_CURRENT_PROOF');
+  });
+
+  it('keeps customer behavior and commitment unknown rather than treating repository green as demand proof', () => {
+    const report = buildGoalfixReport(baseInput({
+      verificationSignals: [
+        { id: 'check-1', name: 'Typecheck', status: 'passed', commitSha: SHA, provider: 'github' },
+        { id: 'check-2', name: 'Playwright', status: 'passed', commitSha: SHA, provider: 'github' },
+      ],
+    }));
+
+    expect(report.decisionKernel.customerTruth.behavior.state).toBe('UNKNOWN');
+    expect(report.decisionKernel.customerTruth.commitment.state).toBe('UNKNOWN');
+    expect(report.decisionKernel.customerTruth.rule).toContain('Praise and stated enthusiasm do not establish demand');
+  });
+
+  it('keeps revenue, profit, and cash independent and unknown without financial evidence', () => {
+    const report = buildGoalfixReport(baseInput({
+      verificationSignals: [
+        { id: 'check-1', name: 'Typecheck', status: 'passed', commitSha: SHA, provider: 'github' },
+        { id: 'check-2', name: 'Playwright', status: 'passed', commitSha: SHA, provider: 'github' },
+      ],
+    }));
+
+    expect(report.decisionKernel.financialTruth.revenue.state).toBe('UNKNOWN');
+    expect(report.decisionKernel.financialTruth.profit.state).toBe('UNKNOWN');
+    expect(report.decisionKernel.financialTruth.cash.state).toBe('UNKNOWN');
+    expect(report.decisionKernel.financialTruth.rule).toContain('Never use one as proof of another');
+  });
+
+  it('does not let decision-kernel unknowns block a bounded technical founder decision', () => {
+    const report = buildGoalfixReport(baseInput({
+      verificationSignals: [
+        { id: 'check-1', name: 'Typecheck', status: 'passed', commitSha: SHA, provider: 'github' },
+        { id: 'check-2', name: 'Playwright', status: 'passed', commitSha: SHA, provider: 'github' },
+      ],
+    }));
+
+    expect(report.readiness).toBe('ready_for_founder_decision');
+    expect(report.decisionKernel.affectsTechnicalReadiness).toBe(false);
+    expect(report.decisionKernel.gaps.length).toBeGreaterThan(0);
+  });
+
+  it('marks implementation feasibility not established when required proof is incomplete', () => {
+    const report = buildGoalfixReport(baseInput({
+      verificationSignals: [
+        { id: 'check-1', name: 'Typecheck', status: 'passed', commitSha: SHA, provider: 'github' },
+        { id: 'check-2', name: 'Playwright', status: 'running', commitSha: SHA, provider: 'github' },
+      ],
+    }));
+
+    expect(report.decisionKernel.productRisk.feasibility.state).toBe('NOT_ESTABLISHED');
+    expect(report.decisionKernel.gaps).toContain('product feasibility: NOT_ESTABLISHED');
   });
 
   it('refuses readiness when no required check names are supplied', () => {

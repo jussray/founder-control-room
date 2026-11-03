@@ -83,7 +83,7 @@ jobs:
       EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
     steps:
       - name: Checkout exact target
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
@@ -127,7 +127,7 @@ jobs:
           printf 'resolved_base_sha=%s\n' "$live_base_sha"
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '24'
           cache: npm
@@ -163,7 +163,7 @@ jobs:
         run: npx eslint src/security/attack20V3.ts src/security/attack20V3.test.ts src/goalfix/executionWorkflow.ts src/goalfix/executionWorkflow.test.ts src/goalfix/executionWorkflow.redteam.test.ts --max-warnings 0
 
       - name: Upload exact-head source proofs
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: attack-20-v3-source-proof-${{ github.event.pull_request.head.sha || github.sha }}
           path: |

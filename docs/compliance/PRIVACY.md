@@ -1,7 +1,9 @@
 # Privacy Policy
 
 > **Founder Control Room** — Privacy Proof Document  
-> Last updated: 2026-07-19
+> Last updated: 2026-10-09  
+> Previous audit: 2026-07-19  
+> Status: Documentation reflects July architecture; runtime verification pending
 
 ## 1. Data Controller
 The Founder Control Room is operated by the account holder. No third-party advertising networks receive user data.

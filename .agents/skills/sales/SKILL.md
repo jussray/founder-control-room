@@ -1,4 +1,4 @@
-# /sales — Founder Control Room sales operating skill
+# /sales - Founder Control Room sales operating skill
 
 ## Trigger
 
@@ -6,19 +6,39 @@ Use `/sales` when the task concerns positioning, offers, pricing analysis, lead 
 
 ## Objective
 
-Create the strongest truthful path from a verified need to a mutually useful exchange. Optimize for durable trust, evidence, margin quality, retention, and founder control—not pressure, vanity activity, or fabricated certainty.
+Create the strongest truthful path from a verified need to a mutually useful exchange. Optimize for durable trust, evidence, margin quality, retention, and founder control - not pressure, vanity activity, or fabricated certainty.
 
 ## Required sequence
 
-1. **5W1H** — identify buyer, decision owner, offer, channel, timing, reason, and permitted execution path.
-2. **Observe** — inspect current product, catalog, pricing authority, proof, customer boundary, funnel evidence, and constraints.
-3. **Qualify** — define the real problem, urgency, fit, authority, budget or resource constraint, and disqualifiers.
-4. **Value thesis** — connect verified capabilities to an outcome using concrete proof and explicit limits.
-5. **Offer design** — define scope, price or value exchange, fulfillment, support, risk reversal, and success criteria.
-6. **Objection map** — answer only with evidence; record unknowns instead of inventing reassurance.
-7. **Close path** — propose the smallest reversible next commitment. No approval carries forward.
-8. **Retention loop** — define onboarding, delivery evidence, feedback, renewal, expansion, and exit conditions.
-9. **Measurement** — track qualified opportunities, conversion, gross-margin quality, cycle time, retention, refunds, complaints, and evidence freshness.
+1. **5W1H** - identify buyer, decision owner, offer, channel, timing, reason, and permitted execution path.
+2. **Observe** - inspect current product, catalog, pricing authority, proof, customer boundary, funnel evidence, and constraints.
+3. **Qualify** - define the real problem, urgency, fit, authority, budget or resource constraint, and disqualifiers.
+4. **Value thesis** - connect verified capabilities to an outcome using concrete proof and explicit limits.
+5. **Offer design** - define scope, price or value exchange, fulfillment, support, risk reversal, and success criteria.
+6. **Objection map** - answer only with evidence; record unknowns instead of inventing reassurance.
+7. **Close path** - propose the smallest reversible next commitment. No approval carries forward.
+8. **Retention loop** - define onboarding, delivery evidence, feedback, renewal, expansion, and exit conditions.
+9. **Measurement** - track qualified opportunities, conversion, gross-margin quality, cycle time, retention, refunds, complaints, and evidence freshness.
+
+## Outreach response negotiation lens
+
+For every consequential outreach draft or reply, silently run:
+
+```text
+DISCOVER -> GOAL -> AUTHORITY -> BATNA -> VALUE -> EVIDENCE -> STRUCTURE -> TERMS -> RECEIPT
+```
+
+- **DISCOVER:** learn the counterpart's objective, constraints, success condition, and decision path before pitching. Ask one useful question when material context is missing.
+- **GOAL:** choose the smallest truthful outcome for this exchange.
+- **AUTHORITY:** identify who can actually approve, veto, fund, sign, buy, hire, rent, or partner. Keep it unknown until proven.
+- **BATNA:** preserve a real alternative without inventing offers, deadlines, demand, or leverage.
+- **VALUE:** use differentiated value that matters to this counterpart.
+- **EVIDENCE:** support claims with current proof, not confidence or model output.
+- **STRUCTURE:** reshape scope, pilot size, milestones, sequence, payment timing, licensing, revenue share, or another reversible structure when the original frame is weak.
+- **TERMS:** discuss numbers and commitments after fit, authority, constraints, and structure are sufficiently understood.
+- **RECEIPT:** end with an observable question, decision, next step, or commitment.
+
+Do not volunteer private budget ceilings, desperation, maximum concessions, fallback options, or full strategy merely because they are known. Never lie, bluff, hide required disclosures, or create a false impression. Use leverage from verified value, evidence, timing, credible alternatives, and structure rather than pressure. Read observable behavior, not hidden motives. Answer the inbound message first, keep the framework backstage, and preserve all founder approval and consent gates.
 
 ## Truth and ethics boundaries
 

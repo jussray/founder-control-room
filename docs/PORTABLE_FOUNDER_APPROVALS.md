@@ -15,7 +15,7 @@ Juss decides in an approved console
 → immutable decision and execution receipts remain in Founder Control Room
 ```
 
-This contract removes manual-only approval bottlenecks without turning model output, copied chat text, or a provider session into unlimited authority.
+This contract removes manual-screen-only approval bottlenecks without turning model output, copied chat text, provider sessions, or standing merge capability into unlimited authority.
 
 ## Ask-Founder broker boundary
 
@@ -32,7 +32,7 @@ The `/mcp/founder-permissions` Ask-Founder broker is an interim decision-capture
 - Founder revocation is a separate interactive transition from an approved browser origin. Revoked decisions cannot become satisfiable again.
 - Founder permission and Independent Review remain separate gates. Neither one implies the other.
 
-This distinction is load-bearing: the Ask-Founder broker records a current founder decision; it does not let a model, bearer token, browser cookie, stored `approved` row, fingerprint, or continuity receipt manufacture reusable execution authority.
+This distinction is load-bearing: the Ask-Founder broker records a current founder decision; it does not let a model, bearer token, browser cookie, stored `approved` row, fingerprint, continuity receipt, or `merge_authority: true` manufacture reusable execution authority.
 
 ## Browser cookie, continuity fingerprint, and proof cookie
 
@@ -154,7 +154,8 @@ A valid founder decision authorizes only its exact scope. It does not make evide
 ChatGPT and Claude may:
 
 - present the exact proposed action and evidence to Juss;
-- capture Juss’s approve or deny decision through a registered authenticated adapter;
+- ask Juss for an explicit approve or deny decision for that exact action;
+- capture that decision through a registered authenticated adapter;
 - transmit the resulting packet to Founder Control Room;
 - request execution through the existing Approval Engine or Command Bridge;
 - report the immutable decision and execution receipts.
@@ -163,20 +164,28 @@ They may not:
 
 - self-approve based on their own recommendation;
 - forge `founderId`, conversation references, hashes, signatures, provider receipts, continuity fingerprints, or proof cookies;
-- treat “continue,” a prior broad approval, model memory, a browser cookie, or a continuity receipt as authorization for unrelated scope;
+- treat “continue,” “approved” without an exact merge target, a review request, a prior broad approval, model memory, a browser cookie, or a continuity receipt as merge authorization;
+- turn `merge_authority: true` into `merge_approved: true`;
 - turn a merge approval into deployment, publication, deletion, credential, or billing authority;
 - bypass exact-head, evidence, rollback, idempotency, or audit requirements.
 
-## Merge authority
+## Merge authority and exact approval
 
-The standing evidence-based merge decision in `docs/FOUNDER_MERGE_AUTHORITY.md` remains valid. Portable approval packets add a provider-independent way for Juss to give a new exact decision when a repository or mission requires one. They do not re-lock merge authority to a manual Founder Control Room screen.
+`docs/FOUNDER_MERGE_AUTHORITY.md` defines merge capability and merge approval as separate concepts.
 
-A repository merge may proceed when either:
+- `merge_authority: true` means the governed merge capability/authority class exists.
+- A repository merge still requires a fresh explicit founder approval for the exact repository, pull request, current base SHA, and current head SHA.
+- If that approval is missing, ambiguous, or stale, the console or operator must ask and stop.
+- Any base/head movement invalidates the prior merge approval and requires a new founder decision.
 
-1. standing Founder Merge Authority applies and every listed evidence condition is satisfied; or
-2. a valid exact-scope portable approval packet authorizes the merge and every evidence condition is satisfied.
+Portable approval packets provide a provider-independent authenticated carrier for that required exact founder decision. They do **not** provide an alternate standing path that can skip asking Juss.
 
-Evidence is the lock. The approved conversational console is a command surface.
+A repository merge may proceed only when:
+
+1. current evidence satisfies the applicable merge conditions; and
+2. a fresh exact-candidate founder approval is present through the repository's authenticated founder-final mechanism or an equivalent valid exact-scope portable approval packet.
+
+Evidence is the lock. Exact founder approval turns the key. The approved conversational console is only a command surface.
 
 ## Command Bridge integration
 
