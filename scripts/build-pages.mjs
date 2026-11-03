@@ -19,6 +19,7 @@ const requiredAssets = [
   'sitemap.xml',
   'llms.txt',
   'crawlers.json',
+  'site-identity.json',
   'work.html',
   '.well-known/sekret-bip-control-room.json',
   'control-room/index.html',

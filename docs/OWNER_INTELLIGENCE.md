@@ -1,3 +1,7 @@
+## November 3, 2026 — CSP-safe public identity data
+
+The browser Playwright proof rejected the proposed homepage inline JSON-LD with `CSP-forbidden inline script present`. The content is now preserved in the static public `/site-identity.json` resource, advertised via a typed `<link rel="alternate">`, with search-user-agent crawler allowances. The main HTML **must contain no inline scripts**. A linked JSON-LD file is not equivalent to Google's recognized inline structured-data integration; do not assert a rich-result enhancement or Google indexing without independently observed Search Console evidence. Canonical URL, Open Graph, social metadata and bounded public sitemap remain operational source assets. Never loosen CSP just to claim SEO.
+
 # Reconciliation notice — November 3, 2026
 
 **Canonical system:** The independently merged FCR main branch already implements Google Search Console snapshot sampling and AI Gateway advisory review in the authenticated Truth Console, under `/dashboard/truth/intelligence/seo` and `/dashboard/truth/intelligence/review`. The canonical UI tabs are `truth-seo` and `truth-ai-review`.

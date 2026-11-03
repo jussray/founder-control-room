@@ -35,9 +35,9 @@ describe('Owner Intelligence private surface and public SEO/AEO contracts',()=>{
   });
   it('publishes valid bounded JSON-LD and canonical open graph identity without unverifiable ratings',()=>{
     const home=read('public/index.html'),sitemap=read('public/sitemap.xml');
-    const match=home.match(/<script type="application\/ld\+json">\s*([\s\S]*?)\s*<\/script>/);
-    expect(match).not.toBeNull();
-    const graph=JSON.parse(match?.[1]||'{}');
+    expect(home).toContain('<link rel="alternate" type="application/ld+json" href="https://www.foundercontrolroom.org/site-identity.json" />');
+    expect(home).not.toMatch(/<script\b(?![^>]*\bsrc=)/i);
+    const graph=JSON.parse(read('public/site-identity.json'));
     expect(graph['@context']).toBe('https://schema.org');
     expect(graph['@graph'].map((x:{'@type':string})=>x['@type'])).toEqual(['Organization','WebSite']);
     expect(home).toContain('<meta property="og:url" content="https://www.foundercontrolroom.org/" />');
