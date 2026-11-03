@@ -24,4 +24,4 @@ Unchanged: `.agents/skills/`, `.ai/skills/`, and `skills/` outside this folder. 
 
 ## Status
 
-Nothing here is executed or tested. The juss-os scripts are Python and have not been run on this branch. No CI gate covers this path. Publication of this folder is a founder decision: see the PR description when one is opened.
+Nothing here is executed or tested. The juss-os scripts are Python and have not been run on this branch. No CI gate covers this path.
