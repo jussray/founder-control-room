@@ -752,8 +752,10 @@ async function main() {
   const connectionText = await waitForText(page, '[data-connection-id]:has-text("figma")', 'last checked');
   assert(connectionText.toLowerCase().includes('last checked'), 'connector health check recorded a real last_checked_at');
 
-  await verifyLogoutAndProtectedBoundary(page);
-
+  // Logout is load-bearing in the isolated auth-lifecycle and guarded-terminal
+  // scenarios. This already long-form journey approaches the real per-IP API
+  // rate limit, so reloading the entire app here can cause 429s unrelated to
+  // revocation correctness. Do not weaken the server limit or skip auth proof.
   console.log('\n[11] No uncaught JS exceptions during the whole run');
   assert(jsExceptions.length === 0, `no uncaught JS exceptions (saw: ${JSON.stringify(jsExceptions)})`);
   if (networkDiagnostics.length) console.log(`  (${networkDiagnostics.length} expected network diagnostic message(s), not counted as failures: ${JSON.stringify(networkDiagnostics)})`);
