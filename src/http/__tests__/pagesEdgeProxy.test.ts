@@ -93,7 +93,7 @@ describe('Cloudflare Pages edge proxy', () => {
   it('retains consent-origin redirects and API-owned consent assets without opening Access-only MCP routes', async () => {
     const handler = await loadHandler();
     const assets = vi.fn(async () => new Response('wrong Pages asset'));
-    const api = vi.fn(async () => identifiedResponse('API consent'));
+    const api = vi.fn(async (_request: Request) => identifiedResponse('API consent'));
     const env = { ASSETS: { fetch: assets }, FCR_API: { fetch: api } };
 
     const redirect = await handler.fetch(new Request(
