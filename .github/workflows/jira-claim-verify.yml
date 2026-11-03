@@ -1,0 +1,28 @@
+name: Jira native claim focused verification
+
+on:
+  push:
+    branches:
+      - fix/fcr-native-jira-claim-20261103
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: jira-claim-verify-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  focused-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Run Jira claim unit tests
+        run: npx vitest run src/lib/__tests__/jiraActionReplayGate.test.ts src/lib/__tests__/jiraActionExecutor.test.ts src/lib/__tests__/jiraSupabaseActionStore.test.ts
