@@ -32,6 +32,39 @@ export function isCredentialBindingName(name) {
   );
 }
 
+// Approved public plaintext bindings. Updating [vars] requires this explicit
+// policy update and a passing declaration-parity test.
+export const PUBLIC_PLAINTEXT_BINDINGS = Object.freeze([
+  'ENVIRONMENT',
+  'SUPABASE_URL',
+  'SUPABASE_PROJECT_REF',
+  'FOUNDER_ALLOWED_ORIGINS',
+  'FOUNDER_API_URL',
+  'FCR_EMAIL_FROM',
+  'FCR_REMOTE_MCP_READ_PROJECTS',
+  'FCR_EVIDENCE_GATEWAY_ID',
+  'FCR_REMOTE_MCP_RESOURCE',
+  'FCR_REMOTE_MCP_OAUTH_ISSUER',
+  'FCR_REMOTE_MCP_OAUTH_AUDIENCE',
+  'FCR_REMOTE_MCP_OAUTH_REQUIRED_SCOPE',
+  'FCR_RELAY_OPENAI_MODEL',
+  'FCR_RELAY_ANTHROPIC_MODEL',
+  'FCR_RELAY_MUSE_MODEL',
+  'FCR_V10_CAPABILITY_PLAN_CONTRACT',
+  'FCR_V10_CONVEYOR_CONTRACT',
+  'FCR_V10_MAX_RUNTIME_AUTHORITY',
+  'FCR_V10_REGISTRY_RESOLUTION_REQUIRED',
+  'FCR_V10_RECEIPT_PERSISTENCE_REQUIRED',
+  'MCP_EXA_URL',
+  'MCP_RESEND_URL',
+  'MCP_CLOUDFLARE_API_URL',
+  'N8N_FOUNDER_CONTENT_ENABLED',
+  'N8N_FOUNDER_CONTENT_ENABLED_PROVIDERS',
+  'N8N_FOUNDER_CONTENT_EXPECTED_WORKFLOW_ID',
+  'N8N_FOUNDER_CONTENT_EXPECTED_RUNTIME_VERSION',
+]);
+const allowedPublicPlainTextBindings = new Set(PUBLIC_PLAINTEXT_BINDINGS);
+
 export function validateBindingTypes(payload, { allowStaleCfApiTokenRemoval = false } = {}) {
   const bindings = payload?.result?.bindings;
   if (payload?.success !== true || !Array.isArray(bindings)) {
