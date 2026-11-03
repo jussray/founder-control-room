@@ -5,12 +5,18 @@ on:
     branches: [main]
     paths:
       - 'scripts/portfolio-actions-audit.mjs'
+      - 'scripts/grafana-irm-portfolio-notifier.mjs'
+      - 'scripts/grafana-irm-portfolio-notifier.test.mjs'
+      - 'docs/GRAFANA_IRM_PORTFOLIO.md'
       - 'scripts/mint-portfolio-github-app-token.mjs'
       - '.github/workflows/portfolio-actions-audit.yml'
   push:
     branches: [main]
     paths:
       - 'scripts/portfolio-actions-audit.mjs'
+      - 'scripts/grafana-irm-portfolio-notifier.mjs'
+      - 'scripts/grafana-irm-portfolio-notifier.test.mjs'
+      - 'docs/GRAFANA_IRM_PORTFOLIO.md'
       - 'scripts/mint-portfolio-github-app-token.mjs'
       - '.github/workflows/portfolio-actions-audit.yml'
   schedule:
@@ -50,6 +56,8 @@ jobs:
           node-version: '24'
       - name: Exercise source classifications
         run: node scripts/portfolio-actions-audit.mjs --self-test
+      - name: Validate private-data-minimized Grafana notification contract offline
+        run: node --test scripts/grafana-irm-portfolio-notifier.test.mjs
       - name: Validate read-only audit token permissions without credentials
         run: node scripts/mint-portfolio-github-app-token.mjs --self-test-token-profiles
 
@@ -103,3 +111,12 @@ jobs:
           path: artifacts/portfolio-actions-audit/receipt.json
           if-no-files-found: error
           retention-days: 30
+
+      - name: Notify Grafana IRM of sanitized audit state (opt-in)
+        if: always()
+        env:
+          GRAFANA_IRM_ENABLED: ${{ vars.GRAFANA_IRM_ENABLED }}
+          GRAFANA_IRM_WEBHOOK_URL: ${{ secrets.GRAFANA_IRM_WEBHOOK_URL }}
+          GRAFANA_IRM_BEARER_TOKEN: ${{ secrets.GRAFANA_IRM_BEARER_TOKEN }}
+          GRAFANA_SOURCE_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: node scripts/grafana-irm-portfolio-notifier.mjs
