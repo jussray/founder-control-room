@@ -59,3 +59,19 @@ Future browser execution needs a founder-authenticated plan API that binds manif
 This v1 runner deliberately does not accept arbitrary natural-language action plans, edit application code or expose a new FCR website button. Future work should add a founder-authenticated, reviewable planner/UI that turns a request into a scoped manifest, validates the plan before execution, and separately authorizes any browser writes and proposed repairs. Preserve current FCR founder approval gates, project isolation, provider-neutral architecture, and exact-head evidence.
 
 The selectors are based on Sync Party source and test files, not yet on a successful live website execution. Verify the live runtime separately before labeling this capability operational.
+
+## Grafana read-only observation (candidate)
+
+`scripts/fcr-grafana-read.mjs` is a separate FCR-owned provider observer. It does not use a browser session, TinyFish, or the synthetic journey executor. The hostname is pinned to `charmingpeacock2261.grafana.net`. Only Grafana GET requests for dashboard discovery and exact-UID configuration are permitted.
+
+Use a server-held Grafana **Viewer/read-only service-account token** as `FCR_GRAFANA_READ_TOKEN` in an authorized private execution environment. Never place the token in GitHub, dashboard JSON, URL parameters, chat, a public site, or CI logs. No token is configured by this change.
+
+```bash
+# Lists candidate Supabase/Postgres dashboard UIDs without selecting one.
+node scripts/fcr-grafana-read.mjs
+# After independently verifying the UID and datasource:
+node scripts/fcr-grafana-read.mjs --uid=<exact-dashboard-uid> --expected-project=iuxworqsqnyilbxrfctv
+node --test test/fcr-grafana-read.test.mjs
+```
+
+The observed Grafana project `iuxworqsqnyilbxrfctv` must **not** be silently equated with StoryEngine's GitHub-linked Supabase project `tarnmxcjpvaxapnjnesf`. A project mismatch exits nonzero. API readback proves configuration only, **not** Prometheus series availability, live browser health, or authority to edit a dashboard. Existing panel queries and database replication state remain untouched. No founder-authenticated remote Grafana execution endpoint or production rollout is provided by this candidate. Preserve the existing dashboard JSON for rollback before any separate, authorized panel edit.
