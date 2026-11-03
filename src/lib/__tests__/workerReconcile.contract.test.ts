@@ -20,6 +20,8 @@ describe('canonical Worker reconcile credential preflight contract', () => {
     expect(workflow).toContain("token.encode('ascii')");
     expect(workflow).toContain('contains non-ASCII characters and cannot be used as an HTTP Authorization value');
     expect(workflow).toContain('contains whitespace or non-printable characters');
+    expect(workflow).toContain('when the same name exists at repository and environment levels, the environment secret takes precedence');
+    expect(workflow).toContain('Check the effective production environment secret and same-name secret precedence');
     expect(workflow).toContain('without a Bearer prefix');
     expect(workflow).toContain('without a NAME=value wrapper');
     expect(workflow).toContain('without wrapping quotes');
