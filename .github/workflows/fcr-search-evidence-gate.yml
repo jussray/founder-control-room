@@ -1,0 +1,53 @@
+name: FCR Search Console and Evidence Intelligence
+on:
+  push:
+    paths:
+      - 'src/lib/searchConsoleRead.ts'
+      - 'src/lib/evidenceGatewayReview.ts'
+      - 'wrangler.worker.toml'
+      - 'src/http/routes/truthSeoEvidence.ts'
+      - 'src/http/routes/truthConsole.ts'
+      - 'src/lib/__tests__/searchConsoleRead.test.ts'
+      - 'src/lib/__tests__/evidenceGatewayReview.test.ts'
+      - 'public/control-room/seo-evidence.js'
+      - 'public/control-room/truth-console.js'
+      - 'public/control-room/stack-router.js'
+      - 'public/index.html'
+      - 'public/sitemap.xml'
+      - 'src/http/__tests__/seoAssets.test.ts'
+      - '.github/workflows/fcr-search-evidence-gate.yml'
+  pull_request:
+    paths:
+      - 'src/lib/searchConsoleRead.ts'
+      - 'src/lib/evidenceGatewayReview.ts'
+      - 'wrangler.worker.toml'
+      - 'src/http/routes/truthSeoEvidence.ts'
+      - 'src/http/routes/truthConsole.ts'
+      - 'src/lib/__tests__/searchConsoleRead.test.ts'
+      - 'src/lib/__tests__/evidenceGatewayReview.test.ts'
+      - 'public/control-room/seo-evidence.js'
+      - 'public/control-room/truth-console.js'
+      - 'public/control-room/stack-router.js'
+      - 'public/index.html'
+      - 'public/sitemap.xml'
+      - 'src/http/__tests__/seoAssets.test.ts'
+      - '.github/workflows/fcr-search-evidence-gate.yml'
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+      - run: npm install --no-audit --no-fund
+      - run: npx tsc --noEmit --strict --target ES2022 --module NodeNext --moduleResolution NodeNext src/lib/searchConsoleRead.ts src/lib/evidenceGatewayReview.ts
+      - run: npx vitest run src/lib/__tests__/searchConsoleRead.test.ts src/lib/__tests__/evidenceGatewayReview.test.ts src/http/__tests__/seoAssets.test.ts
+      - run: node --check public/control-room/seo-evidence.js
+      - run: node --check public/control-room/truth-console.js
+      - run: node --check public/control-room/stack-router.js
+      - run: grep -q '"FCR_GSC_OAUTH_JSON"' wrangler.worker.toml && grep -q '"FCR_EVIDENCE_GATEWAY_TOKEN"' wrangler.worker.toml
+      - run: node scripts/verify-test-discovery.mjs
