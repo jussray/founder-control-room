@@ -10,7 +10,8 @@ describe('Owner Intelligence private surface and public SEO/AEO contracts',()=>{
     expect(canonical).toContain('intelligenceRouter.use(requireFounder)');
     expect(canonical).toContain("shareEvidenceWithModel!==true");
     expect(canonical).toContain('rateLimit');
-    expect(router).toContain('ownerInsightsRouter.use(requireFounder)');
+    expect(router).toContain('ownerInsightsRouter.use(ownerInsightsRateLimit, requireFounder)');
+    expect(router).toContain('limit: 20');
     expect(router).toContain("res.setHeader('Cache-Control','private, no-store')");
     expect(router).toContain("res.setHeader('X-Robots-Tag','noindex, nofollow')");
     expect(router).toContain("select('id,slug').eq('slug',input.projectSlug).maybeSingle()");
