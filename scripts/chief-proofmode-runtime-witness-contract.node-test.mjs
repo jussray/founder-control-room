@@ -66,7 +66,7 @@ test('real protected Playwright runs before any GitHub evidence publication', ()
 
 test('GitHub App publication identity is protected and fixed', () => {
   assert.match(workflow, /GITHUB_APP_ID:\s*\$\{\{ secrets\.APP_ID \}\}/);
-  assert.match(workflow, /GITHUB_PRIVATE_KEY:\s*\$\{\{ secrets\.APP_PRIVATE_KEY \}\}/);
+  assert.match(workflow, /GITHUB_PRIVATE_KEY:\s*\$\{\{ secrets\.FCR_GITHUB_APP_PRIVATE_KEY \}\}/);
   assert.match(publisher, /repository:\s*'jussray\/chief-ai-machine'/);
   assert.match(publisher, /pullRequestNumber:\s*143/);
   assert.match(publisher, /rulesetId:\s*20818149/);
