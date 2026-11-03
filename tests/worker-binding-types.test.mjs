@@ -192,9 +192,9 @@ test('only explicitly reviewed Wrangler public vars may be plaintext; deny unkno
 
 test('reviewed plaintext binding allowlist matches exactly the source-authored Wrangler vars', () => {
   const toml = readFileSync(new URL('../wrangler.worker.toml', import.meta.url), 'utf8');
-  const section = toml.split(/(?:^|\\n)\\[vars\\]\\s*\\n/)[1]?.split(/\\n\\[/)[0];
+  const section = toml.split(/(?:^|\n)\[vars\]\s*\n/)[1]?.split(/\n\[/)[0];
   assert.ok(section, 'missing [vars] section');
-  const declared = section.split(/\\r?\\n/).map(line => line.match(/^([A-Z][A-Z0-9_]*)\\s*=/)?.[1]).filter(Boolean);
+  const declared = section.split(/\r?\n/).map(line => line.match(/^([A-Z][A-Z0-9_]*)\s*=/)?.[1]).filter(Boolean);
   assert.deepEqual([...PUBLIC_PLAINTEXT_BINDINGS].sort(), declared.sort());
   assert.equal(PUBLIC_PLAINTEXT_BINDINGS.every(name => !isCredentialBindingName(name)), true);
 });
