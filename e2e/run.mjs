@@ -44,7 +44,7 @@ const GITHUB_REPO = 'demo-project';
 const GITHUB_WEBHOOK_SECRET = 'e2e-webhook-secret';
 const E2E_SCENARIO = process.env.FCR_E2E_SCENARIO ?? 'full';
 
-if (!['full', 'capability-workbench', 'guarded-terminal'].includes(E2E_SCENARIO)) {
+if (!['full', 'capability-workbench', 'guarded-terminal', 'auth-lifecycle'].includes(E2E_SCENARIO)) {
   throw new Error(`Unsupported FCR_E2E_SCENARIO: ${E2E_SCENARIO}`);
 }
 
@@ -368,8 +368,11 @@ async function verifyLogoutAndProtectedBoundary(page) {
   await page.waitForURL(`${BASE_URL}/welcome`);
   await page.waitForFunction(() => document.getElementById('door')?.dataset.state === 'signed_out');
   assert(await page.locator('#magic').isVisible(), 'welcome is signed out after logout');
-  const identityAfterLogout = await page.request.get(`${BASE_URL}/auth/me`);
-  assert(identityAfterLogout.status() === 401, 'revoked cookie no longer authorizes founder identity');
+  const identityAfterLogout = await page.evaluate(async () => {
+    const response = await fetch('/auth/me', { credentials: 'same-origin', cache: 'no-store' });
+    return response.status;
+  });
+  assert(identityAfterLogout === 401, 'revoked browser cookie no longer authorizes founder identity');
   await page.goto(`${BASE_URL}/control-room/`);
   await page.waitForSelector('#magic-link-form');
   assert(await page.locator('.shell').count() === 0, 'protected founder shell remains hidden after logout');
@@ -432,25 +435,40 @@ async function main() {
   assert(Boolean(bridge?.tokenHash), 'the server generated a real token_hash for the magic link');
 
   console.log('\n[3] Follow the real /auth/callback redirect (simulating clicking the emailed link)');
+  // Observe the actual callback's response headers without printing any credential.
+  const callbackResponsePromise = page.waitForResponse((response) =>
+    response.url().startsWith(`${BASE_URL}/auth/callback?`) && response.status() === 303);
   await page.goto(`${BASE_URL}/auth/callback?token_hash=${bridge.tokenHash}`);
+  const callbackResponse = await callbackResponsePromise;
   await page.waitForSelector('.topbar', { timeout: 5000 });
   assert(await page.locator('.founder-email').innerText() === FOUNDER_EMAIL, 'landed on the app shell signed in as the founder');
 
   console.log('\n[login] Verify the authenticated cookie, identity API and welcome-to-Control-Room handoff');
-  const authenticatedIdentity = await page.request.get(`${BASE_URL}/auth/me`, {
-    headers: { Accept: 'application/json' },
+  const authenticatedIdentity = await page.evaluate(async () => {
+    const response = await fetch('/auth/me', {
+      credentials: 'same-origin', cache: 'no-store',
+      headers: { Accept: 'application/json' },
+    });
+    return { status: response.status, envelope: await response.json() };
   });
-  assert(authenticatedIdentity.status() === 200, 'verified login creates an authorized /auth/me session');
-  const identityEnvelope = await authenticatedIdentity.json();
+  assert(authenticatedIdentity.status === 200, 'browser session authorizes /auth/me after login');
   assert(
-    identityEnvelope?.success === true && identityEnvelope?.data?.founder?.email === FOUNDER_EMAIL,
-    'authenticated identity is the expected allowlisted founder',
+    authenticatedIdentity.envelope?.success === true &&
+      authenticatedIdentity.envelope?.data?.founder?.email === FOUNDER_EMAIL,
+    'authenticated browser identity matches the allowlisted founder',
   );
-  const founderCookie = (await page.context().cookies(BASE_URL))
-    .find((cookie) => cookie.name === '__Host-fcr_session');
+  const callbackCookies = await callbackResponse.headerValues('set-cookie');
   assert(
-    Boolean(founderCookie?.httpOnly && founderCookie?.secure),
-    'login issues an opaque Secure HttpOnly founder-session cookie',
+    callbackCookies.some((value) =>
+      /^__Host-fcr_session=[^;]+;/i.test(value) &&
+      /;\s*Secure(?:;|$)/i.test(value) &&
+      /;\s*HttpOnly(?:;|$)/i.test(value) &&
+      /;\s*Path=\/(?:;|$)/i.test(value)),
+    'real callback sets a Secure HttpOnly host-only session cookie',
+  );
+  assert(
+    await page.evaluate(() => !document.cookie.split('; ').some((value) => value.startsWith('__Host-fcr_session='))),
+    'opaque browser session is not accessible to JavaScript',
   );
   await page.goto(`${BASE_URL}/welcome`);
   await page.waitForURL(`${BASE_URL}/control-room/`);
@@ -459,6 +477,13 @@ async function main() {
     await page.locator('.founder-email').innerText() === FOUNDER_EMAIL,
     'signed-in welcome redirects to the founder-only Control Room',
   );
+
+  if (E2E_SCENARIO === 'auth-lifecycle') {
+    await verifyLogoutAndProtectedBoundary(page);
+    assert(jsExceptions.length === 0, `no uncaught JS exceptions (saw: ${JSON.stringify(jsExceptions)})`);
+    await browser.close();
+    return;
+  }
 
   if (E2E_SCENARIO === 'capability-workbench') {
     // Run the workbench browser journey in an isolated server process. The full
