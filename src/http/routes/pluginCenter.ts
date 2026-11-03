@@ -75,7 +75,7 @@ function projectFromRelation(value: unknown): ProjectLookup | null {
 function normalizeConnection(row: DbRecord): PluginConnectionSnapshot {
   const type = stringOrNull(row.connection_type) ?? 'other';
   const project = projectFromRelation(row.projects);
-  const descriptor = pluginDescriptorFor(type);
+  const descriptor = pluginDescriptorFor(type, stringOrNull(row.label));
   const authorityLevel = stringOrNull(row.authority_level);
   const requiredApproval = stringOrNull(row.required_approval);
 
