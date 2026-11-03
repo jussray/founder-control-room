@@ -47,6 +47,30 @@ describe('claim-gated Jira execution', () => {
     expect(store.markProviderAccepted).not.toHaveBeenCalled();
   });
 
+  it('permits only one provider write across simultaneous deliveries', async () => {
+    let claimed = false;
+    const store = setup().store;
+    vi.mocked(store.claimOnce).mockImplementation(async () => {
+      if (claimed) return false;
+      claimed = true;
+      return true;
+    });
+    const write = vi.fn().mockResolvedValue(undefined);
+    const outcomes = await Promise.all([
+      runClaimedJiraAction(key, store, write),
+      runClaimedJiraAction(key, store, write),
+    ]);
+    expect(outcomes.sort()).toEqual(['provider-accepted', 'verify-provider-state']);
+    expect(write).toHaveBeenCalledOnce();
+  });
+
+  it('does not write when claim storage is unavailable', async () => {
+    const { store, write } = setup();
+    vi.mocked(store.claimOnce).mockRejectedValueOnce(new Error('db unavailable'));
+    await expect(runClaimedJiraAction(key, store, write)).rejects.toThrow('db unavailable');
+    expect(write).not.toHaveBeenCalled();
+  });
+
   it('rejects invalid action keys before claiming', async () => {
     const { store, write } = setup();
     await expect(runClaimedJiraAction('', store, write)).rejects.toThrow('invalid_jira_action_key');
