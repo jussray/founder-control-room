@@ -72,4 +72,15 @@ describe('Owner Intelligence API authentication and provider boundaries',()=>{
     expect(post.body.code).toBe('OWNER_INSIGHTS_UNAVAILABLE');
     expect(post.text).not.toContain('sensitive mock provider details');
   });
+  it('rate-limits repeated unauthenticated requests before any provider access', async () => {
+    const responses = [];
+    for (let i = 0; i < 24; i++) {
+      responses.push(await request(app()).get('/owner-insights/search-console'));
+    }
+    expect(responses.some(r => r.status === 429)).toBe(true);
+    expect(responses.at(-1)?.body.code).toBe('OWNER_INSIGHTS_RATE_LIMITED');
+    expect(mocks.google).not.toHaveBeenCalled();
+    expect(mocks.review).not.toHaveBeenCalled();
+  });
+
 });
