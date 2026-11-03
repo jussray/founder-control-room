@@ -1,7 +1,7 @@
 {
   "contract": "juss/fcr-gpt-skill-source-catalog@v1",
-  "provenance": "Read-only GitHub recursive trees pinned to exact commits; this is a catalog of source paths, not a complete body export or live GPT installation.",
-  "executionRule": "Names and file metadata do not authorize execution. Trusted runtime tools, current target identity, separate exact-scope permission, policy, and receipts required.",
+  "provenance": "Immutable GitHub source references at observed commits, not a certified ownership/license inventory, installed GPT Knowledge, or current head state. Every actual skill body needs owner, visibility, license and secret-screen review before export.",
+  "executionRule": "All catalog entries are non-authorizing, and all body exports require explicit owner/share-scope review. Eligible real executors must verify current runtime permissions, target, policy, approval and receipt. The catalog never grants them.",
   "sources": [
     {
       "repo": "jussray/founder-control-room",
@@ -26,8 +26,8 @@
   ],
   "count": {
     "discovered": 160,
-    "exportableSourceReferences": 158,
-    "heldForOwnerReview": 2
+    "catalogReferences": 117,
+    "heldForReview": 43
   },
   "held": [
     {
@@ -41,29 +41,255 @@
       "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
       "path": ".ai/skills/juss-founder-os/SKILL.md",
       "reason": "private or owner-only skill review required"
-    }
-  ],
-  "skills": [
+    },
     {
       "repo": "jussray/chief-ai-machine",
       "sourceHead": "ae6c366b0bc262ed61f01112ed44dd85f544324f",
       "path": ".agents/skills/agents-sdk/SKILL.md",
-      "gitBlobSha": "d9f1c8a9eaeb271888fb82ecda5d79ebf264944a",
-      "name": "agents-sdk",
-      "kind": "skill",
-      "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "reason": "bundled third-party/reference skill requires license and redistribution review"
     },
     {
       "repo": "jussray/chief-ai-machine",
       "sourceHead": "ae6c366b0bc262ed61f01112ed44dd85f544324f",
       "path": ".agents/skills/artifact-template-creator-response/SKILL.md",
-      "gitBlobSha": "967bc9f964491a282b07b50410ea8c129712e528",
-      "name": "artifact-template-creator-response",
-      "kind": "skill",
-      "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "reason": "bundled third-party/reference skill requires license and redistribution review"
     },
+    {
+      "repo": "jussray/chief-ai-machine",
+      "sourceHead": "ae6c366b0bc262ed61f01112ed44dd85f544324f",
+      "path": ".agents/skills/cloudflare-email-service/SKILL.md",
+      "reason": "bundled third-party/reference skill requires license and redistribution review"
+    },
+    {
+      "repo": "jussray/chief-ai-machine",
+      "sourceHead": "ae6c366b0bc262ed61f01112ed44dd85f544324f",
+      "path": ".agents/skills/cloudflare-one-migrations/SKILL.md",
+      "reason": "bundled third-party/reference skill requires license and redistribution review"
+    },
+    {
+      "repo": "jussray/chief-ai-machine",
+      "sourceHead": "ae6c366b0bc262ed61f01112ed44dd85f544324f",
+      "path": ".agents/skills/cloudflare-one/SKILL.md",
+      "reason": "bundled third-party/reference skill requires license and redistribution review"
+    },
+    {
+      "repo": "jussray/chief-ai-machine",
+      "sourceHead": "ae6c366b0bc262ed61f01112ed44dd85f544324f",
+      "path": ".agents/skills/cloudflare/SKILL.md",
+      "reason": "bundled third-party/reference skill requires license and redistribution review"
+    },
+    {
+      "repo": "jussray/chief-ai-machine",
+      "sourceHead": "ae6c366b0bc262ed61f01112ed44dd85f544324f",
+      "path": ".agents/skills/durable-objects/SKILL.md",
+      "reason": "bundled third-party/reference skill requires license and redistribution review"
+    },
+    {
+      "repo": "jussray/chief-ai-machine",
+      "sourceHead": "ae6c366b0bc262ed61f01112ed44dd85f544324f",
+      "path": ".agents/skills/sandbox-migrate-to-next/SKILL.md",
+      "reason": "bundled third-party/reference skill requires license and redistribution review"
+    },
+    {
+      "repo": "jussray/chief-ai-machine",
+      "sourceHead": "ae6c366b0bc262ed61f01112ed44dd85f544324f",
+      "path": ".agents/skills/sandbox-next/SKILL.md",
+      "reason": "bundled third-party/reference skill requires license and redistribution review"
+    },
+    {
+      "repo": "jussray/chief-ai-machine",
+      "sourceHead": "ae6c366b0bc262ed61f01112ed44dd85f544324f",
+      "path": ".agents/skills/sandbox-stable/SKILL.md",
+      "reason": "bundled third-party/reference skill requires license and redistribution review"
+    },
+    {
+      "repo": "jussray/chief-ai-machine",
+      "sourceHead": "ae6c366b0bc262ed61f01112ed44dd85f544324f",
+      "path": ".agents/skills/turnstile-spin/SKILL.md",
+      "reason": "bundled third-party/reference skill requires license and redistribution review"
+    },
+    {
+      "repo": "jussray/chief-ai-machine",
+      "sourceHead": "ae6c366b0bc262ed61f01112ed44dd85f544324f",
+      "path": ".agents/skills/web-perf/SKILL.md",
+      "reason": "bundled third-party/reference skill requires license and redistribution review"
+    },
+    {
+      "repo": "jussray/chief-ai-machine",
+      "sourceHead": "ae6c366b0bc262ed61f01112ed44dd85f544324f",
+      "path": ".agents/skills/workers-best-practices/SKILL.md",
+      "reason": "bundled third-party/reference skill requires license and redistribution review"
+    },
+    {
+      "repo": "jussray/chief-ai-machine",
+      "sourceHead": "ae6c366b0bc262ed61f01112ed44dd85f544324f",
+      "path": ".agents/skills/wrangler/SKILL.md",
+      "reason": "bundled third-party/reference skill requires license and redistribution review"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": ".agents/skills/agents-sdk/SKILL.md",
+      "reason": "bundled third-party/reference skill requires license and redistribution review"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": ".agents/skills/artifact-template-creator-response/SKILL.md",
+      "reason": "bundled third-party/reference skill requires license and redistribution review"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": ".agents/skills/cloudflare-email-service/SKILL.md",
+      "reason": "bundled third-party/reference skill requires license and redistribution review"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": ".agents/skills/cloudflare-one-migrations/SKILL.md",
+      "reason": "bundled third-party/reference skill requires license and redistribution review"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": ".agents/skills/cloudflare-one/SKILL.md",
+      "reason": "bundled third-party/reference skill requires license and redistribution review"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": ".agents/skills/cloudflare/SKILL.md",
+      "reason": "bundled third-party/reference skill requires license and redistribution review"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": ".agents/skills/durable-objects/SKILL.md",
+      "reason": "bundled third-party/reference skill requires license and redistribution review"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": ".agents/skills/sandbox-migrate-to-next/SKILL.md",
+      "reason": "bundled third-party/reference skill requires license and redistribution review"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": ".agents/skills/sandbox-next/SKILL.md",
+      "reason": "bundled third-party/reference skill requires license and redistribution review"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": ".agents/skills/sandbox-stable/SKILL.md",
+      "reason": "bundled third-party/reference skill requires license and redistribution review"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": ".agents/skills/turnstile-spin/SKILL.md",
+      "reason": "bundled third-party/reference skill requires license and redistribution review"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": ".agents/skills/web-perf/SKILL.md",
+      "reason": "bundled third-party/reference skill requires license and redistribution review"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": ".agents/skills/workers-best-practices/SKILL.md",
+      "reason": "bundled third-party/reference skill requires license and redistribution review"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": ".agents/skills/wrangler/SKILL.md",
+      "reason": "bundled third-party/reference skill requires license and redistribution review"
+    },
+    {
+      "repo": "jussray/SolContinuity",
+      "sourceHead": "855cc8a79f1ea06006c812ec9efb08864a1d55b9",
+      "path": ".agents/skills/agents-sdk/SKILL.md",
+      "reason": "bundled third-party/reference skill requires license and redistribution review"
+    },
+    {
+      "repo": "jussray/SolContinuity",
+      "sourceHead": "855cc8a79f1ea06006c812ec9efb08864a1d55b9",
+      "path": ".agents/skills/cloudflare-email-service/SKILL.md",
+      "reason": "bundled third-party/reference skill requires license and redistribution review"
+    },
+    {
+      "repo": "jussray/SolContinuity",
+      "sourceHead": "855cc8a79f1ea06006c812ec9efb08864a1d55b9",
+      "path": ".agents/skills/cloudflare-one-migrations/SKILL.md",
+      "reason": "bundled third-party/reference skill requires license and redistribution review"
+    },
+    {
+      "repo": "jussray/SolContinuity",
+      "sourceHead": "855cc8a79f1ea06006c812ec9efb08864a1d55b9",
+      "path": ".agents/skills/cloudflare-one/SKILL.md",
+      "reason": "bundled third-party/reference skill requires license and redistribution review"
+    },
+    {
+      "repo": "jussray/SolContinuity",
+      "sourceHead": "855cc8a79f1ea06006c812ec9efb08864a1d55b9",
+      "path": ".agents/skills/cloudflare/SKILL.md",
+      "reason": "bundled third-party/reference skill requires license and redistribution review"
+    },
+    {
+      "repo": "jussray/SolContinuity",
+      "sourceHead": "855cc8a79f1ea06006c812ec9efb08864a1d55b9",
+      "path": ".agents/skills/durable-objects/SKILL.md",
+      "reason": "bundled third-party/reference skill requires license and redistribution review"
+    },
+    {
+      "repo": "jussray/SolContinuity",
+      "sourceHead": "855cc8a79f1ea06006c812ec9efb08864a1d55b9",
+      "path": ".agents/skills/sandbox-migrate-to-next/SKILL.md",
+      "reason": "bundled third-party/reference skill requires license and redistribution review"
+    },
+    {
+      "repo": "jussray/SolContinuity",
+      "sourceHead": "855cc8a79f1ea06006c812ec9efb08864a1d55b9",
+      "path": ".agents/skills/sandbox-next/SKILL.md",
+      "reason": "bundled third-party/reference skill requires license and redistribution review"
+    },
+    {
+      "repo": "jussray/SolContinuity",
+      "sourceHead": "855cc8a79f1ea06006c812ec9efb08864a1d55b9",
+      "path": ".agents/skills/sandbox-stable/SKILL.md",
+      "reason": "bundled third-party/reference skill requires license and redistribution review"
+    },
+    {
+      "repo": "jussray/SolContinuity",
+      "sourceHead": "855cc8a79f1ea06006c812ec9efb08864a1d55b9",
+      "path": ".agents/skills/turnstile-spin/SKILL.md",
+      "reason": "bundled third-party/reference skill requires license and redistribution review"
+    },
+    {
+      "repo": "jussray/SolContinuity",
+      "sourceHead": "855cc8a79f1ea06006c812ec9efb08864a1d55b9",
+      "path": ".agents/skills/web-perf/SKILL.md",
+      "reason": "bundled third-party/reference skill requires license and redistribution review"
+    },
+    {
+      "repo": "jussray/SolContinuity",
+      "sourceHead": "855cc8a79f1ea06006c812ec9efb08864a1d55b9",
+      "path": ".agents/skills/workers-best-practices/SKILL.md",
+      "reason": "bundled third-party/reference skill requires license and redistribution review"
+    },
+    {
+      "repo": "jussray/SolContinuity",
+      "sourceHead": "855cc8a79f1ea06006c812ec9efb08864a1d55b9",
+      "path": ".agents/skills/wrangler/SKILL.md",
+      "reason": "bundled third-party/reference skill requires license and redistribution review"
+    }
+  ],
+  "skills": [
     {
       "repo": "jussray/chief-ai-machine",
       "sourceHead": "ae6c366b0bc262ed61f01112ed44dd85f544324f",
@@ -72,57 +298,9 @@
       "name": "browser-reality-inspector",
       "kind": "skill",
       "executionEligibility": "verification",
-      "executionAuthorized": false
-    },
-    {
-      "repo": "jussray/chief-ai-machine",
-      "sourceHead": "ae6c366b0bc262ed61f01112ed44dd85f544324f",
-      "path": ".agents/skills/cloudflare-email-service/SKILL.md",
-      "gitBlobSha": "fb3565111a2ce94761e5ad6642d20d02e7707946",
-      "name": "cloudflare-email-service",
-      "kind": "skill",
-      "executionEligibility": "advisory",
-      "executionAuthorized": false
-    },
-    {
-      "repo": "jussray/chief-ai-machine",
-      "sourceHead": "ae6c366b0bc262ed61f01112ed44dd85f544324f",
-      "path": ".agents/skills/cloudflare-one-migrations/SKILL.md",
-      "gitBlobSha": "53c770fb2cad0339cccffbc85b68b2b9810dbcb4",
-      "name": "cloudflare-one-migrations",
-      "kind": "skill",
-      "executionEligibility": "advisory",
-      "executionAuthorized": false
-    },
-    {
-      "repo": "jussray/chief-ai-machine",
-      "sourceHead": "ae6c366b0bc262ed61f01112ed44dd85f544324f",
-      "path": ".agents/skills/cloudflare-one/SKILL.md",
-      "gitBlobSha": "753ab60c176e82f11097caa958cd4646ecd67078",
-      "name": "cloudflare-one",
-      "kind": "skill",
-      "executionEligibility": "advisory",
-      "executionAuthorized": false
-    },
-    {
-      "repo": "jussray/chief-ai-machine",
-      "sourceHead": "ae6c366b0bc262ed61f01112ed44dd85f544324f",
-      "path": ".agents/skills/cloudflare/SKILL.md",
-      "gitBlobSha": "2c7da21964ab4168422c5775ec8eeb469c89b1f7",
-      "name": "cloudflare",
-      "kind": "skill",
-      "executionEligibility": "advisory",
-      "executionAuthorized": false
-    },
-    {
-      "repo": "jussray/chief-ai-machine",
-      "sourceHead": "ae6c366b0bc262ed61f01112ed44dd85f544324f",
-      "path": ".agents/skills/durable-objects/SKILL.md",
-      "gitBlobSha": "b595f1c2182f3b7d6f944d7ba0ac59667fba78aa",
-      "name": "durable-objects",
-      "kind": "skill",
-      "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/chief-ai-machine",
@@ -132,7 +310,9 @@
       "name": "goalfix",
       "kind": "skill",
       "executionEligibility": "scoped-branch",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/chief-ai-machine",
@@ -142,7 +322,9 @@
       "name": "humanizer",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/chief-ai-machine",
@@ -152,47 +334,9 @@
       "name": "nvidia-capability-evaluation",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
-    },
-    {
-      "repo": "jussray/chief-ai-machine",
-      "sourceHead": "ae6c366b0bc262ed61f01112ed44dd85f544324f",
-      "path": ".agents/skills/sandbox-migrate-to-next/SKILL.md",
-      "gitBlobSha": "745bcc5655dec3b690d6df4c31141a2b46a6d4c3",
-      "name": "sandbox-migrate-to-next",
-      "kind": "skill",
-      "executionEligibility": "advisory",
-      "executionAuthorized": false
-    },
-    {
-      "repo": "jussray/chief-ai-machine",
-      "sourceHead": "ae6c366b0bc262ed61f01112ed44dd85f544324f",
-      "path": ".agents/skills/sandbox-next/SKILL.md",
-      "gitBlobSha": "6384327710feced81e896501510bd76dd57770ff",
-      "name": "sandbox-next",
-      "kind": "skill",
-      "executionEligibility": "advisory",
-      "executionAuthorized": false
-    },
-    {
-      "repo": "jussray/chief-ai-machine",
-      "sourceHead": "ae6c366b0bc262ed61f01112ed44dd85f544324f",
-      "path": ".agents/skills/sandbox-stable/SKILL.md",
-      "gitBlobSha": "8faf22bf1a77afdcfbf419e7de49762b9fff7d7f",
-      "name": "sandbox-stable",
-      "kind": "skill",
-      "executionEligibility": "advisory",
-      "executionAuthorized": false
-    },
-    {
-      "repo": "jussray/chief-ai-machine",
-      "sourceHead": "ae6c366b0bc262ed61f01112ed44dd85f544324f",
-      "path": ".agents/skills/turnstile-spin/SKILL.md",
-      "gitBlobSha": "57188f97bbbcf2e4ac498c73b19cfe3022b9d8a7",
-      "name": "turnstile-spin",
-      "kind": "skill",
-      "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/chief-ai-machine",
@@ -202,37 +346,9 @@
       "name": "ultrathink-devil",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
-    },
-    {
-      "repo": "jussray/chief-ai-machine",
-      "sourceHead": "ae6c366b0bc262ed61f01112ed44dd85f544324f",
-      "path": ".agents/skills/web-perf/SKILL.md",
-      "gitBlobSha": "0fb166e8e8cb12e42dff4a40905ee4d3d626fcda",
-      "name": "web-perf",
-      "kind": "skill",
-      "executionEligibility": "advisory",
-      "executionAuthorized": false
-    },
-    {
-      "repo": "jussray/chief-ai-machine",
-      "sourceHead": "ae6c366b0bc262ed61f01112ed44dd85f544324f",
-      "path": ".agents/skills/workers-best-practices/SKILL.md",
-      "gitBlobSha": "bebd018cdcae1771eacdee30cfb96af3ad3bd936",
-      "name": "workers-best-practices",
-      "kind": "skill",
-      "executionEligibility": "advisory",
-      "executionAuthorized": false
-    },
-    {
-      "repo": "jussray/chief-ai-machine",
-      "sourceHead": "ae6c366b0bc262ed61f01112ed44dd85f544324f",
-      "path": ".agents/skills/wrangler/SKILL.md",
-      "gitBlobSha": "07d4dbbee98b6a55db42a2a01cb2c84df864a8e6",
-      "name": "wrangler",
-      "kind": "skill",
-      "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/chief-ai-machine",
@@ -242,7 +358,9 @@
       "name": "evidence-decision-loop",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/chief-ai-machine",
@@ -252,7 +370,9 @@
       "name": "goalfix",
       "kind": "skill",
       "executionEligibility": "scoped-branch",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/chief-ai-machine",
@@ -262,7 +382,9 @@
       "name": "juss-chief-ai",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/chief-ai-machine",
@@ -272,7 +394,9 @@
       "name": "playwright-proof",
       "kind": "skill",
       "executionEligibility": "verification",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/chief-ai-machine",
@@ -282,7 +406,9 @@
       "name": "pr-autopilot-triage",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/chief-ai-machine",
@@ -292,7 +418,9 @@
       "name": "proof-led-publishing",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/chief-ai-machine",
@@ -302,7 +430,9 @@
       "name": "repo-truth",
       "kind": "skill",
       "executionEligibility": "verification",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/chief-ai-machine",
@@ -312,7 +442,9 @@
       "name": "review-verify-merge",
       "kind": "skill",
       "executionEligibility": "consequential-gated",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/chief-ai-machine",
@@ -322,7 +454,9 @@
       "name": "sekret-bip-canon",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/chief-ai-machine",
@@ -332,7 +466,9 @@
       "name": "ultrathink-devil",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/chief-ai-machine",
@@ -342,7 +478,9 @@
       "name": "ultrathink",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/chief-ai-machine",
@@ -352,27 +490,9 @@
       "name": "gmail-resolve",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
-    },
-    {
-      "repo": "jussray/founder-control-room",
-      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
-      "path": ".agents/skills/agents-sdk/SKILL.md",
-      "gitBlobSha": "d9f1c8a9eaeb271888fb82ecda5d79ebf264944a",
-      "name": "agents-sdk",
-      "kind": "skill",
-      "executionEligibility": "advisory",
-      "executionAuthorized": false
-    },
-    {
-      "repo": "jussray/founder-control-room",
-      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
-      "path": ".agents/skills/artifact-template-creator-response/SKILL.md",
-      "gitBlobSha": "b7f61e21baaef9596b6e4e55b8f72fab47f34e13",
-      "name": "artifact-template-creator-response",
-      "kind": "skill",
-      "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/founder-control-room",
@@ -382,47 +502,9 @@
       "name": "change-genealogy-audit",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
-    },
-    {
-      "repo": "jussray/founder-control-room",
-      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
-      "path": ".agents/skills/cloudflare-email-service/SKILL.md",
-      "gitBlobSha": "fb3565111a2ce94761e5ad6642d20d02e7707946",
-      "name": "cloudflare-email-service",
-      "kind": "skill",
-      "executionEligibility": "advisory",
-      "executionAuthorized": false
-    },
-    {
-      "repo": "jussray/founder-control-room",
-      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
-      "path": ".agents/skills/cloudflare-one-migrations/SKILL.md",
-      "gitBlobSha": "53c770fb2cad0339cccffbc85b68b2b9810dbcb4",
-      "name": "cloudflare-one-migrations",
-      "kind": "skill",
-      "executionEligibility": "advisory",
-      "executionAuthorized": false
-    },
-    {
-      "repo": "jussray/founder-control-room",
-      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
-      "path": ".agents/skills/cloudflare-one/SKILL.md",
-      "gitBlobSha": "753ab60c176e82f11097caa958cd4646ecd67078",
-      "name": "cloudflare-one",
-      "kind": "skill",
-      "executionEligibility": "advisory",
-      "executionAuthorized": false
-    },
-    {
-      "repo": "jussray/founder-control-room",
-      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
-      "path": ".agents/skills/cloudflare/SKILL.md",
-      "gitBlobSha": "2c7da21964ab4168422c5775ec8eeb469c89b1f7",
-      "name": "cloudflare",
-      "kind": "skill",
-      "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/founder-control-room",
@@ -432,7 +514,9 @@
       "name": "control-room-agent-handoff",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/founder-control-room",
@@ -442,7 +526,9 @@
       "name": "control-room-agent-router",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/founder-control-room",
@@ -452,7 +538,9 @@
       "name": "control-room-cloudflare-agent-fleet",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/founder-control-room",
@@ -462,7 +550,9 @@
       "name": "control-room-design-implementation",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/founder-control-room",
@@ -472,7 +562,9 @@
       "name": "control-room-figma-builder",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/founder-control-room",
@@ -482,7 +574,9 @@
       "name": "control-room-futureyou-leverage",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/founder-control-room",
@@ -492,7 +586,9 @@
       "name": "control-room-incident-triage",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/founder-control-room",
@@ -502,7 +598,9 @@
       "name": "control-room-proof-ladder",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/founder-control-room",
@@ -512,7 +610,9 @@
       "name": "control-room-repo-contract",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/founder-control-room",
@@ -522,7 +622,9 @@
       "name": "control-room-skill-router",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/founder-control-room",
@@ -532,7 +634,9 @@
       "name": "control-room-token-efficient-execution",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/founder-control-room",
@@ -542,17 +646,9 @@
       "name": "devil",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
-    },
-    {
-      "repo": "jussray/founder-control-room",
-      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
-      "path": ".agents/skills/durable-objects/SKILL.md",
-      "gitBlobSha": "b595f1c2182f3b7d6f944d7ba0ac59667fba78aa",
-      "name": "durable-objects",
-      "kind": "skill",
-      "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/founder-control-room",
@@ -562,7 +658,9 @@
       "name": "fact-check-every-claim",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/founder-control-room",
@@ -572,7 +670,9 @@
       "name": "figma-build-implement",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/founder-control-room",
@@ -582,7 +682,9 @@
       "name": "founder-control-room-operator",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/founder-control-room",
@@ -592,7 +694,9 @@
       "name": "l99-v21-transactional-authority",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/founder-control-room",
@@ -602,7 +706,9 @@
       "name": "outcome-first",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/founder-control-room",
@@ -612,37 +718,9 @@
       "name": "sales",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
-    },
-    {
-      "repo": "jussray/founder-control-room",
-      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
-      "path": ".agents/skills/sandbox-migrate-to-next/SKILL.md",
-      "gitBlobSha": "745bcc5655dec3b690d6df4c31141a2b46a6d4c3",
-      "name": "sandbox-migrate-to-next",
-      "kind": "skill",
-      "executionEligibility": "advisory",
-      "executionAuthorized": false
-    },
-    {
-      "repo": "jussray/founder-control-room",
-      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
-      "path": ".agents/skills/sandbox-next/SKILL.md",
-      "gitBlobSha": "6384327710feced81e896501510bd76dd57770ff",
-      "name": "sandbox-next",
-      "kind": "skill",
-      "executionEligibility": "advisory",
-      "executionAuthorized": false
-    },
-    {
-      "repo": "jussray/founder-control-room",
-      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
-      "path": ".agents/skills/sandbox-stable/SKILL.md",
-      "gitBlobSha": "8faf22bf1a77afdcfbf419e7de49762b9fff7d7f",
-      "name": "sandbox-stable",
-      "kind": "skill",
-      "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/founder-control-room",
@@ -652,7 +730,9 @@
       "name": "sauce-guard",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/founder-control-room",
@@ -662,47 +742,9 @@
       "name": "truth-decay",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
-    },
-    {
-      "repo": "jussray/founder-control-room",
-      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
-      "path": ".agents/skills/turnstile-spin/SKILL.md",
-      "gitBlobSha": "57188f97bbbcf2e4ac498c73b19cfe3022b9d8a7",
-      "name": "turnstile-spin",
-      "kind": "skill",
-      "executionEligibility": "advisory",
-      "executionAuthorized": false
-    },
-    {
-      "repo": "jussray/founder-control-room",
-      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
-      "path": ".agents/skills/web-perf/SKILL.md",
-      "gitBlobSha": "0fb166e8e8cb12e42dff4a40905ee4d3d626fcda",
-      "name": "web-perf",
-      "kind": "skill",
-      "executionEligibility": "advisory",
-      "executionAuthorized": false
-    },
-    {
-      "repo": "jussray/founder-control-room",
-      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
-      "path": ".agents/skills/workers-best-practices/SKILL.md",
-      "gitBlobSha": "bebd018cdcae1771eacdee30cfb96af3ad3bd936",
-      "name": "workers-best-practices",
-      "kind": "skill",
-      "executionEligibility": "advisory",
-      "executionAuthorized": false
-    },
-    {
-      "repo": "jussray/founder-control-room",
-      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
-      "path": ".agents/skills/wrangler/SKILL.md",
-      "gitBlobSha": "07d4dbbee98b6a55db42a2a01cb2c84df864a8e6",
-      "name": "wrangler",
-      "kind": "skill",
-      "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/founder-control-room",
@@ -712,7 +754,9 @@
       "name": "chatgpt-openai-developers-zapier-bridge",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/founder-control-room",
@@ -722,7 +766,9 @@
       "name": "claude-zapier-founder-operator",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/founder-control-room",
@@ -732,7 +778,9 @@
       "name": "fact-check-every-claim",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/founder-control-room",
@@ -742,7 +790,9 @@
       "name": "goalfix",
       "kind": "skill",
       "executionEligibility": "scoped-branch",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/founder-control-room",
@@ -752,7 +802,9 @@
       "name": "truth-decay-audit",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/founder-control-room",
@@ -762,7 +814,9 @@
       "name": "ultrathink-devil",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/founder-control-room",
@@ -772,7 +826,9 @@
       "name": "unified-growth-inbox",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/founder-control-room",
@@ -782,7 +838,9 @@
       "name": "goalfix",
       "kind": "skill",
       "executionEligibility": "scoped-branch",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/founder-control-room",
@@ -792,7 +850,9 @@
       "name": "juss-chief-ai",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/founder-control-room",
@@ -802,7 +862,9 @@
       "name": "makevideo",
       "kind": "skill",
       "executionEligibility": "media-generation",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/founder-control-room",
@@ -812,7 +874,9 @@
       "name": "outcome-first",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/founder-control-room",
@@ -822,7 +886,9 @@
       "name": "playwright-proof",
       "kind": "skill",
       "executionEligibility": "verification",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/founder-control-room",
@@ -832,7 +898,9 @@
       "name": "proof-led-publishing",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/founder-control-room",
@@ -842,7 +910,9 @@
       "name": "repo-truth",
       "kind": "skill",
       "executionEligibility": "verification",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/founder-control-room",
@@ -852,7 +922,9 @@
       "name": "review-verify-merge",
       "kind": "skill",
       "executionEligibility": "consequential-gated",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/founder-control-room",
@@ -862,7 +934,9 @@
       "name": "sekret-bip-canon",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/founder-control-room",
@@ -872,7 +946,9 @@
       "name": "ultrathink",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/founder-control-room",
@@ -882,7 +958,9 @@
       "name": "buffer-control",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/founder-control-room",
@@ -892,7 +970,9 @@
       "name": "fcr-public-workflows",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/founder-control-room",
@@ -902,7 +982,9 @@
       "name": "devil",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/founder-control-room",
@@ -912,7 +994,9 @@
       "name": "fact-check-every-claim",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/founder-control-room",
@@ -922,7 +1006,9 @@
       "name": "outcome-first",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/founder-control-room",
@@ -932,7 +1018,9 @@
       "name": "portfolio-control-plane",
       "kind": "skill",
       "executionEligibility": "consequential-gated",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/founder-control-room",
@@ -942,7 +1030,9 @@
       "name": "product-design-gate",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/founder-control-room",
@@ -952,7 +1042,9 @@
       "name": "sales",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/founder-control-room",
@@ -962,7 +1054,9 @@
       "name": "typescript-audit",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/founder-control-room",
@@ -972,7 +1066,9 @@
       "name": "typescript-behavior-tests",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/founder-control-room",
@@ -982,7 +1078,9 @@
       "name": "typescript-minimal-patch",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/founder-control-room",
@@ -992,7 +1090,9 @@
       "name": "typescript-root-cause-debugger",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/founder-control-room",
@@ -1002,7 +1102,9 @@
       "name": "typescript-strict-review",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/founder-control-room",
@@ -1012,7 +1114,9 @@
       "name": "ultrathink-devil",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/founder-control-room",
@@ -1022,7 +1126,9 @@
       "name": "local-80-20",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/founder-control-room",
@@ -1032,7 +1138,9 @@
       "name": "local-antiadvice",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/founder-control-room",
@@ -1042,7 +1150,9 @@
       "name": "local-build",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/founder-control-room",
@@ -1052,7 +1162,9 @@
       "name": "local-capability-mode-router",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/founder-control-room",
@@ -1062,7 +1174,9 @@
       "name": "local-cortex",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/founder-control-room",
@@ -1072,7 +1186,9 @@
       "name": "local-devil",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/founder-control-room",
@@ -1082,7 +1198,9 @@
       "name": "local-first-principles",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/founder-control-room",
@@ -1092,7 +1210,9 @@
       "name": "local-futureyou",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/founder-control-room",
@@ -1102,7 +1222,9 @@
       "name": "local-goalfix",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/founder-control-room",
@@ -1112,7 +1234,9 @@
       "name": "local-hormozi",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/founder-control-room",
@@ -1122,7 +1246,9 @@
       "name": "local-humanize",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/founder-control-room",
@@ -1132,7 +1258,9 @@
       "name": "local-intent-repair-reader",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/founder-control-room",
@@ -1142,7 +1270,9 @@
       "name": "local-lean-build-orchestrator",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/founder-control-room",
@@ -1152,7 +1282,9 @@
       "name": "local-minimal-token-protocol",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/founder-control-room",
@@ -1162,7 +1294,9 @@
       "name": "local-moscow",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/founder-control-room",
@@ -1172,7 +1306,9 @@
       "name": "local-prompts",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/founder-control-room",
@@ -1182,7 +1318,9 @@
       "name": "local-regression-stagnation-guard",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/founder-control-room",
@@ -1192,7 +1330,9 @@
       "name": "local-runtime-kernel",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/founder-control-room",
@@ -1202,7 +1342,9 @@
       "name": "local-socrates",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/founder-control-room",
@@ -1212,7 +1354,9 @@
       "name": "local-truth-research-optimizer",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/founder-control-room",
@@ -1222,7 +1366,9 @@
       "name": "local-truthmode",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/founder-control-room",
@@ -1232,7 +1378,9 @@
       "name": "local-urlfix",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/PromptOS",
@@ -1242,7 +1390,9 @@
       "name": "goalfix",
       "kind": "skill",
       "executionEligibility": "scoped-branch",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/PromptOS",
@@ -1252,7 +1402,9 @@
       "name": "artifact-template-creator-response",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/PromptOS",
@@ -1262,7 +1414,9 @@
       "name": "browser-reality-inspector",
       "kind": "skill",
       "executionEligibility": "verification",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/PromptOS",
@@ -1272,7 +1426,9 @@
       "name": "evidence-decision-loop",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/PromptOS",
@@ -1282,7 +1438,9 @@
       "name": "local-80-20",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/PromptOS",
@@ -1292,7 +1450,9 @@
       "name": "local-antiadvice",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/PromptOS",
@@ -1302,7 +1462,9 @@
       "name": "local-build",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/PromptOS",
@@ -1312,7 +1474,9 @@
       "name": "local-capability-mode-router",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/PromptOS",
@@ -1322,7 +1486,9 @@
       "name": "local-cortex",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/PromptOS",
@@ -1332,7 +1498,9 @@
       "name": "local-devil",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/PromptOS",
@@ -1342,7 +1510,9 @@
       "name": "local-first-principles",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/PromptOS",
@@ -1352,7 +1522,9 @@
       "name": "local-futureyou",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/PromptOS",
@@ -1362,7 +1534,9 @@
       "name": "local-goalfix",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/PromptOS",
@@ -1372,7 +1546,9 @@
       "name": "local-hormozi",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/PromptOS",
@@ -1382,7 +1558,9 @@
       "name": "local-humanize",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/PromptOS",
@@ -1392,7 +1570,9 @@
       "name": "local-intent-repair-reader",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/PromptOS",
@@ -1402,7 +1582,9 @@
       "name": "local-lean-build-orchestrator",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/PromptOS",
@@ -1412,7 +1594,9 @@
       "name": "local-minimal-token-protocol",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/PromptOS",
@@ -1422,7 +1606,9 @@
       "name": "local-moscow",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/PromptOS",
@@ -1432,7 +1618,9 @@
       "name": "local-prompts",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/PromptOS",
@@ -1442,7 +1630,9 @@
       "name": "local-regression-stagnation-guard",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/PromptOS",
@@ -1452,7 +1642,9 @@
       "name": "local-runtime-kernel",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/PromptOS",
@@ -1462,7 +1654,9 @@
       "name": "local-socrates",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/PromptOS",
@@ -1472,7 +1666,9 @@
       "name": "local-truth-research-optimizer",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/PromptOS",
@@ -1482,7 +1678,9 @@
       "name": "local-truthmode",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     },
     {
       "repo": "jussray/PromptOS",
@@ -1492,137 +1690,10 @@
       "name": "local-urlfix",
       "kind": "skill",
       "executionEligibility": "advisory",
-      "executionAuthorized": false
-    },
-    {
-      "repo": "jussray/SolContinuity",
-      "sourceHead": "855cc8a79f1ea06006c812ec9efb08864a1d55b9",
-      "path": ".agents/skills/agents-sdk/SKILL.md",
-      "gitBlobSha": "d9f1c8a9eaeb271888fb82ecda5d79ebf264944a",
-      "name": "agents-sdk",
-      "kind": "skill",
-      "executionEligibility": "advisory",
-      "executionAuthorized": false
-    },
-    {
-      "repo": "jussray/SolContinuity",
-      "sourceHead": "855cc8a79f1ea06006c812ec9efb08864a1d55b9",
-      "path": ".agents/skills/cloudflare-email-service/SKILL.md",
-      "gitBlobSha": "fb3565111a2ce94761e5ad6642d20d02e7707946",
-      "name": "cloudflare-email-service",
-      "kind": "skill",
-      "executionEligibility": "advisory",
-      "executionAuthorized": false
-    },
-    {
-      "repo": "jussray/SolContinuity",
-      "sourceHead": "855cc8a79f1ea06006c812ec9efb08864a1d55b9",
-      "path": ".agents/skills/cloudflare-one-migrations/SKILL.md",
-      "gitBlobSha": "53c770fb2cad0339cccffbc85b68b2b9810dbcb4",
-      "name": "cloudflare-one-migrations",
-      "kind": "skill",
-      "executionEligibility": "advisory",
-      "executionAuthorized": false
-    },
-    {
-      "repo": "jussray/SolContinuity",
-      "sourceHead": "855cc8a79f1ea06006c812ec9efb08864a1d55b9",
-      "path": ".agents/skills/cloudflare-one/SKILL.md",
-      "gitBlobSha": "753ab60c176e82f11097caa958cd4646ecd67078",
-      "name": "cloudflare-one",
-      "kind": "skill",
-      "executionEligibility": "advisory",
-      "executionAuthorized": false
-    },
-    {
-      "repo": "jussray/SolContinuity",
-      "sourceHead": "855cc8a79f1ea06006c812ec9efb08864a1d55b9",
-      "path": ".agents/skills/cloudflare/SKILL.md",
-      "gitBlobSha": "2c7da21964ab4168422c5775ec8eeb469c89b1f7",
-      "name": "cloudflare",
-      "kind": "skill",
-      "executionEligibility": "advisory",
-      "executionAuthorized": false
-    },
-    {
-      "repo": "jussray/SolContinuity",
-      "sourceHead": "855cc8a79f1ea06006c812ec9efb08864a1d55b9",
-      "path": ".agents/skills/durable-objects/SKILL.md",
-      "gitBlobSha": "b595f1c2182f3b7d6f944d7ba0ac59667fba78aa",
-      "name": "durable-objects",
-      "kind": "skill",
-      "executionEligibility": "advisory",
-      "executionAuthorized": false
-    },
-    {
-      "repo": "jussray/SolContinuity",
-      "sourceHead": "855cc8a79f1ea06006c812ec9efb08864a1d55b9",
-      "path": ".agents/skills/sandbox-migrate-to-next/SKILL.md",
-      "gitBlobSha": "745bcc5655dec3b690d6df4c31141a2b46a6d4c3",
-      "name": "sandbox-migrate-to-next",
-      "kind": "skill",
-      "executionEligibility": "advisory",
-      "executionAuthorized": false
-    },
-    {
-      "repo": "jussray/SolContinuity",
-      "sourceHead": "855cc8a79f1ea06006c812ec9efb08864a1d55b9",
-      "path": ".agents/skills/sandbox-next/SKILL.md",
-      "gitBlobSha": "6384327710feced81e896501510bd76dd57770ff",
-      "name": "sandbox-next",
-      "kind": "skill",
-      "executionEligibility": "advisory",
-      "executionAuthorized": false
-    },
-    {
-      "repo": "jussray/SolContinuity",
-      "sourceHead": "855cc8a79f1ea06006c812ec9efb08864a1d55b9",
-      "path": ".agents/skills/sandbox-stable/SKILL.md",
-      "gitBlobSha": "8faf22bf1a77afdcfbf419e7de49762b9fff7d7f",
-      "name": "sandbox-stable",
-      "kind": "skill",
-      "executionEligibility": "advisory",
-      "executionAuthorized": false
-    },
-    {
-      "repo": "jussray/SolContinuity",
-      "sourceHead": "855cc8a79f1ea06006c812ec9efb08864a1d55b9",
-      "path": ".agents/skills/turnstile-spin/SKILL.md",
-      "gitBlobSha": "57188f97bbbcf2e4ac498c73b19cfe3022b9d8a7",
-      "name": "turnstile-spin",
-      "kind": "skill",
-      "executionEligibility": "advisory",
-      "executionAuthorized": false
-    },
-    {
-      "repo": "jussray/SolContinuity",
-      "sourceHead": "855cc8a79f1ea06006c812ec9efb08864a1d55b9",
-      "path": ".agents/skills/web-perf/SKILL.md",
-      "gitBlobSha": "0fb166e8e8cb12e42dff4a40905ee4d3d626fcda",
-      "name": "web-perf",
-      "kind": "skill",
-      "executionEligibility": "advisory",
-      "executionAuthorized": false
-    },
-    {
-      "repo": "jussray/SolContinuity",
-      "sourceHead": "855cc8a79f1ea06006c812ec9efb08864a1d55b9",
-      "path": ".agents/skills/workers-best-practices/SKILL.md",
-      "gitBlobSha": "bebd018cdcae1771eacdee30cfb96af3ad3bd936",
-      "name": "workers-best-practices",
-      "kind": "skill",
-      "executionEligibility": "advisory",
-      "executionAuthorized": false
-    },
-    {
-      "repo": "jussray/SolContinuity",
-      "sourceHead": "855cc8a79f1ea06006c812ec9efb08864a1d55b9",
-      "path": ".agents/skills/wrangler/SKILL.md",
-      "gitBlobSha": "07d4dbbee98b6a55db42a2a01cb2c84df864a8e6",
-      "name": "wrangler",
-      "kind": "skill",
-      "executionEligibility": "advisory",
-      "executionAuthorized": false
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
     }
-  ]
+  ],
+  "reviewedForPublication": false
 }
