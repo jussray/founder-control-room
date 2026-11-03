@@ -86,7 +86,8 @@ export async function dispatch(input,{
   url.searchParams.set('stdin','false');
   await get(fetcher,url.toString(),{method:'POST',headers:{...headers,'Content-Type':'application/octet-stream'}},false);
   const proofURL=new URL(API+'/fs/read');
-  proofURL.searchParams.set('path','/home/sprite/.sprite-proof/receipts/'+request.sha+'-'+request.mission+'-'+invocationId+'.json');
+  const proofKey=createHash('sha256').update(request.sha+'-'+request.mission+'-'+invocationId).digest('hex');
+  proofURL.searchParams.set('path','/home/sprite/.sprite-proof/receipts/'+proofKey+'.json');
   proofURL.searchParams.set('workingDir','/home/sprite');
   const proof=await get(fetcher,proofURL.toString(),{headers});
   if(!denyAll(await get(fetcher,API+'/policy/network',{headers})))throw Error('SPRITE_NETWORK_DRIFT');

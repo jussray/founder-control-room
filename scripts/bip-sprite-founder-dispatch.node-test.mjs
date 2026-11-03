@@ -1,4 +1,5 @@
 import test from 'node:test';
+import { createHash } from 'node:crypto';
 import assert from 'node:assert/strict';
 import {MISSIONS,TARGET,validateIntent,denyAll,validateReceipt,dispatch,persistDispatchReceipt} from './bip-sprite-founder-dispatch.mjs';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
@@ -69,6 +70,10 @@ test('live executes one immutable command; reads receipt; checks policy twice',a
  ['node',TARGET.checkoutDir+'/scripts/bip-sprite-proof.mjs','--mission','repo-truth','--sha',sha,'--invocation',invocationId]);
  assert.equal(urls.filter(x=>x.u.includes('/policy/network')).length,2);
  assert.equal(new URL(exec[0].u).searchParams.get('dir'),TARGET.checkoutDir);
+ const read=urls.find(x=>x.u.includes('/fs/read?'));
+ const expectedHash=createHash('sha256').update(sha+'-repo-truth-'+invocationId).digest('hex');
+ assert.equal(new URL(read.u).searchParams.get('path'),
+   '/home/sprite/.sprite-proof/receipts/'+expectedHash+'.json');
 });
 
 test('an earlier same-commit receipt cannot satisfy a new invocation',()=>{

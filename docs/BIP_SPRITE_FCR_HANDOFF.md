@@ -12,7 +12,7 @@ This is **not** a teen or guardian app capability and does not create a public a
 - FCR validates both current main and the exact live head of Bip's existing governance branch.
 - Live execution requires Production environment `SPRITES_TOKEN` plus approval variables `BIP_SPRITE_APPROVED_SHA` and `BIP_SPRITE_APPROVED_MISSION` matching the request.
 - The manual `execute` checkbox must be true. Dry run does not invoke Sprites or need its credential.
-- FCR checks Sprite identity and network policy, generates a unique 128-bit invocation identifier, sends a fixed command, reads the matching invocation-specific private receipt, and rechecks deny-all network. It does not trust an HTTP 200 or a previous same-SHA receipt as proof.
+- FCR checks Sprite identity and network policy, generates a unique 128-bit invocation identifier, sends a fixed command, reads the matching invocation-specific SHA-256-filename private receipt, and rechecks deny-all network. It does not trust an HTTP 200 or a previous same-SHA receipt as proof.
 - The workflow writes a sanitized SHA/mission/result/fingerprint receipt before claiming success and retains it as a short-lived Actions artifact; no raw Sprite output, credential, or family data enters this artifact.
 - Proof explicitly has no merge, deployment, provider-write, or user-data authority.
 
