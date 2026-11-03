@@ -95,4 +95,18 @@ describe('FCR standing command and OS registry', () => {
     ]));
     expect(decision.standingCommandIds).toContain('plan');
   });
+  it('routes godmode/attack 48000 as bounded review intensity without creating action authority', () => {
+    const decision = routeFcrStandingCommands(
+      'godmode/attack 48000 audit Google Drive skills, no merge or deploy',
+      'review',
+    );
+    expect(decision.explicitCommandIds).toContain('attack');
+    expect(decision.standingCommandIds).toContain('devil');
+    expect(decision.attackIntensity).toBe(48000);
+    const attack = FCR_STANDING_COMMAND_REGISTRY.find((entry) => entry.id === 'attack');
+    expect(attack?.aliases).toContain('/godmode');
+    expect(attack?.mayExecute).toBe(false);
+  });
+
+
 });
