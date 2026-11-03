@@ -10,8 +10,8 @@ import {
 export const ownerInsightsRouter = Router();
 const ownerInsightsRateLimit = rateLimit({
   windowMs: 60_000,
-  limit: 5,
-  standardHeaders: 'draft-8',
+  limit: 20,
+  standardHeaders: true,
   legacyHeaders: false,
   message: { contract: OWNER_INTELLIGENCE_CONTRACT, status: 'BLOCKED', code: 'OWNER_INSIGHTS_RATE_LIMITED' },
 });
