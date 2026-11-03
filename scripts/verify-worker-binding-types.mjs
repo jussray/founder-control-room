@@ -33,7 +33,7 @@ export function isCredentialBindingName(name) {
     .filter(Boolean)
     .map(part => part.toUpperCase());
   return parts.some(part => {
-    const stem = part.replace(/(?:V?\\d+)$/, '');
+    const stem = part.replace(/(?:V?\d+)$/, '');
     return CREDENTIAL_WORDS.has(stem) ||
       (stem.endsWith('S') && CREDENTIAL_WORDS.has(stem.slice(0, -1))) ||
       COMPACT_CREDENTIAL_SUFFIX.test(stem);
