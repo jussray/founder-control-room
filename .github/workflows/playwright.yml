@@ -87,7 +87,7 @@ jobs:
           PY
           grep -n "CHROME_PATH\|chromium.launch" e2e/run.mjs
 
-      - name: Verify real FCR GitHub Workspace and guarded terminal journey
+      - name: Verify FCR welcome login and server-revoked logout
         shell: bash
         env:
           NODE_ENV: test
@@ -95,6 +95,15 @@ jobs:
           set -euo pipefail
           mkdir -p logs
           npm run build
+          FCR_E2E_SCENARIO=auth-lifecycle node e2e/run.mjs 2>&1 | tee logs/auth-lifecycle-e2e.log
+
+      - name: Verify real FCR GitHub Workspace and guarded terminal journey
+        shell: bash
+        env:
+          NODE_ENV: test
+        run: |
+          set -euo pipefail
+          mkdir -p logs
           FCR_E2E_SCENARIO=guarded-terminal node e2e/run.mjs 2>&1 | tee logs/github-workspace-e2e.log
 
       - name: Run E2E harness
