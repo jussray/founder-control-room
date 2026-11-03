@@ -128,6 +128,20 @@ describe('FCR founder-only browser planner', () => {
     }
   });
 
+  it('returns HTTP 429 after repeated anonymous previews, without granting preview authority', async () => {
+    const responses: number[] = [];
+    // Include a margin for other tests sharing the in-process limiter.
+    for (let i = 0; i < 65; i += 1) {
+      const response = await request(app()).post('/browser-operator/preview')
+        .send({ request: 'Test the Sync Party game journey' });
+      responses.push(response.status);
+      expect(response.body.status).not.toBe('REQUIRES_FOUNDER_RUN_APPROVAL');
+    }
+    expect(responses).toContain(429);
+    expect(responses.slice(-1)[0]).toBe(429);
+    expect(mockGetUser).not.toHaveBeenCalled();
+  });
+
   it('matches its preview scope to the checked-in reviewed manifest', () => {
     const manifest = JSON.parse(readFileSync('config/browser-journeys/sync-party.json', 'utf8'));
     const result = previewFounderBrowserIntent('Test Sync Party');
