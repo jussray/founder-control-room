@@ -297,6 +297,24 @@ export const PLUGIN_CATALOG = [
     blockedByDefault: ['production_mutation', 'credential_capture'],
   },
   {
+    type: 'google-drive',
+    label: 'Google Drive',
+    description: 'Unified Google Workspace file surface: google-drive discovery, google-docs edits, google-sheets cells, google-slides decks, and google-drive-comments review. A catalog entry is not a live OAuth connection or proof that a skill executes.',
+    defaultAuthorityLevel: 'L1',
+    defaultDataBoundary: 'Explicitly scoped, per-user files and bounded metadata only; never infer access to another user, tenant, account, or private founder workspace.',
+    secretsPolicy: 'Per-user OAuth tokens remain in a scoped server-side vault; ChatGPT connector tokens and Google Cloud CLI credentials are not reusable FCR credentials.',
+    capabilities: [CAPABILITIES.inspectData],
+    blockedByDefault: [
+      'cross_tenant_file_access',
+      'share_without_explicit_approval',
+      'delete_without_explicit_approval',
+      'bulk_drive_scan',
+      'write_without_exact_file_and_revision',
+      'reuse_chatgpt_connector_credentials',
+      'export_private_files_without_explicit_approval',
+    ],
+  },
+  {
     type: 'other',
     label: 'Other provider',
     description: 'Explicitly documented custom provider connection.',
@@ -312,8 +330,13 @@ export function isAuthorityLevel(value: unknown): value is AuthorityLevel {
   return typeof value === 'string' && AUTHORITY_LEVEL_IDS.has(value);
 }
 
-export function pluginDescriptorFor(type: string): PluginDescriptor | null {
-  return PLUGIN_CATALOG.find((plugin) => plugin.type === type) ?? null;
+export function pluginDescriptorFor(type: string, label?: string | null): PluginDescriptor | null {
+  // Existing Google Workspace connections use connection_type='other'. Resolve
+  // only the explicit Google Drive label; Google Cloud stays a distinct provider.
+  const resolvedType = type === 'other' && label?.trim().toLowerCase() === 'google drive'
+    ? 'google-drive'
+    : type;
+  return PLUGIN_CATALOG.find((plugin) => plugin.type === resolvedType) ?? null;
 }
 
 export function pluginRiskFor(authorityLevel: string | null, requiredApproval: string | null): PluginRiskLevel {
