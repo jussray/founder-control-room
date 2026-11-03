@@ -19,6 +19,8 @@ const ALLOWED_TABS = new Set([
   'truth-attacks',
   'truth-world',
   'truth-continuity',
+  'truth-seo',
+  'truth-ai-review',
 ]);
 
 const READINESS_COPY = {
@@ -165,4 +167,3 @@ if (launchDock instanceof HTMLDetailsElement) {
 installCoworkLane();
 installMissionBoard();
 installProjectShellUi();
-void refreshConveyorReadiness();
