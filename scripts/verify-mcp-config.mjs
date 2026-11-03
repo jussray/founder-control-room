@@ -10,6 +10,7 @@ const expectedServerNames = [
   'cloudflare-observability',
   'context7',
   'figma',
+  'grafana',
   'github',
   'playwright',
   'supabase',
@@ -26,6 +27,7 @@ const expectedRemoteUrls = {
   github: 'https://api.githubcopilot.com/mcp/',
   context7: 'https://mcp.context7.com/mcp',
   figma: 'https://mcp.figma.com/mcp',
+  grafana: 'https://mcp.grafana.com/mcp',
   cloudflare: 'https://mcp.cloudflare.com/mcp',
   'cloudflare-docs': 'https://docs.mcp.cloudflare.com/mcp',
   'cloudflare-bindings': 'https://bindings.mcp.cloudflare.com/mcp',
@@ -84,6 +86,8 @@ function validateRemoteServers(relativePath, servers) {
     `${relativePath}:GitHub Insiders is private opt-in only`,
   );
 
+  assert(!servers.grafana?.headers, `${relativePath}:Grafana must use OAuth, not committed headers`);
+  assert(!servers.grafana?.env, `${relativePath}:Grafana must not commit environment credentials`);
   assert(!servers.figma?.headers, `${relativePath}:figma must authenticate through the supported client`);
   assert(!servers.figma?.env, `${relativePath}:figma must not commit environment credentials`);
 }
