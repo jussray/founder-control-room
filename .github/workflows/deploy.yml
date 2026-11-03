@@ -164,6 +164,10 @@ jobs:
           )
           PY
 
+          # Fail closed if a credential (including CF_API_TOKEN) is bound as plaintext.
+          # Inspect name/type only; no credential values enter logs or artifacts.
+          node scripts/verify-worker-binding-types.mjs
+
       - name: Record authority receipt
         shell: bash
         run: |
