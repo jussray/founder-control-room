@@ -39,6 +39,6 @@ jobs:
           test "$(git hash-object src/lib/council-bus-v1/council.mjs)" = "9ceab39dabba98129bd70d78e7e40d1b6477abbe"
           test "$(git hash-object src/lib/council-bus-v1/busHandoff.mjs)" = "65fadb71521da6da08fa79bc60254fd5d059494a"
           test "$(git hash-object src/lib/council-bus-v1/councilBusRuntime.mjs)" = "ba354c4f926739798ba985fc8b7b1fada6968bab"
-      - run: npx tsc --noEmit --strict --target ES2022 --module NodeNext --moduleResolution NodeNext src/lib/councilBusFcrIntegration.ts src/lib/councilBusCanonical.ts src/lib/councilBusSignedAck.ts
+      - run: npx tsc --noEmit --strict --target ES2022 --module NodeNext --moduleResolution NodeNext src/lib/councilBusFcrIntegration.ts src/lib/councilBusCanonical.ts src/lib/councilBusSignedAck.ts src/lib/__tests__/councilBusSignedAck.test.ts
       - run: npx vitest run src/lib/__tests__/councilBusFcrIntegration.test.ts src/lib/__tests__/councilBusPinnedRuntime.test.ts src/lib/__tests__/councilBusSignedAck.test.ts
       - run: node scripts/verify-test-discovery.mjs

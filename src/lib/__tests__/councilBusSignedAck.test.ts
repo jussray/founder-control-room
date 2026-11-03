@@ -12,8 +12,10 @@ async function fixture(){
     receiptId:'receipt-one',agent:origin.agent,route:origin.route,threadId:origin.threadId,
     keyId:'key-origin-one',issuedAt:'2026-11-02T19:59:00.000Z',
     expiresAt:'2026-11-02T20:02:00.000Z'};
+  const exportedKey=await crypto.subtle.exportKey('jwk',pair.publicKey);
+  if(!('kty' in exportedKey)||exportedKey.kty!=='OKP')throw new Error('Expected Ed25519 JWK');
   const keyEntry:CouncilBusAckKey={
-    keyId:signed.keyId,publicKeyJwk:await crypto.subtle.exportKey('jwk',pair.publicKey),
+    keyId:signed.keyId,publicKeyJwk:exportedKey as JsonWebKey,
     state:'active',subject:principal.subject,tenant:principal.tenant,
     agent:origin.agent,route:origin.route,validFrom:'2026-11-01T00:00:00.000Z'
   };
