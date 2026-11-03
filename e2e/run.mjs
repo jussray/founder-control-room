@@ -383,15 +383,31 @@ async function main() {
     else jsExceptions.push(msg.text());
   });
 
-  console.log('\n[1] Sign-in screen renders for real, unauthenticated');
+  // Express hosts the real local auth API; Cloudflare Pages normally serves
+  // these two source-controlled static assets. Adapt only asset delivery here.
+  await page.route(`${BASE_URL}/welcome`, (route) => route.fulfill({
+    status: 200,
+    contentType: 'text/html',
+    body: readFileSync(join(REPO_ROOT, 'public/welcome.html'), 'utf8'),
+  }));
+  await page.route(`${BASE_URL}/assets/welcome-door.js`, (route) => route.fulfill({
+    status: 200,
+    contentType: 'text/javascript',
+    body: readFileSync(join(REPO_ROOT, 'public/assets/welcome-door.js'), 'utf8'),
+  }));
+
+  console.log('\n[1] Signed-out Control Room remains founder gated');
   await page.goto(`${BASE_URL}/control-room/`);
   await page.waitForSelector('#magic-link-form');
   assert(await page.locator('.sign-in-card h2').innerText() === 'Founder Control Room', 'sign-in card is shown');
 
-  console.log('\n[2] Request a magic link through the real UI and real API');
-  await page.fill('input[name="email"]', FOUNDER_EMAIL);
-  await page.click('#magic-link-form button[type=submit]');
-  await page.waitForSelector('.notice');
+  console.log('\n[2] Existing welcome screen requests a magic link through the real auth API');
+  await page.goto(`${BASE_URL}/welcome`);
+  await page.waitForSelector('#magic');
+  assert(await page.locator('#door').getAttribute('data-state') === 'signed_out', 'welcome renders anonymous sign-in state');
+  await page.fill('#email', FOUNDER_EMAIL);
+  await page.click('#primary');
+  await page.waitForFunction(() => document.getElementById('primary')?.textContent === 'Check your email');
 
   let bridge;
   for (let i = 0; i < 30 && !bridge; i += 1) {
@@ -644,7 +660,18 @@ async function main() {
   const connectionText = await waitForText(page, '[data-connection-id]:has-text("figma")', 'last checked');
   assert(connectionText.toLowerCase().includes('last checked'), 'connector health check recorded a real last_checked_at');
 
-  console.log('\n[10] No uncaught JS exceptions during the whole run');
+  console.log('\n[10] Server-revoked logout returns to welcome and denies the private shell');
+  await page.click('#sign-out');
+  await page.waitForURL(`${BASE_URL}/welcome`);
+  await page.waitForSelector('#magic');
+  assert(await page.locator('#door').getAttribute('data-state') === 'signed_out', 'welcome is signed out after logout');
+  const identityAfterLogout = await page.request.get(`${BASE_URL}/auth/me`);
+  assert(identityAfterLogout.status() === 401, 'revoked cookie no longer authorizes founder identity');
+  await page.goto(`${BASE_URL}/control-room/`);
+  await page.waitForSelector('#magic-link-form');
+  assert(await page.locator('.shell').count() === 0, 'protected founder shell remains hidden after logout');
+
+  console.log('\n[11] No uncaught JS exceptions during the whole run');
   assert(jsExceptions.length === 0, `no uncaught JS exceptions (saw: ${JSON.stringify(jsExceptions)})`);
   if (networkDiagnostics.length) console.log(`  (${networkDiagnostics.length} expected network diagnostic message(s), not counted as failures: ${JSON.stringify(networkDiagnostics)})`);
 
