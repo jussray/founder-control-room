@@ -85,6 +85,22 @@ describe('FCR pinned canonical Council Bus bridge',()=>{
     const second=fixture();delete (second.runtime as Partial<FcrCouncilBusRuntime>).authorizeOrigin;
     await expect(returnCouncilToOrigin(second.input,second.runtime)).rejects.toThrow(/Missing Council Bus runtime port/);
   });
+  it('rejects missing and non-string return origins before authorization or delivery',async()=>{
+    for(const invalidOrigin of [
+      {},
+      {agent:true,route:'founder-relay',threadId:'thread-one',correlationId:'case-one'},
+      {agent:42,route:'founder-relay',threadId:'thread-one',correlationId:'case-one'},
+    ]){
+      const f=fixture();
+      (f.input.bundle.handoff as unknown as {origin:unknown}).origin=invalidOrigin;
+      let authorized=false;
+      f.runtime.authorizeOrigin=async()=>{authorized=true;return true;};
+      await expect(returnCouncilToOrigin(f.input,f.runtime))
+        .rejects.toThrow(/Invalid Bus (origin fields|agent)|Invalid return-to-origin identity/);
+      expect(authorized).toBe(false);
+      expect(f.calls).toHaveLength(0);
+    }
+  });
   it('cannot mutate a hash-bound handoff delivery status',async()=>{
     const f=fixture();
     (f.input.bundle.handoff as {deliveryStatus:string}).deliveryStatus='DELIVERED';

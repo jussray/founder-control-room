@@ -87,7 +87,10 @@ export async function returnCouncilToOrigin(
   if(court.verdict!=='READY_FOR_EXTERNAL_VERIFICATION')
     return {status:'COURT_HOLD',productionVerified:false};
   requireCondition(Boolean(handoff.origin) && ['agent','route','threadId','correlationId']
-    .every(key=>TOKEN.test(handoff.origin[key as keyof typeof handoff.origin])),
+    .every(key=>{
+      const value=handoff.origin[key as keyof typeof handoff.origin];
+      return validText(value) && TOKEN.test(value);
+    }),
     'Invalid return-to-origin identity');
   requireCondition(await runtime.authorizeOrigin({
     founder:input.founder,missionId:input.missionId,origin:handoff.origin
