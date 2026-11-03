@@ -12,6 +12,7 @@ const RETRYABLE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 const NON_RETRYABLE_GET_PATHS = new Set(['/auth/callback']);
 const API_OWNED_ASSET_PATHS = new Set([
   '/assets/auth-callback.js',
+  '/auth/member/callback.js',
   '/assets/control-room.css',
   '/assets/oauth-consent.js',
   '/assets/oauth-consent.css',
@@ -23,6 +24,7 @@ const STATIC_EXACT_PATHS = new Set([
 const STATIC_FILE_PATTERN = /\.(?:avif|css|gif|html|ico|jpe?g|js|json|map|png|svg|txt|webmanifest|webp|woff2?|xml)$/i;
 const STATIC_DIRECTORY_PREFIXES = [
   '/control-room',
+  '/member',
   '/portable-founder-console',
   '/juss-rayy',
 ];

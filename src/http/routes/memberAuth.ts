@@ -15,6 +15,9 @@ const sessionThrottle = rateLimit({
   windowMs: 15 * 60_000, limit: 10, standardHeaders: true, legacyHeaders: false,
 });
 const GENERIC = 'If this address can receive mail, a secure sign-in link may arrive.';
+// The authenticated browser session must be set on the Pages origin, not the API subdomain.
+const MEMBER_CALLBACK_ORIGIN = process.env.NODE_ENV === 'production'
+  ? 'https://foundercontrolroom.org' : FOUNDER_API_URL;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function emailFrom(value: unknown): string {
@@ -61,7 +64,7 @@ memberAuthRouter.post('/magic-link', rateLimitMagicLink, async (req, res) => {
     if (!(await isFounder(email))) {
       const { error } = await supabaseAuth.auth.signInWithOtp({
         email, options: {
-          emailRedirectTo: FOUNDER_API_URL + '/auth/member/callback',
+          emailRedirectTo: MEMBER_CALLBACK_ORIGIN + '/auth/member/callback',
           shouldCreateUser: true,
         },
       });

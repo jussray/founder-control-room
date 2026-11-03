@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Founder Control Room — Sign in</title>
-<meta name="description" content="Founder Control Room sign-in. Access is by invitation.">
+<title>Welcome | Founder Control Room</title>
+<meta name="description" content="Welcome to Founder Control Room. Sign into your own workspace.">
 <meta name="robots" content="noindex">
 <style>
   /* Brand tokens copied from the live FCR homepage (public/index.html, origin/main e075e24). Dark only, like the live site. */
@@ -41,7 +41,7 @@
   @keyframes drift{from{transform:translate3d(-2%,-1%,0)}to{transform:translate3d(2%,1%,0)}}
   @keyframes enter{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 
-  .card{position:relative;z-index:1;width:min(100%,440px);padding:1.5rem 1.35rem;
+  .card{position:relative;z-index:1;width:min(100%,520px);padding:1.5rem 1.35rem;
     border:1px solid rgba(255,255,255,.07);border-radius:var(--radius-lg);
     background:linear-gradient(150deg,rgba(17,21,45,.76),rgba(7,10,22,.82));
     box-shadow:inset 0 1px 0 rgba(255,255,255,.035),0 24px 60px rgba(0,0,0,.35)}
@@ -72,6 +72,12 @@
   .btn:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
   .btn.ghost{color:#eceaf8;background:rgba(255,255,255,.045);border-color:rgba(255,255,255,.1);box-shadow:none}
 
+  .access-tier{padding:1rem 0;border-top:1px solid var(--line)}
+  .access-tier:first-of-type{border-top:0;padding-top:0}
+  .access-tier h2{margin:0 0 .4rem;font-size:1.16rem;letter-spacing:-.02em}
+  .access-tier p{color:var(--muted);font-size:.86rem;line-height:1.5}
+  .option-separator{margin:1rem 0;color:var(--muted-2);font-size:.75rem;text-transform:uppercase;letter-spacing:.11em}
+  .google-link{display:flex;margin-top:.8rem;text-decoration:none}
   .note{margin:1.1rem 0 0;padding:.8rem .9rem;border:1px dashed var(--line-strong);border-radius:var(--radius-md);font-size:.86rem;color:var(--muted)}
   .err{margin:0;color:var(--error);font-size:.86rem}
   .status{display:flex;gap:.5rem;align-items:center;margin-top:1.1rem;font-size:.8rem;color:var(--muted)}
@@ -82,23 +88,35 @@
   .card a:focus-visible{outline:2px solid var(--cyan);outline-offset:3px;border-radius:.5rem}
 </style>
 </head>
-<body data-session-url="/auth/me" data-magic-url="/auth/magic-link" data-enter-url="/control-room/" data-enabled="true">
+<body data-session-url="/auth/me" data-magic-url="/auth/magic-link" data-enter-url="/control-room/" data-member-url="/auth/member/me" data-member-magic-url="/auth/member/magic-link" data-enabled="true">
 <div class="ambient" aria-hidden="true"></div>
 
 <main class="card" id="door" data-state="checking" aria-live="polite">
   <a class="brand" href="/" aria-label="Founder Control Room home"><span class="mark" aria-hidden="true">F</span><span>Founder Control Room</span></a>
-  <p class="eyebrow">Invitation only</p>
+  <p class="eyebrow">Your ideas. Your control room.</p>
 
   <section data-for="signed_out">
-    <h1><span class="gradient">Founder sign-in</span></h1>
-    <p class="lede">Enter your founder email. If it's on the allowlist, a one-time sign-in link is sent. No password.</p>
+    <h1><span class="gradient">Welcome to FCR.</span></h1>
+    <p class="lede">A place to turn goals into verified work. Choose how you'd like to sign in.</p>
+    <section class="access-tier"><h2>Founder access</h2><p>Private founder projects, agents and release controls require a verified founder account.</p>
     <form id="magic" novalidate>
       <label for="email">Email</label>
       <input id="email" name="email" type="email" inputmode="email" autocomplete="email" required placeholder="founder@example.com">
       <button class="btn" id="primary" type="submit">Send sign-in link</button>
       <p class="err" id="formerr" hidden></p>
     </form>
-    <p class="note">Access is by invitation. There is no public sign-up on this page.</p>
+    <a class="btn ghost google-link" href="/auth/google">Continue with Google as founder</a></section>
+    <section class="access-tier" aria-labelledby="member-title">
+      <h2 id="member-title">Your personal workspace</h2>
+      <p>Not the founder? Sign in with your own email. Your workspace starts empty and is separate from the founder's private projects.</p>
+      <form id="member-magic" novalidate>
+        <label for="member-email">Your email</label>
+        <input id="member-email" name="email" type="email" inputmode="email" autocomplete="email" required placeholder="you@example.com">
+        <button class="btn" id="member-primary" type="submit">Continue to my workspace</button>
+        <p class="err" id="member-formerr" hidden></p>
+      </form>
+    </section>
+    <p class="note">Only your verified account can open its workspace. Private founder data is not shared.</p>
   </section>
 
   <section data-for="degraded" hidden>
