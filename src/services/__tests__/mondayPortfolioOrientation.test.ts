@@ -70,7 +70,7 @@ describe('Monday portfolio orientation', () => {
     expect(orientation.orderOfOperations[2]).toContain('story-engine');
   });
 
-  it('selects the newest receipt itself instead of trusting caller order', () => {
+  it('selects the newest observation even when an older packet is received later', () => {
     const orientation = buildMondayPortfolioOrientation({
       now: new Date('2026-10-05T12:00:00Z'),
       weekKey: '2026-10-05',
@@ -79,7 +79,7 @@ describe('Monday portfolio orientation', () => {
         {
           project_id: 'fcr', repository_identifier: 'jussray/founder-control-room', branch: 'main',
           commit_sha: '1111111111111111111111111111111111111111', overall_status: 'failed',
-          signature_verified: false, scanned_at: '2026-10-04T10:00:00Z', received_at: '2026-10-04T10:01:00Z',
+          signature_verified: false, scanned_at: '2026-10-04T10:00:00Z', received_at: '2026-10-05T11:59:00Z',
         },
         {
           project_id: 'fcr', repository_identifier: 'jussray/founder-control-room', branch: 'main',
@@ -123,4 +123,52 @@ describe('Monday portfolio orientation', () => {
     expect(text).toContain('Gmail: UNAVAILABLE_SCOPE_NOT_PROVEN');
     expect(text).toContain('Chief: PROPOSAL_ONLY_NO_WEEKLY_RANKING_RPC');
   });
+  it('does not renew stale evidence merely because the packet was received recently', () => {
+    const orientation = buildMondayPortfolioOrientation({
+      now: new Date('2026-10-05T12:00:00Z'),
+      weekKey: '2026-10-05',
+      projects: [{ id: 'fcr', slug: 'founder-control-room', repo_identifier: 'jussray/founder-control-room' }],
+      verificationRuns: [{
+        project_id: 'fcr', repository_identifier: 'jussray/founder-control-room', branch: 'main',
+        commit_sha: '3333333333333333333333333333333333333333', overall_status: 'passed',
+        signature_verified: true, scanned_at: '2026-09-01T12:00:00Z', received_at: '2026-10-05T11:59:00Z',
+      }],
+      findings: [],
+    });
+
+    expect(orientation.verified).toEqual([]);
+    expect(orientation.stale).toHaveLength(1);
+    expect(orientation.stale[0]?.evidenceAt).toBe('2026-09-01T12:00:00Z');
+  });
+
+  it('rejects invalid and future observation timestamps instead of upgrading them to verified', () => {
+    const orientation = buildMondayPortfolioOrientation({
+      now: new Date('2026-10-05T12:00:00Z'),
+      weekKey: '2026-10-05',
+      projects: [
+        { id: 'invalid', slug: 'invalid-observation', repo_identifier: 'jussray/invalid' },
+        { id: 'future', slug: 'future-observation', repo_identifier: 'jussray/future' },
+      ],
+      verificationRuns: [
+        {
+          project_id: 'invalid', repository_identifier: 'jussray/invalid', branch: 'main',
+          commit_sha: '4444444444444444444444444444444444444444', overall_status: 'passed',
+          signature_verified: true, scanned_at: 'not-a-date', received_at: '2026-10-05T11:58:00Z',
+        },
+        {
+          project_id: 'future', repository_identifier: 'jussray/future', branch: 'main',
+          commit_sha: '5555555555555555555555555555555555555555', overall_status: 'passed',
+          signature_verified: true, scanned_at: '2026-10-06T12:00:00Z', received_at: '2026-10-05T11:59:00Z',
+        },
+      ],
+      findings: [],
+    });
+
+    expect(orientation.verified).toEqual([]);
+    expect(orientation.unknown.map((item) => item.project).sort()).toEqual([
+      'future-observation',
+      'invalid-observation',
+    ]);
+  });
+
 });

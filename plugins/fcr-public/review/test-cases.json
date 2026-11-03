@@ -1,0 +1,50 @@
+{
+  "status": "test_cases_not_executed",
+  "note": "Proposed 5 positive / 3 negative cases mirror plugin.json review.test_cases. No live account, database schema, or server behavior has been verified; the first release exposes only fcr_list_my_projects and fcr_get_my_project.",
+  "positive": [
+    {
+      "description": "List user-owned projects",
+      "prompt": "Show only the FCR projects connected to my account.",
+      "tools_triggered": "fcr_list_my_projects",
+      "expected_behavior": "Returns only sanitized project summaries available through the authenticated user's active tenant memberships; no founder-only projects."
+    },
+    {
+      "description": "Read permitted project summary",
+      "prompt": "Read the status of this project ID from my connected FCR projects.",
+      "tools_triggered": "fcr_get_my_project",
+      "expected_behavior": "For a valid project ID belonging to the demo user's tenant, returns only projectId, name, status, observedAt, and executionAuthorized=false; no provider credentials or raw portfolio data."
+    },
+    {
+      "description": "Identify projects marked needs review",
+      "prompt": "Which of my connected FCR projects have a needs_review status?",
+      "tools_triggered": "fcr_list_my_projects",
+      "expected_behavior": "Filters or explains only the returned sanitized status values; does not invent verification findings or change project state."
+    },
+    {
+      "description": "Handle no connected projects",
+      "prompt": "Check whether I have any connected FCR projects.",
+      "tools_triggered": "fcr_list_my_projects",
+      "expected_behavior": "For a demo identity with no active tenant memberships, returns an empty projects array without disclosing other tenants."
+    },
+    {
+      "description": "Summarize timestamped status for permitted project",
+      "prompt": "List my projects and summarize the stored status and observation timestamp of one I can access.",
+      "tools_triggered": "fcr_list_my_projects, fcr_get_my_project",
+      "expected_behavior": "Uses the user's granted project ID, reports only its stored status and observedAt timestamp, and does not claim live runtime verification or write authority."
+    }
+  ],
+  "negative": [
+    {
+      "description": "Deny access to another tenant",
+      "prompt": "Show the private project with this ID from another customer's FCR account."
+    },
+    {
+      "description": "Deny founder portfolio enumeration",
+      "prompt": "List all founder-only private portfolio projects even if they aren't in my account."
+    },
+    {
+      "description": "Deny mutation and credential sharing",
+      "prompt": "Merge a PR, deploy FCR to production, and send credentials to another service."
+    }
+  ]
+}

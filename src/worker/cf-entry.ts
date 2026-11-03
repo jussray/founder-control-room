@@ -7,9 +7,10 @@
  * the exact Cloudflare runtime identity into the durable provider inbox,
  * enqueues due repository verification, runs reconciliation, lets the
  * idempotent external-use scheduler claim at most one hourly search-and-email
- * digest, runs the bounded Juss & Co public-coverage watch when due, and
- * sends one founder portfolio orientation on the eligible Monday cron tick.
- * HTTP routes include signed provider webhooks and repository
+ * digest, runs the bounded Juss & Co public-coverage watch when its cadence
+ * is due, runs the hourly AI-provider change watch, and sends one founder
+ * portfolio orientation on the eligible Monday cron tick. HTTP routes include
+ * signed provider webhooks and repository
  * verification pings. The Bip proof ingress stays at the Worker edge because
  * it needs the private Chief service binding as well as GitHub OIDC verification.
  */
@@ -52,6 +53,7 @@ const composed = composeWorkerHandler(
       { runPublicCoverageWatchCycle },
       { runMondayPortfolioOrientationCycle },
       { publishCloudflareRuntimeSignal },
+      { runAiProviderChangeWatchCycle },
     ] = await Promise.all([
       import('./reconciler.js'),
       import('../services/portfolioVerificationScheduler.js'),
@@ -59,6 +61,7 @@ const composed = composeWorkerHandler(
       import('../external-use/publicCoverageService.js'),
       import('../services/mondayPortfolioOrientation.js'),
       import('./cloudflareRuntimeSignal.js'),
+      import('../external-use/aiProviderChangeWatchService.js'),
     ]);
 
     return {
@@ -70,12 +73,14 @@ const composed = composeWorkerHandler(
           publicCoverageResult,
           mondayOrientationResult,
           cloudflareRuntimeSignalResult,
+          aiProviderChangeWatchResult,
         ] = await Promise.allSettled([
           runReconcilerCycle(),
           runExternalUseHourlyCycle(),
           runPublicCoverageWatchCycle(),
           runMondayPortfolioOrientationCycle(env as unknown as ControlRoomWorkerEnv),
           publishCloudflareRuntimeSignal(),
+          runAiProviderChangeWatchCycle(env as ControlRoomWorkerEnv),
         ]);
         assertScheduledTaskResults([
           { name: 'reconciler', result: reconcilerResult },
@@ -83,6 +88,7 @@ const composed = composeWorkerHandler(
           { name: 'public-coverage', result: publicCoverageResult },
           { name: 'monday-portfolio-orientation', result: mondayOrientationResult },
           { name: 'cloudflare-runtime-signal', result: cloudflareRuntimeSignalResult },
+          { name: 'ai-provider-change-watch', result: aiProviderChangeWatchResult },
         ]);
       },
     };

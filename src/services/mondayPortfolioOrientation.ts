@@ -125,6 +125,11 @@ function priorityWeight(item: OrientationItem, findingSeverity?: FindingRow['sev
   return 0;
 }
 
+function observationAtMillis(run: VerificationRunRow): number {
+  const parsed = Date.parse(run.scanned_at);
+  return Number.isFinite(parsed) ? parsed : Number.NEGATIVE_INFINITY;
+}
+
 function receivedAtMillis(run: VerificationRunRow): number {
   const parsed = Date.parse(run.received_at);
   return Number.isFinite(parsed) ? parsed : Number.NEGATIVE_INFINITY;
@@ -134,7 +139,13 @@ function latestVerificationByProject(rows: VerificationRunRow[]): Map<string, Ve
   const result = new Map<string, VerificationRunRow>();
   for (const row of rows) {
     const existing = result.get(row.project_id);
-    if (!existing || receivedAtMillis(row) > receivedAtMillis(existing)) {
+    const observedAt = observationAtMillis(row);
+    const existingObservedAt = existing ? observationAtMillis(existing) : Number.NEGATIVE_INFINITY;
+    if (
+      !existing
+      || observedAt > existingObservedAt
+      || (observedAt === existingObservedAt && receivedAtMillis(row) > receivedAtMillis(existing))
+    ) {
       result.set(row.project_id, row);
     }
   }
@@ -165,11 +176,15 @@ function highestSeverityFindingByProject(rows: FindingRow[]): Map<string, Findin
   return result;
 }
 
-function hasFreshVerification(run: VerificationRunRow, now: Date): boolean {
-  const observedAt = receivedAtMillis(run);
-  if (!Number.isFinite(observedAt)) return false;
+function verificationFreshness(
+  run: VerificationRunRow,
+  now: Date,
+): 'fresh' | 'stale' | 'future' | 'invalid' {
+  const observedAt = observationAtMillis(run);
+  if (!Number.isFinite(observedAt)) return 'invalid';
   const age = now.getTime() - observedAt;
-  return age >= 0 && age <= EVIDENCE_FRESHNESS_MS;
+  if (age < 0) return 'future';
+  return age <= EVIDENCE_FRESHNESS_MS ? 'fresh' : 'stale';
 }
 
 export function buildMondayPortfolioOrientation(input: {
@@ -186,6 +201,7 @@ export function buildMondayPortfolioOrientation(input: {
   for (const project of input.projects) {
     const run = latestRun.get(project.id);
     const finding = topFinding.get(project.id);
+    const freshness = run ? verificationFreshness(run, input.now) : null;
     let item: OrientationItem;
 
     if (finding && (finding.severity === 'critical' || finding.severity === 'high')) {
@@ -204,12 +220,22 @@ export function buildMondayPortfolioOrientation(input: {
         evidenceAt: null,
         nextAction: 'Refresh repository verification before making a release or merge claim.',
       };
-    } else if (!hasFreshVerification(run, input.now)) {
+    } else if (freshness === 'invalid' || freshness === 'future') {
+      item = {
+        project: project.slug,
+        state: 'UNKNOWN',
+        reason: freshness === 'future'
+          ? `Latest repository verification claims a future observation time at ${run.commit_sha.slice(0, 12)}.`
+          : `Latest repository verification has an invalid observation time at ${run.commit_sha.slice(0, 12)}.`,
+        evidenceAt: freshness === 'future' ? run.scanned_at : null,
+        nextAction: 'Refresh exact-head repository verification with a valid observation timestamp.',
+      };
+    } else if (freshness === 'stale') {
       item = {
         project: project.slug,
         state: 'STALE',
-        reason: `Latest repository verification is older than 7 days at ${run.commit_sha.slice(0, 12)}.`,
-        evidenceAt: run.received_at,
+        reason: `Latest repository verification observation is older than 7 days at ${run.commit_sha.slice(0, 12)}.`,
+        evidenceAt: run.scanned_at,
         nextAction: 'Refresh exact-head repository verification before treating prior evidence as current.',
       };
     } else if (run.overall_status === 'failed') {
@@ -217,7 +243,7 @@ export function buildMondayPortfolioOrientation(input: {
         project: project.slug,
         state: 'BLOCKED',
         reason: `Latest repository verification failed at ${run.commit_sha.slice(0, 12)}.`,
-        evidenceAt: run.received_at,
+        evidenceAt: run.scanned_at,
         nextAction: 'Open the exact failed verification receipt and repair the first load-bearing failure.',
       };
     } else if (run.overall_status === 'warning' || finding) {
@@ -235,7 +261,7 @@ export function buildMondayPortfolioOrientation(input: {
         project: project.slug,
         state: 'VERIFIED',
         reason: `Latest repository verification passed at ${run.commit_sha.slice(0, 12)}${run.signature_verified ? ' with verified signature' : ''}.`,
-        evidenceAt: run.received_at,
+        evidenceAt: run.scanned_at,
         nextAction: 'No founder intervention required unless a newer decision or deadline changes the state.',
       };
     }
@@ -334,7 +360,7 @@ async function loadEvidence(client: SupabaseClient): Promise<{
     client
       .from('repository_verification_runs')
       .select('project_id,repository_identifier,branch,commit_sha,overall_status,signature_verified,scanned_at,received_at')
-      .order('received_at', { ascending: false })
+      .order('scanned_at', { ascending: false })
       .limit(500),
     client
       .from('repository_findings')
