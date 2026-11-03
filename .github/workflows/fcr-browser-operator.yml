@@ -7,6 +7,7 @@ on:
     paths:
       - 'scripts/fcr-browser-journey.mjs'
       - 'scripts/fcr-browser-plan.mjs'
+      - 'scripts/fcr-grafana-read.mjs'
       - 'src/lib/browserOperatorPlan.ts'
       - 'src/http/routes/browserOperator.ts'
       - 'src/http/server.ts'
@@ -18,6 +19,7 @@ on:
       - 'config/browser-journeys/**'
       - 'test/fcr-browser-journey.test.mjs'
       - 'test/fcr-browser-plan.test.mjs'
+      - 'test/fcr-grafana-read.test.mjs'
       - 'docs/FCR_BROWSER_OPERATOR.md'
       - '.github/workflows/fcr-browser-operator.yml'
   workflow_dispatch:
@@ -56,7 +58,8 @@ jobs:
         run: |
           node --check scripts/fcr-browser-journey.mjs
           node --check scripts/fcr-browser-plan.mjs
-          node --test test/fcr-browser-journey.test.mjs test/fcr-browser-plan.test.mjs
+          node --check scripts/fcr-grafana-read.mjs
+          node --test test/fcr-browser-journey.test.mjs test/fcr-browser-plan.test.mjs test/fcr-grafana-read.test.mjs
           node scripts/fcr-browser-journey.mjs config/browser-journeys/sync-party.json --dry-run
           node scripts/fcr-browser-plan.mjs --request 'Test the complete Sync Party new user journey on https://games.jussco.company'
       - name: Install dependencies and sandboxed Chromium
