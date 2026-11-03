@@ -281,24 +281,56 @@ async function runGuardedTerminalProof(page) {
   // The terminal runs a real `git` process in this checkout. The fake GitHub
   // server is used only to establish the exact-head proof prerequisite through
   // the same real approval routes; it does not stand in for terminal execution.
-  // Negative authority proof: a mission ID alone cannot create a Git branch.
-  const denied = await page.evaluate(async (missionId) => {
-    const response = await fetch(`/approvals/${missionId}/execute`, {
-      method: 'POST',
-      credentials: 'same-origin',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        actionType: 'create_branch',
-        idempotencyKey: `e2e-rejected-branch-${missionId}`,
-        payload: { branchName: 'should-not-exist', baseRef: 'main' },
-      }),
-    });
-    return { status: response.status, body: await response.json() };
+  // Negative authority proof: both the browser transport and the server must
+  // refuse a missing Chief V10 plan. Keep these as two separate boundaries.
+  const planlessRequest = (missionId) => ({
+    actionType: 'create_branch',
+    idempotencyKey: `e2e-rejected-branch-${missionId}`,
+    payload: { branchName: 'should-not-exist', baseRef: 'main' },
+  });
+  const clientBlocked = await page.evaluate(async (missionId) => {
+    try {
+      await fetch(`/approvals/${missionId}/execute`, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          actionType: 'create_branch',
+          idempotencyKey: `e2e-rejected-branch-${missionId}`,
+          payload: { branchName: 'should-not-exist', baseRef: 'main' },
+        }),
+      });
+      return false;
+    } catch (error) {
+      return /Attach the Chief AI V10 capability plan/.test(String(error));
+    }
   }, TERMINAL_PROOF_MISSION_ID);
-  assert(denied.status === 400 && denied.body.code === 'V10_CAPABILITY_PLAN_REQUIRED',
-    'FCR privileged branch creation remains blocked without the approved V10 plan');
+  assert(clientBlocked, 'browser V10 transport rejects a planless privileged request');
+
+  // XMLHttpRequest is intentionally used only in this negative security test
+  // to reach the real same-origin server without the app's fetch wrapper.
+  // It carries the existing browser session and must receive a server 400.
+  const denied = await page.evaluate(async (missionId) => new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', `/approvals/${missionId}/execute`);
+    xhr.withCredentials = true;
+    xhr.setRequestHeader('Content-Type', 'application/json');
+    xhr.onload = () => {
+      let body = null;
+      try { body = JSON.parse(xhr.responseText); } catch { /* non-JSON remains a failure */ }
+      resolve({ status: xhr.status, body });
+    };
+    xhr.onerror = () => reject(new Error('Real server authority request could not complete'));
+    xhr.send(JSON.stringify({
+      actionType: 'create_branch',
+      idempotencyKey: `e2e-rejected-branch-${missionId}`,
+      payload: { branchName: 'should-not-exist', baseRef: 'main' },
+    }));
+  }), TERMINAL_PROOF_MISSION_ID);
+  assert(denied.status === 400 && denied.body?.code === 'V10_CAPABILITY_PLAN_REQUIRED',
+    'real server rejects the planless branch creation with the V10 authority error');
   assert(!terminalFixtureRepo.branches.has('should-not-exist'),
-    'denied privileged request did not mutate GitHub');
+    'both rejected requests left the fake GitHub branch store unchanged');
 
   // This pre-seeded mission exists only in the isolated fake Supabase.
   // Exercise real FCR UI/routes/read-only git and patch ledger, but do NOT
