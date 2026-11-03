@@ -436,6 +436,30 @@ async function main() {
   await page.waitForSelector('.topbar', { timeout: 5000 });
   assert(await page.locator('.founder-email').innerText() === FOUNDER_EMAIL, 'landed on the app shell signed in as the founder');
 
+  console.log('\n[login] Verify the authenticated cookie, identity API and welcome-to-Control-Room handoff');
+  const authenticatedIdentity = await page.request.get(`${BASE_URL}/auth/me`, {
+    headers: { Accept: 'application/json' },
+  });
+  assert(authenticatedIdentity.status() === 200, 'verified login creates an authorized /auth/me session');
+  const identityEnvelope = await authenticatedIdentity.json();
+  assert(
+    identityEnvelope?.success === true && identityEnvelope?.data?.founder?.email === FOUNDER_EMAIL,
+    'authenticated identity is the expected allowlisted founder',
+  );
+  const founderCookie = (await page.context().cookies(BASE_URL))
+    .find((cookie) => cookie.name === '__Host-fcr_session');
+  assert(
+    Boolean(founderCookie?.httpOnly && founderCookie?.secure),
+    'login issues an opaque Secure HttpOnly founder-session cookie',
+  );
+  await page.goto(`${BASE_URL}/welcome`);
+  await page.waitForURL(`${BASE_URL}/control-room/`);
+  await page.waitForSelector('.shell');
+  assert(
+    await page.locator('.founder-email').innerText() === FOUNDER_EMAIL,
+    'signed-in welcome redirects to the founder-only Control Room',
+  );
+
   if (E2E_SCENARIO === 'capability-workbench') {
     // Run the workbench browser journey in an isolated server process. The full
     // founder journey intentionally exercises enough API calls to approach the
