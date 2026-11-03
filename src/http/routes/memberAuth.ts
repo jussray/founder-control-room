@@ -77,7 +77,10 @@ memberAuthRouter.post('/magic-link', rateLimitMagicLink, async (req, res) => {
           shouldCreateUser: true,
         },
       });
-      if (error) console.warn('Member email sign-in could not be delivered');
+      if (error) {
+        // Keep the response indistinguishable for both known and unknown addresses.
+        // Provider delivery diagnostics belong in server-side telemetry, never the browser.
+      }
     }
   } catch {
     // Generic response prevents discovering whether a founder email exists.
