@@ -16,6 +16,17 @@ export function formatAlert(receipt, detailsLink) {
     throw new Error('INVALID_PORTFOLIO_AUDIT_COUNT');
   }
   const healthy = receipt.state === 'OBSERVED_CHECKS_ONLY';
+  // Never auto-resolve from incomplete or contradictory GitHub audit receipts.
+  // Source validation is not independent production verification.
+  if (healthy && (
+    receipt.discoveryComplete !== true ||
+    !Number.isSafeInteger(receipt.expectedMinimum) || receipt.expectedMinimum < 1 ||
+    count < receipt.expectedMinimum || !Array.isArray(receipt.items) ||
+    receipt.items.length !== count ||
+    receipt.items.some((item) => !item || (item.archived !== true && item.state !== 'OBSERVED_CHECKS_ONLY'))
+  )) {
+    throw new Error('INCONSISTENT_PORTFOLIO_AUDIT_RECEIPT');
+  }
   const payload = {
     alert_uid: 'fcr-portfolio-actions-audit',
     title: 'GitHub portfolio audit: ' + receipt.state,
@@ -87,7 +98,8 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   main().catch((error) => {
     const safeCodes = new Set(['GRAFANA_IRM_CONFIGURATION_INCOMPLETE', 'INVALID_GRAFANA_IRM_ENDPOINT',
       'INVALID_GRAFANA_IRM_TOKEN', 'INVALID_PORTFOLIO_AUDIT_RECEIPT',
-      'INVALID_PORTFOLIO_AUDIT_COUNT', 'GRAFANA_IRM_DELIVERY_UNVERIFIED']);
+      'INVALID_PORTFOLIO_AUDIT_COUNT', 'INCONSISTENT_PORTFOLIO_AUDIT_RECEIPT',
+      'GRAFANA_IRM_DELIVERY_UNVERIFIED']);
     console.error(safeCodes.has(error.message) ? error.message : 'GRAFANA_IRM_AUDIT_UNAVAILABLE');
     process.exitCode = 1;
   });
