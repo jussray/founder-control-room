@@ -27,7 +27,6 @@ import { pluginCenterRouter } from './routes/pluginCenter.js';
 import { commandBridgeRouter } from './routes/commandBridge.js';
 import { designOsRouter } from './routes/designOs.js';
 import { cloudflareReasoningRouter } from './routes/cloudflareReasoning.js';
-import { ownerInsightsRouter } from './routes/ownerInsights.js';
 import { mcpRouter } from './routes/mcp.js';
 import { handleRemoteMcpProtectedResourceMetadata } from './routes/remoteReadMcp.js';
 import { publicMcpRouter } from './routes/publicMcp.js';
@@ -426,7 +425,6 @@ export function createServer(options: CreateServerOptions = {}) {
   app.use('/quickscan', quickScanRouter);
   app.use('/design-os', designOsRouter);
   app.use('/cloudflare', cloudflareReasoningRouter);
-  app.use('/owner-insights', ownerInsightsRouter);
   app.use('/mcp', mcpRouter);
   app.use('/external-use', externalUseRouter);
   app.use('/economic-intelligence', economicIntelligenceRouter);

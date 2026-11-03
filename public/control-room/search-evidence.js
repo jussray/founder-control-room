@@ -1,3 +1,6 @@
+// Compatibility alias: the main Truth Console owns both live feature paths.
+// Preserve earlier UI source for audit, but navigate to the single guarded panel.
+window.location.replace('/control-room/?tab=truth-seo');
 const text=(value)=>String(value??'');
 function node(tag,content){const el=document.createElement(tag);el.textContent=text(content);return el;}
 function clear(el){while(el.firstChild)el.removeChild(el.firstChild);}

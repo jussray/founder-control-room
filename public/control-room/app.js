@@ -389,7 +389,7 @@ const HOME_TILES = [
   ['Automation', 'Do more, faster', 'href', '/control-room/command-bridge.html'],
   ['Integrations', 'Plugins and connections', 'href', '/control-room/plugin-center.html'],
   ['Security', 'Posture and receipts', 'href', '/control-room/security.html'],
-  ['Search & Evidence', 'Index status and claim review', 'href', '/control-room/search-evidence.html'],
+  ['Search & Evidence', 'Index status and claim review', 'href', '/control-room/?tab=truth-seo'],
 ];
 
 function routeMarkup(label, sub, kind, target, className) {

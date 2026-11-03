@@ -4,7 +4,12 @@ const read=(p:string)=>readFileSync(p,'utf8');
 describe('Owner Intelligence private surface and public SEO/AEO contracts',()=>{
   it('wires a real founder-protected API, not a public model relay',()=>{
     const server=read('src/http/server.ts'),router=read('src/http/routes/ownerInsights.ts');
-    expect(server).toContain("app.use('/owner-insights', ownerInsightsRouter)");
+    expect(server).toContain("app.use('/dashboard', dashboardRouter)");
+    expect(server).not.toContain("app.use('/owner-insights', ownerInsightsRouter)");
+    const canonical = read('src/http/routes/truthSeoEvidence.ts');
+    expect(canonical).toContain('intelligenceRouter.use(requireFounder)');
+    expect(canonical).toContain("shareEvidenceWithModel!==true");
+    expect(canonical).toContain('rateLimit');
     expect(router).toContain('ownerInsightsRouter.use(requireFounder)');
     expect(router).toContain("res.setHeader('Cache-Control','private, no-store')");
     expect(router).toContain("res.setHeader('X-Robots-Tag','noindex, nofollow')");
@@ -15,7 +20,9 @@ describe('Owner Intelligence private surface and public SEO/AEO contracts',()=>{
     const build=read('scripts/build-pages.mjs'),ui=read('public/control-room/search-evidence.html'),app=read('public/control-room/app.js');
     expect(build).toContain("'control-room/search-evidence.html'");
     expect(build).toContain("'control-room/search-evidence.js'");
-    expect(app).toContain("'/control-room/search-evidence.html'");
+    expect(app).toContain("'/control-room/?tab=truth-seo'");
+    expect(read('public/control-room/search-evidence.js')).toContain("window.location.replace('/control-room/?tab=truth-seo')");
+    expect(read('public/control-room/stack-router.js')).toContain("'truth-ai-review'");
     expect(ui).toContain('name="robots" content="noindex,nofollow"');
     expect(ui).toContain('role="status" aria-live="polite"');
     expect(ui).toContain('name="shareEvidenceWithModel" required');

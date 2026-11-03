@@ -1,3 +1,15 @@
+# Reconciliation notice — November 3, 2026
+
+**Canonical system:** The independently merged FCR main branch already implements Google Search Console snapshot sampling and AI Gateway advisory review in the authenticated Truth Console, under `/dashboard/truth/intelligence/seo` and `/dashboard/truth/intelligence/review`. The canonical UI tabs are `truth-seo` and `truth-ai-review`.
+
+**Conflict-resolution decision:** Preserve prior PR #988 authoring artifacts and their unit tests for provenance, but do not mount a second `/owner-insights` live API. The original `search-evidence.html` panel becomes a compatibility navigation alias. In this reconciliation, harden the canonical main implementation with explicit model consent, no-log/no-cache headers, validation, and regression assertions. No former user files or evidence receipts are deleted. The `src/owner-intelligence` library and `src/http/routes/ownerInsights.ts` remain source-only, not live, and must not be claimed as operational.
+
+**Provider truth:** Cloudflare worker settings returned absent `FCR_GSC_OAUTH_JSON` and `FCR_EVIDENCE_GATEWAY_TOKEN` on November 3. Google and model provider live use are BLOCKED. Authentication/consent code and all tests are implementation evidence only, not runtime proof. Main/PR base merges and founder release approvals must be separately verified.
+
+**Historical notes below** describe the earlier proposed standalone candidate, now superseded as the production entry point.
+
+---
+
 # Owner Intelligence: Search Console and AI Gateway evidence review
 
 Status: **source candidate; NOT deployed or live-verified**. Implemented on existing FCR PR #988 as a disjoint read-only feature set and audited against existing `/dashboard/truth`, `/goalfix`, `/cloudflare`, sitemap/crawler and portfolio-sync routes; no existing authority surface is replaced. CI and exact-head rollout evidence must be recorded separately.
