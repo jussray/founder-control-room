@@ -2,6 +2,8 @@
 
 Read these before changing code, configuration, schemas, providers, verification contracts, commercial plans, launch surfaces, or documentation:
 
+- [`Scoped Parallel Proof Workflow`](.agents/skills/scoped-parallel-proof-workflow/SKILL.md) for scoped skill discovery, parallel non-overlapping audits, test-first repairs, godmode/attack 48000, and evidence-backed defensive simulation promotion; never assume runtime access from instruction files.
+
 - [`Juss Founder OS`](.ai/skills/juss-founder-os/SKILL.md) first
 - [`Outcome-First`](skills/outcome-first/SKILL.md) for outcome, bounded delegation, proportional proof, and an explicit stop condition; it does not weaken any existing founder or evidence gate
 - [`Founder Intelligence Agent Entry Point`](./AGENTS_FOUNDER_INTELLIGENCE.md) for the portfolio constitution, remembrance loop, and inheritance registry
