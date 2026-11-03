@@ -27,6 +27,7 @@ describe('Neon pull-request branch lifecycle contract', () => {
     expect(workflow).toContain('Stale PR ancestry');
     expect(workflow).toContain('PREVIEW_CONTRACT="supabase/preview-contracts/${migration##*/}"');
     expect(workflow).toContain('Running migration preview contract: $PREVIEW_CONTRACT');
+    expect(workflow).toContain('Re-running migration preview contract on exact candidate: $PREVIEW_CONTRACT');
   });
 
   it('allocates Neon only for live-base Supabase changes while preserving the required job identity', () => {

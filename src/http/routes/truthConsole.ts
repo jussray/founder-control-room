@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { intelligenceRouter } from './truthSeoEvidence.js';
 import { rateLimit } from 'express-rate-limit';
 import { supabase } from '../../lib/supabaseClient.js';
 import { truthContinuityState } from '../../lib/truthConsoleRules.js';
@@ -17,6 +18,7 @@ const rateLimitTruthConsole = rateLimit({
   message: { error: 'Truth console rate limit exceeded.' },
 });
 truthConsoleRouter.use(rateLimitTruthConsole, requireFounder);
+truthConsoleRouter.use('/intelligence', intelligenceRouter);
 
 const CLAIM_LIMIT = 200;
 const EVIDENCE_LIMIT = 300;
