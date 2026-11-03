@@ -38,12 +38,12 @@ describe('Founder Control Room Cloudflare topology', () => {
     expect(landing).toContain('<script src="/fcr-public-tabs.js" defer></script>');
     // The page's CSP prohibits executable inline scripts. A single inert,
     // tightly validated application/ld+json schema payload is allowed data.
-    const inlineScripts = landing.match(/<script\\b(?![^>]*\\bsrc=)[^>]*>[\\s\\S]*?<\\/script>/gi) ?? [];
+    const inlineScripts = landing.match(/<script\b(?![^>]*\bsrc=)[^>]*>[\s\S]*?<\/script>/gi) ?? [];
     expect(inlineScripts).toHaveLength(1);
     const schemaTag = inlineScripts[0] ?? '';
-    expect(schemaTag).toMatch(/^<script type="application\\/ld\\+json">/);
-    const schemaText = schemaTag.replace(/^<script[^>]*>/i, '').replace(/<\\/script>$/i, '').trim();
-    expect(schemaText).not.toMatch(/<|>|\\u0000/);
+    expect(schemaTag).toMatch(/^<script type="application\/ld\+json">/);
+    const schemaText = schemaTag.replace(/^<script[^>]*>/i, '').replace(/<\/script>$/i, '').trim();
+    expect(schemaText).not.toMatch(/<|>|\u0000/);
     const structured = JSON.parse(schemaText) as {
       '@context': string;
       '@graph': Array<{ '@type': string }>;
