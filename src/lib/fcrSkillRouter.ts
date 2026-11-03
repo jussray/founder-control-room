@@ -208,6 +208,19 @@ export function routeFcrSkills(input: RouteFcrSkillsInput): FcrSkillRoutingDecis
     pushUnique(requiredProof, proof);
   }
 
+  const workspaceGoal = /\b(google drive|google docs|google sheets|google slides|workspace files|drive comments)\b/.test(goal);
+  const ownedSkillInventoryGoal = /(?:@skills|all my skills|skills inventory|skill inventory|skill audit)/.test(goal);
+  if (workspaceGoal) {
+    pushUnique(requiredProof, 'per-user Google Workspace OAuth and exact file/account/tenant/revision must be verified independently; ChatGPT connector configuration is not FCR runtime authority');
+    pushUnique(requiredProof, 'Google Drive/Docs/Sheets/Slides/Comments native routing with scoped search and provider readback; no cross-tenant access or broad file scans');
+  }
+  if (ownedSkillInventoryGoal) {
+    pushUnique(requiredProof, 'founder-authored skill inventory must be discovered from live repository manifests and owner metadata; declared skill files are not invoked runtimes');
+  }
+  if (standingCommands.attackIntensity !== null) {
+    pushUnique(requiredProof, 'defensive attack regression promotion requires exact-head failing baseline, real focused test, verified CI receipt, and task-specific readback; intensity is not 48000 executed tests');
+  }
+
   if (designCommandIds.length > 0) {
     pushUnique(
       requiredProof,
