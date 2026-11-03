@@ -1,0 +1,55 @@
+import { describe, expect, it, vi } from 'vitest';
+import { runClaimedJiraAction, type JiraActionStore } from '../jiraActionExecutor.js';
+import type { JiraActionClaimState } from '../jiraActionReplayGate.js';
+
+function setup(state: JiraActionClaimState = 'absent', won = true) {
+  const store: JiraActionStore = {
+    read: vi.fn().mockResolvedValue(state),
+    claimOnce: vi.fn().mockResolvedValue(won),
+    markUnknown: vi.fn().mockResolvedValue(undefined),
+    markProviderAccepted: vi.fn().mockResolvedValue(undefined),
+  };
+  const write = vi.fn().mockResolvedValue(undefined);
+  return { store, write };
+}
+
+const key = 'fcr-jira-action:123';
+
+describe('claim-gated Jira execution', () => {
+  it('writes only after winning a durable claim', async () => {
+    const { store, write } = setup();
+    expect(await runClaimedJiraAction(key, store, write)).toBe('provider-accepted');
+    expect(store.claimOnce).toHaveBeenCalledWith(key);
+    expect(write).toHaveBeenCalledOnce();
+    expect(store.markProviderAccepted).toHaveBeenCalledWith(key);
+  });
+
+  it('does not write if another worker owns the claim', async () => {
+    const { store, write } = setup('absent', false);
+    expect(await runClaimedJiraAction(key, store, write)).toBe('verify-provider-state');
+    expect(write).not.toHaveBeenCalled();
+  });
+
+  it.each(['claimed', 'provider-accepted', 'outcome-unknown'] as const)(
+    'does not retry an existing %s action', async (state) => {
+      const { store, write } = setup(state);
+      expect(await runClaimedJiraAction(key, store, write)).toBe('verify-provider-state');
+      expect(store.claimOnce).not.toHaveBeenCalled();
+      expect(write).not.toHaveBeenCalled();
+    },
+  );
+
+  it('records unknown outcome after a provider timeout without replay', async () => {
+    const { store, write } = setup();
+    vi.mocked(write).mockRejectedValueOnce(new Error('timeout'));
+    expect(await runClaimedJiraAction(key, store, write)).toBe('verify-provider-state');
+    expect(store.markUnknown).toHaveBeenCalledWith(key);
+    expect(store.markProviderAccepted).not.toHaveBeenCalled();
+  });
+
+  it('rejects invalid action keys before claiming', async () => {
+    const { store, write } = setup();
+    await expect(runClaimedJiraAction('', store, write)).rejects.toThrow('invalid_jira_action_key');
+    expect(store.read).not.toHaveBeenCalled();
+  });
+});
