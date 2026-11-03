@@ -249,4 +249,16 @@ describe('FCR skill router trust gate', () => {
     expect(decision.missingPolicyCapabilityIds).toContain('goalfix');
     expect(decision.status).toBe('blocked');
   });
+
+  it('adds scoped Workspace skill and attack proof without promoting 48000 into authority', () => {
+    const goal = 'Audit Google Drive apps and all my skills with godmode/attack 48000.';
+    const decision = route(goal, 'inspect', ['juss-chief-ai']);
+    expect(decision.attackIntensity).toBe(48000);
+    expect(decision.requiredProof.join(' ')).toContain('per-user Google Workspace');
+    expect(decision.requiredProof.join(' ')).toContain('founder-authored skill inventory');
+    expect(decision.requiredProof.join(' ')).toContain('defensive attack regression');
+    expect(decision.requiredProof.join(' ')).toContain('not 48000 executed tests');
+    expect(decision.executionAllowed).toBe(false);
+  });
+
 });
