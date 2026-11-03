@@ -88,3 +88,25 @@ describe('Cloudflare canonical deploy-token shape diagnostic', () => {
     expect(workflow).toContain('artifacts/cloudflare-deploy-token-shape.json');
   });
 });
+
+describe('read-only Worker secret proof uses repository Actions credentials', () => {
+  const runtimeProofWorkflow = readFileSync(
+    new URL('../../../.github/workflows/openai-runtime-secret-proof.yml', import.meta.url),
+    'utf8',
+  );
+
+  it('cannot shadow the repository Actions secret with a production environment override', () => {
+    expect(runtimeProofWorkflow).not.toMatch(/^\s+environment:\s+production\s*$/m);
+    expect(runtimeProofWorkflow).toContain('CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}');
+    expect(runtimeProofWorkflow).toContain('CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}');
+  });
+
+  it('retains fail-closed token validation before the read-only provider registry proof', () => {
+    const credentialCheck = runtimeProofWorkflow.indexOf('node scripts/provider-credential-contract.mjs');
+    const providerRead = runtimeProofWorkflow.indexOf('wrangler secret list');
+    expect(credentialCheck).toBeGreaterThanOrEqual(0);
+    expect(providerRead).toBeGreaterThan(credentialCheck);
+    expect(runtimeProofWorkflow).not.toContain('wrangler secret put');
+    expect(runtimeProofWorkflow).not.toContain('wrangler deploy');
+  });
+});
