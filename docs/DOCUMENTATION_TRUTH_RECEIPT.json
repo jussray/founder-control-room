@@ -497,7 +497,8 @@
       "path": "wrangler.worker.toml",
       "claims": [
         "Owner Insights adds an optional Workers AI [ai] binding and optional secret name GSC_SERVICE_ACCOUNT_JSON to the same canonical FCR Worker. Neither authorizes production deployment, proves credentials exist, or exposes a public API.",
-        "The existing FCR Worker preflight, auth, Cloudflare provider verification, and exact-head release gates must remain in force; source-only configuration is not observed runtime authority."
+        "The existing FCR Worker preflight, auth, Cloudflare provider verification, and exact-head release gates must remain in force; source-only configuration is not observed runtime authority.",
+        "`wrangler.worker.toml` must declare the Workers AI binding `AI` under `[ai]` only for the founder-authenticated `/owner-insights/challenge` evidence route, where an absent binding returns 503 `ai_gateway_not_configured`; declaring it in source proves configuration intent only, not a deployed Worker runtime binding or live AI Gateway inference."
       ]
     },
     {
