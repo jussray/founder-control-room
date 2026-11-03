@@ -4,6 +4,11 @@
 
 The existing ULTRATHINK / ATTACK / GODMODE companion now specifies completed 5W1H, precise evidence-scoped claims, 80/20 cause selection and paired pre/post Red Team/Devil, L99, OODA, Bill Gates, Elon Musk and Lindy passes. Open PRs and drafts are untrusted candidates; draft containment, exact-head tests, Playwright where a user-facing browser path changed, independent review and founder merge approval are separate gates. The AI-skill verifier checks mandatory source instructions only. Neither a paired checklist nor its receipt proves model compliance, runtime adoption, execution, production restoration or independent review. Activation is limited to `/godmode` and `attack/godmode`; the unrouted phrases `implant fixes` and `fix merge review` were removed from the companion, while merge review remains owned by `repair-to-proof`.
 
+## November 3, 2026: FCR auth-lifecycle proof is narrower than release proof
+
+FCR PR #978's predecessor `82d0e7139d3876e166844de64e17b4a770c23b90` passed its dedicated Playwright welcome → magic-link login → opaque browser-session identity → authenticated welcome redirect → server-revoked logout → private-shell denial scenario. GitHub run `41728146923` nevertheless failed in the independently required guarded-terminal journey when the V10 client-side fetch membrane rejected a planless privileged action before the older test could observe the server's separate rejection. A source or test fix must preserve both negative guards and require fresh, exact-head Playwright execution; it may never create the branch that the test is supposed to deny.
+
+The updated `.github/workflows/playwright.yml` is evidence-authority code and requires this documented distinction: a local auth scenario PASS is bounded to isolated test providers; overall CI, independent review, StoryEngine peer-ref identity, the actual ChatGPT Site, production Cloudflare routing, authenticated runtime, and deployment remain separate UNKNOWN or blocked gates until directly observed. Previous-head browser evidence expires after any branch commit, even if only a test or receipt changes.
 
 ## November 1, 2026: bounded GitHub App transport reconciliation
 

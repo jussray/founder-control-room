@@ -4,6 +4,11 @@
 
 The existing ULTRATHINK / ATTACK / GODMODE companion now specifies completed 5W1H, precise evidence-scoped claims, 80/20 cause selection and paired pre/post Red Team/Devil, L99, OODA, Bill Gates, Elon Musk and Lindy passes. Open PRs and drafts are untrusted candidates; draft containment, exact-head tests, Playwright where a user-facing browser path changed, independent review and founder merge approval are separate gates. The AI-skill verifier checks mandatory source instructions only. Neither a paired checklist nor its receipt proves model compliance, runtime adoption, execution, production restoration or independent review. Activation is limited to `/godmode` and `attack/godmode`; the unrouted phrases `implant fixes` and `fix merge review` were removed from the companion, while merge review remains owned by `repair-to-proof`.
 
+## November 3, 2026: FCR welcome, login and logout browser authority
+
+PR #978 reuses the existing FCR welcome page and same-origin opaque founder cookie. `.github/workflows/playwright.yml` now runs an explicit `auth-lifecycle` browser scenario that must verify signed-out welcome, real magic-link callback, `/auth/me` founder identity, Secure HttpOnly cookie attributes, signed-in welcome redirect, server-revoked logout, and denial of the private Control Room after logout. The same workflow retains the guarded-terminal negative authority check and broader federation proof; one passing auth slice cannot substitute for the entire required gate.
+
+At predecessor candidate `82d0e7139d3876e166844de64e17b4a770c23b90`, the isolated auth-lifecycle printed `E2E RESULT: PASS` in Playwright run `41728146923`; that same run failed the separate guarded-terminal negative test because the browser's V10 plan guard intercepted a planless request before its expected server-side denial. The successor test must prove **both** browser and API rejection without performing a privileged mutation. The predecessor passing slice is historical once the PR head moves. No source/browser result establishes the actual ChatGPT Site binding, live Cloudflare cookie delivery, production sign-in, portfolio readiness, merge approval, or release authority.
 
 ## November 2, 2026 — FCR Council Bus and search evidence source candidate
 
