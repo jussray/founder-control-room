@@ -22,7 +22,6 @@ function slugsFromConst(source, constName) {
 
 const envExample = read('.env.example');
 const wrangler = read('wrangler.worker.toml');
-const capabilitySecrets = JSON.parse(read('config/worker-capability-secrets.json'));
 const docs = read('docs/MCP_STACK.md');
 const remoteRoute = read('src/http/routes/remoteReadMcp.ts');
 const mcpRouter = read('src/http/routes/mcp.ts');
@@ -46,17 +45,9 @@ assert(
   `.env.example must document the active portfolio scope as ${exactRemoteScope}`,
 );
 
-const remoteReadCapabilitySecret = capabilitySecrets.capabilityOptional?.find(
-  (entry) => entry?.name === 'FCR_REMOTE_MCP_READ_TOKEN',
-);
 assert(
-  capabilitySecrets.schema === 'fcr/worker-capability-secrets@v1'
-    && remoteReadCapabilitySecret?.capability === 'remote-mcp-read-compat',
-  'capability secret contract must bind FCR_REMOTE_MCP_READ_TOKEN to remote-mcp-read-compat',
-);
-assert(
-  !/required\s*=\s*\[[\s\S]*?"FCR_REMOTE_MCP_READ_TOKEN"[\s\S]*?\]/m.test(wrangler),
-  'remote read MCP token must remain capability-scoped instead of blocking unrelated Worker startup',
+  /required\s*=\s*\[[\s\S]*?"FCR_REMOTE_MCP_READ_TOKEN"[\s\S]*?\]/m.test(wrangler),
+  'Worker required secrets must include FCR_REMOTE_MCP_READ_TOKEN',
 );
 assert(
   !/FCR_REMOTE_MCP_READ_TOKEN\s*=\s*"[^"\s]+"/.test(wrangler),
@@ -128,5 +119,5 @@ assert(
 );
 
 console.log(
-  `[verify:remote-read-mcp] registry-derived active scope (${exactRemoteScope}), capability-scoped static token, external-project exclusion, OAuth intersection, secret rejection, and read/preview-only routing are pinned.`,
+  `[verify:remote-read-mcp] registry-derived active scope (${exactRemoteScope}), external-project exclusion, OAuth intersection, static-token compatibility, secret rejection, and read/preview-only routing are pinned.`,
 );

@@ -39,13 +39,11 @@ describe("scheduled portfolio repository verification", () => {
 });
 
 describe("provider and schema truth", () => {
-  it("requires repository-scoped GitHub App installation auth for FCR while preserving bounded non-FCR fallback", () => {
+  it("prefers repository-scoped GitHub App installation auth", () => {
     expect(providerFactory).toContain("getGitHubInstallationToken");
     expect(providerFactory).toContain("GITHUB_APP_ID");
     expect(providerFactory).toContain("GITHUB_PRIVATE_KEY");
-    expect(providerFactory).toContain("isFounderControlRoomRepository(project.repo_identifier) && !hasAppAuthority");
-    expect(providerFactory).toContain("GITHUB_TOKEN fallback is not accepted for the constitutional repository");
-    expect(providerFactory).toContain("Other repositories may retain the bounded local/development token fallback");
+    expect(providerFactory).toContain("GITHUB_TOKEN remains a local/development fallback only");
     expect(appAuth).toContain("apps.getRepoInstallation");
     expect(appAuth).toContain("apps.createInstallationAccessToken");
     expect(appAuth).toContain("repositories: [repository.repo]");

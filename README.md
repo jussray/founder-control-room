@@ -1,5 +1,25 @@
 # Founder Control Room
 
+## November 1, 2026: bounded GitHub App transport reconciliation
+
+The existing PR #986 reconciles bounded private-key wrapper parsing against current main without replacing a protected secret, changing GitHub App installation grants, or asserting production repair. On the November 1 exact-main founder-only diagnostic, the production binding was present and the App ID numeric, but the runtime key transport was classified as unknown; this is evidence of failed parsing, not evidence that the secret was missing or recently replaced. Protected-value scope and provider identity remain independent gates. No inherited historic CI or Playwright result authorizes a merge or release.
+
+
+## November 1, 2026 UTC: exact-head MCP credential preflight
+
+FCR PR #1056 protects the existing `founder-control-room` Worker by requiring `scripts/verify-worker-binding-types.mjs` in both canonical pre-mutation workflows. The verifier reads provider binding names and types only, rejects plaintext credential bindings, withholds deployment when the provider response is unavailable, and never reports credential values as proof. Cloudflare readback previously classified `CF_API_TOKEN` as `plain_text`, so this candidate does not authorize production promotion or secret re-upload.
+
+FCR Playwright also selects a newly observed StoryEngine peer `b2397272a37ed5d987f0b71b2a37dc31c9c84cf5`, four commits ahead and zero behind the prior pin `bffc9f771b673055403f52b29c86b30e5f4dd8c8`. The changed peer files are documentation and governance content, but only a fresh exact-head live-ref check, immutable checkout, runtime and browser/receipt witness can establish compatibility. Previous skipped steps and green predecessor receipts cannot transfer.
+
+
+Documentation Truth and test discovery resolve a pull request's live target branch at verification time, fetch its exact commit, and require it to be an ancestor of the checked-out candidate before evaluating the change. The event's stored base SHA remains historical context. Push verification instead uses the exact push-before SHA; missing, malformed, unavailable, or non-ancestor bases block proof. Passing these source checks grants no merge or deployment authority.
+
+## October 26, 2026 — StoryEngine peer identity renewal for FCR PR #1020 (candidate only)
+
+The exact FCR PR #1020 Playwright run for `8e30ec5418f2fc732b96d8dc5263af4a82f5e5a3` passed its browser harness but stopped at live StoryEngine peer equality: expected `87501be2da31d12f421b0ed2da49df357fc9fcb1`, independently observed `499f2d4eb9edac8bb11b657cf003a056263528d9`. GitHub confirms StoryEngine `refs/heads/main` advanced strictly by two commits, with changes in `story-engine/lib/llmClient.js` and `story-engine/lib/museClient.js`; the federation-specific contract was unchanged in that compare. The successor commit completed its observed push workflows successfully, including the Control Room federation contract; its Supabase Preview check was skipped and cannot be counted as green runtime proof.
+
+`.github/workflows/playwright.yml` now selects `499f2d4eb9edac8bb11b657cf003a056263528d9` as a new exact peer evidence subject. This repin does **not** transfer any earlier FCR Playwright green or grant merge, deploy, publication, provider mutation, or independent runtime authority. Only the successor FCR head's full immutable-peer checkout, runtime identity, directive/receipt/replay, and browser checks can verify the new pair; any later peer/main movement invalidates the pin's currentness.
+
 ## October 28, 2026: PR #1044 peer identity renews after StoryEngine governance move
 
 The previous FCR candidate at `e35b9ecff7801e2b6d36910a9f40208f9815cfdb` selected StoryEngine `dc79a23ffa8e6e5b0964efccdaee7c961b9b9e1d`, but StoryEngine `main` subsequently moved strictly one commit forward to `bffc9f771b673055403f52b29c86b30e5f4dd8c8`. The single successor commit changed `.control-room/necessary-fix-policy.json` and `AGENTS_FOUNDER_INTELLIGENCE.md` and had 14 successful exact-head check runs at observation. This is a governance/instruction delta, **not** FCR-to-StoryEngine runtime proof.
@@ -106,6 +126,8 @@ Exact SHAs belong in receipts, PRs, artifacts, incidents, and provenance. The RE
 
 FCR models projects, proposals, missions, exact refs, verification runs, evidence, approval state, and bounded repository operations behind provider-neutral interfaces.
 
+The existing Worker schedule includes an hourly AI provider change watch in `src/external-use/aiProviderChangeWatchService.ts`. It searches Exa for OpenAI, Anthropic, and Perplexity results, accepts only official provider-domain URLs, stores fingerprinted candidate receipts in FCR's existing `events` inbox, records source coverage, and emails a review-only digest through FCR's existing email binding. Search-derived coverage remains `PARTIAL`, each candidate requires review, and account entitlement and project impact remain `UNKNOWN`; this source implementation does not prove that it is deployed or that a peer handoff is active. See [`docs/AI_PROVIDER_CHANGE_WATCH_CONTRACT.md`](docs/AI_PROVIDER_CHANGE_WATCH_CONTRACT.md).
+
 Branch creation through `src/http/routes/approvals.ts` is now an exact-action governed repository mutation. A fresh `create_branch` proof and authenticated founder execute request cause FCR to issue a server-derived `AuthorityEnvelopeV1` bound to `github.repository.create_branch`, repository scope, exact branch arguments, current mission-state fingerprint, tool-call identity, expiry, founder identity, and idempotency key. The authority lifetime starts from the server-observed execute request time, not the proof receipt timestamp, so proof freshness and authority expiry remain separate fail-closed windows. FCR reserves the execution before the external write, re-reads mission state immediately before mutation, and `executeAuthorizedCreateBranch()` must reject drift before `RepositoryProvider.createBranch(...)` can be reached. A pending or ambiguous execution remains reconcile-before-retry; source and CI proof of this membrane do not by themselves prove that a live GitHub branch was created.
 
 ### First-party video rendering
@@ -149,6 +171,10 @@ FCR now presents Claude Cowork as a governed founder-stack work surface, not as 
 Actual Cowork access to GitHub depends on the user's Claude-side GitHub connector and its current permissions. This repository source does not prove that connector is configured or authorized in a particular Claude session. Durable repository changes return through GitHub commit, pull-request, diff, check, and review evidence.
 
 The current FCR Cowork lane intentionally labels its native receipt integration as **not wired**. Generic Activity entries are not promoted to Cowork receipts, and FCR does not claim Cowork-specific receipt ingestion until a separately reviewed adapter exists and is proven. Council participation, connector availability, or Cowork tool access grants no merge, deploy, provider, credential, billing, publication, deletion, or founder authority.
+
+### Founder-selected GitHub Auto-merge
+
+When the founder enables GitHub's native Auto-merge on an individual PR, GitHub queues that PR until all **configured required** reviews, checks, tests, and branch-protection or merge-queue conditions pass; no second manual merge click is required after those gates clear. Checks that are merely optional are not automatically merge blockers, so intended load-bearing checks must be configured as required in the live ruleset. The PR Continuity workflow now observes `auto_merge_enabled` and `auto_merge_disabled` and records `auto_merge_intent` from provider PR readback as `QUEUED`, `NOT_QUEUED`, or `UNKNOWN`. This is queue metadata, **not** exact-candidate founder-final approval, deterministic independent review, production proof, or merge/deploy authority. Merge conflicts, draft PRs, stale exact heads, missing required gates, or missing applicable founder approval remain blocked. Verify GitHub's current ruleset before claiming native enforcement; no source workflow can silently change that provider setting.
 
 ### PR continuity
 
@@ -207,15 +233,13 @@ See [`docs/JIRA_AUTOMATION.md`](docs/JIRA_AUTOMATION.md).
 
 The repository contains FCR's founder-final merge policy, deterministic independent-review contract, exact-head evidence checks, provider-backed GitHub App witness rules, thread resolution, CodeQL floor, and stale-proof handling.
 
-For the constitutional repository `jussray/founder-control-room`, runtime `RepositoryProvider` access requires the FCR GitHub App pair `GITHUB_APP_ID` + `GITHUB_PRIVATE_KEY` and the repository-scoped installation-token path. `GITHUB_TOKEN` is not an accepted fallback for FCR itself; that bounded token fallback remains available only to non-FCR local/development GitHub repositories. GitHub App authentication proves provider identity and configured installation permissions only. It does not grant founder approval, merge approval, deploy, publication, spend, deletion, secret rotation, or permission to widen the App installation scope.
-
-Source policy is not live GitHub provider truth. Current rulesets, bypass actors, required checks, native review settings, installation identity, and provider enforcement require fresh GitHub provider readback before a merge decision.
+Source policy is not live GitHub provider truth. Current rulesets, bypass actors, required checks, native review settings, and provider enforcement require fresh GitHub provider readback before a merge decision.
 
 Founder self-approval is not relabeled as independent review. The canonical path keeps deterministic independent review and authenticated exact-candidate founder-final approval separate. Merge capability and merge approval are also separate: green evidence, mergeability, review requests, `merge review`, broad `approved`/`cont` language, or `merge_authority: true` cannot silently authorize integration. Before every merge, the founder must explicitly approve the exact current repository, pull request number, current base SHA, and current head SHA; if the candidate moves, approval expires and must be requested again.
 
 For Chief governance, FCR contains a **read-only trusted observation and verification boundary** pinned to `jussray/chief-ai-machine` and Chief ruleset IDs `20818149` and `21261587`. It uses the repository-scoped FCR GitHub App installation-token path rather than caller-supplied PAT/token authority, preserves required-check `integration_id` producer identity, requires complete bypass and deployment readback, and fingerprints the provider observation. Under the current founder decision, ruleset `20818149` is accepted exactly as observed when it preserves zero bypass actors, its approved source checks, `Cloudflare Production`, `proofmode-access-admin`, and the unbound reserved candidate runtime context. A compliant observation returns `NO_CHANGE_REQUIRED` with `mutation:null`; drift blocks verification rather than producing a desired-state rewrite. This boundary never grants provider mutation, merge, deploy, or execution authority.
 
-See [`docs/FOUNDER_MERGE_AUTHORITY.md`](docs/FOUNDER_MERGE_AUTHORITY.md) and [`docs/GITHUB_APP_AUTHORITY.md`](docs/GITHUB_APP_AUTHORITY.md).
+See [`docs/FOUNDER_MERGE_AUTHORITY.md`](docs/FOUNDER_MERGE_AUTHORITY.md).
 
 ### Capability authority
 
@@ -306,13 +330,13 @@ The dedicated review-email Worker uses the same truth separation. `wrangler.emai
 
 `public-web-observation-v1` is an FCR-owned, provider-neutral product contract. FCR's governed research hub resolves a bounded read-only adapter at runtime, and adapter identity remains evidence rather than product authority. The capability itself requires no provider-specific runtime secret; provider configuration, adapter availability, source truth, and downstream outcomes remain separate proof planes.
 
-`OPENAI_API_KEY` is a capability-scoped Worker credential for OpenAI-backed routes. Its absence blocks that provider capability, not core Worker startup. GitHub Actions may separately hold the same logical credential for CI-only consumers such as the bounded AI Failure Repair workflow, but the Actions copy is not runtime proof and must not be copied into the Worker during deploy. `Runtime Secret Proof` derives its complete required-name set from `wrangler.worker.toml`, asks Cloudflare only for secret names, fingerprints that registry, and never reads or prints secret values. If the Cloudflare observation credential is malformed or unusable before enumeration, every unobserved runtime-secret presence claim remains `UNKNOWN`/`BLOCKED`, not missing.
+`OPENAI_API_KEY` follows the same split authority. The canonical Worker registry requires the provider-held runtime binding because live FCR OpenAI paths consume it. GitHub Actions may separately hold the same logical credential for CI-only consumers such as the bounded AI Failure Repair workflow, but the Actions copy is not runtime proof and must not be copied into the Worker during deploy. `Runtime Secret Proof` derives its complete required-name set from `wrangler.worker.toml`, asks Cloudflare only for secret names, fingerprints that registry, and never reads or prints secret values. If the Cloudflare observation credential is malformed or unusable before enumeration, every unobserved runtime-secret presence claim remains `UNKNOWN`/`BLOCKED`, not missing.
 
 The Worker-only reconciliation workflow must run the same canonical Cloudflare runtime-secret **name** check inside its authority gate, before its first secret write or deployment. It derives requirements from `wrangler.worker.toml [secrets].required` and may exclude only the fail-closed `FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON` that it itself writes afterward. A missing name or unavailable Cloudflare enumeration blocks reconciliation; source declarations or historical runtime receipts never satisfy the live gate. No values are read, and passing the gate does not prove credential validity, API identity, or permission to deploy.
 
 Worker-only production reconciliation now has a second, separately verifiable release gate: direct `api.foundercontrolroom.org/version` and public `foundercontrolroom.org/version` must both return the canonical Worker service header and exact approved source SHA. The Pages `FCR_API` service binding, API Worker custom-domain assignment, Cloudflare request-tracer simulation, and a successful GitHub build are configuration or test evidence, **not** substitutes for these live response receipts. Missing public identity evidence fails the workflow closed rather than weakening Pages' identity check.
 
-The first-party FCR Shopify paid-order ingress follows the same boundary. `FCR_SHOPIFY_WEBHOOK_SECRET` and `FCR_COMMERCE_HASH_SALT` must remain provider-held required Worker secrets before promotion, while source merely declares their names. Their presence cannot prove that Shopify registered the `orders/paid` callback, that the deployed Worker serves the exact commerce head, that the production Supabase migration exists, or that any payment was collected; those claims require separate provider, deployment, database, runtime, and revenue receipts.
+The first-party FCR Shopify paid-order ingress follows the same boundary. `FCR_SHOPIFY_WEBHOOK_SECRET` and `FCR_COMMERCE_HASH_SALT` must be installed as provider-held Worker secrets before the commerce ingress is activated; under the founder Path B gate (2026-10-30) they are declared in `wrangler.worker.toml [secrets].optional`, so they no longer block canonical Worker promotion, and the ingress must fail closed while either name is absent. Source merely declares their names. Their presence cannot prove that Shopify registered the `orders/paid` callback, that the deployed Worker serves the exact commerce head, that the production Supabase migration exists, or that any payment was collected; those claims require separate provider, deployment, database, runtime, and revenue receipts.
 
 Production does not deploy merely because `main` moved or a Cloudflare build succeeded. A production claim remains incomplete until the authorized lane proves, for one exact candidate:
 
@@ -425,7 +449,6 @@ Public-safe configuration may live in `.env.example`. Secret values do not belon
 - [`docs/REPOSITORY_FEDERATION.md`](docs/REPOSITORY_FEDERATION.md) — repository and bounded product-build federation
 - [`docs/JIRA_AUTOMATION.md`](docs/JIRA_AUTOMATION.md) — Jira/n8n bounded automation and activation gate
 - [`docs/FOUNDER_MERGE_AUTHORITY.md`](docs/FOUNDER_MERGE_AUTHORITY.md) — repository integration authority
-- [`docs/GITHUB_APP_AUTHORITY.md`](docs/GITHUB_APP_AUTHORITY.md) — FCR-specific GitHub App installation-auth boundary
 - [`docs/TRUTH_DECAY_AUDIT.md`](docs/TRUTH_DECAY_AUDIT.md) — truth aging and documentation drift
 - [`docs/PUBLIC_COMMUNICATION_TRUTH_CONTRACT.md`](docs/PUBLIC_COMMUNICATION_TRUTH_CONTRACT.md) — public truth and Sauce Guard
 - [`docs/PROVIDERS.md`](docs/PROVIDERS.md) — provider handoffs
@@ -549,3 +572,13 @@ Provider configuration, site wiring, observed clicks, and commercial outcomes re
 **Source Guard** adds read-only repository checks for the documented guard boundaries and the portfolio conversion-tracking data contract. See [Source Guard documentation](docs/SOURCE_GUARD.md), scripts/verify-sauce-source-guard.mjs, the Node regression tests, and the separate GitHub Actions workflow. Source Guard complements, but does not replace, [Documentation Truth](.github/workflows/documentation-truth.yml).
 
 **Truth boundary:** checked-in policy and tests are source evidence only. A passing workflow does **not** establish that public content was approved or published, that the collector receives real site traffic, or that live security/runtime controls operate correctly. No new deploy, merge, publication, provider-mutation or deletion authority is granted.
+
+## October 24 StoryEngine relay-proof peer refresh
+
+StoryEngine `refs/heads/main` was independently re-observed at `87501be2da31d12f421b0ed2da49df357fc9fcb1`, so FCR's Playwright federation witness now pins that exact peer identity. This pin movement expires every predecessor FCR↔StoryEngine browser/federation witness; it selects the successor evidence subject only.
+
+The successor FCR head must still pass the live-ref equality check, immutable StoryEngine checkout, exact peer runtime identity, directive/receipt binding, replay protections, and the complete Playwright browser witness before the pair may be called current. Pin alignment grants no merge, deploy, production, publication, billing, or provider-mutation authority.
+
+### FCR external MCP consent candidate (not deployed)
+
+The OAuth consent UI is served by the FCR API service **through the same-origin Pages proxy** at `https://foundercontrolroom.org/oauth/consent`, matching the configured founder callback, CSRF origin, host-only session cookie, and same-tab `sessionStorage`. An exact www consent GET navigates to the canonical apex before login. The API serves the consent UI and assets behind the Pages proxy and requires an interactive, explicitly UUID-bound founder before approve/deny. The OAuth callback resumes a pending, syntax-validated authorization ID on the same apex origin. These are candidate source behaviors, not evidence that Supabase OAuth is enabled, Cloudflare Access permits discovery, or ChatGPT can connect.

@@ -299,11 +299,7 @@ export function providerConfigurationError(
     if (hasAppId !== hasPrivateKey) {
       return "GitHub App authentication is incomplete; set both GITHUB_APP_ID and GITHUB_PRIVATE_KEY or neither";
     }
-    const hasAppAuthority = hasAppId && hasPrivateKey;
-    if (isFounderControlRoomRepository(project.repo_identifier) && !hasAppAuthority) {
-      return "Founder Control Room GitHub access requires GITHUB_APP_ID and GITHUB_PRIVATE_KEY; GITHUB_TOKEN fallback is not accepted for the constitutional repository";
-    }
-    return fallbackToken || hasAppAuthority
+    return fallbackToken || (hasAppId && hasPrivateKey)
       ? null
       : "GitHub authentication is not configured; set GITHUB_APP_ID and GITHUB_PRIVATE_KEY or a local GITHUB_TOKEN fallback";
   }
@@ -324,8 +320,8 @@ async function githubProvider(project: ProviderProjectConfig): Promise<Repositor
   const fallbackToken = process.env.GITHUB_TOKEN?.trim();
   const appId = process.env.GITHUB_APP_ID?.trim();
   const privateKey = process.env.GITHUB_PRIVATE_KEY?.trim();
-  // FCR is rejected above unless complete GitHub App credentials are present.
-  // Other repositories may retain the bounded local/development token fallback.
+  // GITHUB_TOKEN remains a local/development fallback only; production prefers
+  // repository-scoped GitHub App installation credentials minted on demand.
   const hasAppAuthority = Boolean(appId && privateKey);
   const token = hasAppAuthority
     ? await getGitHubInstallationToken(appId!, privateKey!, project.repo_identifier)

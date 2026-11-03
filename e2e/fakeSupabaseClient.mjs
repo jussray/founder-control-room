@@ -475,8 +475,7 @@ if (workspaceProjectId || workspaceMissionId || workspaceSha) {
     slug: 'founder-control-room',
     name: 'FCR Browser Fixture',
     repo_provider: 'github',
-    // Fixture identity is not the constitutional FCR repo, so a fake PAT never bypasses FCR's App-only policy.
-    repo_identifier: 'jussray/founder-control-room-e2e-fixture',
+    repo_identifier: 'jussray/founder-control-room',
     verification_enabled: true,
   }, 'projects'));
   table('missions').push(withDefaults({
