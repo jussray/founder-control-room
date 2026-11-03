@@ -256,3 +256,15 @@ describe('ChatGPT plugin management repository contract', () => {
     expect(opera?.role).toMatch(/BLOCKED_CONNECTOR_BRIDGE/);
   });
 });
+
+describe('Google Drive skills are correctly scoped across Workspace surfaces', () => {
+  it('routes Drive, Docs, Sheets, Slides, and Comments without inventing runtime authority', () => {
+    const role = manifest.plugins.find((plugin) => plugin.name === 'Google Drive')?.role ?? '';
+    for (const skill of ['google-drive', 'google-docs', 'google-sheets', 'google-slides', 'google-drive-comments']) {
+      expect(role).toContain(skill);
+    }
+    expect(role).toContain('per-user');
+    expect(role).toContain('readback');
+    expect(role).toContain('ChatGPT connector session is not an FCR runtime credential');
+  });
+});
