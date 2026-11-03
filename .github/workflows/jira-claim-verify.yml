@@ -17,6 +17,18 @@ jobs:
   focused-tests:
     runs-on: ubuntu-latest
     timeout-minutes: 12
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: test-only-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -26,3 +38,8 @@ jobs:
       - run: npm ci --ignore-scripts
       - name: Run Jira claim unit tests
         run: npx vitest run src/lib/__tests__/jiraActionReplayGate.test.ts src/lib/__tests__/jiraActionExecutor.test.ts src/lib/__tests__/jiraSupabaseActionStore.test.ts
+      - name: Verify migration in ephemeral PostgreSQL
+        env:
+          PGPASSWORD: test-only-password
+        run: |
+          psql -h 127.0.0.1 -U postgres -d postgres -v ON_ERROR_STOP=1 -f supabase/tests/jira_action_claims_verify.sql
