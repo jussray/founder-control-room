@@ -13,7 +13,7 @@ export const WORKER = 'founder-control-room';
 export function safePreflightError(error) {
   if (!(error instanceof Error)) return 'provider-preflight-failed';
   const code = error.message;
-  if (/^(?:missing-cloudflare-preflight-credential|invalid-worker-account-config|worker-account-mismatch|provider-settings-not-verified|malformed-provider-bindings|duplicate-provider-binding-names|credential-binding-not-secret|undeclared-plaintext-binding|json-config-binding-not-reviewed|provider-request-failed|provider-response-invalid)$/.test(code)) {
+  if (/^(?:missing-cloudflare-preflight-credential|invalid-worker-account-config|worker-account-mismatch|provider-settings-not-verified|malformed-provider-bindings|duplicate-provider-binding-names|credential-binding-not-secret|undeclared-plaintext-binding|json-config-binding-not-reviewed|unrecognized-binding-type|provider-request-failed|provider-response-invalid)$/.test(code)) {
     return code;
   }
   if (/^provider-settings-http-[1-5][0-9]{2}$/.test(code)) return code;
@@ -64,19 +64,21 @@ export const PUBLIC_PLAINTEXT_BINDINGS = Object.freeze([
   'N8N_FOUNDER_CONTENT_EXPECTED_RUNTIME_VERSION',
 ]);
 const allowedPublicPlainTextBindings = new Set(PUBLIC_PLAINTEXT_BINDINGS);
+const allowedNonLiteralBindingTypes = new Set(['secret_text', 'secrets_store_secret', 'service', 'workflow', 'send_email']);
 
 export function validateBindingTypes(payload, { allowStaleCfApiTokenRemoval = false } = {}) {
   const bindings = payload?.result?.bindings;
   if (payload?.success !== true || !Array.isArray(bindings)) {
     return { ok: false, reason: 'provider-settings-not-verified', unsafe: [] };
   }
-  if (bindings.some(b => !b || typeof b.name !== 'string' || typeof b.type !== 'string')) {
+  if (bindings.some(b => !b || typeof b.name !== 'string' || typeof b.type !== 'string' || !b.name.trim() || !b.type.trim())) {
     return { ok: false, reason: 'malformed-provider-bindings', unsafe: [] };
   }
   const seen = new Set();
   const unsafe = [];
   let hasUndeclaredPlainText = false;
   let hasUnreviewedJson = false;
+  let hasUnrecognizedType = false;
   for (const { name, type } of bindings) {
     if (seen.has(name)) return { ok: false, reason: 'duplicate-provider-binding-names', unsafe: [] };
     seen.add(name);
@@ -94,6 +96,10 @@ export function validateBindingTypes(payload, { allowStaleCfApiTokenRemoval = fa
       unsafe.push({ name, type });
       hasUndeclaredPlainText = true;
     }
+    if (type !== 'plain_text' && !allowedNonLiteralBindingTypes.has(type)) {
+      unsafe.push({ name, type });
+      hasUnrecognizedType = true;
+    }
   }
   const repairableStaleCfApiToken =
     allowStaleCfApiTokenRemoval &&
@@ -106,8 +112,10 @@ export function validateBindingTypes(payload, { allowStaleCfApiTokenRemoval = fa
       ? 'verified-name-type-only'
       : repairableStaleCfApiToken
         ? 'repairable-stale-cf-api-token-plaintext'
-        : hasUnreviewedJson
-          ? 'json-config-binding-not-reviewed'
+        : hasUnrecognizedType
+          ? 'unrecognized-binding-type'
+          : hasUnreviewedJson
+            ? 'json-config-binding-not-reviewed'
           : hasUndeclaredPlainText
             ? 'undeclared-plaintext-binding'
             : 'credential-binding-not-secret',
