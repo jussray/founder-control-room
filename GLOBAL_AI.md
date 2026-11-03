@@ -1,5 +1,10 @@
 # Founder Control Room Global AI Contract
 
+## Named repair branch CI integrity
+
+The Asana read-only mapping repair branch may opt into core CI on named-branch pushes, but migration lint must assert that its checkout is the exact expected candidate SHA before running. Workflow-authority changes require substantive documentation and a path-bound receipt within the checked push or pull-request range; test green and Playwright green cannot replace a missing documentation-truth receipt or authorize merge.
+
+
 For pull-request Documentation Truth and test-discovery proof, resolve and fetch the live target branch before comparing it with the exact candidate; reject missing, invalid, unavailable, or non-ancestor bases. Keep the event's historical base identity separate from current scope. Default-branch push proof uses the exact push-before SHA. This repairs proof inputs without transferring merge, deployment, or provider authority.
 
 ## Parent operating contract

@@ -1,5 +1,10 @@
 # Founder Merge Authority
 
+## Asana read-only CI exact-head rule
+
+For the bounded Asana read-only integration branch, the migration-lint CI job must check out the exact candidate SHA and reject a mismatch before invoking Supabase tools. A successful named-branch CI run remains branch-scoped evidence only: it neither updates Asana ownership nor grants founder-final merge approval, deployment, or provider mutation authority.
+
+
 Documentation Truth and the test-discovery ratchet must evaluate PR changes against the freshly resolved target branch, with exact-SHA fetch and candidate-ancestry validation. A stored PR-event base can predate inherited main changes and cannot replace that live observation. Push events retain their exact before-SHA range. Resolution, fetch, or ancestry failures block the associated proof; a corrected input or passing gate never supplies founder-final merge approval.
 
 ## Current founder decision

@@ -1,5 +1,10 @@
 # Founder Control Room
 
+## November 3, 2026: Asana branch exact-head CI proof
+
+The `fix/asana-readonly-project-mapping-20261103` branch keeps Asana project linking read-only and project ownership outside FCR. Its `.github/workflows/ci.yml` verifies the exact candidate SHA in migration lint before invoking Supabase tooling. The branch-scoped push job remains a source-level check, not production Asana authorization or merge/release approval; Documentation Truth requires current, substantive workflow-authority documentation in the same reviewed commit range.
+
+
 ## November 1, 2026: bounded GitHub App transport reconciliation
 
 The existing PR #986 reconciles bounded private-key wrapper parsing against current main without replacing a protected secret, changing GitHub App installation grants, or asserting production repair. On the November 1 exact-main founder-only diagnostic, the production binding was present and the App ID numeric, but the runtime key transport was classified as unknown; this is evidence of failed parsing, not evidence that the secret was missing or recently replaced. Protected-value scope and provider identity remain independent gates. No inherited historic CI or Playwright result authorizes a merge or release.

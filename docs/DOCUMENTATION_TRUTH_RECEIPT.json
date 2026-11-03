@@ -100,7 +100,8 @@
       "path": ".github/workflows/ci.yml",
       "claims": [
         "`.github/workflows/ci.yml` must keep the existing crawler and public-work Playwright specs inside the load-bearing `Playwright e2e` job that feeds `Required Gate`; a separate advisory Pages workflow cannot substitute for required exact-head browser execution or grant merge authority.",
-        ".github/workflows/ci.yml must resolve and fetch the live PR target branch separately for Documentation Truth and test discovery, validate a full nonzero SHA and ancestry in the exact checked-out head, retain exact push-before ranges for push events, and fail without exporting a proof base on resolution or fetch failure."
+        ".github/workflows/ci.yml must resolve and fetch the live PR target branch separately for Documentation Truth and test discovery, validate a full nonzero SHA and ancestry in the exact checked-out head, retain exact push-before ranges for push events, and fail without exporting a proof base on resolution or fetch failure.",
+        "`.github/workflows/ci.yml` must preserve exact EXPECTED_HEAD_SHA checkout and fail-closed bash SHA equality in the bounded Asana read-only mapping migration-lint job before Supabase tooling, with same-range Documentation Truth, Test discovery, and Required Gate enforcement; passing branch CI cannot authorize merge, deployment, or Asana mutation."
       ]
     },
     {

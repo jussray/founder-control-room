@@ -12,6 +12,11 @@ owner: Juss
 
 # Juss Flow Launch Loop
 
+## Asana branch evidence boundary
+
+On bounded repair-branch CI runs, migration lint must use a fail-closed exact-checkout SHA assertion before Supabase tooling, and any change to that workflow must carry a substantive path-bound Documentation Truth receipt plus the required governance refresh in the same reviewed range. This evidence is branch- and commit-specific; no passing check can grant Asana write authority, merge approval, or production promotion.
+
+
 When verifying pull-request Documentation Truth or test discovery, resolve the live target branch, fetch its full SHA, and require it to be an ancestor of the exact checked-out candidate before computing the reviewed range. Stored event-base identity is historical context; default-branch push verification instead uses the exact before SHA. Invalid refs, unavailable fetches, malformed identities, and stale candidate ancestry fail closed without becoming product-regression or merge-approval claims.
 
 ## Goal
