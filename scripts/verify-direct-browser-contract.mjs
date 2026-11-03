@@ -18,7 +18,7 @@ assert.match(bootstrap, /--no-proxy-server/);
 assert.match(bootstrap, /delete process\.env\[key\]/);
 assert.match(bootstrap, /process\.env\.NO_PROXY = '\*'/);
 assert.match(bootstrap, /process\.env\.no_proxy = '\*'/);
-assert.equal(pkg.scripts['test:e2e'], 'npm run build && npm run verify:direct-browser && node e2e/pages-auth-callback-proof.mjs && node e2e/direct-browser-run.mjs && node e2e/truth-console-proof.mjs');
+assert.equal(pkg.scripts['test:e2e'], 'npm run build && npm run verify:direct-browser && node e2e/pages-auth-callback-proof.mjs && node e2e/direct-browser-run.mjs && node e2e/truth-console-proof.mjs && node e2e/member-entry-proof.mjs');
 assert.match(localPlaywrightProof, /from 'playwright'/);
 assert.match(localPlaywrightProof, /LOCAL_NO_PROVIDER_FEE/);
 assert.match(localPlaywrightProof, /providerWalletRequired: false/);
