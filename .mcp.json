@@ -7,6 +7,10 @@
         "X-MCP-Toolsets": "repos,issues,pull_requests,actions,code_security,secret_protection"
       }
     },
+    "grafana": {
+      "type": "http",
+      "url": "https://mcp.grafana.com/mcp"
+    },
     "context7": {
       "type": "http",
       "url": "https://mcp.context7.com/mcp"
