@@ -14,7 +14,7 @@ const expectedServerNames = [
   'github',
   'playwright',
   'supabase',
-];
+].sort();
 const expectedCloudflareServerNames = [
   'cloudflare',
   'cloudflare-bindings',
