@@ -90,3 +90,10 @@ jobs:
           node-version: '24'
       - name: Dispatch founder-approved read-only Sprite proof
         run: node scripts/bip-sprite-founder-dispatch.mjs
+      - name: Retain sanitized exact-head Sprite proof receipt
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: fcr-bip-sprite-dispatch-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/bip-sprite-dispatch/receipt.json
+          if-no-files-found: error
+          retention-days: 7
