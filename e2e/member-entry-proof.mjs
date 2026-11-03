@@ -54,13 +54,13 @@ const origin = 'http://127.0.0.1:' + server.address().port;
 await mkdir(outputDir, { recursive: true });
 let browser;
 try {
-  browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
+  browser = await chromium.launch({ headless: true, args: ['--no-sandbox', '--no-proxy-server'] });
   for (const [label, viewport] of [
     ['desktop', { width: 1440, height: 900 }],
     ['mobile', { width: 390, height: 844 }],
   ]) {
     const signedOut = await browser.newPage({ viewport });
-    await signedOut.goto(origin + '/member/', { waitUntil: 'networkidle' });
+    await signedOut.goto(origin + '/member/', { waitUntil: 'domcontentloaded' });
     await signedOut.waitForURL('**/welcome');
     await signedOut.getByRole('heading', { name: /Welcome to FCR/ }).waitFor();
     await signedOut.getByRole('heading', { name: 'Your personal workspace' }).waitFor();
@@ -75,7 +75,7 @@ try {
     const context = await browser.newContext({ viewport });
     await context.addCookies([{ name: 'member_fixture', value: '1', url: origin }]);
     const member = await context.newPage();
-    await member.goto(origin + '/member/', { waitUntil: 'networkidle' });
+    await member.goto(origin + '/member/', { waitUntil: 'domcontentloaded' });
     await member.getByRole('heading', { name: 'Your workspace is empty' }).waitFor();
     if (await member.locator('#workspace[hidden]').count()) throw Error('Authenticated member stayed hidden');
     if (await member.locator('.founder-email,.launch-dock').count()) throw Error('Founder controls leaked into member workspace');

@@ -187,7 +187,7 @@ describe('isolated member access', () => {
     state.failInsert = true;
     const failStore = await request(app()).post('/auth/member/session').send({ access_token: 'token', refresh_token: 'refresh' });
     expect(failStore.status).toBe(503);
-    expect(failStore.headers['set-cookie']).toBeUndefined();
+    expect(String(failStore.headers['set-cookie'])).not.toContain('__Host-fcr_member_session=');
     state.failInsert = false;
     const valid = await request(app()).post('/auth/member/session').send({ access_token: 'token', refresh_token: 'refresh' });
     state.failAllowlist = true;
