@@ -39,7 +39,7 @@ jobs:
       - name: Typecheck repository
         run: npm run typecheck
       - name: Run Jira claim unit tests
-        run: npx vitest run src/lib/__tests__/jiraActionReplayGate.test.ts src/lib/__tests__/jiraActionExecutor.test.ts src/lib/__tests__/jiraSupabaseActionStore.test.ts
+        run: npx vitest run src/lib/__tests__/jiraActionIdentity.test.ts src/lib/__tests__/jiraActionReplayGate.test.ts src/lib/__tests__/jiraActionExecutor.test.ts src/lib/__tests__/jiraSupabaseActionStore.test.ts
       - name: Verify migration in ephemeral PostgreSQL
         env:
           PGPASSWORD: test-only-password
