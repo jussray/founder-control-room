@@ -95,3 +95,43 @@ body{background:radial-gradient(ellipse at 50% -12%,rgba(103,83,217,.32),transpa
   .quote-serif { display: none; }
   .f-head { min-height: 260px; padding: 1.7rem 1.3rem; }
 }
+
+/* Source-image fidelity polish: keep the mountain hero prominent on every viewport. */
+@media (min-width: 981px) {
+  .hero { min-height: clamp(560px, 66vh, 720px); }
+  .hero-art img { object-position: 56% 53%; }
+  .hero-copy { max-width: 620px; }
+  .hero h1 { line-height: 1.04; }
+}
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .card { transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease; }
+  a.card:hover, a.card:focus-visible {
+    transform: translateY(-3px);
+    box-shadow: 0 24px 55px rgba(12, 10, 46, .42), 0 0 26px rgba(115, 104, 255, .16);
+  }
+}
+.f-head { isolation: isolate; overflow: hidden; }
+.f-head::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: radial-gradient(circle at 78% 23%, rgba(255, 190, 126, .23), transparent 34%);
+}
+.f-head > * { position: relative; z-index: 1; }
+.sunrise { min-height: 165px; display: grid; align-content: end; gap: .3rem; }
+.sunrise strong, .sunrise span { text-shadow: 0 2px 16px rgba(2, 4, 19, .8); }
+@media (max-width: 700px) {
+  .topbar { gap: .65rem; }
+  .navlinks { gap: .2rem; }
+  .hero { min-height: 490px; }
+  .hero h1 { font-size: clamp(2.55rem, 9.5vw, 4rem); line-height: 1.03; }
+  .hero-tag { display: none; }
+  .hero-art img { object-position: 64% 50%; }
+  .sub { max-width: 25ch; }
+  .f-head { min-height: 280px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .card, a.card:hover, a.card:focus-visible { transition: none; transform: none; }
+}
