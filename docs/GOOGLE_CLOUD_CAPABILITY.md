@@ -59,6 +59,32 @@ Recommended non-secret config:
 
 Project ID and declared scopes are metadata, not credentials.
 
+## Google Workspace file capability is separate
+
+Google Cloud CLI/project authority and Google Drive/Docs/Sheets/Slides file
+authority are different consent and credential domains. Keep their existing
+`project_connections.connection_type = 'other'` entries separately labeled
+`Google Cloud` and `Google Drive`; only the **exact** Drive label is mapped
+to Google Drive in Plugin Center. A configured connection row does not prove
+a live account-specific OAuth grant.
+
+The checked-in `google-drive` capability in Plugin Center is **discovery and
+read-contract metadata**, not a production Google Workspace adapter. Existing
+ChatGPT Google Drive connector permission never carries into FCR or Chief.
+A live feature needs its own authorized per-user OAuth flow and scoped token
+storage, workspace read verification, and exact-file readback for writes.
+The canonical Google Drive, google-docs, google-sheets, google-slides and
+google-drive-comments skills remain host-specific; no skill file in this repo
+installs them into ChatGPT or gives them access to customer files.
+
+For source-level audit or defensive review use
+`npm run verify:scoped-parallel-proof-workflow`. For actual functionality,
+exercise authorized account A and account B against different files and
+prove (1) allowed read, (2) denied cross-tenant read, (3) denied stale
+revision or missing write approval, (4) exact provider write receipt and
+readback, and (5) no private content in logs/receipts. Do not mark a
+connection `VERIFIED` from catalog text or a synthetic test.
+
 ## Proof gate
 
 Run:
