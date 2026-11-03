@@ -13,7 +13,7 @@ export const WORKER = 'founder-control-room';
 export function safePreflightError(error) {
   if (!(error instanceof Error)) return 'provider-preflight-failed';
   const code = error.message;
-  if (/^(?:missing-cloudflare-preflight-credential|invalid-worker-account-config|worker-account-mismatch|provider-settings-not-verified|malformed-provider-bindings|duplicate-provider-binding-names|credential-binding-not-secret|provider-request-failed|provider-response-invalid)$/.test(code)) {
+  if (/^(?:missing-cloudflare-preflight-credential|invalid-worker-account-config|worker-account-mismatch|provider-settings-not-verified|malformed-provider-bindings|duplicate-provider-binding-names|credential-binding-not-secret|undeclared-plaintext-binding|json-config-binding-not-reviewed|provider-request-failed|provider-response-invalid)$/.test(code)) {
     return code;
   }
   if (/^provider-settings-http-[1-5][0-9]{2}$/.test(code)) return code;
@@ -106,7 +106,11 @@ export function validateBindingTypes(payload, { allowStaleCfApiTokenRemoval = fa
       ? 'verified-name-type-only'
       : repairableStaleCfApiToken
         ? 'repairable-stale-cf-api-token-plaintext'
-        : 'credential-binding-not-secret',
+        : hasUnreviewedJson
+          ? 'json-config-binding-not-reviewed'
+          : hasUndeclaredPlainText
+            ? 'undeclared-plaintext-binding'
+            : 'credential-binding-not-secret',
     unsafe,
     repairableStaleCfApiToken,
   };
