@@ -29,7 +29,7 @@ jobs:
         run: |
           set -euo pipefail
           npm run verify:scoped-parallel-proof-workflow
-          npx vitest run src/lib/__tests__/pluginCenterGoogleWorkspace.test.ts src/lib/__tests__/fcrStandingCommandRegistry.test.ts src/lib/__tests__/fcrSkillRouter.test.ts src/http/routes/__tests__/pluginCenter.integration.test.ts src/founder-os-lab/__tests__/pluginManagement.contract.test.ts
+          npx vitest run src/lib/__tests__/pluginCenterGoogleWorkspace.test.ts src/googleWorkspace/__tests__/fileMetadata.test.ts src/lib/__tests__/fcrStandingCommandRegistry.test.ts src/lib/__tests__/fcrSkillRouter.test.ts src/http/routes/__tests__/pluginCenter.integration.test.ts src/founder-os-lab/__tests__/pluginManagement.contract.test.ts
   typecheck:
     name: Typecheck and lint
     runs-on: ubuntu-latest
