@@ -6,6 +6,8 @@ import { chromium } from 'playwright';
 const publicDir = resolve(process.cwd(), 'public');
 const outputDir = resolve('test-results/fcr-member-entry');
 const staticPaths = new Map([
+  ['/', 'index.html'],
+  ['/fcr-public-tabs.js', 'fcr-public-tabs.js'],
   ['/welcome', 'welcome.html'],
   ['/assets/welcome-door.js', 'assets/welcome-door.js'],
   ['/member/', 'member/index.html'],
@@ -59,6 +61,15 @@ try {
     ['desktop', { width: 1440, height: 900 }],
     ['mobile', { width: 390, height: 844 }],
   ]) {
+    const publicPage = await browser.newPage({ viewport });
+    await publicPage.goto(origin + '/', { waitUntil: 'domcontentloaded' });
+    await publicPage.getByRole('tab', { name: 'Founder View' }).click();
+    await publicPage.locator('#view-founder:not([hidden])').waitFor();
+    const publicProjects = publicPage.locator('#view-founder #projects');
+    await publicProjects.getByText(/Private projects are not listed/).waitFor();
+    if (await publicProjects.locator('.row').count()) throw Error('Public founder preview leaks named projects');
+    await publicPage.screenshot({ path: outputDir + '/' + label + '-public-founder-preview.png', fullPage: true });
+    await publicPage.close();
     const signedOut = await browser.newPage({ viewport });
     await signedOut.goto(origin + '/member/', { waitUntil: 'domcontentloaded' });
     await signedOut.waitForURL('**/welcome');
