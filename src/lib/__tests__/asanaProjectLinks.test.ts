@@ -24,5 +24,6 @@ describe("read-only Asana identity mapping", () => {
   it("rejects unauditable identities and observations", () => {
     expect(() => linkAsanaTask("sekret-bip", { gid: "invalid", name: "Task", completed: false }, "2026-11-03T13:00:00Z")).toThrow();
     expect(() => linkAsanaTask("sekret-bip", { gid: "123", name: "Task", completed: false }, "not-a-date")).toThrow();
+    expect(() => linkAsanaTask("unknown-project" as "sekret-bip", { gid: "123", name: "Task", completed: false }, "2026-11-03T13:00:00Z")).toThrow("Unlinked FCR project");
   });
 });
