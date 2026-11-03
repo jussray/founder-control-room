@@ -19,3 +19,79 @@ body{background:radial-gradient(ellipse at 50% -12%,rgba(103,83,217,.32),transpa
 @media(max-width:700px){.topbar{position:relative;border-radius:0}.hero{min-height:0}.hero::before{height:38%}.hero-art{opacity:.65}.hero h1{font-size:clamp(2.5rem,10vw,4.3rem)}}
 @media(prefers-reduced-motion:reduce){.btn{transition:none}}
 @media(prefers-reduced-transparency:reduce){.topbar{background:#080e25;backdrop-filter:none}.card,.panel,.stat{background:#111b37}}
+
+/* 2026-11-03: image-reference visual fidelity pass (public views only). */
+.hero {
+  display: flex;
+  align-items: center;
+  min-height: 570px;
+  isolation: isolate;
+  padding: clamp(2rem, 5vw, 4rem);
+  overflow: hidden;
+}
+.hero::before { display: none; }
+.hero-art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  border: 0;
+  border-radius: 0;
+  margin: 0;
+  z-index: 0;
+  filter: none;
+  overflow: hidden;
+}
+.hero-art img {
+  object-position: 60% 55%;
+  filter: saturate(1.14) contrast(1.08);
+}
+.hero-art::after {
+  background:
+    linear-gradient(90deg, rgba(5, 7, 27, .95), rgba(5, 8, 28, .79) 45%, rgba(7, 11, 31, .16) 87%),
+    linear-gradient(0deg, rgba(6, 7, 24, .82), transparent 45%);
+}
+.hero-copy {
+  position: relative;
+  z-index: 2;
+  width: min(660px, 70%);
+}
+.hero-tag, .quote-serif { z-index: 2; }
+.quote-serif {
+  top: auto;
+  bottom: 1.5rem;
+  right: 2.5rem;
+  text-shadow: 0 2px 18px #020317;
+}
+.f-head {
+  min-height: 320px;
+  position: relative;
+  align-items: center;
+  padding: 2.7rem 2rem;
+  background:
+    linear-gradient(90deg, rgba(5, 8, 29, .96), rgba(6, 11, 37, .7) 50%, rgba(11, 11, 35, .25)),
+    url('/assets/front-door/hero-peak.jpg') center 56% / cover;
+}
+.f-head h2 {
+  font-size: clamp(2rem, 4.3vw, 4rem);
+  text-shadow: 0 6px 30px #050717;
+}
+.sunrise {
+  background:
+    linear-gradient(90deg, rgba(10, 13, 44, .8), rgba(11, 15, 45, .2)),
+    url('/assets/front-door/hero-peak.jpg') center 65% / cover;
+}
+@media (max-width: 700px) {
+  .hero { min-height: 500px; padding: 2rem 1.3rem; }
+  .hero-copy { width: 100%; }
+  .hero-art { opacity: 1; }
+  .hero-art img { object-position: 60% 50%; }
+  .hero-art::after {
+    background:
+      linear-gradient(90deg, rgba(5, 7, 27, .95), rgba(5, 8, 28, .78) 80%),
+      linear-gradient(0deg, rgba(6, 7, 24, .85), transparent 56%);
+  }
+  .quote-serif { display: none; }
+  .f-head { min-height: 260px; padding: 1.7rem 1.3rem; }
+}
