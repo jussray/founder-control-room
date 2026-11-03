@@ -88,7 +88,7 @@ describe('per-user Google Workspace metadata read', () => {
     [{ expiresAt: '2025-01-01T00:00:00.000Z' }, 'expired grant'],
     [{ scopes: ['https://www.googleapis.com/auth/userinfo.email'] }, 'sign-in-only token'],
     [{ scopes: ['https://www.googleapis.com/auth/drive'] }, 'unnecessarily broad scope'],
-  ])('fails closed for %s (%s) before making Google requests', async (override) => {
+  ] as Array<[Partial<WorkspaceGrant>, string]>)('fails closed for %s (%s) before making Google requests', async (override: Partial<WorkspaceGrant>, _case: string) => {
     const f = fixture(override);
     await expect(readScopedFileMetadata(f.input, f.dependencies)).rejects.toBeInstanceOf(WorkspaceMetadataAccessDenied);
     expect(f.fetchMetadata).not.toHaveBeenCalled();
