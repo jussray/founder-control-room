@@ -59,6 +59,28 @@ The GitHub App **Client ID is not used** by the current installation-token witne
 `APP_ID` and `APP_PRIVATE_KEY` must identify the same installed App. The read-only `github-app-secret-shape-diagnostic.yml` proves only local credential transport/PEM/RSA shape and explicitly performs no provider authentication or issuer readback. For workflows that claim provider proof, success must separately establish that both mapped runtime values were usable and that provider readback reports the expected App issuer; secret-name presence or a green shape diagnostic alone is not provider proof.
 
 
+#### Failed shape diagnostic: verify the effective Actions secret
+
+On the `github-app-secret-shape-diagnostic.yml` job, `environment: production` means
+`secrets.APP_PRIVATE_KEY` may resolve to the **production environment secret**;
+that value overrides a repository secret with the same name. A secret being
+present (`present=true`) does not prove it contains a valid GitHub App RSA key.
+The workflow exposes only boolean `input_shape` facts and a bounded
+`failure_reason`, never private-key bytes or length.
+
+If `failure_reason=private-key-transport-unrecognized`, verify the **effective**
+`APP_PRIVATE_KEY` in Settings → Secrets and variables → Actions, including the
+`production` environment's secrets. Confirm that it is the **complete contents**
+of the private-key `.pem` downloaded for the matching GitHub App, not the file
+path, client secret, App ID, installation token, or a placeholder. Check both
+repository and `production` scopes for same-name shadowing before considering
+any credential change. Store the key only through GitHub's secret UI; never
+paste it into a chat, issue, workflow log, artifact, source file, or PR.
+
+Changing parser code cannot make an incorrect or damaged stored credential
+valid. A shape-valid result is local cryptographic evidence only; the separately
+authorized provider-authentication and issuer readback are still required.
+
 #### Accepted `APP_PRIVATE_KEY` transport shapes
 
 Secret input fields damage PEM text in predictable ways, so the private key is
