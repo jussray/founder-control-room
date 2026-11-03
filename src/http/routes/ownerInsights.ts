@@ -1,4 +1,5 @@
 import { Router, type Response } from 'express';
+import { rateLimit } from 'express-rate-limit';
 import { supabase } from '../../lib/supabaseClient.js';
 import { requireFounder, type FounderRequest } from '../middleware/requireFounder.js';
 import {
@@ -7,7 +8,15 @@ import {
 } from '../../owner-intelligence/ownerInsights.js';
 
 export const ownerInsightsRouter = Router();
-ownerInsightsRouter.use(requireFounder);
+const ownerInsightsRateLimit = rateLimit({
+  windowMs: 60_000,
+  limit: 5,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  message: { contract: OWNER_INTELLIGENCE_CONTRACT, status: 'BLOCKED', code: 'OWNER_INSIGHTS_RATE_LIMITED' },
+});
+// Restrict both authentication attempts and expensive provider calls.
+ownerInsightsRouter.use(ownerInsightsRateLimit, requireFounder);
 ownerInsightsRouter.use((_req,res,next)=>{
   res.setHeader('Cache-Control','private, no-store');
   res.setHeader('X-Robots-Tag','noindex, nofollow');
