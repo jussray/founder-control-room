@@ -91,6 +91,38 @@ projectsRouter.post("/", requireFounder, async (req: FounderRequest, res) => {
 });
 
 /**
+ * GET /projects/:slug/asana-link
+ *
+ * Founder-only coordination pointer. This does not fetch or mutate Asana tasks,
+ * and does not confer any release or merge authority.
+ */
+projectsRouter.get("/:slug/asana-link", requireFounder, async (req: FounderRequest, res) => {
+  const { ASANA_PROJECT_LINKS } = await import("../../lib/asanaProjectLinks.js");
+  const slug = req.params.slug;
+  if (!Object.prototype.hasOwnProperty.call(ASANA_PROJECT_LINKS, slug)) {
+    return res.status(404).json({ error: "No Asana project linked to this slug" });
+  }
+
+  const { data: project, error } = await supabase
+    .from("projects")
+    .select("id, slug")
+    .eq("slug", slug)
+    .maybeSingle();
+  if (error) return res.status(500).json({ error: error.message });
+  if (!project) return res.status(404).json({ error: "FCR project is not registered" });
+
+  return res.json({
+    fcrProjectId: project.id,
+    fcrProjectSlug: project.slug,
+    asanaProjectId: ASANA_PROJECT_LINKS[slug as keyof typeof ASANA_PROJECT_LINKS],
+    source: "asana",
+    mode: "read-only",
+    releaseAuthorized: false,
+    taskState: "not-fetched",
+  });
+});
+
+/**
  * GET /projects/:slug/releases
  *
  * Release Center — read-only. `docs/BLUEPRINT.md` explicitly lists
