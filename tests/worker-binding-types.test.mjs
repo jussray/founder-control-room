@@ -164,3 +164,40 @@ test('provider JSON parsing errors and unsafe binding names do not reveal respon
     { message: 'credential-binding-not-secret' },
   );
 });
+
+// Security regression: aliases must not clear the gate by case, plural, suffix or version.
+test('credential binding aliases reject unsafe plaintext including compact uppercase names', () => {
+  for (const name of [
+    'API_TOKEN2', 'apiToken', 'SESSION_TOKENS', 'GITHUB_APP_PEM2', 'CFAPIToken',
+    'CFAPITOKEN', 'CFAPIKEY', 'OPENAIAPIKEY', 'GITHUBPRIVATEKEY',
+    'SESSIONTOKENS', 'CFAPITOKENV2', 'WEBHOOKKEY',
+  ]) {
+    const verdict = validateBindingTypes(response([{ name, type: 'plain_text', text: 'fixture-secret-never-log' }]));
+    assert.equal(verdict.ok, false, name);
+    assert.equal(verdict.reason, 'credential-binding-not-secret', name);
+    assert.doesNotMatch(JSON.stringify(verdict), /fixture-secret-never-log/);
+  }
+});
+
+test('tokenizer, keyword, monkey and other noncredential names stay public', () => {
+  assert.equal(validateBindingTypes(response([
+    { name: 'MONKEY_MODE', type: 'plain_text', text: 'enabled' },
+    { name: 'FCR_TOKENIZER_MODE', type: 'plain_text', text: 'enabled' },
+    { name: 'REPOSITORY_KEYWORD', type: 'plain_text', text: 'guide' },
+    { name: 'DONKEY_MODE', type: 'plain_text', text: 'enabled' },
+  ])).ok, true);
+});
+
+test('blank provider binding names and types block without exposing values', () => {
+  for (const binding of [
+    { name: '', type: 'plain_text', text: 'never-log' },
+    { name: '   ', type: 'plain_text', text: 'never-log' },
+    { name: 'FCR_MODE', type: '', text: 'never-log' },
+    { name: 'FCR_MODE', type: '  ', text: 'never-log' },
+  ]) {
+    const verdict = validateBindingTypes(response([binding]));
+    assert.equal(verdict.ok, false);
+    assert.equal(verdict.reason, 'malformed-provider-bindings');
+    assert.doesNotMatch(JSON.stringify(verdict), /never-log/);
+  }
+});
