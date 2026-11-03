@@ -40,7 +40,7 @@ export function linkAsanaTask(
   task: AsanaTaskSnapshot,
   observedAt: string,
 ): LinkedAsanaTask {
-  if (!/^\\d+$/.test(task.gid) || !task.name.trim()) {
+  if (!/^[0-9]+$/.test(task.gid) || !task.name.trim()) {
     throw new Error("Invalid Asana task identity");
   }
   if (!Number.isFinite(Date.parse(observedAt))) {
