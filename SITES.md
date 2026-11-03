@@ -71,6 +71,16 @@ The Site must never:
 
 Every write must preserve unrelated work and include repository, base, branch, exact head, changed paths, verification state, rollback, and the next authority gate.
 
+## User-supplied command-center Site candidate (not provider verified)
+
+The founder supplied `https://fcr-command-center.jussray.chatgpt.site` as a command-center Site address on 2026-11-03. This is a **user-reported candidate**, not proof of Site ownership, publication, runtime binding, DNS configuration, or access control. `site_identity_status`, `chatgpt_site_url`, `account_owner`, and `continuity_status` stay unchanged until verified by the Site editor/runtime.
+
+The repository now includes a **disabled-by-default** read-only `GET /site/command-center/bootstrap` route. It requires issuer-verified, resource-bound OAuth bearer tokens; an exact configured founder Auth UUID plus the existing founder allowlist is required for owner role. Owner requests return a link to the first-party authenticated Control Room, **never founder workspace data**. Other authenticated accounts receive only their tenant-scoped public project summaries (empty for an unprovisioned account, 503 when storage is unavailable). Neither account receives execution authority.
+
+Deployment prerequisites are **separate**: verify this exact Site's account/editor binding; configure the Site's OAuth authorization-code/PKCE flow with the exact audience `https://api.foundercontrolroom.org/site/command-center` and approved client ID; establish a server-side `FCR_COMMAND_CENTER_OWNER_USER_ID` from verified Supabase Auth (never a guessed email); configure the exact Site Origin in `FOUNDER_ALLOWED_ORIGINS` *only after site verification*; validate the first-party owner route's Cloudflare Access and session gates; then enable `FCR_COMMAND_CENTER_SITE_ENABLED=true` after customer tenant/RLS and two-account browser tests pass. The ChatGPT Site host is not automatically covered by Cloudflare Access policies for `foundercontrolroom.org`.
+
+Do not use `SameSite=Strict` owner cookies as cross-site authentication; do not put credentials in frontend code; do not reveal private founder data through the Site; do not treat this source implementation as a published Site or a production security guarantee.
+
 ## Site publication contract
 
 A Site identity is executable only after the ChatGPT Sites runtime exposes and verifies that exact Site identity. No slug, hostname, project ID, or generated URL may be guessed from naming conventions.
