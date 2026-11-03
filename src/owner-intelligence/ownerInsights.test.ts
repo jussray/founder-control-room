@@ -32,7 +32,7 @@ describe('Search Console read-only monitoring',()=>{
   it('shows submitted sitemaps separately from five observed URL inspections',async()=>{
     let inspections=0;
     const urls:string[]=[];
-    const requester=async (input:URL|string|Request,init?:RequestInit)=>{
+    const requester=async (input:URL|string|Request)=>{
       const url=String(input);urls.push(url);
       if(url.endsWith('/token'))return json({access_token:'test_token_aaaaaaaaaaaa'});
       if(url.endsWith('/sitemaps'))return json({sitemap:[{path:'https://www.foundercontrolroom.org/sitemap.xml',isPending:false,errors:'0',warnings:'1'}]});
