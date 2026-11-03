@@ -19,7 +19,18 @@ export function safePreflightError(error) {
   if (/^provider-settings-http-[1-5][0-9]{2}$/.test(code)) return code;
   return 'provider-preflight-failed';
 }
-const CREDENTIAL_BINDING = /(?:^|_)(?:TOKEN|SECRET|PASSWORD|PASSWD|KEY|CREDENTIAL|HMAC|PEM|SEED|APIKEY)(?:_|$)/i;
+const CREDENTIAL_WORDS = new Set(['TOKEN', 'SECRET', 'PASSWORD', 'PASSWD', 'KEY', 'CREDENTIAL', 'HMAC', 'PEM', 'SEED', 'APIKEY']);
+export function isCredentialBindingName(name) {
+  const parts = String(name)
+    .replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2')
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .split(/[^A-Za-z]+/)
+    .filter(Boolean)
+    .map(part => part.toUpperCase());
+  return parts.some(part =>
+    CREDENTIAL_WORDS.has(part) || (part.endsWith('S') && CREDENTIAL_WORDS.has(part.slice(0, -1))),
+  );
+}
 
 export function validateBindingTypes(payload, { allowStaleCfApiTokenRemoval = false } = {}) {
   const bindings = payload?.result?.bindings;
@@ -34,7 +45,7 @@ export function validateBindingTypes(payload, { allowStaleCfApiTokenRemoval = fa
   for (const { name, type } of bindings) {
     if (seen.has(name)) return { ok: false, reason: 'duplicate-provider-binding-names', unsafe: [] };
     seen.add(name);
-    if (CREDENTIAL_BINDING.test(name) && type !== 'secret_text' && type !== 'secrets_store_secret') {
+    if (isCredentialBindingName(name) && type !== 'secret_text' && type !== 'secrets_store_secret') {
       unsafe.push({ name, type });
     }
   }
