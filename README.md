@@ -1,3 +1,7 @@
+# Grafana IRM portfolio candidate (branch only, not live)
+
+`integration/grafana-irm-portfolio-20261103` adds a credential-free Grafana Cloud MCP client declaration and an optional, fail-closed, sanitized portfolio-actions alert bridge. See `docs/GRAFANA_IRM_PORTFOLIO.md` for activation prerequisites. Its presence in source **does not** establish Grafana OAuth, GitHub secret provisioning, Telegram channel activation, delivery, merge or deployment.
+
 # Founder Control Room
 
 ## November 1, 2026: bounded GitHub App transport reconciliation
