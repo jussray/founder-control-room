@@ -36,7 +36,20 @@ describe('Founder Control Room Cloudflare topology', () => {
     expect(landing).toContain('id="community-f" aria-labelledby="founder-community-title"');
     expect(landing).toContain('<h3 id="founder-community-title">Founder Community</h3>');
     expect(landing).toContain('<script src="/fcr-public-tabs.js" defer></script>');
-    expect(landing).not.toMatch(/<script\b(?![^>]*\bsrc=)/i);
+    // The page's CSP prohibits executable inline scripts. A single inert,
+    // tightly validated application/ld+json schema payload is allowed data.
+    const inlineScripts = landing.match(/<script\\b(?![^>]*\\bsrc=)[^>]*>[\\s\\S]*?<\\/script>/gi) ?? [];
+    expect(inlineScripts).toHaveLength(1);
+    const schemaTag = inlineScripts[0] ?? '';
+    expect(schemaTag).toMatch(/^<script type="application\\/ld\\+json">/);
+    const schemaText = schemaTag.replace(/^<script[^>]*>/i, '').replace(/<\\/script>$/i, '').trim();
+    expect(schemaText).not.toMatch(/<|>|\\u0000/);
+    const structured = JSON.parse(schemaText) as {
+      '@context': string;
+      '@graph': Array<{ '@type': string }>;
+    };
+    expect(structured['@context']).toBe('https://schema.org');
+    expect(structured['@graph'].map(item => item['@type'])).toEqual(['Organization', 'WebSite']);
     const tabController = read('public/fcr-public-tabs.js');
     expect(tabController).toContain("addEventListener('keydown'");
     expect(tabController).toContain("addEventListener('hashchange'");
