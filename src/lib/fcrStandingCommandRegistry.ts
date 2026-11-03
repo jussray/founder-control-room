@@ -112,7 +112,7 @@ export const FCR_STANDING_COMMAND_REGISTRY: readonly FcrStandingCommandDescripto
   { id: 'ooda', aliases: ['/ooda', 'ooda'], owningOs: 'preflight-os', kind: 'workflow', autoTrigger: 'iterative observe-orient-decide-act-verify loops', mayExecute: false },
   { id: 'l99', aliases: ['/l99', 'l99'], owningOs: 'preflight-os', kind: 'mode', autoTrigger: 'authority, state, evidence, rollback, and compounding-value review', mayExecute: false },
   { id: 'goalfix', aliases: ['/goalfix', '/fixfast', '/repair-verify-merge', '/goal', 'goalfix'], owningOs: 'founder-control-room', kind: 'workflow', autoTrigger: 'focused repair, bug, regression, broken runtime, or failing proof', mayExecute: false },
-  { id: 'attack', aliases: ['/attack', 'attack ten', 'attack against itself ten times', 'attack n'], owningOs: 'council-os', kind: 'mode', autoTrigger: 'explicit attack depth or adversarial stress-testing request', mayExecute: false },
+  { id: 'attack', aliases: ['/attack', '/godmode', 'godmode', 'attack ten', 'attack 48000', 'attack against itself ten times', 'attack n'], owningOs: 'council-os', kind: 'mode', autoTrigger: 'explicit attack depth or adversarial stress-testing request', mayExecute: false },
   { id: 'makevideo', aliases: ['/makevideo', 'makevideo'], owningOs: 'video-production-os', dependentOsIds: ['media-router-os'], kind: 'entrypoint', autoTrigger: 'clear video, movie, reel, cinematic, shot, or video-generation intent', mayExecute: false },
   { id: 'leevize', aliases: ['/leevize', 'leevize'], owningOs: 'video-production-os', dependentOsIds: ['media-router-os'], kind: 'workflow', autoTrigger: 'cinematic direction, world direction, shot continuity, or visual-story production', mayExecute: false },
   { id: 'plan', aliases: ['/plan', 'plan'], owningOs: 'founder-control-room', kind: 'control', autoTrigger: 'planning actions and explicit plan requests', mayExecute: false },
@@ -209,7 +209,7 @@ function explicitCommandIdsFromGoal(goal: string): string[] {
   for (const marker of ['ultrathink', 'truthmode', 'confess', 'redteam', 'lindymode', 'ooda', 'l99', 'goalfix', 'makevideo', 'leevize']) {
     if (new RegExp(`\\b${marker}\\b`).test(goal)) pushUnique(ids, marker);
   }
-  if (/\battack\s+(?:\d+|ten)\b/.test(goal) || goal.includes('attack against itself ten times')) pushUnique(ids, 'attack');
+  if (/\battack\s+(?:\d+|ten)\b/.test(goal) || goal.includes('attack against itself ten times') || /\bgodmode\b/.test(goal)) pushUnique(ids, 'attack');
   return ids;
 }
 
@@ -240,7 +240,7 @@ export function routeFcrStandingCommands(rawGoal: string, action: FcrStandingCom
     pushUnique(autoRoutedCommandIds, 'makevideo');
     pushUnique(autoRoutedCommandIds, 'leevize');
   }
-  if (/\b(attack|adversarial|stress[- ]?test)\b/.test(goal)) {
+  if (/\b(attack|godmode|adversarial|stress[- ]?test)\b/.test(goal)) {
     pushUnique(autoRoutedCommandIds, 'attack');
     pushUnique(autoRoutedCommandIds, 'devil');
   }
