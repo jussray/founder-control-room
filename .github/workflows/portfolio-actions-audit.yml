@@ -8,15 +8,25 @@ on:
       - 'scripts/grafana-irm-portfolio-notifier.mjs'
       - 'scripts/grafana-irm-portfolio-notifier.test.mjs'
       - 'docs/GRAFANA_IRM_PORTFOLIO.md'
+      - '.mcp.json'
+      - '.mcp.example.json'
+      - '.vscode/mcp.json'
+      - 'config/mcp-skill-routing.json'
+      - 'scripts/verify-mcp-config.mjs'
       - 'scripts/mint-portfolio-github-app-token.mjs'
       - '.github/workflows/portfolio-actions-audit.yml'
   push:
-    branches: [main]
+    branches: [main, integration/grafana-irm-portfolio-20261103]
     paths:
       - 'scripts/portfolio-actions-audit.mjs'
       - 'scripts/grafana-irm-portfolio-notifier.mjs'
       - 'scripts/grafana-irm-portfolio-notifier.test.mjs'
       - 'docs/GRAFANA_IRM_PORTFOLIO.md'
+      - '.mcp.json'
+      - '.mcp.example.json'
+      - '.vscode/mcp.json'
+      - 'config/mcp-skill-routing.json'
+      - 'scripts/verify-mcp-config.mjs'
       - 'scripts/mint-portfolio-github-app-token.mjs'
       - '.github/workflows/portfolio-actions-audit.yml'
   schedule:
@@ -58,12 +68,14 @@ jobs:
         run: node scripts/portfolio-actions-audit.mjs --self-test
       - name: Validate private-data-minimized Grafana notification contract offline
         run: node --test scripts/grafana-irm-portfolio-notifier.test.mjs
+      - name: Verify OAuth MCP configs remain credential-free and scoped
+        run: node scripts/verify-mcp-config.mjs
       - name: Validate read-only audit token permissions without credentials
         run: node scripts/mint-portfolio-github-app-token.mjs --self-test-token-profiles
 
   observe:
     name: Audit accessible installation repositories (read-only)
-    if: github.event_name != 'pull_request'
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     needs: regression
     runs-on: ubuntu-24.04
     timeout-minutes: 20
