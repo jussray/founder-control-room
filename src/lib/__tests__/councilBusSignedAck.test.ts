@@ -2,7 +2,7 @@ import {describe,it,expect} from 'vitest';
 import {createSignedCouncilBusAckVerifier,canonicalBusPrincipalSubject,canonicalCouncilAckPayload,COUNCIL_BUS_SIGNED_ACK,type CouncilBusAckKey} from '../councilBusSignedAck.js';
 
 async function fixture(){
-  const pair=await crypto.subtle.generateKey({name:'Ed25519'},true,['sign','verify']);
+  const pair=(await crypto.subtle.generateKey({name:'Ed25519'},true,['sign','verify'])) as CryptoKeyPair;
   const now=new Date('2026-11-02T20:00:00.000Z');
   const key='a'.repeat(64);
   const principal={authenticated:true,subject:'founder',tenant:'juss'};
