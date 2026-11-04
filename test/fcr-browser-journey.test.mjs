@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { enforceSameOriginRoute, validateJourney, validateOrigin, substituteVariables } from '../scripts/fcr-browser-journey.mjs';
+import { enforceSameOriginRoute, enforceSameOriginWebSocket, validateJourney, validateOrigin, substituteVariables } from '../scripts/fcr-browser-journey.mjs';
 
 const manifest = JSON.parse(readFileSync(new URL('../config/browser-journeys/sync-party.json', import.meta.url), 'utf8'));
 const copy = () => structuredClone(manifest);
@@ -103,3 +103,27 @@ test('the network guard fulfills normal same-origin responses but never fetches 
   await enforceSameOriginRoute(route('https://elsewhere.example/leak', 200), 'https://games.jussco.company');
   assert.deepEqual(actions, [['abort', 'blockedbyclient']]);
 });
+
+test('WebSocket guard only forwards the approved origin and rejects external sockets', () => {
+  const calls = [];
+  const socketRoute = (url) => ({
+    url: () => url,
+    connectToServer: () => { calls.push(['connect', url]); },
+    close: (options) => { calls.push(['close', options.code]); },
+  });
+  const origin = 'https://games.jussco.company';
+  enforceSameOriginWebSocket(socketRoute('wss://games.jussco.company/sync'), origin);
+  assert.deepEqual(calls, [['connect', 'wss://games.jussco.company/sync']]);
+  for (const foreign of [
+    'wss://evil.example/sync',
+    'wss://games.jussco.company.evil.example/sync',
+    'wss://games.jussco.company:8443/sync',
+    'ws://games.jussco.company/sync',
+    'not-a-websocket',
+  ]) {
+    calls.length = 0;
+    enforceSameOriginWebSocket(socketRoute(foreign), origin);
+    assert.deepEqual(calls, [['close', 1008]], foreign);
+  }
+});
+
