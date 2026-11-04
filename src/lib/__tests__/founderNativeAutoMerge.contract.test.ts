@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 const readRepo = (path: string): string =>
-  readFileSync(new URL(\`../../../\${path}\`, import.meta.url), 'utf8');
+  readFileSync(new URL(`../../../${path}`, import.meta.url), 'utf8');
 
 // Source-only guard. GitHub, not an agent, executes native auto-merge after
 // its live required conditions pass. No provider state is fabricated here.
@@ -10,7 +10,7 @@ describe('founder-selected GitHub native Auto-merge contract', () => {
   it('preserves the authenticated founder one-click queue', () => {
     const policy = readRepo('GLOBAL_AI.md');
     expect(policy).toContain('FOUNDER_NATIVE_AUTO_MERGE_V1');
-    expect(policy).toContain('authenticated \`jussray\` GitHub account');
+    expect(policy).toContain('authenticated `jussray` GitHub account');
     expect(policy).toContain('no second manual merge click');
     expect(policy).toContain('only GitHub performs the eventual merge');
     expect(policy).toContain('required deployments');
