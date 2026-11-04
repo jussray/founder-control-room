@@ -254,6 +254,12 @@ const wrangler = read('wrangler.worker.toml');
 const requiredSecretsMatch = wrangler.match(/\[secrets\][\s\S]*?required\s*=\s*\[([\s\S]*?)\]/m);
 requireValue(Boolean(requiredSecretsMatch), 'wrangler.worker.toml must declare [secrets].required');
 const workerRequiredSecrets = requiredSecretsMatch ? quotedNames(requiredSecretsMatch[1]) : [];
+// Founder Path B ruling (2026-10-30): feature secrets moved to
+// [secrets].optional are still declared Worker secret names; they are
+// installed before feature activation instead of gating deployment.
+const optionalSecretsMatch = wrangler.match(/\[secrets\][\s\S]*?optional\s*=\s*\[([\s\S]*?)\]/m);
+const workerOptionalSecrets = optionalSecretsMatch ? quotedNames(optionalSecretsMatch[1]) : [];
+const workerDeclaredSecrets = [...workerRequiredSecrets, ...workerOptionalSecrets];
 requireValue(workerRequiredSecrets.length > 0, 'Worker required secret set must not be empty');
 for (const duplicate of duplicates(workerRequiredSecrets)) {
   fail(`wrangler.worker.toml repeats required secret ${duplicate}`);
@@ -330,7 +336,11 @@ if (canonicalEnv) {
 }
 
 for (const githubAuthName of ['GITHUB_APP_ID', 'GITHUB_PRIVATE_KEY']) {
-  requireValue(workerRequiredSecrets.includes(githubAuthName), `Worker required secrets must include ${githubAuthName}`);
+  // The GitHub App pair stays declared as Worker secret names. Under the
+  // Path B gate, GITHUB_APP_ID remains deploy-required while
+  // GITHUB_PRIVATE_KEY is feature-gated in [secrets].optional: GitHub App
+  // authentication activates only once the private key is installed.
+  requireValue(workerDeclaredSecrets.includes(githubAuthName), `Worker declared secrets must include ${githubAuthName}`);
   requireValue(canonicalEnv?.entries.has(githubAuthName), `.env.example must declare ${githubAuthName}`);
 }
 requireValue(handler.includes('FCR_EMAIL'), 'Worker handler must retain the FCR_EMAIL binding contract');
