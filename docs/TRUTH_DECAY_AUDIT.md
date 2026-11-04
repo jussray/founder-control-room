@@ -3,6 +3,11 @@
 ## November 4, 2026: Browser Operator preview scope repair
 
 On PR #1006 predecessor `bde14ffef63d62dbb4662636bcff2259aeee14fd`, both preview policies accepted Sync Party requests also naming a foreign `.io` URL, an IP address, or an approved-host suffix lookalike. The successor validates complete explicit origins and hostnames. Its Playwright witness invokes the actual preview policy behind synthetic authentication/transport; this proves local UI/policy behavior only. Historical successful CI cannot certify the successor, live founder authentication, production deployment, or browser execution.
+## October 22, 2026: Council PR #996 — StoryEngine peer identity moved
+
+The FCR Council receipt candidate passed its scoped Council and most CI gates but its Playwright E2E job stopped at the live StoryEngine peer-ref equality gate. The workflow pinned `26b1c34ae7c97c5d1b66a23d6345b3965cfcdc1f`; the independently observed StoryEngine `refs/heads/main` resolved to `1669d920f28bc81ddd04fea6d0bdb5ee41c29ec9`. GitHub comparison reports a strictly forward, three-commit transition across 24 files, adding tenant authorization safeguards and security tests. The successor had 15 completed successful commit check runs at the observation time. Those check runs verify StoryEngine's head, not FCR-to-StoryEngine compatibility.
+
+Updating `.github/workflows/playwright.yml` to the newer exact SHA selects the successor for a fresh immutable checkout and complete FCR browser federation witness; it **must not** inherit predecessor green, imply Council production execution, or waive founder authentication, review-spend controls, privacy, merge, deployment, or publication gates. An unsuccessful, skipped, cancelled, or incomplete successor Playwright run leaves the FCR federation claim UNKNOWN/BLOCKED, and subsequent peer or FCR head movement expires the evidence again.
 
 ## November 3, 2026: FCR auth-lifecycle proof is narrower than release proof
 
