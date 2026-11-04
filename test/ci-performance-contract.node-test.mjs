@@ -28,7 +28,7 @@ test('CI runs all four lockfile-bound core lanes with dependency download cachin
     assert.match(body, /git rev-parse HEAD/, name + ' missing exact-head assertion');
   }
   const discovery = jobBody(ci, 'test-discovery');
-  assert.match(discovery, /node --test test\/ci-performance-contract\.test\.mjs/);
+  assert.match(discovery, /node --test test\/ci-performance-contract\.node-test\.mjs/);
   assert.match(jobBody(ci, 'required-gate'), /test-discovery/);
 });
 

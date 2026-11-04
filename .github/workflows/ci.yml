@@ -333,7 +333,7 @@ jobs:
       - name: Prove the discovery ratchet rejects baseline laundering
         run: node --test scripts/verify-test-discovery.node-test.mjs
       - name: Enforce CI performance regression contracts
-        run: node --test test/ci-performance-contract.test.mjs
+        run: node --test test/ci-performance-contract.node-test.mjs
       - name: Verify no test is excluded from default discovery without base-bound debt
         run: npm run verify:test-discovery
 
