@@ -65,3 +65,38 @@ test('superseded PR runs cancel without cancelling main branch verification', ()
     assert.ok(workflow.includes('github.event.pull_request.number || github.ref'), name + ' must isolate distinct PRs');
   }
 });
+
+// A canceled predecessor cannot stand in for an exact-head PR witness; a
+// main push, manual proof, or provider revalidation must not be coalesced.
+test('CI wave uses PR-specific cancellation while keeping non-PR evidence independent', () => {
+  const proofs = [
+    '.github/workflows/ci.yml',
+    '.github/workflows/quality-gate.yml',
+    '.github/workflows/playwright.yml',
+    '.github/workflows/documentation-truth.yml',
+    '.github/workflows/verification-core.yml',
+    '.github/workflows/quickscan-proof.yml',
+    '.github/workflows/attack-20-v3.yml',
+    '.github/workflows/pages-api-recovery-playwright.yml',
+    '.github/workflows/repo-cycle.yml',
+    '.github/workflows/control-room-test-ledger.yml',
+  ];
+  for (const file of proofs) {
+    const workflow = read(file);
+    assert.match(workflow, /^concurrency:$/m, file);
+    assert.ok(workflow.includes("cancel-in-progress: ${{ github.event_name == 'pull_request' }}"), file);
+    assert.ok(workflow.includes('github.run_id'), file + ' must retain unique non-PR run identities');
+    assert.ok(workflow.includes('github.event.pull_request.number'), file + ' must cancel per PR, not globally');
+  }
+});
+
+test('focused verification and QuickScan proofs retain their complete steps on cached lockfile installs', () => {
+  for (const file of ['.github/workflows/verification-core.yml', '.github/workflows/quickscan-proof.yml']) {
+    const workflow = read(file);
+    assert.match(workflow, /cache: npm/, file);
+    assert.match(workflow, /run: npm ci --no-audit --no-fund/, file);
+    assert.doesNotMatch(workflow, /run: npm install/, file);
+  }
+  assert.match(read('.github/workflows/verification-core.yml'), /packages\/ultrathink-verification-core test/);
+  assert.match(read('.github/workflows/quickscan-proof.yml'), /Playwright control-board proof/);
+});
