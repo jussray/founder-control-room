@@ -105,6 +105,8 @@ test('migration lint executes real local DB checks only on an exact-head Supabas
   const migration = jobBody(ci, 'migration-lint');
   assert.match(migration, /git merge-base --is-ancestor/);
   assert.match(migration, /node scripts\/ci-migration-scope\.mjs/);
+  assert.match(migration, /Require an explicit fail-closed schema scope decision/);
+  assert.match(migration, /case "\$SCHEMA_SCOPE" in/);
   assert.match(migration, /supabase init/);
   assert.match(migration, /supabase start/);
   assert.match(migration, /supabase db lint --local --fail-on error/);

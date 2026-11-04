@@ -388,6 +388,20 @@ jobs:
         id: scope
         run: node scripts/ci-migration-scope.mjs
 
+      - name: Require an explicit fail-closed schema scope decision
+        shell: bash
+        env:
+          SCHEMA_SCOPE: ${{ steps.scope.outputs.execute }}
+        run: |
+          set -euo pipefail
+          case "$SCHEMA_SCOPE" in
+            true|false) ;;
+            *)
+              echo 'Migration scope verifier did not produce true or false; refusing implicit success.' >&2
+              exit 1
+              ;;
+          esac
+
       - name: Set up Supabase CLI for changed schema
         if: steps.scope.outputs.execute == 'true'
         uses: supabase/setup-cli@v1
