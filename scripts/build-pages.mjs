@@ -21,6 +21,7 @@ const requiredAssets = [
   'crawlers.json',
   'site-identity.json',
   'work.html',
+  '.well-known/security.txt',
   '.well-known/sekret-bip-control-room.json',
   'control-room/index.html',
   'control-room/app.js',
