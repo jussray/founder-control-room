@@ -80,10 +80,10 @@ export function evaluateElax({ record, summaryStatus, bytes, approval, evidence,
   const required = [...REQUIRED_GATES, ...(requiresCommerce ? ['commerce'] : [])];
   for (const name of required) {
     const gate = evidence?.[name];
-    if (gate?.status !== 'PASS') { reasons.push(\`\${name} evidence missing or not PASS\`); continue; }
+    if (gate?.status !== 'PASS') { reasons.push(`${name} evidence missing or not PASS`); continue; }
     const observed = isoMs(gate.observedAt);
     if (!Number.isFinite(observed) || !Number.isFinite(timestamp) || observed > timestamp || timestamp - observed > MAX_EVIDENCE_AGE_MS) {
-      reasons.push(\`\${name} evidence missing, future dated or stale\`);
+      reasons.push(`${name} evidence missing, future dated or stale`);
     }
   }
   if (requiresCommerce && !validUrl(record?.ctaUrl)) reasons.push('commerce CTA URL requires HTTPS destination');
@@ -105,7 +105,7 @@ export async function executeElax(id, deps, now = new Date().toISOString()) {
       id, expectedManifestHash: check.manifestHash, approvalReceiptId: approval.receiptId,
       targetAccountId: snapshot.record.accountId,
       targetPlatform: snapshot.record.platform,
-      idempotencyKey: sha256(\`\${snapshot.record.platform}:\${snapshot.record.accountId}:\${id}:\${check.manifestHash}\`),
+      idempotencyKey: sha256(`${snapshot.record.platform}:${snapshot.record.accountId}:${id}:${check.manifestHash}`),
     });
   } catch { return { status: 'BLOCKED', reasons: ['atomic claim unavailable'] }; }
   if (!lease) return { status: 'BLOCKED', reasons: ['atomic claim rejected or duplicate'] };
