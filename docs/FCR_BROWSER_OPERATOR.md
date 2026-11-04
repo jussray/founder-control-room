@@ -41,7 +41,7 @@ The standalone FCR screen at /control-room/browser-operator.html checks /auth/me
 
 The JavaScript and the server's Worker-compatible TypeScript policy reject unsupported/mixed/private requests and do not run Playwright. The page's Execute control is disabled. This is an honest PREVIEW capability, not active TinyFish-style autonomous execution, and source/UI tests do not prove production reachability. The TypeScript server policy's static 53-step/two-actor metadata is compared to the authoritative manifest by a focused integration test.
 
-Focused verification: npx vitest run src/http/routes/__tests__/browserOperator.integration.test.ts and node e2e/browser-operator-preview-proof.mjs (with Playwright Chromium installed). The latter uses synthetic route fixtures with no live user account, production application, external website, or real provider. The full suite and browser checks remain separately subject to exact-head review.
+Focused verification: npx vitest run src/http/routes/__tests__/browserOperator.integration.test.ts and node e2e/browser-operator-preview-proof.mjs (with Playwright Chromium installed). The latter uses the actual TypeScript preview policy with synthetic authentication and HTTP transport, covering allowed requests, mixed-project rejection, and recovery on mobile and desktop. It does not exercise live authentication, production applications, external websites, or providers. The full suite and browser checks remain separately subject to exact-head review.
 
 Future browser execution needs a founder-authenticated plan API that binds manifest SHA, identity, expiry, caller-to-project scope, approval and execution status at use time. The preview API is not an execution approval, and no browser-run endpoint or merge/deploy capability has been added.
 ## Boundaries
@@ -75,3 +75,7 @@ node --test test/fcr-grafana-read.test.mjs
 ```
 
 The observed Grafana project `iuxworqsqnyilbxrfctv` must **not** be silently equated with StoryEngine's GitHub-linked Supabase project `tarnmxcjpvaxapnjnesf`. A project mismatch exits nonzero. API readback proves configuration only, **not** Prometheus series availability, live browser health, or authority to edit a dashboard. Existing panel queries and database replication state remain untouched. No founder-authenticated remote Grafana execution endpoint or production rollout is provided by this candidate. Preserve the existing dashboard JSON for rollback before any separate, authorized panel edit.
+
+## Complete target validation
+
+CLI and API previews inspect explicit URL origins and complete bare hostnames rather than a short suffix allowlist. Mixed requests containing foreign TLDs, IP addresses, approved-host suffix lookalikes, non-HTTPS origins, or custom ports are rejected before any manifest load or browser execution. This is a conservative bounded intent parser, not a general natural-language safety classifier or execution approval.

@@ -82,9 +82,24 @@ export function previewFounderBrowserIntent(raw: unknown): BrowserPreviewResult 
   if (!SUPPORTED_PROJECT.some((rule) => rule.test(request))) {
     return reject('UNKNOWN_PROJECT');
   }
-  const hosts = [...request.matchAll(/\b(?:[a-z0-9-]+\.)+(?:company|org|net|com|app)\b/gi)]
+  // Inspect complete explicit URLs before extracting bare hostnames. A short
+  // TLD allowlist misses IPs, new TLDs, and approved-host suffix lookalikes.
+  const urls = [...request.matchAll(/(?:[a-z][a-z0-9+.-]*:)?\/\/[^\s<>"']+/gi)];
+  let hostnameText = request;
+  for (const [rawUrl] of urls) {
+    hostnameText = hostnameText.replace(rawUrl, " ");
+    try {
+      const url = new URL(rawUrl.replace(/[),.!;]+$/, ''), 'https://' + PROJECT_DOMAIN);
+      if (url.origin !== 'https://' + PROJECT_DOMAIN || url.username || url.password) {
+        return reject('CROSS_PROJECT_REQUEST');
+      }
+    } catch {
+      return reject('CROSS_PROJECT_REQUEST');
+    }
+  }
+  const hosts = [...hostnameText.matchAll(/\b(?:[a-z0-9-]+\.)+(?:[a-z][a-z0-9-]*|[0-9]+)(?::[0-9]+)?/gi)]
     .map((match) => match[0].toLowerCase());
-  if (hosts.some((host) => host !== PROJECT_DOMAIN)) {
+  if (hosts.some((host) => host !== PROJECT_DOMAIN && host !== PROJECT_DOMAIN + ':443')) {
     return reject('CROSS_PROJECT_REQUEST');
   }
   return {

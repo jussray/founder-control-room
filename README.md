@@ -610,3 +610,7 @@ The OAuth consent UI is served by the FCR API service **through the same-origin 
 ## CI lockfile determinism — current exact-head source contract
 
 Source changes to `.github/workflows/ci.yml` are release-governance changes: its four core Type check, Lint, Unit Tests, and Playwright e2e jobs must install from the committed npm lockfile with `npm ci --no-audit --no-fund`, without bypassing existing jobs, independent review, Required Gate, or founder-final approval. This exact-head source contract prevents unconstrained dependency resolution during CI but does not prove deploy/runtime identity, production behavior, or customer outcomes.
+
+## Browser preview project boundaries
+
+The Browser Operator preview rejects explicit foreign URLs, IP targets, non-HTTPS origins, alternate ports, and hostname suffix lookalikes in both CLI and API policies. Mobile/desktop Playwright checks use the actual preview policy with synthetic authentication and transport; they do not prove production authentication, browser execution, or deployment. See [Browser Operator](docs/FCR_BROWSER_OPERATOR.md).

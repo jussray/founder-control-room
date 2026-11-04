@@ -1,5 +1,9 @@
 # Truth Decay Audit: When a True Claim Becomes Unsafe to Reuse
 
+## November 4, 2026: Browser Operator preview scope repair
+
+On PR #1006 predecessor `bde14ffef63d62dbb4662636bcff2259aeee14fd`, both preview policies accepted Sync Party requests also naming a foreign `.io` URL, an IP address, or an approved-host suffix lookalike. The successor validates complete explicit origins and hostnames. Its Playwright witness invokes the actual preview policy behind synthetic authentication/transport; this proves local UI/policy behavior only. Historical successful CI cannot certify the successor, live founder authentication, production deployment, or browser execution.
+
 ## November 3, 2026: FCR auth-lifecycle proof is narrower than release proof
 
 FCR PR #978's predecessor `82d0e7139d3876e166844de64e17b4a770c23b90` passed its dedicated Playwright welcome → magic-link login → opaque browser-session identity → authenticated welcome redirect → server-revoked logout → private-shell denial scenario. GitHub run `41728146923` nevertheless failed in the independently required guarded-terminal journey when the V10 client-side fetch membrane rejected a planless privileged action before the older test could observe the server's separate rejection. A source or test fix must preserve both negative guards and require fresh, exact-head Playwright execution; it may never create the branch that the test is supposed to deny.

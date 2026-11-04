@@ -57,10 +57,24 @@ export function routeBrowserRequest(raw) {
   if (hits.length !== 1) {
     return { status: 'REJECTED', reason: hits.length ? 'AMBIGUOUS_PROJECT' : 'UNKNOWN_PROJECT', browserExecuted: false };
   }
-  // A request naming an additional hostname cannot be routed to a single project.
-  const explicitHosts = [...request.matchAll(/\b(?:[a-z0-9-]+\.)+(?:company|org|net|com|app)\b/gi)]
+  // Inspect complete explicit URLs before extracting bare hostnames. A short
+  // TLD allowlist misses IPs, new TLDs, and approved-host suffix lookalikes.
+  const urls = [...request.matchAll(/(?:[a-z][a-z0-9+.-]*:)?\/\/[^\s<>"']+/gi)];
+  let hostnameText = request;
+  for (const [rawUrl] of urls) {
+    hostnameText = hostnameText.replace(rawUrl, " ");
+    try {
+      const url = new URL(rawUrl.replace(/[),.!;]+$/, ''), 'https://' + hits[0].hostname);
+      if (url.origin !== 'https://' + hits[0].hostname || url.username || url.password) {
+        return { status: 'REJECTED', reason: 'CROSS_PROJECT_REQUEST', browserExecuted: false };
+      }
+    } catch {
+      return { status: 'REJECTED', reason: 'CROSS_PROJECT_REQUEST', browserExecuted: false };
+    }
+  }
+  const hosts = [...hostnameText.matchAll(/\b(?:[a-z0-9-]+\.)+(?:[a-z][a-z0-9-]*|[0-9]+)(?::[0-9]+)?/gi)]
     .map((match) => match[0].toLowerCase());
-  if (explicitHosts.some((host) => host !== hits[0].hostname)) {
+  if (hosts.some((host) => host !== hits[0].hostname && host !== hits[0].hostname + ':443')) {
     return { status: 'REJECTED', reason: 'CROSS_PROJECT_REQUEST', browserExecuted: false };
   }
   return {

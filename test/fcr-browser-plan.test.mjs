@@ -88,3 +88,23 @@ test('manifest content digest binds the exact preview configuration', async () =
   assert.equal(a.browserExecuted, false);
   assert.equal(b.browserExecuted, false);
 });
+
+
+test('complete URL and bare hostname boundaries reject mixed projects before loading', async () => {
+  for (const target of ['https://example.io', 'https://127.0.0.1', 'https://[::1]',
+    'https://games.jussco.company.evil.dev', 'example.dev', '127.0.0.1',
+    'http://games.jussco.company', 'https://games.jussco.company:8443',
+    '//example.io', 'ftp://games.jussco.company']) {
+    const result = await previewBrowserRequest('Test Sync Party and ' + target, async () => {
+      assert.fail('Rejected cross-project requests must not load a manifest');
+    });
+    assert.equal(result.status, 'REJECTED', target);
+    assert.equal(result.reason, 'CROSS_PROJECT_REQUEST', target);
+    assert.equal(result.browserExecuted, false);
+  }
+  for (const target of ['https://games.jussco.company/', 'https://GAMES.JUSSCO.COMPANY',
+    'https://games.jussco.company:443', '(https://games.jussco.company).',
+    'https://games.jussco.company/index.html']) {
+    assert.equal(routeBrowserRequest('Test Sync Party at ' + target).status, 'ROUTED_FOR_PREVIEW', target);
+  }
+});

@@ -104,6 +104,13 @@ describe('FCR founder-only browser planner', () => {
       'Test Sync Party and email results',
       'Open private parent portal on sekretbip.net',
       'Test another-domain.example',
+      'Test Sync Party and https://example.io',
+      'Test Sync Party and https://127.0.0.1',
+      'Test Sync Party and https://[::1]',
+      'Test Sync Party and https://games.jussco.company.evil.dev',
+      'Test Sync Party and example.dev',
+      'Test Sync Party and http://games.jussco.company',
+      'Test Sync Party and https://games.jussco.company:8443',
     ];
     for (const input of requests) {
       const result = await request(app())
