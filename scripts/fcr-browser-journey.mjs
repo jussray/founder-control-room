@@ -145,6 +145,26 @@ export async function enforceSameOriginRoute(route, origin) {
   }
 }
 
+/**
+ * A WebSocket does not pass through context.route(), so it needs a separate
+ * pre-page policy. Match the same host, scheme security, and port as the
+ * approved HTTP origin. A rejected socket must never reach its server.
+ */
+export function enforceSameOriginWebSocket(socketRoute, origin) {
+  try {
+    const target = new URL(origin);
+    const socket = new URL(socketRoute.url());
+    const mappedProtocol = socket.protocol === 'wss:' ? 'https:'
+      : socket.protocol === 'ws:' ? 'http:' : null;
+    if (mappedProtocol && mappedProtocol === target.protocol
+        && !socket.username && !socket.password
+        && socket.host === target.host) {
+      return socketRoute.connectToServer();
+    }
+  } catch { /* malformed destination: fail closed */ }
+  return socketRoute.close({ code: 1008, reason: 'WebSocket origin blocked' });
+}
+
 export async function runJourney(manifest, outDirectory = 'test-results/fcr-browser-operator') {
   const summary = validateJourney(manifest);
   const [{ chromium }, { expect }] = await Promise.all([import('playwright'), import('@playwright/test')]);
@@ -177,6 +197,7 @@ export async function runJourney(manifest, outDirectory = 'test-results/fcr-brow
         acceptDownloads: false
       });
       await context.route('**/*', (route) => enforceSameOriginRoute(route, summary.origin));
+      await context.routeWebSocket('**/*', (socketRoute) => enforceSameOriginWebSocket(socketRoute, summary.origin));
       const page = await context.newPage();
       // No credentials, cookies, storage state, or FCR internal session are imported.
       page.setDefaultTimeout(DEFAULT_TIMEOUT);
