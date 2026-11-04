@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import express from 'express';
+import { rateLimit } from 'express-rate-limit';
 import request from 'supertest';
 
 const state = vi.hoisted(() => ({
@@ -77,7 +78,11 @@ function app() {
   const api = express();
   api.use(express.json());
   api.use('/auth/member', memberAuthRouter);
-  api.get('/founder-only', requireFounder, (_req, res) => res.json({ private: true }));
+  // Exercise the founder authorization boundary behind a real, bounded limiter.
+  const founderProbeThrottle = rateLimit({
+    windowMs: 15 * 60_000, limit: 30, standardHeaders: true, legacyHeaders: false,
+  });
+  api.get('/founder-only', founderProbeThrottle, requireFounder, (_req, res) => res.json({ private: true }));
   return api;
 }
 function memberCookie(response: { headers: Record<string, string | string[] | undefined> }) {
@@ -101,6 +106,19 @@ beforeEach(() => {
   vi.stubEnv('NODE_ENV', 'test');
 });
 describe('isolated member access', () => {
+  it('bounds repeated requests to the test-only founder guard before authorization', async () => {
+    const probe = app();
+    for (let i = 0; i < 30; i++) {
+      expect((await request(probe).get('/founder-only')).status).toBe(401);
+    }
+    expect((await request(probe).get('/founder-only')).status).toBe(429);
+  });
+  it('rejects long pathological email inputs without triggering OTP delivery', async () => {
+    const result = await request(app()).post('/auth/member/magic-link')
+      .send({ email: '!@!.' + '!.'.repeat(1000) });
+    expect(result.status).toBe(400);
+    expect(state.magic).not.toHaveBeenCalled();
+  });
   it('provides a generic email response without giving founder accounts a member OTP', async () => {
     state.founders.add('founder@example.com');
     const founder = await request(app()).post('/auth/member/magic-link').send({ email: 'founder@example.com' });

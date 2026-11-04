@@ -19,7 +19,14 @@ const GENERIC = 'If this address can receive mail, a secure sign-in link may arr
 // The authenticated browser session must be set on the Pages origin, not the API subdomain.
 const MEMBER_CALLBACK_ORIGIN = process.env.NODE_ENV === 'production'
   ? 'https://foundercontrolroom.org' : FOUNDER_API_URL;
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+// Email validation is bounded and linear even for attacker-controlled inputs.
+function validMemberEmail(email: string): boolean {
+  if (!email || email.length > 254 || /\s/u.test(email)) return false;
+  const at = email.indexOf('@');
+  const lastDot = email.lastIndexOf('.');
+  return at > 0 && at === email.lastIndexOf('@') &&
+    lastDot > at + 1 && lastDot < email.length - 1;
+}
 
 function emailFrom(value: unknown): string {
   return typeof value === 'string' ? value.trim().toLowerCase() : '';
@@ -35,7 +42,7 @@ function verifiedIdentity(value: unknown): { userId: string; email: string } | n
   const user = value as { id?: unknown; email?: unknown };
   const userId = typeof user.id === 'string' ? user.id : '';
   const email = emailFrom(user.email);
-  return userId && EMAIL_PATTERN.test(email) && email.length <= 254 ? { userId, email } : null;
+  return userId && validMemberEmail(email) ? { userId, email } : null;
 }
 
 async function establishMemberSession(req: import('express').Request, res: import('express').Response, identity: {userId: string; email: string}): Promise<void> {
@@ -63,7 +70,7 @@ location.replace('/member/')}catch{fail()}}}
 
 memberAuthRouter.post('/magic-link', rateLimitMagicLink, async (req, res) => {
   const email = emailFrom(req.body?.email);
-  if (!EMAIL_PATTERN.test(email) || email.length > 254) {
+  if (!validMemberEmail(email)) {
     return respondError(res, 400, 'BAD_REQUEST', 'A valid email is required.');
   }
   res.setHeader('Cache-Control', 'no-store');
