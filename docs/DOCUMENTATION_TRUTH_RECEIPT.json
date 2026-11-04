@@ -558,6 +558,12 @@
       "claims": [
         "`src/lib/__tests__/firstPartyContentTruthUi.contract.test.ts` must verify the exact-head Playwright checkout, PR-scoped cancellation that preserves non-PR witnesses, and pinned browser evidence artifacts; a source equality assertion must not require canceling main runs."
       ]
+    },
+    {
+      "path": "src/governance/portfolioGovernanceProfiles.ts",
+      "claims": [
+        "`src/governance/portfolioGovernanceProfiles.ts` must register the SleepWealth account-model eligibility claims `customer_scope_eligibility` and `pooled_scope_eligibility` as observation-only, and must keep `live-trade`, `enable-live-broker`, `accept-pooled-funds` and `cross-account-credential-use` blocked so the customer-connected and pooled-managed scopes never share authority, and it fails closed when a required receipt gate is absent."
+      ]
     }
   ]
 }
