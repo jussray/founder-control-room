@@ -96,13 +96,38 @@ function shapeDiagnostics(trimmed) {
 // Single source of truth for App private-key transport classification. The
 // minting path and the read-only founder shape diagnostic both consume this, so
 // the diagnostic can never disagree with what minting actually accepts.
+function decodeRecognizedKeyWrapper(value) {
+  // Accommodate common safe PEM transport wrappers. RSA parsing remains mandatory.
+  // Never log, digest, forward, or cache the original credential.
+  const fenced = /^```(?:pem|text|plaintext)?[ \t]*\r?\n([\s\S]*?)\r?\n```$/i.exec(value);
+  if (fenced) return { value: fenced[1].trim(), transportClass: 'fenced-pem' };
+  const assigned = /^APP_PRIVATE_KEY\s*=\s*([\s\S]+)$/.exec(value);
+  if (assigned) return { value: assigned[1].trim(), transportClass: 'env-assignment-pem' };
+  if (value.startsWith('{') && value.endsWith('}')) {
+    try {
+      const parsed = JSON.parse(value);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        const candidates = [parsed.APP_PRIVATE_KEY, parsed.private_key, parsed.privateKey]
+          .filter((candidate) => typeof candidate === 'string' && candidate.trim());
+        if (candidates.length === 1) return { value: candidates[0].trim(), transportClass: 'json-object-pem' };
+      }
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
 function classifyPrivateKey(secret) {
   const raw = String(secret ?? '');
-  const trimmed = raw.trim().replace(/^﻿/, '');
+  const trimmed = raw.trim().replace(/^﻿/, '').replace(/\r\n?/g, '\n');
   let transportClass = 'unknown';
   let normalized = trimmed;
-
-  if (!trimmed) {
+  const recognizedWrapper = decodeRecognizedKeyWrapper(trimmed);
+  if (recognizedWrapper) {
+    normalized = recognizedWrapper.value;
+    transportClass = recognizedWrapper.transportClass;
+  } else if (!trimmed) {
     transportClass = 'empty';
   } else if (trimmed.startsWith('"') && trimmed.endsWith('"')) {
     normalized = decodeJsonQuotedString(trimmed);
@@ -140,6 +165,8 @@ function classifyPrivateKey(secret) {
       }
     }
   }
+
+  normalized = normalized.replace(/\r\n?/g, '\n');
 
   let pemBoundary = /^-----BEGIN (?:RSA )?PRIVATE KEY-----\n/.test(normalized)
     && /\n-----END (?:RSA )?PRIVATE KEY-----$/.test(normalized);
