@@ -201,6 +201,11 @@ A required test contributes to merge readiness only when the exact-head workflow
 
 For public crawler and work-directory behavior, `.github/workflows/ci.yml` must keep `e2e/pages-api-recovery.spec.ts` and `e2e/public-work-directory.spec.ts` inside the load-bearing `Playwright e2e` job that feeds `Required Gate`; a green specialized Pages workflow alone cannot satisfy merge-required browser proof or authorize integration.
 
+
+## CI lockfile determinism — current exact-head source contract
+
+Exact-head FCR governance must treat changes to `.github/workflows/ci.yml` as truth-sensitive: Type check, Lint, Unit Tests, and Playwright e2e must use `npm ci --no-audit --no-fund` against the checked-in npm lockfile; required tests and status contexts must remain load-bearing. Locked installs constrain dependency resolution; they cannot substitute for deterministic independent review, trusted witness, authenticated exact-PR/base/head Founder Final, provider readback, or actual production proof. Native GitHub approving-human count remains intentionally zero in the founder-only phase.
+
 ## Required CI owner after queue consolidation
 
 For `main` pull requests, `.github/workflows/ci.yml` must still execute the guarded terminal, Juss Flow, production-authority and AI-skill contracts within its load-bearing `Test` job, alongside required exact-head checks before `Required Gate` can pass. `.github/workflows/quality-gate.yml` may run its extended duplicate tests on `staging` only; this must not waive CodeQL, the required test ledger, Playwright, exact-candidate founder-final approval, review, production deployment or live provider proof. Source-side queue consolidation alone grants no merge or release authority.

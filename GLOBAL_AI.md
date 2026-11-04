@@ -284,6 +284,11 @@ A committed regression test is source evidence only until the exact-head workflo
 
 For public crawler and work-directory behavior, `.github/workflows/ci.yml` must keep `e2e/pages-api-recovery.spec.ts` and `e2e/public-work-directory.spec.ts` inside the load-bearing `Playwright e2e` job that feeds `Required Gate`. A green advisory Pages workflow is supplementary evidence only; it cannot replace this required exact-head browser proof or create merge authority.
 
+
+## CI lockfile determinism — current exact-head source contract
+
+Agents must ensure `.github/workflows/ci.yml` uses `npm ci --no-audit --no-fund` for its four load-bearing Type check, Lint, Unit Tests, and Playwright e2e jobs, rather than installing unconstrained dependencies at verification time. Validate the exact checked-out SHA, required test execution, and lockfile compliance through source checks and GitHub CI. A reproducible install cannot grant merge authorization: retain systematic independent exact-head review and separately authenticated founder-final approval. Do not describe a source-only CI edit as a deployed or production-verified fix.
+
 ## CI queue economy without authority reduction
 
 For `main` pull requests, `.github/workflows/ci.yml` remains the load-bearing owner of typecheck, lint, tests, RLS, documentation truth, test discovery and Playwright, with terminal and AI-skill contracts also executed by its required `Test` job before `Required Gate`. The optional extended `.github/workflows/quality-gate.yml` now runs for `staging` pull requests only, retaining its build, coverage, Qodo and SonarQube lanes there. `.github/workflows/fcr-search-evidence-gate.yml` runs on the exact PR head and on `main` pushes, not on every feature-branch push. This saves duplicate runner allocations; it does not relax CodeQL, the required test-ledger check, independent review, founder-final approval or runtime deployment evidence. Success and queue reduction require new-head provider readback, not this source declaration.
