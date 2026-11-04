@@ -48,7 +48,7 @@ Future browser execution needs a founder-authenticated plan API that binds manif
 
 - Only source-reviewed manifests directly in config/browser-journeys can be executed by the CLI. No free-form instructions from the visited page are trusted.
 - No founder session, credentials, stored cookies, private application data, or production account should be used in a journey.
-- Navigation and HTTP requests are restricted to the declared origin where intercepted. This is NOT a full sandbox or a guarantee against other protocols, such as WebSockets.
+- Navigation/HTTP requests and WebSocket connections have separate same-origin guards. WebSocket interception is registered before pages are created and refuses foreign scheme, host, or port. The Chromium regression verifies that a foreign WebSocket server receives no connection. This is NOT a full sandbox or a guarantee against unrelated network protocols.
 - No teen, parent, journal, voice, family or other private data may be included in browser-test artifacts.
 - The operator cannot merge, deploy, alter secrets, change authentication, delete records, or write source code as a result of website content.
 - A PASS proves only this explicitly reviewed public synthetic journey at that moment; it is not overall launch readiness.
