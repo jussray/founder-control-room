@@ -18,6 +18,7 @@ on:
       - 'e2e/browser-operator-preview-proof.mjs'
       - 'config/browser-journeys/**'
       - 'test/fcr-browser-journey.test.mjs'
+      - 'test/fcr-browser-journey-redirect.e2e.mjs'
       - 'test/fcr-browser-plan.test.mjs'
       - 'test/fcr-grafana-read.test.mjs'
       - 'docs/FCR_BROWSER_OPERATOR.md'
@@ -66,6 +67,8 @@ jobs:
         run: |
           npm ci --ignore-scripts
           npx playwright install chromium --with-deps
+      - name: Verify redirect boundary in Chromium
+        run: node --test test/fcr-browser-journey-redirect.e2e.mjs
       - name: Test founder-only plan API and UI at exact candidate head
         run: |
           npx vitest run src/http/routes/__tests__/browserOperator.integration.test.ts
