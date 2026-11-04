@@ -69,8 +69,8 @@ describe('first-party founder content truth UI contract', () => {
 
   it('binds browser proof to the exact reviewed head', () => {
     expect(playwrightWorkflow).toContain('EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}');
-    expect(playwrightWorkflow).toContain('group: playwright-e2e-${{ github.event.pull_request.number || github.event.workflow_run.id || github.ref }}');
-    expect(playwrightWorkflow).toContain('cancel-in-progress: true');
+    expect(playwrightWorkflow).toContain("group: playwright-e2e-${{ github.event_name }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.run_id }}");
+    expect(playwrightWorkflow).toContain("cancel-in-progress: ${{ github.event_name == 'pull_request' }}");
     expect(playwrightWorkflow).toContain('uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262');
     expect(playwrightWorkflow).toContain('ref: ${{ env.EXPECTED_HEAD_SHA }}');
     expect(playwrightWorkflow).toContain('persist-credentials: false');
