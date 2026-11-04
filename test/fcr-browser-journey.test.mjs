@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { validateJourney, validateOrigin, substituteVariables } from '../scripts/fcr-browser-journey.mjs';
+import { enforceSameOriginRoute, validateJourney, validateOrigin, substituteVariables } from '../scripts/fcr-browser-journey.mjs';
 
 const manifest = JSON.parse(readFileSync(new URL('../config/browser-journeys/sync-party.json', import.meta.url), 'utf8'));
 const copy = () => structuredClone(manifest);
@@ -64,4 +64,42 @@ test('all steps have traceable titles but never require actual user credentials'
   assert.ok(manifest.steps.every((step) => step.label && step.actor));
   const serialized = JSON.stringify(manifest);
   assert.doesNotMatch(serialized, /password|auth_token|api_key|secret_key/i);
+});
+
+test('the network guard blocks cross-origin HTTP redirects without following them', async () => {
+  const actions = [];
+  const route = {
+    request: () => ({ url: () => 'https://games.jussco.company/redirect' }),
+    fetch: async (options) => {
+      actions.push(['fetch', options]);
+      return { status: () => 302 };
+    },
+    abort: async (reason) => { actions.push(['abort', reason]); },
+    fulfill: async () => { actions.push(['fulfill']); },
+    continue: async () => { actions.push(['continue']); },
+  };
+  await enforceSameOriginRoute(route, 'https://games.jussco.company');
+  assert.deepEqual(actions, [
+    ['fetch', { maxRedirects: 0 }],
+    ['abort', 'blockedbyclient'],
+  ]);
+});
+
+test('the network guard fulfills normal same-origin responses but never fetches foreign hosts', async () => {
+  const actions = [];
+  const route = (url, status) => ({
+    request: () => ({ url: () => url }),
+    fetch: async (options) => {
+      actions.push(['fetch', options]);
+      return { status: () => status };
+    },
+    abort: async (reason) => { actions.push(['abort', reason]); },
+    fulfill: async ({ response }) => { actions.push(['fulfill', response.status()]); },
+    continue: async () => { actions.push(['continue']); },
+  });
+  await enforceSameOriginRoute(route('https://games.jussco.company/safe', 200), 'https://games.jussco.company');
+  assert.deepEqual(actions, [['fetch', { maxRedirects: 0 }], ['fulfill', 200]]);
+  actions.length = 0;
+  await enforceSameOriginRoute(route('https://elsewhere.example/leak', 200), 'https://games.jussco.company');
+  assert.deepEqual(actions, [['abort', 'blockedbyclient']]);
 });
