@@ -103,7 +103,8 @@
       "path": ".github/workflows/ci.yml",
       "claims": [
         "`.github/workflows/ci.yml` must keep the existing crawler and public-work Playwright specs inside the load-bearing `Playwright e2e` job that feeds `Required Gate`; a separate advisory Pages workflow cannot substitute for required exact-head browser execution or grant merge authority.",
-        ".github/workflows/ci.yml must resolve and fetch the live PR target branch separately for Documentation Truth and test discovery, validate a full nonzero SHA and ancestry in the exact checked-out head, retain exact push-before ranges for push events, and fail without exporting a proof base on resolution or fetch failure."
+        ".github/workflows/ci.yml must resolve and fetch the live PR target branch separately for Documentation Truth and test discovery, validate a full nonzero SHA and ancestry in the exact checked-out head, retain exact push-before ranges for push events, and fail without exporting a proof base on resolution or fetch failure.",
+        "`.github/workflows/ci.yml` must execute `verify:terminal-contract`, `verify:juss-flow`, `verify:production-authority` and `verify:ai-skills` in the load-bearing Test job before Required Gate, preserving protected main PR coverage after moving duplicate extended quality jobs to staging-only."
       ]
     },
     {
@@ -511,6 +512,18 @@
       "path": "supabase/migrations/20261103000000_member_browser_sessions.sql",
       "claims": [
         "`supabase/migrations/20261103000000_member_browser_sessions.sql` must enable row level security, revoke public, anon and authenticated table access, allow only service-role access, and store only hashed opaque session identifiers rather than bearer credentials; checked-in SQL is not evidence that the migration was applied."
+      ]
+    },
+    {
+      "path": ".github/workflows/quality-gate.yml",
+      "claims": [
+        "`.github/workflows/quality-gate.yml` must restrict its extended duplicate unit/coverage, lint, typecheck, migration contract, build, Qodo and SonarQube jobs to staging pull requests; the main pull-request Required Gate stays in CI and must not be weakened."
+      ]
+    },
+    {
+      "path": ".github/workflows/fcr-search-evidence-gate.yml",
+      "claims": [
+        "`.github/workflows/fcr-search-evidence-gate.yml` must limit feature-branch execution to pull_request events, execute push checks on main only, and checkout the exact selected PR-head or main-push SHA before running Search Console and evidence contracts."
       ]
     }
   ]

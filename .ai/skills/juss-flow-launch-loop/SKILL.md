@@ -14,6 +14,10 @@ owner: Juss
 
 When verifying pull-request Documentation Truth or test discovery, resolve the live target branch, fetch its full SHA, and require it to be an ancestor of the exact checked-out candidate before computing the reviewed range. Stored event-base identity is historical context; default-branch push verification instead uses the exact before SHA. Invalid refs, unavailable fetches, malformed identities, and stale candidate ancestry fail closed without becoming product-regression or merge-approval claims.
 
+## Queue economy and required proof
+
+For `main` pull requests, `.github/workflows/ci.yml` must own the load-bearing verification, including terminal and AI-skill contracts through the required `Test` job. `.github/workflows/quality-gate.yml` remains the extended `staging` proof lane rather than running duplicate main checks. The Search Console/evidence gate must check the exact PR head and avoid a second feature-branch push execution. Do not save runner minutes by dropping CodeQL, required test-ledger/CI gates, browser proof, independently reviewed candidate approval, or production provider readback. This source change is a candidate only until the successor exact head is verified.
+
 ## Goal
 
 Move the authoritative product toward a truthful full app launch without replacing Juss's intent with a smaller cosmetic task, creating fake-green evidence, deleting history, leaking private sauce, or scaling an unproven path.

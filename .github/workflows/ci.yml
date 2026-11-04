@@ -83,6 +83,12 @@ jobs:
         run: npm test
         env:
           NODE_ENV: test
+      - name: Verify guarded terminal and AI skill contracts (required)
+        run: |
+          npm run verify:terminal-contract
+          npm run verify:juss-flow
+          npm run verify:production-authority
+          npm run verify:ai-skills
 
   e2e:
     name: Playwright e2e

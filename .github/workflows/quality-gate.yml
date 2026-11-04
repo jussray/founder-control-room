@@ -1,9 +1,9 @@
 name: Quality Gate
 
+# Main PRs use the load-bearing CI Required Gate; the extended Quality Gate remains on staging.
 on:
   pull_request:
     branches:
-      - main
       - staging
 
 permissions:
