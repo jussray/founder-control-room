@@ -114,4 +114,25 @@ describe('POST /missions/:missionId/council/run', () => {
     expect(persisted.transcript.sourceRef).toBe('founder-attested:claude-code');
     expect(persisted.transcript.humanRelay).toBe(false);
   });
+  it('rejects a forged voice approval before provider dispatch', async () => {
+    const response = await request(app())
+      .post(`/missions/${MISSION_ID}/council/run`)
+      .set('Authorization', 'Bearer test-token')
+      .send({
+        voiceIntent: {
+          contract: 'fcr.voice-council-intent.v1',
+          requestId: 'v1', actorId: 'founder', workspaceId: 'fcr',
+          transcriptDigest: 'a'.repeat(64), sourceKind: 'voice',
+          observedAt: '2026-10-11T08:00:00Z',
+          goal: 'Review', repository: 'jussray/founder-control-room',
+          branch: 'main', expectedHeadSha: 'b'.repeat(40),
+          requestedOperations: ['repo.read', 'council.propose'],
+          evidenceRefs: [], riskClass: 'low',
+          approvalState: 'approved', councilQuestion: 'Review this change',
+        },
+      });
+    expect(response.status).toBe(400);
+    expect(runCouncilRoundMock).not.toHaveBeenCalled();
+  });
+
 });
