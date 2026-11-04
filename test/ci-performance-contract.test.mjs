@@ -16,24 +16,24 @@ function jobBody(workflow, name) {
   const start = startPattern.exec(workflow);
   assert.ok(start, 'missing job: ' + name);
   const remainder = workflow.slice(start.index + start[0].length);
-  const nextJob = /^  [a-zA-Z][a-zA-Z0-9_-]*:\\s*$/m.exec(remainder);
+  const nextJob = /^  [a-zA-Z][a-zA-Z0-9_-]*:\s*$/m.exec(remainder);
   return nextJob ? remainder.slice(0, nextJob.index) : remainder;
 }
 
 test('CI runs all four lockfile-bound core lanes with dependency download caching', () => {
   for (const name of ['typecheck', 'lint', 'test', 'e2e']) {
     const body = jobBody(ci, name);
-    assert.match(body, /node-version: '24'[\\s\\S]*?cache: 'npm'/, name + ' missing npm cache');
+    assert.match(body, /node-version: '24'[\s\S]*?cache: 'npm'/, name + ' missing npm cache');
     assert.match(body, /run: npm ci --no-audit --no-fund/, name + ' must run npm ci');
     assert.match(body, /git rev-parse HEAD/, name + ' missing exact-head assertion');
   }
   const discovery = jobBody(ci, 'test-discovery');
-  assert.match(discovery, /node --test test\\/ci-performance-contract\\.test\\.mjs/);
+  assert.match(discovery, /node --test test\/ci-performance-contract\.test\.mjs/);
   assert.match(jobBody(ci, 'required-gate'), /test-discovery/);
 });
 
 test('Quality Gate preserves coverage and release contracts with deterministic installs', () => {
-  assert.doesNotMatch(quality, /run: npm install(?:\\s|$)/m);
+  assert.doesNotMatch(quality, /run: npm install(?:\s|$)/m);
   for (const name of ['typecheck', 'lint', 'unit-tests', 'terminal-contract', 'build', 'qodo-contracts']) {
     const body = jobBody(quality, name);
     assert.match(body, /run: npm ci --no-audit --no-fund/, name + ' must run npm ci');
@@ -54,6 +54,6 @@ test('separate Playwright workflow builds once then runs the identical complete 
   assert.match(playwright, /npm run build/);
   assert.match(playwright, /npm run test:e2e:prepared/);
   assert.doesNotMatch(playwright, /Make E2E harness use Playwright browser discovery/);
-  assert.doesNotMatch(playwright, /path\\.write_text\\(source\\)/);
-  assert.match(read('e2e/run.mjs'), /chromium\\.launch\\(\\{ headless: true, args: \\['--no-sandbox'\\] \\}\\)/);
+  assert.doesNotMatch(playwright, /path\.write_text\(source\)/);
+  assert.match(read('e2e/run.mjs'), /chromium\.launch\(\{ headless: true, args: \['--no-sandbox'\] \}\)/);
 });
