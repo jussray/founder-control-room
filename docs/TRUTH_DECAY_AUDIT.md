@@ -1,5 +1,13 @@
 # Truth Decay Audit: When a True Claim Becomes Unsafe to Reuse
 
+## November 4, 2026: Chief AI exact-source adapter drift and bounded reconciliation
+
+At a read-only audit of Chief AI `main@4ed9c127014cf8db0ee71d9bc0ad38a9705bcde5`, FCR's predecessor pin `0d1106424802fa21d37c6a05fc3e6f6422cc989a` was no longer current and GitHub history diverged. The five contract paths were read at both exact SHAs: `src/domain/capability-plan.js` and `e2e/chief-capability-plan.pw.mjs` retained their blobs; `src/domain/capability-registry.js`, `src/domain/merge-intent.js`, and `config/founder-chief-pair.contract.json` changed.
+
+The capability registry now adds fingerprint, execution-slot, and non-browser continuity-cookie metadata with `actionAuthority: false` and a founder-approval requirement. The merge-intent policy now blocks draft candidates in addition to explicit blocking directives. The pair contract remains `standalone-peers` with independent commercial and technical identity, while the default commercial-packaging label moved to `inside-founder-control-room`. That label is **not approval of a bundle or a joint customer offer**; the explicit-bundle rule and independent authority still govern.
+
+The refreshed `src/founder-os-lab/projectAdapters.ts` snapshot and corresponding test are limited to source-provenance inspection. The Chief production ProofMode MCP check on this exact Chief head remained failed at the time of audit, and no runtime, merger, launch, customer, checkout, or deployment claims are imported. A successor FCR head must independently pass its own full exact-head CI, adapter freshness, documentation, and browser proof. Any further Chief head or contract-blob movement invalidates this snapshot's freshness and requires renewed review.
+
 ## November 3, 2026: FCR auth-lifecycle proof is narrower than release proof
 
 FCR PR #978's predecessor `82d0e7139d3876e166844de64e17b4a770c23b90` passed its dedicated Playwright welcome → magic-link login → opaque browser-session identity → authenticated welcome redirect → server-revoked logout → private-shell denial scenario. GitHub run `41728146923` nevertheless failed in the independently required guarded-terminal journey when the V10 client-side fetch membrane rejected a planless privileged action before the older test could observe the server's separate rejection. A source or test fix must preserve both negative guards and require fresh, exact-head Playwright execution; it may never create the branch that the test is supposed to deny.
