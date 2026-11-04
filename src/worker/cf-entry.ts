@@ -50,12 +50,14 @@ const composed = composeWorkerHandler(
       { runExternalUseHourlyCycle },
       { runPublicCoverageWatchCycle },
       { publishCloudflareRuntimeSignal },
+      { runAiProviderChangeWatchCycle },
     ] = await Promise.all([
       import('./reconciler.js'),
       import('../services/portfolioVerificationScheduler.js'),
       import('../external-use/service.js'),
       import('../external-use/publicCoverageService.js'),
       import('./cloudflareRuntimeSignal.js'),
+      import('../external-use/aiProviderChangeWatchService.js'),
     ]);
 
     return {
@@ -66,17 +68,20 @@ const composed = composeWorkerHandler(
           externalUseResult,
           publicCoverageResult,
           cloudflareRuntimeSignalResult,
+          aiProviderChangeWatchResult,
         ] = await Promise.allSettled([
           runReconcilerCycle(),
           runExternalUseHourlyCycle(),
           runPublicCoverageWatchCycle(),
           publishCloudflareRuntimeSignal(),
+          runAiProviderChangeWatchCycle(env as ControlRoomWorkerEnv),
         ]);
         assertScheduledTaskResults([
           { name: 'reconciler', result: reconcilerResult },
           { name: 'external-use', result: externalUseResult },
           { name: 'public-coverage', result: publicCoverageResult },
           { name: 'cloudflare-runtime-signal', result: cloudflareRuntimeSignalResult },
+          { name: 'ai-provider-change-watch', result: aiProviderChangeWatchResult },
         ]);
       },
     };
