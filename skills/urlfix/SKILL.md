@@ -232,6 +232,8 @@ Record the exact candidate SHA for every proof claim.
 
 The original failing reproduction is the regression witness.
 
+Rerun the same failing browser path after the patch, preserving its viewport, route, action, and request boundary.
+
 If baseline evidence was:
 
 ```text
