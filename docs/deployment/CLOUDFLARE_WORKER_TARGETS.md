@@ -1,5 +1,14 @@
 # Cloudflare Deployment Targets
 
+## November 2, 2026 — FCR Council Bus and search evidence source candidate
+
+The isolated `feat/fcr-council-bus-handoff-guard-20261102` branch contains pinned Council/Court validators, a signed-ACK contract, and founder-gated Search Console and AI evidence review panels. The Search Console panel inspects five fixed public URLs and sitemap metadata; it does not claim a full indexed-page count. The evidence challenger is advisory, uses a dedicated authenticated BYOK Cloudflare AI Gateway, and never grants publishing or deployment authority. Current candidate source and tests do not prove live delivery. Google OAuth refresh credentials and the dedicated gateway token have not been installed in the Worker; `CF_API_TOKEN` remains incorrectly typed as plaintext and must be remediated through an exact-head authorized reconcile. The public homepage uses CSP-compatible WebPage Microdata, not inline scripts. No PR, merge, or production deployment follows from this source candidate.
+
+## November 1, 2026 UTC: exact-head MCP credential preflight
+
+The existing canonical `founder-control-room` Worker remains the sole API/MCP deployment target. `.github/workflows/deploy.yml` and `.github/workflows/worker-reconcile.yml` must fail closed at `scripts/verify-worker-binding-types.mjs` whenever Cloudflare reports a credential as `plain_text` or cannot provide trustworthy binding name/type metadata. This release gate does not rotate or copy secrets, grant public MCP access, alter Pages routing, or prove live `/mcp` authentication; production promotion still requires safe provider-held secret classification and independent exact-SHA runtime proof.
+
+
 ## Portfolio Logpush target
 
 The repository declares a single account-level Cloudflare Logpush desired job named `fcr-portfolio-workers-trace` for the `workers_trace_events` dataset. This is a source target, not a claim about current provider state or successful log delivery.
@@ -107,19 +116,22 @@ This binding is intentionally inert from application code in this slice: no publ
 
 Repository configuration proves only the desired Workflow class/binding contract. It does not prove that Cloudflare has accepted the binding, that an instance exists or completed, or that any release/provider action occurred. Those are separate provider/runtime evidence gates.
 
-### Remote read MCP operator boundary
+### External MCP OAuth and legacy read boundary
 
-The canonical Worker also owns the served remote read-only MCP endpoint at:
+The canonical `founder-control-room` Worker has two distinct **source-defined** MCP paths:
 
 ```text
+POST https://api.foundercontrolroom.org/mcp
 POST https://api.foundercontrolroom.org/mcp/read
 ```
 
-Repository configuration binds `FCR_REMOTE_MCP_READ_PROJECTS` to exactly `chief-ai-machine,founder-control-room` and requires the dedicated secret name `FCR_REMOTE_MCP_READ_TOKEN`. The scope is server-held; an MCP caller cannot widen it by supplying another project identifier or by reusing another FCR credential.
+`/mcp` is the canonical connector resource for eligible ChatGPT, Claude, and other admitted MCP clients. It requires a Supabase OAuth 2.1 bearer token with a valid current user, founder allowlist membership, client identity, and the supported `authenticated` audience / `email` scope. The FCR server derives project grants from its own portfolio registry; an optional `mcp_projects` token claim can **narrow**, never widen, this authority.
 
-The secret value belongs only in the canonical Worker secret store. Never place it in Wrangler source, `.env.example`, GitHub issues, PR bodies, screenshots, logs, browser code, or proof artifacts. Repository source proves the intended secret interface and project scope only; it does not prove that the secret is installed, the deployed runtime matches this source, or the live endpoint is reachable.
+`/mcp/read` is the compatibility path. Only an exact timing-safe match to the dedicated `FCR_REMOTE_MCP_READ_TOKEN` selects the legacy bounded static-token handler; every other credential redirects with 307 to the canonical HTTPS `/mcp` OAuth resource. The canonical `/mcp` handler verifies OAuth tokens after redirect, never downgrading failed OAuth to static authority. Both routes retain the named-tool, project-policy, secret-rejection, and redacted-evidence-persistence boundaries defined in `src/http/routes/mcp.ts` and `src/http/routes/remoteReadMcp.ts`.
 
-The route must fail closed if the token or project scope is unavailable. Its advertised surface remains limited to `list_read_servers` and `invoke_read_tool`, and the underlying FCR MCP registry/policy remains authoritative for provider/tool reads. Expanding the scope beyond Chief AI + Founder Control Room requires a separate reviewed authority change.
+`wrangler.worker.toml` declares public-safe MCP resource, issuer, audience, scope, and bounded project configuration. Actual runtime credentials belong exclusively in the canonical Worker secret store. Do not put them in Wrangler source, public pages, sample environment files, CI logs, PR bodies, or MCP arguments. The Wrangler variable `FCR_REMOTE_MCP_READ_PROJECTS` does not grant broader runtime authority than the application-owned `PORTFOLIO_PROJECTS` registry.
+
+**Evidence gate:** source configuration, passing tests, and a deployment record are separate claims. Verify the current Cloudflare Worker version/bindings, Supabase consent and issuer, current-user/allowlist authentication, client tools/list, one authorized read, and the persisted redacted tool-call receipt before reporting that ChatGPT can actually operate FCR. A stale production Worker or missing secret binding is not a working connector. See `docs/MCP_STACK.md`.
 
 ### Worker build authority invariant
 
@@ -197,6 +209,8 @@ The canonical Worker runtime secret values belong in the Cloudflare Worker secre
 
 The Worker-only `.github/workflows/worker-reconcile.yml` authority gate must also enumerate the canonical Worker's provider-held secret **names** through Wrangler, compare them with the same `wrangler.worker.toml [secrets].required` registry, and fail before its first `secret put` or deploy if required names are missing or provider enumeration is unavailable. The fail-closed `FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON` is the single exception because the reconcile workflow explicitly replaces that one value with `enabled:false` after preflight. This verification proves name presence only, not secret validity, exact deployed source, live API response, or authorization to promote; all remain separate gates.
 
+The canonical Deploy workflow's authority gate performs the same Wrangler enumeration of provider-held secret names before its first mutation. Its receipt handling accounts for Wrangler writing human authentication notices to stdout ahead of the requested JSON: the gate extracts the JSON name list from the receipt text before parsing, and fails closed with a named receipt error when no JSON list is present. Only the parsing envelope is tolerant; the required-name comparison and the fail-closed posture are unchanged.
+
 The Worker-only reconciliation runtime proof must check the `X-Founder-Control-Room-Service` header and exact approved `gitSha` in the **direct API `/version`** response, and then independently check that the **public Pages `/version`** proxy returns the same required header and exact SHA. Successful `/health` alone, a JSON `/version` body without its header, a Pages preview deployment, or the existence of `FCR_API` service binding is not sufficient. The redacted Pages-proxy proof receipt is produced only after live readback; a green source contract test never substitutes for that receipt.
 
 FCR's `public-web-observation-v1` contract does not require a dedicated provider-held Worker secret. Public-web adapter selection occurs behind FCR's governed read-only research hub, so changing or losing an adapter cannot silently change product authority or become proof of an observed outcome.
@@ -260,3 +274,7 @@ Current executable source and authoritative provider readback outrank an older v
 - Access: roll back only an incomplete or ambiguous browser-destination detachment using the receipt-bound original destination set and unchanged application/policy identity; a later runtime/browser failure alone must not automatically reintroduce a Cloudflare Access product-login screen.
 - Credentials: remove/revoke only the affected credential; do not rotate unrelated keys to repair binding drift.
 - Preserve build logs, deployment IDs, provider readback, browser traces, and runtime receipts.
+
+### External OAuth consent routing candidate
+
+`public/_worker.js` must normalize only a www `GET /oauth/consent` to canonical `https://foundercontrolroom.org/oauth/consent`, retaining query state with no-store/no-referrer protection. The apex Pages origin forwards consent GET, `/assets/oauth-consent.js`, `/assets/oauth-consent.css`, and interactive consent POST through `FCR_API`; the assets are never public Pages `ASSETS` content. Browser cookies, same-tab authorization state and mutation Origin remain on the configured Pages apex, while the API service checks the interactive founder session and decision. Streaming consent POST bodies must be forwarded intact through the Pages `FCR_API` service binding using a compatible half-duplex Request body; a 503 on that request is not a successful approval. This is source-defined until both the Pages and API deployments, Supabase authorization flow, and protected runtime are independently observed. Never weaken Cloudflare Access or founder session boundaries to make the flow pass.

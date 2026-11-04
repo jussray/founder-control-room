@@ -1,5 +1,16 @@
 # Cloudflare Reasoning Contract
 
+## November 2, 2026 — FCR Council Bus and search evidence source candidate
+
+The isolated `feat/fcr-council-bus-handoff-guard-20261102` branch contains pinned Council/Court validators, a signed-ACK contract, and founder-gated Search Console and AI evidence review panels. The Search Console panel inspects five fixed public URLs and sitemap metadata; it does not claim a full indexed-page count. The evidence challenger is advisory, uses a dedicated authenticated BYOK Cloudflare AI Gateway, and never grants publishing or deployment authority. Current candidate source and tests do not prove live delivery. Google OAuth refresh credentials and the dedicated gateway token have not been installed in the Worker; `CF_API_TOKEN` remains incorrectly typed as plaintext and must be remediated through an exact-head authorized reconcile. The public homepage uses CSP-compatible WebPage Microdata, not inline scripts. No PR, merge, or production deployment follows from this source candidate.
+
+## November 1, 2026 UTC: exact-head MCP credential preflight
+
+The canonical `.github/workflows/deploy.yml` and `.github/workflows/worker-reconcile.yml` must run the reviewed `scripts/verify-worker-binding-types.mjs` before any Cloudflare Worker mutation. This preflight inspects only Worker binding names and type classifications; a credential binding classified `plain_text`, a malformed provider response, or unavailable provider metadata must block the release without revealing values, provider response bodies, or arbitrary binding names in logs. A source-green preflight is not evidence that the observed `CF_API_TOKEN` binding has been remediated, that OAuth works, or that production is deployed.
+
+The Deploy authority gate's secret-name verification follows the same reasoning. Wrangler's stdout is a human interface as well as a machine one: when Wrangler authenticates through an environment-variable API token, it prints authentication notices ahead of the JSON it was asked to emit. Treating that whole stream as pure JSON makes a healthy enumeration look corrupt. The gate therefore separates the channels by extracting the JSON name list from the receipt text, and it still fails closed, with the receipt's opening characters named for diagnosis, when no JSON list can be found. Parsing tolerance applies to the envelope only; the required-name comparison itself stays exact.
+
+
 ## Logpush portfolio authority
 
 Founder Control Room owns the source contract for the portfolio Logpush desired state in `config/cloudflare-logpush.portfolio.json`. The first bounded dataset is account-scoped `workers_trace_events`; product repositories participate without receiving FCR Cloudflare write credentials.
@@ -41,6 +52,13 @@ Goal → Reality → Redteam I → Lindy → L99 → Redteam II → OODA → Bil
 ```
 
 The engine is deterministic. It does not call a model, execute Wrangler, deploy a Worker, change DNS, rotate secrets, or roll back production.
+
+### External MCP deployment and identity proof
+
+The canonical FCR Worker is intended to serve `POST /mcp` as the Supabase OAuth-protected connector and `POST /mcp/read` as its exact-static-token compatibility alias. The repository's `wrangler.worker.toml` declares public-safe resource, issuer, audience, and scope configuration; `FCR_REMOTE_MCP_READ_TOKEN` remains a provider-held secret, never a source literal. The `founder_users` allowlist, server-owned project scope, consent, and redacted evidence persistence must remain independent of connector or browser identity.
+
+Treat a passing OAuth bootstrap or Playwright harness as candidate-source proof only. Before any production-ready claim, observe the current Cloudflare deployment and Worker bindings, confirm the OAuth provider consent and issued-token behavior, then exercise tools/list and an authorized read through the actual ChatGPT client with a durable redacted receipt. Missing or stale provider proof is `UNKNOWN/BLOCKED`, not success; publication, provider mutation, and deployment each require their separate approval gate.
+
 
 ## Why this exists
 
@@ -299,3 +317,7 @@ npx playwright test e2e/cloudflare-reasoning.spec.ts
 ```
 
 The browser/API suite verifies the public-safe contract, founder protection, absence of credential leakage, presence of the implementation stack, and absence of an accidental deployment endpoint. Unit tests verify exact-commit reasoning, stale evidence, duplicate authority, authentication failures, runtime failure, rollback preparation, first-principles deletion/simplification output, and approval boundaries.
+
+## OAuth consent browser-origin boundary
+
+For an external connector's authorization request, the Pages edge redirects only www consent GET navigation to canonical `https://foundercontrolroom.org/oauth/consent`, preserving the query string. On the apex, Pages forwards the consent GET, API-owned assets, and protected consent POST through its existing `FCR_API` service binding without changing the browser origin. The browser's host-only founder cookie and same-tab authorization ID therefore remain on the configured Pages origin; the API service still performs authentication, CSRF enforcement, and the server-to-Supabase consent request. Pages must never serve the consent assets from public `ASSETS` or mint its own founder authority. Full acceptance requires current Supabase OAuth settings, Access routing readback, a real authenticated consent decision, and a subsequent scoped MCP tool receipt; source testing is not deployment proof.
