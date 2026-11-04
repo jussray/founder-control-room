@@ -104,7 +104,8 @@
         "`.github/workflows/ci.yml` must keep the existing crawler and public-work Playwright specs inside the load-bearing `Playwright e2e` job that feeds `Required Gate`; a separate advisory Pages workflow cannot substitute for required exact-head browser execution or grant merge authority.",
         ".github/workflows/ci.yml must resolve and fetch the live PR target branch separately for Documentation Truth and test discovery, validate a full nonzero SHA and ancestry in the exact checked-out head, retain exact push-before ranges for push events, and fail without exporting a proof base on resolution or fetch failure.",
         ".github/workflows/ci.yml must require npm ci --no-audit --no-fund in the Type check, Lint, Unit Tests, and Playwright e2e exact-head jobs, retain load-bearing Required Gate and independent review evidence, and must never treat lockfile-consistent installation alone as merge, deployment, or runtime authorization.",
-        "`.github/workflows/ci.yml` must keep four exact-head core installs lockfile-bound, enable package-lock-keyed npm cache without caching mutable node_modules, and run the CI performance regression contract inside its load-bearing test-discovery job; cache availability is an optimization, never a reason to bypass test execution or Required Gate."
+        "`.github/workflows/ci.yml` must keep four exact-head core installs lockfile-bound, enable package-lock-keyed npm cache without caching mutable node_modules, and run the CI performance regression contract inside its load-bearing test-discovery job; cache availability is an optimization, never a reason to bypass test execution or Required Gate.",
+        "`.github/workflows/ci.yml` must cancel superseded pull-request head runs using PR-specific concurrency while preserving main push checks, exact-head gating, and separate PR identities; cancellation of predecessor proof cannot authorize a successor head."
       ]
     },
     {
@@ -499,7 +500,8 @@
     {
       "path": ".github/workflows/quality-gate.yml",
       "claims": [
-        "`.github/workflows/quality-gate.yml` must use lockfile-strict npm ci for its Node verification jobs and cache npm download content keyed to the committed dependency lockfile, while retaining typecheck, lint, coverage tests, guarded terminal contracts, RLS, and production build checks as distinct executed requirements until same-head replacement proof is verified."
+        "`.github/workflows/quality-gate.yml` must use lockfile-strict npm ci for its Node verification jobs and cache npm download content keyed to the committed dependency lockfile, while retaining typecheck, lint, coverage tests, guarded terminal contracts, RLS, and production build checks as distinct executed requirements until same-head replacement proof is verified.",
+        "`.github/workflows/quality-gate.yml` must cancel superseded pull-request head runs using PR-specific concurrency while preserving main push checks, exact-head gating, and separate PR identities; cancellation of predecessor proof cannot authorize a successor head."
       ]
     }
   ]

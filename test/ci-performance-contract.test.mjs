@@ -57,3 +57,11 @@ test('separate Playwright workflow builds once then runs the identical complete 
   assert.doesNotMatch(playwright, /path\.write_text\(source\)/);
   assert.match(read('e2e/run.mjs'), /chromium\.launch\(\{ headless: true, args: \['--no-sandbox'\] \}\)/);
 });
+
+test('superseded PR runs cancel without cancelling main branch verification', () => {
+  for (const [name, workflow] of [['CI', ci], ['Quality Gate', quality]]) {
+    assert.match(workflow, /concurrency:/, name + ' must have bounded concurrency');
+    assert.ok(workflow.includes("cancel-in-progress: ${{ github.event_name == 'pull_request' }}"), name + ' may cancel PR runs only');
+    assert.ok(workflow.includes('github.event.pull_request.number || github.ref'), name + ' must isolate distinct PRs');
+  }
+});
