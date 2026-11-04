@@ -44,6 +44,12 @@
               "prompt": "List my projects and summarize the stored status and observation timestamp of one I can access.",
               "tools_triggered": "fcr_list_my_projects, fcr_get_my_project",
               "expected_behavior": "Uses the user's granted project ID, reports only its stored status and observedAt timestamp, and does not claim live runtime verification or write authority."
+            },
+            {
+              "description": "Blank-slate customer 5W1H onboarding",
+              "prompt": "Start with my own Who, What, When, Where, Why, and How. Do not use anyone else's projects.",
+              "tools_triggered": "fcr_customer_start",
+              "expected_behavior": "Returns six generic intake questions; no inherited founder data, other tenant data, database reads, storage, or provider actions."
             }
           ],
           "negative": [
