@@ -73,7 +73,7 @@ try {
     const signedOut = await browser.newPage({ viewport });
     await signedOut.goto(origin + '/member/', { waitUntil: 'domcontentloaded' });
     await signedOut.waitForURL('**/welcome');
-    await signedOut.getByRole('heading', { name: /Welcome to FCR/ }).waitFor();
+    await signedOut.getByRole('heading', { name: 'Welcome to Founder Control Room' }).waitFor();
     await signedOut.getByRole('heading', { name: 'Your personal workspace' }).waitFor();
     await signedOut.locator('#member-email').fill('member@example.com');
     await signedOut.getByRole('button', { name: 'Continue to my workspace' }).click();
