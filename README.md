@@ -599,3 +599,8 @@ The OAuth consent UI is served by the FCR API service **through the same-origin 
 ## CI lockfile determinism — current exact-head source contract
 
 Source changes to `.github/workflows/ci.yml` are release-governance changes: its four core Type check, Lint, Unit Tests, and Playwright e2e jobs must install from the committed npm lockfile with `npm ci --no-audit --no-fund`, without bypassing existing jobs, independent review, Required Gate, or founder-final approval. This exact-head source contract prevents unconstrained dependency resolution during CI but does not prove deploy/runtime identity, production behavior, or customer outcomes.
+
+## 2026-11-04 Deploy workflow syntax recovery (candidate, not production proof)
+
+Existing PR #1067 restores Python indentation inside `.github/workflows/deploy.yml` while parsing Cloudflare's name-only secret receipt. GitHub rejected the previous file as invalid before any production gate could run; the associated Founder Deploy Command returned HTTP 422. This candidate must pass current exact-head CI, GitHub workflow acceptance, and explicit founder-authorized dispatch before any release is claimed. Successful Cloudflare Pages builds and installed `OPENAI_API_KEY` binding-name metadata do not establish Worker deployment, model-invocation success, customer isolation, or paid customer outcomes.
+
