@@ -94,7 +94,8 @@
         "`.github/workflows/playwright.yml` must pin the independently verified StoryEngine successor `4601cc3a8297875c97e54717f2aeb47db44d0595` after preview-runtime configuration moved `main`; the pin selects only the new evidence subject, and the successor FCR head must rerun the complete live-ref, immutable checkout, runtime identity, directive/receipt/replay, and browser witness before pair compatibility can be current.",
         "`.github/workflows/playwright.yml` must pin StoryEngine `dc79a23ffa8e6e5b0964efccdaee7c961b9b9e1d` only as the independently observed successor evidence subject from PR #1044; the new FCR head must reverify live ref equality, immutable checkout, runtime identity, directive/receipt/replay and browser federation before compatibility is current. This new pin cannot grant merge, deployment, provider, publication or production authority.",
         "`.github/workflows/playwright.yml` must select the independently observed StoryEngine successor `bffc9f771b673055403f52b29c86b30e5f4dd8c8` only as the next exact peer identity; a complete fresh live-ref, immutable checkout, federation runtime and browser/receipt witness is required before current pair compatibility can be claimed, and the pin cannot confer merge, deployment or provider authority.",
-        "`.github/workflows/playwright.yml` must run FCR's exact-head welcome/login/logout `auth-lifecycle` Chromium scenario before the separately required guarded-terminal journey, verify real browser same-origin opaque-session identity and server-revoked logout through `e2e/run.mjs`, preserve both client-side and server-side V10 planless-action denial, and never treat an isolated passing test as deployed Site or production proof."
+        "`.github/workflows/playwright.yml` must run FCR's exact-head welcome/login/logout `auth-lifecycle` Chromium scenario before the separately required guarded-terminal journey, verify real browser same-origin opaque-session identity and server-revoked logout through `e2e/run.mjs`, preserve both client-side and server-side V10 planless-action denial, and never treat an isolated passing test as deployed Site or production proof.",
+        "`.github/workflows/playwright.yml` must install lockfile-bound dependencies and use Playwright's source-level browser discovery without mutating e2e/run.mjs at test time; after the first exact-head build it must run the complete prepared E2E harness without silently omitting browser, peer, authorization, or security proofs."
       ]
     },
     {
@@ -102,7 +103,8 @@
       "claims": [
         "`.github/workflows/ci.yml` must keep the existing crawler and public-work Playwright specs inside the load-bearing `Playwright e2e` job that feeds `Required Gate`; a separate advisory Pages workflow cannot substitute for required exact-head browser execution or grant merge authority.",
         ".github/workflows/ci.yml must resolve and fetch the live PR target branch separately for Documentation Truth and test discovery, validate a full nonzero SHA and ancestry in the exact checked-out head, retain exact push-before ranges for push events, and fail without exporting a proof base on resolution or fetch failure.",
-        ".github/workflows/ci.yml must require npm ci --no-audit --no-fund in the Type check, Lint, Unit Tests, and Playwright e2e exact-head jobs, retain load-bearing Required Gate and independent review evidence, and must never treat lockfile-consistent installation alone as merge, deployment, or runtime authorization."
+        ".github/workflows/ci.yml must require npm ci --no-audit --no-fund in the Type check, Lint, Unit Tests, and Playwright e2e exact-head jobs, retain load-bearing Required Gate and independent review evidence, and must never treat lockfile-consistent installation alone as merge, deployment, or runtime authorization.",
+        "`.github/workflows/ci.yml` must keep four exact-head core installs lockfile-bound, enable package-lock-keyed npm cache without caching mutable node_modules, and run the CI performance regression contract inside its load-bearing test-discovery job; cache availability is an optimization, never a reason to bypass test execution or Required Gate."
       ]
     },
     {
@@ -492,6 +494,12 @@
       "path": "src/http/middleware/mcpRateLimit.ts",
       "claims": [
         "The MCP rate-limit middleware is a dependency-free unit-testable 60-request/minute per-IP and per-process express-rate-limit instance; both canonical and compatibility MCP routes must reuse this same instance before authentication, and this does not prove globally distributed Cloudflare enforcement or override OAuth/founder authorization."
+      ]
+    },
+    {
+      "path": ".github/workflows/quality-gate.yml",
+      "claims": [
+        "`.github/workflows/quality-gate.yml` must use lockfile-strict npm ci for its Node verification jobs and cache npm download content keyed to the committed dependency lockfile, while retaining typecheck, lint, coverage tests, guarded terminal contracts, RLS, and production build checks as distinct executed requirements until same-head replacement proof is verified."
       ]
     }
   ]
