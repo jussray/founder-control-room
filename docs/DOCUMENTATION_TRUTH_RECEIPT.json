@@ -16,7 +16,8 @@
       "path": ".github/workflows/deploy.yml",
       "claims": [
         "`.github/workflows/deploy.yml` must run `scripts/verify-worker-binding-types.mjs` before the first Cloudflare Worker mutation, rejecting plaintext credential bindings or unavailable name/type provider evidence while never logging secret values or treating a passing source preflight as live deployment proof.",
-        "`.github/workflows/deploy.yml` must extract the JSON secret-name list from the wrangler receipt text before parsing it, because wrangler writes human authentication notices to stdout ahead of the JSON, and the production authority gate fails closed when no JSON list is present in the receipt."
+        "`.github/workflows/deploy.yml` must extract the JSON secret-name list from the wrangler receipt text before parsing it, because wrangler writes human authentication notices to stdout ahead of the JSON, and the production authority gate fails closed when no JSON list is present in the receipt.",
+        "`.github/workflows/deploy.yml` must keep the `receipt = json.loads(receipt_text[array_start:array_end + 1])` statement within the `run: |` YAML shell body, retaining the provider-held secret-name receipt validation as an executable fail-closed production preflight; it must never mis-indent the parser into an invalid workflow or use source-only green as deployment authority."
       ]
     },
     {

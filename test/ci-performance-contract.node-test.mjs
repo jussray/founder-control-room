@@ -115,3 +115,10 @@ test('migration lint executes real local DB checks only on an exact-head Supabas
   assert.match(jobBody(ci, 'required-gate'), /- migration-lint/);
   assert.match(jobBody(ci, 'required-gate'), /MIGRATION_RESULT/);
 });
+
+test('Deploy workflow retains the provider secret-name JSON parser inside its executable YAML block', () => {
+  const workflow = read('.github/workflows/deploy.yml');
+  assert.match(workflow, /^          receipt = json\.loads\(receipt_text\[array_start:array_end \+ 1\]\)$/m);
+  assert.doesNotMatch(workflow, /^        receipt = json\.loads\(receipt_text\[array_start:array_end \+ 1\]\)$/m);
+  assert.match(workflow, /secret list \\\n\s+--config wrangler\.worker\.toml/);
+});
