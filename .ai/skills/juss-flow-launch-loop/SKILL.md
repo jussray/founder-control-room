@@ -414,3 +414,9 @@ Next founder gate:
 A committed regression test is source evidence only until the exact-head workflow that feeds the applicable gate actually executes it. For LinkedIn analytics continuity, `.github/workflows/ci.yml` must keep `scripts.test_linkedin_analytics_continuity` inside the load-bearing `python-tests` job, and `Required Gate` must continue to depend on that job. Missing LinkedIn activity rows must remain `UNKNOWN_NO_EVIDENCE` with null metrics, never synthetic zero impressions or engagements.
 
 For public crawler and work-directory behavior, `.github/workflows/ci.yml` must keep `e2e/pages-api-recovery.spec.ts` and `e2e/public-work-directory.spec.ts` inside the load-bearing `Playwright e2e` job that feeds `Required Gate`. The specialized Pages workflow remains useful evidence, but it cannot substitute for this required exact-head browser execution or authorize merge by itself.
+
+## Juss-authored skills export — evidence gate (review-only)
+
+The Juss Flow launch loop must not treat a copy under `skills/juss-authored/` as an active runtime capability or as independent proof that a provider action happened. Existing FCR skill selection and Chief AI capability routing remain separate; any new runtime adapter requires its own explicit authorization, tenant isolation, and regression evidence.
+
+For source review, `.github/workflows/ci.yml` must run the receipt-chain regression and export-inventory verification in `Python tests`, which must feed `Required Gate`. A structural exit code, successful checksum, or historical green check cannot substitute for exact-head CI, current Documentation Truth, independent review, founder-final candidate approval, or post-merge runtime observation.

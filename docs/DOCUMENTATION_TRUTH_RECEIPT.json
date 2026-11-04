@@ -101,7 +101,8 @@
       "path": ".github/workflows/ci.yml",
       "claims": [
         "`.github/workflows/ci.yml` must keep the existing crawler and public-work Playwright specs inside the load-bearing `Playwright e2e` job that feeds `Required Gate`; a separate advisory Pages workflow cannot substitute for required exact-head browser execution or grant merge authority.",
-        ".github/workflows/ci.yml must resolve and fetch the live PR target branch separately for Documentation Truth and test discovery, validate a full nonzero SHA and ancestry in the exact checked-out head, retain exact push-before ranges for push events, and fail without exporting a proof base on resolution or fetch failure."
+        ".github/workflows/ci.yml must resolve and fetch the live PR target branch separately for Documentation Truth and test discovery, validate a full nonzero SHA and ancestry in the exact checked-out head, retain exact push-before ranges for push events, and fail without exporting a proof base on resolution or fetch failure.",
+        "`.github/workflows/ci.yml` must execute the exported Juss-authored receipt-chain tests and complete SHA-256 inventory under the load-bearing `Python tests` job, and `Required Gate` must require that job to succeed; this proves only source/test consistency, never installed FCR behavior, provider execution, or founder-final merge authority."
       ]
     },
     {

@@ -200,3 +200,9 @@ Immediately before merge, re-read current `main`, the exact PR head, required ch
 A required test contributes to merge readiness only when the exact-head workflow that feeds the applicable gate actually executes it. A committed but uninvoked test is source evidence, not CI proof. For LinkedIn analytics continuity, `.github/workflows/ci.yml` must keep `scripts.test_linkedin_analytics_continuity` inside the load-bearing `python-tests` job, and `Required Gate` must continue to depend on that job. Missing LinkedIn activity rows must remain `UNKNOWN_NO_EVIDENCE` with null metrics, never synthetic zero impressions or engagements.
 
 For public crawler and work-directory behavior, `.github/workflows/ci.yml` must keep `e2e/pages-api-recovery.spec.ts` and `e2e/public-work-directory.spec.ts` inside the load-bearing `Playwright e2e` job that feeds `Required Gate`; a green specialized Pages workflow alone cannot satisfy merge-required browser proof or authorize integration.
+
+## Juss-authored skills export — evidence gate (review-only)
+
+Changes under `skills/juss-authored/` must not silently replace `.agents/skills`, `.ai/skills`, `.claude/skills`, or FCR runtime routing. The repaired receipt validators establish structural and byte-integrity constraints only; a matching checksum does not prove provenance, runtime invocation, authenticated founder authority, or provider readback.
+
+The existing `.github/workflows/ci.yml` must run exported receipt and inventory checks inside the load-bearing `Python tests` job, and `Required Gate` must require that job's success. Merge of the export still requires current Documentation Truth, all exact-head checks, independent review, and a new founder-final approval bound to the precise PR, base, and head; neither source publication nor passing tests grants deployment authorization.

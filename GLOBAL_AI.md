@@ -283,3 +283,9 @@ The Control Room exists to preserve founder authority, not automate it out of ex
 A committed regression test is source evidence only until the exact-head workflow that feeds `Required Gate` actually executes it. For LinkedIn analytics continuity, `.github/workflows/ci.yml` must keep `scripts.test_linkedin_analytics_continuity` inside the load-bearing `python-tests` job, and `Required Gate` must continue to depend on that job. Missing LinkedIn activity rows must remain `UNKNOWN_NO_EVIDENCE` with null metrics, never synthetic zero impressions or engagements.
 
 For public crawler and work-directory behavior, `.github/workflows/ci.yml` must keep `e2e/pages-api-recovery.spec.ts` and `e2e/public-work-directory.spec.ts` inside the load-bearing `Playwright e2e` job that feeds `Required Gate`. A green advisory Pages workflow is supplementary evidence only; it cannot replace this required exact-head browser proof or create merge authority.
+
+## Juss-authored skills export — evidence gate (review-only)
+
+FCR must treat `skills/juss-authored/` as an inert, versioned proposal until a separately reviewed runtime adapter deliberately selects an exact skill version. Do not shadow the active FCR skill router, import the export as an auto-executing agent, or inherit authority from the separate Chief AI system.
+
+The `.github/workflows/ci.yml` `Python tests` lane must run the exported receipt and SHA-256 inventory validators and remain required by `Required Gate`. The proof scope is locally observable code and file consistency, not production integration. Current documentation-truth receipts, external action receipts, and exact-candidate founder-final review remain independently required before merge or release.

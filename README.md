@@ -592,3 +592,9 @@ The successor FCR head must still pass the live-ref equality check, immutable St
 ### FCR external MCP consent candidate (not deployed)
 
 The OAuth consent UI is served by the FCR API service **through the same-origin Pages proxy** at `https://foundercontrolroom.org/oauth/consent`, matching the configured founder callback, CSRF origin, host-only session cookie, and same-tab `sessionStorage`. An exact www consent GET navigates to the canonical apex before login. The API serves the consent UI and assets behind the Pages proxy and requires an interactive, explicitly UUID-bound founder before approve/deny. The OAuth callback resumes a pending, syntax-validated authorization ID on the same apex origin. These are candidate source behaviors, not evidence that Supabase OAuth is enabled, Cloudflare Access permits discovery, or ChatGPT can connect.
+
+## Juss-authored skills export — evidence gate (review-only)
+
+The proposed `skills/juss-authored/` tree in FCR PR #1063 is an additive export, not an installed or activated FCR runtime. Its repaired receipt checker rejects unsafe local evidence paths, ambiguous authority digests, invalid or future-dated receipts, and unaccounted receipt records; structural validation does not authenticate founder approval or prove production operation.
+
+The existing `.github/workflows/ci.yml` must execute the export's receipt regressions and complete SHA-256 inventory in its load-bearing `Python tests` job, which feeds `Required Gate`. A green test job is source/test evidence only. Do not merge or promote the export without complete current-head CI, current Documentation Truth, independent review, and exact-candidate founder-final approval; keep the current skill routing and Chief AI runtime independent.
