@@ -62,7 +62,7 @@ test('superseded PR runs cancel without cancelling main branch verification', ()
   for (const [name, workflow] of [['CI', ci], ['Quality Gate', quality]]) {
     assert.match(workflow, /concurrency:/, name + ' must have bounded concurrency');
     assert.ok(workflow.includes("cancel-in-progress: ${{ github.event_name == 'pull_request' }}"), name + ' may cancel PR runs only');
-    assert.ok(workflow.includes('github.event.pull_request.number || github.ref'), name + ' must isolate distinct PRs');
+    assert.ok(workflow.includes("github.event_name == 'pull_request' && github.event.pull_request.number || github.run_id"), name + ' must isolate distinct PRs and preserve other runs');
   }
 });
 
@@ -99,4 +99,17 @@ test('focused verification and QuickScan proofs retain their complete steps on c
   }
   assert.match(read('.github/workflows/verification-core.yml'), /packages\/ultrathink-verification-core test/);
   assert.match(read('.github/workflows/quickscan-proof.yml'), /Playwright control-board proof/);
+});
+
+test('migration lint executes real local DB checks only on an exact-head Supabase change and blocks the required gate', () => {
+  const migration = jobBody(ci, 'migration-lint');
+  assert.match(migration, /git merge-base --is-ancestor/);
+  assert.match(migration, /node scripts\/ci-migration-scope\.mjs/);
+  assert.match(migration, /supabase init/);
+  assert.match(migration, /supabase start/);
+  assert.match(migration, /supabase db lint --local --fail-on error/);
+  assert.doesNotMatch(migration, /continue-on-error/);
+  assert.match(jobBody(ci, 'test-discovery'), /ci-migration-scope\.node-test\.mjs/);
+  assert.match(jobBody(ci, 'required-gate'), /- migration-lint/);
+  assert.match(jobBody(ci, 'required-gate'), /MIGRATION_RESULT/);
 });

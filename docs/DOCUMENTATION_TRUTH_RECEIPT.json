@@ -107,7 +107,8 @@
         ".github/workflows/ci.yml must require npm ci --no-audit --no-fund in the Type check, Lint, Unit Tests, and Playwright e2e exact-head jobs, retain load-bearing Required Gate and independent review evidence, and must never treat lockfile-consistent installation alone as merge, deployment, or runtime authorization.",
         "`.github/workflows/ci.yml` must keep four exact-head core installs lockfile-bound, enable package-lock-keyed npm cache without caching mutable node_modules, and run the CI performance regression contract inside its load-bearing test-discovery job; cache availability is an optimization, never a reason to bypass test execution or Required Gate.",
         "`.github/workflows/ci.yml` must cancel superseded pull-request head runs using PR-specific concurrency while preserving main push checks, exact-head gating, and separate PR identities; cancellation of predecessor proof cannot authorize a successor head.",
-        "`.github/workflows/ci.yml` must cancel only superseded pull-request check runs using PR-scoped concurrency, preserve each main-push and workflow-run source identity with a unique non-PR run ID, and continue to enforce exact-head evidence, complete required tests, and original authority boundaries."
+        "`.github/workflows/ci.yml` must cancel only superseded pull-request check runs using PR-scoped concurrency, preserve each main-push and workflow-run source identity with a unique non-PR run ID, and continue to enforce exact-head evidence, complete required tests, and original authority boundaries.",
+        "`.github/workflows/ci.yml` must require the migration-lint job in Required Gate, verify current PR-base ancestry, classify Supabase and RLS schema changes across the exact base-to-head range, and boot an isolated local Supabase stack before executing db lint with --fail-on error when applicable; a missing local PostgreSQL instance or continue-on-error must never be reported as migration validation."
       ]
     },
     {
@@ -548,6 +549,12 @@
       "path": "scripts/control-room-test-ledger.mjs",
       "claims": [
         "`scripts/control-room-test-ledger.mjs` must select the newest exact-SHA check attempt by check-run identity instead of completion timestamp and fail closed on incomplete or duplicated GitHub check-run enumeration; its observational ledger cannot authorize merge."
+      ]
+    },
+    {
+      "path": "src/lib/__tests__/firstPartyContentTruthUi.contract.test.ts",
+      "claims": [
+        "`src/lib/__tests__/firstPartyContentTruthUi.contract.test.ts` must verify the exact-head Playwright checkout, PR-scoped cancellation that preserves non-PR witnesses, and pinned browser evidence artifacts; a source equality assertion must not require canceling main runs."
       ]
     }
   ]
