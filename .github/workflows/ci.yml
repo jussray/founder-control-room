@@ -413,7 +413,8 @@ jobs:
 
       - name: Explicitly record non-applicability
         if: steps.scope.outputs.execute == 'false'
-        run: echo "NOT_APPLICABLE: exact-head change does not modify the Supabase schema or migrations."
+        run: |
+          echo 'NOT_APPLICABLE: exact-head change does not modify the Supabase schema or migrations.'
 
   required-gate:
     name: Required Gate
