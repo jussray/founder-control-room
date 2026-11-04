@@ -8,6 +8,8 @@ The isolated `feat/fcr-council-bus-handoff-guard-20261102` branch contains pinne
 
 The canonical `.github/workflows/deploy.yml` and `.github/workflows/worker-reconcile.yml` must run the reviewed `scripts/verify-worker-binding-types.mjs` before any Cloudflare Worker mutation. This preflight inspects only Worker binding names and type classifications; a credential binding classified `plain_text`, a malformed provider response, or unavailable provider metadata must block the release without revealing values, provider response bodies, or arbitrary binding names in logs. A source-green preflight is not evidence that the observed `CF_API_TOKEN` binding has been remediated, that OAuth works, or that production is deployed.
 
+The Deploy authority gate's secret-name verification follows the same reasoning. Wrangler's stdout is a human interface as well as a machine one: when Wrangler authenticates through an environment-variable API token, it prints authentication notices ahead of the JSON it was asked to emit. Treating that whole stream as pure JSON makes a healthy enumeration look corrupt. The gate therefore separates the channels by extracting the JSON name list from the receipt text, and it still fails closed, with the receipt's opening characters named for diagnosis, when no JSON list can be found. Parsing tolerance applies to the envelope only; the required-name comparison itself stays exact.
+
 
 ## Logpush portfolio authority
 
