@@ -124,6 +124,27 @@ async function runStep(page, step, origin, vars, expect) {
   }
 }
 
+/**
+ * Intercept before network redirects can leave the approved project origin.
+ * Playwright routes only the first URL of a redirect chain; route.continue()
+ * is insufficient to enforce this boundary. Do not follow HTTP redirects at
+ * all in synthetic journeys, including same-origin redirects: a later hop
+ * could otherwise escape the approved origin without another route callback.
+ */
+export async function enforceSameOriginRoute(route, origin) {
+  const rawUrl = route.request().url();
+  if (rawUrl.startsWith('data:') || rawUrl.startsWith('blob:')) return route.continue();
+  try {
+    if (new URL(rawUrl).origin !== origin) return route.abort('blockedbyclient');
+    const response = await route.fetch({ maxRedirects: 0 });
+    if (response.status() >= 300 && response.status() < 400) return route.abort('blockedbyclient');
+    return route.fulfill({ response });
+  } catch {
+    // A failed preflight must never fall back to an uncontrolled continue().
+    return route.abort('blockedbyclient');
+  }
+}
+
 export async function runJourney(manifest, outDirectory = 'test-results/fcr-browser-operator') {
   const summary = validateJourney(manifest);
   const [{ chromium }, { expect }] = await Promise.all([import('playwright'), import('@playwright/test')]);
@@ -155,14 +176,7 @@ export async function runJourney(manifest, outDirectory = 'test-results/fcr-brow
         serviceWorkers: 'block',
         acceptDownloads: false
       });
-      await context.route('**/*', async (route) => {
-        const url = route.request().url();
-        if (url.startsWith('data:') || url.startsWith('blob:')) return route.continue();
-        try {
-          if (new URL(url).origin === summary.origin) return route.continue();
-        } catch { /* fail closed */ }
-        return route.abort('blockedbyclient');
-      });
+      await context.route('**/*', (route) => enforceSameOriginRoute(route, summary.origin));
       const page = await context.newPage();
       // No credentials, cookies, storage state, or FCR internal session are imported.
       page.setDefaultTimeout(DEFAULT_TIMEOUT);
