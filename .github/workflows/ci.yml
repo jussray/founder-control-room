@@ -148,6 +148,14 @@ jobs:
           python-version: '3.11'
       - name: Run Python unit tests
         run: python3 -m unittest scripts.test_whoami scripts.test_capability_receipt scripts.test_linkedin_analytics_continuity -v
+      - name: Run Juss OS export conformance
+        run: |
+          python3 -m compileall -q skills/juss-authored/juss-os/scripts
+          (cd skills/juss-authored/juss-os/scripts && python3 -m unittest -v test_modes.py test_evidence_ledger.py)
+      - name: Run exported receipt regression tests
+        run: python3 -m unittest discover -s skills/juss-authored/tests -p 'test_*.py' -v
+      - name: Verify complete export SHA-256 inventory
+        run: python3 skills/juss-authored/scripts/verify_inventory.py skills/juss-authored
 
   rls-contract:
     name: RLS migration contract
