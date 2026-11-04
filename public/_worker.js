@@ -312,6 +312,29 @@ export default {
     // browser origin as the __Host-fcr_session cookie and same-origin CSRF
     // checks. They are served by FCR_API, never by public Pages ASSETS.
 
+    // Browser sessions use host-only cookies on the apex Pages hostname.
+    // Normalize only top-level www login/navigation GETs before collecting
+    // credentials; do not redirect login POSTs or claim cross-origin authority.
+    if ((request.method === 'GET' || request.method === 'HEAD') &&
+        requestUrl.origin === 'https://www.foundercontrolroom.org' &&
+        (requestUrl.pathname === '/welcome' ||
+         requestUrl.pathname === '/welcome/' ||
+         requestUrl.pathname === '/member' ||
+         requestUrl.pathname === '/member/')) {
+      const canonicalPath = requestUrl.pathname.startsWith('/member') ? '/member/' : '/welcome';
+      const destination = new URL(canonicalPath, 'https://foundercontrolroom.org');
+      destination.search = requestUrl.search;
+      return new Response(null, {
+        status: 302,
+        headers: {
+          Location: destination.toString(),
+          'Cache-Control': 'no-store',
+          'Referrer-Policy': 'no-referrer',
+          'X-Robots-Tag': 'noindex, nofollow',
+        },
+      });
+    }
+
     // Canonical founder OAuth/session origin is the apex Pages hostname.
     // A www entry must move to apex *before* collecting pending auth state.
     if (request.method === 'GET' &&

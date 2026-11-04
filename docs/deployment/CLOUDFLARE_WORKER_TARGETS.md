@@ -1,5 +1,8 @@
 # Cloudflare Deployment Targets
 
+FCR member sign-in and workspace navigation are apex-cookie-bound: safe `GET`/`HEAD` visits from `www.foundercontrolroom.org` to `/welcome` or `/member/` must redirect to the apex Pages origin before browser authentication state is consumed. This change is separate from public SEO canonical URLs, cannot redirect mutating sign-in requests, cannot expose host-only cookies to `www`, and requires live browser/provider readback before a production-ready claim.
+
+
 ## November 3, 2026 — separate member browser session candidate (PR #1060)
 
 The canonical public Pages site continues to serve `/welcome` and the new `/member/` empty-state interface via `ASSETS`. Dynamic `/auth/member/*` requests and the API-generated callback script require the existing same-origin `FCR_API` binding to `founder-control-room`; they must not be served as static assets or bypass service-identity verification. The server-side `fcr_member_browser_sessions` migration is source-only and must not be treated as applied. A real release requires reviewed SQL migration and RLS checks, existing founder-cookie isolation, live account-switch revocation, deployed API and Pages SHA readback, founder authorization, and a zero-leak cross-account browser test. Do not publish or deploy from PR source or use a passing CI check as provider/runtime proof.

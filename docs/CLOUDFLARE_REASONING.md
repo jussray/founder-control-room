@@ -1,5 +1,8 @@
 # Cloudflare Reasoning Contract
 
+The www public entry is not a browser session origin. `public/_worker.js` must normalize safe `GET`/`HEAD` navigation for `/welcome` and `/member/` from `https://www.foundercontrolroom.org` to `https://foundercontrolroom.org`, retaining queries with no-store, no-referrer, and noindex headers. The existing apex-only cookies, form-origin validation, API-owned callback assets, OAuth consent forwarding and denied cross-origin POST behavior must remain unchanged. Source routing cannot establish live DNS, Pages, Worker binding, or OTP delivery.
+
+
 ## November 3, 2026 — FCR member callback and same-origin Pages boundary (PR #1060; unmerged)
 
 Member email sign-in is distinct from the founder allowlist. `public/_worker.js` must route API-generated `/auth/member/callback.js` and all `/auth/member/*` requests through the same-origin Pages `FCR_API` service binding, while serving the static `/welcome` and `/member/` interfaces from Pages assets. The FCR API validates the Supabase identity, rejects founder accounts in member sessions, revokes cross-role browser sessions, and issues a separate opaque, HttpOnly, Secure, SameSite=Strict cookie backed by `fcr_member_browser_sessions`. The new member route returns only the member's empty workspace, not founder projects or agent state. A source route, pending SQL migration, or mock Playwright result cannot establish an applied migration, a correctly provisioned service binding, a live OTP, or real network/browser isolation. Release must fail closed until independent provider and runtime evidence is observed.
