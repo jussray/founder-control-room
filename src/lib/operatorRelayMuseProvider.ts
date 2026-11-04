@@ -1,6 +1,9 @@
 import type { OperatorRelayRequestV1 } from './operatorRelay.js';
 import type { OperatorRelayAdapter } from './operatorRelayDispatch.js';
-import { operatorRelayAdapterFromTextProvider } from './operatorRelayProvider.js';
+import {
+  OperatorRelayProviderBoundaryError,
+  operatorRelayAdapterFromTextProvider,
+} from './operatorRelayProvider.js';
 
 type FetchLike = typeof fetch;
 type JsonRecord = Record<string, unknown>;
@@ -10,6 +13,14 @@ const MAX_PROVIDER_RESPONSE_BYTES = 64 * 1024;
 const PROVIDER_TIMEOUT_MS = 60_000;
 const MAX_PROVIDER_RESPONSE_ID_LENGTH = 200;
 const SAFE_MUSE_MODEL = /^muse-spark-1\.(?:1|2|3)$/;
+
+function museBoundaryError(error: unknown): OperatorRelayProviderBoundaryError {
+  if (error instanceof OperatorRelayProviderBoundaryError) return error;
+  const message = error instanceof Error && error.message.startsWith('Muse relay')
+    ? error.message
+    : 'Muse relay returned an invalid response';
+  return new OperatorRelayProviderBoundaryError('muse', message);
+}
 
 function record(value: unknown): JsonRecord | null {
   return value && typeof value === 'object' && !Array.isArray(value)
@@ -102,7 +113,7 @@ async function invokeMuse(
       signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
     });
   } catch {
-    throw new Error('Muse relay request failed');
+    throw new OperatorRelayProviderBoundaryError('muse', 'Muse relay request failed');
   }
 
   if (!response.ok) {
@@ -111,18 +122,25 @@ async function invokeMuse(
     } catch {
       // Provider error bodies are intentionally not promoted into FCR errors.
     }
-    throw new Error(`Muse relay failed with HTTP ${response.status}`);
+    throw new OperatorRelayProviderBoundaryError('muse', `Muse relay failed with HTTP ${response.status}`);
   }
 
-  const text = await boundedResponseText(response);
+  let text: string;
+  try {
+    text = await boundedResponseText(response);
+  } catch (error) {
+    throw museBoundaryError(error);
+  }
   let parsed: unknown;
   try {
     parsed = JSON.parse(text);
   } catch {
-    throw new Error('Muse relay returned non-JSON output');
+    throw new OperatorRelayProviderBoundaryError('muse', 'Muse relay returned non-JSON output');
   }
   const body = record(parsed);
-  if (!body) throw new Error('Muse relay returned an invalid response object');
+  if (!body) {
+    throw new OperatorRelayProviderBoundaryError('muse', 'Muse relay returned an invalid response object');
+  }
   return body;
 }
 
@@ -183,10 +201,14 @@ export function createServerMuseRelayAdapter(
     invoke: async ({ request }) => {
       ensureRelayPolicy(request);
       const body = await invokeMuse(fetchImpl, apiKey, model, request);
-      return {
-        text: museText(body),
-        evidenceRef: `provider:meta:${responseIdentity(body)}`,
-      };
+      try {
+        return {
+          text: museText(body),
+          evidenceRef: `provider:meta:${responseIdentity(body)}`,
+        };
+      } catch (error) {
+        throw museBoundaryError(error);
+      }
     },
   });
 }

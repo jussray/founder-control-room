@@ -31,7 +31,7 @@ function relay(toOperator: OperatorRelayRequestV1['toOperator']): OperatorRelayR
     },
     sensitivity: 'internal',
     createdAt: '2026-09-16T06:30:00.000Z',
-    expiresAt: '2099-09-16T06:40:00.000Z',
+    expiresAt: '2026-09-16T06:40:00.000Z',
   };
   return { ...base, requestHash: operatorRelayRequestHash(base) };
 }
