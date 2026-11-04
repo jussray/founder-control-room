@@ -1,8 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
+import { createHash } from 'node:crypto';
 import { chromium } from 'playwright';
-import { enforceSameOriginRoute } from '../scripts/fcr-browser-journey.mjs';
+import { enforceSameOriginRoute, enforceSameOriginWebSocket } from '../scripts/fcr-browser-journey.mjs';
 
 const listen = (server) => new Promise((resolve, reject) => {
   server.once('error', reject);
@@ -51,5 +52,85 @@ test('Playwright never follows a cross-origin redirect from an allowed origin', 
     await browser?.close().catch(() => {});
     if (local.listening) await close(local);
     await close(external);
+  }
+});
+
+test('Playwright WebSocket guard keeps foreign endpoints unreachable while allowing approved origin', { timeout: 30000 }, async () => {
+  let foreignConnections = 0;
+  let approvedConnections = 0;
+  const activeSockets = new Set();
+  const foreign = createServer((_request, response) => { response.writeHead(404); response.end(); });
+  foreign.on('upgrade', (_request, socket) => {
+    foreignConnections += 1;
+    socket.destroy();
+  });
+  await listen(foreign);
+  const approved = createServer((_request, response) => {
+    response.writeHead(200, { 'Content-Type': 'text/html' });
+    response.end('<!doctype html><title>Approved synthetic WebSocket fixture</title>');
+  });
+  approved.on('upgrade', (request, socket) => {
+    approvedConnections += 1;
+    const key = request.headers['sec-websocket-key'];
+    if (typeof key !== 'string') { socket.destroy(); return; }
+    const accept = createHash('sha1')
+      .update(key + '258EAFA5-E914-47DA-95CA-C5AB0DC85B11')
+      .digest('base64');
+    socket.write([
+      'HTTP/1.1 101 Switching Protocols',
+      'Upgrade: websocket',
+      'Connection: Upgrade',
+      'Sec-WebSocket-Accept: ' + accept,
+      '',
+      '',
+    ].join('\r\n'));
+    activeSockets.add(socket);
+    socket.on('close', () => activeSockets.delete(socket));
+  });
+
+  let browser;
+  let context;
+  try {
+    await listen(approved);
+    const origin = `http://127.0.0.1:${approved.address().port}`;
+    const external = `ws://127.0.0.1:${foreign.address().port}/outside`;
+    browser = await chromium.launch({ headless: true });
+    context = await browser.newContext({ serviceWorkers: 'block' });
+    await context.routeWebSocket('**/*', (socketRoute) => enforceSameOriginWebSocket(socketRoute, origin));
+    const page = await context.newPage();
+    await page.goto(origin, { waitUntil: 'domcontentloaded' });
+
+    const result = await page.evaluate(async ({ approvedUrl, externalUrl }) => {
+      const observe = (url) => new Promise((resolve) => {
+        const socket = new WebSocket(url);
+        let done = false;
+        const complete = (event) => {
+          if (done) return;
+          done = true;
+          try { socket.close(); } catch {}
+          resolve(event);
+        };
+        socket.addEventListener('open', () => complete('opened'), { once: true });
+        socket.addEventListener('error', () => complete('failed'), { once: true });
+        setTimeout(() => complete('timed-out'), 4000);
+      });
+      return {
+        allowed: await observe(approvedUrl),
+        foreign: await observe(externalUrl),
+      };
+    }, {
+      approvedUrl: `ws://127.0.0.1:${approved.address().port}/approved`,
+      externalUrl: external,
+    });
+
+    assert.equal(result.allowed, 'opened', 'same-origin WebSocket must remain functional');
+    assert.equal(approvedConnections, 1, 'the approved origin must receive one connection');
+    assert.equal(foreignConnections, 0, 'the cross-origin server must receive no connection');
+  } finally {
+    await context?.close().catch(() => {});
+    await browser?.close().catch(() => {});
+    for (const socket of activeSockets) socket.destroy();
+    if (approved.listening) await close(approved);
+    if (foreign.listening) await close(foreign);
   }
 });
