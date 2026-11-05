@@ -1,5 +1,6 @@
 const SCREEN_KEY = 'fcr_founder_screen';
 const VIEW_KEY = 'fcr_founder_view';
+const PROOF_VIEW_KEY = 'fcr_founder_proof_view';
 const CONTEXT_KEY = 'fcr_founder_context';
 const STYLE_ID = 'fcr-five-screen-shell-style';
 
@@ -18,6 +19,20 @@ const CONTROL_VIEWS = [
   ['execution', 'Execution', 'terminal'],
 ];
 
+// Truth Console remains an owned Proof surface, not a sixth primary screen.
+const PROOF_VIEWS = [
+  ['activity', 'Activity', 'activity'],
+  ['truth-dashboard', 'Truth', 'truth-dashboard'],
+  ['truth-claims', 'Claims', 'truth-claims'],
+  ['truth-evidence', 'Evidence', 'truth-evidence'],
+  ['truth-reconcile', 'Reconcile', 'truth-reconcile'],
+  ['truth-attacks', 'Attacks', 'truth-attacks'],
+  ['truth-world', 'World', 'truth-world'],
+  ['truth-continuity', 'Continuity', 'truth-continuity'],
+  ['truth-seo', 'SEO', 'truth-seo'],
+  ['truth-ai-review', 'AI Review', 'truth-ai-review'],
+];
+
 const LEGACY_ROUTE_MAP = {
   projects: { screen: 'control', view: 'overview' },
   missions: { screen: 'control', view: 'work' },
@@ -25,7 +40,10 @@ const LEGACY_ROUTE_MAP = {
   terminal: { screen: 'control', view: 'execution' },
   l99: { screen: 'chief' },
   promptos: { screen: 'promptos' },
-  activity: { screen: 'proof' },
+  activity: { screen: 'proof', view: 'activity' },
+  ...Object.fromEntries(PROOF_VIEWS.slice(1).map(([id]) => [
+    id, { screen: 'proof', view: id },
+  ])),
 };
 
 const SCREEN_TO_LEGACY = {
@@ -72,29 +90,36 @@ function normalizedScreen(value) {
   return SCREENS.some(([id]) => id === value) ? value : 'home';
 }
 
-function normalizedControlView(value) {
+function normalizedView(screen, value) {
+  if (screen === 'proof') {
+    return PROOF_VIEWS.some(([id]) => id === value) ? value : 'activity';
+  }
   return CONTROL_VIEWS.some(([id]) => id === value) ? value : 'overview';
 }
 
 function initialLocation() {
   const url = new URL(window.location.href);
   const legacy = url.searchParams.get('tab');
-  if (legacy && LEGACY_ROUTE_MAP[legacy]) return LEGACY_ROUTE_MAP[legacy];
+  if (legacy && LEGACY_ROUTE_MAP[legacy]) {
+    const location = LEGACY_ROUTE_MAP[legacy];
+    return { screen: location.screen, view: normalizedView(location.screen, location.view) };
+  }
 
   const screen = normalizedScreen(url.searchParams.get('screen') || safeSessionGet(SCREEN_KEY));
-  const view = normalizedControlView(url.searchParams.get('view') || safeSessionGet(VIEW_KEY));
+  const storedView = screen === 'proof' ? safeSessionGet(PROOF_VIEW_KEY) : safeSessionGet(VIEW_KEY);
+  const view = normalizedView(screen, url.searchParams.get('view') || storedView);
   return { screen, view };
 }
 
 let locationState = initialLocation();
 safeSessionSet(SCREEN_KEY, locationState.screen);
-safeSessionSet(VIEW_KEY, locationState.view);
+safeSessionSet(locationState.screen === 'proof' ? PROOF_VIEW_KEY : VIEW_KEY, locationState.view);
 
 function syncUrl() {
   const url = new URL(window.location.href);
   url.searchParams.delete('tab');
   url.searchParams.set('screen', locationState.screen);
-  if (locationState.screen === 'control') url.searchParams.set('view', locationState.view);
+  if (locationState.screen === 'control' || locationState.screen === 'proof') url.searchParams.set('view', locationState.view);
   else url.searchParams.delete('view');
   history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
 }
@@ -153,13 +178,15 @@ function activateLegacy(tab) {
   return true;
 }
 
-function setLocation(screen, view = locationState.view) {
+function setLocation(screen, view = null) {
+  const selectedScreen = normalizedScreen(screen);
+  const viewKey = selectedScreen === 'proof' ? PROOF_VIEW_KEY : VIEW_KEY;
   locationState = {
-    screen: normalizedScreen(screen),
-    view: normalizedControlView(view),
+    screen: selectedScreen,
+    view: normalizedView(selectedScreen, view || safeSessionGet(viewKey)),
   };
   safeSessionSet(SCREEN_KEY, locationState.screen);
-  safeSessionSet(VIEW_KEY, locationState.view);
+  safeSessionSet(viewKey, locationState.view);
   restoreAttempts.clear();
   syncUrl();
   applyShell();
@@ -241,14 +268,18 @@ function installIntro(content) {
   else content.prepend(template.content);
 }
 
-function installControlSubnav(content) {
+function installViewSubnav(content) {
   content.querySelector('.founder-subnav')?.remove();
-  if (locationState.screen !== 'control') return;
+  if (locationState.screen !== 'control' && locationState.screen !== 'proof') return;
+  const screen = locationState.screen;
+  const views = screen === 'proof' ? PROOF_VIEWS : CONTROL_VIEWS;
   const nav = document.createElement('nav');
   nav.className = 'founder-subnav';
-  nav.setAttribute('aria-label', 'Control views');
-  for (const [id, label] of CONTROL_VIEWS) {
-    nav.appendChild(makeButton(label, locationState.view === id, () => setLocation('control', id)));
+  nav.setAttribute('aria-label', screen === 'proof' ? 'Proof views' : 'Control views');
+  for (const [id, label] of views) {
+    const button = makeButton(label, locationState.view === id, () => setLocation(screen, id));
+    button.dataset[screen === 'proof' ? 'proofView' : 'controlView'] = id;
+    nav.appendChild(button);
   }
   const intro = content.querySelector('.founder-screen-intro');
   if (intro) intro.insertAdjacentElement('afterend', nav);
@@ -258,6 +289,9 @@ function installControlSubnav(content) {
 function desiredLegacyTab() {
   if (locationState.screen === 'control') {
     return CONTROL_VIEWS.find(([id]) => id === locationState.view)?.[2] || 'projects';
+  }
+  if (locationState.screen === 'proof') {
+    return PROOF_VIEWS.find(([id]) => id === locationState.view)?.[2] || 'activity';
   }
   return SCREEN_TO_LEGACY[locationState.screen] || null;
 }
@@ -364,7 +398,7 @@ function showLegacyContent(shell, content) {
   content.hidden = false;
   installContextRibbon(content);
   installIntro(content);
-  installControlSubnav(content);
+  installViewSubnav(content);
 }
 
 function maybeRestoreContext() {
