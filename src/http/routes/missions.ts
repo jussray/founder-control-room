@@ -198,7 +198,21 @@ missionsRouter.post('/:missionId/council/run', async (req: FounderRequest, res) 
       },
     }, createServerOperatorRelayAdapters(process.env));
 
-    return res.status(201).set('Cache-Control', 'no-store').json({ conversation, relay });
+    // A persisted interrupted round is evidence of a failed review, not completion.
+    // Preserve its readback receipt while preventing HTTP 2xx false-green status.
+    if (relay.transcript.state !== 'complete') {
+      return res.status(424).set('Cache-Control', 'no-store').json({
+        code: 'council_round_interrupted',
+        executionState: relay.transcript.state,
+        conversation,
+        relay,
+      });
+    }
+    return res.status(201).set('Cache-Control', 'no-store').json({
+      executionState: 'complete',
+      conversation,
+      relay,
+    });
   } catch (error) {
     return res.status(500).set('Cache-Control', 'no-store').json({
       error: error instanceof Error ? error.message : 'Council relay failed.',
