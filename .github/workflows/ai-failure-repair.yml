@@ -323,7 +323,7 @@ jobs:
           retention-days: 30
 
   verify-and-push:
-    name: Verify, receipt, and push focused repair
+    name: Verify and stage candidate (no remote writes)
     needs: [prepare, codex, claude]
     if: always() && needs.prepare.result == 'success' && needs.prepare.outputs.allowed == 'true'
     runs-on: ubuntu-latest
@@ -353,7 +353,7 @@ jobs:
           test "$(git rev-parse HEAD)" = "$FAILED_SHA"
           current_main="$(git rev-parse refs/remotes/origin/main)"
           if [[ "$current_main" != "$FAILED_SHA" ]]; then
-            echo "::error title=Stale before commit::main advanced to $current_main; refusing to overwrite newer work."
+            echo "::error title=Stale candidate::main advanced to $current_main; refusing to overwrite newer work."
             exit 1
           fi
 
@@ -456,77 +456,66 @@ jobs:
           npm run test:e2e
           npx playwright test -c playwright.config.ts e2e/pages-api-recovery.spec.ts e2e/public-work-directory.spec.ts
 
-      - name: Mint repository-scoped GitHub App write token
-        id: app-token
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1
-        with:
-          app-id: ${{ secrets.APP_ID }}
-          private-key: ${{ secrets.APP_PRIVATE_KEY }}
-          permission-contents: write
-
-      - name: Commit and push only the verified repair
+      # Keep the legacy job ID for dependent checks; no repository write occurs here.
+      - name: Bind verified patch to the failed SHA without publishing it
+        shell: bash
         env:
-          APP_TOKEN: ${{ steps.app-token.outputs.token }}
           REPAIR_ATTEMPT: ${{ needs.prepare.outputs.repair_attempt }}
           FAILURE_FINGERPRINT: ${{ needs.prepare.outputs.fingerprint }}
           CODEX_OUTCOME: ${{ needs.codex.outputs.outcome }}
           CLAUDE_OUTCOME: ${{ needs.claude.outputs.outcome }}
-        shell: bash
         run: |
           set -euo pipefail
           git fetch --no-tags --depth=1 origin refs/heads/main:refs/remotes/origin/main
+          test "$(git rev-parse HEAD)" = "$FAILED_SHA"
           test "$(git rev-parse refs/remotes/origin/main)" = "$FAILED_SHA"
-
-          git add -A
-          git reset -- .repair >/dev/null 2>&1 || true
-          git diff --cached --quiet && {
-            echo '::error title=No staged repair::Nothing remains after authority filtering.'
+          git add -N . >/dev/null 2>&1 || true
+          mapfile -t changed < <(git diff --name-only)
+          if (( ${#changed[@]} == 0 )); then
+            echo '::error title=No repair candidate::The verified diff is empty.'
             exit 1
-          }
-
-          git config user.name 'FCR Repair Loop'
-          git config user.email '286642846+jussray@users.noreply.github.com'
-          git commit -m "fix(ai-repair): repair failed CI [ai-repair ${REPAIR_ATTEMPT}/2]" \
-            -m "Failure-Fingerprint: ${FAILURE_FINGERPRINT}" \
-            -m "Failed-Run: ${FAILED_RUN_ID}" \
-            -m "Codex-Outcome: ${CODEX_OUTCOME}" \
-            -m "Claude-Outcome: ${CLAUDE_OUTCOME}"
-
-          repaired_sha="$(git rev-parse HEAD)"
-          remote="https://x-access-token:${APP_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
-          git push "$remote" HEAD:main
-
+          fi
+          for path in "${changed[@]}"; do
+            case "$path" in
+              .github/*|AGENTS.md|GLOBAL_AI.md|.ai/*|.agents/*|.claude/*|docs/*|e2e/*|supabase/migrations/*|.env*|wrangler*|package.json|package-lock.json|pnpm-lock.yaml|yarn.lock|playwright.config.*|*.test.*|*.spec.*|scripts/verify-*|scripts/*test*)
+                echo "::error title=Forbidden repair candidate::$path is outside the repair authority."
+                exit 1
+                ;;
+            esac
+          done
+          git diff --check
+          git diff --binary > .repair/verified-candidate.patch
+          test -s .repair/verified-candidate.patch
+          patch_digest="sha256:$(sha256sum .repair/verified-candidate.patch | awk '{print $1}')"
           jq -n \
-            --arg state 'REPAIR_PUSHED_AWAITING_FRESH_CI' \
+            --arg state CANDIDATE_VERIFIED_AWAITING_FOUNDER_REVIEW \
             --arg failureFingerprint "$FAILURE_FINGERPRINT" \
             --arg failedSha "$FAILED_SHA" \
-            --arg repairedSha "$repaired_sha" \
-            --arg repairAttempt "$REPAIR_ATTEMPT" \
+            --arg failedRunId "$FAILED_RUN_ID" \
+            --arg patchDigest "$patch_digest" \
+            --arg attempt "$REPAIR_ATTEMPT" \
             --arg codex "$CODEX_OUTCOME" \
             --arg claude "$CLAUDE_OUTCOME" \
-            '{schemaVersion:1,state:$state,failureFingerprint:$failureFingerprint,failedSha:$failedSha,repairedSha:$repairedSha,repairAttempt:($repairAttempt|tonumber),codexOutcome:$codex,claudeOutcome:$claude,verification:{typecheck:true,lint:true,tests:true,rlsContract:true,testDiscovery:true,documentationTruth:true,cloudflareAuthority:true,playwright:true},freshCiRequired:true}' \
+            '{schemaVersion:1,state:$state,failureFingerprint:$failureFingerprint,failedSha:$failedSha,failedRunId:$failedRunId,patchDigest:$patchDigest,repairAttempt:($attempt|tonumber),codexOutcome:$codex,claudeOutcome:$claude,verification:{scope:"isolated runner candidate",typecheck:true,lint:true,tests:true,rlsContract:true,testDiscovery:true,documentationTruth:true,playwright:true},release:{remoteWrite:false,prCreated:false,mergeApproved:false,deployApproved:false,founderReviewRequired:true,freshExactHeadCiRequiredAfterApply:true}}' \
             > .repair/final-repair-receipt.json
-
           {
-            echo '## AI repair pushed'
+            echo '## Repair candidate verified, not published'
             echo
             echo "- Failure fingerprint: \`$FAILURE_FINGERPRINT\`"
-            echo "- Failed head: \`$FAILED_SHA\`"
-            echo "- Repaired head: \`$repaired_sha\`"
-            echo "- Repair attempt: \`${REPAIR_ATTEMPT}/2\`"
-            echo "- Codex: \`$CODEX_OUTCOME\`"
-            echo "- Claude: \`$CLAUDE_OUTCOME\`"
-            echo '- Local runner verification: `GREEN` including Playwright'
-            echo '- Final state: `REPAIR_PUSHED_AWAITING_FRESH_CI`'
-            echo '- The GitHub App push is expected to trigger a fresh CI run; that new exact-head run is the final authority.'
+            echo "- Failed HEAD: \`$FAILED_SHA\`"
+            echo "- Candidate patch SHA-256: \`$patch_digest\`"
+            echo '- Runner tests passed for the isolated patch only; no remote write occurred.'
+            echo '- Next gate: founder-authorized branch, PR review, fresh exact-HEAD CI.'
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Upload final repair receipt
+      - name: Upload verified repair candidate and receipt
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: ai-repair-receipt-${{ github.event.workflow_run.id }}
-          path: .repair/final-repair-receipt.json
+          name: ai-repair-verified-candidate-${{ github.event.workflow_run.id }}
+          path: |
+            .repair/verified-candidate.patch
+            .repair/final-repair-receipt.json
           include-hidden-files: true
           if-no-files-found: ignore
           retention-days: 30

@@ -86,6 +86,8 @@ jobs:
           cache: 'npm'
       - name: Install dependencies
         run: npm ci --no-audit --no-fund
+      - name: Verify unattended repair authority and routing
+        run: node --test scripts/workflow-audit-repair.test.mjs
       - name: Run tests
         run: npm test
         env:

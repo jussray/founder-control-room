@@ -12,6 +12,7 @@ Read these before changing code, configuration, schemas, providers, verification
 - [`Truth Decay Audit`](./docs/TRUTH_DECAY_AUDIT.md)
 - [`Public Communication Truth Contract`](./docs/PUBLIC_COMMUNICATION_TRUTH_CONTRACT.md)
 - [`skills/portfolio-control-plane/SKILL.md`](./skills/portfolio-control-plane/SKILL.md)
+- [`.ai/skills/workflow-audit-repair/SKILL.md`](./.ai/skills/workflow-audit-repair/SKILL.md) for workflow audit and bounded code repair routing; see `docs/WORKFLOW_AUDIT_REPAIR.md` for unattended candidate proof and the founder-review handoff.
 - [`skills/typescript-audit/SKILL.md`](./skills/typescript-audit/SKILL.md) before TypeScript, TSX, JavaScript, Node, Worker, build, PR, draft PR, or mergeability edits
 - [`skills/typescript-root-cause-debugger/SKILL.md`](./skills/typescript-root-cause-debugger/SKILL.md) for ranked root-cause debugging before patch proposals
 - [`skills/typescript-minimal-patch/SKILL.md`](./skills/typescript-minimal-patch/SKILL.md) when writing the smallest safe TypeScript repair
