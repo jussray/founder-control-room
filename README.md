@@ -630,3 +630,7 @@ The portfolio governance profile for `jussray/SleepWealth-Agent` now registers `
 ## Member-owned project drafts (source candidate)
 
 The ordinary-member workspace has private project create, list, resume and versioned save routes, using only the member's verified session and a separate owner-scoped project table. See [Member project drafts](docs/MEMBER_PROJECT_DRAFTS.md) for behavior, isolation, migration prerequisites and release gates. This source change does not establish that its migration or runtime is live.
+
+## 2026-11-04 Deploy workflow syntax recovery (candidate, not production proof)
+
+Existing PR #1067 restores Python indentation inside `.github/workflows/deploy.yml` while parsing Cloudflare's name-only secret receipt. GitHub rejected the previous file as invalid before any production gate could run; the associated Founder Deploy Command returned HTTP 422. This candidate must pass current exact-head CI, GitHub workflow acceptance, and explicit founder-authorized dispatch before any release is claimed. Successful Cloudflare Pages builds and installed `OPENAI_API_KEY` binding-name metadata do not establish Worker deployment, model-invocation success, customer isolation, or paid customer outcomes.
