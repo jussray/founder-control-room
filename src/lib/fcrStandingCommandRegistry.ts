@@ -247,9 +247,12 @@ export function routeFcrStandingCommands(rawGoal: string, action: FcrStandingCom
     pushUnique(autoRoutedCommandIds, 'goalfix');
   }
   const urlTarget = /https?:\/\//.test(goal);
-  const liveSiteTarget = /\b(website|live[- ]site|site url|deployed url)\b/.test(goal);
-  const verificationOrRepair = /\b(test|audit|fix|repair|issue|broken|verify)\b/.test(goal);
-  const liveSiteRepair = /\b(test|fix|repair|issue|broken|verify)\b/.test(goal);
+  // Intent predicates read the goal with URLs removed, so path/query text such as
+  // "/test" or "?fix=1" inside a URL cannot create URLFIX routing on its own.
+  const intentGoal = goal.replace(/https?:\/\/\S+/g, ' ');
+  const liveSiteTarget = /\b(website|live[- ]site|site url|deployed url)\b/.test(intentGoal);
+  const verificationOrRepair = /\b(test|audit|fix|repair|issue|broken|verify)\b/.test(intentGoal);
+  const liveSiteRepair = /\b(test|fix|repair|issue|broken|verify)\b/.test(intentGoal);
   if ((urlTarget && verificationOrRepair) || (liveSiteTarget && liveSiteRepair)) {
     pushUnique(autoRoutedCommandIds, 'urlfix');
   }

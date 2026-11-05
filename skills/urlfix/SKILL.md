@@ -105,6 +105,12 @@ Destination guard (applies to every ownership class, before any browser navigati
 - The literal-URL check in `validateTargetUrl` (`scripts/external-site-snapshot.mjs`) is necessary but not sufficient. It does not resolve DNS and does not follow redirects. Resolve the hostname and reject any non-public address. Re-apply the same checks to every redirect hop and to the final URL.
 - If any check fails, stop with `BLOCKED`, name the rejected destination class, and do not load, capture, screenshot or persist responses from that destination.
 
+Artifact hygiene (applies to every URLFIX run, before any screenshot, trace, console, network or receipt is written):
+
+- Use only synthetic or test identities. Never load a real user's or privileged account's authenticated browser state (storage state, cookies, bearer or session tokens) into a URLFIX run.
+- Never persist cookies, `Authorization` or other request headers, request or response bodies, form field values, or private page text. Console and network capture may keep method, status, and the URL with query strings and fragments removed.
+- Redact any token-like or credential-like value that appears in a captured artifact or receipt before it is stored. If redaction cannot be verified, discard the artifact and report `BLOCKED`.
+
 If ownership is `EXTERNAL` or `UNKNOWN`:
 
 ```text

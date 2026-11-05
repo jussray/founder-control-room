@@ -111,6 +111,12 @@ describe('FCR standing command and OS registry', () => {
     expect(decision.standingCommandIds).not.toContain('urlfix');
   });
 
+  it('does not route URLFIX for a read-only summary whose URL path contains intent words', () => {
+    const decision = routeFcrStandingCommands('Summarize https://example.com/test', 'inspect');
+
+    expect(decision.standingCommandIds).not.toContain('urlfix');
+  });
+
   it('auto-routes website repair intent without a URL or browser keyword', () => {
     const decision = routeFcrStandingCommands('Test this website and fix the broken checkout', 'write');
 
