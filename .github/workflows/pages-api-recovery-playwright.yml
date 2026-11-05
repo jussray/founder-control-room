@@ -45,8 +45,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: pages-api-recovery-${{ github.event.pull_request.head.sha || github.sha }}
-  cancel-in-progress: false
+  group: pages-api-recovery-${{ github.event_name }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
