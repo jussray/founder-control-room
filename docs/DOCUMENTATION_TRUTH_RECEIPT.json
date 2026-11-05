@@ -1,6 +1,6 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Document current evidence-authority boundaries across cross-repository browser federation, resident Council/Muse relay activation, provider-held runtime-secret observation, and account-scoped founder-content metrics so source wiring, account identity, configured bindings, live provider invocation, and mutation authority remain separate claims with separate proof.",
+  "purpose": "Document current evidence-authority boundaries across cross-repository browser federation, resident Council/Muse relay activation, provider-held runtime-secret observation, and account-scoped founder-content metrics so source wiring, account identity, configured bindings, live provider invocation, and mutation authority remain separate claims with separate proof. Include source-only member project ownership, mutation isolation, version conflicts, and app-specific migration prerequisites without claiming live database or browser proof.",
   "domains": [
     "cloudflare-authority",
     "repository-provider",
@@ -584,6 +584,30 @@
       "path": "src/governance/portfolioGovernanceProfiles.ts",
       "claims": [
         "`src/governance/portfolioGovernanceProfiles.ts` must register the SleepWealth account-model eligibility claims `customer_scope_eligibility` and `pooled_scope_eligibility` as observation-only, and must keep `live-trade`, `enable-live-broker`, `accept-pooled-funds` and `cross-account-credential-use` blocked so the customer-connected and pooled-managed scopes never share authority, and it fails closed when a required receipt gate is absent."
+      ]
+    },
+    {
+      "path": "src/http/routes/memberProjects.ts",
+      "claims": [
+        "`src/http/routes/memberProjects.ts` derives project ownership only from a verified revocable member session, denies founder reclassification, filters every read/update by owner, rejects body-supplied ownership and Bearer-based CSRF bypass, requires same-origin browser mutations, and reports stale saves as conflicts rather than success. No founder project table or provider execution authority is introduced."
+      ]
+    },
+    {
+      "path": "supabase/migrations/20261105000000_member_projects.sql",
+      "claims": [
+        "`supabase/migrations/20261105000000_member_projects.sql` is additive source only for the FCR-specific database; RLS is enabled, direct public/anon/authenticated access is revoked, and service_role grants are reset before permitting select/insert/update only. Service-role API queries still require owner filters because service_role bypasses RLS. Source SQL and isolated preview assertions do not establish live installation or production isolation."
+      ]
+    },
+    {
+      "path": "public/member/projects.js",
+      "claims": [
+        "`public/member/projects.js` renders private project titles and goals as text/input values, resumes only through the member project API, preserves form contents on failed saves, sends the current project version on edits, and never interprets a rejected or unconfirmed response as saved. Browser fixture source is not executed browser or provider evidence."
+      ]
+    },
+    {
+      "path": "src/http/routes/__tests__/memberProjects.integration.test.ts",
+      "claims": [
+        "`src/http/routes/__tests__/memberProjects.integration.test.ts` checks separate member ownership, exact-ID cross-account read/update denial, forged-owner rejection, stale version conflicts, session/founder denial and CSRF/Bearer bypass denial through isolated request/database doubles. These tests do not prove live Supabase grants, database migration or production cookie behavior."
       ]
     }
   ]
