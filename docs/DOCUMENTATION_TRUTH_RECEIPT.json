@@ -579,6 +579,12 @@
       "claims": [
         "`.github/workflows/fcr-search-evidence-gate.yml` must limit feature-branch execution to pull_request events, execute push checks on main only, and checkout the exact selected PR-head or main-push SHA before running Search Console and evidence contracts."
       ]
+    },
+    {
+      "path": "src/governance/portfolioGovernanceProfiles.ts",
+      "claims": [
+        "`src/governance/portfolioGovernanceProfiles.ts` must register the SleepWealth account-model eligibility claims `customer_scope_eligibility` and `pooled_scope_eligibility` as observation-only, and must keep `live-trade`, `enable-live-broker`, `accept-pooled-funds` and `cross-account-credential-use` blocked so the customer-connected and pooled-managed scopes never share authority, and it fails closed when a required receipt gate is absent."
+      ]
     }
   ]
 }
