@@ -565,6 +565,12 @@
       "claims": [
         ".github/workflows/deterministic-review-core-advisory.yml must bind its trusted witness publisher's GitHub App private key to the existing repository Actions secret FCR_GITHUB_APP_PRIVATE_KEY while preserving APP_ID issuer identity, protected environment approval, exact current-main verification, fail-closed RSA parsing, independent provider readback, and separately authorized merge and deployment gates."
       ]
+    },
+    {
+      "path": "src/governance/portfolioGovernanceProfiles.ts",
+      "claims": [
+        "`src/governance/portfolioGovernanceProfiles.ts` must register the SleepWealth account-model eligibility claims `customer_scope_eligibility` and `pooled_scope_eligibility` as observation-only, and must keep `live-trade`, `enable-live-broker`, `accept-pooled-funds` and `cross-account-credential-use` blocked so the customer-connected and pooled-managed scopes never share authority, and it fails closed when a required receipt gate is absent."
+      ]
     }
   ]
 }
