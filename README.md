@@ -624,3 +624,7 @@ Source changes to `.github/workflows/ci.yml` are release-governance changes: its
 ## Browser preview project boundaries
 
 The Browser Operator preview rejects explicit foreign URLs, IP targets, non-HTTPS origins, alternate ports, and hostname suffix lookalikes in both CLI and API policies. Mobile/desktop Playwright checks use the actual preview policy with synthetic authentication and transport; they do not prove production authentication, browser execution, or deployment. See [Browser Operator](docs/FCR_BROWSER_OPERATOR.md).
+
+## Governance profile: SleepWealth account-model scopes
+
+The portfolio governance profile for `jussray/SleepWealth-Agent` now registers `customer_scope_eligibility` and `pooled_scope_eligibility` as observation-only eligibility claims. Each requires its own signed receipts, and the two account models never share a scope or credentials. Live trading, broker enablement and capital ceiling increases remain blocked. This README entry is documentation only and is not deployment or runtime proof.
