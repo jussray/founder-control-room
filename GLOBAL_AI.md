@@ -288,3 +288,9 @@ For public crawler and work-directory behavior, `.github/workflows/ci.yml` must 
 ## CI lockfile determinism — current exact-head source contract
 
 Agents must ensure `.github/workflows/ci.yml` uses `npm ci --no-audit --no-fund` for its four load-bearing Type check, Lint, Unit Tests, and Playwright e2e jobs, rather than installing unconstrained dependencies at verification time. Validate the exact checked-out SHA, required test execution, and lockfile compliance through source checks and GitHub CI. A reproducible install cannot grant merge authorization: retain systematic independent exact-head review and separately authenticated founder-final approval. Do not describe a source-only CI edit as a deployed or production-verified fix.
+
+## Juss-authored skills export — evidence gate (review-only)
+
+FCR must treat `skills/juss-authored/` as an inert, versioned proposal until a separately reviewed runtime adapter deliberately selects an exact skill version. Do not shadow the active FCR skill router, import the export as an auto-executing agent, or inherit authority from the separate Chief AI system.
+
+The `.github/workflows/ci.yml` `Python tests` lane must run the exported receipt and SHA-256 inventory validators and remain required by `Required Gate`. The proof scope is locally observable code and file consistency, not production integration. Current documentation-truth receipts, external action receipts, and exact-candidate founder-final review remain independently required before merge or release.

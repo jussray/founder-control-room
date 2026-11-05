@@ -419,3 +419,9 @@ For public crawler and work-directory behavior, `.github/workflows/ci.yml` must 
 ## CI lockfile determinism — current exact-head source contract
 
 For workflow-authority source changes, `.github/workflows/ci.yml` must use `npm ci --no-audit --no-fund` in its Type check, Lint, Unit Tests, and Playwright e2e jobs to bind the dependency tree to the committed lockfile. Keep the test-discovery ratchet, Documentation Truth, Required Gate and systematic review intact. CI pass is exact-head evidence only, never founder-final approval, cloud-provider state, deploy success or an automatic merge permission. When stale docs or gates are observed, repair the current source under the existing authority gates and preserve the predecessor receipt.
+
+## Juss-authored skills export — evidence gate (review-only)
+
+The Juss Flow launch loop must not treat a copy under `skills/juss-authored/` as an active runtime capability or as independent proof that a provider action happened. Existing FCR skill selection and Chief AI capability routing remain separate; any new runtime adapter requires its own explicit authorization, tenant isolation, and regression evidence.
+
+For source review, `.github/workflows/ci.yml` must run the receipt-chain regression and export-inventory verification in `Python tests`, which must feed `Required Gate`. A structural exit code, successful checksum, or historical green check cannot substitute for exact-head CI, current Documentation Truth, independent review, founder-final candidate approval, or post-merge runtime observation.
