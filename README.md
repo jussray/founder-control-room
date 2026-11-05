@@ -617,3 +617,7 @@ The portfolio governance profile for `jussray/SleepWealth-Agent` now registers `
 ## 2026-11-04 Deploy workflow syntax recovery (candidate, not production proof)
 
 Existing PR #1067 restores Python indentation inside `.github/workflows/deploy.yml` while parsing Cloudflare's name-only secret receipt. GitHub rejected the previous file as invalid before any production gate could run; the associated Founder Deploy Command returned HTTP 422. This candidate must pass current exact-head CI, GitHub workflow acceptance, and explicit founder-authorized dispatch before any release is claimed. Successful Cloudflare Pages builds and installed `OPENAI_API_KEY` binding-name metadata do not establish Worker deployment, model-invocation success, customer isolation, or paid customer outcomes.
+
+## 2026-11-05 Post-deploy reconciliation settings (candidate, not production proof)
+
+PR #1069 changes one line of `.github/workflows/deploy.yml` relative to main: it adds `continue-on-error: true` to the `reconcile` job (Post-Deploy Reconciliation), which keeps its existing `needs: smoke-test` and `timeout-minutes: 15`. A reconciliation failure after the Worker is live is therefore visible on that job but does not fail the Deploy run. No job depends on `reconcile`, so this tolerance does not change promotion or authority gates. `test/deploy-reconcile-settings.node-test.mjs` pins both settings in the workflow source. This is source and test evidence only; it does not prove a dispatched production run, reconciliation output, or deployed runtime behavior.
