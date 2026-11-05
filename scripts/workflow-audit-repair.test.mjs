@@ -62,3 +62,37 @@ test('coordinating skill limits authority, avoids duplicate runtime, and separat
     'Red Team II', 'docs/FOUNDER_MERGE_AUTHORITY.md',
   ]) assert.ok(skill.includes(part), part);
 });
+
+const deployWorkflow = source('.github/workflows/deploy.yml');
+
+function invalidEmbeddedPythonIndentation(contents) {
+  const lines = contents.split('\\n');
+  const bad = [];
+  let inside = false;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (line.includes("<<'PY'")) {
+      inside = true;
+      continue;
+    }
+    if (inside && line.trim() === 'PY') {
+      inside = false;
+      continue;
+    }
+    if (inside && line.trim() && line.match(/^ */)[0].length < 10) {
+      bad.push(i + 1);
+    }
+  }
+  return bad;
+}
+
+test('production deploy Python scripts retain valid YAML block indentation', () => {
+  assert.deepEqual(invalidEmbeddedPythonIndentation(deployWorkflow), []);
+});
+
+test('detects the historical deployment-workflow indentation regression', () => {
+  const target = '          receipt = json.loads(receipt_text[array_start:array_end + 1])';
+  assert.ok(deployWorkflow.includes(target));
+  const regressed = deployWorkflow.replace(target, target.slice(2));
+  assert.deepEqual(invalidEmbeddedPythonIndentation(regressed), [154]);
+});
