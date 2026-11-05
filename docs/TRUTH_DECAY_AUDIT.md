@@ -683,3 +683,7 @@ The migration scope output is also a required proof: the local-DB path is condit
 ## SleepWealth account-model scopes (governance profile update)
 
 The claims `customer_scope_eligibility` and `pooled_scope_eligibility` in `src/governance/portfolioGovernanceProfiles.ts` were added on branch `claude/fcr-sleepwealth-account-models`. Their present-tense status is only as current as the exact head that passed CI. Evidence from before this change must not be treated as covering the new claims. Any base or head movement expires that evidence and requires fresh exact-head CI before the claims are treated as current.
+
+## 2026-11-05 PR Continuity check-name collision
+
+A skipped `pull_request_target` copy of the exact-head job shared the name of the real `pull_request` gate, so the PR check list could show a skipped result while the real run had concluded success. The workflow now labels the skipped copy as not gating. Earlier statements that the gate "was skipped" describe this collision, not a failed or passed gate. Current gate status must be re-read from the `pull_request` run on the exact head.

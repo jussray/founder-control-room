@@ -641,3 +641,7 @@ The portfolio governance profile for `jussray/SleepWealth-Agent` now registers `
 ## 2026-11-04 Deploy workflow syntax recovery (candidate, not production proof)
 
 Existing PR #1067 restores Python indentation inside `.github/workflows/deploy.yml` while parsing Cloudflare's name-only secret receipt. GitHub rejected the previous file as invalid before any production gate could run; the associated Founder Deploy Command returned HTTP 422. This candidate must pass current exact-head CI, GitHub workflow acceptance, and explicit founder-authorized dispatch before any release is claimed. Successful Cloudflare Pages builds and installed `OPENAI_API_KEY` binding-name metadata do not establish Worker deployment, model-invocation success, customer isolation, or paid customer outcomes.
+
+## PR Continuity gate naming (2026-11-05)
+
+`.github/workflows/pr-continuity.yml` now derives the exact-head job name from its event. The `pull_request` run keeps the name `PR Continuity Exact-Head Gate`. The `pull_request_target` copy is labeled as not gating, because it is skipped by its own condition and previously shared the gate's name. Trigger set, job condition, steps, and permissions are unchanged. This is a naming change only; it does not prove exact-head CI for any SHA.

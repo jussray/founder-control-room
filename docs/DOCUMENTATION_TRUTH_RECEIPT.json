@@ -14,6 +14,12 @@
   ],
   "changes": [
     {
+      "path": ".github/workflows/pr-continuity.yml",
+      "claims": [
+        "`.github/workflows/pr-continuity.yml` names the exact-head job from its event: the pull_request run keeps the name `PR Continuity Exact-Head Gate`, and the pull_request_target copy is labeled as not gating so it cannot shadow the real gate. Trigger set, job condition, steps, and permissions are unchanged; a skipped pull_request_target copy is not evidence of gate success or failure."
+      ]
+    },
+    {
       "path": ".github/workflows/deploy.yml",
       "claims": [
         "`.github/workflows/deploy.yml` must run `scripts/verify-worker-binding-types.mjs` before the first Cloudflare Worker mutation, rejecting plaintext credential bindings or unavailable name/type provider evidence while never logging secret values or treating a passing source preflight as live deployment proof.",
