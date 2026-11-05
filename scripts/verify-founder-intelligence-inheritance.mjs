@@ -2,8 +2,10 @@ import { readFile } from 'node:fs/promises';
 
 const root = new URL('../', import.meta.url);
 const registryPath = 'config/founder-intelligence.inheritance.json';
+const externalPromotionPath = 'config/founder-intelligence.external-promotion.json';
 const cohesionAuditPath = 'docs/FCR_SINGLE_OS_COHESION_AUDIT.md';
 const registry = JSON.parse(await readFile(new URL(registryPath, root), 'utf8'));
+const externalPromotion = JSON.parse(await readFile(new URL(externalPromotionPath, root), 'utf8'));
 const portfolio = await readFile(new URL('src/config/portfolio.ts', root), 'utf8');
 const l99Repository = await readFile(new URL('src/config/l99Repository.ts', root), 'utf8');
 const entrypoint = await readFile(new URL('AGENTS_FOUNDER_INTELLIGENCE.md', root), 'utf8');
@@ -57,6 +59,16 @@ requireValue(
   'challenge-stack truth boundary must separate rollout state and external continuity from authority',
 );
 requireValue(/^\d{4}-\d{2}-\d{2}$/.test(registry.lastInspected), 'lastInspected must use YYYY-MM-DD');
+
+requireValue(externalPromotion.schemaVersion === 1, 'external promotion schemaVersion must be 1');
+requireValue(externalPromotion.owner === 'Juss', 'external promotion owner must remain Juss');
+requireValue(/^\d{4}-\d{2}-\d{2}$/.test(externalPromotion.inspectedOn), 'external promotion inspectedOn must use YYYY-MM-DD');
+requireValue(
+  typeof externalPromotion.authorityBoundary === 'string'
+    && /external continuity evidence only/i.test(externalPromotion.authorityBoundary)
+    && /grants no FCR portfolio, MCP/i.test(externalPromotion.authorityBoundary),
+  'external promotion authority boundary must deny FCR portfolio/MCP authority',
+);
 
 const repositoryConstants = new Map(
   [...l99Repository.matchAll(/export const\s+([A-Z0-9_]+)\s*=\s*"([^"]+)"/g)]
@@ -161,16 +173,46 @@ for (const project of externalCoverage) {
   externalRepositories.add(project.repository);
 }
 
-// EXTERNAL_PROJECTS is an identity/continuity discovery set, not proof that each
-// repository has already been re-observed with the challenge stack on main.
-// Coverage therefore stays an evidence-bound subset. Requiring exact equality
-// would force newly discovered external repositories to invent on-main proof.
-for (const [slug, repository] of externalCoverageBySlug) {
+const promotionEntries = Array.isArray(externalPromotion.promotions)
+  ? externalPromotion.promotions
+  : [];
+const promotionBySlug = new Map();
+const promotionRepositories = new Set();
+for (const project of promotionEntries) {
+  requireValue(typeof project.slug === 'string' && project.slug.length > 0, 'external promotion slug is required');
+  requireValue(typeof project.repository === 'string' && project.repository.startsWith('jussray/'), `${project.slug ?? 'unknown'}: external promotion repository required`);
+  requireValue(project.challengeStackStatus === 'on-main', `${project.slug ?? 'unknown'}: promoted external challenge stack must be on-main`);
+  requireValue(typeof project.challengeStackCarrier === 'string' && project.challengeStackCarrier.length > 0, `${project.slug ?? 'unknown'}: promotion carrier required`);
+  requireValue(/^[0-9a-f]{40}$/.test(project.observedMainSha ?? ''), `${project.slug ?? 'unknown'}: observedMainSha must be a full commit SHA`);
+  requireValue(Number.isInteger(project.verificationRunId) && project.verificationRunId > 0, `${project.slug ?? 'unknown'}: verificationRunId required`);
+  requireValue(project.verificationResult === 'success', `${project.slug ?? 'unknown'}: verification result must be success`);
+  requireValue(Array.isArray(project.proof) && project.proof.length > 0, `${project.slug ?? 'unknown'}: promotion proof required`);
+  requireValue(typeof project.nextGate === 'string' && /future main movement expires/i.test(project.nextGate), `${project.slug ?? 'unknown'}: promotion next gate must expire on main movement`);
+  requireValue(!promotionBySlug.has(project.slug), `${project.slug}: duplicate external promotion slug`);
+  requireValue(!promotionRepositories.has(project.repository), `${project.repository}: duplicate external promotion repository`);
+  requireValue(!repositoryNames.has(project.repository), `${project.repository}: promoted external cannot also be active`);
+  requireValue(!externalCoverageBySlug.has(project.slug), `${project.slug}: promotion evidence duplicates inheritance registry coverage`);
+  promotionBySlug.set(project.slug, project.repository);
+  promotionRepositories.add(project.repository);
+}
+
+const allExternalEvidenceBySlug = new Map([...externalCoverageBySlug, ...promotionBySlug]);
+for (const [slug, repository] of externalPortfolioBySlug) {
   requireValue(
-    externalPortfolioBySlug.get(slug) === repository,
-    `${slug}: challenge-stack coverage repository does not match EXTERNAL_PROJECTS`,
+    allExternalEvidenceBySlug.get(slug) === repository,
+    `${slug}: EXTERNAL_PROJECTS requires current challenge-stack evidence before inclusion`,
   );
 }
+for (const [slug, repository] of allExternalEvidenceBySlug) {
+  requireValue(
+    externalPortfolioBySlug.get(slug) === repository,
+    `${slug}: external evidence repository does not match EXTERNAL_PROJECTS`,
+  );
+}
+requireValue(
+  allExternalEvidenceBySlug.size === externalPortfolioBySlug.size,
+  'external evidence count must match EXTERNAL_PROJECTS exactly',
+);
 
 requireValue(entrypoint.includes(registryPath), 'Founder Intelligence entrypoint must link the inheritance registry');
 requireValue(entrypoint.includes(cohesionAuditPath), 'Founder Intelligence entrypoint must link the FCR cohesion audit');
@@ -270,4 +312,4 @@ console.log('Founder Intelligence inheritance contract passed.');
 console.log(`Active projects: ${registryProjects.length}`);
 console.log(`Inheritance — enforced: ${counts.enforced}; partial: ${counts.partial}; missing: ${counts.missing}`);
 console.log(`Challenge stack — on-main: ${challengeCounts['on-main']}; pending-main: ${challengeCounts['pending-main']}`);
-console.log(`External continuity coverage: ${externalCoverage.length}; authority promoted: 0`);
+console.log(`External continuity coverage: ${allExternalEvidenceBySlug.size}; authority promoted: 0`);

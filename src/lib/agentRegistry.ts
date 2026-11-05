@@ -29,6 +29,7 @@ const MULTI_AGENT = 'docs/FCR_MULTI_AGENT_ENABLEMENT_CONTRACT.md';
 const DEEPSEEK_INSTRUCTOR = 'docs/DEEPSEEK_INSTRUCTOR_CONTRACT.md';
 const MUSE_CONTROL = '.control-room/MUSE.md';
 const COUNCIL_CONTROL = '.control-room/COUNCIL.md';
+const CHANGE_GENEALOGY = 'docs/AI_CHANGE_GENEALOGY_CONTRACT.md';
 
 export const AGENT_REGISTRY: readonly AgentDescriptor[] = [
   {
@@ -40,7 +41,7 @@ export const AGENT_REGISTRY: readonly AgentDescriptor[] = [
       capabilities: ['research', 'propose', 'review', 'implement'],
       firstSliceRuntimeModel: false,
       externalWritesRequireBoundAuthority: true,
-      instructionContracts: [FCR_V14, MULTI_AGENT],
+      instructionContracts: ['GEMINI.md', FCR_V14, MULTI_AGENT, CHANGE_GENEALOGY],
     },
   },
   {
@@ -52,7 +53,7 @@ export const AGENT_REGISTRY: readonly AgentDescriptor[] = [
       capabilities: ['research', 'propose', 'review', 'implement'],
       firstSliceRuntimeModel: false,
       externalWritesRequireBoundAuthority: true,
-      instructionContracts: ['CLAUDE.md', 'docs/CLAUDE_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC.md', FCR_V14, MULTI_AGENT],
+      instructionContracts: ['CLAUDE.md', 'docs/CLAUDE_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC.md', FCR_V14, MULTI_AGENT, CHANGE_GENEALOGY],
     },
   },
   {
@@ -64,7 +65,7 @@ export const AGENT_REGISTRY: readonly AgentDescriptor[] = [
       capabilities: ['research', 'propose', 'review', 'implement'],
       firstSliceRuntimeModel: false,
       externalWritesRequireBoundAuthority: true,
-      instructionContracts: ['AGENTS.md', 'GLOBAL_AI.md', FCR_V14, MULTI_AGENT],
+      instructionContracts: ['AGENTS.md', 'GLOBAL_AI.md', 'CHATGPT.md', 'CODEX.md', FCR_V14, MULTI_AGENT, CHANGE_GENEALOGY],
     },
   },
   {
@@ -76,7 +77,7 @@ export const AGENT_REGISTRY: readonly AgentDescriptor[] = [
       capabilities: ['research', 'propose', 'review', 'implement'],
       firstSliceRuntimeModel: false,
       externalWritesRequireBoundAuthority: true,
-      instructionContracts: [MUSE_CONTROL, COUNCIL_CONTROL, FCR_V14, MULTI_AGENT],
+      instructionContracts: [MUSE_CONTROL, COUNCIL_CONTROL, FCR_V14, MULTI_AGENT, CHANGE_GENEALOGY],
     },
   },
   {
@@ -88,7 +89,7 @@ export const AGENT_REGISTRY: readonly AgentDescriptor[] = [
       capabilities: ['research', 'propose', 'review', 'implement'],
       firstSliceRuntimeModel: false,
       externalWritesRequireBoundAuthority: true,
-      instructionContracts: [FCR_V14, MULTI_AGENT],
+      instructionContracts: ['DEEPSEEK.md', FCR_V14, MULTI_AGENT, CHANGE_GENEALOGY],
     },
   },
   {
@@ -100,7 +101,7 @@ export const AGENT_REGISTRY: readonly AgentDescriptor[] = [
       capabilities: ['research', 'propose', 'review', 'instruct'],
       firstSliceRuntimeModel: false,
       externalWritesRequireBoundAuthority: true,
-      instructionContracts: [DEEPSEEK_INSTRUCTOR, FCR_V14, MULTI_AGENT],
+      instructionContracts: ['DEEPSEEK.md', DEEPSEEK_INSTRUCTOR, FCR_V14, MULTI_AGENT, CHANGE_GENEALOGY],
     },
   },
   {
@@ -137,7 +138,7 @@ export const AGENT_REGISTRY: readonly AgentDescriptor[] = [
       capabilities: ['research', 'propose', 'review', 'implement'],
       firstSliceRuntimeModel: false,
       externalWritesRequireBoundAuthority: true,
-      instructionContracts: ['PERPLEXITY.md', 'docs/PERPLEXITY_MCP_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC.md', FCR_V14, MULTI_AGENT],
+      instructionContracts: ['PERPLEXITY.md', 'docs/PERPLEXITY_MCP_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC.md', FCR_V14, MULTI_AGENT, CHANGE_GENEALOGY],
     },
   },
   { id: 'github', label: 'GitHub', role: 'Source control, review, CI evidence, and provenance; a merge is not proof of deployment.' },

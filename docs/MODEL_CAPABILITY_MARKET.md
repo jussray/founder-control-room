@@ -16,8 +16,42 @@ The capability market measures operators by task class rather than one global in
 - cross-provider drift
 - browser/runtime work
 - founder synthesis
+- multimodal generation
 
 The implementation lives in `src/lib/modelCapabilityMarket.ts`.
+
+## Feed: from relay receipts to observations
+
+The market ranks from `CapabilityObservation` records. Its intended first receipt source is the operator relay: every relay response records which operator answered, the outcome status, the evidence references, whether authority was requested, and when it completed. `src/lib/capabilityObservationFeed.ts` folds those receipts into one observation per operator and task class, deterministically, so the observation can itself be receipted.
+
+When the provider reports it, a relay response also carries optional `usage` (input, output, cache-write and cache-read token counts; Anthropic only today). Usage is included in `responseHash` only when present, so receipts without it keep their original hash. Council rounds copy it onto each hop. It is measurement, not evidence or authority, and a missing or malformed usage block is omitted rather than estimated.
+
+Today relay responses are returned to the caller and are not persisted anywhere in this repository. Persisting them is a separate gate. Until it lands, the fold has no stored population to read.
+
+Fold rules:
+
+- `accepted` receipts are in-flight, not outcomes, and are excluded from the sample
+- receipts answered by another operator are ignored, never re-attributed
+- exact duplicate receipts (same `responseHash`) count once; when one `relayId` has several outcome receipts, only the latest counts
+- with a freshness window, receipts older than the window are excluded so stale evidence cannot ride on one fresh receipt; a receipt whose `completedAt` does not parse is always excluded
+- a provider answering is not outcome proof: only exact `responseHash` values confirmed by an independent verifier contribute to `proofRate` and `evidenceRefs`; a later response using the same relay ID cannot borrow earlier proof; the fold additionally recomputes each independently verified receipt's canonical response hash and denies proof if its contents were changed; with no verifier the observation carries no evidence and the market's own gate keeps the operator in trial (adapter-proven is not provider-outcome-proven)
+- a `completed` receipt with no evidence reference is a false green, even if it bypassed the relay validator
+- any runtime `authorityRequested` other than the exact string `none` — including a missing or malformed value — is an authority violation
+- `blocked` is an honest authority stop: it stays in the sample but is excluded from the success denominator, so stopping correctly never lowers a score
+- cost and duration are not invented; the relay receipt does not carry them
+- task classification is upstream — the caller names the task class, the fold does not infer it
+- `evidenceRefs` inside an observation are Sauce-Guard-private routing evidence, never public content
+
+Current state, in the repository's own capability vocabulary:
+
+```text
+contract-capable          market ranking + relay-receipt fold exist as tested source
+configured / allowlisted  not yet — no live route calls the market; no store persists relay responses or observations; no outcome verifier exists
+adapter-proven            not yet
+provider-outcome-proven   not yet
+```
+
+Until a live route calls `buildCapabilityRoute` with observations folded from persisted, independently verified relay receipts, the market is advisory source, not enforced routing. Do not describe it in present tense as selecting operators.
 
 ## Evidence hierarchy
 
@@ -36,7 +70,9 @@ A public benchmark cannot by itself make an operator eligible for primary routin
 The market deliberately scores failure modes that common benchmark tables usually omit:
 
 - false-green claims are penalized
-- any fresh authority-boundary violation blocks the candidate from primary routing
+- any fresh authority-boundary violation blocks the candidate from primary routing, even if that observation has no proof references or its authority metric is malformed
+- primary eligibility requires both the proven share of fresh observations (the floor of sample size times independently verified proof rate) and enough independently verified completed outcomes; verified failures or blocked stops are retained as evidence but cannot promote a model, and legacy observations without explicit verified completion counts stay in trial
+- the score uses the same proof-weighted samples; aggregate success rates still cannot substitute for independently verified outcome-quality measures
 - stale local evidence expires instead of self-renewing
 - cost and time are measured alongside correctness
 - external benchmark influence is capped

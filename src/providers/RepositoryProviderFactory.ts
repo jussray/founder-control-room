@@ -1,4 +1,4 @@
-import { GitHubProvider } from "./GitHubProvider.js";
+import { GitHubGenealogyProvider } from "./GitHubGenealogyProvider.js";
 import { getGitHubInstallationToken } from "./githubAppAuth.js";
 import type { RepositoryProvider } from "./RepositoryProvider.js";
 
@@ -67,9 +67,11 @@ export function createRepositoryProvider(
     if (!token) {
       throw new Error("GITHUB_TOKEN is not set");
     }
-    return new GitHubProvider({
+    return new GitHubGenealogyProvider({
       token,
       projectMap: { [connection.projectId]: connection.repository },
+      baseUrl: env.GITHUB_API_BASE_URL,
+      env,
     });
   }
 
@@ -117,10 +119,11 @@ export async function createAppAwareRepositoryProvider(
     const token = appId && privateKey
       ? await getInstallationToken(appId, privateKey, connection.repository)
       : fallbackToken!;
-    return new GitHubProvider({
+    return new GitHubGenealogyProvider({
       token,
       projectMap: { [connection.projectId]: connection.repository },
       baseUrl: env.GITHUB_API_BASE_URL,
+      env,
     });
   }
 
