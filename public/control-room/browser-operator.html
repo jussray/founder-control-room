@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex,nofollow" />
+  <meta name="referrer" content="no-referrer" />
+  <title>Browser Operator · Founder Control Room</title>
+  <style>
+    :root{color-scheme:dark;--ink:#f6f4ff;--muted:#adb9ce;--line:rgba(157,173,239,.22);--panel:#111a2c;--aqua:#65defa;--violet:#b6a0ff}
+    *{box-sizing:border-box}body{margin:0;min-height:100vh;color:var(--ink);font:16px/1.6 Inter,ui-sans-serif,system-ui,sans-serif;background:radial-gradient(circle at 5% 0,rgba(93,91,221,.29),transparent 38rem),radial-gradient(circle at 100% 30%,rgba(30,155,191,.17),transparent 34rem),#070b17}
+    a{color:var(--aqua)}a:focus-visible,button:focus-visible,textarea:focus-visible{outline:3px solid var(--aqua);outline-offset:4px}
+    [hidden]{display:none!important}
+    .shell{width:min(1100px,calc(100% - 2rem));margin:0 auto;padding:1.2rem 0 5rem}
+    .top{display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap}
+    .brand{font-weight:850;text-decoration:none;color:#f7f5ff}.brand span{display:inline-grid;place-items:center;width:2.2rem;height:2.2rem;margin-right:.45rem;border-radius:.6rem;background:linear-gradient(135deg,var(--aqua),var(--violet));color:#10162a}
+    .meta{font-weight:800;text-transform:uppercase;letter-spacing:.18em;font-size:.7rem;color:#a7eaff}
+    .hero{padding:clamp(2.5rem,8vw,5.5rem) 0 1.5rem;max-width:790px}
+    h1{font-size:clamp(2.35rem,7vw,4.4rem);letter-spacing:-.055em;line-height:1.08;margin:.45rem 0 1rem}
+    h1 em{font-style:normal;background:linear-gradient(90deg,#67e8ff,#b9a4ff);color:transparent;background-clip:text}
+    h2{font-size:1.4rem;letter-spacing:-.025em;margin:0 0 .5rem}
+    p{color:var(--muted);margin:.5rem 0 1rem}
+    .surface{border:1px solid var(--line);border-radius:1.25rem;background:linear-gradient(160deg,rgba(25,35,61,.94),rgba(10,15,28,.95));box-shadow:0 28px 80px rgba(0,0,0,.2);padding:clamp(1rem,3vw,1.5rem)}
+    .grid{display:grid;grid-template-columns:1.3fr .75fr;gap:1rem;align-items:start}
+    .panel-label{font-size:.78rem;font-weight:750;color:var(--violet)}
+    label{display:block;margin:.8rem 0 .45rem;font-weight:700}
+    textarea{width:100%;min-height:155px;padding:1rem;border-radius:.85rem;border:1px solid var(--line);background:#0b1221;color:var(--ink);font:inherit;resize:vertical}
+    .toolbar{display:flex;gap:.6rem;align-items:center;flex-wrap:wrap;margin-top:.85rem}
+    button,.btnlink{font:700 .95rem/1.3 inherit;font-family:inherit;font-weight:750;border:0;border-radius:.85rem;background:linear-gradient(95deg,#79deff,#ac9aff);color:#091123;cursor:pointer;padding:.86rem 1.15rem}
+    button:disabled{cursor:not-allowed;opacity:.56}
+    .btnlink{display:inline-block;text-decoration:none;background:#202c4b;color:var(--ink);border:1px solid var(--line)}
+    .mini{font-size:.83rem}
+    .result{margin-top:1rem;padding:1rem;border:1px solid var(--line);background:#081221;border-radius:1rem;overflow-wrap:anywhere}
+    .stat{display:flex;justify-content:space-between;gap:.6rem;padding:.45rem 0;border-bottom:1px solid var(--line)}
+    .stat strong{text-align:right}
+    .warning{border-left:3px solid #f8ca80;padding-left:.85rem}
+    .states{display:grid;gap:.5rem;margin-top:1rem}
+    .state{padding:.7rem .8rem;border:1px solid var(--line);border-radius:.8rem;background:#0c1728;color:#d9dfec;font-size:.9rem}
+    .state b{color:var(--aqua)}
+    .rejected{color:#ffd2d7}.needs-review{color:#f7dc98}
+    #login-gate a{display:inline-block;margin-top:.4rem}
+    @media(max-width:750px){.grid{grid-template-columns:1fr}.hero{padding:3rem 0 1.25rem}}
+    @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
+  </style>
+</head>
+<body>
+<main class="shell">
+  <header class="top">
+    <a class="brand" href="/control-room/"><span aria-hidden="true">F</span> Founder Control Room</a>
+    <a class="btnlink" href="/control-room/">Return to Control Room</a>
+  </header>
+  <section class="hero">
+    <p class="meta">FCR / Browser Operator / Preview-only</p>
+    <h1>Your browser tasks. <em>Your control.</em></h1>
+    <p>Describe the website journey you want verified. FCR prepares a bounded Playwright plan. Execution remains separate and requires founder authorization.</p>
+  </section>
+  <section id="login-gate" class="surface" role="status" aria-live="polite">
+    <h2>Checking founder access</h2>
+    <p id="login-status">The browser operator is available only to an authenticated founder. Nothing can execute from this page.</p>
+    <a id="signin-link" hidden href="/control-room/">Open sign-in</a>
+  </section>
+  <div id="operator-workspace" class="grid" hidden>
+    <section class="surface">
+      <p class="panel-label">01 / Describe the task</p>
+      <h2>Browser journey planner</h2>
+      <form id="preview-form" novalidate>
+        <label for="task">What should FCR test?</label>
+        <textarea id="task" name="task" maxlength="500" required spellcheck="true" autocomplete="off">Test the complete Sync Party new user journey on games.jussco.company</textarea>
+        <p class="mini">Supported now: Sync Party public synthetic game journey. Other projects need their own reviewed plans. Avoid entering personal data, credentials or private URLs.</p>
+        <div class="toolbar">
+          <button id="preview-button" type="submit">Preview test plan →</button>
+          <span id="preview-status" class="mini" role="status" aria-live="polite">Nothing executed.</span>
+        </div>
+      </form>
+      <section id="plan-result" class="result" hidden aria-live="polite">
+        <h2>Plan proposal</h2>
+        <div class="stat"><span>Status</span><strong id="plan-state" class="needs-review">Needs review</strong></div>
+        <div class="stat"><span>Project</span><strong id="plan-project">—</strong></div>
+        <div class="stat"><span>Target</span><strong id="plan-target">—</strong></div>
+        <div class="stat"><span>Actors</span><strong id="plan-actors">—</strong></div>
+        <div class="stat"><span>Steps</span><strong id="plan-steps">—</strong></div>
+        <p id="plan-gate" class="mini warning"></p>
+        <button type="button" disabled title="A separate execution authorization system is required">Execute — not yet enabled</button>
+      </section>
+    </section>
+    <aside class="surface">
+      <p class="panel-label">02 / Authority</p>
+      <h2>Verification without surprises</h2>
+      <div class="states">
+        <div class="state"><b>Private by default</b><div>No personal sessions, secrets or student data imported.</div></div>
+        <div class="state"><b>Preview first</b><div>Natural-language requests never bypass reviewed manifest constraints.</div></div>
+        <div class="state"><b>Run separately</b><div>Live tests may create synthetic rooms and need their own authorization.</div></div>
+        <div class="state"><b>Truth kept separate</b><div>A passing test does not authorize a merge, deployment or production claim.</div></div>
+      </div>
+      <p class="mini">This interface is a review-branch candidate. The public homepage remains visible; private operations remain founder-gated.</p>
+    </aside>
+  </div>
+</main>
+<script src="/control-room/browser-operator.js" type="module"></script>
+</body>
+</html>
