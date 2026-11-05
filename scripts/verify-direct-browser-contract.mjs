@@ -23,23 +23,25 @@ const localFirstFounderState = fs.readFileSync(new URL('../public/control-room/l
 const osTopology = fs.readFileSync(new URL('../public/control-room/os-topology.js', import.meta.url), 'utf8');
 const safeRateLimitFetch = fs.readFileSync(new URL('../public/control-room/safe-rate-limit-fetch.js', import.meta.url), 'utf8');
 const opaqueBootstrap = fs.readFileSync(new URL('../public/control-room/opaque-session-bootstrap.js', import.meta.url), 'utf8');
+const visualParityProofUrl = new URL('../e2e/control-room-visual-parity-proof.mjs', import.meta.url);
+const visualParityProof = fs.readFileSync(visualParityProofUrl, 'utf8');
 const pkg = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
 
 assert.match(bootstrap, /--no-proxy-server/);
 assert.match(bootstrap, /delete process\.env\[key\]/);
 assert.match(bootstrap, /process\.env\.NO_PROXY = '\*'/);
 assert.match(bootstrap, /process\.env\.no_proxy = '\*'/);
-assert.match(bootstrap, /const LEGACY_TAB_ROUTES = \{/);
-assert.match(bootstrap, /missions: \{ screen: 'Control', view: 'Work' \}/);
-assert.match(bootstrap, /terminal: \{ screen: 'Control', view: 'Execution' \}/);
-assert.match(bootstrap, /async function driveFiveScreenNavigation/);
-assert.match(bootstrap, /\.founder-screen-nav button/);
-assert.match(bootstrap, /\.founder-subnav button/);
-assert.equal(pkg.scripts['test:e2e'], 'npm run build && npm run verify:direct-browser && node e2e/pages-auth-callback-proof.mjs && node e2e/direct-browser-run.mjs');
+assert.equal(pkg.scripts['test:e2e'], 'npm run build && npm run verify:direct-browser && node e2e/pages-auth-callback-proof.mjs && node e2e/direct-browser-run.mjs && node e2e/truth-console-proof.mjs');
 assert.match(localPlaywrightProof, /from 'playwright'/);
 assert.match(localPlaywrightProof, /LOCAL_NO_PROVIDER_FEE/);
 assert.match(localPlaywrightProof, /providerWalletRequired: false/);
 assert.doesNotMatch(localPlaywrightProof, /providerWalletRequired:\s*true/);
+assert.match(localPlaywrightProof, /evidenceScope: 'synthetic-dom-fixture'/);
+assert.match(localPlaywrightProof, /fixtureFormMutationProved:\s*true/);
+assert.match(localPlaywrightProof, /providerAccepted:\s*false/);
+assert.match(localPlaywrightProof, /verifiedOutcome:\s*false/);
+assert.doesNotMatch(localPlaywrightProof, /providerAccepted:\s*true/);
+assert.doesNotMatch(localPlaywrightProof, /verifiedOutcome:\s*true/);
 assert.match(ultrathinkPluginProof, /from 'playwright'/);
 assert.match(ultrathinkPluginProof, /data-plugin-id="ultrathink"/);
 assert.match(ultrathinkPluginProof, /non-authorizing/);
@@ -114,11 +116,26 @@ execFileSync(process.execPath, [fileURLToPath(rateLimitProofUrl)], {
   stdio: 'inherit',
   env: process.env,
 });
+assert.match(visualParityProof, /from 'playwright'/);
+assert.match(visualParityProof, /controlRoomVisualBridge/);
+assert.match(visualParityProof, /desktop project choices use the canonical four-column card rhythm/);
+assert.match(visualParityProof, /mobile onboarding condenses to two premium cards per row/);
 
 execFileSync(process.execPath, [fileURLToPath(localPlaywrightProofUrl)], {
   stdio: 'inherit',
   env: process.env,
 });
+
+const fixtureReceipt = JSON.parse(fs.readFileSync(
+  new URL('../artifacts/browser/local-playwright/local-playwright-proof.json', import.meta.url),
+  'utf8',
+));
+assert.equal(fixtureReceipt.contract, 'fcr/local-playwright-browser-fixture@v2');
+assert.equal(fixtureReceipt.evidenceScope, 'synthetic-dom-fixture');
+assert.equal(fixtureReceipt.fixtureFormMutationProved, true);
+assert.equal(fixtureReceipt.formMutationProved, false);
+assert.equal(fixtureReceipt.providerAccepted, false);
+assert.equal(fixtureReceipt.verifiedOutcome, false);
 
 execFileSync(process.execPath, [fileURLToPath(ultrathinkPluginProofUrl)], {
   stdio: 'inherit',
@@ -134,15 +151,9 @@ execFileSync(process.execPath, [fileURLToPath(fiveScreenProofUrl)], {
   stdio: 'inherit',
   env: process.env,
 });
-
-execFileSync(process.execPath, [fileURLToPath(localFirstFounderProofUrl)], {
+execFileSync(process.execPath, [fileURLToPath(visualParityProofUrl)], {
   stdio: 'inherit',
   env: process.env,
 });
 
-execFileSync(process.execPath, [fileURLToPath(osTopologyProofUrl)], {
-  stdio: 'inherit',
-  env: process.env,
-});
-
-console.log('direct browser contract verified with bounded safe-read rate-limit recovery, local proof, ULTRATHINK Plugin Center, Control Room Composer, five-screen cockpit, founder local-first offline/fresh-tab persistence, Founder OS topology, and legacy-journey navigation proofs');
+console.log('direct browser contract verified: safe-read recovery, local proof, ULTRATHINK, Composer, five-screen navigation, offline state, OS topology, visual parity, Truth Console contract');

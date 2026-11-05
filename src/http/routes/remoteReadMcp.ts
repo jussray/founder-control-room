@@ -486,7 +486,7 @@ export function createRemoteReadMcpHandler(
         supportedVersions: [...SUPPORTED_PROTOCOL_VERSIONS],
         capabilities: { tools: {} },
         instructions:
-          'Paired Chief AI + Founder Control Room connector. It exposes six read/preview tools plus one bounded peer-operator relay tool. The relay calls only the explicitly addressed provider for research/propose/review, carries no mutation authority, fails closed on auth/scope/provider/evidence errors, stores no raw MCP arguments or results, and grants no execution authority.',
+          'Paired Chief AI + Founder Control Room connector. It exposes seven read/preview tools plus one bounded peer-operator relay tool. The relay calls only the explicitly addressed provider for research/propose/review, carries no mutation authority, fails closed on auth/scope/provider/evidence errors, stores no raw MCP arguments or results, and grants no execution authority.',
       }, { ttlMs: 300_000, cacheScope: 'private' })));
       return;
     }
@@ -502,7 +502,7 @@ export function createRemoteReadMcpHandler(
         capabilities: { tools: { listChanged: false } },
         serverInfo: { name: SERVER_NAME, version: SERVER_VERSION },
         instructions:
-          'Paired Chief AI + Founder Control Room connector. Six read/preview tools plus one bounded peer-operator relay; relay is research/propose/review only, fails closed when the addressed provider is unavailable, carries no provider mutation or execution authority, and accepts no credential input.',
+          'Paired Chief AI + Founder Control Room connector. Seven read/preview tools plus one bounded peer-operator relay; relay is research/propose/review only, fails closed when the addressed provider is unavailable, carries no provider mutation or execution authority, and accepts no credential input.',
       }));
       return;
     }

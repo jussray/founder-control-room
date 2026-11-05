@@ -78,7 +78,7 @@ function installCookieBackedSignOut() {
         throw new Error(`Founder sign-out failed (${response.status})`);
       }
       sessionStorage.removeItem(LEGACY_SESSION_KEY);
-      location.replace('/control-room/');
+      location.replace('/welcome');
     } catch (error) {
       // Do not lie about revocation. If server-side logout fails, keep the
       // compatibility marker and current page intact so the browser remains
@@ -122,6 +122,7 @@ async function bootLegacyCockpit() {
   await import('/control-room/app.js');
   await import('/control-room/five-screen-shell.js');
   await import('/control-room/os-topology.js');
+  await import('/control-room/fcr-visual-shell.js');
 }
 
 void bootLegacyCockpit();
