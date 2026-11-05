@@ -14,15 +14,15 @@ permissions:
   contents: read
 
 concurrency:
-  group: playwright-e2e-${{ github.event.pull_request.number || github.event.workflow_run.id || github.ref }}
-  cancel-in-progress: true
+  group: playwright-e2e-${{ github.event_name }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   PLAYWRIGHT_BROWSERS_PATH: /opt/pw-browsers
   EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
   PR_BASE_SHA: ${{ github.event.pull_request.base.sha || '' }}
-  STORYENGINE_PEER_SHA: 3c46b3649088ac4c6e1775102ba49abf5c779abf
+  STORYENGINE_PEER_SHA: b2397272a37ed5d987f0b71b2a37dc31c9c84cf5
   STORYENGINE_PEER_REF: refs/heads/main
   STORYENGINE_PEER_URL: http://127.0.0.1:3901
   STORYENGINE_PEER_API_KEY: fcr-ci-product-build
@@ -60,32 +60,23 @@ jobs:
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '24'
+          cache: 'npm'
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci --no-audit --no-fund
 
       - name: Install Playwright browsers
         run: npx playwright install chromium --with-deps
 
-      - name: Make E2E harness use Playwright browser discovery
+      - name: Verify FCR welcome login and server-revoked logout
         shell: bash
+        env:
+          NODE_ENV: test
         run: |
-          python - <<'PY'
-          from pathlib import Path
-
-          path = Path('e2e/run.mjs')
-          source = path.read_text()
-          source = source.replace(
-              "const CHROME_PATH = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';",
-              "const CHROME_PATH = process.env.CHROME_PATH;",
-          )
-          source = source.replace(
-              "const browser = await chromium.launch({ executablePath: CHROME_PATH, headless: true, args: ['--no-sandbox'] });",
-              "const browser = await chromium.launch({ ...(CHROME_PATH ? { executablePath: CHROME_PATH } : {}), headless: true, args: ['--no-sandbox'] });",
-          )
-          path.write_text(source)
-          PY
-          grep -n "CHROME_PATH\|chromium.launch" e2e/run.mjs
+          set -euo pipefail
+          mkdir -p logs
+          npm run build
+          FCR_E2E_SCENARIO=auth-lifecycle node e2e/run.mjs 2>&1 | tee logs/auth-lifecycle-e2e.log
 
       - name: Verify real FCR GitHub Workspace and guarded terminal journey
         shell: bash
@@ -94,7 +85,6 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p logs
-          npm run build
           FCR_E2E_SCENARIO=guarded-terminal node e2e/run.mjs 2>&1 | tee logs/github-workspace-e2e.log
 
       - name: Run E2E harness
@@ -102,7 +92,7 @@ jobs:
         run: |
           mkdir -p logs
           set +e
-          npm run test:e2e 2>&1 | tee logs/e2e.log
+          npm run test:e2e:prepared 2>&1 | tee logs/e2e.log
           status=${PIPESTATUS[0]}
           echo "E2E harness exit status: ${status}" | tee -a logs/e2e.log
           exit "${status}"

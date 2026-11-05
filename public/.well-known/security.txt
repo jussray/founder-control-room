@@ -4,3 +4,7 @@ Preferred-Languages: en
 Canonical: https://foundercontrolroom.org/.well-known/security.txt
 Canonical: https://www.foundercontrolroom.org/.well-known/security.txt
 Policy: https://github.com/jussray/founder-control-room/blob/main/SECURITY.md
+Contact: mailto:support@foundercontrolroom.org
+Expires: 2027-06-30T00:00:00.000Z
+Preferred-Languages: en
+Canonical: https://foundercontrolroom.org/.well-known/security.txt
