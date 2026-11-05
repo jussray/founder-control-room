@@ -288,3 +288,8 @@ For public crawler and work-directory behavior, `.github/workflows/ci.yml` must 
 ## November 2, 2026 — merge-time external peer freshness (source candidate)
 
 For FCR, the `src/http/routes/approvals.ts` merge consumer must treat an external StoryEngine peer transition as a time-of-check/time-of-use invalidation. Read the exact candidate peer pin from `.github/workflows/playwright.yml`, require canonical `refs/heads/main`, independently resolve that registered ref at the last possible point before integration, and fail closed when the pin, full peer SHA, or re-read FCR branch head differs. Candidate-authored alternate refs, old green CI and deterministic review witnesses cannot override this runtime freshness veto. This is compatible with **zero required native human GitHub approvals**, because the load-bearing controls are deterministic independent exact-head review plus separate authenticated, exact-candidate Founder Final. A source edit, static test, or PR description does not itself prove current runtime or authorize merging or deploying.
+
+
+## CI lockfile determinism — current exact-head source contract
+
+Agents must ensure `.github/workflows/ci.yml` uses `npm ci --no-audit --no-fund` for its four load-bearing Type check, Lint, Unit Tests, and Playwright e2e jobs, rather than installing unconstrained dependencies at verification time. Validate the exact checked-out SHA, required test execution, and lockfile compliance through source checks and GitHub CI. A reproducible install cannot grant merge authorization: retain systematic independent exact-head review and separately authenticated founder-final approval. Do not describe a source-only CI edit as a deployed or production-verified fix.
