@@ -98,7 +98,7 @@ try {
     await signedOut.getByRole('heading', { name: 'Welcome to Founder Control Room' }).waitFor();
     await signedOut.getByRole('heading', { name: 'Your personal workspace' }).waitFor();
     await signedOut.locator('#member-email').fill('member@example.com');
-    await signedOut.getByRole('button', { name: 'Continue to my workspace' }).click();
+    await signedOut.getByRole('button', { name: 'Email me a sign-in link' }).click();
     await signedOut.getByRole('button', { name: 'Check your inbox' }).waitFor();
     if (lastMemberEmail !== 'member@example.com') throw Error('Incorrect member sign-in email');
     if (await signedOut.locator('.shell').count()) throw Error('Founder shell leaked into welcome');

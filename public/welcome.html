@@ -93,13 +93,12 @@
 
 <main class="card" id="door" data-state="checking" aria-live="polite">
   <a class="brand" href="/" aria-label="Founder Control Room home"><span class="mark" aria-hidden="true">F</span><span>Founder Control Room</span></a>
-  <p class="eyebrow">Your ideas. Your control room.</p>
+  <p class="eyebrow">Make ideas real.</p>
 
   <section data-for="signed_out">
     <h1>Welcome to <span class="gradient">Founder Control Room</span></h1>
-    <p class="lede">A place to turn goals into verified work. Choose how you'd like to sign in.</p>
-    <section class="access-tier"><h2>Founder access</h2><p>Private founder projects, agents and release controls require a verified founder account.</p>
-    <p>Your private launch command center. Sign in with your founder email to continue. If it is on the allowlist, a one-time link is sent. No password.</p>
+    <p class="lede">Turn your next idea into real progress. Choose how to sign in.</p>
+    <section class="access-tier"><h2>Founder sign-in</h2><p>Your private control room. Enter your approved email for a one-time sign-in link.</p>
     <form id="magic" novalidate>
       <label for="email">Email</label>
       <input id="email" name="email" type="email" inputmode="email" autocomplete="email" required placeholder="founder@example.com">
@@ -109,15 +108,15 @@
     <a class="btn ghost google-link" href="/auth/google">Continue with Google as founder</a></section>
     <section class="access-tier" aria-labelledby="member-title">
       <h2 id="member-title">Your personal workspace</h2>
-      <p>Not the founder? Sign in with your own email. Your workspace starts empty and is separate from the founder's private projects.</p>
+      <p>Start with one goal. Build at your pace. Your workspace is yours.</p>
       <form id="member-magic" novalidate>
         <label for="member-email">Your email</label>
         <input id="member-email" name="email" type="email" inputmode="email" autocomplete="email" required placeholder="you@example.com">
-        <button class="btn" id="member-primary" type="submit">Continue to my workspace</button>
+        <button class="btn" id="member-primary" type="submit">Email me a sign-in link</button>
         <p class="err" id="member-formerr" hidden></p>
       </form>
     </section>
-    <p class="note">Only your verified account can open its workspace. Private founder data is not shared.</p>
+    <p class="note">Your workspace stays separate from private founder projects.</p>
   </section>
 
   <section data-for="degraded" hidden>
