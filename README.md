@@ -613,3 +613,7 @@ Source changes to `.github/workflows/ci.yml` are release-governance changes: its
 ## Governance profile: SleepWealth account-model scopes
 
 The portfolio governance profile for `jussray/SleepWealth-Agent` now registers `customer_scope_eligibility` and `pooled_scope_eligibility` as observation-only eligibility claims. Each requires its own signed receipts, and the two account models never share a scope or credentials. Live trading, broker enablement and capital ceiling increases remain blocked. This README entry is documentation only and is not deployment or runtime proof.
+
+## Founder OS lab adapter provenance (November 5, 2026)
+
+The read-only Chief AI project adapter in `src/founder-os-lab/projectAdapters.ts` records the reviewed Chief main `b1b9e0faa159d20973ee1eda293a4bf7de963ea9` and five exact contract blobs, including non-authorizing execution-continuity markers and a merge-intent check that blocks draft PRs targeting main. Provenance eligibility never grants permission to merge, deploy, publish, or mutate providers. Source movement or a changed required contract blob requires a new semantic review and new exact-head CI evidence.
