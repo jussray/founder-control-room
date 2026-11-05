@@ -628,3 +628,7 @@ The Browser Operator preview rejects explicit foreign URLs, IP targets, non-HTTP
 ## Governance profile: SleepWealth account-model scopes
 
 The portfolio governance profile for `jussray/SleepWealth-Agent` now registers `customer_scope_eligibility` and `pooled_scope_eligibility` as observation-only eligibility claims. Each requires its own signed receipts, and the two account models never share a scope or credentials. Live trading, broker enablement and capital ceiling increases remain blocked. This README entry is documentation only and is not deployment or runtime proof.
+
+## 2026-11-04 Deploy workflow syntax recovery (candidate, not production proof)
+
+Existing PR #1067 restores Python indentation inside `.github/workflows/deploy.yml` while parsing Cloudflare's name-only secret receipt. GitHub rejected the previous file as invalid before any production gate could run; the associated Founder Deploy Command returned HTTP 422. This candidate must pass current exact-head CI, GitHub workflow acceptance, and explicit founder-authorized dispatch before any release is claimed. Successful Cloudflare Pages builds and installed `OPENAI_API_KEY` binding-name metadata do not establish Worker deployment, model-invocation success, customer isolation, or paid customer outcomes.
