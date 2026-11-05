@@ -66,7 +66,7 @@ test('coordinating skill limits authority, avoids duplicate runtime, and separat
 const deployWorkflow = source('.github/workflows/deploy.yml');
 
 function invalidEmbeddedPythonIndentation(contents) {
-  const lines = contents.split('\\n');
+  const lines = contents.split('\n');
   const bad = [];
   let inside = false;
   for (let i = 0; i < lines.length; i++) {
