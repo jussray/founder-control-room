@@ -1,5 +1,11 @@
 # Truth Decay Audit: When a True Claim Becomes Unsafe to Reuse
 
+## November 5, 2026: PR #1029 adapter pin refresh expired sibling evidence
+
+The `src/founder-os-lab/projectAdapters.ts` change in FCR PR #1029 advanced the audited Se’kret Bip source identity to `84ee251890a792f2a80b486deaa20c96200637ff` and Chief AI to `3e3dd73010d04111c94128e28d0a3e53d0de7a35`. Changing an audited head or required contract blob digest expires prior read-only project-adapter evidence. A matching pinned digest alone proves neither current sibling-head equality nor preservation of the sibling's full safety contract.
+
+The PR continuity record flags a Chief-specific regression risk: a pair-contract version rollback, changed capability-registry continuity semantics, and a removed draft-status merge-intent block. These remain review findings, not an authorization to attest that regressed contract as acceptable. The authoritative Chief current head, affected paths and behavior must be independently re-read and tested, and any harmful regression repaired in Chief before relying on the refreshed FCR attestation. Until then Chief freshness and release readiness remain BLOCKED or UNKNOWN. Documentation Truth run 40301522488 failed because `README.md`, this audit, and `docs/DOCUMENTATION_TRUTH_RECEIPT.json` were not changed together with the evidence-authority source; the downstream Required Gate in run 40301522033 correctly propagated that failure. This documentation correction supplies a bounded, reviewable statement of the failure, not proof that the Chief regression, PR merge conflict, exact-head verification, Cloudflare deployment or production-runtime witness has been resolved.
+
 ## October 24, 2026: founder-dock privacy boundary and StoryEngine peer movement
 
 The signed-out Control Room previously left founder-stack navigation present in the DOM as a visible dock. The repair makes first paint fail closed and derives dock visibility from the authenticated `#root .shell`; losing that shell closes and hides the dock again. Structural fixtures may synthesize the authenticated shell only after proving the signed-out state, while the opaque HttpOnly-cookie browser path remains the authority for real session behavior. UI hiding does not replace server authorization and does not prove production privacy until the exact successor browser witness passes.

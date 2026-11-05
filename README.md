@@ -1,5 +1,11 @@
 # Founder Control Room
 
+## November 5, 2026: PR #1029 audited project adapter freshness is not a deployment approval
+
+The existing `src/founder-os-lab/projectAdapters.ts` candidate refreshes Se’kret Bip's audited source head to `84ee251890a792f2a80b486deaa20c96200637ff` and Chief AI's audited source head to `3e3dd73010d04111c94128e28d0a3e53d0de7a35`, with path-bound contract blob hashes and focused adapter tests. These values select historical exact-source evidence subjects for read-only previews; they do not assert that either sibling is currently deployed, operational, or independently approved for merge.
+
+PR #1029 records unresolved concerns about the Chief contract's earlier-version pair topology, continuity-cookie handling, and draft merge-intent guard. Those claims require a fresh, independent Chief source and test readback before the Chief attestation can be accepted; documentation and matching hash pins cannot waive a lost safety invariant. FCR must keep Chief evidence BLOCKED or UNKNOWN while the concerns and PR merge conflict remain unresolved. Current exact-head checks, founder approval bound to the exact candidate, a conflict-free integration, Cloudflare deployment and production/browser receipts remain separate required gates. Neither a documentation-truth pass nor a green local Playwright test authorizes promotion or production release.
+
 ## October 24, 2026 authenticated founder dock + StoryEngine peer renewal
 
 The public FCR entrance remains available without a session, while the internal `/control-room/` founder navigation dock starts `hidden` with `aria-hidden="true"` and becomes visible only after the existing authenticated `#root .shell` renders. Session/shell loss closes and hides the dock again. This is a UI privacy safeguard only; server-side authorization remains independently required.
