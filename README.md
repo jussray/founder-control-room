@@ -45,6 +45,10 @@ The successor StoryEngine commit showed 17 successful check runs and one skipped
 No merge, deployment, provider, credential, production, or publication permission is granted by this documentation or pin update.
 
 
+## Workflow Audit & Repair — governed candidate routing
+
+The new `.ai/skills/workflow-audit-repair/SKILL.md` routes authorized code and workflow audits into existing GoalFix, TypeScript, Codex, and verification capabilities rather than creating a separate operating system. The FCR unattended AI Failure Repair workflow is being changed on a review branch to produce a SHA-256-bound **verified patch candidate and receipt**, not an automatic GitHub push or deploy. Applying that candidate, opening a PR, merging and deploying remain separately governed actions. The full artifact and approval path is described in [Workflow Audit & Repair](docs/WORKFLOW_AUDIT_REPAIR.md). A review-branch source change does not prove merged or live behavior.
+
 ## Outcome-First agent workflow
 
 `skills/outcome-first/SKILL.md` defines one shared outcome, authority, acceptance and stop workflow for Codex, Claude Code, Gemini, Copilot, Cursor and Windsurf. Thin adapters point to the same source; FCR founder approval, privacy, evidence, exact-head review, merge and deployment gates remain unchanged. This is repository instruction text, not proof of live agent activation.
