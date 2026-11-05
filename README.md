@@ -645,3 +645,10 @@ Existing PR #1067 restores Python indentation inside `.github/workflows/deploy.y
 ## PR Continuity gate naming (2026-11-05)
 
 `.github/workflows/pr-continuity.yml` now derives the exact-head job name from its event. The `pull_request` run keeps the name `PR Continuity Exact-Head Gate`. The `pull_request_target` copy is labeled as not gating, because it is skipped by its own condition and previously shared the gate's name. Trigger set, job condition, steps, and permissions are unchanged. This is a naming change only; it does not prove exact-head CI for any SHA.
+
+### URLFIX destination and artifact guard (2026-11-05)
+
+- `scripts/external-site-snapshot.mjs` now resolves DNS and rejects non-public addresses for the target, every redirect hop and every sub-resource before the browser loads them. Failures abort the request and are recorded as `blockedDestinations`.
+- `skills/urlfix/SKILL.md` adds artifact hygiene: synthetic identities only, no persisted cookies, headers, bodies or private text, and `BLOCKED` when redaction cannot be verified.
+- Standing-command routing evaluates intent predicates on the goal with URLs removed, so URL path text cannot create URLFIX routing on its own.
+- Verified locally only: snapshot tests 6/6, registry and router tests 35/35, AI-skill verifier passed, typecheck passed. Provider CI on the new head is not yet observed. Claims about live runtime behaviour remain unproven.

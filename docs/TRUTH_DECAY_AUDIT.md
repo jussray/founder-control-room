@@ -687,3 +687,9 @@ The claims `customer_scope_eligibility` and `pooled_scope_eligibility` in `src/g
 ## 2026-11-05 PR Continuity check-name collision
 
 A skipped `pull_request_target` copy of the exact-head job shared the name of the real `pull_request` gate, so the PR check list could show a skipped result while the real run had concluded success. The workflow now labels the skipped copy as not gating. Earlier statements that the gate "was skipped" describe this collision, not a failed or passed gate. Current gate status must be re-read from the `pull_request` run on the exact head.
+
+## 2026-11-05 — URLFIX destination guard and artifact hygiene
+
+- Previously current: URLFIX's destination guard relied on a literal-only URL check, which did not stop DNS names resolving to private addresses or redirects into private space.
+- Now: the snapshot script resolves DNS and checks every request, and the URLFIX contract forbids persisting authenticated state or private artifacts. Routing ignores URL text when reading intent.
+- Historical evidence from earlier heads is superseded for this surface. Re-observe provider CI on the new exact head before any present-tense claim.
