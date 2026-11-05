@@ -10,6 +10,7 @@ import type {
   ReviewSignal,
   ReviewSignalState,
   PullRequestReviewContext,
+  PullRequestObservation,
   Diff,
   DiffFile,
   Patch,
@@ -199,6 +200,43 @@ export class GitHubProvider implements RepositoryProvider {
       submittedAt: review.submitted_at ?? undefined,
       detailsUrl: review._links?.html?.href ?? undefined,
     }));
+  }
+
+  /**
+   * Diagnostic read does not enforce review readiness and does not populate
+   * pullRequestContextByProject. Merge gates continue to use their own strict
+   * getPullRequestReviewContext method.
+   */
+  async observePullRequest(
+    projectId: string,
+    pullRequestNumber: number,
+  ): Promise<PullRequestObservation> {
+    const { owner, repo } = this.locate(projectId);
+    if (!Number.isInteger(pullRequestNumber) || pullRequestNumber <= 0) {
+      throw new Error("GitHubProvider: pullRequestNumber must be a positive integer");
+    }
+
+    const { data } = await this.octokit.pulls.get({
+      owner,
+      repo,
+      pull_number: pullRequestNumber,
+    });
+    if (data.state !== "open" && data.state !== "closed") {
+      throw new Error("GitHubProvider: unsupported pull request state");
+    }
+    return {
+      number: data.number,
+      repository: owner + "/" + repo,
+      headRepository: data.head.repo?.full_name ?? "",
+      baseRef: data.base.ref,
+      headRef: data.head.ref,
+      baseSha: data.base.sha,
+      headSha: data.head.sha,
+      authorIdentity: data.user?.login ?? "",
+      state: data.state,
+      draft: data.draft === true,
+      merged: data.merged === true,
+    };
   }
 
   async getPullRequestReviewContext(

@@ -30,7 +30,8 @@
   }if(selected)select.value=selected}
   function render(d){
     inspected=d;el('detail').hidden=false;
-    el('identity').textContent=d.project.name+' / PR #'+d.pullRequest;
+    el('identity').textContent=d.project.name+' / PR #'+d.pullRequest
+      +(d.pr?.draft?' / DRAFT':'')+(d.pr?.state==='closed'?' / CLOSED':'');
     const sha=el('sha');clear(sha);sha.append(cell('BASE SHA',d.exact.baseSha),cell('HEAD SHA',d.exact.headSha),cell('LIVE BASE',d.live.currentBaseSha),cell('LIVE HEAD',d.live.currentHeadSha));
     const counts=el('counts');clear(counts);counts.append(count('FAILING',d.counts.failing),count('QUEUED',d.counts.queued),count('CANCELLED',d.counts.cancelled),count('DUPLICATES',d.counts.duplicate));
     const checks=el('checks');clear(checks);if(!d.checks.length)checks.append(mk('p','unknown','No check evidence. Unknown is not green.'));

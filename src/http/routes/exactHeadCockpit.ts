@@ -46,30 +46,35 @@ exactHeadCockpitRouter.get('/inspect/:id/:number', async(req,res)=>{
     return res.status(503).json({code:'GITHUB_PROVIDER_NOT_CONFIGURED',evidenceStatus:'unknown'});
   try {
     const provider=providerForProject(config);
-    if(!provider.getPullRequestReviewContext||!provider.listReviewSignals)
+    if(!provider.observePullRequest||!provider.listReviewSignals)
       return res.status(503).json({code:'PROVIDER_READ_NOT_SUPPORTED'});
-    // This canonical review context intentionally rejects draft and closed PRs.
-    // Keep those UNKNOWN instead of weakening the review provider or inventing SHAs.
+    // The separate read-only observation includes drafts and closed PRs.
+    // It does not populate FCR's strict independent-review / merge context.
     let ctx;
-    try { ctx=await provider.getPullRequestReviewContext(project.id,number); }
-    catch { return res.status(409).json({code:'PR_NOT_REVIEW_ELIGIBLE',detail:'Draft, closed, inaccessible or not verified by the review provider.'}); }
+    try { ctx=await provider.observePullRequest(project.id,number); }
+    catch { return res.status(503).json({code:'PR_OBSERVATION_UNAVAILABLE',detail:'PR identity cannot be independently verified.'}); }
     if(!SHA.test(ctx.baseSha)||!SHA.test(ctx.headSha)||ctx.repository.toLowerCase()!==project.repo.toLowerCase())
       return res.status(503).json({code:'PR_IDENTITY_MISMATCH'});
     const responses=await Promise.allSettled([
       provider.resolveRef(project.id,ctx.baseRef),
-      provider.resolveRef(project.id,ctx.headRef),
+      provider.observePullRequest(project.id,number),
       provider.listVerificationSignals(project.id,ctx.headSha),
       provider.listReviewSignals(project.id,number),
-      provider.compare(project.id,ctx.baseRef,ctx.headRef),
+      provider.compare(project.id,ctx.baseRef,ctx.headSha),
     ] as const);
     const read=<T>(r:PromiseSettledResult<T>):T|null=>r.status==='fulfilled'?r.value:null;
     const currentBase=read(responses[0]);
-    const currentHead=read(responses[1]);
+    const currentObservation=read(responses[1]);
+    const currentHead=currentObservation?.headSha??null;
     const verifiedSignals=read(responses[2]);
     const reviewSignals=read(responses[3]);
     const comparison=read(responses[4]) as Diff|null;
     const baseMatches=currentBase?currentBase.toLowerCase()===ctx.baseSha.toLowerCase():null;
-    const headMatches=currentHead?currentHead.toLowerCase()===ctx.headSha.toLowerCase():null;
+    const headMatches=currentObservation
+      ? currentObservation.headSha.toLowerCase()===ctx.headSha.toLowerCase()
+        && currentObservation.headRepository.toLowerCase()===ctx.headRepository.toLowerCase()
+        && currentObservation.baseRef===ctx.baseRef
+      : null;
     const checks=(verifiedSignals||[]).filter((v:VerificationSignal)=>v.commitSha.toLowerCase()===ctx.headSha.toLowerCase());
     const counts={
       failing:checks.filter(v=>v.status==='failed').length,
@@ -79,8 +84,10 @@ exactHeadCockpitRouter.get('/inspect/:id/:number', async(req,res)=>{
       duplicate:null, // latest-only Check Run evidence cannot establish duplicate count
     };
     const reviews=(reviewSignals||[]).filter((v:ReviewSignal)=>v.state==='approved'&&v.commitSha.toLowerCase()===ctx.headSha.toLowerCase()).length;
-    const allPassed=checks.length>0&&checks.every(v=>v.status==='passed'||v.status==='skipped');
+    const allPassed=checks.length>0&&checks.every(v=>v.status==='passed');
     const blockers=[
+      ctx.state!=='open'?'PR is closed and cannot be reviewed or merged':'',
+      ctx.draft?'PR is draft and not review eligible':'',
       headMatches!==true?'Current PR head could not be confirmed':'',
       baseMatches!==true?'PR base differs from live base or is unknown':'',
       !comparison?'Branch relationship unavailable':'',
@@ -93,7 +100,8 @@ exactHeadCockpitRouter.get('/inspect/:id/:number', async(req,res)=>{
       'FCR founder-final review is not established',
       'Cloudflare and Supabase runtime proof not established',
     ].filter(Boolean);
-    const nextReversibleFix=headMatches!==true?'Re-read the live PR head before any changes.':
+    const nextReversibleFix=ctx.state!=='open'?'Confirm whether this closed PR is intentionally retained as history.':
+      headMatches!==true?'Re-read the live PR head before any changes.':
       baseMatches!==true?'Reconcile this PR with current main, then reverify its exact head.':
       counts.failing?'Inspect the first failing check and patch one evidenced cause.':
       counts.queued?'Finish queued checks; avoid duplicate reruns.':
@@ -102,7 +110,8 @@ exactHeadCockpitRouter.get('/inspect/:id/:number', async(req,res)=>{
     return res.json({
       contract:'fcr/exact-head-cockpit-inspection@v1',observedAt:new Date().toISOString(),
       project:{id:project.id,name:project.name,repository:project.repo},
-      pullRequest:number,exact:{baseSha:ctx.baseSha,headSha:ctx.headSha,baseRef:ctx.baseRef,headRef:ctx.headRef},
+      pullRequest:number,pr:{state:ctx.state,draft:ctx.draft,merged:ctx.merged,headRepository:ctx.headRepository},
+      exact:{baseSha:ctx.baseSha,headSha:ctx.headSha,baseRef:ctx.baseRef,headRef:ctx.headRef},
       live:{currentBaseSha:currentBase,currentHeadSha:currentHead,baseMatches,headMatches,
         branchRelationship:comparison?{aheadBy:comparison.aheadBy,behindBy:comparison.behindBy}:null},
       counts, checks:checks.map(v=>({name:v.name,status:v.status,headSha:v.commitSha,
