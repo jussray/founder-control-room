@@ -10,17 +10,9 @@ At predecessor candidate `82d0e7139d3876e166844de64e17b4a770c23b90`, the isolate
 
 The isolated `feat/fcr-council-bus-handoff-guard-20261102` branch contains pinned Council/Court validators, a signed-ACK contract, and founder-gated Search Console and AI evidence review panels. The Search Console panel inspects five fixed public URLs and sitemap metadata; it does not claim a full indexed-page count. The evidence challenger is advisory, uses a dedicated authenticated BYOK Cloudflare AI Gateway, and never grants publishing or deployment authority. Current candidate source and tests do not prove live delivery. Google OAuth refresh credentials and the dedicated gateway token have not been installed in the Worker; `CF_API_TOKEN` remains incorrectly typed as plaintext and must be remediated through an exact-head authorized reconcile. The public homepage uses CSP-compatible WebPage Microdata, not inline scripts. No PR, merge, or production deployment follows from this source candidate.
 
-## November 3, 2026: reuse the existing GitHub Actions App key
+## November 4, 2026: GitHub App parser parity remains source-only
 
-Draft PR #1061 rebinds FCR's trusted-review, portfolio-evidence, Actions-audit,
-secret-safe diagnostic, guarded repair, and Chief ProofMode GitHub App
-consumers from `secrets.APP_PRIVATE_KEY` to the existing **repository Actions**
-secret `secrets.FCR_GITHUB_APP_PRIVATE_KEY`. This changes a source reference,
-not any secret value, installation grant, App ID, or Cloudflare Worker credential.
-The repository still requires RSA parsing, App-issuer readback, exact-head
-checks, founder authority, and separate live evidence before release.
-A green source test alone does not prove the protected secret is valid or
-that PR #1006 can merge.
+PR #1061 adds cryptographically validated DER, headerless-PEM, and collapsed-PEM parsing while retaining the existing `production` environment `secrets.APP_PRIVATE_KEY` binding. The latest live read-only diagnostic still classified the stored value as `unknown`, with no valid PEM boundary or RSA parse. Source tests do not prove a usable credential or authorize governance reconciliation, merge, or deployment.
 
 ## November 1, 2026: bounded GitHub App transport reconciliation
 
