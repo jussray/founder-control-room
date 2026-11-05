@@ -1,0 +1,24 @@
+{
+  "schema": "fcr/pr-state@v1",
+  "repository": "jussray/founder-control-room",
+  "pullNumber": 969,
+  "branch": "skills/ultrathink-suite-rollover-20261012",
+  "recordedHeadSha": "7ee0b736eb205d64a87e3162e3f2dc5444d1dc1f",
+  "recordedBaseSha": "3d1516e06d5fb2be9bff539e699f69f82046e680",
+  "requiredChecks": [
+    "Required Gate",
+    "PR Continuity Exact-Head Gate",
+    "Documentation truth",
+    "Typecheck",
+    "Lint",
+    "Unit Tests",
+    "Playwright E2E",
+    "verify-pair-contract",
+    "Verify every project adapter exact source contract"
+  ],
+  "independentReview": { "required": true, "recorded": false },
+  "founderMergeApproval": { "approved": false, "headSha": null, "baseSha": null },
+  "dependencies": [
+    { "repository": "jussray/chief-ai-machine", "pullNumber": 271, "headSha": "c2792c2", "state": "open-draft", "mergeApproved": false }
+  ]
+}
