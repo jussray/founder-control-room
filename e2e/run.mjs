@@ -34,6 +34,7 @@ import { fileURLToPath } from 'node:url';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { chromium } from 'playwright';
 import { createFakeGitHubServer } from './fakeGitHubServer.mjs';
+import { ensureRateLimitHeadroom } from './rate-limit-headroom.mjs';
 
 const PORT = 8802;
 const BASE_URL = `http://127.0.0.1:${PORT}`;
@@ -389,6 +390,11 @@ async function runGuardedTerminalProof(page) {
 
 async function verifyLogoutAndProtectedBoundary(page) {
   console.log('\n[logout] Server-revoked logout returns to welcome and denies the private shell');
+  // The same origin and per-IP limiter protect subsequent real page/script requests.
+  // Observe its own remaining quota and wait for a bounded reset when needed;
+  // this does not relax the server limiter or assert an unobserved 200.
+  const logoutHeadroom = await ensureRateLimitHeadroom(`${BASE_URL}/health`, { minimumRemaining: 90 });
+  if (logoutHeadroom.waited) console.log(`  rate-limit reset observed before logout browser proof: ${logoutHeadroom.waitedMs}ms`);
   await page.goto(`${BASE_URL}/control-room/`);
   await page.waitForSelector('#sign-out');
   await page.click('#sign-out');
@@ -671,6 +677,10 @@ async function main() {
   assert(branchFileContent === 'console.log("edited by e2e");\n', 'the fake GitHub branch tree was actually updated by a real commitPatch call');
 
   console.log('\n[6d] Deliver a real signed CI webhook (check_run success) — should advance the mission to in_review via the real background reconciler');
+  // Preserve the real general API limiter during the dense founder journey.
+  // A 429 here is evidence of backpressure, not a reason to fake mission status.
+  const missionHeadroom = await ensureRateLimitHeadroom(`${BASE_URL}/health`);
+  if (missionHeadroom.waited) console.log(`  rate-limit reset observed before CI webhook proof: ${missionHeadroom.waitedMs}ms`);
   const branchHeadSha = fakeGitHubBranches.get(branchName)?.sha;
   await sendCheckRunWebhook({ headSha: branchHeadSha, conclusion: 'success' });
   const inReviewText = await waitForMissionStatusByPolling(page, 'in_review', 25000);

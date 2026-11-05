@@ -116,6 +116,12 @@ execFileSync(process.execPath, [fileURLToPath(rateLimitProofUrl)], {
   stdio: 'inherit',
   env: process.env,
 });
+
+// Deterministic negative-case proof for real 429 reset observation in the full E2E journey.
+execFileSync(process.execPath, ['--test', fileURLToPath(new URL('../e2e/rate-limit-headroom.test.mjs', import.meta.url))], {
+  stdio: 'inherit',
+  env: process.env,
+});
 assert.match(visualParityProof, /from 'playwright'/);
 assert.match(visualParityProof, /controlRoomVisualBridge/);
 assert.match(visualParityProof, /desktop project choices use the canonical four-column card rhythm/);
