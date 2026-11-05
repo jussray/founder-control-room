@@ -15,7 +15,9 @@
     {
       "path": ".github/workflows/deploy.yml",
       "claims": [
-        "`.github/workflows/deploy.yml` must run `scripts/verify-worker-binding-types.mjs` before the first Cloudflare Worker mutation, rejecting plaintext credential bindings or unavailable name/type provider evidence while never logging secret values or treating a passing source preflight as live deployment proof."
+        "`.github/workflows/deploy.yml` must run `scripts/verify-worker-binding-types.mjs` before the first Cloudflare Worker mutation, rejecting plaintext credential bindings or unavailable name/type provider evidence while never logging secret values or treating a passing source preflight as live deployment proof.",
+        "`.github/workflows/deploy.yml` must extract the JSON secret-name list from the wrangler receipt text before parsing it, because wrangler writes human authentication notices to stdout ahead of the JSON, and the production authority gate fails closed when no JSON list is present in the receipt.",
+        "`.github/workflows/deploy.yml` must keep the Python Cloudflare secret-name receipt parsing block correctly indented so GitHub can accept the workflow file; a source-only indentation repair is not proof of successful authorized production dispatch or deployed runtime behavior, which require separate exact-head receipts."
       ]
     },
     {
@@ -557,6 +559,12 @@
       "path": "src/lib/__tests__/firstPartyContentTruthUi.contract.test.ts",
       "claims": [
         "`src/lib/__tests__/firstPartyContentTruthUi.contract.test.ts` must verify the exact-head Playwright checkout, PR-scoped cancellation that preserves non-PR witnesses, and pinned browser evidence artifacts; a source equality assertion must not require canceling main runs."
+      ]
+    },
+    {
+      "path": "src/governance/portfolioGovernanceProfiles.ts",
+      "claims": [
+        "`src/governance/portfolioGovernanceProfiles.ts` must register the SleepWealth account-model eligibility claims `customer_scope_eligibility` and `pooled_scope_eligibility` as observation-only, and must keep `live-trade`, `enable-live-broker`, `accept-pooled-funds` and `cross-account-credential-use` blocked so the customer-connected and pooled-managed scopes never share authority, and it fails closed when a required receipt gate is absent."
       ]
     }
   ]
