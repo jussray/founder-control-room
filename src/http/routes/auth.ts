@@ -4,6 +4,7 @@ import type { Session } from '@supabase/supabase-js';
 import { createSupabaseAuthClient, supabaseAuth } from '../../lib/supabaseAuthClient.js';
 import { supabase } from '../../lib/supabaseClient.js';
 import { clearFounderSession, readFounderSession, revokeFounderSession, rotateFounderSession } from '../../auth/founderSession.js';
+import { clearMemberSession, revokeMemberSession } from '../../auth/memberSession.js';
 import { respondError, respondSuccess } from '../apiResponse.js';
 import { FOUNDER_API_URL, rateLimitMagicLink } from '../middleware/security.js';
 import { requireFounder, requireInteractiveFounder, type FounderRequest } from '../middleware/requireFounder.js';
@@ -37,7 +38,13 @@ async function isAllowlisted(email: string): Promise<boolean> {
 }
 function sessionWithVerifiedUser(session: Session, user: Session['user']): Session { return { ...session, user }; }
 async function establishFounderSession(req: Request, res: Response, session: Session): Promise<boolean> {
-  try { await rotateFounderSession(req, res, session); return true; }
+  try {
+    // Switching back to founder must retire the browser's previous member identity.
+    if (!(await revokeMemberSession(req))) return false;
+    await rotateFounderSession(req, res, session);
+    clearMemberSession(res);
+    return true;
+  }
   catch (error) {
     console.error('Founder browser session persistence failed:', error instanceof Error ? error.message : String(error));
     return false;
@@ -154,6 +161,8 @@ authRouter.post('/password', rateLimitFounderPassword, requireInteractiveFounder
 authRouter.post('/logout', async (req, res) => {
   const revoked = await revokeFounderSession(req, 'logout');
   if (!revoked) return respondError(res, 503, 'SESSION_REVOCATION_FAILED', 'Founder browser session could not be revoked.');
+  if (!(await revokeMemberSession(req))) return respondError(res, 503, 'SESSION_REVOCATION_FAILED', 'Member session could not be revoked.');
   clearFounderSession(res);
+  clearMemberSession(res);
   return res.status(204).end();
 });

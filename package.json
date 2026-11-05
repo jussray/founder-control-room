@@ -24,7 +24,7 @@
     "lint": "eslint 'src/**/*.ts'",
     "lint:design-os": "eslint 'src/design-os/**/*.ts' 'src/http/routes/designOs.ts' 'src/http/routes/designOs.test.ts' --max-warnings 0",
     "test": "vitest run",
-    "test:e2e": "npm run build && npm run verify:direct-browser && node e2e/pages-auth-callback-proof.mjs && node e2e/direct-browser-run.mjs && node e2e/truth-console-proof.mjs",
+    "test:e2e": "npm run build && npm run verify:direct-browser && node e2e/pages-auth-callback-proof.mjs && node e2e/direct-browser-run.mjs && node e2e/truth-console-proof.mjs && node e2e/member-entry-proof.mjs",
     "setup:test-browser": "playwright install chromium",
     "verify:direct-browser": "node scripts/verify-direct-browser-contract.mjs",
     "verify:founder-home": "node e2e/founder-home-dashboard-proof.mjs",
@@ -66,7 +66,7 @@
     "proof:goalfix": "npm run build && node e2e/goalfix-proof.mjs && node e2e/goalfix-same-sha-proof.mjs",
     "verify:test-discovery": "node scripts/verify-test-discovery.mjs",
     "generate:worker-types": "node -e \"require('node:fs').mkdirSync('.wrangler/types',{recursive:true})\" && wrangler types .wrangler/types/worker-configuration.d.ts --config wrangler.worker.toml --env-interface FcrWorkerEnv --include-env=false",
-    "test:e2e:prepared": "npm run verify:direct-browser && node e2e/pages-auth-callback-proof.mjs && node e2e/direct-browser-run.mjs && node e2e/truth-console-proof.mjs"
+    "test:e2e:prepared": "npm run verify:direct-browser && node e2e/pages-auth-callback-proof.mjs && node e2e/direct-browser-run.mjs && node e2e/truth-console-proof.mjs && node e2e/member-entry-proof.mjs"
   },
   "dependencies": {
     "@octokit/rest": "^21.0.2",

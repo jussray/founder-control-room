@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow"><title>My workspace | Founder Control Room</title>
+<link rel="stylesheet" href="/member/styles.css"><script src="/member/member.js" defer></script><script src="/member/projects.js" defer></script>
+</head><body><div class="ambient" aria-hidden="true"></div>
+<main id="loading" class="loading" role="status">Verifying your account…</main>
+<div id="workspace" hidden>
+<header class="topbar"><a class="brand" href="/" aria-label="Founder Control Room homepage"><span class="mark">FCR</span><span>Founder Control Room</span></a>
+<div class="account"><span id="member-email"></span><button id="sign-out" type="button">Log out</button></div></header>
+<main class="container">
+<p class="eyebrow">YOUR CONTROL ROOM</p>
+<h1>Your space.<br><span class="gradient">A fresh beginning.</span></h1>
+<p class="intro">Your goals and projects belong here. This space is yours.</p>
+<section id="project-start" class="empty" aria-labelledby="empty-title">
+<div class="empty-symbol" aria-hidden="true">✦</div><p class="eyebrow">No projects yet</p>
+<h2 id="empty-title">Your workspace is empty</h2>
+<p>Every project starts with one idea. Name yours to begin.</p>
+</section>
+<section class="project-panel" aria-labelledby="projects-title">
+<h2 id="projects-title">Your projects</h2><p id="project-status" role="status">Loading your projects…</p>
+<button id="project-retry" type="button" hidden>Reload projects</button><div id="project-list"></div>
+<button id="new-project" type="button">Start a project</button>
+</section>
+<section id="project-editor" class="project-panel" hidden aria-labelledby="editor-title">
+<p class="eyebrow">ONE OUTCOME AT A TIME</p><h2 id="editor-title">Start your first project</h2>
+<form id="project-form"><label for="project-title">Project name</label><input id="project-title" required maxlength="120" autocomplete="off">
+<label for="project-goal">What do you want to move forward?</label><textarea id="project-goal" maxlength="4000" rows="6"></textarea>
+<button id="project-save" type="submit">Create project</button><button id="project-close" type="button">Back to projects</button>
+<p id="project-feedback" role="status"></p></form>
+</section>
+<p id="notice" class="notice" role="status" hidden></p>
+</main></div>
+<section id="unavailable" class="error" hidden><h1>Account service unavailable</h1><p>Your workspace could not be verified. No private information was loaded.</p><button id="retry" type="button">Try again</button><a href="/welcome">Return to welcome</a></section>
+</body></html>
