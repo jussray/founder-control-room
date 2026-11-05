@@ -12,6 +12,7 @@ const staticPaths = new Map([
   ['/assets/welcome-door.js', 'assets/welcome-door.js'],
   ['/member/', 'member/index.html'],
   ['/member/member.js', 'member/member.js'],
+  ['/member/projects.js', 'member/projects.js'],
   ['/member/styles.css', 'member/styles.css'],
 ]);
 const contentTypes = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8' };
@@ -19,6 +20,8 @@ const founderPaths = [];
 let lastMemberEmail = '';
 let failLogout = false;
 let memberPresent = false;
+let fixtureProjects = [];
+let failProjectSave = false;
 function json(res, status, body, headers = {}) {
   res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', ...headers });
   res.end(JSON.stringify(body));
@@ -30,6 +33,24 @@ const server = createServer(async (req, res) => {
     return json(res, 403, { error: 'Founder-only' });
   }
   if (url.pathname === '/auth/me') return json(res, 401, { error: 'No founder session' });
+  // Browser fixture only: backend ownership is exercised by memberProjects.integration.test.ts.
+  if (url.pathname === '/auth/member/projects' || url.pathname.startsWith('/auth/member/projects/')) {
+    if (!/(?:^|;\s*)member_fixture=1(?:;|$)/.test(req.headers.cookie ?? '')) return json(res, 401, { success: false });
+    const id = url.pathname.slice('/auth/member/projects/'.length);
+    if (req.method === 'GET') return json(res, 200, { success: true, data: url.pathname === '/auth/member/projects'
+      ? { projects: fixtureProjects } : { project: fixtureProjects.find(project => project.id === id) } });
+    if (failProjectSave) return json(res, 503, { success: false, error: { message: 'Fixture storage unavailable' } });
+    let raw = ''; for await (const chunk of req) raw += chunk;
+    const body = JSON.parse(raw);
+    if (req.method === 'POST') {
+      const project = { id: '11111111-1111-4111-8111-111111111111', title: body.title, goal: body.goal, version: 1 };
+      fixtureProjects.push(project); return json(res, 201, { success: true, data: { project } });
+    }
+    const project = fixtureProjects.find(value => value.id === id && value.version === body.version);
+    if (!project) return json(res, 409, { success: false, error: { message: 'Project changed' } });
+    Object.assign(project, { title: body.title, goal: body.goal, version: project.version + 1 });
+    return json(res, 200, { success: true, data: { project } });
+  }
   if (url.pathname === '/auth/member/me') {
     const hasCookie = /(?:^|;\s*)member_fixture=1(?:;|$)/.test(req.headers.cookie ?? '');
     return json(res, hasCookie ? 200 : 401, hasCookie
@@ -61,6 +82,7 @@ try {
     ['desktop', { width: 1440, height: 900 }],
     ['mobile', { width: 390, height: 844 }],
   ]) {
+    fixtureProjects = []; failProjectSave = false;
     const publicPage = await browser.newPage({ viewport });
     await publicPage.goto(origin + '/', { waitUntil: 'domcontentloaded' });
     await publicPage.getByRole('tab', { name: 'Founder View' }).click();
@@ -94,17 +116,34 @@ try {
       throw Error('Member workspace horizontal overflow: ' + label);
     }
     await member.screenshot({ path: outputDir + '/' + label + '-empty.png', fullPage: true });
+    await member.getByRole('button', { name: 'Start a project' }).click();
+    await member.getByLabel('Project name').fill('One useful product');
+    await member.getByLabel('What do you want to move forward?').fill('Talk to one customer');
+    await member.getByRole('button', { name: 'Create project' }).click();
+    await member.getByText('Saved to your workspace.', { exact: true }).waitFor();
+    await member.reload({ waitUntil: 'domcontentloaded' });
+    await member.waitForFunction(() => document.getElementById('project-goal').value === 'Talk to one customer');
+    await member.getByLabel('What do you want to move forward?').fill('Keep this unsaved outcome');
+    failProjectSave = true;
+    await member.getByRole('button', { name: 'Save project' }).click();
+    await member.getByText(/Your changes remain in this form/).waitFor();
+    if (await member.getByLabel('What do you want to move forward?').inputValue() !== 'Keep this unsaved outcome') throw Error('Failed save erased the draft');
+    failProjectSave = false;
+    await member.getByRole('button', { name: 'Save project' }).click();
+    await member.getByText('Saved to your workspace.', { exact: true }).waitFor();
+    if (await member.locator('#project-list .project-item').count() !== 1) throw Error('Save duplicated the project list');
+    await member.screenshot({ path: outputDir + '/' + label + '-project-resumed.png', fullPage: true });
     failLogout = true;
     await member.getByRole('button', { name: 'Log out' }).click();
     await member.getByText(/Logout did not complete/).waitFor();
-    if (!member.url().endsWith('/member/')) throw Error('Failed logout falsely navigated away');
+    if (new URL(member.url()).pathname !== '/member/') throw Error('Failed logout falsely navigated away');
     failLogout = false;
     await member.getByRole('button', { name: 'Log out' }).click();
     await member.waitForURL('**/welcome');
     await context.close();
   }
   if (founderPaths.length) throw Error('Member screen requested private APIs: ' + founderPaths.join(', '));
-  console.log('FCR member welcome, blank state and logout Playwright proof passed.');
+  console.log('FCR member welcome, private project create/resume/save, failure recovery and logout browser fixture proof passed.');
 } finally {
   if (browser) await browser.close();
   await new Promise(resolve => server.close(resolve));

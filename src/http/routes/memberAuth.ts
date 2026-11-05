@@ -7,8 +7,10 @@ import { clearFounderSession, revokeFounderSession } from '../../auth/founderSes
 import { respondError, respondSuccess } from '../apiResponse.js';
 import { FOUNDER_API_URL, rateLimitMagicLink } from '../middleware/security.js';
 import { onboardingContentSecurityPolicy } from '../middleware/onboardingSecurity.js';
+import { memberProjectsRouter } from './memberProjects.js';
 
 export const memberAuthRouter = Router();
+memberAuthRouter.use('/projects', memberProjectsRouter);
 const callbackThrottle = rateLimit({
   windowMs: 15 * 60_000, limit: 30, standardHeaders: true, legacyHeaders: false,
 });

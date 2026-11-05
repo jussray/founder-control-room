@@ -22,6 +22,7 @@
       }
       $('member-email').textContent = member.email;
       $('loading').hidden = true; $('workspace').hidden = false;
+      window.dispatchEvent(new Event('fcr-member-ready'));
     } catch {
       $('loading').hidden = true; $('unavailable').hidden = false;
     }

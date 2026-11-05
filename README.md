@@ -625,3 +625,8 @@ Source changes to `.github/workflows/ci.yml` are release-governance changes: its
 ## Governance profile: SleepWealth account-model scopes
 
 The portfolio governance profile for `jussray/SleepWealth-Agent` now registers `customer_scope_eligibility` and `pooled_scope_eligibility` as observation-only eligibility claims. Each requires its own signed receipts, and the two account models never share a scope or credentials. Live trading, broker enablement and capital ceiling increases remain blocked. This README entry is documentation only and is not deployment or runtime proof.
+
+
+## Member-owned project drafts (source candidate)
+
+The ordinary-member workspace has private project create, list, resume and versioned save routes, using only the member's verified session and a separate owner-scoped project table. See [Member project drafts](docs/MEMBER_PROJECT_DRAFTS.md) for behavior, isolation, migration prerequisites and release gates. This source change does not establish that its migration or runtime is live.

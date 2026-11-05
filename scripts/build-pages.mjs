@@ -25,6 +25,7 @@ const requiredAssets = [
   'control-room/index.html',
   'member/index.html',
   'member/member.js',
+  'member/projects.js',
   'member/styles.css',
   'control-room/app.js',
   'control-room/styles.css',
