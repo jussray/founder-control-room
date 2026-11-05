@@ -107,4 +107,21 @@ describe('exact-head cockpit founder read boundary', () => {
     expect((await request(a).get('/integration-cockpit/inspect/fcr/0').set('x-fixture-founder','yes')).status).toBe(400);
     expect(fixtures.providerForProject).not.toHaveBeenCalled();
   });
+
+  it('bounds authenticated catalog reads with an independent route-local 429', async () => {
+    const instance = app();
+    let limited = null;
+    for (let attempt = 0; attempt < 70; attempt += 1) {
+      const response = await request(instance).get('/integration-cockpit/projects').set('x-fixture-founder','yes');
+      if (response.status === 429) {
+        limited = response;
+        break;
+      }
+      expect(response.status).toBe(200);
+    }
+    if (!limited) throw new Error('Cockpit route-local limiter failed to return 429');
+    expect(limited.body).toMatchObject({code:'COCKPIT_RATE_LIMITED',blocked:true});
+    expect(limited.headers['retry-after']).toBeDefined();
+    expect(fixtures.providerForProject).not.toHaveBeenCalled();
+  });
 });

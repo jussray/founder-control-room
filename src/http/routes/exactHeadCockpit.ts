@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { rateLimit } from 'express-rate-limit';
 import { requireFounder } from '../middleware/requireFounder.js';
 import { providerForProject, providerConfigurationError } from '../../providers/providerFactory.js';
 import type { VerificationSignal, ReviewSignal, Diff } from '../../providers/RepositoryProvider.js';
@@ -19,12 +20,26 @@ const PROJECTS = [
   { id:'image', name:'MakeImage', repo:'jussray/make-image' },
 ] as const;
 
-exactHeadCockpitRouter.use(requireFounder, (_req,res,next) => {
+// The global FCR request limiter remains in force. This smaller independent
+// read budget is explicitly applied before founder authorization on all three
+// diagnostic handlers, including catalog reads. It protects expensive GitHub
+// provider inspection even if the route is reused in a different server mount.
+exactHeadCockpitRouter.use(
+  rateLimit({
+    windowMs: 60_000,
+    limit: 60,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { code: 'COCKPIT_RATE_LIMITED', blocked: true },
+  }),
+  requireFounder,
+  (_req,res,next) => {
   res.setHeader('Cache-Control', 'private, no-store');
   res.setHeader('X-Robots-Tag', 'noindex, nofollow, noarchive');
   res.setHeader('Referrer-Policy','no-referrer');
   next();
 });
+
 exactHeadCockpitRouter.get('/projects', (_req,res) => res.json({
   contract:'fcr/exact-head-cockpit@v1',
   observedAt:new Date().toISOString(),
