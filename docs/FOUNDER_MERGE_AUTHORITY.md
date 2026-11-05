@@ -204,3 +204,8 @@ For public crawler and work-directory behavior, `.github/workflows/ci.yml` must 
 ## Sauce Guard egress proof before merge
 
 A contributor or agent changing public product communications must apply `.agents/skills/sauce-guard/SKILL.md` and preserve Current You's exact-copy publication approval, FCR revalidation, and provider readback. Proposed code changes cannot confer communication authority. For newly introduced logging calls, the existing PR/push CI lane must execute the fail-closed `scripts/verify-sauce-guard-egress.mjs` audit and contract suite; a failed, skipped, or stale-head log check is not permission to bypass, suppress, or merge. Scanner success is changed-line evidence only, not a complete privacy audit, proof of safe historical logs, or a substitute for founder-final merge approval.
+
+
+## CI lockfile determinism — current exact-head source contract
+
+Exact-head FCR governance must treat changes to `.github/workflows/ci.yml` as truth-sensitive: Type check, Lint, Unit Tests, and Playwright e2e must use `npm ci --no-audit --no-fund` against the checked-in npm lockfile; required tests and status contexts must remain load-bearing. Locked installs constrain dependency resolution; they cannot substitute for deterministic independent review, trusted witness, authenticated exact-PR/base/head Founder Final, provider readback, or actual production proof. Native GitHub approving-human count remains intentionally zero in the founder-only phase.

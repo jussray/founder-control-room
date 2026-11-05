@@ -418,3 +418,8 @@ For public crawler and work-directory behavior, `.github/workflows/ci.yml` must 
 ## Sauce Guard agent inheritance and log-egress stop condition
 
 Always load the founder-owned `.agents/skills/sauce-guard/SKILL.md` before public posts, outreach, status summaries, release announcements, or any external communication derived from product work. Chief proposes; Current You approves exact copy; FCR revalidates temporal claims and executes only within approved authority; provider readback proves the result. CI must block new dynamic logger sinks through `scripts/verify-sauce-guard-egress.mjs`. Never print raw errors, private user records, prompts, keys, or provider payloads to defeat a failing check. The narrow changed-line audit cannot prove older logs are safe and never grants merge, publish, deploy, or production authority.
+
+
+## CI lockfile determinism — current exact-head source contract
+
+For workflow-authority source changes, `.github/workflows/ci.yml` must use `npm ci --no-audit --no-fund` in its Type check, Lint, Unit Tests, and Playwright e2e jobs to bind the dependency tree to the committed lockfile. Keep the test-discovery ratchet, Documentation Truth, Required Gate and systematic review intact. CI pass is exact-head evidence only, never founder-final approval, cloud-provider state, deploy success or an automatic merge permission. When stale docs or gates are observed, repair the current source under the existing authority gates and preserve the predecessor receipt.
