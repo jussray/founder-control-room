@@ -207,7 +207,7 @@ BEGIN
 
   BEGIN
     INSERT INTO public.post_metrics (
-      receipt_id, window, evidence_state, views
+      receipt_id, "window", evidence_state, views
     ) VALUES (first_receipt, '24h', 'UNKNOWN_NO_EVIDENCE', 12);
     RAISE EXCEPTION 'UNKNOWN metric was coerced into a measured value';
   EXCEPTION WHEN check_violation THEN
@@ -215,7 +215,7 @@ BEGIN
   END;
 
   INSERT INTO public.post_metrics (
-    receipt_id, window, evidence_state
+    receipt_id, "window", evidence_state
   ) VALUES (first_receipt, '24h', 'UNKNOWN_NO_EVIDENCE');
 
   IF (SELECT count(*) FROM public.publication_receipts
