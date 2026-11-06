@@ -44,6 +44,8 @@ export interface LearningStep {
   statement: string;
   evidenceRefs: string[];
   falsifier?: string;
+  /** Bounded evidence-based hypothesis confidence, never authority. */
+  confidence?: number;
   retentionRef?: string;
   application?: LearningApplication;
   improvement?: LearningMetric;
@@ -130,6 +132,13 @@ function normalStep(step: LearningStep): LearningStep {
   if (phase === 'interpreted' || phase === 'revised') {
     normalized.falsifier = required(step.falsifier, 'falsifier', 600);
   }
+  if (phase === 'learned' || phase === 'revised') {
+    if (typeof step.confidence !== 'number' || !Number.isFinite(step.confidence)
+      || step.confidence < 0 || step.confidence > 1) {
+      throw new Error('LEARNING_INVALID: bounded hypothesis confidence required');
+    }
+    normalized.confidence = step.confidence;
+  }
   if (phase === 'retained') {
     normalized.retentionRef = required(step.retentionRef, 'retentionRef', 500);
   }
@@ -173,7 +182,7 @@ function identity(event: Omit<LearningEvent, 'eventHash'>): object {
   return [
     event.studyId, event.sequence, event.previousHash,
     event.phase, event.recordedAt, event.statement, event.evidenceRefs,
-    event.falsifier ?? null, event.retentionRef ?? null,
+    event.falsifier ?? null, event.confidence ?? null, event.retentionRef ?? null,
     event.application ? [event.application.project, event.application.headSha, event.application.outcomeReceiptId] : null,
     event.improvement ? [event.improvement.name, event.improvement.before, event.improvement.after, event.improvement.unit, event.improvement.betterWhen] : null,
   ];
@@ -234,7 +243,11 @@ export function readLearningStudy(study: LearningStudy): LearningRead {
       || event.eventHash !== eventHash(event)) {
       throw new Error('LEARNING_INVALID: broken history or tampering');
     }
-    if (!previous && event.phase !== 'observed') throw new Error('LEARNING_INVALID: study must start observed');
+    if (!previous && (event.phase !== 'observed'
+      || event.recordedAt !== study.source.observedAt
+      || JSON.stringify(event.evidenceRefs) !== JSON.stringify(study.source.evidenceRefs))) {
+      throw new Error('LEARNING_INVALID: observed event must bind exact source evidence');
+    }
     if (previous && (!NEXT[previous.phase].includes(event.phase)
       || Date.parse(event.recordedAt) <= Date.parse(previous.recordedAt))) {
       throw new Error('LEARNING_INVALID: illegal or out-of-order transition');
