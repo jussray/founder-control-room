@@ -1,7 +1,8 @@
 -- Learning OS v1: independent knowledge lifecycle; FCR retains all execution authority.
 -- SOURCE ONLY until exact-head tests and a separately approved migration apply.
 -- Uses actual FCR outcomes and approval_executions, not an imaginary fcr_receipts table.
-begin;
+-- The migration executor owns the transaction. The same SQL can run inside
+-- Neon CI's rollback-only source proof without an embedded commit.
 
 -- Explicit server-owned classification: missions have no native domain column.
 -- A model-supplied target_domain is never enough to claim a cross-domain reuse.
@@ -477,4 +478,3 @@ begin
 end;
 $function$;
 
-commit;
