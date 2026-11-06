@@ -505,12 +505,12 @@ BEGIN
   END IF;
 
   SELECT claim_id INTO v_lease FROM public.claim_revenue_strike_customer_send_lease(
-    'learning-preview',1,'founder-preview',repeat('a',64),repeat('b',64),
+    'learning-preview',1::smallint,'founder-preview',repeat('a',64),repeat('b',64),
     repeat('c',64),repeat('d',64),repeat('e',64),
     now()-interval '1 minute','ci',now());
   IF v_lease IS NULL THEN RAISE EXCEPTION 'customer lease claim failed'; END IF;
   IF (SELECT count(*) FROM public.claim_revenue_strike_customer_send_lease(
-    'learning-preview',1,'founder-preview',repeat('a',64),repeat('b',64),
+    'learning-preview',1::smallint,'founder-preview',repeat('a',64),repeat('b',64),
     repeat('c',64),repeat('d',64),repeat('e',64),
     now()-interval '1 minute','ci',now())) <> 0 THEN
     RAISE EXCEPTION 'repeat customer lease was authorized';
