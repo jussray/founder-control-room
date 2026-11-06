@@ -172,6 +172,52 @@ describe('founder permission broker HTTP contract', () => {
     expect(approved.body.independentReviewSatisfied).toBeNull();
   });
 
+  it('proposes cross-domain learning through the existing interactive-founder broker without granting action authority', async () => {
+    const app = createServer();
+    const learningProposal = {
+      ...proposal, actionType: 'apply_learning_cross_domain',proposalId: 'learning-cross-domain',
+    };
+    const learningTarget = {
+      type: 'learning_application',
+      learningId: '11111111-1111-4111-8111-111111111111',
+      targetMissionId: '22222222-2222-4222-8222-222222222222',
+      targetOutcomeId: '33333333-3333-4333-8333-333333333333',
+      targetHeadSha: 'b'.repeat(40), targetDomain: 'auth',
+      crossDomainReason: 'The same validation check applies to the authentication product.',
+    };
+    const created = await request(app)
+      .post('/mcp/founder-permissions/requests')
+      .set('Authorization',bearer).send({
+        requestId: 'permission:learning-application-http',
+        requestedBySurface: 'chatgpt',proposal:learningProposal,actionTarget:learningTarget,
+      });
+    expect(created.status).toBe(201);
+    expect(created.body.actionTarget).toEqual(learningTarget);
+    expect(created.body.founderPermissionSatisfied).toBe(false);
+
+    const bearerOnly = await interactivePost(app,
+      '/mcp/founder-permissions/requests/permission:learning-application-http/decision')
+      .send({decision:'approved'});
+    expect(bearerOnly.status).toBe(401);
+    interactiveSession.enabled = true;
+    const approved = await interactivePost(app,
+      '/mcp/founder-permissions/requests/permission:learning-application-http/decision')
+      .send({decision:'approved'});
+    expect(approved.status).toBe(200);
+    expect(approved.body.founderPermissionSatisfied).toBe(true);
+    expect(approved.body.executionAuthorized).toBe(false);
+
+    const replayWithAnotherOutcome = await request(app)
+      .post('/mcp/founder-permissions/requests')
+      .set('Authorization', bearer).send({
+        requestId: 'permission:learning-application-http',
+        requestedBySurface: 'chatgpt',proposal:learningProposal,
+        actionTarget: {...learningTarget,targetOutcomeId:'44444444-4444-4444-8444-444444444444'},
+      });
+    expect(replayWithAnotherOutcome.status).toBe(409);
+    expect(replayWithAnotherOutcome.body.code).toBe('FOUNDER_PERMISSION_SCOPE_MISMATCH');
+  });
+
   it('ignores bearer identity when authenticating the interactive decision cookie', async () => {
     const app = createServer();
     await request(app).post('/mcp/founder-permissions/requests').set('Authorization', bearer)
