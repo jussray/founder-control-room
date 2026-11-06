@@ -71,7 +71,7 @@ describe('Learning OS independent outcome-to-knowledge boundary', () => {
   it('retention is not application, and verified reuse is not improvement', () => {
     let s = create();
     s = progress(s, 'interpreted', '2026-11-06T12:01:00Z', { falsifier: 'Check regressions on another project' });
-    s = progress(s, 'learned', '2026-11-06T12:02:00Z');
+    s = progress(s, 'learned', '2026-11-06T12:02:00Z', { confidence: 0.65 });
     s = progress(s, 'retained', '2026-11-06T12:03:00Z', { retentionRef: 'canon:fcr/reuse-lesson' });
     expect(readLearningStudy(s).learningDemonstrated).toBe(false);
     expect(() => progress(s, 'applied', '2026-11-06T12:04:00Z', {
@@ -94,6 +94,7 @@ describe('Learning OS independent outcome-to-knowledge boundary', () => {
   it('rejects out-of-order states, evidence tampering, and challenges prior learning', () => {
     let s = create();
     expect(() => progress(s, 'applied', '2026-11-06T12:01:00Z')).toThrow(/illegal transition/);
+    expect(() => progress(s, 'learned', '2026-11-06T12:01:00Z')).toThrow(/illegal transition/);
     const forged: LearningStudy = structuredClone(s);
     forged.source.result = 'failed';
     expect(() => readLearningStudy(forged)).toThrow(/source evidence tampering/);
@@ -108,14 +109,14 @@ describe('Learning OS independent outcome-to-knowledge boundary', () => {
   it('revision resets historical application until the new lesson is independently reused', () => {
     let s = create();
     s = progress(s, 'interpreted', '2026-11-06T12:01:00Z', { falsifier: 'Test target again' });
-    s = progress(s, 'learned', '2026-11-06T12:02:00Z');
+    s = progress(s, 'learned', '2026-11-06T12:02:00Z', { confidence: 0.65 });
     s = progress(s, 'retained', '2026-11-06T12:03:00Z', { retentionRef: 'canon:fcr/lesson' });
     s = progress(s, 'applied', '2026-11-06T12:04:00Z', {
       application: { project: 'chief-ai-machine', headSha: SHA_B, outcomeReceiptId: RECEIPT_B },
     });
     expect(readLearningStudy(s).learningDemonstrated).toBe(true);
     s = progress(s, 'challenged', '2026-11-06T12:05:00Z');
-    s = progress(s, 'revised', '2026-11-06T12:06:00Z', { falsifier: 'Repeat corrected scope test' });
+    s = progress(s, 'revised', '2026-11-06T12:06:00Z', { falsifier: 'Repeat corrected scope test', confidence: 0.4 });
     s = progress(s, 'retained', '2026-11-06T12:07:00Z', { retentionRef: 'canon:fcr/revised-lesson' });
     expect(readLearningStudy(s)).toMatchObject({
       phase: 'retained', learningDemonstrated: false, improvementObserved: false,
