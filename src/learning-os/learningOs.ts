@@ -119,7 +119,7 @@ function digest(value: unknown): string {
 }
 
 function normalStep(step: LearningStep): LearningStep {
-  if (!(step.phase in NEXT)) throw new Error('LEARNING_INVALID: unknown phase');
+  if (!Object.hasOwn(NEXT, step.phase)) throw new Error('LEARNING_INVALID: unknown phase');
   const phase = step.phase;
   const normalized: LearningStep = {
     phase,
@@ -201,6 +201,14 @@ export function readLearningStudy(study: LearningStudy): LearningRead {
   }
   required(study.source.project, 'source.project', 120);
   required(study.source.verifierId, 'source.verifierId', 120);
+  const sourceKeys = [
+    'project', 'headSha', 'executionReceiptId', 'capabilityPlanHash',
+    'result', 'observedAt', 'evidenceRefs', 'verifierId',
+  ];
+  if (Object.keys(study.source).length !== sourceKeys.length
+    || sourceKeys.some((key) => !Object.hasOwn(study.source, key))) {
+    throw new Error('LEARNING_INVALID: unexpected source fields');
+  }
   if (instant(study.source.observedAt) !== study.source.observedAt) {
     throw new Error('LEARNING_INVALID: noncanonical source observation time');
   }
@@ -231,7 +239,13 @@ export function readLearningStudy(study: LearningStudy): LearningRead {
       || Date.parse(event.recordedAt) <= Date.parse(previous.recordedAt))) {
       throw new Error('LEARNING_INVALID: illegal or out-of-order transition');
     }
+    if (event.phase === 'challenged' || event.phase === 'revised') {
+      // Prior reuses cannot prove a new version of a revised or disputed lesson.
+      applied = false;
+      improved = false;
+    }
     if (event.phase === 'applied') {
+      improved = false;
       if (event.application?.outcomeReceiptId === study.source.executionReceiptId) {
         throw new Error('LEARNING_INVALID: reuse needs an independent outcome receipt');
       }
