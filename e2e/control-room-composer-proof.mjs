@@ -178,6 +178,16 @@ async function proveComposer(browser, scenario) {
 
   const recommendation = page.locator('#chief-recommendation');
   await recommendation.waitFor({ state: 'visible' });
+  // The recommendation is asynchronous: visibility alone only proves the
+  // placeholder rendered. Await the actual proposal before asserting it.
+  await page.waitForFunction(
+    ({ typeLabel, missionLabel }) => {
+      const title = document.getElementById('chief-recommendation-title')?.textContent ?? '';
+      return title.includes(typeLabel) && title.includes(missionLabel);
+    },
+    { typeLabel: scenario.projectTypeLabel, missionLabel: scenario.missionLabel },
+    { timeout: 10000 },
+  );
   const recommendationTitle = await page.locator('#chief-recommendation-title').textContent();
   const recommendationDetail = await page.locator('#chief-recommendation-detail').textContent();
   assert.match(recommendationTitle || '', new RegExp(scenario.projectTypeLabel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
