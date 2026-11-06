@@ -169,11 +169,12 @@ export function createServer(options: CreateServerOptions = {}) {
   });
   app.use(helmetMiddleware);
   app.use(corsMiddleware);
+  app.use(requestAudit);
 
-  // The existing requestAudit path also enforces this 120/minute IP limit,
-  // but its custom limiter is not recognized by CodeQL's Express model.
-  // Use a library-backed, matching boundary before all routes as independent
-  // defense in depth, without overriding the existing RateLimit headers.
+  // The request-audit path enforces 120/minute per IP with a custom limiter.
+  // Keep it first so all denied requests are logged. This independently
+  // modeled Express limiter adds defense in depth without altering the
+  // existing RateLimit headers or allowing a different request quota.
   app.use(rateLimit({
     windowMs: 60 * 1_000,
     limit: 120,
@@ -181,7 +182,6 @@ export function createServer(options: CreateServerOptions = {}) {
     legacyHeaders: false,
     message: { error: 'Rate limit exceeded.' },
   }));
-  app.use(requestAudit);
 
   if (options.serveStatic) {
     const publicDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '../../public');
