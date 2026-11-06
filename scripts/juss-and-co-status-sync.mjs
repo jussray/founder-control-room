@@ -6,15 +6,14 @@
 
 const API = 'https://api.github.com';
 const TARGET = process.env.SYNC_TARGET_REPO || 'jussray/jussray';
-const DECLARED = ['name', 'repo', 'st', 'label', 'link', 'held', 'contact'];
-
-export function summarizeChecks(runs) {
-  if (!runs || !runs.length) return 'no checks';
-  const c = runs.map((r) => r.conclusion || r.status);
-  const failing = c.filter((x) => ['failure', 'timed_out', 'cancelled', 'action_required'].includes(x)).length;
+export function summarizeChecks(runs, totalCount = runs?.length ?? 0) {
+  if (!Array.isArray(runs) || !runs.length) return totalCount > 0 ? 'incomplete' : 'no checks';
+  const failing = runs.filter((r) => ['failure', 'timed_out', 'cancelled', 'action_required', 'startup_failure', 'stale'].includes(r?.conclusion)).length;
   if (failing) return `red (${failing} failing)`;
-  if (c.some((x) => ['in_progress', 'queued', 'pending'].includes(x))) return 'running';
-  return 'green';
+  if (runs.some((r) => ['in_progress', 'queued', 'pending', 'waiting', 'requested'].includes(r?.status))) return 'running';
+  if (totalCount > runs.length) return 'incomplete';
+  if (runs.some((r) => !['success', 'neutral', 'skipped'].includes(r?.conclusion))) return 'unverified';
+  return runs.some((r) => r.conclusion === 'success') ? 'green' : 'unverified';
 }
 
 export function mergeEvidence(current, evidenceByName, now = new Date()) {
@@ -26,7 +25,6 @@ export function mergeEvidence(current, evidenceByName, now = new Date()) {
     const before = JSON.stringify(w.evidence || {});
     w.evidence = { ...(w.evidence || {}), ...e };
     if (JSON.stringify(w.evidence) !== before) changed = true;
-    for (const k of Object.keys(w)) if (!DECLARED.includes(k) && k !== 'evidence') delete w[k];
   }
   if (changed) next.generatedAt = now.toISOString();
   return { next, changed };
@@ -49,7 +47,7 @@ export async function observeRepo(fullName, token) {
     mainSha: head.sha,
     mainDate: head.commit.committer.date,
     latestMergedPr: merged ? { number: merged.number, title: merged.title.slice(0, 90), mergedAt: merged.merged_at } : null,
-    ci: summarizeChecks(checks.check_runs),
+    ci: summarizeChecks(checks.check_runs, checks.total_count),
     observedAt: new Date().toISOString(),
   };
 }
