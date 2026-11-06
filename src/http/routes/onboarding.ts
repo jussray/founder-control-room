@@ -15,7 +15,6 @@ import {
   workspaceCallbackJs,
   workspaceControlRoomHtml,
 } from './onboardingAssets/workspaceSurface.js';
-import { workspaceProjectsRouter } from './workspaceProjects.js';
 
 export const onboardingRouter = Router();
 
@@ -23,10 +22,7 @@ export const onboardingRouter = Router();
 // policy, while this identity and onboarding surface stays same-origin.
 onboardingRouter.use(onboardingContentSecurityPolicy);
 
-// Workspace-scoped founder onboarding is deliberately separate from legacy
-// global FCR routes. The route owns its tenant filter and cannot borrow global
-// project authority merely because a founder is authenticated.
-onboardingRouter.use('/workspace', workspaceProjectsRouter);
+// Workspace APIs are mounted by the server, not by this public static-assets router.
 
 function sendAsset(res: Response, type: string, body: string) {
   res.setHeader('Content-Type', type);

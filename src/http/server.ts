@@ -4,6 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { authRouter } from './routes/auth.js';
 import { onboardingRouter } from './routes/onboarding.js';
+import { workspaceProjectsRouter } from './routes/workspaceProjects.js';
 import { founderOnboardingRouter } from './routes/founderOnboarding.js';
 import { projectsRouter } from './routes/projects.js';
 import { projectShellStateRouter } from './routes/projectShellState.js';
@@ -382,6 +383,7 @@ export function createServer(options: CreateServerOptions = {}) {
   );
 
   app.use('/', onboardingRouter);
+  app.use('/workspace', workspaceProjectsRouter);
   app.use('/auth', authRouter);
   app.use('/onboarding', founderOnboardingRouter);
   app.use('/portfolio', portfolioVerificationRouter);
