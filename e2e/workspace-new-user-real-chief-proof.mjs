@@ -135,6 +135,7 @@ const server = spawn(
       SUPABASE_PUBLISHABLE_KEY: 'fake-publishable-key',
       FOUNDER_EMAIL: 'platform-owner@example.com',
       E2E_PUBLIC_WORKSPACE: '1',
+      E2E_CUSTOMER_INVITE_EMAIL: CUSTOMER_EMAIL,
       E2E_REAL_CHIEF: '1',
       E2E_SEED_PROJECTS_JSON: JSON.stringify([foreignProject]),
       E2E_AUTH_BRIDGE_FILE: BRIDGE_FILE,
