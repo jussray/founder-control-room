@@ -13,13 +13,13 @@ create table public.learning_mission_domains (
   recorded_at timestamptz not null default now()
 );
 create function public.learning_domain_guard() returns trigger
-language plpgsql security invoker set search_path=public as $
+language plpgsql security invoker set search_path=public as $$
 begin
   if not exists(select 1 from public.missions where id=new.mission_id and project_id=new.project_id) then
     raise exception 'LEARNING_DOMAIN_PROJECT_MISMATCH';
   end if;
   return new;
-end $;
+end $$;
 create trigger learning_domain_insert_guard before insert on public.learning_mission_domains
 for each row execute function public.learning_domain_guard();
 
