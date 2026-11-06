@@ -382,6 +382,19 @@ GRANT EXECUTE ON FUNCTION public.finalize_revenue_strike_customer_send_lease(uui
 -- Actual truth-console predecessor and candidate migration, not stubs.
 \ir ../migrations/20260917183000_truth_console_claims.sql
 \ir ../migrations/20261106173000_learning_os_v1.sql
+-- The Neon branch is empty. Recreate the exact columns/constraints of the
+-- canonical 20260711214937_proof_gate_results source for this transaction only.
+-- Do not import its old auth.role() RLS policies into the preview fixture.
+CREATE TABLE public.proof_gate_results (
+  id uuid primary key default gen_random_uuid(),
+  mission_id uuid references public.missions(id) on delete cascade,
+  project_id uuid not null references public.projects(id) on delete cascade,
+  gate_id text not null,
+  status text not null check (status in ('pass','fail','skipped')),
+  evidence jsonb not null default '{}'::jsonb,
+  approved_by text,
+  ran_at timestamptz not null default now()
+);
 \ir ../migrations/20261106193000_learning_os_proof_binding_v2.sql
 
 -- Runtime contract, not a "migration parsed" shortcut: source provenance,
