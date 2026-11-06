@@ -4,6 +4,11 @@
 -- apply. Neon does not carry canonical Supabase's truth/revenue prerequisites.
 -- Construct them from the historical source and test only the new behavior.
 
+-- Match the canonical Supabase pgcrypto installation without changing any
+-- production authority schema or permitting a digest bypass.
+create schema if not exists extensions;
+create extension if not exists pgcrypto with schema extensions;
+
 \ir ../migrations/20260912191500_revenue_strike_customer_send_gate.sql
 
 -- Minimal test-only digest-function signature. CI's full Supabase reset and
