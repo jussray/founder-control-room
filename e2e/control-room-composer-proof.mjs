@@ -57,7 +57,7 @@ async function proveComposer(browser, scenario) {
     if (url.pathname === '/health') {
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true }) });
     }
-    if (url.pathname === '/auth/me') {
+    if (url.pathname === '/workspace/me' || url.pathname === '/auth/me') {
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -87,6 +87,28 @@ async function proveComposer(browser, scenario) {
         }),
       });
     }
+    // Synthetic DOM proof only. The protected real-Chief runtime is exercised
+    // by the independent exact-head Workspace Founder Boundary workflow.
+    if (url.pathname === '/onboarding/chief-recommendation' && request.method() === 'POST') {
+      const payload = request.postDataJSON();
+      const types = { 'ai-agent': 'AI / Agent System', 'store-commerce': 'Store / Commerce' };
+      const missions = { fix: 'Fix', grow: 'Grow' };
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          recommendation: {
+            recommendationHash: 'a'.repeat(64),
+            title: 'Chief recommends a ' + (types[payload.controlRoom.projectType] || payload.controlRoom.projectType) + ' Control Room focused on ' + (missions[payload.controlRoom.mission] || payload.controlRoom.mission),
+            focus: 'For ' + payload.project.name + ', start from the declared project reality.',
+            stateGuidance: 'Keep founder declarations separate from verified evidence.',
+            nextGate: 'Confirm the first measurable step before acting.',
+          },
+          acceptance: { fingerprint: 'b'.repeat(64) },
+        }),
+      });
+    }
+
     if (url.pathname === '/onboarding/bootstrap' && request.method() === 'POST') {
       submittedPayload = request.postDataJSON();
       const connections = submittedPayload.providers.map((type, index) => ({
