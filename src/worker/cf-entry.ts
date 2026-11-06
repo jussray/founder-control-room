@@ -29,6 +29,10 @@ import {
   type ControlRoomWorkerEnv,
 } from './handler.js';
 import { assertScheduledTaskResults } from './scheduledTaskResults.js';
+import {
+  PUBLIC_OPPORTUNITY_RESEARCH_PATH,
+  handlePublicOpportunityResearch,
+} from './publicOpportunityResearch.js';
 
 export { ReleaseProofWorkflowV0 } from '../workflows/releaseProofWorkflow.js';
 
@@ -94,6 +98,10 @@ if (!composedFetch) throw new Error('Cloudflare HTTP handler is missing fetch');
 const worker: ExportedHandler<ControlRoomWorkerEnv> = {
   async fetch(request, workerEnv, ctx) {
     const url = new URL(request.url);
+    if (url.pathname === PUBLIC_OPPORTUNITY_RESEARCH_PATH) {
+      const response = await handlePublicOpportunityResearch(request as unknown as Request);
+      return response as unknown as Awaited<ReturnType<NonNullable<ExportedHandler<ControlRoomWorkerEnv>['fetch']>>>;
+    }
     if (url.pathname === BIP_PROOF_INGRESS_PATH) {
       return handleBipControlRoomProofIngress(request, workerEnv);
     }
