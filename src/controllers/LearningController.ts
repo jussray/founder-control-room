@@ -41,6 +41,18 @@ export class LearningController {
   readonly name = 'LearningController';
   readonly authority = 'observation-and-knowledge-only' as const;
 
+  /** Source classifications are durable and server-scoped; never trust model labels. */
+  async classifyMissionDomain(input: {missionId: string; projectId: string; domain: string; sourceRef: string}) {
+    const { data, error } = await supabase.from('learning_mission_domains').insert({
+      mission_id: input.missionId,
+      project_id: input.projectId,
+      domain: nonblank(input.domain, 'DOMAIN'),
+      source_ref: nonblank(input.sourceRef, 'SOURCE'),
+    }).select('mission_id').single();
+    if (error || !data) throw new Error(`LEARNING_DOMAIN_DENIED: ${error?.message ?? 'no insert confirmation'}`);
+    return { missionId: String(data.mission_id), authorizesExecution: false as const };
+  }
+
   async recordOutcome(input: RecordEarnedOutcome): Promise<{ learningId: string; state: LearningState }> {
     const { data, error } = await supabase.from('learning_records').insert({
       outcome_id: input.outcomeId,
@@ -122,16 +134,24 @@ export class LearningController {
   }
 
   revise(learningId: string, review: {
+    downstreamOutcomeId: string;
     outcome: LearningOutcome;
     demonstratedImprovement: boolean;
     revision: string;
     evidenceRefs: string[];
+    metricBefore?: number;
+    metricAfter?: number;
+    betterWhen?: 'higher' | 'lower';
   }) {
     return this.progress({
       learningId, expected: 'APPLIED', next: 'REVISED',
       payload: {
+        downstream_outcome_id: review.downstreamOutcomeId,
         outcome: review.outcome,
         demonstrated_improvement: review.demonstratedImprovement,
+        metric_before: review.metricBefore ?? null,
+        metric_after: review.metricAfter ?? null,
+        better_when: review.betterWhen ?? null,
         revision: review.revision,
         evidence_refs: review.evidenceRefs,
       },
