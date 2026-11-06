@@ -113,7 +113,7 @@ begin
      or v_e.status <> 'succeeded' or v_e.success is distinct from true or v_e.executed_at is null
      or v_e.expected_head_sha is distinct from new.origin_head_sha
      or v_o.classification not in ('achieved','partial','failed')
-     or v_o.observed_at is null or v_o.observed_at < v_e.started_at
+     or v_o.observed_at is null or v_o.observed_at < v_e.executed_at
      or nullif(btrim(v_o.verification_method),'') is null
      or jsonb_typeof(v_o.evidence) is distinct from 'array'
      or jsonb_array_length(v_o.evidence) = 0 then
@@ -131,10 +131,10 @@ as $$
 declare v_permission record;
 begin
   if (new.outcome_id,new.origin_execution_id,new.origin_mission_id,new.origin_project_id,new.origin_head_sha,new.domain,
-      new.outcome_summary,new.observed_by,new.created_at)
+      new.outcome_summary,new.observed_by,new.expires_at,new.created_at)
      is distinct from
      (old.outcome_id,old.origin_execution_id,old.origin_mission_id,old.origin_project_id,old.origin_head_sha,old.domain,
-      old.outcome_summary,old.observed_by,old.created_at) then
+      old.outcome_summary,old.observed_by,old.expires_at,old.created_at) then
     raise exception 'LEARNING_IMMUTABLE_IDENTITY';
   end if;
   if new.state = old.state then
