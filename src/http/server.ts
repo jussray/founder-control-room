@@ -169,6 +169,18 @@ export function createServer(options: CreateServerOptions = {}) {
   });
   app.use(helmetMiddleware);
   app.use(corsMiddleware);
+
+  // The existing requestAudit path also enforces this 120/minute IP limit,
+  // but its custom limiter is not recognized by CodeQL's Express model.
+  // Use a library-backed, matching boundary before all routes as independent
+  // defense in depth, without overriding the existing RateLimit headers.
+  app.use(rateLimit({
+    windowMs: 60 * 1_000,
+    limit: 120,
+    standardHeaders: false,
+    legacyHeaders: false,
+    message: { error: 'Rate limit exceeded.' },
+  }));
   app.use(requestAudit);
 
   if (options.serveStatic) {
