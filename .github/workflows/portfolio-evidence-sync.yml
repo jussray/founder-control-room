@@ -12,7 +12,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: jussco-portfolio-evidence-sync
@@ -105,6 +105,27 @@ jobs:
           EXPECTED_SYSTEMS_GENERATED_AT: ${{ steps.sync.outputs.systems_generated_at }}
           JUSSCO_URLS: https://jussco.company,https://www.jussco.company
         run: node scripts/sync-jussco-portfolio-evidence.mjs --live-proof
+
+      - name: Record blocked authentication evidence
+        if: ${{ failure() }}
+        env:
+          FAILED_JOB_STATUS: ${{ job.status }}
+          FCR_RUN_ID: ${{ github.run_id }}
+          FCR_HEAD_SHA: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if test -s "$PORTFOLIO_SYNC_RECEIPT"; then
+            echo "Existing evidence receipt preserved."
+            exit 0
+          fi
+          mkdir -p "$(dirname "$PORTFOLIO_SYNC_RECEIPT")"
+          jq -n \
+            --arg run "$FCR_RUN_ID" \
+            --arg sha "$FCR_HEAD_SHA" \
+            --arg status "$FAILED_JOB_STATUS" \
+            '{contract:"juss/fcr-portfolio-evidence@v1",state:"BLOCKED",reason:"WORKFLOW_FAILED_BEFORE_EVIDENCE_RECEIPT",runId:$run,headSha:$sha,jobStatus:$status,sourceVerified:false,liveVerified:false}' \
+            > "$PORTFOLIO_SYNC_RECEIPT"
 
       - name: Upload bounded evidence receipt and browser proof
         if: always()
