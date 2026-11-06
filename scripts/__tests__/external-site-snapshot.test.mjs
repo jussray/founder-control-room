@@ -46,3 +46,44 @@ test('request guard blocks literal and DNS-private destinations for redirects an
   const publicDns = async () => [{ address: '93.184.216.34', family: 4 }];
   assert.equal((await checkRequestUrl('https://example.com/ok', publicDns)).ok, true);
 });
+
+import { walkRedirects } from '../external-site-snapshot.mjs';
+
+function fakeFetch(routes) {
+  return async (url) => {
+    const r = routes[url];
+    if (!r) throw new Error(`no route for ${url}`);
+    return { status: r.status, headers: { get: (k) => (r.location && k === 'location' ? r.location : null) }, body: null };
+  };
+}
+const publicLookup = async () => [{ address: '93.184.216.34', family: 4 }];
+
+test('redirect walker follows a public chain and stops at the validated final URL', async () => {
+  const fetchFn = fakeFetch({
+    'https://start.example.com/': { status: 301, location: 'https://www.example.com/' },
+    'https://www.example.com/': { status: 200 },
+  });
+  const r = await walkRedirects('https://start.example.com/', { fetchFn, lookupFn: publicLookup });
+  assert.equal(r.ok, true);
+  assert.equal(r.finalUrl, 'https://www.example.com/');
+  assert.deepEqual(r.hops, ['https://start.example.com/', 'https://www.example.com/']);
+});
+
+test('redirect walker blocks a chain that hops into a private destination before fetching it', async () => {
+  let fetched = [];
+  const fetchFn = async (url) => {
+    fetched.push(url);
+    if (url === 'https://start.example.com/') return { status: 302, headers: { get: (k) => (k === 'location' ? 'http://127.0.0.1:8080/admin' : null) }, body: null };
+    throw new Error(`must not fetch ${url}`);
+  };
+  const r = await walkRedirects('https://start.example.com/', { fetchFn, lookupFn: publicLookup });
+  assert.equal(r.ok, false);
+  assert.deepEqual(fetched, ['https://start.example.com/']);
+});
+
+test('redirect walker fails closed on a redirect loop', async () => {
+  const fetchFn = async () => ({ status: 302, headers: { get: () => 'https://loop.example.com/' }, body: null });
+  const r = await walkRedirects('https://loop.example.com/', { fetchFn, lookupFn: publicLookup, maxHops: 3 });
+  assert.equal(r.ok, false);
+  assert.equal(r.reason, 'too many redirects');
+});

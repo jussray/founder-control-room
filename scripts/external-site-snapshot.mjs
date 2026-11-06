@@ -76,6 +76,35 @@ export async function checkRequestUrl(raw, lookupFn = dnsLookup) {
   return { ok: true, url: literal.url, host: literal.host };
 }
 
+// Walks the top-level redirect chain one hop at a time with redirect:'manual', so every
+// Location is validated before anything follows it. Returns the validated final URL the
+// browser should navigate to. Limits: sub-resource redirects and DNS rebinding between this
+// check and the browser connection are not covered here (see the URLFIX contract).
+export async function walkRedirects(startUrl, { fetchFn = fetch, lookupFn = dnsLookup, maxHops = 5 } = {}) {
+  let current = startUrl;
+  const hops = [];
+  for (let i = 0; i <= maxHops; i++) {
+    const verdict = await checkRequestUrl(current, lookupFn);
+    if (!verdict.ok) return { ok: false, reason: verdict.reason, hops };
+    hops.push(verdict.url);
+    let res;
+    try {
+      res = await fetchFn(verdict.url, { redirect: 'manual', method: 'GET', signal: AbortSignal.timeout(20_000) });
+    } catch {
+      return { ok: false, reason: 'hop request failed', hops };
+    }
+    try { await res.body?.cancel(); } catch { /* ignore */ }
+    if (res.status >= 300 && res.status < 400) {
+      const location = res.headers.get('location');
+      if (!location) return { ok: true, finalUrl: verdict.url, hops };
+      current = new URL(location, verdict.url).toString();
+      continue;
+    }
+    return { ok: true, finalUrl: verdict.url, hops };
+  }
+  return { ok: false, reason: 'too many redirects', hops };
+}
+
 export function snapshotDirName(host, now = new Date()) {
   const stamp = now.toISOString().replace(/[:.]/g, '-').replace('T', 'T').slice(0, 19);
   return `${stamp}-${host.replace(/[^a-z0-9.-]/gi, '_')}`;
@@ -93,11 +122,12 @@ async function run() {
     console.error(`::error title=Invalid target::${target.reason}`);
     process.exit(2);
   }
-  const targetDns = await resolvePublicHost(target.host);
-  if (!targetDns.ok) {
-    console.error(`::error title=BLOCKED destination::${targetDns.reason}`);
+  const walk = await walkRedirects(target.url);
+  if (!walk.ok) {
+    console.error(`::error title=BLOCKED destination::${walk.reason}`);
     process.exit(2);
   }
+  const navigateUrl = walk.finalUrl;
   const outRoot = process.env.SNAPSHOT_OUT_DIR || 'snapshots';
   const dir = join(outRoot, snapshotDirName(target.host));
   mkdirSync(dir, { recursive: true });
@@ -125,7 +155,7 @@ async function run() {
     page.on('pageerror', (e) => consoleErrors.push(`PAGEERROR ${String(e).slice(0, 300)}`));
     let status = null;
     try {
-      const res = await page.goto(target.url, { waitUntil: 'load', timeout: 45_000 });
+      const res = await page.goto(navigateUrl, { waitUntil: 'load', timeout: 45_000 });
       status = res ? res.status() : null;
       await page.waitForTimeout(1500);
     } catch (error) {
@@ -150,6 +180,7 @@ async function run() {
   }
   await browser.close();
   report.blockedDestinations = [...new Set(blockedDestinations)];
+  report.redirectHops = walk.hops;
   writeFileSync(join(dir, 'report.json'), JSON.stringify(report, null, 2));
   const captured = Object.values(report.viewports).filter((v) => !v.error).length;
   if (captured === 0) {

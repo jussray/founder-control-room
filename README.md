@@ -652,3 +652,4 @@ Existing PR #1067 restores Python indentation inside `.github/workflows/deploy.y
 - `skills/urlfix/SKILL.md` adds artifact hygiene: synthetic identities only, no persisted cookies, headers, bodies or private text, and `BLOCKED` when redaction cannot be verified.
 - Standing-command routing evaluates intent predicates on the goal with URLs removed, so URL path text cannot create URLFIX routing on its own.
 - Verified locally only: snapshot tests 6/6, registry and router tests 35/35, AI-skill verifier passed, typecheck passed. Provider CI on the new head is not yet observed. Claims about live runtime behaviour remain unproven.
+- Redirect handling: the snapshot script walks the top-level redirect chain one validated hop at a time before navigation. Known limits: sub-resource redirects and DNS rebinding between check and connection are not covered.
