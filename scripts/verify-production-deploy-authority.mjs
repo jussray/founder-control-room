@@ -35,6 +35,16 @@ assert.match(
   /^on:\n  workflow_dispatch:/m,
   'production deployment must be manually dispatched',
 );
+assert.match(
+  workflow,
+  /^ {10}receipt = json\.loads\(receipt_text\[array_start:array_end \+ 1\]\)$/m,
+  'Cloudflare secret receipt parser must remain inside the YAML run block',
+);
+assert.doesNotMatch(
+  workflow,
+  /^ {8}receipt = json\.loads\(receipt_text\[array_start:array_end \+ 1\]\)$/m,
+  'dedented receipt parser invalidates the production Actions workflow',
+);
 assert.doesNotMatch(
   workflow,
   /^  push:/m,
@@ -347,7 +357,6 @@ const requiredWorkerSecrets = [
   'GITHUB_APP_ID',
   'GITHUB_PRIVATE_KEY',
   'FCR_REMOTE_MCP_READ_TOKEN',
-  'TINYFISH_API_KEY',
   'FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON',
   'FOUNDER_SIGNAL_ENGINE_MCP_TOKEN',
   'ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL',
@@ -496,7 +505,6 @@ for (const name of [
   'GITHUB_APP_ID',
   'GITHUB_PRIVATE_KEY',
   'FCR_REMOTE_MCP_READ_TOKEN',
-  'TINYFISH_API_KEY',
   'FOUNDER_SIGNAL_ENGINE_MCP_TOKEN',
   'ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL',
   'FOUNDER_REVIEW_EMAIL_INGRESS_SECRET',
