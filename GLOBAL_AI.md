@@ -1,5 +1,7 @@
 # Founder Control Room Global AI Contract
 
+For pull-request Documentation Truth and test-discovery proof, resolve and fetch the live target branch before comparing it with the exact candidate; reject missing, invalid, unavailable, or non-ancestor bases. Keep the event's historical base identity separate from current scope. Default-branch push proof uses the exact push-before SHA. This repairs proof inputs without transferring merge, deployment, or provider authority.
+
 ## Parent operating contract
 
 Before nontrivial work, read [`Juss Founder OS`](.ai/skills/juss-founder-os/SKILL.md).
@@ -183,6 +185,10 @@ Investor email remains separate. Never auto-send without both the applicable sta
 - Every material read, proposal, approval, integration, deployment, rollback, publication, and provider action should leave an auditable event.
 - No authority class silently grants another.
 
+## Founder-selected GitHub Auto-merge queue
+
+The founder may use GitHub's **Enable auto-merge** UI for an individual PR. The PR is queued, not immediately merged, until GitHub enforces every configured required check/test/review and branch protection or merge-queue rule. Every genuinely load-bearing step must feed a configured required check; a non-required advisory check does not block native Auto-merge. PR Continuity observes the live queue setting on `auto_merge_enabled`/`auto_merge_disabled` events but cannot authorize or dispatch a merge. Native queue intent is not a replacement for the canonical exact-repo/PR/base/head founder-final approval receipt; stale heads, conflicts, missing approval, or provider uncertainty remain blocked. No extra manual merge click is needed after GitHub independently clears its enforced gates, and queueing confers no deploy/provider-write authority. Verify live rulesets before claiming enforcement.
+
 ## FCR merge review boundary
 
 The canonical in-app FCR merge path uses **deterministic independent review followed by authenticated founder-final approval**. It requires exact provider PR identity, exact-head machine proof, canonical diff/policy hashes, a passed deterministic exact-head review witness, P2 blocking, an authenticated founder-final receipt pinned to the exact PR/base/head, and a final mutable-head re-read before provider integration.
@@ -277,3 +283,8 @@ The Control Room exists to preserve founder authority, not automate it out of ex
 A committed regression test is source evidence only until the exact-head workflow that feeds `Required Gate` actually executes it. For LinkedIn analytics continuity, `.github/workflows/ci.yml` must keep `scripts.test_linkedin_analytics_continuity` inside the load-bearing `python-tests` job, and `Required Gate` must continue to depend on that job. Missing LinkedIn activity rows must remain `UNKNOWN_NO_EVIDENCE` with null metrics, never synthetic zero impressions or engagements.
 
 For public crawler and work-directory behavior, `.github/workflows/ci.yml` must keep `e2e/pages-api-recovery.spec.ts` and `e2e/public-work-directory.spec.ts` inside the load-bearing `Playwright e2e` job that feeds `Required Gate`. A green advisory Pages workflow is supplementary evidence only; it cannot replace this required exact-head browser proof or create merge authority.
+
+
+## CI lockfile determinism — current exact-head source contract
+
+Agents must ensure `.github/workflows/ci.yml` uses `npm ci --no-audit --no-fund` for its four load-bearing Type check, Lint, Unit Tests, and Playwright e2e jobs, rather than installing unconstrained dependencies at verification time. Validate the exact checked-out SHA, required test execution, and lockfile compliance through source checks and GitHub CI. A reproducible install cannot grant merge authorization: retain systematic independent exact-head review and separately authenticated founder-final approval. Do not describe a source-only CI edit as a deployed or production-verified fix.
