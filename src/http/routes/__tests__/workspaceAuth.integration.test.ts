@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   verifyOtp: vi.fn(),
   setSession: vi.fn(),
   rpc: vi.fn(),
+  from: vi.fn(),
   rotateFounderSession: vi.fn(),
 }));
 
@@ -31,7 +32,7 @@ vi.mock('../../../lib/supabaseAuthClient.js', () => ({
 vi.mock('../../../lib/supabaseClient.js', () => ({
   supabase: {
     rpc: mocks.rpc,
-    from: vi.fn(),
+    from: mocks.from,
   },
 }));
 
@@ -103,6 +104,16 @@ beforeEach(() => {
     error: null,
   });
   mocks.rotateFounderSession.mockResolvedValue(undefined);
+  mocks.from.mockImplementation(() => ({
+    select: () => ({
+      eq: () => ({
+        maybeSingle: async () => ({
+          data: { account_role: 'workspace_owner', workspace_id: WORKSPACE_ID },
+          error: null,
+        }),
+      }),
+    }),
+  }));
 });
 
 describe('customer Founder authentication', () => {
@@ -120,7 +131,7 @@ describe('customer Founder authentication', () => {
     });
   });
 
-  it('sends a public customer magic link without requiring a pre-existing founder_users row', async () => {
+  it('sends a customer magic link only when an existing workspace invitation is present', async () => {
     const response = await request(app())
       .post('/auth/workspace/magic-link')
       .send({ email: `  ${EMAIL.toUpperCase()}  ` });
@@ -133,6 +144,42 @@ describe('customer Founder authentication', () => {
         shouldCreateUser: true,
       },
     });
+  });
+
+  it('does not send a magic link for an uninvited identity or reveal invitation status', async () => {
+    mocks.from.mockImplementation(() => ({
+      select: () => ({
+        eq: () => ({
+          maybeSingle: async () => ({ data: null, error: null }),
+        }),
+      }),
+    }));
+    const response = await request(app())
+      .post('/auth/workspace/magic-link')
+      .send({ email: 'uninvited@example.com' });
+
+    expect(response.status).toBe(202);
+    expect(response.body.data.message).toMatch(/check your inbox/i);
+    expect(mocks.signInWithOtp).not.toHaveBeenCalled();
+  });
+
+  it('never sends a customer magic link to the platform owner', async () => {
+    mocks.from.mockImplementation(() => ({
+      select: () => ({
+        eq: () => ({
+          maybeSingle: async () => ({
+            data: { account_role: 'platform_owner', workspace_id: WORKSPACE_ID },
+            error: null,
+          }),
+        }),
+      }),
+    }));
+    const response = await request(app())
+      .post('/auth/workspace/magic-link')
+      .send({ email: 'platform-owner@example.com' });
+
+    expect(response.status).toBe(202);
+    expect(mocks.signInWithOtp).not.toHaveBeenCalled();
   });
 
   it('provisions only workspace_owner membership after OTP verification and then establishes the opaque session', async () => {
