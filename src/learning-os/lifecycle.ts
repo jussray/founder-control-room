@@ -1,3 +1,5 @@
+import type { LearningPhase } from './learningOs.js';
+
 /**
  * Learning OS is a peer knowledge domain, not an FCR execution authority.
  * The DB persists authoritative transitions; this pure policy rejects invalid proposals early.
@@ -61,4 +63,73 @@ export function lessonUsableAt(expiresAt: string, now: string): boolean {
   const until = Date.parse(expiresAt);
   const current = Date.parse(now);
   return Number.isFinite(until) && Number.isFinite(current) && until > current;
+}
+
+/**
+ * Explicit compatibility between the append-only study kernel and the SQL
+ * operational ledger. This is an observation-only translation, not a state
+ * transition, an authority claim, or proof of a provider outcome.
+ *
+ * Important:
+ * - A study "learned" phase is only a hypothesis/candidate until independently
+ *   proven future reuse. It is not a separate database execution status.
+ * - SQL REVISED is an *application review*, NOT a revised hypothesis.
+ * - Challenged/revised study branches have no SQL representation in v1.
+ *   Those must HOLD instead of silently being projected as RETAINED/REVISED.
+ */
+export type StudyLedgerProjection =
+  | { status: 'supported'; studyPhase: LearningPhase; ledgerState: LearningState; demonstratedByPhase: false; explanation: string }
+  | { status: 'unsupported'; studyPhase: LearningPhase; ledgerState: null; demonstratedByPhase: false; explanation: string };
+
+const PHASE_TO_LEDGER: Readonly<Record<LearningPhase, LearningState | null>> = Object.freeze({
+  observed: 'OUTCOME_RECORDED',
+  interpreted: 'INTERPRETED', // Requires independently captured signal and hypothesis.
+  learned: 'INTERPRETED', // Candidate only, never proof of application.
+  retained: 'RETAINED',
+  applied: 'APPLIED',
+  improved: 'REVISED', // SQL REVIEW result; improvement needs distinct measured evidence.
+  challenged: null, // No SQL challenge event exists yet.
+  revised: null, // SQL REVISED does NOT mean study hypothesis revision.
+});
+
+export function projectLearningStudyPhase(phase: LearningPhase): StudyLedgerProjection {
+  // Reject unknown/poisoned phases rather than defaulting to RETAINED.
+  if (!Object.hasOwn(PHASE_TO_LEDGER, phase)) throw new Error('LEARNING_UNKNOWN_STUDY_PHASE');
+  const ledgerState = PHASE_TO_LEDGER[phase];
+  if (ledgerState === null) return {
+    status: 'unsupported', studyPhase: phase, ledgerState: null, demonstratedByPhase: false,
+    explanation: 'No durable SQL phase for challenge/reinterpretation; hold until an independently verified knowledge transition is persisted.',
+  };
+  return {
+    status: 'supported', studyPhase: phase, ledgerState, demonstratedByPhase: false,
+    explanation: phase === 'learned'
+      ? 'A studied hypothesis is not demonstrated reuse or improvement.'
+      : phase === 'improved'
+        ? 'REVISED in SQL is an application review, not proof of measured improvement. Verify downstream outcome and metrics.'
+        : 'A phase mapping alone is not evidence and grants no authority.',
+  };
+}
+
+export function compareStudyToLedger(phase: LearningPhase, persistedState: LearningState): {
+  aligned: boolean;
+  status: 'matched_vocabulary' | 'unrepresented_phase' | 'different_state';
+  authorizesExecution: false;
+  learningDemonstrated: false;
+  improved: false;
+  nextGate: string;
+} {
+  const mapping = projectLearningStudyPhase(phase);
+  const aligned = mapping.status === 'supported' && mapping.ledgerState === persistedState;
+  const status = mapping.status === 'unsupported' ? 'unrepresented_phase'
+    : aligned ? 'matched_vocabulary' : 'different_state';
+  return {
+    aligned,
+    status,
+    authorizesExecution: false,
+    learningDemonstrated: false,
+    improved: false,
+    nextGate: aligned
+      ? 'Verify independent source, cross-mission application, and outcome receipts before asserting demonstrated learning.'
+      : mapping.explanation,
+  };
 }
