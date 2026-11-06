@@ -312,7 +312,8 @@ export function buildFfmpegArgs(
       chain += `,drawbox=x=${inset}:y=${inset}:w=${w - inset * 2}:h=${h - inset * 2}:color=${ff(spec.frameColor)}@0.9:t=${Math.max(2, Math.round(inset / 6))}`;
     }
     const segmentEdge = Math.min(edge, seg.durationSec / 2);
-    chain += `,fade=t=in:st=0:d=${segmentEdge},fade=t=out:st=${Math.max(0, seg.durationSec - segmentEdge)}:d=${segmentEdge},setsar=1,fps=${fps}[v${i}]`;
+    const segmentFrames = Math.max(1, Math.round(seg.durationSec * fps));
+    chain += `,fade=t=in:st=0:d=${segmentEdge},fade=t=out:st=${Math.max(0, seg.durationSec - segmentEdge)}:d=${segmentEdge},setsar=1,tpad=stop_mode=clone:stop_duration=${(1 / fps).toFixed(8)},fps=${fps},trim=end_frame=${segmentFrames},setpts=N/(${fps}*TB)[v${i}]`;
     chains.push(chain);
   });
 
@@ -432,6 +433,8 @@ function probeMatchesTimeline(spec: FfmpegTimelineSpec, probe: FfmpegProbeSummar
   if (probe.width !== spec.width || probe.height !== spec.height || probe.videoCodec !== 'h264') return false;
   if (spec.audio ? probe.audioCodec !== 'aac' : probe.audioCodec !== null) return false;
   const expectedDuration = spec.segments.reduce((sum, segment) => sum + segment.durationSec, 0);
+  const expectedFrames = spec.segments.reduce((sum, segment) => sum + Math.max(1, Math.round(segment.durationSec * spec.fps)), 0);
+  if (probe.frameCount !== null && probe.frameCount !== expectedFrames) return false;
   return Math.abs(probe.durationSec - expectedDuration) <= Math.max(0.25, 2 / spec.fps);
 }
 

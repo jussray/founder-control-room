@@ -89,7 +89,7 @@ The API never writes raw transcript or memory text into `project_events`. Audit 
   },
   "provenance": {
     "provider": "openai",
-    "model": "gpt-5-mini",
+    "model": "gpt-4o-mini",
     "responseId": "resp_...",
     "promptVersion": "mirror-engine-v1-2026-07-30",
     "storedByProvider": false

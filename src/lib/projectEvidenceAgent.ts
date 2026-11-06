@@ -2,7 +2,7 @@ import type { ProviderProjectConfig } from '../providers/providerFactory.js';
 import type { RepositoryProvider, VerificationSignal } from '../providers/RepositoryProvider.js';
 
 const DEFAULT_OPENAI_BASE_URL = 'https://api.openai.com/v1';
-const DEFAULT_MODEL = 'gpt-5.6-sol';
+const DEFAULT_MODEL = 'gpt-4o-mini';
 const DEFAULT_TIMEOUT_MS = 30_000;
 const MAX_RESPONSE_BYTES = 256 * 1024;
 const MAX_TOOL_ROUNDS = 3;
