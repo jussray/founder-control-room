@@ -653,3 +653,4 @@ Existing PR #1067 restores Python indentation inside `.github/workflows/deploy.y
 - Standing-command routing evaluates intent predicates on the goal with URLs removed, so URL path text cannot create URLFIX routing on its own.
 - Verified locally only: snapshot tests 6/6, registry and router tests 35/35, AI-skill verifier passed, typecheck passed. Provider CI on the new head is not yet observed. Claims about live runtime behaviour remain unproven.
 - Redirect handling: the snapshot script walks the top-level redirect chain one validated hop at a time before navigation. Known limits: sub-resource redirects and DNS rebinding between check and connection are not covered.
+- Redirect cookies: Set-Cookie from validated redirect hops is carried into the ephemeral browser context (host-bound, no Domain widening). Cookie values are never written to reports or artifacts.

@@ -83,26 +83,56 @@ export async function checkRequestUrl(raw, lookupFn = dnsLookup) {
 export async function walkRedirects(startUrl, { fetchFn = fetch, lookupFn = dnsLookup, maxHops = 5 } = {}) {
   let current = startUrl;
   const hops = [];
+  const cookies = [];
   for (let i = 0; i <= maxHops; i++) {
     const verdict = await checkRequestUrl(current, lookupFn);
-    if (!verdict.ok) return { ok: false, reason: verdict.reason, hops };
+    if (!verdict.ok) return { ok: false, reason: verdict.reason, hops, cookies };
     hops.push(verdict.url);
     let res;
     try {
       res = await fetchFn(verdict.url, { redirect: 'manual', method: 'GET', signal: AbortSignal.timeout(20_000) });
     } catch {
-      return { ok: false, reason: 'hop request failed', hops };
+      return { ok: false, reason: 'hop request failed', hops, cookies };
     }
+    // Keep Set-Cookie from every validated hop so the browser sees the same session state
+    // a normal navigation would have produced. Values are held in memory only.
+    const setCookies = typeof res.headers.getSetCookie === 'function' ? res.headers.getSetCookie() : [];
+    for (const raw of setCookies) cookies.push({ host: verdict.host, secure: verdict.url.startsWith('https:'), raw });
     try { await res.body?.cancel(); } catch { /* ignore */ }
     if (res.status >= 300 && res.status < 400) {
       const location = res.headers.get('location');
-      if (!location) return { ok: true, finalUrl: verdict.url, hops };
+      if (!location) return { ok: true, finalUrl: verdict.url, hops, cookies };
       current = new URL(location, verdict.url).toString();
       continue;
     }
-    return { ok: true, finalUrl: verdict.url, hops };
+    return { ok: true, finalUrl: verdict.url, hops, cookies };
   }
-  return { ok: false, reason: 'too many redirects', hops };
+  return { ok: false, reason: 'too many redirects', hops, cookies };
+}
+
+// Converts Set-Cookie lines from the validated walk into Playwright cookie objects.
+// Host-only cookies are bound to the hop host. A Domain attribute is ignored on purpose:
+// it could widen scope beyond the validated host. Expired cookies are dropped.
+export function cookiesFromWalk(walk) {
+  const out = [];
+  for (const c of walk.cookies || []) {
+    const [pair, ...attrs] = c.raw.split(';').map((x) => x.trim());
+    const eq = pair.indexOf('=');
+    if (eq <= 0) continue;
+    const cookie = { name: pair.slice(0, eq), value: pair.slice(eq + 1), domain: c.host, path: '/', secure: c.secure, httpOnly: false };
+    let expired = false;
+    for (const a of attrs) {
+      const [k, ...rest] = a.split('=');
+      const key = k.toLowerCase();
+      const val = rest.join('=');
+      if (key === 'path' && val.startsWith('/')) cookie.path = val;
+      else if (key === 'httponly') cookie.httpOnly = true;
+      else if (key === 'secure') cookie.secure = true;
+      else if (key === 'max-age' && Number(val) <= 0) expired = true;
+    }
+    if (!expired) out.push(cookie);
+  }
+  return out;
 }
 
 export function snapshotDirName(host, now = new Date()) {
@@ -128,6 +158,7 @@ async function run() {
     process.exit(2);
   }
   const navigateUrl = walk.finalUrl;
+  const carriedCookies = cookiesFromWalk(walk);
   const outRoot = process.env.SNAPSHOT_OUT_DIR || 'snapshots';
   const dir = join(outRoot, snapshotDirName(target.host));
   mkdirSync(dir, { recursive: true });
@@ -149,6 +180,7 @@ async function run() {
       }
       return route.continue();
     });
+    if (carriedCookies.length) await context.addCookies(carriedCookies);
     const page = await context.newPage();
     const consoleErrors = [];
     page.on('console', (m) => { if (m.type() === 'error') consoleErrors.push(m.text().slice(0, 300)); });

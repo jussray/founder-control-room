@@ -47,13 +47,13 @@ test('request guard blocks literal and DNS-private destinations for redirects an
   assert.equal((await checkRequestUrl('https://example.com/ok', publicDns)).ok, true);
 });
 
-import { walkRedirects } from '../external-site-snapshot.mjs';
+import { walkRedirects, cookiesFromWalk } from '../external-site-snapshot.mjs';
 
 function fakeFetch(routes) {
   return async (url) => {
     const r = routes[url];
     if (!r) throw new Error(`no route for ${url}`);
-    return { status: r.status, headers: { get: (k) => (r.location && k === 'location' ? r.location : null) }, body: null };
+    return { status: r.status, headers: { get: (k) => (r.location && k === 'location' ? r.location : null), getSetCookie: () => r.setCookie || [] }, body: null };
   };
 }
 const publicLookup = async () => [{ address: '93.184.216.34', family: 4 }];
@@ -86,4 +86,19 @@ test('redirect walker fails closed on a redirect loop', async () => {
   const r = await walkRedirects('https://loop.example.com/', { fetchFn, lookupFn: publicLookup, maxHops: 3 });
   assert.equal(r.ok, false);
   assert.equal(r.reason, 'too many redirects');
+});
+
+test('redirect cookies from validated hops are carried into the browser context without widening scope', async () => {
+  const fetchFn = fakeFetch({
+    'https://start.example.com/': { status: 302, location: 'https://www.example.com/', setCookie: ['session=abc123; Path=/; Secure; HttpOnly; Domain=example.com'] },
+    'https://www.example.com/': { status: 200, setCookie: ['routing=eu; Max-Age=0', 'lang=en; Path=/app'] },
+  });
+  const walk = await walkRedirects('https://start.example.com/', { fetchFn, lookupFn: publicLookup });
+  assert.equal(walk.ok, true);
+  const cookies = cookiesFromWalk(walk);
+  const session = cookies.find((c) => c.name === 'session');
+  assert.deepEqual(session, { name: 'session', value: 'abc123', domain: 'start.example.com', path: '/', secure: true, httpOnly: true });
+  assert.equal(cookies.find((c) => c.name === 'routing'), undefined);
+  assert.equal(cookies.find((c) => c.name === 'lang').domain, 'www.example.com');
+  assert.equal(cookies.every((c) => c.domain !== 'example.com'), true);
 });
