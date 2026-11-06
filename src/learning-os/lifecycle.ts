@@ -133,3 +133,78 @@ export function compareStudyToLedger(phase: LearningPhase, persistedState: Learn
       : mapping.explanation,
   };
 }
+
+/**
+ * This deterministic projection accepts evidence flags only from a trusted
+ * receipt verifier. It is NOT an evidence verifier or a mutation gate itself.
+ * Missing proof blocks rather than guessing the ledger state. In particular,
+ * study "learned" means candidate interpretation, not demonstrated reuse.
+ */
+export const LEARNING_STUDY_PHASES = Object.freeze([
+  'observed', 'interpreted', 'learned', 'retained',
+  'applied', 'improved', 'challenged', 'revised',
+] as const satisfies readonly LearningPhase[]);
+
+export interface LearningReceiptChain {
+  originOutcomeVerified: boolean;
+  originExecutionVerified: boolean;
+  signalVerified: boolean;
+  interpretationVerified: boolean;
+  retentionVerified: boolean;
+  downstreamExecutionVerified: boolean;
+  downstreamOutcomeVerified: boolean;
+  distinctMissionVerified: boolean;
+  sameDomain: boolean;
+  crossDomainFounderPermissionVerified: boolean;
+  reviewVerified: boolean;
+  baselineMeasurementVerified: boolean;
+  currentMeasurementVerified: boolean;
+  directionalImprovementVerified: boolean;
+}
+
+export function expectedLedgerStateFromProofChain(
+  phase: LearningPhase,
+  proofs: Readonly<LearningReceiptChain>,
+): {
+  state: LearningState | null;
+  eligibleForReconciliation: boolean;
+  missing: readonly (keyof LearningReceiptChain)[];
+  authorizesExecution: false;
+  learningDemonstrated: false;
+  improved: false;
+} {
+  const mapping = projectLearningStudyPhase(phase);
+  if (mapping.status === 'unsupported') {
+    return {
+      state: null, eligibleForReconciliation: false, missing: [],
+      authorizesExecution: false, learningDemonstrated: false, improved: false,
+    };
+  }
+  const required: (keyof LearningReceiptChain)[] = [
+    'originOutcomeVerified', 'originExecutionVerified',
+  ];
+  if (['interpreted', 'learned', 'retained', 'applied', 'improved'].includes(phase)) {
+    required.push('signalVerified', 'interpretationVerified');
+  }
+  if (['retained', 'applied', 'improved'].includes(phase)) {
+    required.push('retentionVerified');
+  }
+  if (phase === 'applied' || phase === 'improved') {
+    required.push('downstreamExecutionVerified', 'downstreamOutcomeVerified', 'distinctMissionVerified');
+    if (!proofs.sameDomain) required.push('crossDomainFounderPermissionVerified');
+  }
+  if (phase === 'improved') {
+    required.push('reviewVerified', 'baselineMeasurementVerified',
+      'currentMeasurementVerified', 'directionalImprovementVerified');
+  }
+  const missing = required.filter((key) => proofs[key] !== true);
+  return {
+    state: missing.length === 0 ? mapping.ledgerState : null,
+    eligibleForReconciliation: missing.length === 0,
+    missing,
+    authorizesExecution: false,
+    // A pure evidence summary is never a substitute for persisted provider receipts.
+    learningDemonstrated: false,
+    improved: false,
+  };
+}
