@@ -35,7 +35,7 @@ function start(overrides = {}) {
 }
 const steps = [
   { phase: 'interpreted', recordedAt: '2026-11-06T12:01:00Z', statement: 'Likely bottleneck removed', falsifier: 'Check later production errors', evidenceRefs: ['receipt:source'] },
-  { phase: 'learned', recordedAt: '2026-11-06T12:02:00Z', statement: 'Candidate reusable approach', evidenceRefs: ['receipt:source'] },
+  { phase: 'learned', recordedAt: '2026-11-06T12:02:00Z', statement: 'Candidate reusable approach', confidence: 0.65, evidenceRefs: ['receipt:source'] },
   { phase: 'retained', recordedAt: '2026-11-06T12:03:00Z', statement: 'Stored as scoped candidate', retentionRef: 'canon:fcr/bottleneck', evidenceRefs: ['receipt:retention'] },
   { phase: 'applied', recordedAt: '2026-11-06T12:04:00Z', statement: 'Applied to another head', application: { project: 'chief-ai-machine', headSha: HEAD_B, outcomeReceiptId: RECEIPT_B }, evidenceRefs: ['receipt:independent-application'] },
   { phase: 'improved', recordedAt: '2026-11-06T12:05:00Z', statement: 'Observed fewer production errors', improvement: { name: 'errors', before: 10, after: 2, unit: 'per-hour', betterWhen: 'lower' }, evidenceRefs: ['receipt:metric-observation'] },
@@ -150,6 +150,6 @@ test('challenge and revision revoke demonstrated status until fresh application'
   let s = through(4);
   s = move(s, { phase: 'challenged', recordedAt: '2026-11-06T12:05:00Z', statement: 'Contradictory new evidence', evidenceRefs: ['receipt:contradiction'] });
   assert.equal(readLearningStudy(s).learningDemonstrated, false);
-  s = move(s, { phase: 'revised', recordedAt: '2026-11-06T12:06:00Z', statement: 'Reduced applicability', falsifier: 'Test revised scope', evidenceRefs: ['receipt:revision'] });
+  s = move(s, { phase: 'revised', recordedAt: '2026-11-06T12:06:00Z', statement: 'Reduced applicability', falsifier: 'Test revised scope', confidence: 0.4, evidenceRefs: ['receipt:revision'] });
   assert.equal(readLearningStudy(s).next[0], 'retained');
 });
