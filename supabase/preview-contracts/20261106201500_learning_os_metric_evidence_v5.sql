@@ -416,6 +416,10 @@ DECLARE
   v_permission uuid := gen_random_uuid();
   v_cross_permission uuid := gen_random_uuid();
   v_cross_reason text := 'Shared validation technique directly applies to this new domain';
+  v_same_mission uuid := gen_random_uuid();
+  v_same_execution uuid := gen_random_uuid();
+  v_same_outcome uuid := gen_random_uuid();
+  v_same_learning uuid;
   v_truth uuid;
   v_truth_result jsonb;
   v_lease uuid;
@@ -471,6 +475,48 @@ BEGIN
     jsonb_build_object('hypothesis','The proof can be reused with fresh authority',
       'confidence','high','confidence_basis','Source and provider observation align'));
   PERFORM public.learning_progress(v_learning,'INTERPRETED','RETAINED','{}'::jsonb);
+  -- Same source mission cannot cite itself as a later application, even if
+  -- it has a real verified outcome and stays in the same domain.
+  v_rejected := false;
+  BEGIN
+    PERFORM public.learning_apply_verified(
+      v_learning,'RETAINED',v_first_execution,v_first_outcome,'ci',
+      'Attempt to cite the original verified mission',null,null);
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM LIKE 'LEARNING_VERIFIED_DOWNSTREAM_OUTCOME_REQUIRED%' THEN
+      v_rejected := true;
+    ELSE RAISE;
+    END IF;
+  END;
+  IF NOT v_rejected THEN RAISE EXCEPTION 'same-mission learning application accepted'; END IF;
+
+  -- Cross-domain without a meaningful reason or with whitespace-only reason
+  -- must be rejected before any permission can be consumed or state promoted.
+  v_rejected := false;
+  BEGIN
+    PERFORM public.learning_apply_verified(
+      v_learning,'RETAINED',v_next_execution,v_next_outcome,'auth',
+      'Missing cross-domain explanation',null,null);
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM LIKE 'LEARNING_CROSS_DOMAIN_REASON_REQUIRED%' THEN
+      v_rejected := true;
+    ELSE RAISE;
+    END IF;
+  END;
+  IF NOT v_rejected THEN RAISE EXCEPTION 'missing cross-domain reason accepted'; END IF;
+  v_rejected := false;
+  BEGIN
+    PERFORM public.learning_apply_verified(
+      v_learning,'RETAINED',v_next_execution,v_next_outcome,'auth',
+      'Whitespace cross-domain explanation','   ',null);
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM LIKE 'LEARNING_CROSS_DOMAIN_REASON_REQUIRED%' THEN
+      v_rejected := true;
+    ELSE RAISE;
+    END IF;
+  END;
+  IF NOT v_rejected THEN RAISE EXCEPTION 'blank cross-domain reason accepted'; END IF;
+
   -- Unrelated-domain reuse without explicit permission must be rejected.
   v_rejected := false;
   BEGIN
@@ -586,6 +632,93 @@ BEGIN
   IF (SELECT state FROM public.learning_records WHERE id=v_learning) <> 'RETIRED'
     OR (SELECT consumed_at FROM public.founder_permission_requests WHERE id=v_permission) IS NULL
      THEN RAISE EXCEPTION 'authorized retirement did not consume the founder decision'; END IF;
+
+  -- RETIRED is absorbing for direct SQL writes, state-machine RPCs,
+  -- and later applications. Historical evidence remains intact.
+  v_rejected := false;
+  BEGIN
+    UPDATE public.learning_records SET state='RETAINED' WHERE id=v_learning;
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM LIKE 'LEARNING_INVALID_TRANSITION RETIRED -> RETAINED%' THEN
+      v_rejected := true;
+    ELSE RAISE;
+    END IF;
+  END;
+  IF NOT v_rejected THEN RAISE EXCEPTION 'direct unretirement accepted'; END IF;
+
+  v_rejected := false;
+  BEGIN
+    PERFORM public.learning_progress(v_learning,'RETIRED','OUTCOME_RECORDED','{}'::jsonb);
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM LIKE 'LEARNING_ILLEGAL_TRANSITION%' THEN
+      v_rejected := true;
+    ELSE RAISE;
+    END IF;
+  END;
+  IF NOT v_rejected THEN RAISE EXCEPTION 'state RPC unretirement accepted'; END IF;
+
+  v_rejected := false;
+  BEGIN
+    PERFORM public.learning_apply_verified(
+      v_learning,'RETAINED',v_next_execution,v_next_outcome,'auth',
+      'A retired lesson cannot be reapplied',v_cross_reason,v_cross_permission);
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM LIKE 'LEARNING_STALE_STATE%' THEN
+      v_rejected := true;
+    ELSE RAISE;
+    END IF;
+  END;
+  IF NOT v_rejected THEN RAISE EXCEPTION 'retired lesson application accepted'; END IF;
+  IF EXISTS (
+    SELECT 1 FROM public.learning_records WHERE id=v_learning
+    AND state IN ('RETAINED','APPLIED','REVISED')
+  ) THEN RAISE EXCEPTION 'retired lesson leaked into applicable states'; END IF;
+  IF (SELECT count(*) FROM public.learning_applications WHERE learning_id=v_learning) <> 1
+     THEN RAISE EXCEPTION 'retirement modified immutable application history'; END IF;
+
+  -- Same-domain reuse remains usable without a cross-domain approval.
+  -- This is a separate verified source outcome and distinct target mission.
+  INSERT INTO public.missions(id,project_id,title)
+  VALUES(v_same_mission,v_project,'Independent same-domain target');
+  INSERT INTO public.approval_executions(
+    id,mission_id,project_id,action_type,idempotency_key,executed_by,
+    status,success,executed_at,expected_head_sha
+  ) VALUES (
+    v_same_execution,v_same_mission,v_project,'preview',
+    'learning-preview-same-domain','ci','succeeded',true,
+    now()-interval '30 seconds',repeat('c',40)
+  );
+  INSERT INTO public.outcomes(
+    id,founder_intent_id,project_id,mission_id,intended_outcome,
+    evidence,verification_method,classification,observed_at
+  ) VALUES (
+    v_same_outcome,v_intent,v_project,v_same_mission,'Same-domain later verified outcome',
+    '["github://same-domain"]'::jsonb,'provider','achieved',now()-interval '15 seconds'
+  );
+  INSERT INTO public.learning_mission_domains(mission_id,project_id,domain,source_ref)
+  VALUES (v_same_mission,v_project,'auth','github://same-domain');
+  INSERT INTO public.learning_records(
+    outcome_id,origin_execution_id,origin_mission_id,origin_project_id,
+    origin_head_sha,domain,outcome_summary,observed_by
+  ) VALUES (
+    v_next_outcome,v_next_execution,v_next,v_project,repeat('b',40),
+    'auth','Verified source for independent same-domain reuse','provider'
+  ) RETURNING id INTO v_same_learning;
+  PERFORM public.learning_progress(v_same_learning,'OUTCOME_RECORDED','SIGNAL_EXTRACTED',
+    jsonb_build_object('signal_class','repeatable',
+      'description','Later verification stayed within the same verified domain',
+      'evidence_refs',jsonb_build_array('github://next')));
+  PERFORM public.learning_progress(v_same_learning,'SIGNAL_EXTRACTED','INTERPRETED',
+    jsonb_build_object('hypothesis','Verified auth learning can be reused within auth',
+      'confidence','medium','confidence_basis','Separate mission and later source proof'));
+  PERFORM public.learning_progress(v_same_learning,'INTERPRETED','RETAINED','{}'::jsonb);
+  PERFORM public.learning_apply_verified(
+    v_same_learning,'RETAINED',v_same_execution,v_same_outcome,'auth',
+    'Reused with a different verified auth mission',null,null);
+  IF (SELECT state FROM public.learning_records WHERE id=v_same_learning) <> 'APPLIED'
+     OR (SELECT count(*) FROM public.learning_applications
+         WHERE learning_id=v_same_learning AND cross_domain_permission_id IS NULL) <> 1
+  THEN RAISE EXCEPTION 'same-domain reuse without founder approval failed'; END IF;
 
   INSERT INTO public.truth_claims(project_id,statement,created_by)
   VALUES (v_project,'Neon proof of truth-console compatibility','ci')
