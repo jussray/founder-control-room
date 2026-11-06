@@ -13,6 +13,10 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
 
+concurrency:
+  group: fcr-quality-${{ github.event_name }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   typecheck:
     name: "Typecheck"
@@ -31,8 +35,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
+          cache: 'npm'
       - name: Install dependencies
-        run: npm install
+        run: npm ci --no-audit --no-fund
       - run: npm run typecheck
 
   lint:
@@ -52,8 +57,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
+          cache: 'npm'
       - name: Install dependencies
-        run: npm install
+        run: npm ci --no-audit --no-fund
       - run: npm run lint
 
   unit-tests:
@@ -73,8 +79,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
+          cache: 'npm'
       - name: Install dependencies
-        run: npm install
+        run: npm ci --no-audit --no-fund
       - run: npm test -- --coverage --reporter=json --outputFile=test-results.json
       - uses: actions/upload-artifact@v4
         if: always()
@@ -101,8 +108,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
+          cache: 'npm'
       - name: Install dependencies
-        run: npm install
+        run: npm ci --no-audit --no-fund
       - run: npm run verify:terminal-contract
       - run: npm run verify:juss-flow
       - run: npm run verify:production-authority
@@ -126,6 +134,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
+          cache: 'npm'
       - name: Verify migration-wide RLS state
         shell: bash
         run: |
@@ -163,8 +172,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
+          cache: 'npm'
       - name: Install dependencies
-        run: npm install
+        run: npm ci --no-audit --no-fund
       - run: npm run build
 
   qodo-contracts:
@@ -187,8 +197,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
+          cache: 'npm'
       - name: Install dependencies
-        run: npm install
+        run: npm ci --no-audit --no-fund
       - name: Run Qodo tests
         if: env.QODO_API_KEY != ''
         run: npx qodo test --coverage --reporter=json --output=qodo-results.json
