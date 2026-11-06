@@ -55,3 +55,53 @@ Illegal transition, stale timestamp, tampered event/source, missing proof, sourc
 - The Learning OS must not create another event bus or competing FCR approval gate. Any later authorized project action still belongs to FCR and that project's real control plane.
 
 Acceptance criterion: a proven original result becomes a scoped candidate; an independently proven later application demonstrates reuse; independent measurements test improvement. Otherwise the honest status is retained candidate.
+
+## Canonical FCR database and authenticated authority integration (verified 2026-11-06)
+
+The connected FCR Supabase project has `public.missions`, `public.approval_executions`,
+`public.outcomes`, and `public.founder_permission_requests`. It does **not** have
+`public.fcr_receipts` or a `missions.domain` column. Do not create a fake
+`fcr_receipts` prerequisite or silently backfill a guessed taxonomy. The
+additive migration uses `learning_mission_domains` with explicit source references.
+
+FCR already has `src/http/middleware/requireFounder.ts` exporting
+`requireFounder` and `requireInteractiveFounder`. The latter authenticates
+a current opaque founder browser session and verifies the canonical founder
+allowlist. Future high-consequence Learning OS routes must reuse this middleware
+and FCR's exact-action decision receipt; `LearningController` is not an HTTP
+authorization boundary and cannot independently certify its caller.
+
+## Study-to-ledger mapping
+
+The study kernel and SQL ledger represent different aspects of experience.
+`src/learning-os/lifecycle.ts` has an observation-only compatibility
+projection; a matching vocabulary does **not** prove a verified outcome:
+
+| Study phase | SQL ledger | Interpretation |
+| --- | --- | --- |
+| observed | OUTCOME_RECORDED | Exact earned outcome still needs independent verification |
+| interpreted | INTERPRETED | SQL requires separate signal and hypothesis records |
+| learned | INTERPRETED | Candidate hypothesis, **not** demonstrated learning |
+| retained | RETAINED | Retained knowledge, not reused |
+| applied | APPLIED | Independently proved new mission reuse required |
+| improved | REVISED | SQL means *application review*; measured improvement requires an independent downstream outcome |
+| challenged | no representation | Hold; cannot silently retain disputed knowledge |
+| revised | no representation | Hold; do not confuse with SQL REVISED application review |
+
+A future durable challenge/revision event and trusted source-to-ledger receipt
+binding are required before operational synchronization of all phases. Never
+translate a model claim, receipt-shaped string, or successful CI job into
+founder authority or learning demonstration.
+
+### Exact-head validation and open preview gate
+
+This PR's new migration was checked in a rollback-only transaction against the
+existing FCR Supabase schema; the production migration was not applied.
+`Create/Delete Branch for Pull Request` failed on head
+`125d52272cf09af8cc7d74d021cbbf4cafef0b4c`: its **Neon preview**
+had no `public.missions` table. FCR production does have this table. The
+Neon preview must be provisioned from a trustworthy canonical schema (or its
+independent integration proof path must be made explicit) before this is green.
+Do not delete the FK, replace it with a stub table, or skip the failing
+migration merely to pass CI. New exact-head proof supersedes the cited historic
+head.
